@@ -6,6 +6,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.41.0-beta] - 2026-09-21
+### A decision model, measured on every lane that could use one
+
+ADR-033 moves to **Accepted**. What is accepted is the *shape* — a decision model as its own transport, its
+own leaf and its own provenance kind — not a licence to grade with it: **no criterion switches to a decision
+model in this release**, and the escalation primitive the proposal sketched is deliberately not built. The
+release is mostly evidence, and the evidence says *per lane*, with two clear no-gos.
+
+The CLI also stops assuming Azure OpenAI, so every `bench` and `calibrate` command runs on whichever
+provider `AI_INFERENCE_PROVIDER` selects.
+
 #### Added
 - `AgentEval.Memory.External.DecisionBenchmarkJudge` — a decision model behind the memory benchmarks'
   `IExternalBenchmarkJudge` seam: one binary question per item, P(yes) on `RawScore` so a threshold sweep
@@ -22,6 +34,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   one request per judge call. ⚠️ **For calibration and comparison only.** A persisted eval tree that reached
   a decision model through this adapter would carry `provenance.type = "atomic-llm"` naming a judge that is
   not an LLM; the persisted kind is `DecisionEval` (`"atomic-decision"`).
+- Sample **N3 — Judge vs Judge** (`dotnet run -- 102`): the evaluator evaluates the evaluators. Jev, through a
+  sample-local `DecisionJudge : IEvaluator` (one binary question per criterion, one request per judge call), beside
+  the configured generative judge, on the 378 agentic golden cases in 22 files, scored by the agentic
+  `CalibrationRunner` through the shared `EvalRegistry` — the same rubrics, no second harness. Per file and per
+  evaluator key: accuracy, Cohen's κ, false-pass on `fail`-labelled cases, within-band rate, Brier, latency, tokens,
+  cost; then the seven hypotheses pre-registered in the Jev factsheet, each confirmed, refuted or left open by the
+  numbers. `--dry-run` resolves every key, runs every dispatched case (unknown keys are listed, not run) against a judge that records its criteria and sends
+  nothing, and renders the first Jev request through the real serializer. Results stay in memory: through the
+  registry a decision model would carry `atomic-llm` provenance, and the sample says so.
+- `docs/adr/evidence/033-n3-judge-vs-judge-2026-09-21.md` — the first run: 298 comparable cases, Jev 79.2%
+  agreement with the labels against GLM-5.3 Flash's 92.3%, false-pass 6.5% vs 5.6%, 55 of Jev's 62 errors
+  false fails, verdict flips across three repeats 0.3%, p50 296 ms vs 10.6 s. Three pre-registered hypotheses
+  refuted, two confirmed, two open; a go / no-go list per category.
 
 #### Changed
 - **The CLI resolves `AI_INFERENCE_PROVIDER`** instead of assuming Azure OpenAI. Every `bench` and
@@ -46,6 +71,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   provider has secrets (Azure, Bitdeer or OpenAI) and names it through `AI_INFERENCE_PROVIDER`; an automatic
   run with no provider configured **skips with a notice** instead of erroring, because an optional paid job
   without credentials is unconfigured, not broken. An explicit `workflow_dispatch` with none still errors.
+- `SecurityGraphIngestionPump` (Gatekeeper): the same late-consumer defect fixed in `ShadowJudgePump` for
+  0.40.0-beta. A consumer that started after `DisposeAsync` had drained, given up and disposed its cancellation
+  source threw `ObjectDisposedException` at its first line, unobserved. The token is now captured in the
+  constructor; the regression test forces the ordering through the same internal consumer-starter seam. These
+  were the only two pumps with the pattern.
+- Sample N1 (`-- 100`) summed judge tokens from the composite root, which carries none, and printed
+  `Σ judge tokens: 0` under three leaves of ~800; it now sums the leaves.
+- Samples: `AGENTEVAL_SAMPLES_SHOW_RAW=1` wrapped only N2's Jev transport. It now wraps the chat client the
+  samples build for the selected provider and the Bitdeer client N1/N2 use, through the same logger, so the wire
+  evidence ADR-033 §7 asks for exists for every provider. Each request-and-reply block prints atomically after
+  its reply; a composite evaluates its leaves concurrently and the old two-write logger could put one call's
+  reply under another call's request.
+  The logger scrubs the request URI as well as the bodies (a user-configured endpoint could carry the key) and
+  passes streaming replies through unbuffered, so the streaming samples' time-to-first-token is unaffected.
 
 #### Evidence
 - `docs/adr/evidence/033-n4-memory-judge-2026-09-21.md` — sample N4: on 84 clean LongMemEval items with a
@@ -68,38 +107,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   not a tuning knob. It also found **22 cases scored inside their golden band whose recorded verdict
   disagrees with the golden verdict** — an evaluator threshold and its goldens' bands that contradict each
   other, which makes calibration accuracy partly a measure of the threshold.
-#### Added
-- Sample **N3 — Judge vs Judge** (`dotnet run -- 102`): the evaluator evaluates the evaluators. Jev, through a
-  sample-local `DecisionJudge : IEvaluator` (one binary question per criterion, one request per judge call), beside
-  the configured generative judge, on the 378 agentic golden cases in 22 files, scored by the agentic
-  `CalibrationRunner` through the shared `EvalRegistry` — the same rubrics, no second harness. Per file and per
-  evaluator key: accuracy, Cohen's κ, false-pass on `fail`-labelled cases, within-band rate, Brier, latency, tokens,
-  cost; then the seven hypotheses pre-registered in the Jev factsheet, each confirmed, refuted or left open by the
-  numbers. `--dry-run` resolves every key, runs every dispatched case (unknown keys are listed, not run) against a judge that records its criteria and sends
-  nothing, and renders the first Jev request through the real serializer. Results stay in memory: through the
-  registry a decision model would carry `atomic-llm` provenance, and the sample says so.
-- `docs/adr/evidence/033-n3-judge-vs-judge-2026-09-21.md` — the first run: 298 comparable cases, Jev 79.2%
-  agreement with the labels against GLM-5.3 Flash's 92.3%, false-pass 6.5% vs 5.6%, 55 of Jev's 62 errors
-  false fails, verdict flips across three repeats 0.3%, p50 296 ms vs 10.6 s. Three pre-registered hypotheses
-  refuted, two confirmed, two open; a go / no-go list per category.
-
-#### Fixed
-- `SecurityGraphIngestionPump` (Gatekeeper): the same late-consumer defect fixed in `ShadowJudgePump` for
-  0.40.0-beta. A consumer that started after `DisposeAsync` had drained, given up and disposed its cancellation
-  source threw `ObjectDisposedException` at its first line, unobserved. The token is now captured in the
-  constructor; the regression test forces the ordering through the same internal consumer-starter seam. These
-  were the only two pumps with the pattern.
-- Sample N1 (`-- 100`) summed judge tokens from the composite root, which carries none, and printed
-  `Σ judge tokens: 0` under three leaves of ~800; it now sums the leaves.
-- Samples: `AGENTEVAL_SAMPLES_SHOW_RAW=1` wrapped only N2's Jev transport. It now wraps the chat client the
-  samples build for the selected provider and the Bitdeer client N1/N2 use, through the same logger, so the wire
-  evidence ADR-033 §7 asks for exists for every provider. Each request-and-reply block prints atomically after
-  its reply; a composite evaluates its leaves concurrently and the old two-write logger could put one call's
-  reply under another call's request.
-  The logger scrubs the request URI as well as the bodies (a user-configured endpoint could carry the key) and
-  passes streaming replies through unbuffered, so the streaming samples' time-to-first-token is unaffected.
-
-#### Evidence
 - `docs/adr/evidence/033-jev-first-calls-2026-09-20.md` gains the judged runs of 2026-09-21 on the released
   code: N1 step 3 and N2 stage 5 ran on Bitdeer after the top-up (no 402); Jev answered 0.98 / 0.01 / 0.02 on
   the same three cases as the day before. ADR-033 §7 (1) is closed for both providers.
