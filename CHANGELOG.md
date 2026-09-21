@@ -76,6 +76,11 @@ provider `AI_INFERENCE_PROVIDER` selects.
 - Provider diagnostics name the **variable**, never its value: an endpoint that fails validation is
   reported by name and reason, because a configured URL can carry a token in its user-info, query or
   fragment and the diagnostic reaches stderr.
+- ⚠️ **`--azure-from-env` is now a misnomer, and keeps its name.** On `bench gdpr`, `eu-ai-act`,
+  `owasp`, `mitre`, `nist` and `perf` it builds the agent from whichever provider `AI_INFERENCE_PROVIDER`
+  selects, not from Azure. The name is unchanged because renaming it would break every script that passes
+  it, and each flag's `--help` now states which provider it uses. An alias is worth adding and is not in
+  this release.
 - Provider diagnostics name only the variables that are **missing**. Listing every provider's requirements
   told operators `AZURE_OPENAI_ENDPOINT` was missing when they had just set it.
 - **22 release headings in this file rendered as plain text instead of links.** The compare-link section
