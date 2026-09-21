@@ -212,13 +212,14 @@ public static class Program
             new("Deterministic Benchmark",  "The same eval as a BenchmarkDefinition: 3 cases × 2 arms × 2 reps, scored against its floor AND against a control arm", DeterministicBenchmark.RunAsync),
         ]),
 
-        // ⚠ APPENDED — see the note above group M. Legacy numbers: N1 = 100, N2 = 101, N3 = 102, N4 = 103.
+        // ⚠ APPENDED — see the note above group M. Legacy numbers: N1 = 100, N2 = 101, N3 = 102, N4 = 103, N5 = 104.
         new('N', "Providers: Bitdeer GLM + TypeSafe Jev", "🔑 BITDEER_API_KEY · TYPESAFE_API_KEY or OPENROUTER_API_KEY · --dry-run prints every payload, spends nothing",
         [
             new("GLM-5.3 Flash @ Bitdeer",   "Subject + judge through the ordinary IChatClient path — no provider code, provider kept in the identity", GlmBitdeerProviderDemo.RunAsync),
             new("Jev Decisions",             "IDecisionClient + DecisionEval: P(yes) as the score, three question shapes in one request, a third evaluator kind in a composite", JevDecisionsDemo.RunAsync),
             new("Judge vs Judge",            "The evaluator evaluates the evaluators: Jev beside the generative judge on the 378 agentic golden cases, same rubrics, through the agentic CalibrationRunner — --dry-run, --limit N, --repeats N", JudgeVsJudgeDemo.RunAsync),
             new("Memory Judge vs Judge",     "Can a decision model do the memory judge's job? LongMemEval's labelled questions, gold answer vs same-type distractor, chance floor 50% — --dry-run, --limit N, --types a,b", MemoryJudgeVsJudgeDemo.RunAsync),
+            new("Judge Reference Experiment", "Does a reference stop a decision model over-flagging? One golden category, five arms, only the PROMPT moves; floor is the majority class, not 50% — --dry-run, --file KEY, --arms A0,B1,B2", JudgeReferenceExperimentDemo.RunAsync),
         ]),
     ];
 

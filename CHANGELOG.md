@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+#### Added
+- Sample **N5 — Judge Reference Experiment** (`dotnet run -- 104`): does giving a decision model a
+  reference stop it over-flagging? One golden category, five arms over the same cases with the same
+  criteria, so **only the prompt moves**. The control calls `DecisionJudge.BuildState` and
+  `BuildQuestions` directly, so it is provably the shipped path. Takes `--file <key>` for another
+  category, `--arms` to select, and `--dry-run` to render every payload and send nothing.
+  The floor it prints is the **majority class**, not 50%: on a 17/8 split "always pass" already scores
+  68%, above the control's measured 64%. An arm counts as an improvement only if false-fails drop **and**
+  false-passes do not rise, because accuracy on a safety set is otherwise buyable by becoming permissive.
+
+#### Evidence
+- `docs/adr/evidence/033-n5-reference-experiment-2026-09-21.md` — the first run: a reference block in the
+  state moves the decision model from **64.0% to 96.0%** on the `violence` golden set while **false-passes
+  stay at 0.0%**, closing the gap to the generative judge from 36 points to 4 at 49x lower latency. The
+  control replicates N3's 0.640 exactly, independently. The two interventions **do not compose** — examples
+  plus reference scores worse than reference alone. The residual failure is **fiction**, not refusal.
+  Deltas are the result; the absolute numbers await the threshold/band reconciliation.
+
 ## [0.41.0-beta] - 2026-09-21
 ### A decision model, measured on every lane that could use one
 
