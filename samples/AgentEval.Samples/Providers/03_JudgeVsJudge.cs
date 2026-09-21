@@ -408,7 +408,7 @@ internal static class JudgeVsJudgeDemo
             var files = new[] { "20-process", "20-quality", "20-system", "memory-multiturn" };
             var rowsB = comparable.Where(r => r.Arm == "B" && files.Contains(r.File) && r.Error is null).ToList();
             var rowsA = comparable.Where(r => r.Arm == "A" && files.Contains(r.File) && r.Error is null).ToList();
-            if (rowsB.Count == 0) rows.Add(new("H1", "open", "no cases from process/quality/system/memory-multiturn in this run"));
+            if (rowsB.Count < MinN) rows.Add(new("H1", "open", $"{rowsB.Count} case(s) from process/quality/system/memory-multiturn; needs ≥ {MinN} to decide"));
             else
             {
                 var accB = rowsB.Average(r => r.Label == r.ExpectedVerdict ? 1.0 : 0);
@@ -423,7 +423,7 @@ internal static class JudgeVsJudgeDemo
             var files = new[] { "indirect-attack", "adversarial-direct" };
             var fb = comparable.Where(r => r.Arm == "B" && files.Contains(r.File) && r.Error is null && r.ExpectedVerdict == "fail").ToList();
             var fa = comparable.Where(r => r.Arm == "A" && files.Contains(r.File) && r.Error is null && r.ExpectedVerdict == "fail").ToList();
-            if (fb.Count == 0 || fa.Count == 0) rows.Add(new("H2", "open", "no fail-labelled adversarial cases in this run"));
+            if (fb.Count < MinFail || fa.Count < MinFail) rows.Add(new("H2", "open", $"{fb.Count} fail-labelled adversarial case(s); needs ≥ {MinFail} to decide"));
             else
             {
                 var fpB = fb.Average(r => r.Label == "pass" ? 1.0 : 0); var fpA = fa.Average(r => r.Label == "pass" ? 1.0 : 0);
@@ -434,7 +434,8 @@ internal static class JudgeVsJudgeDemo
         // H3 — sharp but not calibrated
         {
             var b = overall.Arms["B"];
-            if (double.IsNaN(b.SharpWhenWrong)) rows.Add(new("H3", "open", $"Brier on right cases {b.BrierOnRight:F3}; no wrong cases to test sharpness on"));
+            var wrongB = comparable.Count(r => r.Arm == "B" && r.Error is null && r.Label != r.ExpectedVerdict);
+            if (double.IsNaN(b.SharpWhenWrong) || wrongB < MinWrong) rows.Add(new("H3", "open", $"Brier on right cases {b.BrierOnRight:F3}; {wrongB} wrong case(s), needs ≥ {MinWrong} to test sharpness"));
             else
             {
                 var verdict = b.BrierOnRight <= 0.10 && b.SharpWhenWrong > 0.5 ? "confirmed" : b.SharpWhenWrong < 0.5 ? "refuted" : "open";
@@ -448,16 +449,16 @@ internal static class JudgeVsJudgeDemo
             {
                 var a = comparable.Where(r => r.Arm == "A" && r.Error is null && pred(r)).ToList();
                 var b = comparable.Where(r => r.Arm == "B" && r.Error is null && pred(r)).ToList();
-                if (a.Count == 0 || b.Count == 0) return double.NaN;
+                if (a.Count < MinN || b.Count < MinN) return double.NaN;
                 return a.Average(r => r.Label == r.ExpectedVerdict ? 1.0 : 0) - b.Average(r => r.Label == r.ExpectedVerdict ? 1.0 : 0);
             }
             var gapIn = Gap(r => files.Contains(r.File)); var gapOut = Gap(r => !files.Contains(r.File));
-            if (double.IsNaN(gapIn) || double.IsNaN(gapOut)) rows.Add(new("H4", "open", "need both the numeric sets and the others in one run"));
+            if (double.IsNaN(gapIn) || double.IsNaN(gapOut)) rows.Add(new("H4", "open", $"needs ≥ {MinN} cases on each side (numeric sets vs the rest) in one run"));
             else rows.Add(new("H4", gapIn > gapOut + 0.05 ? "confirmed" : gapIn <= gapOut ? "refuted" : "open", $"accuracy gap (generative − Jev) on confidence-calibration + code-vulnerability {Pct(gapIn)} vs elsewhere {Pct(gapOut)}"));
         }
         // H5 — latency and cost per request
         {
-            if (jevLatencies.Count == 0) rows.Add(new("H5", "open", "no Jev requests recorded"));
+            if (jevLatencies.Count < MinN) rows.Add(new("H5", "open", $"{jevLatencies.Count} Jev request(s); needs ≥ {MinN}"));
             else
             {
                 var p50 = Percentile(jevLatencies, 0.5); var p90 = Percentile(jevLatencies, 0.9);
@@ -472,7 +473,7 @@ internal static class JudgeVsJudgeDemo
         }
         // H7 — negated criteria
         {
-            if (negated.Count < 5 || positive.Count < 5) rows.Add(new("H7", "open", $"too few criteria on pass-labelled cases (negated {negated.Count}, positive {positive.Count})"));
+            if (negated.Count < MinN || positive.Count < MinN) rows.Add(new("H7", "open", $"too few criteria on pass-labelled cases (negated {negated.Count}, positive {positive.Count}; needs ≥ {MinN} each)"));
             else
             {
                 var n = negated.Average(); var p = positive.Average();
@@ -481,6 +482,9 @@ internal static class JudgeVsJudgeDemo
         }
         return rows;
     }
+
+    // A hypothesis decided on a handful of cases is a coincidence with a verdict attached. Below these, it stays open.
+    private const int MinN = 20, MinFail = 10, MinWrong = 5;
 
     private static bool IsNegated(string criterion) =>
         Regex.IsMatch(criterion, @"\b(does not|do not|doesn't|don't|never|no |not |without|avoids?|refrains?)\b", RegexOptions.IgnoreCase);
@@ -535,7 +539,7 @@ internal static class JudgeVsJudgeDemo
             jevTraces = traces.Values.SelectMany(b => b).Select(t => new { t.Model, t.LatencyMs, t.InputTokens, t.OutputTokens, t.Cost, criteria = t.Criteria.Select(c => new { c.Criterion, c.ProbabilityMet }) }),
         };
         var jsonPath = Path.Combine(dir, $"n3-judge-vs-judge-{stamp}.json");
-        File.WriteAllText(jsonPath, JsonSerializer.Serialize(json, new JsonSerializerOptions { WriteIndented = true, IncludeFields = true }));
+        File.WriteAllText(jsonPath, JsonSerializer.Serialize(json, new JsonSerializerOptions { WriteIndented = true, IncludeFields = true, NumberHandling = System.Text.Json.Serialization.JsonNumberHandling.AllowNamedFloatingPointLiterals }));
 
         var md = new StringBuilder();
         md.AppendLine($"# N3 — Judge vs Judge — {stamp}Z");
