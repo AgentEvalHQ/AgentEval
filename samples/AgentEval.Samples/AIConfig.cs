@@ -2,6 +2,8 @@
 // Copyright (c) 2026 AgentEval Contributors
 
 using System.ClientModel;
+using System.ClientModel.Primitives;
+using AgentEval.Samples.Providers;
 using AgentEval.Providers;
 using Azure;
 using Azure.AI.OpenAI;
@@ -88,17 +90,20 @@ public static class AIConfig
             throw new InvalidOperationException(s.Diagnostic ?? "No chat provider is configured.");
 
         var resolved = model ?? s.Model!;
+        // AGENTEVAL_SAMPLES_SHOW_RAW=1 prints every request and reply body on the wire, key scrubbed — the same
+        // switch and the same logger the Jev transport uses, so provider evidence has one shape.
+        var transport = new HttpClientPipelineTransport(ProviderConfig.CreateWireLoggedHttpClient(s.ApiKey!));
         if (s.UsesAzureProtocol)
         {
             // Azure OpenAI and a Foundry resource's OpenAI-compatible endpoint speak the same protocol.
-            return new AzureOpenAIClient(s.Endpoint!, new AzureKeyCredential(s.ApiKey!))
+            return new AzureOpenAIClient(s.Endpoint!, new AzureKeyCredential(s.ApiKey!), new AzureOpenAIClientOptions { Transport = transport })
                 .GetChatClient(resolved)
                 .AsIChatClient();
         }
 
         // Bitdeer, OpenAI and any OpenAI-compatible host: the same construction the CLI's
         // EndpointFactory.CreateOpenAICompatible uses for --endpoint --model --api-key.
-        return new OpenAIClient(new ApiKeyCredential(s.ApiKey!), new OpenAIClientOptions { Endpoint = s.Endpoint })
+        return new OpenAIClient(new ApiKeyCredential(s.ApiKey!), new OpenAIClientOptions { Endpoint = s.Endpoint, Transport = transport })
             .GetChatClient(resolved)
             .AsIChatClient();
     }
