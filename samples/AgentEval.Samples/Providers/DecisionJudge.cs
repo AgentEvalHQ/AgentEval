@@ -46,7 +46,8 @@ internal sealed class DecisionJudge : IEvaluator
     public DecisionJudge(IDecisionClient client, string requestedModel, Action<Trace>? onTrace = null)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
-        _requestedModel = string.IsNullOrWhiteSpace(requestedModel) ? throw new ArgumentException("requestedModel", nameof(requestedModel)) : requestedModel;
+        ArgumentException.ThrowIfNullOrWhiteSpace(requestedModel);
+        _requestedModel = requestedModel;
         _onTrace = onTrace;
     }
 

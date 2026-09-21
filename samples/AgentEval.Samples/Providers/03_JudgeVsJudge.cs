@@ -291,8 +291,8 @@ internal static class JudgeVsJudgeDemo
         foreach (var (key, sets) in criteriaByKey.OrderBy(kv => kv.Key))
         {
             var distinct = sets.Select(s => string.Join(" | ", s)).Distinct().ToList();
-            var calls = sets.Count / Math.Max(1, datasets.SelectMany(d => d.Entries).Count(e => e.EvaluatorKey.Equals(key, StringComparison.OrdinalIgnoreCase)));
-            Console.WriteLine($"     {key,-34} {calls} judge call(s)/case, {distinct.Count} criteria set(s), {sets.First().Count} criteria in the first");
+            var calls = (double)sets.Count / Math.Max(1, datasets.SelectMany(d => d.Entries).Count(e => e.EvaluatorKey.Equals(key, StringComparison.OrdinalIgnoreCase)));
+            Console.WriteLine($"     {key,-34} {calls:F1} judge call(s)/case, {distinct.Count} criteria set(s), {sets.First().Count} criteria in the first");
             foreach (var c in sets.First()) Console.WriteLine($"         • {Trim(c, 110)}");
         }
         Console.WriteLine();
@@ -355,7 +355,8 @@ internal static class JudgeVsJudgeDemo
         var latencies = jevTraces.Select(t => (double)t.LatencyMs).OrderBy(x => x).ToList();
         var jevIn = jevTraces.Sum(t => t.InputTokens);
         var jevOut = jevTraces.Sum(t => t.OutputTokens);
-        var jevCost = jevTraces.Any(t => t.Cost is not null) ? jevTraces.Sum(t => t.Cost ?? 0) : jevIn * 0.042 / 1_000_000.0;
+        // Provider-reported cost when it exists (OpenRouter); otherwise the repo's one price table, keyed by the requested model.
+        var jevCost = jevTraces.Any(t => t.Cost is not null) ? jevTraces.Sum(t => t.Cost ?? 0) : JudgeCostMap.EstimateCost(jevOptions.Model, jevIn, jevOut);
         var jevCostPerCase = comparable.Count(r => r.Arm == "B") is var nB && nB > 0 ? jevCost / nB : 0;
 
         // Negated vs positive criteria on pass-labelled cases (H7)
