@@ -4,8 +4,8 @@
   precedent). The code in §4 is built and unit-tested. §7 (1) is **met for TypeSafe** the same day —
   thirteen real calls, every one HTTP 200, requests and replies in
   [`evidence/033-jev-first-calls-2026-09-20.md`](evidence/033-jev-first-calls-2026-09-20.md) — and
-  **half-met for Bitdeer**: one real call answered correctly, then the account returned HTTP 402
-  "insufficient balance", so the judged run is still owed. §7 (2) and (3) are untouched: no number
+  **met for Bitdeer since 2026-09-21**: one real call answered correctly on 2026-09-20, the account then
+  returned HTTP 402 "insufficient balance", and after the top-up N1 step 3 and N2 stage 5 ran clean. §7 (2) and (3) are untouched: no number
   about Jev's behaviour on AgentEval data exists yet, and none is estimated here.
 - **Date:** 2026-09-20, written against `0e37b758` (v0.39.0-beta) on `main`.
 - **Decision in one line:** **A structured decision model (TypeSafe's Jev is the first) enters
@@ -187,8 +187,9 @@ must sample past.
 ## 7. What acceptance requires
 
 1. One real call to each provider from the N2 sample, with the rendered request and the raw reply
-   kept beside this ADR (redacted). **TypeSafe: done 2026-09-20. Bitdeer: smoke call done; the
-   judged run (N1 step 3, N2 stage 5 with the GLM leaf) is owed once the balance allows.**
+   kept beside this ADR (redacted). **TypeSafe: done 2026-09-20 (5 calls) and 2026-09-21 (7). Bitdeer: smoke call
+   2026-09-20; the judged run (N1 step 3, N2 stage 5 with the GLM leaf) done 2026-09-21 after the top-up —
+   see the evidence file's judged-runs section.**
 2. A shadow run of `DecisionEval` beside an existing `AtomicLlmEval` leaf on one composite family
    with labels (GDPR or Agentic), reporting agreement, false-pass rate on high-severity cases, Brier
    score, latency and cost — per shape, not as a mean.
