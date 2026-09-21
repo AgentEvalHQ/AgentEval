@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   evidence ADR-033 §7 asks for exists for every provider. Each request-and-reply block prints atomically after
   its reply; a composite evaluates its leaves concurrently and the old two-write logger could put one call's
   reply under another call's request.
+  The logger scrubs the request URI as well as the bodies (a user-configured endpoint could carry the key) and
+  passes streaming replies through unbuffered, so the streaming samples' time-to-first-token is unaffected.
 
 #### Evidence
 - `docs/adr/evidence/033-jev-first-calls-2026-09-20.md` gains the judged runs of 2026-09-21 on the released

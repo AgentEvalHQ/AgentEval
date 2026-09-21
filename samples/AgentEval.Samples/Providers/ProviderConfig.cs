@@ -194,22 +194,34 @@ internal static class ProviderConfig
             // and printing the request before the await let another call's reply land under this call's request.
             var body = request.Content is null ? "" : await request.Content.ReadAsStringAsync(cancellationToken);
             var block = new System.Text.StringBuilder();
-            block.AppendLine($"   ┌─ RAW → {request.Method} {request.RequestUri}   (Authorization header present, not shown)");
+            // The URI is user-configured (BITDEER_ENDPOINT, OPENAI_COMPATIBLE_ENDPOINT) and could carry the key; scrub it too.
+            block.AppendLine($"   ┌─ RAW → {request.Method} {Scrub(request.RequestUri?.ToString() ?? "")}   (Authorization header present, not shown)");
             block.AppendLine($"   │ {Scrub(body)}");
 
             var response = await base.SendAsync(request, cancellationToken);
 
-            // Buffer with the SAME cap the client enforces, so a debugging aid cannot be the way an
-            // oversized body gets into memory; the buffered content stays readable for the client.
+            // A streaming reply (SSE) must not be buffered: the samples that measure time-to-first-token would
+            // see the whole response arrive at once. The stream passes through untouched and is not shown.
+            var streaming = string.Equals(response.Content.Headers.ContentType?.MediaType, "text/event-stream", StringComparison.OrdinalIgnoreCase)
+                || body.Contains("\"stream\":true", StringComparison.OrdinalIgnoreCase);
             string reply;
-            try
+            if (streaming)
             {
-                await response.Content.LoadIntoBufferAsync(SystemOneDecisionClient.MaxResponseBytes, cancellationToken);
-                reply = await response.Content.ReadAsStringAsync(cancellationToken);
+                reply = "[streaming reply — passed through unbuffered, not shown]";
             }
-            catch (HttpRequestException)
+            else
             {
-                reply = $"[body larger than {SystemOneDecisionClient.MaxResponseBytes:N0} bytes — not shown; the client will refuse it]";
+                // Buffer with the SAME cap the client enforces, so a debugging aid cannot be the way an
+                // oversized body gets into memory; the buffered content stays readable for the client.
+                try
+                {
+                    await response.Content.LoadIntoBufferAsync(SystemOneDecisionClient.MaxResponseBytes, cancellationToken);
+                    reply = await response.Content.ReadAsStringAsync(cancellationToken);
+                }
+                catch (HttpRequestException)
+                {
+                    reply = $"[body larger than {SystemOneDecisionClient.MaxResponseBytes:N0} bytes — not shown; the client will refuse it]";
+                }
             }
             block.AppendLine($"   ├─ RAW ← HTTP {(int)response.StatusCode} {response.ReasonPhrase}");
             block.AppendLine($"   │ {Scrub(reply)}");
