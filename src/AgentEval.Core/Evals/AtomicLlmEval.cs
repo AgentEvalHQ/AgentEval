@@ -77,7 +77,16 @@ public sealed class AtomicLlmEval : AtomicEval
         if (input.Response is null)
             throw new InvalidOperationException("AtomicLlmEval requires EvalInput.Response to be set.");
 
-        var er = await _evaluator.EvaluateAsync(input.Query, input.Response, _criteria, ct);
+        // The judge must SEE the context the response is supposed to be faithful to. This leaf used to hand
+        // over the query and the response only, so an eval that set EvalInput.Context — a retrieved passage, a
+        // ledger extract, the source document — asked "is this grounded?" while withholding the ground. The
+        // judge then graded plausibility, and every such score was of a question nobody had actually posed.
+        // IEvaluator takes (input, output, criteria), so the context travels with the input, labelled.
+        var judgeInput = string.IsNullOrWhiteSpace(input.Context)
+            ? input.Query
+            : $"{input.Query}\n\nContext the response must be faithful to:\n{input.Context}";
+
+        var er = await _evaluator.EvaluateAsync(judgeInput, input.Response, _criteria, ct);
 
         // v1.1 task 1.7 / 6-plan F-002: populate EstimatedCost from real judge token usage
         // so composite cost rollups stop summing to $0. When the underlying IEvaluator does

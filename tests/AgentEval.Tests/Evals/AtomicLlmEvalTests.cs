@@ -176,4 +176,63 @@ public class AtomicLlmEvalTests
         Assert.NotNull(result.Details.Dimensions);
         Assert.Equal(1.0, result.Details.Dimensions!["accuracy"]);  // Last wins: Met=true => 1.0
     }
+    /// <summary>Records exactly what the judge was handed, so the test can assert on the prompt itself.</summary>
+    private sealed class CapturingEvaluator : AgentEval.Core.IEvaluator
+    {
+        public string? Input { get; private set; }
+        public string? Output { get; private set; }
+
+        public Task<AgentEval.Core.EvaluationResult> EvaluateAsync(string input, string output, IEnumerable<string> criteria, CancellationToken ct = default)
+        {
+            Input = input;
+            Output = output;
+            return Task.FromResult(new AgentEval.Core.EvaluationResult { OverallScore = 100, Summary = "ok" });
+        }
+    }
+
+    [Fact]
+    public async Task Context_ReachesTheJudge_BecauseAJudgeCannotGradeGroundingItCannotSee()
+    {
+        // This leaf used to hand the judge the query and the response only. An eval that set Context — a
+        // retrieved passage, a ledger extract, the source document — then asked "is this grounded?" while
+        // withholding the ground, and the judge graded plausibility instead. Two samples carried a wrapper
+        // to work around it; this is the library doing it.
+        var judge = new CapturingEvaluator();
+        var eval = new AtomicLlmEval(judge, "k", "n", "c", "1.0.0", ["Every fact appears in the context."]);
+
+        await eval.EvaluateAsync(new EvalInput(
+            Query: "When was invoice 4471 paid?",
+            Response: "On 3 May 2026.",
+            Context: "Ledger: invoice 4471 paid 2026-05-03 by bank transfer."));
+
+        Assert.Contains("Ledger: invoice 4471 paid 2026-05-03", judge.Input!, StringComparison.Ordinal);
+        Assert.Contains("When was invoice 4471 paid?", judge.Input!, StringComparison.Ordinal);
+        Assert.Equal("On 3 May 2026.", judge.Output);
+    }
+
+    [Fact]
+    public async Task NoContext_LeavesTheJudgeInputExactlyTheQuery()
+    {
+        // The common case must not gain a dangling label or a trailing blank section.
+        var judge = new CapturingEvaluator();
+        var eval = new AtomicLlmEval(judge, "k", "n", "c", "1.0.0", ["Answers the question."]);
+
+        await eval.EvaluateAsync(new EvalInput(Query: "What is 2 + 2?", Response: "4"));
+
+        Assert.Equal("What is 2 + 2?", judge.Input);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task BlankContext_IsNotAppended(string context)
+    {
+        var judge = new CapturingEvaluator();
+        var eval = new AtomicLlmEval(judge, "k", "n", "c", "1.0.0", ["Answers the question."]);
+
+        await eval.EvaluateAsync(new EvalInput(Query: "Q", Response: "A", Context: context));
+
+        Assert.Equal("Q", judge.Input);
+    }
+
 }

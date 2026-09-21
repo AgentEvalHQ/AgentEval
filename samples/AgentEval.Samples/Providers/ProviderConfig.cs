@@ -12,18 +12,6 @@ using OpenAI;
 namespace AgentEval.Samples.Providers;
 
 /// <summary>
-/// <see cref="AgentEval.Evals.AtomicLlmEval"/> hands an <see cref="IEvaluator"/> only the query and the
-/// response. A judge asked whether a response is faithful to a context must be SHOWN that context, or it
-/// is grading something it cannot see. This wrapper prepends the case's context to the judge's input.
-/// The decision leaf does not need it: <c>DecisionEval</c> sends the context through its state projector.
-/// </summary>
-internal sealed class ContextAwareJudge(IEvaluator inner, string context) : IEvaluator
-{
-    public Task<EvaluationResult> EvaluateAsync(string input, string output, IEnumerable<string> criteria, CancellationToken cancellationToken = default) =>
-        inner.EvaluateAsync($"{input}\n\nContext the response must be faithful to:\n{context}", output, criteria, cancellationToken);
-}
-
-/// <summary>
 /// Configuration for group N (Bitdeer-hosted GLM-5.3 Flash and TypeSafe Jev). Everything is an
 /// environment variable; nothing here is persisted, and no key is ever printed.
 ///

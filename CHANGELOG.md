@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   told operators `AZURE_OPENAI_ENDPOINT` was missing when they had just set it.
 
 #### Fixed
+- **`AtomicLlmEval` passes `EvalInput.Context` to its judge.** It used to hand over the query and the
+  response only, so an eval that set a context — a retrieved passage, a ledger extract, the source document —
+  asked "is this grounded?" while withholding the ground, and the judge graded plausibility instead. Samples
+  N1 and N2 carried a wrapper to work around it; the wrapper is deleted. ⚠️ **This changes judge prompts**
+  wherever `Context` was set, and therefore scores and `PromptHash`: any calibration baseline measured on an
+  eval that set `Context` was measured without it and should be re-run. Evals that leave `Context` unset are
+  bit-for-bit unaffected, which a test pins.
 - The tag-triggered LLM integration workflow no longer fails on every release tag. It selects whichever
   provider has secrets (Azure, Bitdeer or OpenAI) and names it through `AI_INFERENCE_PROVIDER`; an automatic
   run with no provider configured **skips with a notice** instead of erroring, because an optional paid job

@@ -186,8 +186,9 @@ public static class JevDecisionsDemo
         // ── Stage 5: three evaluator kinds in one composite ─────────────────────────────────
         Console.WriteLine("📝 Stage 5: CompositeEval — deterministic + decision (+ generative when Bitdeer is configured)\n");
 
-        // The generative judge must SEE the ledger. AtomicLlmEval hands its IEvaluator only the query and
-        // the response, so the GLM leaf is built per case with ContextAwareJudge prepending that case's
+        // The generative judge sees the ledger because AtomicLlmEval now passes EvalInput.Context to its
+        // judge. It used to hand over only the query and the response, and this sample worked around it with
+        // a per-case wrapper; the workaround is gone and the library carries that case's
         // context. The Jev leaf needs nothing of the sort: its state projector already sends the context.
         var withGlm = ProviderConfig.IsBitdeerConfigured;
         IChatClient? glm = withGlm ? ProviderConfig.CreateBitdeerChatClient() : null;
@@ -206,7 +207,7 @@ public static class JevDecisionsDemo
             if (glm is not null)
             {
                 components.Add(new EvalComponent(new AtomicLlmEval(
-                    evaluator: new ContextAwareJudge(new ChatClientEvaluator(glm), c.Context),
+                    evaluator: new ChatClientEvaluator(glm),
                     key: "faithful_llm",
                     name: "Faithful to the ledger (generative judge)",
                     category: "quality",
