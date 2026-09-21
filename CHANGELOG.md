@@ -6,6 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+#### Changed
+- **The CLI resolves `AI_INFERENCE_PROVIDER`** instead of assuming Azure OpenAI. Every `bench` and
+  `calibrate` command reaches its model through `AzureChatAgentFactory` or `JudgeFactory`, and both now go
+  through `InferenceProviderEnvironment`, so `agenteval bench gdpr` runs on Bitdeer, OpenAI, Foundry, Azure
+  or any OpenAI-compatible host. Backward compatible: with the selector unset and `AZURE_OPENAI_*` set, the
+  resolver auto-detects Azure and uses the same endpoint, key and deployment as before. `AZURE_OPENAI_JUDGE_*`
+  still wins outright, so a capable grader can face a cheap subject in one run. The command help no longer
+  tells users to set `AZURE_OPENAI_*`.
+- Provider diagnostics name only the variables that are **missing**. Listing every provider's requirements
+  told operators `AZURE_OPENAI_ENDPOINT` was missing when they had just set it.
+
+#### Evidence
+- `docs/adr/evidence/033-n3-threshold-sweep-and-label-review-2026-09-21.md` — a threshold sweep over the N3
+  probabilities (no spend) and a review of the 20 cases both judges got wrong. A uniform 0.55 bar lifts
+  agreement 79.2% → 87.9% and quadruples false passes, so the bar is where the error preference is written,
+  not a tuning knob. It also found **22 cases scored inside their golden band whose recorded verdict
+  disagrees with the golden verdict** — an evaluator threshold and its goldens' bands that contradict each
+  other, which makes calibration accuracy partly a measure of the threshold.
 #### Added
 - Sample **N3 — Judge vs Judge** (`dotnet run -- 102`): the evaluator evaluates the evaluators. Jev, through a
   sample-local `DecisionJudge : IEvaluator` (one binary question per criterion, one request per judge call), beside
