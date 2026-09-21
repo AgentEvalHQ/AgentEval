@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+#### Added
+- **`--decisions` on `bench gdpr calibrate` and `bench eu-ai-act calibrate`** — grade the compliance golden
+  cases with the decision model instead of the generative judge, for a judge-vs-judge calibration. Reads
+  `TYPESAFE_API_KEY` (or `OPENROUTER_API_KEY`); `JEV_MODEL` pins a build; a missing or unknown transport
+  fails closed naming what it needs.
+- `AgentEval.Decisions.DecisionJudge` (Core, promoted from the samples) — a decision model behind the
+  `IEvaluator` seam that calibration runners and judge comparisons use: one binary question per criterion,
+  one request per judge call. ⚠️ **For calibration and comparison only.** A persisted eval tree that reached
+  a decision model through this adapter would carry `provenance.type = "atomic-llm"` naming a judge that is
+  not an LLM; the persisted kind is `DecisionEval` (`"atomic-decision"`).
+
 #### Changed
 - **The CLI resolves `AI_INFERENCE_PROVIDER`** instead of assuming Azure OpenAI. Every `bench` and
   `calibrate` command reaches its model through `AzureChatAgentFactory` or `JudgeFactory`, and both now go
@@ -31,6 +42,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without credentials is unconfigured, not broken. An explicit `workflow_dispatch` with none still errors.
 
 #### Evidence
+- `docs/adr/evidence/033-compliance-calibration-2026-09-21.md` — **ADR-033 §7 (2)**: 263 labelled compliance
+  cases (145 GDPR + 118 EU AI Act), per pillar, against the gate the incumbent judges passed, 0 evaluation
+  failures, 79 s, about half a cent. **5 of 12 pillars pass, 7 fail.** Three pass at parity with the
+  generative baseline; EU AI Act prohibited practices scores **20% against an 84% baseline** because that
+  pillar grades an agent's *refusal* and the decision model grades the thing being refused.
 - `docs/adr/evidence/033-n3-threshold-sweep-and-label-review-2026-09-21.md` — a threshold sweep over the N3
   probabilities (no spend) and a review of the 20 cases both judges got wrong. A uniform 0.55 bar lifts
   agreement 79.2% → 87.9% and quadruples false passes, so the bar is where the error preference is written,

@@ -144,14 +144,28 @@ benchGdprCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 // bench gdpr calibrate
 var calibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };
 var calibrateOutOpt = new Option<string?>("--out") { Description = "Output Markdown report path (default: strategy/FutureFeatures/calibration-baselines/gdpr-calibration-{date}.md)" };
+var calibrateDecisionsOpt = new Option<bool>("--decisions") { Description = "Grade with the decision model (TypeSafe Jev) instead of the generative judge, for a judge-vs-judge calibration. Reads TYPESAFE_API_KEY (or OPENROUTER_API_KEY); JEV_MODEL pins a build. ADR-033: the adapter is for calibration only — nothing it produces is persisted as an eval tree." };
 var calibrateCmd = new Command("calibrate", "Run GDPR judge calibration against hand-labeled golden datasets");
 calibrateCmd.Add(calibrateRootOpt);
 calibrateCmd.Add(calibrateOutOpt);
+calibrateCmd.Add(calibrateDecisionsOpt);
 calibrateCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
     var root = parseResult.GetValue(calibrateRootOpt);
     var outPath = parseResult.GetValue(calibrateOutOpt);
-    return await BenchCalibrateCommand.RunAsync(root, outPath, ct: ct);
+    AgentEval.Core.IEvaluator? decisionJudge = null;
+    if (parseResult.GetValue(calibrateDecisionsOpt))
+    {
+        var (decisionOptions, decisionDiagnostic) = DecisionClientFactory.TryResolve();
+        if (decisionOptions is null)
+        {
+            Console.Error.WriteLine($"✖ --decisions needs a decision-model transport: {decisionDiagnostic} Set {DecisionClientFactory.RequiredVariables}.");
+            return AgentEval.Cli.ExitCodes.RuntimeError;
+        }
+        decisionJudge = new AgentEval.Decisions.DecisionJudge(new AgentEval.Decisions.SystemOneDecisionClient(decisionOptions), decisionOptions.Model);
+        Console.Error.WriteLine($"✔ Decision-model judge configured — {decisionOptions.ProviderName}, model={decisionOptions.Model} (requested; provenance records what the provider echoes).");
+    }
+    return await BenchCalibrateCommand.RunAsync(root, outPath, evaluatorOverride: decisionJudge, ct: ct);
 });
 benchGdprCmd.Add(calibrateCmd);
 
@@ -215,14 +229,28 @@ benchEuAiActCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) 
 // bench eu-ai-act calibrate
 var euCalibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };
 var euCalibrateOutOpt = new Option<string?>("--out") { Description = "Output Markdown report path (default: strategy/FutureFeatures/calibration-baselines/eu-ai-act-calibration-{date}.md)" };
+var euCalibrateDecisionsOpt = new Option<bool>("--decisions") { Description = "Grade with the decision model (TypeSafe Jev) instead of the generative judge, for a judge-vs-judge calibration. Reads TYPESAFE_API_KEY (or OPENROUTER_API_KEY); JEV_MODEL pins a build. ADR-033: the adapter is for calibration only — nothing it produces is persisted as an eval tree." };
 var euCalibrateCmd = new Command("calibrate", "Run EU AI Act judge calibration against hand-labeled golden datasets");
 euCalibrateCmd.Add(euCalibrateRootOpt);
 euCalibrateCmd.Add(euCalibrateOutOpt);
+euCalibrateCmd.Add(euCalibrateDecisionsOpt);
 euCalibrateCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
     var root = parseResult.GetValue(euCalibrateRootOpt);
     var outPath = parseResult.GetValue(euCalibrateOutOpt);
-    return await BenchEuAiActCalibrateCommand.RunAsync(root, outPath, ct: ct);
+    AgentEval.Core.IEvaluator? decisionJudge = null;
+    if (parseResult.GetValue(euCalibrateDecisionsOpt))
+    {
+        var (decisionOptions, decisionDiagnostic) = DecisionClientFactory.TryResolve();
+        if (decisionOptions is null)
+        {
+            Console.Error.WriteLine($"✖ --decisions needs a decision-model transport: {decisionDiagnostic} Set {DecisionClientFactory.RequiredVariables}.");
+            return AgentEval.Cli.ExitCodes.RuntimeError;
+        }
+        decisionJudge = new AgentEval.Decisions.DecisionJudge(new AgentEval.Decisions.SystemOneDecisionClient(decisionOptions), decisionOptions.Model);
+        Console.Error.WriteLine($"✔ Decision-model judge configured — {decisionOptions.ProviderName}, model={decisionOptions.Model} (requested; provenance records what the provider echoes).");
+    }
+    return await BenchEuAiActCalibrateCommand.RunAsync(root, outPath, evaluatorOverride: decisionJudge, ct: ct);
 });
 benchEuAiActCmd.Add(euCalibrateCmd);
 
