@@ -104,6 +104,13 @@ internal static class JudgeVsJudgeDemo
         Console.WriteLine();
 
         AgenticEvalRegistration.Register();
+        // Keys the registry does not dispatch are skipped by CalibrationRunner; the report counts them so the
+        // comparison's denominator is never mistaken for the golden set's size.
+        var probe = new CapturingJudge(new ConcurrentDictionary<string, ConcurrentBag<IReadOnlyList<string>>>(StringComparer.OrdinalIgnoreCase), "probe");
+        var undispatchedKeys = keys.Where(k => EvalRegistry.Shared.Resolve(k, probe, "probe") is null).ToList();
+        var undispatchedCases = datasets.SelectMany(d => d.Entries).Count(e => undispatchedKeys.Contains(e.EvaluatorKey, StringComparer.OrdinalIgnoreCase));
+        Console.WriteLine($"   registry dispatches {keys.Count - undispatchedKeys.Count} of {keys.Count} key(s); {undispatchedCases} case(s) carry undispatched keys and are skipped by the runner, counted below as such");
+        Console.WriteLine();
 
         // ── Stage 1: dry run — every eval runs against a judge that records and sends nothing ──
         if (dryRun)
@@ -174,7 +181,7 @@ internal static class JudgeVsJudgeDemo
 
         // ── The comparison ───────────────────────────────────────────────────────────────────
         var all = records.ToList();
-        var report = Compare(all, traces, arms, opts.Repeats, jevOptions);
+        var report = Compare(all, traces, arms, opts.Repeats, jevOptions, undispatchedKeys, undispatchedCases);
         PrintReport(report, arms);
         var outDir = WriteReport(report, all, traces, opts, arms, goldenDir, total.Elapsed);
         Console.WriteLine($"   📄 Report     : {outDir}");
@@ -201,7 +208,9 @@ internal static class JudgeVsJudgeDemo
                 if (byInput.TryGetValue((k, input.Query ?? "", input.Response ?? ""), out var hit))
                     return hit;
                 return default;
-            }, (file, entry, result, ms) => records.Add(CaseRecord.From(arm.Id, repeat, file, entry, result, ms)));
+            }, (file, entry, result, error, ms) => records.Add(result is not null
+                ? CaseRecord.From(arm.Id, repeat, file, entry, result, ms)
+                : CaseRecord.Failed(arm.Id, repeat, file, entry, error!, ms)));
         });
 
         using var gate = new SemaphoreSlim(Math.Max(1, parallel));
@@ -221,11 +230,15 @@ internal static class JudgeVsJudgeDemo
         await Task.WhenAll(tasks);
     }
 
-    /// <summary>Wraps a resolved eval so every case's result, wall-clock and judge leaves are captured.</summary>
+    /// <summary>
+    /// Wraps a resolved eval so every case's result, wall-clock and judge leaves are captured — and a case whose
+    /// evaluator throws is captured as an error, then rethrown for the runner to count. A dropped case would
+    /// shrink the denominator silently; an error row keeps it honest.
+    /// </summary>
     private sealed class RecordingEval(
         IEval inner,
         Func<EvalInput, (string File, CalibrationEntry Entry)> lookup,
-        Action<string, CalibrationEntry, EvalResult, long> sink) : IEval
+        Action<string, CalibrationEntry, EvalResult?, Exception?, long> sink) : IEval
     {
         public string Key => inner.Key;
         public string Name => inner.Name;
@@ -235,11 +248,23 @@ internal static class JudgeVsJudgeDemo
         public async Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)
         {
             var sw = Stopwatch.StartNew();
-            var result = await inner.EvaluateAsync(input, ct);
+            EvalResult result;
+            try
+            {
+                result = await inner.EvaluateAsync(input, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                sw.Stop();
+                var (failedFile, failedEntry) = lookup(input);
+                if (failedEntry is not null)
+                    sink(failedFile, failedEntry, null, ex, sw.ElapsedMilliseconds);
+                throw;
+            }
             sw.Stop();
             var (file, entry) = lookup(input);
             if (entry is not null)
-                sink(file, entry, result, sw.ElapsedMilliseconds);
+                sink(file, entry, result, null, sw.ElapsedMilliseconds);
             return result;
         }
     }
@@ -284,7 +309,7 @@ internal static class JudgeVsJudgeDemo
         Console.WriteLine($"   resolved by the registry   : {resolvedEvals.Count}");
         Console.WriteLine($"   of which reach a judge     : {criteriaByKey.Count}   (the others decide in code — same result on both arms, excluded from the comparison)");
         if (noJudge.Count > 0) Console.WriteLine($"     no judge involved        : {string.Join(", ", noJudge.OrderBy(k => k))}");
-        if (unresolved.Count > 0) Console.WriteLine($"   ⚠ unknown to the registry  : {string.Join(", ", unresolved)}   (skipped by the runner, counted in the report)");
+        if (unresolved.Count > 0) Console.WriteLine($"   ⚠ unknown to the registry  : {string.Join(", ", unresolved)}   (skipped by the runner; a real run's report counts their cases as undispatched)");
         Console.WriteLine();
 
         Console.WriteLine("   Criteria each evaluator hands its judge (these are the questions Jev will be asked, verbatim):");
@@ -321,7 +346,7 @@ internal static class JudgeVsJudgeDemo
     //  The comparison
     // ────────────────────────────────────────────────────────────────────────────────────────
 
-    private static Report Compare(IReadOnlyList<CaseRecord> all, ConcurrentDictionary<(string, string), ConcurrentBag<DecisionJudge.Trace>> traces, Arm[] arms, int repeats, SystemOneClientOptions jevOptions)
+    private static Report Compare(IReadOnlyList<CaseRecord> all, ConcurrentDictionary<(string, string), ConcurrentBag<DecisionJudge.Trace>> traces, Arm[] arms, int repeats, SystemOneClientOptions jevOptions, IReadOnlyList<string> undispatchedKeys, int undispatchedCases)
     {
         // Only cases where the eval reached a judge on BOTH arms compare the judges; the rest decided in code.
         var comparable = all.Where(r => r.JudgeLeaves > 0 || r.Error is not null)
@@ -368,7 +393,7 @@ internal static class JudgeVsJudgeDemo
 
         var hypotheses = Hypotheses(byFile, overall, comparable, arms, flips, latencies, jevCostPerCase, negated, positive, repeats);
 
-        return new Report(overall, byFile, byKey, excluded, agreement, flips, latencies.Count == 0 ? 0 : Percentile(latencies, 0.5), latencies.Count == 0 ? 0 : Percentile(latencies, 0.9), jevTraces.Count, jevIn, jevOut, jevCost, jevCostPerCase,
+        return new Report(overall, byFile, byKey, excluded, undispatchedKeys, undispatchedCases, agreement, flips, latencies.Count == 0 ? 0 : Percentile(latencies, 0.5), latencies.Count == 0 ? 0 : Percentile(latencies, 0.9), jevTraces.Count, jevIn, jevOut, jevCost, jevCostPerCase,
             jevTraces.Select(t => t.Model).Distinct().ToList(), negated.Count, positive.Count, hypotheses);
     }
 
@@ -502,7 +527,7 @@ internal static class JudgeVsJudgeDemo
     private const int MinN = 20, MinFail = 10, MinWrong = 5;
 
     private static bool IsNegated(string criterion) =>
-        Regex.IsMatch(criterion, @"\b(does not|do not|doesn't|don't|never|no |not |without|avoids?|refrains?)\b", RegexOptions.IgnoreCase);
+        Regex.IsMatch(criterion, @"\b(does not|do not|doesn't|don't|never|no|not|without|avoids?|refrains?)\b", RegexOptions.IgnoreCase);
 
     // ────────────────────────────────────────────────────────────────────────────────────────
     //  Output
@@ -511,7 +536,7 @@ internal static class JudgeVsJudgeDemo
     private static void PrintReport(Report report, Arm[] arms)
     {
         Console.WriteLine("📝 Stage 4: the comparison (cases where the evaluator reached a judge on both arms)\n");
-        Console.WriteLine($"   arm A = {ArmLabel(arms, "A")}    arm B = {ArmLabel(arms, "B")}    excluded (decided in code, or missing an arm): {report.Excluded}");
+        Console.WriteLine($"   arm A = {ArmLabel(arms, "A")}    arm B = {ArmLabel(arms, "B")}    excluded (decided in code, or missing an arm): {report.Excluded}    undispatched keys: {report.UndispatchedKeys.Count} ({report.UndispatchedCases} case(s), skipped by the runner)");
         Console.WriteLine();
         Console.WriteLine("   file                        n   acc A    acc B    κ A     κ B     false-pass A/B   false-fail A/B    band A/B     Brier A/B    p50 ms A/B      tokens A/B");
         foreach (var row in report.ByFile.Append(report.Overall))
@@ -563,7 +588,7 @@ internal static class JudgeVsJudgeDemo
         var md = new StringBuilder();
         md.AppendLine($"# N3 — Judge vs Judge — {stamp}Z");
         md.AppendLine();
-        md.AppendLine($"Arm A = {ArmLabel(arms, "A")} (generative) · Arm B = {ArmLabel(arms, "B")} (decision) · repeats {opts.Repeats} · excluded {report.Excluded} · {elapsed.TotalSeconds:F0} s");
+        md.AppendLine($"Arm A = {ArmLabel(arms, "A")} (generative) · Arm B = {ArmLabel(arms, "B")} (decision) · repeats {opts.Repeats} · excluded {report.Excluded} · undispatched keys {report.UndispatchedKeys.Count} ({report.UndispatchedCases} cases skipped: {string.Join(", ", report.UndispatchedKeys)}) · {elapsed.TotalSeconds:F0} s");
         md.AppendLine();
         md.AppendLine("| file | n | acc A | acc B | κ A | κ B | false-pass A | false-pass B | false-fail A | false-fail B | band A | band B | Brier A | Brier B | p50 A | p50 B | tokens A | tokens B |");
         md.AppendLine("|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|");
@@ -669,6 +694,11 @@ internal static class JudgeVsJudgeDemo
                 errored.Count > 0 ? $"{errored.Count} leaf/leaves errored: {Trim(errored[0].Details.Summary ?? "", 120)}" : null);
         }
 
+        public static CaseRecord Failed(string arm, int repeat, string file, CalibrationEntry entry, Exception ex, long ms) =>
+            new(arm, repeat, file, entry.EvaluatorKey, entry.ScenarioId, entry.Input, entry.AgentResponse,
+                entry.ExpectedVerdict, entry.ExpectedScoreMin, entry.ExpectedScoreMax,
+                "error", 0.0, 0, 0, ms, $"evaluator threw {ex.GetType().Name}: {Trim(ex.Message, 160)}");
+
         private static void Walk(EvalResult r, List<EvalResult> acc)
         {
             acc.Add(r);
@@ -680,7 +710,8 @@ internal static class JudgeVsJudgeDemo
     private sealed record GroupSummaryRow(string Name, int N, IReadOnlyDictionary<string, ArmStatsRow> Arms);
     private sealed record HypothesisRow(string Id, string Verdict, string Detail);
     private sealed record Report(
-        GroupSummaryRow Overall, IReadOnlyList<GroupSummaryRow> ByFile, IReadOnlyList<GroupSummaryRow> ByKey, int Excluded, double JudgeAgreement,
+        GroupSummaryRow Overall, IReadOnlyList<GroupSummaryRow> ByFile, IReadOnlyList<GroupSummaryRow> ByKey, int Excluded,
+        IReadOnlyList<string> UndispatchedKeys, int UndispatchedCases, double JudgeAgreement,
         IReadOnlyDictionary<string, double?> FlipsByArm, double JevP50Ms, double JevP90Ms, int JevRequests, long JevInputTokens, long JevOutputTokens,
         double JevCost, double JevCostPerCase, IReadOnlyList<string> JevModels, int NegatedCriteria, int PositiveCriteria, IReadOnlyList<HypothesisRow> Hypotheses);
 
