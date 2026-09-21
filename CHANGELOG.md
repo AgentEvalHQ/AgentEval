@@ -6,6 +6,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+#### Added
+- Sample **N3 — Judge vs Judge** (`dotnet run -- 102`): the evaluator evaluates the evaluators. Jev, through a
+  sample-local `DecisionJudge : IEvaluator` (one binary question per criterion, one request per judge call), beside
+  the configured generative judge, on the 378 agentic golden cases in 22 files, scored by the agentic
+  `CalibrationRunner` through the shared `EvalRegistry` — the same rubrics, no second harness. Per file and per
+  evaluator key: accuracy, Cohen's κ, false-pass on `fail`-labelled cases, within-band rate, Brier, latency, tokens,
+  cost; then the seven hypotheses pre-registered in the Jev factsheet, each confirmed, refuted or left open by the
+  numbers. `--dry-run` resolves every key, runs every case against a judge that records its criteria and sends
+  nothing, and renders the first Jev request through the real serializer. Results stay in memory: through the
+  registry a decision model would carry `atomic-llm` provenance, and the sample says so.
+
 
 ## [0.40.0-beta] - 2026-09-21
 ### A third evaluator kind, and the samples stop assuming Azure
