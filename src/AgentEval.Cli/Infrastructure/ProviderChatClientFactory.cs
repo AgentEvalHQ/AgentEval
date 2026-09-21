@@ -130,12 +130,21 @@ internal static class ProviderChatClientFactory
         return $"✔ {s.DisplayName} {purpose} configured — endpoint={SafeEndpoint(s.Endpoint)}, model={model} ({how}).";
     }
 
-    /// <summary>Scheme, host, port and path — never user-info, query or fragment, which can carry a token.</summary>
+    /// <summary>
+    /// Scheme, host and port ONLY. Never user-info, path, query or fragment.
+    /// </summary>
+    /// <remarks>
+    /// The path was included until a review pointed out that it is credential-bearing too: the endpoint
+    /// validator accepts any path, so <c>https://host/v1/&lt;token&gt;</c> is a legal configured value and
+    /// this string reaches stderr and CI logs. A guarantee of "no credentials" that holds for three of the
+    /// four URI parts that can carry one is not a guarantee, so the path goes as well. A misconfigured path
+    /// is diagnosed by the provider's own error, not by echoing it here.
+    /// </remarks>
     internal static string SafeEndpoint(Uri? endpoint)
     {
         if (endpoint is null) return "(none)";
         if (!endpoint.IsAbsoluteUri) return "(relative)";
         var port = endpoint.IsDefaultPort ? "" : $":{endpoint.Port}";
-        return $"{endpoint.Scheme}://{endpoint.Host}{port}{endpoint.AbsolutePath.TrimEnd('/')}";
+        return $"{endpoint.Scheme}://{endpoint.Host}{port}";
     }
 }

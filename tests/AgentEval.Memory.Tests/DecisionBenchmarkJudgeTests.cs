@@ -68,20 +68,48 @@ public class DecisionBenchmarkJudgeTests
     [InlineData("")]
     [InlineData("   ")]
     [InlineData("\n\t")]
-    public async Task EmptyResponse_IsEmpty_NotWrong_AndSpendsNothing(string response)
+    public async Task EmptyResponse_IsWrong_AndStillSpendsNothing(string response)
     {
-        // A judge that scores silence as "No" converts an abstention into an incorrect answer, which is the
-        // distinction the typed outcome vector exists to preserve.
+        // An empty AGENT response is wrong under both rubrics: it cannot contain the gold answer, and it
+        // does not RECOGNISE that it cannot answer. Returning Empty/null here put the case outside the
+        // accuracy denominator — the scorers count Correct.HasValue — so an agent that said nothing was
+        // excused rather than scored, which flatters exactly the failure it hides.
         var client = new FixedClient(0.99);
         var judge = new DecisionBenchmarkJudge(client, "jev-latest");
 
         var result = await judge.JudgeAsync(response, Question());
 
-        Assert.Equal(JudgeOutcomeStatus.Empty, result.Status);
-        Assert.Null(result.Correct);
-        Assert.Null(result.RawScore);
-        Assert.Equal(0, client.Calls);        // no provider call was made
+        Assert.Equal(JudgeOutcomeStatus.No, result.Status);
+        Assert.False(result.Correct);
+        Assert.Equal(0.0, result.RawScore);
+        Assert.Equal(0, client.Calls);        // still no provider call
         Assert.Equal(0, result.LlmCallCount);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task EmptyResponse_ToAnAbstentionQuestion_IsAlsoWrong(string response)
+    {
+        // The reason this was got wrong the first time: it looks as though silence should count as an
+        // abstention. It does not. The rubric asks whether the response RECOGNISES that it cannot answer,
+        // and an empty string recognises nothing.
+        var client = new FixedClient(0.99);
+        var judge = new DecisionBenchmarkJudge(client, "jev-latest");
+        var abstention = new ExternalBenchmarkQuestion
+        {
+            QuestionId = "q1_abs",
+            QuestionType = "single-session-user",
+            Question = "What did I say?",
+            GoldAnswer = "The conversation does not contain this.",
+            IsAbstention = true,
+        };
+
+        var result = await judge.JudgeAsync(response, abstention);
+
+        Assert.Equal(JudgeOutcomeStatus.No, result.Status);
+        Assert.False(result.Correct);
+        Assert.Equal(0, client.Calls);
     }
 
     [Fact]

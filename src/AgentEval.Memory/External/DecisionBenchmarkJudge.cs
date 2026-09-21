@@ -19,10 +19,13 @@ namespace AgentEval.Memory.External;
 /// P(yes) ≥ <see cref="Threshold"/> to <see cref="JudgeOutcomeStatus.Yes"/>.
 /// </para>
 /// <para>
-/// <b>An empty response is not a wrong answer.</b> The memory benchmarks distinguish an abstention from an
-/// incorrect answer, and a judge that scores silence as "No" quietly converts one into the other — the
-/// defect that made 78% of one probe's answers uncitable. A blank or whitespace response is returned as
-/// <see cref="JudgeOutcomeStatus.Empty"/> without a provider call.
+/// <b>An empty response IS a wrong answer, and costs no provider call.</b> Silence cannot contain the gold
+/// answer, and silence does not <i>recognise</i> that it cannot answer, which is what the abstention rubric
+/// asks — so a blank or whitespace response is <see cref="JudgeOutcomeStatus.No"/> with
+/// <c>Correct = false</c>, decided locally. It is deliberately NOT
+/// <see cref="JudgeOutcomeStatus.Empty"/>: that status means the <i>judge's</i> provider returned no usable
+/// text, it carries <c>Correct = null</c>, and the scorers count only <c>Correct.HasValue</c> — so an agent
+/// that answered nothing would drop out of its own denominator rather than score zero.
 /// </para>
 /// <para>
 /// <b>A transport failure is not a verdict.</b> <see cref="DecisionClientException"/> propagates: the caller
@@ -176,16 +179,29 @@ public sealed class DecisionBenchmarkJudge : IExternalBenchmarkJudge
     {
         ArgumentNullException.ThrowIfNull(question);
 
-        // Silence is its own outcome. Judging it would spend a call to turn an abstention into a wrong answer.
+        // An empty AGENT response is a real answer to grade, and it is wrong under BOTH rubrics: silence
+        // cannot contain the gold answer, and silence does not *recognise* that it cannot answer, which is
+        // what the abstention rubric asks. Deciding it here costs no provider call, but the verdict must be
+        // a real No.
+        //
+        // This deliberately does NOT use JudgeOutcomeStatus.Empty. That status means the JUDGE's provider
+        // returned no usable text (see its own documentation, and LongMemEvalJudge, which raises it only for
+        // a silent judge). Reusing it for a silent agent carried `Correct = null`, and the scorers count
+        // only `Correct.HasValue` — LongMemEvalPentagonMapper computes the abstention score over
+        // `absScored = Count(q => q.Correct.HasValue)`. An agent that answered nothing therefore dropped out
+        // of its own denominator instead of scoring zero, which flatters exactly the failure it is hiding.
+        // The incumbent LongMemEvalJudge judges a blank response rather than excusing it.
         if (string.IsNullOrWhiteSpace(agentResponse))
         {
             return new ExternalJudgmentResult
             {
-                Status = JudgeOutcomeStatus.Empty,
-                Correct = null,
-                RawScore = null,
-                Explanation = "The response was empty; no judgement was requested.",
+                Status = JudgeOutcomeStatus.No,
+                Correct = false,
+                RawScore = 0.0,
+                Explanation = "The response was empty, which satisfies no rubric. Decided without a provider call.",
                 LlmCallCount = 0,
+                PrimaryLlmCallCount = 0,
+                AttemptsUsed = 0,
             };
         }
 

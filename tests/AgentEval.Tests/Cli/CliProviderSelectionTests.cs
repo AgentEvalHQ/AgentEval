@@ -175,15 +175,19 @@ public class CliProviderSelectionTests
     // ── The banner must not echo a credential ───────────────────────────────────────────
 
     [Theory]
-    [InlineData("https://user:sekret@example.openai.azure.com/v1", "https://example.openai.azure.com/v1")]
-    [InlineData("https://host.example/v1?api-key=sekret", "https://host.example/v1")]
-    [InlineData("https://host.example/v1#sekret", "https://host.example/v1")]
-    [InlineData("https://host.example:8443/v1/", "https://host.example:8443/v1")]
+    [InlineData("https://user:sekret@example.openai.azure.com/v1", "https://example.openai.azure.com")]
+    [InlineData("https://host.example/v1?api-key=sekret", "https://host.example")]
+    [InlineData("https://host.example/v1#sekret", "https://host.example")]
+    [InlineData("https://host.example:8443/v1/", "https://host.example:8443")]
     [InlineData("https://host.example/", "https://host.example")]
+    // The case that was missing: a token in a PATH SEGMENT. The endpoint validator accepts any path, so
+    // this is a legal configured value, and the printed string used to include it verbatim.
+    [InlineData("https://host.example/v1/sekret", "https://host.example")]
+    [InlineData("https://host.example/sekret/chat/completions", "https://host.example")]
     public void SafeEndpoint_DropsEveryPartOfAUrlThatCouldCarryAToken(string configured, string expected)
     {
         // The banner goes to stderr on every run, and a CI log keeps it. An endpoint is user-configured and
-        // may legitimately carry user-info, a query or a fragment — any of which can hold a key.
+        // may legitimately carry user-info, a path, a query or a fragment — any of which can hold a key.
         var printed = ProviderChatClientFactory.SafeEndpoint(new Uri(configured));
 
         Assert.Equal(expected, printed);

@@ -27,8 +27,12 @@ provider `AI_INFERENCE_PROVIDER` selects.
   abstention wrong. The other per-type semantics are mirrored too: `single-session-preference` judges against
   a rubric rather than an exact answer, the time-grounded types tolerate an off-by-one day/week/month, and
   `knowledge-update` accepts the superseded value alongside the current one. `InstructionsFor` is public so a
-  run can record which rubric each item was judged under. An empty response is `Empty` and spends no call (a judge that scores silence as "No"
-  turns an abstention into a wrong answer); a transport failure propagates rather than becoming a verdict.
+  run can record which rubric each item was judged under. An empty **agent** response is scored `No` / incorrect without spending a call — silence cannot
+  contain the gold answer and does not *recognise* that it cannot answer, which is what the abstention
+  rubric asks. It is deliberately not `JudgeOutcomeStatus.Empty`: that status means the *judge's* provider
+  returned nothing, it carries `Correct = null`, and the scorers count only `Correct.HasValue`, so an agent
+  that answered nothing would have dropped out of its own denominator instead of scoring zero. A transport
+  failure propagates rather than becoming a verdict.
 - Sample **N4 — Memory Judge vs Judge** (`dotnet run -- 103`): LongMemEval's labelled questions, each
   contributing its gold answer and a same-type distractor, so the comparison has a **50% chance floor**.
 - **`--decisions` on `bench gdpr calibrate` and `bench eu-ai-act calibrate`** — grade the compliance golden
@@ -96,6 +100,10 @@ provider `AI_INFERENCE_PROVIDER` selects.
   unaffected, which a test pins. (`AtomicLlmEval` emits `PromptHash: null` and always has, so the change is
   **not** visible in provenance — a reader diffing prompt hashes would see nothing moved. Hashing the real
   prompt is worth doing and is not in this release.)
+- **The provider banner and diagnostics no longer print the endpoint's path.** They already dropped
+  user-info, query and fragment, but the endpoint validator accepts any path, so `https://host/v1/<token>`
+  is a legal configured value and the path reached stderr and CI logs verbatim. A no-credential guarantee
+  that covers three of the four URI parts that can carry one is not a guarantee. Scheme, host and port only.
 - `AZURE_OPENAI_JUDGE_ENDPOINT` is validated by the same endpoint policy as every other provider (https, or
   http to loopback). That branch constructed its client directly, so a plain-http remote endpoint was accepted
   and the judge key went out in cleartext while the generic path refused exactly that.
