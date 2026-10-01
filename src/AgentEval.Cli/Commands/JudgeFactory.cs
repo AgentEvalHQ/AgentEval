@@ -2,7 +2,9 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Reflection;
 using AgentEval.Cli.Infrastructure;
+using AgentEval.Benchmarks;
 using AgentEval.Providers;
 using AgentEval.Core;
 using Azure;
@@ -39,6 +41,34 @@ namespace AgentEval.Cli.Commands;
 /// </remarks>
 internal static class JudgeFactory
 {
+    /// <summary>The embedded system prompt the GDPR judge sends, for <c>bench gdpr</c> AND <c>bench gdpr calibrate</c>.</summary>
+    internal const string GdprJudgeSystemPromptFile = "gdpr-judge-system.v1.md";
+
+    /// <summary>The embedded system prompt the EU AI Act judge sends, for <c>bench eu-ai-act</c> AND its calibrate.</summary>
+    internal const string EuAiActJudgeSystemPromptFile = "eu-ai-act-judge-system.v1.md";
+
+    /// <summary>
+    /// The GDPR judge — one resolver for the benchmark AND its calibration, so the instrument that is calibrated is
+    /// the instrument that runs.
+    /// </summary>
+    /// <remarks>
+    /// Before this existed, <c>bench gdpr</c> loaded and sent <see cref="GdprJudgeSystemPromptFile"/> while
+    /// <c>bench gdpr calibrate</c> called <see cref="Resolve"/> without it, so every published GDPR calibration figure
+    /// described a judge on the generic default prompt — not the one the benchmark used. Same for EU AI Act.
+    /// </remarks>
+    internal static (IEvaluator? Judge, string JudgeModel, int ExitCode) ResolveGdpr(
+        IEvaluator? evaluatorOverride, string judgeKind) =>
+        ResolveWithFamilyPrompt(evaluatorOverride, judgeKind, typeof(GdprBenchmark).Assembly, GdprJudgeSystemPromptFile);
+
+    /// <summary>The EU AI Act judge — one resolver for the benchmark AND its calibration (see <see cref="ResolveGdpr"/>).</summary>
+    internal static (IEvaluator? Judge, string JudgeModel, int ExitCode) ResolveEuAiAct(
+        IEvaluator? evaluatorOverride, string judgeKind) =>
+        ResolveWithFamilyPrompt(evaluatorOverride, judgeKind, typeof(EuAiActBenchmark).Assembly, EuAiActJudgeSystemPromptFile);
+
+    private static (IEvaluator? Judge, string JudgeModel, int ExitCode) ResolveWithFamilyPrompt(
+        IEvaluator? evaluatorOverride, string judgeKind, Assembly promptAssembly, string promptFile) =>
+        Resolve(evaluatorOverride, judgeKind, EmbeddedPromptLoader.Load(promptAssembly, promptFile), systemPromptId: promptFile);
+
     /// <summary>
     /// Resolves the judge to use for a bench run.
     /// </summary>
@@ -60,7 +90,8 @@ internal static class JudgeFactory
     internal static (IEvaluator? Judge, string JudgeModel, int ExitCode) Resolve(
         IEvaluator? evaluatorOverride,
         string judgeKind = "benchmark",
-        string? systemPrompt = null)
+        string? systemPrompt = null,
+        string? systemPromptId = null)
     {
         if (evaluatorOverride is not null)
             return (evaluatorOverride, "override", 0);
@@ -94,7 +125,7 @@ internal static class JudgeFactory
             {
                 var azureClient = new AzureOpenAIClient(new Uri(endpoint!), new AzureKeyCredential(apiKey!));
                 IChatClient chatClient = CliChatClientDiagnostics.Wrap(azureClient.GetChatClient(deployment!).AsIChatClient(), "judge");
-                IEvaluator real = new ChatClientEvaluator(chatClient, systemPrompt);
+                IEvaluator real = new ChatClientEvaluator(chatClient, systemPrompt, systemPromptId);
                 Console.Error.WriteLine(
                     $"✔ Azure OpenAI judge configured — endpoint={ProviderChatClientFactory.SafeEndpoint(new Uri(endpoint!))}, deployment={deployment} ({judgeKind})" +
                     (systemPrompt is null ? "." : $" [system prompt: {systemPrompt.Length} chars]."));
@@ -134,7 +165,7 @@ internal static class JudgeFactory
         var (providerClient, providerModel, diagnostic) = ProviderChatClientFactory.TryCreate("judge");
         if (providerClient is not null)
         {
-            IEvaluator providerJudge = new ChatClientEvaluator(providerClient, systemPrompt);
+            IEvaluator providerJudge = new ChatClientEvaluator(providerClient, systemPrompt, systemPromptId);
             Console.Error.WriteLine(
                 $"{ProviderChatClientFactory.Describe($"{judgeKind} judge", providerModel!)}" +
                 (systemPrompt is null ? "" : $" [system prompt: {systemPrompt.Length} chars]"));
