@@ -118,7 +118,7 @@ internal static class GatekeeperInspectCommand
         var stateClass = desc?.StateClass ?? "stateless-text";
         if (stateClass == "needs-run-state")
         {
-            stderr.WriteLine($"  Error: gate '{gateId}' needs held run state — available via 'gatekeeper serve', not stateless inspect.");
+            stderr.WriteLine($"  Error: gate '{gateId}' needs held run state, which stateless inspect cannot provide (the stateful 'gatekeeper serve' daemon is not implemented). Use the gate in-process through the library.");
             return ExitCodes.UsageError;
         }
 

@@ -438,7 +438,6 @@ drop straight into CI.
 agenteval gatekeeper list-gates [--json] [--phase inspect|serve|all]
 agenteval gatekeeper inspect   --gate <id> [--input <file.jsonl>] [--policy block|warn] [gate flags] [model flags]
 agenteval gatekeeper calibrate --gate judge:<axis> <model flags> [--certify]
-agenteval gatekeeper serve                                # stub — not implemented
 ```
 
 **Subcommands**
