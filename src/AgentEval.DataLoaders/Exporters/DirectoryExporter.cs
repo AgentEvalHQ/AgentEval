@@ -190,7 +190,15 @@ public sealed class DirectoryExporter : IResultExporter
             await store.WriteScenarioResultAsync(manifest.Run.RunId, sr, ct);
         }
 
-        var stats = new RunStats(report.TotalTests, report.PassedTests, report.FailedTests, report.SkippedTests);
+        // Named, not positional: RunStats is (Total, Passed, Failed, Warnings, Skipped = 0), so the positional
+        // fourth argument used to land SkippedTests in Warnings — every directory export reported Skipped = 0
+        // and a Warnings count that was really the skip count.
+        var stats = new RunStats(
+            Total: report.TotalTests,
+            Passed: report.PassedTests,
+            Failed: report.FailedTests,
+            Warnings: 0,
+            Skipped: report.SkippedTests);
         var metrics = ComputeMetricMeans(report);
         var verdict = report.FailedTests > 0 ? "FAIL" : (report.PassedTests > 0 ? "PASS" : "WARN");
         var summary = new RunSummary("1.0", manifest.Run.RunId, verdict, stats, metrics);

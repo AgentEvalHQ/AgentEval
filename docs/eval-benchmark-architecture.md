@@ -106,7 +106,7 @@ public sealed class AtomicLlmEval : AtomicEval
         IReadOnlyList<string> criteria,
         double passThreshold = 0.70,
         string? judgeModel = null,           // recorded in provenance
-        string? promptId = null,             // rubric prompt identifier
+        string? promptId = null,             // recorded only if the evaluator cannot name the prompt it sends; does not load a prompt
         string? failureSeverity = null,      // "critical" | "high" | "medium" | "low"
         Func<string?, JudgeCostMap.ModelRate>? rateResolver = null)
 }
@@ -216,11 +216,13 @@ All three follow the same architectural pattern. They differ in subject matter (
 | **Domain packs** | Healthcare, HR, children | High-risk employment, credit, education | n/a — generic |
 | **Default aggregation** | WeightedSum per article; per-pillar varies | Pillar 1 uses Min (any prohibition violation fails); others WeightedSum | WeightedSum |
 | **`audit` preset aggregation** | CapByWorst at top level | CapByWorst at top level — critical Pillar 1 failure caps overall verdict at FAIL | Multi-run stochastic |
-| **Calibration status** | 5/5 pillars PASS at strict gate | 4/6 pillars PASS at strict gate (Art 5 + GPAI under investigation) | 49/60 evaluators pass strict calibration; 9 carve-outs documented |
-| **Where YAML lives** | `samples/AgentEval.GdprBenchmark/Articles/Yaml/` | `samples/AgentEval.EuAiActBenchmark/Articles/Yaml/` | Per-evaluator definition in code + prompts |
-| **Judge prompt** | `samples/.../Prompts/gdpr-judge-system.v1.md` | `samples/.../Prompts/eu-ai-act-judge-system.v1.md` | Per-evaluator |
+| **Calibration status** | Not reproducible from the repository — see the note below the table | Not reproducible from the repository — see the note below the table | 40 evaluators dispatched, 20 carved out; ux and adversarial gated at 0.85 / 0.70, the other six scored categories at relaxed per-category gates (`s_categoryOverrides`) |
+| **Where YAML lives** | `src/AgentEval.Compliance.Gdpr/Articles/Yaml/` | `src/AgentEval.Compliance.EuAiAct/Articles/Yaml/` | No YAML — each evaluator defines its criteria in code |
+| **Judge prompt** | `src/AgentEval.Compliance.Gdpr/Resources/Prompts/gdpr-judge-system.v1.md` — sent by `bench gdpr` and, from 0.42.0-beta, by `bench gdpr calibrate` (one resolver for both) | `src/AgentEval.Compliance.EuAiAct/Resources/Prompts/eu-ai-act-judge-system.v1.md` — sent by `bench eu-ai-act` and, from 0.42.0-beta, by its `calibrate` | The generic default judge prompt; the per-evaluator files under `Resources/Prompts/` are references and are not sent |
 | **Smoke preset cost** | < $0.10 | < $0.10 | < $0.05 |
 | **Audit-grade preset cost** | $5–10 (multi-judge × stochastic) | $5–10 | Varies |
+
+> **Calibration status, precisely.** The compliance figures this table used to show (GDPR "5/5", EU AI Act "4/6") come from runs in May 2026 on the maintainer's Azure OpenAI deployments. Those runs graded with the generic default judge prompt — before 0.42.0-beta, `calibrate` did not send the regulation prompt that `bench` sends — the reports are not in the repository and do not record the judge model, and results moved with the judge model (with gpt-4o-mini as judge, EU AI Act pillars 3–5 failed). GDPR's sixth pillar cleared only a relaxed κ ≥ 0.60 gate. Treat these judges as uncalibrated for your deployment until you re-run `calibrate`, which sends the benchmark prompt from 0.42.0-beta, and its reports are published.
 
 The headline takeaway: **same primitive, same composition pattern, different content and weighting.** Adding a new regulation (NIST AI RMF, ISO 42001, future Colorado AI Act) is largely a content addition — new YAML scenarios + new judge prompt + a preset factory method that wires them together. No new framework code needed.
 

@@ -60,8 +60,8 @@ public class AuditChainTamperingTests
         // Companion test: same shape but with hashes aligned. Locks down the
         // happy path so a future regression in the chain-check (e.g. inverted
         // condition) doesn't go silently unnoticed. Asserts on Cells.NotEmpty
-        // too, because the empty-matrix branch ALSO returns AllChainsValid=true
-        // — the assertion would otherwise pass even if no audit chain ran.
+        // too. (The empty-matrix branch used to return AllChainsValid=true, so the
+        // assertion could pass with no audit chain run; it now returns false.)
         const string sharedHash = "SHARED_HASH_VALID_AUDIT_CHAIN";
         var (subject, manifest, evidence) =
             BuildFixture(manifestHash: sharedHash, evidenceHash: sharedHash);
@@ -74,6 +74,23 @@ public class AuditChainTamperingTests
         Assert.True(matrix.AllChainsValid);
         Assert.NotEmpty(matrix.Subjects);
         Assert.NotEmpty(matrix.Cells);
+    }
+
+    [Fact]
+    public async Task ComplianceMatrix_IndexedEvidenceThatCannotBeRead_IsNotReportedValid()
+    {
+        // The index lists the evidence, but the evidence itself is gone (e.g. its directory was deleted). This
+        // used to be skipped by a silent `continue`, the matrix came out empty, and the empty branch reported
+        // AllChainsValid = true: deleting evidence turned the audit badge green.
+        const string sharedHash = "SHARED_HASH_VALID_AUDIT_CHAIN";
+        var (subject, manifest, evidence) = BuildFixture(manifestHash: sharedHash, evidenceHash: sharedHash);
+
+        var service = new ComplianceMatrixService(new TamperedReader(subject, manifest, evidence, evidenceUnreadable: true));
+        var matrix = await service.BuildMatrixAsync("test-reg", CancellationToken.None);
+
+        Assert.False(matrix.AllChainsValid);
+        // Counted, so the page shows a broken chain rather than a neutral "no evidence".
+        Assert.Equal(1, matrix.UnreadableEvidence);
     }
 
     [Fact]
@@ -243,15 +260,18 @@ public class AuditChainTamperingTests
         private readonly RunManifest _manifest;
         private readonly ComplianceEvidence _evidence;
         private readonly string _ts;
+        private readonly bool _evidenceUnreadable;
 
         public TamperedReader(
             SubjectIdentity subject,
             RunManifest manifest,
-            ComplianceEvidence evidence)
+            ComplianceEvidence evidence,
+            bool evidenceUnreadable = false)
         {
             _subject = subject;
             _manifest = manifest;
             _evidence = evidence;
+            _evidenceUnreadable = evidenceUnreadable;
             _ts = evidence.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss");
         }
 
@@ -325,6 +345,8 @@ public class AuditChainTamperingTests
             string timestamp,
             CancellationToken ct = default)
         {
+            if (_evidenceUnreadable)
+                return Task.FromResult<ComplianceEvidence?>(null);
             if (regulation == _evidence.Regulation
                 && subject.Kind == _subject.Kind
                 && subject.Name == _subject.Name

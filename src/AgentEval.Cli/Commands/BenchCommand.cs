@@ -77,13 +77,10 @@ public static class BenchCommand
         // through. Previously the prompt was validated by tests + recorded in
         // provenance but never reached the LLM — the "Cite articles / Be conservative /
         // Flag evasive responses" rules had no actual effect on judgements.
-        var gdprPrompt = EmbeddedPromptLoader.Load(
-            typeof(GdprBenchmark).Assembly,
-            "gdpr-judge-system.v1.md");
-        var (resolvedJudge, judgeModelName, exitCode) = JudgeFactory.Resolve(
+        // The same resolver `bench gdpr calibrate` uses, so the calibrated judge is the judge that runs.
+        var (resolvedJudge, judgeModelName, exitCode) = JudgeFactory.ResolveGdpr(
             evaluatorOverride,
-            judgeKind: "GDPR benchmark",
-            systemPrompt: gdprPrompt);
+            judgeKind: "GDPR benchmark");
         if (resolvedJudge is null) return exitCode;
         IEvaluator judge = resolvedJudge;
 

@@ -82,8 +82,9 @@ public sealed record AgenticEvaluatorSummary(
 /// The judge mode used: <c>single</c>, <c>panel</c>, or <c>adjudicated</c>.
 /// </param>
 /// <param name="PromptVersions">
-/// Map of prompt template key to version string, e.g.
-/// <c>{ "agentic-judge-system": "v1", "task-completion-criterion": "v1" }</c>.
+/// Map of prompt key to the version actually sent to the judge. The default is
+/// <c>{ "judge-system": "agenteval.judge.default-system.v1" }</c>: the agentic judges use the built-in
+/// default system prompt, and the per-evaluator files under <c>Resources/Prompts/</c> are not sent.
 /// </param>
 public sealed record AgenticAttestation(
     string AgentEvalVersion,

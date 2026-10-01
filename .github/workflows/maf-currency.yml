@@ -1,0 +1,41 @@
+name: MAF currency
+
+# Fails when the Microsoft Agent Framework stack pinned in Directory.Packages.props falls more than one
+# minor version behind NuGet.
+#
+# WHY THIS EXISTS. Dependabot's NuGet version updates were configured weekly and never completed: every
+# run from June to September 2026 spent ~55 minutes failing dependency discovery (NETSDK1005 on the
+# multi-targeted projects) and was cancelled, and from 2026-09-06 none ran at all. MAF moved from 1.17
+# to 1.23 in that time and nothing said so. This check reads the pins and NuGet's index directly, so it
+# either prints a verdict or fails; "could not measure" is its own exit code, never "current".
+#
+# It runs weekly and on any change to the pins. It never gates a pull request that does not touch them.
+on:
+  schedule:
+    - cron: '0 7 * * 1'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'Directory.Packages.props'
+      - 'tools/check_maf_currency.py'
+      - '.github/workflows/maf-currency.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  maf-currency:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+      # The verdict logic is exercised offline first, both directions (behind fails, current passes,
+      # an unreachable index is "could not measure"), so a green run cannot come from a check that
+      # stopped checking.
+      - name: Self-test
+        run: python tools/check_maf_currency.py --self-test
+      - name: Check pins against NuGet
+        run: python tools/check_maf_currency.py --max-minor-lag 1

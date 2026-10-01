@@ -30,6 +30,8 @@ namespace AgentEval.Evals.Agentic.Safety;
 /// https://raw.githubusercontent.com/Azure/azure-sdk-for-python/main/sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_protected_material/protected_material.prompty
 /// License: MIT. Modifications: temperature=0, structured evidence[], severity=high,
 /// label table, AgentEval envelope.
+/// These modifications are in the reference prompt file under <c>Resources/Prompts/</c>, which is not
+/// yet sent to the judge; the judge call sets no temperature.
 /// </para>
 /// <para>
 /// Foundry reference: <c>azureai://built-in/evaluators/protected_material</c>

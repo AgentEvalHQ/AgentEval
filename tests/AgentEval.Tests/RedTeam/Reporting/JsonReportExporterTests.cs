@@ -37,7 +37,7 @@ public class JsonReportExporterTests
         var doc = JsonDocument.Parse(json);
 
         var schemaVersion = doc.RootElement.GetProperty("schema_version").GetString();
-        Assert.Equal("0.2.0", schemaVersion);   // 5d: bumped for coverage/truncation + per-probe fidelity fields
+        Assert.Equal("0.3.0", schemaVersion);   // 0.3.0: over_refusal (always) + benign_controls + fold turn/node counts; 0.2.0: coverage/truncation (5d)
     }
 
     [Fact]

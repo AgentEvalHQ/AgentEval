@@ -137,8 +137,26 @@ public class CompositeEvalSkippedLeavesTests
     [Fact]
     public async Task OneRealLeafAmongSkipped_StillYieldsARealVerdict()
     {
-        // Guard: the fix must not widen. A single measured leaf still decides the composite exactly
-        // as before, with the skipped siblings excluded from the denominator.
+        // The skipped siblings stay out of the denominator, so the one measured leaf still sets the score. With
+        // MinimumMeasuredShare = 0 it decides the label exactly as it did before that bar existed.
+        var sut = new CompositeEval("composite", "Composite", "test", "1.0.0", new EvalComponent[]
+        {
+            new(new SkippingEval("a")),
+            new(new FixedEval("b", 0.9, passed: true)),
+            new(new SkippingEval("c")),
+        }, WeightedSumAggregation.Instance) { MinimumMeasuredShare = 0 };
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("pass", result.Score.Label);
+        Assert.True(result.Score.Passed);
+        Assert.Equal(0.9, result.Score.Value, precision: 10);
+    }
+
+    [Fact]
+    public async Task OneRealPassingLeafAmongSkipped_IsAWarnUnderTheDefaultBar()
+    {
+        // One of three measured is below the default half: nothing failed, but the pass is not the composite's.
         var sut = Composite(new EvalComponent[]
         {
             new(new SkippingEval("a")),
@@ -148,8 +166,8 @@ public class CompositeEvalSkippedLeavesTests
 
         var result = await sut.EvaluateAsync(Input);
 
-        Assert.Equal("pass", result.Score.Label);
-        Assert.True(result.Score.Passed);
+        Assert.Equal("warn", result.Score.Label);
+        Assert.False(result.Score.Passed);
         Assert.Equal(0.9, result.Score.Value, precision: 10);
     }
 

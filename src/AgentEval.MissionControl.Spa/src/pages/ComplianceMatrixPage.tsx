@@ -22,6 +22,7 @@ interface MatrixResponse {
     cells: MatrixCell[];
     allChainsValid: boolean;
     lastEvidenceAt: string | null;
+    unreadableEvidence: number;
   };
 }
 
@@ -45,6 +46,7 @@ const MATRIX_QUERY = /* GraphQL */ `
       }
       allChainsValid
       lastEvidenceAt
+      unreadableEvidence
     }
   }
 `;
@@ -94,7 +96,11 @@ export function ComplianceMatrixPage() {
                   per cell.
                 </p>
               </div>
-              <AuditChainBadge valid={m.allChainsValid} />
+              {m.subjects.length > 0 || m.unreadableEvidence > 0 ? (
+                <AuditChainBadge valid={m.allChainsValid} />
+              ) : (
+                <span className="text-xs text-slate-500">No evidence — no audit chain to check</span>
+              )}
             </header>
 
             <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">

@@ -43,7 +43,7 @@ public static class GatekeeperJailbreakAndToolAbuse
         var agent = new ChatClientAgent(client, new ChatClientAgentOptions
         {
             Name = "JailbreakPreGate",
-            ChatOptions = new ChatOptions { MaxOutputTokens = 256 },
+            ChatOptions = new ChatOptions { MaxOutputTokens = 1024 },
         })
             .AsBuilder()
             .UseGatekeeper(RuntimeEnforcement.ReplaceResult, options =>
@@ -113,7 +113,7 @@ public static class GatekeeperJailbreakAndToolAbuse
             new ChatClientAgentOptions
             {
                 Name = "ParaphrasedJailbreak",
-                ChatOptions = new ChatOptions { Tools = tools, MaxOutputTokens = 256 },
+                ChatOptions = new ChatOptions { Tools = tools, MaxOutputTokens = 1024 },
             })
             .AsBuilder()
             .UseGatekeeper(RuntimeEnforcement.ReplaceResult, options =>
@@ -177,7 +177,7 @@ public static class GatekeeperJailbreakAndToolAbuse
             new ChatClientAgentOptions
             {
                 Name = "BenignJailbreakControl",
-                ChatOptions = new ChatOptions { Tools = [readCustomer], MaxOutputTokens = 256 },
+                ChatOptions = new ChatOptions { Tools = [readCustomer], MaxOutputTokens = 1024 },
             })
             .AsBuilder()
             .UseGatekeeper(RuntimeEnforcement.ReplaceResult, options =>

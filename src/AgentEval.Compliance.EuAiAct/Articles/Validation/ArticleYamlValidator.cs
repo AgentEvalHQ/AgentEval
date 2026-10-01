@@ -25,7 +25,11 @@ public sealed class ArticleYamlValidator
 
     private static readonly string[] s_validGranularities = ["atomic", "composite"];
 
-    private static readonly string[] s_validAggregations = ["weighted_sum", "min", "cap_by_worst"];
+    // Every aggregation that means what it says under an article's mandatory pass threshold. weighted_median was
+    // missing although the builder can construct it. majority_vote is deliberately NOT admitted: an article always
+    // has a pass threshold, and under a threshold MajorityVote's score is an unweighted mean of the scenarios, so
+    // it would ignore the weights the validator requires and vote only on severity.
+    private static readonly string[] s_validAggregations = ["weighted_sum", "min", "cap_by_worst", "weighted_median"];
 
     /// <summary>Validates <paramref name="spec"/> and returns a <see cref="ValidationResult"/>.</summary>
     public ValidationResult Validate(ArticleSpec spec)
@@ -46,19 +50,12 @@ public sealed class ArticleYamlValidator
         if (!s_validAggregations.Contains(spec.Metadata.Aggregation))
             errors.Add($"metadata.aggregation '{spec.Metadata.Aggregation}' must be one of: {string.Join(", ", s_validAggregations)}");
 
-        // 16: <= 0, not < 0 — PassThreshold directly gates pass/fail (ArticleCompositeBuilder), unlike
-        // WarnThreshold/PillarWeight (documented dead metadata, not consumed — see ArticleMetadata's doc). An
+        // 16: <= 0, not < 0 — PassThreshold directly gates pass/fail (ArticleCompositeBuilder). An
         // omitted YAML field silently deserializes to the C# default 0.0, and a 0.0 threshold trivially passes
         // every score ≥ 0 — silently making the whole article auto-pass with zero actual signal, exactly the
         // failure mode this benchmark exists to catch. Every real article ships 0.50-0.85; 0.0 is never intentional.
         if (spec.Metadata.PassThreshold is <= 0 or > 1)
             errors.Add("metadata.pass_threshold must be in (0,1]");
-
-        if (spec.Metadata.WarnThreshold is < 0 or > 1)
-            errors.Add("metadata.warn_threshold must be in [0,1]");
-
-        if (spec.Metadata.PillarWeight is < 0 or > 1)
-            errors.Add("metadata.pillar_weight must be in [0,1]");
 
         if (spec.Scenarios.Count == 0)
             errors.Add("article must have at least one scenario");

@@ -420,6 +420,7 @@ agenteval redteam [--azure] [--endpoint <url>] [--model <name>] [--deployment-na
 | `--baseline`, `--save-baseline`, `--fail-on` | Regression gating for CI. |
 | `--calibration` | Relative scoring against a reference cohort. |
 | `--explain` | Attach an LLM rationale to each finding (requires `--judge`). |
+| `--benign-controls` | Also run benign look-alike requests and report over-refusal beside the attack success rate (does not change the verdict). |
 
 For the full flag matrix and examples, see [Red Team Security](redteam.md). Exit codes: see [Exit codes](#exit-codes).
 
@@ -438,7 +439,6 @@ drop straight into CI.
 agenteval gatekeeper list-gates [--json] [--phase inspect|serve|all]
 agenteval gatekeeper inspect   --gate <id> [--input <file.jsonl>] [--policy block|warn] [gate flags] [model flags]
 agenteval gatekeeper calibrate --gate judge:<axis> <model flags> [--certify]
-agenteval gatekeeper serve                                # stub — not implemented
 ```
 
 **Subcommands**

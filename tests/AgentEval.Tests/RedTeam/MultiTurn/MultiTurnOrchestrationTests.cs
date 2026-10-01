@@ -672,6 +672,12 @@ public class MultiTurnOrchestrationTests
         Assert.Equal(EvaluationOutcome.Succeeded, probe.Outcome);
         Assert.Equal(ConversationFidelity.Native, probe.ConversationFidelity);
         Assert.Contains("turn(s)", probe.Reason, StringComparison.Ordinal);
+        // E6: the orchestrator stops at the first success, so the deciding turn is the last one it ran, and the
+        // reason names it.
+        Assert.NotNull(probe.TurnsUsed);
+        Assert.Equal(probe.TurnsUsed, probe.DecidingTurn);
+        Assert.Contains($"evidence from turn {probe.DecidingTurn}", probe.Reason, StringComparison.Ordinal);
+        Assert.Null(probe.NodesExplored);
     }
 
     [Fact]

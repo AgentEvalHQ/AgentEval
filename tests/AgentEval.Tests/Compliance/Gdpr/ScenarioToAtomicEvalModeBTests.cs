@@ -49,9 +49,7 @@ public class ScenarioToAtomicEvalModeBTests
             ControlId: "gdpr.art9.special_categories",
             Title: "Special categories",
             Severity: severity,
-            PassThreshold: 0.90,
-            WarnThreshold: 0.70,
-            PillarWeight: 0.20);
+            PassThreshold: 0.90);
 
     private static ScenarioSpec MakeScenario(string granularity, int criteriaCount = 3) =>
         new(

@@ -65,6 +65,8 @@ public sealed class TurnOrchestrator
         // 5c: track fidelity of the EVIDENCE behind the fold, not a running max across all turns: the succeeding
         // turn's fidelity on success, else the highest fidelity among CONCLUSIVE turns (Inconclusive turns excluded).
         EvidenceFidelity? succeededTurnFidelity = null;
+        int? succeededTurnNumber = null;   // E6: the selector below already picks a turn; keep WHICH turn it picked
+        int? conclusiveTurnNumber = null;
         var conclusiveFidelity = EvidenceFidelity.Verbal;
         // ADR-021 (§5): grading provenance of the representative turn — paired with the same selection
         // as fidelity (the succeeding turn on success, else the highest-fidelity conclusive turn).
@@ -193,12 +195,14 @@ public sealed class TurnOrchestrator
             {
                 succeededTurnFidelity = turnFidelity;
                 succeededTurnGrading = turnGrading;
+                succeededTurnNumber = perTurn.Count;
             }
             if (result.Outcome != EvaluationOutcome.Inconclusive)
             {
                 if (!haveConclusive || turnFidelity > conclusiveFidelity)
                 {
                     conclusiveGrading = turnGrading;
+                    conclusiveTurnNumber = perTurn.Count;
                     haveConclusive = true;
                 }
                 conclusiveFidelity = Max(conclusiveFidelity, turnFidelity);
@@ -262,6 +266,10 @@ public sealed class TurnOrchestrator
         var grading = outcome == EvaluationOutcome.Succeeded && succeededTurnFidelity.HasValue
             ? succeededTurnGrading
             : conclusiveGrading;
+        // E6: the turn that selection picked. An all-Inconclusive fold has no evidence turn.
+        var decidingTurn = outcome == EvaluationOutcome.Succeeded && succeededTurnFidelity.HasValue
+            ? succeededTurnNumber
+            : outcome == EvaluationOutcome.Inconclusive ? null : conclusiveTurnNumber;
 
         return new MultiTurnResult
         {
@@ -272,6 +280,7 @@ public sealed class TurnOrchestrator
             Transcript = history,
             PerTurnResults = perTurn,
             TurnsUsed = perTurn.Count,
+            DecidingTurn = decidingTurn,
             Reason = reason,
             WasTruncated = truncated && outcome != EvaluationOutcome.Succeeded,
             // L10 / Jun14-M13: AttackerDriven is true only when an attacker LLM was BOTH wired AND actually consumed by

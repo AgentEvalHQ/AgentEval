@@ -285,7 +285,7 @@ public static class BenchAgenticCommand
     /// </param>
     /// <param name="judgeModel">
     /// T3.2 (2026-05-25): the deployment / model identifier returned by
-    /// <see cref="JudgeFactory.Resolve(IEvaluator?, string, string?)"/>. Forwarded to the
+    /// <see cref="JudgeFactory.Resolve(IEvaluator?, string, string?, string?)"/>. Forwarded to the
     /// preset factories so every leaf evaluator records the judge model on
     /// its provenance. <c>null</c> when not threaded (preserves the legacy
     /// behaviour for the calibration / fixture paths that do not need it).

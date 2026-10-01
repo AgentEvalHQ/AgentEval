@@ -72,6 +72,28 @@ public class MemoryBenchmarkRunnerTests
         Assert.NotNull(crossSession);
         Assert.True(crossSession.Skipped);
         Assert.Contains("ISessionResettableAgent", crossSession.SkipReason);
+        // Unsupported is not a crash: it leaves the denominator rather than counting as 0.
+        Assert.False(crossSession.Errored);
+    }
+
+    private sealed class ThrowingAgent : AgentEval.Core.IEvaluableAgent
+    {
+        public string Name => "throwing";
+        public Task<AgentEval.Core.AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("the agent's transport failed");
+    }
+
+    [Fact]
+    public async Task RunBenchmarkAsync_ACategoryThatThrows_IsErrored_AndCountsAsZero()
+    {
+        var result = await _runner.RunBenchmarkAsync(new ThrowingAgent(), MemoryBenchmark.Quick);
+
+        var errored = result.CategoryResults.Where(c => c.Errored).ToList();
+        Assert.NotEmpty(errored);
+        Assert.All(errored, c => Assert.StartsWith("Error: ", c.SkipReason, StringComparison.Ordinal));
+        // Every category crashed, so nothing may renormalise into a score.
+        Assert.Equal(0, result.OverallScore);
+        Assert.Equal(errored.Select(c => c.CategoryName), result.ErroredCategories);
     }
 
     [Fact]

@@ -53,6 +53,27 @@ public sealed class CompositeEval : IEval
     /// </summary>
     public double? Threshold { get; }
 
+    /// <summary>
+    /// The share of components (0..1) that must produce a measurement for a passing composite to report
+    /// <c>pass</c>. Below it the composite reports <c>warn</c>: nothing failed, but the pass would rest on a minority
+    /// of what the composite claims to cover. Default 0.5. Set 0 to accept a pass on any measured component.
+    /// </summary>
+    /// <remarks>
+    /// Leaves that could not measure (skipped, inapplicable, errored) are excluded from the score, which is right:
+    /// they must not score 0. But it means a composite whose components mostly declare themselves inapplicable
+    /// passes on whatever is left. A CI gate keyed on the label then exits 0 on a 1-of-10 measurement. This bar
+    /// stops a self-declared "not applicable" from diluting the denominator into a pass.
+    /// </remarks>
+    /// <exception cref="ArgumentOutOfRangeException">The value is not a finite number in [0, 1].</exception>
+    public double MinimumMeasuredShare
+    {
+        get => _minimumMeasuredShare;
+        init => _minimumMeasuredShare = double.IsFinite(value) && value is >= 0.0 and <= 1.0
+            ? value
+            : throw new ArgumentOutOfRangeException(nameof(MinimumMeasuredShare), value, "must be a finite value in [0, 1].");
+    }
+    private readonly double _minimumMeasuredShare = 0.5;
+
     /// <summary>Initialises a new <see cref="CompositeEval"/>.</summary>
     public CompositeEval(
         string key,
@@ -179,13 +200,13 @@ public sealed class CompositeEval : IEval
         //   Threshold null       -> severity is { high|critical -> fail, medium -> warn, _ -> pass }
         // "warn" is a soft fail: passed = false but label distinguishes from a hard fail.
         //
-        // The nothing-measured label stays inside schema v1's closed `label` enum
-        // {pass,fail,warn,skipped,error}. An all-inapplicable composite is a CORPUS finding and its
-        // true label is "inapplicable", which the enum does not yet carry — that is the other half of
-        // ADR-030 Slice 1.4, gated by §9 Q4. Until then it reports "skipped" (in the enum, non-passing,
-        // and correct about the one thing that matters here: no verdict) and the note below carries the
-        // attribution the label cannot. This choice is behaviour-identical for every pre-existing label:
-        // all-skipped still yields "skipped", and any errored leaf still yields "error".
+        // An all-inapplicable composite is a CORPUS finding and its true label is "inapplicable". The
+        // schema has ACCEPTED that label since v1.1 (ADR-030 Slice 1.4(i), 2026-09-06); what is not done is
+        // the writer half, Slice 1.4(ii) — emitting it here changes historical content hashes, and that
+        // slice is unfunded, not blocked by an open question. Until it lands this composite reports
+        // "skipped" (non-passing, and correct about the one thing that matters here: no verdict) and the
+        // note below carries the attribution the label cannot. Behaviour-identical for every pre-existing
+        // label: all-skipped still yields "skipped", and any errored leaf still yields "error".
         var label = hasRequiredError
             ? "error"
             : nothingMeasured
@@ -198,6 +219,12 @@ public sealed class CompositeEval : IEval
                         "medium" => "warn",
                         _ => "pass"
                     };
+
+        // A pass that rests on a minority of the components is not the composite's pass. Nothing failed, so it is a
+        // soft finding (warn → exit 10 through BenchExitCodes), not a fail.
+        var underCovered = label == "pass" && measuredCount < MinimumMeasuredShare * subs.Length;
+        if (underCovered)
+            label = "warn";
         var passed = label == "pass";
 
         // Say why in the result itself (mirrors EvalResult.Skipped, which writes its reason to
@@ -214,17 +241,44 @@ public sealed class CompositeEval : IEval
                       $"{skippedCount} skipped, {inapplicableCount} inapplicable); no verdict is reported.")
             : null;
 
+        // Coverage disclosure for a PARTLY measured composite. Excluding skipped, inapplicable and
+        // errored leaves from the denominator is deliberate (and test-pinned): a leaf that could not
+        // measure must not score 0. But without a note, a composite with 9 of 10 leaves unmeasured and
+        // one leaf at 1.0 reported pass, Score = 1.0 and nothing else, under every aggregation strategy —
+        // the diluted-denominator shape, in silence. The verdict is unchanged; the result now says how
+        // much of it was measured.
+        // The breakdown is mutually exclusive (error first, then inapplicable, then everything else not
+        // measured), so its three numbers always add up to the unmeasured count it explains.
+        var unmeasured = subs.Where(s => !s.Score.CountsTowardAggregate()).ToArray();
+        var unmeasuredErrored = unmeasured.Count(s => s.Score.Label == "error");
+        var unmeasuredInapplicable = unmeasured.Count(s =>
+            s.Score.Label != "error" && s.Score.CensusBucket() == MeasurementState.NotApplicable);
+        var unmeasuredOther = unmeasured.Length - unmeasuredErrored - unmeasuredInapplicable;
+        var breakdown = $"({unmeasuredOther} skipped or not measured, {unmeasuredInapplicable} inapplicable, {unmeasuredErrored} errored)";
+        string? partialCoverageNote = nothingMeasured || unmeasured.Length == 0
+            ? null
+            : hasRequiredError
+                ? $"A required component errored, so no pass/fail verdict is reported. Measured {measuredCount} of " +
+                  $"{subs.Length} component(s); {unmeasured.Length} produced no measurement {breakdown}."
+                : underCovered
+                    ? $"Passed on only {measuredCount} of {subs.Length} component(s), below the " +
+                      $"{MinimumMeasuredShare.ToString("P0", System.Globalization.CultureInfo.InvariantCulture)} a pass needs, " +
+                      $"so the verdict is warn; {unmeasured.Length} left out of the score {breakdown}."
+                    : $"Measured {measuredCount} of {subs.Length} component(s); {unmeasured.Length} left out of the score " +
+                      $"{breakdown}, so this verdict covers only the measured part.";
+        var coverageNote = nothingMeasuredNote ?? partialCoverageNote;
+
         return new EvalResult(
             Metric: new(Key, Name, Category, Version),
             Score: new(score, null, label, passed, Threshold, severity, null),
             Details: new(
                 Dimensions: null,
                 Evidence: null,
-                Recommendations: nothingMeasuredNote is null ? null : new[] { nothingMeasuredNote },
+                Recommendations: coverageNote is null ? null : new[] { coverageNote },
                 SubResults: subs,
                 AggregationStrategy: Aggregation.Name)
             {
-                Summary = nothingMeasuredNote,
+                Summary = coverageNote,
             },
             Provenance: new(
                 Type: "composite",

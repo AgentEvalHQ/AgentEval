@@ -202,20 +202,38 @@ public static class BenchAgenticCalibrateCommand
     /// <param name="outPathOverride">Optional output path override (used by tests).</param>
     /// <param name="evaluatorOverride">Optional evaluator override (used by tests).</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <param name="recordsPath">When set, one JSON line per evaluated case is written here (<c>--records</c>).</param>
+    /// <param name="limitPerCategory">When set, at most this many entries per category are evaluated (<c>--limit</c>).</param>
     /// <returns>0 on success, 2 if thresholds not met, 1 on internal error.</returns>
     public static Task<int> RunAsync(
         string? rootOverride = null,
         string? outPathOverride = null,
         IEvaluator? evaluatorOverride = null,
-        CancellationToken ct = default)
-        => RunCoreAsync(rootOverride, outPathOverride, evaluatorOverride, ct);
+        CancellationToken ct = default,
+        string? recordsPath = null,
+        int? limitPerCategory = null)
+        => RunCoreAsync(rootOverride, outPathOverride, evaluatorOverride, ct, recordsPath, limitPerCategory);
 
     internal static async Task<int> RunCoreAsync(
         string? rootOverride,
         string? outPathOverride,
         IEvaluator? evaluatorOverride,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        string? recordsPath = null,
+        int? limitPerCategory = null)
     {
+        if (limitPerCategory is < 1)
+        {
+            Console.Error.WriteLine("--limit must be at least 1.");
+            return ExitCodes.UsageError;
+        }
+        if (limitPerCategory is not null && outPathOverride is null)
+        {
+            // A limited run must never land on the default dated baseline path and overwrite that day's full run.
+            Console.Error.WriteLine("--limit requires --out: a limited run is a wiring check, not a baseline, and must not overwrite the day's report.");
+            return ExitCodes.UsageError;
+        }
+
         // ── Workspace root canonicalisation ──────────────────────────────────
         if (rootOverride is not null)
         {
@@ -311,7 +329,27 @@ public static class BenchAgenticCalibrateCommand
         try
         {
             var runner = new AgentEval.Evals.Agentic.Calibration.CalibrationRunner(Resolver);
-            report = await runner.RunAsync(datasets, ct);
+            if (recordsPath is null)
+            {
+                report = await runner.RunAsync(datasets, caseSink: null, limitPerCategory, ct);
+            }
+            else
+            {
+                var dir = Path.GetDirectoryName(Path.GetFullPath(recordsPath));
+                if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+                await using var writer = new StreamWriter(recordsPath, append: false);
+                var jsonOptions = new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web);
+                report = await runner.RunAsync(
+                    datasets,
+                    async (record, token) =>
+                    {
+                        await writer.WriteLineAsync(System.Text.Json.JsonSerializer.Serialize(record, jsonOptions).AsMemory(), token);
+                        await writer.FlushAsync(token);
+                    },
+                    limitPerCategory,
+                    ct);
+                Console.WriteLine($"Per-case records written: {recordsPath}");
+            }
         }
         catch (Exception ex)
         {
@@ -330,6 +368,9 @@ public static class BenchAgenticCalibrateCommand
         {
             Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
             var md = BuildMarkdownReport(report);
+            if (limitPerCategory is int lim)
+                md = $"> ⚠️ **LIMITED RUN — at most {lim} entr{(lim == 1 ? "y" : "ies")} per category.** A wiring check, not a baseline: " +
+                     "accuracy and kappa on this few cases mean nothing, and the calibration gate is not applied." + Environment.NewLine + Environment.NewLine + md;
             await File.WriteAllTextAsync(outPath, md);
             Console.WriteLine($"Agentic calibration report: {outPath}");
         }
@@ -385,6 +426,16 @@ public static class BenchAgenticCalibrateCommand
             ? "Agentic calibration gate PASSED — all categories meet thresholds with zero evaluation failures."
             : $"Agentic calibration gate FAILED — one or more categories below " +
               $"accuracy>={AccuracyThreshold:P0} or kappa>={KappaThreshold:F2}, or had non-zero evaluation_failures.");
+
+        if (limitPerCategory is not null)
+        {
+            // At one entry per category kappa is undefined, so the gate would fail every category by construction.
+            // A limited run checks the wiring; it passes when nothing errored, and says the gate was not applied.
+            var anyFailures = report.PerCategory.Values.Any(c => c.EvaluationFailures > 0);
+            Console.WriteLine($"Limited run (--limit {limitPerCategory}): the calibration gate is NOT applied. " +
+                              (anyFailures ? "Evaluation failures occurred — the wiring is not clean." : "No evaluation failures — the wiring is clean."));
+            return anyFailures ? ExitCodes.GateFailed : ExitCodes.Success;
+        }
 
         return allPass ? ExitCodes.Success : ExitCodes.GateFailed;
     }

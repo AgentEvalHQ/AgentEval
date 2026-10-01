@@ -9,16 +9,57 @@ namespace AgentEval.Core;
 /// <summary>
 /// Default implementation of IEvaluator using an IChatClient.
 /// </summary>
-public class ChatClientEvaluator : IEvaluator
+/// <remarks>
+/// Implements <see cref="IJudgePromptSource"/> so the evals built on it can record which prompt was sent. With no
+/// system prompt supplied it sends <see cref="DefaultSystemPromptId"/>, a generic instruction that asks for
+/// per-criterion verdicts and an overall 0-100 score; no evaluator-specific rubric reaches the judge unless the
+/// caller passes one here.
+/// </remarks>
+public class ChatClientEvaluator : IEvaluator, IJudgePromptSource
 {
+    /// <summary>The <see cref="IJudgePromptSource.SystemPromptId"/> reported when no system prompt was supplied.</summary>
+    public const string DefaultSystemPromptId = "agenteval.judge.default-system.v1";
+
+    /// <summary>
+    /// Version marker for the user-prompt template built in <see cref="EvaluateAsync"/> (the fenced INPUT/OUTPUT
+    /// sections and the numbered criteria list). <b>Bump it whenever that template changes</b>: it is part of
+    /// <see cref="PromptMaterial"/>, so the bump is what makes every downstream <c>PromptHash</c> move. A test pins
+    /// the rendered template to this value.
+    /// </summary>
+    public const string UserPromptTemplateVersion = "chatclient-evaluator.user-template.v1";
+
+    /// <summary>Used as the id when a caller supplies a system prompt without naming it.</summary>
+    public const string UnnamedCustomSystemPromptId = "custom-system-prompt";
+
     private readonly IChatClient _chatClient;
     private readonly string _systemPrompt;
+    private readonly string _systemPromptId;
 
     public ChatClientEvaluator(IChatClient chatClient, string? systemPrompt = null)
+        : this(chatClient, systemPrompt, systemPromptId: null) { }
+
+    /// <summary>Creates a judge that sends <paramref name="systemPrompt"/> and reports it as <paramref name="systemPromptId"/>.</summary>
+    /// <param name="chatClient">The chat client the judge calls.</param>
+    /// <param name="systemPrompt">The system prompt, or <see langword="null"/> for the built-in default.</param>
+    /// <param name="systemPromptId">
+    /// A stable name for <paramref name="systemPrompt"/> (e.g. the embedded file it was loaded from). Ignored when
+    /// <paramref name="systemPrompt"/> is <see langword="null"/>; defaults to <see cref="UnnamedCustomSystemPromptId"/>
+    /// otherwise, in which case the prompt is still identified by <see cref="PromptMaterial"/>'s hash.
+    /// </param>
+    public ChatClientEvaluator(IChatClient chatClient, string? systemPrompt, string? systemPromptId)
     {
         _chatClient = chatClient ?? throw new ArgumentNullException(nameof(chatClient));
         _systemPrompt = systemPrompt ?? DefaultSystemPrompt;
+        _systemPromptId = systemPrompt is null
+            ? DefaultSystemPromptId
+            : (string.IsNullOrWhiteSpace(systemPromptId) ? UnnamedCustomSystemPromptId : systemPromptId);
     }
+
+    /// <inheritdoc/>
+    public string? SystemPromptId => _systemPromptId;
+
+    /// <inheritdoc/>
+    public string PromptMaterial => "system-prompt:\n" + _systemPrompt + "\nuser-template: " + UserPromptTemplateVersion;
 
 
     private const string DefaultSystemPrompt = """

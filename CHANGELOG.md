@@ -7,6 +7,390 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.42.0-beta] - 2026-10-01
+
+One release with seven parts, newest first below:
+- Microsoft Agent Framework 1.23, with judge-prompt provenance and a block of corrections to earlier claims;
+- Gatekeeper v1;
+- over-refusal reported beside the attack success rate;
+- a composite cannot pass on a minority of its components;
+- a crashed memory-benchmark category counts as 0;
+- dead compliance fields removed;
+- the measured reference block for decision models.
+
+### Over-refusal beside the attack success rate
+
+A red-team scan now reports both headline numbers of a safety evaluation. It reports how often attacks get through,
+and, with `--benign-controls`, how often the agent refuses requests it should serve. Before this, an agent that
+refused everything resisted every attack, scored 100% and passed, and nothing in the report could show it. This
+wires the building blocks that this release's correction (below, under MAF 1.23) describes as unwired.
+
+#### Added
+- **`--benign-controls`** (`ScanOptions.RunBenignControls`, default off).
+  - It runs the benign-control corpus after the attacks. The results go to `RedTeamResult.BenignControlResults`,
+    which is kept apart from `AttackResults`, so they never move the attack success rate, the score or the
+    verdict.
+  - A benign control is graded by `RefusalDetector` alone. The attack judge is never consulted, because it grades
+    whether an attack succeeded, and on a silent benign case its verdict would read inverted.
+  - `FailFast` and `--explain` do not apply inside the arm. The arm is skipped when `FailFast` stopped the scan
+    early, and the report says so.
+- **`RedTeamResult` over-refusal members:**
+  - `OverRefusal`: refused benign controls over the conclusive ones, with a Wilson 95% interval;
+  - `IsOverRefusalMeasured` and `OverRefusalSummary`;
+  - `OverRefusalByClass`, a breakdown by look-alike class.
+  The rate is reported only from **20** conclusive cases, the same per-direction bar the judge calibration gate
+  enforces. Below that, the line reads `not measured` with the raw counts.
+- **`AgentEval.Models.RequestPermissibility`** (`NotPermissible` / `Permissible`): the split between the two
+  numbers, defined once so that compliance scenarios can mark their cases with the same vocabulary.
+- **`ProbeResult` members:**
+  - `Expectation`, stamped on every result from the probe's own marker, on every exit path;
+  - `TurnsUsed`, `DecidingTurn` and `NodesExplored`, for folded multi-turn and tree-search probes.
+- **The benign-control corpus grows from 18 to 29 probes**, with at least 4 in each of the 7 look-alike classes.
+  At 18 it sat below the 20-case bar, so it could never yield a rate. Every probe still has to use attack
+  vocabulary in a benign context; that test was not widened to admit the new probes.
+
+#### Changed
+- **Every report prints an over-refusal line, whether or not the arm ran:**
+  - the Markdown executive summary (and, when the arm ran, a per-class section listing the refused requests);
+  - the JSON `summary.over_refusal`, plus a `benign_controls` block when the arm ran;
+  - the SARIF run's invocation property bag (a refused benign request is not a code-scanning finding);
+  - the CLI summary.
+  JUnit always has a `RedTeam.BenignControls` suite: a refused request is a failed case, the root totals include
+  the suite, and when the arm did not run the suite is empty and its `over_refusal` property says `not measured`.
+  The scan verdict and exit code are unchanged.
+- **A scan that times out inside the arm keeps the benign results it already has.** The over-refusal line says
+  how many of the planned controls ran (`RedTeamResult.BenignControlsPlanned`).
+- **JSON report schema `0.3.0`:**
+  - `summary.over_refusal`;
+  - `benign_controls`;
+  - `turns_used` / `deciding_turn` / `nodes_explored` on failures.
+
+#### Fixed
+- **A TAP finding printed its node count as a number of turns.** A tree search's reason read
+  `[Flattened, 7 turn(s)]`, but each of the 7 nodes is an independent single-turn call to the agent. No 7-turn
+  conversation happened.
+  **Direction:** it described independent attempts as one long escalating conversation. Scores and verdicts were
+  not affected.
+  **Affected:** the reason text of TAP findings in SARIF, JSON, Markdown and JUnit since TAP shipped.
+  **Now:** TAP reads `[Flattened, 7 node(s), each a single-turn call]` and sets `NodesExplored`.
+  A linear multi-turn finding also names the turn its verdict rests on (`evidence from turn 3`, `DecidingTurn`).
+  The orchestrator already computed that turn and then discarded it.
+
+#### Measured, and a limit found by it
+- **First live run** (GLM-5.3-Flash via Bitdeer, 2 attack probes plus the 29 benign controls): 28 conclusive, 1
+  flagged, `3.6% [95% CI 0.6%, 17.7%]`.
+- **The one flag is the detector's error, not the model's.** The reply was a complete answer to BC-022 ("act as a
+  Socratic tutor"), and it contained "I won't confirm or deny each guess outright", which is the method the request
+  asked for. On that run the true over-refusal is 0 of 28.
+- Keyword refusal detection errs both ways. Read a non-zero rate together with the refused responses the report
+  lists. Grading benign controls with a calibrated over-refusal judge is the follow-up.
+
+#### Not included
+- The PDF and NIST exporters do not carry over-refusal yet.
+- Benign controls run single-turn and text-only.
+- No option fails the scan on over-refusal: the number is reported, not gated.
+
+### Decision models: the measured reference block ships, and the abstraction is marked preview
+
+#### Added
+- **`DecisionReferences`**: eight reference blocks. Each is a short description of what is being judged and what
+  is not, for a decision model:
+  - `Violence`, `SelfHarm`, `Adversarial`, `AgentProcess`, `AgentTask`, `Reasoning`, `Grounding`,
+    `CodeVulnerability`.
+  - Each was the best or joint-best decision-model arm on the golden sets it was measured on. On `violence` a
+    reference moved the decision model from 64.0% to 96.0% with false passes held at 0.0%
+    (`docs/adr/evidence/033-n5-reference-experiment-2026-09-21.md`, `033-n5-maximal-v2-2026-09-22.md`).
+  - The texts are the measured bytes; the experiment sample now reads them from the library.
+  - References for sexual content, sensitive-data leakage, communication and memory were not winners and stay in
+    the sample.
+  - A reference never says which way to answer: directional wording saturated the model in the same
+    measurements.
+- **A `reference` option on `DecisionJudge` and `DecisionEval`.** It is sent ahead of the state, in the shape the
+  experiment measured.
+  - It is part of the prompt fingerprint: `DecisionEval`'s `PromptHash`, and `DecisionJudge`'s new
+    `IJudgePromptSource` identity.
+  - Without one, the request bytes and every previously recorded hash are unchanged.
+  - Nothing grades with a decision model by default. This makes the measured pattern available; it does not
+    switch any criterion.
+
+#### Changed
+- **The decision-model abstraction is marked `[Experimental("AGENTEVAL_DECISIONS_PREVIEW001")]`.** This covers
+  `IDecisionClient` with its request, question, answer and usage types, and the System-One transport.
+  Microsoft.Extensions.AI is defining its own decision abstraction; AgentEval will adapt to it rather than keep a
+  third public one, so these types can change. Using them now raises the diagnostic; suppress it to acknowledge
+  the preview.
+
+### Compliance article files lose two numbers nothing read
+
+#### Removed
+- **`warn_threshold` and `pillar_weight` are gone from the GDPR and EU AI Act article schema.** They were in all 58
+  shipped article and domain-pack YAMLs (116 hand-written numbers) and were validated, but nothing read them:
+  - the WARN band is derived elsewhere;
+  - pillar weights are composite-builder constants.
+  They read as gates that gated nothing.
+  - **Breaking (library):** `ArticleMetadata` no longer has the `WarnThreshold` / `PillarWeight` parameters and
+    properties. Drop them from any code that constructs it.
+  - **Not breaking (data):** the loaders ignore unknown keys, so an article file written for an older release
+    still loads.
+  - `granularity` stays: it selects the per-criterion "Mode B" build that the planned holistic-vs-isolated
+    comparison uses.
+
+### `mc serve` says when the web UI is not there
+
+#### Fixed
+- **`agenteval mc serve` announced the portal even when the SPA had not been built**, and every page then answered
+  404. It now checks for `wwwroot/index.html` first. Without it, it reports that only the API is up, says why, and
+  points to `agenteval mc doctor`. The API and GraphQL endpoints still start.
+
+### A crashed memory benchmark category counts as 0
+
+#### Fixed
+- **A memory benchmark category that crashed raised the grade instead of lowering it.** A category whose run threw
+  was recorded as a skip, and `OverallScore` renormalised the weights around it. "87% across the board" and "87%
+  across the third that ran" produced the same grade. The recommendation could also call the crash "not supported
+  by this agent".
+  **Direction:** flattering. **Affected:** `OverallScore`, `Grade`, `Stars` and `Passed` of any memory benchmark
+  run in which a category threw. Runs without a crash are unchanged, and so are legitimately unsupported
+  categories.
+  **Now:**
+  - `BenchmarkCategoryResult.Errored` marks a crash, which counts as 0.
+  - `CapabilityScore` keeps the renormalised view for diagnosis.
+  - `ErroredCategories` lists the crashes, and the recommendations name a crash as a crash.
+
+### A composite cannot pass on a minority of its components
+
+#### Changed
+- **`CompositeEval` reports `warn`, not `pass`, when fewer than half of its components produced a measurement**
+  (`MinimumMeasuredShare`, default 0.5; set 0 for the old behaviour).
+  - Skipped, inapplicable and errored components are left out of the score, which is right, but it meant a
+    composite with 9 of 10 components unmeasured passed on the one left, and a CI gate keyed on the label exited
+    0.
+  - Components that declare themselves not applicable can no longer dilute the denominator into a pass. This is a
+    prerequisite for importing judge-declared applicability (the ASSERT track).
+  - Only a pass is withheld; a measured failure still fails. The score is unchanged, and the summary says how
+    many components were measured.
+  - Through the CLI, `warn` exits 10 (`GateWarning`): `bench owasp`, `bench mitre` and `bench nist` gate on the
+    composite label.
+- **The composite verdict matrix in `docs/composite-evals.md` now matches the code.** It lists the required-error
+  and nothing-measured rows it had omitted, and the new coverage row.
+
+### Gatekeeper v1, and it runs inside Microsoft Agent Framework's own AgentHooks host
+
+Gatekeeper's public surface is frozen, and the release says what that promise covers and what it does
+not. The headline evidence is a test, not a slide: an agent built with MAF's own
+`AsAIAgentWithAgentHooks` host and Gatekeeper's interceptor never executes a forbidden tool. In the
+control, the same host still executes an allowed one.
+
+#### Added
+- **`AgentEval.MAF.AgentHooks`** (experimental, not packaged): `GatekeeperInterceptor` exposes the
+  Gatekeeper tool-gate pipeline as an AGENT-HOOKS-0.1 `AgentHooks.IInterceptor`.
+  - Microsoft Agent Framework's AgentHooks host (`Microsoft.Agents.AI.AgentHooks`, MAF 1.19+) consumes that
+    interface, from the same `ResponsibleAI.AgentHooks 0.1.0-alpha.5` package. Gatekeeper therefore plugs
+    into MAF's own host and into any other conformant host.
+  - It enforces `pre_tool_call`. Every other interception point returns `allow` with a warning that names
+    the point as unenforced, never a silent pass.
+  - Verdicts map Allow → allow, Block → deny and Mutate → transform. Composition matches Gatekeeper's own
+    tool pipeline:
+    - strict sequential, first Block wins;
+    - a rewrite restarts the scan, so every gate checks the rewritten call before the host may run it;
+    - a rewrite that does not converge within 8 passes is denied;
+    - a gate that throws fails closed.
+  - Run-scoped gates (`GateRequirements.RunScope`, e.g. `RunBudgetGate`) are rejected at construction. A host
+    does not establish an `AgentRunScope`, so their state would fall back to a process-wide ledger shared by
+    every session.
+  - An allow from a context without `messages` warns `no_conversation`: gates that correlate against the
+    conversation had nothing to check.
+  - Rewritten arguments keep their JSON types. A value that cannot be serialized faithfully denies the call
+    instead of becoming its `ToString()`.
+  - The whole assembly is `[Experimental("AGENTEVAL_AGENTHOOKS_PREVIEW001")]`.
+- **AEVP 0.1** (`docs/aevp/AEVP-0.1.md`, schema `aevp-0.1.schema.json`), a **draft profile, not a
+  standard**. It is the evidence an interceptor attaches to a verdict: whether anything actually
+  evaluated the call, how well, whether it could have stopped it, who decided, and how good they are.
+  It exists because AGENT-HOOKS-0.1's decision enum has no abstention, so an interceptor that could not
+  evaluate a call must still answer `allow` or `deny`.
+  - The content address is the SHA-256 of the profile's **RFC 8785 (JCS)** canonical bytes, and a test checks
+    them against the AGENT-HOOKS reference core.
+  - The interceptor writes each profile to an `IAevpArtifactStore` (in-memory by default) before returning
+    its address, so every address it emits resolves.
+- **Gatekeeper public API snapshot.** `GatekeeperPublicApiSnapshotTests` approves every public type and
+  member of `AgentEval.MAF.Gatekeeper*`, `AgentEval.Guardrails*` and the adapter. That includes parameter
+  names and default values, because renaming a parameter breaks named-argument callers and changing a
+  default changes compiled ones. A change fails CI until the snapshot is reviewed. This is the v1 freeze.
+- **In-host tests:** Gatekeeper inside MAF's `AgentHooksAgent` denies a forbidden tool, and its body never
+  runs. The control: an allowed tool still runs.
+
+#### Changed
+- **Gatekeeper is Stable (v1)** in the README maturity table. Outside the promise:
+  - eight types that stay `[Experimental("AGENTEVAL_GATEKEEPER_PREVIEW001")]`: `FleetCorrelator` (+
+    options), `GatekeeperFleetHealthIndex` (+ report), `ICalibrationReportStore` /
+    `JsonFileCalibrationReportStore`, `SessionIdentityDriftGate` and `ToolResultSizeAnomalyGate`;
+  - the A2A inter-agent gates, which are implemented and calibrated but **not promoted**. Their κ = 1.0 was
+    measured on the calibration set itself, not on held-out cases.
+- **The Gatekeeper status page** carries a dated v1 entry and one known-limitations list:
+  - no OpenTelemetry yet;
+  - session reconciliation partial;
+  - run-post gates cannot stop streamed output;
+  - MAF Workflows interception blocked upstream;
+  - A2A not promoted;
+  - the adapter enforces `pre_tool_call` only;
+  - inline judges need a certificate for the model in use.
+
+#### Removed
+- **`agenteval gatekeeper serve`.** It was a visible subcommand that always exited with a runtime error,
+  which contradicted the docs. The stateful daemon remains a deferred design, and
+  `gatekeeper list-gates --phase serve` still classifies the gates that would need it. `gatekeeper
+  inspect` now says the daemon is not implemented, instead of pointing to it.
+
+#### Note for consumers
+- The adapter and the MAF host package are experimental and alpha. Nothing in the `AgentEval` package
+  depends on them; reference `AgentEval.MAF.AgentHooks` from source if you want to try it.
+- Using the adapter raises the error-severity diagnostic `AGENTEVAL_AGENTHOOKS_PREVIEW001`. Suppress it to
+  acknowledge the preview.
+- A pull request that changes Gatekeeper's public surface must update the approved snapshot
+  (`tests/AgentEval.Tests/Snapshots/GatekeeperPublicApiSnapshotTests.*.verified.txt`). That is the review
+  point.
+
+### Microsoft Agent Framework 1.23, and provenance that names the instrument that actually ran
+
+Two threads. The framework moves from MAF 1.17 to 1.23 with no source change. Most of the release is
+about what the project prints about its own instruments: which prompt a judge received, which criteria it
+graded, which judge a calibration measured, and which earlier claims were wrong. Several fixes run in
+the unflattering direction on purpose: an empty compliance matrix no longer reports its audit chains
+valid, and two adversarial evaluators stop failing agents that resisted the attack.
+
+#### Corrected
+
+Each entry below corrects something an earlier release published. Earlier release notes are left as
+they were; this is the record of what was wrong, in which direction, and what it touched.
+
+- **Red-team scans do not report over-refusal or Wilson intervals** (0.19.0-beta). That release said
+  red-team reports "state their own uncertainty (Wilson intervals, over-refusal against benign
+  controls …)" and that `FalsePositiveRate` meant "an agent that refuses everything no longer scores as
+  safe". `WilsonInterval`, `BenignControlCorpus`, `FalsePositiveRate`, `ProbeExpectation`,
+  `BypassClassBreakdown` and `ProbeLabelSource` shipped as tested library types, but nothing in a scan
+  uses them: `RedTeamRunner`, `RedTeamResult`, the JSON/SARIF/JUnit/Markdown exporters and the CLI never
+  compute or print an interval, a false-positive rate or a bypass-class breakdown, and no preset runs the
+  benign controls. An agent that refuses every probe is still scored as safe.
+  **Direction:** flattering — it described a safeguard against rewarding over-refusal that scans do not
+  apply. **Affected:** the 0.19.0-beta summary and its `WilsonInterval` / `FalsePositiveRate` entries, and
+  the v0.19.0-beta release notes, which also said the intervals were on "the headline score".
+  **Not affected:** every published red-team score and verdict — none was computed with these types; the
+  SARIF `kind: "open"` fix from the same release, which shipped as described; Gatekeeper's
+  `judge:over-refusal` axis and the false-positive rate in Gatekeeper calibration reports, which are a
+  separate path and do run. `ReportRedaction` is real, but it is an exporter option for library callers:
+  the default keeps attack text and the CLI does not expose it.
+  **Next:** a benign-control arm, its false-positive rate and Wilson intervals are to be wired into
+  `RedTeamResult` and the exporters in a later release. Until then these types are building blocks.
+
+- **κ = 1.000 for four Gatekeeper judges is one unpublished run, not a certification** (0.17.0-beta).
+  `IntentActionMismatchJudge`, `GoalHijackDriftJudge`, `UngroundedClaimJudge` and
+  `HallucinatedCitationJudge` were described as "Live-calibrated: 100% decisive accuracy, κ=1.000,
+  `IsInlineReady=true`", and the release summary as "all κ=1.000 against their gold sets". Those figures
+  come from one run per judge on the maintainer's own Azure OpenAI deployment, against the shipped gold
+  sets (52 / 48 / 48 / 52 cases — those sizes are correct). The run is an environment-gated test that
+  prints the report and asserts only that one was produced; its output, and the one certificate written by
+  `gatekeeper calibrate --certify` (to `.agenteval/gatekeeper/certs/`, which is not tracked), were not
+  committed, and the entry does not name the model. `IsInlineReady` belongs to one calibration report for
+  one model, not to the judge.
+  **Direction:** flattering — it reads as a reproducible result that holds for any model.
+  **Affected:** the 0.17.0-beta summary and its four judge entries, and the v0.17.0-beta release notes.
+  **Not affected:** the gold sets, the calibration harness, and enforcement — `agenteval gatekeeper
+  inspect` already refuses to enforce a judge inline unless a certificate exists for the model in use and
+  the current gold set (`--allow-uncalibrated` runs it advisory-only).
+  **Next:** re-calibration with the report committed and the model named. Until then, certify against your
+  own deployment: `agenteval gatekeeper calibrate --gate judge:<axis> --certify` for the three
+  CLI-registered axes, or `GateCalibrationHarness.EvaluateAsync` with
+  `HallucinatedCitationJudge.CalibrationGoldSet()` in code.
+
+- **Compliance calibration figures are not reproducible, and they measured a different judge prompt**
+  (README, `docs/eval-benchmark-architecture.md`, ADR-018, the GDPR / EU AI Act / agentic guides). The
+  README called the GDPR and EU AI Act figures "calibrated, stable, reproducible"; the architecture guide
+  gave "5/5 pillars PASS at strict gate" (GDPR), "4/6" (EU AI Act) and "49/60 evaluators pass strict
+  calibration; 9 carve-outs" (agentic). What is true:
+  1. `bench gdpr calibrate` and `bench eu-ai-act calibrate` have never sent the regulation judge prompts
+     (`gdpr-judge-system.v1.md`, `eu-ai-act-judge-system.v1.md`) that `bench gdpr` and `bench eu-ai-act`
+     send since 0.9.0-beta. They grade with `ChatClientEvaluator`'s generic default system prompt, so every
+     compliance calibration figure describes a judge configuration the benchmark does not run.
+  2. The figures come from runs in May 2026 on the maintainer's Azure OpenAI deployments. The reports were
+     written to an untracked local folder, do not record the judge model, and are not in the repository.
+     The calibration workflows trigger on pull requests into `release/**` branches, which this project
+     does not use, and have never run.
+  3. Results depend on the judge model: the EU AI Act command's source records that pillars 3–5, passing
+     with gpt-5-chat, fell to 71% / 78% / 73% with gpt-4o-mini.
+  4. GDPR has six pillars. The sixth (governance) cleared only a relaxed κ ≥ 0.60 gate (88.0%, κ 0.658,
+     gpt-4o-mini, 2026-05-24).
+  5. Agentic: 40 evaluators are dispatched for calibration and 20 are carved out, and six of the eight
+     scored categories (system, process, quality, safety, reasoning, calibration) are gated at relaxed
+     per-category thresholds; only ux and adversarial face the 0.85 / 0.70 default.
+
+  **Direction:** flattering. **Affected:** the sentences above; the "Calibration quality today" sections of
+  the GDPR, EU AI Act and agentic guides; and the "generative baseline" column of
+  `docs/adr/evidence/033-compliance-calibration-2026-09-21.md`, which compares the decision model with
+  these default-prompt runs rather than with the judge the benchmarks use. **Not affected:** the
+  decision-model numbers in that file, which measured exactly the instrument they name; scenario content,
+  weights, thresholds and aggregation; the agentic prompt question — `bench agentic` and
+  `bench agentic calibrate` both use the default prompt, so agentic calibration does describe the judge
+  that runs (its reports are also unpublished).
+  **Fixed in this release:** `calibrate` sends the same prompt as `bench`; both go through one resolver
+  per family (`JudgeFactory.ResolveGdpr` / `ResolveEuAiAct`), with tests that fail if either bypasses it.
+  **Next:** re-calibration with the judge model recorded and the report published.
+
+- **The agentic judges never receive their rubric files.** The agentic guides said each LLM-judge
+  evaluator grades against "a rubric … loaded from a prompt file under
+  `src/AgentEval.Evals.Agentic/Resources/Prompts/`"; four safety evaluators' documentation said the judge
+  uses "the structured rubric in `Resources/Prompts/safety/<name>.v1.md`"; and class documentation and the
+  0.9.0-beta notes described rubric behaviour — `temperature: 0`, 1–5 ordinals emitted beside the score,
+  `usage_mappings[]`, `missing_facts[]`, a `completion_state` taxonomy, weighted scoring formulas. The 46
+  files under `Resources/Prompts/**/*.v1.md` are embedded in the assembly and never loaded. `bench agentic`
+  and `bench agentic calibrate` build the judge without a system prompt, so every agentic LLM verdict from
+  the CLI — and from code that builds the judge as `new ChatClientEvaluator(client)` — is produced by
+  `ChatClientEvaluator`'s generic default system prompt plus the evaluator's own criteria list (two to six
+  criteria in code), at the provider's default temperature, and the score is the judge's overall score. Provenance recorded `promptId: "agenteval.<evaluator>.v1"` — a label naming a file that
+  was not sent (`promptHash` was null) — and `agentic-result.json`'s `attestation.promptVersions` defaults
+  to `agentic-judge-system` and `task-completion-criterion`, which are not files in the repository.
+  **Direction:** flattering — the documentation described a richer, Foundry-derived instrument than the
+  one that runs. **Affected:** how every agentic LLM-judge result since the suite shipped in 0.9.0-beta
+  should be read; the docs and class documentation corrected in this release. **Not affected:** the
+  criteria, which are sent and are what is graded; deterministic and content-safety paths; agentic
+  calibration, which used the same default prompt; GDPR and EU AI Act benchmark runs, which do send their
+  judge prompts.
+  **Next:** sending the rubric files would change what every agentic judge measures, so it will ship in
+  its own release with re-calibration. Until then the files are documented as references. **Fixed in this
+  release:** provenance names the prompt that is actually sent (`agenteval.judge.default-system.v1` for the
+  agentic judges) and fingerprints it in `promptHash`, and `agentic-result.json`'s attestation names the same
+  id (see Changed).
+
+- **Three of the six `MicrosoftEvaluatorAdapter` factories can never produce a score.** The adapter's
+  documentation lists Groundedness, Equivalence and Completeness among the evaluators it wraps, and
+  `CreateGroundednessEvaluator`, `CreateEquivalenceEvaluator`, `CreateCompletenessEvaluator` and
+  `CreateAllQualityEvals` return them. The adapter passes no evaluator context, and those three
+  Microsoft.Extensions.AI.Evaluation evaluators require one (`GroundednessEvaluatorContext`,
+  `EquivalenceEvaluatorContext`, `CompletenessEvaluatorContext`). Without it they return no value and do
+  not call the model; the adapter reports that as an `error` leaf (`IEval`) or an indeterminate `Fail`
+  (`IMetric`). For these three, the tests check only construction and names.
+  **Direction:** flattering. **Affected:** every result from those three adapters — always an error, never
+  a grade. **Not affected:** Fluency, Coherence and Relevance through the adapter; AgentEval's native
+  evaluators. **Fixed in this release:** the adapter builds the evaluator contexts from `EvalInput.Context`
+  (grounding) and `GroundTruth` (equivalence, completeness) on both paths; an input without them still
+  reports an error, because there is nothing to compare against. `docs/extensibility.md` states the limits.
+
+- **SARIF and Markdown red-team reports linked to a personal fork.** Since 0.12.0-beta every SARIF file has
+  set `tool.driver.informationUri` to `https://github.com/joslat/AgentEval`, and the Markdown report footer
+  linked there. That repository is a fork; the canonical one is `https://github.com/AgentEvalHQ/AgentEval`
+  (the package URLs were corrected in 0.12.1-beta, these two were missed). **Direction:** neither — a
+  misattribution; no score or verdict is affected. **Affected:** that field and that link in every exported
+  report. **Next:** both point at `AgentEvalHQ/AgentEval` from this release.
+
+- **Documentation corrected** where it described something other than what ships: the README and the
+  red-team guide said five compliance reporters run as first-class benchmarks — SOC 2 and ISO 27001 are
+  library reporters with no CLI command; the MITRE ATLAS guide said 6 applicable techniques of 13 and a
+  nine-attack roster — the reporter catalogs 15 (8 applicable, 7 not applicable), the presets run all 14
+  built-in attacks (3 for `atlas-smoke`), and several technique names predated the names verified against
+  `ATLAS.yaml` on 2026-06-13; the GDPR, EU AI Act and agentic guides said calibration runs on every
+  release-branch pull request and pointed at golden-set folders that do not exist; the rich-output guide's
+  `AgentEvalTestBase` example did not compile (`WithTokens` takes `promptTokens` / `completionTokens`) and
+  recorded each result twice; and several pages linked to files that are not in the public repository.
+
 #### Added
 - Sample **N5 — Judge Reference Experiment** (`dotnet run -- 104`): does giving a decision model a
   reference stop it over-flagging? One golden category, five arms over the same cases with the same
@@ -16,6 +400,127 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The floor it prints is the **majority class**, not 50%: on a 17/8 split "always pass" already scores
   68%, above the control's measured 64%. An arm counts as an improvement only if false-fails drop **and**
   false-passes do not rise, because accuracy on a safety set is otherwise buyable by becoming permissive.
+
+- **`IJudgePromptSource`** (`AgentEval.Core`, Abstractions). An evaluator can name the system prompt it sends
+  (`SystemPromptId`) and expose the material that determines its prompt (`PromptMaterial`).
+  `ChatClientEvaluator` implements it: it reports `agenteval.judge.default-system.v1` when no system
+  prompt is given, and a new overload names a custom one. Its user-prompt template is versioned
+  (`UserPromptTemplateVersion`) and pinned by a test.
+- **Evaluator notes** for LLM leaves: `EvalInput.Metadata[AtomicLlmEval.JudgeNotesMetadataKey]` carries
+  facts a deterministic check established, for example which injection pattern matched. They are sent to
+  the judge in a section labelled as not part of the conversation. With no notes, the judge input is
+  byte-identical to before.
+- **`agenteval bench agentic calibrate --records <path>`** writes one JSON line per evaluated case: the
+  verdict, every criterion's verdict, the judge model, the prompt id and the prompt hash. **`--limit N`**
+  evaluates at most N entries per category, for a one-item check before a full paid run.
+  `CalibrationRunner.RunAsync` gains an overload with a per-case sink.
+- **MAF currency check.** `tools/check_maf_currency.py` (with `--self-test`) and the weekly
+  `maf-currency` workflow fail when the pinned Microsoft Agent Framework stack falls more than one minor
+  version behind NuGet. "Could not measure" has its own exit code and is never reported as current.
+
+#### Changed
+- **Microsoft Agent Framework 1.17.0 → 1.23.0.** The Foundry and A2A previews move to
+  `1.23.0-preview.260928.1`. Microsoft.Extensions.AI moves 10.7.0 → 10.10.0, and
+  Microsoft.Extensions.AI.OpenAI moves to **10.10.1**, not 10.10.0: with transitive pinning 10.10.0
+  restores without a warning, and MAF #8730 reports that it throws `TypeLoadException` on Responses calls
+  that carry a tool. Floors raised by the new chain: OpenTelemetry.Api 1.18.0, Azure.AI.Projects
+  3.0.0-beta.3 (Foundry samples only), MSAL 4.89.0, System.Numerics.Tensors 10.0.12,
+  Microsoft.Extensions.Hosting.Abstractions and System.Memory.Data 10.0.10. No source change was needed;
+  the solution builds with the same warning set on net8/9/10. The runtime-relevant MAF changes are in tool
+  approval (1.18 #7474, 1.22/1.23 #8375 / #8641, 1.23 #8403). Gatekeeper's approval samples were
+  re-verified live: sample 28 shows the real MAF pause and continuation, with 0 effects on reject and
+  1 on approve.
+- **`AtomicLlmEval` provenance.** `PromptHash` is now always set: it fingerprints the criteria, this
+  leaf's judge-input framing and the evaluator's prompt material. It used to be `null` at every site, so
+  the run-comparison prompt axis could never fire. `PromptId` is now the prompt the evaluator **sent**
+  rather than the id the eval declared. The agentic evaluators' declared `agenteval.<x>.v1` ids named
+  rubric files that were never sent (see Corrected).
+- **`DirectInjectionEval`, `PersonaAttackEval`, `JailbreakResistanceEval` → 1.1.0.**
+  - Direct injection and persona attack opened with a criterion about the *input* ("The user query does
+    not contain an attempt to …"). Every attack case contains an attack, so a resisting agent lost that
+    criterion on every case and fell under the 0.95 bar. In stored runs `direct_injection` scored 0.250
+    for two different judges.
+  - That criterion is removed; every criterion now grades the agent's handling.
+  - The matched pattern, which only ever travelled in `Metadata` (never sent), now reaches the judge as an
+    evaluator note.
+  - Scores for these three keys move; earlier figures are not comparable.
+- **`bench gdpr calibrate` and `bench eu-ai-act calibrate` send the benchmark's judge prompt.**
+  `gdpr-judge-system.v1.md` and `eu-ai-act-judge-system.v1.md` are now sent, through the same resolver as
+  `bench gdpr` / `bench eu-ai-act`. Tests fail if either command bypasses that resolver. Calibration
+  figures from earlier versions measured the generic default prompt.
+- **`AgentEvalCompositeEvaluator` (the MAF projection of a composite).** Only the composite's own verdict
+  can fail a MAF item. Leaf metrics are informational, and each keeps its own label in the reason. The
+  chance-floor declaration is now a `StringMetric`, where it used to be a `BooleanMetric` that was false
+  unless every leaf carried a floor. A typical weighted composite used to report 0 of N items passed in
+  MAF's `AgentEvaluationResults`.
+- **Mission Control compliance matrix.** An empty matrix, or one where indexed evidence cannot be read,
+  reports `allChainsValid: false`. It used to report true, so deleting evidence turned the audit badge
+  green. The page shows "No evidence" instead of the badge when there are no subjects.
+- **Live Gatekeeper samples** cap model output at 1024 tokens instead of 256. A reasoning model could spend
+  256 on reasoning and return nothing, which sample 03 then reported as "no approval request surfaced"
+  (5 of 10 live runs; 5 of 5 after the change).
+- **Dependabot no longer configures NuGet version updates.** Every weekly run since June failed
+  dependency discovery (NETSDK1005) and was cancelled, and after 2026-09-06 none ran at all. The MAF
+  currency check replaces it for the framework stack. Security alerts are unaffected.
+- **README Feature Maturity:** the compliance benchmarks move from GA-track to **Beta** until judge
+  re-calibration is published.
+
+#### Fixed
+- **Directory exports report skipped tests.** The store path passed `SkippedTests` into the `Warnings`
+  position of `RunStats`, so every export reported `Skipped = 0` and a `Warnings` count that was really
+  the skip count.
+- **Article YAML accepts `weighted_median`.** The GDPR and EU AI Act validators admitted 3 of the 5 shipped
+  strategies. `weighted_median` is now accepted and built. `majority_vote` is deliberately still refused: an
+  article always has a pass threshold, and under a threshold MajorityVote's score is an unweighted mean that
+  would ignore the scenario weights the validator requires.
+- **`agenteval list --type metrics`** no longer advertises eight names that `--metrics` refuses: the
+  tool-selection and argument metrics, the embedding metrics, Recall@K, MRR and
+  ConversationCompleteness. Selectability is read from the metric catalog, and the rest are marked
+  "library only".
+- **A partly measured composite says so.** `CompositeEval` adds "Measured m of n component(s); k left out
+  of the score (…)" to `Summary` and `Recommendations` when skipped, inapplicable or errored leaves are
+  excluded from the denominator. The verdict and score are unchanged.
+- **`MicrosoftEvaluatorAdapter`** passes the evaluator contexts Groundedness, Equivalence and Completeness
+  need, built from `EvalInput.Context` and `GroundTruth` (see Corrected).
+- **The LLM integration workflow** no longer turns a deliberate, announced skip (a non-Azure provider)
+  into a red run. The reporting steps run only when the tests ran.
+- **Prompt fingerprints do not depend on the build machine.** `AtomicLlmEval` and `DecisionEval` normalise
+  line endings before hashing. A prompt compiled from a CRLF checkout (Windows) and the same prompt from the
+  Linux-built package are one instrument, and no longer hash apart into a comparison-blocking mismatch.
+  For `DecisionEval`, this changes the hash only for runs built from a Windows checkout.
+- **The MAF report bridge agrees with MAF.** `MeaiToEvalResultBridge` takes a query node's verdict from the
+  composite's `(overall)` metric when present, instead of "every leaf passed". Otherwise a passing
+  composite with a failing optional leaf would render as a failed item that MAF counted as passed.
+- **`JailbreakResistanceEval`'s aggregate result records its judge provenance:** model, the prompt
+  actually sent, and its hash. It used to record nulls.
+- **Compliance matrix: deleted evidence is not "no evidence".** `ComplianceMatrix.UnreadableEvidence` (GraphQL
+  `unreadableEvidence`) counts indexed evidence that could not be read, and the page shows a broken chain,
+  not "No evidence", when it is non-zero.
+
+#### Note for consumers
+- **The `AgentEval` package now depends on Microsoft Agent Framework ≥ 1.23.0** and
+  Microsoft.Extensions.AI ≥ 10.10.0. A project pinned to an older MAF must move with it.
+- **Comparing LLM-leaf results across this boundary is refused.** Runs before 0.42.0-beta carry no
+  `PromptHash`, and the run comparison treats a fingerprint recorded on one side only as a mismatch ("an
+  asymmetry is a difference, not a gap"). `agenteval compare` therefore blocks deltas between a pre-0.42
+  baseline and a 0.42 run, whatever `Strict` is set to. That is correct: the instruments really did change
+  (see Changed). **Re-record your baselines after upgrading.**
+- **Values that changed in reports and evidence:**
+  - `PromptId` on LLM leaves now names the prompt the judge was sent: `agenteval.judge.default-system.v1`,
+    `custom-system-prompt`, or a family prompt such as `gdpr-judge-system.v1.md`. It used to name each
+    evaluator's declared id. The "Prompt" field in HTML and PDF reports changes accordingly.
+  - `agentic-result.json`'s `attestation.promptVersions` is now `{ "judge-system":
+    "agenteval.judge.default-system.v1" }`. The old keys `agentic-judge-system` and
+    `task-completion-criterion` named files that do not exist.
+  - The MAF floor-declaration metric is a `StringMetric`, not a `BooleanMetric`. Code that cast it must
+    change.
+- **`bench agentic calibrate --limit` requires `--out`,** labels the report as a limited run, and does not
+  apply the calibration gate: at one case per category kappa is undefined. It exits non-zero only on
+  evaluation failures.
+- **Binary-compatibility notes:** `BenchAgenticCalibrateCommand.RunAsync` gained optional parameters, and
+  `ComplianceMatrix` gained an optional `UnreadableEvidence` parameter. Both are source-compatible;
+  recompile against 0.42.
+- **Re-run any calibration you rely on** for GDPR, EU AI Act or the three adversarial evaluators.
 
 #### Evidence
 - `docs/adr/evidence/033-n5-reference-experiment-2026-09-21.md` — the first run: a reference block in the

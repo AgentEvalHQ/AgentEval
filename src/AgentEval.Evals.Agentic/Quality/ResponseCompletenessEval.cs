@@ -11,12 +11,11 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// Evaluates whether an AI response covers all information the user would reasonably expect
 /// given the query and available context.
 /// <para>
-/// Wraps an <see cref="AtomicLlmEval"/> configured with the response-completeness rubric.
-/// The prompt instructs the judge to enumerate expected facts, classify each as
-/// <c>critical</c> or <c>optional</c>, and compute a weighted score
-/// (critical gaps weighted at 0.80, optional gaps at 0.20). The <c>missing_facts[]</c>
-/// array in the judge output is surfaced via <see cref="EvalDetails"/> evidence
-/// for diagnosability.
+/// Wraps an <see cref="AtomicLlmEval"/> configured with three response-completeness criteria;
+/// each criterion's verdict and explanation is surfaced via <see cref="EvalDetails"/> evidence.
+/// The critical/optional fact classification, its 0.80 / 0.20 weighting and the
+/// <c>missing_facts[]</c> array are specified in the reference prompt file and are not yet
+/// produced: the judge does not receive that file yet.
 /// </para>
 /// <para>
 /// <b>Input contract</b>: requires <see cref="EvalInput.Query"/> and
@@ -30,6 +29,8 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_response_completeness/response_completeness.prompty
 /// License: MIT. Modifications: temperature=0, critical/optional gap classification,
 /// missing_facts[] array, structured evidence[], label table, severity=medium.
+/// These modifications are in the reference prompt file under <c>Resources/Prompts/</c>, which is not
+/// yet sent to the judge; the judge call sets no temperature.
 /// </para>
 /// </summary>
 public sealed class ResponseCompletenessEval : IEval

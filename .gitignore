@@ -499,3 +499,8 @@ tools/ce/judge-agreement-results.json
 # Ignore the DIRECTORY, per the rule above. Note that `git check-ignore -v runs/` on the directory
 # can report a match against a BLANK line and tell you nothing; check a FILE inside it.
 runs/
+
+# Playwright MCP browser-session output (page snapshots, console logs, saved page text). It can
+# capture whatever page the browser had open, including third-party chat shares, so it must never
+# reach this public repo. Ignore the DIRECTORY; prove it on a FILE, per the note above.
+.playwright-mcp/

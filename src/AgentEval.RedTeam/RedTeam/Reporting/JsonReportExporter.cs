@@ -61,7 +61,7 @@ public sealed class JsonReportExporter : IReportExporter
 
         var report = new JsonReport
         {
-            SchemaVersion = "0.2.0",   // 0.2.0: added coverage/conclusive + truncation honesty fields + per-probe fidelity (5d)
+            SchemaVersion = "0.3.0",   // 0.3.0: summary.over_refusal (always) + benign_controls (when run) + fold turn/node counts; 0.2.0: coverage/truncation/fidelity (5d)
             ReportId = DeriveReportId(result),   // LOW: deterministic so re-exporting the same result is byte-identical (diffable)
             CreatedUtc = result.CompletedAt.UtcDateTime,
             Target = new JsonTarget
@@ -86,8 +86,11 @@ public sealed class JsonReportExporter : IReportExporter
                 WasTruncated = result.WasTruncated,
                 SkippedProbes = result.SkippedProbes,
                 PlannedProbes = result.PlannedProbes,
-                Duration = result.Duration.TotalSeconds
+                Duration = result.Duration.TotalSeconds,
+                // The second headline number, always present: a scan that did not ask says "not measured", not 0%.
+                OverRefusal = result.OverRefusalSummary
             },
+            BenignControls = BenignControlsOf(result),
             ByAttack = result.AttackResults.Select(a => new JsonAttackSummary
             {
                 Attack = a.AttackName,
@@ -121,7 +124,10 @@ public sealed class JsonReportExporter : IReportExporter
                         ConversationFidelity = p.ConversationFidelity?.ToString(),
                         GradedBy = p.Grading?.ShippedBy.ToString(),
                         GraderDisagreed = p.Grading is { } g ? g.Disagreed : null,
-                        AttackerDriven = p.AttackerDriven ? true : null
+                        AttackerDriven = p.AttackerDriven ? true : null,
+                        TurnsUsed = p.TurnsUsed,
+                        DecidingTurn = p.DecidingTurn,
+                        NodesExplored = p.NodesExplored
                     }))
                 .ToList()
         };
@@ -134,6 +140,47 @@ public sealed class JsonReportExporter : IReportExporter
     {
         var json = Export(result);
         await File.WriteAllTextAsync(filePath, json, cancellationToken);
+    }
+
+    private JsonBenignControls? BenignControlsOf(RedTeamResult result)
+    {
+        if (result.BenignControlResults is not { } benign)
+            return null;
+
+        var rate = result.OverRefusal!;
+        var measured = result.IsOverRefusalMeasured;
+        return new JsonBenignControls
+        {
+            Probes = benign.Count,
+            Conclusive = rate.BenignTotal,
+            Refused = rate.Flagged,
+            Answered = benign.Count(p => p.Outcome == EvaluationOutcome.Succeeded),
+            Inconclusive = benign.Count(p => p.Outcome == EvaluationOutcome.Inconclusive),
+            Measured = measured,
+            MinimumForRate = RedTeamResult.MinimumBenignControlsForRate,
+            // Below the bar there is no rate to report, so the fields are absent rather than a flattering 0.
+            OverRefusalRate = measured ? rate.Rate.Estimate : null,
+            OverRefusalCi95 = measured ? [rate.Rate.Lower, rate.Rate.Upper] : null,
+            ByClass = result.OverRefusalByClass.Select(c => new JsonBenignClass
+            {
+                Class = c.Class,
+                Probes = c.Total,
+                Refused = c.Refused,
+                Answered = c.Answered,
+                Inconclusive = c.Inconclusive,
+            }).ToList(),
+            Refusals = benign
+                .Where(p => BenignControls.BenignControlCorpus.IsFalsePositive(p.Outcome))
+                .Select(p => new JsonBenignRefusal
+                {
+                    ProbeId = p.ProbeId,
+                    Class = p.Technique,
+                    Prompt = _redaction.Apply(p.Prompt),
+                    Response = _redaction.Apply(p.Response),
+                    Reason = p.Reason,
+                })
+                .ToList(),
+        };
     }
 
     // LOW: derive a stable report id from the result's content (agent + start + probe ids) so exporting the same
@@ -165,6 +212,56 @@ public sealed class JsonReportExporter : IReportExporter
         public List<JsonAttackSummary> ByAttack { get; init; } = [];
 
         public List<JsonFailure> Failures { get; init; } = [];
+
+        /// <summary>The benign-control arm; omitted when it was not requested.</summary>
+        [JsonPropertyName("benign_controls")]
+        public JsonBenignControls? BenignControls { get; init; }
+    }
+
+    private sealed record JsonBenignControls
+    {
+        public int Probes { get; init; }
+        public int Conclusive { get; init; }
+        public int Refused { get; init; }
+        public int Answered { get; init; }
+        public int Inconclusive { get; init; }
+
+        /// <summary>Whether the conclusive count reached <c>minimum_for_rate</c>, so a rate is reported.</summary>
+        public bool Measured { get; init; }
+
+        [JsonPropertyName("minimum_for_rate")]
+        public int MinimumForRate { get; init; }
+
+        [JsonPropertyName("over_refusal_rate")]
+        public double? OverRefusalRate { get; init; }
+
+        [JsonPropertyName("over_refusal_ci95")]
+        public double[]? OverRefusalCi95 { get; init; }
+
+        [JsonPropertyName("by_class")]
+        public List<JsonBenignClass> ByClass { get; init; } = [];
+
+        public List<JsonBenignRefusal> Refusals { get; init; } = [];
+    }
+
+    private sealed record JsonBenignClass
+    {
+        public string Class { get; init; } = "";
+        public int Probes { get; init; }
+        public int Refused { get; init; }
+        public int Answered { get; init; }
+        public int Inconclusive { get; init; }
+    }
+
+    private sealed record JsonBenignRefusal
+    {
+        [JsonPropertyName("probe_id")]
+        public string ProbeId { get; init; } = "";
+
+        public string? Class { get; init; }
+        public string Prompt { get; init; } = "";
+        public string Response { get; init; } = "";
+        public string Reason { get; init; } = "";
     }
 
     private sealed record JsonTarget
@@ -211,6 +308,10 @@ public sealed class JsonReportExporter : IReportExporter
 
         [JsonPropertyName("duration_seconds")]
         public double Duration { get; init; }
+
+        /// <summary>Over-refusal on benign controls, or why it was not measured. Always present.</summary>
+        [JsonPropertyName("over_refusal")]
+        public string OverRefusal { get; init; } = "";
     }
 
     private sealed record JsonAttackSummary
@@ -275,5 +376,17 @@ public sealed class JsonReportExporter : IReportExporter
         /// non-deterministic). Null-omittable so a non-attacker run is byte-identical.</summary>
         [JsonPropertyName("attacker_driven")]
         public bool? AttackerDriven { get; init; }
+
+        /// <summary>Linear multi-turn only: the agent turns the conversation ran.</summary>
+        [JsonPropertyName("turns_used")]
+        public int? TurnsUsed { get; init; }
+
+        /// <summary>Linear multi-turn only: the 1-based turn whose verdict is the evidence.</summary>
+        [JsonPropertyName("deciding_turn")]
+        public int? DecidingTurn { get; init; }
+
+        /// <summary>Tree search (TAP) only: nodes explored, each a separate single-turn call.</summary>
+        [JsonPropertyName("nodes_explored")]
+        public int? NodesExplored { get; init; }
     }
 }

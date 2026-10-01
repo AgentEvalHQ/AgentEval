@@ -2,20 +2,47 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Security.Cryptography;
+using System.Text;
+
 namespace AgentEval.Evals;
 
 /// <summary>
 /// Atomic eval that delegates scoring to an <see cref="AgentEval.Core.IEvaluator"/> (LLM judge).
 /// </summary>
+/// <remarks>
+/// <b>Provenance names what was sent.</b> <c>PromptHash</c> fingerprints the instrument: the criteria, this leaf's
+/// judge-input framing (<see cref="JudgeInputFramingVersion"/>) and — when the evaluator implements
+/// <see cref="AgentEval.Core.IJudgePromptSource"/> — its system prompt and user-prompt template. Editing any of them
+/// moves the hash, so a run comparison stops reporting a clean delta between two different instruments. It used to
+/// be <see langword="null"/> at every production site, which disabled that comparison axis entirely. <c>PromptId</c>
+/// is the evaluator's own name for the system prompt it sends when it reports one; only an evaluator that cannot
+/// name its prompt falls back to the <c>promptId</c> the eval declared.
+/// </remarks>
 public sealed class AtomicLlmEval : AtomicEval
 {
+    /// <summary>
+    /// <see cref="EvalInput.Metadata"/> key for evaluator notes: facts a deterministic check established about the
+    /// case (for example, which injection pattern matched) that the judge should read. They are sent in a labelled
+    /// section that says they are not part of the conversation. Absent or blank means the judge input is
+    /// byte-identical to that of a leaf that never had notes.
+    /// </summary>
+    public const string JudgeNotesMetadataKey = "agenteval.judge_notes";
+
+    /// <summary>
+    /// Version of how this leaf frames the judge input: v1 sent the query only; v2 (0.41.0-beta) added the labelled
+    /// context; v3 adds the labelled evaluator-notes section. Part of <c>PromptHash</c>.
+    /// </summary>
+    public const string JudgeInputFramingVersion = "atomic-llm.judge-input.v3";
+
     private readonly AgentEval.Core.IEvaluator _evaluator;
     private readonly IReadOnlyList<string> _criteria;
     private readonly string? _judgeModel;
-    private readonly string? _promptId;
     private readonly double _passThreshold;
     private readonly string? _failureSeverity;
     private readonly Func<string?, JudgeCostMap.ModelRate>? _rateResolver;
+    private readonly string _promptHash;
+    private readonly string? _sentPromptId;
 
     /// <summary>
     /// Initialises a new <see cref="AtomicLlmEval"/>.
@@ -60,14 +87,21 @@ public sealed class AtomicLlmEval : AtomicEval
         : base(key, name, category, version)
     {
         _evaluator = evaluator ?? throw new ArgumentNullException(nameof(evaluator));
-        _criteria = criteria ?? throw new ArgumentNullException(nameof(criteria));
+        // A private copy: the PromptHash below fingerprints these criteria, so a caller mutating the list it passed
+        // in must not change what is sent without changing what was recorded.
+        _criteria = criteria?.ToArray() ?? throw new ArgumentNullException(nameof(criteria));
         if (!double.IsFinite(passThreshold) || passThreshold < 0.0 || passThreshold > 1.0)
             throw new ArgumentOutOfRangeException(nameof(passThreshold), passThreshold, "passThreshold must be a finite value in [0, 1].");
         _passThreshold = passThreshold;
         _judgeModel = judgeModel;
-        _promptId = promptId;
         _failureSeverity = failureSeverity;
         _rateResolver = rateResolver;
+
+        var promptSource = evaluator as AgentEval.Core.IJudgePromptSource;
+        _sentPromptId = promptSource?.SystemPromptId ?? promptId;
+        _promptHash = HashPrompt(
+            _criteria,
+            promptSource?.PromptMaterial ?? $"unidentified-evaluator:{evaluator.GetType().FullName}");
     }
 
     /// <inheritdoc/>
@@ -85,6 +119,19 @@ public sealed class AtomicLlmEval : AtomicEval
         var judgeInput = string.IsNullOrWhiteSpace(input.Context)
             ? input.Query
             : $"{input.Query}\n\nContext the response must be faithful to:\n{input.Context}";
+
+        // Evaluator notes: facts a deterministic check established about this case (e.g. the injection pattern that
+        // matched). They used to travel in Metadata, which this leaf never sends, so a criterion such as "did not
+        // comply with the instruction identified by the matched pattern" was graded by a judge that had never been
+        // told the pattern. Labelled as notes, not as conversation, and deliberately NOT as context: the context
+        // label says "the response must be faithful to", which would invert the meaning of an attack pattern.
+        if (input.Metadata is not null
+            && input.Metadata.TryGetValue(JudgeNotesMetadataKey, out var notesValue)
+            && notesValue is string notes
+            && !string.IsNullOrWhiteSpace(notes))
+        {
+            judgeInput += $"\n\nEvaluator notes (established by deterministic checks; not part of the conversation):\n{notes}";
+        }
 
         var er = await _evaluator.EvaluateAsync(judgeInput, input.Response, _criteria, ct);
 
@@ -185,11 +232,23 @@ public sealed class AtomicLlmEval : AtomicEval
             Provenance: new(
                 Type: "atomic-llm",
                 JudgeModel: _judgeModel,
-                PromptId: _promptId,
-                PromptHash: null,
+                PromptId: _sentPromptId,
+                PromptHash: _promptHash,
                 TokensUsed: tokensUsed,
                 EstimatedCost: estimatedCost,
                 CacheHit: false),
             EvaluatedAt: DateTimeOffset.UtcNow);
+    }
+
+    /// <summary>The instrument fingerprint: framing version, evaluator prompt material and the declared criteria.</summary>
+    /// <remarks>Same shape as <c>DecisionEval</c>'s: SHA-256 over unit-separated parts, first 16 hex characters.</remarks>
+    private static string HashPrompt(IReadOnlyList<string> criteria, string evaluatorMaterial)
+    {
+        var material = JudgeInputFramingVersion + "\u001f" + evaluatorMaterial + "\u001f" + string.Join("\u001e", criteria);
+        // Line endings are normalised before hashing: a prompt compiled from a CRLF checkout (Windows, autocrlf)
+        // and the same prompt from an LF checkout (the Linux-built package) are the same instrument, and must not
+        // hash apart into a comparison-blocking mismatch.
+        material = material.Replace("\r\n", "\n", StringComparison.Ordinal);
+        return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(material)))[..16].ToLowerInvariant();
     }
 }

@@ -10,13 +10,14 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// <summary>
 /// Evaluates whether an AI response is relevant to the user's query.
 /// <para>
-/// Wraps an <see cref="AtomicLlmEval"/> configured with the relevance rubric.
+/// Wraps an <see cref="AtomicLlmEval"/> configured with three relevance criteria.
 /// </para>
 /// <para>
 /// <b>Secondary metric caveat</b>: Relevance is a necessary but insufficient quality signal.
 /// A response can score high on relevance while being factually wrong. Always interpret
 /// relevance alongside <see cref="GroundednessEval"/> for a complete quality picture.
-/// This caveat is explicit in the prompt rubric so the judge internalises it.
+/// This caveat is written into the reference prompt file, which is not yet sent to the judge;
+/// the judge sees only the three criteria in the constructor.
 /// </para>
 /// <para>
 /// <b>Input contract</b>: requires <see cref="EvalInput.Query"/> and
@@ -29,6 +30,8 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_relevance/relevance.prompty
 /// License: MIT. Modifications: temperature=0, secondary-metric caveat, structured evidence[],
 /// label assignment table, severity rubric.
+/// These modifications are in the reference prompt file under <c>Resources/Prompts/</c>, which is not
+/// yet sent to the judge; the judge call sets no temperature.
 /// </para>
 /// </summary>
 public sealed class RelevanceEval : IEval

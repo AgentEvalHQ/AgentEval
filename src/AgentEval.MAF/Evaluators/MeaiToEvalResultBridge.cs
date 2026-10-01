@@ -59,12 +59,23 @@ public static class MeaiToEvalResultBridge
             // Iterate the dictionary (not just .Values): the key carries the disambiguation suffix
             // (e.g. "Relevance #2") that AgentEvalCompositeEvaluator.AddMetric adds when two leaves
             // share a metric name — using it as the leaf key keeps the EvalResult tree keys unique.
-            var leaves = meai.Metrics.Select(kv => MetricToLeaf(kv.Key, kv.Value, judgeModel)).ToList();
+            // The chance-floor declaration is a statement about the tree, not a score: rendering it as a
+            // leaf used to show a "100/100 pass" node that measured nothing.
+            var leaves = meai.Metrics
+                .Where(kv => !string.Equals(kv.Key, AgentEvalCompositeEvaluator.FloorDeclarationMetricName, StringComparison.Ordinal))
+                .Select(kv => MetricToLeaf(kv.Key, kv.Value, judgeModel)).ToList();
+            // An AgentEvalCompositeEvaluator item carries its verdict on the "(overall)" metric and marks every leaf
+            // informational, so MAF passes the item on that verdict alone. The report must agree with MAF: the query
+            // node takes its verdict from "(overall)" when present, not from "every leaf passed".
+            var overall = meai.Metrics.Keys.Any(k => k.EndsWith(" (overall)", StringComparison.Ordinal))
+                ? leaves.FirstOrDefault(l => l.Metric.Key.EndsWith(" (overall)", StringComparison.Ordinal))
+                : null;
             queryNodes.Add(Composite(
                 key: $"maf.eval.query{i}",
                 name: $"Query: {Truncate(query, 80)}",
                 category: "agentic",
-                subs: leaves));
+                subs: leaves,
+                verdictFrom: overall));
         }
 
         return Composite("maf.eval", evalName, "agentic", queryNodes);
@@ -151,19 +162,20 @@ public static class MeaiToEvalResultBridge
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 
-    private static EvalResult Composite(string key, string name, string category, IReadOnlyList<EvalResult> subs)
+    private static EvalResult Composite(
+        string key, string name, string category, IReadOnlyList<EvalResult> subs, EvalResult? verdictFrom = null)
     {
-        var avg = subs.Count == 0 ? 0 : subs.Average(s => s.Score.Value);
-        var passed = subs.Count > 0 && subs.All(s => s.Score.Passed);
+        var avg = verdictFrom?.Score.Value ?? (subs.Count == 0 ? 0 : subs.Average(s => s.Score.Value));
+        var passed = verdictFrom?.Score.Passed ?? (subs.Count > 0 && subs.All(s => s.Score.Passed));
         return new EvalResult(
             Metric: new EvalMetadata(key, name, category, "1.0.0"),
             Score: new EvalScore(
                 Value: avg,
                 Ordinal: null,
-                Label: passed ? "pass" : "fail",
+                Label: verdictFrom?.Score.Label ?? (passed ? "pass" : "fail"),
                 Passed: passed,
                 Threshold: 0.70,
-                Severity: passed ? "none" : "high",
+                Severity: verdictFrom?.Score.Severity ?? (passed ? "none" : "high"),
                 Confidence: null),
             Details: new EvalDetails(
                 Dimensions: null,

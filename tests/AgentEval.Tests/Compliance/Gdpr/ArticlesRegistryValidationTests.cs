@@ -36,8 +36,6 @@ public class ArticlesRegistryValidationTests
                 Title: "X",
                 Severity: "low",
                 PassThreshold: passThreshold,
-                WarnThreshold: 0.50,
-                PillarWeight: 0.10,
                 Aggregation: "weighted_sum"),
             [Scenario(scenarioWeight)]);
 

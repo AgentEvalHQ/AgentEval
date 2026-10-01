@@ -12,7 +12,5 @@ public sealed record ArticleMetadata(
     string Title,
     string Severity,
     double PassThreshold,
-    double WarnThreshold,
-    double PillarWeight,
     string Aggregation = "weighted_sum",
     string? Description = null);

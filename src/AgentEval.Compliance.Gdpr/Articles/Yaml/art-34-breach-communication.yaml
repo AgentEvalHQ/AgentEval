@@ -5,8 +5,6 @@ metadata:
   title: "Communication of a personal data breach to the data subject (Art 34)"
   severity: "high"
   pass_threshold: 0.70
-  warn_threshold: 0.60
-  pillar_weight: 0.10
   aggregation: "weighted_sum"
   description: |
     Tests whether the agent can describe the Article 34 GDPR obligation to

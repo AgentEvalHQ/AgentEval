@@ -168,3 +168,85 @@ public class JudgeFactoryTests : IDisposable
         Assert.All(result.CriteriaResults, c => Assert.True(c.Met));
     }
 }
+
+/// <summary>
+/// The compliance families resolve ONE judge for the benchmark and its calibration. Before this, <c>bench gdpr</c>
+/// sent <c>gdpr-judge-system.v1.md</c> while <c>bench gdpr calibrate</c> sent the generic default prompt, so every
+/// published GDPR (and EU AI Act) calibration figure described a different judge from the one the benchmark ran.
+/// </summary>
+[Collection("EnvVarTests")]
+public class JudgeFactoryFamilyPromptTests : IDisposable
+{
+    private readonly ProviderEnvironmentScope _env = new();
+
+    public void Dispose() => _env.Dispose();
+
+    private static void ConfigureAzureJudge()
+    {
+        Environment.SetEnvironmentVariable("AZURE_OPENAI_ENDPOINT", "https://example.openai.azure.com/");
+        Environment.SetEnvironmentVariable("AZURE_OPENAI_API_KEY", "test-key-not-real");
+        Environment.SetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT", "gpt-4o-test");
+    }
+
+    [Fact]
+    public void ResolveGdpr_SendsAndNamesTheGdprSystemPrompt()
+    {
+        ConfigureAzureJudge();
+
+        var (judge, _, exit) = JudgeFactory.ResolveGdpr(evaluatorOverride: null, judgeKind: "test");
+
+        Assert.Equal(0, exit);
+        var chat = Assert.IsType<ChatClientEvaluator>(judge);
+        Assert.Equal(JudgeFactory.GdprJudgeSystemPromptFile, chat.SystemPromptId);
+        Assert.DoesNotContain("You are a Test Evaluator Agent", chat.PromptMaterial, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ResolveEuAiAct_SendsAndNamesTheEuAiActSystemPrompt()
+    {
+        ConfigureAzureJudge();
+
+        var (judge, _, exit) = JudgeFactory.ResolveEuAiAct(evaluatorOverride: null, judgeKind: "test");
+
+        Assert.Equal(0, exit);
+        var chat = Assert.IsType<ChatClientEvaluator>(judge);
+        Assert.Equal(JudgeFactory.EuAiActJudgeSystemPromptFile, chat.SystemPromptId);
+        Assert.DoesNotContain("You are a Test Evaluator Agent", chat.PromptMaterial, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("BenchCommand.cs", "JudgeFactory.ResolveGdpr(")]
+    [InlineData("BenchCalibrateCommand.cs", "JudgeFactory.ResolveGdpr(")]
+    [InlineData("BenchEuAiActCommand.cs", "JudgeFactory.ResolveEuAiAct(")]
+    [InlineData("BenchEuAiActCalibrateCommand.cs", "JudgeFactory.ResolveEuAiAct(")]
+    public void BenchAndCalibrate_GoThroughTheSameFamilyResolver(string file, string resolver)
+    {
+        // A guard on the source, because the defect was a CALL SITE that bypassed the resolver: the benchmark
+        // and its calibration must not be able to drift onto two different judges again.
+        var source = File.ReadAllText(Path.Combine(RepoRoot(), "src", "AgentEval.Cli", "Commands", file));
+
+        Assert.Contains(resolver, source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void NoCommand_LoadsAFamilyJudgePrompt_OutsideTheResolver()
+    {
+        var commands = Path.Combine(RepoRoot(), "src", "AgentEval.Cli", "Commands");
+        var offenders = Directory.EnumerateFiles(commands, "*.cs", SearchOption.AllDirectories)
+            .Where(f => Path.GetFileName(f) is not ("JudgeFactory.cs" or "EmbeddedPromptLoader.cs"))
+            .Where(f => File.ReadAllText(f).Contains("EmbeddedPromptLoader.Load(", StringComparison.Ordinal))
+            .Select(Path.GetFileName)
+            .ToList();
+
+        Assert.Empty(offenders);
+    }
+
+    private static string RepoRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "AgentEval.sln")))
+            dir = dir.Parent;
+        return dir?.FullName ?? throw new InvalidOperationException("Could not find repo root (AgentEval.sln).");
+    }
+}
+

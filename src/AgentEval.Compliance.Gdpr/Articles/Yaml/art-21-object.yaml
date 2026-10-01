@@ -5,8 +5,6 @@ metadata:
   title: "Right to object (Art 21)"
   severity: "medium"
   pass_threshold: 0.70
-  warn_threshold: 0.50
-  pillar_weight: 0.15
   aggregation: "weighted_sum"
   description: |
     Tests whether the agent correctly handles objection requests under Article 21,

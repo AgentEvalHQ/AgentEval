@@ -1,9 +1,9 @@
 # Gatekeeper implementation status
 
-> **Status:** implementation complete for the currently approved scope; one live promotion
-> validation remains deferred.
+> **Status:** **Gatekeeper v1**: the public surface is frozen (snapshot-tested) and stable-labelled inside
+> the `AgentEval` package. One live promotion validation (remote A2A) remains deferred.
 >
-> **Updated:** 2026-08-07
+> **Updated:** 2026-10-01
 >
 > **Publication target:** the current main branch
 
@@ -22,7 +22,7 @@ implemented.
 | 1 | Boundary and reuse spikes | ✅ | Result injection, intent coherence, MCP provenance, retry detection, and opaque-tool seam decisions are merged |
 | 2 | Tool-usage contract engine | ✅ | Fluent and JSON contracts, seven deterministic predicates, stateful limits, hidden-instruction prefilter, and aggregate review are merged |
 | 3 | Containment core | ✅ | Resolved options, signed containment storage, containment gates, escalation wiring, precise correlation, and camouflaged refusal are merged |
-| 4 | Cross-agent boundary | ⏸️ | A2A composition plus inbound/outbound gates and reviewed calibration are complete; real remote-endpoint validation remains the only promotion item |
+| 4 | Cross-agent boundary | ⏸️ | **Implemented, calibrated, not promoted.** A2A composition plus inbound/outbound gates are complete. Their calibration (100% decisive accuracy, κ = 1.0) was measured on the calibration set itself, not on held-out cases, so it is not evidence of generalisation. Real remote-endpoint validation remains the promotion item |
 | 5 | Resource isolation | ✅ | HTTP resource isolation is implemented and promoted; additional resource types remain demand-gated until a concrete exhaustion mode exists |
 | 6 | Security graph and escalation | ✅ | Durable graph storage/computation, ingestion, global containment, and the read-only operations surface are merged |
 | 7 | Applicable long-tail work | ✅ | Mock dangerous-tool fixtures and session-identity drift coverage are complete; deployment-specific predicates and judges remain demand-gated |
@@ -105,9 +105,34 @@ calibrated-corpus workflow, avoiding a second uncalibrated model path that could
 | 12 | 12.1 | Reorganize sample discovery without deleting coverage | 100% | ✅ | Group J shows six recommended samples by default; **M** reveals all 29 menu entries; the 30-contract manifest and legacy numeric order remain unchanged |
 | 12 | 12.2 | Simplify recipes and current capability navigation | 100% | ✅ | Replaced the recipe encyclopedia with curated learning paths, added direct sample links to gate selection, and converted the dated “What’s New” page into compact capability history |
 | 12 | 12.3 | Add executable documentation and architecture maps | 100% | ✅ | Two canonical `UseGatekeeper` snippets compile and match docs mechanically; lifecycle, graph/containment, and memory architecture maps expose ownership and handoffs |
-| 12 | 12.4 | Clarify operational decisions and CLI truth | 100% | ✅ | Added calibration-release and approval matrices; the unimplemented `serve` command is explicitly reserved/deferred rather than advertised as a stub |
+| 12 | 12.4 | Clarify operational decisions and CLI truth | 100% | ✅ | Added calibration-release and approval matrices; the unimplemented `serve` command is explicitly reserved/deferred rather than advertised as a stub (correction, 2026-10-01: a visible stub was in fact still registered until v1, which removed it) |
 | 12 | 12.5 | Improve dense sample console evidence | 100% | ✅ | Samples 14, 20, 22, and 27 print asserted effect, transition, incident, and construction-decision matrices |
 | 12 | 12.R | Usability-consolidation review | 100% | ✅ | Recommended launcher + four oracles pass; 1,386 Gatekeeper tests; Release build 0 warnings; task C# formatter clean; DocFX 0 errors; scoped MAF B/0 errors |
+
+## Gatekeeper v1 (2026-10-01)
+
+**What "v1" means.**
+- Gatekeeper's public surface is frozen: every public type and member in `AgentEval.MAF.Gatekeeper*`, `AgentEval.Guardrails*` and the AgentHooks adapter is snapshotted by `GatekeeperPublicApiSnapshotTests`. A change fails CI until the new snapshot is reviewed.
+- It is the stable surface **inside the `AgentEval` package** (one lockstep version), not a separately versioned package.
+- Eight types stay **preview**, marked `[Experimental("AGENTEVAL_GATEKEEPER_PREVIEW001")]` and outside the v1 promise: `FleetCorrelator` and its options, `GatekeeperFleetHealthIndex` and its report, `ICalibrationReportStore` / `JsonFileCalibrationReportStore`, `SessionIdentityDriftGate` and `ToolResultSizeAnomalyGate`.
+
+**What landed with v1.**
+- **Microsoft Agent Framework 1.23.** Tool approval's binding changes (#7474, #8375 / #8641, #8403) were re-verified live. The real MAF approval pause and continuation (sample 28) produced 0 effects on reject and 1 on approve.
+- **Gatekeeper runs inside MAF's own AgentHooks host** (`Microsoft.Agents.AI.AgentHooks`, alpha). `GatekeeperInterceptor` implements `AgentHooks.IInterceptor`, the type MAF's host consumes. A tested end-to-end case shows a forbidden tool's body never runs inside that host, with a control that an allowed tool still does. The adapter (`AgentEval.MAF.AgentHooks`) is experimental and not packaged.
+- **AEVP 0.1** (`docs/aevp/AEVP-0.1.md`) is published as a **draft profile, not a standard**. It is the evidence an interceptor can attach to a verdict, including whether anything actually evaluated the call.
+- **Late-consumer fixes:** `ShadowJudgePump` (#259) and `SecurityGraphIngestionPump` (#262).
+- The `gatekeeper serve` stub is removed from the CLI.
+
+**Known limitations, in one place.**
+- **No OpenTelemetry.** Gatekeeper emits no `ActivitySource` or `Meter`. `IGatekeeperObserver` is the integration point.
+- **Session reconciliation is partial.** Waiting on a MAF seam.
+- **Run-post gates cannot stop a streamed response** under `Redact` / `ThrowOnFail`: the streamed text has already left.
+- **MAF Workflows interception is blocked upstream** until the framework exposes a supported enforcement seam.
+- **A2A gates are not promoted.** Their calibration was not held-out (Phase 4 above).
+- **The AgentHooks adapter enforces `pre_tool_call` only.** Every other interception point returns `allow` with a warning that names it unenforced, never a silent pass.
+- **The AgentHooks adapter rejects run-scoped gates** (`RunBudgetGate`, `SequenceGate`, anything declaring `GateRequirements.RunScope`). An AGENT-HOOKS host establishes no run scope, so their state would be shared across sessions. Use them inside a MAF agent built with `UseGatekeeper`.
+- **Without `messages`, conversation-correlating gates have nothing to check.** The adapter still evaluates the call, and its allow carries a `no_conversation` warning.
+- **Inline semantic judges need a certificate for the model in use.** Calibration on the calibration set is not evidence of generalisation.
 
 ## Deferred and demand-gated work
 

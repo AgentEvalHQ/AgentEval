@@ -1,0 +1,2433 @@
+﻿enum AgentEval.Guardrails.EvalGatePolicy
+    WarnOnly
+    ThrowOnFail
+    Redact
+class AgentEval.Guardrails.EvalGateRefusalException
+    AgentEval.Guardrails.GateAction Action { get; }
+    String PolicyName { get; }
+    String Reason { get; }
+    String ReferenceId { get; }
+    String Stage { get; }
+    ctor(AgentEval.Guardrails.GateVerdict verdict, String stage)
+class AgentEval.Guardrails.EvalGatingChatClient
+    IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions options = null, CancellationToken cancellationToken = default)
+    Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions options = null, CancellationToken cancellationToken = default)
+    ctor(IChatClient inner, IReadOnlyList<AgentEval.Guardrails.IChatGate> pre, IReadOnlyList<AgentEval.Guardrails.IChatGate> post, AgentEval.Guardrails.EvalGatePolicy policy, AgentTrace trace = null, AgentEval.Guardrails.FleetCorrelator correlator = null)
+static class AgentEval.Guardrails.EvalGatingChatClientExtensions
+    static ChatClientBuilder UseEvalGate(ChatClientBuilder builder, IReadOnlyList<AgentEval.Guardrails.IChatGate> pre = null, IReadOnlyList<AgentEval.Guardrails.IChatGate> post = null, AgentEval.Guardrails.EvalGatePolicy policy = EvalGatePolicy.WarnOnly, AgentTrace trace = null, AgentEval.Guardrails.FleetCorrelator correlator = null)
+class AgentEval.Guardrails.FleetCorrelator [Experimental(AGENTEVAL_GATEKEEPER_PREVIEW001)]
+    AgentEval.Guardrails.GateVerdict CheckCorrelation()
+    Int64 BeginTurn()
+    Void AdvanceTurn()
+    Void Observe(AgentEval.Guardrails.GateVerdict verdict, String stage)
+    Void Observe(AgentEval.Guardrails.GateVerdict verdict, String stage, Int64 turn)
+    ctor(AgentEval.Guardrails.FleetCorrelatorOptions options = null)
+class AgentEval.Guardrails.FleetCorrelatorOptions [Experimental(AGENTEVAL_GATEKEEPER_PREVIEW001)]
+    Double SoftSignalFloor { get; init; }
+    Func<String, String> FamilyOf { get; init; }
+    Int32 MaxObservations { get; init; }
+    Int32 MinDistinctFamilies { get; init; }
+    Int32 WindowTurns { get; init; }
+    ctor()
+enum AgentEval.Guardrails.GateAction
+    Allow
+    Block
+static class AgentEval.Guardrails.GateCorrelationId
+    static String New()
+class AgentEval.Guardrails.GateProvenance
+    AgentEval.Guardrails.GateProvenance <Clone>$()
+    Boolean Equals(AgentEval.Guardrails.GateProvenance other)
+    Boolean Equals(Object obj)
+    Double? ActualValue { get; init; }
+    Double? Threshold { get; init; }
+    IReadOnlyList<AgentEval.Guardrails.GateProvenance> Contributing { get; init; }
+    IReadOnlyList<String> Evidence { get; init; }
+    Int32 GetHashCode()
+    String RuleName { get; init; }
+    String ToString()
+    Void Deconstruct(out String RuleName, out IReadOnlyList<String> Evidence, out Double? Threshold, out Double? ActualValue, out IReadOnlyList<AgentEval.Guardrails.GateProvenance> Contributing)
+    ctor(String RuleName, IReadOnlyList<String> Evidence, Double? Threshold = null, Double? ActualValue = null, IReadOnlyList<AgentEval.Guardrails.GateProvenance> Contributing = null)
+    static AgentEval.Guardrails.GateProvenance ForRule(String ruleName)
+static class AgentEval.Guardrails.GateRegexTimeouts
+    static TimeSpan Extended
+    static TimeSpan Standard
+    static TimeSpan Trivial
+class AgentEval.Guardrails.GateVerdict
+    AgentEval.Guardrails.GateAction Action { get; init; }
+    AgentEval.Guardrails.GateProvenance Provenance { get; init; }
+    AgentEval.Guardrails.GateVerdict <Clone>$()
+    Boolean Equals(AgentEval.Guardrails.GateVerdict other)
+    Boolean Equals(Object obj)
+    Double? Confidence { get; init; }
+    IReadOnlyList<String> Matches { get; init; }
+    Int32 GetHashCode()
+    String PolicyName { get; init; }
+    String Reason { get; init; }
+    String RedactedText { get; init; }
+    String ToString()
+    Void Deconstruct(out AgentEval.Guardrails.GateAction Action, out String PolicyName, out String Reason, out String RedactedText, out IReadOnlyList<String> Matches, out Double? Confidence, out AgentEval.Guardrails.GateProvenance Provenance)
+    ctor(AgentEval.Guardrails.GateAction Action, String PolicyName, String Reason = null, String RedactedText = null, IReadOnlyList<String> Matches = null, Double? Confidence = null, AgentEval.Guardrails.GateProvenance Provenance = null)
+    static AgentEval.Guardrails.GateVerdict Allow(String policy)
+    static AgentEval.Guardrails.GateVerdict Block(String policy, String reason, IReadOnlyList<String> matches = null, String redactedText = null)
+class AgentEval.Guardrails.Gates.KeywordOracleGate
+    String PolicyName { get; }
+    ValueTask<AgentEval.Guardrails.GateVerdict> InspectAsync(String text, CancellationToken cancellationToken = default)
+    ctor(IEnumerable<String> keywords = null, String policyName = null)
+    static IReadOnlyList<String> DefaultInjectionKeywords
+class AgentEval.Guardrails.Gates.PiiScanResult
+    AgentEval.Guardrails.Gates.PiiScanResult <Clone>$()
+    AgentEval.Guardrails.Gates.PiiScanStatus Status { get; init; }
+    Boolean Equals(AgentEval.Guardrails.Gates.PiiScanResult other)
+    Boolean Equals(Object obj)
+    IReadOnlyList<String> DetectedKinds { get; init; }
+    Int32 GetHashCode()
+    String RedactedText { get; init; }
+    String ToString()
+    Void Deconstruct(out AgentEval.Guardrails.Gates.PiiScanStatus Status, out IReadOnlyList<String> DetectedKinds, out String RedactedText)
+    ctor(AgentEval.Guardrails.Gates.PiiScanStatus Status, IReadOnlyList<String> DetectedKinds, String RedactedText)
+enum AgentEval.Guardrails.Gates.PiiScanStatus
+    Clean
+    Match
+    Inconclusive
+static class AgentEval.Guardrails.Gates.PiiScanner
+    static AgentEval.Guardrails.Gates.PiiScanResult Scan(String text)
+class AgentEval.Guardrails.Gates.RegexPiiGate
+    String PolicyName { get; }
+    ValueTask<AgentEval.Guardrails.GateVerdict> InspectAsync(String text, CancellationToken cancellationToken = default)
+    ctor()
+class AgentEval.Guardrails.Gates.RenderedOutputExfilGate
+    String PolicyName { get; }
+    ValueTask<AgentEval.Guardrails.GateVerdict> InspectAsync(String text, CancellationToken cancellationToken = default)
+    ctor()
+class AgentEval.Guardrails.Gates.SafetyMetricGate
+    String PolicyName { get; }
+    ValueTask<AgentEval.Guardrails.GateVerdict> InspectAsync(String text, CancellationToken cancellationToken = default)
+    ctor(ISafetyMetric metric, String policyName = null)
+class AgentEval.Guardrails.Gates.TokenInjectionGate
+    String PolicyName { get; }
+    ValueTask<AgentEval.Guardrails.GateVerdict> InspectAsync(String text, CancellationToken cancellationToken = default)
+    ctor(IEnumerable<String> tokens = null)
+    static IReadOnlyList<String> DefaultTokens
+interface AgentEval.Guardrails.IChatGate
+    String PolicyName { get; }
+    ValueTask<AgentEval.Guardrails.GateVerdict> InspectAsync(String text, CancellationToken cancellationToken = default)
+class AgentEval.Guardrails.Judges.CalibrationCaseResult
+    AgentEval.Guardrails.Judges.CalibrationCaseResult <Clone>$()
+    Boolean Blocked { get; init; }
+    Boolean Correct { get; }
+    Boolean Equals(AgentEval.Guardrails.Judges.CalibrationCaseResult other)
+    Boolean Equals(Object obj)
+    Boolean IsDangerousError { get; }
+    Boolean IsFalsePositive { get; }
+    Boolean ShouldBlock { get; init; }
+    Int32 GetHashCode()
+    String Text { get; init; }
+    String ToString()
+    Void Deconstruct(out String Text, out Boolean ShouldBlock, out Boolean Blocked)
+    ctor(String Text, Boolean ShouldBlock, Boolean Blocked)
+class AgentEval.Guardrails.Judges.CalibrationOptions
+    AgentEval.Guardrails.IChatGate DeterministicBaseline { get; init; }
+    Double MaxFalsePositiveRate { get; init; }
+    Double MinDecisiveAccuracy { get; init; }
+    Int32 MaxConcurrency { get; init; }
+    Int32 MaxDangerousErrors { get; init; }
+    Int32 MinCasesPerDirection { get; init; }
+    TimeProvider TimeProvider { get; init; }
+    ctor()
+class AgentEval.Guardrails.Judges.CalibrationReport
+    Boolean IsInlineReady { get; }
+    Boolean IsStale(TimeSpan maxAge, TimeProvider clock = null)
+    Boolean MeetsThresholds { get; }
+    Boolean PromotionCriteriaConfigured { get; }
+    Boolean SufficientData { get; }
+    Boolean? BeatsBaseline { get; }
+    DateTimeOffset CapturedAt { get; }
+    Double DecisiveAccuracy { get; }
+    Double FalsePositiveRate { get; }
+    Double KappaVsGold { get; }
+    Double? BaselineAccuracy { get; }
+    IReadOnlyList<AgentEval.Guardrails.Judges.CalibrationCaseResult> Cases { get; }
+    Int32 DangerousErrorCount { get; }
+    Int32 FalseNegatives { get; }
+    Int32 FalsePositives { get; }
+    Int32 Total { get; }
+    Int32 TrueNegatives { get; }
+    Int32 TruePositives { get; }
+    String Axis { get; }
+    Void AssertInlineReady()
+class AgentEval.Guardrails.Judges.CompositeJudgeGate<TRubric>
+    String AxisName { get; }
+    String PolicyName { get; }
+    ValueTask<AgentEval.Guardrails.GateVerdict> InspectAsync(String text, CancellationToken cancellationToken = default)
+    ctor(TRubric rubric, IChatClient fastModel, AgentEval.Guardrails.Judges.JudgeGateOptions options = null)
+static class AgentEval.Guardrails.Judges.CrescendoTrajectoryTurnJudge
+    const String Axis
+    static AgentEval.Guardrails.IChatGate Create(IChatClient fastModel, AgentEval.Guardrails.Judges.JudgeGateOptions options = null, Boolean cache = true)
+    static AgentEval.Guardrails.IChatGate KeywordBaseline()
+    static AgentEval.Guardrails.Judges.JudgeGoldSet GoldSet()
+    static Task<AgentEval.Guardrails.Judges.CalibrationReport> CalibrateAsync(IChatClient fastModel, AgentEval.Guardrails.Judges.JudgeGoldSet goldSet = null, AgentEval.Guardrails.IChatGate baseline = null, Int32 maxDangerousErrors = 0, AgentEval.Guardrails.Judges.JudgeGateOptions options = null, CancellationToken cancellationToken = default)
+static class AgentEval.Guardrails.Judges.ExfiltrationIntentJudge
+    const String Axis
+    static AgentEval.Guardrails.IChatGate Create(IChatClient fastModel, AgentEval.Guardrails.Judges.JudgeGateOptions options = null, Boolean cache = true)
+    static AgentEval.Guardrails.IChatGate KeywordBaseline()
+    static AgentEval.Guardrails.Judges.JudgeGoldSet GoldSet()
+    static IReadOnlyList<String> DefaultExfilKeywords
+    static Task<AgentEval.Guardrails.Judges.CalibrationReport> CalibrateAsync(IChatClient fastModel, AgentEval.Guardrails.Judges.JudgeGoldSet goldSet = null, AgentEval.Guardrails.IChatGate baseline = null, Int32 maxDangerousErrors = 0, AgentEval.Guardrails.Judges.JudgeGateOptions options = null, CancellationToken cancellationToken = default)
+static class AgentEval.Guardrails.Judges.GateCalibrationHarness
+    static Task<AgentEval.Guardrails.Judges.CalibrationReport> EvaluateAsync(AgentEval.Guardrails.IChatGate judge, AgentEval.Guardrails.Judges.JudgeGoldSet goldSet, AgentEval.Guardrails.Judges.CalibrationOptions options = null, CancellationToken cancellationToken = default)
+static class AgentEval.Guardrails.Judges.GatekeeperFleetHealthIndex [Experimental(AGENTEVAL_GATEKEEPER_PREVIEW001)]
+    static AgentEval.Guardrails.Judges.GatekeeperFleetHealthReport Compute(IReadOnlyDictionary<String, AgentEval.Guardrails.Judges.CalibrationReport> reportsByAxis, TimeSpan staleAfter, TimeProvider clock = null)
+class AgentEval.Guardrails.Judges.GatekeeperFleetHealthReport [Experimental(AGENTEVAL_GATEKEEPER_PREVIEW001)]
+    AgentEval.Guardrails.Judges.GatekeeperFleetHealthReport <Clone>$()
+    Boolean Equals(AgentEval.Guardrails.Judges.GatekeeperFleetHealthReport other)
+    Boolean Equals(Object obj)
+    Double? MeanDecisiveAccuracy { get; init; }
+    Double? MeanKappa { get; init; }
+    IReadOnlyDictionary<String, AgentEval.Guardrails.Judges.CalibrationReport> ReportsByAxis { get; init; }
+    IReadOnlyList<String> NeverCalibratedAxes { get; init; }
+    IReadOnlyList<String> StaleAxes { get; init; }
+    Int32 GetHashCode()
+    Int32 TotalDangerousErrors { get; init; }
+    String Explanation { get; init; }
+    String ToString()
+    Void Deconstruct(out IReadOnlyDictionary<String, AgentEval.Guardrails.Judges.CalibrationReport> ReportsByAxis, out Double? MeanDecisiveAccuracy, out Int32 TotalDangerousErrors, out Double? MeanKappa, out IReadOnlyList<String> StaleAxes, out IReadOnlyList<String> NeverCalibratedAxes, out String Explanation)
+    ctor(IReadOnlyDictionary<String, AgentEval.Guardrails.Judges.CalibrationReport> ReportsByAxis, Double? MeanDecisiveAccuracy, Int32 TotalDangerousErrors, Double? MeanKappa, IReadOnlyList<String> StaleAxes, IReadOnlyList<String> NeverCalibratedAxes, String Explanation)
+static class AgentEval.Guardrails.Judges.GoalHijackDriftJudge
+    const String Axis
+    static AgentEval.Guardrails.IChatGate Create(IChatClient fastModel, AgentEval.Guardrails.Judges.JudgeGateOptions options = null, Boolean cache = true)
+    static AgentEval.Guardrails.IChatGate KeywordBaseline()
+    static AgentEval.Guardrails.Judges.JudgeGoldSet GoldSet()
+    static Task<AgentEval.Guardrails.Judges.CalibrationReport> CalibrateAsync(IChatClient fastModel, AgentEval.Guardrails.Judges.JudgeGoldSet goldSet = null, AgentEval.Guardrails.IChatGate baseline = null, Int32 maxDangerousErrors = 0, AgentEval.Guardrails.Judges.JudgeGateOptions options = null, CancellationToken cancellationToken = default)
+class AgentEval.Guardrails.Judges.HallucinatedCitationJudge
+    String PolicyName { get; }
+    ValueTask<AgentEval.Guardrails.GateVerdict> InspectAsync(String text, CancellationToken cancellationToken = default)
+    ctor(IChatClient fastModel, AgentEval.Guardrails.Judges.JudgeGateOptions options = null)
+    static AgentEval.Guardrails.Judges.JudgeGoldSet CalibrationGoldSet()
+    static String FormatCase(IReadOnlyDictionary<String, String> retrievedSources, String citedSourceId, String claim)
+interface AgentEval.Guardrails.Judges.ICalibrationReportStore [Experimental(AGENTEVAL_GATEKEEPER_PREVIEW001)]
+    Task SaveAsync(AgentEval.Guardrails.Judges.CalibrationReport report, CancellationToken ct = default)
+    Task<AgentEval.Guardrails.Judges.CalibrationReport> LoadLatestAsync(String axis, CancellationToken ct = default)
+    Task<IReadOnlyDictionary<String, AgentEval.Guardrails.Judges.CalibrationReport>> LoadLatestAllAsync(CancellationToken ct = default)
+interface AgentEval.Guardrails.Judges.IJudgeRubric
+    AgentEval.Guardrails.Judges.JudgeVerdict Parse(String modelReply)
+    Boolean Prefilter(String text)
+    String Axis { get; }
+    String BuildPrompt(String text)
+interface AgentEval.Guardrails.Judges.IRequiresCalibration
+    String AxisName { get; }
+static class AgentEval.Guardrails.Judges.IndirectInjectionJudge
+    const String Axis
+    static AgentEval.Guardrails.IChatGate Create(IChatClient fastModel, AgentEval.Guardrails.Judges.JudgeGateOptions options = null, Boolean cache = true)
+    static AgentEval.Guardrails.IChatGate KeywordBaseline()
+    static AgentEval.Guardrails.Judges.JudgeGoldSet GoldSet()
+    static Task<AgentEval.Guardrails.Judges.CalibrationReport> CalibrateAsync(IChatClient fastModel, AgentEval.Guardrails.Judges.JudgeGoldSet goldSet = null, AgentEval.Guardrails.IChatGate baseline = null, Int32 maxDangerousErrors = 0, AgentEval.Guardrails.Judges.JudgeGateOptions options = null, CancellationToken cancellationToken = default)
+static class AgentEval.Guardrails.Judges.IntentActionMismatchJudge
+    const String Axis
+    static AgentEval.Guardrails.IChatGate Create(IChatClient fastModel, AgentEval.Guardrails.Judges.JudgeGateOptions options = null, Boolean cache = true)
+    static AgentEval.Guardrails.IChatGate KeywordBaseline()
+    static AgentEval.Guardrails.Judges.JudgeGoldSet GoldSet()
+    static Task<AgentEval.Guardrails.Judges.CalibrationReport> CalibrateAsync(IChatClient fastModel, AgentEval.Guardrails.Judges.JudgeGoldSet goldSet = null, AgentEval.Guardrails.IChatGate baseline = null, Int32 maxDangerousErrors = 0, AgentEval.Guardrails.Judges.JudgeGateOptions options = null, CancellationToken cancellationToken = default)
+static class AgentEval.Guardrails.Judges.InterAgentBoundaryInjectionGate
+    const Int32 MaxOutboundInstructionChars
+    const Int32 MaxTrustedGoalChars
+    const String InboundAxis
+    const String OutboundAxis
+    static AgentEval.Guardrails.IChatGate CreateInbound(IChatClient fastModel, AgentEval.Guardrails.Judges.JudgeGateOptions options = null, Boolean cache = true)
+    static AgentEval.Guardrails.IChatGate CreateOutbound(IChatClient fastModel, Func<CancellationToken, ValueTask<String>> trustedGoalResolver, AgentEval.Guardrails.Judges.JudgeGateOptions options = null, Boolean cache = true)
+    static AgentEval.Guardrails.IChatGate CreateOutbound(IChatClient fastModel, String trustedParentGoal, AgentEval.Guardrails.Judges.JudgeGateOptions options = null, Boolean cache = true)
+    static AgentEval.Guardrails.IChatGate InboundKeywordBaseline()
+    static AgentEval.Guardrails.IChatGate OutboundKeywordBaseline()
+    static AgentEval.Guardrails.Judges.JudgeGoldSet InboundGoldSet()
+    static AgentEval.Guardrails.Judges.JudgeGoldSet OutboundGoldSet()
+    static String FormatOutboundCase(String trustedParentGoal, String outboundInstruction)
+    static Task<AgentEval.Guardrails.Judges.CalibrationReport> CalibrateInboundAsync(IChatClient fastModel, AgentEval.Guardrails.Judges.JudgeGoldSet goldSet = null, AgentEval.Guardrails.IChatGate baseline = null, Int32 maxDangerousErrors = 0, AgentEval.Guardrails.Judges.JudgeGateOptions options = null, CancellationToken cancellationToken = default)
+    static Task<AgentEval.Guardrails.Judges.CalibrationReport> CalibrateOutboundAsync(IChatClient fastModel, AgentEval.Guardrails.Judges.JudgeGoldSet goldSet = null, AgentEval.Guardrails.IChatGate baseline = null, Int32 maxDangerousErrors = 0, AgentEval.Guardrails.Judges.JudgeGateOptions options = null, CancellationToken cancellationToken = default)
+class AgentEval.Guardrails.Judges.JsonFileCalibrationReportStore [Experimental(AGENTEVAL_GATEKEEPER_PREVIEW001)]
+    Task SaveAsync(AgentEval.Guardrails.Judges.CalibrationReport report, CancellationToken ct = default)
+    Task<AgentEval.Guardrails.Judges.CalibrationReport> LoadLatestAsync(String axis, CancellationToken ct = default)
+    Task<IReadOnlyDictionary<String, AgentEval.Guardrails.Judges.CalibrationReport>> LoadLatestAllAsync(CancellationToken ct = default)
+    ctor(String rootPath = ".agenteval/gatekeeper")
+class AgentEval.Guardrails.Judges.JudgeCacheEvent
+    AgentEval.Guardrails.Judges.JudgeCacheEvent <Clone>$()
+    Boolean Equals(AgentEval.Guardrails.Judges.JudgeCacheEvent other)
+    Boolean Equals(Object obj)
+    Boolean Hit { get; init; }
+    DateTimeOffset? OriginalTimestampUtc { get; init; }
+    Int32 GetHashCode()
+    String Policy { get; init; }
+    String ToString()
+    Void Deconstruct(out String Policy, out Boolean Hit, out DateTimeOffset? OriginalTimestampUtc)
+    ctor(String Policy, Boolean Hit, DateTimeOffset? OriginalTimestampUtc)
+enum AgentEval.Guardrails.Judges.JudgeDecision
+    Allowed
+    Blocked
+    Inconclusive
+class AgentEval.Guardrails.Judges.JudgeGateOptions
+    AgentEval.Guardrails.Judges.JudgeSpendGovernor SpendGovernor { get; init; }
+    Boolean FailClosedOnBudgetExhausted { get; init; }
+    Boolean FailClosedOnInconclusive { get; init; }
+    Double BlockThreshold { get; init; }
+    Int32 MaxInputChars { get; init; }
+    Int32 MaxOutputTokens { get; init; }
+    Single? Temperature { get; init; }
+    TimeSpan Timeout { get; init; }
+    ctor()
+class AgentEval.Guardrails.Judges.JudgeGoldCase
+    AgentEval.Guardrails.Judges.JudgeGoldCase <Clone>$()
+    Boolean Equals(AgentEval.Guardrails.Judges.JudgeGoldCase other)
+    Boolean Equals(Object obj)
+    Boolean ShouldBlock { get; init; }
+    Int32 GetHashCode()
+    String Note { get; init; }
+    String Text { get; init; }
+    String ToString()
+    Void Deconstruct(out String Text, out Boolean ShouldBlock, out String Note)
+    ctor(String Text, Boolean ShouldBlock, String Note = null)
+class AgentEval.Guardrails.Judges.JudgeGoldSet
+    IReadOnlyList<AgentEval.Guardrails.Judges.JudgeGoldCase> Cases { get; }
+    Int32 AttackCount { get; }
+    Int32 BenignCount { get; }
+    String Axis { get; }
+    ctor(String axis, IEnumerable<AgentEval.Guardrails.Judges.JudgeGoldCase> cases)
+class AgentEval.Guardrails.Judges.JudgeSpendGovernor
+    Boolean TryReserve(Int64 estimatedTokens)
+    ctor(Int32 maxCalls, Int64 maxTokens, TimeSpan? window = null, TimeProvider timeProvider = null)
+class AgentEval.Guardrails.Judges.JudgeVerdict
+    AgentEval.Guardrails.Judges.JudgeDecision Decision { get; init; }
+    AgentEval.Guardrails.Judges.JudgeVerdict <Clone>$()
+    Boolean Equals(AgentEval.Guardrails.Judges.JudgeVerdict other)
+    Boolean Equals(Object obj)
+    Double Confidence { get; init; }
+    IReadOnlyList<String> Spans { get; init; }
+    Int32 GetHashCode()
+    String Rationale { get; init; }
+    String ToString()
+    Void Deconstruct(out AgentEval.Guardrails.Judges.JudgeDecision Decision, out Double Confidence, out IReadOnlyList<String> Spans, out String Rationale)
+    ctor(AgentEval.Guardrails.Judges.JudgeDecision Decision, Double Confidence = 1, IReadOnlyList<String> Spans = null, String Rationale = null)
+    static AgentEval.Guardrails.Judges.JudgeVerdict Allowed(Double confidence = 1)
+    static AgentEval.Guardrails.Judges.JudgeVerdict Blocked(String rationale = null, IReadOnlyList<String> spans = null, Double confidence = 1)
+    static AgentEval.Guardrails.Judges.JudgeVerdict Inconclusive(String rationale = null)
+class AgentEval.Guardrails.Judges.JudgeVerdictCache
+    Int32 Count { get; }
+    Int64 Hits { get; }
+    Int64 Misses { get; }
+    String PolicyName { get; }
+    ValueTask<AgentEval.Guardrails.GateVerdict> InspectAsync(String text, CancellationToken cancellationToken = default)
+    ctor(AgentEval.Guardrails.IChatGate inner, Int32 maxEntries = 4096, Action<AgentEval.Guardrails.Judges.JudgeCacheEvent> onLookup = null, TimeProvider timeProvider = null, TimeSpan? ttl = null, String invalidationKey = null)
+static class AgentEval.Guardrails.Judges.MemoryWritePoisoningGate
+    const String Axis
+    static AgentEval.Guardrails.IChatGate Create(IChatClient fastModel, AgentEval.Guardrails.Judges.JudgeGateOptions options = null, Boolean cache = true)
+    static AgentEval.Guardrails.IChatGate KeywordBaseline()
+    static AgentEval.Guardrails.Judges.JudgeGoldSet GoldSet()
+    static Task<AgentEval.Guardrails.Judges.CalibrationReport> CalibrateAsync(IChatClient fastModel, AgentEval.Guardrails.Judges.JudgeGoldSet goldSet = null, AgentEval.Guardrails.IChatGate baseline = null, Int32 maxDangerousErrors = 0, AgentEval.Guardrails.Judges.JudgeGateOptions options = null, CancellationToken cancellationToken = default)
+static class AgentEval.Guardrails.Judges.OverRefusalJudge
+    const String Axis
+    static AgentEval.Guardrails.IChatGate Create(IChatClient fastModel, AgentEval.Guardrails.Judges.JudgeGateOptions options = null, Boolean cache = true)
+    static AgentEval.Guardrails.IChatGate KeywordBaseline()
+    static AgentEval.Guardrails.Judges.JudgeGoldSet GoldSet()
+    static IReadOnlyList<String> DefaultRefusalMarkers
+    static Task<AgentEval.Guardrails.Judges.CalibrationReport> CalibrateAsync(IChatClient fastModel, AgentEval.Guardrails.Judges.JudgeGoldSet goldSet = null, AgentEval.Guardrails.IChatGate baseline = null, Int32 maxDangerousErrors = 0, AgentEval.Guardrails.Judges.JudgeGateOptions options = null, CancellationToken cancellationToken = default)
+class AgentEval.Guardrails.Judges.ParallelJudgeFanOut
+    String PolicyName { get; }
+    ValueTask<AgentEval.Guardrails.GateVerdict> InspectAsync(String text, CancellationToken cancellationToken = default)
+    ctor(IEnumerable<AgentEval.Guardrails.IChatGate> judges, String policyName = null)
+static class AgentEval.Guardrails.Judges.Rubrics.CodeToolIntentGoldSet
+    const String IntendedUse
+    static AgentEval.Guardrails.Judges.JudgeGoldSet CalibrationGoldSet()
+class AgentEval.Guardrails.Judges.Rubrics.CrescendoTrajectoryRubric
+    AgentEval.Guardrails.Judges.JudgeVerdict Parse(String modelReply)
+    Boolean Prefilter(String text)
+    String Axis { get; }
+    String BuildPrompt(String text)
+    ctor()
+    static AgentEval.Guardrails.Judges.JudgeGoldSet CalibrationGoldSet()
+    static String FormatCase(String summarySoFar, String newTurnText)
+class AgentEval.Guardrails.Judges.Rubrics.ExfiltrationIntentRubric
+    AgentEval.Guardrails.Judges.JudgeVerdict Parse(String modelReply)
+    Boolean Prefilter(String text)
+    String Axis { get; }
+    String BuildPrompt(String text)
+    ctor()
+    static AgentEval.Guardrails.Judges.JudgeGoldSet CalibrationGoldSet()
+    static AgentEval.Guardrails.Judges.JudgeGoldSet StarterGoldSet()
+class AgentEval.Guardrails.Judges.Rubrics.GoalHijackDriftRubric
+    AgentEval.Guardrails.Judges.JudgeVerdict Parse(String modelReply)
+    Boolean Prefilter(String text)
+    String Axis { get; }
+    String BuildPrompt(String text)
+    ctor()
+    static AgentEval.Guardrails.Judges.JudgeGoldSet CalibrationGoldSet()
+    static String FormatCase(String originalGoal, String currentDirection)
+class AgentEval.Guardrails.Judges.Rubrics.IndirectInjectionRubric
+    AgentEval.Guardrails.Judges.JudgeVerdict Parse(String modelReply)
+    Boolean Prefilter(String text)
+    String Axis { get; }
+    String BuildPrompt(String text)
+    ctor()
+    static AgentEval.Guardrails.Judges.JudgeGoldSet CalibrationGoldSet()
+    static AgentEval.Guardrails.Judges.JudgeGoldSet StarterGoldSet()
+class AgentEval.Guardrails.Judges.Rubrics.IntentActionMismatchRubric
+    AgentEval.Guardrails.Judges.JudgeVerdict Parse(String modelReply)
+    Boolean Prefilter(String text)
+    String Axis { get; }
+    String BuildPrompt(String text)
+    ctor()
+    static AgentEval.Guardrails.Judges.JudgeGoldSet CalibrationGoldSet()
+    static String FormatCase(String narratedIntent, String toolName, String argumentsJson)
+class AgentEval.Guardrails.Judges.Rubrics.InterAgentOutboundGoalDriftRubric
+    AgentEval.Guardrails.Judges.JudgeVerdict Parse(String modelReply)
+    Boolean Prefilter(String text)
+    String Axis { get; }
+    String BuildPrompt(String text)
+    const String AxisName
+    ctor()
+    static AgentEval.Guardrails.Judges.JudgeGoldSet CalibrationGoldSet()
+    static String FormatCase(String trustedParentGoal, String outboundInstruction)
+class AgentEval.Guardrails.Judges.Rubrics.OverRefusalRubric
+    AgentEval.Guardrails.Judges.JudgeVerdict Parse(String modelReply)
+    Boolean Prefilter(String text)
+    String Axis { get; }
+    String BuildPrompt(String text)
+    ctor()
+    static AgentEval.Guardrails.Judges.JudgeGoldSet CalibrationGoldSet()
+    static AgentEval.Guardrails.Judges.JudgeGoldSet StarterGoldSet()
+static class AgentEval.Guardrails.Judges.Rubrics.SkillInjectionGoldSet
+    static AgentEval.Guardrails.Judges.JudgeGoldSet CalibrationGoldSet()
+class AgentEval.Guardrails.Judges.Rubrics.SystemPromptExtractionRubric
+    AgentEval.Guardrails.Judges.JudgeVerdict Parse(String modelReply)
+    Boolean Prefilter(String text)
+    String Axis { get; }
+    String BuildPrompt(String text)
+    ctor()
+    static AgentEval.Guardrails.Judges.JudgeGoldSet CalibrationGoldSet()
+    static AgentEval.Guardrails.Judges.JudgeGoldSet StarterGoldSet()
+class AgentEval.Guardrails.Judges.Rubrics.ToolArgumentGoalCoherenceRubric
+    AgentEval.Guardrails.Judges.JudgeVerdict Parse(String modelReply)
+    Boolean Prefilter(String text)
+    String Axis { get; }
+    String BuildPrompt(String text)
+    ctor()
+    static AgentEval.Guardrails.Judges.JudgeGoldSet CalibrationGoldSet()
+    static String FormatCase(String goal, String toolName, String argumentsJson)
+class AgentEval.Guardrails.Judges.Rubrics.UngroundedClaimRubric
+    AgentEval.Guardrails.Judges.JudgeVerdict Parse(String modelReply)
+    Boolean Prefilter(String text)
+    String Axis { get; }
+    String BuildPrompt(String text)
+    ctor()
+    static AgentEval.Guardrails.Judges.JudgeGoldSet CalibrationGoldSet()
+    static String FormatCase(String retrievedContext, String claim)
+static class AgentEval.Guardrails.Judges.SystemPromptExtractionJudge
+    const String Axis
+    static AgentEval.Guardrails.IChatGate Create(IChatClient fastModel, AgentEval.Guardrails.Judges.JudgeGateOptions options = null, Boolean cache = true)
+    static AgentEval.Guardrails.IChatGate KeywordBaseline()
+    static AgentEval.Guardrails.Judges.JudgeGoldSet GoldSet()
+    static IReadOnlyList<String> DefaultLeakTells
+    static Task<AgentEval.Guardrails.Judges.CalibrationReport> CalibrateAsync(IChatClient fastModel, AgentEval.Guardrails.Judges.JudgeGoldSet goldSet = null, AgentEval.Guardrails.IChatGate baseline = null, Int32 maxDangerousErrors = 0, AgentEval.Guardrails.Judges.JudgeGateOptions options = null, CancellationToken cancellationToken = default)
+static class AgentEval.Guardrails.Judges.ToolArgumentGoalCoherenceJudge
+    const String Axis
+    static AgentEval.Guardrails.IChatGate Create(IChatClient fastModel, AgentEval.Guardrails.Judges.JudgeGateOptions options = null, Boolean cache = true)
+    static AgentEval.Guardrails.IChatGate KeywordBaseline()
+    static AgentEval.Guardrails.Judges.JudgeGoldSet GoldSet()
+    static Task<AgentEval.Guardrails.Judges.CalibrationReport> CalibrateAsync(IChatClient fastModel, AgentEval.Guardrails.Judges.JudgeGoldSet goldSet = null, AgentEval.Guardrails.IChatGate baseline = null, Int32 maxDangerousErrors = 0, AgentEval.Guardrails.Judges.JudgeGateOptions options = null, CancellationToken cancellationToken = default)
+static class AgentEval.Guardrails.Judges.UngroundedClaimJudge
+    const String Axis
+    static AgentEval.Guardrails.IChatGate Create(IChatClient fastModel, AgentEval.Guardrails.Judges.JudgeGateOptions options = null, Boolean cache = true)
+    static AgentEval.Guardrails.IChatGate KeywordBaseline()
+    static AgentEval.Guardrails.Judges.JudgeGoldSet GoldSet()
+    static Task<AgentEval.Guardrails.Judges.CalibrationReport> CalibrateAsync(IChatClient fastModel, AgentEval.Guardrails.Judges.JudgeGoldSet goldSet = null, AgentEval.Guardrails.IChatGate baseline = null, Int32 maxDangerousErrors = 0, AgentEval.Guardrails.Judges.JudgeGateOptions options = null, CancellationToken cancellationToken = default)
+static class AgentEval.Guardrails.ManifestDriftDetector
+    static IReadOnlyList<AgentEval.Guardrails.ManifestDriftFinding> Detect(IReadOnlyDictionary<String, String> baselineHashesByKey, IReadOnlyDictionary<String, String> currentHashesByKey)
+class AgentEval.Guardrails.ManifestDriftFinding
+    AgentEval.Guardrails.ManifestDriftFinding <Clone>$()
+    AgentEval.Guardrails.ManifestDriftKind Kind { get; init; }
+    Boolean Equals(AgentEval.Guardrails.ManifestDriftFinding other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    String BaselineHash { get; init; }
+    String CurrentHash { get; init; }
+    String Key { get; init; }
+    String ToString()
+    Void Deconstruct(out String Key, out AgentEval.Guardrails.ManifestDriftKind Kind, out String BaselineHash, out String CurrentHash)
+    ctor(String Key, AgentEval.Guardrails.ManifestDriftKind Kind, String BaselineHash, String CurrentHash)
+enum AgentEval.Guardrails.ManifestDriftKind
+    Unchanged
+    Changed
+    New
+    Removed
+static class AgentEval.Guardrails.ManifestFingerprint
+    static String Hash(String canonicalContent)
+static class AgentEval.Guardrails.McpServerProvenanceGate
+    static IReadOnlyDictionary<String, String> CaptureBaseline(IReadOnlyList<AgentEval.Guardrails.McpToolDefinition> tools)
+    static IReadOnlyList<AgentEval.Guardrails.ManifestDriftFinding> CheckDrift(IReadOnlyList<AgentEval.Guardrails.McpToolDefinition> currentTools, IReadOnlyDictionary<String, String> baselineHashesByServerAndTool)
+    static String ManifestKey(AgentEval.Guardrails.McpToolDefinition tool)
+class AgentEval.Guardrails.McpToolDefinition
+    AgentEval.Guardrails.McpToolDefinition <Clone>$()
+    Boolean Equals(AgentEval.Guardrails.McpToolDefinition other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    String CanonicalContent()
+    String Description { get; init; }
+    String InputSchemaJson { get; init; }
+    String Name { get; init; }
+    String ServerId { get; init; }
+    String ToString()
+    Void Deconstruct(out String Name, out String Description, out String InputSchemaJson)
+    ctor(String Name, String Description, String InputSchemaJson)
+static class AgentEval.Guardrails.McpToolDescriptionPoisoningGate
+    static IReadOnlyDictionary<String, String> CaptureBaseline(IReadOnlyList<AgentEval.Guardrails.McpToolDefinition> tools)
+    static IReadOnlyList<AgentEval.Guardrails.ManifestDriftFinding> CheckDrift(IReadOnlyList<AgentEval.Guardrails.McpToolDefinition> currentTools, IReadOnlyDictionary<String, String> baselineHashesByToolName)
+    static String Fingerprint(AgentEval.Guardrails.McpToolDefinition tool)
+static class AgentEval.Guardrails.PromptTemplateDriftGate
+    static IReadOnlyDictionary<String, String> CaptureBaseline(IReadOnlyDictionary<String, String> templatesByName)
+    static IReadOnlyList<AgentEval.Guardrails.ManifestDriftFinding> CheckDrift(IReadOnlyDictionary<String, String> currentTemplatesByName, IReadOnlyDictionary<String, String> baselineHashesByName)
+    static String Fingerprint(String templateContent)
+static class AgentEval.Guardrails.SensitiveJudgeAxes
+    static Boolean IsSensitive(String policyName)
+    static IReadOnlySet<String> RedactAxes
+    static String AxisOf(String policyName)
+enum AgentEval.MAF.AgentHooks.Aevp.AevpEnforcementCapability [Experimental(AGENTEVAL_AGENTHOOKS_PREVIEW001)]
+    Observe
+    Block
+    Transform
+class AgentEval.MAF.AgentHooks.Aevp.AgentEvidenceProfile [Experimental(AGENTEVAL_AGENTHOOKS_PREVIEW001)]
+    AgentEval.MAF.AgentHooks.Aevp.AevpEnforcementCapability EnforcementCapability { get; init; }
+    AgentEval.MAF.AgentHooks.Aevp.AgentEvidenceProfile <Clone>$()
+    AgentEval.MAF.AgentHooks.Aevp.CalibrationEvidence Calibration { get; init; }
+    AgentEval.MAF.AgentHooks.Aevp.EvidenceTier? EvidenceTier { get; init; }
+    AgentEval.MAF.AgentHooks.Aevp.JudgeIdentity Judge { get; init; }
+    Boolean Equals(AgentEval.MAF.AgentHooks.Aevp.AgentEvidenceProfile other)
+    Boolean Equals(Object obj)
+    Boolean Evaluated { get; init; }
+    Int32 GetHashCode()
+    JsonObject ToJsonObject()
+    String Aevp { get; init; }
+    String ToCanonicalJson()
+    String ToContentAddress()
+    String ToString()
+    const String SpecVersion
+    ctor()
+    static AgentEval.MAF.AgentHooks.Aevp.AgentEvidenceProfile FromJson(String json)
+    static String AddressOf(String canonicalJson)
+class AgentEval.MAF.AgentHooks.Aevp.CalibrationEvidence [Experimental(AGENTEVAL_AGENTHOOKS_PREVIEW001)]
+    AgentEval.MAF.AgentHooks.Aevp.CalibrationEvidence <Clone>$()
+    Boolean BaselineBeaten { get; init; }
+    Boolean Equals(AgentEval.MAF.AgentHooks.Aevp.CalibrationEvidence other)
+    Boolean Equals(Object obj)
+    Double DecisiveAccuracy { get; init; }
+    Double Kappa { get; init; }
+    Int32 DangerousErrors { get; init; }
+    Int32 GetHashCode()
+    Int32 SampleSize { get; init; }
+    String ToString()
+    Void Deconstruct(out Double Kappa, out Double DecisiveAccuracy, out Int32 DangerousErrors, out Int32 SampleSize, out Boolean BaselineBeaten)
+    ctor(Double Kappa, Double DecisiveAccuracy, Int32 DangerousErrors, Int32 SampleSize, Boolean BaselineBeaten)
+enum AgentEval.MAF.AgentHooks.Aevp.EvidenceTier [Experimental(AGENTEVAL_AGENTHOOKS_PREVIEW001)]
+    Verbal
+    IntentToAct
+    Behavioral
+interface AgentEval.MAF.AgentHooks.Aevp.IAevpArtifactStore [Experimental(AGENTEVAL_AGENTHOOKS_PREVIEW001)]
+    Boolean TryGet(String contentAddress, out String canonicalJson)
+    ValueTask PutAsync(String contentAddress, String canonicalJson, CancellationToken cancellationToken = default)
+class AgentEval.MAF.AgentHooks.Aevp.InMemoryAevpArtifactStore [Experimental(AGENTEVAL_AGENTHOOKS_PREVIEW001)]
+    Boolean TryGet(String contentAddress, out String canonicalJson)
+    Int32 Count { get; }
+    ValueTask PutAsync(String contentAddress, String canonicalJson, CancellationToken cancellationToken = default)
+    ctor()
+class AgentEval.MAF.AgentHooks.Aevp.JudgeIdentity [Experimental(AGENTEVAL_AGENTHOOKS_PREVIEW001)]
+    AgentEval.MAF.AgentHooks.Aevp.JudgeIdentity <Clone>$()
+    Boolean Equals(AgentEval.MAF.AgentHooks.Aevp.JudgeIdentity other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    String Id { get; init; }
+    String Model { get; init; }
+    String ToString()
+    String Version { get; init; }
+    Void Deconstruct(out String Id, out String Version, out String Model)
+    ctor(String Id, String Version = null, String Model = null)
+static class AgentEval.MAF.AgentHooks.AgentContextMapper [Experimental(AGENTEVAL_AGENTHOOKS_PREVIEW001)]
+    static AgentEval.MAF.Gatekeeper.GatedToolCall ToGatedToolCall(AgentContext context)
+    static Boolean HasConversation(AgentContext context)
+class AgentEval.MAF.AgentHooks.GatekeeperInterceptor [Experimental(AGENTEVAL_AGENTHOOKS_PREVIEW001)]
+    AgentEval.MAF.AgentHooks.Aevp.IAevpArtifactStore ArtifactStore { get; }
+    ValueTask<Verdict> InterceptAsync(AgentContext context, CancellationToken ct)
+    const Int32 MaxMutationRevalidations
+    const String ReasonPrefix
+    ctor(IReadOnlyList<AgentEval.MAF.Gatekeeper.IToolGate> toolGates, AgentEval.MAF.AgentHooks.Aevp.IAevpArtifactStore artifactStore = null)
+static class AgentEval.MAF.Gatekeeper.AgentEvalGatekeeperExtensions
+    static AIAgentBuilder EnforceAgentEvalGates(AIAgentBuilder builder, Action<AgentEval.MAF.Gatekeeper.GatekeeperOptions> configure, AgentEval.MAF.Gatekeeper.GatekeeperEnforcement level = GatekeeperEnforcement.Terminate)
+    static AIAgentBuilder ObserveWithAgentEvalGates(AIAgentBuilder builder, Action<AgentEval.MAF.Gatekeeper.GatekeeperOptions> configure)
+    static AIAgentBuilder UseGatekeeper(AIAgentBuilder builder, AgentEval.MAF.Gatekeeper.GatekeeperEnforcement enforcement, Action<AgentEval.MAF.Gatekeeper.GatekeeperOptions> configure)
+static class AgentEval.MAF.Gatekeeper.AgentEvalRunGateExtensions
+    static AIAgentBuilder UseAgentEvalGate(AIAgentBuilder builder, IReadOnlyList<AgentEval.Guardrails.IChatGate> pre = null, IReadOnlyList<AgentEval.Guardrails.IChatGate> post = null, AgentEval.Guardrails.EvalGatePolicy? policy = null, AgentTrace trace = null, AgentEval.MAF.Gatekeeper.IGateEvidenceSink evidenceSink = null)
+static class AgentEval.MAF.Gatekeeper.AgentEvalShadowJudgeExtensions
+    static AIAgentBuilder UseAgentEvalShadowJudge(AIAgentBuilder builder, AgentEval.MAF.Gatekeeper.ShadowJudgePump pump)
+static class AgentEval.MAF.Gatekeeper.AgentEvalToolApprovalExtensions
+    static AIAgentBuilder UseAgentEvalToolApproval(AIAgentBuilder builder, IReadOnlyList<AgentEval.MAF.Gatekeeper.IToolApprovalGate> gates, AgentTrace trace = null)
+    static AIFunction RequiresApproval(AIFunction function)
+static class AgentEval.MAF.Gatekeeper.AgentEvalToolGateExtensions
+    static AIAgentBuilder UseAgentEvalToolGate(AIAgentBuilder builder, IReadOnlyList<AgentEval.MAF.Gatekeeper.IToolGate> gates, AgentEval.MAF.Gatekeeper.ToolGatePolicy policy, AgentTrace trace = null, AgentEval.MAF.Gatekeeper.GateTelemetry telemetry = null, AgentEval.MAF.Gatekeeper.TraceCaptureMode mutationCaptureMode = TraceCaptureMode.Redacted, IReadOnlyList<AgentEval.MAF.Gatekeeper.IToolResultGate> resultGates = null, AgentEval.MAF.Gatekeeper.IGateEvidenceSink evidenceSink = null, Func<AgentSession, IReadOnlyList<AgentEval.MAF.Gatekeeper.ContainmentTarget>> denialCorrelationTargets = null)
+class AgentEval.MAF.Gatekeeper.AgentRunScope
+    AgentEval.MAF.Gatekeeper.AgentRunScope Parent { get; }
+    AgentEval.MAF.Gatekeeper.AgentRunScope Root { get; }
+    AgentSession Session { get; }
+    AgentTrace Trace { get; }
+    IDisposable Enter()
+    String AgentName { get; }
+    String RunId { get; }
+    Void Dispose()
+    static AgentEval.MAF.Gatekeeper.AgentRunScope Begin(AgentSession session, String agentName, AgentTrace trace)
+    static AgentEval.MAF.Gatekeeper.AgentRunScope Current { get; }
+static class AgentEval.MAF.Gatekeeper.AgenticSecurityGraph
+    static AgentEval.MAF.Gatekeeper.SecurityGraphReport Compute(AgentEval.MAF.Gatekeeper.SecurityGraphTenantSnapshot snapshot, IReadOnlyCollection<AgentEval.MAF.Gatekeeper.SecurityGraphNode> expectedNodes, TimeSpan staleAfter, TimeProvider clock = null)
+class AgentEval.MAF.Gatekeeper.AnalyzeOptions
+    Boolean HasDynamicToolProvider { get; init; }
+    Boolean TreatArbitraryCapabilityOpaqueToolsAsHighRisk { get; init; }
+    Func<AITool, Boolean> IsHighRisk { get; init; }
+    IReadOnlySet<String> AcknowledgeProviderHostedTools { get; init; }
+    ctor()
+    static AgentEval.MAF.Gatekeeper.AnalyzeOptions Default { get; }
+static class AgentEval.MAF.Gatekeeper.ArgumentCanonicalizer
+    const Int32 DefaultMaxDepth
+    const Int32 DefaultMaxLength
+    const Int32 DefaultMaxProjections
+    static IReadOnlyList<String> Canonicalize(String raw, Int32 maxDepth = 2, Int32 maxLength = 65536, Int32 maxProjections = 24)
+class AgentEval.MAF.Gatekeeper.ArgumentPatternApprovalGate
+    String PolicyName { get; }
+    ValueTask<Boolean> IsAutoApprovableAsync(FunctionCallContent call, CancellationToken cancellationToken = default)
+    ctor(Regex escalateWhenArgumentsMatch, String policyName = null)
+    ctor(String escalateWhenArgumentsMatch, String policyName = null)
+class AgentEval.MAF.Gatekeeper.ArgumentPatternGate
+    AgentEval.MAF.Gatekeeper.GateCost Cost { get; }
+    String PolicyName { get; }
+    ValueTask<AgentEval.MAF.Gatekeeper.ToolGateVerdict> InspectAsync(AgentEval.MAF.Gatekeeper.GatedToolCall call, CancellationToken cancellationToken = default)
+    ctor(Regex forbiddenPattern, String policyName = null, Boolean canonicalize = false)
+    ctor(String forbiddenPattern, String policyName = null, Boolean canonicalize = false)
+class AgentEval.MAF.Gatekeeper.BlockStormIncident
+    AgentEval.MAF.Gatekeeper.BlockStormIncident <Clone>$()
+    AgentEval.MAF.Gatekeeper.GateSeverity Severity { get; init; }
+    Boolean Equals(AgentEval.MAF.Gatekeeper.BlockStormIncident other)
+    Boolean Equals(Object obj)
+    Int32 EnforcedBlockCount { get; init; }
+    Int32 GetHashCode()
+    Int32 Threshold { get; init; }
+    String EvidenceReference { get; init; }
+    String RunId { get; init; }
+    String ToString()
+    Void Deconstruct(out String RunId, out Int32 EnforcedBlockCount, out Int32 Threshold, out AgentEval.MAF.Gatekeeper.GateSeverity Severity)
+    ctor(String RunId, Int32 EnforcedBlockCount, Int32 Threshold, AgentEval.MAF.Gatekeeper.GateSeverity Severity)
+class AgentEval.MAF.Gatekeeper.BlockStormSentinelGate
+    AgentEval.MAF.Gatekeeper.GateCost Cost { get; }
+    String PolicyName { get; }
+    ValueTask<AgentEval.MAF.Gatekeeper.ToolGateVerdict> InspectAsync(AgentEval.MAF.Gatekeeper.GatedToolCall call, CancellationToken cancellationToken = default)
+    ctor(Int32 threshold = 5, Action<AgentEval.MAF.Gatekeeper.BlockStormIncident> onBlockStorm = null)
+class AgentEval.MAF.Gatekeeper.CompositeGateEvidenceSink
+    Void Record(AgentEval.MAF.Gatekeeper.GateEvidence evidence, Int32 sequence)
+    ctor(AgentEval.MAF.Gatekeeper.IGateEvidenceSink[] sinks)
+class AgentEval.MAF.Gatekeeper.ContainedIdentityGate
+    String PolicyName { get; }
+    ctor(AgentEval.MAF.Gatekeeper.IContainmentStore store, Func<AgentSession, IReadOnlyList<AgentEval.MAF.Gatekeeper.ContainmentTarget>> sessionTargets)
+class AgentEval.MAF.Gatekeeper.ContainmentHttpClientPool
+    HttpClient IsolatedClient { get; }
+    HttpClient NormalClient { get; }
+    IServiceProvider IsolatedServices { get; }
+    IServiceProvider NormalServices { get; }
+    Int32 IsolatedCurrentRequests { get; }
+    Int32 IsolatedPeakRequests { get; }
+    Int32 NormalCurrentRequests { get; }
+    Int32 NormalPeakRequests { get; }
+    Void Dispose()
+    ctor(AgentEval.MAF.Gatekeeper.ContainmentHttpClientPoolOptions options = null)
+class AgentEval.MAF.Gatekeeper.ContainmentHttpClientPoolOptions
+    Func<HttpMessageHandler> IsolatedPrimaryHandlerFactory { get; set; }
+    Func<HttpMessageHandler> NormalPrimaryHandlerFactory { get; set; }
+    Int32 IsolatedMaxConcurrency { get; set; }
+    Int32 NormalMaxConcurrency { get; set; }
+    TimeSpan PooledConnectionLifetime { get; set; }
+    TimeSpan Timeout { get; set; }
+    Uri BaseAddress { get; set; }
+    ctor()
+static class AgentEval.MAF.Gatekeeper.ContainmentHttpResourceRoutingExtensions
+    static AIFunction WithContainmentHttpResourceIsolation(AIFunction function, AgentEval.MAF.Gatekeeper.IContainmentStore store, Func<AgentSession, AgentEval.MAF.Gatekeeper.ContainmentTarget> targetResolver, AgentEval.MAF.Gatekeeper.ContainmentHttpClientPool pool)
+    static Void ValidateContainmentHttpResourceIsolation(IEnumerable<AIFunction> resourceConsumingFunctions)
+class AgentEval.MAF.Gatekeeper.ContainmentHttpResourceRoutingFunction
+    IReadOnlyDictionary<String, Object> AdditionalProperties { get; }
+    JsonElement JsonSchema { get; }
+    JsonElement? ReturnJsonSchema { get; }
+    JsonSerializerOptions JsonSerializerOptions { get; }
+    MethodInfo UnderlyingMethod { get; }
+    Object GetService(Type serviceType, Object serviceKey = null)
+    String Description { get; }
+    String Name { get; }
+    ctor(AIFunction inner, AgentEval.MAF.Gatekeeper.IContainmentStore store, Func<AgentSession, AgentEval.MAF.Gatekeeper.ContainmentTarget> targetResolver, AgentEval.MAF.Gatekeeper.ContainmentHttpClientPool pool)
+enum AgentEval.MAF.Gatekeeper.ContainmentMutationDisposition
+    Applied
+    Unchanged
+    Conflict
+    Indeterminate
+class AgentEval.MAF.Gatekeeper.ContainmentMutationResult
+    AgentEval.MAF.Gatekeeper.ContainmentMutationDisposition Disposition { get; }
+    AgentEval.MAF.Gatekeeper.ContainmentSnapshot Snapshot { get; }
+    static AgentEval.MAF.Gatekeeper.ContainmentMutationResult Applied(AgentEval.MAF.Gatekeeper.ContainmentSnapshot snapshot)
+    static AgentEval.MAF.Gatekeeper.ContainmentMutationResult Conflict(AgentEval.MAF.Gatekeeper.ContainmentSnapshot snapshot)
+    static AgentEval.MAF.Gatekeeper.ContainmentMutationResult Indeterminate(AgentEval.MAF.Gatekeeper.ContainmentSnapshot snapshot)
+    static AgentEval.MAF.Gatekeeper.ContainmentMutationResult Unchanged(AgentEval.MAF.Gatekeeper.ContainmentSnapshot snapshot)
+class AgentEval.MAF.Gatekeeper.ContainmentOverrideGate
+    AgentEval.MAF.Gatekeeper.GateCost Cost { get; }
+    AgentEval.MAF.Gatekeeper.GateRequirements Requirements { get; }
+    AgentEval.MAF.Gatekeeper.ToolGatePolicy MinimumPolicy { get; }
+    String PolicyName { get; }
+    ValueTask<AgentEval.MAF.Gatekeeper.ToolGateVerdict> InspectAsync(AgentEval.MAF.Gatekeeper.GatedToolCall call, CancellationToken cancellationToken = default)
+    ctor(AgentEval.MAF.Gatekeeper.IContainmentStore store, Func<AgentSession, IReadOnlyList<AgentEval.MAF.Gatekeeper.ContainmentTarget>> sessionTargets, Func<AgentEval.MAF.Gatekeeper.GatedToolCall, IReadOnlyList<AgentEval.MAF.Gatekeeper.ContainmentTarget>> additionalCallTargets = null)
+class AgentEval.MAF.Gatekeeper.ContainmentRecord
+    AgentEval.MAF.Gatekeeper.ContainmentRecord <Clone>$()
+    AgentEval.MAF.Gatekeeper.ContainmentStatus Status { get; }
+    AgentEval.MAF.Gatekeeper.ContainmentTarget Target { get; }
+    Boolean Equals(AgentEval.MAF.Gatekeeper.ContainmentRecord other)
+    Boolean Equals(Object obj)
+    DateTimeOffset ContainedAtUtc { get; }
+    DateTimeOffset? ReleasedAtUtc { get; }
+    Int32 GetHashCode()
+    Int32 SchemaVersion { get; }
+    Int64 Version { get; }
+    String ETag { get; }
+    String EvidenceReference { get; }
+    String Issuer { get; }
+    String ReasonCode { get; }
+    String Reviewer { get; }
+    String ToString()
+    const Int32 CurrentSchemaVersion
+    ctor(AgentEval.MAF.Gatekeeper.ContainmentTarget target, AgentEval.MAF.Gatekeeper.ContainmentStatus status, DateTimeOffset containedAtUtc, DateTimeOffset? releasedAtUtc, String reasonCode, String evidenceReference, String issuer, String reviewer, Int64 version, String etag)
+class AgentEval.MAF.Gatekeeper.ContainmentReleaseAuthorization
+    AgentEval.MAF.Gatekeeper.ContainmentReleaseAuthorization <Clone>$()
+    AgentEval.MAF.Gatekeeper.ContainmentTarget Target { get; }
+    Boolean Equals(AgentEval.MAF.Gatekeeper.ContainmentReleaseAuthorization other)
+    Boolean Equals(Object obj)
+    DateTimeOffset ExpiresAtUtc { get; }
+    DateTimeOffset IssuedAtUtc { get; }
+    Int32 AlgorithmVersion { get; }
+    Int32 GetHashCode()
+    Int64 ExpectedVersion { get; }
+    String Algorithm { get; }
+    String KeyId { get; }
+    String Nonce { get; }
+    String OperatorId { get; }
+    String Signature { get; }
+    String ToString()
+    ctor(AgentEval.MAF.Gatekeeper.ContainmentTarget target, Int64 expectedVersion, String operatorId, DateTimeOffset issuedAtUtc, DateTimeOffset expiresAtUtc, String nonce, String algorithm, Int32 algorithmVersion, String keyId, String signature)
+    static TimeSpan MaximumLifetime
+static class AgentEval.MAF.Gatekeeper.ContainmentReleaseAuthorizationCanonicalizer
+    const String Domain
+    static Byte[] CreatePayload(AgentEval.MAF.Gatekeeper.ContainmentReleaseAuthorization authorization)
+    static Byte[] CreatePayload(AgentEval.MAF.Gatekeeper.ContainmentTarget target, Int64 expectedVersion, String operatorId, DateTimeOffset issuedAtUtc, DateTimeOffset expiresAtUtc, String nonce, String algorithm, Int32 algorithmVersion, String keyId)
+class AgentEval.MAF.Gatekeeper.ContainmentRequest
+    AgentEval.MAF.Gatekeeper.ContainmentRequest <Clone>$()
+    AgentEval.MAF.Gatekeeper.ContainmentTarget Target { get; }
+    Boolean Equals(AgentEval.MAF.Gatekeeper.ContainmentRequest other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    String EvidenceReference { get; }
+    String Issuer { get; }
+    String ReasonCode { get; }
+    String ToString()
+    ctor(AgentEval.MAF.Gatekeeper.ContainmentTarget target, String reasonCode, String evidenceReference, String issuer)
+class AgentEval.MAF.Gatekeeper.ContainmentSnapshot
+    AgentEval.MAF.Gatekeeper.ContainmentRecord Record { get; }
+    AgentEval.MAF.Gatekeeper.ContainmentSnapshotState State { get; }
+    AgentEval.MAF.Gatekeeper.ContainmentTarget Target { get; }
+    Boolean MustBlock { get; }
+    String FailureCode { get; }
+    static AgentEval.MAF.Gatekeeper.ContainmentSnapshot FromRecord(AgentEval.MAF.Gatekeeper.ContainmentRecord record)
+    static AgentEval.MAF.Gatekeeper.ContainmentSnapshot Indeterminate(AgentEval.MAF.Gatekeeper.ContainmentTarget target, String failureCode)
+    static AgentEval.MAF.Gatekeeper.ContainmentSnapshot NotContained(AgentEval.MAF.Gatekeeper.ContainmentTarget target)
+enum AgentEval.MAF.Gatekeeper.ContainmentSnapshotState
+    NotContained
+    Active
+    Released
+    Indeterminate
+enum AgentEval.MAF.Gatekeeper.ContainmentStatus
+    Active
+    Released
+class AgentEval.MAF.Gatekeeper.ContainmentTarget
+    AgentEval.MAF.Gatekeeper.ContainmentTargetKind Kind { get; }
+    Boolean Equals(AgentEval.MAF.Gatekeeper.ContainmentTarget other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    String Identifier { get; }
+    String Tenant { get; }
+    String ToString()
+class AgentEval.MAF.Gatekeeper.ContainmentTarget.AgentEndpoint
+    AgentEval.MAF.Gatekeeper.ContainmentTargetKind Kind { get; }
+    String AgentId { get; }
+    ctor(String tenant, String agentId)
+class AgentEval.MAF.Gatekeeper.ContainmentTarget.McpServer
+    AgentEval.MAF.Gatekeeper.ContainmentTargetKind Kind { get; }
+    String ServerId { get; }
+    ctor(String tenant, String serverId)
+class AgentEval.MAF.Gatekeeper.ContainmentTarget.Session
+    AgentEval.MAF.Gatekeeper.ContainmentTargetKind Kind { get; }
+    String SessionId { get; }
+    ctor(String tenant, String sessionId)
+class AgentEval.MAF.Gatekeeper.ContainmentTarget.TenantScope
+    AgentEval.MAF.Gatekeeper.ContainmentTargetKind Kind { get; }
+    const String GlobalIdentifier
+    ctor(String tenant)
+enum AgentEval.MAF.Gatekeeper.ContainmentTargetKind
+    Session
+    McpServer
+    AgentEndpoint
+    TenantScope
+class AgentEval.MAF.Gatekeeper.ContractPredicate
+    String Argument { get; }
+class AgentEval.MAF.Gatekeeper.CrescendoTrajectoryJudge
+    Task<AgentEval.MAF.Gatekeeper.ShadowVerdict> JudgeAsync(AgentEval.MAF.Gatekeeper.ShadowJudgeContext context, CancellationToken cancellationToken = default)
+    const Int32 DefaultArmThreshold
+    const Int32 DefaultMaxTrackedTurns
+    const String StateKey
+    ctor(IChatClient fastModel, AgentEval.Guardrails.Judges.JudgeGateOptions options = null, Int32 maxTrackedTurns = 5, Int32 armThreshold = 3)
+class AgentEval.MAF.Gatekeeper.DeniedKeywordsPredicate
+    IReadOnlyList<String> Keywords { get; }
+    ctor(String argument, IEnumerable<String> keywords)
+enum AgentEval.MAF.Gatekeeper.DistinctValueDecision
+    Existing
+    Admitted
+    Exceeded
+class AgentEval.MAF.Gatekeeper.DomainAllowListGate
+    AgentEval.MAF.Gatekeeper.GateCost Cost { get; }
+    String PolicyName { get; }
+    ValueTask<AgentEval.MAF.Gatekeeper.ToolGateVerdict> InspectAsync(AgentEval.MAF.Gatekeeper.GatedToolCall call, CancellationToken cancellationToken = default)
+    ctor(IEnumerable<String> allowedDomains, String policyName = null, IEnumerable<String> hostArguments = null, Boolean canonicalize = false)
+class AgentEval.MAF.Gatekeeper.Egress.GatekeeperHttpEgressOptions
+    AgentEval.MAF.Gatekeeper.Egress.IDnsResolver DnsResolver { get; set; }
+    Boolean BlockPrivateNetworks { get; set; }
+    Int32 MaxRedirects { get; set; }
+    TimeSpan DnsResolutionTimeout { get; set; }
+    ctor()
+class AgentEval.MAF.Gatekeeper.Egress.GatekeeperHttpMessageHandler
+    ctor(HttpMessageHandler innerHandler, IEnumerable<String> allowedDomains, AgentEval.MAF.Gatekeeper.Egress.GatekeeperHttpEgressOptions options = null)
+    static HttpClient CreateHttpClient(IEnumerable<String> allowedDomains, AgentEval.MAF.Gatekeeper.Egress.GatekeeperHttpEgressOptions options = null)
+class AgentEval.MAF.Gatekeeper.Egress.HttpEgressBlockedException
+    String Host { get; }
+    ctor(String host, String message)
+interface AgentEval.MAF.Gatekeeper.Egress.IDnsResolver
+    Task<IPAddress[]> ResolveAsync(String host, CancellationToken cancellationToken = default)
+static class AgentEval.MAF.Gatekeeper.Egress.PrivateNetworkClassifier
+    static Boolean IsPrivateOrReserved(IPAddress address)
+class AgentEval.MAF.Gatekeeper.Egress.SystemDnsResolver
+    Task<IPAddress[]> ResolveAsync(String host, CancellationToken cancellationToken = default)
+    ctor()
+    static AgentEval.MAF.Gatekeeper.Egress.SystemDnsResolver Instance
+class AgentEval.MAF.Gatekeeper.ForbiddenIfPrecededByPredicate
+    IReadOnlyList<String> TriggerTools { get; }
+    ctor(IEnumerable<String> triggerTools)
+class AgentEval.MAF.Gatekeeper.ForbiddenToolGate
+    AgentEval.MAF.Gatekeeper.GateCost Cost { get; }
+    String PolicyName { get; }
+    ValueTask<AgentEval.MAF.Gatekeeper.ToolGateVerdict> InspectAsync(AgentEval.MAF.Gatekeeper.GatedToolCall call, CancellationToken cancellationToken = default)
+    ctor(String[] forbiddenNames)
+class AgentEval.MAF.Gatekeeper.GateBlockAggregation
+    AgentEval.MAF.Gatekeeper.GateBlockAggregation <Clone>$()
+    Boolean Equals(AgentEval.MAF.Gatekeeper.GateBlockAggregation other)
+    Boolean Equals(Object obj)
+    IReadOnlyDictionary<String, Int32> ByConfigFingerprint { get; init; }
+    IReadOnlyDictionary<String, Int32> ByDay { get; init; }
+    IReadOnlyDictionary<String, Int32> ByPolicy { get; init; }
+    IReadOnlyDictionary<String, Int32> BySeverity { get; init; }
+    IReadOnlyDictionary<String, Int32> ByTool { get; init; }
+    Int32 GetHashCode()
+    Int32 Total { get; init; }
+    String ToString()
+    Void Deconstruct(out Int32 Total, out IReadOnlyDictionary<String, Int32> ByPolicy, out IReadOnlyDictionary<String, Int32> ByTool, out IReadOnlyDictionary<String, Int32> ByConfigFingerprint, out IReadOnlyDictionary<String, Int32> BySeverity, out IReadOnlyDictionary<String, Int32> ByDay)
+    ctor(Int32 Total, IReadOnlyDictionary<String, Int32> ByPolicy, IReadOnlyDictionary<String, Int32> ByTool, IReadOnlyDictionary<String, Int32> ByConfigFingerprint, IReadOnlyDictionary<String, Int32> BySeverity, IReadOnlyDictionary<String, Int32> ByDay)
+static class AgentEval.MAF.Gatekeeper.GateConfigFingerprint
+    static String Compute(IReadOnlyList<AgentEval.MAF.Gatekeeper.IToolGate> toolGates = null, IReadOnlyList<AgentEval.MAF.Gatekeeper.IToolResultGate> resultGates = null, IReadOnlyList<AgentEval.Guardrails.IChatGate> chatGates = null)
+enum AgentEval.MAF.Gatekeeper.GateCost
+    PureCode
+    Bounded
+    Network
+    Llm
+class AgentEval.MAF.Gatekeeper.GateCostViolation
+    AgentEval.MAF.Gatekeeper.GateCost DeclaredCost { get; init; }
+    AgentEval.MAF.Gatekeeper.GateCostViolation <Clone>$()
+    Boolean Equals(AgentEval.MAF.Gatekeeper.GateCostViolation other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    Int64 Invocations { get; init; }
+    String PolicyName { get; init; }
+    String ToString()
+    TimeSpan Ceiling { get; init; }
+    TimeSpan MeasuredAverage { get; init; }
+    Void Deconstruct(out String PolicyName, out AgentEval.MAF.Gatekeeper.GateCost DeclaredCost, out TimeSpan MeasuredAverage, out TimeSpan Ceiling, out Int64 Invocations)
+    ctor(String PolicyName, AgentEval.MAF.Gatekeeper.GateCost DeclaredCost, TimeSpan MeasuredAverage, TimeSpan Ceiling, Int64 Invocations)
+static class AgentEval.MAF.Gatekeeper.GateCostWatchdog
+    static IReadOnlyList<AgentEval.MAF.Gatekeeper.GateCostViolation> CheckViolations(IEnumerable<AgentEval.MAF.Gatekeeper.IToolGate> gates, AgentEval.MAF.Gatekeeper.GateTelemetry telemetry, Int32 minInvocations = 20)
+    static TimeSpan CeilingFor(AgentEval.MAF.Gatekeeper.GateCost cost)
+class AgentEval.MAF.Gatekeeper.GateEvidence
+    AgentEval.Guardrails.GateProvenance Provenance { get; init; }
+    AgentEval.MAF.Gatekeeper.GateEvidence <Clone>$()
+    AgentEval.MAF.Gatekeeper.GateSeverity Severity { get; init; }
+    Boolean Equals(AgentEval.MAF.Gatekeeper.GateEvidence other)
+    Boolean Equals(Object obj)
+    DateTimeOffset TimestampUtc { get; init; }
+    Dictionary<String, Object> ToMetadata()
+    IReadOnlyDictionary<String, Object> Extra { get; init; }
+    Int32 GetHashCode()
+    Int32? Iteration { get; init; }
+    String Action { get; init; }
+    String AgentName { get; init; }
+    String ConfigFingerprint { get; init; }
+    String CorrelationId { get; init; }
+    String Policy { get; init; }
+    String Reason { get; init; }
+    String ReferenceId { get; init; }
+    String RunId { get; init; }
+    String Stage { get; init; }
+    String ToString()
+    String ToolName { get; init; }
+    String TraceKey(Int32 seq)
+    ctor()
+static class AgentEval.MAF.Gatekeeper.GateReferenceIndexAggregator
+    static AgentEval.MAF.Gatekeeper.GateBlockAggregation Aggregate(IEnumerable<AgentEval.MAF.Gatekeeper.GateReferenceLedger.GateReferenceIndexEntry> entries)
+    static AgentEval.MAF.Gatekeeper.GateBlockAggregation ReadAndAggregate(TextReader reader)
+    static IReadOnlyList<AgentEval.MAF.Gatekeeper.GateReferenceLedger.GateReferenceIndexEntry> Read(TextReader reader)
+class AgentEval.MAF.Gatekeeper.GateReferenceLedger
+    AgentEval.MAF.Gatekeeper.GateVerdictResolver Resolver { get; }
+    Void Record(AgentEval.MAF.Gatekeeper.GateEvidence evidence, Int32 sequence)
+    ctor(AgentEval.MAF.Gatekeeper.GateVerdictResolver resolver = null, TextWriter jsonlIndex = null)
+class AgentEval.MAF.Gatekeeper.GateReferenceLedger.GateReferenceIndexEntry
+    AgentEval.MAF.Gatekeeper.GateReferenceLedger.GateReferenceIndexEntry <Clone>$()
+    Boolean Equals(AgentEval.MAF.Gatekeeper.GateReferenceLedger.GateReferenceIndexEntry other)
+    Boolean Equals(Object obj)
+    DateTimeOffset TsUtc { get; init; }
+    Int32 GetHashCode()
+    String AgentName { get; init; }
+    String ConfigFingerprint { get; init; }
+    String Policy { get; init; }
+    String ReferenceId { get; init; }
+    String RunId { get; init; }
+    String Severity { get; init; }
+    String Stage { get; init; }
+    String ToString()
+    String ToolName { get; init; }
+    Void Deconstruct(out String ReferenceId, out DateTimeOffset TsUtc, out String RunId, out String Policy, out String Stage, out String ToolName, out String AgentName, out String Severity, out String ConfigFingerprint)
+    ctor(String ReferenceId, DateTimeOffset TsUtc, String RunId, String Policy, String Stage, String ToolName, String AgentName, String Severity, String ConfigFingerprint = null)
+class AgentEval.MAF.Gatekeeper.GateReplayActionCounts
+    AgentEval.MAF.Gatekeeper.GateReplayActionCounts <Clone>$()
+    Boolean Equals(AgentEval.MAF.Gatekeeper.GateReplayActionCounts other)
+    Boolean Equals(Object obj)
+    Int32 Allow { get; init; }
+    Int32 Block { get; init; }
+    Int32 GetHashCode()
+    Int32 Mutate { get; init; }
+    String ToString()
+    Void Deconstruct(out Int32 Allow, out Int32 Block, out Int32 Mutate)
+    ctor(Int32 Allow, Int32 Block, Int32 Mutate)
+static class AgentEval.MAF.Gatekeeper.GateReplayBuildAdapter
+    static Int32 GetExitCode(AgentEval.MAF.Gatekeeper.GateReplayThresholdResult result)
+class AgentEval.MAF.Gatekeeper.GateReplayComparison
+    AgentEval.MAF.Gatekeeper.GateReplayComparison <Clone>$()
+    Boolean Equals(AgentEval.MAF.Gatekeeper.GateReplayComparison other)
+    Boolean Equals(Object obj)
+    IReadOnlyList<AgentEval.MAF.Gatekeeper.GateReplayRow> Diverged { get; }
+    IReadOnlyList<AgentEval.MAF.Gatekeeper.GateReplayRow> Rows { get; init; }
+    Int32 GetHashCode()
+    String ToString()
+    Void Deconstruct(out IReadOnlyList<AgentEval.MAF.Gatekeeper.GateReplayRow> Rows)
+    ctor(IReadOnlyList<AgentEval.MAF.Gatekeeper.GateReplayRow> Rows)
+class AgentEval.MAF.Gatekeeper.GateReplayCorpus
+    IReadOnlyList<AgentEval.MAF.Gatekeeper.GateReplayFixture> Fixtures { get; }
+    String CorpusId { get; }
+    ctor(String corpusId, IEnumerable<AgentEval.MAF.Gatekeeper.GateReplayFixture> fixtures)
+class AgentEval.MAF.Gatekeeper.GateReplayCorpusFormatException
+    ctor(String message)
+    ctor(String message, Exception innerException)
+class AgentEval.MAF.Gatekeeper.GateReplayCorpusLimits
+    AgentEval.MAF.Gatekeeper.GateReplayCorpusLimits <Clone>$()
+    Boolean Equals(AgentEval.MAF.Gatekeeper.GateReplayCorpusLimits other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    Int32 MaxArgumentsPerCall { get; init; }
+    Int32 MaxCalls { get; init; }
+    Int32 MaxContentsPerMessage { get; init; }
+    Int32 MaxJsonDepth { get; init; }
+    Int32 MaxLineBytes { get; init; }
+    Int32 MaxMessagesPerCall { get; init; }
+    Int32 MaxTotalBytes { get; init; }
+    String ToString()
+    Void Deconstruct(out Int32 MaxCalls, out Int32 MaxLineBytes, out Int32 MaxTotalBytes, out Int32 MaxJsonDepth, out Int32 MaxMessagesPerCall, out Int32 MaxContentsPerMessage, out Int32 MaxArgumentsPerCall)
+    ctor(Int32 MaxCalls = 10000, Int32 MaxLineBytes = 262144, Int32 MaxTotalBytes = 16777216, Int32 MaxJsonDepth = 32, Int32 MaxMessagesPerCall = 256, Int32 MaxContentsPerMessage = 64, Int32 MaxArgumentsPerCall = 256)
+static class AgentEval.MAF.Gatekeeper.GateReplayCorpusRunner
+    static Task<AgentEval.MAF.Gatekeeper.GateReplayReport> RunAsync(AgentEval.MAF.Gatekeeper.GateReplayCorpus corpus, IReadOnlyList<AgentEval.MAF.Gatekeeper.IToolGate> baseline, IReadOnlyList<AgentEval.MAF.Gatekeeper.IToolGate> candidate, String baselineConfigId = null, String candidateConfigId = null, CancellationToken cancellationToken = default)
+static class AgentEval.MAF.Gatekeeper.GateReplayCorpusSerializer
+    const String SchemaVersion
+    static Task WriteAsync(Stream destination, AgentEval.MAF.Gatekeeper.GateReplayCorpus corpus, AgentEval.MAF.Gatekeeper.GateReplayCorpusLimits limits = null, CancellationToken cancellationToken = default)
+    static Task<AgentEval.MAF.Gatekeeper.GateReplayCorpus> ReadAsync(Stream source, AgentEval.MAF.Gatekeeper.GateReplayCorpusLimits limits = null, CancellationToken cancellationToken = default)
+class AgentEval.MAF.Gatekeeper.GateReplayFixture
+    AgentEval.MAF.Gatekeeper.GatedToolCall Call { get; }
+    String Id { get; }
+    ctor(String id, AgentEval.MAF.Gatekeeper.GatedToolCall call)
+static class AgentEval.MAF.Gatekeeper.GateReplayRenderer
+    static IReadOnlyList<AgentEval.MAF.Gatekeeper.GatedToolCall> ExtractToolCalls(IEnumerable<ChatMessage> capturedMessages, String agentName = null)
+    static String Render(AgentEval.MAF.Gatekeeper.GateReplayComparison comparison)
+class AgentEval.MAF.Gatekeeper.GateReplayReport
+    AgentEval.MAF.Gatekeeper.GateReplayActionCounts BaselineActions { get; }
+    AgentEval.MAF.Gatekeeper.GateReplayActionCounts CandidateActions { get; }
+    IReadOnlyList<AgentEval.MAF.Gatekeeper.GateReplayReportRow> Rows { get; }
+    Int32 Diverged { get; }
+    Int32 Total { get; }
+    String BaselineConfigId { get; }
+    String CandidateConfigId { get; }
+    String CorpusId { get; }
+class AgentEval.MAF.Gatekeeper.GateReplayReportRow
+    AgentEval.MAF.Gatekeeper.GateReplayReportRow <Clone>$()
+    AgentEval.MAF.Gatekeeper.ToolGateAction Baseline { get; init; }
+    AgentEval.MAF.Gatekeeper.ToolGateAction Candidate { get; init; }
+    Boolean Diverged { get; init; }
+    Boolean Equals(AgentEval.MAF.Gatekeeper.GateReplayReportRow other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    String BaselinePolicy { get; init; }
+    String CandidatePolicy { get; init; }
+    String FunctionName { get; init; }
+    String Id { get; init; }
+    String ToString()
+    Void Deconstruct(out String Id, out String FunctionName, out AgentEval.MAF.Gatekeeper.ToolGateAction Baseline, out String BaselinePolicy, out AgentEval.MAF.Gatekeeper.ToolGateAction Candidate, out String CandidatePolicy, out Boolean Diverged)
+    ctor(String Id, String FunctionName, AgentEval.MAF.Gatekeeper.ToolGateAction Baseline, String BaselinePolicy, AgentEval.MAF.Gatekeeper.ToolGateAction Candidate, String CandidatePolicy, Boolean Diverged)
+static class AgentEval.MAF.Gatekeeper.GateReplayReportSerializer
+    const String SchemaVersion
+    static String Serialize(AgentEval.MAF.Gatekeeper.GateReplayReport report)
+    static Task WriteAsync(Stream destination, AgentEval.MAF.Gatekeeper.GateReplayReport report, CancellationToken cancellationToken = default)
+class AgentEval.MAF.Gatekeeper.GateReplayRow
+    AgentEval.MAF.Gatekeeper.GateReplayRow <Clone>$()
+    AgentEval.MAF.Gatekeeper.GatedToolCall Call { get; init; }
+    AgentEval.MAF.Gatekeeper.ToolGateVerdict Baseline { get; init; }
+    AgentEval.MAF.Gatekeeper.ToolGateVerdict Candidate { get; init; }
+    Boolean Diverged { get; init; }
+    Boolean Equals(AgentEval.MAF.Gatekeeper.GateReplayRow other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    String ToString()
+    Void Deconstruct(out AgentEval.MAF.Gatekeeper.GatedToolCall Call, out AgentEval.MAF.Gatekeeper.ToolGateVerdict Baseline, out AgentEval.MAF.Gatekeeper.ToolGateVerdict Candidate, out Boolean Diverged)
+    ctor(AgentEval.MAF.Gatekeeper.GatedToolCall Call, AgentEval.MAF.Gatekeeper.ToolGateVerdict Baseline, AgentEval.MAF.Gatekeeper.ToolGateVerdict Candidate, Boolean Diverged)
+static class AgentEval.MAF.Gatekeeper.GateReplayThresholdEvaluator
+    static AgentEval.MAF.Gatekeeper.GateReplayThresholdResult Evaluate(AgentEval.MAF.Gatekeeper.GateReplayReport report, AgentEval.MAF.Gatekeeper.GateReplayThresholds thresholds)
+class AgentEval.MAF.Gatekeeper.GateReplayThresholdResult
+    Boolean Passed { get; }
+    IReadOnlyList<AgentEval.MAF.Gatekeeper.GateReplayThresholdViolation> Violations { get; }
+class AgentEval.MAF.Gatekeeper.GateReplayThresholdViolation
+    AgentEval.MAF.Gatekeeper.GateReplayThresholdViolation <Clone>$()
+    Boolean Equals(AgentEval.MAF.Gatekeeper.GateReplayThresholdViolation other)
+    Boolean Equals(Object obj)
+    Int32 Actual { get; init; }
+    Int32 GetHashCode()
+    Int32 Maximum { get; init; }
+    String Metric { get; init; }
+    String ToString()
+    Void Deconstruct(out String Metric, out Int32 Actual, out Int32 Maximum)
+    ctor(String Metric, Int32 Actual, Int32 Maximum)
+class AgentEval.MAF.Gatekeeper.GateReplayThresholds
+    AgentEval.MAF.Gatekeeper.GateReplayThresholds <Clone>$()
+    Boolean Equals(AgentEval.MAF.Gatekeeper.GateReplayThresholds other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    Int32 MaxCandidateBlocks { get; init; }
+    Int32 MaxCandidateMutations { get; init; }
+    Int32 MaxDiverged { get; init; }
+    String ToString()
+    Void Deconstruct(out Int32 MaxDiverged, out Int32 MaxCandidateBlocks, out Int32 MaxCandidateMutations)
+    Void Validate()
+    ctor(Int32 MaxDiverged, Int32 MaxCandidateBlocks, Int32 MaxCandidateMutations)
+static class AgentEval.MAF.Gatekeeper.GateReplayer
+    static Task<AgentEval.MAF.Gatekeeper.GateReplayComparison> CompareAsync(IReadOnlyList<AgentEval.MAF.Gatekeeper.GatedToolCall> calls, IReadOnlyList<AgentEval.MAF.Gatekeeper.IToolGate> baseline, IReadOnlyList<AgentEval.MAF.Gatekeeper.IToolGate> candidate, CancellationToken cancellationToken = default)
+enum AgentEval.MAF.Gatekeeper.GateRequirements
+    None
+    RunScope
+enum AgentEval.MAF.Gatekeeper.GateSeverity
+    Routine
+    Suspicious
+    Incident
+static class AgentEval.MAF.Gatekeeper.GateSeverityClassifier
+    static AgentEval.MAF.Gatekeeper.GateSeverity Classify(String policyName, Boolean failedClosedOnThrow = false)
+class AgentEval.MAF.Gatekeeper.GateTelemetry
+    IReadOnlyList<AgentEval.MAF.Gatekeeper.GateTelemetrySnapshot> Snapshot()
+    Void Record(String policyName, AgentEval.MAF.Gatekeeper.ToolGateAction action, TimeSpan elapsed)
+    Void Record(String policyName, AgentEval.MAF.Gatekeeper.ToolResultAction action, TimeSpan elapsed)
+    Void Reset()
+    ctor()
+class AgentEval.MAF.Gatekeeper.GateTelemetrySnapshot
+    AgentEval.MAF.Gatekeeper.GateTelemetrySnapshot <Clone>$()
+    Boolean Equals(AgentEval.MAF.Gatekeeper.GateTelemetrySnapshot other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    Int64 AllowCount { get; init; }
+    Int64 BlockCount { get; init; }
+    Int64 InvocationCount { get; init; }
+    Int64 MutateCount { get; init; }
+    String PolicyName { get; init; }
+    String ToString()
+    TimeSpan AverageElapsed { get; init; }
+    TimeSpan TotalElapsed { get; init; }
+    Void Deconstruct(out String PolicyName, out Int64 InvocationCount, out Int64 AllowCount, out Int64 BlockCount, out Int64 MutateCount, out TimeSpan TotalElapsed, out TimeSpan AverageElapsed)
+    ctor(String PolicyName, Int64 InvocationCount, Int64 AllowCount, Int64 BlockCount, Int64 MutateCount, TimeSpan TotalElapsed, TimeSpan AverageElapsed)
+class AgentEval.MAF.Gatekeeper.GateVerdictResolver
+    Boolean TryResolve(String referenceId, out AgentEval.MAF.Gatekeeper.GateEvidence evidence)
+    Int32 Count { get; }
+    Void Record(AgentEval.MAF.Gatekeeper.GateEvidence evidence)
+    ctor(Int32 maxEntries = 4096, TimeSpan? ttl = null, TimeProvider timeProvider = null)
+class AgentEval.MAF.Gatekeeper.GatedToolCall
+    AgentEval.MAF.Gatekeeper.GatedToolCall <Clone>$()
+    Boolean Equals(AgentEval.MAF.Gatekeeper.GatedToolCall other)
+    Boolean Equals(Object obj)
+    Boolean IsStreaming { get; init; }
+    IReadOnlyDictionary<String, Object> Arguments { get; init; }
+    IReadOnlyList<ChatMessage> Messages { get; init; }
+    Int32 FunctionCallIndex { get; init; }
+    Int32 FunctionCount { get; init; }
+    Int32 GetHashCode()
+    Int32 Iteration { get; init; }
+    String AgentName { get; init; }
+    String FunctionName { get; init; }
+    String ToString()
+    Void Deconstruct(out String FunctionName, out IReadOnlyDictionary<String, Object> Arguments, out String AgentName, out Int32 Iteration, out Int32 FunctionCallIndex, out Int32 FunctionCount, out Boolean IsStreaming, out IReadOnlyList<ChatMessage> Messages)
+    ctor(String FunctionName, IReadOnlyDictionary<String, Object> Arguments, String AgentName, Int32 Iteration, Int32 FunctionCallIndex, Int32 FunctionCount, Boolean IsStreaming, IReadOnlyList<ChatMessage> Messages)
+class AgentEval.MAF.Gatekeeper.GatedToolResult
+    AgentEval.MAF.Gatekeeper.GatedToolResult <Clone>$()
+    Boolean Equals(AgentEval.MAF.Gatekeeper.GatedToolResult other)
+    Boolean Equals(Object obj)
+    Boolean IsStreaming { get; init; }
+    IReadOnlyDictionary<String, Object> Arguments { get; init; }
+    IReadOnlyList<ChatMessage> Messages { get; init; }
+    Int32 FunctionCallIndex { get; init; }
+    Int32 FunctionCount { get; init; }
+    Int32 GetHashCode()
+    Int32 Iteration { get; init; }
+    Object Result { get; init; }
+    String AgentName { get; init; }
+    String FunctionName { get; init; }
+    String ResultText { get; }
+    String ToString()
+    Void Deconstruct(out String FunctionName, out IReadOnlyDictionary<String, Object> Arguments, out Object Result, out String AgentName, out Int32 Iteration, out Int32 FunctionCallIndex, out Int32 FunctionCount, out Boolean IsStreaming, out IReadOnlyList<ChatMessage> Messages)
+    ctor(String FunctionName, IReadOnlyDictionary<String, Object> Arguments, Object Result, String AgentName, Int32 Iteration, Int32 FunctionCallIndex, Int32 FunctionCount, Boolean IsStreaming, IReadOnlyList<ChatMessage> Messages)
+class AgentEval.MAF.Gatekeeper.GatekeeperContractConfigurationException
+    String ErrorCode { get; }
+    String JsonPath { get; }
+static class AgentEval.MAF.Gatekeeper.GatekeeperCoverageAnalyzer
+    static AgentEval.MAF.Gatekeeper.GatekeeperCoverageReport Analyze(AIAgent agent, IReadOnlyList<AgentEval.MAF.Gatekeeper.IToolGate> toolGates = null, AgentEval.MAF.Gatekeeper.AnalyzeOptions options = null)
+    static AgentEval.MAF.Gatekeeper.GatekeeperCoverageReport Analyze(IEnumerable<AITool> tools, IReadOnlyList<AgentEval.MAF.Gatekeeper.IToolGate> toolGates = null, AgentEval.MAF.Gatekeeper.AnalyzeOptions options = null)
+    static AgentEval.MAF.Gatekeeper.GatekeeperCoverageReport AnalyzeOrThrow(AIAgent agent, IReadOnlyList<AgentEval.MAF.Gatekeeper.IToolGate> toolGates = null, AgentEval.MAF.Gatekeeper.AnalyzeOptions options = null)
+    static AgentEval.MAF.Gatekeeper.GatekeeperCoverageReport AnalyzeOrThrow(IEnumerable<AITool> tools, IReadOnlyList<AgentEval.MAF.Gatekeeper.IToolGate> toolGates = null, AgentEval.MAF.Gatekeeper.AnalyzeOptions options = null)
+class AgentEval.MAF.Gatekeeper.GatekeeperCoverageReport
+    AgentEval.MAF.Gatekeeper.GatekeeperCoverageReport <Clone>$()
+    Boolean Equals(AgentEval.MAF.Gatekeeper.GatekeeperCoverageReport other)
+    Boolean Equals(Object obj)
+    Boolean HasUnprotectedHighRiskTools { get; }
+    Boolean ToolInventoryAvailable { get; init; }
+    Double EnforcementCoveragePercent { get; }
+    IReadOnlyList<AgentEval.MAF.Gatekeeper.ToolCoverageEntry> Tools { get; init; }
+    IReadOnlyList<String> RegisteredToolGateNames { get; init; }
+    Int32 GetHashCode()
+    Int32 HighRiskCount { get; }
+    Int32 HighRiskUnprotectedCount { get; }
+    Int32 InterceptedLocalFunctionCount { get; }
+    Int32 ProtectedCount { get; }
+    Int32 ProviderHostedOpaqueCount { get; }
+    Int32 UnknownExecutionModelCount { get; }
+    String Render()
+    String ToString()
+    Void Deconstruct(out IReadOnlyList<AgentEval.MAF.Gatekeeper.ToolCoverageEntry> Tools, out IReadOnlyList<String> RegisteredToolGateNames, out Boolean ToolInventoryAvailable)
+    ctor(IReadOnlyList<AgentEval.MAF.Gatekeeper.ToolCoverageEntry> Tools, IReadOnlyList<String> RegisteredToolGateNames, Boolean ToolInventoryAvailable)
+enum AgentEval.MAF.Gatekeeper.GatekeeperEnforcement
+    Observe
+    ReplaceResult
+    Terminate
+class AgentEval.MAF.Gatekeeper.GatekeeperOptions
+    AgentEval.Guardrails.Judges.ICalibrationReportStore CalibrationReportStore { get; set; }
+    AgentEval.MAF.Gatekeeper.AnalyzeOptions CoverageAnalyzeOptions { get; set; }
+    AgentEval.MAF.Gatekeeper.GateTelemetry Telemetry { get; set; }
+    AgentEval.MAF.Gatekeeper.GatekeeperCoverageReport CoverageReport { get; }
+    AgentEval.MAF.Gatekeeper.GatekeeperOptions WithSkillGate(IReadOnlyList<ScannedSkillInfo> skills, String baselinePath, AgentEval.MAF.Gatekeeper.SkillGateMode mode = SkillGateMode.Strict)
+    AgentEval.MAF.Gatekeeper.GatekeeperRefusalStyle? RefusalStyle { get; set; }
+    AgentEval.MAF.Gatekeeper.IContainmentStore ContainmentStore { get; set; }
+    AgentEval.MAF.Gatekeeper.IGateEvidenceSink EvidenceSink { get; set; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryProtectionReport MemoryProtectionReport { get; }
+    AgentEval.MAF.Gatekeeper.ShadowJudgePump ShadowJudgePump { get; set; }
+    AgentEval.MAF.Gatekeeper.SkillGateMode SkillGateMode { get; set; }
+    AgentEval.MAF.Gatekeeper.TraceCaptureMode MutationCaptureMode { get; set; }
+    AgentTrace Trace { get; set; }
+    Boolean AllowUncalibratedInlineJudge { get; set; }
+    Boolean EstablishRunScope { get; set; }
+    Boolean RefuseUnprotectedHighRiskTools { get; set; }
+    Func<AgentEval.MAF.Gatekeeper.GatedToolCall, IReadOnlyList<AgentEval.MAF.Gatekeeper.ContainmentTarget>> AdditionalContainmentTargets { get; set; }
+    Func<AgentSession, IReadOnlyList<AgentEval.MAF.Gatekeeper.ContainmentTarget>> ContainmentTargets { get; set; }
+    Func<AgentSession, String> SessionIdentity { get; set; }
+    IList<AgentEval.Guardrails.IChatGate> PostGates { get; }
+    IList<AgentEval.Guardrails.IChatGate> PreGates { get; }
+    IList<AgentEval.MAF.Gatekeeper.IToolApprovalGate> ApprovalGates { get; }
+    IList<AgentEval.MAF.Gatekeeper.IToolGate> ToolGates { get; }
+    IList<AgentEval.MAF.Gatekeeper.IToolResultGate> ToolResultGates { get; }
+    IReadOnlyDictionary<String, String> PromptTemplateBaseline { get; set; }
+    IReadOnlyDictionary<String, String> PromptTemplates { get; set; }
+    IReadOnlyList<AITool> KnownTools { get; set; }
+    IReadOnlyList<ScannedSkillInfo> Skills { get; set; }
+    IReadOnlyList<String> CamouflagedRefusalMessages { get; set; }
+    Int32? ContainmentRetryThreshold { get; set; }
+    String SkillBaselinePath { get; set; }
+    Task ValidateInlineJudgesAsync(CancellationToken cancellationToken = default)
+    TextWriter BannerWriter { get; set; }
+    Void Add(AgentEval.MAF.Gatekeeper.IToolGate gate)
+    Void AddApprovalGate(AgentEval.MAF.Gatekeeper.IToolApprovalGate gate)
+    Void AddPostGate(AgentEval.Guardrails.IChatGate gate)
+    Void AddPreGate(AgentEval.Guardrails.IChatGate gate)
+    Void AddResultGate(AgentEval.MAF.Gatekeeper.IToolResultGate gate)
+    Void Contract(String toolName, Action<AgentEval.MAF.Gatekeeper.ToolContractBuilder> configure)
+    Void LoadContractsFromFile(String path)
+    Void LoadContractsFromJson(String json)
+    Void ProtectMemory(AgentEval.MAF.Gatekeeper.Memory.MemoryProtectionOptions protection)
+    ctor()
+static class AgentEval.MAF.Gatekeeper.GatekeeperRefusalContract
+    const String EnvelopeKey
+    const String Schema
+    static Boolean TryParse(String body, out String referenceId, out AgentEval.MAF.Gatekeeper.RefusalDisposition disposition, out Int32? attempts)
+    static String Build(String referenceId, AgentEval.MAF.Gatekeeper.RefusalDisposition disposition = RefusalDisposition.Denied, Int32? attempts = null)
+enum AgentEval.MAF.Gatekeeper.GatekeeperRefusalStyle
+    Structured
+    Camouflaged
+class AgentEval.MAF.Gatekeeper.HiddenInstructionPrefilterGate
+    AgentEval.MAF.Gatekeeper.GateCost Cost { get; }
+    String ConfigurationFingerprint { get; }
+    String PolicyName { get; }
+    ValueTask<AgentEval.MAF.Gatekeeper.ToolResultVerdict> InspectAsync(AgentEval.MAF.Gatekeeper.GatedToolResult result, CancellationToken cancellationToken = default)
+    ctor(IEnumerable<String> tokens = null)
+    ctor(IEnumerable<String> tokens, IEnumerable<String> functionNames)
+interface AgentEval.MAF.Gatekeeper.IContainmentReleaseAuthorizationVerifier
+    Boolean Verify(AgentEval.MAF.Gatekeeper.ContainmentReleaseAuthorization authorization, ReadOnlyMemory<Byte> canonicalPayload)
+interface AgentEval.MAF.Gatekeeper.IContainmentStore
+    AgentEval.MAF.Gatekeeper.ContainmentSnapshot GetCurrent(AgentEval.MAF.Gatekeeper.ContainmentTarget target)
+    ValueTask<AgentEval.MAF.Gatekeeper.ContainmentMutationResult> ContainAsync(AgentEval.MAF.Gatekeeper.ContainmentRequest request, CancellationToken cancellationToken = default)
+    ValueTask<AgentEval.MAF.Gatekeeper.ContainmentMutationResult> ReleaseAsync(AgentEval.MAF.Gatekeeper.ContainmentReleaseAuthorization authorization, CancellationToken cancellationToken = default)
+interface AgentEval.MAF.Gatekeeper.IGateEvidenceSink
+    Void Record(AgentEval.MAF.Gatekeeper.GateEvidence evidence, Int32 sequence)
+interface AgentEval.MAF.Gatekeeper.IGatekeeperObserver
+    Void OnFinding(AgentEval.MAF.Gatekeeper.GateEvidence evidence)
+interface AgentEval.MAF.Gatekeeper.IReconcilableSession
+    Boolean TryReconcileLastAssistantMessage(String safeText)
+interface AgentEval.MAF.Gatekeeper.ISecurityGraphReader
+    AgentEval.MAF.Gatekeeper.SecurityGraphTenantSnapshot Read(TimeSpan window)
+interface AgentEval.MAF.Gatekeeper.ISecurityGraphStore
+    AgentEval.MAF.Gatekeeper.SecurityGraphTenantSnapshot Read(TimeSpan window)
+    ValueTask<AgentEval.MAF.Gatekeeper.SecurityGraphMutationResult> AppendAsync(AgentEval.MAF.Gatekeeper.SecurityGraphObservationRequest observation, CancellationToken cancellationToken = default)
+    ValueTask<AgentEval.MAF.Gatekeeper.SecurityGraphMutationResult> MarkCoverageGapAsync(AgentEval.MAF.Gatekeeper.SecurityGraphCoverageGap gap, CancellationToken cancellationToken = default)
+interface AgentEval.MAF.Gatekeeper.ISessionIdentityAware
+    Void UseSessionIdentityDefault(Func<AgentSession, String> resolver)
+interface AgentEval.MAF.Gatekeeper.IShadowJudge
+    Task<AgentEval.MAF.Gatekeeper.ShadowVerdict> JudgeAsync(AgentEval.MAF.Gatekeeper.ShadowJudgeContext context, CancellationToken cancellationToken = default)
+interface AgentEval.MAF.Gatekeeper.IToolApprovalGate
+    String PolicyName { get; }
+    ValueTask<Boolean> IsAutoApprovableAsync(FunctionCallContent call, CancellationToken cancellationToken = default)
+interface AgentEval.MAF.Gatekeeper.IToolGate
+    AgentEval.MAF.Gatekeeper.GateCost Cost { get; }
+    AgentEval.MAF.Gatekeeper.GateRequirements Requirements { get; }
+    AgentEval.MAF.Gatekeeper.ToolGatePolicy MinimumPolicy { get; }
+    String PolicyName { get; }
+    ValueTask<AgentEval.MAF.Gatekeeper.ToolGateVerdict> InspectAsync(AgentEval.MAF.Gatekeeper.GatedToolCall call, CancellationToken cancellationToken = default)
+interface AgentEval.MAF.Gatekeeper.IToolResultGate
+    AgentEval.MAF.Gatekeeper.GateCost Cost { get; }
+    AgentEval.MAF.Gatekeeper.GateRequirements Requirements { get; }
+    AgentEval.MAF.Gatekeeper.ToolGatePolicy MinimumPolicy { get; }
+    String PolicyName { get; }
+    ValueTask<AgentEval.MAF.Gatekeeper.ToolResultVerdict> InspectAsync(AgentEval.MAF.Gatekeeper.GatedToolResult result, CancellationToken cancellationToken = default)
+static class AgentEval.MAF.Gatekeeper.IdentifierRecognizers
+    static Func<String, Boolean> AlphanumericMinLength(Int32 minLength = 8)
+    static Func<String, Boolean> ContainsDigit(Int32 minLength = 4)
+    static Func<String, Boolean> Matching(Regex pattern)
+class AgentEval.MAF.Gatekeeper.JsonFileContainmentStore
+    AgentEval.MAF.Gatekeeper.ContainmentSnapshot GetCurrent(AgentEval.MAF.Gatekeeper.ContainmentTarget target)
+    ValueTask<AgentEval.MAF.Gatekeeper.ContainmentMutationResult> ContainAsync(AgentEval.MAF.Gatekeeper.ContainmentRequest request, CancellationToken cancellationToken = default)
+    ValueTask<AgentEval.MAF.Gatekeeper.ContainmentMutationResult> ReleaseAsync(AgentEval.MAF.Gatekeeper.ContainmentReleaseAuthorization authorization, CancellationToken cancellationToken = default)
+    ValueTask<Boolean> TryReloadAsync(CancellationToken cancellationToken = default)
+    Void Dispose()
+    ctor(String path, AgentEval.MAF.Gatekeeper.IContainmentReleaseAuthorizationVerifier releaseVerifier, AgentEval.MAF.Gatekeeper.JsonFileContainmentStoreOptions options = null, TimeProvider timeProvider = null)
+class AgentEval.MAF.Gatekeeper.JsonFileContainmentStoreOptions
+    Boolean BootstrapIfMissing { get; init; }
+    Int32 MaxLiveReleaseNonces { get; init; }
+    Int32 MaxRecords { get; init; }
+    Int64 MaxFileBytes { get; init; }
+    const Int64 DefaultMaxFileBytes
+    ctor()
+class AgentEval.MAF.Gatekeeper.JsonFileSecurityGraphStore
+    AgentEval.MAF.Gatekeeper.SecurityGraphTenantSnapshot Read(TimeSpan window)
+    ValueTask<AgentEval.MAF.Gatekeeper.SecurityGraphMutationResult> AppendAsync(AgentEval.MAF.Gatekeeper.SecurityGraphObservationRequest observation, CancellationToken cancellationToken = default)
+    ValueTask<AgentEval.MAF.Gatekeeper.SecurityGraphMutationResult> MarkCoverageGapAsync(AgentEval.MAF.Gatekeeper.SecurityGraphCoverageGap gap, CancellationToken cancellationToken = default)
+    ValueTask<Boolean> TryReloadAsync(CancellationToken cancellationToken = default)
+    Void Dispose()
+    ctor(String path, String tenant, String sessionKeyId, ReadOnlySpan<Byte> sessionHmacKey, AgentEval.MAF.Gatekeeper.JsonFileSecurityGraphStoreOptions options = null, TimeProvider timeProvider = null)
+class AgentEval.MAF.Gatekeeper.JsonFileSecurityGraphStoreOptions
+    Boolean BootstrapIfMissing { get; init; }
+    Int32 MaxCoverageGaps { get; init; }
+    Int32 MaxJsonDepth { get; init; }
+    Int32 MaxObservations { get; init; }
+    Int64 MaxFileBytes { get; init; }
+    TimeSpan Retention { get; init; }
+    const Int64 DefaultMaxFileBytes
+    ctor()
+class AgentEval.MAF.Gatekeeper.MaxDistinctValuesPredicate
+    Int32 Max { get; }
+    const Int32 Maximum
+    const Int32 Minimum
+    ctor(String argument, Int32 max)
+class AgentEval.MAF.Gatekeeper.Memory.GatedAIContextProvider
+    AgentEval.MAF.Gatekeeper.Memory.MemoryCoverageLevel Coverage { get; }
+    IReadOnlyList<String> StateKeys { get; }
+    Object GetService(Type serviceType, Object serviceKey = null)
+    String PolicyFingerprint { get; }
+    String ProviderFingerprint { get; }
+    ctor(AIContextProvider inner, AgentEval.MAF.Gatekeeper.Memory.MemoryGatePipeline pipeline, AgentEval.MAF.Gatekeeper.Memory.MemoryToolOperationRegistry toolRegistry, AgentEval.MAF.Gatekeeper.Memory.IMemoryContextProviderAdapter adapter, AgentEval.MAF.Gatekeeper.Memory.MemoryToolCallGate callGate = null, AgentEval.MAF.Gatekeeper.Memory.MemoryToolResultGate resultGate = null, AgentEval.MAF.Gatekeeper.Memory.MemoryInfluenceGate influenceGate = null, AgentEval.MAF.Gatekeeper.Memory.IMemoryGateDecisionSink decisionSink = null, AgentEval.MAF.Gatekeeper.Memory.IMemoryContextProviderEventSink eventSink = null, AgentEval.MAF.Gatekeeper.Memory.MemoryContextProviderOptions options = null)
+interface AgentEval.MAF.Gatekeeper.Memory.IMemoryApprovalHandler
+    ValueTask<AgentEval.MAF.Gatekeeper.Memory.MemoryApprovalDecision> RequestApprovalAsync(AgentEval.MAF.Gatekeeper.Memory.MemoryApprovalRequest request, CancellationToken cancellationToken = default)
+interface AgentEval.MAF.Gatekeeper.Memory.IMemoryContextProviderAdapter
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGateContext CreateRecallInstructionsContext(AIContextProvider.InvokingContext context, String instructions)
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGateContext CreateRecallMessageContext(AIContextProvider.InvokingContext context, ChatMessage message, Int32 ordinal)
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGateContext CreateWriteMessageContext(AIContextProvider.InvokedContext context, ChatMessage message, AgentEval.MAF.Gatekeeper.Memory.MemoryContextMessageOrigin origin, Int32 ordinal)
+    ChatMessage ApplySanitizedMessage(ChatMessage message, String sanitizedContent)
+interface AgentEval.MAF.Gatekeeper.Memory.IMemoryContextProviderEventSink
+    ValueTask RecordAsync(AgentEval.MAF.Gatekeeper.Memory.MemoryContextProviderEvent event, CancellationToken cancellationToken = default)
+interface AgentEval.MAF.Gatekeeper.Memory.IMemoryGate
+    AgentEval.MAF.Gatekeeper.GateCost Cost { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGateRequirements Requirements { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGateStage Stages { get; }
+    String PolicyName { get; }
+    ValueTask<AgentEval.MAF.Gatekeeper.Memory.MemoryGateVerdict> InspectAsync(AgentEval.MAF.Gatekeeper.Memory.MemoryGateContext context, CancellationToken cancellationToken = default)
+interface AgentEval.MAF.Gatekeeper.Memory.IMemoryGateDecisionSink
+    ValueTask RecordAsync(AgentEval.MAF.Gatekeeper.Memory.MemoryGateContext context, AgentEval.MAF.Gatekeeper.Memory.MemoryGateDecision decision, CancellationToken cancellationToken = default)
+interface AgentEval.MAF.Gatekeeper.Memory.IMemoryMcpConfigurationFingerprintContributor
+    String ConfigurationFingerprint { get; }
+interface AgentEval.MAF.Gatekeeper.Memory.IMemoryMcpServerContextAdapter<TRequest, TResult>
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGateContext CreateRequestContext(TRequest request, AgentEval.MAF.Gatekeeper.Memory.MemoryMcpServerOperationContract operation, AgentEval.MAF.Gatekeeper.Memory.MemoryGateStage stage)
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGateContext CreateResultContext(TRequest request, TResult result, AgentEval.MAF.Gatekeeper.Memory.MemoryMcpServerOperationContract operation)
+    TRequest ApplySanitizedRequest(TRequest request, AgentEval.MAF.Gatekeeper.Memory.MemoryMcpServerOperationContract operation, String sanitizedContent)
+    TResult ApplySanitizedResult(TResult result, AgentEval.MAF.Gatekeeper.Memory.MemoryMcpServerOperationContract operation, String sanitizedContent)
+interface AgentEval.MAF.Gatekeeper.Memory.IMemoryProviderCandidateHook
+    String HookId { get; }
+    String Version { get; }
+interface AgentEval.MAF.Gatekeeper.Memory.IMemoryProviderNativeGate
+    AgentEval.MAF.Gatekeeper.Memory.MemoryProviderNativeDescriptor Descriptor { get; }
+    ValueTask<AgentEval.MAF.Gatekeeper.Memory.MemoryGateEnforcementResult> GateCandidateWriteAsync(AgentEval.MAF.Gatekeeper.Memory.MemoryGateContext context, CancellationToken cancellationToken = default)
+    ValueTask<AgentEval.MAF.Gatekeeper.Memory.MemoryProviderNativeRecallResult> GateRecalledItemAsync(AgentEval.MAF.Gatekeeper.Memory.MemoryGateContext context, CancellationToken cancellationToken = default)
+interface AgentEval.MAF.Gatekeeper.Memory.IMemoryQuarantineStore
+    ValueTask<AgentEval.MAF.Gatekeeper.Memory.MemoryQuarantineReceipt> StoreAsync(AgentEval.MAF.Gatekeeper.Memory.MemoryQuarantineRequest request, CancellationToken cancellationToken = default)
+interface AgentEval.MAF.Gatekeeper.Memory.IMemoryScopeResolver
+    AgentEval.MAF.Gatekeeper.Memory.MemorySecurityScope Resolve(AgentSession session, String agentName)
+interface AgentEval.MAF.Gatekeeper.Memory.IMemoryToolContextAdapter
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGateContext CreateCallContext(AgentEval.MAF.Gatekeeper.GatedToolCall call, AgentEval.MAF.Gatekeeper.Memory.MemoryOperationContract operation, AgentEval.MAF.Gatekeeper.Memory.MemoryGateStage stage)
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGateContext CreateResultContext(AgentEval.MAF.Gatekeeper.GatedToolResult result, AgentEval.MAF.Gatekeeper.Memory.MemoryOperationContract operation)
+    IReadOnlyDictionary<String, Object> ApplySanitizedArguments(AgentEval.MAF.Gatekeeper.GatedToolCall call, AgentEval.MAF.Gatekeeper.Memory.MemoryOperationContract operation, String sanitizedContent)
+    Object ApplySanitizedResult(AgentEval.MAF.Gatekeeper.GatedToolResult result, AgentEval.MAF.Gatekeeper.Memory.MemoryOperationContract operation, String sanitizedContent)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryApprovalDecision
+    Boolean Approved { get; }
+    String ApprovalId { get; }
+    ctor(Boolean approved, String approvalId)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryApprovalRequest
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGateReceipt DecisionReceipt { get; }
+    ctor(AgentEval.MAF.Gatekeeper.Memory.MemoryGateReceipt decisionReceipt)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryBudgetSnapshot
+    Int32 LineageDepth { get; }
+    Int32 PromotionsInSession { get; }
+    Int32 QuarantinedItemsForScope { get; }
+    Int32 RecalledContentCharacters { get; }
+    Int32 RecalledItemCount { get; }
+    Int32 ReconciliationAttemptsInSession { get; }
+    Int32 UniqueCandidatesForSource { get; }
+    Int32 WritesForSource { get; }
+    Int32 WritesForUser { get; }
+    Int32 WritesInRun { get; }
+    Int32 WritesInSession { get; }
+    ctor(Int32 writesInRun = 0, Int32 writesInSession = 0, Int32 writesForUser = 0, Int32 writesForSource = 0, Int32 uniqueCandidatesForSource = 0, Int32 promotionsInSession = 0, Int32 reconciliationAttemptsInSession = 0, Int32 recalledItemCount = 0, Int32 recalledContentCharacters = 0, Int32 lineageDepth = 0, Int32 quarantinedItemsForScope = 0)
+enum AgentEval.MAF.Gatekeeper.Memory.MemoryCategory
+    Unknown
+    Fact
+    Preference
+    Summary
+    Procedure
+    ReasoningTrace
+    Message
+class AgentEval.MAF.Gatekeeper.Memory.MemoryConflictCandidate
+    AgentEval.MAF.Gatekeeper.Memory.MemoryCategory Category { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryTrustLevel Trust { get; }
+    String ContentDigest { get; }
+    String MemoryId { get; }
+    String RootLineageId { get; }
+    ctor(String memoryId, String contentDigest, AgentEval.MAF.Gatekeeper.Memory.MemoryTrustLevel trust, String rootLineageId, AgentEval.MAF.Gatekeeper.Memory.MemoryCategory category)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryConflictGate
+    AgentEval.MAF.Gatekeeper.GateCost Cost { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGateRequirements Requirements { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGateStage Stages { get; }
+    String PolicyName { get; }
+    ValueTask<AgentEval.MAF.Gatekeeper.Memory.MemoryGateVerdict> InspectAsync(AgentEval.MAF.Gatekeeper.Memory.MemoryGateContext context, CancellationToken cancellationToken = default)
+    ctor(AgentEval.MAF.Gatekeeper.Memory.MemoryConflictOptions options = null)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryConflictOptions
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGateAction DuplicateLineageAction { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGateAction EqualTrustConflictAction { get; }
+    Int32 RequiredIndependentCorroborations { get; }
+    ctor(Int32 requiredIndependentCorroborations = 2, AgentEval.MAF.Gatekeeper.Memory.MemoryGateAction equalTrustConflictAction = MemoryGateAction.Quarantine, AgentEval.MAF.Gatekeeper.Memory.MemoryGateAction duplicateLineageAction = MemoryGateAction.Reject)
+enum AgentEval.MAF.Gatekeeper.Memory.MemoryContextMessageOrigin
+    Request
+    Response
+class AgentEval.MAF.Gatekeeper.Memory.MemoryContextProviderEvent
+    AgentEval.MAF.Gatekeeper.Memory.MemoryContextProviderEventKind Kind { get; }
+    String PolicyFingerprint { get; }
+    String ProviderFingerprint { get; }
+    String ReasonCode { get; }
+    ctor(AgentEval.MAF.Gatekeeper.Memory.MemoryContextProviderEventKind kind, String reasonCode, String providerFingerprint, String policyFingerprint)
+enum AgentEval.MAF.Gatekeeper.Memory.MemoryContextProviderEventKind
+    RecallProviderFailure
+    WriteProviderFailure
+    RecallRejected
+    WriteExcluded
+    DynamicToolExcluded
+class AgentEval.MAF.Gatekeeper.Memory.MemoryContextProviderException
+    String ReasonCode { get; }
+    ctor(String reasonCode)
+enum AgentEval.MAF.Gatekeeper.Memory.MemoryContextProviderFailureMode
+    FailClosed
+    ContinueWithoutProviderData
+class AgentEval.MAF.Gatekeeper.Memory.MemoryContextProviderOptions
+    AgentEval.MAF.Gatekeeper.Memory.MemoryContextProviderFailureMode RecallFailureMode { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryContextProviderFailureMode WriteFailureMode { get; }
+    Int32 MaximumMessages { get; }
+    Int32 MaximumTools { get; }
+    ctor(AgentEval.MAF.Gatekeeper.Memory.MemoryContextProviderFailureMode recallFailureMode = MemoryContextProviderFailureMode.FailClosed, AgentEval.MAF.Gatekeeper.Memory.MemoryContextProviderFailureMode writeFailureMode = MemoryContextProviderFailureMode.FailClosed, Int32 maximumMessages = 256, Int32 maximumTools = 128)
+enum AgentEval.MAF.Gatekeeper.Memory.MemoryCoverageLevel
+    Unsupported
+    ObserveOnly
+    ActionOnly
+    Boundary
+    FullLifecycle
+enum AgentEval.MAF.Gatekeeper.Memory.MemoryDestination
+    Active
+    Quarantine
+    ProviderNative
+enum AgentEval.MAF.Gatekeeper.Memory.MemoryGateAction
+    Allow
+    Sanitize
+    Exclude
+    Quarantine
+    RequireApproval
+    Reject
+class AgentEval.MAF.Gatekeeper.Memory.MemoryGateCapabilities
+    AgentEval.MAF.Gatekeeper.Memory.IMemoryApprovalHandler ApprovalHandler { get; }
+    AgentEval.MAF.Gatekeeper.Memory.IMemoryProviderCandidateHook ProviderCandidateHook { get; }
+    AgentEval.MAF.Gatekeeper.Memory.IMemoryQuarantineStore QuarantineStore { get; }
+    AgentEval.MAF.Gatekeeper.Memory.IMemoryScopeResolver ScopeResolver { get; }
+    Boolean GuaranteesRunScope { get; }
+    Boolean QuarantineOnApprovalUnavailable { get; }
+    ctor(Boolean guaranteesRunScope = false, AgentEval.MAF.Gatekeeper.Memory.IMemoryScopeResolver scopeResolver = null, AgentEval.MAF.Gatekeeper.Memory.IMemoryQuarantineStore quarantineStore = null, AgentEval.MAF.Gatekeeper.Memory.IMemoryApprovalHandler approvalHandler = null, AgentEval.MAF.Gatekeeper.Memory.IMemoryProviderCandidateHook providerCandidateHook = null, Boolean quarantineOnApprovalUnavailable = false)
+static class AgentEval.MAF.Gatekeeper.Memory.MemoryGateConfigFingerprint
+    static String Compute(IReadOnlyList<AgentEval.MAF.Gatekeeper.Memory.IMemoryGate> gates, AgentEval.MAF.Gatekeeper.Memory.MemorySecurityPolicy policy, AgentEval.MAF.Gatekeeper.Memory.MemoryGateCapabilities capabilities)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryGateContext
+    AgentEval.MAF.Gatekeeper.Memory.MemoryBudgetSnapshot Budget { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryDestination Destination { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGateContext WithContent(String content)
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGateStage Stage { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryOperationContract Operation { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryOperationKind Kind { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryProvenance Provenance { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryRecordMetadata RecordMetadata { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemorySecurityScope AuthenticatedScope { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemorySurface Surface { get; }
+    Boolean HasAdministrativeCrossScopeCapability { get; }
+    IReadOnlyDictionary<String, String> ModelSuppliedScope { get; }
+    IReadOnlyList<AgentEval.MAF.Gatekeeper.Memory.MemoryConflictCandidate> Conflicts { get; }
+    String Content { get; }
+    String ContentDigest { get; }
+    String LogicalSessionId { get; }
+    String OperationId { get; }
+    String ProviderId { get; }
+    String RunId { get; }
+    const Int32 MaximumContentCharacters
+    ctor(String operationId, AgentEval.MAF.Gatekeeper.Memory.MemoryGateStage stage, AgentEval.MAF.Gatekeeper.Memory.MemoryOperationContract operation, String providerId, AgentEval.MAF.Gatekeeper.Memory.MemorySecurityScope authenticatedScope, AgentEval.MAF.Gatekeeper.Memory.MemoryProvenance provenance, String content = null, String contentDigest = null, IReadOnlyDictionary<String, String> modelSuppliedScope = null, IEnumerable<AgentEval.MAF.Gatekeeper.Memory.MemoryConflictCandidate> conflicts = null, String runId = null, String logicalSessionId = null, AgentEval.MAF.Gatekeeper.Memory.MemoryDestination destination = MemoryDestination.Active, AgentEval.MAF.Gatekeeper.Memory.MemoryRecordMetadata recordMetadata = null, AgentEval.MAF.Gatekeeper.Memory.MemoryBudgetSnapshot budget = null, Boolean hasAdministrativeCrossScopeCapability = false)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryGateDecision
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGateAction Action { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemorySecurityProfile Profile { get; }
+    Boolean IsAllowed { get; }
+    Boolean ShouldApplySanitizedContent { get; }
+    IReadOnlyList<AgentEval.MAF.Gatekeeper.Memory.MemoryGateReceipt> Receipts { get; }
+    String EffectiveContent { get; }
+    String PolicyFingerprint { get; }
+    String ReasonCode { get; }
+class AgentEval.MAF.Gatekeeper.Memory.MemoryGateDecisionExecutor
+    ValueTask<AgentEval.MAF.Gatekeeper.Memory.MemoryGateEnforcementResult> ExecuteAsync(AgentEval.MAF.Gatekeeper.Memory.MemoryGateContext context, AgentEval.MAF.Gatekeeper.Memory.MemoryGateDecision decision, CancellationToken cancellationToken = default)
+    ctor(AgentEval.MAF.Gatekeeper.Memory.MemoryGateCapabilities capabilities)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryGateEnforcementResult
+    AgentEval.MAF.Gatekeeper.Memory.MemoryApprovalDecision ApprovalDecision { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryQuarantineReceipt QuarantineReceipt { get; }
+    Boolean Allowed { get; }
+    String EffectiveContent { get; }
+class AgentEval.MAF.Gatekeeper.Memory.MemoryGatePipeline
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGateCapabilities Capabilities { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGateRequirements Requirements { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemorySecurityPolicy Policy { get; }
+    IReadOnlyList<AgentEval.MAF.Gatekeeper.Memory.IMemoryGate> Gates { get; }
+    String PolicyFingerprint { get; }
+    ValueTask<AgentEval.MAF.Gatekeeper.Memory.MemoryGateDecision> EvaluateAsync(AgentEval.MAF.Gatekeeper.Memory.MemoryGateContext context, CancellationToken cancellationToken = default)
+    ctor(IEnumerable<AgentEval.MAF.Gatekeeper.Memory.IMemoryGate> gates, AgentEval.MAF.Gatekeeper.Memory.MemoryGateCapabilities capabilities = null, AgentEval.MAF.Gatekeeper.Memory.MemorySecurityPolicy policy = null, TimeProvider timeProvider = null)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryGateReceipt
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGateAction Action { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGateStage Stage { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemorySurface Surface { get; }
+    DateTimeOffset EvaluatedAtUtc { get; }
+    String ContentDigest { get; }
+    String OperationId { get; }
+    String PolicyFingerprint { get; }
+    String PolicyName { get; }
+    String ReasonCode { get; }
+    String RunId { get; }
+    String ScopeCorrelation { get; }
+    ctor(String operationId, AgentEval.MAF.Gatekeeper.Memory.MemoryGateStage stage, AgentEval.MAF.Gatekeeper.Memory.MemorySurface surface, AgentEval.MAF.Gatekeeper.Memory.MemoryGateAction action, String policyName, String reasonCode, String policyFingerprint, String contentDigest, String runId, String scopeCorrelation, DateTimeOffset evaluatedAtUtc)
+enum AgentEval.MAF.Gatekeeper.Memory.MemoryGateRequirements
+    None
+    RunScope
+    AuthenticatedMemoryScope
+    QuarantineStore
+    ApprovalHandler
+    ProviderCandidateHook
+enum AgentEval.MAF.Gatekeeper.Memory.MemoryGateStage
+    None
+    BeforeRead
+    AfterRead
+    BeforeWrite
+    BeforePromotion
+    BeforeAction
+    AfterDecision
+class AgentEval.MAF.Gatekeeper.Memory.MemoryGateVerdict
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGateAction Action { get; }
+    String PolicyName { get; }
+    String ReasonCode { get; }
+    String SanitizedContent { get; }
+    static AgentEval.MAF.Gatekeeper.Memory.MemoryGateVerdict Allow(String policyName, String reasonCode = "memory.allow")
+    static AgentEval.MAF.Gatekeeper.Memory.MemoryGateVerdict Exclude(String policyName, String reasonCode)
+    static AgentEval.MAF.Gatekeeper.Memory.MemoryGateVerdict Quarantine(String policyName, String reasonCode)
+    static AgentEval.MAF.Gatekeeper.Memory.MemoryGateVerdict Reject(String policyName, String reasonCode)
+    static AgentEval.MAF.Gatekeeper.Memory.MemoryGateVerdict RequireApproval(String policyName, String reasonCode)
+    static AgentEval.MAF.Gatekeeper.Memory.MemoryGateVerdict Sanitize(String policyName, String sanitizedContent, String reasonCode)
+enum AgentEval.MAF.Gatekeeper.Memory.MemoryHostedMcpApprovalMode
+    Never
+    Always
+    ProviderDefault
+enum AgentEval.MAF.Gatekeeper.Memory.MemoryHostedMcpCallbackCapabilities
+    None
+    CallArguments
+    ResultContent
+    TrustedScope
+    PreExecutionApproval
+    DerivedActions
+class AgentEval.MAF.Gatekeeper.Memory.MemoryHostedMcpOperationContract
+    AgentEval.MAF.Gatekeeper.Memory.MemoryHostedMcpApprovalMode ApprovalMode { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryHostedMcpCallbackCapabilities CallbackCapabilities { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryOperationContract Operation { get; }
+    String ConfigurationFingerprint { get; }
+    String SchemaFingerprint { get; }
+    String ServerId { get; }
+    String ServerVersion { get; }
+    ctor(String serverId, String serverVersion, String schemaFingerprint, AgentEval.MAF.Gatekeeper.Memory.MemoryOperationContract operation, AgentEval.MAF.Gatekeeper.Memory.MemoryHostedMcpApprovalMode approvalMode, AgentEval.MAF.Gatekeeper.Memory.MemoryHostedMcpCallbackCapabilities callbackCapabilities)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryInfluenceGate
+    AgentEval.MAF.Gatekeeper.GateCost Cost { get; }
+    AgentEval.MAF.Gatekeeper.GateRequirements Requirements { get; }
+    AgentEval.MAF.Gatekeeper.ToolGatePolicy MinimumPolicy { get; }
+    Boolean Canonicalize { get; }
+    Int32 MinimumTaintLength { get; }
+    String PolicyName { get; }
+    ValueTask<AgentEval.MAF.Gatekeeper.ToolGateVerdict> InspectAsync(AgentEval.MAF.Gatekeeper.GatedToolCall call, CancellationToken cancellationToken = default)
+    ctor(AgentEval.MAF.Gatekeeper.Memory.MemoryToolOperationRegistry registry, IEnumerable<String> sensitiveSinkTools, Int32 minimumTaintLength = 8, Boolean canonicalize = true)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryMcpClientOperationContract
+    AgentEval.MAF.Gatekeeper.Memory.MemoryMcpTransport Transport { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryOperationContract Operation { get; }
+    String SchemaFingerprint { get; }
+    String ServerId { get; }
+    String ServerVersion { get; }
+    ctor(String serverId, String serverVersion, AgentEval.MAF.Gatekeeper.Memory.MemoryMcpTransport transport, String schemaFingerprint, AgentEval.MAF.Gatekeeper.Memory.MemoryOperationContract operation)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryMcpClientOperationRegistry
+    AgentEval.MAF.Gatekeeper.Memory.MemoryToolOperationRegistry OperationRegistry { get; }
+    Boolean TryGet(String operationName, out AgentEval.MAF.Gatekeeper.Memory.MemoryMcpClientOperationContract contract)
+    IReadOnlyDictionary<String, AgentEval.MAF.Gatekeeper.Memory.MemoryMcpClientOperationContract> Contracts { get; }
+    String ConfigurationFingerprint { get; }
+    ctor(IEnumerable<AgentEval.MAF.Gatekeeper.Memory.MemoryMcpClientOperationContract> contracts)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryMcpClientToolBinding
+    AITool Tool { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryMcpTransport Transport { get; }
+    String SchemaFingerprint { get; }
+    String ServerId { get; }
+    String ServerVersion { get; }
+    ctor(AITool tool, String serverId, String serverVersion, AgentEval.MAF.Gatekeeper.Memory.MemoryMcpTransport transport, String schemaFingerprint)
+    static AgentEval.MAF.Gatekeeper.Memory.MemoryMcpClientToolBinding FromFunction(AIFunction tool, String serverId, String serverVersion, AgentEval.MAF.Gatekeeper.Memory.MemoryMcpTransport transport)
+static class AgentEval.MAF.Gatekeeper.Memory.MemoryMcpCoverageAnalyzer
+    static AgentEval.MAF.Gatekeeper.Memory.MemoryMcpCoverageReport AnalyzeHosted(IEnumerable<AgentEval.MAF.Gatekeeper.Memory.MemoryHostedMcpOperationContract> contracts, AgentEval.MAF.Gatekeeper.Memory.MemorySecurityProfile profile, AgentEval.MAF.Gatekeeper.Memory.MemoryMcpServerCoverageEvidence ownedServer = null, String policyFingerprint = null)
+    static AgentEval.MAF.Gatekeeper.Memory.MemoryMcpCoverageReport AnalyzeLocal(IEnumerable<AgentEval.MAF.Gatekeeper.Memory.MemoryMcpClientToolBinding> bindings, AgentEval.MAF.Gatekeeper.Memory.MemoryMcpClientOperationRegistry registry, AgentEval.MAF.Gatekeeper.Memory.MemoryToolCallGate callGate = null, AgentEval.MAF.Gatekeeper.Memory.MemoryToolResultGate resultGate = null, AgentEval.MAF.Gatekeeper.Memory.MemoryInfluenceGate influenceGate = null, AgentEval.MAF.Gatekeeper.Memory.MemoryMcpServerCoverageEvidence ownedServer = null)
+    static AgentEval.MAF.Gatekeeper.Memory.MemoryMcpCoverageReport RequireCoverage(AgentEval.MAF.Gatekeeper.Memory.MemoryMcpCoverageReport report, AgentEval.MAF.Gatekeeper.Memory.MemoryCoverageLevel minimumCoverage)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryMcpCoverageEntry
+    AgentEval.MAF.Gatekeeper.Memory.MemoryCoverageLevel Coverage { get; init; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryMcpCoverageEntry <Clone>$()
+    AgentEval.MAF.Gatekeeper.Memory.MemoryMcpTransport Transport { get; init; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryOperationKind? OperationKind { get; init; }
+    AgentEval.MAF.Gatekeeper.Memory.MemorySurface Surface { get; init; }
+    Boolean Equals(AgentEval.MAF.Gatekeeper.Memory.MemoryMcpCoverageEntry other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    String Note { get; init; }
+    String OperationName { get; init; }
+    String SchemaFingerprint { get; init; }
+    String ServerId { get; init; }
+    String ServerVersion { get; init; }
+    String ToString()
+    Void Deconstruct(out String ServerId, out String ServerVersion, out AgentEval.MAF.Gatekeeper.Memory.MemoryMcpTransport Transport, out String OperationName, out AgentEval.MAF.Gatekeeper.Memory.MemoryOperationKind? OperationKind, out AgentEval.MAF.Gatekeeper.Memory.MemorySurface Surface, out String SchemaFingerprint, out AgentEval.MAF.Gatekeeper.Memory.MemoryCoverageLevel Coverage, out String Note)
+    ctor(String ServerId, String ServerVersion, AgentEval.MAF.Gatekeeper.Memory.MemoryMcpTransport Transport, String OperationName, AgentEval.MAF.Gatekeeper.Memory.MemoryOperationKind? OperationKind, AgentEval.MAF.Gatekeeper.Memory.MemorySurface Surface, String SchemaFingerprint, AgentEval.MAF.Gatekeeper.Memory.MemoryCoverageLevel Coverage, String Note)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryMcpCoverageException
+    AgentEval.MAF.Gatekeeper.Memory.MemoryCoverageLevel MinimumCoverage { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryMcpCoverageReport Report { get; }
+    ctor(AgentEval.MAF.Gatekeeper.Memory.MemoryMcpCoverageReport report, AgentEval.MAF.Gatekeeper.Memory.MemoryCoverageLevel minimumCoverage)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryMcpCoverageReport
+    Boolean HasCoverageBelow(AgentEval.MAF.Gatekeeper.Memory.MemoryCoverageLevel minimum)
+    IReadOnlyList<AgentEval.MAF.Gatekeeper.Memory.MemoryMcpCoverageEntry> Entries { get; }
+    String ConfigurationFingerprint { get; }
+    String PolicyFingerprint { get; }
+class AgentEval.MAF.Gatekeeper.Memory.MemoryMcpSafeException
+    String CorrelationId { get; }
+    String ReasonCode { get; }
+static class AgentEval.MAF.Gatekeeper.Memory.MemoryMcpSchema
+    const Int32 MaximumSchemaCharacters
+    static String ComputeFingerprint(String schemaJson)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryMcpServerCoverageEvidence
+    AgentEval.MAF.Gatekeeper.Memory.MemoryMcpTransport Transport { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemorySecurityProfile Profile { get; }
+    String AdapterConfigurationFingerprint { get; }
+    String ConfigurationFingerprint { get; }
+    String PipelineFingerprint { get; }
+    String RegistryFingerprint { get; }
+    String ServerId { get; }
+    String ServerVersion { get; }
+class AgentEval.MAF.Gatekeeper.Memory.MemoryMcpServerGate<TRequest, TResult>
+    AgentEval.MAF.Gatekeeper.Memory.MemoryMcpServerCoverageEvidence CoverageEvidence { get; }
+    String ConfigurationFingerprint { get; }
+    ValueTask<TResult> ExecuteAsync(String operationName, String correlationId, TRequest request, Func<TRequest, CancellationToken, ValueTask<TResult>> invokeBackend, CancellationToken cancellationToken = default)
+    ctor(AgentEval.MAF.Gatekeeper.Memory.MemoryGatePipeline pipeline, AgentEval.MAF.Gatekeeper.Memory.MemoryMcpServerOperationRegistry registry, AgentEval.MAF.Gatekeeper.Memory.IMemoryMcpServerContextAdapter<TRequest, TResult> adapter, AgentEval.MAF.Gatekeeper.Memory.IMemoryGateDecisionSink decisionSink = null)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryMcpServerOperationContract
+    AgentEval.MAF.Gatekeeper.Memory.MemoryOperationContract Operation { get; }
+    String SchemaFingerprint { get; }
+    ctor(String schemaFingerprint, AgentEval.MAF.Gatekeeper.Memory.MemoryOperationContract operation)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryMcpServerOperationRegistry
+    AgentEval.MAF.Gatekeeper.Memory.MemoryMcpTransport Transport { get; }
+    Boolean TryGet(String operationName, out AgentEval.MAF.Gatekeeper.Memory.MemoryMcpServerOperationContract contract)
+    IReadOnlyDictionary<String, AgentEval.MAF.Gatekeeper.Memory.MemoryMcpServerOperationContract> Contracts { get; }
+    String ConfigurationFingerprint { get; }
+    String ServerId { get; }
+    String ServerVersion { get; }
+    ctor(String serverId, String serverVersion, AgentEval.MAF.Gatekeeper.Memory.MemoryMcpTransport transport, IEnumerable<AgentEval.MAF.Gatekeeper.Memory.MemoryMcpServerOperationContract> contracts)
+enum AgentEval.MAF.Gatekeeper.Memory.MemoryMcpTransport
+    InProcess
+    Stdio
+    StreamableHttp
+    ProviderHosted
+class AgentEval.MAF.Gatekeeper.Memory.MemoryOperationContract
+    AgentEval.MAF.Gatekeeper.Memory.MemoryCategory Category { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryOperationKind Kind { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemorySurface Surface { get; }
+    Boolean IsSideEffecting { get; }
+    Boolean MayReturnSensitiveContent { get; }
+    IReadOnlyList<String> ContentArguments { get; }
+    IReadOnlyList<String> ScopeArguments { get; }
+    String OperationName { get; }
+    ctor(String operationName, AgentEval.MAF.Gatekeeper.Memory.MemoryOperationKind kind, AgentEval.MAF.Gatekeeper.Memory.MemorySurface surface, IEnumerable<String> contentArguments, IEnumerable<String> scopeArguments, AgentEval.MAF.Gatekeeper.Memory.MemoryCategory category, Boolean isSideEffecting, Boolean mayReturnSensitiveContent)
+enum AgentEval.MAF.Gatekeeper.Memory.MemoryOperationKind
+    Search
+    Recall
+    Write
+    Update
+    Delete
+    Promote
+    Reconcile
+    Audit
+class AgentEval.MAF.Gatekeeper.Memory.MemoryProtectionConfiguration
+    AgentEval.MAF.Gatekeeper.Memory.MemoryCoverageLevel MinimumCoverage { get; }
+    IReadOnlyList<String> SensitiveSinkTools { get; }
+    String ExpectedPolicyFingerprint { get; }
+    const String SchemaVersion
+    static AgentEval.MAF.Gatekeeper.Memory.MemoryProtectionConfiguration ParseJson(String json)
+    static AgentEval.MAF.Gatekeeper.Memory.MemoryProtectionConfiguration ReadFileOnce(String path)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryProtectionConfigurationException
+    String ReasonCode { get; }
+class AgentEval.MAF.Gatekeeper.Memory.MemoryProtectionCoverageException
+    AgentEval.MAF.Gatekeeper.Memory.MemoryProtectionReport Report { get; }
+class AgentEval.MAF.Gatekeeper.Memory.MemoryProtectionOptions
+    AgentEval.MAF.Gatekeeper.Memory.IMemoryGateDecisionSink DecisionSink { get; init; }
+    AgentEval.MAF.Gatekeeper.Memory.IMemoryToolContextAdapter ToolContextAdapter { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGatePipeline Pipeline { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryMcpClientOperationRegistry LocalMcpRegistry { get; init; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryMcpServerCoverageEvidence OwnedMcpServer { get; init; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryProtectionConfiguration DeploymentConfiguration { get; init; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryToolOperationRegistry ToolRegistry { get; }
+    Boolean CanonicalizeInfluence { get; init; }
+    IReadOnlyList<AgentEval.MAF.Gatekeeper.Memory.GatedAIContextProvider> ContextProviders { get; init; }
+    IReadOnlyList<AgentEval.MAF.Gatekeeper.Memory.MemoryHostedMcpOperationContract> HostedMcpContracts { get; init; }
+    IReadOnlyList<AgentEval.MAF.Gatekeeper.Memory.MemoryMcpClientToolBinding> LocalMcpBindings { get; init; }
+    IReadOnlyList<AgentEval.MAF.Gatekeeper.Memory.MemoryProviderNativeGate> ProviderNativeGates { get; init; }
+    IReadOnlyList<String> SensitiveSinkTools { get; init; }
+    Int32 MinimumTaintLength { get; init; }
+    ctor(AgentEval.MAF.Gatekeeper.Memory.MemoryGatePipeline pipeline, AgentEval.MAF.Gatekeeper.Memory.MemoryToolOperationRegistry toolRegistry, AgentEval.MAF.Gatekeeper.Memory.IMemoryToolContextAdapter toolContextAdapter)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryProtectionReport
+    AgentEval.MAF.Gatekeeper.Memory.MemoryCoverageLevel MinimumCoverage { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryMcpCoverageReport McpCoverage { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemorySecurityProfile Profile { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryToolCoverageReport ToolCoverage { get; }
+    Boolean HasCoverageBelowMinimum { get; }
+    IReadOnlyList<AgentEval.MAF.Gatekeeper.Memory.MemoryProviderCoverageEntry> ProviderCoverage { get; }
+    String AdapterFingerprint { get; }
+    String ConfigurationFingerprint { get; }
+    String PolicyFingerprint { get; }
+    String PolicyId { get; }
+    String PolicyVersion { get; }
+    String Schema { get; }
+    String ToJson(JsonSerializerOptions options = null)
+    const String SchemaVersion
+static class AgentEval.MAF.Gatekeeper.Memory.MemoryProtectionServiceCollectionExtensions
+    static IServiceCollection AddAgentEvalMemoryProtection(IServiceCollection services, AgentEval.MAF.Gatekeeper.Memory.MemoryProtectionOptions protection)
+    static IServiceCollection AddAgentEvalMemoryProtection(IServiceCollection services, Func<IServiceProvider, AgentEval.MAF.Gatekeeper.Memory.MemoryProtectionOptions> factory)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryProvenance
+    AgentEval.MAF.Gatekeeper.Memory.MemorySourceKind SourceKind { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryTrustLevel Trust { get; }
+    IReadOnlyList<String> CitationIds { get; }
+    IReadOnlyList<String> ParentMemoryIds { get; }
+    IReadOnlyList<String> Transformations { get; }
+    String RootLineageId { get; }
+    String SourceId { get; }
+    ctor(AgentEval.MAF.Gatekeeper.Memory.MemorySourceKind sourceKind, String sourceId, AgentEval.MAF.Gatekeeper.Memory.MemoryTrustLevel trust, String rootLineageId = null, IEnumerable<String> parentMemoryIds = null, IEnumerable<String> transformations = null, IEnumerable<String> citationIds = null)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryProviderCoverageEntry
+    AgentEval.MAF.Gatekeeper.Memory.MemoryCoverageLevel Coverage { get; init; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryProviderCoverageEntry <Clone>$()
+    AgentEval.MAF.Gatekeeper.Memory.MemoryProviderNativeCapabilities NativeCapabilities { get; init; }
+    Boolean Equals(AgentEval.MAF.Gatekeeper.Memory.MemoryProviderCoverageEntry other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    String Integration { get; init; }
+    String Note { get; init; }
+    String PolicyFingerprint { get; init; }
+    String ProviderFingerprint { get; init; }
+    String ToString()
+    Void Deconstruct(out String ProviderFingerprint, out String Integration, out AgentEval.MAF.Gatekeeper.Memory.MemoryProviderNativeCapabilities NativeCapabilities, out AgentEval.MAF.Gatekeeper.Memory.MemoryCoverageLevel Coverage, out String PolicyFingerprint, out String Note)
+    ctor(String ProviderFingerprint, String Integration, AgentEval.MAF.Gatekeeper.Memory.MemoryProviderNativeCapabilities NativeCapabilities, AgentEval.MAF.Gatekeeper.Memory.MemoryCoverageLevel Coverage, String PolicyFingerprint, String Note)
+enum AgentEval.MAF.Gatekeeper.Memory.MemoryProviderNativeCapabilities
+    None
+    CandidateWrites
+    RecalledItems
+class AgentEval.MAF.Gatekeeper.Memory.MemoryProviderNativeDescriptor
+    AgentEval.MAF.Gatekeeper.Memory.MemoryProviderNativeCapabilities Capabilities { get; }
+    String ConfigurationFingerprint { get; }
+    String ProviderId { get; }
+    String Version { get; }
+    ctor(String providerId, String version, AgentEval.MAF.Gatekeeper.Memory.MemoryProviderNativeCapabilities capabilities)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryProviderNativeGate
+    AgentEval.MAF.Gatekeeper.Memory.MemoryProviderNativeDescriptor Descriptor { get; }
+    String PolicyFingerprint { get; }
+    ValueTask<AgentEval.MAF.Gatekeeper.Memory.MemoryGateEnforcementResult> GateCandidateWriteAsync(AgentEval.MAF.Gatekeeper.Memory.MemoryGateContext context, CancellationToken cancellationToken = default)
+    ValueTask<AgentEval.MAF.Gatekeeper.Memory.MemoryProviderNativeRecallResult> GateRecalledItemAsync(AgentEval.MAF.Gatekeeper.Memory.MemoryGateContext context, CancellationToken cancellationToken = default)
+    ctor(AgentEval.MAF.Gatekeeper.Memory.MemoryProviderNativeDescriptor descriptor, AgentEval.MAF.Gatekeeper.Memory.MemoryGatePipeline pipeline, AgentEval.MAF.Gatekeeper.Memory.IMemoryGateDecisionSink decisionSink = null)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryProviderNativeRecallResult
+    Boolean Include { get; }
+    IReadOnlyList<AgentEval.MAF.Gatekeeper.Memory.MemoryGateReceipt> Receipts { get; }
+    String EffectiveContent { get; }
+class AgentEval.MAF.Gatekeeper.Memory.MemoryQuarantineReceipt
+    DateTimeOffset StoredAtUtc { get; }
+    String OperationId { get; }
+    String QuarantineId { get; }
+    ctor(String quarantineId, String operationId, DateTimeOffset storedAtUtc)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryQuarantineRequest
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGateContext Context { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGateReceipt DecisionReceipt { get; }
+    ctor(AgentEval.MAF.Gatekeeper.Memory.MemoryGateContext context, AgentEval.MAF.Gatekeeper.Memory.MemoryGateReceipt decisionReceipt)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryRecallAdmissionGate
+    AgentEval.MAF.Gatekeeper.GateCost Cost { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGateRequirements Requirements { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGateStage Stages { get; }
+    String PolicyName { get; }
+    ValueTask<AgentEval.MAF.Gatekeeper.Memory.MemoryGateVerdict> InspectAsync(AgentEval.MAF.Gatekeeper.Memory.MemoryGateContext context, CancellationToken cancellationToken = default)
+    ctor(AgentEval.MAF.Gatekeeper.Memory.MemoryRecallAdmissionOptions options = null, TimeProvider timeProvider = null)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryRecallAdmissionOptions
+    AgentEval.MAF.Gatekeeper.Memory.MemoryTrustLevel MinimumTrust { get; }
+    Boolean DelimitUntrustedContent { get; }
+    Boolean ExcludeInstructionLikeContent { get; }
+    Boolean RequireCitationVerification { get; }
+    Boolean RequireIntegrityVerification { get; }
+    Boolean RequireRecordMetadata { get; }
+    ctor(AgentEval.MAF.Gatekeeper.Memory.MemoryTrustLevel minimumTrust = MemoryTrustLevel.Low, Boolean requireRecordMetadata = true, Boolean requireIntegrityVerification = false, Boolean requireCitationVerification = false, Boolean excludeInstructionLikeContent = true, Boolean delimitUntrustedContent = true)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryRecordMetadata
+    AgentEval.MAF.Gatekeeper.Memory.MemoryRecordState State { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemorySecurityScope OwnerScope { get; }
+    Boolean? CitationsVerified { get; }
+    Boolean? IntegrityVerified { get; }
+    DateTimeOffset? CreatedAtUtc { get; }
+    DateTimeOffset? ExpiresAtUtc { get; }
+    String MemoryId { get; }
+    ctor(String memoryId, AgentEval.MAF.Gatekeeper.Memory.MemorySecurityScope ownerScope, AgentEval.MAF.Gatekeeper.Memory.MemoryRecordState state = MemoryRecordState.Active, DateTimeOffset? createdAtUtc = null, DateTimeOffset? expiresAtUtc = null, Boolean? integrityVerified = null, Boolean? citationsVerified = null)
+enum AgentEval.MAF.Gatekeeper.Memory.MemoryRecordState
+    Active
+    Quarantined
+    Revoked
+    Superseded
+class AgentEval.MAF.Gatekeeper.Memory.MemoryResourceBudgetGate
+    AgentEval.MAF.Gatekeeper.GateCost Cost { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGateRequirements Requirements { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGateStage Stages { get; }
+    String PolicyName { get; }
+    ValueTask<AgentEval.MAF.Gatekeeper.Memory.MemoryGateVerdict> InspectAsync(AgentEval.MAF.Gatekeeper.Memory.MemoryGateContext context, CancellationToken cancellationToken = default)
+    ctor(AgentEval.MAF.Gatekeeper.Memory.MemoryResourceBudgetOptions options = null)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryResourceBudgetOptions
+    Int32 MaximumLineageDepth { get; }
+    Int32 MaximumParentCount { get; }
+    Int32 MaximumPromotionsPerSession { get; }
+    Int32 MaximumQuarantinedItemsPerScope { get; }
+    Int32 MaximumRecalledCharacters { get; }
+    Int32 MaximumRecalledItems { get; }
+    Int32 MaximumReconciliationsPerSession { get; }
+    Int32 MaximumRecordCharacters { get; }
+    Int32 MaximumUniqueCandidatesPerSource { get; }
+    Int32 MaximumWritesPerRun { get; }
+    Int32 MaximumWritesPerSession { get; }
+    Int32 MaximumWritesPerSource { get; }
+    Int32 MaximumWritesPerUser { get; }
+    ctor(Int32 maximumRecordCharacters = 16384, Int32 maximumWritesPerRun = 32, Int32 maximumWritesPerSession = 128, Int32 maximumWritesPerUser = 10000, Int32 maximumWritesPerSource = 256, Int32 maximumUniqueCandidatesPerSource = 128, Int32 maximumPromotionsPerSession = 16, Int32 maximumReconciliationsPerSession = 32, Int32 maximumRecalledItems = 32, Int32 maximumRecalledCharacters = 32768, Int32 maximumLineageDepth = 16, Int32 maximumParentCount = 32, Int32 maximumQuarantinedItemsPerScope = 1000)
+enum AgentEval.MAF.Gatekeeper.Memory.MemoryScopeDimensions
+    None
+    Tenant
+    User
+    Agent
+    Application
+    Session
+class AgentEval.MAF.Gatekeeper.Memory.MemoryScopeIntegrityGate
+    AgentEval.MAF.Gatekeeper.GateCost Cost { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGateRequirements Requirements { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGateStage Stages { get; }
+    String PolicyName { get; }
+    ValueTask<AgentEval.MAF.Gatekeeper.Memory.MemoryGateVerdict> InspectAsync(AgentEval.MAF.Gatekeeper.Memory.MemoryGateContext context, CancellationToken cancellationToken = default)
+    ctor(AgentEval.MAF.Gatekeeper.Memory.MemoryScopeIntegrityOptions options = null)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryScopeIntegrityOptions
+    AgentEval.MAF.Gatekeeper.Memory.MemoryScopeDimensions ReadDimensions { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryScopeDimensions WriteDimensions { get; }
+    Boolean RejectModelSuppliedScope { get; }
+    ctor(AgentEval.MAF.Gatekeeper.Memory.MemoryScopeDimensions readDimensions = MemoryScopeDimensions.Tenant, User, AgentEval.MAF.Gatekeeper.Memory.MemoryScopeDimensions writeDimensions = MemoryScopeDimensions.Tenant, User, Boolean rejectModelSuppliedScope = true)
+class AgentEval.MAF.Gatekeeper.Memory.MemorySecurityPolicy
+    AgentEval.MAF.Gatekeeper.Memory.MemoryCoverageLevel MinimumCoverage { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGateAction AmbiguousWriteAction { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemorySecurityProfile Profile { get; }
+    String PolicyId { get; }
+    String Version { get; }
+    ctor(String policyId, String version, AgentEval.MAF.Gatekeeper.Memory.MemorySecurityProfile profile = MemorySecurityProfile.Enforce, AgentEval.MAF.Gatekeeper.Memory.MemoryGateAction ambiguousWriteAction = MemoryGateAction.Quarantine, AgentEval.MAF.Gatekeeper.Memory.MemoryCoverageLevel minimumCoverage = MemoryCoverageLevel.Boundary)
+enum AgentEval.MAF.Gatekeeper.Memory.MemorySecurityProfile
+    Observe
+    Enforce
+class AgentEval.MAF.Gatekeeper.Memory.MemorySecurityScope
+    String AgentId { get; }
+    String ApplicationId { get; }
+    String SessionId { get; }
+    String TenantId { get; }
+    String UserId { get; }
+    ctor(String tenantId = null, String userId = null, String agentId = null, String applicationId = null, String sessionId = null)
+enum AgentEval.MAF.Gatekeeper.Memory.MemorySourceKind
+    Unknown
+    User
+    Assistant
+    Tool
+    Mcp
+    ContextProvider
+    Application
+    Operator
+    Imported
+enum AgentEval.MAF.Gatekeeper.Memory.MemorySurface
+    Tool
+    LocalMcp
+    HostedMcp
+    McpServer
+    AIContextProvider
+    ProviderNative
+class AgentEval.MAF.Gatekeeper.Memory.MemoryToolCallGate
+    AgentEval.MAF.Gatekeeper.GateCost Cost { get; }
+    AgentEval.MAF.Gatekeeper.GateRequirements Requirements { get; }
+    AgentEval.MAF.Gatekeeper.ToolGatePolicy MinimumPolicy { get; }
+    String PolicyName { get; }
+    ValueTask<AgentEval.MAF.Gatekeeper.ToolGateVerdict> InspectAsync(AgentEval.MAF.Gatekeeper.GatedToolCall call, CancellationToken cancellationToken = default)
+    ctor(AgentEval.MAF.Gatekeeper.Memory.MemoryGatePipeline pipeline, AgentEval.MAF.Gatekeeper.Memory.MemoryToolOperationRegistry registry, AgentEval.MAF.Gatekeeper.Memory.IMemoryToolContextAdapter adapter, AgentEval.MAF.Gatekeeper.Memory.IMemoryGateDecisionSink decisionSink = null)
+enum AgentEval.MAF.Gatekeeper.Memory.MemoryToolClassification
+    NonMemory
+    RegisteredMemory
+    UnclassifiedMemoryLike
+static class AgentEval.MAF.Gatekeeper.Memory.MemoryToolClassifier
+    static AgentEval.MAF.Gatekeeper.Memory.MemoryToolClassification Classify(AITool tool, AgentEval.MAF.Gatekeeper.Memory.MemoryToolOperationRegistry registry)
+static class AgentEval.MAF.Gatekeeper.Memory.MemoryToolCoverageAnalyzer
+    static AgentEval.MAF.Gatekeeper.Memory.MemoryToolCoverageReport Analyze(IEnumerable<AITool> tools, AgentEval.MAF.Gatekeeper.Memory.MemoryToolOperationRegistry registry, AgentEval.MAF.Gatekeeper.Memory.MemoryToolCallGate callGate = null, AgentEval.MAF.Gatekeeper.Memory.MemoryToolResultGate resultGate = null, AgentEval.MAF.Gatekeeper.Memory.MemoryInfluenceGate influenceGate = null)
+    static AgentEval.MAF.Gatekeeper.Memory.MemoryToolCoverageReport AnalyzeOrThrow(IEnumerable<AITool> tools, AgentEval.MAF.Gatekeeper.Memory.MemoryToolOperationRegistry registry, AgentEval.MAF.Gatekeeper.Memory.MemoryToolCallGate callGate = null, AgentEval.MAF.Gatekeeper.Memory.MemoryToolResultGate resultGate = null, AgentEval.MAF.Gatekeeper.Memory.MemoryInfluenceGate influenceGate = null, AgentEval.MAF.Gatekeeper.Memory.MemoryCoverageLevel minimumCoverage = MemoryCoverageLevel.Boundary)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryToolCoverageEntry
+    AgentEval.MAF.Gatekeeper.Memory.MemoryCoverageLevel Coverage { get; init; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryOperationKind? OperationKind { get; init; }
+    AgentEval.MAF.Gatekeeper.Memory.MemorySurface? Surface { get; init; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryToolClassification Classification { get; init; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryToolCoverageEntry <Clone>$()
+    AgentEval.MAF.Gatekeeper.ToolExecutionModel ExecutionModel { get; init; }
+    Boolean Equals(AgentEval.MAF.Gatekeeper.Memory.MemoryToolCoverageEntry other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    String Note { get; init; }
+    String ToString()
+    String ToolName { get; init; }
+    Void Deconstruct(out String ToolName, out AgentEval.MAF.Gatekeeper.Memory.MemoryToolClassification Classification, out AgentEval.MAF.Gatekeeper.Memory.MemoryOperationKind? OperationKind, out AgentEval.MAF.Gatekeeper.Memory.MemorySurface? Surface, out AgentEval.MAF.Gatekeeper.ToolExecutionModel ExecutionModel, out AgentEval.MAF.Gatekeeper.Memory.MemoryCoverageLevel Coverage, out String Note)
+    ctor(String ToolName, AgentEval.MAF.Gatekeeper.Memory.MemoryToolClassification Classification, AgentEval.MAF.Gatekeeper.Memory.MemoryOperationKind? OperationKind, AgentEval.MAF.Gatekeeper.Memory.MemorySurface? Surface, AgentEval.MAF.Gatekeeper.ToolExecutionModel ExecutionModel, AgentEval.MAF.Gatekeeper.Memory.MemoryCoverageLevel Coverage, String Note)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryToolCoverageException
+    AgentEval.MAF.Gatekeeper.Memory.MemoryCoverageLevel MinimumCoverage { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryToolCoverageReport Report { get; }
+    ctor(AgentEval.MAF.Gatekeeper.Memory.MemoryToolCoverageReport report, AgentEval.MAF.Gatekeeper.Memory.MemoryCoverageLevel minimumCoverage = MemoryCoverageLevel.Boundary)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryToolCoverageReport
+    Boolean HasCoverageBelow(AgentEval.MAF.Gatekeeper.Memory.MemoryCoverageLevel minimum)
+    Boolean HasUnclassifiedMemoryLikeTools { get; }
+    Boolean HasUnsupportedMemoryTools { get; }
+    IReadOnlyList<AgentEval.MAF.Gatekeeper.Memory.MemoryToolCoverageEntry> Entries { get; }
+    String PolicyFingerprint { get; }
+class AgentEval.MAF.Gatekeeper.Memory.MemoryToolOperationRegistry
+    Boolean TryGet(String functionName, out AgentEval.MAF.Gatekeeper.Memory.MemoryOperationContract contract)
+    IReadOnlyDictionary<String, AgentEval.MAF.Gatekeeper.Memory.MemoryOperationContract> Contracts { get; }
+    String ConfigurationFingerprint { get; }
+    ctor(IEnumerable<AgentEval.MAF.Gatekeeper.Memory.MemoryOperationContract> contracts)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryToolResultGate
+    AgentEval.MAF.Gatekeeper.GateCost Cost { get; }
+    AgentEval.MAF.Gatekeeper.GateRequirements Requirements { get; }
+    AgentEval.MAF.Gatekeeper.ToolGatePolicy MinimumPolicy { get; }
+    String PolicyName { get; }
+    ValueTask<AgentEval.MAF.Gatekeeper.ToolResultVerdict> InspectAsync(AgentEval.MAF.Gatekeeper.GatedToolResult result, CancellationToken cancellationToken = default)
+    ctor(AgentEval.MAF.Gatekeeper.Memory.MemoryGatePipeline pipeline, AgentEval.MAF.Gatekeeper.Memory.MemoryToolOperationRegistry registry, AgentEval.MAF.Gatekeeper.Memory.IMemoryToolContextAdapter adapter, AgentEval.MAF.Gatekeeper.Memory.IMemoryGateDecisionSink decisionSink = null)
+enum AgentEval.MAF.Gatekeeper.Memory.MemoryTrustLevel
+    Untrusted
+    Low
+    Medium
+    High
+    ApplicationTrusted
+class AgentEval.MAF.Gatekeeper.Memory.MemoryWriteAdmissionGate
+    AgentEval.MAF.Gatekeeper.GateCost Cost { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGateRequirements Requirements { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryGateStage Stages { get; }
+    String PolicyName { get; }
+    ValueTask<AgentEval.MAF.Gatekeeper.Memory.MemoryGateVerdict> InspectAsync(AgentEval.MAF.Gatekeeper.Memory.MemoryGateContext context, CancellationToken cancellationToken = default)
+    ctor(AgentEval.MAF.Gatekeeper.Memory.MemoryWriteAdmissionOptions options = null)
+class AgentEval.MAF.Gatekeeper.Memory.MemoryWriteAdmissionOptions
+    AgentEval.MAF.Gatekeeper.Memory.MemoryTrustLevel MinimumPromotionTrust { get; }
+    AgentEval.MAF.Gatekeeper.Memory.MemoryTrustLevel MinimumTrust { get; }
+    Boolean QuarantineInstructionLikeContent { get; }
+    Boolean RejectControlCharacters { get; }
+    Boolean SanitizeSecrets { get; }
+    IReadOnlySet<AgentEval.MAF.Gatekeeper.Memory.MemoryCategory> ExcludedCategories { get; }
+    Int32 MaximumContentCharacters { get; }
+    ctor(Int32 maximumContentCharacters = 16384, AgentEval.MAF.Gatekeeper.Memory.MemoryTrustLevel minimumTrust = MemoryTrustLevel.Low, IEnumerable<AgentEval.MAF.Gatekeeper.Memory.MemoryCategory> excludedCategories = null, Boolean sanitizeSecrets = true, Boolean rejectControlCharacters = true, Boolean quarantineInstructionLikeContent = true, AgentEval.MAF.Gatekeeper.Memory.MemoryTrustLevel minimumPromotionTrust = MemoryTrustLevel.High)
+class AgentEval.MAF.Gatekeeper.MonetaryLimitGate
+    AgentEval.MAF.Gatekeeper.GateCost Cost { get; }
+    AgentEval.MAF.Gatekeeper.GateRequirements Requirements { get; }
+    String PolicyName { get; }
+    ValueTask<AgentEval.MAF.Gatekeeper.ToolGateVerdict> InspectAsync(AgentEval.MAF.Gatekeeper.GatedToolCall call, CancellationToken cancellationToken = default)
+    ctor(String argName, Decimal maxTotal, String policyName = null, AgentEval.MAF.Gatekeeper.RunBudgetScope budgetScope = RunBudgetScope.Current)
+class AgentEval.MAF.Gatekeeper.ObserverEvidenceSink
+    Void Record(AgentEval.MAF.Gatekeeper.GateEvidence evidence, Int32 sequence)
+    ctor(AgentEval.MAF.Gatekeeper.IGatekeeperObserver observer)
+class AgentEval.MAF.Gatekeeper.OperatorAuthGate
+    String PolicyName { get; }
+    const String OperatorMetadataKey
+    ctor(String[] allowedOperators)
+class AgentEval.MAF.Gatekeeper.PathContainmentPredicate
+    IReadOnlyList<String> AllowedRoots { get; }
+    String BasePath { get; }
+    ctor(String argument, IEnumerable<String> allowedRoots, String basePath = null)
+class AgentEval.MAF.Gatekeeper.PerToolCallBudgetGate
+    AgentEval.MAF.Gatekeeper.GateCost Cost { get; }
+    AgentEval.MAF.Gatekeeper.GateRequirements Requirements { get; }
+    String PolicyName { get; }
+    ValueTask<AgentEval.MAF.Gatekeeper.ToolGateVerdict> InspectAsync(AgentEval.MAF.Gatekeeper.GatedToolCall call, CancellationToken cancellationToken = default)
+    ctor(IReadOnlyDictionary<String, Int32> maxCallsPerTool, String policyName = null, AgentEval.MAF.Gatekeeper.RunBudgetScope budgetScope = RunBudgetScope.Current)
+class AgentEval.MAF.Gatekeeper.PiiPredicate
+    ctor(String argument)
+class AgentEval.MAF.Gatekeeper.PromptTemplateDriftException
+    IReadOnlyList<AgentEval.Guardrails.ManifestDriftFinding> Findings { get; }
+    ctor(IReadOnlyList<AgentEval.Guardrails.ManifestDriftFinding> findings)
+class AgentEval.MAF.Gatekeeper.QuarantineGate
+    String PolicyName { get; }
+    ctor()
+class AgentEval.MAF.Gatekeeper.QuarantineLease
+    AgentEval.MAF.Gatekeeper.QuarantineLease <Clone>$()
+    Boolean Equals(AgentEval.MAF.Gatekeeper.QuarantineLease other)
+    Boolean Equals(Object obj)
+    Boolean IsActiveAt(DateTimeOffset nowUtc)
+    DateTimeOffset ArmedAtUtc { get; init; }
+    DateTimeOffset ExpiresAtUtc { get; init; }
+    Int32 GetHashCode()
+    String EvidenceId { get; init; }
+    String LiftedByOperator { get; init; }
+    String Reason { get; init; }
+    String Signature { get; init; }
+    String ToString()
+    Void Deconstruct(out String Reason, out String EvidenceId, out DateTimeOffset ArmedAtUtc, out DateTimeOffset ExpiresAtUtc, out String LiftedByOperator, out String Signature)
+    ctor(String Reason, String EvidenceId, DateTimeOffset ArmedAtUtc, DateTimeOffset ExpiresAtUtc, String LiftedByOperator, String Signature)
+class AgentEval.MAF.Gatekeeper.QuarantineLeaseAuthority
+    AgentEval.MAF.Gatekeeper.QuarantineLease Arm(String reason, String evidenceId, DateTimeOffset nowUtc, TimeSpan timeToLive)
+    AgentEval.MAF.Gatekeeper.QuarantineLease ArmSession(AgentSession session, String reason, String evidenceId, DateTimeOffset nowUtc, TimeSpan timeToLive)
+    AgentEval.MAF.Gatekeeper.QuarantineLease LiftByOperator(AgentEval.MAF.Gatekeeper.QuarantineLease lease, String operatorId)
+    AgentEval.MAF.Gatekeeper.QuarantineLease Rearm(AgentEval.MAF.Gatekeeper.QuarantineLease current, String reason, String evidenceId, DateTimeOffset nowUtc, TimeSpan timeToLive)
+    Boolean TryLiftSession(AgentSession session, String operatorId)
+    Boolean Verify(AgentEval.MAF.Gatekeeper.QuarantineLease lease)
+    const String LeaseStateKey
+    ctor(Byte[] signingKey)
+    static AgentEval.MAF.Gatekeeper.QuarantineLease ReadLease(AgentSession session)
+    static Boolean ClearSession(AgentSession session)
+class AgentEval.MAF.Gatekeeper.QuarantineLeaseGate
+    String PolicyName { get; }
+    ctor(AgentEval.MAF.Gatekeeper.QuarantineLeaseAuthority authority, TimeProvider timeProvider = null)
+class AgentEval.MAF.Gatekeeper.RateLimitGate
+    String PolicyName { get; }
+    ctor(Int32 maxRuns, TimeSpan window, TimeProvider timeProvider = null, Func<AgentSession, String> sessionKeySelector = null)
+class AgentEval.MAF.Gatekeeper.RecipientDomainAllowListPredicate
+    IReadOnlyList<String> AllowedDomains { get; }
+    ctor(String argument, IEnumerable<String> allowedDomains)
+class AgentEval.MAF.Gatekeeper.ReferentialIntegrityGate
+    AgentEval.MAF.Gatekeeper.GateCost Cost { get; }
+    String PolicyName { get; }
+    ValueTask<AgentEval.MAF.Gatekeeper.ToolGateVerdict> InspectAsync(AgentEval.MAF.Gatekeeper.GatedToolCall call, CancellationToken cancellationToken = default)
+    ctor(IEnumerable<String> idArgNames, IEnumerable<String> guardedTools = null, IEnumerable<String> trustedSourceTools = null, Func<String, Boolean> isIdentifier = null)
+enum AgentEval.MAF.Gatekeeper.RefusalDisposition
+    Denied
+    Quota
+    Transient
+    Escalate
+static class AgentEval.MAF.Gatekeeper.RefusalDispositionClassifier
+    static AgentEval.MAF.Gatekeeper.RefusalDisposition Classify(String policyName, Boolean failedClosedOnThrow = false)
+enum AgentEval.MAF.Gatekeeper.RunBudgetDecision
+    Admitted
+    TotalExceeded
+    PerToolExceeded
+    MonetaryExceeded
+class AgentEval.MAF.Gatekeeper.RunBudgetGate
+    AgentEval.MAF.Gatekeeper.GateCost Cost { get; }
+    AgentEval.MAF.Gatekeeper.GateRequirements Requirements { get; }
+    String PolicyName { get; }
+    ValueTask<AgentEval.MAF.Gatekeeper.ToolGateVerdict> InspectAsync(AgentEval.MAF.Gatekeeper.GatedToolCall call, CancellationToken cancellationToken = default)
+    ctor(Int32? maxToolCalls = null, IReadOnlyDictionary<String, Int32> maxCallsPerTool = null, ValueTuple<String, Decimal>? maxMonetaryPerRun = null, AgentEval.MAF.Gatekeeper.RunBudgetScope budgetScope = RunBudgetScope.Current)
+enum AgentEval.MAF.Gatekeeper.RunBudgetScope
+    Current
+    Root
+class AgentEval.MAF.Gatekeeper.RunLedger
+    AgentEval.MAF.Gatekeeper.DistinctValueDecision TryAdmitDistinctValue(String dimensionKey, ReadOnlySpan<Byte> canonicalValueHash, Int32 maxDistinctValues)
+    AgentEval.MAF.Gatekeeper.RunBudgetDecision TryAdmitMonetary(String argName, Decimal amount, Decimal max)
+    AgentEval.MAF.Gatekeeper.RunBudgetDecision TryAdmitPerToolCall(String toolName, Int32 maxPerTool)
+    AgentEval.MAF.Gatekeeper.RunBudgetDecision TryAdmitToolCall(String toolName, Int32? maxTotal, Int32? maxPerTool, String monetaryArg, Decimal monetaryAmount, Decimal maxMonetary)
+    AgentEval.MAF.Gatekeeper.RunReceipt Summarize(String runId, String agentName, String configFingerprint, DateTimeOffset endedAtUtc)
+    AgentEval.MAF.Gatekeeper.ToolResultSizeSnapshot RecordToolResultSize(String toolName, Int64 size)
+    AgentEval.MAF.Gatekeeper.ToolResultSizeSnapshot RecordToolResultSizeUnlessAnomalous(String toolName, Int64 size, Func<AgentEval.MAF.Gatekeeper.ToolResultSizeSnapshot, Boolean> isAnomalous)
+    Boolean TryLatchBlockStorm()
+    Boolean WasObserved(String id)
+    Decimal MonetaryLimitSum(String argName)
+    Decimal MonetarySum(String argName)
+    Int32 DenialCount(String denialKey)
+    Int32 PerToolCallBudgetCount(String toolName)
+    Int32 RecordDenial(String denialKey)
+    Int32 RecordTreeDenial()
+    Int32 ToolCallCount(String toolName)
+    Int32 TotalToolCalls { get; }
+    Int32 TreeDenialCount { get; }
+    Void RecordObservedId(String id)
+    Void RecordToolCall(String toolName)
+    ctor()
+    static AgentEval.MAF.Gatekeeper.RunLedger ForCurrentRun()
+    static AgentEval.MAF.Gatekeeper.RunLedger ForRootRun()
+class AgentEval.MAF.Gatekeeper.RunReceipt
+    AgentEval.MAF.Gatekeeper.RunReceipt <Clone>$()
+    Boolean Equals(AgentEval.MAF.Gatekeeper.RunReceipt other)
+    Boolean Equals(Object obj)
+    DateTimeOffset EndedAtUtc { get; init; }
+    IReadOnlyDictionary<String, Int32> ToolCallCounts { get; init; }
+    Int32 GetHashCode()
+    Int32 TotalToolCalls { get; init; }
+    String AgentName { get; init; }
+    String ConfigFingerprint { get; init; }
+    String RunId { get; init; }
+    String ToString()
+    Void Deconstruct(out String RunId, out String AgentName, out String ConfigFingerprint, out DateTimeOffset EndedAtUtc, out Int32 TotalToolCalls, out IReadOnlyDictionary<String, Int32> ToolCallCounts)
+    ctor(String RunId, String AgentName, String ConfigFingerprint, DateTimeOffset EndedAtUtc, Int32 TotalToolCalls, IReadOnlyDictionary<String, Int32> ToolCallCounts)
+class AgentEval.MAF.Gatekeeper.SameBatchOrderingGate
+    AgentEval.MAF.Gatekeeper.GateCost Cost { get; }
+    String PolicyName { get; }
+    ValueTask<AgentEval.MAF.Gatekeeper.ToolGateVerdict> InspectAsync(AgentEval.MAF.Gatekeeper.GatedToolCall call, CancellationToken cancellationToken = default)
+    ctor(IEnumerable<String> triggerTools, IEnumerable<String> guardedTools, String policyName = null)
+class AgentEval.MAF.Gatekeeper.SecurityGraphContainmentBridge
+    ValueTask<AgentEval.MAF.Gatekeeper.ContainmentMutationResult> ApplyAsync(AgentEval.MAF.Gatekeeper.SecurityGraphContainmentDecision decision, CancellationToken cancellationToken = default)
+    ctor(String tenant, AgentEval.MAF.Gatekeeper.IContainmentStore store)
+class AgentEval.MAF.Gatekeeper.SecurityGraphContainmentDecision
+    AgentEval.MAF.Gatekeeper.ContainmentTarget Target { get; }
+    String EvidenceReference { get; }
+    String ReasonCode { get; }
+    static AgentEval.MAF.Gatekeeper.SecurityGraphContainmentDecision ForNode(AgentEval.MAF.Gatekeeper.SecurityGraphReport report, AgentEval.MAF.Gatekeeper.SecurityGraphNode node, String reasonCode, String evidenceReference)
+    static AgentEval.MAF.Gatekeeper.SecurityGraphContainmentDecision ForTenant(AgentEval.MAF.Gatekeeper.SecurityGraphReport report, String reasonCode, String evidenceReference)
+class AgentEval.MAF.Gatekeeper.SecurityGraphCoverageGap
+    DateTimeOffset AtUtc { get; }
+    Int32 Count { get; }
+    String ReasonCode { get; }
+    ctor(String reasonCode, Int32 count = 1)
+    static AgentEval.MAF.Gatekeeper.SecurityGraphCoverageGap Accepted(DateTimeOffset atUtc, String reasonCode, Int32 count = 1)
+enum AgentEval.MAF.Gatekeeper.SecurityGraphCoverageState
+    Complete
+    Incomplete
+    Indeterminate
+class AgentEval.MAF.Gatekeeper.SecurityGraphEdgeReport
+    AgentEval.MAF.Gatekeeper.SecurityGraphEdgeReport <Clone>$()
+    AgentEval.MAF.Gatekeeper.SecurityGraphNode Destination { get; init; }
+    AgentEval.MAF.Gatekeeper.SecurityGraphNode Source { get; init; }
+    Boolean Equals(AgentEval.MAF.Gatekeeper.SecurityGraphEdgeReport other)
+    Boolean Equals(Object obj)
+    DateTimeOffset LastObservedAtUtc { get; init; }
+    Double BlockRate { get; init; }
+    Int32 BlockedCallCount { get; init; }
+    Int32 CallCount { get; init; }
+    Int32 DistinctSessionCount { get; init; }
+    Int32 GetHashCode()
+    String ToString()
+    Void Deconstruct(out AgentEval.MAF.Gatekeeper.SecurityGraphNode Source, out AgentEval.MAF.Gatekeeper.SecurityGraphNode Destination, out Int32 CallCount, out Int32 BlockedCallCount, out Double BlockRate, out Int32 DistinctSessionCount, out DateTimeOffset LastObservedAtUtc)
+    ctor(AgentEval.MAF.Gatekeeper.SecurityGraphNode Source, AgentEval.MAF.Gatekeeper.SecurityGraphNode Destination, Int32 CallCount, Int32 BlockedCallCount, Double BlockRate, Int32 DistinctSessionCount, DateTimeOffset LastObservedAtUtc)
+class AgentEval.MAF.Gatekeeper.SecurityGraphIngestionPump
+    Boolean DrainCompleted { get; }
+    Boolean TryEnqueue(AgentEval.MAF.Gatekeeper.SecurityGraphObservationRequest observation)
+    Int64 AcceptedCount { get; }
+    Int64 AppliedCount { get; }
+    Int64 ConflictCount { get; }
+    Int64 DroppedCount { get; }
+    Int64 IndeterminateCount { get; }
+    Int64 RejectedCount { get; }
+    Int64 UnchangedCount { get; }
+    Task<Boolean> CompleteAndDrainAsync()
+    ValueTask DisposeAsync()
+    ctor(AgentEval.MAF.Gatekeeper.ISecurityGraphStore store, Action<AgentEval.MAF.Gatekeeper.SecurityGraphPumpFailure> onFailure = null, Int32 queueCapacity = 128, TimeSpan? drainTimeout = null)
+enum AgentEval.MAF.Gatekeeper.SecurityGraphMutationDisposition
+    Applied
+    Unchanged
+    Conflict
+    RejectedWithGap
+    Indeterminate
+class AgentEval.MAF.Gatekeeper.SecurityGraphMutationResult
+    AgentEval.MAF.Gatekeeper.SecurityGraphMutationDisposition Disposition { get; }
+    String ReasonCode { get; }
+    ctor(AgentEval.MAF.Gatekeeper.SecurityGraphMutationDisposition disposition, String reasonCode)
+class AgentEval.MAF.Gatekeeper.SecurityGraphNode
+    AgentEval.MAF.Gatekeeper.SecurityGraphNodeKind Kind { get; }
+    Boolean Equals(AgentEval.MAF.Gatekeeper.SecurityGraphNode other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    String Identifier { get; }
+    String ToString()
+    ctor(AgentEval.MAF.Gatekeeper.SecurityGraphNodeKind kind, String identifier)
+enum AgentEval.MAF.Gatekeeper.SecurityGraphNodeKind
+    Agent
+    Tool
+    McpServer
+    AgentEndpoint
+class AgentEval.MAF.Gatekeeper.SecurityGraphNodeReport
+    AgentEval.MAF.Gatekeeper.SecurityGraphNode Node { get; init; }
+    AgentEval.MAF.Gatekeeper.SecurityGraphNodeReport <Clone>$()
+    Boolean Equals(AgentEval.MAF.Gatekeeper.SecurityGraphNodeReport other)
+    Boolean Equals(Object obj)
+    Boolean NeverObserved { get; init; }
+    Boolean Stale { get; init; }
+    DateTimeOffset? LastContainedAtUtc { get; init; }
+    DateTimeOffset? LastObservedAtUtc { get; init; }
+    DateTimeOffset? LastReleasedAtUtc { get; init; }
+    Double? BlockRate { get; init; }
+    Int32 GetHashCode()
+    Int32? BlockedCallCount { get; init; }
+    Int32? CallCount { get; init; }
+    Int32? DistinctSessionCount { get; init; }
+    String ToString()
+    Void Deconstruct(out AgentEval.MAF.Gatekeeper.SecurityGraphNode Node, out Int32? CallCount, out Int32? BlockedCallCount, out Double? BlockRate, out Int32? DistinctSessionCount, out DateTimeOffset? LastObservedAtUtc, out DateTimeOffset? LastContainedAtUtc, out DateTimeOffset? LastReleasedAtUtc, out Boolean NeverObserved, out Boolean Stale)
+    ctor(AgentEval.MAF.Gatekeeper.SecurityGraphNode Node, Int32? CallCount, Int32? BlockedCallCount, Double? BlockRate, Int32? DistinctSessionCount, DateTimeOffset? LastObservedAtUtc, DateTimeOffset? LastContainedAtUtc, DateTimeOffset? LastReleasedAtUtc, Boolean NeverObserved, Boolean Stale)
+class AgentEval.MAF.Gatekeeper.SecurityGraphObservation
+    AgentEval.MAF.Gatekeeper.SecurityGraphNode Destination { get; }
+    AgentEval.MAF.Gatekeeper.SecurityGraphNode Source { get; }
+    AgentEval.MAF.Gatekeeper.SecurityGraphSignalKind Signal { get; }
+    DateTimeOffset AcceptedAtUtc { get; }
+    String EventId { get; }
+    String EvidenceReference { get; }
+    String SessionDigest { get; }
+    ctor(String eventId, DateTimeOffset acceptedAtUtc, AgentEval.MAF.Gatekeeper.SecurityGraphNode source, AgentEval.MAF.Gatekeeper.SecurityGraphNode destination, AgentEval.MAF.Gatekeeper.SecurityGraphSignalKind signal, String sessionDigest, String evidenceReference = null)
+class AgentEval.MAF.Gatekeeper.SecurityGraphObservationRequest
+    AgentEval.MAF.Gatekeeper.SecurityGraphNode Destination { get; }
+    AgentEval.MAF.Gatekeeper.SecurityGraphNode Source { get; }
+    AgentEval.MAF.Gatekeeper.SecurityGraphSignalKind Signal { get; }
+    String EventId { get; }
+    String EvidenceReference { get; }
+    String SessionIdentifier { get; }
+    ctor(String eventId, AgentEval.MAF.Gatekeeper.SecurityGraphNode source, AgentEval.MAF.Gatekeeper.SecurityGraphNode destination, AgentEval.MAF.Gatekeeper.SecurityGraphSignalKind signal, String sessionIdentifier, String evidenceReference = null)
+class AgentEval.MAF.Gatekeeper.SecurityGraphPumpFailure
+    AgentEval.MAF.Gatekeeper.SecurityGraphPumpFailureKind Kind { get; }
+    String ReasonCode { get; }
+    ctor(AgentEval.MAF.Gatekeeper.SecurityGraphPumpFailureKind kind, String reasonCode)
+enum AgentEval.MAF.Gatekeeper.SecurityGraphPumpFailureKind
+    Append
+    CoverageGap
+    Lifecycle
+class AgentEval.MAF.Gatekeeper.SecurityGraphReport
+    AgentEval.MAF.Gatekeeper.SecurityGraphCoverageState Coverage { get; init; }
+    AgentEval.MAF.Gatekeeper.SecurityGraphReport <Clone>$()
+    Boolean Equals(AgentEval.MAF.Gatekeeper.SecurityGraphReport other)
+    Boolean Equals(Object obj)
+    DateTimeOffset CapturedAtUtc { get; init; }
+    Double? FleetBlockRate { get; init; }
+    IReadOnlyList<AgentEval.MAF.Gatekeeper.SecurityGraphEdgeReport> Edges { get; init; }
+    IReadOnlyList<AgentEval.MAF.Gatekeeper.SecurityGraphNode> NeverObservedNodes { get; init; }
+    IReadOnlyList<AgentEval.MAF.Gatekeeper.SecurityGraphNode> StaleNodes { get; init; }
+    IReadOnlyList<AgentEval.MAF.Gatekeeper.SecurityGraphNodeReport> Nodes { get; init; }
+    Int32 GetHashCode()
+    Int32 TotalBlockedCallCount { get; init; }
+    Int32 TotalCallCount { get; init; }
+    String Explanation { get; init; }
+    String Tenant { get; init; }
+    String ToString()
+    TimeSpan Window { get; init; }
+    Void Deconstruct(out String Tenant, out TimeSpan Window, out DateTimeOffset CapturedAtUtc, out AgentEval.MAF.Gatekeeper.SecurityGraphCoverageState Coverage, out IReadOnlyList<AgentEval.MAF.Gatekeeper.SecurityGraphNodeReport> Nodes, out IReadOnlyList<AgentEval.MAF.Gatekeeper.SecurityGraphEdgeReport> Edges, out IReadOnlyList<AgentEval.MAF.Gatekeeper.SecurityGraphNode> NeverObservedNodes, out IReadOnlyList<AgentEval.MAF.Gatekeeper.SecurityGraphNode> StaleNodes, out Int32 TotalCallCount, out Int32 TotalBlockedCallCount, out Double? FleetBlockRate, out String Explanation)
+    ctor(String Tenant, TimeSpan Window, DateTimeOffset CapturedAtUtc, AgentEval.MAF.Gatekeeper.SecurityGraphCoverageState Coverage, IReadOnlyList<AgentEval.MAF.Gatekeeper.SecurityGraphNodeReport> Nodes, IReadOnlyList<AgentEval.MAF.Gatekeeper.SecurityGraphEdgeReport> Edges, IReadOnlyList<AgentEval.MAF.Gatekeeper.SecurityGraphNode> NeverObservedNodes, IReadOnlyList<AgentEval.MAF.Gatekeeper.SecurityGraphNode> StaleNodes, Int32 TotalCallCount, Int32 TotalBlockedCallCount, Double? FleetBlockRate, String Explanation)
+enum AgentEval.MAF.Gatekeeper.SecurityGraphSignalKind
+    CallObserved
+    CallBlocked
+    ContainmentApplied
+    ContainmentReleased
+class AgentEval.MAF.Gatekeeper.SecurityGraphTenantSnapshot
+    AgentEval.MAF.Gatekeeper.SecurityGraphCoverageState Coverage { get; }
+    DateTimeOffset CapturedAtUtc { get; }
+    IReadOnlyList<AgentEval.MAF.Gatekeeper.SecurityGraphCoverageGap> CoverageGaps { get; }
+    IReadOnlyList<AgentEval.MAF.Gatekeeper.SecurityGraphObservation> Observations { get; }
+    String FailureCode { get; }
+    String Tenant { get; }
+    TimeSpan Window { get; }
+    static AgentEval.MAF.Gatekeeper.SecurityGraphTenantSnapshot Determinate(String tenant, TimeSpan window, DateTimeOffset capturedAtUtc, IEnumerable<AgentEval.MAF.Gatekeeper.SecurityGraphObservation> observations, IEnumerable<AgentEval.MAF.Gatekeeper.SecurityGraphCoverageGap> coverageGaps = null)
+    static AgentEval.MAF.Gatekeeper.SecurityGraphTenantSnapshot Indeterminate(String tenant, TimeSpan window, DateTimeOffset capturedAtUtc, String failureCode)
+class AgentEval.MAF.Gatekeeper.SequenceGate
+    AgentEval.MAF.Gatekeeper.GateCost Cost { get; }
+    AgentEval.MAF.Gatekeeper.GateRequirements Requirements { get; }
+    String PolicyName { get; }
+    ValueTask<AgentEval.MAF.Gatekeeper.ToolGateVerdict> InspectAsync(AgentEval.MAF.Gatekeeper.GatedToolCall call, CancellationToken cancellationToken = default)
+    ctor(IEnumerable<String> triggerTools, IEnumerable<String> guardedTools, String policyName = null)
+class AgentEval.MAF.Gatekeeper.SessionContextGate
+    String PolicyName { get; }
+    ValueTask<AgentEval.Guardrails.GateVerdict> InspectAsync(String text, CancellationToken cancellationToken = default)
+static class AgentEval.MAF.Gatekeeper.SessionIdentity
+    static Func<AgentSession, String> Combine(Func<AgentSession, String>[] resolvers)
+    static Func<AgentSession, String> FromStateBag(String key)
+class AgentEval.MAF.Gatekeeper.SessionIdentityDriftGate [Experimental(AGENTEVAL_GATEKEEPER_PREVIEW001)]
+    String ConfigurationFingerprint { get; }
+    String PolicyName { get; }
+    ctor(IEnumerable<String> allowedOperators, Int32 maxTrackedSessions = 10000, Func<AgentSession, String> sessionKeySelector = null)
+class AgentEval.MAF.Gatekeeper.ShadowJudgeContext
+    AgentEval.MAF.Gatekeeper.ShadowJudgeContext <Clone>$()
+    AgentSession Session { get; init; }
+    Boolean Equals(AgentEval.MAF.Gatekeeper.ShadowJudgeContext other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    String AgentName { get; init; }
+    String InputText { get; init; }
+    String ResponseText { get; init; }
+    String ToString()
+    Void Deconstruct(out String ResponseText, out String InputText, out String AgentName, out AgentSession Session)
+    ctor(String ResponseText, String InputText, String AgentName, AgentSession Session)
+class AgentEval.MAF.Gatekeeper.ShadowJudgePump
+    Int64 AcceptedCount { get; }
+    Int64 DroppedCount { get; }
+    Task CompleteAndDrainAsync()
+    ValueTask DisposeAsync()
+    Void Enqueue(AgentEval.MAF.Gatekeeper.ShadowJudgeContext context)
+    const String QuarantineStateKey
+    ctor(AgentEval.MAF.Gatekeeper.IShadowJudge judge, Action<AgentEval.MAF.Gatekeeper.ShadowVerdict, AgentEval.MAF.Gatekeeper.ShadowJudgeContext> onVerdict = null, Action<Exception> onError = null, Int32 queueCapacity = 128, TimeSpan? drainTimeout = null)
+class AgentEval.MAF.Gatekeeper.ShadowVerdict
+    AgentEval.MAF.Gatekeeper.ShadowVerdict <Clone>$()
+    Boolean Compromised { get; init; }
+    Boolean Equals(AgentEval.MAF.Gatekeeper.ShadowVerdict other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    String Reason { get; init; }
+    String ToString()
+    Void Deconstruct(out Boolean Compromised, out String Reason)
+    ctor(Boolean Compromised, String Reason)
+    static AgentEval.MAF.Gatekeeper.ShadowVerdict Clean(String reason = "clean")
+    static AgentEval.MAF.Gatekeeper.ShadowVerdict Compromise(String reason)
+enum AgentEval.MAF.Gatekeeper.ShellDialect
+    PowerShell
+    PosixSh
+    Cmd
+class AgentEval.MAF.Gatekeeper.ShellMetacharDenyPredicate
+    AgentEval.MAF.Gatekeeper.ShellDialect Dialect { get; }
+    ctor(String argument, AgentEval.MAF.Gatekeeper.ShellDialect dialect)
+class AgentEval.MAF.Gatekeeper.SkillDriftException
+    IReadOnlyList<AgentEval.Guardrails.ManifestDriftFinding> Findings { get; }
+    ctor(IReadOnlyList<AgentEval.Guardrails.ManifestDriftFinding> findings)
+static class AgentEval.MAF.Gatekeeper.SkillGateConstructionCheck
+    static Void CheckAndEnforce(IReadOnlyList<ScannedSkillInfo> skills, String baselinePath, AgentEval.MAF.Gatekeeper.SkillGateMode mode)
+enum AgentEval.MAF.Gatekeeper.SkillGateMode
+    Strict
+    Bootstrap
+class AgentEval.MAF.Gatekeeper.SkillScriptApprovalGate
+    String PolicyName { get; }
+    ValueTask<Boolean> IsAutoApprovableAsync(FunctionCallContent call, CancellationToken cancellationToken = default)
+    ctor(IEnumerable<String> trustedScripts = null, String policyName = null)
+class AgentEval.MAF.Gatekeeper.SkillScriptExecutionGate
+    AgentEval.MAF.Gatekeeper.GateCost Cost { get; }
+    AgentEval.MAF.Gatekeeper.ToolGatePolicy MinimumPolicy { get; }
+    String PolicyName { get; }
+    ValueTask<AgentEval.MAF.Gatekeeper.ToolGateVerdict> InspectAsync(AgentEval.MAF.Gatekeeper.GatedToolCall call, CancellationToken cancellationToken = default)
+    ctor(IEnumerable<String> allowedScripts, String policyName = null)
+class AgentEval.MAF.Gatekeeper.TaintTrackingGate
+    AgentEval.MAF.Gatekeeper.GateCost Cost { get; }
+    String PolicyName { get; }
+    ValueTask<AgentEval.MAF.Gatekeeper.ToolGateVerdict> InspectAsync(AgentEval.MAF.Gatekeeper.GatedToolCall call, CancellationToken cancellationToken = default)
+    ctor(IEnumerable<String> sourceTools, IEnumerable<String> sinkTools, Int32 minTaintLength = 8, Boolean canonicalize = false)
+class AgentEval.MAF.Gatekeeper.ToolArgumentGoalCoherenceApprovalGate
+    String PolicyName { get; }
+    ValueTask<Boolean> IsAutoApprovableAsync(FunctionCallContent call, CancellationToken cancellationToken = default)
+    ctor(IChatClient fastModel, String goal, AgentEval.Guardrails.Judges.JudgeGateOptions options = null, String policyName = null, Boolean cache = true)
+class AgentEval.MAF.Gatekeeper.ToolContract
+    IReadOnlyList<AgentEval.MAF.Gatekeeper.ContractPredicate> Predicates { get; }
+    String ToolName { get; }
+    ctor(String toolName, IEnumerable<AgentEval.MAF.Gatekeeper.ContractPredicate> predicates)
+class AgentEval.MAF.Gatekeeper.ToolContractBuilder
+    AgentEval.MAF.Gatekeeper.ToolContractBuilder DeniedKeywords(String argument, String[] words)
+    AgentEval.MAF.Gatekeeper.ToolContractBuilder ForbiddenIfPrecededBy(String[] triggerTools)
+    AgentEval.MAF.Gatekeeper.ToolContractBuilder MaxDistinctValues(String argument, Int32 max)
+    AgentEval.MAF.Gatekeeper.ToolContractBuilder PathContainment(String argument, IEnumerable<String> allowedRoots, String basePath = null)
+    AgentEval.MAF.Gatekeeper.ToolContractBuilder Pii(String argument)
+    AgentEval.MAF.Gatekeeper.ToolContractBuilder RecipientDomains(String argument, String[] allowedDomains)
+    AgentEval.MAF.Gatekeeper.ToolContractBuilder ShellMetacharDeny(String argument, AgentEval.MAF.Gatekeeper.ShellDialect dialect)
+class AgentEval.MAF.Gatekeeper.ToolCoverageEntry
+    AgentEval.MAF.Gatekeeper.ToolCoverageEntry <Clone>$()
+    AgentEval.MAF.Gatekeeper.ToolExecutionModel ExecutionModel { get; init; }
+    AgentEval.MAF.Gatekeeper.ToolRiskLevel RiskLevel { get; init; }
+    Boolean Equals(AgentEval.MAF.Gatekeeper.ToolCoverageEntry other)
+    Boolean Equals(Object obj)
+    Boolean IsGateProtected { get; init; }
+    Boolean IsUnprotectedHighRisk { get; }
+    Int32 GetHashCode()
+    String Description { get; init; }
+    String Note { get; init; }
+    String ToString()
+    String ToolName { get; init; }
+    Void Deconstruct(out String ToolName, out String Description, out AgentEval.MAF.Gatekeeper.ToolExecutionModel ExecutionModel, out AgentEval.MAF.Gatekeeper.ToolRiskLevel RiskLevel, out Boolean IsGateProtected, out String Note)
+    ctor(String ToolName, String Description, AgentEval.MAF.Gatekeeper.ToolExecutionModel ExecutionModel, AgentEval.MAF.Gatekeeper.ToolRiskLevel RiskLevel, Boolean IsGateProtected, String Note)
+enum AgentEval.MAF.Gatekeeper.ToolExecutionModel
+    InterceptedLocalFunction
+    ProviderHostedOpaque
+    UnknownExecutionModel
+enum AgentEval.MAF.Gatekeeper.ToolGateAction
+    Allow
+    Block
+    Mutate
+enum AgentEval.MAF.Gatekeeper.ToolGatePolicy
+    WarnOnly
+    ReplaceResult
+    Terminate
+class AgentEval.MAF.Gatekeeper.ToolGateVerdict
+    AgentEval.MAF.Gatekeeper.ToolGateAction Action { get; init; }
+    AgentEval.MAF.Gatekeeper.ToolGateVerdict <Clone>$()
+    Boolean Equals(AgentEval.MAF.Gatekeeper.ToolGateVerdict other)
+    Boolean Equals(Object obj)
+    IReadOnlyDictionary<String, Object> NewArguments { get; init; }
+    Int32 GetHashCode()
+    String PolicyName { get; init; }
+    String Reason { get; init; }
+    String ToString()
+    Void Deconstruct(out AgentEval.MAF.Gatekeeper.ToolGateAction Action, out String PolicyName, out String Reason, out IReadOnlyDictionary<String, Object> NewArguments)
+    ctor(AgentEval.MAF.Gatekeeper.ToolGateAction Action, String PolicyName, String Reason = null, IReadOnlyDictionary<String, Object> NewArguments = null)
+    static AgentEval.MAF.Gatekeeper.ToolGateVerdict Allow(String policy)
+    static AgentEval.MAF.Gatekeeper.ToolGateVerdict Block(String policy, String reason)
+    static AgentEval.MAF.Gatekeeper.ToolGateVerdict Mutate(String policy, IReadOnlyDictionary<String, Object> newArguments, String reason)
+class AgentEval.MAF.Gatekeeper.ToolInventoryUnavailableException
+    AgentEval.MAF.Gatekeeper.GatekeeperCoverageReport Report { get; }
+    ctor(AgentEval.MAF.Gatekeeper.GatekeeperCoverageReport report)
+class AgentEval.MAF.Gatekeeper.ToolNameApprovalGate
+    String PolicyName { get; }
+    ValueTask<Boolean> IsAutoApprovableAsync(FunctionCallContent call, CancellationToken cancellationToken = default)
+    ctor(IEnumerable<String> escalateTools, String policyName = null)
+enum AgentEval.MAF.Gatekeeper.ToolResultAction
+    Allow
+    Block
+    Redact
+class AgentEval.MAF.Gatekeeper.ToolResultInjectionGate
+    AgentEval.MAF.Gatekeeper.GateCost Cost { get; }
+    String PolicyName { get; }
+    ValueTask<AgentEval.MAF.Gatekeeper.ToolResultVerdict> InspectAsync(AgentEval.MAF.Gatekeeper.GatedToolResult result, CancellationToken cancellationToken = default)
+    ctor(IEnumerable<String> tokens = null)
+    ctor(IEnumerable<String> tokens, IEnumerable<String> functionNames)
+class AgentEval.MAF.Gatekeeper.ToolResultSecretGate
+    AgentEval.MAF.Gatekeeper.GateCost Cost { get; }
+    String PolicyName { get; }
+    ValueTask<AgentEval.MAF.Gatekeeper.ToolResultVerdict> InspectAsync(AgentEval.MAF.Gatekeeper.GatedToolResult result, CancellationToken cancellationToken = default)
+    ctor(TimeSpan? matchTimeout = null)
+    static String MaskSecrets(String text)
+class AgentEval.MAF.Gatekeeper.ToolResultSizeAnomalyGate [Experimental(AGENTEVAL_GATEKEEPER_PREVIEW001)]
+    AgentEval.MAF.Gatekeeper.GateCost Cost { get; }
+    String PolicyName { get; }
+    ValueTask<AgentEval.MAF.Gatekeeper.ToolResultVerdict> InspectAsync(AgentEval.MAF.Gatekeeper.GatedToolResult result, CancellationToken cancellationToken = default)
+    const Double DefaultAnomalyMultiplier
+    const Int32 DefaultMinBaselineCalls
+    const Int32 DefaultMinFlagSize
+    ctor(Double anomalyMultiplier = 5, Int32 minBaselineCalls = 3, Int32 minFlagSize = 500)
+class AgentEval.MAF.Gatekeeper.ToolResultSizeGate
+    AgentEval.MAF.Gatekeeper.GateCost Cost { get; }
+    String PolicyName { get; }
+    ValueTask<AgentEval.MAF.Gatekeeper.ToolResultVerdict> InspectAsync(AgentEval.MAF.Gatekeeper.GatedToolResult result, CancellationToken cancellationToken = default)
+    const Int32 DefaultMaxLength
+    ctor(Int32 maxLength = 8000)
+struct AgentEval.MAF.Gatekeeper.ToolResultSizeSnapshot
+    Boolean Equals(AgentEval.MAF.Gatekeeper.ToolResultSizeSnapshot other)
+    Boolean Equals(Object obj)
+    Double AverageSize { get; }
+    Int32 Count { get; init; }
+    Int32 GetHashCode()
+    Int64 Max { get; init; }
+    Int64 Sum { get; init; }
+    String ToString()
+    Void Deconstruct(out Int32 Count, out Int64 Sum, out Int64 Max)
+    ctor(Int32 Count, Int64 Sum, Int64 Max)
+class AgentEval.MAF.Gatekeeper.ToolResultVerdict
+    AgentEval.MAF.Gatekeeper.ToolResultAction Action { get; init; }
+    AgentEval.MAF.Gatekeeper.ToolResultVerdict <Clone>$()
+    Boolean Equals(AgentEval.MAF.Gatekeeper.ToolResultVerdict other)
+    Boolean Equals(Object obj)
+    Int32 GetHashCode()
+    Object RedactedResult { get; init; }
+    String PolicyName { get; init; }
+    String Reason { get; init; }
+    String ToString()
+    Void Deconstruct(out AgentEval.MAF.Gatekeeper.ToolResultAction Action, out String PolicyName, out String Reason, out Object RedactedResult)
+    ctor(AgentEval.MAF.Gatekeeper.ToolResultAction Action, String PolicyName, String Reason = null, Object RedactedResult = null)
+    static AgentEval.MAF.Gatekeeper.ToolResultVerdict Allow(String policy)
+    static AgentEval.MAF.Gatekeeper.ToolResultVerdict Block(String policy, String reason)
+    static AgentEval.MAF.Gatekeeper.ToolResultVerdict Redact(String policy, Object redactedResult, String reason)
+static class AgentEval.MAF.Gatekeeper.ToolRiskClassifier
+    static Boolean IsHighRisk(AITool tool)
+enum AgentEval.MAF.Gatekeeper.ToolRiskLevel
+    Standard
+    HighRisk
+class AgentEval.MAF.Gatekeeper.ToolUsageContractGate
+    AgentEval.MAF.Gatekeeper.GateCost Cost { get; }
+    AgentEval.MAF.Gatekeeper.GateRequirements Requirements { get; }
+    IReadOnlyList<AgentEval.MAF.Gatekeeper.ToolContract> Contracts { get; }
+    String ConfigurationFingerprint { get; }
+    String PolicyName { get; }
+    ValueTask<AgentEval.MAF.Gatekeeper.ToolGateVerdict> InspectAsync(AgentEval.MAF.Gatekeeper.GatedToolCall call, CancellationToken cancellationToken = default)
+    ctor(IEnumerable<AgentEval.MAF.Gatekeeper.ToolContract> contracts)
+enum AgentEval.MAF.Gatekeeper.TraceCaptureMode
+    None
+    SchemaOnly
+    Redacted
+    Hashed
+    Full
+class AgentEval.MAF.Gatekeeper.TraceGateEvidenceSink
+    Void Record(AgentEval.MAF.Gatekeeper.GateEvidence evidence, Int32 sequence)
+    ctor(AgentTrace trace)
+class AgentEval.MAF.Gatekeeper.UncalibratedInlineJudgeException
+    String AxisName { get; }
+    ctor(String axisName, String reason)
+class AgentEval.MAF.Gatekeeper.UnprotectedHighRiskToolException
+    AgentEval.MAF.Gatekeeper.GatekeeperCoverageReport Report { get; }
+    ctor(AgentEval.MAF.Gatekeeper.GatekeeperCoverageReport report)

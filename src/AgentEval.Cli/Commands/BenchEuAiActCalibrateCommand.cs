@@ -100,7 +100,9 @@ public static class BenchEuAiActCalibrateCommand
             rootOverride = canonical;
         }
 
-        var (resolvedJudge, judgeModelName, exitCode) = JudgeFactory.Resolve(evaluatorOverride, "EU AI Act calibration");
+        // The EU AI Act system prompt `bench eu-ai-act` sends. This used to resolve the judge WITHOUT it, so the
+        // calibration measured a judge on the generic default prompt while the benchmark ran another one.
+        var (resolvedJudge, judgeModelName, exitCode) = JudgeFactory.ResolveEuAiAct(evaluatorOverride, "EU AI Act calibration");
         if (resolvedJudge is null) return exitCode;
         IEvaluator judge = resolvedJudge;
 

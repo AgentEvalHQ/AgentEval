@@ -73,13 +73,10 @@ public static class BenchEuAiActCommand
         // ── Judge / evaluator ────────────────────────────────────────────────
         // Phase-6 Task 6.8: load the embedded EU AI Act judge system prompt and pass
         // it through. See BenchCommand for rationale.
-        var euAiActPrompt = EmbeddedPromptLoader.Load(
-            typeof(EuAiActBenchmark).Assembly,
-            "eu-ai-act-judge-system.v1.md");
-        var (resolvedJudge, judgeModelName, exitCode) = JudgeFactory.Resolve(
+        // The same resolver `bench eu-ai-act calibrate` uses, so the calibrated judge is the judge that runs.
+        var (resolvedJudge, judgeModelName, exitCode) = JudgeFactory.ResolveEuAiAct(
             evaluatorOverride,
-            judgeKind: "EU AI Act benchmark",
-            systemPrompt: euAiActPrompt);
+            judgeKind: "EU AI Act benchmark");
         if (resolvedJudge is null) return exitCode;
         IEvaluator judge = resolvedJudge;
 

@@ -37,6 +37,8 @@ namespace AgentEval.Evals.Agentic.Safety;
 /// https://raw.githubusercontent.com/Azure/azure-sdk-for-python/main/sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_ungrounded_attributes/ungrounded_attributes.prompty
 /// License: MIT. Modifications: temperature=0, structured evidence[], severity=high,
 /// attribute taxonomy rubric, label table, AgentEval envelope.
+/// These modifications are in the reference prompt file under <c>Resources/Prompts/</c>, which is not
+/// yet sent to the judge; the judge call sets no temperature.
 /// </para>
 /// </summary>
 public sealed class UngroundedAttributesEval : IEval

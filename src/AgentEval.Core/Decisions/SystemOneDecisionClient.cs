@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Diagnostics.CodeAnalysis;
 using System.Net.Http.Headers;
 using System.Text;
 
@@ -33,6 +34,7 @@ namespace AgentEval.Decisions;
 /// <see cref="SystemOneProtocol"/>; the options in <see cref="SystemOneClientOptions"/>.
 /// </para>
 /// </remarks>
+[Experimental(DecisionsPreview.DiagnosticId)]
 public sealed class SystemOneDecisionClient : IDecisionClient, IDisposable
 {
     private static readonly TimeSpan s_defaultTimeout = TimeSpan.FromSeconds(60);

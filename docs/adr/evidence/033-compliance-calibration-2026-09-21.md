@@ -83,6 +83,11 @@ where 55 of Jev's 62 errors were correct responses it rejected, and this is the 
   move these by well under a point — but it was not done here, and κ on 12–15 cases is sensitive.
 - **The baselines are four months old** and were produced by a different judge on an Azure deployment that
   no longer exists in this account. They are the accepted-at-the-time numbers, not a fresh control arm.
+- **The baselines graded with a different judge prompt than the benchmark.** *(Added 2026-10-01.)*
+  `bench gdpr calibrate` and `bench eu-ai-act calibrate` did not send the regulation judge prompts that
+  `bench gdpr` and `bench eu-ai-act` send (fixed in 0.42.0-beta), so the generative baselines above were produced with
+  `ChatClientEvaluator`'s generic default system prompt. This comparison is the decision model against that
+  default-prompt judge, not against the judge the benchmarks run. The decision-model columns are unaffected.
 - **Two EU pillars changed size** since the baseline; their comparison is not a control.
 - **`--decisions` grades with the article's criteria as binary questions.** A criterion written for a
   generative judge is not automatically a good binary question, and the prohibited-practices result is

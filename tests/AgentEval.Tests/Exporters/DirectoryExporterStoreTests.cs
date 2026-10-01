@@ -209,3 +209,46 @@ public class DirectoryExporterStoreTests
             ContentHash: "sha256:0000000000000000000000000000000000000000000000000000000000000000");
     }
 }
+
+/// <summary>
+/// The skipped count reaches the run summary as Skipped. RunStats is (Total, Passed, Failed, Warnings, Skipped = 0),
+/// and the store path passed SkippedTests positionally as the fourth argument, so every directory export reported
+/// Skipped = 0 and a Warnings count that was really the skip count. Every test above used SkippedTests = 0, which
+/// is the one value the mis-binding cannot show.
+/// </summary>
+public class DirectoryExporterSkippedCountTests
+{
+    [Fact]
+    public async Task SkippedTests_LandInSkipped_NotInWarnings()
+    {
+        var store = new InMemoryOutputStore();
+        var subject = new SubjectIdentity(SubjectKind.Agent, "TestAgent");
+        var context = new RunContext("TestProject", ".", "TestHarness", null, null, "eval");
+        var manifest = await store.StartRunAsync(subject, context);
+
+        var report = new EvaluationReport
+        {
+            RunId = manifest.Run.RunId,
+            Name = "Skipped count",
+            StartTime = DateTimeOffset.UtcNow.AddSeconds(-5),
+            EndTime = DateTimeOffset.UtcNow,
+            TotalTests = 5,
+            PassedTests = 2,
+            FailedTests = 0,
+            SkippedTests = 3,
+            OverallScore = 100.0,
+            TestResults =
+            [
+                new TestResultSummary { Name = "a", Passed = true, Score = 100, DurationMs = 10 },
+                new TestResultSummary { Name = "b", Passed = true, Score = 100, DurationMs = 10 },
+            ]
+        };
+
+        await new DirectoryExporter().ExportThroughStoreAsync(store, subject, manifest, report);
+
+        var summary = await store.GetRunSummaryAsync(manifest.Run.RunId);
+        Assert.NotNull(summary);
+        Assert.Equal(3, summary!.Stats.Skipped);
+        Assert.Equal(0, summary.Stats.Warnings);
+    }
+}

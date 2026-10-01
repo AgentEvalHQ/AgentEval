@@ -39,6 +39,7 @@ public sealed class ArticleCompositeBuilder
             "weighted_sum"  => WeightedSumAggregation.Instance,
             "min"           => MinAggregation.Instance,
             "cap_by_worst"  => CapByWorstAggregation.Instance,
+            "weighted_median" => WeightedMedianAggregation.Instance,
             _ => throw new InvalidOperationException(
                 $"Unknown aggregation '{article.Metadata.Aggregation}' for {article.Metadata.ControlId}.")
         };

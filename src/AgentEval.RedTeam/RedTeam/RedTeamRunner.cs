@@ -4,6 +4,8 @@
 using System.Diagnostics;
 using System.IO;
 using AgentEval.Core;
+using AgentEval.RedTeam.BenignControls;
+using AgentEval.RedTeam.Reporting;
 
 namespace AgentEval.RedTeam;
 
@@ -59,6 +61,15 @@ public sealed class RedTeamRunner : IRedTeamRunner
         // Count total PLANNED probes (RA3-06: the denominator a non-truncated scan would execute).
         var plannedProbes = probesByAttack.Values.Sum(p => p.Count);
         var completedProbes = 0;
+
+        // The benign-control arm (opt-in) runs after the attacks and is reported apart from them. Its probes count
+        // toward the progress total only, never toward PlannedProbes, which stays the attack denominator.
+        var benignArm = options.RunBenignControls ? new BenignControlArm() : null;
+        var benignProbes = benignArm?.GetProbes(options.Intensity) ?? [];
+        var progressTotal = plannedProbes + benignProbes.Count;
+        // Empty, not null, once the caller opted in: a scan that stops before the arm runs reports "not measured,
+        // stopped early", never "not run".
+        List<ProbeResult>? benignResults = benignArm is null ? null : [];
         var failFastTriggered = false;
         var timedOut = false;
 
@@ -84,7 +95,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
                     options,
                     progress,
                     completedProbes,
-                    plannedProbes,
+                    progressTotal,
                     sw,
                     scanToken);
 
@@ -97,6 +108,25 @@ public sealed class RedTeamRunner : IRedTeamRunner
                     failFastTriggered = true;
                     break;
                 }
+            }
+
+            // The benign arm bypasses GraderFactory: an attack judge grades whether an attack succeeded, while a
+            // benign control is graded only on whether the agent refused. FailFast does not apply inside the arm,
+            // because Succeeded there means "answered", and --explain does not either, because its narration is
+            // written for attack verdicts.
+            if (benignArm is not null && !failFastTriggered)
+            {
+                // Each benign result is kept as it completes, so a scan whose overall timeout fires inside the arm still
+                // reports what it measured (the catch below salvages it) instead of "the controls never ran".
+                var completedBenign = benignResults!;
+                void KeepBenign(ProbeResult r) { lock (completedBenign) completedBenign.Add(r); }
+
+                var armResults = options.Parallelism > 1
+                    ? await RunProbesParallelAsync(agent, benignArm, benignProbes, benignArm.GetEvaluator(), options, progress,
+                        completedProbes, progressTotal, sw, scanToken, stopOnSucceeded: false, allowExplain: false, onCompleted: KeepBenign)
+                    : await RunProbesSequentialAsync(agent, benignArm, benignProbes, benignArm.GetEvaluator(), options, progress,
+                        completedProbes, progressTotal, sw, scanToken, stopOnSucceeded: false, allowExplain: false, onCompleted: KeepBenign);
+                benignResults = armResults;   // the loop's own list: in corpus order
             }
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -130,8 +160,17 @@ public sealed class RedTeamRunner : IRedTeamRunner
             InconclusiveProbes = attackResults.Sum(a => a.InconclusiveCount),
             ErroredProbes = attackResults.Sum(a => a.ErroredCount),
             WasTruncated = wasTruncated,
-            SkippedProbes = skippedProbes
+            SkippedProbes = skippedProbes,
+            BenignControlResults = benignResults is null ? null : InCorpusOrder(benignResults, benignProbes),
+            BenignControlsPlanned = benignProbes.Count
         };
+    }
+
+    // A salvaged parallel arm completes out of order; reports read in corpus order either way.
+    private static List<ProbeResult> InCorpusOrder(List<ProbeResult> results, IReadOnlyList<AttackProbe> probes)
+    {
+        var position = probes.Select((p, i) => (p.Id, i)).ToDictionary(x => x.Id, x => x.i, StringComparer.Ordinal);
+        return results.OrderBy(r => position.TryGetValue(r.ProbeId, out var i) ? i : int.MaxValue).ToList();
     }
 
     private static List<IAttackType> ResolveAttacks(ScanOptions options)
@@ -170,8 +209,10 @@ public sealed class RedTeamRunner : IRedTeamRunner
         // RA3-05 / T5-1: bounded-concurrency path only when the caller opts in; Parallelism <= 1 keeps the
         // exact sequential behavior (probe-level FailFast, progress timing, inter-probe delay) unchanged.
         var probeResults = options.Parallelism > 1
-            ? await RunProbesParallelAsync(agent, attack, probes, evaluator, options, progress, completedProbesBefore, totalProbes, sw, cancellationToken)
-            : await RunProbesSequentialAsync(agent, attack, probes, evaluator, options, progress, completedProbesBefore, totalProbes, sw, cancellationToken);
+            ? await RunProbesParallelAsync(agent, attack, probes, evaluator, options, progress, completedProbesBefore, totalProbes, sw, cancellationToken,
+                stopOnSucceeded: options.FailFast, allowExplain: true)
+            : await RunProbesSequentialAsync(agent, attack, probes, evaluator, options, progress, completedProbesBefore, totalProbes, sw, cancellationToken,
+                stopOnSucceeded: options.FailFast, allowExplain: true);
 
         var result = new AttackResult
         {
@@ -196,7 +237,8 @@ public sealed class RedTeamRunner : IRedTeamRunner
     private async Task<List<ProbeResult>> RunProbesSequentialAsync(
         IEvaluableAgent agent, IAttackType attack, IReadOnlyList<AttackProbe> probes, IProbeEvaluator evaluator,
         ScanOptions options, IProgress<ScanProgress>? progress, int completedProbesBefore, int totalProbes,
-        Stopwatch sw, CancellationToken cancellationToken)
+        Stopwatch sw, CancellationToken cancellationToken, bool stopOnSucceeded, bool allowExplain,
+        Action<ProbeResult>? onCompleted = null)
     {
         var probeResults = new List<ProbeResult>();
         var completedProbes = completedProbesBefore;
@@ -221,9 +263,10 @@ public sealed class RedTeamRunner : IRedTeamRunner
                 options.OnProgress?.Invoke(progressReport);
             }
 
-            var probeResult = await ExecuteProbeAsync(agent, attack, probe, evaluator, options, attack.DefaultSeverity, cancellationToken);
+            var probeResult = await ExecuteProbeAsync(agent, attack, probe, evaluator, options, attack.DefaultSeverity, allowExplain, cancellationToken);
 
             probeResults.Add(probeResult);
+            onCompleted?.Invoke(probeResult);
             completedProbes++;
             lastOutcome = probeResult.Outcome;
 
@@ -233,7 +276,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
                 totalSucceeded++;
 
             // FailFast check at probe level
-            if (options.FailFast && probeResult.Outcome == EvaluationOutcome.Succeeded)
+            if (stopOnSucceeded && probeResult.Outcome == EvaluationOutcome.Succeeded)
                 break;
 
             // Respect rate limiting delay
@@ -253,7 +296,8 @@ public sealed class RedTeamRunner : IRedTeamRunner
     private async Task<List<ProbeResult>> RunProbesParallelAsync(
         IEvaluableAgent agent, IAttackType attack, IReadOnlyList<AttackProbe> probes, IProbeEvaluator evaluator,
         ScanOptions options, IProgress<ScanProgress>? progress, int completedProbesBefore, int totalProbes,
-        Stopwatch sw, CancellationToken cancellationToken)
+        Stopwatch sw, CancellationToken cancellationToken, bool stopOnSucceeded, bool allowExplain,
+        Action<ProbeResult>? onCompleted = null)
     {
         var dop = Math.Max(1, options.Parallelism);
         using var gate = new SemaphoreSlim(dop, dop);
@@ -272,7 +316,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
             {
                 if (cancellationToken.IsCancellationRequested)
                     break; // stop scheduling; already-launched probes are observed in the finally
-                if (options.FailFast && Volatile.Read(ref failFastHit) == 1)
+                if (stopOnSucceeded && Volatile.Read(ref failFastHit) == 1)
                     break; // a probe already succeeded — schedule no more (in-flight ones still complete)
 
                 await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -286,10 +330,11 @@ public sealed class RedTeamRunner : IRedTeamRunner
                 {
                     try
                     {
-                        var r = await ExecuteProbeAsync(agent, attack, probe, evaluator, options, attack.DefaultSeverity, cancellationToken).ConfigureAwait(false);
+                        var r = await ExecuteProbeAsync(agent, attack, probe, evaluator, options, attack.DefaultSeverity, allowExplain, cancellationToken).ConfigureAwait(false);
                         indexed[idx] = r;
+                        onCompleted?.Invoke(r);
 
-                        if (options.FailFast && r.Outcome == EvaluationOutcome.Succeeded)
+                        if (stopOnSucceeded && r.Outcome == EvaluationOutcome.Succeeded)
                             Interlocked.Exchange(ref failFastHit, 1);
 
                         ScanProgress? report = null;
@@ -345,6 +390,24 @@ public sealed class RedTeamRunner : IRedTeamRunner
         IProbeEvaluator evaluator,
         ScanOptions options,
         Severity attackSeverity,
+        bool allowExplain,
+        CancellationToken cancellationToken)
+    {
+        var result = await ExecuteProbeCoreAsync(agent, attack, probe, evaluator, options, attackSeverity, allowExplain, cancellationToken);
+
+        // One stamp for every exit path below (not exercised, not deliverable, folded, scored, timed out, errored),
+        // so no path can report a benign control as an attack.
+        return result with { Expectation = ProbeExpectation.PermissibilityOf(probe) };
+    }
+
+    private async Task<ProbeResult> ExecuteProbeCoreAsync(
+        IEvaluableAgent agent,
+        IAttackType attack,
+        AttackProbe probe,
+        IProbeEvaluator evaluator,
+        ScanOptions options,
+        Severity attackSeverity,
+        bool allowExplain,
         CancellationToken cancellationToken)
     {
         var probeSw = Stopwatch.StartNew();
@@ -482,7 +545,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
             // is gated on IncludeEvidence exactly like Prompt/Response below — a redacted scan must not leak via the
             // explain channel. Gating here also avoids the (paid) LLM call entirely when evidence is redacted.
             string? rationale = null;
-            if (options.IncludeEvidence && options.ExplainFindings && options.JudgeClient is not null
+            if (allowExplain && options.IncludeEvidence && options.ExplainFindings && options.JudgeClient is not null
                 && evalResult.Outcome is EvaluationOutcome.Succeeded or EvaluationOutcome.Inconclusive)
             {
                 try
@@ -601,7 +664,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
             Prompt = options.IncludeEvidence ? probe.Prompt : "[REDACTED]",
             Response = options.IncludeEvidence ? transcript : "[REDACTED]",
             Outcome = mt.Outcome,
-            Reason = $"[{mt.ConversationFidelity}, {mt.TurnsUsed} turn(s)] {mt.Reason}"
+            Reason = $"[{FoldLabel(mt)}] {mt.Reason}"
                      + (mt.WasTruncated ? " [TRUNCATED]" : string.Empty)
                      + (mt.AttackerDriven ? " [ATTACKER-DRIVEN]" : string.Empty),   // L10: human-visible non-determinism marker
             Technique = probe.Technique,
@@ -613,8 +676,20 @@ public sealed class RedTeamRunner : IRedTeamRunner
             ConversationFidelity = mt.ConversationFidelity,
             AttackerDriven = mt.AttackerDriven,   // L10: provenance flag (reserved for a future baseline gate; see ProbeResult.AttackerDriven)
             Grading = mt.Grading,                 // ADR-021 §5: judge-primary grading provenance, carried across the fold
+            TurnsUsed = mt.NodesExplored is null ? mt.TurnsUsed : null,
+            DecidingTurn = mt.DecidingTurn,
+            NodesExplored = mt.NodesExplored,
         };
     }
+
+    /// <summary>
+    /// The bracketed prefix of a folded reason. A tree search explores independent single-turn calls, so it reports
+    /// nodes; printing its node count as "turns" described a conversation that never happened.
+    /// </summary>
+    private static string FoldLabel(MultiTurnResult mt) => mt.NodesExplored is { } nodes
+        ? $"{mt.ConversationFidelity}, {nodes} node(s), each a single-turn call"
+        : $"{mt.ConversationFidelity}, {mt.TurnsUsed} turn(s)"
+          + (mt.DecidingTurn is { } turn ? $", evidence from turn {turn}" : string.Empty);
 
     /// <summary>
     /// RC-1: classify the evidence behind a verdict. Trusts only an explicit hint in

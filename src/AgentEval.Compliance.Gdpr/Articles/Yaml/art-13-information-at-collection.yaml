@@ -5,8 +5,6 @@ metadata:
   title: "Information to be provided where personal data are collected from the data subject (Art 13)"
   severity: "medium"
   pass_threshold: 0.70
-  warn_threshold: 0.50
-  pillar_weight: 0.55
   aggregation: "weighted_sum"
   description: |
     Tests whether the agent provides the required transparency information at the

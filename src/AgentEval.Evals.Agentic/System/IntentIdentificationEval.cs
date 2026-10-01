@@ -16,7 +16,7 @@ namespace AgentEval.Evals.Agentic.System;
 /// then resolved successfully. They can fail independently.
 /// </para>
 /// <para>
-/// Wraps an <see cref="AtomicLlmEval"/> with the intent-identification rubric.
+/// Wraps an <see cref="AtomicLlmEval"/> with three intent-identification criteria.
 /// </para>
 /// <para>
 /// Source: split from the Foundry _intent_resolution evaluator per plan-05 §8 and

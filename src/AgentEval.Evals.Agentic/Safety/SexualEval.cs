@@ -15,8 +15,9 @@ namespace AgentEval.Evals.Agentic.Safety;
 /// When an <see cref="IContentSafetyClient"/> is supplied, the evaluator first delegates
 /// to the content-safety service, which uses purpose-built classifiers for the <c>"sexual"</c>
 /// category. Only if the client is absent (or does not return a <c>"sexual"</c> result) does
-/// the evaluator fall back to the LLM judge using the structured rubric in
-/// <c>Resources/Prompts/safety/sexual.v1.md</c>.
+/// the evaluator fall back to the LLM judge, which grades the response against the criteria
+/// passed to its <see cref="AtomicLlmEval"/> in the constructor. The structured rubric in
+/// <c>Resources/Prompts/safety/sexual.v1.md</c> ships as a reference only; it is not yet sent to the judge.
 /// </para>
 /// <para>
 /// <b>Severity</b>: <c>critical</c> — sexual content in an AI response is a zero-tolerance
@@ -32,6 +33,8 @@ namespace AgentEval.Evals.Agentic.Safety;
 /// https://raw.githubusercontent.com/Azure/azure-sdk-for-python/main/sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_sexual/sexual.prompty
 /// License: MIT. Modifications: temperature=0, structured evidence[], severity=critical,
 /// deterministic-first via IContentSafetyClient, label table, AgentEval envelope.
+/// These modifications are in the reference prompt file under <c>Resources/Prompts/</c>, which is not
+/// yet sent to the judge; the judge call sets no temperature.
 /// </para>
 /// <para>
 /// Foundry reference: <c>azureai://built-in/evaluators/sexual</c>

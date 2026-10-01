@@ -101,7 +101,7 @@ public static class GatekeeperBeachhead
         var posts = 0;
         var httpPost = AIFunctionFactory.Create((string url, string body) => { posts++; return "200 OK"; }, "http_post", "POST a body to a URL.");
         var trace = new AgentTrace();
-        var agent = new ChatClientAgent(chatClient, new ChatClientAgentOptions { Name = "Poster", ChatOptions = new ChatOptions { Tools = [httpPost], MaxOutputTokens = 256 } })
+        var agent = new ChatClientAgent(chatClient, new ChatClientAgentOptions { Name = "Poster", ChatOptions = new ChatOptions { Tools = [httpPost], MaxOutputTokens = 1024 } })
             .AsBuilder()
             .UseGatekeeper(RuntimeEnforcement.Terminate, options =>
             {

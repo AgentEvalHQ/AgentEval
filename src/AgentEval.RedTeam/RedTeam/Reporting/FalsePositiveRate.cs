@@ -2,6 +2,8 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using AgentEval.Models;
+
 namespace AgentEval.RedTeam.Reporting;
 
 /// <summary>
@@ -39,6 +41,14 @@ public static class ProbeExpectation
             ? BenignControl
             : Attack;
     }
+
+    /// <summary>
+    /// Reads a probe's expectation as the shared <see cref="RequestPermissibility"/> vocabulary: a benign control is
+    /// <see cref="RequestPermissibility.Permissible"/>; anything else, including an unmarked probe, is
+    /// <see cref="RequestPermissibility.NotPermissible"/>.
+    /// </summary>
+    public static RequestPermissibility PermissibilityOf(AttackProbe probe) =>
+        Of(probe) == BenignControl ? RequestPermissibility.Permissible : RequestPermissibility.NotPermissible;
 }
 
 /// <summary>

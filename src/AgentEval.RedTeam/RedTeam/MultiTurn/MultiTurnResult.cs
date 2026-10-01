@@ -37,8 +37,24 @@ public sealed class MultiTurnResult
     /// <summary>The per-turn verdicts, in order — the verdict stream.</summary>
     public required IReadOnlyList<EvaluationResult> PerTurnResults { get; init; }
 
-    /// <summary>Number of agent turns actually executed.</summary>
+    /// <summary>
+    /// Number of agent turns the conversation ran. For a tree search (TAP) every node is a separate single-turn call,
+    /// so this is 1 once any node ran; the number of attempts is <see cref="NodesExplored"/>.
+    /// </summary>
     public int TurnsUsed { get; init; }
+
+    /// <summary>
+    /// The 1-based turn whose verdict the fold reports as its evidence: the first turn that succeeded, otherwise the
+    /// highest-fidelity conclusive turn (the same selection as <see cref="Fidelity"/> and <see cref="Grading"/>).
+    /// <see langword="null"/> when no turn was conclusive, and for a tree search.
+    /// </summary>
+    public int? DecidingTurn { get; init; }
+
+    /// <summary>
+    /// For a tree search (TAP) only: the nodes explored, each an independent single-turn call to the agent.
+    /// <see langword="null"/> for a linear conversation.
+    /// </summary>
+    public int? NodesExplored { get; init; }
 
     /// <summary>Why the conversation stopped (success / refusal-lock / exhausted rungs / max turns / duration).</summary>
     public string Reason { get; init; } = "";

@@ -7,8 +7,9 @@ using AgentEval.Models;
 namespace AgentEval.Output;
 
 /// <summary>
-/// Base class for AgentEval test fixtures providing automatic tracing and rich output.
-/// Inherit from this class to get automatic trace capture and test output.
+/// Base class for AgentEval test fixtures. Formats a <see cref="TestResult"/> to the test output and,
+/// when trace saving is enabled, writes it to disk. It records what the test supplies through
+/// <see cref="CreateResult"/>; it does not capture tool calls, tokens or cost from an agent.
 /// </summary>
 public abstract class AgentEvalTestBase : IDisposable
 {

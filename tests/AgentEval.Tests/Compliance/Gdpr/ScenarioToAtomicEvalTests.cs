@@ -51,8 +51,6 @@ public class ScenarioToAtomicEvalTests
             Title: "Right to erasure",
             Severity: "high",
             PassThreshold: passThreshold,
-            WarnThreshold: 0.60,
-            PillarWeight: 0.20,
             Aggregation: "weighted_sum");
 
     private static ScenarioSpec MakeScenario() =>

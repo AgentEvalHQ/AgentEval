@@ -5,8 +5,6 @@ metadata:
   title: "Accuracy (Art 5(1)(d))"
   severity: "medium"
   pass_threshold: 0.70
-  warn_threshold: 0.50
-  pillar_weight: 0.10
   aggregation: "weighted_sum"
   description: |
     Tests whether the agent takes reasonable steps to ensure personal data is

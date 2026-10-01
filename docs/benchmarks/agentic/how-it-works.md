@@ -45,7 +45,7 @@ The trace is what the evaluators look at. Some evaluators read the response only
 
 Each atomic evaluator answers one focused question. There are three kinds:
 
-- **LLM-judge evaluators** — a second AI grades the agent's output against a rubric (e.g., *Task Completion*, *Groundedness*, *Coherence*). The rubric is loaded from a prompt file under `src/AgentEval.Evals.Agentic/Resources/Prompts/<category>/*.v1.md`. Most rubrics are forked from the public MIT-licensed Azure SDK evaluators with documented modifications.
+- **LLM-judge evaluators** — a second AI grades the agent's output against a short list of criteria defined in each evaluator (e.g., *Task Completion*, *Groundedness*, *Coherence*), under a generic judge system prompt. Each also has a longer rubric file under `src/AgentEval.Evals.Agentic/Resources/Prompts/<category>/*.v1.md`, most forked from the public MIT-licensed Azure SDK evaluators with documented modifications; those files ship as references and are **not yet sent to the judge**.
 - **Code-only evaluators** — pure C# code reads the trace and computes a score (e.g., *Latency*, *Cost*, *Token Usage*, *Error Rate*, *F1 Score*). No LLM call, no LLM cost.
 - **Hybrid evaluators** — deterministic check first, LLM fallback only when needed (e.g., *Tool Call Success* reads structured status fields if present, falls back to LLM only on free-text result strings).
 
@@ -113,7 +113,7 @@ The `--budget-tier low` flag filters the preset to keep only LOW and TRIVIAL tie
 
 ## How we know the judges can be trusted — **calibration**
 
-The agentic benchmark uses many judges (one per LLM-graded dimension), each with its own rubric. Each judge gets its own golden dataset and its own calibration pass.
+The agentic benchmark uses many judges (one per LLM-graded dimension), each with its own criteria list; all of them share the generic judge system prompt. Each evaluator dispatched for calibration has its own golden dataset; some are carved out (see below).
 
 ### The golden datasets — reference truth per evaluator
 
@@ -148,18 +148,18 @@ The default gate is *accuracy ≥ 85%* AND *kappa ≥ 0.70* per category, with z
 The agentic benchmark publishes calibration coverage **per evaluator category**, and the current release is honest about which categories are fully calibrated and which still rely on synthetic-or-partial coverage. A categorical-coverage gap is **not** a quality problem — it's a coverage problem, and it's tracked publicly. The headline split today:
 
 - **Calibrated** — every evaluator in the category has a hand-labelled golden dataset that runs in `bench agentic calibrate` and meets the calibration gate. These categories produce evidence you can stand behind.
-- **Coverage gap** — the evaluator exists, is wired, and produces a verdict at runtime, but its golden dataset is either absent or below target size. The verdict at runtime is still real (the rubric still runs); we just can't tell you with the same confidence how well the judge matches a human on this evaluator.
+- **Coverage gap** — the evaluator exists, is wired, and produces a verdict at runtime, but its golden dataset is either absent or below target size. The verdict at runtime is still real (its criteria are still graded); we just can't tell you with the same confidence how well the judge matches a human on this evaluator.
 
-The full categorisation per evaluator is in [`docs/benchmarks/agentic/evaluator-cards.md`](evaluator-cards.md). The v1.1 plan closes the coverage gap (see [`strategy/FutureFeatures/todo/11-v1.1-implementation-plan.md`](../../../strategy/FutureFeatures/todo/11-v1.1-implementation-plan.md) — task 1.3 "Agentic calibration coverage").
+The full categorisation per evaluator is in [`docs/benchmarks/agentic/evaluator-cards.md`](evaluator-cards.md).
 
 ### Calibration quality today
 
-Specific kappa and accuracy values live in the dated baseline report under `strategy/FutureFeatures/calibration-baselines/agentic-calibration-{date}.md`. The qualitative picture by category:
+The project's calibration reports are not published. The qualitative picture by category, with the gate each category is held to (`s_categoryOverrides` in `src/AgentEval.Cli/Commands/BenchAgenticCalibrateCommand.cs`; the default is 0.85 / 0.70):
 
 | Category | Calibration quality | Notes |
 |---|---|---|
-| System and Process | **HIGH** (calibrated subset) | Headline tool-call and task evaluators meet the strict default gate |
-| RAG Quality | **HIGH** (calibrated subset) | Groundedness, relevance, completeness meet the gate |
+| System and Process | **Calibrated subset, relaxed gates** | Tool-call and task evaluators; process is gated at 0.85 / 0.65 and system at 0.70 / 0.45 |
+| RAG Quality | **Calibrated subset, relaxed gate** | Groundedness, relevance, completeness; gated at 0.65 / 0.40 |
 | Judge Quality | **N/A — meta** | Meta-evaluators have no separate judge to calibrate |
 | Operational / Telemetry | **N/A — code-only** | No LLM judge to calibrate; deterministic from trace metadata |
 | Safety | **MEDIUM** (coverage gap) | Calibration coverage being expanded in v1.1; the Safety preset still runs and produces verdicts today |
@@ -180,8 +180,8 @@ Categories shown as MEDIUM run at runtime and produce verdicts — they just awa
 1. **Coverage.** No single number tells you whether an agent is good. The benchmark gives you many orthogonal angles — task completion, tool accuracy, RAG quality, reasoning, memory, safety — and shows where the agent succeeds and where it breaks.
 2. **Diagnosability.** Composite evaluators surface sub-scores. A 0.4 on Tool Call Accuracy tells you something failed; the sub-scores tell you *which dimension* — selection, inputs, outputs, execution, or efficiency.
 3. **Cost-tiered.** The `--budget-tier low` flag keeps inner-loop runs cheap. Operational evaluators run free (pure-code). Safety and RAG runs reserved for releases.
-4. **Forked-from-Foundry.** The LLM-judge prompts trace back to the public Azure SDK Foundry evaluator prompts — same lineage as the Microsoft tooling, with documented improvements (deterministic-first tool-call success, structured failure-type taxonomy, multi-judge consensus, sub-dimension splits).
-5. **Calibrated where it matters.** The headline System-and-Process and RAG categories meet the strict calibration gate today. The expansion to full coverage is tracked publicly and scheduled.
+4. **Foundry lineage.** Most evaluators mirror a public Azure SDK Foundry evaluator by name and intent, and the forked prompt text ships under `Resources/Prompts/` with its modifications listed. The judge does not receive that text yet — it grades each evaluator's own criteria. Deterministic-first tool-call success and the sub-dimension splits are implemented in code.
+5. **Calibration built in.** Golden datasets ship for the dispatched evaluators and `calibrate` measures the judge against them; most categories currently pass at relaxed per-category gates (see the table above).
 6. **Open.** Every evaluator card, prompt file, and golden entry is in the repo.
 
 ---

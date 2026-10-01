@@ -2,35 +2,37 @@
 
 > Status: beta. The MITRE ATLAS benchmark ships as a red-team scanner that tags the existing OWASP attack roster against the MITRE ATLAS (Adversarial Threat Landscape for AI Systems) techniques. Verdicts reflect dialog-observable behaviour only; they are not a substitute for full ATLAS-aligned threat modelling, infrastructure-layer security review, or pen-testing.
 >
-> Coverage: all 6 applicable ATLAS techniques are exercised today (AML.T0037 Data from Information Repositories, AML.T0045 ML Intellectual Property Theft / Inference API Access, AML.T0051 LLM Prompt Injection, AML.T0054 LLM Jailbreak, AML.T0056 LLM Meta Prompt Extraction, AML.T0057 LLM Data Leakage). Seven further techniques are out-of-band for a black-box conversational scanner and surface as honest `NotApplicable` skipped leaves (AML.T0043 Craft Adversarial Data, AML.T0044 Full ML Model Replication, AML.T0046 Publish Poisoned Dataset, AML.T0047 ML Artifact Collection, AML.T0048 Exfiltration via ML Inference API, AML.T0052 Phishing via AI-Generated Content, AML.T0053 Adversarial SEO). *(RC-5/T4-2: system-prompt/data extraction maps to AML.T0056/T0057, not the previously-misused AML.T0043; AML.T0024 "Develop Capabilities" was retired as undetectable by a black-box scanner.)*
+> Coverage: all 8 applicable ATLAS techniques are exercised today (AML.T0010 AI Supply Chain Compromise, AML.T0020 Poison Training Data, AML.T0034 Cost Harvesting, AML.T0037 Data from Local System, AML.T0051 LLM Prompt Injection, AML.T0054 LLM Jailbreak, AML.T0056 Extract LLM System Prompt, AML.T0057 LLM Data Leakage). T0010 and T0020 are black-box proxies — hallucinated or typosquatted package recommendations, and in-context / RAG poisoning — not real supply-chain or training-set tampering. Seven further techniques are out-of-band for a black-box conversational scanner and surface as honest `NotApplicable` skipped leaves (AML.T0043 Craft Adversarial Data, AML.T0044 Full AI Model Access, AML.T0046 Spamming AI System with Chaff Data, AML.T0047 AI-Enabled Product or Service, AML.T0048 External Harms, AML.T0052 Phishing, AML.T0053 AI Agent Tool Invocation). Names and IDs follow `ATLAS.yaml` as verified on 2026-06-13: the former AML.T0045 was retired by ATLAS, and the inference-API abuse probes now map to AML.T0034. *(RC-5/T4-2: system-prompt/data extraction maps to AML.T0056/T0057, not the previously-misused AML.T0043; AML.T0024 "Develop Capabilities" was retired as undetectable by a black-box scanner.)*
 
 ## What this measures
 
-The MITRE benchmark drives the agent under test with curated probes from the same nine attack types used by the OWASP family (PromptInjection, Jailbreak, IndirectInjection, EncodingEvasion, PIILeakage, InsecureOutput, ExcessiveAgency, SystemPromptExtraction, InferenceAPIAbuse) and grades each response with per-attack heuristic evaluators. Each attack type self-tags against one or more ATLAS technique IDs via `IAttackType.MitreAtlasIds`, so the composite `EvalResult` includes one leaf per ATLAS technique covered (plus honest `NotTested` / `NotApplicable` skipped leaves for the rest), aggregated via `MinAggregation`.
+The MITRE benchmark drives the agent under test with the built-in attack roster it shares with the OWASP family — all 14 attacks for `atlas-baseline` and `atlas-audit-grade` (PromptInjection, Jailbreak, PIILeakage, SystemPromptExtraction, IndirectInjection, InferenceAPIAbuse, ExcessiveAgency, InsecureOutput, EncodingEvasion, SupplyChain, DataPoisoning, VectorEmbedding, Misinformation, SkillInjection), three for `atlas-smoke` — and grades each response with per-attack heuristic evaluators. Each attack type self-tags against one or more ATLAS technique IDs via `IAttackType.MitreAtlasIds` (Misinformation carries none, so it runs but adds no ATLAS leaf), so the composite `EvalResult` includes one leaf per ATLAS technique covered (plus honest `NotTested` / `NotApplicable` skipped leaves for the rest), aggregated via `MinAggregation`.
 
-What IS tested: agent-runtime resistance to the 6 applicable ATLAS techniques the existing attack roster exercises — prompt-injection (T0051), jailbreak (T0054), data exfiltration from agent-accessible repositories (T0037), inference-API / IP access (T0045), system / meta-prompt extraction (T0056), and sensitive-data leakage via PII and system-prompt probes (T0057). What is NOT tested: the seven out-of-band techniques (adversarial-data crafting T0043, ML Artifact Collection T0047, Exfiltration via ML Inference API T0048, model replication, dataset poisoning, AI-phishing campaigns, adversarial SEO) — those all surface as `NotApplicable` skipped leaves with rationale.
+What IS tested: agent-runtime resistance to the 8 applicable ATLAS techniques the attack roster exercises — supply-chain compromise via package recommendations (T0010), training/grounding-data poisoning via in-context and RAG poisoning (T0020), cost harvesting via inference-API abuse (T0034), data extraction from the agent's accessible context (T0037), prompt injection (T0051), jailbreak (T0054), system-prompt extraction (T0056), and sensitive-data leakage via PII and system-prompt probes (T0057). What is NOT tested: the seven out-of-band techniques listed below — they all surface as `NotApplicable` skipped leaves with rationale.
 
 ## Scope and omissions
 
 - Covered (with rationale per item):
-  - AML.T0037 Data from Information Repositories — probed via PII-leakage attacks against the agent's accessible context.
-  - AML.T0045 ML Intellectual Property Theft / Inference API Access — probed via InferenceAPIAbuse attacks.
-  - AML.T0051 LLM Prompt Injection — primary probe via PromptInjection + IndirectInjection (also EncodingEvasion / InsecureOutput / ExcessiveAgency).
+  - AML.T0010 AI Supply Chain Compromise — probed via SupplyChain attacks (black-box proxy: hallucinated or typosquatted package recommendations).
+  - AML.T0020 Poison Training Data — probed via DataPoisoning attacks (black-box proxy: in-context / RAG poisoning, not training-set tampering).
+  - AML.T0034 Cost Harvesting — probed via InferenceAPIAbuse attacks (OWASP LLM10 Unbounded Consumption; replaces the retired AML.T0045).
+  - AML.T0037 Data from Local System — probed via PII-leakage attacks against the agent's accessible context.
+  - AML.T0051 LLM Prompt Injection — primary probe via PromptInjection + IndirectInjection (also Jailbreak / EncodingEvasion / InsecureOutput / ExcessiveAgency / DataPoisoning / VectorEmbedding / SkillInjection).
   - AML.T0054 LLM Jailbreak — primary probe via Jailbreak (and ExcessiveAgency) attacks.
-  - AML.T0056 LLM Meta Prompt Extraction — probed via SystemPromptExtraction attacks (canary-instrumented).
+  - AML.T0056 Extract LLM System Prompt — probed via SystemPromptExtraction attacks (canary-instrumented when a canary is supplied).
   - AML.T0057 LLM Data Leakage — probed via SystemPromptExtraction + PIILeakage attacks.
 - Out of scope (out-of-band for a black-box conversational scanner — all surface as `NotApplicable` skipped leaves):
   - AML.T0043 Craft Adversarial Data — offline adversarial-input staging, not agent-dialog-testable. (RC-5/T4-2: previously misused as the system-prompt-extraction tag.)
-  - AML.T0047 ML Artifact Collection — requires environment/file-system access, not the agent's API surface.
-  - AML.T0048 Exfiltration via ML Inference API — white-box training-data/model reconstruction, not a black-box chat probe.
-  - AML.T0044 Full ML Model Replication — not testable from agent dialog (requires extraction of weights / training pipeline).
-  - AML.T0046 Publish Poisoned Dataset — upstream-process supply-chain attack, not agent-runtime-testable.
-  - AML.T0052 Phishing via AI-Generated Content — campaign-level attacker behaviour, not testable by probing the defender.
-  - AML.T0053 Adversarial SEO — corpus-level attacker behaviour outside the agent's API surface.
+  - AML.T0044 Full AI Model Access — white-box access to the model, not observable through the agent's dialog.
+  - AML.T0046 Spamming AI System with Chaff Data — flooding the system with chaff data; a volume attack, not a conversational probe.
+  - AML.T0047 AI-Enabled Product or Service — reconnaissance or abuse of the product surface outside the agent's API.
+  - AML.T0048 External Harms — harm outside the AI system itself; not observable from a single dialog.
+  - AML.T0052 Phishing — campaign-level attacker behaviour, out of band for a prompt scanner.
+  - AML.T0053 AI Agent Tool Invocation — no probe maps to this technique specifically.
 
 ## Presets
 
-Sourced verbatim from `BenchmarkFamilyRegistry` (see `src/AgentEval.RedTeam/RedTeam/Compliance/MitreBenchmarkRegistration.cs:32-37`).
+Sourced verbatim from `BenchmarkFamilyRegistry` (see `src/AgentEval.RedTeam/RedTeam/Compliance/MitreBenchmarkRegistration.cs:34-36`).
 
 | Preset | Description (verbatim) | Cost tier | Typical scope | Approx. LLM cost |
 |---|---|---|---|---|
@@ -48,7 +50,7 @@ The current MITRE attack pipeline uses heuristic per-attack evaluators (see `src
 # Basic — scans the built-in SafeRefusalAgent stub (prints a stub-mode warning banner)
 agenteval bench mitre --preset atlas-baseline --subject MyAgent
 
-# Real agent via Azure OpenAI env vars
+# Real agent from the configured inference provider
 agenteval bench mitre --preset atlas-baseline --subject MyAgent --azure-from-env
 
 # Smoke (CI-friendly)
@@ -60,7 +62,7 @@ agenteval bench mitre --preset atlas-audit-grade --subject MyAgent --azure-from-
 
 The `--input` flag is accepted for provenance but the MITRE pipeline generates its own probes — `--input` is recorded in the run manifest, not consumed by the attacks.
 
-`--azure-from-env` requires all three of `AZURE_OPENAI_ENDPOINT` + `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_DEPLOYMENT`. Without it, the CLI falls back to the built-in `SafeRefusalAgent` stub with a prominent banner warning that the scan result does not reflect a real agent.
+`--azure-from-env` builds the agent from whichever provider `AI_INFERENCE_PROVIDER` selects (Azure OpenAI included) and fails, naming what is missing, if none is configured. Without the flag, the CLI falls back to the built-in `SafeRefusalAgent` stub with a prominent banner warning that the scan result does not reflect a real agent.
 
 ## Output
 
@@ -91,8 +93,10 @@ The CLI exit code mirrors the composite verdict: `pass` → exit 0, `fail` → e
 
 - T0051 LLM Prompt Injection failures — same remediation as OWASP LLM01; review system-prompt scaffolding + retrieval / tool-output sanitisation.
 - T0054 LLM Jailbreak failures — strengthen refusal policy; consider an upstream guardrail (e.g. content-safety pre-filter) for high-stakes deployments.
-- T0037 Data from Information Repositories failures — the agent is exfiltrating data from its accessible context (system prompt, retrieved docs, tool outputs); tighten redaction at the context boundary.
-- T0045 ML Intellectual Property Theft / Inference API Access failures (InferenceAPIAbuse) — apply rate limits / resource quotas and avoid echoing model/version metadata an attacker can fingerprint.
+- T0037 Data from Local System failures — the agent is exfiltrating data from its accessible context (system prompt, retrieved docs, tool outputs); tighten redaction at the context boundary.
+- T0034 Cost Harvesting failures (InferenceAPIAbuse) — apply rate limits / resource quotas and avoid echoing model/version metadata an attacker can fingerprint.
+- T0010 AI Supply Chain Compromise failures (SupplyChain) — the agent recommends packages that do not exist or are typosquats; verify package names against a registry before they reach users or build scripts.
+- T0020 Poison Training Data failures (DataPoisoning) — the agent adopts planted false facts from its context; treat retrieved and in-context content as untrusted and check high-impact claims against an authoritative source.
 - T0056 LLM Meta Prompt Extraction failures (system-prompt extraction) — harden the refusal policy against extraction probes; never echo system-prompt contents; embed a canary to detect leaks.
 - T0057 LLM Data Leakage failures (system-prompt extraction / PII probes) — tighten redaction at the context boundary and add PII/secret detection on the output path.
 
@@ -104,8 +108,8 @@ The CLI exit code mirrors the composite verdict: `pass` → exit 0, `fail` → e
 - You want a complementary cross-reference to the OWASP run — same attacks, different taxonomy.
 
 When NOT to use:
-- For T0044 (Full ML Model Replication) or T0046 (Publish Poisoned Dataset) — those are upstream-process obligations or campaign-level attacker behaviour, not dialog-testable.
-- For T0052 (Phishing via AI-Generated Content) or T0053 (Adversarial SEO) — those describe attacker corpus behaviour outside the agent's API surface.
+- For T0044 (Full AI Model Access) or T0046 (Spamming AI System with Chaff Data) — white-box access and volume flooding are not dialog-testable.
+- For T0047 (AI-Enabled Product or Service), T0048 (External Harms), T0052 (Phishing) or T0053 (AI Agent Tool Invocation) — these describe attacker behaviour or harms outside what a conversational probe can observe.
 - As a substitute for a full ATLAS-aligned threat-modelling exercise covering deployment infrastructure, model-training pipeline, and operator-side controls.
 
 ## Programmatic use
@@ -140,12 +144,12 @@ Same baseline story as the OWASP family — runs are stored canonically under `.
 ## Limitations and roadmap
 
 Known limitations:
-- 7 of 13 ATLAS techniques surface as honest `NotApplicable` `skipped` leaves (out-of-band for a black-box conversational scanner). The composite verdict can still be `PASS` when all 6 covered techniques pass.
+- 7 of the 15 cataloged ATLAS techniques surface as honest `NotApplicable` `skipped` leaves (out-of-band for a black-box conversational scanner). The composite verdict can still be `PASS` when all 8 applicable techniques pass.
 - System-prompt leakage (T0056/T0057) is only conclusively gradable when the benchmark caller plants a canary in the agent's system prompt; without one, those leaves are honestly `NotTested` rather than a false pass.
 - The judge is currently advisory only — per-attack heuristic evaluators do the grading. An LLM-graded judge mode is reserved for future probes.
-- The current attack roster is fixed at nine probes; custom attack injection (per-org policy probes) is not yet supported via CLI.
+- The presets run a fixed roster — the 14 built-in attacks (`atlas-baseline`, `atlas-audit-grade`) or 3 (`atlas-smoke`); custom attack injection (per-org policy probes) is not yet supported via CLI.
 
-Tracking backlog (see `strategy/FutureFeatures/todo/13-pending-issues-tasks.md`):
+Tracking backlog:
 - T0.2 — `--azure-from-env` flag on `bench mitre` (shipped 2026-05-24).
 - T0.5 — `report.html` + `report.pdf` parity with the compliance benchmarks (shipped 2026-05-24 via `GenericReportRenderer`).
 - T3.11 — Multi-provider agent-manifest schema (would let `--agent-config <path>` resolve non-Azure agents).

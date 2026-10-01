@@ -10,15 +10,17 @@ namespace AgentEval.Evals.Agentic.System;
 /// <summary>
 /// Evaluates whether an AI agent completed the user's task end-to-end.
 /// <para>
-/// Wraps an <see cref="AtomicLlmEval"/> configured with the task-completion rubric.
-/// Emits <c>completion_state</c> taxonomy
+/// Wraps an <see cref="AtomicLlmEval"/> configured with three task-completion criteria (end-to-end
+/// completion, tool-supported external claims, an actionable response); each criterion's result is
+/// surfaced in <see cref="EvalResult.Details"/>. The <c>completion_state</c> taxonomy
 /// (<c>complete | partial | blocked_requires_user | blocked_requires_tool | safe_refusal | failed</c>)
-/// via the judge's <c>criteria_results</c> → <see cref="EvalResult.Details"/>.
+/// is specified in the reference prompt file and is not yet produced.
 /// </para>
 /// <para>
 /// Source: forked from Azure/azure-sdk-for-python
 /// sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_task_completion/task_completion.prompty
 /// License: MIT. Modifications listed in the corresponding prompt file.
+/// That prompt file is a reference only and is not yet sent to the judge.
 /// </para>
 /// </summary>
 public sealed class TaskCompletionEval : IEval

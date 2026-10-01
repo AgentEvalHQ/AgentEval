@@ -5,8 +5,6 @@ metadata:
   title: "Designation, position and tasks of the Data Protection Officer (Art 37-39)"
   severity: "high"
   pass_threshold: 0.70
-  warn_threshold: 0.60
-  pillar_weight: 0.10
   aggregation: "weighted_sum"
   description: |
     Tests whether the agent can describe the Article 37-39 GDPR Data

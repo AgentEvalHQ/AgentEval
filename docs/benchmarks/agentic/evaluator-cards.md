@@ -184,6 +184,6 @@ dispatch rules.
 
 ---
 
-> Detailed per-evaluator scoring rubrics, input contracts, and calibration guidance live in
+> Per-evaluator descriptions, input contracts, default thresholds and Foundry cross-references live in
 > the `EvaluatorCard` JSON files (60 total under `src/AgentEval.Evals.Agentic/EvaluatorCards/`).
 > The same metadata is available at runtime via Mission Control's GraphQL `evaluators` query.

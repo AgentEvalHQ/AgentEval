@@ -92,6 +92,8 @@ internal static class RedTeamCommand
         // Options
         var failFastFlag = new Option<bool>("--fail-fast")
             { Description = "Stop scanning on first successful attack" };
+        var benignControlsFlag = new Option<bool>("--benign-controls")
+            { Description = "Also run benign look-alike requests and report over-refusal beside the attack success rate (does not change the verdict)" };
         var maxProbesOpt = new Option<int>("--max-probes")
             { DefaultValueFactory = _ => 0, Description = "Maximum probes per attack (0 = unlimited)" };
 
@@ -179,6 +181,7 @@ internal static class RedTeamCommand
         command.Options.Add(acceptLicenseOpt);
         command.Options.Add(intensityOpt);
         command.Options.Add(failFastFlag);
+        command.Options.Add(benignControlsFlag);
         command.Options.Add(maxProbesOpt);
         command.Options.Add(delayOpt);
         command.Options.Add(parallelismOpt);
@@ -230,6 +233,7 @@ internal static class RedTeamCommand
                 AcceptLicense = parseResult.GetValue(acceptLicenseOpt),
                 Intensity = parseResult.GetValue(intensityOpt)!,
                 FailFast = parseResult.GetValue(failFastFlag),
+                BenignControls = parseResult.GetValue(benignControlsFlag),
                 MaxProbes = parseResult.GetValue(maxProbesOpt),
                 DelaySeconds = parseResult.GetValue(delayOpt),
                 Parallelism = parseResult.GetValue(parallelismOpt),
@@ -582,6 +586,8 @@ internal static class RedTeamCommand
             Console.Error.WriteLine($"  Verdict: {result.Verdict}  (score {result.ConclusiveScore:F1}/100 over {result.Coverage:F0}% conclusive coverage)");
             if (result.InconclusiveProbes > 0)
                 Console.Error.WriteLine($"  Note: {result.InconclusiveProbes}/{result.TotalProbes} probes were inconclusive — that lowers coverage, not the pass rate.");
+            // The second headline number, always: an agent that refuses everything passes on attacks alone.
+            Console.Error.WriteLine($"  Over-refusal: {result.OverRefusalSummary}");
 
             // Built-in target post-scan summary (e.g. the gatekeeper-demo gate-block count — the closed loop).
             if (selectedTarget is not null && gateTrace is not null)
@@ -757,6 +763,7 @@ internal static class RedTeamCommand
             AttackTypes = attacks,
             Intensity = intensity,
             FailFast = opts.FailFast,
+            RunBenignControls = opts.BenignControls,
             MaxProbesPerAttack = opts.MaxProbes,
             JudgeClient = judgeClient, // GAP-19: the runner re-evaluates Inconclusive probes with this judge (capped at IntentToAct)
             // ADR-021 (B.1): judge grading mode/rubric/timeout. Mode is orthogonal to --judge: 'primary' with no
@@ -916,6 +923,7 @@ internal sealed class RedTeamOptions
     public bool AcceptLicense { get; init; }
     public required string Intensity { get; init; }
     public bool FailFast { get; init; }
+    public bool BenignControls { get; init; }
     public int MaxProbes { get; init; }
     public string? JudgeEndpoint { get; init; }
     public string? JudgeModel { get; init; }

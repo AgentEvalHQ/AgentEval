@@ -56,7 +56,7 @@ public static class GatekeeperToolResultAdmission
             new ChatClientAgentOptions
             {
                 Name = "ResultAdmissionAttack",
-                ChatOptions = new ChatOptions { Tools = [tool], MaxOutputTokens = 256 },
+                ChatOptions = new ChatOptions { Tools = [tool], MaxOutputTokens = 1024 },
             })
             .AsBuilder()
             .UseGatekeeper(RuntimeEnforcement.ReplaceResult, options =>
@@ -108,7 +108,7 @@ public static class GatekeeperToolResultAdmission
             new ChatClientAgentOptions
             {
                 Name = "ResultAdmissionControl",
-                ChatOptions = new ChatOptions { Tools = [tool], MaxOutputTokens = 256 },
+                ChatOptions = new ChatOptions { Tools = [tool], MaxOutputTokens = 1024 },
             })
             .AsBuilder()
             .UseGatekeeper(RuntimeEnforcement.ReplaceResult, options =>

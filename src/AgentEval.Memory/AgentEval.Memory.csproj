@@ -6,6 +6,8 @@
          Not packed as a standalone package — consumers reach Memory types via the umbrella. -->
     <IsPackable>false</IsPackable>
     <RootNamespace>AgentEval</RootNamespace>
+    <!-- AgentEval's own use of its preview decision abstraction (DecisionsPreview): acknowledged here; consumers still see it. -->
+    <NoWarn>$(NoWarn);AGENTEVAL_DECISIONS_PREVIEW001</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

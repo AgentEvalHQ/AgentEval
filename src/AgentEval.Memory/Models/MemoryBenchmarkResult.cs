@@ -19,24 +19,54 @@ public class MemoryBenchmarkResult
     public required IReadOnlyList<BenchmarkCategoryResult> CategoryResults { get; init; }
 
     /// <summary>
-    /// Weighted overall score (0-100) across all non-skipped categories.
-    /// Skipped categories are excluded and weights are renormalized.
+    /// Weighted overall score (0-100). A category the agent does not support (skipped) is excluded and the weights
+    /// renormalise over the rest. A category that <b>crashed</b> (<see cref="BenchmarkCategoryResult.Errored"/>) stays
+    /// in the denominator at 0.
     /// </summary>
     /// <remarks>
+    /// <para>
+    /// Before the split, a crash was recorded as a skip, and the weights renormalised around it. The grade could not
+    /// tell "87% across the board" from "87% across the third that ran". A run failure must not raise the score;
+    /// <see cref="CapabilityScore"/> keeps the renormalised view for diagnosis.
+    /// </para>
+    /// <para>
     /// Computed once and cached — the object is immutable after init, yet Grade/Stars/Passed each
     /// re-invoke this, so a single log statement otherwise triggered the full weighted-sum three
     /// times (PERF-03).
+    /// </para>
     /// </remarks>
     public double OverallScore => _overallScore ??= ComputeOverallScore();
     private double? _overallScore;
 
     private double ComputeOverallScore()
     {
-        var active = CategoryResults.Where(c => !c.Skipped).ToList();
-        if (active.Count == 0) return 0;
-        var totalWeight = active.Sum(c => c.Weight);
-        return totalWeight > 0 ? active.Sum(c => c.Score * c.Weight) / totalWeight : 0;
+        // Errored categories are Skipped too (for back-compat), so select them explicitly.
+        var counted = CategoryResults.Where(c => !c.Skipped || c.Errored).ToList();
+        if (counted.Count == 0) return 0;
+        var totalWeight = counted.Sum(c => c.Weight);
+        return totalWeight > 0 ? counted.Sum(c => (c.Errored ? 0 : c.Score) * c.Weight) / totalWeight : 0;
     }
+
+    /// <summary>
+    /// Weighted score (0-100) over only the categories that produced a score: skipped and crashed ones are both
+    /// excluded. It answers "how good is the agent at what was measured". It is a diagnosis, not the grade: when a
+    /// category crashed it is higher than <see cref="OverallScore"/>, and the difference is the crash.
+    /// </summary>
+    public double CapabilityScore
+    {
+        get
+        {
+            var measured = CategoryResults.Where(c => !c.Skipped && !c.Errored).ToList();
+            var totalWeight = measured.Sum(c => c.Weight);
+            return totalWeight > 0 ? measured.Sum(c => c.Score * c.Weight) / totalWeight : 0;
+        }
+    }
+
+    /// <summary>Categories whose run threw. Each counts as 0 in <see cref="OverallScore"/>.</summary>
+    public IReadOnlyList<string> ErroredCategories => CategoryResults
+        .Where(c => c.Errored)
+        .Select(c => c.CategoryName)
+        .ToList();
 
     /// <summary>
     /// Letter grade for the overall score.
@@ -112,8 +142,15 @@ public class MemoryBenchmarkResult
     {
         var recommendations = new List<string>();
 
-        // Note skipped categories first
-        foreach (var cat in CategoryResults.Where(c => c.Skipped))
+        // Crashed categories first: they are a run failure to fix, and they count as 0 in the score.
+        foreach (var cat in CategoryResults.Where(c => c.Errored))
+        {
+            recommendations.Add($"{cat.CategoryName} crashed ({cat.SkipReason ?? "error"}). It counts as 0 in the overall " +
+                                "score; fix the run and re-measure.");
+        }
+
+        // Then categories the agent does not support. Only these may default to "not supported".
+        foreach (var cat in CategoryResults.Where(c => c.Skipped && !c.Errored))
         {
             recommendations.Add($"{cat.CategoryName} was skipped: {cat.SkipReason ?? "not supported by this agent"}.");
         }
@@ -209,4 +246,11 @@ public class BenchmarkCategoryResult
     /// Reason the category was skipped, if applicable.
     /// </summary>
     public string? SkipReason { get; init; }
+
+    /// <summary>
+    /// Whether the category's run threw. An errored category is also <see cref="Skipped"/>, so existing readers still
+    /// see that it produced no score. It differs from a legitimate skip in one place: it counts as 0 in
+    /// <see cref="MemoryBenchmarkResult.OverallScore"/> instead of leaving the denominator.
+    /// </summary>
+    public bool Errored { get; init; }
 }

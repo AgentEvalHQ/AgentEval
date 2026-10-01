@@ -2,6 +2,8 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Diagnostics.CodeAnalysis;
+
 namespace AgentEval.Decisions;
 
 /// <summary>
@@ -30,6 +32,7 @@ namespace AgentEval.Decisions;
 /// could not ask its question has not measured anything.
 /// </para>
 /// </remarks>
+[Experimental(DecisionsPreview.DiagnosticId)]
 public interface IDecisionClient
 {
     /// <summary>Asks every question in <paramref name="request"/> about its state, in one round trip.</summary>
@@ -53,6 +56,7 @@ public interface IDecisionClient
 /// Optional model override. <see langword="null"/> uses the transport's configured default. Pin a
 /// versioned id in anything reproducible; a moving alias can change what answered between runs.
 /// </param>
+[Experimental(DecisionsPreview.DiagnosticId)]
 public sealed record DecisionRequest(
     object State,
     IReadOnlyDictionary<string, DecisionQuestion> Questions,
@@ -89,6 +93,7 @@ public sealed record DecisionRequest(
 /// error the transport throws on; it never reaches here as an absent key.</param>
 /// <param name="Usage">Token usage and, when the provider bills the call itself, the cost it reported.</param>
 /// <param name="ResponseId">The provider's identifier for this call when it reports one (OpenRouter's relay does; TypeSafe does not), for provenance and support tickets.</param>
+[Experimental(DecisionsPreview.DiagnosticId)]
 public sealed record DecisionResponse(
     string Model,
     IReadOnlyDictionary<string, DecisionAnswer> Answers,
@@ -112,6 +117,7 @@ public sealed record DecisionResponse(
 /// today), or <see langword="null"/> when it reports none. Prefer this over any list-price estimate:
 /// it is what was billed, not what a table says.
 /// </param>
+[Experimental(DecisionsPreview.DiagnosticId)]
 public sealed record DecisionUsage(long InputTokens, long OutputTokens, double? Cost = null)
 {
     /// <summary>Prompt-side tokens; never negative.</summary>

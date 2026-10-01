@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.AI.Evaluation;
 using AgentEval.Evals;
@@ -76,6 +77,61 @@ public class AgentEvalCompositeEvaluatorTests
 
         Assert.Contains("relevance", result.Metrics.Keys);
         Assert.Contains(result.Metrics.Keys, k => k.StartsWith("relevance #", StringComparison.Ordinal));
+    }
+
+    // ── Only the composite's verdict can fail a MAF item ─────────────────────────────────────────
+    // MAF's AgentEvaluationResults fails an item on ANY metric with Interpretation.Failed == true or
+    // ANY false BooleanMetric. These run the real MAF rollup, not a re-implementation of it.
+
+    [Fact]
+    public async Task APassingComposite_WithAFailingLeaf_PassesTheMafItem()
+    {
+        // The composite decided "pass" from its weights; a leaf at 0.5 must not overrule it.
+        var tree = Tree(Leaf("relevance", 0.95), Leaf("coherence", 0.5));
+        var evaluator = new AgentEvalCompositeEvaluator(new StubComposite(tree));
+
+        var item = await Run(tree, evaluator);
+        var maf = new AgentEvaluationResults("agenteval", [item]);
+
+        Assert.True(maf.AllPassed);
+        Assert.Equal(1, maf.Passed);
+    }
+
+    [Fact]
+    public async Task AFailingComposite_FailsTheMafItem()
+    {
+        var failing = Tree(Leaf("relevance", 0.9)) with
+        {
+            Score = new EvalScore(0.4, null, "fail", false, 0.7, "high", null),
+        };
+        var evaluator = new AgentEvalCompositeEvaluator(new StubComposite(failing));
+
+        var maf = new AgentEvaluationResults("agenteval", [await Run(failing, evaluator)]);
+
+        Assert.False(maf.AllPassed);
+        Assert.Equal(1, maf.Failed);
+    }
+
+    [Fact]
+    public async Task ALeafStaysInformational_ButKeepsItsOwnVerdictForTheReport()
+    {
+        var tree = Tree(Leaf("relevance", 0.95), Leaf("coherence", 0.5));
+        var evaluator = new AgentEvalCompositeEvaluator(new StubComposite(tree));
+
+        var item = await Run(tree, evaluator);
+        var coherence = item.Metrics["coherence"];
+
+        Assert.False(coherence.Interpretation!.Failed);
+        // The leaf's own "fail" survives in the marker, which is what the report bridge reads back.
+        Assert.StartsWith("AgentEval score: 50/100 (fail,", coherence.Interpretation.Reason, StringComparison.Ordinal);
+        var report = MeaiToEvalResultBridge.Build("run", ["q"], new AgentEvaluationResults("agenteval", [item]));
+        var queryNode = report.Details.SubResults![0];
+        var leaves = queryNode.Details.SubResults!;
+        Assert.Contains(leaves, l => l.Metric.Key == "coherence" && l.Score.Label == "fail");
+        // ...but the report agrees with MAF on the item: the query node takes the composite's (overall) verdict,
+        // not "every leaf passed".
+        Assert.True(queryNode.Score.Passed);
+        Assert.True(report.Score.Passed);
     }
 }
 
@@ -158,6 +214,8 @@ public class AgentEvalCompositeEvaluatorFloorTests
 
         var metric = result.Metrics[AgentEvalCompositeEvaluator.FloorDeclarationMetricName];
 
+        // A declaration, never a check: MAF reads a false BooleanMetric as a failed item.
+        Assert.IsType<StringMetric>(metric);
         Assert.Contains("RECORDED and NOT APPLIED", metric.Reason, StringComparison.Ordinal);
         Assert.Contains("0.2500", metric.Reason, StringComparison.Ordinal);
     }
@@ -176,6 +234,20 @@ public class AgentEvalCompositeEvaluatorFloorTests
         Assert.Null(evaluator.DeclaredRootFloor);
         Assert.Contains("nobody asked", metric.Reason, StringComparison.Ordinal);
         Assert.DoesNotContain("NOT DERIVABLE", metric.Reason, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AFloorlessComposite_ThatPasses_PassesTheMafItem()
+    {
+        // The defect this pins: the floor declaration used to be a BooleanMetric that was false unless
+        // EVERY leaf carried its own floor, so MAF's rollup failed a passing composite — 0 of N passed.
+        var evaluator = new AgentEvalCompositeEvaluator(Composite(false, false, false));
+        var item = await evaluator.EvaluateAsync(
+            [new ChatMessage(ChatRole.User, "q")],
+            new ChatResponse(new ChatMessage(ChatRole.Assistant, "a")));
+
+        Assert.True(evaluator.CapturedResults[0].Score.Passed);
+        Assert.True(new AgentEvaluationResults("agenteval", [item]).AllPassed);
     }
 
     [Fact]

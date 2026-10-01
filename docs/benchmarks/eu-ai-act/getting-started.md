@@ -127,7 +127,7 @@ The per-run cost figures in the quick-start CLI examples assume a GPT-4o-class j
 
 `agenteval bench eu-ai-act calibrate` runs the per-pillar golden datasets through the configured judge:
 - One LLM call per golden entry; total cost is in the LOW band (cents to a few dollars per full run with a GPT-4o-class judge, depending on dataset size).
-- The CI workflow (`.github/workflows/eu-ai-act-calibration.yml`) runs calibration on each release-branch PR.
+- The CI workflow (`.github/workflows/eu-ai-act-calibration.yml`) is configured to run calibration on pull requests into `release/**` branches and on manual dispatch. Releases are cut from `main`, and the workflow has not run in this repository.
 
 ### Cost reduction strategies
 
@@ -214,7 +214,7 @@ agenteval bench eu-ai-act calibrate
 
 The golden dataset contains hand-labeled scenario/response pairs distributed across the 6 EU AI Act pillars. Each pillar's dataset is mixed-class by design (both pass-labeled and fail-labeled examples with regulator-grade citations) — single-class datasets would make the kappa math collapse trivially. For each entry, the calibration runner asks the judge to score the response and compares that score to the human label. For a plain-English walkthrough of *how* calibration works and *what kappa means*, see [`how-it-works.md`](how-it-works.md).
 
-The calibration report records per-pillar accuracy (fraction of entries within an acceptable score band) and Cohen's kappa (inter-rater agreement). The default CI workflow `.github/workflows/eu-ai-act-calibration.yml` gates release branches on:
+The calibration report records per-pillar accuracy (fraction of entries within an acceptable score band) and Cohen's kappa (inter-rater agreement). The command passes (exit 0) only when every pillar meets the following; otherwise it exits 9, which fails the CI workflow above:
 
 - Accuracy ≥ 85% per pillar.
 - Cohen's kappa ≥ 0.70 per pillar.
@@ -222,7 +222,9 @@ The calibration report records per-pillar accuracy (fraction of entries within a
 
 Two pillars run against documented relaxed thresholds with a written investigation path to retire them: **pillar 1 (Prohibited Practices)** because the rubric is strictly graded with borderline cases, and **pillar 6 (GPAI self-awareness)** because the small dataset is prone to small-N stochasticity. The relaxations are encoded in `src/AgentEval.Cli/Commands/BenchEuAiActCalibrateCommand.cs`.
 
-A pillar that fails any threshold blocks the release PR. Golden dataset files are embedded by the test assembly from `tests/AgentEval.Tests/EuAiActBenchmark/Calibration/Golden/`.
+A pillar that fails any threshold fails the command. The golden datasets are embedded in the test assembly from `tests/AgentEval.Tests/Compliance/EuAiAct/Calibration/Golden/`, so `calibrate` runs from a built source tree (for example `dotnet run --project src/AgentEval.Cli -- bench eu-ai-act calibrate`), not from the NuGet package. The Markdown report is written under the working directory unless you pass `--out`; the project's own calibration reports are not published.
+
+**Fixed in 0.42.0-beta:** `calibrate` now sends `eu-ai-act-judge-system.v1.md`, the same judge prompt `bench eu-ai-act` sends; both resolve their judge through one resolver, so they cannot drift apart again. Before 0.42.0-beta, `calibrate` graded with the generic default judge prompt, so calibration figures from earlier versions describe a different judge configuration from the benchmark run. Re-run `calibrate` against your own judge.
 
 **Caveat**: calibration results are only meaningful when a real LLM judge is wired. Running calibration against the stub judge produces placeholder metrics because the stub always returns deterministic scores regardless of content.
 

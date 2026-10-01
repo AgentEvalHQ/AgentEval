@@ -10,14 +10,13 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// <summary>
 /// Evaluates the logical organization, internal consistency, and natural flow of an AI response.
 /// <para>
-/// Wraps an <see cref="AtomicLlmEval"/> using a 5-point ordinal scale.
-/// Both the 0..1 normalized <c>score</c> and the integer <c>ordinal</c> (1–5) are
-/// emitted in <see cref="EvalResult.Details"/> metadata (per findings-and-suggestions §2
-/// universal envelope: always emit both ordinal and normalized score).
+/// Wraps an <see cref="AtomicLlmEval"/> with four criteria; the first names a 5-point ordinal
+/// scale (1=incoherent, 2=poor, 3=moderate, 4=mostly coherent, 5=highly coherent). The score is the judge's overall score normalised to <c>[0,1]</c>; no separate
+/// ordinal is emitted.
 /// </para>
 /// <para>
-/// Scale: 1=incoherent, 2=poor, 3=moderate, 4=mostly coherent, 5=highly coherent.
-/// Normalized score = ordinal / 5.0.
+/// The ordinal-plus-score envelope (normalised score = ordinal / 5.0) is specified in the reference
+/// prompt file, which is not yet sent to the judge.
 /// </para>
 /// <para>
 /// <b>Input contract</b>: requires <see cref="EvalInput.Query"/> and
@@ -28,6 +27,8 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_coherence/coherence.prompty
 /// License: MIT. Modifications: temperature=0, 5-point ordinal normalized to 0..1,
 /// structured evidence[], both ordinal and score in output, label table, severity=low.
+/// These modifications are in the reference prompt file under <c>Resources/Prompts/</c>, which is not
+/// yet sent to the judge; the judge call sets no temperature.
 /// </para>
 /// </summary>
 public sealed class CoherenceEval : IEval

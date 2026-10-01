@@ -113,7 +113,7 @@ Full JSON Trace:
 
 ## Step-by-Step: Using AgentEvalTestBase
 
-For the best experience, inherit from `AgentEvalTestBase`:
+`AgentEvalTestBase` is an optional base class for xUnit tests. It formats a `TestResult` to the test output and, when trace saving is enabled, writes it to disk. It records what **your test** supplies — it does not capture tool calls, tokens or cost from the agent, so every value below the agent call comes from the test. (It has unit tests; no sample uses it yet.)
 
 ### Step 1: Create Your Test Class
 
@@ -123,9 +123,9 @@ using AgentEval.Models;
 using Xunit;
 using Xunit.Abstractions;
 
-public class MyAgentTests : AgentEvalTestBase, IDisposable
+public class MyAgentTests : AgentEvalTestBase
 {
-    public MyAgentTests(ITestOutputHelper output) 
+    public MyAgentTests(ITestOutputHelper output)
         : base(new XUnitTextWriter(output))
     {
         // Optional: Enable trace saving for ALL tests (not just failures)
@@ -136,24 +136,23 @@ public class MyAgentTests : AgentEvalTestBase, IDisposable
     public async Task MyAgent_HandlesQuery_Successfully()
     {
         // Arrange
-        var agent = new MyAgent();
-        
+        var agent = new MyAgent();   // your agent
+
         // Act
         var response = await agent.ExecuteAsync("Book a flight to Paris");
-        
-        // Assert & Record
-        var result = CreateResult("MyAgent_HandlesQuery")
+
+        // Record — Build() writes the result to the test output and, when configured,
+        // saves a trace. Do not also call RecordResult() for the same result.
+        CreateResult("MyAgent_HandlesQuery")
             .WithOutput(response)
-            .WithToolCall("SearchFlights", "call_1", 
+            .WithToolCall("SearchFlights", "call_1",
                 new Dictionary<string, object?> { ["destination"] = "Paris" },
                 "[{\"flightId\": \"AF123\"}]")
             .WithToolCall("BookFlight", "call_2")
-            .WithTokens(inputTokens: 100, outputTokens: 50)
+            .WithTokens(promptTokens: 100, completionTokens: 50)
             .WithCost(0.0025m)
             .Passed(score: 95)
             .Build();
-        
-        RecordResult(result);
         
         // Traditional assertions still work
         Assert.Contains("Paris", response);
@@ -533,7 +532,7 @@ var settings = new VerbositySettings
 
 1. Check that `AGENTEVAL_SAVE_TRACES=true`
 2. Verify the trace directory is writable
-3. Ensure you're calling `RecordResult()` at the end of your tests
+3. Ensure the result is recorded: `CreateResult(...)...Build()` records it; call `RecordResult()` only for a `TestResult` you built yourself
 
 ### Output not appearing in xUnit
 

@@ -5,8 +5,6 @@ metadata:
   title: "Storage limitation (Art 5(1)(e))"
   severity: "medium"
   pass_threshold: 0.70
-  warn_threshold: 0.50
-  pillar_weight: 0.10
   aggregation: "weighted_sum"
   description: |
     Tests whether the agent keeps personal data in identifiable form only for
