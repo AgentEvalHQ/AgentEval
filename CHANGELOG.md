@@ -78,6 +78,13 @@ wires the building blocks that 0.42.0-beta's correction described as unwired.
 - Benign controls run single-turn and text-only.
 - No option fails the scan on over-refusal: the number is reported, not gated.
 
+### `mc serve` says when the web UI is not there
+
+#### Fixed
+- **`agenteval mc serve` announced the portal even when the SPA had not been built**, and every page then answered
+  404. It now checks for `wwwroot/index.html` first. Without it, it reports that only the API is up, says why, and
+  points to `agenteval mc doctor`. The API and GraphQL endpoints still start.
+
 ### A crashed memory benchmark category counts as 0
 
 #### Fixed

@@ -110,7 +110,18 @@ public static class McServeCommand
         psi.Environment["ASPNETCORE_URLS"] = $"http://127.0.0.1:{port}";
         psi.Environment["AgentEval__Root"] = resolvedRoot;
 
-        Console.WriteLine($"▶ Mission Control on http://localhost:{port}");
+        // The API and GraphQL endpoints work without the SPA; the portal does not. Say which one is up rather than
+        // announcing a portal that will answer every page with a 404.
+        var missingUi = MissingWebUiReason(cliDir);
+        if (missingUi is null)
+        {
+            Console.WriteLine($"▶ Mission Control on http://localhost:{port}");
+        }
+        else
+        {
+            Console.WriteLine($"▶ Mission Control API on http://localhost:{port} (the web UI is not available)");
+            Console.Error.WriteLine($"⚠  {missingUi} Run `agenteval mc doctor` for details.");
+        }
         Console.WriteLine($"  workspace: {resolvedRoot}");
         Console.WriteLine($"  graphql:   http://localhost:{port}/graphql");
         Console.WriteLine($"  rest:      http://localhost:{port}/api/v1/version");
@@ -245,4 +256,19 @@ public static class McServeCommand
         }
     }
 #endif
+
+    /// <summary>
+    /// Why the Mission Control web UI cannot be served from <paramref name="cliDir"/>, or <see langword="null"/> when
+    /// <c>wwwroot/index.html</c> is present. The host serves the SPA from <c>{ContentRoot}/wwwroot</c>, and
+    /// <c>mc serve</c> runs it with the CLI's directory as its content root.
+    /// </summary>
+    internal static string? MissingWebUiReason(string cliDir)
+    {
+        var wwwroot = Path.Combine(cliDir, "wwwroot");
+        if (!Directory.Exists(wwwroot))
+            return $"wwwroot/ is missing at '{cliDir}': the SPA has not been built.";
+        return File.Exists(Path.Combine(wwwroot, "index.html"))
+            ? null
+            : $"wwwroot/index.html is missing at '{cliDir}': the SPA build is incomplete.";
+    }
 }
