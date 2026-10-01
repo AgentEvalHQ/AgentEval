@@ -7,6 +7,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.43.0-beta] - 2026-10-01
+### Gatekeeper v1, and it runs inside Microsoft Agent Framework's own AgentHooks host
+
+Gatekeeper's public surface is frozen, and the release says what that promise covers and what it does
+not. The headline evidence is a test, not a slide: an agent built with MAF's own
+`AsAIAgentWithAgentHooks` host and Gatekeeper's interceptor never executes a forbidden tool. In the
+control, the same host still executes an allowed one.
+
+#### Added
+- **`AgentEval.MAF.AgentHooks`** (experimental, not packaged): `GatekeeperInterceptor` exposes the
+  Gatekeeper tool-gate pipeline as an AGENT-HOOKS-0.1 `AgentHooks.IInterceptor`.
+  - Microsoft Agent Framework's AgentHooks host (`Microsoft.Agents.AI.AgentHooks`, MAF 1.19+) consumes that
+    interface, from the same `ResponsibleAI.AgentHooks 0.1.0-alpha.5` package. Gatekeeper therefore plugs
+    into MAF's own host and into any other conformant host.
+  - It enforces `pre_tool_call`. Every other interception point returns `allow` with a warning that names
+    the point as unenforced, never a silent pass.
+  - Verdicts map Allow → allow, Block → deny and Mutate → transform. The composition is strict sequential,
+    first non-Allow wins.
+- **AEVP 0.1** (`docs/aevp/AEVP-0.1.md`, schema `aevp-0.1.schema.json`), a **draft profile, not a
+  standard**. It is the evidence an interceptor attaches to a verdict: whether anything actually
+  evaluated the call, how well, whether it could have stopped it, who decided, and how good they are.
+  It exists because AGENT-HOOKS-0.1's decision enum has no abstention, so an interceptor that could not
+  evaluate a call must still answer `allow` or `deny`.
+- **Gatekeeper public API snapshot.** `GatekeeperPublicApiSnapshotTests` approves every public type and
+  member of `AgentEval.MAF.Gatekeeper*`, `AgentEval.Guardrails*` and the adapter. A change fails CI until
+  the snapshot is reviewed. This is the v1 freeze.
+- **In-host tests:** Gatekeeper inside MAF's `AgentHooksAgent` denies a forbidden tool, and its body never
+  runs. The control: an allowed tool still runs.
+
+#### Changed
+- **Gatekeeper is Stable (v1)** in the README maturity table. Outside the promise:
+  - eight types that stay `[Experimental("AGENTEVAL_GATEKEEPER_PREVIEW001")]`: `FleetCorrelator` (+
+    options), `GatekeeperFleetHealthIndex` (+ report), `ICalibrationReportStore` /
+    `JsonFileCalibrationReportStore`, `SessionIdentityDriftGate` and `ToolResultSizeAnomalyGate`;
+  - the A2A inter-agent gates, which are implemented and calibrated but **not promoted**. Their κ = 1.0 was
+    measured on the calibration set itself, not on held-out cases.
+- **The Gatekeeper status page** carries a dated v1 entry and one known-limitations list:
+  - no OpenTelemetry yet;
+  - session reconciliation partial;
+  - run-post gates cannot stop streamed output;
+  - MAF Workflows interception blocked upstream;
+  - A2A not promoted;
+  - the adapter enforces `pre_tool_call` only;
+  - inline judges need a certificate for the model in use.
+
+#### Removed
+- **`agenteval gatekeeper serve`.** It was a visible subcommand that always exited with a runtime error,
+  which contradicted the docs. The stateful daemon remains a deferred design, and
+  `gatekeeper list-gates --phase serve` still classifies the gates that would need it. `gatekeeper
+  inspect` now says the daemon is not implemented, instead of pointing to it.
+
+#### Note for consumers
+- The adapter and the MAF host package are experimental and alpha. Nothing in the `AgentEval` package
+  depends on them; reference `AgentEval.MAF.AgentHooks` from source if you want to try it.
+- A pull request that changes Gatekeeper's public surface must update the approved snapshot
+  (`tests/AgentEval.Tests/Snapshots/GatekeeperPublicApiSnapshotTests.*.verified.txt`). That is the review
+  point.
+
 ## [0.42.0-beta] - 2026-10-01
 ### Microsoft Agent Framework 1.23, and provenance that names the instrument that actually ran
 
