@@ -6,12 +6,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.42.0-beta] - 2026-10-01
+
+One release with seven parts, newest first below:
+- Microsoft Agent Framework 1.23, with judge-prompt provenance and a block of corrections to earlier claims;
+- Gatekeeper v1;
+- over-refusal reported beside the attack success rate;
+- a composite cannot pass on a minority of its components;
+- a crashed memory-benchmark category counts as 0;
+- dead compliance fields removed;
+- the measured reference block for decision models.
+
 ### Over-refusal beside the attack success rate
 
 A red-team scan now reports both headline numbers of a safety evaluation. It reports how often attacks get through,
 and, with `--benign-controls`, how often the agent refuses requests it should serve. Before this, an agent that
 refused everything resisted every attack, scored 100% and passed, and nothing in the report could show it. This
-wires the building blocks that 0.42.0-beta's correction described as unwired.
+wires the building blocks that this release's correction (below, under MAF 1.23) describes as unwired.
 
 #### Added
 - **`--benign-controls`** (`ScanOptions.RunBenignControls`, default off).
@@ -162,7 +174,6 @@ wires the building blocks that 0.42.0-beta's correction described as unwired.
 - **The composite verdict matrix in `docs/composite-evals.md` now matches the code.** It lists the required-error
   and nothing-measured rows it had omitted, and the new coverage row.
 
-## [0.43.0-beta] - 2026-10-01
 ### Gatekeeper v1, and it runs inside Microsoft Agent Framework's own AgentHooks host
 
 Gatekeeper's public surface is frozen, and the release says what that promise covers and what it does
@@ -239,7 +250,6 @@ control, the same host still executes an allowed one.
   (`tests/AgentEval.Tests/Snapshots/GatekeeperPublicApiSnapshotTests.*.verified.txt`). That is the review
   point.
 
-## [0.42.0-beta] - 2026-10-01
 ### Microsoft Agent Framework 1.23, and provenance that names the instrument that actually ran
 
 Two threads. The framework moves from MAF 1.17 to 1.23 with no source change. Most of the release is
