@@ -59,7 +59,11 @@ public static class MeaiToEvalResultBridge
             // Iterate the dictionary (not just .Values): the key carries the disambiguation suffix
             // (e.g. "Relevance #2") that AgentEvalCompositeEvaluator.AddMetric adds when two leaves
             // share a metric name — using it as the leaf key keeps the EvalResult tree keys unique.
-            var leaves = meai.Metrics.Select(kv => MetricToLeaf(kv.Key, kv.Value, judgeModel)).ToList();
+            // The chance-floor declaration is a statement about the tree, not a score: rendering it as a
+            // leaf used to show a "100/100 pass" node that measured nothing.
+            var leaves = meai.Metrics
+                .Where(kv => !string.Equals(kv.Key, AgentEvalCompositeEvaluator.FloorDeclarationMetricName, StringComparison.Ordinal))
+                .Select(kv => MetricToLeaf(kv.Key, kv.Value, judgeModel)).ToList();
             queryNodes.Add(Composite(
                 key: $"maf.eval.query{i}",
                 name: $"Query: {Truncate(query, 80)}",

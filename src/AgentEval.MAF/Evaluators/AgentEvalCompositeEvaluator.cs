@@ -37,6 +37,18 @@ namespace AgentEval.MAF.Evaluators;
 /// <see cref="CapturedResults"/> so callers can render it (HTML/PDF) with the full hierarchy intact —
 /// the flat MEAI <see cref="MEAIEvaluationResult"/> returned to MAF is only for MAF's pass/fail rollup.
 /// </para>
+/// <para>
+/// <b>Only the composite's own verdict can fail an item.</b> MAF's <c>AgentEvaluationResults</c> fails an
+/// item when ANY metric has <c>Interpretation.Failed == true</c> or ANY <see cref="BooleanMetric"/> is
+/// <see langword="false"/>. The composite already decided its verdict from its leaves — by its weights,
+/// its aggregation strategy, <c>Required</c> and its threshold — so letting each leaf vote again would
+/// overrule that decision: a failing optional or inapplicable leaf under a passing weighted verdict used
+/// to fail the item. The root metric therefore carries the verdict; every leaf metric is informational
+/// (<c>Failed = false</c>, its own label kept in the reason, where <see cref="MeaiToEvalResultBridge"/>
+/// reads it back); and the chance-floor declaration is a <see cref="StringMetric"/>, which no MAF rollup
+/// treats as a check. Before this, the declaration was a <see cref="BooleanMetric"/> that was false
+/// unless every leaf carried its own floor, so a typical composite reported 0 of N items passed.
+/// </para>
 /// </remarks>
 public sealed class AgentEvalCompositeEvaluator : MEAIIEvaluator
 {
@@ -176,6 +188,11 @@ public sealed class AgentEvalCompositeEvaluator : MEAIIEvaluator
             e.Source, ComparabilityFacts.ChanceFloorEvidenceSource, StringComparison.Ordinal)) == true;
 
     /// <summary>Puts the floor situation on the result as text a reader cannot miss — never as a gate.</summary>
+    /// <remarks>
+    /// A <see cref="StringMetric"/>, deliberately: MAF fails an item on any <see cref="BooleanMetric"/> whose
+    /// value is <see langword="false"/>, so a boolean here — as it once was — turned "not every leaf carries
+    /// a floor" into a failed item. A declaration that gates nothing must not be a type MAF reads as a check.
+    /// </remarks>
     private void AddFloorDeclaration(MEAIEvaluationResult result)
     {
         var leafPart = LeafCount == 0
@@ -194,11 +211,10 @@ public sealed class AgentEvalCompositeEvaluator : MEAIIEvaluator
             + "This floor is RECORDED and NOT APPLIED: it changes no score and gates nothing "
             + "(ADR-030 Q6 — yes on the principle, staged in execution).";
 
-        result.Metrics[FloorDeclarationMetricName] =
-            new BooleanMetric(FloorDeclarationMetricName, LeafCount > 0 && FlooredLeafCount == LeafCount, reason)
-            {
-                Interpretation = new EvaluationMetricInterpretation(reason: reason),
-            };
+        var value = LeafCount == 0
+            ? "no leaves"
+            : string.Create(CultureInfo.InvariantCulture, $"{FlooredLeafCount} of {LeafCount} leaves floored");
+        result.Metrics[FloorDeclarationMetricName] = new StringMetric(FloorDeclarationMetricName, value, reason);
     }
 
     private static void AddMetric(MEAIEvaluationResult result, EvalResult node, bool isRoot)
@@ -206,7 +222,11 @@ public sealed class AgentEvalCompositeEvaluator : MEAIIEvaluator
         // AgentEval EvalScore.Value is 0..1; MEAI NumericMetric convention is 1..5.
         var meaiValue = 1.0 + Math.Clamp(node.Score.Value, 0, 1) * 4.0;
         var pct = node.Score.Value * 100.0;
+        // The marker comes FIRST and keeps the node's own label: MeaiToEvalResultBridge recovers the leaf's
+        // verdict from it, so making a leaf informational below loses nothing on the way back.
         var reason = $"AgentEval score: {pct:F0}/100 ({node.Score.Label}, severity {node.Score.Severity})";
+        if (!isRoot)
+            reason += " — informational: the composite's (overall) verdict decides this item";
 
         var metric = new NumericMetric(isRoot ? $"{node.Metric.Name} (overall)" : node.Metric.Name, meaiValue, reason)
         {
@@ -218,7 +238,9 @@ public sealed class AgentEvalCompositeEvaluator : MEAIIEvaluator
                     >= 50 => EvaluationRating.Average,
                     _ => EvaluationRating.Poor,
                 },
-                failed: !node.Score.Passed,
+                // Only the root carries a verdict. A leaf voting here would overrule the composite's own
+                // weighted/Required/threshold decision (see the class remarks).
+                failed: isRoot && !node.Score.Passed,
                 reason: reason),
         };
 

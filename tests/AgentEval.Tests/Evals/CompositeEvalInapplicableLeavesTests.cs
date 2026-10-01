@@ -117,3 +117,73 @@ public class CompositeEvalInapplicableLeavesTests
         Assert.False(result.Score.Passed);
     }
 }
+
+/// <summary>
+/// Coverage disclosure for a PARTLY measured composite. The unmeasured leaves stay out of the score
+/// (deliberate, pinned elsewhere); what was missing is any statement that they did. Before this, nine
+/// skipped leaves and one at 1.0 reported pass, Score = 1.0, and no note at all.
+/// </summary>
+public class CompositeEvalCoverageDisclosureTests
+{
+    private sealed class FixedEval(string key, EvalScore score) : IEval
+    {
+        public string Key => key;
+        public string Name => key;
+        public string Category => "test";
+        public string Version => "1.0.0";
+        public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)
+            => Task.FromResult(new EvalResult(
+                new(Key, Name, Category, Version), score, new(null, null, null, null, null),
+                new("atomic-code", null, null, null, null, 0, false), DateTimeOffset.UtcNow));
+    }
+
+    private static EvalComponent Leaf(string key, EvalScore score, bool required = true) =>
+        new(new FixedEval(key, score), 1.0, required);
+
+    private static EvalScore Pass(double v) => new(v, null, "pass", true, null, "none", null);
+    private static EvalScore Skipped() => new(0, null, "skipped", false, null, "none", null);
+    private static EvalScore Errored() => new(0, null, "error", false, null, "none", null);
+
+    [Fact]
+    public async Task NineOfTenUnmeasured_KeepsTheVerdict_ButSaysHowLittleWasMeasured()
+    {
+        var components = new List<EvalComponent> { Leaf("measured", Pass(1.0)) };
+        components.AddRange(Enumerable.Range(0, 9).Select(i => Leaf($"s{i}", Skipped())));
+        var composite = new CompositeEval("c", "C", "test", "1.0.0", components, WeightedSumAggregation.Instance);
+
+        var result = await composite.EvaluateAsync(new EvalInput("q"));
+
+        // The verdict and score are unchanged — the disclosure is the fix, not a new rule.
+        Assert.Equal("pass", result.Score.Label);
+        Assert.Equal(1.0, result.Score.Value);
+        Assert.Contains("Measured 1 of 10", result.Details.Summary!, StringComparison.Ordinal);
+        Assert.Contains("9 left out of the score", result.Details.Summary!, StringComparison.Ordinal);
+        Assert.Equal(result.Details.Summary, Assert.Single(result.Details.Recommendations!));
+    }
+
+    [Fact]
+    public async Task TheBreakdownAddsUpToTheUnmeasuredCount()
+    {
+        var composite = new CompositeEval("c", "C", "test", "1.0.0",
+            [Leaf("m", Pass(0.9)), Leaf("s", Skipped()), Leaf("i", EvalScore.NotApplicable()),
+             Leaf("e", Errored(), required: false)],
+            WeightedSumAggregation.Instance);
+
+        var result = await composite.EvaluateAsync(new EvalInput("q"));
+
+        Assert.Contains("3 left out of the score (1 skipped or not measured, 1 inapplicable, 1 errored)",
+            result.Details.Summary!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AFullyMeasuredComposite_CarriesNoCoverageNote()
+    {
+        var composite = new CompositeEval("c", "C", "test", "1.0.0",
+            [Leaf("a", Pass(0.9)), Leaf("b", Pass(0.8))], WeightedSumAggregation.Instance);
+
+        var result = await composite.EvaluateAsync(new EvalInput("q"));
+
+        Assert.Null(result.Details.Summary);
+        Assert.Null(result.Details.Recommendations);
+    }
+}
