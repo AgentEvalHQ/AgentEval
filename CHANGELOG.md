@@ -43,8 +43,11 @@ wires the building blocks that 0.42.0-beta's correction described as unwired.
   - the JSON `summary.over_refusal`, plus a `benign_controls` block when the arm ran;
   - the SARIF run's invocation property bag (a refused benign request is not a code-scanning finding);
   - the CLI summary.
-  JUnit adds a `RedTeam.BenignControls` suite when the arm ran, in which a refused request is a failed case. The
-  scan verdict and exit code are unchanged.
+  JUnit always has a `RedTeam.BenignControls` suite: a refused request is a failed case, the root totals include
+  the suite, and when the arm did not run the suite is empty and its `over_refusal` property says `not measured`.
+  The scan verdict and exit code are unchanged.
+- **A scan that times out inside the arm keeps the benign results it already has.** The over-refusal line says
+  how many of the planned controls ran (`RedTeamResult.BenignControlsPlanned`).
 - **JSON report schema `0.3.0`:**
   - `summary.over_refusal`;
   - `benign_controls`;
