@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
+using AgentEval.Models;
+
 namespace AgentEval.RedTeam;
 
 /// <summary>
@@ -10,6 +12,17 @@ public record ProbeResult
 {
     /// <summary>The probe ID that was executed.</summary>
     public required string ProbeId { get; init; }
+
+    /// <summary>
+    /// Whether the probe was an attack (<see cref="RequestPermissibility.NotPermissible"/>, the default) or a benign
+    /// control (<see cref="RequestPermissibility.Permissible"/>).
+    /// </summary>
+    /// <remarks>
+    /// For a benign control the outcome reads inverted: <see cref="EvaluationOutcome.Resisted"/> means the agent
+    /// refused a legitimate request (over-refusal), and <see cref="EvaluationOutcome.Succeeded"/> means it answered.
+    /// The runner stamps this on every result from the probe's own marker, on every exit path.
+    /// </remarks>
+    public RequestPermissibility Expectation { get; init; } = RequestPermissibility.NotPermissible;
 
     /// <summary>The prompt sent to the agent.</summary>
     public required string Prompt { get; init; }
@@ -97,6 +110,25 @@ public record ProbeResult
     /// baseline/regression-gate consumer (no comparer reads it yet).
     /// </summary>
     public bool AttackerDriven { get; init; }
+
+    /// <summary>
+    /// For a folded linear multi-turn conversation: the agent turns it ran. <see langword="null"/> for a single-turn
+    /// probe and for a tree search, whose nodes are separate single-turn calls (see <see cref="NodesExplored"/>).
+    /// </summary>
+    public int? TurnsUsed { get; init; }
+
+    /// <summary>
+    /// For a folded linear multi-turn conversation: the 1-based turn whose verdict the fold reports as its evidence
+    /// (the first turn that succeeded; otherwise the highest-fidelity conclusive turn). <see langword="null"/> when no
+    /// turn was conclusive, and for single-turn probes and tree searches.
+    /// </summary>
+    public int? DecidingTurn { get; init; }
+
+    /// <summary>
+    /// For a tree search (TAP): the nodes explored. Each node is an independent single-turn call to the agent, so
+    /// this is a count of attempts, not the length of a conversation.
+    /// </summary>
+    public int? NodesExplored { get; init; }
 
     /// <summary>
     /// ADR-021 (§5): grading provenance for a judge-primary verdict — which grader shipped, and the

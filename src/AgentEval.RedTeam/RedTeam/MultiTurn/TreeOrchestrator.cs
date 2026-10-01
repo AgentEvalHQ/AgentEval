@@ -98,7 +98,7 @@ public sealed class TreeOrchestrator
                         // reason (preserving any conclusive verdicts), never the "attacker exhausted" stop.
                         var outcome = anyResisted ? EvaluationOutcome.Resisted : EvaluationOutcome.Inconclusive;
                         return Fold(outcome, fidelity, grading, transcript, verdicts,
-                            $"TAP attacker LLM errored ({ex.Category}) after {nodes} node(s) explored", truncated: true);
+                            $"TAP attacker LLM errored ({ex.Category}) after {nodes} node(s) explored", truncated: true, nodes);
                     }
 
                     transcript.Add(Turn.User(prompt));
@@ -116,7 +116,7 @@ public sealed class TreeOrchestrator
 
                     if (verdict.Outcome == EvaluationOutcome.Succeeded)
                         return Fold(verdict.Outcome, turnFidelity, GradingMetadata.ProvenanceOf(verdict), transcript, verdicts,
-                            $"TAP success at depth {depth + 1} ({nodes} node(s) explored)", truncated: false);
+                            $"TAP success at depth {depth + 1} ({nodes} node(s) explored)", truncated: false, nodes);
 
                     children.Add(node.Extend(prompt, reply.Text, verdict.Outcome.ToString(), score));
                 }
@@ -157,7 +157,7 @@ public sealed class TreeOrchestrator
     private static EvidenceFidelity Max(EvidenceFidelity a, EvidenceFidelity b) => (EvidenceFidelity)Math.Max((int)a, (int)b);
 
     private static MultiTurnResult Fold(EvaluationOutcome outcome, EvidenceFidelity fidelity, GraderProvenance? grading,
-        IReadOnlyList<Turn> transcript, IReadOnlyList<EvaluationResult> verdicts, string reason, bool truncated) => new()
+        IReadOnlyList<Turn> transcript, IReadOnlyList<EvaluationResult> verdicts, string reason, bool truncated, int nodes) => new()
     {
         Outcome = outcome,
         Fidelity = fidelity,
@@ -165,7 +165,10 @@ public sealed class TreeOrchestrator
         ConversationFidelity = ConversationFidelity.Flattened,   // each node is an independent single-turn call
         Transcript = transcript,
         PerTurnResults = verdicts,
-        TurnsUsed = transcript.Count / 2,
+        // E6: each node is an independent single-turn call, so the conversation behind any one verdict is one turn.
+        // The old `transcript.Count / 2` printed the NODE count under the word "turn" in every exported reason.
+        TurnsUsed = transcript.Count > 0 ? 1 : 0,
+        NodesExplored = nodes,
         Reason = reason,
         WasTruncated = truncated && outcome != EvaluationOutcome.Succeeded,
         AttackerDriven = true,   // L10: TAP always uses an attacker LLM to generate nodes — inherently non-deterministic
@@ -180,7 +183,7 @@ public sealed class TreeOrchestrator
         var reason = nodes == 0
             ? "TAP produced no attack (attacker exhausted before any prompt)"
             : $"TAP exhausted ({nodes} node(s) explored), target was not driven to the objective";
-        return Fold(outcome, fidelity, grading, transcript, verdicts, reason, truncated);
+        return Fold(outcome, fidelity, grading, transcript, verdicts, reason, truncated, nodes);
     }
 }
 

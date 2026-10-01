@@ -100,6 +100,13 @@ public sealed class SarifReportExporter : IReportExporter
                                 SkippedProbes = result.SkippedProbes,
                                 PlannedProbes = result.PlannedProbes,
                                 ErroredProbes = result.ErroredProbes,
+                                // Over-refusal is not a code-scanning finding, so it is not a result; it rides in the
+                                // run's property bag, always present, saying "not measured" when it was not.
+                                OverRefusal = result.OverRefusalSummary,
+                                OverRefusalMeasured = result.IsOverRefusalMeasured,
+                                BenignControlsRefused = result.OverRefusal?.Flagged,
+                                BenignControlsConclusive = result.OverRefusal?.BenignTotal,
+                                OverRefusalRate = result.IsOverRefusalMeasured ? result.OverRefusal!.Rate.Estimate : null,
                             }
                         }
                     ]
@@ -391,5 +398,10 @@ public sealed class SarifReportExporter : IReportExporter
         public int SkippedProbes { get; init; }
         public int PlannedProbes { get; init; }
         public int ErroredProbes { get; init; }
+        public string OverRefusal { get; init; } = "";
+        public bool OverRefusalMeasured { get; init; }
+        public int? BenignControlsRefused { get; init; }
+        public int? BenignControlsConclusive { get; init; }
+        public double? OverRefusalRate { get; init; }
     }
 }

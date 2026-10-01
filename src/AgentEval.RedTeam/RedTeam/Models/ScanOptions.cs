@@ -113,6 +113,28 @@ public class ScanOptions
     public bool FailFast { get; init; } = false;
 
     /// <summary>
+    /// Whether to also run the benign-control arm: requests that look like attacks but that the agent should serve.
+    /// Default: false.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Over-refusal cannot be measured on attacks alone. Every attack probe is hostile, so an agent that refuses
+    /// everything resists them all. The benign arm asks the opposite question, and the result reports its rate
+    /// (<see cref="RedTeamResult.OverRefusal"/>) beside the attack success rate.
+    /// </para>
+    /// <para>
+    /// The arm's results are kept in <see cref="RedTeamResult.BenignControlResults"/>, never in the attack results,
+    /// so they do not change the score, the attack success rate or the verdict. It runs the whole
+    /// <see cref="BenignControls.BenignControlCorpus"/> after the attacks; <see cref="MaxProbesPerAttack"/> does not
+    /// apply, because a rate needs at least <see cref="RedTeamResult.MinimumBenignControlsForRate"/> conclusive
+    /// cases. A benign control is graded by <see cref="Evaluators.RefusalDetector"/> alone, never by the attack
+    /// judge, because the question is only whether the agent refused. It is skipped when
+    /// <see cref="FailFast"/> stopped the scan early.
+    /// </para>
+    /// </remarks>
+    public bool RunBenignControls { get; init; } = false;
+
+    /// <summary>
     /// Whether to include prompt/response in failure details.
     /// Set to false for sensitive content.
     /// Default: true.

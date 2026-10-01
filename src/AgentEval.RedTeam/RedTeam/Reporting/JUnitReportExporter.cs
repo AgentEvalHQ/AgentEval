@@ -58,6 +58,7 @@ public sealed class JUnitReportExporter : IReportExporter
             new XAttribute("time", result.Duration.TotalSeconds.ToString("F3", CultureInfo.InvariantCulture)),
             new XAttribute("timestamp", result.StartedAt.ToString("yyyy-MM-ddTHH:mm:ss")),
             GetTestSuites(result),
+            BenignControlSuite(result),   // null when the arm was not requested → ignored by XElement
             TruncationNotice(result)   // null when not truncated → ignored by XElement
         );
 
@@ -104,6 +105,47 @@ public sealed class JUnitReportExporter : IReportExporter
                 new XAttribute("name", "ScanTruncated"),
                 new XAttribute("classname", "RedTeam.TruncationNotice"),
                 new XElement("skipped", new XAttribute("message", SanitizeForXml(msg)))));
+    }
+
+    // The benign-control arm as its own suite. A refused benign request is a failed case (the agent failed to
+    // serve a legitimate request); a case with no verdict is skipped. The scan verdict and exit code do not change.
+    private static XElement? BenignControlSuite(RedTeamResult result)
+    {
+        if (result.BenignControlResults is not { } benign)
+            return null;
+
+        const string suite = "RedTeam.BenignControls";
+        return new XElement("testsuite",
+            new XAttribute("name", suite),
+            new XAttribute("tests", benign.Count),
+            new XAttribute("failures", benign.Count(p => BenignControls.BenignControlCorpus.IsFalsePositive(p.Outcome))),
+            new XAttribute("errors", 0),
+            new XAttribute("skipped", benign.Count(p => p.Outcome == EvaluationOutcome.Inconclusive)),
+            new XElement("properties",
+                new XElement("property",
+                    new XAttribute("name", "over_refusal"),
+                    new XAttribute("value", SanitizeForXml(result.OverRefusalSummary))),
+                new XElement("property",
+                    new XAttribute("name", "over_refusal_measured"),
+                    new XAttribute("value", result.IsOverRefusalMeasured ? "true" : "false"))),
+            benign.Select(p =>
+            {
+                var testCase = new XElement("testcase",
+                    new XAttribute("name", $"BenignControl.{SanitizeForXml(p.ProbeId)}"),
+                    new XAttribute("classname", suite),
+                    new XAttribute("time", p.Duration?.TotalSeconds.ToString("F3", CultureInfo.InvariantCulture) ?? "0.000"));
+                if (BenignControls.BenignControlCorpus.IsFalsePositive(p.Outcome))
+                {
+                    testCase.Add(new XElement("failure",
+                        new XAttribute("message", $"Over-refusal: {SanitizeForXml(p.Reason)}"),
+                        new XAttribute("type", "OverRefusal")));
+                }
+                else if (p.Outcome == EvaluationOutcome.Inconclusive)
+                {
+                    testCase.Add(new XElement("skipped", new XAttribute("message", SanitizeForXml(p.Reason))));
+                }
+                return testCase;
+            }));
     }
 
     private IEnumerable<XElement> GetTestSuites(RedTeamResult result)
