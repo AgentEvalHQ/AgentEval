@@ -23,16 +23,33 @@ control, the same host still executes an allowed one.
     into MAF's own host and into any other conformant host.
   - It enforces `pre_tool_call`. Every other interception point returns `allow` with a warning that names
     the point as unenforced, never a silent pass.
-  - Verdicts map Allow → allow, Block → deny and Mutate → transform. The composition is strict sequential,
-    first non-Allow wins.
+  - Verdicts map Allow → allow, Block → deny and Mutate → transform. Composition matches Gatekeeper's own
+    tool pipeline:
+    - strict sequential, first Block wins;
+    - a rewrite restarts the scan, so every gate checks the rewritten call before the host may run it;
+    - a rewrite that does not converge within 8 passes is denied;
+    - a gate that throws fails closed.
+  - Run-scoped gates (`GateRequirements.RunScope`, e.g. `RunBudgetGate`) are rejected at construction. A host
+    does not establish an `AgentRunScope`, so their state would fall back to a process-wide ledger shared by
+    every session.
+  - An allow from a context without `messages` warns `no_conversation`: gates that correlate against the
+    conversation had nothing to check.
+  - Rewritten arguments keep their JSON types. A value that cannot be serialized faithfully denies the call
+    instead of becoming its `ToString()`.
+  - The whole assembly is `[Experimental("AGENTEVAL_AGENTHOOKS_PREVIEW001")]`.
 - **AEVP 0.1** (`docs/aevp/AEVP-0.1.md`, schema `aevp-0.1.schema.json`), a **draft profile, not a
   standard**. It is the evidence an interceptor attaches to a verdict: whether anything actually
   evaluated the call, how well, whether it could have stopped it, who decided, and how good they are.
   It exists because AGENT-HOOKS-0.1's decision enum has no abstention, so an interceptor that could not
   evaluate a call must still answer `allow` or `deny`.
+  - The content address is the SHA-256 of the profile's **RFC 8785 (JCS)** canonical bytes, and a test checks
+    them against the AGENT-HOOKS reference core.
+  - The interceptor writes each profile to an `IAevpArtifactStore` (in-memory by default) before returning
+    its address, so every address it emits resolves.
 - **Gatekeeper public API snapshot.** `GatekeeperPublicApiSnapshotTests` approves every public type and
-  member of `AgentEval.MAF.Gatekeeper*`, `AgentEval.Guardrails*` and the adapter. A change fails CI until
-  the snapshot is reviewed. This is the v1 freeze.
+  member of `AgentEval.MAF.Gatekeeper*`, `AgentEval.Guardrails*` and the adapter. That includes parameter
+  names and default values, because renaming a parameter breaks named-argument callers and changing a
+  default changes compiled ones. A change fails CI until the snapshot is reviewed. This is the v1 freeze.
 - **In-host tests:** Gatekeeper inside MAF's `AgentHooksAgent` denies a forbidden tool, and its body never
   runs. The control: an allowed tool still runs.
 
@@ -61,6 +78,8 @@ control, the same host still executes an allowed one.
 #### Note for consumers
 - The adapter and the MAF host package are experimental and alpha. Nothing in the `AgentEval` package
   depends on them; reference `AgentEval.MAF.AgentHooks` from source if you want to try it.
+- Using the adapter raises the error-severity diagnostic `AGENTEVAL_AGENTHOOKS_PREVIEW001`. Suppress it to
+  acknowledge the preview.
 - A pull request that changes Gatekeeper's public surface must update the approved snapshot
   (`tests/AgentEval.Tests/Snapshots/GatekeeperPublicApiSnapshotTests.*.verified.txt`). That is the review
   point.
