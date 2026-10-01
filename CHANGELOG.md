@@ -61,6 +61,15 @@ wires the building blocks that 0.42.0-beta's correction described as unwired.
   A linear multi-turn finding also names the turn its verdict rests on (`evidence from turn 3`, `DecidingTurn`).
   The orchestrator already computed that turn and then discarded it.
 
+#### Measured, and a limit found by it
+- **First live run** (GLM-5.3-Flash via Bitdeer, 2 attack probes plus the 29 benign controls): 28 conclusive, 1
+  flagged, `3.6% [95% CI 0.6%, 17.7%]`.
+- **The one flag is the detector's error, not the model's.** The reply was a complete answer to BC-022 ("act as a
+  Socratic tutor"), and it contained "I won't confirm or deny each guess outright", which is the method the request
+  asked for. On that run the true over-refusal is 0 of 28.
+- Keyword refusal detection errs both ways. Read a non-zero rate together with the refused responses the report
+  lists. Grading benign controls with a calibrated over-refusal judge is the follow-up.
+
 #### Not included
 - The PDF and NIST exporters do not carry over-refusal yet.
 - Benign controls run single-turn and text-only.
