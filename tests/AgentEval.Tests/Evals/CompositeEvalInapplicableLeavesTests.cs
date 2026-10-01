@@ -176,6 +176,18 @@ public class CompositeEvalCoverageDisclosureTests
     }
 
     [Fact]
+    public async Task ARequiredError_SaysNoVerdict_RatherThanClaimingToCoverTheMeasuredPart()
+    {
+        var composite = new CompositeEval("c", "C", "test", "1.0.0",
+            [Leaf("m", Pass(0.9)), Leaf("e", Errored(), required: true)], WeightedSumAggregation.Instance);
+
+        var result = await composite.EvaluateAsync(new EvalInput("q"));
+
+        Assert.Equal("error", result.Score.Label);
+        Assert.StartsWith("A required component errored", result.Details.Summary!, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task AFullyMeasuredComposite_CarriesNoCoverageNote()
     {
         var composite = new CompositeEval("c", "C", "test", "1.0.0",

@@ -125,8 +125,13 @@ public class AgentEvalCompositeEvaluatorTests
         // The leaf's own "fail" survives in the marker, which is what the report bridge reads back.
         Assert.StartsWith("AgentEval score: 50/100 (fail,", coherence.Interpretation.Reason, StringComparison.Ordinal);
         var report = MeaiToEvalResultBridge.Build("run", ["q"], new AgentEvaluationResults("agenteval", [item]));
-        var leaves = report.Details.SubResults![0].Details.SubResults!;
+        var queryNode = report.Details.SubResults![0];
+        var leaves = queryNode.Details.SubResults!;
         Assert.Contains(leaves, l => l.Metric.Key == "coherence" && l.Score.Label == "fail");
+        // ...but the report agrees with MAF on the item: the query node takes the composite's (overall) verdict,
+        // not "every leaf passed".
+        Assert.True(queryNode.Score.Passed);
+        Assert.True(report.Score.Passed);
     }
 }
 

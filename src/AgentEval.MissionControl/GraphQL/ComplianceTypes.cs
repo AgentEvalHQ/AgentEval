@@ -62,10 +62,16 @@ public sealed record ComplianceMatrixCell(
 /// The killer-feature endpoint: full subject × control matrix for a regulation,
 /// computed from the latest evidence per subject. Plan-07 §10 / §8.
 /// </summary>
+/// <remarks>
+/// <see cref="UnreadableEvidence"/> counts indexed evidence that could not be read (unknown subject, or the
+/// evidence file is gone). It separates "there is no evidence" from "the evidence was deleted": both can produce a
+/// matrix with no subjects, and only the second is a broken audit chain.
+/// </remarks>
 public sealed record ComplianceMatrix(
     string Regulation,
     IReadOnlyList<ComplianceMatrixSubject> Subjects,
     IReadOnlyList<ComplianceMatrixControl> Controls,
     IReadOnlyList<ComplianceMatrixCell> Cells,
     bool AllChainsValid,
-    DateTimeOffset? LastEvidenceAt);
+    DateTimeOffset? LastEvidenceAt,
+    int UnreadableEvidence = 0);

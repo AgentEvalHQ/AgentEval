@@ -229,7 +229,9 @@ public sealed class DecisionEval : AtomicEval
 
     private static string HashPrompt(string instructions, string? trueCriteria, string? falseCriteria)
     {
-        var bytes = Encoding.UTF8.GetBytes(instructions + "\u001f" + (trueCriteria ?? "") + "\u001f" + (falseCriteria ?? ""));
+        // Normalised line endings: a CRLF (Windows checkout) and an LF build of the same prompt are one instrument.
+        var bytes = Encoding.UTF8.GetBytes((instructions + "\u001f" + (trueCriteria ?? "") + "\u001f" + (falseCriteria ?? ""))
+            .Replace("\r\n", "\n", StringComparison.Ordinal));
         return Convert.ToHexString(SHA256.HashData(bytes))[..16].ToLowerInvariant();
     }
 }

@@ -227,11 +227,14 @@ public sealed class CompositeEval : IEval
         var unmeasuredInapplicable = unmeasured.Count(s =>
             s.Score.Label != "error" && s.Score.CensusBucket() == MeasurementState.NotApplicable);
         var unmeasuredOther = unmeasured.Length - unmeasuredErrored - unmeasuredInapplicable;
-        string? partialCoverageNote = !nothingMeasured && unmeasured.Length > 0
-            ? $"Measured {measuredCount} of {subs.Length} component(s); {unmeasured.Length} left out of the score " +
-              $"({unmeasuredOther} skipped or not measured, {unmeasuredInapplicable} inapplicable, " +
-              $"{unmeasuredErrored} errored), so this verdict covers only the measured part."
-            : null;
+        var breakdown = $"({unmeasuredOther} skipped or not measured, {unmeasuredInapplicable} inapplicable, {unmeasuredErrored} errored)";
+        string? partialCoverageNote = nothingMeasured || unmeasured.Length == 0
+            ? null
+            : hasRequiredError
+                ? $"A required component errored, so no pass/fail verdict is reported. Measured {measuredCount} of " +
+                  $"{subs.Length} component(s); {unmeasured.Length} produced no measurement {breakdown}."
+                : $"Measured {measuredCount} of {subs.Length} component(s); {unmeasured.Length} left out of the score " +
+                  $"{breakdown}, so this verdict covers only the measured part.";
         var coverageNote = nothingMeasuredNote ?? partialCoverageNote;
 
         return new EvalResult(

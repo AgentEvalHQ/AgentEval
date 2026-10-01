@@ -18,9 +18,11 @@ public sealed class ArticleYamlValidator
 
     private static readonly string[] s_validGranularities = ["atomic", "composite"];
 
-    // Every aggregation the builder can construct. This listed 3 of the 5 strategies the library ships, so an
-    // article could not ask for majority_vote or weighted_median although both exist and are tested.
-    private static readonly string[] s_validAggregations = ["weighted_sum", "min", "cap_by_worst", "majority_vote", "weighted_median"];
+    // Every aggregation that means what it says under an article's mandatory pass threshold. weighted_median was
+    // missing although the builder can construct it. majority_vote is deliberately NOT admitted: an article always
+    // has a pass threshold, and under a threshold MajorityVote's score is an unweighted mean of the scenarios, so
+    // it would ignore the weights the validator requires and vote only on severity.
+    private static readonly string[] s_validAggregations = ["weighted_sum", "min", "cap_by_worst", "weighted_median"];
 
     /// <summary>Validates <paramref name="spec"/> and returns a <see cref="ValidationResult"/>.</summary>
     public ValidationResult Validate(ArticleSpec spec)
