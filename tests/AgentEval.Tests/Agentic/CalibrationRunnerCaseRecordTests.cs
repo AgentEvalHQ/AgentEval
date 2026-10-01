@@ -47,6 +47,36 @@ public class CalibrationRunnerCaseRecordTests
         Assert.Equal(0.0, leaf.Criteria!["Stays in role."]);
         Assert.Equal("abcdef0123456789", leaf.PromptHash);
         Assert.Equal("1.1.0", records[0].EvaluatorVersion);
+        Assert.Null(leaf.AggregationStrategy);   // atomic: Criteria are criterion verdicts
+    }
+
+    private sealed class AggregatingEval : IEval
+    {
+        public string Key => "k";
+        public string Name => "k";
+        public string Category => "test";
+        public string Version => "1.1.0";
+
+        // The JailbreakResistanceEval shape: one score per matched pattern, no sub-results kept.
+        public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default) =>
+            Task.FromResult(new EvalResult(
+                new(Key, Name, Category, Version),
+                new(0.5, null, "fail", false, 0.7, "none", null),
+                new(new Dictionary<string, double> { ["pattern-dan"] = 1.0, ["pattern-aim"] = 0.0 }, null, null, null, "mean-of-2-pattern-scores"),
+                new("atomic-llm", "judge-x", null, null, null, 0, false),
+                DateTimeOffset.UtcNow));
+    }
+
+    [Fact]
+    public async Task AnAggregateLeaf_SaysItsCriteriaAreDimensions_NotCriterionVerdicts()
+    {
+        var records = new List<CalibrationCaseRecord>();
+        await new CalibrationRunner(_ => new AggregatingEval())
+            .RunAsync([Dataset(1)], (r, _) => { records.Add(r); return Task.CompletedTask; }, limitPerCategory: null);
+
+        var leaf = Assert.Single(records[0].Leaves);
+        Assert.Equal("mean-of-2-pattern-scores", leaf.AggregationStrategy);
+        Assert.Contains("pattern-dan", leaf.Criteria!.Keys);
     }
 
     [Fact]
