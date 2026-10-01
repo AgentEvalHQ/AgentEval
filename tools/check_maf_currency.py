@@ -34,6 +34,7 @@ GATED = (
     "Microsoft.Agents.AI.Harness",
     "Microsoft.Extensions.AI",
     "Microsoft.Extensions.AI.OpenAI",
+    "Microsoft.Extensions.AI.Evaluation.Quality",
 )
 REPORTED = (
     "Microsoft.Agents.AI.Foundry",

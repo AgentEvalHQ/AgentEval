@@ -219,7 +219,25 @@ public sealed record CalibrationCaseRecord(
         node.Details.SubResults is { Count: > 0 } subs ? subs.SelectMany(Flatten) : [node];
 }
 
-/// <summary>One atomic leaf of a calibration case: its verdict, its criteria's verdicts and its prompt identity.</summary>
+/// <summary>One leaf of a calibration case: its verdict, its dimension scores and its prompt identity.</summary>
+/// <param name="Key">The leaf evaluator's key.</param>
+/// <param name="Label">The leaf's verdict label.</param>
+/// <param name="Value">The leaf's score.</param>
+/// <param name="Passed">Whether the leaf passed.</param>
+/// <param name="Criteria">
+/// The leaf's dimension scores. For an atomic judge leaf (<paramref name="AggregationStrategy"/> null) these are the
+/// per-criterion verdicts. For an evaluator that aggregates without keeping its sub-results, they are the
+/// aggregate's own dimensions, and the underlying criterion verdicts were not preserved. One example is
+/// <c>JailbreakResistanceEval</c>, which keeps one score per matched pattern.
+/// </param>
+/// <param name="ProvenanceType">The leaf's provenance type.</param>
+/// <param name="JudgeModel">The judge model, when one ran.</param>
+/// <param name="PromptId">The prompt the judge was sent.</param>
+/// <param name="PromptHash">The fingerprint of that prompt.</param>
+/// <param name="AggregationStrategy">
+/// Null for an atomic leaf. Otherwise the evaluator's aggregation (for example <c>mean-of-3-pattern-scores</c>),
+/// which says that <paramref name="Criteria"/> holds aggregate dimensions rather than criterion verdicts.
+/// </param>
 public sealed record CalibrationLeafRecord(
     string Key,
     string? Label,
@@ -229,10 +247,12 @@ public sealed record CalibrationLeafRecord(
     string? ProvenanceType,
     string? JudgeModel,
     string? PromptId,
-    string? PromptHash)
+    string? PromptHash,
+    string? AggregationStrategy = null)
 {
     internal static CalibrationLeafRecord From(EvalResult leaf) => new(
         leaf.Metric.Key, leaf.Score.Label, leaf.Score.Value, leaf.Score.Passed,
         leaf.Details.Dimensions is { Count: > 0 } d ? new Dictionary<string, double>(d) : null,
-        leaf.Provenance.Type, leaf.Provenance.JudgeModel, leaf.Provenance.PromptId, leaf.Provenance.PromptHash);
+        leaf.Provenance.Type, leaf.Provenance.JudgeModel, leaf.Provenance.PromptId, leaf.Provenance.PromptHash,
+        leaf.Details.AggregationStrategy);
 }
