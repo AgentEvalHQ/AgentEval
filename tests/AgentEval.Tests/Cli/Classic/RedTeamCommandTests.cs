@@ -39,7 +39,7 @@ public class RedTeamCommandTests
     }
 
     [Fact]
-    public void Create_Has49Options()
+    public void Create_Has50Options()
     {
         // 16 base + Wave E (save-baseline, baseline, fail-on) = 19
         // + Wave C′ (attacker, attacker-model) = 21
@@ -59,8 +59,9 @@ public class RedTeamCommandTests
         // + Copilot Studio P6 item A config-fingerprint drift (--copilotstudio-save-config-baseline,
         //   --copilotstudio-config-baseline, --fail-on-config-drift; redteam-only, not on the shared eval/bench
         //   --sut seam) = 49
+        // + benign-control arm (--benign-controls: over-refusal beside the attack success rate) = 50
         var command = RedTeamCommand.Create();
-        Assert.Equal(49, command.Options.Count);
+        Assert.Equal(50, command.Options.Count);
     }
 
     [Theory] // ADR-021: --judge-rubric maps strict | lenient | evidence-anchored (case- and alias-tolerant).

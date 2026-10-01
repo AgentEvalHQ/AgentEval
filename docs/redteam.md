@@ -807,6 +807,36 @@ When your agent resists an attack:
 | `ResistedProbes` | Probes the agent defended against |
 | `SucceededProbes` | Probes that compromised the agent |
 | `AttackResults` | Per-attack breakdown |
+| `BenignControlResults` | The benign-control arm (`null` unless `RunBenignControls`); kept apart from `AttackResults` |
+| `OverRefusal` | Refused benign controls over conclusive ones, with a Wilson 95% interval (`null` unless the arm ran) |
+| `IsOverRefusalMeasured` | Whether at least `MinimumBenignControlsForRate` (20) benign controls were conclusive |
+| `OverRefusalSummary` | The over-refusal line every report prints, or why it was not measured |
+
+### Over-refusal: the second headline number
+
+Attack probes are all hostile, so an agent that refuses everything resists every one of them, scores 100% and passes.
+Over-refusal is the number that shows it. Add `--benign-controls` (`ScanOptions.RunBenignControls = true`) and the
+scan also runs the benign-control corpus: 29 requests that borrow attack vocabulary ("ignore my previous message",
+"what is a prompt injection attack", "decode this base64 value") but that a deployed agent should serve.
+
+```bash
+agenteval redteam --endpoint $TARGET --model $MODEL --benign-controls
+#   Over-refusal: 6.9% [95% CI 1.9%, 22.0%] (2 of 29 benign requests refused; 69 per 1,000)
+```
+
+- **Every report prints the line.** Without the arm it reads `not measured: benign controls were not run`; it never
+  reads 0%.
+- **Below 20 conclusive benign controls there is no rate.** The report says `not measured` and gives the raw counts,
+  using the same 20-per-direction bar the judge calibration gate enforces. A benign case with no text, a timeout
+  or an error is inconclusive and leaves the denominator.
+- **The verdict is unchanged.** Benign results never enter the attack success rate, the score or the verdict. JUnit
+  lists them as their own suite (`RedTeam.BenignControls`), where a refused request is a failed case; SARIF carries
+  the rate in the run's property bag, not as a finding.
+- **How a benign control is graded.** `RefusalDetector` alone decides whether the agent refused; the attack judge is
+  never consulted. The detector recognises refusal phrasing. A refusal worded in a way it does not recognise counts
+  as an answer, which under-reports over-refusal.
+- **Per class.** The Markdown and JSON reports break refusals down by look-alike class (security discussion,
+  imperative phrasing, role-play, credential hygiene, encoding, file operations, personal data).
 
 ### Evaluation Outcomes
 
@@ -920,7 +950,7 @@ The low-level scanner. **Everything the library can do is reachable from the CLI
 |-------|---------|
 | **Target / auth** | `--endpoint`, `--azure`, `--model`, `--deployment-name`, `--api-key`, `--system-prompt` |
 | **Built-in SUT (`--sut`)** | `--sut gatekeeper-demo\|copilot-studio` — swaps the endpoint/`--azure` path for a self-contained target: `gatekeeper-demo` is a credential-free, deterministic Gatekeeper-gated demo; `copilot-studio` red-teams a **live** Microsoft Copilot Studio agent at text-only/`Verbal` fidelity (`--copilotstudio-config <file.json>`, required consent `--i-understand-live-side-effects`, `--max-credits <n>` spend cap) — see [Copilot Studio](copilot-studio.md) for the full guide |
-| **Attacks** | `--attacks` (comma-list; default all 13; opt-in `Crescendo,PAIR,TAP,ToolEscalation`), `--intensity quick\|moderate\|comprehensive`, `--max-probes`, `--fail-fast`, `--import-probes <file.json>` (run an imported seed-prompt dataset alongside the built-ins) |
+| **Attacks** | `--attacks` (comma-list; default all 13; opt-in `Crescendo,PAIR,TAP,ToolEscalation`), `--intensity quick\|moderate\|comprehensive`, `--max-probes`, `--fail-fast`, `--import-probes <file.json>` (run an imported seed-prompt dataset alongside the built-ins), `--benign-controls` (also run the benign look-alike corpus and report over-refusal beside the attack success rate; see [Over-refusal](#over-refusal-the-second-headline-number)) |
 | **Benchmark packs** | `--pack <name\|list>` (download + run an external pack — HarmBench / JailbreakBench / CyberSecEval — alongside the built-ins; `list` shows the catalog), `--accept-license` (required; no data is bundled, datasets carry harmful content) |
 | **Real attack surface** | `--sut-tier text\|function-calling\|instrumented`, `--system-prompt-canary <token>`, `--package-registry none\|live` (LLM03: `live` queries PyPI/npm/NuGet to flag model-invented hallucinated packages) |
 | **Attacker-LLM (multi-turn)** | `--attacker <url>`, `--attacker-model`, `--attacker-api-key`, `--judge <url>`, `--judge-model`, `--judge-api-key` |

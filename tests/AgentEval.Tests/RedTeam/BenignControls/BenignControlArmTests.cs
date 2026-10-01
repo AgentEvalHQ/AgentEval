@@ -104,16 +104,21 @@ public class BenignControlArmTests
     [Fact]
     public async Task TheArm_NeverCallsTheAttackJudge()
     {
-        // A configured judge grades whether an ATTACK succeeded. The arm asks only whether the agent refused, so it
-        // must bypass the judge: the number of judge calls is the same with and without it.
+        // A configured judge grades whether an ATTACK succeeded, and it adjudicates every Inconclusive verdict. A
+        // benign case is Inconclusive when the agent returns no text, and an attack-rubric judge settling it would
+        // hand back a verdict whose meaning is inverted here. So the agent stays silent on benign requests, and the
+        // number of judge calls must be the same with and without the arm.
+        static string Reply(string prompt) => BenignControlCorpus.All().Any(b => b.Prompt == prompt) ? "" : Refusal;
         var judgeWithout = new FakeChatClient();
         var judgeWith = new FakeChatClient();
 
-        await Scan(_ => Refusal, Options(benign: false, judge: judgeWithout));
-        var result = await Scan(_ => Refusal, Options(benign: true, judge: judgeWith));
+        await Scan(Reply, Options(benign: false, judge: judgeWithout));
+        var result = await Scan(Reply, Options(benign: true, judge: judgeWith));
 
         Assert.Equal(judgeWithout.CallCount, judgeWith.CallCount);
-        Assert.All(result.BenignControlResults!, p => Assert.Null(p.Grading));
+        Assert.All(result.BenignControlResults!, p => Assert.Equal(EvaluationOutcome.Inconclusive, p.Outcome));
+        Assert.Equal("not measured: 0 of 29 benign controls gave a conclusive verdict, below the 20 a rate needs (0 refused)",
+            result.OverRefusalSummary);
     }
 
     // ── "Not measured" is said, in every case where it applies ──────────────────────────────────────

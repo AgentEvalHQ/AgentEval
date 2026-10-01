@@ -6,6 +6,65 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Over-refusal beside the attack success rate
+
+A red-team scan now reports both headline numbers of a safety evaluation. It reports how often attacks get through,
+and, with `--benign-controls`, how often the agent refuses requests it should serve. Before this, an agent that
+refused everything resisted every attack, scored 100% and passed, and nothing in the report could show it. This
+wires the building blocks that 0.42.0-beta's correction described as unwired.
+
+#### Added
+- **`--benign-controls`** (`ScanOptions.RunBenignControls`, default off).
+  - It runs the benign-control corpus after the attacks. The results go to `RedTeamResult.BenignControlResults`,
+    which is kept apart from `AttackResults`, so they never move the attack success rate, the score or the
+    verdict.
+  - A benign control is graded by `RefusalDetector` alone. The attack judge is never consulted, because it grades
+    whether an attack succeeded, and on a silent benign case its verdict would read inverted.
+  - `FailFast` and `--explain` do not apply inside the arm. The arm is skipped when `FailFast` stopped the scan
+    early, and the report says so.
+- **`RedTeamResult` over-refusal members:**
+  - `OverRefusal`: refused benign controls over the conclusive ones, with a Wilson 95% interval;
+  - `IsOverRefusalMeasured` and `OverRefusalSummary`;
+  - `OverRefusalByClass`, a breakdown by look-alike class.
+  The rate is reported only from **20** conclusive cases, the same per-direction bar the judge calibration gate
+  enforces. Below that, the line reads `not measured` with the raw counts.
+- **`AgentEval.Models.RequestPermissibility`** (`NotPermissible` / `Permissible`): the split between the two
+  numbers, defined once so that compliance scenarios can mark their cases with the same vocabulary.
+- **`ProbeResult` members:**
+  - `Expectation`, stamped on every result from the probe's own marker, on every exit path;
+  - `TurnsUsed`, `DecidingTurn` and `NodesExplored`, for folded multi-turn and tree-search probes.
+- **The benign-control corpus grows from 18 to 29 probes**, with at least 4 in each of the 7 look-alike classes.
+  At 18 it sat below the 20-case bar, so it could never yield a rate. Every probe still has to use attack
+  vocabulary in a benign context; that test was not widened to admit the new probes.
+
+#### Changed
+- **Every report prints an over-refusal line, whether or not the arm ran:**
+  - the Markdown executive summary (and, when the arm ran, a per-class section listing the refused requests);
+  - the JSON `summary.over_refusal`, plus a `benign_controls` block when the arm ran;
+  - the SARIF run's invocation property bag (a refused benign request is not a code-scanning finding);
+  - the CLI summary.
+  JUnit adds a `RedTeam.BenignControls` suite when the arm ran, in which a refused request is a failed case. The
+  scan verdict and exit code are unchanged.
+- **JSON report schema `0.3.0`:**
+  - `summary.over_refusal`;
+  - `benign_controls`;
+  - `turns_used` / `deciding_turn` / `nodes_explored` on failures.
+
+#### Fixed
+- **A TAP finding printed its node count as a number of turns.** A tree search's reason read
+  `[Flattened, 7 turn(s)]`, but each of the 7 nodes is an independent single-turn call to the agent. No 7-turn
+  conversation happened.
+  **Direction:** it described independent attempts as one long escalating conversation. Scores and verdicts were
+  not affected.
+  **Affected:** the reason text of TAP findings in SARIF, JSON, Markdown and JUnit since TAP shipped.
+  **Now:** TAP reads `[Flattened, 7 node(s), each a single-turn call]` and sets `NodesExplored`.
+  A linear multi-turn finding also names the turn its verdict rests on (`evidence from turn 3`, `DecidingTurn`).
+  The orchestrator already computed that turn and then discarded it.
+
+#### Not included
+- The PDF and NIST exporters do not carry over-refusal yet.
+- Benign controls run single-turn and text-only.
+- No option fails the scan on over-refusal: the number is reported, not gated.
 
 ## [0.43.0-beta] - 2026-10-01
 ### Gatekeeper v1, and it runs inside Microsoft Agent Framework's own AgentHooks host
