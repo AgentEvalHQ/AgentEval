@@ -14,16 +14,12 @@ updates:
         patterns:
           - "*"
 
-  - package-ecosystem: "nuget"
-    directory: "/"
-    schedule:
-      interval: "weekly"
-    commit-message:
-      prefix: "chore"
-    groups:
-      nuget:
-        patterns:
-          - "*"
+  # NuGet version updates are deliberately NOT configured here. They were, from SEC-04 until 2026-10, and
+  # never completed: every weekly run spent ~55 minutes failing dependency discovery on the multi-targeted
+  # projects (NETSDK1005, "assets file doesn't have a target for net10.0") and was cancelled, and after
+  # 2026-09-06 none ran at all. A configured-but-never-run updater is worse than none, because it reads as
+  # coverage. The Microsoft Agent Framework stack is watched by .github/workflows/maf-currency.yml instead,
+  # and NuGet security alerts still come from the dependency graph, which this block never fed.
 
   # SEC-14: keep the Dockerfile base images (and their pinned digests, once pinned) current. The
   # Dockerfile uses floating major tags for readability; pin each FROM to a digest and Dependabot
