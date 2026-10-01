@@ -202,6 +202,8 @@ public static class BenchAgenticCalibrateCommand
     /// <param name="outPathOverride">Optional output path override (used by tests).</param>
     /// <param name="evaluatorOverride">Optional evaluator override (used by tests).</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <param name="recordsPath">When set, one JSON line per evaluated case is written here (<c>--records</c>).</param>
+    /// <param name="limitPerCategory">When set, at most this many entries per category are evaluated (<c>--limit</c>).</param>
     /// <returns>0 on success, 2 if thresholds not met, 1 on internal error.</returns>
     public static Task<int> RunAsync(
         string? rootOverride = null,
