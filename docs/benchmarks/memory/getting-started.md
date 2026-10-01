@@ -86,7 +86,10 @@ CLI verdict mapping (aligned with `MemoryBenchmarkResult.Passed` canonical seman
 
 The native `MemoryBenchmarkResult` carries:
 
-- `OverallScore` — weighted aggregate across the preset's category set (0-100 scale).
+- `OverallScore` — weighted aggregate across the preset's category set (0-100 scale). A category the agent does
+  not support (for example cross-session without `ISessionResettableAgent`) is skipped and leaves the weights. A
+  category that **crashed** (`Errored`) stays in at 0, so a run failure cannot raise the grade. `ErroredCategories`
+  lists the crashes, and `CapabilityScore` is the score over only the categories that ran.
 - `Grade` — letter grade derived from `OverallScore`.
 - `CategoryResults[]` — per-category score, name, scenario-level breakdown.
 - Per-scenario judge verdicts + raw transcripts (programmatically accessible via the runner).

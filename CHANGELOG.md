@@ -78,6 +78,21 @@ wires the building blocks that 0.42.0-beta's correction described as unwired.
 - Benign controls run single-turn and text-only.
 - No option fails the scan on over-refusal: the number is reported, not gated.
 
+### A crashed memory benchmark category counts as 0
+
+#### Fixed
+- **A memory benchmark category that crashed raised the grade instead of lowering it.** A category whose run threw
+  was recorded as a skip, and `OverallScore` renormalised the weights around it. "87% across the board" and "87%
+  across the third that ran" produced the same grade. The recommendation could also call the crash "not supported
+  by this agent".
+  **Direction:** flattering. **Affected:** `OverallScore`, `Grade`, `Stars` and `Passed` of any memory benchmark
+  run in which a category threw. Runs without a crash are unchanged, and so are legitimately unsupported
+  categories.
+  **Now:**
+  - `BenchmarkCategoryResult.Errored` marks a crash, which counts as 0.
+  - `CapabilityScore` keeps the renormalised view for diagnosis.
+  - `ErroredCategories` lists the crashes, and the recommendations name a crash as a crash.
+
 ### A composite cannot pass on a minority of its components
 
 #### Changed
