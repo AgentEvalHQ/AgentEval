@@ -166,9 +166,21 @@ jobs:
         BITDEER_API_KEY: ${{ secrets.BITDEER_API_KEY }}
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
 
+    # When the suite was skipped there are no result files, and the reporter below runs with fail-on-empty:
+    # publishing a "no tests found" failure for a skip that was deliberate and announced turned every run on a
+    # non-Azure provider red (09-20 to 10-01). The reporting steps now run only when the tests ran, and a skip
+    # says so in the job summary instead.
+    - name: Record the skip
+      if: steps.provider.outputs.provider != '' && steps.provider.outputs.provider != 'azure'
+      run: |
+        echo "## ⏭️ LLM integration tests skipped" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "Provider selected: \`${{ steps.provider.outputs.provider }}\`. This suite's live paths build Azure clients directly," >> $GITHUB_STEP_SUMMARY
+        echo "so on another provider they would pass while asserting nothing. Skipped rather than reported green." >> $GITHUB_STEP_SUMMARY
+
     - name: Upload Test Results
       uses: actions/upload-artifact@v7
-      if: always() && steps.provider.outputs.provider != ''
+      if: always() && steps.provider.outputs.provider == 'azure'
       with:
         name: integration-test-results
         path: |
@@ -179,7 +191,7 @@ jobs:
     - name: Publish Test Summary
       # SHA-pinned (SEC-04): third-party action; resolved from the v1 moving tag, kept current by Dependabot.
       uses: dorny/test-reporter@a53e41438c2381e621dc719a47a57180e30c7075 # v1
-      if: always() && steps.provider.outputs.provider != ''
+      if: always() && steps.provider.outputs.provider == 'azure'
       with:
         name: LLM Integration Test Results
         path: './test-results/**/*.trx'
@@ -187,7 +199,7 @@ jobs:
         fail-on-error: true
 
     - name: Cost Estimation Summary
-      if: always() && steps.provider.outputs.provider != ''
+      if: always() && steps.provider.outputs.provider == 'azure'
       run: |
         echo "## 💰 Cost Estimation" >> $GITHUB_STEP_SUMMARY
         echo "" >> $GITHUB_STEP_SUMMARY
