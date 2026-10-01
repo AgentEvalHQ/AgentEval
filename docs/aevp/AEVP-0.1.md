@@ -1,8 +1,9 @@
 # AEVP 0.1 — Agent Evidence Profile
 
-**Status:** draft · **Applies to:** AGENT-HOOKS-0.1 · **Schema:** `aevp-0.1.schema.json`
+**Status:** draft profile — not a standard; no standards body or AGENT-HOOKS maintainer has reviewed it · **Applies to:** AGENT-HOOKS-0.1 · **Schema:** `aevp-0.1.schema.json`
 
-An *interceptor specification* in the sense AGENT-HOOKS-0.1 §1 intends:
+A **profile** for the evidence an interceptor attaches to its verdicts. It is offered as an *interceptor
+specification* in the sense AGENT-HOOKS-0.1 §1 intends, but it is one project's proposal, not a standard:
 
 > "This specification does **NOT** define how an interceptor computes a verdict. Policy languages, manifests,
 > dispatchers, annotators, and information-flow lattices are out of scope and are defined by **interceptor
@@ -41,8 +42,12 @@ AGENT-HOOKS-0.1's decision enum is closed:
 and both `Verdict` and `InterceptionRecord` are `additionalProperties: false` with **no extension mechanism**
 (`AgentContext` has one; the interceptor→host direction does not).
 
-**An interceptor that could not evaluate a call must therefore return `allow` or `deny` — it must lie in one
-direction.** There is no conformant way to abstain.
+**An interceptor that could not evaluate a call must still return `allow` or `deny`.** Either way, the verdict
+on the wire records a decision the interceptor did not actually reach: the host, its audit sink and a later
+reader cannot tell "examined and allowed" from "could not examine, defaulted to allow". There is no conformant
+way to abstain, and AEVP does not add one. It lets the evidence say what the verdict cannot. A first-class
+abstention would be an AGENT-HOOKS change (a proposal of its own), and if one is accepted, AEVP's `evaluated`
+field becomes redundant while its other four fields are unaffected.
 
 This is not an inference from the schema — the reference core says so directly. Submitting an abstention to
 `ah_validate_verdict` (the same call the SDK's own emitter makes before dispatch) returns:

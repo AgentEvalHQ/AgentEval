@@ -31,9 +31,10 @@ namespace AgentEval.MAF.AgentHooks.Aevp;
 ///
 /// <para>🔑 <b><see cref="Evaluated"/> is abstention smuggled in legally.</b> The spec's decision enum is
 /// closed (<c>allow | deny | transform</c>) and <c>Verdict</c> is <c>additionalProperties: false</c> with no
-/// extension slot, so an interceptor that could not evaluate must return <c>allow</c> — it must lie. With this
-/// profile the verdict still says <c>allow</c>, but the artefact says <b>nobody actually checked</b>, letting an
-/// auditor distinguish <em>permitted</em> from <em>unexamined</em> with no change to agent-hooks at all.</para>
+/// extension slot, so an interceptor that could not evaluate must still return <c>allow</c> (or <c>deny</c>), and the
+/// verdict alone records a decision nobody reached. With this profile the verdict still says <c>allow</c>, but the
+/// artefact says <b>nobody actually checked</b>, letting an auditor distinguish <em>permitted</em> from
+/// <em>unexamined</em> with no change to agent-hooks at all. AEVP is a draft profile, not a standard.</para>
 /// </remarks>
 public sealed record AgentEvidenceProfile
 {
