@@ -53,6 +53,27 @@ public sealed class CompositeEval : IEval
     /// </summary>
     public double? Threshold { get; }
 
+    /// <summary>
+    /// The share of components (0..1) that must produce a measurement for a passing composite to report
+    /// <c>pass</c>. Below it the composite reports <c>warn</c>: nothing failed, but the pass would rest on a minority
+    /// of what the composite claims to cover. Default 0.5. Set 0 to accept a pass on any measured component.
+    /// </summary>
+    /// <remarks>
+    /// Leaves that could not measure (skipped, inapplicable, errored) are excluded from the score, which is right:
+    /// they must not score 0. But it means a composite whose components mostly declare themselves inapplicable
+    /// passes on whatever is left. A CI gate keyed on the label then exits 0 on a 1-of-10 measurement. This bar
+    /// stops a self-declared "not applicable" from diluting the denominator into a pass.
+    /// </remarks>
+    /// <exception cref="ArgumentOutOfRangeException">The value is not a finite number in [0, 1].</exception>
+    public double MinimumMeasuredShare
+    {
+        get => _minimumMeasuredShare;
+        init => _minimumMeasuredShare = double.IsFinite(value) && value is >= 0.0 and <= 1.0
+            ? value
+            : throw new ArgumentOutOfRangeException(nameof(MinimumMeasuredShare), value, "must be a finite value in [0, 1].");
+    }
+    private readonly double _minimumMeasuredShare = 0.5;
+
     /// <summary>Initialises a new <see cref="CompositeEval"/>.</summary>
     public CompositeEval(
         string key,
@@ -198,6 +219,12 @@ public sealed class CompositeEval : IEval
                         "medium" => "warn",
                         _ => "pass"
                     };
+
+        // A pass that rests on a minority of the components is not the composite's pass. Nothing failed, so it is a
+        // soft finding (warn → exit 10 through BenchExitCodes), not a fail.
+        var underCovered = label == "pass" && measuredCount < MinimumMeasuredShare * subs.Length;
+        if (underCovered)
+            label = "warn";
         var passed = label == "pass";
 
         // Say why in the result itself (mirrors EvalResult.Skipped, which writes its reason to
@@ -233,8 +260,12 @@ public sealed class CompositeEval : IEval
             : hasRequiredError
                 ? $"A required component errored, so no pass/fail verdict is reported. Measured {measuredCount} of " +
                   $"{subs.Length} component(s); {unmeasured.Length} produced no measurement {breakdown}."
-                : $"Measured {measuredCount} of {subs.Length} component(s); {unmeasured.Length} left out of the score " +
-                  $"{breakdown}, so this verdict covers only the measured part.";
+                : underCovered
+                    ? $"Passed on only {measuredCount} of {subs.Length} component(s), below the " +
+                      $"{MinimumMeasuredShare.ToString("P0", System.Globalization.CultureInfo.InvariantCulture)} a pass needs, " +
+                      $"so the verdict is warn; {unmeasured.Length} left out of the score {breakdown}."
+                    : $"Measured {measuredCount} of {subs.Length} component(s); {unmeasured.Length} left out of the score " +
+                      $"{breakdown}, so this verdict covers only the measured part.";
         var coverageNote = nothingMeasuredNote ?? partialCoverageNote;
 
         return new EvalResult(

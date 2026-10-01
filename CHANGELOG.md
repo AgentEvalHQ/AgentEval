@@ -78,6 +78,23 @@ wires the building blocks that 0.42.0-beta's correction described as unwired.
 - Benign controls run single-turn and text-only.
 - No option fails the scan on over-refusal: the number is reported, not gated.
 
+### A composite cannot pass on a minority of its components
+
+#### Changed
+- **`CompositeEval` reports `warn`, not `pass`, when fewer than half of its components produced a measurement**
+  (`MinimumMeasuredShare`, default 0.5; set 0 for the old behaviour).
+  - Skipped, inapplicable and errored components are left out of the score, which is right, but it meant a
+    composite with 9 of 10 components unmeasured passed on the one left, and a CI gate keyed on the label exited
+    0.
+  - Components that declare themselves not applicable can no longer dilute the denominator into a pass. This is a
+    prerequisite for importing judge-declared applicability (the ASSERT track).
+  - Only a pass is withheld; a measured failure still fails. The score is unchanged, and the summary says how
+    many components were measured.
+  - Through the CLI, `warn` exits 10 (`GateWarning`): `bench owasp`, `bench mitre` and `bench nist` gate on the
+    composite label.
+- **The composite verdict matrix in `docs/composite-evals.md` now matches the code.** It lists the required-error
+  and nothing-measured rows it had omitted, and the new coverage row.
+
 ## [0.43.0-beta] - 2026-10-01
 ### Gatekeeper v1, and it runs inside Microsoft Agent Framework's own AgentHooks host
 

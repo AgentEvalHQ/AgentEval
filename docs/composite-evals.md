@@ -105,15 +105,23 @@ Composites can nest. Because `CompositeEval` implements `IEval`, it can itself a
 
 ## Verdict matrix
 
-The composite verdict is determined after aggregation. `warn` is a soft fail: `Passed = false` but `Label = "warn"` distinguishes it from a hard fail.
+The composite verdict is determined after aggregation. `warn` is a soft fail: `Passed = false` but `Label = "warn"` distinguishes it from a hard fail. The rows are checked in order:
 
-| Threshold set? | Condition | `Label` | `Passed` |
-|----------------|-----------|---------|----------|
-| Yes | `score >= threshold` | `"pass"` | `true` |
-| Yes | `score < threshold` | `"fail"` | `false` |
-| No | severity is `critical` or `high` | `"fail"` | `false` |
-| No | severity is `medium` | `"warn"` | `false` |
-| No | severity is `none` or `low` | `"pass"` | `true` |
+| # | Condition | `Label` | `Passed` |
+|---|-----------|---------|----------|
+| 1 | a `Required` component errored | `"error"` | `false` |
+| 2 | no component produced a measurement | `"error"` if any errored, else `"skipped"` | `false` |
+| 3 | threshold set, `score >= threshold` | `"pass"` (see row 6) | `true` |
+| 4 | threshold set, `score < threshold` | `"fail"` | `false` |
+| 5 | no threshold: severity `critical` or `high` → `"fail"`; `medium` → `"warn"`; `none` or `low` → `"pass"` (see row 6) | as stated | |
+| 6 | the label would be `"pass"`, but fewer than `MinimumMeasuredShare` (default **0.5**) of the components produced a measurement | `"warn"` | `false` |
+
+Skipped, inapplicable and errored components are left out of the score, so they never count as 0. Row 6 stops that
+from turning into a pass on whatever is left: a composite whose components mostly report "not applicable" cannot
+pass on the few that remain. Only a pass is withheld; a measured failure stays a failure. Set
+`MinimumMeasuredShare = 0` to accept a pass on any measured component. Whenever components were left out, the
+result's `Details.Summary` says how many were measured and why the others were not. Through the CLI, `warn` exits
+with code 10 (`GateWarning`), which CI can treat as blocking or not.
 
 Composite severity is the maximum severity across all sub-results (`none < low < medium < high < critical`), computed by `SeverityRollup.Max`.
 

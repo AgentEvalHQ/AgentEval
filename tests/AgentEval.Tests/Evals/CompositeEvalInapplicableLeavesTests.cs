@@ -145,21 +145,76 @@ public class CompositeEvalCoverageDisclosureTests
     private static EvalScore Errored() => new(0, null, "error", false, null, "none", null);
 
     [Fact]
-    public async Task NineOfTenUnmeasured_KeepsTheVerdict_ButSaysHowLittleWasMeasured()
+    public async Task NineOfTenUnmeasured_IsAWarn_AndSaysHowLittleWasMeasured()
     {
+        // E7: a 9-of-10-unmeasured composite used to pass, and a CI gate keyed on the label exited 0. The score is
+        // still the measured part's; the label no longer claims the composite passed.
         var components = new List<EvalComponent> { Leaf("measured", Pass(1.0)) };
         components.AddRange(Enumerable.Range(0, 9).Select(i => Leaf($"s{i}", Skipped())));
         var composite = new CompositeEval("c", "C", "test", "1.0.0", components, WeightedSumAggregation.Instance);
 
         var result = await composite.EvaluateAsync(new EvalInput("q"));
 
-        // The verdict and score are unchanged — the disclosure is the fix, not a new rule.
-        Assert.Equal("pass", result.Score.Label);
+        Assert.Equal("warn", result.Score.Label);
+        Assert.False(result.Score.Passed);
         Assert.Equal(1.0, result.Score.Value);
-        Assert.Contains("Measured 1 of 10", result.Details.Summary!, StringComparison.Ordinal);
+        Assert.Contains("Passed on only 1 of 10", result.Details.Summary!, StringComparison.Ordinal);
         Assert.Contains("9 left out of the score", result.Details.Summary!, StringComparison.Ordinal);
         Assert.Equal(result.Details.Summary, Assert.Single(result.Details.Recommendations!));
     }
+
+    [Fact]
+    public async Task NineOfTenInapplicable_CannotPassOnTheOneLeft()
+    {
+        // The ASSERT-shaped case: components declaring themselves not applicable must not shrink the denominator
+        // into a pass.
+        var components = new List<EvalComponent> { Leaf("measured", Pass(1.0)) };
+        components.AddRange(Enumerable.Range(0, 9).Select(i => Leaf($"n{i}", EvalScore.NotApplicable())));
+        var composite = new CompositeEval("c", "C", "test", "1.0.0", components, WeightedSumAggregation.Instance);
+
+        var result = await composite.EvaluateAsync(new EvalInput("q"));
+
+        Assert.Equal("warn", result.Score.Label);
+        Assert.Contains("9 inapplicable", result.Details.Summary!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task HalfMeasured_StillPasses_AtTheDefaultBar()
+    {
+        var components = Enumerable.Range(0, 5).Select(i => Leaf($"m{i}", Pass(1.0)))
+            .Concat(Enumerable.Range(0, 5).Select(i => Leaf($"s{i}", Skipped())))
+            .ToList();
+        var composite = new CompositeEval("c", "C", "test", "1.0.0", components, WeightedSumAggregation.Instance);
+
+        var result = await composite.EvaluateAsync(new EvalInput("q"));
+
+        Assert.Equal("pass", result.Score.Label);
+        Assert.Contains("Measured 5 of 10", result.Details.Summary!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AMeasuredFailure_StillFails_HoweverLittleWasMeasured()
+    {
+        // The bar only withholds a pass. A failure that was measured is a failure.
+        var components = new List<EvalComponent> { Leaf("measured", new EvalScore(0.1, null, "fail", false, 0.5, "high", null)) };
+        components.AddRange(Enumerable.Range(0, 9).Select(i => Leaf($"s{i}", Skipped())));
+        var composite = new CompositeEval("c", "C", "test", "1.0.0", components, WeightedSumAggregation.Instance, threshold: 0.5);
+
+        var result = await composite.EvaluateAsync(new EvalInput("q"));
+
+        Assert.Equal("fail", result.Score.Label);
+    }
+
+    [Theory]
+    [InlineData(double.NaN)]
+    [InlineData(-0.1)]
+    [InlineData(1.1)]
+    public void MinimumMeasuredShare_RejectsValuesOutsideZeroToOne(double share) =>
+        Assert.Throws<ArgumentOutOfRangeException>(() =>
+            new CompositeEval("c", "C", "test", "1.0.0", [Leaf("m", Pass(1.0))], WeightedSumAggregation.Instance)
+            {
+                MinimumMeasuredShare = share,
+            });
 
     [Fact]
     public async Task TheBreakdownAddsUpToTheUnmeasuredCount()
