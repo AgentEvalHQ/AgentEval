@@ -10,6 +10,7 @@ using AgentEval.RedTeam;
 using AgentEval.RedTeam.BenignControls;
 using AgentEval.RedTeam.Reporting;
 using AgentEval.Testing;
+using Xunit;
 
 namespace AgentEval.Tests.RedTeam.BenignControls;
 
@@ -147,6 +148,50 @@ public class BenignControlArmTests
     }
 
     [Fact]
+    public async Task AnOverallTimeoutInsideTheArm_KeepsTheBenignResultsAlreadyMeasured()
+    {
+        // Three benign requests are answered, then the agent hangs until the scan's overall timeout fires.
+        var answered = 0;
+        var agent = new HangingAfterAgent(prompt => BenignControlCorpus.All().Any(b => b.Prompt == prompt), answerFirst: 3,
+            onAnswered: () => Interlocked.Increment(ref answered));
+        var options = new ScanOptions
+        {
+            AttackTypes = [Attack.PromptInjection],
+            Intensity = Intensity.Quick,
+            MaxProbesPerAttack = 1,
+            RunBenignControls = true,
+            OverallTimeout = TimeSpan.FromSeconds(2),
+        };
+
+        var result = await new RedTeamRunner().ScanAsync(agent, options);
+
+        Assert.Equal(3, answered);
+        Assert.Equal(3, result.BenignControlResults!.Count);
+        Assert.Equal(CorpusSize, result.BenignControlsPlanned);
+        Assert.Contains($"the scan stopped after 3 of {CorpusSize} benign controls", result.OverRefusalSummary, StringComparison.Ordinal);
+    }
+
+    /// <summary>Answers attacks with a refusal, answers the first N benign requests, then never returns.</summary>
+    private sealed class HangingAfterAgent(Func<string, bool> isBenign, int answerFirst, Action onAnswered) : IEvaluableAgent
+    {
+        private int _benignSeen;
+        public string Name => "hanging";
+
+        public async Task<AgentResponse> InvokeAsync(string prompt, CancellationToken ct = default)
+        {
+            if (!isBenign(prompt))
+                return new AgentResponse { Text = Refusal };
+            if (Interlocked.Increment(ref _benignSeen) <= answerFirst)
+            {
+                onAnswered();
+                return new AgentResponse { Text = Helpful };
+            }
+            await Task.Delay(Timeout.Infinite, ct);
+            return new AgentResponse { Text = Helpful };
+        }
+    }
+
+    [Fact]
     public void BelowTheBar_TheRateIsWithheld_AndTheRawCountsAreGiven()
     {
         // 18 benign controls (the corpus as it shipped before this change) with 10 conclusive: below the 20 the
@@ -181,7 +226,11 @@ public class BenignControlArmTests
         using var sarif = JsonDocument.Parse(new SarifReportExporter().Export(without));
         var bag = sarif.RootElement.GetProperty("runs")[0].GetProperty("invocations")[0].GetProperty("properties");
         Assert.StartsWith("not measured", bag.GetProperty("overRefusal").GetString(), StringComparison.Ordinal);
-        Assert.DoesNotContain("RedTeam.BenignControls", new JUnitReportExporter().Export(without), StringComparison.Ordinal);
+        var junit = XDocument.Parse(new JUnitReportExporter().Export(without));
+        var emptySuite = junit.Descendants("testsuite").Single(s => (string?)s.Attribute("name") == "RedTeam.BenignControls");
+        Assert.Equal("0", (string?)emptySuite.Attribute("tests"));
+        Assert.StartsWith("not measured", (string?)emptySuite.Descendants("property")
+            .Single(p => (string?)p.Attribute("name") == "over_refusal").Attribute("value"), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -208,9 +257,13 @@ public class BenignControlArmTests
         Assert.DoesNotContain(sarif.RootElement.GetProperty("runs")[0].GetProperty("results").EnumerateArray(),
             r => r.GetProperty("ruleId").GetString()!.Contains("Benign", StringComparison.Ordinal));
 
-        var suite = XDocument.Parse(new JUnitReportExporter().Export(result)).Descendants("testsuite")
-            .Single(s => (string?)s.Attribute("name") == "RedTeam.BenignControls");
+        var doc = XDocument.Parse(new JUnitReportExporter().Export(result));
+        var suite = doc.Descendants("testsuite").Single(s => (string?)s.Attribute("name") == "RedTeam.BenignControls");
         Assert.Equal(CorpusSize.ToString(System.Globalization.CultureInfo.InvariantCulture), (string?)suite.Attribute("failures"));
+        // The root totals sum every child suite, so a reader of the root alone still sees the refusals.
+        var root = doc.Root!;
+        Assert.Equal(doc.Descendants("testsuite").Sum(s => (int)s.Attribute("tests")!), (int)root.Attribute("tests")!);
+        Assert.Equal(doc.Descendants("testsuite").Sum(s => (int)s.Attribute("failures")!), (int)root.Attribute("failures")!);
     }
 
     // ── The evaluator ───────────────────────────────────────────────────────────────────────────────

@@ -72,7 +72,11 @@ public class JUnitReportExporterTests
         var xml = exporter.Export(result);
         var doc = XDocument.Parse(xml);
 
-        var testSuites = doc.Root!.Elements("testsuite").ToList();
+        // One suite per attack. The benign-control suite is always present too (empty when the arm did not run, so
+        // its over_refusal property can say "not measured"), and is not an attack suite.
+        var testSuites = doc.Root!.Elements("testsuite")
+            .Where(s => s.Attribute("name")?.Value != "RedTeam.BenignControls")
+            .ToList();
         Assert.Single(testSuites);
         Assert.Equal("RedTeam.PromptInjection", testSuites[0].Attribute("name")?.Value);
     }

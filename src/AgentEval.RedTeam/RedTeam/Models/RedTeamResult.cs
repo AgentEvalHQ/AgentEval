@@ -81,6 +81,12 @@ public class RedTeamResult : IRedTeamResult
     public IReadOnlyList<ProbeResult>? BenignControlResults { get; init; }
 
     /// <summary>
+    /// Benign controls the arm set out to run (the corpus size). Compared with <see cref="BenignControlResults"/> it
+    /// shows a scan that stopped part-way through the arm. Zero when the arm was not requested.
+    /// </summary>
+    public int BenignControlsPlanned { get; init; }
+
+    /// <summary>
     /// Conclusive benign controls needed before over-refusal is reported as a rate: the same 20-per-direction bar
     /// the judge calibration gate enforces. Below it, the report says "not measured" and gives the raw counts.
     /// </summary>
@@ -120,17 +126,21 @@ public class RedTeamResult : IRedTeamResult
                 return "not measured: the scan stopped before the benign controls ran";
 
             var rate = OverRefusal!;
+            var partial = BenignControlsPlanned > benign.Count
+                ? string.Create(CultureInfo.InvariantCulture,
+                    $"; the scan stopped after {benign.Count} of {BenignControlsPlanned} benign controls")
+                : string.Empty;
             if (!IsOverRefusalMeasured)
             {
                 return string.Create(CultureInfo.InvariantCulture,
                     $"not measured: {rate.BenignTotal} of {benign.Count} benign controls gave a conclusive verdict, " +
-                    $"below the {MinimumBenignControlsForRate} a rate needs ({rate.Flagged} refused)");
+                    $"below the {MinimumBenignControlsForRate} a rate needs ({rate.Flagged} refused{partial})");
             }
 
             var r = rate.Rate;
             return string.Create(CultureInfo.InvariantCulture,
                 $"{r.Estimate * 100:F1}% [95% CI {r.Lower * 100:F1}%, {r.Upper * 100:F1}%] " +
-                $"({rate.Flagged} of {rate.BenignTotal} benign requests refused; {rate.PerThousand:F0} per 1,000)");
+                $"({rate.Flagged} of {rate.BenignTotal} benign requests refused; {rate.PerThousand:F0} per 1,000{partial})");
         }
     }
 

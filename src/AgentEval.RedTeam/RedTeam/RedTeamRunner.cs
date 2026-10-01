@@ -116,12 +116,17 @@ public sealed class RedTeamRunner : IRedTeamRunner
             // written for attack verdicts.
             if (benignArm is not null && !failFastTriggered)
             {
+                // Each benign result is kept as it completes, so a scan whose overall timeout fires inside the arm still
+                // reports what it measured (the catch below salvages it) instead of "the controls never ran".
+                var completedBenign = benignResults!;
+                void KeepBenign(ProbeResult r) { lock (completedBenign) completedBenign.Add(r); }
+
                 var armResults = options.Parallelism > 1
                     ? await RunProbesParallelAsync(agent, benignArm, benignProbes, benignArm.GetEvaluator(), options, progress,
-                        completedProbes, progressTotal, sw, scanToken, stopOnSucceeded: false, allowExplain: false)
+                        completedProbes, progressTotal, sw, scanToken, stopOnSucceeded: false, allowExplain: false, onCompleted: KeepBenign)
                     : await RunProbesSequentialAsync(agent, benignArm, benignProbes, benignArm.GetEvaluator(), options, progress,
-                        completedProbes, progressTotal, sw, scanToken, stopOnSucceeded: false, allowExplain: false);
-                benignResults = armResults;
+                        completedProbes, progressTotal, sw, scanToken, stopOnSucceeded: false, allowExplain: false, onCompleted: KeepBenign);
+                benignResults = armResults;   // the loop's own list: in corpus order
             }
         }
         catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
@@ -156,8 +161,16 @@ public sealed class RedTeamRunner : IRedTeamRunner
             ErroredProbes = attackResults.Sum(a => a.ErroredCount),
             WasTruncated = wasTruncated,
             SkippedProbes = skippedProbes,
-            BenignControlResults = benignResults
+            BenignControlResults = benignResults is null ? null : InCorpusOrder(benignResults, benignProbes),
+            BenignControlsPlanned = benignProbes.Count
         };
+    }
+
+    // A salvaged parallel arm completes out of order; reports read in corpus order either way.
+    private static List<ProbeResult> InCorpusOrder(List<ProbeResult> results, IReadOnlyList<AttackProbe> probes)
+    {
+        var position = probes.Select((p, i) => (p.Id, i)).ToDictionary(x => x.Id, x => x.i, StringComparer.Ordinal);
+        return results.OrderBy(r => position.TryGetValue(r.ProbeId, out var i) ? i : int.MaxValue).ToList();
     }
 
     private static List<IAttackType> ResolveAttacks(ScanOptions options)
@@ -224,7 +237,8 @@ public sealed class RedTeamRunner : IRedTeamRunner
     private async Task<List<ProbeResult>> RunProbesSequentialAsync(
         IEvaluableAgent agent, IAttackType attack, IReadOnlyList<AttackProbe> probes, IProbeEvaluator evaluator,
         ScanOptions options, IProgress<ScanProgress>? progress, int completedProbesBefore, int totalProbes,
-        Stopwatch sw, CancellationToken cancellationToken, bool stopOnSucceeded, bool allowExplain)
+        Stopwatch sw, CancellationToken cancellationToken, bool stopOnSucceeded, bool allowExplain,
+        Action<ProbeResult>? onCompleted = null)
     {
         var probeResults = new List<ProbeResult>();
         var completedProbes = completedProbesBefore;
@@ -252,6 +266,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
             var probeResult = await ExecuteProbeAsync(agent, attack, probe, evaluator, options, attack.DefaultSeverity, allowExplain, cancellationToken);
 
             probeResults.Add(probeResult);
+            onCompleted?.Invoke(probeResult);
             completedProbes++;
             lastOutcome = probeResult.Outcome;
 
@@ -281,7 +296,8 @@ public sealed class RedTeamRunner : IRedTeamRunner
     private async Task<List<ProbeResult>> RunProbesParallelAsync(
         IEvaluableAgent agent, IAttackType attack, IReadOnlyList<AttackProbe> probes, IProbeEvaluator evaluator,
         ScanOptions options, IProgress<ScanProgress>? progress, int completedProbesBefore, int totalProbes,
-        Stopwatch sw, CancellationToken cancellationToken, bool stopOnSucceeded, bool allowExplain)
+        Stopwatch sw, CancellationToken cancellationToken, bool stopOnSucceeded, bool allowExplain,
+        Action<ProbeResult>? onCompleted = null)
     {
         var dop = Math.Max(1, options.Parallelism);
         using var gate = new SemaphoreSlim(dop, dop);
@@ -316,6 +332,7 @@ public sealed class RedTeamRunner : IRedTeamRunner
                     {
                         var r = await ExecuteProbeAsync(agent, attack, probe, evaluator, options, attack.DefaultSeverity, allowExplain, cancellationToken).ConfigureAwait(false);
                         indexed[idx] = r;
+                        onCompleted?.Invoke(r);
 
                         if (stopOnSucceeded && r.Outcome == EvaluationOutcome.Succeeded)
                             Interlocked.Exchange(ref failFastHit, 1);
