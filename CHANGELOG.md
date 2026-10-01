@@ -119,8 +119,9 @@ they were; this is the record of what was wrong, in which direction, and what it
   (`IMetric`). For these three, the tests check only construction and names.
   **Direction:** flattering. **Affected:** every result from those three adapters — always an error, never
   a grade. **Not affected:** Fluency, Coherence and Relevance through the adapter; AgentEval's native
-  evaluators. **Next:** passing the context through (from `EvalInput.Context` and `GroundTruth`) is to land
-  in a later release; `docs/extensibility.md` now states the adapter's limits.
+  evaluators. **Fixed in this release:** the adapter builds the evaluator contexts from `EvalInput.Context`
+  (grounding) and `GroundTruth` (equivalence, completeness) on both paths; an input without them still
+  reports an error, because there is nothing to compare against. `docs/extensibility.md` states the limits.
 
 - **SARIF and Markdown red-team reports linked to a personal fork.** Since 0.12.0-beta every SARIF file has
   set `tool.driver.informationUri` to `https://github.com/joslat/AgentEval`, and the Markdown report footer

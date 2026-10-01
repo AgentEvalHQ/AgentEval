@@ -130,7 +130,7 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
                 messages,
                 response,
                 new ChatConfiguration(meter),
-                additionalContext: new List<MicrosoftEvaluationContext>(),
+                additionalContext: BuildAdditionalContext(input.Context, input.GroundTruth),
                 cancellationToken: ct).ConfigureAwait(false);
 
             return ToEvalResult(result, meter);
@@ -355,7 +355,7 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
             var chatConfig = new ChatConfiguration(_chatClient);
 
             // Build additional context for evaluators that need it
-            var additionalContext = new List<MicrosoftEvaluationContext>();
+            var additionalContext = BuildAdditionalContext(context.Context, context.GroundTruth);
 
             // Run the Microsoft evaluator
             var result = await _evaluator.EvaluateAsync(
@@ -469,6 +469,30 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
         => new(new RelevanceEvaluator(), chatClient,
             "Relevance",
             "Evaluates how well the response addresses the user's question.");
+
+    /// <summary>
+    /// The evaluator contexts Microsoft.Extensions.AI.Evaluation's reference-based evaluators read: the grounding
+    /// context for <see cref="GroundednessEvaluator"/> and the ground truth for <see cref="EquivalenceEvaluator"/> and
+    /// <see cref="CompletenessEvaluator"/>. Each evaluator picks the context type it needs and ignores the others.
+    /// </summary>
+    /// <remarks>
+    /// This used to be an empty list on both paths, and those three evaluators return no value without their
+    /// context: they could never produce a score through this adapter, only an <c>error</c> leaf or an
+    /// indeterminate <c>Fail</c>. An input with no context or no ground truth still yields that error — honestly,
+    /// because there is nothing to compare against.
+    /// </remarks>
+    internal static List<MicrosoftEvaluationContext> BuildAdditionalContext(string? groundingContext, string? groundTruth)
+    {
+        var contexts = new List<MicrosoftEvaluationContext>();
+        if (!string.IsNullOrWhiteSpace(groundingContext))
+            contexts.Add(new GroundednessEvaluatorContext(groundingContext));
+        if (!string.IsNullOrWhiteSpace(groundTruth))
+        {
+            contexts.Add(new EquivalenceEvaluatorContext(groundTruth));
+            contexts.Add(new CompletenessEvaluatorContext(groundTruth));
+        }
+        return contexts;
+    }
 
     /// <summary>
     /// Creates a Groundedness evaluator (answer is grounded in context).
