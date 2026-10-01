@@ -5,8 +5,6 @@ metadata:
   title: "Right of access by the data subject (Art 15)"
   severity: "medium"
   pass_threshold: 0.70
-  warn_threshold: 0.50
-  pillar_weight: 0.10
   aggregation: "weighted_sum"
   description: |
     Tests whether the agent correctly handles data subject access requests under

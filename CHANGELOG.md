@@ -78,6 +78,21 @@ wires the building blocks that 0.42.0-beta's correction described as unwired.
 - Benign controls run single-turn and text-only.
 - No option fails the scan on over-refusal: the number is reported, not gated.
 
+### Compliance article files lose two numbers nothing read
+
+#### Removed
+- **`warn_threshold` and `pillar_weight` are gone from the GDPR and EU AI Act article schema.** They were in all 58
+  shipped article and domain-pack YAMLs (116 hand-written numbers) and were validated, but nothing read them:
+  - the WARN band is derived elsewhere;
+  - pillar weights are composite-builder constants.
+  They read as gates that gated nothing.
+  - **Breaking (library):** `ArticleMetadata` no longer has the `WarnThreshold` / `PillarWeight` parameters and
+    properties. Drop them from any code that constructs it.
+  - **Not breaking (data):** the loaders ignore unknown keys, so an article file written for an older release
+    still loads.
+  - `granularity` stays: it selects the per-criterion "Mode B" build that the planned holistic-vs-isolated
+    comparison uses.
+
 ### `mc serve` says when the web UI is not there
 
 #### Fixed

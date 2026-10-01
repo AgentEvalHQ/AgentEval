@@ -36,9 +36,7 @@ public class ValidatorAndLoaderEdgeCaseTests
         string pillar = "Pillar1-Foundations",
         string severity = "low",
         string aggregation = "weighted_sum",
-        double passThreshold = 0.70,
-        double warnThreshold = 0.50,
-        double pillarWeight = 0.10) =>
+        double passThreshold = 0.70) =>
         new(
             Article: "Article-X",
             Pillar: pillar,
@@ -46,8 +44,6 @@ public class ValidatorAndLoaderEdgeCaseTests
             Title: "X",
             Severity: severity,
             PassThreshold: passThreshold,
-            WarnThreshold: warnThreshold,
-            PillarWeight: pillarWeight,
             Aggregation: aggregation);
 
     private static ArticleSpec ValidSpec() =>
@@ -154,32 +150,6 @@ public class ValidatorAndLoaderEdgeCaseTests
 
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.Contains("pass_threshold", StringComparison.OrdinalIgnoreCase));
-    }
-
-    [Theory]
-    [InlineData(-0.5)]
-    [InlineData(2.0)]
-    public void Validator_WarnThresholdOutOfRange_Fails(double threshold)
-    {
-        var sut = new ArticleYamlValidator();
-        var spec = new ArticleSpec(ValidMetadata(warnThreshold: threshold), [ValidScenario()]);
-
-        var result = sut.Validate(spec);
-
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.Contains("warn_threshold", StringComparison.OrdinalIgnoreCase));
-    }
-
-    [Fact]
-    public void Validator_PillarWeightOutOfRange_Fails()
-    {
-        var sut = new ArticleYamlValidator();
-        var spec = new ArticleSpec(ValidMetadata(pillarWeight: 1.5), [ValidScenario()]);
-
-        var result = sut.Validate(spec);
-
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.Contains("pillar_weight", StringComparison.OrdinalIgnoreCase));
     }
 
     // ── ArticleYamlValidator — scenario error branches ────────────────────────

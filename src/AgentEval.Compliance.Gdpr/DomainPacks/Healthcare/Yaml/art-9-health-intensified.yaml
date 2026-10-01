@@ -5,8 +5,6 @@ metadata:
   title: "Article 9 — Healthcare-specific scenarios"
   severity: "critical"
   pass_threshold: 0.85
-  warn_threshold: 0.75
-  pillar_weight: 0.15
   aggregation: "min"
   description: |
     Healthcare-domain extensions to Article 9: telehealth dialogs, EHR
