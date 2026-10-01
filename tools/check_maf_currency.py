@@ -24,17 +24,23 @@ import sys
 import urllib.request
 from pathlib import Path
 
-# Stable packages whose minor-version lag gates the check. Preview-only packages (Foundry, A2A) follow
-# the stable core's version line, so they are reported but not gated separately.
-GATED = ("Microsoft.Agents.AI", "Microsoft.Agents.AI.Workflows", "Microsoft.Extensions.AI")
-REPORTED = (
+# Every STABLE package of the stack gates the check: a stale OpenAI, Harness or Generators pin is as real a lag
+# as a stale core. Preview-only packages (Foundry, A2A) follow the stable core's version line and are reported.
+GATED = (
+    "Microsoft.Agents.AI",
     "Microsoft.Agents.AI.OpenAI",
-    "Microsoft.Agents.AI.Harness",
+    "Microsoft.Agents.AI.Workflows",
     "Microsoft.Agents.AI.Workflows.Generators",
-    "Microsoft.Agents.AI.Foundry",
-    "Microsoft.Agents.AI.A2A",
+    "Microsoft.Agents.AI.Harness",
+    "Microsoft.Extensions.AI",
     "Microsoft.Extensions.AI.OpenAI",
 )
+REPORTED = (
+    "Microsoft.Agents.AI.Foundry",
+    "Microsoft.Agents.AI.A2A",
+)
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 PIN = re.compile(r'<PackageVersion\s+Include="(?P<id>[^"]+)"\s+Version="(?P<ver>[^"]+)"')
 
@@ -77,6 +83,9 @@ def evaluate(pins: dict[str, str], index: dict[str, list[str]], max_lag: int) ->
     for pkg in GATED + REPORTED:
         pinned = pins.get(pkg)
         if pinned is None:
+            if pkg in GATED:
+                # A gated pin that is missing is a parser miss or a removal, never "current".
+                return 2, lines + [f"COULD NOT MEASURE: gated package {pkg} is not pinned in Directory.Packages.props"]
             lines.append(f"  {pkg}: not pinned in Directory.Packages.props (skipped)")
             continue
         versions = index.get(pkg)
@@ -98,12 +107,14 @@ def evaluate(pins: dict[str, str], index: dict[str, list[str]], max_lag: int) ->
 
 
 def self_test() -> int:
-    pins = {"Microsoft.Agents.AI": "1.17.0", "Microsoft.Agents.AI.Workflows": "1.23.0",
-            "Microsoft.Extensions.AI": "10.10.0", "Microsoft.Agents.AI.Foundry": "1.17.0-preview.1"}
-    idx = {"Microsoft.Agents.AI": ["1.17.0", "1.22.0", "1.23.0", "1.24.0-preview.1"],
-           "Microsoft.Agents.AI.Workflows": ["1.23.0"],
-           "Microsoft.Extensions.AI": ["10.9.0", "10.10.0"],
-           "Microsoft.Agents.AI.Foundry": ["1.17.0-preview.1", "1.23.0-preview.2"]}
+    current = {p: "1.23.0" for p in GATED}
+    current["Microsoft.Extensions.AI"] = "10.10.0"
+    current["Microsoft.Extensions.AI.OpenAI"] = "10.10.1"
+    pins = {**current, "Microsoft.Agents.AI": "1.17.0", "Microsoft.Agents.AI.Foundry": "1.17.0-preview.1"}
+    idx = {p: [v] for p, v in current.items()}
+    idx["Microsoft.Agents.AI"] = ["1.17.0", "1.22.0", "1.23.0", "1.24.0-preview.1"]
+    idx["Microsoft.Extensions.AI"] = ["10.9.0", "10.10.0"]
+    idx["Microsoft.Agents.AI.Foundry"] = ["1.17.0-preview.1", "1.23.0-preview.2"]
     checks = []
     code, _ = evaluate(pins, idx, max_lag=1)
     checks.append(("6 minors behind fails", code == 1))
@@ -116,6 +127,8 @@ def self_test() -> int:
     checks.append(("prerelease is ignored for a stable pin", latest_from_index(idx["Microsoft.Agents.AI"], False) == "1.23.0"))
     checks.append(("preview pin compares against previews", latest_from_index(idx["Microsoft.Agents.AI.Foundry"], True) == "1.23.0-preview.2"))
     checks.append(("parser reads a real pin line", parse_pins('<PackageVersion Include="A.B" Version="1.2.3" />') == {"A.B": "1.2.3"}))
+    code, _ = evaluate({}, {}, max_lag=1)
+    checks.append(("no gated pins at all is 'could not measure', never current", code == 2))
     failed = [name for name, ok in checks if not ok]
     for name, ok in checks:
         print(f"  [{'ok' if ok else 'FAIL'}] {name}")
@@ -124,7 +137,7 @@ def self_test() -> int:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--props", default="Directory.Packages.props")
+    ap.add_argument("--props", default=str(REPO_ROOT / "Directory.Packages.props"))
     ap.add_argument("--max-minor-lag", type=int, default=1)
     ap.add_argument("--self-test", action="store_true")
     args = ap.parse_args()

@@ -147,9 +147,9 @@ The project's calibration figures are not published, so this section states what
 - The last recorded runs were in May 2026, on the maintainer's Azure OpenAI deployments. The reports were not committed and do not record which judge model produced them.
 - Results moved with the judge model: the source of `BenchEuAiActCalibrateCommand` records that pillars 3–5 passed with gpt-5-chat and fell to 71% / 78% / 73% accuracy with gpt-4o-mini (2026-05-24).
 - Pillars 1 and 6 are gated at relaxed thresholds (0.65 / 0.35 and 0.60 / 0.25), each with its reason documented in that file.
-- `calibrate` grades with the generic default judge prompt, not the EU AI Act prompt that `bench eu-ai-act` sends, so none of these runs measured the judge configuration the benchmark uses.
+- Those runs predate 0.42.0-beta, when `calibrate` graded with the generic default judge prompt rather than the EU AI Act prompt `bench eu-ai-act` sends, so none of them measured the judge configuration the benchmark uses. From 0.42.0-beta, `calibrate` sends the same prompt.
 
-Treat the judge as uncalibrated for your deployment until `calibrate` sends the benchmark prompt and its reports are published.
+Treat the judge as uncalibrated for your deployment until you re-run `calibrate` (0.42.0-beta or later) against your own judge, or calibration reports are published.
 
 ---
 
