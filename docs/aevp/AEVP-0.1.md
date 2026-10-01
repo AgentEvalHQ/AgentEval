@@ -94,8 +94,12 @@ Deliberately capped. Each answers a question an auditor must ask and cannot ask 
 2. **Unknown `aevp` version ⇒ reject.** A consumer must not partially interpret an unrecognised profile
    (**AEVP-004**).
 3. **Unknown fields ⇒ reject** (**AEVP-005**).
-4. **The artefact is content-addressed.** Serialization is deterministic so `sha256:<hex>` resolves
-   (**AEVP-007**).
+4. **The artefact is content-addressed.**
+   - The address is `sha256:<hex>` over the profile's **RFC 8785 (JCS)** canonical UTF-8 bytes, so any JCS
+     implementation computes the same address (**AEVP-007**).
+   - The reference interceptor writes each profile to an `IAevpArtifactStore` before it returns the address, so
+     the address resolves (**AEVP-008**).
+   - The default store is in-memory; supply a durable one when auditors outside the process must resolve it.
 5. **Absent `calibration` is not "fine".** It means the decider never underwent calibration.
 
 ---

@@ -130,6 +130,8 @@ calibrated-corpus workflow, avoiding a second uncalibrated model path that could
 - **MAF Workflows interception is blocked upstream** until the framework exposes a supported enforcement seam.
 - **A2A gates are not promoted.** Their calibration was not held-out (Phase 4 above).
 - **The AgentHooks adapter enforces `pre_tool_call` only.** Every other interception point returns `allow` with a warning that names it unenforced, never a silent pass.
+- **The AgentHooks adapter rejects run-scoped gates** (`RunBudgetGate`, `SequenceGate`, anything declaring `GateRequirements.RunScope`). An AGENT-HOOKS host establishes no run scope, so their state would be shared across sessions. Use them inside a MAF agent built with `UseGatekeeper`.
+- **Without `messages`, conversation-correlating gates have nothing to check.** The adapter still evaluates the call, and its allow carries a `no_conversation` warning.
 - **Inline semantic judges need a certificate for the model in use.** Calibration on the calibration set is not evidence of generalisation.
 
 ## Deferred and demand-gated work

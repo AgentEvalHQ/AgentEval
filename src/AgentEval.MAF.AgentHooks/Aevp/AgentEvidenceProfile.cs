@@ -82,16 +82,24 @@ public sealed record AgentEvidenceProfile
     [JsonPropertyName("calibration")]
     public CalibrationEvidence? Calibration { get; init; }
 
-    /// <summary>Serializes to canonical JSON — the exact bytes the content address is computed over.</summary>
-    public string ToCanonicalJson() => JsonSerializer.Serialize(this, CanonicalOptions);
+    /// <summary>
+    /// Serializes to RFC 8785 canonical JSON (JCS), the exact bytes the content address is computed over. Member order
+    /// is the canonical sort, not declaration order, so a verifier canonicalizing the same document with any JCS
+    /// implementation computes the same address.
+    /// </summary>
+    public string ToCanonicalJson() => JsonCanonicalizer.Canonicalize(JsonSerializer.SerializeToNode(this, CanonicalOptions));
 
     /// <summary>
     /// The <c>sha256:&lt;hex&gt;</c> content address for this profile, in the form
     /// <c>verdict.evidence.artefact</c> expects.
     /// </summary>
-    public string ToContentAddress()
+    public string ToContentAddress() => AddressOf(ToCanonicalJson());
+
+    /// <summary>The <c>sha256:&lt;hex&gt;</c> address of a canonical JSON document's UTF-8 bytes.</summary>
+    public static string AddressOf(string canonicalJson)
     {
-        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(ToCanonicalJson()));
+        ArgumentNullException.ThrowIfNull(canonicalJson);
+        var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(canonicalJson));
         // Convert.ToHexStringLower is .NET 9+; this project targets net8.0 (the SDK ships lib/net8.0 only).
         return "sha256:" + Convert.ToHexString(bytes).ToLowerInvariant();
     }

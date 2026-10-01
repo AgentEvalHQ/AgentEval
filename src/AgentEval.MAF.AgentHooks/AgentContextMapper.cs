@@ -177,7 +177,15 @@ public static class AgentContextMapper
         _ => ChatRole.User
     };
 
-    /// <summary>Serializes rewritten gate arguments back into a JSON object for a spec transform.</summary>
+    /// <summary>
+    /// Serializes rewritten gate arguments back into a JSON object for a spec transform, or returns
+    /// <see langword="null"/> when a value cannot be serialized faithfully (the caller then denies).
+    /// </summary>
+    /// <remarks>
+    /// Every value is serialized as JSON of its own type: a decimal stays a number, a <see cref="JsonElement"/>, an
+    /// array or a nested dictionary keeps its structure. Falling back to <c>ToString()</c> would have changed the
+    /// tool call (a list becoming its type name) instead of carrying the gate's rewrite.
+    /// </remarks>
     internal static JsonObject? ToJsonObject(IReadOnlyDictionary<string, object?>? arguments)
     {
         if (arguments is null)
@@ -188,20 +196,54 @@ public static class AgentContextMapper
         var result = new JsonObject();
         foreach (var (key, value) in arguments)
         {
-            result[key] = value switch
+            if (!TryToJsonNode(value, out var node))
             {
-                null => null,
-                JsonNode node => node.DeepClone(),
-                string s => JsonValue.Create(s),
-                bool b => JsonValue.Create(b),
-                int i => JsonValue.Create(i),
-                long l => JsonValue.Create(l),
-                double d => JsonValue.Create(d),
-                _ => JsonValue.Create(value.ToString())
-            };
+                return null;
+            }
+
+            result[key] = node;
         }
 
         return result;
+    }
+
+    private static bool TryToJsonNode(object? value, out JsonNode? node)
+    {
+        switch (value)
+        {
+            case null:
+                node = null;
+                return true;
+            case JsonNode existing:
+                node = existing.DeepClone();
+                return true;
+            case string s:
+                node = JsonValue.Create(s);
+                return true;
+            case bool b:
+                node = JsonValue.Create(b);
+                return true;
+            case long l:
+                node = JsonValue.Create(l);
+                return true;
+            case double d when double.IsFinite(d):
+                node = JsonValue.Create(d);
+                return true;
+            case double:
+                node = null;
+                return false;   // NaN and infinity have no JSON form
+        }
+
+        try
+        {
+            node = JsonSerializer.SerializeToNode(value, value.GetType());
+            return true;
+        }
+        catch (Exception ex) when (ex is NotSupportedException or JsonException or InvalidOperationException or ArgumentException)
+        {
+            node = null;
+            return false;
+        }
     }
 
     private static string? AgentName(AgentContext context)

@@ -28,6 +28,14 @@ AgentEval uses the following third-party libraries. Each is used under its respe
 | Microsoft.Agents.AI.Workflows.Generators | 1.23.0 | MIT | https://github.com/microsoft/agents |
 | Microsoft.SourceLink.GitHub | 10.0.401 | MIT | https://github.com/dotnet/sourcelink |
 
+## Experimental Adapter Dependencies (not shipped)
+
+`AgentEval.MAF.AgentHooks` is not packaged (`IsPackable=false`); these are referenced from source only.
+
+| Package | Version | License | URL |
+|---------|---------|---------|-----|
+| ResponsibleAI.AgentHooks | 0.1.0-alpha.5 | MIT | https://github.com/responsibleai/agent-hooks |
+
 ## Test Dependencies (not shipped)
 
 | Package | Version | License | URL |
@@ -37,6 +45,7 @@ AgentEval uses the following third-party libraries. Each is used under its respe
 | xunit.runner.visualstudio | 2.8.2 | Apache-2.0 | https://github.com/xunit/visualstudio.xunit |
 | Verify.Xunit | 28.8.1 | MIT | https://github.com/VerifyTests/Verify |
 | coverlet.collector | 8.0.0 | MIT | https://github.com/coverlet-coverage/coverlet |
+| Microsoft.Agents.AI.AgentHooks | 1.23.0-alpha.260928.1 | MIT | https://github.com/microsoft/agent-framework |
 
 ## Summary
 
