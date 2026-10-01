@@ -358,6 +358,15 @@ they were; this is the record of what was wrong, in which direction, and what it
 - **Re-run any calibration you rely on** for GDPR, EU AI Act or the three adversarial evaluators.
 
 #### Evidence
+- `docs/adr/evidence/042-calibration-before-after-2026-10-01.md` — the calibration families before and after
+  this release, on one judge (Bitdeer `zai-org/GLM-5.3-Flash`), one run per arm:
+  - **Agentic adversarial goes from FAIL to PASS**, 69.6% / κ 0.415 → 91.3% / κ 0.823. That is 5 more of 23
+    cases, after the input-graded criteria were removed. Categories whose code did not change are identical,
+    or move by one case of 223.
+  - **Sending the regulation prompt (F13)** moves GDPR by 4 of 145 cases toward the labels and none away.
+    EU AI Act `pillar2` and `pillar4` now clear the strict gate. `pillar3-oversight` stays just under it
+    (κ 0.696).
+  - These are new figures for one model. They do not restore the withdrawn May 2026 figures.
 - `docs/adr/evidence/033-n5-reference-experiment-2026-09-21.md` — the first run: a reference block in the
   state moves the decision model from **64.0% to 96.0%** on the `violence` golden set while **false-passes
   stay at 0.0%**, closing the gap to the generative judge from 36 points to 4 at 49x lower latency. The
