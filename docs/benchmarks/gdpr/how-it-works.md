@@ -140,9 +140,9 @@ The project's calibration figures are not published, so this section states what
 
 - The last recorded runs were in May 2026, on the maintainer's Azure OpenAI deployments. The reports were not committed and do not record which judge model produced them.
 - On those runs pillars 1–5 met the strict gate. Pillar 6 (governance), added later, met only a relaxed κ ≥ 0.60 gate (88.0%, κ 0.658 with gpt-4o-mini).
-- `calibrate` grades with the generic default judge prompt, not the GDPR prompt that `bench gdpr` sends, so none of these runs measured the judge configuration the benchmark uses.
+- Those runs predate 0.42.0-beta, when `calibrate` graded with the generic default judge prompt rather than the GDPR prompt `bench gdpr` sends, so none of them measured the judge configuration the benchmark uses. From 0.42.0-beta, `calibrate` sends the same prompt.
 
-Treat the judge as uncalibrated for your deployment until `calibrate` sends the benchmark prompt and its reports are published.
+Treat the judge as uncalibrated for your deployment until you re-run `calibrate` (0.42.0-beta or later) against your own judge, or calibration reports are published.
 
 ---
 

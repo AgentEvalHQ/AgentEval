@@ -95,6 +95,34 @@ public class AtomicLlmEvalPromptFingerprintTests
         Assert.Equal(lf.PromptHash, crlf.PromptHash);
     }
 
+    private sealed class CriteriaCapturingEvaluator : IEvaluator
+    {
+        public IReadOnlyList<string> Sent { get; private set; } = [];
+
+        public Task<EvaluationResult> EvaluateAsync(string input, string output, IEnumerable<string> criteria, CancellationToken ct = default)
+        {
+            Sent = [.. criteria];
+            return Task.FromResult(new EvaluationResult { OverallScore = 100 });
+        }
+    }
+
+    [Fact]
+    public async Task MutatingTheCallersList_ChangesNeitherWhatIsSentNorTheHash()
+    {
+        // The hash fingerprints the criteria at construction. If the leaf kept the caller's list, a later mutation
+        // would change what the judge receives while the recorded fingerprint stayed the same.
+        var criteria = new List<string> { "Answers the question." };
+        var judge = new CriteriaCapturingEvaluator();
+        var eval = Leaf(judge, criteria);
+        var before = await ProvenanceOf(eval);
+
+        criteria.Add("Cites a source.");
+        var after = await ProvenanceOf(eval);
+
+        Assert.Equal(before.PromptHash, after.PromptHash);
+        Assert.Equal(["Answers the question."], judge.Sent);
+    }
+
     [Fact]
     public async Task PromptId_NamesWhatTheEvaluatorSent_NotWhatTheEvalDeclared()
     {

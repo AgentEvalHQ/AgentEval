@@ -87,7 +87,9 @@ public sealed class AtomicLlmEval : AtomicEval
         : base(key, name, category, version)
     {
         _evaluator = evaluator ?? throw new ArgumentNullException(nameof(evaluator));
-        _criteria = criteria ?? throw new ArgumentNullException(nameof(criteria));
+        // A private copy: the PromptHash below fingerprints these criteria, so a caller mutating the list it passed
+        // in must not change what is sent without changing what was recorded.
+        _criteria = criteria?.ToArray() ?? throw new ArgumentNullException(nameof(criteria));
         if (!double.IsFinite(passThreshold) || passThreshold < 0.0 || passThreshold > 1.0)
             throw new ArgumentOutOfRangeException(nameof(passThreshold), passThreshold, "passThreshold must be a finite value in [0, 1].");
         _passThreshold = passThreshold;
