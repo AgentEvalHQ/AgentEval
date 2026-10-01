@@ -374,7 +374,8 @@ public class GraphQLReadResolversTests : IClassFixture<SeededMissionControlFacto
         Assert.Equal(0, matrix.GetProperty("subjects").GetArrayLength());
         Assert.Equal(0, matrix.GetProperty("controls").GetArrayLength());
         Assert.Equal(0, matrix.GetProperty("cells").GetArrayLength());
-        Assert.True(matrix.GetProperty("allChainsValid").GetBoolean());
+        // No evidence ⇒ no chain was checked. This used to pin TRUE, the flattering value.
+        Assert.False(matrix.GetProperty("allChainsValid").GetBoolean());
     }
 
     // ─── Cost-tier breakdown (MC1.4.3) ────────────────────────────────────────

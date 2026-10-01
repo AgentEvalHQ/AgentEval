@@ -118,12 +118,16 @@ public sealed class ComplianceMatrixService
         foreach (var pointer in latestPerSubject)
         {
             // ComplianceEvidence is keyed in the store by SubjectIdentity, so we need the kind.
+            // An indexed evidence pointer that cannot be resolved is a break in the audit chain, not an absence
+            // of one. These two branches used to `continue` silently, so deleting a subject's directory dropped
+            // its evidence AND left the matrix reporting every chain valid — the flattering direction, on the
+            // screen auditors read first.
             var subjectIdentity = await ResolveSubjectIdentityAsync(pointer.SubjectName, ct);
-            if (subjectIdentity is null) continue;
+            if (subjectIdentity is null) { allChainsValid = false; continue; }
 
             var evidence = await _store.GetComplianceEvidenceAsync(
                 regulation, subjectIdentity, pointer.Timestamp, ct);
-            if (evidence is null) continue;
+            if (evidence is null) { allChainsValid = false; continue; }
 
             // Verify audit chain: SourceRun.ManifestHash must match the run's content hash.
             var manifest = await _store.GetRunManifestAsync(evidence.SourceRun.RunId, ct);
@@ -222,12 +226,15 @@ public sealed class ComplianceMatrixService
         return null;
     }
 
+    // No evidence ⇒ no chain was checked, so "all chains valid" would be a claim about nothing. It used to be true
+    // here, which made an empty matrix — including one emptied by deleting evidence — render a green audit badge.
+    // The SPA shows "no evidence" instead of the badge when there are no subjects.
     private static ComplianceMatrix EmptyMatrix(string regulation) => new(
         Regulation: regulation,
         Subjects: Array.Empty<ComplianceMatrixSubject>(),
         Controls: Array.Empty<ComplianceMatrixControl>(),
         Cells: Array.Empty<ComplianceMatrixCell>(),
-        AllChainsValid: true,
+        AllChainsValid: false,
         LastEvidenceAt: null);
 
     private static DateTimeOffset? TryParseTimestamp(string timestamp)
