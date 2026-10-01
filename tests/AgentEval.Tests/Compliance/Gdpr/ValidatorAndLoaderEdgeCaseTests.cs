@@ -109,6 +109,21 @@ public class ValidatorAndLoaderEdgeCaseTests
         Assert.Contains(result.Errors, e => e.Contains("severity", StringComparison.OrdinalIgnoreCase));
     }
 
+    [Theory]
+    [InlineData("weighted_sum")]
+    [InlineData("min")]
+    [InlineData("cap_by_worst")]
+    [InlineData("majority_vote")]
+    [InlineData("weighted_median")]
+    public void Validator_AcceptsEveryAggregationTheLibraryShips(string aggregation)
+    {
+        // The validator admitted 3 of the 5 strategies in Core/Evals/Aggregations, so an article could not ask for
+        // majority_vote or weighted_median although both exist and the builder can now construct them.
+        var result = new ArticleYamlValidator().Validate(new ArticleSpec(ValidMetadata(aggregation: aggregation), [ValidScenario()]));
+
+        Assert.True(result.IsValid, string.Join("; ", result.Errors));
+    }
+
     [Fact]
     public void Validator_InvalidAggregation_Fails()
     {

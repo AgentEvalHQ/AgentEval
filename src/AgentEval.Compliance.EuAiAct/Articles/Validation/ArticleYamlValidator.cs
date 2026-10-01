@@ -25,7 +25,9 @@ public sealed class ArticleYamlValidator
 
     private static readonly string[] s_validGranularities = ["atomic", "composite"];
 
-    private static readonly string[] s_validAggregations = ["weighted_sum", "min", "cap_by_worst"];
+    // Every aggregation the builder can construct. This listed 3 of the 5 strategies the library ships, so an
+    // article could not ask for majority_vote or weighted_median although both exist and are tested.
+    private static readonly string[] s_validAggregations = ["weighted_sum", "min", "cap_by_worst", "majority_vote", "weighted_median"];
 
     /// <summary>Validates <paramref name="spec"/> and returns a <see cref="ValidationResult"/>.</summary>
     public ValidationResult Validate(ArticleSpec spec)
