@@ -257,6 +257,8 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
                 ScenarioType = category.ScenarioType,
                 Duration = catStopwatch.Elapsed,
                 Skipped = true,
+                // A crash is not "not supported": it counts as 0 in OverallScore instead of leaving the weights.
+                Errored = true,
                 SkipReason = $"Error: {ex.Message}"
             };
         }
