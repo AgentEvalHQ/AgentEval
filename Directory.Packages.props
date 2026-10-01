@@ -8,7 +8,13 @@
   </PropertyGroup>
   
   <ItemGroup>
-    <!-- Microsoft Agent Framework — core packages on 1.17.0 (stable), bumped from 1.13.0 (S4).
+    <!-- Microsoft Agent Framework — core packages on 1.23.0 (stable), bumped from 1.17.0 (2026-10).
+         1.17→1.23 needed NO source changes: a trial build had 0 errors on net8/9/10 and the same warning set as 1.17.
+         The runtime-relevant changes are in tool approval (1.18 #7474 bounds the auto-approval loop with
+         MaxAutoApprovalIterations; 1.22/1.23 #8375/#8641 bind and then enforce approval responses on replay;
+         1.23 #8403 closes an invoke path that bypassed approval) — Gatekeeper's approval samples are re-verified
+         live against them. Foundry and A2A are still preview-only, pinned to the matching 1.23.0 preview.
+         History of the previous bump (1.13.0 → 1.17.0, S4), kept for the record:
          Microsoft.Agents.AI.Foundry has no stable 1.17.0 yet (published preview-only), so it's pinned to
          the matching 1.17.0-preview and is referenced only by the SAMPLES (the
          AgentEval.MafEvalFoundryAlongsideLocal standalone + the AgentEval.Samples H12/H13 benchmarks) —
@@ -25,26 +31,28 @@
              1.14.0, which is why AgentEval's own AEGK001 experimental marker and every MAAI001 suppression
              around the approval bridge were removed.
          Microsoft.Agents.AI.Harness reaches its first STABLE release at 1.17.0 (was preview-only at 1.13.0). -->
-    <PackageVersion Include="Microsoft.Agents.AI" Version="1.17.0" />
-    <PackageVersion Include="Microsoft.Agents.AI.A2A" Version="1.17.0-preview.260804.1" /><!-- preview-only; A2A boundary sample + tests -->
-    <PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="1.17.0" />
-    <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.17.0" />
-    <PackageVersion Include="Microsoft.Agents.AI.Workflows.Generators" Version="1.17.0" />
-    <PackageVersion Include="Microsoft.Agents.AI.Foundry" Version="1.17.0-preview.260804.1" /><!-- preview-only; sample-only -->
-    <PackageVersion Include="Microsoft.Agents.AI.Harness" Version="1.17.0" /><!-- S4: 1.17.0 is the first STABLE Harness release; was preview-only at 1.13.0 -->
-    <PackageVersion Include="Azure.AI.Projects" Version="2.1.0-beta.4" /><!-- required by Microsoft.Agents.AI.Foundry 1.17.0-preview.260804.1, whose nuspec still declares exactly 2.1.0-beta.4 -->
+    <PackageVersion Include="Microsoft.Agents.AI" Version="1.23.0" />
+    <PackageVersion Include="Microsoft.Agents.AI.A2A" Version="1.23.0-preview.260928.1" /><!-- preview-only; A2A boundary sample + tests -->
+    <PackageVersion Include="Microsoft.Agents.AI.OpenAI" Version="1.23.0" />
+    <PackageVersion Include="Microsoft.Agents.AI.Workflows" Version="1.23.0" />
+    <PackageVersion Include="Microsoft.Agents.AI.Workflows.Generators" Version="1.23.0" />
+    <PackageVersion Include="Microsoft.Agents.AI.Foundry" Version="1.23.0-preview.260928.1" /><!-- preview-only; sample-only -->
+    <PackageVersion Include="Microsoft.Agents.AI.Harness" Version="1.23.0" /><!-- stable since 1.17.0 (S4); was preview-only at 1.13.0 -->
+    <PackageVersion Include="Azure.AI.Projects" Version="3.0.0-beta.3" /><!-- required by Microsoft.Agents.AI.Foundry 1.23.0-preview.260928.1, whose nuspec declares exactly 3.0.0-beta.3 (a major beta with breaking changes; referenced only by the Foundry SAMPLES, which build against it) -->
     
-    <!-- Microsoft Extensions AI — 10.7.0 is the floor Microsoft.Agents.AI 1.17.0 requires (S4).
-         Bumped to exactly that floor, not to the newest 10.8.x, to keep the MAF upgrade one variable. -->
-    <PackageVersion Include="Microsoft.Extensions.AI" Version="10.7.0" />
-    <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.7.0" />
-    <PackageVersion Include="Microsoft.Extensions.AI.Evaluation.Quality" Version="10.7.0" />
+    <!-- Microsoft Extensions AI — 10.10.0 is the floor Microsoft.Agents.AI 1.23.0 requires.
+         Microsoft.Extensions.AI.OpenAI is pinned to 10.10.1, NOT 10.10.0: Microsoft.Agents.AI.OpenAI 1.23.0 and the
+         Foundry preview declare >= 10.10.1, yet with transitive pinning a 10.10.0 pin restores WITHOUT a warning, and
+         MAF #8730 reports that 10.10.0 throws TypeLoadException on every Responses call that carries a tool. -->
+    <PackageVersion Include="Microsoft.Extensions.AI" Version="10.10.0" />
+    <PackageVersion Include="Microsoft.Extensions.AI.OpenAI" Version="10.10.1" />
+    <PackageVersion Include="Microsoft.Extensions.AI.Evaluation.Quality" Version="10.10.0" />
 
     <!-- Azure -->
     <!-- SEC-13: Azure.AI.OpenAI is a direct ref of AgentEval.Cli (packed/published as a global
          dotnet tool), so a -beta dependency risks yank/unlist and API churn. It is pinned to beta
          deliberately: the only stable 2.x release on NuGet is 2.0.0 (Nov 2024), which predates the
-         API surface used by the Microsoft.Agents.AI 1.17.0 stack and AzureChatAgentFactory — there is
+         API surface used by the Microsoft.Agents.AI 1.17+ stack and AzureChatAgentFactory — there is
          no recent GA to move to. Mitigations: (1) the CLI itself ships on the -prerelease channel,
          so a beta dependency is in-band; (2) the version is centrally pinned here (CPM) so it cannot
          float. ACTION: upgrade to a stable Azure.AI.OpenAI 2.x as soon as one ships (tracked, vNext). -->
@@ -61,19 +69,20 @@
     <PackageVersion Include="Microsoft.Agents.Core" Version="1.3.171-beta" />
     <!-- MSAL device-code auth + the officially-recommended cross-platform persisted token cache
          (DPAPI on Windows / Keychain on macOS / libsecret on Linux) — see CopilotStudioTokenProvider.cs. -->
-    <PackageVersion Include="Microsoft.Identity.Client" Version="4.84.2" />
-    <PackageVersion Include="Microsoft.Identity.Client.Extensions.Msal" Version="4.84.2" />
+    <PackageVersion Include="Microsoft.Identity.Client" Version="4.89.0" /><!-- floor raised to 4.89.0 by the Foundry 1.23 preview chain (Azure.Identity/Azure.Core); central pins are solution-wide, so the Copilot Studio connector moves with it -->
+    <PackageVersion Include="Microsoft.Identity.Client.Extensions.Msal" Version="4.89.0" />
     <!-- IHttpClientFactory — required by the CopilotClient constructor. 10.0.8 (not the 9.0.1 floor
          CopilotStudio.Client's own nuspec declares) to stay on the same 10.x line as the other
          Microsoft.Extensions.* pins below. -->
     <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.8" />
 
     <!-- Core -->
-    <PackageVersion Include="System.Numerics.Tensors" Version="10.0.9" /><!-- floor raised by Microsoft.Extensions.AI 10.7.0 (required by MAF 1.17.0) -->
-    <PackageVersion Include="System.Memory.Data" Version="10.0.9" /><!-- floor raised by Azure.Core 1.60.0 (transitive via Azure.AI.Projects 2.1.0-beta.4, required by Microsoft.Agents.AI.Foundry 1.17.0-preview) -->
-    <!-- Security: pin to patch that resolves GHSA-g94r-2vxg-569j (transitive via MAF; the
-         1.17.0 Workflows packages still declare OpenTelemetry.Api 1.15.3, so this pin stays valid) -->
-    <PackageVersion Include="OpenTelemetry.Api" Version="1.15.3" />
+    <PackageVersion Include="System.Numerics.Tensors" Version="10.0.12" /><!-- floor raised by Microsoft.Extensions.AI 10.10.0 (required by MAF 1.23.0) -->
+    <PackageVersion Include="System.Memory.Data" Version="10.0.10" /><!-- floor raised by Azure.Core (transitive via Azure.AI.Projects 3.0.0-beta.3, required by Microsoft.Agents.AI.Foundry 1.23.0-preview) -->
+    <!-- Security: originally pinned to 1.15.3, the patch that resolves GHSA-g94r-2vxg-569j (transitive via MAF).
+         Microsoft.Agents.AI.Workflows 1.23.0 itself declares OpenTelemetry.Api >= 1.18.0, which is past that patch,
+         so the pin now follows MAF's floor; it is kept so the transitive version cannot fall back below the fix. -->
+    <PackageVersion Include="OpenTelemetry.Api" Version="1.18.0" />
     <PackageVersion Include="System.CommandLine" Version="2.0.3" />
     <PackageVersion Include="YamlDotNet" Version="16.3.0" />
     <!-- Abstractions packages target netstandard2.0/net8.0 — safe for net8/9/10 TFMs.
@@ -81,7 +90,7 @@
          Microsoft.Extensions.Http 10.0.8 imposes via Microsoft.Extensions.Logging 10.0.8 (Copilot Studio
          live connector's IHttpClientFactory wiring). -->
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.8" />
-    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.9" /><!-- floor raised by Azure.Core 1.60.0 (transitive via Azure.AI.Projects 2.1.0-beta.4, required by Microsoft.Agents.AI.Foundry 1.17.0-preview) -->
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.10" /><!-- floor raised by Azure.Core (transitive via Azure.AI.Projects 3.0.0-beta.3, required by Microsoft.Agents.AI.Foundry 1.23.0-preview) -->
     
     <!-- PDF Generation -->
     <PackageVersion Include="PdfSharp-MigraDoc" Version="6.2.4" />
