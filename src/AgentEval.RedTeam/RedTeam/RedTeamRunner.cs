@@ -64,7 +64,12 @@ public sealed class RedTeamRunner : IRedTeamRunner
 
         // The benign-control arm (opt-in) runs after the attacks and is reported apart from them. Its probes count
         // toward the progress total only, never toward PlannedProbes, which stays the attack denominator.
-        var benignArm = options.RunBenignControls ? new BenignControlArm() : null;
+        // A benign control is graded by the over-refusal judge, so the arm needs the scan's judge. Without one it does
+        // not run and the report says why: a phrase list is not allowed to stand in for the judgement.
+        var benignArm = options.RunBenignControls && options.JudgeClient is { } benignJudge ? new BenignControlArm(benignJudge) : null;
+        var benignNotRunReason = options.RunBenignControls && options.JudgeClient is null
+            ? "over-refusal needs a judge (ScanOptions.JudgeClient, --judge); the benign controls were not run"
+            : null;
         var benignProbes = benignArm?.GetProbes(options.Intensity) ?? [];
         var progressTotal = plannedProbes + benignProbes.Count;
         // Empty, not null, once the caller opted in: a scan that stops before the arm runs reports "not measured,
@@ -110,8 +115,8 @@ public sealed class RedTeamRunner : IRedTeamRunner
                 }
             }
 
-            // The benign arm bypasses GraderFactory: an attack judge grades whether an attack succeeded, while a
-            // benign control is graded only on whether the agent refused. FailFast does not apply inside the arm,
+            // The benign arm bypasses GraderFactory: the attack grader decides whether an attack succeeded, while a
+            // benign control is graded by the over-refusal judge on whether the agent refused. FailFast does not apply inside the arm,
             // because Succeeded there means "answered", and --explain does not either, because its narration is
             // written for attack verdicts.
             if (benignArm is not null && !failFastTriggered)
@@ -162,7 +167,8 @@ public sealed class RedTeamRunner : IRedTeamRunner
             WasTruncated = wasTruncated,
             SkippedProbes = skippedProbes,
             BenignControlResults = benignResults is null ? null : InCorpusOrder(benignResults, benignProbes),
-            BenignControlsPlanned = benignProbes.Count
+            BenignControlsPlanned = benignProbes.Count,
+            BenignControlsNotRunReason = benignNotRunReason
         };
     }
 

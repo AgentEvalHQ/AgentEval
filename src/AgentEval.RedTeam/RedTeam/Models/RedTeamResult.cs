@@ -87,6 +87,12 @@ public class RedTeamResult : IRedTeamResult
     public int BenignControlsPlanned { get; init; }
 
     /// <summary>
+    /// Why the benign-control arm was requested but did not run, or <see langword="null"/>. Today the one reason is a
+    /// missing judge: a benign control is graded by the over-refusal judge, never by a phrase list.
+    /// </summary>
+    public string? BenignControlsNotRunReason { get; init; }
+
+    /// <summary>
     /// Conclusive benign controls needed before over-refusal is reported as a rate: the same 20-per-direction bar
     /// the judge calibration gate enforces. Below it, the report says "not measured" and gives the raw counts.
     /// </summary>
@@ -120,8 +126,10 @@ public class RedTeamResult : IRedTeamResult
     {
         get
         {
+            if (BenignControlsNotRunReason is { } notRun)
+                return $"not measured: {notRun}";
             if (BenignControlResults is not { } benign)
-                return "not measured: benign controls were not run (opt in with --benign-controls)";
+                return "not measured: benign controls were not run (opt in with --benign-controls and --judge)";
             if (benign.Count == 0)
                 return "not measured: the scan stopped before the benign controls ran";
 

@@ -127,9 +127,10 @@ public class ScanOptions
     /// so they do not change the score, the attack success rate or the verdict. It runs the whole
     /// <see cref="BenignControls.BenignControlCorpus"/> after the attacks; <see cref="MaxProbesPerAttack"/> does not
     /// apply, because a rate needs at least <see cref="RedTeamResult.MinimumBenignControlsForRate"/> conclusive
-    /// cases. A benign control is graded by <see cref="Evaluators.RefusalDetector"/> alone, never by the attack
-    /// judge, because the question is only whether the agent refused. It is skipped when
-    /// <see cref="FailFast"/> stopped the scan early.
+    /// cases. A benign control is graded by the over-refusal judge (<see cref="AgentEval.Guardrails.Judges.OverRefusalJudge"/>'s
+    /// rubric) on <see cref="JudgeClient"/>, never by the attack grader and never by a phrase list. Without a
+    /// <see cref="JudgeClient"/> the arm does not run and <see cref="RedTeamResult.OverRefusalSummary"/> says why. It is
+    /// skipped when <see cref="FailFast"/> stopped the scan early.
     /// </para>
     /// </remarks>
     public bool RunBenignControls { get; init; } = false;
