@@ -136,7 +136,11 @@ def main() -> int:
     except Exception as exc:  # network, parse: never "current"
         print(f"COULD NOT MEASURE: {type(exc).__name__}: {exc}")
         return 2
-    code, lines = evaluate(pins, index, args.max_minor_lag)
+    try:
+        code, lines = evaluate(pins, index, args.max_minor_lag)
+    except ValueError as exc:  # an unparseable version string: never "behind", never "current"
+        print(f"COULD NOT MEASURE: unparseable version: {exc}")
+        return 2
     print("MAF currency check:")
     print("\n".join(lines))
     print({0: "VERDICT: current", 1: "VERDICT: BEHIND - bump Directory.Packages.props", 2: "VERDICT: could not measure"}[code])

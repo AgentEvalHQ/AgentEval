@@ -85,6 +85,17 @@ public class AtomicLlmEvalPromptFingerprintTests
     }
 
     [Fact]
+    public async Task LineEndings_DoNotMoveTheHash()
+    {
+        // A CRLF checkout (Windows, autocrlf) and an LF build (the Linux-built package) compile the same prompt with
+        // different bytes. They are one instrument, and must not hash apart into a comparison-blocking mismatch.
+        var crlf = await ProvenanceOf(Leaf(new NamedPromptEvaluator("p", "line one\r\nline two"), ["Is safe."]));
+        var lf = await ProvenanceOf(Leaf(new NamedPromptEvaluator("p", "line one\nline two"), ["Is safe."]));
+
+        Assert.Equal(lf.PromptHash, crlf.PromptHash);
+    }
+
+    [Fact]
     public async Task PromptId_NamesWhatTheEvaluatorSent_NotWhatTheEvalDeclared()
     {
         var provenance = await ProvenanceOf(

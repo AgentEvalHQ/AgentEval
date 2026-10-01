@@ -243,6 +243,10 @@ public sealed class AtomicLlmEval : AtomicEval
     private static string HashPrompt(IReadOnlyList<string> criteria, string evaluatorMaterial)
     {
         var material = JudgeInputFramingVersion + "\u001f" + evaluatorMaterial + "\u001f" + string.Join("\u001e", criteria);
+        // Line endings are normalised before hashing: a prompt compiled from a CRLF checkout (Windows, autocrlf)
+        // and the same prompt from an LF checkout (the Linux-built package) are the same instrument, and must not
+        // hash apart into a comparison-blocking mismatch.
+        material = material.Replace("\r\n", "\n", StringComparison.Ordinal);
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(material)))[..16].ToLowerInvariant();
     }
 }

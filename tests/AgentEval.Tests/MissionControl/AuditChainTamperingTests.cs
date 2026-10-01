@@ -89,6 +89,8 @@ public class AuditChainTamperingTests
         var matrix = await service.BuildMatrixAsync("test-reg", CancellationToken.None);
 
         Assert.False(matrix.AllChainsValid);
+        // Counted, so the page shows a broken chain rather than a neutral "no evidence".
+        Assert.Equal(1, matrix.UnreadableEvidence);
     }
 
     [Fact]

@@ -115,6 +115,7 @@ public sealed class ComplianceMatrixService
         // remains for the matrix-header badge.
         var loaded = new List<(ComplianceEvidencePointer Pointer, ComplianceEvidence Evidence, bool ChainValid, string? ChainBreakReason)>();
         var allChainsValid = true;
+        var unreadableEvidence = 0;
         foreach (var pointer in latestPerSubject)
         {
             // ComplianceEvidence is keyed in the store by SubjectIdentity, so we need the kind.
@@ -123,11 +124,11 @@ public sealed class ComplianceMatrixService
             // its evidence AND left the matrix reporting every chain valid — the flattering direction, on the
             // screen auditors read first.
             var subjectIdentity = await ResolveSubjectIdentityAsync(pointer.SubjectName, ct);
-            if (subjectIdentity is null) { allChainsValid = false; continue; }
+            if (subjectIdentity is null) { allChainsValid = false; unreadableEvidence++; continue; }
 
             var evidence = await _store.GetComplianceEvidenceAsync(
                 regulation, subjectIdentity, pointer.Timestamp, ct);
-            if (evidence is null) { allChainsValid = false; continue; }
+            if (evidence is null) { allChainsValid = false; unreadableEvidence++; continue; }
 
             // Verify audit chain: SourceRun.ManifestHash must match the run's content hash.
             var manifest = await _store.GetRunManifestAsync(evidence.SourceRun.RunId, ct);
@@ -155,7 +156,7 @@ public sealed class ComplianceMatrixService
         }
 
         if (loaded.Count == 0)
-            return EmptyMatrix(regulation);
+            return EmptyMatrix(regulation) with { UnreadableEvidence = unreadableEvidence };
 
         // Step 4 — derive the column inventory from the union of controls.
         var controlMap = new Dictionary<string, string>(StringComparer.Ordinal); // id -> title
@@ -208,7 +209,8 @@ public sealed class ComplianceMatrixService
             Controls: controls,
             Cells: cells,
             AllChainsValid: allChainsValid,
-            LastEvidenceAt: lastEvidenceAt);
+            LastEvidenceAt: lastEvidenceAt,
+            UnreadableEvidence: unreadableEvidence);
     }
 
     /// <summary>

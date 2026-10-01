@@ -67,7 +67,9 @@ internal static class JudgeFactory
 
     private static (IEvaluator? Judge, string JudgeModel, int ExitCode) ResolveWithFamilyPrompt(
         IEvaluator? evaluatorOverride, string judgeKind, Assembly promptAssembly, string promptFile) =>
-        Resolve(evaluatorOverride, judgeKind, EmbeddedPromptLoader.Load(promptAssembly, promptFile), systemPromptId: promptFile);
+        evaluatorOverride is not null
+            ? (evaluatorOverride, "override", 0)
+            : Resolve(evaluatorOverride, judgeKind, EmbeddedPromptLoader.Load(promptAssembly, promptFile), systemPromptId: promptFile);
 
     /// <summary>
     /// Resolves the judge to use for a bench run.

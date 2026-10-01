@@ -227,8 +227,10 @@ they were; this is the record of what was wrong, in which direction, and what it
 - **Directory exports report skipped tests.** The store path passed `SkippedTests` into the `Warnings`
   position of `RunStats`, so every export reported `Skipped = 0` and a `Warnings` count that was really
   the skip count.
-- **Article YAML accepts every shipped aggregation.** The GDPR and EU AI Act validators admitted 3 of 5;
-  `majority_vote` and `weighted_median` are now accepted and built.
+- **Article YAML accepts `weighted_median`.** The GDPR and EU AI Act validators admitted 3 of the 5 shipped
+  strategies. `weighted_median` is now accepted and built. `majority_vote` is deliberately still refused: an
+  article always has a pass threshold, and under a threshold MajorityVote's score is an unweighted mean that
+  would ignore the scenario weights the validator requires.
 - **`agenteval list --type metrics`** no longer advertises eight names that `--metrics` refuses: the
   tool-selection and argument metrics, the embedding metrics, Recall@K, MRR and
   ConversationCompleteness. Selectability is read from the metric catalog, and the rest are marked
@@ -240,13 +242,42 @@ they were; this is the record of what was wrong, in which direction, and what it
   need, built from `EvalInput.Context` and `GroundTruth` (see Corrected).
 - **The LLM integration workflow** no longer turns a deliberate, announced skip (a non-Azure provider)
   into a red run. The reporting steps run only when the tests ran.
+- **Prompt fingerprints do not depend on the build machine.** `AtomicLlmEval` and `DecisionEval` normalise
+  line endings before hashing. A prompt compiled from a CRLF checkout (Windows) and the same prompt from the
+  Linux-built package are one instrument, and no longer hash apart into a comparison-blocking mismatch.
+  For `DecisionEval`, this changes the hash only for runs built from a Windows checkout.
+- **The MAF report bridge agrees with MAF.** `MeaiToEvalResultBridge` takes a query node's verdict from the
+  composite's `(overall)` metric when present, instead of "every leaf passed". Otherwise a passing
+  composite with a failing optional leaf would render as a failed item that MAF counted as passed.
+- **`JailbreakResistanceEval`'s aggregate result records its judge provenance:** model, the prompt
+  actually sent, and its hash. It used to record nulls.
+- **Compliance matrix: deleted evidence is not "no evidence".** `ComplianceMatrix.UnreadableEvidence` (GraphQL
+  `unreadableEvidence`) counts indexed evidence that could not be read, and the page shows a broken chain,
+  not "No evidence", when it is non-zero.
 
 #### Note for consumers
 - **The `AgentEval` package now depends on Microsoft Agent Framework ≥ 1.23.0** and
   Microsoft.Extensions.AI ≥ 10.10.0. A project pinned to an older MAF must move with it.
-- **Comparing LLM-leaf results across this boundary:** runs before 0.42.0-beta carry no `PromptHash`, so a
-  run comparison reports the prompt axis as unpinned. Under `Strict` it refuses the comparison, as
-  designed: the instruments differ.
+- **Comparing LLM-leaf results across this boundary is refused.** Runs before 0.42.0-beta carry no
+  `PromptHash`, and the run comparison treats a fingerprint recorded on one side only as a mismatch ("an
+  asymmetry is a difference, not a gap"). `agenteval compare` therefore blocks deltas between a pre-0.42
+  baseline and a 0.42 run, whatever `Strict` is set to. That is correct: the instruments really did change
+  (see Changed). **Re-record your baselines after upgrading.**
+- **Values that changed in reports and evidence:**
+  - `PromptId` on LLM leaves now names the prompt the judge was sent: `agenteval.judge.default-system.v1`,
+    `custom-system-prompt`, or a family prompt such as `gdpr-judge-system.v1.md`. It used to name each
+    evaluator's declared id. The "Prompt" field in HTML and PDF reports changes accordingly.
+  - `agentic-result.json`'s `attestation.promptVersions` is now `{ "judge-system":
+    "agenteval.judge.default-system.v1" }`. The old keys `agentic-judge-system` and
+    `task-completion-criterion` named files that do not exist.
+  - The MAF floor-declaration metric is a `StringMetric`, not a `BooleanMetric`. Code that cast it must
+    change.
+- **`bench agentic calibrate --limit` requires `--out`,** labels the report as a limited run, and does not
+  apply the calibration gate: at one case per category kappa is undefined. It exits non-zero only on
+  evaluation failures.
+- **Binary-compatibility notes:** `BenchAgenticCalibrateCommand.RunAsync` gained optional parameters, and
+  `ComplianceMatrix` gained an optional `UnreadableEvidence` parameter. Both are source-compatible;
+  recompile against 0.42.
 - **Re-run any calibration you rely on** for GDPR, EU AI Act or the three adversarial evaluators.
 
 #### Evidence

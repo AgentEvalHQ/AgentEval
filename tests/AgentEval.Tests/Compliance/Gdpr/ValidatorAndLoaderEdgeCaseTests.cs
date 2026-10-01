@@ -113,15 +113,21 @@ public class ValidatorAndLoaderEdgeCaseTests
     [InlineData("weighted_sum")]
     [InlineData("min")]
     [InlineData("cap_by_worst")]
-    [InlineData("majority_vote")]
     [InlineData("weighted_median")]
-    public void Validator_AcceptsEveryAggregationTheLibraryShips(string aggregation)
+    public void Validator_AcceptsEveryAggregationThatMeansWhatItSaysUnderAThreshold(string aggregation)
     {
-        // The validator admitted 3 of the 5 strategies in Core/Evals/Aggregations, so an article could not ask for
-        // majority_vote or weighted_median although both exist and the builder can now construct them.
+        // weighted_median was missing although the builder can construct it.
         var result = new ArticleYamlValidator().Validate(new ArticleSpec(ValidMetadata(aggregation: aggregation), [ValidScenario()]));
 
         Assert.True(result.IsValid, string.Join("; ", result.Errors));
+    }
+
+    [Fact]
+    public void Validator_RefusesMajorityVote_BecauseUnderAThresholdItIgnoresTheWeights()
+    {
+        var result = new ArticleYamlValidator().Validate(new ArticleSpec(ValidMetadata(aggregation: "majority_vote"), [ValidScenario()]));
+
+        Assert.False(result.IsValid);
     }
 
     [Fact]
