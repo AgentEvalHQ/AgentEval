@@ -4,6 +4,8 @@
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
     <IsPackable>false</IsPackable>
     <RootNamespace>AgentEval</RootNamespace>
+    <!-- AgentEval's own use of its preview decision abstraction (DecisionsPreview): acknowledged here; consumers still see it. -->
+    <NoWarn>$(NoWarn);AGENTEVAL_DECISIONS_PREVIEW001</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

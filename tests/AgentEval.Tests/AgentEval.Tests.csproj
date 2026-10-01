@@ -9,7 +9,8 @@
          ToolResultSizeAnomalyGate) — the diagnostic is error-severity by design, so this suppression is a
          deliberate acknowledgment, not a blanket warning bypass. The same holds for the AgentHooks adapter, which is
          experimental as a whole assembly (AGENTEVAL_AGENTHOOKS_PREVIEW001). -->
-    <NoWarn>$(NoWarn);AGENTEVAL_GATEKEEPER_PREVIEW001;AGENTEVAL_AGENTHOOKS_PREVIEW001</NoWarn>
+    <!-- AgentEval's own use of its preview decision abstraction (DecisionsPreview): acknowledged here; consumers still see it. -->
+    <NoWarn>$(NoWarn);AGENTEVAL_GATEKEEPER_PREVIEW001;AGENTEVAL_AGENTHOOKS_PREVIEW001;AGENTEVAL_DECISIONS_PREVIEW001</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>

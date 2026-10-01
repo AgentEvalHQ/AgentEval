@@ -78,6 +78,36 @@ wires the building blocks that 0.42.0-beta's correction described as unwired.
 - Benign controls run single-turn and text-only.
 - No option fails the scan on over-refusal: the number is reported, not gated.
 
+### Decision models: the measured reference block ships, and the abstraction is marked preview
+
+#### Added
+- **`DecisionReferences`**: eight reference blocks. Each is a short description of what is being judged and what
+  is not, for a decision model:
+  - `Violence`, `SelfHarm`, `Adversarial`, `AgentProcess`, `AgentTask`, `Reasoning`, `Grounding`,
+    `CodeVulnerability`.
+  - Each was the best or joint-best decision-model arm on the golden sets it was measured on. On `violence` a
+    reference moved the decision model from 64.0% to 96.0% with false passes held at 0.0%
+    (`docs/adr/evidence/033-n5-reference-experiment-2026-09-21.md`, `033-n5-maximal-v2-2026-09-22.md`).
+  - The texts are the measured bytes; the experiment sample now reads them from the library.
+  - References for sexual content, sensitive-data leakage, communication and memory were not winners and stay in
+    the sample.
+  - A reference never says which way to answer: directional wording saturated the model in the same
+    measurements.
+- **A `reference` option on `DecisionJudge` and `DecisionEval`.** It is sent ahead of the state, in the shape the
+  experiment measured.
+  - It is part of the prompt fingerprint: `DecisionEval`'s `PromptHash`, and `DecisionJudge`'s new
+    `IJudgePromptSource` identity.
+  - Without one, the request bytes and every previously recorded hash are unchanged.
+  - Nothing grades with a decision model by default. This makes the measured pattern available; it does not
+    switch any criterion.
+
+#### Changed
+- **The decision-model abstraction is marked `[Experimental("AGENTEVAL_DECISIONS_PREVIEW001")]`.** This covers
+  `IDecisionClient` with its request, question, answer and usage types, and the System-One transport.
+  Microsoft.Extensions.AI is defining its own decision abstraction; AgentEval will adapt to it rather than keep a
+  third public one, so these types can change. Using them now raises the diagnostic; suppress it to acknowledge
+  the preview.
+
 ### Compliance article files lose two numbers nothing read
 
 #### Removed

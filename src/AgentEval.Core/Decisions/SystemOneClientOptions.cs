@@ -2,6 +2,8 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Diagnostics.CodeAnalysis;
+
 namespace AgentEval.Decisions;
 
 /// <summary>
@@ -14,6 +16,7 @@ namespace AgentEval.Decisions;
 /// A class rather than a record on purpose: a record's generated <c>ToString()</c> would print the
 /// API key into any log line that formats the options.
 /// </remarks>
+[Experimental(DecisionsPreview.DiagnosticId)]
 public sealed class SystemOneClientOptions
 {
     /// <summary>TypeSafe's own endpoint (<c>POST</c>), per their API reference.</summary>

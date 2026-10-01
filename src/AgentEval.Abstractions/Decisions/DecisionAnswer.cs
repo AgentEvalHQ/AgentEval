@@ -2,12 +2,15 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Diagnostics.CodeAnalysis;
+
 namespace AgentEval.Decisions;
 
 /// <summary>
 /// A typed answer from a decision model. Exactly one concrete shape per <see cref="DecisionQuestion"/>
 /// shape; the transport guarantees the pairing and throws on a mismatch rather than coercing.
 /// </summary>
+[Experimental(DecisionsPreview.DiagnosticId)]
 public abstract record DecisionAnswer
 {
     private protected DecisionAnswer() { }
@@ -34,6 +37,7 @@ public abstract record DecisionAnswer
 
 /// <summary>The answer to a <see cref="BinaryQuestion"/>: the probability that the proposition is true.</summary>
 /// <param name="TrueProbability">P(true), in [0, 1]. This IS the answer; there is no separate confidence.</param>
+[Experimental(DecisionsPreview.DiagnosticId)]
 public sealed record BinaryAnswer(double TrueProbability) : DecisionAnswer
 {
     /// <summary>P(true), finite and within [0, 1].</summary>
@@ -44,6 +48,7 @@ public sealed record BinaryAnswer(double TrueProbability) : DecisionAnswer
 /// <param name="Choice">The highest-probability option id.</param>
 /// <param name="Probabilities">Probability per option id.</param>
 /// <param name="Confidence">The provider's confidence in <paramref name="Choice"/>, derived from the distribution; in [0, 1].</param>
+[Experimental(DecisionsPreview.DiagnosticId)]
 public sealed record ChoiceAnswer(
     string Choice,
     IReadOnlyDictionary<string, double> Probabilities,
@@ -66,6 +71,7 @@ public sealed record ChoiceAnswer(
 /// <param name="Probabilities">Probability per level, keyed by the level's index as the provider labels it — 0-based, so <c>"0"</c> is the first criterion (observed from TypeSafe, 2026-09-20).</param>
 /// <param name="Legend">Optional: the level descriptions echoed back, keyed like <paramref name="Probabilities"/>.</param>
 /// <param name="Confidence">The provider's confidence, in [0, 1].</param>
+[Experimental(DecisionsPreview.DiagnosticId)]
 public sealed record ScoreAnswer(
     double Score,
     IReadOnlyDictionary<string, double> Probabilities,

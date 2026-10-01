@@ -29,7 +29,7 @@ namespace AgentEval.Decisions;
 /// receive the same criteria the evaluator was written with, which is the whole point of the comparison.
 /// </para>
 /// </remarks>
-public sealed class DecisionJudge : IEvaluator
+public sealed class DecisionJudge : IEvaluator, IJudgePromptSource
 {
     /// <summary>One judge call, as it went over the wire — for the comparison's per-criterion analysis.</summary>
     public sealed record Trace(
@@ -42,21 +42,56 @@ public sealed class DecisionJudge : IEvaluator
         double? Cost,
         long LatencyMs);
 
+    /// <summary>Names the state and question templates below. Bump it when either changes.</summary>
+    public const string TemplateVersion = "agenteval.decision-judge.v1";
+
     private readonly IDecisionClient _client;
     private readonly string _requestedModel;
     private readonly Action<Trace>? _onTrace;
+    private readonly string? _reference;
 
-    public DecisionJudge(IDecisionClient client, string requestedModel, Action<Trace>? onTrace = null)
+    /// <summary>Creates a decision judge.</summary>
+    /// <param name="client">The decision-model transport.</param>
+    /// <param name="requestedModel">The model to request.</param>
+    /// <param name="onTrace">Optional: receives every call as it went over the wire.</param>
+    /// <param name="reference">
+    /// Optional reference block placed ahead of the state: what is being judged and what is not (see
+    /// <see cref="DecisionReferences"/>). Without one, a decision model tends to grade the content it is shown rather
+    /// than the agent's handling of it.
+    /// </param>
+    public DecisionJudge(IDecisionClient client, string requestedModel, Action<Trace>? onTrace = null, string? reference = null)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
         ArgumentException.ThrowIfNullOrWhiteSpace(requestedModel);
         _requestedModel = requestedModel;
         _onTrace = onTrace;
+        _reference = string.IsNullOrWhiteSpace(reference) ? null : reference;
     }
 
+    /// <inheritdoc/>
+    public string? SystemPromptId => _reference is null ? TemplateVersion : TemplateVersion + "+reference";
+
+    /// <inheritdoc/>
+    /// <remarks>The templates' version and the reference text: a different reference is a different instrument.</remarks>
+    public string PromptMaterial => _reference is null ? TemplateVersion : TemplateVersion + "\nreference:\n" + _reference;
+
     /// <summary>The state every question is asked about. The projection is the same for every criterion.</summary>
-    public static string BuildState(string input, string output) =>
-        $"INPUT (the user's request, or the conversation so far):\n{input}\n\nOUTPUT (the agent's response under evaluation):\n{output}";
+    /// <param name="input">The input under evaluation.</param>
+    /// <param name="output">The agent's output under evaluation.</param>
+    public static string BuildState(string input, string output) => BuildState(input, output, reference: null);
+
+    /// <summary>The state with an optional reference block ahead of it.</summary>
+    /// <param name="input">The input under evaluation.</param>
+    /// <param name="output">The agent's output under evaluation.</param>
+    /// <param name="reference">
+    /// Optional reference block, placed first and followed by a blank line: the shape the reference experiment
+    /// measured. Null or blank gives exactly the two-argument state.
+    /// </param>
+    public static string BuildState(string input, string output, string? reference)
+    {
+        var state = $"INPUT (the user's request, or the conversation so far):\n{input}\n\nOUTPUT (the agent's response under evaluation):\n{output}";
+        return string.IsNullOrWhiteSpace(reference) ? state : reference + "\n\n" + state;
+    }
 
     /// <summary>One binary question per criterion, ids c1..cN in criterion order.</summary>
     public static IReadOnlyDictionary<string, DecisionQuestion> BuildQuestions(IReadOnlyList<string> criteria)
@@ -74,7 +109,7 @@ public sealed class DecisionJudge : IEvaluator
 
     /// <summary>The exact request a call would send — used by the dry run to render bytes without sending.</summary>
     public DecisionRequest BuildRequest(string input, string output, IReadOnlyList<string> criteria) =>
-        new(BuildState(input, output), BuildQuestions(criteria), _requestedModel);
+        new(BuildState(input, output, _reference), BuildQuestions(criteria), _requestedModel);
 
     public async Task<EvaluationResult> EvaluateAsync(
         string input, string output, IEnumerable<string> criteria, CancellationToken cancellationToken = default)
