@@ -133,6 +133,19 @@ public class BenchCalibrateCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task Calibrate_WithoutOut_WritesUnderTheWorkspaceFolder()
+    {
+        await BenchCalibrateCommand.RunCoreAsync(
+            rootOverride: _root,
+            outPathOverride: null,
+            evaluatorOverride: new AlwaysPassEvaluator());
+
+        // With no --out, the report goes to the workspace folder, never a repository-internal path.
+        var written = Directory.GetFiles(Path.Combine(_root, ".agenteval", "calibration"), "gdpr-calibration-*.md");
+        Assert.Single(written);
+    }
+
+    [Fact]
     public async Task Calibrate_WritesMarkdownReportWithPerPillarHeadings()
     {
         // Arrange

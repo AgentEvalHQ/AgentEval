@@ -10,9 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Changed
 - **`bench gdpr calibrate`, `bench eu-ai-act calibrate` and `bench agentic calibrate` now write their report to
-  `.agenteval/calibration/<family>-calibration-<date>.md` when `--out` is not given.** The old default was
-  `strategy/FutureFeatures/calibration-baselines/`, which is this repository's private planning folder. Running
-  `calibrate` in your own project created that tree there. Every other bench command already writes under
+  `.agenteval/calibration/<family>-calibration-<date>.md` when `--out` is not given.** The old default was a
+  folder internal to this repository, and running `calibrate` in your own project created that folder tree there. Every other bench command already writes under
   `.agenteval/`. Pass `--out` to choose the path.
 
 ### Grader test sets agree with the thresholds they test
