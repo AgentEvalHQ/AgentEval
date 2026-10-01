@@ -73,6 +73,8 @@
     href: gatekeeper/attack-the-gate.md
   - name: CLI (from any language)
     href: gatekeeper-cli.md
+  - name: AEVP 0.1 (draft evidence profile)
+    href: aevp/AEVP-0.1.md
   - name: Implementation Status
     href: gatekeeper/implementation-status.md
   - name: Capability History
