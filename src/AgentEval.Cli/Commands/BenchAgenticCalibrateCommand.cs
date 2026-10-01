@@ -207,15 +207,25 @@ public static class BenchAgenticCalibrateCommand
         string? rootOverride = null,
         string? outPathOverride = null,
         IEvaluator? evaluatorOverride = null,
-        CancellationToken ct = default)
-        => RunCoreAsync(rootOverride, outPathOverride, evaluatorOverride, ct);
+        CancellationToken ct = default,
+        string? recordsPath = null,
+        int? limitPerCategory = null)
+        => RunCoreAsync(rootOverride, outPathOverride, evaluatorOverride, ct, recordsPath, limitPerCategory);
 
     internal static async Task<int> RunCoreAsync(
         string? rootOverride,
         string? outPathOverride,
         IEvaluator? evaluatorOverride,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        string? recordsPath = null,
+        int? limitPerCategory = null)
     {
+        if (limitPerCategory is < 1)
+        {
+            Console.Error.WriteLine("--limit must be at least 1.");
+            return ExitCodes.UsageError;
+        }
+
         // ── Workspace root canonicalisation ──────────────────────────────────
         if (rootOverride is not null)
         {
@@ -311,7 +321,27 @@ public static class BenchAgenticCalibrateCommand
         try
         {
             var runner = new AgentEval.Evals.Agentic.Calibration.CalibrationRunner(Resolver);
-            report = await runner.RunAsync(datasets, ct);
+            if (recordsPath is null)
+            {
+                report = await runner.RunAsync(datasets, caseSink: null, limitPerCategory, ct);
+            }
+            else
+            {
+                var dir = Path.GetDirectoryName(Path.GetFullPath(recordsPath));
+                if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+                await using var writer = new StreamWriter(recordsPath, append: false);
+                var jsonOptions = new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web);
+                report = await runner.RunAsync(
+                    datasets,
+                    async (record, token) =>
+                    {
+                        await writer.WriteLineAsync(System.Text.Json.JsonSerializer.Serialize(record, jsonOptions).AsMemory(), token);
+                        await writer.FlushAsync(token);
+                    },
+                    limitPerCategory,
+                    ct);
+                Console.WriteLine($"Per-case records written: {recordsPath}");
+            }
         }
         catch (Exception ex)
         {

@@ -63,8 +63,28 @@ public sealed class CalibrationRunner
     /// <param name="datasets">One or more datasets (typically one per category) to evaluate.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>A report containing per-category accuracy, kappa, and score delta statistics.</returns>
-    public async Task<CalibrationReport> RunAsync(
+    public Task<CalibrationReport> RunAsync(
         IReadOnlyList<CalibrationDataset> datasets, CancellationToken ct = default)
+        => RunAsync(datasets, caseSink: null, limitPerCategory: null, ct);
+
+    /// <summary>
+    /// Runs calibration and hands every evaluated case to <paramref name="caseSink"/>, so the run can be kept as
+    /// per-case records rather than only as category aggregates.
+    /// </summary>
+    /// <param name="datasets">One or more datasets (typically one per category) to evaluate.</param>
+    /// <param name="caseSink">
+    /// Receives one <see cref="CalibrationCaseRecord"/> per evaluated entry, including entries that errored. The record
+    /// carries the leaf's verdict AND each criterion's verdict, so a later analysis can recompute a verdict from the
+    /// criteria (or compare the judge's holistic number with them) without paying for the calls again.
+    /// </param>
+    /// <param name="limitPerCategory">When set, evaluates at most this many entries per category (the one-item stage of a
+    /// paid run). <see langword="null"/> evaluates everything.</param>
+    /// <param name="ct">Cancellation token.</param>
+    public async Task<CalibrationReport> RunAsync(
+        IReadOnlyList<CalibrationDataset> datasets,
+        Func<CalibrationCaseRecord, CancellationToken, Task>? caseSink,
+        int? limitPerCategory,
+        CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(datasets);
 
@@ -80,7 +100,8 @@ public sealed class CalibrationRunner
             int evaluationFailures = 0;
             int skippedUnknownKey = 0;
 
-            foreach (var entry in ds.Entries)
+            var entries = limitPerCategory is int limit ? ds.Entries.Take(limit) : ds.Entries;
+            foreach (var entry in entries)
             {
                 var eval = _evaluatorResolver(entry.EvaluatorKey);
                 if (eval is null)
@@ -111,8 +132,13 @@ public sealed class CalibrationRunner
                         $"[calibration] {ds.CategoryKey} entry {entry.ScenarioId}: " +
                         $"{ex.GetType().Name}: {ex.Message}");
                     evaluationFailures++;
+                    if (caseSink is not null)
+                        await caseSink(CalibrationCaseRecord.ForError(ds.CategoryKey, entry, eval, ex), ct).ConfigureAwait(false);
                     continue;
                 }
+
+                if (caseSink is not null)
+                    await caseSink(CalibrationCaseRecord.From(ds.CategoryKey, entry, result), ct).ConfigureAwait(false);
 
                 pairs.Add((entry.ExpectedVerdict, result.Score.Label));
 
@@ -154,3 +180,59 @@ public sealed record CalibrationCategoryReport(
     double MeanScoreDelta,
     int EvaluationFailures = 0,
     int SkippedUnknownKey = 0);
+
+/// <summary>
+/// One evaluated calibration case, as a record that can be written to JSONL and analysed offline.
+/// </summary>
+/// <remarks>
+/// <see cref="Leaves"/> keeps every atomic result under the evaluator, each with its criterion verdicts
+/// (<see cref="CalibrationLeafRecord.Criteria"/>), prompt identity and holistic score. Before this, a calibration run
+/// kept only category aggregates, so whether a leaf's verdict agreed with its own criteria could not be measured from
+/// history.
+/// </remarks>
+public sealed record CalibrationCaseRecord(
+    string Category,
+    string ScenarioId,
+    string EvaluatorKey,
+    string? EvaluatorVersion,
+    string ExpectedVerdict,
+    double ExpectedScoreMin,
+    double ExpectedScoreMax,
+    string? Label,
+    double? Value,
+    bool? Passed,
+    string? Error,
+    IReadOnlyList<CalibrationLeafRecord> Leaves)
+{
+    internal static CalibrationCaseRecord From(string category, CalibrationEntry entry, EvalResult result) => new(
+        category, entry.ScenarioId, entry.EvaluatorKey, result.Metric.Version,
+        entry.ExpectedVerdict, entry.ExpectedScoreMin, entry.ExpectedScoreMax,
+        result.Score.Label, result.Score.Value, result.Score.Passed, Error: null,
+        Leaves: Flatten(result).Select(CalibrationLeafRecord.From).ToList());
+
+    internal static CalibrationCaseRecord ForError(string category, CalibrationEntry entry, IEval eval, Exception ex) => new(
+        category, entry.ScenarioId, entry.EvaluatorKey, eval.Version,
+        entry.ExpectedVerdict, entry.ExpectedScoreMin, entry.ExpectedScoreMax,
+        Label: null, Value: null, Passed: null, Error: $"{ex.GetType().Name}: {ex.Message}", Leaves: []);
+
+    private static IEnumerable<EvalResult> Flatten(EvalResult node) =>
+        node.Details.SubResults is { Count: > 0 } subs ? subs.SelectMany(Flatten) : [node];
+}
+
+/// <summary>One atomic leaf of a calibration case: its verdict, its criteria's verdicts and its prompt identity.</summary>
+public sealed record CalibrationLeafRecord(
+    string Key,
+    string? Label,
+    double Value,
+    bool Passed,
+    IReadOnlyDictionary<string, double>? Criteria,
+    string? ProvenanceType,
+    string? JudgeModel,
+    string? PromptId,
+    string? PromptHash)
+{
+    internal static CalibrationLeafRecord From(EvalResult leaf) => new(
+        leaf.Metric.Key, leaf.Score.Label, leaf.Score.Value, leaf.Score.Passed,
+        leaf.Details.Dimensions is { Count: > 0 } d ? new Dictionary<string, double>(d) : null,
+        leaf.Provenance.Type, leaf.Provenance.JudgeModel, leaf.Provenance.PromptId, leaf.Provenance.PromptHash);
+}

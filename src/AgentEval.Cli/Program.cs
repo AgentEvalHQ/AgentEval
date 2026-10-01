@@ -294,14 +294,20 @@ benchAgenticCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) 
 // bench agentic calibrate
 var agenticCalibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };
 var agenticCalibrateOutOpt = new Option<string?>("--out") { Description = "Output Markdown report path (default: strategy/FutureFeatures/calibration-baselines/agentic-calibration-{date}.md)" };
+var agenticCalibrateRecordsOpt = new Option<string?>("--records") { Description = "Also write one JSON line per evaluated case (verdict, every criterion's verdict, prompt id and hash) to this path, so the run can be re-analysed without repeating the calls" };
+var agenticCalibrateLimitOpt = new Option<int?>("--limit") { Description = "Evaluate at most N entries per category (the one-item stage before a full paid run)" };
 var agenticCalibrateCmd = new Command("calibrate", "Run agentic judge calibration against hand-labeled golden datasets");
 agenticCalibrateCmd.Add(agenticCalibrateRootOpt);
 agenticCalibrateCmd.Add(agenticCalibrateOutOpt);
+agenticCalibrateCmd.Add(agenticCalibrateRecordsOpt);
+agenticCalibrateCmd.Add(agenticCalibrateLimitOpt);
 agenticCalibrateCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
     var root = parseResult.GetValue(agenticCalibrateRootOpt);
     var outPath = parseResult.GetValue(agenticCalibrateOutOpt);
-    return await BenchAgenticCalibrateCommand.RunAsync(root, outPath, ct: ct);
+    var records = parseResult.GetValue(agenticCalibrateRecordsOpt);
+    var limit = parseResult.GetValue(agenticCalibrateLimitOpt);
+    return await BenchAgenticCalibrateCommand.RunAsync(root, outPath, ct: ct, recordsPath: records, limitPerCategory: limit);
 });
 benchAgenticCmd.Add(agenticCalibrateCmd);
 
