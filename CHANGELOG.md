@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Over-refusal is graded by a judge, not a phrase list
+
+#### Changed
+- **`--benign-controls` is now graded by the over-refusal judge and needs `--judge`.**
+  - In 0.42.0-beta a phrase list (`RefusalDetector`) decided whether the agent refused a benign request. On the
+    first live run it counted a complete Socratic answer as a refusal, because the answer contained "I won't".
+  - The judge is Gatekeeper's over-refusal judge, with the same rubric and options. Certify it for your model with
+    `agenteval gatekeeper calibrate --gate judge:over-refusal --certify`.
+  - Its broad prefilter selects which replies reach the model, so a reply with no refusal signal costs no call.
+  - A judge that cannot decide makes the case inconclusive; it never counts as an answer.
+  - Without a judge the CLI refuses `--benign-controls`, and in the library the arm does not run and
+    `OverRefusalSummary` says why (`RedTeamResult.BenignControlsNotRunReason`).
+  - **Known blind spot:** the rubric accepts a refusal that cites a genuine reason as justified, so a refusal of a
+    legitimate request with a wrong reason can be counted as an answer. That under-reports over-refusal.
+
+#### Added
+- **`CompositeJudgeGate.JudgeTextAsync` and `IsFlagged`.** They expose the judge's own verdict and the gate's block
+  threshold, for callers that must keep an undecided judgement apart from a decision. `InspectAsync` has to act,
+  so it turns an undecided judge into a block (fail-closed, the default) or an allow. The Gatekeeper API snapshot
+  is updated for these two additive members.
+
 
 ## [0.42.0-beta] - 2026-10-01
 
