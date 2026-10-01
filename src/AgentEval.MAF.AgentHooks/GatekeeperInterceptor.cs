@@ -24,9 +24,16 @@ namespace AgentEval.MAF.AgentHooks;
 /// <c>pre_tool_call</c> the spec fixes <c>target = tool_call.args</c> (§4.2), so a Mutate becomes
 /// <c>Transform("$target", &lt;new args&gt;)</c>.</para>
 ///
-/// <para><b>Composition.</b> The gate loop is STRICT SEQUENTIAL, first-non-Allow-wins — identical to
-/// <c>AgentEvalToolGateExtensions</c>. The spec's own <c>sequential_first_deny</c> composition profile
-/// describes the same rule, so the host profile should be set accordingly.</para>
+/// <para><b>Composition.</b> The gate loop is STRICT SEQUENTIAL, first-Block-wins, with the same fixed-point
+/// rule as <c>AgentEvalToolGateExtensions</c>: a gate that rewrites the arguments restarts the scan from the first
+/// gate against the rewritten call, so a later gate sees exactly what the host would execute. A transform is
+/// emitted only once a full pass changes nothing. A gate that keeps rewriting is denied after
+/// <see cref="MaxMutationRevalidations"/> passes. A gate that throws fails closed.</para>
+///
+/// <para><b>Not supported: run-scoped gates.</b> An AGENT-HOOKS host does not establish an
+/// <c>AgentRunScope</c>, so a gate that requires one (<c>GateRequirements.RunScope</c>, e.g. <c>RunBudgetGate</c>)
+/// would fall back to <c>RunLedger</c>'s process-wide state, and unrelated sessions would share its counters. The
+/// constructor rejects such gates.</para>
 ///
 /// <para><b>Honesty — what this adapter does NOT claim.</b> Points other than <c>pre_tool_call</c> return
 /// <see cref="Verdict.Allow"/> carrying a <see cref="Warning"/> that names the point as unenforced. That is
@@ -34,11 +41,19 @@ namespace AgentEval.MAF.AgentHooks;
 /// "this was checked and found safe". The warning is the only conformant way to say so today — the
 /// <c>Verdict</c> schema is <c>additionalProperties: false</c> with no extension slot, and its
 /// <c>decision</c> enum has no abstain value. This limitation is the motivating case for the AEVP evidence
-/// profile (S2) and the upstream abstention proposal (S3).</para>
+/// profile (S2) and the upstream abstention proposal (S3). A context without <c>messages</c> is evaluated, but the
+/// verdict carries a warning that conversation-correlating gates had nothing to check.</para>
+///
+/// <para><b>Evidence.</b> Every verdict carries an AEVP profile's content address, and the profile's canonical
+/// bytes are written to the <see cref="ArtifactStore"/> before the verdict is returned, so the address resolves.</para>
 /// </remarks>
 public sealed class GatekeeperInterceptor : IInterceptor
 {
-    private readonly IReadOnlyList<IToolGate> _toolGates;
+    /// <summary>Full gate passes allowed after an argument rewrite before the call is denied as non-convergent; the
+    /// same bound as the Gatekeeper tool pipeline.</summary>
+    public const int MaxMutationRevalidations = 8;
+
+    private readonly IToolGate[] _toolGates;
 
     /// <summary>Reason prefix for verdicts this adapter produces. Interceptor-supplied reasons must not use
     /// the <c>host_error:</c> prefix, which the spec reserves for host-synthesized failures (§5).</summary>
@@ -46,15 +61,41 @@ public sealed class GatekeeperInterceptor : IInterceptor
 
     /// <summary>Creates an interceptor over the supplied Gatekeeper tool gates.</summary>
     /// <param name="toolGates">
-    /// The gates to run at <c>pre_tool_call</c>, in composition order. An empty list is permitted and is
-    /// reported honestly (every verdict then carries the "no gate registered" warning) rather than silently
-    /// reading as a clean pass.
+    /// The gates to run at <c>pre_tool_call</c>, in composition order. The list is copied, so later changes to the
+    /// caller's list do not change what is enforced. An empty list is permitted and is reported honestly (every
+    /// verdict then carries the "no gate registered" warning) rather than silently reading as a clean pass.
     /// </param>
-    public GatekeeperInterceptor(IReadOnlyList<IToolGate> toolGates)
+    /// <param name="artifactStore">
+    /// Where emitted AEVP profiles are written so their addresses resolve. Defaults to an
+    /// <see cref="InMemoryAevpArtifactStore"/>, which resolves for the lifetime of the process.
+    /// </param>
+    /// <exception cref="ArgumentException">A gate is null, or requires a run scope that an AGENT-HOOKS host does not
+    /// establish.</exception>
+    public GatekeeperInterceptor(IReadOnlyList<IToolGate> toolGates, IAevpArtifactStore? artifactStore = null)
     {
         ArgumentNullException.ThrowIfNull(toolGates);
-        _toolGates = toolGates;
+
+        // Snapshot now: a caller-owned List<IToolGate> mutated later must not change enforcement, and must not throw
+        // "collection was modified" in the middle of an interception.
+        _toolGates = toolGates.ToArray();
+        for (var i = 0; i < _toolGates.Length; i++)
+        {
+            var gate = _toolGates[i] ?? throw new ArgumentException($"Gate at index {i} is null.", nameof(toolGates));
+            if (gate.Requirements.HasFlag(GateRequirements.RunScope))
+            {
+                throw new ArgumentException(
+                    $"Gate '{gate.PolicyName}' requires a run scope (GateRequirements.RunScope). An AGENT-HOOKS host does " +
+                    "not establish one, so its state would fall back to a process-wide ledger shared by every session. " +
+                    "Use it inside a MAF agent built with UseGatekeeper instead.",
+                    nameof(toolGates));
+            }
+        }
+
+        ArtifactStore = artifactStore ?? new InMemoryAevpArtifactStore();
     }
+
+    /// <summary>Where this interceptor writes the AEVP profiles its verdicts point to.</summary>
+    public IAevpArtifactStore ArtifactStore { get; }
 
     /// <inheritdoc />
     public async ValueTask<Verdict> InterceptAsync(AgentContext context, CancellationToken ct)
@@ -64,11 +105,11 @@ public sealed class GatekeeperInterceptor : IInterceptor
         // returning a bare permit that would read as "checked and safe".
         if (context.InterceptionPoint != InterceptionPoint.PreToolCall)
         {
-            return NotEnforced(context.InterceptionPoint);
+            return await NotEnforcedAsync(context.InterceptionPoint, ct).ConfigureAwait(false);
         }
 
-        var call = AgentContextMapper.ToGatedToolCall(context);
-        if (call is null)
+        var original = AgentContextMapper.ToGatedToolCall(context);
+        if (original is null)
         {
             // A pre_tool_call context without a usable tool_call is malformed for this point. Fail closed
             // with a deny rather than allowing an unexamined call through (never silently swallow).
@@ -77,70 +118,130 @@ public sealed class GatekeeperInterceptor : IInterceptor
                 "pre_tool_call context did not carry a readable tool_call.name; refusing to allow an unexamined tool call.");
         }
 
-        if (_toolGates.Count == 0)
+        if (_toolGates.Length == 0)
         {
-            return NoGatesRegistered();
+            return await NoGatesRegisteredAsync(ct).ConfigureAwait(false);
         }
 
-        // STRICT SEQUENTIAL, first-non-Allow-wins — mirrors AgentEvalToolGateExtensions exactly.
-        foreach (var gate in _toolGates)
+        var call = original;
+        ToolGateVerdict? lastMutation = null;
+        var revalidations = 0;
+
+        // STRICT SEQUENTIAL, first-Block-wins, to a fixed point: an argument rewrite restarts the scan from the first
+        // gate, so no gate is skipped and the rewritten call is checked by every gate before the host may run it.
+        while (true)
         {
-            ct.ThrowIfCancellationRequested();
+            var argumentsChanged = false;
 
-            var verdict = await gate.InspectAsync(call, ct).ConfigureAwait(false);
-
-            switch (verdict.Action)
+            foreach (var gate in _toolGates)
             {
-                case ToolGateAction.Allow:
-                    continue;
+                ct.ThrowIfCancellationRequested();
 
-                case ToolGateAction.Block:
+                ToolGateVerdict verdict;
+                try
+                {
+                    verdict = await gate.InspectAsync(call, ct).ConfigureAwait(false);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    // A gate that cannot decide must not let the call through.
                     return Verdict.Deny(
-                        $"{ReasonPrefix}.{Slug(verdict.PolicyName)}",
-                        verdict.Reason ?? $"Blocked by {verdict.PolicyName}.")
-                        with { Evidence = Aevp(EvaluatedProfile(verdict.PolicyName)) };
+                        $"{ReasonPrefix}.{Slug(gate.PolicyName)}",
+                        $"Gate '{gate.PolicyName}' threw ({ex.GetType().Name}); failing closed.")
+                        with { Evidence = await EvidenceAsync(EvaluatedProfile(gate.PolicyName), ct).ConfigureAwait(false) };
+                }
 
-                case ToolGateAction.Mutate:
-                    return ToTransform(verdict);
+                switch (verdict.Action)
+                {
+                    case ToolGateAction.Allow:
+                        continue;
 
-                default:
-                    // An unrecognised action must not be treated as Allow. Fail closed.
-                    return Verdict.Deny(
-                        $"{ReasonPrefix}.unknown_action",
-                        $"Gate '{verdict.PolicyName}' returned an unrecognised action; failing closed.");
+                    case ToolGateAction.Block:
+                        return Verdict.Deny(
+                            $"{ReasonPrefix}.{Slug(verdict.PolicyName)}",
+                            verdict.Reason ?? $"Blocked by {verdict.PolicyName}.")
+                            with { Evidence = await EvidenceAsync(EvaluatedProfile(verdict.PolicyName), ct).ConfigureAwait(false) };
+
+                    case ToolGateAction.Mutate:
+                    {
+                        var rewritten = AgentContextMapper.ToJsonObject(verdict.NewArguments);
+                        if (rewritten is null)
+                        {
+                            // The gate wanted to change the call and the change cannot be carried faithfully.
+                            return Verdict.Deny(
+                                $"{ReasonPrefix}.{Slug(verdict.PolicyName)}",
+                                verdict.Reason ?? $"{verdict.PolicyName} required rewritten arguments that could not be serialized faithfully.")
+                                with { Evidence = await EvidenceAsync(EvaluatedProfile(verdict.PolicyName), ct).ConfigureAwait(false) };
+                        }
+
+                        if (JsonNode.DeepEquals(rewritten, AgentContextMapper.ToJsonObject(call.Arguments) ?? new JsonObject()))
+                        {
+                            continue;   // a rewrite to the same arguments is a fixed point, not a change
+                        }
+
+                        call = call with { Arguments = verdict.NewArguments };
+                        lastMutation = verdict;
+                        argumentsChanged = true;
+                        break;
+                    }
+
+                    default:
+                        // An unrecognised action must not be treated as Allow. Fail closed.
+                        return Verdict.Deny(
+                            $"{ReasonPrefix}.unknown_action",
+                            $"Gate '{verdict.PolicyName}' returned an unrecognised action; failing closed.");
+                }
+
+                if (argumentsChanged)
+                {
+                    break;   // restart the scan against the rewritten arguments
+                }
+            }
+
+            if (!argumentsChanged)
+            {
+                break;   // a full pass changed nothing: the call (rewritten or not) satisfies every gate
+            }
+
+            if (++revalidations > MaxMutationRevalidations)
+            {
+                return Verdict.Deny(
+                    $"{ReasonPrefix}.mutation_revalidation",
+                    $"Gate rewrites did not converge within {MaxMutationRevalidations} passes; failing closed.")
+                    with { Evidence = await EvidenceAsync(EvaluatedProfile(lastMutation!.PolicyName), ct).ConfigureAwait(false) };
             }
         }
 
-        // Every gate ran and agreed. Unlike the not-enforced paths above, this permit IS evidence.
-        return Verdict.Allow with { Evidence = Aevp(EvaluatedProfile(_toolGates[^1].PolicyName)) };
-    }
+        var warnings = AgentContextMapper.HasConversation(context) ? [] : new[] { NoConversationWarning };
 
-    /// <summary>Maps a Mutate verdict onto a spec <c>transform</c> rooted at <c>$target</c>.</summary>
-    private static Verdict ToTransform(ToolGateVerdict verdict)
-    {
-        var rewritten = AgentContextMapper.ToJsonObject(verdict.NewArguments);
-        if (rewritten is null)
+        if (lastMutation is not null)
         {
-            // A Mutate with no usable arguments cannot be expressed as a transform. Denying is the honest
-            // outcome: the gate wanted to change the call, and we could not carry that change.
-            return Verdict.Deny(
-                $"{ReasonPrefix}.{Slug(verdict.PolicyName)}",
-                verdict.Reason ?? $"{verdict.PolicyName} required rewritten arguments that could not be serialized.");
+            // §4.2 fixes target = tool_call.args at pre_tool_call, so the whole args object is the transform root.
+            return new Verdict(
+                Decision.Transform,
+                $"{ReasonPrefix}.{Slug(lastMutation.PolicyName)}",
+                lastMutation.Reason ?? $"Arguments rewritten by {lastMutation.PolicyName}.",
+                Warnings: warnings,
+                Approval: null,
+                Transform: new Transform("$target", AgentContextMapper.ToJsonObject(call.Arguments)!),
+                Evidence: await EvidenceAsync(EvaluatedProfile(lastMutation.PolicyName), ct).ConfigureAwait(false),
+                ResultLabels: []);
         }
 
-        // §4.2 fixes target = tool_call.args at pre_tool_call, so the whole args object is the transform root.
-        return new Verdict(
-            Decision.Transform,
-            $"{ReasonPrefix}.{Slug(verdict.PolicyName)}",
-            verdict.Reason ?? $"Arguments rewritten by {verdict.PolicyName}.",
-            Warnings: [],
-            Approval: null,
-            Transform: new Transform("$target", rewritten),
-            Evidence: Aevp(EvaluatedProfile(verdict.PolicyName)),
-            ResultLabels: []);
+        // Every gate ran and agreed. Unlike the not-enforced paths above, this permit IS evidence.
+        return Verdict.Allow with
+        {
+            Warnings = warnings,
+            Evidence = await EvidenceAsync(EvaluatedProfile(_toolGates[^1].PolicyName), ct).ConfigureAwait(false),
+        };
     }
 
-    private static Verdict NotEnforced(InterceptionPoint point) =>
+    private static readonly Warning NoConversationWarning = new(
+        $"{ReasonPrefix}.no_conversation",
+        "The context carried no messages, so gates that correlate against the conversation (ReferentialIntegrityGate, " +
+        "TaintTrackingGate) had nothing to check. Their silence here is a coverage gap, not a pass.");
+
+    private async ValueTask<Verdict> NotEnforcedAsync(InterceptionPoint point, CancellationToken ct) =>
         Verdict.Allow with
         {
             Warnings =
@@ -152,14 +253,14 @@ public sealed class GatekeeperInterceptor : IInterceptor
             ],
             // evaluated:false — the permit carries no evidence of safety. This is the abstention the closed
             // decision enum cannot express, and the reason AEVP exists.
-            Evidence = Aevp(new AgentEvidenceProfile
+            Evidence = await EvidenceAsync(new AgentEvidenceProfile
             {
                 Evaluated = false,
                 EnforcementCapability = AevpEnforcementCapability.Observe,
-            }),
+            }, ct).ConfigureAwait(false),
         };
 
-    private static Verdict NoGatesRegistered() =>
+    private async ValueTask<Verdict> NoGatesRegisteredAsync(CancellationToken ct) =>
         Verdict.Allow with
         {
             Warnings =
@@ -168,23 +269,29 @@ public sealed class GatekeeperInterceptor : IInterceptor
                     $"{ReasonPrefix}.no_gates_registered",
                     "No Gatekeeper tool gates were registered. This allow means nothing examined the call.")
             ],
-            Evidence = Aevp(new AgentEvidenceProfile
+            Evidence = await EvidenceAsync(new AgentEvidenceProfile
             {
                 Evaluated = false,
                 EnforcementCapability = AevpEnforcementCapability.Observe,
-            }),
+            }, ct).ConfigureAwait(false),
         };
 
     /// <summary>
-    /// Builds the AGENT-HOOKS <c>evidence</c> pointer for a profile. The pointer carries only the content
-    /// address — §5.3 caps the serialized <c>evidence</c> member at 10,240 bytes, so the profile itself lives
-    /// outside the verdict and is resolved by an auditor.
+    /// Writes the profile's canonical bytes to <see cref="ArtifactStore"/> and returns the AGENT-HOOKS
+    /// <c>evidence</c> pointer to them. The pointer carries only the content address — §5.3 caps the serialized
+    /// <c>evidence</c> member at 10,240 bytes, so the profile itself lives outside the verdict and is resolved by an
+    /// auditor. It is stored first, so no verdict ever points at bytes nobody kept.
     /// </summary>
-    private static Evidence Aevp(AgentEvidenceProfile profile) =>
-        new(profile.ToContentAddress(), new Dictionary<string, string>
+    private async ValueTask<Evidence> EvidenceAsync(AgentEvidenceProfile profile, CancellationToken ct)
+    {
+        var canonical = profile.ToCanonicalJson();
+        var address = AgentEvidenceProfile.AddressOf(canonical);
+        await ArtifactStore.PutAsync(address, canonical, ct).ConfigureAwait(false);
+        return new Evidence(address, new Dictionary<string, string>
         {
             ["aevp"] = AgentEvidenceProfile.SpecVersion,
         });
+    }
 
     /// <summary>The profile describing a verdict this interceptor actually computed at the tool seam.</summary>
     private static AgentEvidenceProfile EvaluatedProfile(string policyName) => new()

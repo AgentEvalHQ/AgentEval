@@ -1,5 +1,5 @@
 {
-  "$id": "https://github.com/joslat/AgentEval/schema/aevp/0.1/aevp.schema.json",
+  "$id": "https://agenteval.dev/schemas/aevp-0.1.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "AEVP 0.1 — Agent Evidence Profile",
   "description": "The document an AGENT-HOOKS-0.1 verdict.evidence.artefact content address resolves to. AGENT-HOOKS-0.1 §5.3 defines the POINTER to an 'offline-verifiable artefact supporting the verdict' but never defines the artefact's contents; this profile does, for the one question the contract leaves unanswerable: how much should this verdict be trusted.",

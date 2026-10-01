@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Reflection;
 using System.Text;
 using Xunit;
@@ -13,7 +14,9 @@ namespace AgentEval.Tests.MAF.Gatekeeper;
 /// Gatekeeper v1 API freeze: the public surface of Gatekeeper (<c>AgentEval.MAF.Gatekeeper*</c>,
 /// <c>AgentEval.Guardrails*</c>, and the AgentHooks adapter) is snapshotted. Any change to a public type or member
 /// fails this test until the new snapshot is reviewed and accepted, so the surface cannot move silently.
-/// Types marked <c>[Experimental]</c> are listed with that marker: they are preview, outside the v1 promise.
+/// Types marked <c>[Experimental]</c>, directly or by their assembly, are listed with that marker: they are preview,
+/// outside the v1 promise. Parameter names and default values are part of the surface (renaming a parameter breaks
+/// named-argument callers; changing a default changes compiled callers), so both are in the snapshot.
 /// </summary>
 public class GatekeeperPublicApiSnapshotTests
 {
@@ -40,7 +43,9 @@ public class GatekeeperPublicApiSnapshotTests
         var sb = new StringBuilder();
         foreach (var t in types)
         {
-            var experimental = t.GetCustomAttribute<ExperimentalAttribute>() is { } x ? $" [Experimental({x.DiagnosticId})]" : "";
+            var experimental = (t.GetCustomAttribute<ExperimentalAttribute>() ?? t.Assembly.GetCustomAttribute<ExperimentalAttribute>()) is { } x
+                ? $" [Experimental({x.DiagnosticId})]"
+                : "";
             sb.Append(Kind(t)).Append(' ').Append(Name(t)).AppendLine(experimental);
             foreach (var m in Members(t))
                 sb.Append("    ").AppendLine(m);
@@ -80,7 +85,20 @@ public class GatekeeperPublicApiSnapshotTests
         m.IsGenericMethodDefinition ? "<" + string.Join(", ", m.GetGenericArguments().Select(a => a.Name)) + ">" : "";
 
     private static string Params(ParameterInfo[] ps) =>
-        string.Join(", ", ps.Select(p => $"{(p.ParameterType.IsByRef ? (p.IsOut ? "out " : "ref ") : "")}{Name(p.ParameterType.IsByRef ? p.ParameterType.GetElementType()! : p.ParameterType)}{(p.HasDefaultValue ? " = …" : "")}"));
+        string.Join(", ", ps.Select(p => $"{(p.ParameterType.IsByRef ? (p.IsOut ? "out " : "ref ") : "")}{Name(p.ParameterType.IsByRef ? p.ParameterType.GetElementType()! : p.ParameterType)} {p.Name}{(p.HasDefaultValue ? " = " + Default(p) : "")}"));
+
+    /// <summary>A stable, culture-invariant rendering of a parameter's default value.</summary>
+    private static string Default(ParameterInfo p) => p.DefaultValue switch
+    {
+        null when p.ParameterType.IsValueType && Nullable.GetUnderlyingType(p.ParameterType) is null => "default",
+        null => "null",
+        DBNull or Missing => "default",
+        string s => "\"" + s + "\"",
+        bool b => b ? "true" : "false",
+        Enum e => e.GetType().Name + "." + e,
+        IFormattable f => f.ToString(null, CultureInfo.InvariantCulture),
+        var v => v.ToString() ?? "?",
+    };
 
     private static string Name(Type t)
     {

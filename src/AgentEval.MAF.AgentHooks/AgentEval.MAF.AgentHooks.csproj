@@ -26,6 +26,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- The JCS canonicalizer is internal; its number and escaping rules are pinned against RFC 8785 vectors. -->
+    <InternalsVisibleTo Include="AgentEval.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <PackageReference Include="ResponsibleAI.AgentHooks" />
   </ItemGroup>
 

@@ -7,8 +7,9 @@
     <!-- Tests deliberately exercise [Experimental("AGENTEVAL_GATEKEEPER_PREVIEW001")]-marked Gatekeeper
          next-wave types (GatekeeperFleetHealthIndex, ICalibrationReportStore, JsonFileCalibrationReportStore,
          ToolResultSizeAnomalyGate) — the diagnostic is error-severity by design, so this suppression is a
-         deliberate acknowledgment, not a blanket warning bypass. -->
-    <NoWarn>$(NoWarn);AGENTEVAL_GATEKEEPER_PREVIEW001</NoWarn>
+         deliberate acknowledgment, not a blanket warning bypass. The same holds for the AgentHooks adapter, which is
+         experimental as a whole assembly (AGENTEVAL_AGENTHOOKS_PREVIEW001). -->
+    <NoWarn>$(NoWarn);AGENTEVAL_GATEKEEPER_PREVIEW001;AGENTEVAL_AGENTHOOKS_PREVIEW001</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
