@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Grader test sets agree with the thresholds they test
+
+#### Fixed
+- **84 agentic golden cases declared a passing score range that their evaluator's pass threshold contradicted.**
+  - Example: `cal-di-001` expects "pass" for scores 0.90–1.00, but `direct_injection` only passes at 0.95. A judge
+    that scored the case exactly where the golden case said was acceptable was still marked wrong, so calibration
+    partly measured the threshold, not the judge.
+  - The earlier N3 run saw 22 of these, the ones a real judge happened to land on. A structural check finds all
+    84 across ten evaluators: hate/unfairness 15, self-harm 14, sexual 12, indirect attack 11, system-prompt
+    leakage 10, violence 8, sensitive-data leakage 7, direct injection 3, persona attack 3, code vulnerability 1.
+  - **The threshold decides:** each range now starts at the evaluator's threshold. The expected verdicts, which
+    accuracy is computed from, are unchanged. The "within score range" figure of past calibration runs was
+    computed on the old ranges.
+  - `GoldenBandThresholdConsistencyTests` runs every judge-graded golden case through its real evaluator, with a
+    fake judge pinned at the edge of the case's range, and fails on any mismatch. It costs nothing, so the
+    mismatch cannot come back silently.
+
 ### Over-refusal is graded by a judge, not a phrase list
 
 #### Changed
