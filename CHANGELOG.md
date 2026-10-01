@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### Calibration reports default to the workspace folder
+
+#### Changed
+- **`bench gdpr calibrate`, `bench eu-ai-act calibrate` and `bench agentic calibrate` now write their report to
+  `.agenteval/calibration/<family>-calibration-<date>.md` when `--out` is not given.** The old default was
+  `strategy/FutureFeatures/calibration-baselines/`, which is this repository's private planning folder. Running
+  `calibrate` in your own project created that tree there. Every other bench command already writes under
+  `.agenteval/`. Pass `--out` to choose the path.
+
 ### Grader test sets agree with the thresholds they test
 
 #### Fixed

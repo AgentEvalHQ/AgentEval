@@ -143,7 +143,7 @@ benchGdprCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 
 // bench gdpr calibrate
 var calibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };
-var calibrateOutOpt = new Option<string?>("--out") { Description = "Output Markdown report path (default: strategy/FutureFeatures/calibration-baselines/gdpr-calibration-{date}.md)" };
+var calibrateOutOpt = new Option<string?>("--out") { Description = "Output Markdown report path (default: .agenteval/calibration/gdpr-calibration-{date}.md)" };
 var calibrateDecisionsOpt = new Option<bool>("--decisions") { Description = "Grade with the decision model (TypeSafe Jev) instead of the generative judge, for a judge-vs-judge calibration. Reads TYPESAFE_API_KEY (or OPENROUTER_API_KEY); JEV_MODEL pins a build. ADR-033: the adapter is for calibration only — nothing it produces is persisted as an eval tree." };
 var calibrateCmd = new Command("calibrate", "Run GDPR judge calibration against hand-labeled golden datasets");
 calibrateCmd.Add(calibrateRootOpt);
@@ -228,7 +228,7 @@ benchEuAiActCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) 
 });
 // bench eu-ai-act calibrate
 var euCalibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };
-var euCalibrateOutOpt = new Option<string?>("--out") { Description = "Output Markdown report path (default: strategy/FutureFeatures/calibration-baselines/eu-ai-act-calibration-{date}.md)" };
+var euCalibrateOutOpt = new Option<string?>("--out") { Description = "Output Markdown report path (default: .agenteval/calibration/eu-ai-act-calibration-{date}.md)" };
 var euCalibrateDecisionsOpt = new Option<bool>("--decisions") { Description = "Grade with the decision model (TypeSafe Jev) instead of the generative judge, for a judge-vs-judge calibration. Reads TYPESAFE_API_KEY (or OPENROUTER_API_KEY); JEV_MODEL pins a build. ADR-033: the adapter is for calibration only — nothing it produces is persisted as an eval tree." };
 var euCalibrateCmd = new Command("calibrate", "Run EU AI Act judge calibration against hand-labeled golden datasets");
 euCalibrateCmd.Add(euCalibrateRootOpt);
@@ -293,7 +293,7 @@ benchAgenticCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) 
 });
 // bench agentic calibrate
 var agenticCalibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };
-var agenticCalibrateOutOpt = new Option<string?>("--out") { Description = "Output Markdown report path (default: strategy/FutureFeatures/calibration-baselines/agentic-calibration-{date}.md)" };
+var agenticCalibrateOutOpt = new Option<string?>("--out") { Description = "Output Markdown report path (default: .agenteval/calibration/agentic-calibration-{date}.md)" };
 var agenticCalibrateRecordsOpt = new Option<string?>("--records") { Description = "Also write one JSON line per evaluated case (verdict, every criterion's verdict, prompt id and hash) to this path, so the run can be re-analysed without repeating the calls" };
 var agenticCalibrateLimitOpt = new Option<int?>("--limit") { Description = "Evaluate at most N entries per category (the one-item stage before a full paid run)" };
 var agenticCalibrateCmd = new Command("calibrate", "Run agentic judge calibration against hand-labeled golden datasets");

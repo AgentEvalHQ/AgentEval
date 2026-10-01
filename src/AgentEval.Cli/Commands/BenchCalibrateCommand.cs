@@ -145,7 +145,7 @@ public static class BenchCalibrateCommand
         var dateStr = report.GeneratedAt.ToString("yyyy-MM-dd");
         var defaultOut = Path.Combine(
             rootOverride ?? Directory.GetCurrentDirectory(),
-            "strategy", "FutureFeatures", "calibration-baselines", $"gdpr-calibration-{dateStr}.md");
+            ".agenteval", "calibration", $"gdpr-calibration-{dateStr}.md");   // the workspace folder every bench command writes to
         var outPath = outPathOverride ?? defaultOut;
 
         try
