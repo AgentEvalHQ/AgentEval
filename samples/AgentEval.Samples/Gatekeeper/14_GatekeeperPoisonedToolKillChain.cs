@@ -89,7 +89,7 @@ public static class GatekeeperPoisonedToolKillChain
                 new ChatClientAgentOptions
                 {
                     Name = "PoisonedSourceDemo",
-                    ChatOptions = new ChatOptions { Tools = [partnerTool], MaxOutputTokens = 256 },
+                    ChatOptions = new ChatOptions { Tools = [partnerTool], MaxOutputTokens = 1024 },
                 });
 
             var gated = baseAgent.AsBuilder()
@@ -237,7 +237,7 @@ public static class GatekeeperPoisonedToolKillChain
             new ChatClientAgentOptions
             {
                 Name = "CompromisedAgentDemo",
-                ChatOptions = new ChatOptions { Tools = tools, MaxOutputTokens = 256 },
+                ChatOptions = new ChatOptions { Tools = tools, MaxOutputTokens = 1024 },
             });
 
         var gated = baseAgent.AsBuilder()

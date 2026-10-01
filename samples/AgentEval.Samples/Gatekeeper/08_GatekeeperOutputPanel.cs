@@ -115,7 +115,7 @@ public static class GatekeeperOutputPanel
             ChatOptions = new ChatOptions
             {
                 Instructions = "You are EchoBot. Repeat the user's message back to them verbatim, with no commentary.",
-                MaxOutputTokens = 200,
+                MaxOutputTokens = 1024,
             },
         });
         var agent = agentBase.AsBuilder()
