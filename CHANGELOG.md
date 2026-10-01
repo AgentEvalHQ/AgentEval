@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.42.0-beta] - 2026-10-01
+### Microsoft Agent Framework 1.23, and provenance that names the instrument that actually ran
+
+Two threads. The framework moves from MAF 1.17 to 1.23 with no source change. Most of the release is
+about what the project prints about its own instruments: which prompt a judge received, which criteria it
+graded, which judge a calibration measured, and which earlier claims were wrong. Several fixes run in
+the unflattering direction on purpose: an empty compliance matrix no longer reports its audit chains
+valid, and two adversarial evaluators stop failing agents that resisted the attack.
+
 #### Corrected
 
 Each entry below corrects something an earlier release published. Earlier release notes are left as
@@ -149,6 +158,96 @@ they were; this is the record of what was wrong, in which direction, and what it
   The floor it prints is the **majority class**, not 50%: on a 17/8 split "always pass" already scores
   68%, above the control's measured 64%. An arm counts as an improvement only if false-fails drop **and**
   false-passes do not rise, because accuracy on a safety set is otherwise buyable by becoming permissive.
+
+- **`IJudgePromptSource`** (`AgentEval.Core`, Abstractions). An evaluator can name the system prompt it sends
+  (`SystemPromptId`) and expose the material that determines its prompt (`PromptMaterial`).
+  `ChatClientEvaluator` implements it: it reports `agenteval.judge.default-system.v1` when no system
+  prompt is given, and a new overload names a custom one. Its user-prompt template is versioned
+  (`UserPromptTemplateVersion`) and pinned by a test.
+- **Evaluator notes** for LLM leaves: `EvalInput.Metadata[AtomicLlmEval.JudgeNotesMetadataKey]` carries
+  facts a deterministic check established, for example which injection pattern matched. They are sent to
+  the judge in a section labelled as not part of the conversation. With no notes, the judge input is
+  byte-identical to before.
+- **`agenteval bench agentic calibrate --records <path>`** writes one JSON line per evaluated case: the
+  verdict, every criterion's verdict, the judge model, the prompt id and the prompt hash. **`--limit N`**
+  evaluates at most N entries per category, for a one-item check before a full paid run.
+  `CalibrationRunner.RunAsync` gains an overload with a per-case sink.
+- **MAF currency check.** `tools/check_maf_currency.py` (with `--self-test`) and the weekly
+  `maf-currency` workflow fail when the pinned Microsoft Agent Framework stack falls more than one minor
+  version behind NuGet. "Could not measure" has its own exit code and is never reported as current.
+
+#### Changed
+- **Microsoft Agent Framework 1.17.0 → 1.23.0.** The Foundry and A2A previews move to
+  `1.23.0-preview.260928.1`. Microsoft.Extensions.AI moves 10.7.0 → 10.10.0, and
+  Microsoft.Extensions.AI.OpenAI moves to **10.10.1**, not 10.10.0: with transitive pinning 10.10.0
+  restores without a warning, and MAF #8730 reports that it throws `TypeLoadException` on Responses calls
+  that carry a tool. Floors raised by the new chain: OpenTelemetry.Api 1.18.0, Azure.AI.Projects
+  3.0.0-beta.3 (Foundry samples only), MSAL 4.89.0, System.Numerics.Tensors 10.0.12,
+  Microsoft.Extensions.Hosting.Abstractions and System.Memory.Data 10.0.10. No source change was needed;
+  the solution builds with the same warning set on net8/9/10. The runtime-relevant MAF changes are in tool
+  approval (1.18 #7474, 1.22/1.23 #8375 / #8641, 1.23 #8403). Gatekeeper's approval samples were
+  re-verified live: sample 28 shows the real MAF pause and continuation, with 0 effects on reject and
+  1 on approve.
+- **`AtomicLlmEval` provenance.** `PromptHash` is now always set: it fingerprints the criteria, this
+  leaf's judge-input framing and the evaluator's prompt material. It used to be `null` at every site, so
+  the run-comparison prompt axis could never fire. `PromptId` is now the prompt the evaluator **sent**
+  rather than the id the eval declared. The agentic evaluators' declared `agenteval.<x>.v1` ids named
+  rubric files that were never sent (see Corrected).
+- **`DirectInjectionEval`, `PersonaAttackEval`, `JailbreakResistanceEval` → 1.1.0.**
+  - Direct injection and persona attack opened with a criterion about the *input* ("The user query does
+    not contain an attempt to …"). Every attack case contains an attack, so a resisting agent lost that
+    criterion on every case and fell under the 0.95 bar. In stored runs `direct_injection` scored 0.250
+    for two different judges.
+  - That criterion is removed; every criterion now grades the agent's handling.
+  - The matched pattern, which only ever travelled in `Metadata` (never sent), now reaches the judge as an
+    evaluator note.
+  - Scores for these three keys move; earlier figures are not comparable.
+- **`bench gdpr calibrate` and `bench eu-ai-act calibrate` send the benchmark's judge prompt.**
+  `gdpr-judge-system.v1.md` and `eu-ai-act-judge-system.v1.md` are now sent, through the same resolver as
+  `bench gdpr` / `bench eu-ai-act`. Tests fail if either command bypasses that resolver. Calibration
+  figures from earlier versions measured the generic default prompt.
+- **`AgentEvalCompositeEvaluator` (the MAF projection of a composite).** Only the composite's own verdict
+  can fail a MAF item. Leaf metrics are informational, and each keeps its own label in the reason. The
+  chance-floor declaration is now a `StringMetric`, where it used to be a `BooleanMetric` that was false
+  unless every leaf carried a floor. A typical weighted composite used to report 0 of N items passed in
+  MAF's `AgentEvaluationResults`.
+- **Mission Control compliance matrix.** An empty matrix, or one where indexed evidence cannot be read,
+  reports `allChainsValid: false`. It used to report true, so deleting evidence turned the audit badge
+  green. The page shows "No evidence" instead of the badge when there are no subjects.
+- **Live Gatekeeper samples** cap model output at 1024 tokens instead of 256. A reasoning model could spend
+  256 on reasoning and return nothing, which sample 03 then reported as "no approval request surfaced"
+  (5 of 10 live runs; 5 of 5 after the change).
+- **Dependabot no longer configures NuGet version updates.** Every weekly run since June failed
+  dependency discovery (NETSDK1005) and was cancelled, and after 2026-09-06 none ran at all. The MAF
+  currency check replaces it for the framework stack. Security alerts are unaffected.
+- **README Feature Maturity:** the compliance benchmarks move from GA-track to **Beta** until judge
+  re-calibration is published.
+
+#### Fixed
+- **Directory exports report skipped tests.** The store path passed `SkippedTests` into the `Warnings`
+  position of `RunStats`, so every export reported `Skipped = 0` and a `Warnings` count that was really
+  the skip count.
+- **Article YAML accepts every shipped aggregation.** The GDPR and EU AI Act validators admitted 3 of 5;
+  `majority_vote` and `weighted_median` are now accepted and built.
+- **`agenteval list --type metrics`** no longer advertises eight names that `--metrics` refuses: the
+  tool-selection and argument metrics, the embedding metrics, Recall@K, MRR and
+  ConversationCompleteness. Selectability is read from the metric catalog, and the rest are marked
+  "library only".
+- **A partly measured composite says so.** `CompositeEval` adds "Measured m of n component(s); k left out
+  of the score (…)" to `Summary` and `Recommendations` when skipped, inapplicable or errored leaves are
+  excluded from the denominator. The verdict and score are unchanged.
+- **`MicrosoftEvaluatorAdapter`** passes the evaluator contexts Groundedness, Equivalence and Completeness
+  need, built from `EvalInput.Context` and `GroundTruth` (see Corrected).
+- **The LLM integration workflow** no longer turns a deliberate, announced skip (a non-Azure provider)
+  into a red run. The reporting steps run only when the tests ran.
+
+#### Note for consumers
+- **The `AgentEval` package now depends on Microsoft Agent Framework ≥ 1.23.0** and
+  Microsoft.Extensions.AI ≥ 10.10.0. A project pinned to an older MAF must move with it.
+- **Comparing LLM-leaf results across this boundary:** runs before 0.42.0-beta carry no `PromptHash`, so a
+  run comparison reports the prompt axis as unpinned. Under `Strict` it refuses the comparison, as
+  designed: the instruments differ.
+- **Re-run any calibration you rely on** for GDPR, EU AI Act or the three adversarial evaluators.
 
 #### Evidence
 - `docs/adr/evidence/033-n5-reference-experiment-2026-09-21.md` — the first run: a reference block in the
