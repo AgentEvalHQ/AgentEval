@@ -335,9 +335,9 @@ public sealed class AgentEvalCompositeEvaluator : IEvaluator {        // (Micros
 `tool_selection`, `tool_input_accuracy`, `tool_output_utilization`, `tool_call_success`; Quality:
 `coherence`, `fluency`, `relevance`, `groundedness`, `response_completeness`, `similarity`; Safety).
 **AgentEval re-implements the same universe locally** (`AgentEval.Evals.Agentic` + `AgentEval.Metrics.*`,
-same names, same rubrics) as LLM-as-judge over any `IChatClient` — **no Azure AI Foundry project
-required**. Net: pick `FoundryEvals` for the managed cloud service + portal; pick AgentEval for the same
-metrics offline/self-hosted, with weighted composites, thresholds, and the HTML/PDF/audit-chain reports.
+same names; AgentEval's judges grade their own short criteria lists, not Foundry's rubric text) as
+LLM-as-judge over any `IChatClient` — **no Azure AI Foundry project required**. Net: pick `FoundryEvals`
+for the managed cloud service + portal; pick AgentEval for equivalently-named metrics offline/self-hosted, with weighted composites, thresholds, and the HTML/PDF/audit-chain reports.
 
 ### 8.5 Workflow evaluation — complementary, not competing
 

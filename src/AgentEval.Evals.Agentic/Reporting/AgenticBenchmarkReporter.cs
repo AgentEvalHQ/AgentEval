@@ -106,8 +106,10 @@ public sealed class AgenticBenchmarkReporter
                 JudgeMode: options.JudgeMode,
                 PromptVersions: options.PromptVersions ?? new Dictionary<string, string>
                 {
-                    ["agentic-judge-system"] = "v1",
-                    ["task-completion-criterion"] = "v1"
+                    // The agentic judges run on ChatClientEvaluator's built-in default system prompt
+                    // plus each evaluator's inline criteria; no versioned prompt file is sent.
+                    // The same id the judge reports as provenance PromptId, so evidence and provenance agree.
+                    ["judge-system"] = AgentEval.Core.ChatClientEvaluator.DefaultSystemPromptId,
                 }));
 
         await WriteAgenticResultFileAsync(store, subject, generatedAt, result, ct);

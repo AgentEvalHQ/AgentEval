@@ -35,6 +35,8 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// Source: forked from Azure/azure-sdk-for-python (commit &lt;TBD-foundry-sha&gt; see CHANGELOG T3.7)
 /// sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_groundedness/groundedness.prompty
 /// License: MIT. Modifications: temperature=0, 4 sub-dimensions, structured evidence[], severity rubric.
+/// These modifications are in the reference prompt file under <c>Resources/Prompts/</c>, which is not
+/// yet sent to the judge; the judge call sets no temperature.
 /// </para>
 /// </summary>
 public sealed class GroundednessEval : IEval

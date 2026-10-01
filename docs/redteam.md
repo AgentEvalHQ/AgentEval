@@ -6,7 +6,7 @@ AgentEval's Red Team module provides **automated security evaluation** for AI ag
 
 ## Capabilities at a glance
 
-**14 built-in attacks · 264 probes · OWASP LLM Top 10 (10/10) · 8 MITRE ATLAS techniques · 5 compliance reporters.** Every capability below is reachable from the [`agenteval redteam` CLI](#agenteval-redteam--cli-reference) and the [`AttackPipeline`](#pipeline-api).
+**14 built-in attacks · 264 probes · OWASP LLM Top 10 (10/10) · 8 MITRE ATLAS techniques · 5 compliance reporters.** Every capability below is reachable from the [`AttackPipeline`](#pipeline-api) and from the CLI ([`agenteval redteam`](#agenteval-redteam--cli-reference), or `agenteval bench owasp\|mitre\|nist` for those reporters) — except the SOC 2 and ISO 27001 reporters, which are library-only for now.
 
 | Capability | What it adds | Where |
 |------------|--------------|-------|
@@ -21,7 +21,7 @@ AgentEval's Red Team module provides **automated security evaluation** for AI ag
 | **z-score calibration** | rank a model vs a peer cohort (`--calibration`) | [Relative scoring](#relative-scoring--calibration---calibration) |
 | **Explainable findings** | `--explain` attaches an LLM rationale narrating the verdict | [Explainable findings](#explainable-findings) |
 | **Dataset import + packs** | `--import-probes` / `--pack` (HarmBench/JailbreakBench/CyberSecEval) | [Benchmark packs walkthrough](#benchmark-packs---pack--install--run-walkthrough) |
-| **Compliance** | OWASP, MITRE, SOC 2, ISO 27001, NIST AI RMF reporters + `bench owasp\|mitre\|nist` | [Compliance Reports](#compliance-reports) |
+| **Compliance** | OWASP, MITRE, SOC 2, ISO 27001, NIST AI RMF reporters; OWASP / MITRE / NIST also via `bench owasp\|mitre\|nist` (SOC 2 and ISO 27001: library API only) | [Compliance Reports](#compliance-reports) |
 | **CI/CD** | SARIF + JUnit export, baseline regression gate, honest exit codes | [CI/CD Integration](#cicd-integration) |
 | **Honesty discipline** | conclusive-only scoring; Inconclusive coverage state; never-fabricate; governance-never-PASS | [Honesty & evidence fidelity](#honesty--evidence-fidelity) |
 

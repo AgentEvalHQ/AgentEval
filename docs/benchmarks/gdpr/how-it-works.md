@@ -101,7 +101,7 @@ The benchmark's results are only as good as the judge that produces them. **Cali
 
 ### The golden datasets — our reference truth
 
-For each pillar, we hand-labeled a set of scenario+response pairs as **pass** or **fail**, each carrying a rationale that cites the specific GDPR article (and sub-article) that justifies the label. These live as JSONL files under `tests/AgentEval.Tests/GdprBenchmark/Calibration/Golden/`.
+For each pillar, we hand-labeled a set of scenario+response pairs as **pass** or **fail**, each carrying a rationale that cites the specific GDPR article (and sub-article) that justifies the label. These live as JSONL files under `tests/AgentEval.Tests/Compliance/Gdpr/Calibration/Golden/`.
 
 Crucially, the golden datasets contain **both kinds of examples**: clearly correct answers (`pass`) and clearly wrong answers (`fail`). A single-class dataset (all-pass or all-fail) would make the math collapse — we'd never know if the judge was lazily agreeing with whichever label dominated. Mixed datasets force the judge to make real distinctions.
 
@@ -132,21 +132,17 @@ The **default gate** is *accuracy ≥ 85%* AND *kappa ≥ 0.70* per pillar, with
 
 ### The release gate
 
-A pillar that fails any threshold blocks the release PR. The CI workflow (`.github/workflows/gdpr-calibration.yml`) runs calibration on every release-branch PR. We only ship a benchmark version when **every pillar** passes calibration.
+A pillar that fails any threshold fails `calibrate`. The CI workflow (`.github/workflows/gdpr-calibration.yml`) is configured to run it on pull requests into `release/**` branches; releases are cut from `main`, and the workflow has not run in this repository.
 
 ### Calibration quality today
 
-Rather than print numbers that change with every refinement, here's the qualitative picture across the five pillars. Specific kappa and accuracy values live in the dated baseline report under `strategy/FutureFeatures/calibration-baselines/gdpr-calibration-{date}.md`.
+The project's calibration figures are not published, so this section states what is known instead of a quality grade:
 
-| Pillar | Calibration quality | Notes |
-|---|---|---|
-| 1 — Foundations | **HIGH** | Strict default gate met |
-| 2 — Lawful basis | **HIGH** | Strict default gate met |
-| 3 — Subject rights | **HIGH** | Strict default gate met |
-| 4 — Transparency | **HIGH** | Strict default gate met |
-| 5 — Privacy by design | **HIGH** | Strict default gate met |
+- The last recorded runs were in May 2026, on the maintainer's Azure OpenAI deployments. The reports were not committed and do not record which judge model produced them.
+- On those runs pillars 1–5 met the strict gate. Pillar 6 (governance), added later, met only a relaxed κ ≥ 0.60 gate (88.0%, κ 0.658 with gpt-4o-mini).
+- `calibrate` grades with the generic default judge prompt, not the GDPR prompt that `bench gdpr` sends, so none of these runs measured the judge configuration the benchmark uses.
 
-If any pillar were to drop into MEDIUM or LOW, the corresponding finding would land in the consolidated tracker (`strategy/FutureFeatures/todo/12-6plan-review-findings-and-fixes.md`) with a fix path before the next release.
+Treat the judge as uncalibrated for your deployment until `calibrate` sends the benchmark prompt and its reports are published.
 
 ---
 
@@ -156,7 +152,7 @@ If any pillar were to drop into MEDIUM or LOW, the corresponding finding would l
 2. **Repeatability.** The same scenarios run on every release. You can see trends over time, not just one-shot snapshots.
 3. **Defensible evidence.** Each run produces a JSON evidence file, a markdown report, and a PDF — all sealed with an audit-chain hash that `agenteval doctor` can re-verify. You can hand the evidence to a DPO, attach it to a PR, or store it for an audit.
 4. **Regulator-grade reasoning.** The judge's rubric is built from the actual EU regulation text. Citations in the report point to the specific article and sub-article that justify each verdict.
-5. **Calibrated quality.** We don't ship a benchmark version until its judge agrees with hand-labeled human experts at near-expert levels. Bench you can trust isn't free — it takes the work above.
+5. **Calibration built in.** Hand-labelled golden sets ship with the benchmark and `calibrate` measures a judge against them; see *Calibration quality today* for what has and has not been measured.
 6. **Open and inspectable.** Every prompt, every scenario, every golden entry is in the repo. You can read why the judge graded the way it did, and disagree if you want.
 
 ---

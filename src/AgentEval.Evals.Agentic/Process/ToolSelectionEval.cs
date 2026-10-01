@@ -15,16 +15,18 @@ namespace AgentEval.Evals.Agentic.Process;
 /// alternatives used in place of required tools?
 /// </para>
 /// <para>
-/// Wraps an <see cref="AtomicLlmEval"/> with a weighted rubric:
-/// required-tool coverage (0.60 weight) − redundancy penalty (0.25) + acceptable-alternative
-/// bonus (0.15). Emits <c>score</c> in <c>[0,1]</c> plus structured <c>evidence[]</c>
-/// and <c>failure_type</c> via the judge's criteria results.
+/// Wraps an <see cref="AtomicLlmEval"/> with four criteria: required-tool coverage, no redundant
+/// calls, alignment with the query intent, and credit for acceptable alternatives. The score is the
+/// judge's overall score in <c>[0,1]</c>, with one evidence entry per criterion. The weighted formula
+/// (0.60 / 0.25 / 0.15) and the <c>failure_type</c> field are in the reference prompt file and are not
+/// yet applied.
 /// </para>
 /// <para>
 /// Source: forked from Azure/azure-sdk-for-python
 /// sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_tool_selection/tool_selection.prompty
 /// License: MIT. Modifications listed in the corresponding prompt file at
 /// Resources/Prompts/process/tool-selection.v1.md.
+/// That prompt file is a reference only and is not yet sent to the judge.
 /// </para>
 /// <para>
 /// Foundry reference: <c>azureai://built-in/evaluators/tool_selection</c>

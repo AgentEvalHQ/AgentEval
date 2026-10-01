@@ -77,7 +77,7 @@ The benchmark cost is dominated by:
 `agenteval bench gdpr calibrate` runs hand-labeled golden datasets through the judge and computes accuracy + Cohen's kappa per pillar:
 
 - One LLM call per golden entry; total cost is in the LOW band (cents to a few dollars per full run with a GPT-4o-class judge, depending on dataset size).
-- The release-gate CI workflow (`.github/workflows/gdpr-calibration.yml`) runs full calibration on each release-branch PR.
+- The release-gate CI workflow (`.github/workflows/gdpr-calibration.yml`) is configured to run full calibration on pull requests into `release/**` branches and on manual dispatch. Releases are cut from `main`, and the workflow has not run in this repository.
 
 ### Cost reduction strategies
 
@@ -249,9 +249,11 @@ The calibration report records per-pillar accuracy (fraction of entries within a
 - Cohen's kappa ≥ 0.70 per pillar
 - Zero evaluation failures (judge errors) per pillar
 
-A pillar that fails any threshold blocks the release PR. The dated report is written to `strategy/FutureFeatures/calibration-baselines/gdpr-calibration-{date}.md` by default (internal artifact, not published on the docs site).
+A pillar that fails any threshold fails the command (exit code 9). The dated Markdown report is written under the working directory unless you pass `--out`; the project's own calibration reports are not published.
 
-**Caveat**: calibration results are only meaningful when a real LLM judge is wired (Azure OpenAI with `AZURE_OPENAI_*` env vars set). Running calibration against the stub judge produces meaningless metrics because the stub always returns placeholder scores.
+**Fixed in 0.42.0-beta:** `calibrate` now sends `gdpr-judge-system.v1.md`, the same judge prompt `bench gdpr` sends; both resolve their judge through one resolver, so they cannot drift apart again. Before 0.42.0-beta, `calibrate` graded with the generic default judge prompt, so calibration figures from earlier versions describe a different judge configuration from the benchmark run. Re-run `calibrate` against your own judge.
+
+**Caveat**: calibration results are only meaningful when a real LLM judge is wired (the provider `AI_INFERENCE_PROVIDER` selects, or a dedicated judge endpoint via `AZURE_OPENAI_JUDGE_*`). Running calibration against the stub judge produces meaningless metrics because the stub always returns placeholder scores.
 
 ---
 

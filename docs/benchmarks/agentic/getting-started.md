@@ -37,7 +37,7 @@ Covers the agent's end-to-end task execution and tool-use behavior:
 - **Tool Efficiency** — whether the agent avoided redundant or wasteful tool calls.
 - **Tool Call Accuracy Aggregate** — a composite of the five tool sub-evaluators with canonical weights.
 
-Each evaluator's prompt file (`Resources/Prompts/<category>/*.v1.md`) carries a header documenting its public MIT-licensed source (Azure SDK for Python `_evaluators/...prompty` files), a date-stamped fork reference, and the modifications applied. Tightening the date stamp to a real pinned commit SHA per file is tracked as a v1.1 polish item.
+Each evaluator's prompt file (`Resources/Prompts/<category>/*.v1.md`) carries a header documenting its public MIT-licensed source (Azure SDK for Python `_evaluators/...prompty` files), a date-stamped fork reference, and the modifications applied. These files ship as references and are **not yet sent to the judge**: every LLM-judge evaluator is graded on its own criteria under a generic judge system prompt. Tightening the date stamp to a real pinned commit SHA per file is tracked as a v1.1 polish item.
 
 ### RAG Quality (Phase 2)
 
@@ -304,15 +304,15 @@ agenteval bench agentic calibrate
 
 The golden datasets live as JSONL files under `tests/AgentEval.Tests/Agentic/Calibration/Golden/`, organised by evaluator category. Each dataset is mixed-class by design (both pass-labeled and fail-labeled entries with rationales) — single-class datasets would let the kappa math collapse trivially. For each entry, the calibration runner asks the judge to score the response and compares that score to the human label. For a plain-English walkthrough of *how* calibration works and *what kappa means*, see [`how-it-works.md`](how-it-works.md).
 
-The calibration report records per-category accuracy (fraction of entries within an acceptable score band) and Cohen's kappa (inter-rater agreement). The default CI workflow `.github/workflows/agentic-calibration.yml` gates release branches on:
+The calibration report records per-category accuracy (fraction of entries within an acceptable score band) and Cohen's kappa (inter-rater agreement). The workflow `.github/workflows/agentic-calibration.yml` is configured to run it on pull requests into `release/**` branches; releases are cut from `main`, and it has not run in this repository. The default gate is:
 
 - Accuracy ≥ 85% per category.
 - Cohen's kappa ≥ 0.70 per category.
 - Zero evaluation failures (judge errors) per category.
 
-A category that fails any threshold blocks the release PR. The calibration report is written to `strategy/FutureFeatures/calibration-baselines/agentic-calibration-{date}.md` by default (internal artifact, not published on the docs site).
+A category that fails its threshold fails the command (exit code 9). The calibration report is written under the working directory unless you pass `--out`; the project's own calibration reports are not published.
 
-**Calibration coverage is a known v1.1 expansion item**: the headline system-and-process and RAG-quality categories meet the strict gate; several other categories run at runtime but await fuller calibration evidence. See the Known Limitations section below and [`how-it-works.md`](how-it-works.md) for the per-category quality picture.
+**Calibration coverage is a known expansion item**: six of the eight scored categories — system, process and RAG quality among them — are gated at relaxed per-category thresholds rather than the 0.85 / 0.70 default, and several categories run at runtime but await fuller calibration evidence. See the Known Limitations section below and [`how-it-works.md`](how-it-works.md) for the per-category quality picture.
 
 **Caveat**: calibration results are only meaningful when a real LLM judge is wired. Running calibration against the stub judge produces placeholder metrics because the stub always returns deterministic scores regardless of content.
 
@@ -320,7 +320,7 @@ A category that fails any threshold blocks the release PR. The calibration repor
 
 ## Prompt Provenance
 
-Evaluator prompts are forked from public MIT-licensed sources (the `azure-sdk-for-python` evaluator `.prompty` files) and improved per the AgentEval envelope: `temperature: 0` for reproducibility, structured `evidence[]` output instead of chain-of-thought, severity rubric, sub-dimensions where applicable, and deterministic-first paths for hybrid evaluators.
+The evaluator prompt files are forked from public MIT-licensed sources (the `azure-sdk-for-python` evaluator `.prompty` files) and modified per the AgentEval envelope: `temperature: 0`, structured `evidence[]` output instead of chain-of-thought, a severity rubric, and sub-dimensions where applicable. **They are not yet sent to the judge**: the judge receives each evaluator's own criteria under a generic system prompt, at the provider's default temperature, so none of those prompt-file modifications is in effect. Sub-dimension splits and deterministic-first paths for hybrid evaluators are implemented in code and do run.
 
 Each prompt file's header carries the source URL, a date-stamped fork reference, and the list of modifications applied — that's the credit-where-credit-is-due story per the MIT license. Tightening the date stamp to a real pinned commit SHA per file is tracked as a v1.1 polish item.
 
@@ -347,7 +347,7 @@ Each prompt file's header carries the source URL, a date-stamped fork reference,
     - **Judge-quality meta** (`calibration_accuracy`, `judge_agreement`, `judge_drift`): consume other evaluators' outputs as input — their `EvalInput.Metadata` contract is incompatible with the calibration golden's `query/response` shape.
     - **Multi-turn / trace-dependent** (Path A' v1.1 carve-out — 5 memory evals + 3 trace-reasoning evals + `f1_score`): the `CalibrationEntry` record is single-turn `(input, response)` and cannot carry the conversation-history / reasoning-trace data these evaluators need to grade against. Tracked for re-inclusion when the entry schema is extended (v1.2 backlog item `MAJOR-05`).
 
-  Active per-category thresholds are recorded in the calibration markdown report header (`strategy/futurefeatures/calibration-baselines/agentic-calibration-{date}.md`). The default gate is `accuracy ≥ 0.85` and `Cohen's kappa ≥ 0.70`; each `BenchAgenticCalibrateCommand.s_categoryOverrides` entry documents its measurement floor + retirement criterion inline.
+  Active per-category thresholds are recorded in the calibration markdown report header. The default gate is `accuracy ≥ 0.85` and `Cohen's kappa ≥ 0.70`; each `BenchAgenticCalibrateCommand.s_categoryOverrides` entry documents its measurement floor + retirement criterion inline.
 
 ---
 

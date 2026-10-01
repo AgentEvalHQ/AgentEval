@@ -14,9 +14,10 @@ namespace AgentEval.Evals.Agentic.Process;
 /// Did it make wasteful calls (tool called but result never used in subsequent reasoning)?
 /// </para>
 /// <para>
-/// Implemented as an <see cref="AtomicLlmEval"/>. The prompt asks the judge to count
-/// redundant and wasteful calls and compute a score of
-/// <c>1.0 − (bad_calls / total_calls)</c>. Severity is intentionally lower than other
+/// Implemented as an <see cref="AtomicLlmEval"/> with three criteria (no redundant calls, no
+/// wasted results, exploratory calls not penalised); the score is the judge's overall score. The
+/// <c>1.0 − (bad_calls / total_calls)</c> formula is in the reference prompt file and is not yet
+/// applied. Severity is intentionally lower than other
 /// process evaluators: efficiency failures are optimization concerns, not correctness failures.
 /// </para>
 /// <para>
@@ -24,6 +25,7 @@ namespace AgentEval.Evals.Agentic.Process;
 /// sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_tool_call_accuracy/tool_call_accuracy.prompty
 /// License: MIT. Modifications listed in the corresponding prompt file at
 /// Resources/Prompts/process/tool-efficiency.v1.md.
+/// That prompt file is a reference only and is not yet sent to the judge.
 /// </para>
 /// <para>
 /// Foundry reference: <c>azureai://built-in/evaluators/tool_call_accuracy</c> (efficiency sub-dimension)

@@ -40,7 +40,7 @@ public sealed class SarifReportExporter : IReportExporter
     private const string SarifVersion = "2.1.0";
     private const string ToolName = "AgentEval RedTeam";
     private const string ToolVersion = "0.2.0";
-    private const string ToolUri = "https://github.com/joslat/AgentEval";   // Jun14-L17: correct upstream repo
+    private const string ToolUri = "https://github.com/AgentEvalHQ/AgentEval";
 
     private static readonly JsonSerializerOptions Options = new()
     {

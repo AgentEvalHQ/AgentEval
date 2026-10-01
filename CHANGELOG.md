@@ -7,6 +7,138 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+#### Corrected
+
+Each entry below corrects something an earlier release published. Earlier release notes are left as
+they were; this is the record of what was wrong, in which direction, and what it touched.
+
+- **Red-team scans do not report over-refusal or Wilson intervals** (0.19.0-beta). That release said
+  red-team reports "state their own uncertainty (Wilson intervals, over-refusal against benign
+  controls …)" and that `FalsePositiveRate` meant "an agent that refuses everything no longer scores as
+  safe". `WilsonInterval`, `BenignControlCorpus`, `FalsePositiveRate`, `ProbeExpectation`,
+  `BypassClassBreakdown` and `ProbeLabelSource` shipped as tested library types, but nothing in a scan
+  uses them: `RedTeamRunner`, `RedTeamResult`, the JSON/SARIF/JUnit/Markdown exporters and the CLI never
+  compute or print an interval, a false-positive rate or a bypass-class breakdown, and no preset runs the
+  benign controls. An agent that refuses every probe is still scored as safe.
+  **Direction:** flattering — it described a safeguard against rewarding over-refusal that scans do not
+  apply. **Affected:** the 0.19.0-beta summary and its `WilsonInterval` / `FalsePositiveRate` entries, and
+  the v0.19.0-beta release notes, which also said the intervals were on "the headline score".
+  **Not affected:** every published red-team score and verdict — none was computed with these types; the
+  SARIF `kind: "open"` fix from the same release, which shipped as described; Gatekeeper's
+  `judge:over-refusal` axis and the false-positive rate in Gatekeeper calibration reports, which are a
+  separate path and do run. `ReportRedaction` is real, but it is an exporter option for library callers:
+  the default keeps attack text and the CLI does not expose it.
+  **Next:** a benign-control arm, its false-positive rate and Wilson intervals are to be wired into
+  `RedTeamResult` and the exporters in a later release. Until then these types are building blocks.
+
+- **κ = 1.000 for four Gatekeeper judges is one unpublished run, not a certification** (0.17.0-beta).
+  `IntentActionMismatchJudge`, `GoalHijackDriftJudge`, `UngroundedClaimJudge` and
+  `HallucinatedCitationJudge` were described as "Live-calibrated: 100% decisive accuracy, κ=1.000,
+  `IsInlineReady=true`", and the release summary as "all κ=1.000 against their gold sets". Those figures
+  come from one run per judge on the maintainer's own Azure OpenAI deployment, against the shipped gold
+  sets (52 / 48 / 48 / 52 cases — those sizes are correct). The run is an environment-gated test that
+  prints the report and asserts only that one was produced; its output, and the one certificate written by
+  `gatekeeper calibrate --certify` (to `.agenteval/gatekeeper/certs/`, which is not tracked), were not
+  committed, and the entry does not name the model. `IsInlineReady` belongs to one calibration report for
+  one model, not to the judge.
+  **Direction:** flattering — it reads as a reproducible result that holds for any model.
+  **Affected:** the 0.17.0-beta summary and its four judge entries, and the v0.17.0-beta release notes.
+  **Not affected:** the gold sets, the calibration harness, and enforcement — `agenteval gatekeeper
+  inspect` already refuses to enforce a judge inline unless a certificate exists for the model in use and
+  the current gold set (`--allow-uncalibrated` runs it advisory-only).
+  **Next:** re-calibration with the report committed and the model named. Until then, certify against your
+  own deployment: `agenteval gatekeeper calibrate --gate judge:<axis> --certify` for the three
+  CLI-registered axes, or `GateCalibrationHarness.EvaluateAsync` with
+  `HallucinatedCitationJudge.CalibrationGoldSet()` in code.
+
+- **Compliance calibration figures are not reproducible, and they measured a different judge prompt**
+  (README, `docs/eval-benchmark-architecture.md`, ADR-018, the GDPR / EU AI Act / agentic guides). The
+  README called the GDPR and EU AI Act figures "calibrated, stable, reproducible"; the architecture guide
+  gave "5/5 pillars PASS at strict gate" (GDPR), "4/6" (EU AI Act) and "49/60 evaluators pass strict
+  calibration; 9 carve-outs" (agentic). What is true:
+  1. `bench gdpr calibrate` and `bench eu-ai-act calibrate` have never sent the regulation judge prompts
+     (`gdpr-judge-system.v1.md`, `eu-ai-act-judge-system.v1.md`) that `bench gdpr` and `bench eu-ai-act`
+     send since 0.9.0-beta. They grade with `ChatClientEvaluator`'s generic default system prompt, so every
+     compliance calibration figure describes a judge configuration the benchmark does not run.
+  2. The figures come from runs in May 2026 on the maintainer's Azure OpenAI deployments. The reports were
+     written to an untracked local folder, do not record the judge model, and are not in the repository.
+     The calibration workflows trigger on pull requests into `release/**` branches, which this project
+     does not use, and have never run.
+  3. Results depend on the judge model: the EU AI Act command's source records that pillars 3–5, passing
+     with gpt-5-chat, fell to 71% / 78% / 73% with gpt-4o-mini.
+  4. GDPR has six pillars. The sixth (governance) cleared only a relaxed κ ≥ 0.60 gate (88.0%, κ 0.658,
+     gpt-4o-mini, 2026-05-24).
+  5. Agentic: 40 evaluators are dispatched for calibration and 20 are carved out, and six of the eight
+     scored categories (system, process, quality, safety, reasoning, calibration) are gated at relaxed
+     per-category thresholds; only ux and adversarial face the 0.85 / 0.70 default.
+
+  **Direction:** flattering. **Affected:** the sentences above; the "Calibration quality today" sections of
+  the GDPR, EU AI Act and agentic guides; and the "generative baseline" column of
+  `docs/adr/evidence/033-compliance-calibration-2026-09-21.md`, which compares the decision model with
+  these default-prompt runs rather than with the judge the benchmarks use. **Not affected:** the
+  decision-model numbers in that file, which measured exactly the instrument they name; scenario content,
+  weights, thresholds and aggregation; the agentic prompt question — `bench agentic` and
+  `bench agentic calibrate` both use the default prompt, so agentic calibration does describe the judge
+  that runs (its reports are also unpublished).
+  **Fixed in this release:** `calibrate` sends the same prompt as `bench`; both go through one resolver
+  per family (`JudgeFactory.ResolveGdpr` / `ResolveEuAiAct`), with tests that fail if either bypasses it.
+  **Next:** re-calibration with the judge model recorded and the report published.
+
+- **The agentic judges never receive their rubric files.** The agentic guides said each LLM-judge
+  evaluator grades against "a rubric … loaded from a prompt file under
+  `src/AgentEval.Evals.Agentic/Resources/Prompts/`"; four safety evaluators' documentation said the judge
+  uses "the structured rubric in `Resources/Prompts/safety/<name>.v1.md`"; and class documentation and the
+  0.9.0-beta notes described rubric behaviour — `temperature: 0`, 1–5 ordinals emitted beside the score,
+  `usage_mappings[]`, `missing_facts[]`, a `completion_state` taxonomy, weighted scoring formulas. The 46
+  files under `Resources/Prompts/**/*.v1.md` are embedded in the assembly and never loaded. `bench agentic`
+  and `bench agentic calibrate` build the judge without a system prompt, so every agentic LLM verdict from
+  the CLI — and from code that builds the judge as `new ChatClientEvaluator(client)` — is produced by
+  `ChatClientEvaluator`'s generic default system prompt plus the evaluator's own criteria list (two to six
+  criteria in code), at the provider's default temperature, and the score is the judge's overall score. Provenance recorded `promptId: "agenteval.<evaluator>.v1"` — a label naming a file that
+  was not sent (`promptHash` was null) — and `agentic-result.json`'s `attestation.promptVersions` defaults
+  to `agentic-judge-system` and `task-completion-criterion`, which are not files in the repository.
+  **Direction:** flattering — the documentation described a richer, Foundry-derived instrument than the
+  one that runs. **Affected:** how every agentic LLM-judge result since the suite shipped in 0.9.0-beta
+  should be read; the docs and class documentation corrected in this release. **Not affected:** the
+  criteria, which are sent and are what is graded; deterministic and content-safety paths; agentic
+  calibration, which used the same default prompt; GDPR and EU AI Act benchmark runs, which do send their
+  judge prompts.
+  **Next:** sending the rubric files would change what every agentic judge measures, so it will ship in
+  its own release with re-calibration. Until then the files are documented as references. **Fixed in this
+  release:** provenance names the prompt that is actually sent (`agenteval.judge.default-system.v1` for the
+  agentic judges) and fingerprints it in `promptHash`, and `agentic-result.json`'s attestation names the same
+  id (see Changed).
+
+- **Three of the six `MicrosoftEvaluatorAdapter` factories can never produce a score.** The adapter's
+  documentation lists Groundedness, Equivalence and Completeness among the evaluators it wraps, and
+  `CreateGroundednessEvaluator`, `CreateEquivalenceEvaluator`, `CreateCompletenessEvaluator` and
+  `CreateAllQualityEvals` return them. The adapter passes no evaluator context, and those three
+  Microsoft.Extensions.AI.Evaluation evaluators require one (`GroundednessEvaluatorContext`,
+  `EquivalenceEvaluatorContext`, `CompletenessEvaluatorContext`). Without it they return no value and do
+  not call the model; the adapter reports that as an `error` leaf (`IEval`) or an indeterminate `Fail`
+  (`IMetric`). For these three, the tests check only construction and names.
+  **Direction:** flattering. **Affected:** every result from those three adapters — always an error, never
+  a grade. **Not affected:** Fluency, Coherence and Relevance through the adapter; AgentEval's native
+  evaluators. **Next:** passing the context through (from `EvalInput.Context` and `GroundTruth`) is to land
+  in a later release; `docs/extensibility.md` now states the adapter's limits.
+
+- **SARIF and Markdown red-team reports linked to a personal fork.** Since 0.12.0-beta every SARIF file has
+  set `tool.driver.informationUri` to `https://github.com/joslat/AgentEval`, and the Markdown report footer
+  linked there. That repository is a fork; the canonical one is `https://github.com/AgentEvalHQ/AgentEval`
+  (the package URLs were corrected in 0.12.1-beta, these two were missed). **Direction:** neither — a
+  misattribution; no score or verdict is affected. **Affected:** that field and that link in every exported
+  report. **Next:** both point at `AgentEvalHQ/AgentEval` from this release.
+
+- **Documentation corrected** where it described something other than what ships: the README and the
+  red-team guide said five compliance reporters run as first-class benchmarks — SOC 2 and ISO 27001 are
+  library reporters with no CLI command; the MITRE ATLAS guide said 6 applicable techniques of 13 and a
+  nine-attack roster — the reporter catalogs 15 (8 applicable, 7 not applicable), the presets run all 14
+  built-in attacks (3 for `atlas-smoke`), and several technique names predated the names verified against
+  `ATLAS.yaml` on 2026-06-13; the GDPR, EU AI Act and agentic guides said calibration runs on every
+  release-branch pull request and pointed at golden-set folders that do not exist; the rich-output guide's
+  `AgentEvalTestBase` example did not compile (`WithTokens` takes `promptTokens` / `completionTokens`) and
+  recorded each result twice; and several pages linked to files that are not in the public repository.
+
 #### Added
 - Sample **N5 — Judge Reference Experiment** (`dotnet run -- 104`): does giving a decision model a
   reference stop it over-flagging? One golden category, five arms over the same cases with the same

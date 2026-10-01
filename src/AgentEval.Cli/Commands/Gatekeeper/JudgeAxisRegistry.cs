@@ -37,10 +37,9 @@ internal static class JudgeAxisRegistry
         ["over-refusal"] = new(
             (m, c) => OverRefusalJudge.Create(m, null, c), OverRefusalJudge.KeywordBaseline,
             OverRefusalJudge.GoldSet, () => new OverRefusalRubric()),
-        // Stage 3 (2026-07-16 marathon session) — all three cleared live calibration this session
-        // (IsInlineReady == true, perfect decisive accuracy on their canonical gold sets; see
-        // strategy/TODO.md for the numbers). Registered exactly like the four axes above: same
-        // Create/KeywordBaseline/GoldSet/Rubric shape, no special-casing.
+        // Stage 3 (2026-07-16) — registered exactly like the four axes above: same
+        // Create/KeywordBaseline/GoldSet/Rubric shape, no special-casing. Inline readiness is per model:
+        // certify each axis against the deployment you run with `gatekeeper calibrate --certify`.
         ["intent-action-mismatch"] = new(
             (m, c) => IntentActionMismatchJudge.Create(m, null, c), IntentActionMismatchJudge.KeywordBaseline,
             IntentActionMismatchJudge.GoldSet, () => new IntentActionMismatchRubric()),

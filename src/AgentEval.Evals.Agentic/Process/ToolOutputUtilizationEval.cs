@@ -13,18 +13,20 @@ namespace AgentEval.Evals.Agentic.Process;
 /// <para>
 /// Tests: did the agent reference or act on the data returned by each tool call?
 /// Did it ignore tool results and hallucinate the answer instead?
-/// The prompt emits field-level <c>usage_mappings[]</c> so callers can see which
-/// tool-output fields were utilized vs. ignored.
+/// Field-level <c>usage_mappings[]</c> (which tool-output fields were used vs. ignored) are
+/// specified in the reference prompt file but are not produced: the judge does not receive that file yet.
 /// </para>
 /// <para>
-/// Wraps an <see cref="AtomicLlmEval"/> configured with the tool-output-utilization rubric.
-/// Score is the average per-call utilization (1.0 full, 0.5 partial, 0.0 ignored).
+/// Wraps an <see cref="AtomicLlmEval"/> configured with four tool-output-utilization criteria.
+/// The score is the judge's overall score in <c>[0,1]</c>; the per-call average (1.0 full,
+/// 0.5 partial, 0.0 ignored) is specified in the reference prompt file and is not yet applied.
 /// </para>
 /// <para>
 /// Source: forked from Azure/azure-sdk-for-python
 /// sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_tool_output_utilization/tool_output_utilization.prompty
 /// License: MIT. Modifications listed in the corresponding prompt file at
 /// Resources/Prompts/process/tool-output-utilization.v1.md.
+/// That prompt file is a reference only and is not yet sent to the judge.
 /// </para>
 /// <para>
 /// Foundry reference: <c>azureai://built-in/evaluators/tool_output_utilization</c>

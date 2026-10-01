@@ -81,6 +81,11 @@ internal static class JudgeFactory
     /// responses" rules. <c>null</c> (the default) preserves the prior behaviour of using
     /// <see cref="ChatClientEvaluator"/>'s built-in default system prompt.
     /// </param>
+    /// <param name="systemPromptId">
+    /// A stable name for <paramref name="systemPrompt"/>, reported as the judge's
+    /// <see cref="IJudgePromptSource.SystemPromptId"/> and so recorded as provenance <c>PromptId</c>.
+    /// Ignored when <paramref name="systemPrompt"/> is <c>null</c>.
+    /// </param>
     /// <returns>
     /// <c>(judge, judgeModel, exitCode)</c>. When <c>judge</c> is <c>null</c>, the caller
     /// MUST return <c>exitCode</c> immediately (the helper already wrote the user-facing

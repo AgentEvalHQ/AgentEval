@@ -10,7 +10,7 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// <summary>
 /// Evaluates the semantic similarity between an AI response and a ground-truth reference answer.
 /// <para>
-/// Wraps an <see cref="AtomicLlmEval"/> configured with the similarity rubric.
+/// Wraps an <see cref="AtomicLlmEval"/> configured with three similarity criteria.
 /// </para>
 /// <para>
 /// <b>Ground-truth resolution</b>: ground truth is read from <see cref="EvalInput.GroundTruth"/>
@@ -29,6 +29,8 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_similarity/similarity.prompty
 /// License: MIT. Modifications: temperature=0, structured evidence[], label assignment table,
 /// explicit missing-ground-truth handling, severity=medium.
+/// These modifications are in the reference prompt file under <c>Resources/Prompts/</c>, which is not
+/// yet sent to the judge; the judge call sets no temperature.
 /// </para>
 /// </summary>
 public sealed class SimilarityEval : IEval

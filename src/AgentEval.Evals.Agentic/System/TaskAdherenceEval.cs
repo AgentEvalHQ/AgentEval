@@ -19,6 +19,7 @@ namespace AgentEval.Evals.Agentic.System;
 /// Source: forked from Azure/azure-sdk-for-python
 /// sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_task_adherence/task_adherence.prompty
 /// License: MIT. Modifications listed in the corresponding prompt file.
+/// That prompt file is a reference only and is not yet sent to the judge.
 /// </para>
 /// </summary>
 public sealed class TaskAdherenceEval : IEval

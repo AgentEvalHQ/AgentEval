@@ -27,6 +27,7 @@ namespace AgentEval.Evals.Agentic.Process;
 /// sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_tool_input_accuracy/tool_input_accuracy.prompty
 /// License: MIT. Modifications listed in the corresponding prompt file at
 /// Resources/Prompts/process/tool-input-accuracy.v1.md.
+/// That prompt file is a reference only and is not yet sent to the judge.
 /// </para>
 /// <para>
 /// Foundry reference: <c>azureai://built-in/evaluators/tool_input_accuracy</c>

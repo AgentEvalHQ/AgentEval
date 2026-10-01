@@ -390,6 +390,7 @@ var registry = new MetricRegistry(new IMetric[]
 AgentEval includes `MicrosoftEvaluatorAdapter` to use official Microsoft evaluators:
 
 ```csharp
+using AgentEval.Adapters;
 using AgentEval.Core;
 using Microsoft.Extensions.AI.Evaluation.Quality;
 
@@ -422,6 +423,8 @@ Console.WriteLine($"Coherence: {result.Score}"); // e.g., 85.0
 
 - **Use adapter** when you want Microsoft's exact prompts and scoring
 - **Use native** when you want AgentEval's tool tracking and detailed breakdowns
+
+> **Maturity and limits.** `MicrosoftEvaluatorAdapter` is a thin, single-turn bridge. Its tests use fake judges (score mapping, error leaves, cost); it is not run against a live model in CI and is not calibrated against any AgentEval golden set. It sends the query, the response and — when present — the context as a system message, and passes **no** evaluator context. Evaluators that require one therefore cannot score through it: `GroundednessEvaluator` (needs `GroundednessEvaluatorContext`), `EquivalenceEvaluator` (`EquivalenceEvaluatorContext`), `CompletenessEvaluator` (`CompletenessEvaluatorContext`) and `ToolCallAccuracyEvaluator` (`ToolCallAccuracyEvaluatorContext`) return no value without calling the model, which the adapter reports as an `error` leaf on the `IEval` path and an indeterminate `Fail` on the `IMetric` path. That includes `CreateGroundednessEvaluator`, `CreateEquivalenceEvaluator`, `CreateCompletenessEvaluator`, and three of the six adapters returned by `CreateAllQualityEvals` / `CreateAllQualityEvaluators`. Fluency, Coherence and Relevance work. Only the first metric an evaluator returns is read. Prefer the `IEval` path (`EvaluateAsync(EvalInput)`), which records the judge model, tokens and cost; the `IMetric` path is kept for compatibility. For groundedness, equivalence and completeness, use the native metrics in the table above.
 
 ---
 

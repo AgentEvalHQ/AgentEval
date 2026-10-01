@@ -29,6 +29,7 @@ namespace AgentEval.Evals.Agentic.Process;
 /// sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_tool_call_success/tool_call_success.prompty
 /// License: MIT. Modifications listed in the corresponding prompt file at
 /// Resources/Prompts/process/tool-call-success.v1.md.
+/// That prompt file is a reference only and is not yet sent to the judge.
 /// </para>
 /// <para>
 /// Foundry reference: <c>azureai://built-in/evaluators/tool_call_success</c>
