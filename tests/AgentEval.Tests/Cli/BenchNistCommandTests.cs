@@ -83,6 +83,17 @@ public class BenchNistCommandTests : IDisposable
         Assert.Equal(1, result.ExitCode);
     }
 
+    [Fact]
+    public async Task BenchNist_UnknownPreset_IsAUsageError_NotATestFailure()
+    {
+        // An unknown preset is a rejected argument. It used to exit 1, which CI reads as a failed evaluation.
+        InitWorkspace();
+        var result = await BenchNistCommand.RunAsync(
+            preset: "no-such-preset", subject: "NistPresetAgent", rootOverride: _root, inputText: null,
+            evaluatorOverride: new PassingStubEvaluator(), agentOverride: null);
+        Assert.Equal(AgentEval.Cli.ExitCodes.UsageError, result.ExitCode);
+    }
+
     // ── Preset arg parsing ────────────────────────────────────────────────────
 
     [Theory]

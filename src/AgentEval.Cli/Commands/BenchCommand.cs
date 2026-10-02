@@ -119,6 +119,12 @@ public static class BenchCommand
         {
             benchmark = ResolvePreset(preset, articles, scenarioBuilder);
         }
+        catch (ArgumentException ex)
+        {
+            // An unknown preset or domain pack is a rejected argument: a usage error, not a failed run.
+            Console.Error.WriteLine($"Failed to build benchmark preset '{preset}': {ex.Message}");
+            return ExitCodes.UsageError;
+        }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Failed to build benchmark preset '{preset}': {ex.Message}");

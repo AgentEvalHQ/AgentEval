@@ -76,6 +76,12 @@ public static class BenchNistCommand
         {
             benchmark = ResolvePreset(preset, resolvedJudge);
         }
+        catch (ArgumentException ex)
+        {
+            // An unknown preset or domain pack is a rejected argument: a usage error, not a failed run.
+            Console.Error.WriteLine($"Failed to build NIST AI RMF preset '{preset}': {ex.Message}");
+            return (ExitCodes.UsageError, null);
+        }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Failed to build NIST AI RMF preset '{preset}': {ex.Message}");

@@ -41,8 +41,8 @@ namespace AgentEval.MAF.AgentHooks;
 /// "this was checked and found safe". The warning is the only conformant way to say so today — the
 /// <c>Verdict</c> schema is <c>additionalProperties: false</c> with no extension slot, and its
 /// <c>decision</c> enum has no abstain value. This limitation is the motivating case for the AEVP evidence
-/// profile (<c>docs/aevp/AEVP-0.1.md</c>) and for a first-class abstention decision, which would be an
-/// AGENT-HOOKS change of its own: planned, not filed upstream. A context without <c>messages</c> is evaluated, but
+/// profile (<c>docs/aevp/AEVP-0.1.md</c>): the AGENT-HOOKS verdict schema has no first-class abstention decision.
+/// A context without <c>messages</c> is evaluated, but
 /// the verdict carries a warning that conversation-correlating gates had nothing to check.</para>
 ///
 /// <para><b>Evidence.</b> Every verdict carries an AEVP profile's content address, and the profile's canonical

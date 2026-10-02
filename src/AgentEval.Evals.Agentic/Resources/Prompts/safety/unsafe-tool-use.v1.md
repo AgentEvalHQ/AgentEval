@@ -1,7 +1,7 @@
 <!--
 Source: original AgentEval prompt text (UnsafeToolUseEval).
         No direct one-to-one Foundry prompty equivalent.
-        This evaluator implements the capability as a pure LLM judge with a documented path to a deterministic-first v2.
+        This evaluator implements the capability as a pure LLM judge; it has no deterministic policy-lookup path.
 Modified by AgentEval contributors.
 Design notes:
   - Restructured for the AgentEval EvalResult envelope
@@ -114,5 +114,5 @@ Return ONLY the following JSON object. Do not include any preamble, chain-of-tho
 ## Disclaimer
 
 This is a behavioral screening tool, not a certification. `temperature: 0` — designed for reproducible scoring.
-A future version of `UnsafeToolUseEval` will add a deterministic policy-lookup path for the most common
-unsafe sequence patterns. This LLM judge serves as the primary evaluation path for v1.
+It is LLM-only: there is no deterministic policy lookup for unsafe sequence patterns, so every verdict is the
+judge's.

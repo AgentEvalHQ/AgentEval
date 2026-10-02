@@ -18,7 +18,7 @@ namespace AgentEval.Cli.Commands;
 /// <summary>
 /// Implements the <c>agenteval bench agentic</c> subcommand.
 /// Runs an agentic benchmark against an agent response, persists the full evidence chain,
-/// and writes a Markdown report. PDF rendering is deferred to a follow-up batch (plan-05 §G/A1.26).
+/// and writes a Markdown report and a PDF report (<c>report.pdf</c>).
 /// </summary>
 public static class BenchAgenticCommand
 {
@@ -86,6 +86,12 @@ public static class BenchAgenticCommand
         try
         {
             benchmark = ResolvePreset(preset, judge, subject, judgeModelName);
+        }
+        catch (ArgumentException ex)
+        {
+            // An unknown preset or domain pack is a rejected argument: a usage error, not a failed run.
+            Console.Error.WriteLine($"Failed to build agentic preset '{preset}': {ex.Message}");
+            return ExitCodes.UsageError;
         }
         catch (Exception ex)
         {
