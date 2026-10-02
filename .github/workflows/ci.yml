@@ -128,6 +128,21 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore
 
+    # One leg builds the Mission Control UI, so a TypeScript or bundling break fails here and not at release
+    # time, and the .NET build on this leg includes the UI the way the released tool does.
+    - name: Setup Node (Mission Control UI)
+      if: matrix.dotnet-version == '10.0.x'
+      uses: actions/setup-node@v7
+      with:
+        node-version: '22'
+
+    - name: Build the Mission Control UI
+      if: matrix.dotnet-version == '10.0.x'
+      working-directory: src/AgentEval.MissionControl.Spa
+      run: |
+        npm ci
+        npm run build
+
     - name: Build
       run: dotnet build --configuration Release --no-restore
 

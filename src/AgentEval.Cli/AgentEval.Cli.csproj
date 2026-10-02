@@ -89,6 +89,18 @@
     <ProjectReference Include="..\AgentEval.MissionControl\AgentEval.MissionControl.csproj" />
   </ItemGroup>
 
+  <!-- The Mission Control UI (the SPA build output, gitignored) must ship INSIDE this tool: `mc serve` looks for
+       {tool dir}/wwwroot/index.html. The referenced web project copies its wwwroot into this project's build output,
+       but the Web SDK's static-asset handling keeps it out of the publish output a tool package is made from, so
+       every published tool through 0.42.0-beta had no UI. Including it here puts it at tools/net10.0/any/wwwroot/.
+       The release workflow builds the SPA first and fails if the packed tool has no wwwroot/index.html. -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <None Include="..\AgentEval.MissionControl\wwwroot\**\*"
+          Link="wwwroot\%(RecursiveDir)%(Filename)%(Extension)"
+          CopyToPublishDirectory="PreserveNewest"
+          Visible="false" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="System.CommandLine" />
     <!-- Real Azure OpenAI judge for `agenteval bench ...` when env vars are set. -->

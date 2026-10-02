@@ -38,6 +38,20 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore
 
+    # Mission Control's UI is gitignored build output that ships inside the CLI tool (`agenteval mc serve`
+    # serves it from the tool's own wwwroot/). Built before the .NET build so the CLI picks it up. Through
+    # 0.42.0-beta nothing built it here, and the published tool had no UI.
+    - name: Setup Node (Mission Control UI)
+      uses: actions/setup-node@v7
+      with:
+        node-version: '22'
+
+    - name: Build the Mission Control UI
+      working-directory: src/AgentEval.MissionControl.Spa
+      run: |
+        npm ci
+        npm run build
+
     - name: Build
       run: dotnet build --configuration Release --no-restore
 
@@ -108,6 +122,16 @@ jobs:
           exit 1
         }
         Write-Host "All packed AgentEval assemblies report $expected."
+
+    # A NuGet package cannot be recalled: refuse to publish a CLI tool whose `mc serve` would have no UI.
+    - name: Verify the CLI tool contains the Mission Control UI
+      run: |
+        pkg=$(ls ./nupkgs/AgentEval.Cli.*.nupkg | grep -v '\.snupkg$' | head -1)
+        if ! unzip -l "$pkg" | grep -q 'tools/net10.0/any/wwwroot/index.html'; then
+          echo "::error::$pkg has no tools/net10.0/any/wwwroot/index.html: 'agenteval mc serve' would have no UI."
+          exit 1
+        fi
+        echo "Mission Control UI present in $pkg"
 
     - name: Verify the packed corpora are the corpora in this repository
       shell: pwsh

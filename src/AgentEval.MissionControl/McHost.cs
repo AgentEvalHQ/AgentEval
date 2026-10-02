@@ -279,12 +279,21 @@ public static class McHost
         // `dotnet run --project src/AgentEval.MissionControl` boots the whole
         // portal (GraphQL + REST + UI) on one port.
         //
-        // Order matters: UseDefaultFiles must come BEFORE MapStaticAssets, else
-        // requests for "/" are 404'd. MapFallbackToFile handles SPA routes
-        // (e.g. /subjects/agent/Foo) by serving index.html so client-side
-        // react-router takes over.
+        // Order matters: UseDefaultFiles must come BEFORE the static-file
+        // middleware, else requests for "/" are 404'd. MapFallbackToFile handles
+        // SPA routes (e.g. /subjects/agent/Foo) by serving index.html so
+        // client-side react-router takes over.
+        //
+        // UseStaticFiles, not MapStaticAssets. MapStaticAssets serves from the
+        // build's static-web-assets manifest, which also lists pre-compressed
+        // .br/.gz variants. The copy `agenteval mc serve` launches has the files
+        // but not those variants, so a browser (which always sends
+        // Accept-Encoding: gzip, br) got 200 with an empty body and no content
+        // type for every asset: the JS bundle never ran and the portal was blank.
+        // UseStaticFiles serves what is actually under wwwroot/, with the content
+        // type taken from the file extension.
         app.UseDefaultFiles();
-        app.MapStaticAssets();
+        app.UseStaticFiles();
         app.MapFallbackToFile("index.html");
     }
 
