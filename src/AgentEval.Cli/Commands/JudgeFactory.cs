@@ -33,7 +33,7 @@ namespace AgentEval.Cli.Commands;
 ///         AZURE_OPENAI_DEPLOYMENT are set → build a real Azure OpenAI
 ///         <c>IChatClient</c> and wrap it in
 ///         <see cref="ChatClientEvaluator"/>.</item>
-///   <item>Otherwise fail with exit code 3 and say what is missing. There is no stand-in judge: through 0.43
+///   <item>Otherwise fail with exit code 3 and say what is missing. There is no stand-in judge: through 0.42
 ///         <c>AGENTEVAL_ALLOW_STUB_JUDGE=1</c> selected one that scored 75 on everything, including in
 ///         <c>calibrate</c>, which then reported figures that measured no judge. The variable is now ignored.
 ///         A <c>--sut mock</c> run uses its own judge (<see cref="MockTarget"/>) and is never stored.</item>

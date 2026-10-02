@@ -200,7 +200,7 @@ public class CliProviderSelectionTests
     public void Judge_ExplicitSelectorWithMissingVariables_FailsAndSaysItIsMisconfigured()
     {
         // AI_INFERENCE_PROVIDER=foundry with its variables missing is a typo, not an unconfigured machine. The
-        // retired stub opt-in is set too: through 0.43 it could turn such a typo into stub-graded evidence.
+        // retired stub opt-in is set too: through 0.42 it could turn such a typo into stub-graded evidence.
         using var _ = new ProviderEnvironmentScope(
             ("AI_INFERENCE_PROVIDER", "foundry"),
             ("AGENTEVAL_ALLOW_STUB_JUDGE", "1"));
@@ -224,7 +224,7 @@ public class CliProviderSelectionTests
     [Fact]
     public void Judge_NothingConfiguredAtAll_GetsNoJudge_EvenWithTheRetiredStubOptIn()
     {
-        // Through 0.43 this returned a judge that scored 75 on everything. A verdict no judge gave measures nothing.
+        // Through 0.42 this returned a judge that scored 75 on everything. A verdict no judge gave measures nothing.
         using var _ = new ProviderEnvironmentScope(("AGENTEVAL_ALLOW_STUB_JUDGE", "1"));
 
         var (judge, judgeModel, exitCode) = JudgeFactory.Resolve(evaluatorOverride: null);

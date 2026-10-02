@@ -171,7 +171,7 @@ public class BenchCommandTests : IDisposable
     [Fact]
     public async Task BenchGdpr_NoTarget_Refuses_AndGradesNothing()
     {
-        // Through 0.43 a run with no target graded a built-in answer and stored it as the subject's evidence.
+        // Through 0.42 a run with no target graded a built-in answer and stored it as the subject's evidence.
         InitWorkspace();
         var capturing = new CapturingStubEvaluator();
         var before = WorkspaceFiles();
@@ -331,7 +331,7 @@ public class BenchCommandTests : IDisposable
             evaluatorOverride: new FailingStubEvaluator(),
             responseText: SuppliedAnswer);
 
-        // Assert — a failing grade (9). Through 0.43 this test accepted any non-zero exit, so a refusal (2), a crash
+        // Assert — a failing grade (9). Through 0.42 this test accepted any non-zero exit, so a refusal (2), a crash
         // (1) or a judge configuration error (3) would have satisfied it without grading anything.
         Assert.Equal(ExitCodes.GateFailed, exitCode);
     }

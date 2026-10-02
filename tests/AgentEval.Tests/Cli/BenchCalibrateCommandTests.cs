@@ -223,7 +223,7 @@ public class BenchCalibrateCommandTests : IDisposable
     [Fact]
     public async Task Calibrate_WithoutARealJudge_Refuses_AndWritesNoReport()
     {
-        // Calibration measures a judge. Through 0.43 the retired AGENTEVAL_ALLOW_STUB_JUDGE=1 let it "calibrate" a
+        // Calibration measures a judge. Through 0.42 the retired AGENTEVAL_ALLOW_STUB_JUDGE=1 let it "calibrate" a
         // placeholder that scored 75 on everything and write the figures as a calibration report. No provider is
         // configured here (the collection scrubs them all); the retired variable is set to prove it is ignored.
         Environment.SetEnvironmentVariable("AGENTEVAL_ALLOW_STUB_JUDGE", "1");

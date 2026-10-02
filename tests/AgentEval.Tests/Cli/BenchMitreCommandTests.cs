@@ -73,7 +73,7 @@ public class BenchMitreCommandTests : IDisposable
     [Fact]
     public async Task BenchMitre_NoTarget_Refuses_AndStoresNothing()
     {
-        // Through 0.43 a run with no target scanned a built-in agent that refuses everything (a red-team PASS)
+        // Through 0.42 a run with no target scanned a built-in agent that refuses everything (a red-team PASS)
         // and stored it as the subject's result.
         InitWorkspace();
         var before = WorkspaceFiles();

@@ -93,7 +93,7 @@ public class BenchPerfCommandTests
     [Fact]
     public async Task RunAsync_NoTarget_Refuses_AndStoresNothing()
     {
-        // Through 0.43 a run with no target measured a built-in echo agent and stored it as the subject's result.
+        // Through 0.42 a run with no target measured a built-in echo agent and stored it as the subject's result.
         var workspace = CreateTempWorkspace();
         try
         {

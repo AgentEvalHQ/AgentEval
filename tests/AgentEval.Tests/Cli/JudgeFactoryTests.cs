@@ -109,7 +109,7 @@ public class JudgeFactoryTests : IDisposable
     // ── Branch 5: the retired stub opt-in ────────────────────────────────
 
     /// <summary>
-    /// Through 0.43, <c>AGENTEVAL_ALLOW_STUB_JUDGE=1</c> on a machine with no provider returned a judge that scored
+    /// Through 0.42, <c>AGENTEVAL_ALLOW_STUB_JUDGE=1</c> on a machine with no provider returned a judge that scored
     /// 75 with every criterion met, for benchmarks and for calibration. There is no stand-in judge now: whatever the
     /// variable says, a machine with no provider gets exit 3 and no judge.
     /// </summary>

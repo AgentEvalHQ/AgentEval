@@ -160,7 +160,7 @@ public class BenchEuAiActCommandTests : IDisposable
     [Fact]
     public async Task BenchEuAiAct_NoTarget_Refuses_AndGradesNothing()
     {
-        // Through 0.43 a run with no target graded a built-in answer and stored it as the subject's evidence.
+        // Through 0.42 a run with no target graded a built-in answer and stored it as the subject's evidence.
         InitWorkspace();
         var capturing = new CapturingStubEvaluator();
         var before = WorkspaceFiles();

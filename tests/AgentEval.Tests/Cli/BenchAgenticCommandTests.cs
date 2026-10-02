@@ -106,7 +106,7 @@ public class BenchAgenticCommandTests : IDisposable
     [Fact]
     public async Task BenchAgentic_NoAnswer_Refuses_AndStoresNothing()
     {
-        // Through 0.43 a run with no --response graded a built-in answer and stored it as the subject's evidence.
+        // Through 0.42 a run with no --response graded a built-in answer and stored it as the subject's evidence.
         InitWorkspace();
         var before = WorkspaceFiles();
 
@@ -166,7 +166,7 @@ public class BenchAgenticCommandTests : IDisposable
     public async Task BenchAgentic_TraceOnly_GradesTheAnswerTheTraceRecorded()
     {
         // A captured run is a real target: its own question and final answer are graded, nothing is made up.
-        // Through 0.43 a --trace without --response graded a built-in answer next to the real trace.
+        // Through 0.42 a --trace without --response graded a built-in answer next to the real trace.
         InitWorkspace();
         var trace = new AgentEval.Tracing.AgentTrace { TraceName = "captured-run" };
         trace.AddEntry(new AgentEval.Tracing.TraceEntry

@@ -67,7 +67,7 @@ public class PerformanceBenchmarkAdapterTests
     [Fact]
     public async Task EvaluateAsync_UnpricedModel_CostIsNotMeasured_NotAZeroDollarPass()
     {
-        // Through 0.43 a model missing from the pricing table gave the cost leaf $0 and a passing score of 1.0.
+        // Through 0.42 a model missing from the pricing table gave the cost leaf $0 and a passing score of 1.0.
         var agent = new MockTestableAgent("UnpricedAgent", "Success response");
         var benchmark = FastBenchmark(agent, new PerformanceBenchmarkEvaluateOptions
         {

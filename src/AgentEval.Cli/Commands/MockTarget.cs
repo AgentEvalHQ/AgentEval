@@ -13,7 +13,7 @@ namespace AgentEval.Cli.Commands;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Through 0.43, <c>bench owasp</c>, <c>mitre</c> and <c>nist</c> scanned a built-in agent that refuses everything,
+/// Through 0.42, <c>bench owasp</c>, <c>mitre</c> and <c>nist</c> scanned a built-in agent that refuses everything,
 /// <c>bench perf</c> measured an echo agent, and <c>bench gdpr</c> and <c>eu-ai-act</c> graded a built-in answer,
 /// whenever no target was given. A warning was printed, but the run was stored in <c>.agenteval/</c> and shown in
 /// Mission Control and <c>compare</c> like a measurement, and a stand-in that refuses everything passes a red-team

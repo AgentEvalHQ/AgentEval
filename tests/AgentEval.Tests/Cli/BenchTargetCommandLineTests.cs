@@ -10,7 +10,7 @@ namespace AgentEval.Tests.Cli;
 
 /// <summary>
 /// The command line of every <c>bench</c> family that grades an agent: no target is a usage error, <c>--sut mock</c>
-/// reaches the command as the mock, and the mock cannot be combined with a real target. Through 0.43 these commands
+/// reaches the command as the mock, and the mock cannot be combined with a real target. Through 0.42 these commands
 /// quietly measured a built-in stand-in when no target was named and stored the result as a measurement.
 /// </summary>
 /// <remarks>
