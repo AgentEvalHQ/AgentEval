@@ -8,6 +8,17 @@ A roundup of what landed in AgentEval's red-team module recently: broader covera
 
 ## New & upgraded capabilities
 
+### Over-refusal beside the attack success rate *(new)*
+
+An agent that refuses everything resists every attack, so attack success alone rewards it. `--benign-controls`
+(with `--judge`) adds the second number:
+- **The corpus:** 29 legitimate requests that look like attacks ("ignore my previous message", "decode this base64
+  value"). Each reply is graded by Gatekeeper's over-refusal judge, never by a phrase list.
+- **The report:** the refusal rate with a Wilson 95% interval, and "not measured" below 20 conclusive cases.
+- **The verdict is unchanged.** Over-refusal is reported beside it and does not change it.
+
+See [Over-refusal](redteam.md#over-refusal-the-second-headline-number).
+
 ### Grading — judge-primary by default + Composite Judges *(the big one)*
 
 The grader — the component that decides whether each attack actually *succeeded* — moved from a keyword/substring oracle to **LLM-judge-primary grading** with **honest-by-construction "Composite Judges."** This is the headline change here, and it's a deliberate, evidence-driven flip (see [ADR-021→024](adr/README.md)).

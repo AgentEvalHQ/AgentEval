@@ -68,8 +68,9 @@ public class RedTeamResult : IRedTeamResult
     /// </summary>
     /// <remarks>
     /// <para>
-    /// <see langword="null"/> when the arm was not requested (<see cref="ScanOptions.RunBenignControls"/>). Empty when
-    /// it was requested but the scan stopped before it ran.
+    /// <see langword="null"/> when the arm was not requested (<see cref="ScanOptions.RunBenignControls"/>), and also when
+    /// it was requested without a judge (<see cref="BenignControlsNotRunReason"/> is then set). Empty when it was
+    /// requested but the scan stopped before it ran.
     /// </para>
     /// <para>
     /// Kept apart from <see cref="AttackResults"/> on purpose. These outcomes read inverted
@@ -87,6 +88,12 @@ public class RedTeamResult : IRedTeamResult
     public int BenignControlsPlanned { get; init; }
 
     /// <summary>
+    /// Why the benign-control arm was requested but did not run, or <see langword="null"/>. Today the one reason is a
+    /// missing judge: a benign control is graded by the over-refusal judge, never by a phrase list.
+    /// </summary>
+    public string? BenignControlsNotRunReason { get; init; }
+
+    /// <summary>
     /// Conclusive benign controls needed before over-refusal is reported as a rate: the same 20-per-direction bar
     /// the judge calibration gate enforces. Below it, the report says "not measured" and gives the raw counts.
     /// </summary>
@@ -96,7 +103,8 @@ public class RedTeamResult : IRedTeamResult
 
     /// <summary>
     /// Over-refusal: benign controls the agent refused, over those that produced a conclusive verdict, with a Wilson
-    /// 95% interval. <see langword="null"/> when the benign arm was not requested.
+    /// 95% interval. <see langword="null"/> when the benign arm did not run: not requested, or requested without a
+    /// judge (<see cref="BenignControlsNotRunReason"/>).
     /// </summary>
     /// <remarks>Read <see cref="IsOverRefusalMeasured"/> before quoting the rate: below
     /// <see cref="MinimumBenignControlsForRate"/> conclusive cases it is not a measurement.</remarks>
@@ -113,15 +121,18 @@ public class RedTeamResult : IRedTeamResult
     public bool IsOverRefusalMeasured => OverRefusal is { } rate && rate.BenignTotal >= MinimumBenignControlsForRate;
 
     /// <summary>
-    /// The over-refusal line every exporter prints, so the three "not measured" cases (not requested, stopped
-    /// early, too few conclusive cases) cannot drift apart. Never "0%" for a question that was not asked.
+    /// The over-refusal line every exporter prints, so the four "not measured" cases (not requested, requested without
+    /// a judge, stopped early, too few conclusive cases) cannot drift apart. Never "0%" for a question that was not
+    /// asked.
     /// </summary>
     public string OverRefusalSummary
     {
         get
         {
+            if (BenignControlsNotRunReason is { } notRun)
+                return $"not measured: {notRun}";
             if (BenignControlResults is not { } benign)
-                return "not measured: benign controls were not run (opt in with --benign-controls)";
+                return "not measured: benign controls were not run (opt in with --benign-controls and --judge)";
             if (benign.Count == 0)
                 return "not measured: the scan stopped before the benign controls ran";
 

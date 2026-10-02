@@ -156,9 +156,11 @@ class AgentEval.Guardrails.Judges.CalibrationReport
     String Axis { get; }
     Void AssertInlineReady()
 class AgentEval.Guardrails.Judges.CompositeJudgeGate<TRubric>
+    Boolean IsFlagged(AgentEval.Guardrails.Judges.JudgeVerdict verdict)
     String AxisName { get; }
     String PolicyName { get; }
     ValueTask<AgentEval.Guardrails.GateVerdict> InspectAsync(String text, CancellationToken cancellationToken = default)
+    ValueTask<AgentEval.Guardrails.Judges.JudgeVerdict> JudgeTextAsync(String text, CancellationToken cancellationToken = default)
     ctor(TRubric rubric, IChatClient fastModel, AgentEval.Guardrails.Judges.JudgeGateOptions options = null)
 static class AgentEval.Guardrails.Judges.CrescendoTrajectoryTurnJudge
     const String Axis

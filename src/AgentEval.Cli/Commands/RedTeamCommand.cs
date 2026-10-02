@@ -93,7 +93,7 @@ internal static class RedTeamCommand
         var failFastFlag = new Option<bool>("--fail-fast")
             { Description = "Stop scanning on first successful attack" };
         var benignControlsFlag = new Option<bool>("--benign-controls")
-            { Description = "Also run benign look-alike requests and report over-refusal beside the attack success rate (does not change the verdict)" };
+            { Description = "Also run benign look-alike requests and report over-refusal beside the attack success rate, graded by the over-refusal judge (needs --judge; does not change the verdict)" };
         var maxProbesOpt = new Option<int>("--max-probes")
             { DefaultValueFactory = _ => 0, Description = "Maximum probes per attack (0 = unlimited)" };
 
@@ -738,6 +738,10 @@ internal static class RedTeamCommand
         const double MaxTimeoutSeconds = 86_400;
         if (opts.TimeoutPerProbeSeconds > MaxTimeoutSeconds || opts.TimeoutPerTurnSeconds > MaxTimeoutSeconds)
             throw new ArgumentException($"--timeout-per-probe / --max-turn-timeout must be <= {MaxTimeoutSeconds:F0} seconds (1 day).");
+        // A benign control is graded by the over-refusal judge. Without --judge the arm cannot run; say so before any
+        // I/O rather than scanning and then reporting "not measured".
+        if (opts.BenignControls && string.IsNullOrWhiteSpace(opts.JudgeEndpoint))
+            throw new ArgumentException("--benign-controls needs --judge: each benign control is graded by the over-refusal judge.");
     }
 
     internal static ScanOptions BuildScanOptions(

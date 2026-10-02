@@ -223,6 +223,23 @@ public class RedTeamCommandTests
         Assert.Contains("--azure", ex.Message);
     }
 
+    [Fact]
+    public void BenignControls_WithoutAJudge_AreRefusedBeforeAnyIo()
+    {
+        // A benign control is graded by the over-refusal judge, so without --judge the arm cannot run. The check is in
+        // the step-1 validation, so it fails before the target, the import or a pack download is touched.
+        var opts = new RedTeamOptions { Sut = "gatekeeper-demo", BenignControls = true, Intensity = "quick", Format = "json" };
+
+        var ex = Assert.Throws<ArgumentException>(() => RedTeamCommand.ValidateTimeouts(opts));
+        Assert.Contains("--benign-controls needs --judge", ex.Message, StringComparison.Ordinal);
+
+        // With a judge the same options are valid.
+        RedTeamCommand.ValidateTimeouts(new RedTeamOptions
+        {
+            Sut = "gatekeeper-demo", BenignControls = true, JudgeEndpoint = "https://judge.example", Intensity = "quick", Format = "json",
+        });
+    }
+
     // ── --sut gatekeeper-demo validation (the credential-free on-ramp) ──
 
     [Fact]

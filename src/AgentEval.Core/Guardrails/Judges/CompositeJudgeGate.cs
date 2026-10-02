@@ -127,6 +127,45 @@ public sealed class CompositeJudgeGate<TRubric> : IChatGate, IRequiresCalibratio
         };
     }
 
+    /// <summary>
+    /// The judge's own verdict on <paramref name="text"/>, before it is mapped to a gate action.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Returns <see langword="null"/> when the prefilter skips the text; <see cref="InspectAsync"/> would then allow it
+    /// without a model call. Use this where an inconclusive judgement must stay distinguishable from a decision.
+    /// <see cref="InspectAsync"/> has to act, so it turns an undecided judge into a block (fail-closed, the default)
+    /// or an allow (fail-open). A measurement that leaves undecided cases out of its denominator needs the raw
+    /// verdict instead. Apply <see cref="IsFlagged"/> for the same block threshold <see cref="InspectAsync"/> uses.
+    /// </para>
+    /// <para>The spend governor is honoured: an exhausted budget returns an inconclusive verdict without a model call.</para>
+    /// </remarks>
+    public async ValueTask<JudgeVerdict?> JudgeTextAsync(string text, CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrEmpty(text) || !SafePrefilter(text))
+        {
+            return null;
+        }
+
+        if (_options.SpendGovernor is { } governor && !governor.TryReserve(EstimateTokens(text)))
+        {
+            return JudgeVerdict.Inconclusive($"{_rubric.Axis} judge unjudged — spend budget exhausted");
+        }
+
+        return await JudgeAsync(text, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Whether a judge verdict crosses this gate's block threshold. This is the rule <see cref="InspectAsync"/> applies:
+    /// a <see cref="JudgeDecision.Blocked"/> decision at or above <see cref="JudgeGateOptions.BlockThreshold"/>, where a
+    /// NaN confidence counts as crossing it.
+    /// </summary>
+    public bool IsFlagged(JudgeVerdict verdict)
+    {
+        ArgumentNullException.ThrowIfNull(verdict);
+        return verdict.Decision == JudgeDecision.Blocked && !(verdict.Confidence < _options.BlockThreshold);
+    }
+
     // P5-3: bound the text the model sees to a head + tail sandwich when it exceeds MaxInputChars, so a
     // pathologically large turn can't blow up cost/latency/context — while an injection payload at EITHER
     // boundary is still visible. The prefilter has already run on the full text; only the prompt is bounded.

@@ -98,5 +98,9 @@ public class BenchEuAiActCalibrateCommandTests : IDisposable
 
         Assert.True(exit is 0 or 9,
             $"Expected exit 0 (calibration passed) or 9 (GateFailed); got {exit}.");
+
+        // With no --out, the report goes to the workspace folder, never a repository-internal path.
+        var written = Directory.GetFiles(Path.Combine(_root, ".agenteval", "calibration"), "eu-ai-act-calibration-*.md");
+        Assert.Single(written);
     }
 }
