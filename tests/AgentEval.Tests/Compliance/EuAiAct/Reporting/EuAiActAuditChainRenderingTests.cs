@@ -19,6 +19,10 @@ namespace AgentEval.Tests.Compliance.EuAiAct.Reporting;
 /// rendering and pass on the honest one: "hash recorded, not verified in this report" plus how to
 /// verify it, or "no hash recorded".
 /// </summary>
+// Rendered PDFs are read back as text. Under a fully parallel run the text came back as NUL characters (seen once
+// on net8.0, never alone), so these render outside the parallel phase, with the other tests that touch QuestPDF's
+// process-wide state.
+[Collection(AgentEval.Tests.Rendering.Pdf.QuestPdfLicenceCollection.Name)]
 public class EuAiActAuditChainRenderingTests : IDisposable
 {
     private readonly string _tempDir;

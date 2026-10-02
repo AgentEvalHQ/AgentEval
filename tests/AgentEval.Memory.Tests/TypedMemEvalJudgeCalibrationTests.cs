@@ -6,6 +6,7 @@ using System.Text;
 using System.Text.Json;
 using AgentEval.Memory.External.Models;
 using AgentEval.Memory.External.TypedMemEval;
+using AgentEval.Providers;
 using Microsoft.Extensions.AI;
 using Xunit;
 using Xunit.Abstractions;
@@ -313,13 +314,12 @@ public sealed class TypedMemEvalJudgeCalibrationTests(ITestOutputHelper output)
     [Trait("Category", "Integration")]
     public async Task LiveJudge_LabelsTheCalibrationSetAsTheHumansDid()
     {
-        var endpoint = Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT");
-        var apiKey = Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY");
-        var deployment = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT");
-
-        if (string.IsNullOrWhiteSpace(endpoint) ||
-            string.IsNullOrWhiteSpace(apiKey) ||
-            string.IsNullOrWhiteSpace(deployment))
+        // The provider is resolved exactly as the CLI and the samples resolve it: AI_INFERENCE_PROVIDER selects
+        // (bitdeer, openai, foundry, azure, openai-compatible); unset, the first provider with complete credentials
+        // wins. Azure needs endpoint, key AND deployment, so a machine or workflow with only an endpoint and key
+        // stays unconfigured here, as it did when this arm read the Azure variables directly.
+        var provider = InferenceProviderEnvironment.Resolve();
+        if (!provider.IsConfigured || provider.Endpoint is null || provider.ApiKey is null || provider.Model is null)
         {
             // Returns having asserted nothing about agreement, on purpose. xUnit cannot skip a fact
             // from inside it, and the alternatives are both worse: a green test that measured nothing
@@ -357,7 +357,7 @@ public sealed class TypedMemEvalJudgeCalibrationTests(ITestOutputHelper output)
         var options = new ExternalBenchmarkOptions
         {
             JudgeVerdictProtocol = JudgeVerdictProtocol.StructuredJson,
-            JudgeMaxOutputTokens = AzureOpenAIJudgeClient.MinimumCompletionBudget,
+            JudgeMaxOutputTokens = ProviderJudgeClient.MinimumCompletionBudget,
             MaxJudgeRetries = 1
         };
         options.Validate();
@@ -378,8 +378,7 @@ public sealed class TypedMemEvalJudgeCalibrationTests(ITestOutputHelper output)
                 // One judge per case: the type remembers a provider's response-format capabilities on
                 // the instance, and that is per-run state rather than something a parallel measurement
                 // should be sharing.
-                var judge = new TypedMemEvalJudge(
-                    new AzureOpenAIJudgeClient(http, endpoint, apiKey, deployment));
+                var judge = new TypedMemEvalJudge(new ProviderJudgeClient(http, provider));
 
                 var judgment = await judge.JudgeAsync(
                     calibrationCase.Answer,
@@ -411,7 +410,8 @@ public sealed class TypedMemEvalJudgeCalibrationTests(ITestOutputHelper output)
 
         // Printed, not just asserted: this output is what the recorded-result file is filled in from,
         // and a run that only says pass or fail leaves the maintainer nothing to record.
-        _output.WriteLine($"deployment: {deployment}");
+        _output.WriteLine($"provider: {provider.DisplayName}");
+        _output.WriteLine($"deployment: {provider.Model}");
         _output.WriteLine($"agreement: {agreement:0.###} ({agreed}/{selected.Length})");
         foreach (var vertical in Enum.GetValues<TypedMemEvalVertical>())
         {
@@ -464,7 +464,7 @@ public sealed class TypedMemEvalJudgeCalibrationTests(ITestOutputHelper output)
         Assert.True(
             lowVerticals.Length == 0,
             $"verticals below the {PerVerticalAgreementThreshold} floor in this run: " +
-            $"{string.Join(", ", lowVerticals)}. Measured live against '{deployment}'.");
+            $"{string.Join(", ", lowVerticals)}. Measured live against '{provider.Model}' on {provider.DisplayName}.");
 
         // The discriminator branch, asserted independently of the outcome. Without this a template
         // that suppresses a label outright is indistinguishable from one that discriminates
@@ -486,7 +486,7 @@ public sealed class TypedMemEvalJudgeCalibrationTests(ITestOutputHelper output)
         Assert.True(
             agreement >= AgreementThreshold,
             $"judge agreement with the calibration set was {agreement:0.###} over {Cases.Count} cases " +
-            $"against deployment '{deployment}', below the {AgreementThreshold} floor. " +
+            $"against model '{provider.Model}' on {provider.DisplayName}, below the {AgreementThreshold} floor. " +
             $"Disagreements:{Environment.NewLine}{string.Join(Environment.NewLine, disagreements.Take(40))}");
     }
 
@@ -554,8 +554,10 @@ public sealed class TypedMemEvalJudgeCalibrationTests(ITestOutputHelper output)
     private sealed record CalibrationDerivationInput(int SessionIndex, double Value);
 
     /// <summary>
-    /// A minimal Azure OpenAI chat client, written here rather than taken as a package reference so
-    /// the test project's dependency set does not grow for one env-gated arm.
+    /// A minimal chat client for the selected provider, written here rather than taken as a package reference
+    /// so the test project's dependency set does not grow for one env-gated arm. It speaks the two protocols
+    /// the provider contract has: the Azure one (Azure OpenAI and Foundry: deployment in the path, <c>api-key</c>
+    /// header) and the OpenAI one (Bitdeer, OpenAI and any OpenAI-compatible host: model in the body, bearer key).
     /// </summary>
     /// <remarks>
     /// Two deliberate omissions, both because this deployment family is a reasoning model: no
@@ -564,7 +566,7 @@ public sealed class TypedMemEvalJudgeCalibrationTests(ITestOutputHelper output)
     /// question; the JSON contract is in the prompt either way, and the parser still refuses to
     /// guess when a response does not honour it.
     /// </remarks>
-    private sealed class AzureOpenAIJudgeClient : IChatClient
+    private sealed class ProviderJudgeClient : IChatClient
     {
         /// <summary>
         /// Floor on the completion budget. Reasoning tokens are drawn from it before a single
@@ -575,15 +577,22 @@ public sealed class TypedMemEvalJudgeCalibrationTests(ITestOutputHelper output)
 
         private readonly HttpClient _http;
         private readonly string _apiKey;
+        private readonly string _model;
+        private readonly string _providerName;
+        private readonly bool _azureProtocol;
         private readonly Uri _uri;
 
-        internal AzureOpenAIJudgeClient(HttpClient http, string endpoint, string apiKey, string deployment)
+        internal ProviderJudgeClient(HttpClient http, InferenceProviderSettings provider)
         {
             _http = http;
-            _apiKey = apiKey;
-            _uri = new Uri(
-                $"{endpoint.TrimEnd('/')}/openai/deployments/{deployment}/chat/completions" +
-                "?api-version=2024-12-01-preview");
+            _apiKey = provider.ApiKey!;
+            _model = provider.Model!;
+            _providerName = provider.DisplayName;
+            _azureProtocol = provider.UsesAzureProtocol;
+            var endpoint = provider.Endpoint!.ToString().TrimEnd('/');
+            _uri = _azureProtocol
+                ? new Uri($"{endpoint}/openai/deployments/{_model}/chat/completions?api-version=2024-12-01-preview")
+                : new Uri($"{endpoint}/chat/completions");
         }
 
         public async Task<ChatResponse> GetResponseAsync(
@@ -592,17 +601,26 @@ public sealed class TypedMemEvalJudgeCalibrationTests(ITestOutputHelper output)
             CancellationToken cancellationToken = default)
         {
             var prompt = string.Join("\n\n", chatMessages.Select(message => message.Text));
-            var payload = JsonSerializer.Serialize(new
-            {
-                messages = new[] { new { role = "user", content = prompt } },
-                max_completion_tokens = Math.Max(MinimumCompletionBudget, options?.MaxOutputTokens ?? 0)
-            });
+            var budget = Math.Max(MinimumCompletionBudget, options?.MaxOutputTokens ?? 0);
+            var messages = new[] { new { role = "user", content = prompt } };
+            // Azure names the deployment in the path; an OpenAI-compatible host takes the model in the body.
+            // max_tokens is the budget field every OpenAI-compatible host accepts.
+            var payload = _azureProtocol
+                ? JsonSerializer.Serialize(new { messages, max_completion_tokens = budget })
+                : JsonSerializer.Serialize(new { model = _model, messages, max_tokens = budget });
 
             using var request = new HttpRequestMessage(HttpMethod.Post, _uri)
             {
                 Content = new StringContent(payload, Encoding.UTF8, "application/json")
             };
-            request.Headers.Add("api-key", _apiKey);
+            if (_azureProtocol)
+            {
+                request.Headers.Add("api-key", _apiKey);
+            }
+            else
+            {
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", _apiKey);
+            }
 
             using var response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
             var body = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
@@ -612,7 +630,7 @@ public sealed class TypedMemEvalJudgeCalibrationTests(ITestOutputHelper output)
                 // Status and a bounded body: enough to tell a throttle from a bad deployment name,
                 // without pasting a provider payload of unknown length into a test log.
                 throw new InvalidOperationException(
-                    $"Azure OpenAI returned {(int)response.StatusCode}: " +
+                    $"{_providerName} returned {(int)response.StatusCode}: " +
                     $"{body[..Math.Min(400, body.Length)]}");
             }
 

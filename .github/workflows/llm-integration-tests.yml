@@ -130,12 +130,12 @@ jobs:
           echo "::notice::No inference provider secrets are configured; skipping the paid integration tests. This is not a failure — add the Azure pair to enable them."
         fi
         if [ "$(grep -c . <<< "${AZURE_OPENAI_ENDPOINT:-}")" = "0" ] && [ -n "${BITDEER_API_KEY}${OPENAI_API_KEY}" ]; then
-          echo "::notice::A non-Azure provider is configured, but this suite's live paths build Azure clients directly and would assert nothing. Skipping rather than reporting a green that exercised no provider."
+          echo "::notice::A non-Azure provider is configured. The live tests can run on it (they resolve AI_INFERENCE_PROVIDER), but this scheduled run stays Azure-only by decision: on another provider it would be a weekly paid judge calibration on a model the published figures were not measured on. Run them locally or dispatch with the Azure pair."
         fi
 
-    # The integration suite's live paths construct Azure clients directly and return early without
-    # AZURE_OPENAI_*, so a run with another provider selected would pass while asserting nothing. A green
-    # that exercises nothing is worse than a skip that says so.
+    # Azure-only by decision (0.42): the live tests resolve AI_INFERENCE_PROVIDER and would run on Bitdeer or
+    # OpenAI, but there this scheduled job would be a weekly paid judge calibration on a model the published
+    # figures were not measured on. Locally they follow the selected provider, like the samples.
     - name: Run Integration Tests
       if: steps.provider.outputs.provider == 'azure'
       run: |

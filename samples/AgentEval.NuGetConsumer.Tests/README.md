@@ -10,7 +10,7 @@ This project demonstrates a recommended pattern for evaluating AI agents: **keep
 AgentEval.NuGetConsumer/          <-- Your agent application
 ├── AgentFactory.cs               <-- Creates agents with tools
 ├── Tools/TravelTools.cs          <-- Tool implementations
-├── Config.cs                     <-- Azure OpenAI configuration
+├── Config.cs                     <-- inference-provider configuration (AI_INFERENCE_PROVIDER)
 ├── Program.cs                    <-- Application entry point
 └── Demos.cs                      <-- Interactive demos (optional)
 
@@ -31,13 +31,22 @@ AgentEval.NuGetConsumer.Tests/    <-- Agent evaluations (this project)
 
 ## Prerequisites
 
-All tests require Azure OpenAI credentials:
+The live tests need a configured inference provider; without one they skip:
 
 ```powershell
-$env:AZURE_OPENAI_ENDPOINT = "https://your-resource.openai.azure.com/"
-$env:AZURE_OPENAI_API_KEY = "your-api-key"
-$env:AZURE_OPENAI_DEPLOYMENT = "gpt-4o"
+# Pick a provider, then set its variables (same contract as the AgentEval CLI and samples).
+$env:AI_INFERENCE_PROVIDER = "bitdeer"
+$env:BITDEER_API_KEY = "your-api-key"               # BITDEER_MODEL / BITDEER_MODEL_2 are optional
+
+# Or Azure OpenAI:
+# $env:AI_INFERENCE_PROVIDER = "azure"
+# $env:AZURE_OPENAI_ENDPOINT = "https://your-resource.openai.azure.com/"
+# $env:AZURE_OPENAI_API_KEY = "your-api-key"
+# $env:AZURE_OPENAI_DEPLOYMENT = "gpt-4o"
 ```
+
+`openai`, `foundry` and `openai-compatible` work the same way. With `AI_INFERENCE_PROVIDER` unset, the first provider with
+complete credentials is used.
 
 There are no mocks. Every test runs the real agent against a real LLM and evaluates the actual result.
 

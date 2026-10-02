@@ -95,6 +95,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   With `--decisions` they name the decision-model provider and the model requested from it. Keys and endpoints are
   never written.
 
+### Live tests and the NuGet sample follow `AI_INFERENCE_PROVIDER`
+
+#### Changed
+- **The live tests use the provider you selected, like the CLI and the samples.** The NuGet-consumer sample, its tests
+  and the TypedMemEval live-judge calibration read `AZURE_OPENAI_*` directly, so with `AI_INFERENCE_PROVIDER=bitdeer`
+  they ignored Bitdeer and called whatever Azure resource those variables named. They now resolve the provider through
+  `InferenceProviderEnvironment`: an explicit selector wins, an unset one auto-detects in the documented order, and with
+  no provider configured they skip (or, for the calibration arm, assert nothing) exactly as before.
+- **The NuGet-consumer sample tracks the latest package, 0.42.0-beta** (MAF 1.23, Microsoft.Extensions.AI 10.10), the
+  first published version with the provider resolver. Its Semantic Kernel demo uses the OpenAI connector at the
+  provider's endpoint for Bitdeer and other OpenAI-compatible hosts. Mock mode is unchanged.
+- The weekly live-test workflow still runs only on Azure; on Bitdeer it records a skip, as decided for 0.42.
+
 ### Corrected
 
 - **The agentic prompt files were never forks of Microsoft's prompts.**

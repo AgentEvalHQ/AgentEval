@@ -17,6 +17,10 @@ namespace AgentEval.Tests.Compliance.Gdpr;
 /// <summary>
 /// Unit and integration tests for <see cref="GDPRPdfRenderer"/> (Phase 6, G6.1-G6.8).
 /// </summary>
+// Rendered PDFs are read back as text. Under a fully parallel run the text came back as NUL characters (seen once
+// on net8.0, never alone), so these render outside the parallel phase, with the other tests that touch QuestPDF's
+// process-wide state.
+[Collection(AgentEval.Tests.Rendering.Pdf.QuestPdfLicenceCollection.Name)]
 public class GDPRPdfRendererTests : IDisposable
 {
     private readonly string _tempDir;
