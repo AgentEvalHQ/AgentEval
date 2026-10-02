@@ -318,6 +318,17 @@ public static class CompareCommand
                 return false;
             }
 
+            // A JSON file with no scenario id is not a scenario result (for example a run's manifest.json or
+            // summary.json, read because the directory has no scenarios/ folder). It used to reach the index as a
+            // null key and crash the command with "Value cannot be null".
+            if (string.IsNullOrWhiteSpace(result.Id))
+            {
+                Console.Error.WriteLine(
+                    $"✖ {option}: {file} is not a scenario result (it has no scenario id). Point at a run directory "
+                  + "with a scenarios/ folder; a run that wrote none cannot be compared per scenario.");
+                return false;
+            }
+
             results.Add(result);
         }
 

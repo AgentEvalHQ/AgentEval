@@ -160,6 +160,26 @@ public static class BenchMemoryCommand
                 {
                     ["overall_score"] = result.OverallScore,
                 });
+            // One scenario result per measured category, so `agenteval compare` can diff two memory runs per
+            // category (before this, a memory run had no scenarios/ and compare could not read it). A skipped
+            // category measured nothing and is left out; an errored one is a 0 and not passed, as in the overall
+            // score. Score is on the 0..1 scale every other scenario result uses.
+            foreach (var category in result.CategoryResults.Where(c => !c.Skipped || c.Errored))
+            {
+                var scenarioScore = category.Errored ? 0.0 : Math.Clamp(category.Score / 100.0, 0.0, 1.0);
+                await store.WriteScenarioResultAsync(runId, new ScenarioResult(
+                    Id: "memory-" + category.CategoryName.ToLowerInvariant().Replace(' ', '-'),
+                    Name: category.CategoryName,
+                    Input: category.ScenarioType.ToString(),
+                    Output: category.Errored ? "errored" : $"score {category.Score:F1}",
+                    Passed: !category.Errored && category.Score >= 70,
+                    Score: scenarioScore,
+                    Metrics: new Dictionary<string, double> { ["score"] = category.Errored ? 0.0 : category.Score, ["weight"] = category.Weight },
+                    Assertions: [],
+                    Duration: category.Duration,
+                    EstimatedCost: 0.0), ct);
+            }
+
             await store.CompleteRunAsync(manifest, summary, ct);
 
             // Native MemoryBenchmarkResult JSON alongside the manifest (Shape B per ADR-017).
