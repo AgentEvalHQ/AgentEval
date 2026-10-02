@@ -33,9 +33,10 @@ namespace AgentEval.Cli.Commands;
 ///         AZURE_OPENAI_DEPLOYMENT are set → build a real Azure OpenAI
 ///         <c>IChatClient</c> and wrap it in
 ///         <see cref="ChatClientEvaluator"/>.</item>
-///   <item>Otherwise, allow <c>AGENTEVAL_ALLOW_STUB_JUDGE=1</c> opt-in to fall
-///         back to <see cref="StubEvaluator"/>; without the opt-in, fail with
-///         exit code 2 so CI cannot silently produce stub-graded evidence.</item>
+///   <item>Otherwise fail with exit code 3 and say what is missing. There is no stand-in judge: through 0.43
+///         <c>AGENTEVAL_ALLOW_STUB_JUDGE=1</c> selected one that scored 75 on everything, including in
+///         <c>calibrate</c>, which then reported figures that measured no judge. The variable is now ignored.
+///         A <c>--sut mock</c> run uses its own judge (<see cref="MockTarget"/>) and is never stored.</item>
 /// </list>
 /// </para>
 /// </remarks>
@@ -91,7 +92,7 @@ internal static class JudgeFactory
     /// <returns>
     /// <c>(judge, judgeModel, exitCode)</c>. When <c>judge</c> is <c>null</c>, the caller
     /// MUST return <c>exitCode</c> immediately (the helper already wrote the user-facing
-    /// error to <see cref="Console.Error"/>). <c>judgeModel</c> is the deployment / "stub"
+    /// error to <see cref="Console.Error"/>). <c>judgeModel</c> is the deployment or model
     /// label to record in provenance.
     /// </returns>
     internal static (IEvaluator? Judge, string JudgeModel, int ExitCode) Resolve(
@@ -180,38 +181,20 @@ internal static class JudgeFactory
         }
 
         // A provider WAS named or half-configured and could not be built: that is a typo, not an
-        // unconfigured machine, and the stub must not rescue it. Falling through here would turn
-        // AI_INFERENCE_PROVIDER=foundry with missing variables plus AGENTEVAL_ALLOW_STUB_JUDGE=1 into
-        // stub-graded evidence — the resolver's fail-closed contract undone by the fallback beneath it.
+        // unconfigured machine, so say that rather than "nothing is configured".
         if (InferenceProviderEnvironment.AnyConfigurationAttempted(Environment.GetEnvironmentVariable))
         {
             Console.Error.WriteLine(
                 $"✖ A provider is selected or partially configured but could not be used. {diagnostic}\n" +
-                "  Fix it, or unset every provider variable to run with AGENTEVAL_ALLOW_STUB_JUDGE=1.\n" +
-                "  The stub is for a machine with no provider at all, never for a misconfigured one.");
+                "  Fix its variables and retry.");
             return (null, "", ExitCodes.RuntimeError);
         }
 
-        // No provider configured anywhere — gate the stub behind an explicit opt-in so CI
-        // cannot silently produce stub-graded evidence.
-        var allowStub = Environment.GetEnvironmentVariable("AGENTEVAL_ALLOW_STUB_JUDGE");
-        var stubAllowed =
-               string.Equals(allowStub, "1", StringComparison.Ordinal)
-            || string.Equals(allowStub, "true", StringComparison.OrdinalIgnoreCase);
-
-        if (!stubAllowed)
-        {
-            Console.Error.WriteLine(
-                $"✖ No LLM evaluator configured. {diagnostic}\n" +
-                "  Configure a provider to enable real judging, or set AGENTEVAL_ALLOW_STUB_JUDGE=1 to run\n" +
-                "  with a deterministic stub (results are not meaningful — CI must NOT do this).");
-            return (null, "", ExitCodes.RuntimeError);
-        }
-
+        // No provider at all. There is no stand-in judge: a verdict no judge gave measures nothing.
         Console.Error.WriteLine(
-            $"⚠ AGENTEVAL_ALLOW_STUB_JUDGE=1 — using stub evaluator for {judgeKind}. " +
-            "Results are not a real judgement; do not rely on the verdict in CI.");
-        return (new StubEvaluator(), "stub", 0);
+            $"✖ No LLM judge configured for {judgeKind}. {diagnostic}\n" +
+            $"  Configure a provider ({InferenceProviderEnvironment.SelectorVariable}; see docs/cli.md) and retry.");
+        return (null, "", ExitCodes.RuntimeError);
     }
 
     /// <summary>Returns the value of the first environment variable in <paramref name="names"/>
@@ -225,40 +208,5 @@ internal static class JudgeFactory
                 return value;
         }
         return null;
-    }
-
-    /// <summary>
-    /// Deterministic placeholder evaluator. Returns score=75 with every criterion
-    /// "met" so the pipeline produces a complete (but meaningless) evidence file
-    /// for smoke-testing the workflow without LLM cost.
-    /// </summary>
-    /// <remarks>
-    /// Only reachable when <c>AGENTEVAL_ALLOW_STUB_JUDGE=1</c> is opted-in
-    /// explicitly. The "Stub: assumed met" explanation is intentionally obvious
-    /// in artefacts so consumers can spot stub-graded evidence at a glance.
-    /// </remarks>
-    internal sealed class StubEvaluator : IEvaluator
-    {
-        public Task<EvaluationResult> EvaluateAsync(
-            string input,
-            string output,
-            IEnumerable<string> criteria,
-            CancellationToken cancellationToken = default)
-        {
-            var criteriaList = criteria.ToList();
-            return Task.FromResult(new EvaluationResult
-            {
-                OverallScore = 75,
-                Summary = "Stub evaluation — no real LLM judge configured.",
-                CriteriaResults = criteriaList
-                    .Select(c => new CriterionResult
-                    {
-                        Criterion = c,
-                        Met = true,
-                        Explanation = "Stub: assumed met."
-                    })
-                    .ToList()
-            });
-        }
     }
 }

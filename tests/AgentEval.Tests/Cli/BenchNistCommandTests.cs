@@ -130,7 +130,7 @@ public class BenchNistCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task BenchNist_NoEnvVars_NoStubOptIn_ReturnsExitCode3()
+    public async Task BenchNist_NoProvider_ReturnsExitCode3()
     {
         InitWorkspace();
         var result = await BenchNistCommand.RunAsync(

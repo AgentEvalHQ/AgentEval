@@ -132,7 +132,7 @@ public class BenchOwaspCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task BenchOwasp_NoEnvVars_NoStubOptIn_ReturnsExitCode3()
+    public async Task BenchOwasp_NoProvider_ReturnsExitCode3()
     {
         InitWorkspace();
         var result = await BenchOwaspCommand.RunAsync(

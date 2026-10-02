@@ -217,9 +217,8 @@ public static class InferenceProviderEnvironment
 
     /// <summary>
     /// True when someone tried to configure a provider: the selector is set, or any provider has at least
-    /// one of its variables. The difference matters to a caller that may fall back to a stub — an
-    /// unconfigured machine is a legitimate fallback, a MISCONFIGURED one is a typo that must fail closed,
-    /// or the run silently produces stub-graded evidence from a mistake.
+    /// one of its variables. It separates an unconfigured machine from a MISCONFIGURED one, so a caller can say
+    /// "this provider is missing variables" (a typo to fix) instead of "nothing is configured".
     /// </summary>
     public static bool AnyConfigurationAttempted(Func<string, string?> getEnvironmentVariable)
     {
@@ -228,8 +227,7 @@ public static class InferenceProviderEnvironment
         if (Set(SelectorVariable)) return true;
         // EVERY variable a provider reads, not only its required credentials. Someone who set
         // OPENAI_BASE_URL or BITDEER_MODEL and nothing else has tried to configure a provider and made a
-        // mistake; counting only credentials would let the stub rescue exactly that case, which is the hole
-        // this predicate exists to close.
+        // mistake; counting only credentials would report that case as "nothing configured".
         foreach (var name in AllProviderVariables)
         {
             if (Set(name)) return true;

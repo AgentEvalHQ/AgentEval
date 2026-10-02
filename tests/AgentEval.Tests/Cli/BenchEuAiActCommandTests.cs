@@ -114,7 +114,7 @@ public class BenchEuAiActCommandTests : IDisposable
     // ── Env-gate trio (Phase-4 gate-review follow-up) ────────────────────
 
     [Fact]
-    public async Task BenchEuAiAct_NoEnvVars_NoStubOptIn_ReturnsExitCode3()
+    public async Task BenchEuAiAct_NoProvider_ReturnsExitCode3()
     {
         // env already scrubbed by ctor — no override path, no stub opt-in.
         InitWorkspace();

@@ -100,17 +100,6 @@ public class CalibrationJudgeIdentityTests
     }
 
     [Fact]
-    public void Of_StubJudge_SaysItIsTheStubAndNamesNoModel()
-    {
-        using var env = new ProviderEnvironmentScope(("AGENTEVAL_ALLOW_STUB_JUDGE", "1"));
-
-        var identity = ResolveAndIdentify();
-
-        Assert.StartsWith("stub (AGENTEVAL_ALLOW_STUB_JUDGE=1)", identity.Provider);
-        Assert.Equal("none", identity.Model);
-    }
-
-    [Fact]
     public void Of_EnvironmentChangedAfterTheJudgeWasBuilt_ReportsTheProviderAsUnknown()
     {
         using var env = new ProviderEnvironmentScope(

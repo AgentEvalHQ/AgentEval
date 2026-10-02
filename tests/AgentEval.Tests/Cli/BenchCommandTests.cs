@@ -435,7 +435,7 @@ public class BenchCommandTests : IDisposable
         Assert.Equal("AgentEval.Compliance.Gdpr", attestation.GetProperty("evaluator").GetString());
     }
 
-    // ── AGENTEVAL_ALLOW_STUB_JUDGE gate (batch-5 surface) ────────────────────
+    // ── No judge configured ──────────────────────────────────────────────────
     //
     // These tests scrub the AZURE_OPENAI_* env vars to simulate a CI run that
     // forgot to wire the secrets. With evaluatorOverride=null the resolver
@@ -443,7 +443,7 @@ public class BenchCommandTests : IDisposable
     // don't race with parallel tests that also touch env vars.
 
     [Fact]
-    public async Task RunGdprAsync_NoEnvVars_NoStubOptIn_ReturnsExitCode3()
+    public async Task RunGdprAsync_NoProvider_ReturnsExitCode3()
     {
         InitWorkspace();
 

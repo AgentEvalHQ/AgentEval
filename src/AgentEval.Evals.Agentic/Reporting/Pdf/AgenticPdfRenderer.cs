@@ -409,12 +409,15 @@ public sealed class AgenticPdfRenderer
                 : part));
     }
 
-    private static string GetJudgeModeDescription(string judgeMode) => judgeMode.ToLowerInvariant() switch
+    internal static string GetJudgeModeDescription(string judgeMode) => judgeMode.ToLowerInvariant() switch
     {
-        "stub" or "mode-a" =>
-            "Stub judge mode: evaluators return deterministic fixed responses based on scenario metadata. " +
-            "Designed for fast CI validation without requiring a live LLM endpoint.",
-        "single" or "mode-b" or "real" or "llm" =>
+        "stub" =>
+            "Placeholder judge (stub, AgentEval 0.43 and earlier): every criterion received a fixed score, so " +
+            "this evidence measures no model.",
+        "none" =>
+            "No judge: every evaluator in this preset is computed in code from the answer, trace or telemetry; no " +
+            "language model graded anything.",
+        "single" or "mode-a" or "mode-b" or "real" or "llm" =>
             "Single LLM judge mode: each scenario is evaluated by a single live language model call " +
             "configured via the benchmark's judge pipeline. Results reflect genuine model behavior " +
             "against each scenario's evaluation criteria.",

@@ -165,7 +165,7 @@ The suite can be run two ways:
 
 - .NET 10.0.x SDK (or 8.x / 9.x).
 - An initialized `.agenteval` workspace in your repository root.
-- A judge model reachable through one of the CLI's inference providers (see Configuration below). If no provider is configured, or a selected provider is missing variables, the CLI refuses to run (exit code 3 — see [Exit codes](../../cli.md#exit-codes)). To exercise the pipeline without LLM cost — smoke-test mode only, **not for CI** — set `AGENTEVAL_ALLOW_STUB_JUDGE=1` on a machine with no provider configured; stub-mode results are deterministic placeholders and not meaningful for quality evaluation. See [CLI Reference — Environment variables](../../cli.md#environment-variables) for the full resolution-order contract.
+- A judge model reachable through one of the CLI's inference providers (see Configuration below). If no provider is configured, or a selected provider is missing variables, the CLI refuses to run (exit code 3 — see [Exit codes](../../cli.md#exit-codes)). 
 
 ---
 
@@ -315,9 +315,9 @@ AZURE_OPENAI_DEPLOYMENT=<your-deployment>
 
 If `AI_INFERENCE_PROVIDER` is unset, the CLI uses the first provider whose variables are all present, checking Azure OpenAI, Bitdeer, OpenAI, Foundry and OpenAI-compatible in that order. To grade with a different endpoint than the agent under test, set all three of `AZURE_OPENAI_JUDGE_ENDPOINT`, `AZURE_OPENAI_JUDGE_API_KEY` and `AZURE_OPENAI_JUDGE_DEPLOYMENT`; when all three are set they take precedence for the judge.
 
-If no provider is configured, a selected provider is missing variables, or only some of the `AZURE_OPENAI_JUDGE_*` variables are set, the CLI exits **3** with a diagnostic naming what is missing. To exercise the pipeline without LLM cost, set `AGENTEVAL_ALLOW_STUB_JUDGE=1` on a machine with no provider configured — the CLI prints a warning to stderr on every run and returns deterministic placeholder scores. A selected or partly configured provider is never replaced by the stub. **Stub-mode results must not be used for quality evaluation or decision-making.** See [CLI Reference — Environment variables](../../cli.md#environment-variables) for every provider's variables and the full contract.
+If no provider is configured, a selected provider is missing variables, or only some of the `AZURE_OPENAI_JUDGE_*` variables are set, the CLI exits **3** with a diagnostic naming what is missing. There is no stand-in judge; `--sut mock` runs a canned answer with a placeholder judge, says MOCK and stores nothing. See [CLI Reference — Environment variables](../../cli.md#environment-variables) for every provider's variables and the full contract.
 
-Pure-code evaluators (Telemetry, StochasticStability, JudgeQuality, TaskNavigationEfficiency deterministic path, ToolCallSuccess deterministic path) do not call the judge and produce meaningful scores in stub mode.
+Pure-code evaluators (Telemetry, StochasticStability, JudgeQuality, TaskNavigationEfficiency deterministic path, ToolCallSuccess deterministic path) do not call the judge. The `telemetry`, `judge-quality` and `stochastic-stability` presets use only such evaluators, so they run without a judge or a provider; every other preset needs a configured judge.
 
 ---
 
@@ -341,7 +341,7 @@ A category that fails its threshold fails the command (exit code 9). The calibra
 
 **Calibration coverage is partial**: six of the eight scored categories — system, process and RAG quality among them — are gated at relaxed per-category thresholds rather than the 0.85 / 0.70 default, and the memory, multi-turn and trace-dependent reasoning evaluators are not calibrated at all, although they run and produce verdicts. See the Known Limitations section below and [`how-it-works.md`](how-it-works.md) for the per-category picture.
 
-**Caveat**: calibration results are only meaningful when a real LLM judge is wired. Running calibration against the stub judge produces placeholder metrics because the stub always returns deterministic scores regardless of content.
+**Calibration needs a real judge.** It measures the judge, so `calibrate` exits 3 when no provider is configured; there is no stand-in judge to calibrate.
 
 ---
 
@@ -361,7 +361,7 @@ The files also describe an output envelope of their own: structured `evidence[]`
 
 ## Known Limitations
 
-- **Stub-mode scores are not meaningful** — the stub judge always returns a configurable fixed score regardless of content. Do not use stub-mode results for quality gates, compliance purposes, or decision-making.
+- **A `--sut mock` run measures nothing** — a canned answer graded by a placeholder judge. It exits 11 and is never stored; use it to try the command, never as a result.
 - **Telemetry evaluators require caller-supplied trace data** — `AgenticTelemetry` must be populated by the consuming application (or test harness) before invoking telemetry evaluators. AgentEval does not auto-instrument the agent runtime.
 - **Stochastic Stability requires multiple prior runs** — at least 2 `EvalResult` objects must be supplied via `EvalInput.Metadata["run_results"]`. The evaluator returns a skipped result when fewer than 2 results are available.
 - **English-only scenarios** — all built-in benchmark scenarios and golden entries are authored in English. There are no multi-language scenario packs.

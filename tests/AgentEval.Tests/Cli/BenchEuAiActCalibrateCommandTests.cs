@@ -66,7 +66,7 @@ public class BenchEuAiActCalibrateCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task BenchEuAiActCalibrate_NoEnvVars_NoStubOptIn_ReturnsExitCode3()
+    public async Task BenchEuAiActCalibrate_NoProvider_ReturnsExitCode3()
     {
         // env already scrubbed by ctor
         var exit = await BenchEuAiActCalibrateCommand.RunAsync(_root, outPathOverride: null);

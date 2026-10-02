@@ -76,10 +76,8 @@ public static class BenchCalibrateCommand
         }
 
         // ── Judge / evaluator ────────────────────────────────────────────────
-        // Calibration uses the SAME gate as `bench` — running calibration against
-        // the stub produces a meaningless accuracy/kappa number and dead-weights
-        // the CI gate. AGENTEVAL_ALLOW_STUB_JUDGE=1 is required to fall through
-        // to the stub.
+        // Calibration measures a judge, so it needs a real one: there is no stand-in judge (a placeholder verdict
+        // would yield an accuracy/kappa figure that measures nothing).
         // The GDPR system prompt `bench gdpr` sends. This used to resolve the judge WITHOUT it, so the calibration
         // measured a judge on the generic default prompt while the benchmark ran another one.
         var (resolvedJudge, judgeModelName, exitCode) = JudgeFactory.ResolveGdpr(evaluatorOverride, "GDPR calibration");

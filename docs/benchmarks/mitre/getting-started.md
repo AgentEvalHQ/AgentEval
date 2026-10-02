@@ -42,7 +42,7 @@ Sourced verbatim from `BenchmarkFamilyRegistry` (see `src/AgentEval.RedTeam/RedT
 
 Preset aliases are accepted: `atlas-baseline` = `baseline`, `atlas-smoke` = `smoke`, `atlas-audit-grade` = `atlas-audit` = `audit` = `auditgrade`.
 
-The current MITRE attack pipeline uses heuristic per-attack evaluators (see `src/AgentEval.RedTeam/RedTeam/Evaluators/`), not an LLM judge. Every run still resolves a judge, with or without `--azure-from-env`, for API symmetry with the other bench commands: the `AZURE_OPENAI_JUDGE_*` override if set, otherwise the provider `AI_INFERENCE_PROVIDER` selects; with no provider configured it needs `AGENTEVAL_ALLOW_STUB_JUDGE=1` or the command exits 3 (see [CLI Reference — Environment variables](../../cli.md#environment-variables)). The judge is not called during the scan and consumes no tokens. The dominant cost is the agent-under-test's per-probe inference calls.
+The current MITRE attack pipeline uses heuristic per-attack evaluators (see `src/AgentEval.RedTeam/RedTeam/Evaluators/`), not an LLM judge. Every run still resolves a judge, with or without `--azure-from-env`, for API symmetry with the other bench commands: the `AZURE_OPENAI_JUDGE_*` override if set, otherwise the provider `AI_INFERENCE_PROVIDER` selects; with no provider configured the command exits 3 (a `--sut mock` run needs none) (see [CLI Reference — Environment variables](../../cli.md#environment-variables)). The judge is not called during the scan and consumes no tokens. The dominant cost is the agent-under-test's per-probe inference calls.
 
 ## CLI usage
 

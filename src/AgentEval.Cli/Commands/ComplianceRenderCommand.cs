@@ -268,9 +268,7 @@ public static class ComplianceRenderCommand
     /// pre-existing <c>gdpr-evidence.json</c> (or EU-AI-Act equivalent) end-to-end
     /// and never invokes <see cref="EvaluateAsync"/> — no judgment occurs.
     /// <para>
-    /// This stub therefore does NOT need to be gated by
-    /// <c>AGENTEVAL_ALLOW_STUB_JUDGE</c>: that gate exists to prevent stub-graded
-    /// CI gates, and there is no grading on the render path. The registry is
+    /// It is not a stand-in judge: it never grades, and there is no grading on the render path. The registry is
     /// needed only for PII-redaction metadata lookup during PDF rendering. If
     /// <see cref="EvaluateAsync"/> is ever called on this type, it throws — that
     /// would indicate the render path regressed into a grading flow and should
@@ -286,6 +284,6 @@ public static class ComplianceRenderCommand
                 "StubEvaluatorForRegistry.EvaluateAsync was invoked. This stub is " +
                 "registry-construction-only — no grading should occur on the render " +
                 "path. If you see this, the render path has regressed into a " +
-                "judgment flow without the AGENTEVAL_ALLOW_STUB_JUDGE gate.");
+                "judgment flow, which must resolve a real judge.");
     }
 }

@@ -96,7 +96,7 @@ public class BenchCalibrateCommandTests : IDisposable
     // ── Env-gate trio (Phase-4 gate-review follow-up) ─────────────────────────
 
     [Fact]
-    public async Task Calibrate_NoEnvVars_NoStubOptIn_ReturnsExitCode3()
+    public async Task Calibrate_NoProvider_ReturnsExitCode3()
     {
         // env already scrubbed by ctor.
         var exit = await BenchCalibrateCommand.RunAsync(_root, outPathOverride: null);
@@ -221,19 +221,20 @@ public class BenchCalibrateCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task Calibrate_StubJudge_ReportSaysStubAndNamesNoModel()
+    public async Task Calibrate_WithoutARealJudge_Refuses_AndWritesNoReport()
     {
-        // No provider is configured (the collection scrubs them all); the stub is opted into explicitly.
+        // Calibration measures a judge. Through 0.43 the retired AGENTEVAL_ALLOW_STUB_JUDGE=1 let it "calibrate" a
+        // placeholder that scored 75 on everything and write the figures as a calibration report. No provider is
+        // configured here (the collection scrubs them all); the retired variable is set to prove it is ignored.
         Environment.SetEnvironmentVariable("AGENTEVAL_ALLOW_STUB_JUDGE", "1");
-        var outPath = Path.Combine(_root, "report-stub.md");
+        var outPath = Path.Combine(_root, "report-no-judge.md");
 
-        await BenchCalibrateCommand.RunCoreAsync(
+        var exit = await BenchCalibrateCommand.RunCoreAsync(
             rootOverride: _root,
             outPathOverride: outPath,
             evaluatorOverride: null);
 
-        var content = await File.ReadAllTextAsync(outPath);
-        Assert.Contains("Judge provider: stub (AGENTEVAL_ALLOW_STUB_JUDGE=1)", content);
-        Assert.Contains("Judge model: none", content);
+        Assert.Equal(3, exit);
+        Assert.False(File.Exists(outPath));
     }
 }

@@ -64,7 +64,7 @@ public class BenchAgenticCalibrateCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task BenchAgenticCalibrate_NoEnvVars_NoStubOptIn_ReturnsExitCode3()
+    public async Task BenchAgenticCalibrate_NoProvider_ReturnsExitCode3()
     {
         var exit = await BenchAgenticCalibrateCommand.RunAsync(_root, outPathOverride: null);
         Assert.Equal(3, exit);

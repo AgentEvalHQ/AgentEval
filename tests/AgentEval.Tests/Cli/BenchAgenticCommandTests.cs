@@ -225,11 +225,11 @@ public class BenchAgenticCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task BenchAgentic_NoEnvVars_NoStubOptIn_ReturnsExitCode3()
+    public async Task BenchAgentic_NoProvider_ReturnsExitCode3()
     {
         InitWorkspace();
         var exit = await BenchAgenticCommand.RunAsync(
-            preset: "telemetry",                                // pure-code preset; no real LLM calls
+            preset: "agentic-execution",                        // a preset that calls the judge
             subject: "AgenticGateTestAgent",
             rootOverride: _root,
             inputText: SuppliedQuestion,
@@ -237,6 +237,36 @@ public class BenchAgenticCommandTests : IDisposable
             evaluatorOverride: null,                            // exercise the env-gate path
             budgetTier: null);
         Assert.Equal(3, exit);
+    }
+
+    [Theory]
+    [InlineData("telemetry")]
+    [InlineData("judge-quality")]
+    [InlineData("stochastic-stability")]
+    public async Task BenchAgentic_PureCodePreset_RunsWithoutAProvider_AndRecordsNoJudge(string preset)
+    {
+        // These presets call no judge. A selector naming a provider with no variables makes any judge resolution
+        // fail closed (exit 3), so a run that resolved one would fail here.
+        InitWorkspace();
+        using var env = new ProviderEnvironmentScope(("AI_INFERENCE_PROVIDER", "foundry"));
+        var subject = "AgenticPureCode" + preset.Replace("-", "");
+
+        var exit = await BenchAgenticCommand.RunAsync(
+            preset: preset,
+            subject: subject,
+            rootOverride: _root,
+            inputText: SuppliedQuestion,
+            responseText: SuppliedAnswer,
+            evaluatorOverride: null,
+            budgetTier: null);
+
+        Assert.True(exit is 0 or 9 or 10 or 11, $"Expected a gate verdict; got {exit}.");
+        var recorded = Directory.GetFiles(Path.Combine(_root, ".agenteval"), "*.json", SearchOption.AllDirectories)
+            .Select(File.ReadAllText)
+            .Where(t => t.Contains("\"judgeMode\"", StringComparison.Ordinal))
+            .ToList();
+        Assert.NotEmpty(recorded);
+        Assert.All(recorded, t => Assert.Matches(@"""judgeMode""\s*:\s*""none""", t));
     }
 
     [Fact]
@@ -247,7 +277,7 @@ public class BenchAgenticCommandTests : IDisposable
         // Missing key + deployment → partial config → exit 2
 
         var exit = await BenchAgenticCommand.RunAsync(
-            preset: "telemetry",
+            preset: "agentic-execution",
             subject: "AgenticPartialAgent",
             rootOverride: _root,
             inputText: SuppliedQuestion,

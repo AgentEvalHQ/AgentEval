@@ -118,7 +118,7 @@
           "description": "AgentEval assembly version that generated this result."
         },
         "judgeMode": {
-          "enum": ["single", "panel", "adjudicated"],
+          "enum": ["single", "panel", "adjudicated", "none"],
           "description": "Judge mode used during evaluation."
         },
         "promptVersions": {

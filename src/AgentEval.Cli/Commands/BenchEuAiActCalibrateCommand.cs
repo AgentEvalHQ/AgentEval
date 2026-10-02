@@ -91,8 +91,7 @@ public static class BenchEuAiActCalibrateCommand
         CalibrationJudgeIdentity? evaluatorOverrideIdentity = null)
     {
         // ── Judge / evaluator ────────────────────────────────────────────────
-        // Calibration requires AGENTEVAL_ALLOW_STUB_JUDGE=1 to use stub mode —
-        // stub-graded calibration gates the wrong thing.
+        // Calibration measures a judge, so it needs a real one: there is no stand-in judge.
         // Workspace root canonicalisation (defense-in-depth against --root traversal).
         if (rootOverride is not null)
         {

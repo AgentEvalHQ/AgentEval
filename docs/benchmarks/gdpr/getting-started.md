@@ -21,7 +21,7 @@
 
 > **Access path.** The GDPR benchmark runs through the `agenteval` CLI binaries and is also available programmatically via NuGet (`using AgentEval.Compliance.Gdpr;`) — see [NuGet samples](../../samples/) for end-to-end consumer tests.
 
-> **Real judging needs a configured inference provider**: the one `AI_INFERENCE_PROVIDER` selects — Azure OpenAI, Bitdeer, OpenAI, Azure AI Foundry or any OpenAI-compatible host; see the [provider table](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to) for the variables each needs — or a judge-only Azure OpenAI endpoint set with all three `AZURE_OPENAI_JUDGE_*` variables, which wins when present. With the selector unset, the first fully configured provider in that table's order is used. If no provider is configured, or a selected provider is missing variables, the CLI refuses to run (exit code **3** — see [Exit codes](../../cli.md#exit-codes)). To exercise the pipeline without LLM cost — smoke-test mode only, **not for CI** — set `AGENTEVAL_ALLOW_STUB_JUDGE=1` on a machine with no provider variables set. Stub-mode results are deterministic placeholders and **must not** be relied on as compliance evidence. See [CLI Reference — Environment variables](../../cli.md#environment-variables) for the full contract.
+> **Real judging needs a configured inference provider**: the one `AI_INFERENCE_PROVIDER` selects — Azure OpenAI, Bitdeer, OpenAI, Azure AI Foundry or any OpenAI-compatible host; see the [provider table](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to) for the variables each needs — or a judge-only Azure OpenAI endpoint set with all three `AZURE_OPENAI_JUDGE_*` variables, which wins when present. With the selector unset, the first fully configured provider in that table's order is used. If no provider is configured, or a selected provider is missing variables, the CLI refuses to run (exit code **3** — see [Exit codes](../../cli.md#exit-codes)). See [CLI Reference — Environment variables](../../cli.md#environment-variables) for the full contract.
 
 For example, to judge with Azure OpenAI (auto-detected when only these three are set), export the following before running:
 
@@ -247,7 +247,7 @@ agenteval bench gdpr calibrate
 
 The golden dataset contains hand-labeled scenario/response pairs distributed across the 6 GDPR pillars (Foundations, Lawful Basis, Subject Rights, Transparency, Privacy-by-Design, Governance & Accountability). For each entry, the calibration runner asks the judge to score the response, then compares the judge's score to the human label. For an end-to-end plain-English walkthrough of *how* calibration works and *what kappa means*, see [`how-it-works.md`](how-it-works.md).
 
-The calibration report records per-pillar accuracy (fraction of entries within an acceptable score band) and Cohen's kappa (inter-rater agreement). Its header names the judge provider (and how it was chosen) and the judge model or deployment, so reports produced by different judges can be told apart, including in a diff. When the environment no longer resolves to the model the judge was built with, the provider is reported as unknown rather than guessed; a stub-judge run says that its figures measure no model. The default CI gate requires:
+The calibration report records per-pillar accuracy (fraction of entries within an acceptable score band) and Cohen's kappa (inter-rater agreement). Its header names the judge provider (and how it was chosen) and the judge model or deployment, so reports produced by different judges can be told apart, including in a diff. When the environment no longer resolves to the model the judge was built with, the provider is reported as unknown rather than guessed. Calibration needs a real judge: with no provider configured it exits 3. The default CI gate requires:
 - accuracy ≥ 85% per pillar
 - Cohen's kappa ≥ 0.70 per pillar
 - Zero evaluation failures (judge errors) per pillar
@@ -256,7 +256,7 @@ A pillar that fails any threshold fails the command (exit code 9). The dated Mar
 
 **Fixed in 0.42.0-beta:** `calibrate` now sends `gdpr-judge-system.v1.md`, the same judge prompt `bench gdpr` sends; both resolve their judge through one resolver, so they cannot drift apart again. Before 0.42.0-beta, `calibrate` graded with the generic default judge prompt, so calibration figures from earlier versions describe a different judge configuration from the benchmark run. Re-run `calibrate` against your own judge.
 
-**Caveat**: calibration results are only meaningful when a real LLM judge is wired (the provider `AI_INFERENCE_PROVIDER` selects, or a dedicated judge endpoint via `AZURE_OPENAI_JUDGE_*`). Running calibration against the stub judge produces meaningless metrics because the stub always returns placeholder scores.
+**Calibration needs a real judge** (the provider `AI_INFERENCE_PROVIDER` selects, or a dedicated judge endpoint via `AZURE_OPENAI_JUDGE_*`). It measures the judge, so `calibrate` exits 3 when none is configured; there is no stand-in judge to calibrate.
 
 ---
 

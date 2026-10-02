@@ -35,7 +35,9 @@ internal sealed class ProviderEnvironmentScope : IDisposable
         "FOUNDRY_ENDPOINT", "FOUNDRY_API_KEY", "FOUNDRY_MODEL", "FOUNDRY_MODEL_2", "FOUNDRY_MODEL_3",
         "OPENAI_COMPATIBLE_ENDPOINT", "OPENAI_COMPATIBLE_API_KEY", "OPENAI_COMPATIBLE_MODEL",
         "OPENAI_COMPATIBLE_MODEL_2", "OPENAI_COMPATIBLE_MODEL_3",
-        "AGENTEVAL_ALLOW_STUB_JUDGE", "AGENTEVAL_AGENT_NETWORK_TIMEOUT_S",
+        // Retired in 0.44 (there is no stand-in judge); still scrubbed because tests set it to prove it is ignored.
+        "AGENTEVAL_ALLOW_STUB_JUDGE",
+        "AGENTEVAL_AGENT_NETWORK_TIMEOUT_S",
     ];
 
     private readonly Dictionary<string, string?> _saved = [];

@@ -132,7 +132,7 @@ public class BenchMitreCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task BenchMitre_NoEnvVars_NoStubOptIn_ReturnsExitCode3()
+    public async Task BenchMitre_NoProvider_ReturnsExitCode3()
     {
         InitWorkspace();
         var result = await BenchMitreCommand.RunAsync(

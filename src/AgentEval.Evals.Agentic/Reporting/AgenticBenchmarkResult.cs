@@ -79,7 +79,8 @@ public sealed record AgenticEvaluatorSummary(
 /// </summary>
 /// <param name="AgentEvalVersion">The AgentEval assembly version that generated this result.</param>
 /// <param name="JudgeMode">
-/// The judge mode used: <c>single</c>, <c>panel</c>, or <c>adjudicated</c>.
+/// The judge mode used: <c>single</c>, <c>panel</c>, <c>adjudicated</c>, or <c>none</c> for a preset whose
+/// evaluators are all computed in code and call no judge.
 /// </param>
 /// <param name="PromptVersions">
 /// Map of prompt key to the version actually sent to the judge. The default is

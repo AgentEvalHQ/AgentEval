@@ -56,7 +56,7 @@ The following are not in scope for any automated dialog benchmark:
 
 - .NET 10.0.x SDK (or 8.x / 9.x).
 - An initialized `.agenteval` workspace in your repository root.
-- A configured inference provider with a GPT-4o-class model for the judge (see Configuration below): the one `AI_INFERENCE_PROVIDER` selects — Azure OpenAI, Bitdeer, OpenAI, Azure AI Foundry or any OpenAI-compatible host; see the [provider table](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to) — or a judge-only Azure OpenAI endpoint set with all three `AZURE_OPENAI_JUDGE_*` variables. If no provider is configured, or a selected provider is missing variables, the CLI refuses to run (exit code 3 — see [Exit codes](../../cli.md#exit-codes)). To exercise the pipeline without LLM cost — smoke-test mode only, **not for CI** — set `AGENTEVAL_ALLOW_STUB_JUDGE=1` on a machine with no provider variables set; stub-mode results are deterministic placeholders and must not be relied on as compliance evidence. See [CLI Reference — Environment variables](../../cli.md#environment-variables) for the full resolution-order contract.
+- A configured inference provider with a GPT-4o-class model for the judge (see Configuration below): the one `AI_INFERENCE_PROVIDER` selects — Azure OpenAI, Bitdeer, OpenAI, Azure AI Foundry or any OpenAI-compatible host; see the [provider table](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to) — or a judge-only Azure OpenAI endpoint set with all three `AZURE_OPENAI_JUDGE_*` variables. If no provider is configured, or a selected provider is missing variables, the CLI refuses to run (exit code 3 — see [Exit codes](../../cli.md#exit-codes)). 
 
 ---
 
@@ -205,7 +205,7 @@ AZURE_OPENAI_API_KEY=<your-key>
 AZURE_OPENAI_DEPLOYMENT=<your-gpt-4o-deployment>
 ```
 
-If no provider is configured, or the selected provider is missing variables, the CLI exits **3** with a diagnostic naming what is missing. To exercise the pipeline without LLM cost, set `AGENTEVAL_ALLOW_STUB_JUDGE=1` on a machine with no provider variables set — the CLI prints a warning to stderr on every run and returns deterministic placeholder scores. **Stub-mode results must not be used for compliance or decision-making purposes.** See [CLI Reference — Environment variables](../../cli.md#environment-variables) for the full contract.
+If no provider is configured, or the selected provider is missing variables, the CLI exits **3** with a diagnostic naming what is missing. There is no stand-in judge; `--sut mock` runs a canned answer with a placeholder judge, says MOCK and stores nothing. See [CLI Reference — Environment variables](../../cli.md#environment-variables) for the full contract.
 
 ---
 
@@ -219,7 +219,7 @@ agenteval bench eu-ai-act calibrate
 
 The golden dataset contains hand-labeled scenario/response pairs distributed across the 6 EU AI Act pillars. Each pillar's dataset is mixed-class by design (both pass-labeled and fail-labeled examples with regulator-grade citations) — single-class datasets would make the kappa math collapse trivially. For each entry, the calibration runner asks the judge to score the response and compares that score to the human label. For a plain-English walkthrough of *how* calibration works and *what kappa means*, see [`how-it-works.md`](how-it-works.md).
 
-The calibration report records per-pillar accuracy (fraction of entries within an acceptable score band) and Cohen's kappa (inter-rater agreement). Its header names the judge provider (and how it was chosen) and the judge model or deployment, so reports produced by different judges can be told apart, including in a diff. When the environment no longer resolves to the model the judge was built with, the provider is reported as unknown rather than guessed; a stub-judge run says that its figures measure no model. The command passes (exit 0) only when every pillar meets the following; otherwise it exits 9, which fails the CI workflow above:
+The calibration report records per-pillar accuracy (fraction of entries within an acceptable score band) and Cohen's kappa (inter-rater agreement). Its header names the judge provider (and how it was chosen) and the judge model or deployment, so reports produced by different judges can be told apart, including in a diff. When the environment no longer resolves to the model the judge was built with, the provider is reported as unknown rather than guessed. Calibration needs a real judge: with no provider configured it exits 3. The command passes (exit 0) only when every pillar meets the following; otherwise it exits 9, which fails the CI workflow above:
 
 - Accuracy ≥ 85% per pillar.
 - Cohen's kappa ≥ 0.70 per pillar.
@@ -231,7 +231,7 @@ A pillar that fails any threshold fails the command. The golden datasets are emb
 
 **Fixed in 0.42.0-beta:** `calibrate` now sends `eu-ai-act-judge-system.v1.md`, the same judge prompt `bench eu-ai-act` sends; both resolve their judge through one resolver, so they cannot drift apart again. Before 0.42.0-beta, `calibrate` graded with the generic default judge prompt, so calibration figures from earlier versions describe a different judge configuration from the benchmark run. Re-run `calibrate` against your own judge.
 
-**Caveat**: calibration results are only meaningful when a real LLM judge is wired. Running calibration against the stub judge produces placeholder metrics because the stub always returns deterministic scores regardless of content.
+**Calibration needs a real judge.** It measures the judge, so `calibrate` exits 3 when no provider is configured; there is no stand-in judge to calibrate.
 
 ---
 

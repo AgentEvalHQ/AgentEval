@@ -33,6 +33,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     the built-in question it never sent, so `compare` treats such runs from before and after this change as
     different stimuli.
 
+### No stand-in judge
+
+#### Removed
+- **`AGENTEVAL_ALLOW_STUB_JUDGE` is retired and ignored.** On a machine with no provider it let the `bench`
+  commands and `calibrate` run with a placeholder judge that scored 75/100 with every criterion met. `calibrate`
+  then wrote a calibration report for that placeholder: accuracy and kappa figures that measured no judge.
+  - **Behaviour change:** with no provider configured, every command that needs a judge exits 3, whatever the
+    variable says. To try a command without a model, use `--sut mock`, which writes nothing to `.agenteval/`.
+  - Calibration reports no longer carry a "stub" judge identity.
+  - The agentic presets that call no judge (`telemetry`, `judge-quality`, `stochastic-stability`) no longer need a
+    provider, and their report records judge mode `none` instead of claiming a single LLM judge.
+
+#### Fixed
+- **Every EU AI Act PDF graded by a real judge said, in its methodology appendix, that a deterministic stub had
+  graded it** (since 0.10.0). `mode-a`, which every single-judge run records, was described as a stub that needs
+  no live model. The appendix now describes the mode the run recorded: a single LLM judge for `mode-a`, a
+  per-criterion judge for `mode-b`, majority vote over several runs for `multi-judge`. Evidence from 0.43 and
+  earlier that the placeholder judge graded is still described as measuring no model. The agentic PDF had the
+  same mapping for `mode-a`.
+
 ### Gatekeeper v1: the startup check sees every judge, and coverage never reads as full when nothing was measured
 
 #### Fixed

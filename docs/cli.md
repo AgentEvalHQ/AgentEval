@@ -61,34 +61,22 @@ fragment and the diagnostic reaches stderr.
 An optional **judge override**, independent of the selector above. When all three are set they win
 outright, so a capable grader can face a cheap subject in a single run. The same endpoint policy applies.
 
-### `AGENTEVAL_ALLOW_STUB_JUDGE`
+### `AGENTEVAL_ALLOW_STUB_JUDGE` (retired)
 
-Opt-in escape valve for running benchmarks **without any provider configured**. Set to `1` or `true`
-(case-insensitive) to fall back to a deterministic placeholder evaluator that returns score **75/100** and
-"criterion met" for every criterion.
-
-**Do NOT use in CI.** Stub-mode results are not real judgements; the CLI prints a warning to stderr on
-every run, and the produced evidence is unsuitable for any compliance claim. Use this only for
-smoke-testing the pipeline end-to-end without LLM cost.
-
-| Platform | Set the variable |
-|---|---|
-| Linux / macOS (bash, zsh) | `export AGENTEVAL_ALLOW_STUB_JUDGE=1` |
-| Windows (PowerShell) | `$env:AGENTEVAL_ALLOW_STUB_JUDGE = "1"` |
-| Windows (cmd) | `set AGENTEVAL_ALLOW_STUB_JUDGE=1` |
-| GitHub Actions | `env: AGENTEVAL_ALLOW_STUB_JUDGE: "1"` *(don't — set a provider's secrets instead)* |
+Ignored since 0.44. Through 0.43 it let the `bench` commands, and `calibrate`, run with a placeholder judge that
+scored 75/100 with every criterion met, so the results and calibration figures measured no judge. There is no
+stand-in judge now: with no provider configured, every command that needs a judge exits 3. To try a command
+without a model, use `--sut mock` (see [`agenteval bench`](#agenteval-bench)): it runs a built-in stand-in agent
+and a placeholder judge, says MOCK, exits 11 and writes nothing to `.agenteval/`.
 
 **Resolution order** (exit codes per [Exit codes](#exit-codes)):
 
 1. Test override (programmatic; not user-visible).
 2. All three `AZURE_OPENAI_JUDGE_*` set → that judge, whatever the selector says.
 3. A provider resolves with credentials → the real judge for that provider.
-4. **Any provider variable or the selector is set, but a provider could not be built → exit 3
-   (`RuntimeError`), even with `AGENTEVAL_ALLOW_STUB_JUDGE=1`.** The stub rescues an *unconfigured*
-   machine, never a *misconfigured* one: before v0.41.0-beta, `AI_INFERENCE_PROVIDER=foundry` with its
-   variables missing would fall through to the stub and produce stub-graded evidence from a typo.
-5. Nothing configured at all + `AGENTEVAL_ALLOW_STUB_JUDGE=1` → stub judge, with a stderr warning.
-6. Nothing configured + no opt-in → exit 3, listing each provider and the variables it would need.
+4. Any provider variable or the selector is set, but a provider could not be built → exit 3
+   (`RuntimeError`), saying the provider is misconfigured.
+5. Nothing configured → exit 3, listing each provider and the variables it would need.
 
 ### `AgentEval__Root`
 

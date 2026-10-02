@@ -79,13 +79,6 @@ internal sealed record CalibrationJudgeIdentity(string Provider, string Model)
                       "unknown: the caller did not name it");
         }
 
-        if (judge is JudgeFactory.StubEvaluator)
-        {
-            return new(
-                "stub (AGENTEVAL_ALLOW_STUB_JUDGE=1): a fixed placeholder verdict for every case, so these figures measure no model",
-                "none");
-        }
-
         var model = OneLine(judgeModel);
         var judgeSpecificSet = s_judgeSpecificVariables.Count(n => !string.IsNullOrWhiteSpace(getEnvironmentVariable(n)));
 

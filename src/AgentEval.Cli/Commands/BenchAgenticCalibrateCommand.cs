@@ -247,8 +247,7 @@ public static class BenchAgenticCalibrateCommand
         }
 
         // ── Judge / evaluator ────────────────────────────────────────────────
-        // Calibration requires AGENTEVAL_ALLOW_STUB_JUDGE=1 to use stub mode —
-        // stub-graded calibration gates the wrong thing.
+        // Calibration measures a judge, so it needs a real one: there is no stand-in judge.
         var (resolvedJudge, judgeModelName, exitCode) = JudgeFactory.Resolve(evaluatorOverride, "agentic calibration");
         if (resolvedJudge is null) return exitCode;
         IEvaluator judge = resolvedJudge;

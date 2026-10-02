@@ -15,8 +15,8 @@ namespace AgentEval.Tests.Cli;
 ///   <item>Test override supplied → passthrough with model name "override".</item>
 ///   <item>All three AZURE_OPENAI_* set → real Azure judge constructed.</item>
 ///   <item>Partial Azure config → exit code 2 with diagnostic.</item>
-///   <item>No config + no opt-in → exit code 2 with help message.</item>
-///   <item>No config + AGENTEVAL_ALLOW_STUB_JUDGE=1 → stub judge with warning.</item>
+///   <item>No config → exit code 3 with help message.</item>
+///   <item>No config + the retired <c>AGENTEVAL_ALLOW_STUB_JUDGE</c> → still exit code 3: there is no stand-in judge.</item>
 /// </list>
 /// </summary>
 [Collection("EnvVarTests")]
@@ -92,10 +92,10 @@ public class JudgeFactoryTests : IDisposable
         Assert.Equal("", model);
     }
 
-    // ── Branch 4: no config + no opt-in → exit 3 (RuntimeError, BUG-22) ─────────────────────────
+    // ── Branch 4: no config → exit 3 (RuntimeError, BUG-22) ─────────────────────────
 
     [Fact]
-    public void Resolve_NoConfig_NoStubOptIn_ReturnsExitCode3()
+    public void Resolve_NoConfig_ReturnsExitCode3()
     {
         // env already scrubbed by ctor
 
@@ -106,66 +106,28 @@ public class JudgeFactoryTests : IDisposable
         Assert.Equal("", model);
     }
 
-    // ── Branch 5: opt-in stub ────────────────────────────────────────────
+    // ── Branch 5: the retired stub opt-in ────────────────────────────────
 
+    /// <summary>
+    /// Through 0.43, <c>AGENTEVAL_ALLOW_STUB_JUDGE=1</c> on a machine with no provider returned a judge that scored
+    /// 75 with every criterion met, for benchmarks and for calibration. There is no stand-in judge now: whatever the
+    /// variable says, a machine with no provider gets exit 3 and no judge.
+    /// </summary>
     [Theory]
     [InlineData("1")]
     [InlineData("true")]
     [InlineData("TRUE")]
-    [InlineData("True")]
-    public void Resolve_NoConfig_StubOptIn_ReturnsStubEvaluator(string optInValue)
-    {
-        Environment.SetEnvironmentVariable("AGENTEVAL_ALLOW_STUB_JUDGE", optInValue);
-
-        var (judge, model, exit) = JudgeFactory.Resolve(evaluatorOverride: null, judgeKind: "stub-opt-in");
-
-        Assert.NotNull(judge);
-        Assert.IsType<JudgeFactory.StubEvaluator>(judge);
-        Assert.Equal("stub", model);
-        Assert.Equal(0, exit);
-    }
-
-    /// <summary>
-    /// Negative test for the stub opt-in: only "1" and "true" (case-insensitive)
-    /// should engage the stub. Other values (including "yes", "0", "false", empty)
-    /// must continue to gate.
-    /// </summary>
-    [Theory]
     [InlineData("0")]
-    [InlineData("false")]
-    [InlineData("yes")]
     [InlineData("")]
-    [InlineData("anything-else")]
-    public void Resolve_NoConfig_InvalidStubOptInValue_ReturnsExitCode3(string optInValue)
+    public void Resolve_NoConfig_TheRetiredStubOptIn_ChangesNothing(string optInValue)
     {
         Environment.SetEnvironmentVariable("AGENTEVAL_ALLOW_STUB_JUDGE", optInValue);
 
-        var (judge, _, exit) = JudgeFactory.Resolve(evaluatorOverride: null, judgeKind: "invalid-opt-in");
+        var (judge, model, exit) = JudgeFactory.Resolve(evaluatorOverride: null, judgeKind: "retired-opt-in");
 
         Assert.Null(judge);
+        Assert.Equal("", model);
         Assert.Equal(3, exit);
-    }
-
-    // ── Stub evaluator behaviour ─────────────────────────────────────────
-
-    /// <summary>
-    /// Sanity-check that the stub evaluator returned by branch 5 actually
-    /// produces deterministic placeholder output. Documents the contract so
-    /// downstream consumers expecting score=75 / criteria-met don't get
-    /// surprised by a future stub-shape change.
-    /// </summary>
-    [Fact]
-    public async Task StubEvaluator_ReturnsDeterministic75WithAllCriteriaMet()
-    {
-        Environment.SetEnvironmentVariable("AGENTEVAL_ALLOW_STUB_JUDGE", "1");
-        var (judge, _, _) = JudgeFactory.Resolve(evaluatorOverride: null);
-        Assert.NotNull(judge);
-
-        var result = await judge!.EvaluateAsync("input", "output", new[] { "criterion-a", "criterion-b" });
-
-        Assert.Equal(75, result.OverallScore);
-        Assert.Equal(2, result.CriteriaResults.Count);
-        Assert.All(result.CriteriaResults, c => Assert.True(c.Met));
     }
 }
 

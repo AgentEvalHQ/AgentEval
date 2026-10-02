@@ -101,9 +101,12 @@ public static class BenchAgenticCommand
         // honest for the bench-agentic path; calibration paths and the
         // remaining bench commands (perf / red-team) inherit the same
         // wiring through ResolvePreset.
+        // The pure-code presets never call a judge, so they need no provider; every other preset does.
         var (resolvedJudge, judgeModelName, exitCode) = mock && evaluatorOverride is null
             ? MockTarget.JudgeResolution
-            : JudgeFactory.Resolve(evaluatorOverride, "agentic benchmark");
+            : evaluatorOverride is null && PresetNeedsNoJudge(preset)
+                ? (NoJudge.Instance, "none", 0)
+                : JudgeFactory.Resolve(evaluatorOverride, "agentic benchmark");
         if (resolvedJudge is null) return exitCode;
         IEvaluator judge = resolvedJudge;
 
@@ -250,7 +253,8 @@ public static class BenchAgenticCommand
 
         // ── Generate reports ─────────────────────────────────────────────────
         var reporter = new AgenticBenchmarkReporter();
-        var options = new AgenticReportOptions(Preset: preset);
+        // A pure-code preset calls no judge, and its report must not say one graded it.
+        var options = new AgenticReportOptions(Preset: preset, JudgeMode: PresetNeedsNoJudge(preset) ? "none" : "single");
         AgenticBenchmarkResult result;
         try
         {
@@ -320,6 +324,24 @@ public static class BenchAgenticCommand
         return BenchExitCodes.FromLabel(overall);
     }
 
+    /// <summary>The presets built only from pure-code evaluators: they never call a judge.</summary>
+    internal static bool PresetNeedsNoJudge(string preset) =>
+        preset.ToLowerInvariant() is "telemetry" or "judge-quality" or "stochastic-stability";
+
+    /// <summary>
+    /// Stands in the judge slot of a pure-code preset, which never calls it. Calling it is a wiring bug, so it
+    /// throws rather than returning a verdict nobody gave.
+    /// </summary>
+    private sealed class NoJudge : IEvaluator
+    {
+        public static readonly NoJudge Instance = new();
+
+        public Task<EvaluationResult> EvaluateAsync(
+            string input, string output, IEnumerable<string> criteria, CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException(
+                "A pure-code agentic preset called the judge. No judge was resolved for it; resolve a real one.");
+    }
+
     /// <summary>
     /// The question and the final answer a trace recorded at the agent boundary, when it recorded them: the first
     /// agent-level request's prompt and the last agent-level response's text.
@@ -378,8 +400,8 @@ public static class BenchAgenticCommand
         ArgumentNullException.ThrowIfNull(judge);
 
         // T3.2 (2026-05-25): `judgeModel` is the deployment identifier
-        // returned by JudgeFactory.Resolve (e.g. "gpt-4o-mini" or "stub" /
-        // "override"); the preset factories accept it as an optional second
+        // returned by JudgeFactory.Resolve (e.g. "gpt-4o-mini" or "override");
+        // the preset factories accept it as an optional second
         // parameter and forward it to every leaf evaluator so the provenance
         // chain records WHO judged the response.
         return presetSpec.ToLowerInvariant() switch
