@@ -32,7 +32,7 @@ Sourced verbatim from `BenchmarkFamilyRegistry` (see `src/AgentEval.Evals.Perfor
 
 | Preset | Description (verbatim) | Cost tier | Typical iterations | Approx. LLM cost |
 |---|---|---|---|---|
-| `latency` | P99 latency measurement (3 iterations x N prompts + warmup) | Low | 1 prompt x 3 iterations + 1 warmup = 4 calls | telemetry-only (~$0.001 per call against gpt-4o-mini if using `--azure-from-env`; default EchoAgent stub: free) |
+| `latency` | P99 latency measurement (3 iterations x N prompts + warmup) | Low | 1 prompt x 3 iterations + 1 warmup = 4 calls | telemetry-only (~$0.001 per call against gpt-4o-mini if using `--azure-from-env`; `--sut mock`: free, and measures nothing) |
 | `throughput` | Concurrent throughput measurement (default 2 workers x 5s) | Low | 2 concurrent workers x ~5s window (typically 5-20 calls depending on agent speed) | telemetry-only |
 | `cost` | Per-prompt token + cost estimate (pricing-table-backed) | Low | 1 call per supplied prompt | telemetry-only |
 
@@ -49,22 +49,20 @@ Note: the `EvaluateAsync` adapter runs ALL THREE leaves (latency, throughput, co
 The `bench perf` family exposes three subcommands (one per preset):
 
 ```bash
-# Basic — uses built-in EchoAgent stub (prints a stub-mode warning banner)
-agenteval bench perf latency --subject MyAgent
-agenteval bench perf throughput --subject MyAgent
-agenteval bench perf cost --subject MyAgent
-
 # Real model from the configured inference provider
 agenteval bench perf latency --subject MyAgent --azure-from-env
 agenteval bench perf throughput --subject MyAgent --azure-from-env --prompt "Summarise the last quarter's earnings."
 agenteval bench perf cost --subject MyAgent --azure-from-env --prompt "Hello!"
+
+# Any OpenAI-compatible endpoint
+agenteval bench perf latency --subject MyAgent --endpoint http://localhost:11434/v1 --model llama3.1
 ```
 
 The `--prompt` flag overrides the default `"Hello!"` prompt. The benchmark uses the same prompt for latency + throughput + cost measurements within a single run.
 
-`--azure-from-env` builds the agent from whichever provider `AI_INFERENCE_PROVIDER` selects — Azure OpenAI, Bitdeer, OpenAI, Azure AI Foundry or any OpenAI-compatible host; see the [provider table](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to) for the variables each one needs. Despite its name, the flag is not Azure-only: with the selector unset, the first fully configured provider in that table's order is used, so an environment with only the `AZURE_OPENAI_*` trio still gets Azure OpenAI. If no provider is configured, the command fails and names what is missing. Without the flag, the CLI falls back to the built-in `EchoAgent` stub (50 ms synthetic delay + prompt echo) with a prominent banner warning that the measurements do not reflect a real agent.
+`--azure-from-env` builds the agent from whichever provider `AI_INFERENCE_PROVIDER` selects — Azure OpenAI, Bitdeer, OpenAI, Azure AI Foundry or any OpenAI-compatible host; see the [provider table](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to) for the variables each one needs. Despite its name, the flag is not Azure-only: with the selector unset, the first fully configured provider in that table's order is used, so an environment with only the `AZURE_OPENAI_*` trio still gets Azure OpenAI. If no provider is configured, the command fails and names what is missing. Without a target the command refuses (exit 2). `--sut mock` measures a built-in stand-in (a 50 ms echo) instead: the run says MOCK, exits 11 whatever it scores, and nothing is written to `.agenteval/`, because it measures no agent.
 
-With `--azure-from-env`, the cost leaf looks the model up in the pricing table first by the name in `AZURE_OPENAI_DEPLOYMENT` when that variable is set, whichever provider served the run (otherwise by the `--subject` name), and then by the model id the provider reported in its response. If neither name is in the table, the leaf reports "Cost unknown" with a passing score of 1.0 (see [Limitations](#limitations)); read that as not measured. If `AZURE_OPENAI_DEPLOYMENT` is set while another provider is selected and that name is in the table, the price shown is for the Azure deployment's model, not for the model that ran.
+The cost leaf prices the model the agent used: the model the provider resolved for `--azure-from-env` (the Azure deployment, the Bitdeer model id, and so on), or `--model` for an `--endpoint` target. A `--sut` target names no model, so the leaf falls back to the `--subject` name and then to the model id the provider reported in its response. If no name is in the pricing table, the leaf reports "Cost unknown" with a passing score of 1.0 (see [Limitations](#limitations)); read that as not measured.
 
 ## Output
 
@@ -165,7 +163,7 @@ Known limitations:
 - Cold-start latency is explicitly excluded (the warmup iteration runs first).
 - Cost estimation requires the agent's model name to appear in `ModelPricing.GetPricing` — unknown models default the cost leaf to pass with score 1.0.
 - Per-prompt input is single-string only; multi-prompt CSV / metadata override (via `EvalInput.Metadata["prompts"]`) is supported programmatically but not exposed on the CLI subcommands.
-- The CLI can measure the built-in `EchoAgent` stub or a plain chat model built with `--azure-from-env` from any configured provider. There is no option that loads an agent from a manifest file. An agent with its own tools, memory or a non-chat interface is measured from a small program that wraps it as an `IEvaluableAgent` — see `samples/AgentEval.Samples/Benchmarks/02_PerformanceBenchmark.cs` and [Programmatic use](#programmatic-use).
+- The CLI measures a plain chat model: built with `--azure-from-env` from any configured provider, an OpenAI-compatible `--endpoint`, or a built-in `--sut` target. There is no option that loads an agent from a manifest file. An agent with its own tools, memory or a non-chat interface is measured from a small program that wraps it as an `IEvaluableAgent` — see `samples/AgentEval.Samples/Benchmarks/02_PerformanceBenchmark.cs` and [Programmatic use](#programmatic-use).
 
 See also:
 - [OWASP getting-started](../owasp/getting-started.md) — security red-team family.

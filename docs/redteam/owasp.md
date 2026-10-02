@@ -25,7 +25,7 @@ The subject identity is the **agent under test**, not the dev's name. AgentEval 
 agenteval bench owasp --preset smoke --subject MyBookingAgent --azure-from-env
 ```
 
-Without `--azure-from-env`, the CLI falls back to the built-in `SafeRefusalAgent` stub and prints a warning banner. That stub passes everything by design — useful only to verify the toolchain works, never as a signal about your agent.
+Without a target the command refuses. `--sut mock` scans a built-in stand-in that refuses everything, which passes by construction; the run says MOCK, exits 11 and is not stored, so it can never be read as a signal about your agent.
 
 ### 2. Run progressively, not all-at-once
 

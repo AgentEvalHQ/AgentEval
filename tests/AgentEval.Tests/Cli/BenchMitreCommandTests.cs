@@ -64,6 +64,73 @@ public class BenchMitreCommandTests : IDisposable
 
     // ── Env-gate parity with the other bench commands ─────────────────────────
 
+    private string[] WorkspaceFiles() =>
+        Directory.GetFileSystemEntries(Path.Combine(_root, ".agenteval"), "*", SearchOption.AllDirectories)
+            .Select(f => Path.GetRelativePath(_root, f))
+            .OrderBy(f => f, StringComparer.Ordinal)
+            .ToArray();
+
+    [Fact]
+    public async Task BenchMitre_NoTarget_Refuses_AndStoresNothing()
+    {
+        // Through 0.43 a run with no target scanned a built-in agent that refuses everything (a red-team PASS)
+        // and stored it as the subject's result.
+        InitWorkspace();
+        var before = WorkspaceFiles();
+
+        var result = await BenchMitreCommand.RunAsync(
+            preset: "atlas-smoke", subject: "MitreNoTargetAgent", rootOverride: _root, inputText: null,
+            evaluatorOverride: new PassingStubEvaluator(), agentOverride: null);
+
+        Assert.Equal(AgentEval.Cli.ExitCodes.UsageError, result.ExitCode);
+        Assert.Null(result.ReportDir);
+        Assert.Equal(before, WorkspaceFiles());
+    }
+
+    [Fact]
+    public async Task BenchMitre_Mock_NeedsNoJudgeOrProvider()
+    {
+        // A selector naming a provider with no variables makes any real judge resolution fail closed (exit 3).
+        // A mock run must not reach it.
+        InitWorkspace();
+        using var env = new ProviderEnvironmentScope(("AI_INFERENCE_PROVIDER", "foundry"));
+
+        var result = await BenchMitreCommand.RunAsync(
+            preset: "atlas-smoke", subject: "MitreMockNoProviderAgent", rootOverride: _root, inputText: null,
+            evaluatorOverride: null, agentOverride: null, mock: true);
+
+        Assert.Equal(AgentEval.Cli.ExitCodes.GateIndeterminate, result.ExitCode);
+    }
+
+    [Fact]
+    public async Task BenchMitre_MockWithARealTarget_IsRefusedByTheCommandItself()
+    {
+        InitWorkspace();
+        var before = WorkspaceFiles();
+
+        var result = await BenchMitreCommand.RunAsync(
+            preset: "atlas-smoke", subject: "MitreMockPlusTargetAgent", rootOverride: _root, inputText: null,
+            evaluatorOverride: new PassingStubEvaluator(), agentOverride: new SafeRefusalAgent("MitreReal"), mock: true);
+
+        Assert.Equal(AgentEval.Cli.ExitCodes.UsageError, result.ExitCode);
+        Assert.Equal(before, WorkspaceFiles());
+    }
+
+    [Fact]
+    public async Task BenchMitre_Mock_ExitsIndeterminate_AndStoresNothing()
+    {
+        InitWorkspace();
+        var before = WorkspaceFiles();
+
+        var result = await BenchMitreCommand.RunAsync(
+            preset: "atlas-smoke", subject: "MitreMockAgent", rootOverride: _root, inputText: null,
+            evaluatorOverride: new PassingStubEvaluator(), agentOverride: null, mock: true);
+
+        Assert.Equal(AgentEval.Cli.ExitCodes.GateIndeterminate, result.ExitCode);
+        Assert.Null(result.ReportDir);
+        Assert.Equal(before, WorkspaceFiles());
+    }
+
     [Fact]
     public async Task BenchMitre_NoEnvVars_NoStubOptIn_ReturnsExitCode3()
     {
@@ -74,7 +141,7 @@ public class BenchMitreCommandTests : IDisposable
             rootOverride: _root,
             inputText: null,
             evaluatorOverride: null,
-            agentOverride: null);
+            agentOverride: new SafeRefusalAgent("MitreTargetAgent"));
         Assert.Equal(3, result.ExitCode);
     }
 
@@ -91,7 +158,7 @@ public class BenchMitreCommandTests : IDisposable
             rootOverride: _root,
             inputText: null,
             evaluatorOverride: null,
-            agentOverride: null);
+            agentOverride: new SafeRefusalAgent("MitreTargetAgent"));
         Assert.Equal(3, result.ExitCode);
     }
 
@@ -107,7 +174,7 @@ public class BenchMitreCommandTests : IDisposable
             rootOverride: noWorkspaceRoot,
             inputText: null,
             evaluatorOverride: new PassingStubEvaluator(),
-            agentOverride: null);
+            agentOverride: new SafeRefusalAgent("MitreTargetAgent"));
 
         Assert.Equal(1, result.ExitCode);
     }

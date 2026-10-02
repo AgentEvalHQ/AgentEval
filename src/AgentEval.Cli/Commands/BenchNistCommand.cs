@@ -13,8 +13,8 @@ namespace AgentEval.Cli.Commands;
 
 /// <summary>
 /// Implements the <c>agenteval bench nist</c> subcommand — parity with <see cref="BenchMitreCommand"/> /
-/// <see cref="BenchOwaspCommand"/>. Runs the NIST AI RMF red-team scan against an agent (a stub safe-refusal agent by
-/// default), persists the composite <see cref="EvalResult"/> through the unified output-store, and emits the rich
+/// <see cref="BenchOwaspCommand"/>. Runs the NIST AI RMF red-team scan against the named target (without one it
+/// refuses, see <see cref="MockTarget"/>), persists the composite <see cref="EvalResult"/> through the unified output-store, and emits the rich
 /// <see cref="NistAiRmfComplianceReport"/> as JSON + Markdown (+ HTML/PDF).
 /// </summary>
 public static class BenchNistCommand
@@ -28,7 +28,7 @@ public static class BenchNistCommand
         bool azureFromEnv = false,
         CancellationToken ct = default)
     {
-        var (exitCode, _) = await RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, agentOverride: null, azureFromEnv, ct).ConfigureAwait(false);
+        var (exitCode, _) = await RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, agentOverride: null, azureFromEnv, mock: false, ct).ConfigureAwait(false);
         return exitCode;
     }
 
@@ -42,8 +42,18 @@ public static class BenchNistCommand
         IEvaluator? evaluatorOverride,
         IEvaluableAgent? agentOverride,
         bool azureFromEnv = false,
+        bool mock = false,
         CancellationToken ct = default)
     {
+        if (mock && (agentOverride is not null || azureFromEnv))
+        {
+            return (MockTarget.RefuseMockWithRealTarget(), null);
+        }
+        if (agentOverride is null && !azureFromEnv && !mock)
+        {
+            return (MockTarget.RefuseWithoutTarget("bench nist", MockTarget.AgentTargets), null);
+        }
+
         // ── Workspace setup ──────────────────────────────────────────────────
         if (rootOverride is not null)
         {
@@ -67,7 +77,9 @@ public static class BenchNistCommand
         }
 
         // ── Judge / evaluator (accepted for API symmetry; heuristic evaluators today) ──
-        var (resolvedJudge, _, exitCode) = JudgeFactory.Resolve(evaluatorOverride, judgeKind: "NIST AI RMF benchmark");
+        var (resolvedJudge, _, exitCode) = mock && evaluatorOverride is null
+            ? MockTarget.JudgeResolution
+            : JudgeFactory.Resolve(evaluatorOverride, judgeKind: "NIST AI RMF benchmark");
         if (resolvedJudge is null) return (exitCode, null);
 
         // ── Select preset ────────────────────────────────────────────────────
@@ -103,21 +115,23 @@ public static class BenchNistCommand
         }
         else
         {
-            AzureChatAgentFactory.PrintStubAgentWarning(
-                benchmarkName: "NIST AI RMF",
-                stubAgentDescription: "SafeRefusalAgent stub",
-                sampleFileName: "08_NistBenchmark.cs");
-            agent = new SafeRefusalAgent(subject);
+            MockTarget.PrintBanner("bench nist", "a stand-in that refuses every request");
+            agent = new MockTarget.RefusingAgent(subject);
         }
+        var isMock = agent is MockTarget.RefusingAgent;
 
         // ── Run benchmark ────────────────────────────────────────────────────
-        var store = new FileSystemOutputStore(agentEvalDir);
-        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
-        await store.EnsureSolutionAsync();
-        await store.EnsureSubjectAsync(subjectIdentity);
+        FileSystemOutputStore? store = null;
+        if (!isMock)
+        {
+            store = new FileSystemOutputStore(agentEvalDir);
+            await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
+            await store.EnsureSolutionAsync();
+            await store.EnsureSubjectAsync(subjectIdentity);
+        }
 
-        Console.WriteLine($"Running NIST AI RMF benchmark ({preset}) for subject '{subject}'...");
+        Console.WriteLine($"{(isMock ? "MOCK RUN: " : "")}Running NIST AI RMF benchmark ({preset}) for subject '{subject}'...");
 
         EvalResult compositeEval;
         RedTeamResult redTeamResult;
@@ -133,12 +147,17 @@ public static class BenchNistCommand
         }
 
         var report = benchmark.GenerateReport(redTeamResult);
+        if (isMock)
+        {
+            return (MockTarget.Finish("bench nist",
+                $"{compositeEval.Score.Label.ToUpperInvariant()} (score {compositeEval.Score.Value:F3}) for a stand-in that refuses every request"), null);
+        }
 
         // ── Persist through the unified output-store ─────────────────────────
         string runId;
         try
         {
-            var manifest = await store.StartRunAsync(
+            var manifest = await store!.StartRunAsync(
                 subjectIdentity,
                 new RunContext(
                     EvalProject: "AgentEval.RedTeam",
@@ -153,7 +172,7 @@ public static class BenchNistCommand
                 compositeEval,
                 scenarioId: $"nist-{preset.ToLowerInvariant()}",
                 scenarioName: $"NIST AI RMF — {preset}");
-            await store.WriteScenarioResultAsync(runId, scenarioResult);
+            await store!.WriteScenarioResultAsync(runId, scenarioResult);
 
             var verdict = compositeEval.Score.Label.ToUpperInvariant() switch
             {
@@ -175,7 +194,7 @@ public static class BenchNistCommand
                     ["overallScore"] = compositeEval.Score.Value,
                     ["overallPassRate"] = report.Summary.OverallPassRate / 100.0,
                 });
-            await store.CompleteRunAsync(manifest, summary, ct);
+            await store!.CompleteRunAsync(manifest, summary, ct);
             Console.WriteLine($"Persisted run {runId} to {agentEvalDir}");
         }
         catch (Exception ex)
@@ -188,7 +207,7 @@ public static class BenchNistCommand
         try
         {
             var reporter = new NistAiRmfComplianceReporter();
-            await reporter.SaveReportAsync(store, subjectIdentity, runId, redTeamResult);
+            await reporter.SaveReportAsync(store!, subjectIdentity, runId, redTeamResult);
         }
         catch (Exception ex)
         {

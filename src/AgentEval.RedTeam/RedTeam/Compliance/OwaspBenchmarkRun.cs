@@ -113,7 +113,7 @@ public sealed class OwaspBenchmarkRun
     /// <summary>
     /// Adapter that lets OWASP results flow through the same output-store + audit-chain
     /// pipeline as the other benchmark families. Runs the scan against the agent carried
-    /// in <c>input.Metadata["agent"]</c> (or falls back to a stub-agent path when absent)
+    /// in <c>input.Metadata["agent"]</c> (a skipped composite when absent, see below)
     /// and shapes the resulting <see cref="RedTeamResult"/> into an <see cref="EvalResult"/>
     /// composite with one sub-result per OWASP LLM Top 10 category (10 total).
     /// </summary>

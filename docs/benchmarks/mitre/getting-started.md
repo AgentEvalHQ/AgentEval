@@ -47,9 +47,6 @@ The current MITRE attack pipeline uses heuristic per-attack evaluators (see `src
 ## CLI usage
 
 ```bash
-# Basic — scans the built-in SafeRefusalAgent stub (prints a stub-mode warning banner)
-agenteval bench mitre --preset atlas-baseline --subject MyAgent
-
 # Real agent from the configured inference provider
 agenteval bench mitre --preset atlas-baseline --subject MyAgent --azure-from-env
 
@@ -62,7 +59,7 @@ agenteval bench mitre --preset atlas-audit-grade --subject MyAgent --azure-from-
 
 The `--input` flag is accepted for provenance but the MITRE pipeline generates its own probes — `--input` is recorded in the run manifest, not consumed by the attacks.
 
-`--azure-from-env` builds the agent from whichever provider `AI_INFERENCE_PROVIDER` selects (Azure OpenAI included; see the [provider table](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to)) and fails, naming what is missing, if none is configured. `--endpoint <url> --model <name>` targets any OpenAI-compatible endpoint directly instead. Without either, the CLI falls back to the built-in `SafeRefusalAgent` stub with a prominent banner warning that the scan result does not reflect a real agent.
+`--azure-from-env` builds the agent from whichever provider `AI_INFERENCE_PROVIDER` selects (Azure OpenAI included; see the [provider table](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to)) and fails, naming what is missing, if none is configured. `--endpoint <url> --model <name>` targets any OpenAI-compatible endpoint directly instead. Without a target the command refuses (exit 2). `--sut mock` runs a built-in stand-in instead: the run says MOCK, exits 11 whatever it scores, and nothing is written to `.agenteval/`, because it measures no agent.
 
 ## Output
 

@@ -91,6 +91,56 @@ public class BenchPerfCommandTests
     }
 
     [Fact]
+    public async Task RunAsync_NoTarget_Refuses_AndStoresNothing()
+    {
+        // Through 0.43 a run with no target measured a built-in echo agent and stored it as the subject's result.
+        var workspace = CreateTempWorkspace();
+        try
+        {
+            var before = Directory.GetFileSystemEntries(workspace, "*", SearchOption.AllDirectories).Length;
+
+            var exitCode = await BenchPerfCommand.RunAsync(
+                preset: "latency",
+                subject: "perf-no-target",
+                prompt: "hello",
+                rootOverride: workspace,
+                agentOverride: null);
+
+            Assert.Equal(AgentEval.Cli.ExitCodes.UsageError, exitCode);
+            Assert.Equal(before, Directory.GetFileSystemEntries(workspace, "*", SearchOption.AllDirectories).Length);
+        }
+        finally
+        {
+            Cleanup(workspace);
+        }
+    }
+
+    [Fact]
+    public async Task RunAsync_Mock_ExitsIndeterminate_AndStoresNothing()
+    {
+        var workspace = CreateTempWorkspace();
+        try
+        {
+            var before = Directory.GetFileSystemEntries(workspace, "*", SearchOption.AllDirectories).Length;
+
+            var exitCode = await BenchPerfCommand.RunAsync(
+                preset: "latency",
+                subject: "perf-mock",
+                prompt: "hello",
+                rootOverride: workspace,
+                agentOverride: null,
+                mock: true);
+
+            Assert.Equal(AgentEval.Cli.ExitCodes.GateIndeterminate, exitCode);
+            Assert.Equal(before, Directory.GetFileSystemEntries(workspace, "*", SearchOption.AllDirectories).Length);
+        }
+        finally
+        {
+            Cleanup(workspace);
+        }
+    }
+
+    [Fact]
     public async Task RunAsync_UnknownPreset_ReturnsError()
     {
         var workspace = CreateTempWorkspace();

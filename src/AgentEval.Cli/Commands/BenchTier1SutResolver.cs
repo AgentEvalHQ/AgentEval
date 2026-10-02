@@ -19,8 +19,9 @@ namespace AgentEval.Cli.Commands;
 /// <c>Program.cs</c>'s top-level statements (which aren't a unit-testable surface) on purpose.
 /// <c>BenchOwaspCommand</c>/<c>BenchMitreCommand</c>/<c>BenchNistCommand</c>/<c>BenchCommand</c>/
 /// <c>BenchEuAiActCommand</c> are themselves untouched by this resolver: each already has its own
-/// <c>agentOverride</c> seam that wins over <c>--azure-from-env</c>/the stub/the supplied response, so this
-/// class only needs to decide WHAT (if anything) to pass as that override.
+/// <c>agentOverride</c> seam that wins over <c>--azure-from-env</c>/the supplied response, so this
+/// class only needs to decide WHAT (if anything) to pass as that override. <c>--sut mock</c> never reaches it:
+/// the command line hands it to the command as its own flag (see <see cref="MockTarget"/>).
 /// </summary>
 internal static class BenchTier1SutResolver
 {
@@ -29,7 +30,8 @@ internal static class BenchTier1SutResolver
     /// runs, surfaced here as a friendly error rather than an exception so the caller can print it and exit
     /// cleanly with <c>ExitCodes.UsageError</c> (2), as for any other rejected argument); otherwise a non-empty
     /// <paramref name="endpoint"/> builds a plain OpenAI-compatible agent. Neither set → <c>(null, null)</c>,
-    /// letting the caller's existing <c>--azure-from-env</c>/stub fallback (inside <c>RunAsync</c>) run unchanged.
+    /// leaving the caller's <c>--azure-from-env</c> or supplied response to name the target, or its refusal to run
+    /// without one (inside <c>RunAsync</c>).
     /// </summary>
     /// <param name="sut">The parsed <c>--sut</c> value, or <see langword="null"/> if not set.</param>
     /// <param name="targetOptions">Every registered target's own bound options, keyed by <see cref="ISutTarget.Sut"/>.</param>
@@ -56,6 +58,12 @@ internal static class BenchTier1SutResolver
     {
         if (sut is not null)
         {
+            if (!targets.Any(t => string.Equals(t.Sut, sut.Trim(), StringComparison.OrdinalIgnoreCase)))
+            {
+                // Name the mock too: it is a valid --sut on every bench command, handled before this resolver.
+                return (null, $"Unknown --sut value: '{sut}'. Valid: {string.Join(", ", targets.Select(t => t.Sut).Append(MockTarget.Sut))}.");
+            }
+
             var common = new CommonTargetOptions { Sut = sut, TargetOptions = targetOptions };
             try
             {

@@ -30,7 +30,7 @@ namespace AgentEval.Tests.Cli;
 [Collection("ConsoleTests")]
 public class CliParseErrorExitCodeTests
 {
-    private static async Task<(int ExitCode, string StdOut, string StdErr)> RunCliAsync(params string[] args)
+    internal static async Task<(int ExitCode, string StdOut, string StdErr)> RunCliAsync(params string[] args)
     {
         var entryPoint = typeof(ExitCodes).Assembly.EntryPoint
             ?? throw new InvalidOperationException("AgentEval.Cli has no entry point.");

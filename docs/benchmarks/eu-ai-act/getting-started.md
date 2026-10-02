@@ -66,14 +66,17 @@ The following are not in scope for any automated dialog benchmark:
 # Initialize the .agenteval workspace if not already done
 agenteval init-workspace --name MySolution
 
+# Each run needs a target: --azure-from-env (the configured provider), --sut copilot-studio, or the agent's
+# answer with --response/--response-file. Without one it refuses; --sut mock measures nothing and is not stored.
+
 # Run the Smoke preset (5 controls, ~$0.05 with real LLM)
-agenteval bench eu-ai-act --preset smoke --subject MyAgent
+agenteval bench eu-ai-act --preset smoke --subject MyAgent --azure-from-env
 
 # Run the Standard preset (all 15 controls, 51 scenarios)
-agenteval bench eu-ai-act --preset standard --subject MyAgent
+agenteval bench eu-ai-act --preset standard --subject MyAgent --azure-from-env
 
 # Run AuditGrade (Standard + CapByWorst aggregation)
-agenteval bench eu-ai-act --preset audit --subject MyAgent
+agenteval bench eu-ai-act --preset audit --subject MyAgent --azure-from-env
 
 # Re-render an existing report without LLM cost
 agenteval compliance render --regulation eu-ai-act --subject MyAgent
@@ -82,9 +85,9 @@ agenteval compliance render --regulation eu-ai-act --subject MyAgent
 Domain packs extend the Standard preset with additional high-risk-area scenarios:
 
 ```bash
-agenteval bench eu-ai-act --preset standard+high-risk-employment --subject MyAgent
-agenteval bench eu-ai-act --preset standard+high-risk-credit --subject MyAgent
-agenteval bench eu-ai-act --preset standard+high-risk-education --subject MyAgent
+agenteval bench eu-ai-act --preset standard+high-risk-employment --subject MyAgent --azure-from-env
+agenteval bench eu-ai-act --preset standard+high-risk-credit --subject MyAgent --azure-from-env
+agenteval bench eu-ai-act --preset standard+high-risk-education --subject MyAgent --azure-from-env
 ```
 
 ---

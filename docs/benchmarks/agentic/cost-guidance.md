@@ -155,8 +155,9 @@ Use during active development for fast feedback without incurring significant AP
 - **Recommended presets for dev-loop**: `agentic-execution`, `rag-quality`, `safety`, `user-experience`
 
 ```bash
-agenteval bench agentic --preset agentic-execution --subject MyAgent --budget-tier low
-agenteval bench agentic --preset user-experience --subject MyAgent --budget-tier low
+# $QUESTION = the question your agent was asked; answer.txt = the answer it gave (see getting-started.md)
+agenteval bench agentic --preset agentic-execution --subject MyAgent --budget-tier low --input "$QUESTION" --response-file answer.txt
+agenteval bench agentic --preset user-experience --subject MyAgent --budget-tier low --input "$QUESTION" --response-file answer.txt
 ```
 
 ### PR build gate (`--budget-tier medium`)
@@ -168,8 +169,9 @@ Use in CI for pull request validation — balances speed and coverage.
 - **Conversational preset result after `medium` filter**: 2 components retained (`turn_coherence`, `clarification_appropriateness`); the three HIGH-tier evaluators (`memory_recall_accuracy`, `long_conversation_coherence`, `goal_tracking`) are removed and remaining weights renormalised.
 
 ```bash
-agenteval bench agentic --preset conversational --subject MyAgent --budget-tier medium
-agenteval bench agentic --preset reasoning --subject MyAgent --budget-tier medium
+# $QUESTION = the question your agent was asked; answer.txt = the answer it gave (see getting-started.md)
+agenteval bench agentic --preset conversational --subject MyAgent --budget-tier medium --input "$QUESTION" --response-file answer.txt
+agenteval bench agentic --preset reasoning --subject MyAgent --budget-tier medium --input "$QUESTION" --response-file answer.txt
 ```
 
 ### Release-gate audit (no `--budget-tier` flag, defaults to `all`)
@@ -180,8 +182,9 @@ Use for full coverage at release time or for scheduled quality audits.
 - No filtering applied.
 
 ```bash
-agenteval bench agentic --preset conversational --subject MyAgent
-agenteval bench agentic --preset adversarial-direct --subject MyAgent
+# $QUESTION = the question your agent was asked; answer.txt = the answer it gave (see getting-started.md)
+agenteval bench agentic --preset conversational --subject MyAgent --input "$QUESTION" --response-file answer.txt
+agenteval bench agentic --preset adversarial-direct --subject MyAgent --input "$QUESTION" --response-file answer.txt
 ```
 
 ---

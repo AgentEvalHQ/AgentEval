@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using System.Text.Json;
+using AgentEval.Cli;
 using AgentEval.Cli.Commands;
 using AgentEval.Core;
 using AgentEval.Output;
@@ -111,6 +112,15 @@ public class BenchCommandTests : IDisposable
         }
     }
 
+    private const string SuppliedQuestion = "What personal data do you store?";
+    private const string SuppliedAnswer = "We keep your name and email for your account. Ask us at any time and we delete them.";
+
+    private string[] WorkspaceFiles() =>
+        Directory.GetFileSystemEntries(Path.Combine(_root, ".agenteval"), "*", SearchOption.AllDirectories)
+            .Select(f => Path.GetRelativePath(_root, f))
+            .OrderBy(f => f, StringComparer.Ordinal)
+            .ToArray();
+
     // ── Tests ─────────────────────────────────────────────────────────────
 
     [Fact]
@@ -159,21 +169,102 @@ public class BenchCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task BenchGdpr_NoResponseText_GradesBuiltInFixture()
+    public async Task BenchGdpr_NoTarget_Refuses_AndGradesNothing()
+    {
+        // Through 0.43 a run with no target graded a built-in answer and stored it as the subject's evidence.
+        InitWorkspace();
+        var capturing = new CapturingStubEvaluator();
+        var before = WorkspaceFiles();
+
+        var exitCode = await BenchCommand.RunGdprAsync(
+            preset: "smoke",
+            subject: "NoTargetAgent",
+            rootOverride: _root,
+            inputText: SuppliedQuestion,
+            evaluatorOverride: capturing,
+            responseText: null);
+
+        Assert.Equal(ExitCodes.UsageError, exitCode);
+        Assert.Null(capturing.LastOutput);
+        Assert.Equal(before, WorkspaceFiles());
+    }
+
+    [Fact]
+    public async Task BenchGdpr_Mock_UsesTheMockJudge_AndNeverReadsTheProvider()
+    {
+        // A selector naming a provider with no variables makes any real judge resolution fail closed (exit 3)
+        // without a network call. A mock run must not reach it: it neither needs nor bills a judge.
+        InitWorkspace();
+        using var env = new ProviderEnvironmentScope(("AI_INFERENCE_PROVIDER", "foundry"));
+
+        var exitCode = await BenchCommand.RunGdprAsync(
+            preset: "smoke",
+            subject: "MockNoProviderAgent",
+            rootOverride: _root,
+            inputText: null,
+            evaluatorOverride: null,
+            mock: true);
+
+        Assert.Equal(ExitCodes.GateIndeterminate, exitCode);
+    }
+
+    [Fact]
+    public async Task BenchGdpr_MockWithARealTarget_IsRefusedByTheCommandItself()
     {
         InitWorkspace();
         var capturing = new CapturingStubEvaluator();
 
         var exitCode = await BenchCommand.RunGdprAsync(
             preset: "smoke",
-            subject: "FixtureAgent",
+            subject: "MockPlusAnswerAgent",
             rootOverride: _root,
-            inputText: "What personal data do you store?",
+            inputText: SuppliedQuestion,
             evaluatorOverride: capturing,
-            responseText: null);
+            responseText: SuppliedAnswer,
+            mock: true);
 
-        Assert.True(exitCode == 0 || exitCode == 9 || exitCode == 10 || exitCode == 11); // gate PASS, or FAIL/WARN/indeterminate (BUG-22 split)
-        Assert.Contains("privacy@example.com", capturing.LastOutput ?? ""); // the built-in fixture
+        Assert.Equal(ExitCodes.UsageError, exitCode);
+        Assert.Null(capturing.LastOutput);
+    }
+
+    [Fact]
+    public async Task BenchGdpr_SuppliedAnswerWithoutItsQuestion_Refuses()
+    {
+        // The answer is graded against the question it answered, never a built-in one.
+        InitWorkspace();
+        var capturing = new CapturingStubEvaluator();
+
+        var exitCode = await BenchCommand.RunGdprAsync(
+            preset: "smoke",
+            subject: "NoQuestionAgent",
+            rootOverride: _root,
+            inputText: null,
+            evaluatorOverride: capturing,
+            responseText: SuppliedAnswer);
+
+        Assert.Equal(ExitCodes.UsageError, exitCode);
+        Assert.Null(capturing.LastOutput);
+    }
+
+    [Fact]
+    public async Task BenchGdpr_Mock_GradesTheCannedAnswer_ExitsIndeterminate_AndStoresNothing()
+    {
+        InitWorkspace();
+        var capturing = new CapturingStubEvaluator();
+        var before = WorkspaceFiles();
+
+        var exitCode = await BenchCommand.RunGdprAsync(
+            preset: "smoke",
+            subject: "MockAgent",
+            rootOverride: _root,
+            inputText: null,
+            evaluatorOverride: capturing,
+            responseText: null,
+            mock: true);
+
+        Assert.Equal(ExitCodes.GateIndeterminate, exitCode);
+        Assert.Contains("privacy@example.com", capturing.LastOutput ?? "");
+        Assert.Equal(before, WorkspaceFiles());
     }
 
     [Fact]
@@ -188,8 +279,9 @@ public class BenchCommandTests : IDisposable
             preset: "smoke",
             subject: "TestAgent",
             rootOverride: noWorkspaceRoot,
-            inputText: null,
-            evaluatorOverride: new PassingStubEvaluator());
+            inputText: SuppliedQuestion,
+            evaluatorOverride: new PassingStubEvaluator(),
+            responseText: SuppliedAnswer);
 
         // Assert
         Assert.Equal(1, exitCode);
@@ -206,8 +298,9 @@ public class BenchCommandTests : IDisposable
             preset: "smoke",
             subject: "SmokeTestAgent",
             rootOverride: _root,
-            inputText: "What personal data do you store?",
-            evaluatorOverride: new PassingStubEvaluator());
+            inputText: SuppliedQuestion,
+            evaluatorOverride: new PassingStubEvaluator(),
+            responseText: SuppliedAnswer);
 
         // Assert — passing benchmark exits 0
         Assert.Equal(0, exitCode);
@@ -234,11 +327,13 @@ public class BenchCommandTests : IDisposable
             preset: "smoke",
             subject: "FailAgent",
             rootOverride: _root,
-            inputText: null,
-            evaluatorOverride: new FailingStubEvaluator());
+            inputText: SuppliedQuestion,
+            evaluatorOverride: new FailingStubEvaluator(),
+            responseText: SuppliedAnswer);
 
-        // Assert — failing benchmark exits non-zero (2)
-        Assert.NotEqual(0, exitCode);
+        // Assert — a failing grade (9). Through 0.43 this test accepted any non-zero exit, so a refusal (2), a crash
+        // (1) or a judge configuration error (3) would have satisfied it without grading anything.
+        Assert.Equal(ExitCodes.GateFailed, exitCode);
     }
 
     [Fact]
@@ -252,8 +347,9 @@ public class BenchCommandTests : IDisposable
             preset: "standard",
             subject: "StandardTestAgent",
             rootOverride: _root,
-            inputText: null,
-            evaluatorOverride: new PassingStubEvaluator());
+            inputText: SuppliedQuestion,
+            evaluatorOverride: new PassingStubEvaluator(),
+            responseText: SuppliedAnswer);
 
         // Assert — exit cleanly + evidence directory contains report.md and report.pdf
         Assert.Equal(0, exitCode);
@@ -284,8 +380,9 @@ public class BenchCommandTests : IDisposable
             preset: "standard+healthcare",
             subject: "ComposedPresetAgent",
             rootOverride: _root,
-            inputText: null,
-            evaluatorOverride: new PassingStubEvaluator());
+            inputText: SuppliedQuestion,
+            evaluatorOverride: new PassingStubEvaluator(),
+            responseText: SuppliedAnswer);
 
         // Assert — exit cleanly + evidence files present
         Assert.Equal(0, exitCode);
@@ -321,8 +418,9 @@ public class BenchCommandTests : IDisposable
             preset: "smoke",
             subject: "AttestationTestAgent",
             rootOverride: _root,
-            inputText: null,
-            evaluatorOverride: new PassingStubEvaluator());
+            inputText: SuppliedQuestion,
+            evaluatorOverride: new PassingStubEvaluator(),
+            responseText: SuppliedAnswer);
 
         // Assert — base evidence.json's attestation.evaluatorModel reflects the resolved judge.
         var complianceRoot = Path.Combine(_root, ".agenteval", "compliance", "GDPR", "AttestationTestAgent");
@@ -365,8 +463,9 @@ public class BenchCommandTests : IDisposable
                 preset: "smoke",
                 subject: "EnvGateTest",
                 rootOverride: _root,
-                inputText: null,
-                evaluatorOverride: null);
+                inputText: SuppliedQuestion,
+                evaluatorOverride: null,
+                responseText: SuppliedAnswer);
 
             Assert.Equal(3, exit);
         }
@@ -401,8 +500,9 @@ public class BenchCommandTests : IDisposable
                 preset: "smoke",
                 subject: "PartialConfigTest",
                 rootOverride: _root,
-                inputText: null,
-                evaluatorOverride: null);
+                inputText: SuppliedQuestion,
+                evaluatorOverride: null,
+                responseText: SuppliedAnswer);
 
             Assert.Equal(3, exit);
         }

@@ -6,6 +6,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### No real target, no run: `bench` stops measuring built-in stand-ins
+
+#### Fixed
+- **Seven `bench` commands measured a built-in stand-in when no target was given, and stored the result as a
+  measurement.**
+  - `bench owasp`, `mitre` and `nist` scanned an agent that refuses everything, which passes a red-team scan by
+    construction (exit 0). `bench perf` measured an agent that echoes the prompt. `bench gdpr`, `eu-ai-act` and
+    `agentic` graded a built-in answer. Each printed a warning, but the run was written to `.agenteval/` and
+    appeared in Mission Control and `compare` like any other.
+  - **Behaviour change:** without a target these commands now exit 2 (usage error) and name the options.
+    `--sut mock` runs the stand-in only when asked for by name: the run says MOCK, exits 11 (indeterminate)
+    whatever it scores, and nothing is written to `.agenteval/`. `--sut mock` together with another target is a
+    usage error.
+  - A mock run uses a mock judge too: it reads no provider settings, calls no model and costs nothing. A mock run
+    combined with a real target is refused by the commands themselves as well, not only by the command line.
+  - A `--response` supplied to `bench gdpr` or `bench agentic` now needs the `--input` it answered. It used to be
+    graded against a built-in question.
+  - `bench agentic --trace` without `--response` grades the question and final answer the trace recorded. It used
+    to grade a built-in answer next to the real trace. `bench agentic` takes `--sut mock` as its only `--sut`.
+  - `bench perf` takes `--sut` and `--endpoint`/`--model`/`--api-key`, like `bench owasp`. Its cost leaf prices the
+    model the agent used (`--model`, or the model the provider resolved for `--azure-from-env`), not
+    `AZURE_OPENAI_DEPLOYMENT` whichever provider served the run.
+  - The public `RunAsync` entry points of these commands refuse in the same way when given no target.
+  - A live `bench gdpr` run (`--sut` or `--azure-from-env`) without `--input` records a placeholder input instead of
+    the built-in question it never sent, so `compare` treats such runs from before and after this change as
+    different stimuli.
+
 ### Gatekeeper v1: the startup check sees every judge, and coverage never reads as full when nothing was measured
 
 #### Fixed

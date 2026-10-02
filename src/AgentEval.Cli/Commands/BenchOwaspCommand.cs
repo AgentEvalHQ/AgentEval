@@ -13,8 +13,8 @@ namespace AgentEval.Cli.Commands;
 
 /// <summary>
 /// Implements the <c>agenteval bench owasp</c> subcommand. Runs the OWASP LLM Top 10
-/// red-team scan against an agent (a stub safe-refusal agent is used by default —
-/// supply an agent override on the internal overload for real targets in tests),
+/// red-team scan against the named target (<c>--sut</c>, <c>--endpoint</c>/<c>--model</c> or
+/// <c>--azure-from-env</c>; without one it refuses, see <see cref="MockTarget"/>),
 /// persists the resulting <see cref="EvalResult"/> through the unified output-store,
 /// and additionally emits the rich <see cref="OWASPComplianceReport"/> as JSON +
 /// Markdown alongside.
@@ -30,7 +30,7 @@ public static class BenchOwaspCommand
         bool azureFromEnv = false,
         CancellationToken ct = default)
     {
-        var (exitCode, _) = await RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, agentOverride: null, azureFromEnv, ct).ConfigureAwait(false);
+        var (exitCode, _) = await RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, agentOverride: null, azureFromEnv, mock: false, ct).ConfigureAwait(false);
         return exitCode;
     }
 
@@ -43,10 +43,10 @@ public static class BenchOwaspCommand
     /// directories by name — that name-based lookup races on second-precision
     /// timestamps when two operations land in the same second.
     /// When <paramref name="azureFromEnv"/> is true AND <paramref name="agentOverride"/>
-    /// is null, builds an Azure OpenAI chat agent from <c>AZURE_OPENAI_*</c> env vars
-    /// via <see cref="AzureChatAgentFactory"/>. When neither is provided, falls back to
-    /// the built-in <c>SafeRefusalAgent</c> stub with a prominent warning banner
-    /// explaining that results do not reflect a real agent.
+    /// is null, builds a chat agent from the configured provider via
+    /// <see cref="AzureChatAgentFactory"/>. With neither, the command refuses (usage error)
+    /// unless <paramref name="mock"/> asks for the stand-in by name (<c>--sut mock</c>);
+    /// a mock run is labelled and not stored (see <see cref="MockTarget"/>).
     /// </summary>
     internal static async Task<(int ExitCode, string? ReportDir)> RunAsync(
         string preset,
@@ -56,8 +56,18 @@ public static class BenchOwaspCommand
         IEvaluator? evaluatorOverride,
         IEvaluableAgent? agentOverride,
         bool azureFromEnv = false,
+        bool mock = false,
         CancellationToken ct = default)
     {
+        if (mock && (agentOverride is not null || azureFromEnv))
+        {
+            return (MockTarget.RefuseMockWithRealTarget(), null);
+        }
+        if (agentOverride is null && !azureFromEnv && !mock)
+        {
+            return (MockTarget.RefuseWithoutTarget("bench owasp", MockTarget.AgentTargets), null);
+        }
+
         // ── Workspace setup ──────────────────────────────────────────────────
         if (rootOverride is not null)
         {
@@ -84,10 +94,10 @@ public static class BenchOwaspCommand
         // The OWASP attack pipeline uses heuristic per-attack evaluators today;
         // the judge is accepted for API symmetry with other bench commands and
         // reserved for future LLM-graded probes. JudgeFactory.Resolve still runs
-        // to honour the AZURE_OPENAI_* env gate (CI parity).
-        var (resolvedJudge, judgeModelName, exitCode) = JudgeFactory.Resolve(
-            evaluatorOverride,
-            judgeKind: "OWASP benchmark");
+        // to honour the AZURE_OPENAI_* env gate (CI parity). A mock run reads no environment.
+        var (resolvedJudge, judgeModelName, exitCode) = mock && evaluatorOverride is null
+            ? MockTarget.JudgeResolution
+            : JudgeFactory.Resolve(evaluatorOverride, judgeKind: "OWASP benchmark");
         if (resolvedJudge is null) return (exitCode, null);
 
         // ── Select preset ────────────────────────────────────────────────────
@@ -127,21 +137,23 @@ public static class BenchOwaspCommand
         }
         else
         {
-            AzureChatAgentFactory.PrintStubAgentWarning(
-                benchmarkName: "OWASP LLM Top 10",
-                stubAgentDescription: "SafeRefusalAgent stub",
-                sampleFileName: "06_OwaspBenchmark.cs");
-            agent = new SafeRefusalAgent(subject);
+            MockTarget.PrintBanner("bench owasp", "a stand-in that refuses every request");
+            agent = new MockTarget.RefusingAgent(subject);
         }
+        var isMock = agent is MockTarget.RefusingAgent;
 
         // ── Run benchmark ────────────────────────────────────────────────────
-        var store = new FileSystemOutputStore(agentEvalDir);
-        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
-        await store.EnsureSolutionAsync();
-        await store.EnsureSubjectAsync(subjectIdentity);
+        FileSystemOutputStore? store = null;
+        if (!isMock)
+        {
+            store = new FileSystemOutputStore(agentEvalDir);
+            await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
+            await store.EnsureSolutionAsync();
+            await store.EnsureSubjectAsync(subjectIdentity);
+        }
 
-        Console.WriteLine($"Running OWASP benchmark ({preset}) for subject '{subject}'...");
+        Console.WriteLine($"{(isMock ? "MOCK RUN: " : "")}Running OWASP benchmark ({preset}) for subject '{subject}'...");
 
         EvalResult compositeEval;
         RedTeamResult redTeamResult;
@@ -163,12 +175,17 @@ public static class BenchOwaspCommand
         }
 
         var report = benchmark.GenerateReport(redTeamResult);
+        if (isMock)
+        {
+            return (MockTarget.Finish("bench owasp",
+                $"{compositeEval.Score.Label.ToUpperInvariant()} (score {compositeEval.Score.Value:F3}) for a stand-in that refuses every request"), null);
+        }
 
         // ── Persist through the unified output-store ─────────────────────────
         string runId;
         try
         {
-            var manifest = await store.StartRunAsync(
+            var manifest = await store!.StartRunAsync(
                 subjectIdentity,
                 new RunContext(
                     EvalProject: "AgentEval.RedTeam",
@@ -187,7 +204,7 @@ public static class BenchOwaspCommand
                 compositeEval,
                 scenarioId: $"owasp-{preset.ToLowerInvariant()}",
                 scenarioName: $"OWASP LLM Top 10 — {preset}");
-            await store.WriteScenarioResultAsync(runId, scenarioResult);
+            await store!.WriteScenarioResultAsync(runId, scenarioResult);
 
             var verdict = compositeEval.Score.Label.ToUpperInvariant() switch
             {
@@ -209,7 +226,7 @@ public static class BenchOwaspCommand
                     ["overallScore"] = compositeEval.Score.Value,
                     ["overallPassRate"] = report.Summary.OverallPassRate / 100.0,
                 });
-            await store.CompleteRunAsync(manifest, summary, ct);
+            await store!.CompleteRunAsync(manifest, summary, ct);
             Console.WriteLine($"Persisted run {runId} to {agentEvalDir}");
         }
         catch (Exception ex)
@@ -222,7 +239,7 @@ public static class BenchOwaspCommand
         try
         {
             var reporter = new OWASPComplianceReporter();
-            await reporter.SaveReportAsync(store, subjectIdentity, runId, redTeamResult);
+            await reporter.SaveReportAsync(store!, subjectIdentity, runId, redTeamResult);
         }
         catch (Exception ex)
         {
@@ -302,6 +319,4 @@ public static class BenchOwaspCommand
                 nameof(presetSpec))
         };
     }
-
-    // SafeRefusalAgent hoisted to a shared internal type — see SafeRefusalAgent.cs (MNT-02).
 }

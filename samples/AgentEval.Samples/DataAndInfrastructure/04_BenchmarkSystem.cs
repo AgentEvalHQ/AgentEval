@@ -32,7 +32,7 @@ namespace AgentEval.Samples;
 /// (removed in v0.9.0-beta). For a full pipeline with audit-chain evidence, PDF reports,
 /// and Mission Control integration, prefer the CLI:
 ///
-///     agenteval bench agentic --preset tool-call-accuracy --subject MyAgent
+///     agenteval bench agentic --preset tool-call-accuracy --subject MyAgent --input "<question>" --response-file answer.txt
 ///
 /// Requires: a model provider — AZURE_OPENAI_* or BITDEER_API_KEY or OPENAI_COMPATIBLE_* (see AIConfig)
 /// ⏱️ Time to understand: 5 minutes
@@ -288,7 +288,7 @@ public static class BenchmarkSystem
         Console.WriteLine("   - AgenticBenchmark.ToolCallAccuracy(judge) returns a CompositeEval composed of");
         Console.WriteLine("     5 sub-evaluators with canonical weights; same as the CLI preset");
         Console.WriteLine("   - For full pipeline with audit-chain evidence + PDF reports, use the CLI:");
-        Console.WriteLine("       agenteval bench agentic --preset tool-call-accuracy --subject MyAgent");
+        Console.WriteLine("       agenteval bench agentic --preset tool-call-accuracy --subject MyAgent --input \"<question>\" --response-file answer.txt");
         Console.WriteLine("   - Other presets: agentic-execution, rag-quality, safety, conversational,");
         Console.WriteLine("     reasoning, user-experience, adversarial-direct, telemetry, judge-quality");
         Console.WriteLine("\n   NEXT: Explore Sample B5 for calibrated evaluation, or run `agenteval bench`!\n");

@@ -108,9 +108,12 @@ internal static class SutTargetResolver
         ArgumentNullException.ThrowIfNull(verb);
 
         var targets = BuiltInTargets().Where(t => t.SupportedVerbs.Contains(verb)).ToList();
+        // Every bench command also takes the explicit mock (handled by the command itself, not a registered target).
+        var valid = targets.Select(t => t.Sut).Concat(verb == "bench" ? [MockTarget.Sut] : []).ToList();
         var sutOpt = new Option<string?>("--sut")
         {
-            Description = $"Built-in system-under-test for this verb. Valid: {(targets.Count > 0 ? string.Join(", ", targets.Select(t => t.Sut)) : "(none registered for this verb)")}.",
+            Description = $"Built-in system-under-test for this verb. Valid: {(valid.Count > 0 ? string.Join(", ", valid) : "(none registered for this verb)")}." +
+                (verb == "bench" ? $" ({MockTarget.SutHelp}.)" : ""),
         };
         command.Options.Add(sutOpt);
         foreach (var t in targets)

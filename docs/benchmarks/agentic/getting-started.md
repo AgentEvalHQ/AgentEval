@@ -175,26 +175,31 @@ The suite can be run two ways:
 # Initialize the .agenteval workspace if not already done
 agenteval init-workspace --name MySolution
 
+# Every run grades your agent's real answer: --input is the question it was asked, --response-file the answer it
+# gave. (Or pass --trace run.trace.json to grade a captured run.) Without one the command refuses; --sut mock runs
+# a canned answer that measures nothing and is not stored.
+QUESTION="Book me a flight to Lisbon next Friday and a hotel near the old town."
+
 # Run the Agentic Execution preset (task completion, adherence, intent, tool accuracy, navigation)
-agenteval bench agentic --preset agentic-execution --subject MyTravelAgent
+agenteval bench agentic --preset agentic-execution --subject MyTravelAgent --input "$QUESTION" --response-file answer.txt
 
 # Run the RAG Quality preset
-agenteval bench agentic --preset rag-quality --subject MyTravelAgent
+agenteval bench agentic --preset rag-quality --subject MyTravelAgent --input "$QUESTION" --response-file answer.txt
 
 # Run the Judge Quality preset (no LLM required)
-agenteval bench agentic --preset judge-quality
+agenteval bench agentic --preset judge-quality --subject MyTravelAgent --input "$QUESTION" --response-file answer.txt
 
 # Run the Safety preset (12-evaluator safety/security composite)
-agenteval bench agentic --preset safety --subject MyTravelAgent
+agenteval bench agentic --preset safety --subject MyTravelAgent --input "$QUESTION" --response-file answer.txt
 
 # Run the Conversational Quality preset (memory + multi-turn)
-agenteval bench agentic --preset conversational --subject MyTravelAgent
+agenteval bench agentic --preset conversational --subject MyTravelAgent --input "$QUESTION" --response-file answer.txt
 
 # Run the Reasoning Quality preset
-agenteval bench agentic --preset reasoning --subject MyTravelAgent
+agenteval bench agentic --preset reasoning --subject MyTravelAgent --input "$QUESTION" --response-file answer.txt
 
 # Run with cost-aware filtering — keep only LOW-tier evaluators for fast dev-loop iteration
-agenteval bench agentic --preset conversational --subject MyTravelAgent --budget-tier low
+agenteval bench agentic --preset conversational --subject MyTravelAgent --budget-tier low --input "$QUESTION" --response-file answer.txt
 
 # Run calibration and write a calibration report
 agenteval bench agentic calibrate
@@ -243,14 +248,15 @@ The `--budget-tier` flag filters out evaluators whose cost tier exceeds the spec
 ### Usage
 
 ```bash
+# $QUESTION = the question your agent was asked; answer.txt = the answer it gave (see Quick start)
 # Dev-loop iteration — only LOW and below (fast, cheap)
-agenteval bench agentic --preset conversational --subject MyAgent --budget-tier low
+agenteval bench agentic --preset conversational --subject MyAgent --budget-tier low --input "$QUESTION" --response-file answer.txt
 
 # PR build — MEDIUM and below (balance speed and coverage)
-agenteval bench agentic --preset conversational --subject MyAgent --budget-tier medium
+agenteval bench agentic --preset conversational --subject MyAgent --budget-tier medium --input "$QUESTION" --response-file answer.txt
 
 # Release gate — all evaluators (full coverage, no filtering)
-agenteval bench agentic --preset conversational --subject MyAgent
+agenteval bench agentic --preset conversational --subject MyAgent --input "$QUESTION" --response-file answer.txt
 ```
 
 When filtering removes some components, the CLI prints: `Budget-tier filter 'low': kept N of M components (removed K above-budget evaluators).`
