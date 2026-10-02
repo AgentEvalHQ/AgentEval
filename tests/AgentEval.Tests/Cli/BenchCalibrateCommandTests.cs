@@ -182,4 +182,58 @@ public class BenchCalibrateCommandTests : IDisposable
         // Assert — at least one pillar fails thresholds → exit 9 (GateFailed)
         Assert.Equal(9, exitCode);
     }
+
+    // ── The report names the judge that produced it ──────────────────────────
+
+    [Fact]
+    public async Task Calibrate_ReportHeader_NamesTheJudgeProviderAndModel()
+    {
+        var outPath = Path.Combine(_root, "report-judge.md");
+
+        await BenchCalibrateCommand.RunCoreAsync(
+            rootOverride: _root,
+            outPathOverride: outPath,
+            evaluatorOverride: new AlwaysPassEvaluator(),
+            evaluatorOverrideIdentity: new CalibrationJudgeIdentity("Test Provider", "test-model-7"));
+
+        var content = await File.ReadAllTextAsync(outPath);
+        Assert.Contains("Judge provider: Test Provider", content);
+        Assert.Contains("Judge model: test-model-7", content);
+        // In the header, ahead of the first pillar section.
+        Assert.True(
+            content.IndexOf("Judge model:", StringComparison.Ordinal) < content.IndexOf("## ", StringComparison.Ordinal),
+            "The judge lines must be in the report header, before the first pillar section.");
+    }
+
+    [Fact]
+    public async Task Calibrate_SuppliedEvaluatorWithoutIdentity_ReportsTheJudgeAsUnknown()
+    {
+        var outPath = Path.Combine(_root, "report-unknown-judge.md");
+
+        await BenchCalibrateCommand.RunCoreAsync(
+            rootOverride: _root,
+            outPathOverride: outPath,
+            evaluatorOverride: new AlwaysPassEvaluator());
+
+        var content = await File.ReadAllTextAsync(outPath);
+        Assert.Contains($"Judge provider: unknown: an evaluator supplied by the caller ({nameof(AlwaysPassEvaluator)})", content);
+        Assert.Contains("Judge model: unknown", content);
+    }
+
+    [Fact]
+    public async Task Calibrate_StubJudge_ReportSaysStubAndNamesNoModel()
+    {
+        // No provider is configured (the collection scrubs them all); the stub is opted into explicitly.
+        Environment.SetEnvironmentVariable("AGENTEVAL_ALLOW_STUB_JUDGE", "1");
+        var outPath = Path.Combine(_root, "report-stub.md");
+
+        await BenchCalibrateCommand.RunCoreAsync(
+            rootOverride: _root,
+            outPathOverride: outPath,
+            evaluatorOverride: null);
+
+        var content = await File.ReadAllTextAsync(outPath);
+        Assert.Contains("Judge provider: stub (AGENTEVAL_ALLOW_STUB_JUDGE=1)", content);
+        Assert.Contains("Judge model: none", content);
+    }
 }

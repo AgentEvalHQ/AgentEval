@@ -131,7 +131,7 @@ public class DataPoisonDenyTrueHeldOutLiveCheck(ITestOutputHelper output)
         Console.WriteLine(text);
         var path = Path.Combine(Path.GetTempPath(), "agenteval-datapoison-deny-true-stochastic.txt");
         await File.WriteAllTextAsync(path, text);
-        Console.WriteLine($"[stochastic] report → {path}  (curate into strategy/redteam/paper/proof/artifacts/)");
+        Console.WriteLine($"[stochastic] report → {path}  (a temp file: copy it elsewhere to keep it)");
         Assert.True(systematic.Count == 0, "SYSTEMATIC fabrications:\n" + string.Join("\n", systematic));
     }
 

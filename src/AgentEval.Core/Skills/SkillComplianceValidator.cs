@@ -9,8 +9,7 @@ namespace AgentEval.Skills;
 /// <summary>
 /// Pure, deterministic, MAF-free validator for <see cref="SkillManifest"/>s against the GA <c>SKILL.md</c>
 /// rules plus AgentEval's own governance/trust-boundary flags. No I/O, no LLM, no <c>Microsoft.Agents.AI</c>
-/// reference — fully unit-testable without a live MAF assembly. See
-/// <c>strategy/FutureFeatures/Skills/AgentEval-AgentSkills-Evals-Design-and-Plan.md</c> §5.
+/// reference — fully unit-testable without a live MAF assembly. See <c>docs/agent-skills.md</c> §2.
 /// </summary>
 public static class SkillComplianceValidator
 {
@@ -63,8 +62,7 @@ public static class SkillComplianceValidator
     /// per-skill inside <see cref="Validate"/> — extracted as a public entry point so a second, independent
     /// caller (the silent-discovery-exclusion reconciliation in <c>AgentEval.MAF.Skills.MafSkillScanner</c>)
     /// can run a raw-parsed, MAF-never-returned manifest through the identical rules rather than
-    /// duplicating them. One rule set, two callers — see
-    /// <c>strategy/FutureFeatures/Skills/Skill-Discovery-Exclusion-Detection-Design.md</c> §2.3.
+    /// duplicating them. One rule set, two callers.
     /// </summary>
     public static IReadOnlyList<SkillComplianceFinding> ValidateSingle(SkillManifest skill, SkillScanOptions? options = null)
     {

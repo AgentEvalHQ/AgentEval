@@ -23,13 +23,15 @@ namespace AgentEval.Cli.Commands;
 /// result (<see cref="ExternalBenchmarkResult"/>) does not fit the
 /// <c>EvaluateAsync(EvalInput) → EvalResult</c> shape that <c>bench perf</c> uses, so this
 /// command writes the native shape directly to <c>report-native.json</c> alongside the
-/// canonical run manifest. A human-readable summary lands in <c>report.md</c>.
+/// canonical run manifest. No <c>report.md</c> is written; the human-readable summary is
+/// the console output.
 ///
 /// <para>
-/// REQUIRES Azure OpenAI. The runner normally makes one answer call plus one judge
-/// call per question, with bounded judge retries increasing the total. All three
-/// <c>AZURE_OPENAI_*</c> env vars must be set; there is no stub fallback because
-/// LongMemEval's correctness signal IS the LLM grader.
+/// Needs a real model, from whichever provider <c>AI_INFERENCE_PROVIDER</c> selects (or
+/// auto-detects) via <see cref="AzureChatAgentFactory.TryBuildChatClientFromEnv"/>; the one
+/// client both answers and judges. The runner normally makes one answer call plus one judge
+/// call per question, with bounded judge retries increasing the total. There is no stub
+/// fallback because LongMemEval's correctness signal IS the LLM grader.
 /// </para>
 ///
 /// <para>
@@ -71,7 +73,8 @@ public static class BenchLongMemEvalCommand
         var agentEvalDir = Path.Combine(workspaceRoot, ".agenteval");
         if (!Directory.Exists(agentEvalDir))
         {
-            Console.Error.WriteLine($".agenteval/ not found at {agentEvalDir}. Run `agenteval init` first.");
+            // `init` is the dataset scaffolder; `init-workspace` is what creates .agenteval/.
+            Console.Error.WriteLine($".agenteval/ not found at {agentEvalDir}. Run `agenteval init-workspace` first.");
             return 1;
         }
 
@@ -88,7 +91,7 @@ public static class BenchLongMemEvalCommand
         {
             Console.Error.WriteLine($"Unknown longmemeval preset '{preset}'. Known: " +
                 string.Join(", ", family.Presets.Select(p => p.Name)));
-            return 1;
+            return ExitCodes.UsageError;
         }
 
         // ── Resolve chat client ──────────────────────────────────────────────

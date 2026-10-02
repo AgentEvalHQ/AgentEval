@@ -3,7 +3,8 @@
 // Licensed under the MIT License.
 //
 // Ported from AgentEvalHQ/AgentEval.Cli/tests/AgentEval.Cli.Tests/StochasticFlagTests.cs
-// during the v1.1 CLI consolidation. Only the namespace was edited.
+// during the v1.1 CLI consolidation. The namespace was edited at port time; the tests that documented
+// unvalidated --runs values and the stochastic path's silent export drop were rewritten when both were fixed.
 
 using AgentEval.Cli.Commands;
 using Xunit;
@@ -215,28 +216,16 @@ public class StochasticFlagTests
         Assert.True(opts.Runs > 1, $"Runs={runs} should trigger stochastic evaluation path");
     }
 
-    [Fact]
-    public void EvalOptions_Runs0_IsNotStochastic()
-    {
-        var opts = new EvalOptions
-        {
-            Dataset = new FileInfo("test.yaml"),
-            Model = "gpt-4o",
-            Format = "json",
-            Runs = 0,
-        };
-
-        Assert.True(opts.Runs <= 1, "Runs=0 should NOT trigger stochastic evaluation path");
-    }
-
     [Theory]
+    [InlineData(0)]
     [InlineData(-1)]
     [InlineData(-10)]
     [InlineData(int.MinValue)]
-    public void EvalOptions_NegativeRuns_IsNotStochastic(int runs)
+    public void ValidateRuns_BelowOne_IsRejected(int runs)
     {
-        // Negative --runs values are not validated by the CLI; they fall through
-        // to the standard single-run path (Runs <= 1). This documents that behavior.
+        // These used to fall through to the single-run path unvalidated (0 and negatives silently ran once).
+        // ExecuteAsync now turns this message into exit 2 before anything else runs — see
+        // EvalCommandTemperatureAndRunsTests.Eval_RunsBelowOne_IsAUsageError_BeforeAnythingElseIsChecked.
         var opts = new EvalOptions
         {
             Dataset = new FileInfo("test.yaml"),
@@ -245,30 +234,62 @@ public class StochasticFlagTests
             Runs = runs,
         };
 
-        Assert.True(opts.Runs <= 1, $"Runs={runs} should NOT trigger stochastic evaluation path");
+        var error = EvalCommand.ValidateRuns(opts);
+
+        Assert.NotNull(error);
+        Assert.Contains("--runs must be at least 1", error);
     }
 
     [Fact]
-    public void EvalOptions_StochasticPath_DoesNotSupportExport()
+    public void ValidateRuns_SingleRun_IgnoresTheStochasticThreshold()
     {
-        // Documents the known gap: the stochastic path (--runs > 1) writes
-        // statistics to stderr only. --format/--output are NOT used for
-        // stochastic results. When this is fixed, this test should be updated
-        // to verify export support.
+        // At --runs 1 the threshold is not used, so it is not checked either.
+        var opts = new EvalOptions
+        {
+            Dataset = new FileInfo("test.yaml"),
+            Format = "json",
+            Runs = 1,
+            SuccessThreshold = 5.0,
+        };
+
+        Assert.Null(EvalCommand.ValidateRuns(opts));
+    }
+
+    [Fact]
+    public void StochasticPath_DoesNotExport_AndNamesEveryExportOptionItIgnores()
+    {
+        // The stochastic path (--runs > 1) still writes no export: no exporter accepts a stochastic result, and
+        // projecting one into EvaluationReport would read as a single run in the formats that drop its metadata.
+        // What changed is that it says so, naming each option with the value given.
         var opts = new EvalOptions
         {
             Dataset = new FileInfo("test.yaml"),
             Model = "gpt-4o",
-            Format = "json",
-            Output = new FileInfo("results.json"),
+            Format = "csv",
+            Output = new FileInfo("results.csv"),
+            OutputDir = new DirectoryInfo("out"),
             Runs = 5,
         };
 
-        // The stochastic path is triggered but export flags are ignored.
-        // Verify the options can express this combination (they can, but
-        // ExecuteStochasticAsync does not use Format/Output).
-        Assert.True(opts.Runs > 1);
-        Assert.NotNull(opts.Output);
-        Assert.Equal("json", opts.Format);
+        var ignored = EvalCommand.ExportOptionsIgnoredByStochasticMode(opts);
+
+        Assert.Equal(
+            new[]
+            {
+                "--format csv",
+                $"-o/--output {opts.Output!.FullName}",
+                $"--output-dir {opts.OutputDir!.FullName}",
+            },
+            ignored.ToArray());
+    }
+
+    [Fact]
+    public void StochasticPath_DefaultFormat_IsNamedOnlyWhenGivenExplicitly()
+    {
+        var defaulted = new EvalOptions { Dataset = new FileInfo("test.yaml"), Format = "json", Runs = 5 };
+        var explicitJson = new EvalOptions { Dataset = new FileInfo("test.yaml"), Format = "json", FormatGiven = true, Runs = 5 };
+
+        Assert.Empty(EvalCommand.ExportOptionsIgnoredByStochasticMode(defaulted));
+        Assert.Equal(new[] { "--format json" }, EvalCommand.ExportOptionsIgnoredByStochasticMode(explicitJson).ToArray());
     }
 }

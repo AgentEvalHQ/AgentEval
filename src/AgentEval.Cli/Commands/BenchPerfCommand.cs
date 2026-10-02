@@ -62,7 +62,7 @@ public static class BenchPerfCommand
         var agentEvalDir = Path.Combine(workspaceRoot, ".agenteval");
         if (!Directory.Exists(agentEvalDir))
         {
-            Console.Error.WriteLine($".agenteval/ not found at {agentEvalDir}. Run `agenteval init` first.");
+            Console.Error.WriteLine($".agenteval/ not found at {agentEvalDir}. Run `agenteval init-workspace` first.");
             return 1;
         }
 
@@ -82,7 +82,7 @@ public static class BenchPerfCommand
         {
             Console.Error.WriteLine($"Unknown perf preset '{preset}'. Known presets: " +
                 $"{string.Join(", ", family.Presets.Select(p => p.Name))}.");
-            return 1;
+            return ExitCodes.UsageError;
         }
 
         // ── Resolve target agent ─────────────────────────────────────────────

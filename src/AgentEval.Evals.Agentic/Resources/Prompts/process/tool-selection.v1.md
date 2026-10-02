@@ -1,11 +1,11 @@
 <!--
-Source: forked from Azure/azure-sdk-for-python (commit <TBD-foundry-sha> see CHANGELOG T3.7)
-        sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_tool_selection/tool_selection.prompty
-License: MIT (https://github.com/Azure/azure-sdk-for-python/blob/main/LICENSE)
-Modified by AgentEval contributors. See CHANGELOG.md.
-Modifications:
+Lineage: original AgentEval prompt text, modelled on the evaluator concept (name, inputs and
+         scoring dimensions) of Azure/azure-sdk-for-python
+         sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_tool_selection/tool_selection.prompty
+         Checked 2026-10-02: no upstream prompt text is reproduced.
+License: MIT (https://github.com/AgentEvalHQ/AgentEval/blob/main/LICENSE)
+Differences from the upstream evaluator:
   - Restructured for AgentEval Universal Metric Envelope (EvalResult)
-  - temperature 1.0 → 0
   - Added weighted rubric: required tools (high weight) vs redundant tools (penalty) vs alternative tools (acceptable)
   - Added structured evidence[] output; replaced chain-of-thought output
   - Added failure_type taxonomy field

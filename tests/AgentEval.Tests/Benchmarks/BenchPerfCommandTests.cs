@@ -103,7 +103,8 @@ public class BenchPerfCommandTests
                 rootOverride: workspace,
                 agentOverride: new StubAgent("test"));
 
-            Assert.Equal(1, exitCode);
+            // An unknown preset is a rejected argument: usage error (2), not a test failure (1).
+            Assert.Equal(AgentEval.Cli.ExitCodes.UsageError, exitCode);
         }
         finally
         {

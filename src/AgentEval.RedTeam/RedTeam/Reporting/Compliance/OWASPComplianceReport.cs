@@ -27,8 +27,11 @@ public class OWASPComplianceReport : IComplianceReport
     /// <summary>Duration of the original scan.</summary>
     public TimeSpan ScanDuration { get; init; }
 
-    /// <summary>AgentEval version used.</summary>
-    public string AgentEvalVersion { get; init; } = "0.2.0";
+    /// <summary>
+    /// AgentEval version that produced the report: the red-team assembly's informational version, read from the
+    /// build rather than written as a literal. Printed in the Markdown footer.
+    /// </summary>
+    public string AgentEvalVersion { get; init; } = ReportToolVersion.Informational;
 
     /// <summary>Status for each OWASP LLM category.</summary>
     public required IReadOnlyList<OWASPCategoryStatus> Categories { get; init; }

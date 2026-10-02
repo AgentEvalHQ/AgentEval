@@ -19,7 +19,7 @@ namespace AgentEval.Cli.Commands;
 /// <see cref="SkillComplianceValidator"/>), plus Agent Skills Wave 1 (§4.1/§4.3): a timestamped baseline
 /// ledger (<c>--write-baseline</c> / <c>skills baseline list|diff|history</c>) and repo-wide multi-convention
 /// discovery (<c>--repo</c>). v1 scan scope is deliberately compliance-only, not the full Skill Health &amp;
-/// Security Index (see <c>strategy/FutureFeatures/Skills/Skills-Scan-CLI-Verb-Design.md</c> §2.3).
+/// Security Index (see <c>docs/agent-skills.md</c> §2).
 /// </summary>
 internal static class SkillsScanCommand
 {
@@ -372,8 +372,8 @@ internal static class SkillsScanCommand
     /// Core execution logic for <c>scan-workspace</c> — separated from command wiring for testability, mirroring
     /// <see cref="ExecuteAsync"/>. Deliberately a SEPARATE verb from <c>scan --repo</c> rather than a bolted-on
     /// flag on it (naming a flag <c>--workspace</c> would collide with Mission Control's unrelated
-    /// <c>--workspace</c> concept and its own honesty history — see <c>strategy/AgentEval-Status-and-Plan-Forward.md</c>
-    /// Front D) — so this verb's own name states plainly what it does, without borrowing an already-loaded word.
+    /// <c>--workspace</c> concept and its own honesty history) — so this verb's own name states plainly what it
+    /// does, without borrowing an already-loaded word.
     /// </summary>
     internal static async Task<int> ExecuteWorkspaceAsync(
         DirectoryInfo path, string format, FileInfo? output, bool failOnNoncompliant,

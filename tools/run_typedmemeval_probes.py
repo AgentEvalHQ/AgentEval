@@ -1825,12 +1825,20 @@ def _discrimination(group: list[dict]) -> dict:
     published headroom is unreachable, and a consumer reading it will buy retrieval work that cannot
     help.
 
-    Measured, the two kinds look nothing alike and read identically today:
+    Measured on an earlier corpus, the two kinds looked nothing alike and read identically:
 
         episodic/list-order     V1 1.00  V8 1.00  V9 0.27  ->  RETRIEVAL-limited, headroom real
         prospective/due-window  V1 1.00  V8 0.22  V9 0.06  ->  REASONING-limited, headroom is not
 
     So both numbers ship, and the classification with them.
+
+    That due-window row came from a wrong answer key. On the shipped corpus it reads V1 1.00
+    V8 0.89 V9 0.06, which is retrieval-limited. `limited_by` below is "reasoning" only when
+    (v1 - v8) > (v1 - v9) / 2, i.e. only when V8 < (V1 + V9) / 2 -- the whole haystack recovers
+    less than half of the V9-to-V1 gap. No shipped shape is below that midpoint, so on the shipped
+    records the field says "retrieval" for all 35 shapes that carry it (forgetting/never-known has
+    no gold and carries none) and does not discriminate. `headroom_reachable` is the number that
+    varies; read it beside `headroom_perfect_selector`.
     """
     def rate(arm: str) -> float | None:
         applicable = [r for r in group if r.get(arm) is not None]

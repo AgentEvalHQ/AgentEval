@@ -10,12 +10,10 @@ namespace AgentEval.Cli.Commands;
 
 /// <summary>
 /// Resolves an optional agent override for a <c>bench</c> subcommand from either the shared <c>--sut</c> seam
-/// (Track 2 PR3 — <c>strategy/CopilotStudio/Bench-Eval-Integration-and-Live-Connector-Plan.md</c> §3.4 "bench
-/// Tier 1") or a generic OpenAI-compatible <c>--endpoint</c>/<c>--model</c>/<c>--api-key</c> set (Part C —
-/// <c>strategy/CLI-Custom-Benchmarks-CopilotStudio-OpenAI-and-Metrics-Remediation-Design.md</c> §2). Despite
-/// the "Tier1" name (kept for history — it shipped for <c>bench owasp</c>/<c>mitre</c>/<c>nist</c> first), the
-/// <see cref="Resolve"/> logic itself is verb/tier-agnostic and is also reused verbatim by <c>bench gdpr</c>/
-/// <c>eu-ai-act</c> (Tier 2, §2.2 of <c>strategy/CopilotStudio/Remaining-Backlog-Implementation-Plan-2026-07-16.md</c>)
+/// (Track 2 PR3, "bench Tier 1") or a generic OpenAI-compatible <c>--endpoint</c>/<c>--model</c>/<c>--api-key</c>
+/// set (Part C). Despite the "Tier1" name (kept for history — it shipped for <c>bench owasp</c>/<c>mitre</c>/
+/// <c>nist</c> first), the <see cref="Resolve"/> logic itself is verb/tier-agnostic and is also reused verbatim
+/// by <c>bench gdpr</c>/<c>eu-ai-act</c> (Tier 2)
 /// with <c>endpoint</c>/<c>model</c>/<c>apiKey</c> passed as <see langword="null"/> — a separate
 /// <c>BenchTier2SutResolver</c> would have been byte-identical duplication. Pure/testable — kept out of
 /// <c>Program.cs</c>'s top-level statements (which aren't a unit-testable surface) on purpose.
@@ -29,7 +27,7 @@ internal static class BenchTier1SutResolver
     /// <summary>
     /// Resolves the agent override, if any. <c>--sut</c> wins when set (its own <see cref="ISutTarget.Validate"/>
     /// runs, surfaced here as a friendly error rather than an exception so the caller can print it and exit
-    /// cleanly — mirroring every other bench command's "Error: ..." + exit 1 convention); otherwise a non-empty
+    /// cleanly with <c>ExitCodes.UsageError</c> (2), as for any other rejected argument); otherwise a non-empty
     /// <paramref name="endpoint"/> builds a plain OpenAI-compatible agent. Neither set → <c>(null, null)</c>,
     /// letting the caller's existing <c>--azure-from-env</c>/stub fallback (inside <c>RunAsync</c>) run unchanged.
     /// </summary>

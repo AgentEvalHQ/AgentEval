@@ -27,12 +27,18 @@ namespace AgentEval.MAF.Gatekeeper;
 /// <see cref="Analyze(AIAgent,IReadOnlyList{IToolGate}?,AnalyzeOptions?)"/> reads <c>ChatOptions.Tools</c> off
 /// the agent — the STATIC, build-time tool list. A tool an <c>AIContextProvider</c> (e.g. Agent Skills, a memory
 /// provider) contributes via <c>AIContext.Tools</c> is merged into a transient, per-invocation copy of
-/// <c>ChatOptions</c> and is never written back to the property this analyzer reads. An agent that exposes tools
-/// ONLY through such a provider (no <c>ChatOptions.Tools</c> set at all) reports <c>Tools.Count == 0</c> and
-/// <c>EnforcementCoveragePercent == 100</c> — vacuously "fully covered" — even though the model genuinely sees
-/// and can call those tools at runtime. There is no fix for this short of hooking the live invocation path (a
-/// larger change); until then, treat a coverage report as ONLY about statically-declared tools, and do not use
-/// it to conclude an <see cref="AIContextProvider"/>-driven agent has no unprotected high-risk tools.</para>
+/// <c>ChatOptions</c> and is never written back to the property this analyzer reads, so it is never listed. What
+/// the analyzer does when such a provider is detected on the agent (or declared through
+/// <see cref="AnalyzeOptions.HasDynamicToolProvider"/>, which both overloads honour):
+/// with NO static tools, the report is marked inventory-unavailable and <c>AnalyzeOrThrow</c> throws
+/// <see cref="ToolInventoryUnavailableException"/> rather than certify a vacuous 100%; WITH static tools, the static
+/// tools are analyzed as usual and the report carries a warning (in <see cref="GatekeeperCoverageReport.Render"/> and
+/// its <c>ToString()</c>) that injected tools were not inventoried. <c>AnalyzeOrThrow</c> still decides on the static
+/// tools alone in that second case — it does not throw just because a provider exists, since that would refuse every
+/// memory- or skills-enabled agent with no way to acknowledge it — so its pass means "no unprotected high-risk STATIC
+/// tool", not "no unprotected high-risk tool". A provider that is neither detected nor declared cannot be warned
+/// about. There is no complete fix short of hooking the live invocation path; do not use a coverage report to
+/// conclude an <see cref="AIContextProvider"/>-driven agent has no unprotected high-risk tools.</para>
 /// </summary>
 public static class GatekeeperCoverageAnalyzer
 {
@@ -50,7 +56,9 @@ public static class GatekeeperCoverageAnalyzer
     /// <param name="toolGates">The tool gates registered via <c>UseAgentEvalToolGate</c> — pass the same list. Null/empty means no tool gate is registered anywhere.</param>
     /// <param name="options">Analysis options (risk heuristic override). Defaults to <see cref="AnalyzeOptions.Default"/>.</param>
     /// <remarks>Only sees the static <c>ChatOptions.Tools</c> list — a tool contributed dynamically by an
-    /// <see cref="Microsoft.Agents.AI.AIContextProvider"/> is invisible here. See the class remarks.</remarks>
+    /// <see cref="Microsoft.Agents.AI.AIContextProvider"/> is invisible here. When such a provider is detected or
+    /// declared, the report says so (inventory-unavailable with no static tools, a warning otherwise). See the class
+    /// remarks.</remarks>
     public static GatekeeperCoverageReport Analyze(AIAgent agent, IReadOnlyList<IToolGate>? toolGates = null, AnalyzeOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(agent);
@@ -64,26 +72,22 @@ public static class GatekeeperCoverageAnalyzer
         var tools = chatOptions.Tools ?? (IList<AITool>)Array.Empty<AITool>();
 
         // P1-12 (§1): an AIContextProvider can inject tools at invocation time that never appear in the static
-        // Tools list. If the agent has one (caller-declared, or detected) and the static list is empty, we cannot
-        // enumerate the real inventory — fail closed (inventory-unavailable) so AnalyzeOrThrow refuses to certify a
-        // vacuous 100% rather than silently green-light an unverified agent.
+        // Tools list. If the agent has one (caller-declared, or detected), AnalyzeCore fails closed on an empty static
+        // list and marks a non-empty one as not covering the injected tools.
         var hasDynamicProvider = options.HasDynamicToolProvider || agent.GetService(typeof(AIContextProvider)) is not null;
-        if (hasDynamicProvider && tools.Count == 0)
-        {
-            return new GatekeeperCoverageReport(Array.Empty<ToolCoverageEntry>(), GateNames(toolGates), ToolInventoryAvailable: false);
-        }
-
-        return AnalyzeCore(tools, toolGates, options, toolInventoryAvailable: true);
+        return AnalyzeCore(tools, toolGates, options, hasDynamicProvider);
     }
 
     /// <summary>Analyzes an explicit tool list (the same list you passed to <see cref="ChatOptions.Tools"/>).</summary>
     /// <param name="tools">The tools exposed to the model.</param>
     /// <param name="toolGates">The tool gates registered via <c>UseAgentEvalToolGate</c> — pass the same list.</param>
-    /// <param name="options">Analysis options (risk heuristic override). Defaults to <see cref="AnalyzeOptions.Default"/>.</param>
+    /// <param name="options">Analysis options (risk heuristic override). Defaults to <see cref="AnalyzeOptions.Default"/>.
+    /// <see cref="AnalyzeOptions.HasDynamicToolProvider"/> is honoured exactly as on the agent overload: an empty list
+    /// is reported inventory-unavailable, and a non-empty one carries the not-inventoried warning.</param>
     public static GatekeeperCoverageReport Analyze(IEnumerable<AITool> tools, IReadOnlyList<IToolGate>? toolGates = null, AnalyzeOptions? options = null)
     {
         ArgumentNullException.ThrowIfNull(tools);
-        return AnalyzeCore(tools, toolGates, options, toolInventoryAvailable: true);
+        return AnalyzeCore(tools, toolGates, options, hasDynamicProvider: options?.HasDynamicToolProvider ?? false);
     }
 
     /// <summary>
@@ -96,7 +100,7 @@ public static class GatekeeperCoverageAnalyzer
     public static GatekeeperCoverageReport AnalyzeOrThrow(AIAgent agent, IReadOnlyList<IToolGate>? toolGates = null, AnalyzeOptions? options = null)
         => ThrowIfUnprotected(Analyze(agent, toolGates, options));
 
-    /// <summary>Like <see cref="Analyze(IEnumerable{AITool},IReadOnlyList{IToolGate}?,AnalyzeOptions?)"/>, but throws <see cref="UnprotectedHighRiskToolException"/> on an unprotected high-risk tool.</summary>
+    /// <summary>Like <see cref="Analyze(IEnumerable{AITool},IReadOnlyList{IToolGate}?,AnalyzeOptions?)"/>, but throws <see cref="UnprotectedHighRiskToolException"/> on an unprotected high-risk tool, or <see cref="ToolInventoryUnavailableException"/> when <see cref="AnalyzeOptions.HasDynamicToolProvider"/> is set and <paramref name="tools"/> is empty.</summary>
     public static GatekeeperCoverageReport AnalyzeOrThrow(IEnumerable<AITool> tools, IReadOnlyList<IToolGate>? toolGates = null, AnalyzeOptions? options = null)
         => ThrowIfUnprotected(Analyze(tools, toolGates, options));
 
@@ -108,7 +112,7 @@ public static class GatekeeperCoverageAnalyzer
     };
 
     private static GatekeeperCoverageReport AnalyzeCore(
-        IEnumerable<AITool> tools, IReadOnlyList<IToolGate>? toolGates, AnalyzeOptions? options, bool toolInventoryAvailable)
+        IEnumerable<AITool> tools, IReadOnlyList<IToolGate>? toolGates, AnalyzeOptions? options, bool hasDynamicProvider)
     {
         options ??= AnalyzeOptions.Default;
         var hasToolGate = toolGates is { Count: > 0 };   // every registered gate sees every local-function call (structural, see class doc)
@@ -123,7 +127,22 @@ public static class GatekeeperCoverageAnalyzer
             entries.Add(new ToolCoverageEntry(tool.Name, tool.Description, model, risk, isProtected, NoteFor(model, isProtected)));
         }
 
-        return new GatekeeperCoverageReport(entries, GateNames(toolGates), toolInventoryAvailable);
+        // P1-12 (§1): an AIContextProvider can inject tools at invocation time that never appear in the static list.
+        // With no static tools at all we cannot enumerate the real inventory — fail closed (inventory-unavailable) so
+        // AnalyzeOrThrow refuses to certify a vacuous 100%. With static tools, analyze them, but mark the report so
+        // every rendering says the injected tools were not inventoried.
+        if (hasDynamicProvider && entries.Count == 0)
+        {
+            return new GatekeeperCoverageReport(Array.Empty<ToolCoverageEntry>(), GateNames(toolGates), ToolInventoryAvailable: false)
+            {
+                DynamicToolsNotInventoried = true,
+            };
+        }
+
+        return new GatekeeperCoverageReport(entries, GateNames(toolGates), ToolInventoryAvailable: true)
+        {
+            DynamicToolsNotInventoried = hasDynamicProvider,
+        };
     }
 
     private static string NoteFor(ToolExecutionModel model, bool isProtected) => model switch

@@ -21,8 +21,10 @@ namespace AgentEval.Cli.Commands;
 /// <remarks>
 /// <para>
 /// Presets: <c>quick</c> (3 categories) / <c>standard</c> / <c>full</c> / <c>diagnostic</c>
-/// / <c>overflow</c> (deliberately exceeds 128K context). All require Azure OpenAI; no
-/// stub fallback because Memory's signal IS the LLM round-trips.
+/// / <c>overflow</c> (deliberately exceeds 128K context). All need a real model, from whichever
+/// provider <c>AI_INFERENCE_PROVIDER</c> selects (<see cref="AzureChatAgentFactory.TryBuildChatClientFromEnv"/>
+/// → <c>ProviderChatClientFactory.TryCreate</c>); there is no stub fallback because
+/// Memory's signal IS the LLM round-trips. The one client is both the agent under test and the judge.
 /// </para>
 /// </remarks>
 public static class BenchMemoryCommand
@@ -55,7 +57,8 @@ public static class BenchMemoryCommand
         var agentEvalDir = Path.Combine(workspaceRoot, ".agenteval");
         if (!Directory.Exists(agentEvalDir))
         {
-            Console.Error.WriteLine($".agenteval/ not found at {agentEvalDir}. Run `agenteval init` first.");
+            // `init` is the dataset scaffolder; `init-workspace` is what creates .agenteval/.
+            Console.Error.WriteLine($".agenteval/ not found at {agentEvalDir}. Run `agenteval init-workspace` first.");
             return 1;
         }
 
@@ -80,7 +83,7 @@ public static class BenchMemoryCommand
             case "overflow":   benchmark = MemoryBenchmark.Overflow; break;
             default:
                 Console.Error.WriteLine($"Unknown memory preset '{preset}'. Known: quick, standard, full, diagnostic, overflow.");
-                return 1;
+                return ExitCodes.UsageError;
         }
 
         // ── Resolve chat client ──────────────────────────────────────────────
@@ -179,11 +182,10 @@ public static class BenchMemoryCommand
             Console.WriteLine($"   Canonical: {runDir}");
             Console.WriteLine($"   Native:    {Path.Combine(runDir, "report-native.json")}");
 
-            // Align with the family convention (PASS=>0, FAIL/WARN=>2). Previously WARN returned 0,
-            // so a memory run in the 50–69 band silently passed CI while the identical band failed CI
-            // for every other benchmark family (BUG-23). Reuse fix: now calls the shared BenchExitCodes
-            // helper (identical PASS=>0/else=>2 mapping — verdict is always exactly "PASS"/"WARN"/"FAIL")
-            // instead of re-inlining the same convention as a bespoke ternary.
+            // Align with the family convention via the shared BenchExitCodes helper: PASS=>0,
+            // WARN=>GateWarning (10), FAIL=>GateFailed (9). Previously WARN returned 0, so a memory
+            // run in the 50–69 band silently passed CI while the identical band failed CI for every
+            // other benchmark family (BUG-23). The verdict is always exactly "PASS"/"WARN"/"FAIL".
             return BenchExitCodes.FromLabel(verdict);
         }
         catch (Exception ex)

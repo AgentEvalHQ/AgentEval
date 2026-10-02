@@ -10,6 +10,7 @@
 
 using System.CommandLine;
 using System.CommandLine.Parsing;
+using System.Globalization;
 using AgentEval.Cli.Commands.Targets;
 using AgentEval.Cli.Infrastructure;
 using AgentEval.Cli.Output;
@@ -29,6 +30,9 @@ namespace AgentEval.Cli.Commands;
 /// </summary>
 internal static class EvalCommand
 {
+    /// <summary>The <c>--format</c> value used when the option is not given.</summary>
+    internal const string DefaultFormat = "json";
+
     public static Command Create()
     {
         var command = new Command("eval", "Evaluate an AI agent against a dataset");
@@ -60,13 +64,17 @@ internal static class EvalCommand
         var systemPromptOpt = new Option<string?>("--system-prompt") { Description = "System prompt text" };
         var systemPromptFileOpt = new Option<FileInfo?>("--system-prompt-file")
             { Description = "Read system prompt from file" };
-        var temperatureOpt = new Option<float>("--temperature")
-            { DefaultValueFactory = _ => 0f, Description = "Sampling temperature (0 = deterministic)" };
+        var temperatureOpt = new Option<float?>("--temperature")
+        {
+            Description = "Sampling temperature sent with every agent call. Omit it to use the provider's default; " +
+                          "a value given, including 0, is sent as given (0 narrows sampling but does not guarantee " +
+                          "identical outputs). Not applied with --sut, which configures its own model.",
+        };
         var maxTokensOpt = new Option<int?>("--max-tokens") { Description = "Maximum output tokens" };
 
         // Metric selection
         var metricsOpt = new Option<string?>("--metrics")
-            { Description = "Comma-separated metric names to run (e.g., llm_relevance,code_tool_success). Default: all" };
+            { Description = "Comma-separated named metrics to score in addition to the pass/fail check (e.g., llm_relevance,code_tool_success). Omitted: none are scored. 'agenteval list --type metrics' shows which names are accepted." };
 
         // Judge (LLM-as-judge for scoring)
         var judgeEndpointOpt = new Option<string?>("--judge")
@@ -76,13 +84,18 @@ internal static class EvalCommand
 
         // Stochastic evaluation
         var runsOpt = new Option<int>("--runs")
-            { DefaultValueFactory = _ => 1, Description = "Number of evaluation runs for stochastic analysis (default: 1)" };
+        {
+            DefaultValueFactory = _ => 1,
+            Description = "Runs per test case (default: 1; must be at least 1). Above 1 is stochastic analysis, which " +
+                          "the stochastic runner accepts from 3 runs; it prints per-test statistics to stderr and " +
+                          "writes no export, so --format, -o and --output-dir are ignored with a warning.",
+        };
         var thresholdOpt = new Option<double>("--success-threshold")
             { DefaultValueFactory = _ => 0.8, Description = "Success rate threshold for stochastic evaluation (default: 0.8)" };
 
         // Output
         var formatOpt = new Option<string>("--format")
-            { DefaultValueFactory = _ => "json", Description = "Export format: json | junit | xml | markdown | md | trx | csv | directory | dir" };
+            { DefaultValueFactory = _ => DefaultFormat, Description = "Export format: json | junit | xml | markdown | md | trx | csv | directory | dir" };
         var outputOpt = new Option<FileInfo?>("-o", "--output") { Description = "Output file (default: stdout)" };
         var outputDirOpt = new Option<DirectoryInfo?>("--output-dir")
             { Description = "Write structured results to a directory (ADR-002 format: results.jsonl + summary.json + run.json)" };
@@ -137,6 +150,7 @@ internal static class EvalCommand
                 JudgeEndpoint = parseResult.GetValue(judgeEndpointOpt),
                 JudgeModel = parseResult.GetValue(judgeModelOpt),
                 Format = parseResult.GetValue(formatOpt)!,
+                FormatGiven = WasGiven(parseResult, formatOpt),
                 Output = parseResult.GetValue(outputOpt),
                 OutputDir = parseResult.GetValue(outputDirOpt),
                 Verbose = parseResult.GetValue(verboseFlag),
@@ -161,11 +175,24 @@ internal static class EvalCommand
     /// Core execution logic — separated from command wiring for testability. <paramref name="sutOverride"/>,
     /// when non-null, is forwarded into a built-in <c>--sut</c> target's construction (the credential-free
     /// test seam — mirrors <see cref="RedTeamCommand.ExecuteAsync"/>); it has no effect when <c>--sut</c>
-    /// is not set.
-    /// Returns exit code: 0 = all passed, 1 = test failure, 3 = runtime error.
+    /// is not set. <paramref name="agentClientOverride"/>, when non-null, replaces the chat client the
+    /// <c>--endpoint</c>/<c>--azure</c> path would build — the same kind of seam for that path. Every validation
+    /// still runs and the agent is still built from <paramref name="opts"/>; only the client construction is
+    /// replaced. It has no effect when <c>--sut</c> is set.
+    /// Returns exit code: 0 = all passed, 1 = test failure, 2 = usage error (<c>--runs</c>), 3 = runtime error.
     /// </summary>
-    internal static async Task<int> ExecuteAsync(EvalOptions opts, CancellationToken ct, IEvaluableAgent? sutOverride = null)
+    internal static async Task<int> ExecuteAsync(
+        EvalOptions opts, CancellationToken ct, IEvaluableAgent? sutOverride = null, IChatClient? agentClientOverride = null)
     {
+        // --runs (and, in stochastic mode, --success-threshold) are checked before anything else: a value the
+        // command cannot honour is a usage error, exit 2. Before this check, 0 and negative values silently ran
+        // once, and 2 got past this method only to fail inside StochasticOptions.Validate() as a runtime error.
+        if (ValidateRuns(opts) is { } runsError)
+        {
+            Console.Error.WriteLine($"  Error: {runsError}");
+            return ExitCodes.UsageError;
+        }
+
         // --sut path ONLY: dataset-existence must be checked before ISutTarget.Validate (called inside
         // TryResolve below, step 1) — a bad --sut config (e.g. missing consent) shouldn't mask a typo'd
         // --dataset path, and vice versa (see EvalCommandCopilotStudioSutTests.Eval_MissingDataset_
@@ -224,6 +251,14 @@ internal static class EvalCommand
             // --metrics selection then needs an explicit --judge (see MetricCatalog.Resolve's own error).
             agent = sutAgent;
             resolvedName = sutResolvedName!;
+
+            // The target builds and configures its own model, so these agent options never reach it. Say so
+            // rather than accept them silently (respects --quiet, like the --metrics warning further down).
+            var notApplied = AgentOptionsNotAppliedBySut(opts);
+            if (notApplied.Count > 0 && !opts.Quiet)
+                Console.Error.WriteLine(
+                    $"  Warning: --sut {opts.Sut} configures its own model; {string.Join(", ", notApplied)} " +
+                    $"{(notApplied.Count == 1 ? "is" : "are")} not applied.");
         }
         else
         {
@@ -256,18 +291,14 @@ internal static class EvalCommand
                 systemPrompt = await File.ReadAllTextAsync(opts.SystemPromptFile.FullName, ct);
 
             // 3. Create IChatClient → IStreamableAgent
-            chatClient = CliChatClientDiagnostics.Wrap(opts.Azure
+            chatClient = CliChatClientDiagnostics.Wrap(agentClientOverride ?? (opts.Azure
                 ? EndpointFactory.CreateAzure(opts.Endpoint, opts.DeploymentName!, opts.ApiKey)
-                : EndpointFactory.CreateOpenAICompatible(opts.Endpoint!, opts.Model!, opts.ApiKey), "agent");
-
-            var chatOptions = new ChatOptions();
-            if (opts.Temperature != 0f) chatOptions.Temperature = opts.Temperature;
-            if (opts.MaxTokens.HasValue) chatOptions.MaxOutputTokens = opts.MaxTokens.Value;
+                : EndpointFactory.CreateOpenAICompatible(opts.Endpoint!, opts.Model!, opts.ApiKey)), "agent");
 
             agent = chatClient.AsEvaluableAgent(
                 name: resolvedName,
                 systemPrompt: systemPrompt,
-                chatOptions: chatOptions);
+                chatOptions: BuildAgentChatOptions(opts));
         }
 
         // 4. Load dataset
@@ -322,6 +353,19 @@ internal static class EvalCommand
                 Console.Error.WriteLine(
                     "  Warning: --metrics has no effect combined with --runs > 1 in this release " +
                     "(stochastic scoring is not wired to the named-metric pipeline yet).");
+
+            // No exporter accepts a stochastic result. EvaluationReport holds one score per test, and the
+            // JUnit, TRX, CSV and Markdown exporters do not write its metadata, so a projected report would read
+            // as a single run. Rather than export something that looks like a different measurement, name every
+            // export option this mode does not honour — before any agent call is made. Printed even with
+            // --quiet: --quiet keeps only the export, and the export is what is missing.
+            var ignoredExport = ExportOptionsIgnoredByStochasticMode(opts);
+            if (ignoredExport.Count > 0)
+                Console.Error.WriteLine(
+                    $"  Warning: --runs {opts.Runs} (stochastic mode) writes no export: nothing is written to stdout " +
+                    "or to any path named here, and a file already at one of them is left unchanged. " +
+                    $"Ignored: {string.Join(", ", ignoredExport)}.");
+
             return await ExecuteStochasticAsync(opts, harness, agent, testCases, evalOptions, ct);
         }
 
@@ -403,6 +447,98 @@ internal static class EvalCommand
         Performance = testResult.Performance,
     };
 
+    /// <summary>True when <paramref name="option"/> appeared on the command line rather than taking its default.</summary>
+    internal static bool WasGiven(ParseResult parseResult, Option option) =>
+        parseResult.GetResult(option) is { Implicit: false };
+
+    /// <summary>
+    /// Why <c>--runs</c> cannot be honoured, or <see langword="null"/> when it can. Below 1 is refused here. Above 1
+    /// (stochastic mode) is checked by <see cref="StochasticOptions.Validate"/> itself — the same check the run
+    /// would hit — so this method never restates that runner's limits (its minimum run count and the
+    /// <c>--success-threshold</c> range). At exactly 1, <c>--success-threshold</c> is not used and not checked.
+    /// </summary>
+    internal static string? ValidateRuns(EvalOptions opts)
+    {
+        if (opts.Runs < 1)
+            return $"--runs must be at least 1 (got {opts.Runs}).";
+
+        if (opts.Runs == 1)
+            return null;
+
+        try
+        {
+            ToStochasticOptions(opts).Validate();
+            return null;
+        }
+        catch (ArgumentOutOfRangeException ex)
+        {
+            var given = ex.ParamName switch
+            {
+                nameof(StochasticOptions.Runs) => $"--runs {opts.Runs}",
+                nameof(StochasticOptions.SuccessRateThreshold) =>
+                    $"--success-threshold {opts.SuccessThreshold.ToString(CultureInfo.InvariantCulture)}",
+                _ => $"stochastic option '{ex.ParamName}'",
+            };
+            return $"{given} is not accepted in stochastic mode (--runs greater than 1): {ThrownText(ex)}";
+        }
+    }
+
+    private static StochasticOptions ToStochasticOptions(EvalOptions opts) =>
+        new(Runs: opts.Runs, SuccessRateThreshold: opts.SuccessThreshold);
+
+    // ArgumentOutOfRangeException.Message appends " (Parameter '…')" and an "Actual value was …" line to the text
+    // it was thrown with. The caller already names the flag and its value, so keep only the thrown text.
+    private static string ThrownText(ArgumentException ex)
+    {
+        var text = ex.Message.Split('\n')[0].TrimEnd('\r');
+        var suffix = ex.ParamName is null ? null : $" (Parameter '{ex.ParamName}')";
+        return suffix is not null && text.EndsWith(suffix, StringComparison.Ordinal) ? text[..^suffix.Length] : text;
+    }
+
+    /// <summary>
+    /// The <see cref="ChatOptions"/> the <c>--endpoint</c>/<c>--azure</c> path sends with every agent call. An option
+    /// that was not given is left unset, so the provider's own default applies; one that was given is sent as given —
+    /// including a temperature of 0, which used to be dropped because 0 was also the "not given" value.
+    /// </summary>
+    internal static ChatOptions BuildAgentChatOptions(EvalOptions opts)
+    {
+        var chatOptions = new ChatOptions();
+        if (opts.Temperature is { } temperature) chatOptions.Temperature = temperature;
+        if (opts.MaxTokens is { } maxTokens) chatOptions.MaxOutputTokens = maxTokens;
+        return chatOptions;
+    }
+
+    /// <summary>
+    /// The agent options a built-in <c>--sut</c> target does not use: the target builds and configures its own
+    /// model, and <see cref="CommonTargetOptions"/> carries none of these to it.
+    /// </summary>
+    internal static IReadOnlyList<string> AgentOptionsNotAppliedBySut(EvalOptions opts)
+    {
+        var notApplied = new List<string>();
+        if (opts.Temperature is not null) notApplied.Add("--temperature");
+        if (opts.MaxTokens is not null) notApplied.Add("--max-tokens");
+        if (opts.SystemPrompt is not null) notApplied.Add("--system-prompt");
+        if (opts.SystemPromptFile is not null) notApplied.Add("--system-prompt-file");
+        return notApplied;
+    }
+
+    /// <summary>
+    /// The export options stochastic mode (<c>--runs</c> greater than 1) does not honour, each with the value given.
+    /// <c>--format</c> counts when it was given on the command line, or when a caller set a value other than the
+    /// default.
+    /// </summary>
+    internal static IReadOnlyList<string> ExportOptionsIgnoredByStochasticMode(EvalOptions opts)
+    {
+        var ignored = new List<string>();
+        if (opts.FormatGiven || !string.Equals(opts.Format, DefaultFormat, StringComparison.OrdinalIgnoreCase))
+            ignored.Add($"--format {opts.Format}");
+        if (opts.Output is not null)
+            ignored.Add($"-o/--output {opts.Output.FullName}");
+        if (opts.OutputDir is not null)
+            ignored.Add($"--output-dir {opts.OutputDir.FullName}");
+        return ignored;
+    }
+
     /// <summary>
     /// Stochastic evaluation path — runs each test case N times and reports statistics.
     /// </summary>
@@ -415,9 +551,7 @@ internal static class EvalCommand
         CancellationToken ct)
     {
         var runner = new StochasticRunner(harness, statisticsCalculator: null, evalOptions);
-        var stochasticOptions = new StochasticOptions(
-            Runs: opts.Runs,
-            SuccessRateThreshold: opts.SuccessThreshold);
+        var stochasticOptions = ToStochasticOptions(opts);
 
         if (!opts.Quiet)
             Console.Error.WriteLine($"  Stochastic mode: {opts.Runs} runs per test case, threshold={opts.SuccessThreshold:P0}");
@@ -437,7 +571,9 @@ internal static class EvalCommand
 
             if (!opts.Quiet)
             {
-                result.PrintTable(testCase.Name ?? "Test");
+                // stdout is the export's channel, and this mode has no export; the table is a human report, so it
+                // goes to stderr with every other line here (OutputOptions writes to Console.Out by default).
+                result.PrintTable(testCase.Name ?? "Test", new OutputOptions { Writer = Console.Error });
                 Console.Error.WriteLine($"    {result.Summary}");
             }
 
@@ -484,11 +620,24 @@ internal sealed class EvalOptions
     public double SuccessThreshold { get; init; } = 0.8;
     public string? SystemPrompt { get; init; }
     public FileInfo? SystemPromptFile { get; init; }
-    public float Temperature { get; init; }
+
+    /// <summary>
+    /// Sampling temperature for the agent's model, or <see langword="null"/> when <c>--temperature</c> was not given
+    /// (the provider's default then applies). Not applied with <see cref="Sut"/>.
+    /// </summary>
+    public float? Temperature { get; init; }
+
     public int? MaxTokens { get; init; }
     public string? JudgeEndpoint { get; init; }
     public string? JudgeModel { get; init; }
     public required string Format { get; init; }
+
+    /// <summary>
+    /// True when <c>--format</c> appeared on the command line, as opposed to <see cref="Format"/> holding the
+    /// default — so stochastic mode can name an explicitly requested format it will not write.
+    /// </summary>
+    public bool FormatGiven { get; init; }
+
     public FileInfo? Output { get; init; }
     public DirectoryInfo? OutputDir { get; init; }
     public bool Verbose { get; init; }

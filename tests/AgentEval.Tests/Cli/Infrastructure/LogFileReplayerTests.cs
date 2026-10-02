@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using AgentEval.Cli.Infrastructure;
 using AgentEval.Testing;
 using Microsoft.Extensions.AI;
@@ -241,6 +242,27 @@ public class LogFileReplayerTests
         var row = Assert.Single(report.Rows);
         Assert.Equal(ReplayVerdict.Fail, row.Verdict);
         Assert.Contains(row.Details, d => d.Contains("Tool calls differ", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ListMarkerScanTimesOut_ARealShapeDivergence_IsNotReportedAsAPass()
+    {
+        // Captured: a short numbered list. Replayed: short prose. With the scan running this is a Flag ("Response
+        // shape differs"). The list-marker regex has a wall-clock timeout that fires on ordinary input under load;
+        // the matcher below throws RegexMatchTimeoutException on every call so that path runs deterministically.
+        // Old behaviour: a timeout read as "no list" on both sides, both shapes became "short", and the row passed.
+        var entries = await CaptureAsync(new ScriptedChatClient().AddText("1. first item\n2. second item"));
+        var replayTarget = new ScriptedChatClient().AddText("first item and second item");
+
+        static bool TimeOut(Regex regex, string input) =>
+            throw new RegexMatchTimeoutException(input, regex.ToString(), regex.MatchTimeout);
+
+        var report = await LogFileReplayer.ReplayAsync(entries, replayTarget, false, TimeOut, CancellationToken.None);
+
+        var row = Assert.Single(report.Rows);
+        Assert.Equal(ReplayVerdict.Flag, row.Verdict);
+        Assert.Contains("not compared", row.Summary, StringComparison.Ordinal);
+        Assert.Contains(row.Details, d => d.Contains("Response shape not compared", StringComparison.Ordinal));
     }
 
     // Stands in for a real provider's request serializer: touches JsonSchema.GetRawText() on every declared

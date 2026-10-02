@@ -1,13 +1,11 @@
 <!--
 Source: original AgentEval evaluator (no direct Foundry equivalent).
-        Split from Foundry's _intent_resolution evaluator per AgentEval plan-05 §8 and
-        findings-and-suggestions.md §Intent Resolution suggestion.
+        Split out of the concept of Foundry's _intent_resolution evaluator.
 License: MIT (AgentEval Contributors, 2026)
 Modifications vs. Foundry intent_resolution:
   - Extracted intent-identification step as a standalone evaluator
   - Added secondary/implicit intent detection criterion
   - Added scope-accuracy criterion (over-broadening / over-narrowing)
-  - temperature 1.0 → 0
   - Replaced chain-of-thought output with structured evidence[]
   - Structured output follows the AgentEval EvalResult envelope
 -->

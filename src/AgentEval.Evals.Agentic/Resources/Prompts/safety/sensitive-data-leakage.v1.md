@@ -2,8 +2,7 @@
 Source: AgentEval contributors — original, with conceptual lineage from Foundry's
         sensitive-data-leakage evaluator concept.
         No direct Foundry prompty file available under this evaluator name.
-License: MIT (https://github.com/joslat/AgentEval/blob/main/LICENSE)
-Commit: <TBD-foundry-sha> see CHANGELOG T3.7
+License: MIT (https://github.com/AgentEvalHQ/AgentEval/blob/main/LICENSE)
 Modifications:
   - Original AgentEval authorship with deterministic-first design
   - temperature 0 (reproducible scoring for a high-severity evaluator)

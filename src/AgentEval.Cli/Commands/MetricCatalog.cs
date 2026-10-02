@@ -12,8 +12,8 @@ using Microsoft.Extensions.AI;
 namespace AgentEval.Cli.Commands;
 
 /// <summary>
-/// Item 4 (<c>strategy/CLI-Custom-Benchmarks-CopilotStudio-OpenAI-and-Metrics-Remediation-Design.md</c> §2 D,
-/// candidate D1): resolves a bare <c>--metrics</c> name (e.g. <c>llm_relevance</c>) to a real
+/// Item 4 of the CLI metrics remediation (candidate D1): resolves a bare <c>--metrics</c> name
+/// (e.g. <c>llm_relevance</c>) to a real
 /// <see cref="IMetric"/> instance. Genuinely new code — nothing in this repo mapped a name string to a
 /// metric instance before this; <c>AgentEvalBuilder</c> requires the caller to <c>.AddMetric(new
 /// SomeMetric(...))</c> by hand.

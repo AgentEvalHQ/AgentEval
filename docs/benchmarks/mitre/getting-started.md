@@ -42,7 +42,7 @@ Sourced verbatim from `BenchmarkFamilyRegistry` (see `src/AgentEval.RedTeam/RedT
 
 Preset aliases are accepted: `atlas-baseline` = `baseline`, `atlas-smoke` = `smoke`, `atlas-audit-grade` = `atlas-audit` = `audit` = `auditgrade`.
 
-The current MITRE attack pipeline uses heuristic per-attack evaluators (see `src/AgentEval.RedTeam/RedTeam/Evaluators/`), not an LLM judge. The `--azure-from-env` flag resolves the judge for API symmetry, but the judge does not consume tokens during the scan. The dominant cost is the agent-under-test's per-probe inference calls.
+The current MITRE attack pipeline uses heuristic per-attack evaluators (see `src/AgentEval.RedTeam/RedTeam/Evaluators/`), not an LLM judge. Every run still resolves a judge, with or without `--azure-from-env`, for API symmetry with the other bench commands: the `AZURE_OPENAI_JUDGE_*` override if set, otherwise the provider `AI_INFERENCE_PROVIDER` selects; with no provider configured it needs `AGENTEVAL_ALLOW_STUB_JUDGE=1` or the command exits 3 (see [CLI Reference — Environment variables](../../cli.md#environment-variables)). The judge is not called during the scan and consumes no tokens. The dominant cost is the agent-under-test's per-probe inference calls.
 
 ## CLI usage
 
@@ -62,7 +62,7 @@ agenteval bench mitre --preset atlas-audit-grade --subject MyAgent --azure-from-
 
 The `--input` flag is accepted for provenance but the MITRE pipeline generates its own probes — `--input` is recorded in the run manifest, not consumed by the attacks.
 
-`--azure-from-env` builds the agent from whichever provider `AI_INFERENCE_PROVIDER` selects (Azure OpenAI included) and fails, naming what is missing, if none is configured. Without the flag, the CLI falls back to the built-in `SafeRefusalAgent` stub with a prominent banner warning that the scan result does not reflect a real agent.
+`--azure-from-env` builds the agent from whichever provider `AI_INFERENCE_PROVIDER` selects (Azure OpenAI included; see the [provider table](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to)) and fails, naming what is missing, if none is configured. `--endpoint <url> --model <name>` targets any OpenAI-compatible endpoint directly instead. Without either, the CLI falls back to the built-in `SafeRefusalAgent` stub with a prominent banner warning that the scan result does not reflect a real agent.
 
 ## Output
 
@@ -70,8 +70,8 @@ Each run writes to `.agenteval/compliance/MITRE-ATLAS/{subject}/{timestamp}/` an
 
 - `report.json` — canonical eval-result shape (one leaf per ATLAS technique covered + `NotTested` / `NotApplicable` skipped leaves).
 - `report.md` — human-readable markdown summary (PR-friendly).
-- `report.html` — HTML report (T0.5 v1.1, shipped 2026-05-24 via `GenericReportRenderer`).
-- `report.pdf` — PDF report (T0.5 v1.1, generated via `AgentEval.Rendering.Pdf` / QuestPDF).
+- `report.html` — HTML report, rendered by `GenericReportRenderer`.
+- `report.pdf` — PDF report, generated via `AgentEval.Rendering.Pdf` / QuestPDF.
 - Plus the rich `MITREATLASReport` JSON written via `MITREATLASReporter.SaveReportAsync` in the canonical run dir for downstream evidence packs.
 
 PDF and HTML emission is best-effort with warning-fallback — failures do not abort the run.
@@ -114,7 +114,7 @@ When NOT to use:
 
 ## Programmatic use
 
-The CLI is the supported path for v1.1 audit-grade evidence emission, but the underlying `MitreBenchmark` factory + `MitreBenchmarkRun` runner are public and usable from C# directly. Minimal example:
+The CLI is the supported path for audit-grade evidence emission, but the underlying `MitreBenchmark` factory + `MitreBenchmarkRun` runner are public and usable from C# directly. Minimal example:
 
 ```csharp
 using AgentEval.Benchmarks;
@@ -141,19 +141,14 @@ For Mission Control rendering or programmatic post-processing, prefer the `EvalR
 
 Same baseline story as the OWASP family — runs are stored canonically under `.agenteval/subjects/agents/{subject}/runs/{runId}/`, `agenteval doctor` validates the audit chain, Mission Control renders cross-run diffs. The `AgentEval.RedTeam` baseline surface (`RedTeamBaseline` / `RedTeamBaselineComparer` at `src/AgentEval.RedTeam/RedTeam/Baseline/`) is programmatically available.
 
-## Limitations and roadmap
+## Limitations
 
 Known limitations:
 - 7 of the 15 cataloged ATLAS techniques surface as honest `NotApplicable` `skipped` leaves (out-of-band for a black-box conversational scanner). The composite verdict can still be `PASS` when all 8 applicable techniques pass.
 - System-prompt leakage (T0056/T0057) is only conclusively gradable when the benchmark caller plants a canary in the agent's system prompt; without one, those leaves are honestly `NotTested` rather than a false pass.
-- The judge is currently advisory only — per-attack heuristic evaluators do the grading. An LLM-graded judge mode is reserved for future probes.
+- In `bench mitre`, per-attack heuristic evaluators do all of the grading; the judge the command resolves is not called.
 - The presets run a fixed roster — the 14 built-in attacks (`atlas-baseline`, `atlas-audit-grade`) or 3 (`atlas-smoke`); custom attack injection (per-org policy probes) is not yet supported via CLI.
-
-Tracking backlog:
-- T0.2 — `--azure-from-env` flag on `bench mitre` (shipped 2026-05-24).
-- T0.5 — `report.html` + `report.pdf` parity with the compliance benchmarks (shipped 2026-05-24 via `GenericReportRenderer`).
-- T3.11 — Multi-provider agent-manifest schema (would let `--agent-config <path>` resolve non-Azure agents).
-- Dedicated T0047 + T0048 probe authoring remains roadmap.
+- The CLI can scan a plain chat model (`--azure-from-env` with any configured provider, or `--endpoint`/`--model` for an OpenAI-compatible endpoint) or the built-in `--sut` targets. There is no option that loads an agent from a manifest file. An agent with its own tools, memory or a non-chat interface is scanned from a small program that wraps it as an `IEvaluableAgent` — see `samples/AgentEval.Samples/Benchmarks/07_MitreBenchmark.cs` and [Programmatic use](#programmatic-use).
 
 See also:
 - [OWASP getting-started](../owasp/getting-started.md) — sister red-team family; same attack pipeline tagged against OWASP categories.

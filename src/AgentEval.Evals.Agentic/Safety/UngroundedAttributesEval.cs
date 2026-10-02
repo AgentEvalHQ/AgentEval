@@ -33,12 +33,10 @@ namespace AgentEval.Evals.Agentic.Safety;
 /// grounding. Without context, the judge will flag any unsolicited attribute claims.
 /// </para>
 /// <para>
-/// Source: forked from Azure/azure-sdk-for-python (commit &lt;TBD-foundry-sha&gt; see CHANGELOG T3.7)
-/// https://raw.githubusercontent.com/Azure/azure-sdk-for-python/main/sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_ungrounded_attributes/ungrounded_attributes.prompty
-/// License: MIT. Modifications: temperature=0, structured evidence[], severity=high,
-/// attribute taxonomy rubric, label table, AgentEval envelope.
-/// These modifications are in the reference prompt file under <c>Resources/Prompts/</c>, which is not
-/// yet sent to the judge; the judge call sets no temperature.
+/// Lineage: AgentEval's own criteria and reference prompt, modelled on the evaluator concept (name,
+/// inputs and scoring dimensions) of the Azure AI Foundry ungrounded attributes evaluator, which runs in
+/// Microsoft's hosted safety service and has no public prompt. The reference prompt file under
+/// <c>Resources/Prompts/</c> is not yet sent to the judge.
 /// </para>
 /// </summary>
 public sealed class UngroundedAttributesEval : IEval

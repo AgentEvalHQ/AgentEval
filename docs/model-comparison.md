@@ -1,118 +1,84 @@
 ﻿# Model Comparison Guide
 
-> **Which model is best for your use case?** Let data answer that question.
+> **Which model is best for your use case?** Run the same test cases on each model, several times each, and compare what came back.
 
 ---
 
 ## The Challenge: So Many Models, So Little Time
 
 You have options:
-- GPT-4o vs GPT-4o-mini
-- Claude 3.5 Sonnet vs Haiku
-- Gemini 1.5 Pro vs Flash
-- Open source alternatives
+- GPT-4o vs GPT-4o mini
+- A Claude or Gemini model vs an OpenAI one
+- An open-weights model you host yourself
 
-**How do you choose?** 
-
-- Gut feeling? ❌
-- Marketing claims? ❌
-- Trial and error? ❌
-- **Data-driven comparison? ✅**
+Marketing claims and a single run of each tell you little about how a model behaves on *your* tasks. `ModelComparer` runs the same test cases on every model, repeats each run so that one lucky or unlucky reply does not decide the result, and ranks the models on quality, speed, cost and reliability.
 
 ---
 
 ## Model Comparison in 60 Seconds
 
 ```csharp
-var stochasticRunner = new StochasticRunner(harness, statisticsCalculator: null, EvaluationOptions);
+using AgentEval.Comparison;
+using AgentEval.Core;
+using AgentEval.MAF;
+using AgentEval.Models;
+
+var harness = new MAFEvaluationHarness(judgeClient);   // judgeClient: the IChatClient that grades replies
+var stochasticRunner = new StochasticRunner(harness);
 var comparer = new ModelComparer(stochasticRunner);
 
-var comparison = await comparer.CompareModelsAsync(
-    new[] { gpt4oFactory, gpt4oMiniFactory, claudeFactory },
-    testCases,
-    metrics,
-    new ComparisonOptions(RunsPerModel: 10)
-);
+// CreateAgent(deployment) is your code: it returns a fresh IEvaluableAgent for that model
+var factories = new IAgentFactory[]
+{
+    new DelegateAgentFactory("gpt-4o", "GPT-4o", () => CreateAgent("gpt-4o")),
+    new DelegateAgentFactory("gpt-4o-mini", "GPT-4o Mini", () => CreateAgent("gpt-4o-mini"))
+};
 
-comparison.PrintComparisonTable();
+var testCase = new TestCase
+{
+    Name = "Refund policy",
+    Input = "Can I return an opened item after 20 days?",
+    EvaluationCriteria = ["States the 30-day return window", "Mentions that a receipt is required"]
+};
 
-// Get actionable recommendations
-var rec = comparison.Recommendation;
-Console.WriteLine($"🏆 Best Overall: {rec.BestOverall}");
-Console.WriteLine($"💰 Best Value: {rec.BestValue}");
-Console.WriteLine($"⭐ Best Quality: {rec.BestQuality}");
+var result = await comparer.CompareModelsAsync(factories, testCase,
+    new ModelComparisonOptions(RunsPerModel: 10));
+
+Console.WriteLine(result.Summary);
 ```
 
-Output:
+Illustrative output (two models, nothing priced the runs):
 ```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                        Model Comparison Results                              │
-├──────────────┬─────────────┬────────────┬──────────┬────────────┬───────────┤
-│ Model        │ Success Rate│ Mean Score │ Latency  │ Cost/1K    │ Recommend │
-├──────────────┼─────────────┼────────────┼──────────┼────────────┼───────────┤
-│ gpt-4o       │ 94%         │ 91.2       │ 2.1s     │ $0.015     │ ⭐ Quality│
-│ gpt-4o-mini  │ 89%         │ 85.4       │ 0.8s     │ $0.00015   │ 💰 Value  │
-│ claude-3.5   │ 92%         │ 89.7       │ 1.8s     │ $0.012     │ 🏆 Overall│
-└──────────────┴─────────────┴────────────┴──────────┴────────────┴───────────┘
+🏆 Model Comparison Results for: Refund policy
+   Test: "Can I return an opened item after 20 days?"
+
+Rankings:
+   🥇 GPT-4o - Score: 80.0 (Quality: 100.0, Speed: 0.0, Cost: 100.0, Reliability: 100.0)
+   🥈 GPT-4o Mini - Score: 60.0 (Quality: 0.0, Speed: 100.0, Cost: 100.0, Reliability: 100.0)
+
+Recommendation: Use GPT-4o
 ```
 
-**That's it.** No spreadsheets. No manual comparisons. Actionable recommendations.
+Two things to notice. With two models every dimension score is 0 or 100, because the scores rank the models against each other rather than grade them ([How the Scores Are Computed](#how-the-scores-are-computed)). And both models score 100 on cost because no run was priced ([Cost is priced from one model name](#what-the-ranking-does-not-tell-you)).
 
 ---
 
 ## Setting Up Model Comparison
 
-### Step 1: Create Agent Factories
+### Step 1: An Agent Factory per Model
 
-Each model needs a factory that creates agents consistently:
+`IAgentFactory` has a `ModelId`, a `ModelName` and a `CreateAgent()` method. `CreateAgent()` is called once per run, so return a new agent each time. `DelegateAgentFactory` wraps a delegate, which covers most cases:
 
 ```csharp
-public class GPT4oAgentFactory : IAgentFactory
-{
-    public string ModelId => "gpt-4o";
-    public string ModelName => "GPT-4o";
-    
-    public IEvaluableAgent CreateAgent()
-    {
-        var chatClient = new AzureOpenAIChatClient(
-            new Uri(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT")!),
-            new AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY")!),
-            "gpt-4o"
-        );
-        
-        return new MAFAgentAdapter(new AIAgent(chatClient, tools));
-    }
-}
-
-public class GPT4oMiniAgentFactory : IAgentFactory
-{
-    public string ModelId => "gpt-4o-mini";
-    public string ModelName => "GPT-4o Mini";
-    
-    public IEvaluableAgent CreateAgent()
-    {
-        var chatClient = new AzureOpenAIChatClient(
-            new Uri(Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT")!),
-            new AzureKeyCredential(Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY")!),
-            "gpt-4o-mini"
-        );
-        
-        return new MAFAgentAdapter(new AIAgent(chatClient, tools));
-    }
-}
-
-public class ClaudeAgentFactory : IAgentFactory
-{
-    public string ModelId => "claude-3.5-sonnet";
-    public string ModelName => "Claude 3.5 Sonnet";
-    
-    public IEvaluableAgent CreateAgent()
-    {
-        // Your Claude client setup
-        return new MAFAgentAdapter(new AIAgent(claudeClient, tools));
-    }
-}
+// One way to write CreateAgent: any IChatClient becomes an evaluable agent.
+// CreateChatClient(deployment) is yours: Azure OpenAI, OpenAI, Ollama, or any other IChatClient.
+IEvaluableAgent CreateAgent(string deployment) =>
+    CreateChatClient(deployment).AsEvaluableAgent(
+        name: "SupportAgent",
+        systemPrompt: "You are a customer support assistant for an online store.");
 ```
+
+For a Microsoft Agent Framework `AIAgent`, return `new MAFAgentAdapter(aiAgent)` instead (see [Sample D3](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/PerformanceAndStatistics/03_ModelComparison.cs)). Implement `IAgentFactory` yourself when a factory needs its own state. `ModelComparer` does not read `IAgentFactory.Configuration`.
 
 ### Step 2: Define Test Cases
 
@@ -121,168 +87,205 @@ var testCases = new[]
 {
     new TestCase
     {
-        Name = "Simple Weather Query",
-        Input = "What's the weather in Seattle?",
-        ExpectedOutput = "Contains temperature"
+        Name = "Order status",
+        Input = "Where is order 1042?",
+        ExpectedOutputContains = "1042"
     },
     new TestCase
     {
-        Name = "Complex Booking Flow",
-        Input = "Book a flight from NYC to Paris for next Monday",
-        ExpectedOutput = "Flight booked"
-    },
-    new TestCase
-    {
-        Name = "Multi-step Research",
-        Input = "Compare iPhone 15 and Samsung S24 specs",
-        ExpectedOutput = "Comparison with specs"
+        Name = "Refund policy",
+        Input = "Can I return an opened item after 20 days?",
+        EvaluationCriteria = ["States the 30-day return window", "Mentions that a receipt is required"]
     }
 };
 ```
 
-### Step 3: Select Metrics
+How `MAFEvaluationHarness` scores a run decides what "quality" means in the comparison:
+
+- With a judge (`new MAFEvaluationHarness(judgeClient)`) and `EvaluationCriteria`, the judge grades the reply against the criteria, 0 to 100.
+- Otherwise a run scores 100 when the reply is non-empty and contains `ExpectedOutputContains` (when set), and 0 when it does not. A test case with neither criteria nor an expected substring scores 100 for any non-empty reply, so it compares speed and reliability, not quality.
+
+### Step 3: Run the Comparison
 
 ```csharp
-var metrics = new IMetric[]
-{
-    new RelevanceMetric(judgeChatClient),
-    new FaithfulnessMetric(judgeChatClient),
-    new ToolSuccessMetric()
-};
-```
-
-### Step 4: Run Comparison
-
-```csharp
-var stochasticRunner = new StochasticRunner(harness, statisticsCalculator: null, EvaluationOptions);
+var stochasticRunner = new StochasticRunner(harness);
 var comparer = new ModelComparer(stochasticRunner);
 
-var comparison = await comparer.CompareModelsAsync(
-    factories: new[] { gpt4oFactory, gpt4oMiniFactory, claudeFactory },
+IReadOnlyList<ModelComparisonResult> results = await comparer.CompareModelsAsync(
+    factories: factories,
     testCases: testCases,
-    metrics: metrics,
-    options: new ComparisonOptions(
-        RunsPerModel: 10,           // Stochastic runs per model
-        IncludePerformance: true,   // Track latency, cost
-        IncludeToolUsage: true      // Track tool calls
-    )
-);
+    options: new ModelComparisonOptions(RunsPerModel: 10));
 ```
+
+The overload that takes a list runs the single-test-case comparison once per test case, in order, and returns one `ModelComparisonResult` per test case. Each result ranks the models on that test case only; `results.ToMarkdown()` adds up wins and averages the scores across them.
+
+A comparison makes models × test cases × `RunsPerModel` agent calls, plus the judge's calls when a judge grades the replies.
 
 ---
 
 ## Understanding the Results
 
-### ComparisonResult Structure
+### Result Types
+
+Abridged from `AgentEval.Comparison`:
 
 ```csharp
-public class ComparisonResult
-{
-    // Results per model
-    public IReadOnlyDictionary<string, ModelResult> ModelResults { get; }
-    
-    // Aggregated recommendations
-    public ModelRecommendation Recommendation { get; }
-    
-    // Per-test-case breakdowns
-    public IReadOnlyList<TestCaseComparison> TestCaseResults { get; }
-}
+public record ModelComparisonResult(
+    TestCase TestCase,
+    IReadOnlyList<ModelResult> ModelResults,   // one per factory, in factory order
+    IReadOnlyList<ModelRanking> Ranking,       // highest composite score first
+    ModelRanking Winner,                       // Ranking[0]
+    ModelComparisonOptions Options);           // plus a Summary string
 
-public class ModelResult
-{
-    public string ModelId { get; }
-    public string ModelName { get; }
-    public double SuccessRate { get; }
-    public double MeanScore { get; }
-    public double StandardDeviation { get; }
-    public TimeSpan MeanLatency { get; }
-    public decimal MeanCostPerRequest { get; }
-    public StochasticStatistics Statistics { get; }
-}
+public record ModelResult(
+    string ModelId,
+    string ModelName,
+    StochasticResult StochasticResult,         // every run, and their statistics
+    TimeSpan AverageLatency,
+    decimal? AverageCost,                      // null when no run carried a cost estimate
+    decimal? TotalCost);                       // plus PassRate, MeanScore, StandardDeviation
 
-public class ModelRecommendation
-{
-    public string BestOverall { get; }      // Balanced choice
-    public string BestQuality { get; }      // Highest scores
-    public string BestValue { get; }        // Best quality/cost ratio
-    public string BestSpeed { get; }        // Lowest latency
-    public string MostConsistent { get; }   // Lowest variance
-}
+public record ModelRanking(
+    string ModelId,
+    string ModelName,
+    double CompositeScore,
+    double QualityScore,
+    double SpeedScore,
+    double CostScore,
+    double ReliabilityScore,
+    int Rank);                                 // 1 = best
 ```
 
 ### Accessing Detailed Results
 
 ```csharp
-// Iterate through model results
-foreach (var (modelId, result) in comparison.ModelResults)
+foreach (var model in result.ModelResults)
 {
-    Console.WriteLine($"\n=== {result.ModelName} ===");
-    Console.WriteLine($"Success Rate: {result.SuccessRate:P0}");
-    Console.WriteLine($"Mean Score: {result.MeanScore:F1}");
-    Console.WriteLine($"Std Dev: {result.StandardDeviation:F2}");
-    Console.WriteLine($"Mean Latency: {result.MeanLatency.TotalSeconds:F2}s");
-    Console.WriteLine($"Cost/Request: ${result.MeanCostPerRequest:F4}");
+    var cost = model.AverageCost is { } c ? $"${c:F4}" : "not measured";
+    Console.WriteLine($"{model.ModelName}: pass rate {model.PassRate:P0}, mean score {model.MeanScore:F1} " +
+                      $"(SD {model.StandardDeviation:F1}), latency {model.AverageLatency.TotalSeconds:F2}s, cost/run {cost}");
 }
 
-// Get recommendations
-var rec = comparison.Recommendation;
-Console.WriteLine($"\n🏆 Best Overall: {rec.BestOverall}");
-Console.WriteLine($"⭐ Best Quality: {rec.BestQuality}");
-Console.WriteLine($"💰 Best Value: {rec.BestValue}");
-Console.WriteLine($"⚡ Best Speed: {rec.BestSpeed}");
-Console.WriteLine($"📊 Most Consistent: {rec.MostConsistent}");
+foreach (var ranking in result.Ranking)
+{
+    Console.WriteLine($"#{ranking.Rank} {ranking.ModelName}: composite {ranking.CompositeScore:F1} " +
+                      $"(quality {ranking.QualityScore:F1}, speed {ranking.SpeedScore:F1}, " +
+                      $"cost {ranking.CostScore:F1}, reliability {ranking.ReliabilityScore:F1})");
+}
+
+Console.WriteLine($"Winner: {result.Winner.ModelName}");
 ```
+
+---
+
+## How the Scores Are Computed
+
+1. Each model runs `RunsPerModel` times through the stochastic runner. `ModelResult.StochasticResult` keeps every run (`IndividualResults`) and their statistics.
+2. Each model gets four raw numbers: mean score (quality), average latency (speed), average estimated cost per run (cost) and pass rate (reliability).
+3. Each raw number is rescaled to 0–100 across the models **in this comparison**: the best model gets 100 and the worst 0, with lower latency and lower cost counting as better. With one model, or when every model has the same value, every model gets 100.
+4. `CompositeScore` = Quality × `ScoringWeights.Quality` + Speed × `Speed` + Cost × `Cost` + Reliability × `Reliability`, with default weights 0.4 / 0.2 / 0.2 / 0.2. `Ranking` sorts by composite score, highest first; on a tie the factory listed first ranks first. `Winner` is `Ranking[0]`.
+
+What follows from this:
+
+- **The scores are relative.** A speed score of 0 means "slowest of these models", not "slow". Adding or removing a model changes every model's scores.
+- **Small differences use the whole scale.** Two models with mean scores of 91.0 and 90.5 get quality scores of 100 and 0. Check `ModelResults` and the confidence interval in `StochasticResult.Statistics.ConfidenceInterval` before treating a rank as a real difference.
+
+### What the Ranking Does Not Tell You
+
+- **Cost is priced from one model name.** The harness estimates a run's cost from its token counts and the price of `EvaluationOptions.ModelName` in `ModelPricing`. `StochasticRunner` passes the same `EvaluationOptions` for every model, so every model is priced at that one model's rate, and the cost dimension then compares token usage, not prices. With no `ModelName` (as in the examples above), or a name missing from the price table, no run is priced: `AverageCost` is `null` for every model and every model gets the same cost score, 100. To compare prices, price each model's tokens at its own rate ([Cost-Quality Tradeoffs](#cost-quality-tradeoffs)), or set the cost weight to 0.
+- **Missing data scores as best.** A run records latency and cost only when the agent call returns. A model whose every run throws has an average latency of zero and no cost, which the ranking treats as fastest and cheapest. Its quality and reliability scores will be 0, but check `PassRate` and each run's `TestResult.Error` in `StochasticResult.IndividualResults` before trusting its rank.
+- **Weights are not checked.** `ModelComparer` does not call `ScoringWeights.Validate()`. Weights that do not sum to 1 change the scale of `CompositeScore`, which is then no longer 0–100. Call `Validate()` on your weights yourself.
+- **Tokens may be estimated.** When the provider returns no token usage, the harness estimates tokens from the text (`PerformanceMetrics.TokensAreEstimated`), and a cost built on them is an estimate of an estimate.
 
 ---
 
 ## Comparison Options
 
 ```csharp
-var options = new ComparisonOptions(
-    RunsPerModel: 10,              // Stochastic runs per model
-    IncludePerformance: true,      // Track latency, tokens, cost
-    IncludeToolUsage: true,        // Track tool call success
-    ParallelModels: false,         // Run models sequentially
-    WarmupRuns: 1,                 // Warm-up runs (not counted)
-    SuccessThreshold: 70.0         // Score >= this is "success"
+var options = new ModelComparisonOptions(
+    RunsPerModel: 10,                                // runs per model, per test case
+    ScoringWeights: ScoringWeights.QualityFocused,   // null means ScoringWeights.Default
+    EnableCostAnalysis: true,                        // false: AverageCost and TotalCost are null
+    EnableStatistics: true,                          // false: see below
+    ConfidenceLevel: 0.95,                           // for the confidence interval on the mean score
+    MaxParallelism: 1,                               // runs of one model at the same time
+    DelayBetweenRuns: TimeSpan.FromMilliseconds(500) // pause between runs, for rate limits
 );
 ```
 
-### Parallel Execution
+Presets: `ModelComparisonOptions.Quick` (3 runs per model), `ModelComparisonOptions.Default` (5) and `ModelComparisonOptions.Thorough` (10).
+
+- **At least 3 runs.** `ModelComparisonOptions.Validate()` accepts 1 or 2, but the stochastic runner rejects fewer than 3 runs with an `ArgumentOutOfRangeException`, so `RunsPerModel: 2` fails as soon as the comparison starts.
+- **Parallelism.** Models run one after another. `MaxParallelism` runs that many runs of the same model at the same time, which shortens the comparison and raises the load on the API.
+- **`EnableStatistics: false`.** The runner skips the statistics calculator: `StandardDeviation` and the percentiles are reported as 0 and `ConfidenceInterval` as `null`. A 0 there means "not computed", not "perfectly consistent". The ranking is unaffected, because reliability uses the pass rate.
+- **Pass threshold.** `ModelComparer` runs each model with the default stochastic success threshold of 0.8, which sets `StochasticResult.Passed`. It does not affect the ranking.
+
+---
+
+## Scoring Weights
+
+| Profile | Quality | Speed | Cost | Reliability |
+|---------|---------|-------|------|-------------|
+| `ScoringWeights.Default` | 0.40 | 0.20 | 0.20 | 0.20 |
+| `ScoringWeights.QualityFocused` | 0.60 | 0.15 | 0.10 | 0.15 |
+| `ScoringWeights.SpeedFocused` | 0.25 | 0.50 | 0.10 | 0.15 |
+| `ScoringWeights.CostFocused` | 0.25 | 0.10 | 0.50 | 0.15 |
+| `ScoringWeights.ReliabilityFocused` | 0.30 | 0.15 | 0.15 | 0.40 |
+
+Your own weights:
 
 ```csharp
-// Run models in parallel (faster, but higher API load)
-var options = new ComparisonOptions(
-    RunsPerModel: 10,
-    ParallelModels: true
-);
+// Cost weight 0: the runs are not priced per model, so cost would not discriminate anyway
+var weights = new ScoringWeights(Quality: 0.5, Speed: 0.3, Cost: 0.0, Reliability: 0.2);
+weights.Validate();   // throws unless every weight is non-negative and they sum to 1.0
 
-// Caution: May hit rate limits
+var result = await comparer.CompareModelsAsync(factories, testCase,
+    new ModelComparisonOptions(RunsPerModel: 10, ScoringWeights: weights));
+
+Console.WriteLine($"Best for your weights: {result.Winner.ModelName}");
 ```
 
 ---
 
 ## Visual Outputs
 
+### Text and Markdown
+
+```csharp
+Console.WriteLine(result.Summary);                   // ranking with every dimension score, and the winner
+
+string report = result.ToMarkdown();                 // header, winner, rankings, raw metrics, statistics, weights
+string brief = result.ToMarkdown(MarkdownExportOptions.Minimal);
+string rankings = result.ToRankingsTable();          // composite and the four dimension scores
+string metrics = result.ToDetailedMetricsTable();    // pass rate, mean score, latency, average and total cost
+string stats = result.ToStatisticsTable();           // mean, median, SD, min, max, P25/P75/P95, confidence intervals
+string comment = result.ToGitHubComment();           // winner plus a collapsible rankings table
+await result.SaveToMarkdownAsync("model-comparison.md");
+
+// Several test cases: wins per model, average scores, and a rankings table per test case
+string suiteReport = results.ToMarkdown();
+string suiteComment = results.ToGitHubComment();
+await results.SaveToMarkdownAsync("model-comparison-suite.md");
+```
+
+The detailed metrics table prints `N/A` for a cost that was not measured. Markdown reports end with a UTC timestamp unless `MarkdownExportOptions.IncludeTimestamp` is `false`.
+
 ### Console Table
 
-```csharp
-comparison.PrintComparisonTable();
-```
-
-### Markdown Report
+`PrintComparisonTable()` (in `AgentEval.Output`) prints the runs of each model side by side: pass rate, mean score, duration and its spread, time to first token, tokens, cost, tool success rate, and the mean of every metric the runs recorded.
 
 ```csharp
-var markdown = comparison.ToMarkdown();
-File.WriteAllText("model-comparison.md", markdown);
+using AgentEval.Output;
+
+result.ModelResults
+    .Select(m => (ModelName: m.ModelName, Result: m.StochasticResult))
+    .ToList()
+    .PrintComparisonTable();
 ```
 
-### JSON Export
+### JSON
 
-```csharp
-var json = comparison.ToJson();
-File.WriteAllText("model-comparison.json", json);
-```
+There is no JSON exporter for `ModelComparisonResult`.
 
 ---
 
@@ -290,96 +293,73 @@ File.WriteAllText("model-comparison.json", json);
 
 ### Weighted Comparison
 
-Weight factors by importance to your use case:
-
-```csharp
-var weights = new ComparisonWeights
-{
-    Quality = 0.4,      // 40% weight on score
-    Speed = 0.3,        // 30% weight on latency
-    Cost = 0.2,         // 20% weight on cost
-    Consistency = 0.1   // 10% weight on low variance
-};
-
-var comparison = await comparer.CompareModelsAsync(
-    factories, testCases, metrics,
-    new ComparisonOptions(RunsPerModel: 10, Weights: weights)
-);
-
-// BestOverall now reflects your priorities
-Console.WriteLine($"Best for your weights: {comparison.Recommendation.BestOverall}");
-```
+See [Scoring Weights](#scoring-weights). `Winner` reflects the weights you pass; the raw numbers in `ModelResults` do not change with them.
 
 ### Per-Test-Case Analysis
 
 ```csharp
-foreach (var tcResult in comparison.TestCaseResults)
+foreach (var r in results)
 {
-    Console.WriteLine($"\n=== {tcResult.TestCase.Name} ===");
-    
-    foreach (var (modelId, score) in tcResult.ModelScores)
+    Console.WriteLine($"{r.TestCase.Name}: winner {r.Winner.ModelName}");
+
+    foreach (var model in r.ModelResults)
     {
-        Console.WriteLine($"  {modelId}: {score:F1}");
+        Console.WriteLine($"  {model.ModelName}: mean score {model.MeanScore:F1}, pass rate {model.PassRate:P0}");
     }
-    
-    Console.WriteLine($"  Best: {tcResult.BestModelForThisTest}");
 }
 ```
 
 ### Finding the Right Model per Use Case
 
 ```csharp
-// Different test categories
-var simpleQueries = testCases.Where(t => t.Tags.Contains("simple"));
-var complexFlows = testCases.Where(t => t.Tags.Contains("complex"));
+// Two groups of your own test cases
+var simpleComparison = await comparer.CompareModelsAsync(factories, simpleQueries, options);
+var complexComparison = await comparer.CompareModelsAsync(factories, complexFlows, options);
 
-var simpleComparison = await comparer.CompareModelsAsync(
-    factories, simpleQueries.ToArray(), metrics, options);
-
-var complexComparison = await comparer.CompareModelsAsync(
-    factories, complexFlows.ToArray(), metrics, options);
-
-Console.WriteLine($"Best for simple queries: {simpleComparison.Recommendation.BestValue}");
-Console.WriteLine($"Best for complex flows: {complexComparison.Recommendation.BestQuality}");
+Console.WriteLine("Simple queries:\n" + simpleComparison.ToMarkdown(MarkdownExportOptions.Minimal));
+Console.WriteLine("Complex flows:\n" + complexComparison.ToMarkdown(MarkdownExportOptions.Minimal));
 ```
 
 ---
 
 ## Cost-Quality Tradeoffs
 
-### Pareto Frontier Analysis
+The built-in cost dimension prices every model at one rate ([see above](#what-the-ranking-does-not-tell-you)). To weigh quality against price, price each model's own token usage at its own rate with `ModelPricing.EstimateCost`:
 
 ```csharp
-// Find models on the Pareto frontier (best quality for their cost tier)
-var paretoModels = comparison.ModelResults
-    .Values
-    .OrderBy(m => m.MeanCostPerRequest)
-    .Where((m, i) => 
-        i == 0 || // Cheapest model is always on frontier
-        m.MeanScore > comparison.ModelResults.Values
-            .Where(other => other.MeanCostPerRequest < m.MeanCostPerRequest)
-            .Max(other => other.MeanScore)
-    )
+using AgentEval.Models;
+
+// ModelId must match a ModelPricing entry (for example "gpt-4o" or "gpt-4o-mini");
+// otherwise, or when the runs recorded no tokens, the cost stays null: not measured.
+var priced = result.ModelResults
+    .Select(m => (
+        Model: m,
+        CostPerRun: m.StochasticResult.PromptTokenStats is { } prompt
+                    && m.StochasticResult.CompletionTokenStats is { } completion
+            ? ModelPricing.EstimateCost(m.ModelId, (int)prompt.Mean, (int)completion.Mean)
+            : null))
     .ToList();
 
-Console.WriteLine("Pareto-optimal models (best quality for cost):");
-foreach (var model in paretoModels)
+foreach (var (model, costPerRun) in priced)
 {
-    Console.WriteLine($"  {model.ModelName}: Score={model.MeanScore:F1}, Cost=${model.MeanCostPerRequest:F4}");
+    Console.WriteLine($"{model.ModelName}: mean score {model.MeanScore:F1}, " +
+                      $"cost/run {(costPerRun is { } cost ? $"${cost:F4}" : "not measured")}");
 }
 ```
 
 ### Budget-Constrained Selection
 
 ```csharp
-decimal maxCostPerRequest = 0.01m;
+decimal maxCostPerRun = 0.01m;
 
-var withinBudget = comparison.ModelResults.Values
-    .Where(m => m.MeanCostPerRequest <= maxCostPerRequest)
-    .OrderByDescending(m => m.MeanScore)
+var withinBudget = priced
+    .Where(p => p.CostPerRun is { } cost && cost <= maxCostPerRun)
+    .OrderByDescending(p => p.Model.MeanScore)
     .FirstOrDefault();
 
-Console.WriteLine($"Best model within ${maxCostPerRequest}/request: {withinBudget?.ModelName}");
+Console.WriteLine(withinBudget.Model is null
+    ? $"No priced model costs ${maxCostPerRun} or less per run"
+    : $"Best model within ${maxCostPerRun}/run: {withinBudget.Model.ModelName}");
 ```
 
 ### Quality-Constrained Selection
@@ -387,39 +367,44 @@ Console.WriteLine($"Best model within ${maxCostPerRequest}/request: {withinBudge
 ```csharp
 double minScore = 85.0;
 
-var meetsQuality = comparison.ModelResults.Values
-    .Where(m => m.MeanScore >= minScore)
-    .OrderBy(m => m.MeanCostPerRequest)
+var meetsQuality = priced
+    .Where(p => p.Model.MeanScore >= minScore && p.CostPerRun is not null)
+    .OrderBy(p => p.CostPerRun)
     .FirstOrDefault();
 
-Console.WriteLine($"Cheapest model with score >= {minScore}: {meetsQuality?.ModelName}");
+Console.WriteLine(meetsQuality.Model is null
+    ? $"No priced model has a mean score of {minScore} or more"
+    : $"Cheapest model with a mean score of {minScore} or more: {meetsQuality.Model.ModelName}");
 ```
 
 ---
 
 ## CI/CD Integration
 
-### Regression Detection
+### Fail the Build When a Model Drops Below Your Bar
 
 ```csharp
-// Load previous comparison results
-var previousComparison = ComparisonResult.Load("baseline-comparison.json");
+var results = await comparer.CompareModelsAsync(factories, testCases, options);
 
-var currentComparison = await comparer.CompareModelsAsync(
-    factories, testCases, metrics, options);
+await results.SaveToMarkdownAsync("comparison-results.md");
+await File.WriteAllTextAsync("comparison-comment.md", results.ToGitHubComment());
 
-// Detect regressions
-foreach (var (modelId, current) in currentComparison.ModelResults)
+// The model you ship must keep passing every test case
+const string shippedModel = "gpt-4o-mini";
+var regressions = results
+    .SelectMany(r => r.ModelResults
+        .Where(m => m.ModelId == shippedModel && m.PassRate < 0.8)
+        .Select(m => $"{r.TestCase.Name}: pass rate {m.PassRate:P0}"))
+    .ToList();
+
+if (regressions.Count > 0)
 {
-    var previous = previousComparison.ModelResults[modelId];
-    
-    var scoreDrop = previous.MeanScore - current.MeanScore;
-    if (scoreDrop > 5.0)
-    {
-        Console.WriteLine($"⚠️ {modelId} regressed: {previous.MeanScore:F1} → {current.MeanScore:F1}");
-    }
+    Console.Error.WriteLine("Below the 80% pass-rate bar:\n  " + string.Join("\n  ", regressions));
+    Environment.ExitCode = 1;
 }
 ```
+
+Model comparison results have no saved-baseline format. To track a trend across builds, keep the numbers you gate on (pass rate, mean score) in a file of your own.
 
 ### GitHub Action for Model Comparison
 
@@ -429,41 +414,39 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '9.0.x'
-      
+
+      # tests/ModelComparison stands for your own console project running the code above
       - name: Run Model Comparison
         env:
           AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
           AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
-        run: |
-          dotnet run --project tools/ModelComparison \
-            --output comparison-results.json \
-            --markdown comparison-results.md
-      
+        run: dotnet run --project tests/ModelComparison
+
       - name: Upload Comparison Results
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: model-comparison
           path: |
-            comparison-results.json
             comparison-results.md
-      
+            comparison-comment.md
+
       - name: Comment on PR
-        if: github.event_name == 'pull_request'
+        if: always() && github.event_name == 'pull_request'
         uses: actions/github-script@v7
         with:
           script: |
             const fs = require('fs');
-            const markdown = fs.readFileSync('comparison-results.md', 'utf8');
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: markdown
+              body: fs.readFileSync('comparison-comment.md', 'utf8')
             });
 ```
 
@@ -471,44 +454,35 @@ jobs:
 
 ## Model Comparison with Trace Replay
 
-Reduce costs by recording once, comparing from traces:
+Record each model's replies once, then re-grade them without calling the models again:
 
 ```csharp
-// RECORD: Capture traces from each model once
+using AgentEval.Tracing;
+
+// RECORD: one live run per model and test case
 foreach (var factory in factories)
 {
-    var agent = factory.CreateAgent();
-    var traces = new List<AgentTrace>();
-    
-    foreach (var testCase in testCases)
+    for (var i = 0; i < testCases.Length; i++)
     {
-        var recorder = new TraceRecordingAgent(agent);
-        await recorder.ExecuteAsync(testCase.Input);
-        traces.Add(recorder.GetTrace());
+        await using var recorder = new TraceRecordingAgent(factory.CreateAgent(), $"{factory.ModelId}-{i}");
+        await recorder.InvokeAsync(testCases[i].Input);
+        await recorder.SaveAsync($"traces/{factory.ModelId}/{i}.trace.json");
     }
-    
-    TraceSerializer.SaveMany(traces, $"traces/{factory.ModelId}.json");
 }
 
-// COMPARE: Replay and evaluate without API calls
-var replayResults = new Dictionary<string, List<TestResult>>();
-
+// RE-GRADE: replay the recorded replies through the harness; the models are not called
 foreach (var factory in factories)
 {
-    var traces = TraceSerializer.LoadMany($"traces/{factory.ModelId}.json");
-    var results = new List<TestResult>();
-    
-    foreach (var trace in traces)
+    for (var i = 0; i < testCases.Length; i++)
     {
-        var replayer = new TraceReplayingAgent(trace);
-        var response = await replayer.ReplayNextAsync();
-        var result = await EvaluateResponse(response);
-        results.Add(result);
+        var replayer = await TraceReplayingAgent.FromFileAsync($"traces/{factory.ModelId}/{i}.trace.json");
+        var replayed = await harness.RunEvaluationAsync(replayer, testCases[i]);
+        Console.WriteLine($"{factory.ModelName} / {testCases[i].Name}: score {replayed.Score}, passed {replayed.Passed}");
     }
-    
-    replayResults[factory.ModelId] = results;
 }
 ```
+
+A replay returns the recorded reply at once and the same reply every time, so it re-checks grading and assertions, not speed or run-to-run variation. A judge, when the harness has one, is still called. Compare speed and reliability with live runs.
 
 ---
 
@@ -516,23 +490,23 @@ foreach (var factory in factories)
 
 ### Scenario 1: Upgrade Evaluation
 
-*Should we upgrade from GPT-4 to GPT-4o?*
+*Should we move from GPT-4 to GPT-4o?*
 
 ```csharp
-var factories = new[] { gpt4Factory, gpt4oFactory };
+var results = await comparer.CompareModelsAsync(
+    new IAgentFactory[] { gpt4Factory, gpt4oFactory }, testCases,
+    new ModelComparisonOptions(RunsPerModel: 20));
 
-var comparison = await comparer.CompareModelsAsync(
-    factories, testCases, metrics, 
-    new ComparisonOptions(RunsPerModel: 20));
+foreach (var r in results)
+{
+    var before = r.ModelResults.Single(m => m.ModelId == "gpt-4");
+    var after = r.ModelResults.Single(m => m.ModelId == "gpt-4o");
 
-var gpt4 = comparison.ModelResults["gpt-4"];
-var gpt4o = comparison.ModelResults["gpt-4o"];
-
-Console.WriteLine($"GPT-4 → GPT-4o:");
-Console.WriteLine($"  Score: {gpt4.MeanScore:F1} → {gpt4o.MeanScore:F1}");
-Console.WriteLine($"  Latency: {gpt4.MeanLatency.TotalSeconds:F2}s → {gpt4o.MeanLatency.TotalSeconds:F2}s");
-Console.WriteLine($"  Cost: ${gpt4.MeanCostPerRequest:F4} → ${gpt4o.MeanCostPerRequest:F4}");
-Console.WriteLine($"  Recommendation: {(gpt4o.MeanScore > gpt4.MeanScore ? "✅ Upgrade" : "❌ Stay")}");
+    Console.WriteLine($"{r.TestCase.Name}:");
+    Console.WriteLine($"  Mean score: {before.MeanScore:F1} -> {after.MeanScore:F1}");
+    Console.WriteLine($"  Pass rate:  {before.PassRate:P0} -> {after.PassRate:P0}");
+    Console.WriteLine($"  Latency:    {before.AverageLatency.TotalSeconds:F2}s -> {after.AverageLatency.TotalSeconds:F2}s");
+}
 ```
 
 ### Scenario 2: Cost Reduction
@@ -540,43 +514,33 @@ Console.WriteLine($"  Recommendation: {(gpt4o.MeanScore > gpt4.MeanScore ? "✅ 
 *Can we use a cheaper model without losing quality?*
 
 ```csharp
-var factories = new[] { gpt4oFactory, gpt4oMiniFactory };
+var result = await comparer.CompareModelsAsync(
+    new IAgentFactory[] { gpt4oFactory, gpt4oMiniFactory }, testCase,
+    new ModelComparisonOptions(RunsPerModel: 10));
 
-var comparison = await comparer.CompareModelsAsync(
-    factories, testCases, metrics, options);
+var expensive = result.ModelResults.Single(m => m.ModelId == "gpt-4o");
+var cheap = result.ModelResults.Single(m => m.ModelId == "gpt-4o-mini");
 
-var expensive = comparison.ModelResults["gpt-4o"];
-var cheap = comparison.ModelResults["gpt-4o-mini"];
-
-var qualityDrop = expensive.MeanScore - cheap.MeanScore;
-var costSavings = 1 - (cheap.MeanCostPerRequest / expensive.MeanCostPerRequest);
-
-Console.WriteLine($"Quality drop: {qualityDrop:F1} points");
-Console.WriteLine($"Cost savings: {costSavings:P0}");
-
-if (qualityDrop < 5.0 && costSavings > 0.5)
-{
-    Console.WriteLine("✅ Switch to cheaper model - minimal quality impact");
-}
+Console.WriteLine($"Mean score drop: {expensive.MeanScore - cheap.MeanScore:F1} points");
+Console.WriteLine($"Pass rate:       {expensive.PassRate:P0} -> {cheap.PassRate:P0}");
+// For the price side, price each model's tokens at its own rate (see Cost-Quality Tradeoffs)
 ```
 
 ### Scenario 3: Multi-Provider Evaluation
 
-*Which provider is best: OpenAI, Anthropic, or Google?*
+*Which provider fits best?*
 
 ```csharp
-var factories = new[]
+// openAiClient, anthropicClient and geminiClient are IChatClient instances for each provider
+var factories = new IAgentFactory[]
 {
-    new OpenAIAgentFactory("gpt-4o"),
-    new AnthropicAgentFactory("claude-3.5-sonnet"),
-    new GoogleAgentFactory("gemini-1.5-pro")
+    new DelegateAgentFactory("gpt-4o", "GPT-4o", () => openAiClient.AsEvaluableAgent(name: "Agent")),
+    new DelegateAgentFactory("claude-3-5-sonnet", "Claude 3.5 Sonnet", () => anthropicClient.AsEvaluableAgent(name: "Agent")),
+    new DelegateAgentFactory("gemini-1.5-pro", "Gemini 1.5 Pro", () => geminiClient.AsEvaluableAgent(name: "Agent"))
 };
 
-var comparison = await comparer.CompareModelsAsync(
-    factories, testCases, metrics, options);
-
-comparison.PrintComparisonTable();
-Console.WriteLine($"\nBest overall: {comparison.Recommendation.BestOverall}");
+var results = await comparer.CompareModelsAsync(factories, testCases, options);
+Console.WriteLine(results.ToMarkdown());
 ```
 
 ---
@@ -586,16 +550,16 @@ Console.WriteLine($"\nBest overall: {comparison.Recommendation.BestOverall}");
 ### 1. Use Representative Test Cases
 
 ```csharp
-// ✅ Good: Mix of difficulty levels
+// ✅ Good: a mix of difficulty levels, each with criteria a judge can grade
 var testCases = new[]
 {
-    new TestCase { Name = "Simple", Input = "What's 2+2?" },
-    new TestCase { Name = "Medium", Input = "Summarize this article..." },
-    new TestCase { Name = "Complex", Input = "Multi-step reasoning..." }
+    new TestCase { Name = "Simple", Input = "What's 2+2?", ExpectedOutputContains = "4" },
+    new TestCase { Name = "Medium", Input = "Summarize this article: ...", EvaluationCriteria = ["Covers the three main points"] },
+    new TestCase { Name = "Complex", Input = "Plan a 3-city trip within a $2,000 budget", EvaluationCriteria = ["Stays within budget", "Covers all three cities"] }
 };
 
-// ❌ Bad: Only easy cases
-var testCases = new[]
+// ❌ Bad: only easy cases, and nothing for quality to be judged on (any non-empty reply scores 100)
+var easyCases = new[]
 {
     new TestCase { Name = "Easy1", Input = "Hello" },
     new TestCase { Name = "Easy2", Input = "Hi there" }
@@ -605,60 +569,56 @@ var testCases = new[]
 ### 2. Run Enough Iterations
 
 ```csharp
-// ✅ Good: 10+ runs for reliable statistics
-new ComparisonOptions(RunsPerModel: 10)
+// ✅ Good: 10+ runs, so the statistics and confidence intervals mean something
+var enough = new ModelComparisonOptions(RunsPerModel: 10);
 
-// ❌ Bad: 1-2 runs (lucky/unlucky)
-new ComparisonOptions(RunsPerModel: 2)
+// ❌ Fails once the comparison starts: the stochastic runner needs at least 3 runs
+//    and throws ArgumentOutOfRangeException
+var tooFew = new ModelComparisonOptions(RunsPerModel: 2);
 ```
 
 ### 3. Control for External Factors
 
 ```csharp
-// Run all models close in time to avoid API variance
-var options = new ComparisonOptions(
+// Models already run one after another; space the runs out to stay under rate limits
+var options = new ModelComparisonOptions(
     RunsPerModel: 10,
-    ParallelModels: false  // Sequential to control timing
-);
+    MaxParallelism: 1,
+    DelayBetweenRuns: TimeSpan.FromSeconds(1));
 ```
 
-### 4. Consider Your Actual Workload
+Run the models you compare close together in time, so that API load affects them alike.
+
+### 4. Weight What You Measured
 
 ```csharp
-// Weight metrics based on what matters to you
-var weights = new ComparisonWeights
-{
-    Quality = 0.5,      // If accuracy is critical
-    Speed = 0.3,        // If latency matters
-    Cost = 0.2          // If budget is flexible
-};
+// Weight what matters to you, and leave out what the comparison did not measure
+var weights = new ScoringWeights(Quality: 0.6, Speed: 0.2, Cost: 0.0, Reliability: 0.2);
+weights.Validate();
 ```
 
 ---
 
 ## Summary
 
-| Question | AgentEval Answer |
-|----------|------------------|
-| Which model is best overall? | `comparison.Recommendation.BestOverall` |
-| Which has best quality? | `comparison.Recommendation.BestQuality` |
-| Which is most cost-effective? | `comparison.Recommendation.BestValue` |
-| Which is fastest? | `comparison.Recommendation.BestSpeed` |
-| Which is most consistent? | `comparison.Recommendation.MostConsistent` |
-| Should we upgrade models? | Compare scores before/after |
-| Can we use a cheaper model? | Calculate quality drop vs cost savings |
-
-**Stop guessing which model to use. Let data tell you.**
+| Question | Where to look |
+|----------|---------------|
+| Which model ranked first? | `result.Winner` |
+| How did each model score on each dimension? | `result.Ranking` |
+| What were the raw numbers? | `result.ModelResults`: pass rate, mean score, SD, latency, cost |
+| Is a difference real or noise? | `model.StochasticResult.Statistics.ConfidenceInterval`, and enough runs |
+| Which model won across a suite? | `results.ToMarkdown()`: wins and average scores |
+| What does each model cost? | Its own tokens at its own rate: `ModelPricing.EstimateCost` |
 
 ---
 
 ## Next Steps
 
-- [stochastic evaluation](stochastic-evaluation.md) - The foundation for model comparison
-- [Trace Record & Replay](tracing.md) - Reduce comparison costs
+- [Stochastic evaluation](stochastic-evaluation.md) - The foundation for model comparison
+- [Trace Record & Replay](tracing.md) - Record replies once, re-grade them for free
 - [Code Gallery](showcase/code-gallery.md) - More examples
-- [Sample 15](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Sample15_ModelComparison.cs) - Runnable model comparison example
-- [Sample 16](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Sample16_CombinedStochasticComparison.cs) - Combined stochastic + model comparison
+- [Sample D3](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/PerformanceAndStatistics/03_ModelComparison.cs) - Runnable model comparison example
+- [Sample D4](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/PerformanceAndStatistics/04_CombinedStochasticComparison.cs) - Combined stochastic + model comparison
 
 ---
 

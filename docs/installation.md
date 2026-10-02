@@ -113,7 +113,7 @@ AgentEval ships a standalone CLI for terminal and CI/CD usage, published as a
 dotnet tool install --global AgentEval.Cli --prerelease
 
 # Use
-agenteval init                                                 # bootstrap .agenteval/ workspace
+agenteval init-workspace                                       # bootstrap .agenteval/ workspace
 agenteval bench --list                                         # discover available benchmark families
 agenteval bench gdpr --preset smoke --subject MyAgent          # run a GDPR compliance benchmark
 agenteval bench owasp --preset smoke --subject MyAgent --azure-from-env   # OWASP red-team against your real agent

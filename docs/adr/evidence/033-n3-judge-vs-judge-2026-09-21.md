@@ -21,7 +21,7 @@ Released code: `v0.40.0-beta` plus the N3 sample. Golden set: `tests/AgentEval.T
 Of the 378 cases, **40 carry keys the registry does not dispatch** — the nine multi-turn and trace-dependent
 keys that `BenchAgenticCalibrateCommand`'s carve-out list omits **deliberately**, with its reason recorded
 there: their grading semantics do not fit a single-turn calibration entry, so an LLM judge would measure the
-judge rather than the evaluator. Counted here, not hidden and **40 decide in code** without a judge leaf (`unsafe_tool_use`, the
+judge rather than the evaluator. Counted here, not hidden. Another **40 decide in code** without a judge leaf (`unsafe_tool_use`, the
 regex path of `prompt_leak`, and the like); those cannot tell the judges apart and are excluded. **298 cases
 compare the judges.** Zero transport errors on either arm. Dry-run first: the 40 dispatched keys resolved (the
 nine unknown ones listed), every dispatched case run against a judge that recorded its criteria and sent nothing, the first Jev request rendered through the
@@ -59,6 +59,12 @@ mean squared distance between the score and the label; `p50` = per-case wall-clo
 calls); tokens are the judge's, from leaf provenance (`escalation-resistance` reports none on either arm,
 a provenance gap in that evaluator, not a free call). Bitdeer is unpriced, so arm A shows tokens only; arm
 B cost **$0.0090 for the run at list price, $0.000030 per case**.
+
+`band` was counted against the golden bands as they stood at the run. On 2026-10-02 (#274) the bottom of 84
+`expected pass` bands was raised to the evaluator's pass threshold, with no expected verdict changed, so a
+recount against today's bands could only stay the same or fall. Every other column is unaffected: accuracy,
+κ, false-pass and Brier compare with `expectedVerdict`, which did not change. See
+[`033-n3-threshold-sweep-and-label-review-2026-09-21.md`](033-n3-threshold-sweep-and-label-review-2026-09-21.md) §3.
 
 **Judge-vs-judge agreement (same label on the same case): 84.9%.**
 
@@ -145,3 +151,4 @@ dotnet run -- 102 --arms B --repeats 3           # run 2: Jev alone, three repea
 
 Reports (JSON with every record and every Jev probability, plus Markdown) are written to
 `%TEMP%/agenteval-n3/` or `--out DIR`. The two runs above are the 2026-09-21 00:41Z and 00:54Z reports.
+Those reports are not published in this repository; the tables in this file are what is published.

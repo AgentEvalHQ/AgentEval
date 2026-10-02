@@ -30,7 +30,7 @@ Agentic, GDPR, and EU AI Act are **preset-factory based**: a factory method retu
 The fastest path to a working benchmark:
 
 ```bash
-agenteval init --name MySolution
+agenteval init-workspace --name MySolution
 agenteval bench agentic --preset agentic-execution --subject MyAgent
 ```
 

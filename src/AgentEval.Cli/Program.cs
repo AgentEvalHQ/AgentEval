@@ -111,8 +111,8 @@ benchGdprCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     var subject = parseResult.GetValue(benchSubjectOpt);
     if (string.IsNullOrWhiteSpace(subject))
     {
-        Console.Error.WriteLine("Error: --subject is required. (Phase-7 7.21: the previous 'default-agent' default has been removed.)");
-        return 1;
+        Console.Error.WriteLine("Error: --subject is required. (There is no default subject.)");
+        return AgentEval.Cli.ExitCodes.UsageError;
     }
     var root = parseResult.GetValue(benchRootOpt);
     var input = parseResult.GetValue(benchInputOpt);
@@ -133,11 +133,11 @@ benchGdprCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     if (sutError is not null)
     {
         Console.Error.WriteLine($"Error: {sutError}");
-        return 1;
+        return AgentEval.Cli.ExitCodes.UsageError;
     }
 
     var response = await ResolveBenchResponseAsync(parseResult.GetValue(benchResponseOpt), parseResult.GetValue(benchResponseFileOpt), ct);
-    if (response.Error) return 1;
+    if (response.Error) return AgentEval.Cli.ExitCodes.UsageError;
     return await BenchCommand.RunGdprAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride: agentOverride, runs: runs, responseText: response.Text, azureFromEnv: azureFromEnv, ct: ct);
 });
 
@@ -153,19 +153,12 @@ calibrateCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
     var root = parseResult.GetValue(calibrateRootOpt);
     var outPath = parseResult.GetValue(calibrateOutOpt);
-    AgentEval.Core.IEvaluator? decisionJudge = null;
-    if (parseResult.GetValue(calibrateDecisionsOpt))
-    {
-        var (decisionOptions, decisionDiagnostic) = DecisionClientFactory.TryResolve();
-        if (decisionOptions is null)
-        {
-            Console.Error.WriteLine($"✖ --decisions needs a decision-model transport: {decisionDiagnostic} Set {DecisionClientFactory.RequiredVariables}.");
-            return AgentEval.Cli.ExitCodes.RuntimeError;
-        }
-        decisionJudge = new AgentEval.Decisions.DecisionJudge(new AgentEval.Decisions.SystemOneDecisionClient(decisionOptions), decisionOptions.Model);
-        Console.Error.WriteLine($"✔ Decision-model judge configured — {decisionOptions.ProviderName}, model={decisionOptions.Model} (requested; provenance records what the provider echoes).");
-    }
-    return await BenchCalibrateCommand.RunAsync(root, outPath, evaluatorOverride: decisionJudge, ct: ct);
+    // With --decisions the report names the decision model's provider and requested model; without the identity it
+    // said "unknown" for both, because the judge arrives as a caller-supplied evaluator.
+    return await DecisionCalibration.RunAsync(
+        parseResult.GetValue(calibrateDecisionsOpt),
+        (decisionJudge, decisionJudgeIdentity) => BenchCalibrateCommand.RunCoreAsync(
+            root, outPath, evaluatorOverride: decisionJudge, ct: ct, evaluatorOverrideIdentity: decisionJudgeIdentity));
 });
 benchGdprCmd.Add(calibrateCmd);
 
@@ -196,13 +189,13 @@ benchEuAiActCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) 
     var input = parseResult.GetValue(benchEuAiActInputOpt);
     if (string.IsNullOrWhiteSpace(subject))
     {
-        Console.Error.WriteLine("Error: --subject is required. (Phase-7 7.21: 'default-agent' default removed.)");
-        return 1;
+        Console.Error.WriteLine("Error: --subject is required. (There is no default subject.)");
+        return AgentEval.Cli.ExitCodes.UsageError;
     }
     if (string.IsNullOrWhiteSpace(input))
     {
-        Console.Error.WriteLine("Error: --input is required. (Phase-7 7.22: built-in fixture removed.)");
-        return 1;
+        Console.Error.WriteLine("Error: --input is required. (There is no built-in input fixture.)");
+        return AgentEval.Cli.ExitCodes.UsageError;
     }
     var root = parseResult.GetValue(benchEuAiActRootOpt);
     var azureFromEnv = parseResult.GetValue(benchEuAiActAzureFromEnvOpt);
@@ -219,11 +212,11 @@ benchEuAiActCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) 
     if (sutError is not null)
     {
         Console.Error.WriteLine($"Error: {sutError}");
-        return 1;
+        return AgentEval.Cli.ExitCodes.UsageError;
     }
 
     var response = await ResolveBenchResponseAsync(parseResult.GetValue(benchEuAiActResponseOpt), parseResult.GetValue(benchEuAiActResponseFileOpt), ct);
-    if (response.Error) return 1;
+    if (response.Error) return AgentEval.Cli.ExitCodes.UsageError;
     return await BenchEuAiActCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride: agentOverride, responseText: response.Text, azureFromEnv: azureFromEnv, ct: ct);
 });
 // bench eu-ai-act calibrate
@@ -238,19 +231,11 @@ euCalibrateCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =
 {
     var root = parseResult.GetValue(euCalibrateRootOpt);
     var outPath = parseResult.GetValue(euCalibrateOutOpt);
-    AgentEval.Core.IEvaluator? decisionJudge = null;
-    if (parseResult.GetValue(euCalibrateDecisionsOpt))
-    {
-        var (decisionOptions, decisionDiagnostic) = DecisionClientFactory.TryResolve();
-        if (decisionOptions is null)
-        {
-            Console.Error.WriteLine($"✖ --decisions needs a decision-model transport: {decisionDiagnostic} Set {DecisionClientFactory.RequiredVariables}.");
-            return AgentEval.Cli.ExitCodes.RuntimeError;
-        }
-        decisionJudge = new AgentEval.Decisions.DecisionJudge(new AgentEval.Decisions.SystemOneDecisionClient(decisionOptions), decisionOptions.Model);
-        Console.Error.WriteLine($"✔ Decision-model judge configured — {decisionOptions.ProviderName}, model={decisionOptions.Model} (requested; provenance records what the provider echoes).");
-    }
-    return await BenchEuAiActCalibrateCommand.RunAsync(root, outPath, evaluatorOverride: decisionJudge, ct: ct);
+    // Same as bench gdpr calibrate: with --decisions the report names the decision model, not "unknown".
+    return await DecisionCalibration.RunAsync(
+        parseResult.GetValue(euCalibrateDecisionsOpt),
+        (decisionJudge, decisionJudgeIdentity) => BenchEuAiActCalibrateCommand.RunCoreAsync(
+            root, outPath, evaluatorOverride: decisionJudge, ct: ct, evaluatorOverrideIdentity: decisionJudgeIdentity));
 });
 benchEuAiActCmd.Add(euCalibrateCmd);
 
@@ -280,13 +265,13 @@ benchAgenticCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) 
     var subject = parseResult.GetValue(benchAgenticSubjectOpt);
     if (string.IsNullOrWhiteSpace(subject))
     {
-        Console.Error.WriteLine("Error: --subject is required. (Phase-7 7.21: 'default-agent' default removed.)");
-        return 1;
+        Console.Error.WriteLine("Error: --subject is required. (There is no default subject.)");
+        return AgentEval.Cli.ExitCodes.UsageError;
     }
     var root = parseResult.GetValue(benchAgenticRootOpt);
     var input = parseResult.GetValue(benchAgenticInputOpt);
     var response = await ResolveBenchResponseAsync(parseResult.GetValue(benchAgenticResponseOpt), parseResult.GetValue(benchAgenticResponseFileOpt), ct);
-    if (response.Error) return 1;
+    if (response.Error) return AgentEval.Cli.ExitCodes.UsageError;
     var budgetTier = parseResult.GetValue(benchAgenticBudgetTierOpt);
     var traceFile = parseResult.GetValue(benchAgenticTraceOpt);
     return await BenchAgenticCommand.RunAsync(preset, subject, root, input, response.Text, budgetTier, traceFile, ct);
@@ -340,7 +325,7 @@ benchOwaspCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     if (string.IsNullOrWhiteSpace(subject))
     {
         Console.Error.WriteLine("Error: --subject is required.");
-        return 1;
+        return AgentEval.Cli.ExitCodes.UsageError;
     }
     var root = parseResult.GetValue(benchOwaspRootOpt);
     var input = parseResult.GetValue(benchOwaspInputOpt);
@@ -357,7 +342,7 @@ benchOwaspCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     if (error is not null)
     {
         Console.Error.WriteLine($"Error: {error}");
-        return 1;
+        return AgentEval.Cli.ExitCodes.UsageError;
     }
 
     var (exitCode, _) = await BenchOwaspCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride, azureFromEnv, ct);
@@ -392,7 +377,7 @@ benchMitreCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     if (string.IsNullOrWhiteSpace(subject))
     {
         Console.Error.WriteLine("Error: --subject is required.");
-        return 1;
+        return AgentEval.Cli.ExitCodes.UsageError;
     }
     var root = parseResult.GetValue(benchMitreRootOpt);
     var input = parseResult.GetValue(benchMitreInputOpt);
@@ -409,7 +394,7 @@ benchMitreCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     if (error is not null)
     {
         Console.Error.WriteLine($"Error: {error}");
-        return 1;
+        return AgentEval.Cli.ExitCodes.UsageError;
     }
 
     var (exitCode, _) = await BenchMitreCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride, azureFromEnv, ct);
@@ -443,7 +428,7 @@ benchNistCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     if (string.IsNullOrWhiteSpace(subject))
     {
         Console.Error.WriteLine("Error: --subject is required.");
-        return 1;
+        return AgentEval.Cli.ExitCodes.UsageError;
     }
     var root = parseResult.GetValue(benchNistRootOpt);
     var input = parseResult.GetValue(benchNistInputOpt);
@@ -460,7 +445,7 @@ benchNistCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     if (error is not null)
     {
         Console.Error.WriteLine($"Error: {error}");
-        return 1;
+        return AgentEval.Cli.ExitCodes.UsageError;
     }
 
     var (exitCode, _) = await BenchNistCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride, azureFromEnv, ct);
@@ -494,7 +479,7 @@ benchCmd.Add(benchNistCmd);
             if (string.IsNullOrWhiteSpace(subject))
             {
                 Console.Error.WriteLine("Error: --subject is required.");
-                return 1;
+                return AgentEval.Cli.ExitCodes.UsageError;
             }
             var root = parseResult.GetValue(benchLmeRootOpt);
             return await BenchLongMemEvalCommand.RunAsync(preset, subject, root, ct);
@@ -520,13 +505,13 @@ benchCmd.Add(benchNistCmd);
             if (string.IsNullOrWhiteSpace(vertical))
             {
                 Console.Error.WriteLine("Error: --vertical is required. Known: prospective, episodic, arithmetic, workingmemory, forgetting.");
-                return 1;
+                return AgentEval.Cli.ExitCodes.UsageError;
             }
             var subject = parseResult.GetValue(benchTmeSubjectOpt);
             if (string.IsNullOrWhiteSpace(subject))
             {
                 Console.Error.WriteLine("Error: --subject is required.");
-                return 1;
+                return AgentEval.Cli.ExitCodes.UsageError;
             }
             var root = parseResult.GetValue(benchTmeRootOpt);
 
@@ -538,7 +523,7 @@ benchCmd.Add(benchNistCmd);
             {
                 Console.Error.WriteLine(
                     $"Error: --evidence-detail must be 'references' or 'content', not '{evidenceDetail}'.");
-                return 1;
+                return AgentEval.Cli.ExitCodes.UsageError;
             }
 
             return await BenchTypedMemEvalCommand.RunAsync(
@@ -564,7 +549,7 @@ benchCmd.Add(benchNistCmd);
             if (string.IsNullOrWhiteSpace(subject))
             {
                 Console.Error.WriteLine("Error: --subject is required.");
-                return 1;
+                return AgentEval.Cli.ExitCodes.UsageError;
             }
             var root = parseResult.GetValue(benchMemRootOpt);
             return await BenchMemoryCommand.RunAsync(preset, subject, root, ct);
@@ -594,13 +579,13 @@ benchCmd.Add(benchNistCmd);
             if (string.IsNullOrWhiteSpace(agentTrace) || string.IsNullOrWhiteSpace(chatTrace))
             {
                 Console.Error.WriteLine("Error: --agent-trace and --chat-trace are required.");
-                return 1;
+                return AgentEval.Cli.ExitCodes.UsageError;
             }
 
             if (string.IsNullOrWhiteSpace(subject))
             {
                 Console.Error.WriteLine("Error: --subject is required.");
-                return 1;
+                return AgentEval.Cli.ExitCodes.UsageError;
             }
 
             var preset = parseResult.GetValue(tfPresetOpt) ?? "standard";
@@ -629,13 +614,13 @@ benchCmd.Add(benchNistCmd);
             if (string.IsNullOrWhiteSpace(workflowTrace))
             {
                 Console.Error.WriteLine("Error: --workflow-trace is required.");
-                return 1;
+                return AgentEval.Cli.ExitCodes.UsageError;
             }
 
             if (string.IsNullOrWhiteSpace(subject))
             {
                 Console.Error.WriteLine("Error: --subject is required.");
-                return 1;
+                return AgentEval.Cli.ExitCodes.UsageError;
             }
 
             var preset = parseResult.GetValue(wtfPresetOpt) ?? "standard";
@@ -671,7 +656,7 @@ benchCmd.Add(benchNistCmd);
             if (string.IsNullOrWhiteSpace(subject))
             {
                 Console.Error.WriteLine("Error: --subject is required.");
-                return 1;
+                return AgentEval.Cli.ExitCodes.UsageError;
             }
             var prompt = parseResult.GetValue(benchPerfPromptOpt);
             var root = parseResult.GetValue(benchPerfRootOpt);
@@ -692,7 +677,7 @@ benchCmd.SetAction((ParseResult parseResult, CancellationToken ct) =>
         return Task.FromResult(BenchListCommand.Run());
     }
     Console.Error.WriteLine("Usage: agenteval bench {family} [--preset NAME] ... | agenteval bench --list");
-    return Task.FromResult(1);
+    return Task.FromResult(AgentEval.Cli.ExitCodes.UsageError);
 });
 
 // ─── compliance ───────────────────────────────────────────────────────────────
@@ -715,7 +700,7 @@ renderCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     if (string.IsNullOrWhiteSpace(regulation) || string.IsNullOrWhiteSpace(subject))
     {
         Console.Error.WriteLine("Error: --regulation and --subject are required.");
-        return 1;
+        return AgentEval.Cli.ExitCodes.UsageError;
     }
     var ts = parseResult.GetValue(renderTsOpt);
     var root = parseResult.GetValue(renderRootOpt);
@@ -740,7 +725,7 @@ renderBenchCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =
     if (string.IsNullOrWhiteSpace(benchmark) || string.IsNullOrWhiteSpace(subject))
     {
         Console.Error.WriteLine("Error: --benchmark and --subject are required.");
-        return 1;
+        return AgentEval.Cli.ExitCodes.UsageError;
     }
     var ts = parseResult.GetValue(renderBenchTsOpt);
     var root = parseResult.GetValue(renderBenchRootOpt);
@@ -795,8 +780,10 @@ rootCmd.Options.Add(logFileOpt);
 var captureFixtureOpt = new Option<string?>("--capture-fixture")
 {
     Description = "Write a structured JSONL capture of every LLM round-trip (full message array, full response) to " +
-                   "this file, for later replay or fixture generation via 'agenteval log-file to-fixture'. Off by " +
-                   "default. Same raw, UNREDACTED content warning as --log-file. Overwritten on each invocation.",
+                   "this file, for 'agenteval log-file to-fixture' or 'agenteval log-file replay'. Off by default. " +
+                   "Strings matching known credential formats are masked; prompts and responses are otherwise " +
+                   "written as-is, so treat it like --log-file output: never share or commit it. Overwritten on " +
+                   "each invocation.",
     Recursive = true,
 };
 rootCmd.Options.Add(captureFixtureOpt);
@@ -830,6 +817,97 @@ rootCmd.Add(SkillsScanCommand.Create());
 rootCmd.Add(LogFileCommand.Create());
 
 var parseResult = rootCmd.Parse(args);
+
+// A parse error — an unknown command or option, a value that does not convert (`--runs abc`), a missing required
+// option, no command at all — exits ExitCodes.UsageError (2). System.CommandLine's own ParseErrorAction prints the
+// errors to stderr and the help to stdout, then returns 1, which this CLI's contract reserves for a failed evaluation
+// (ExitCodes.TestFailure): CI could not tell a typo from a failing run. Its output is kept; only the code changes.
+// --help and --version are not parse errors: their actions clear the errors and return 0.
+// This runs before --log-file and --capture-fixture are read: reading an option whose own value failed to parse
+// throws, and an invocation that never started must not create or truncate either file.
+if (parseResult.Action is System.CommandLine.Invocation.ParseErrorAction)
+{
+    await parseResult.InvokeAsync();
+    return AgentEval.Cli.ExitCodes.UsageError;
+}
+
 using var logWriter = VerboseLog.Initialize(parseResult.GetValue(logFileOpt));
 using var fixtureWriter = FixtureCapture.Initialize(parseResult.GetValue(captureFixtureOpt));
 return await parseResult.InvokeAsync();
+
+namespace AgentEval.Cli.Commands
+{
+    using AgentEval.Core;
+    using AgentEval.Decisions;
+
+    /// <summary>
+    /// The <c>--decisions</c> switch of <c>bench gdpr calibrate</c> and <c>bench eu-ai-act calibrate</c>: grades the
+    /// golden datasets with the decision model instead of the generative judge, and names that judge in the report.
+    /// </summary>
+    internal static class DecisionCalibration
+    {
+        /// <summary>
+        /// Runs <paramref name="runCalibration"/> with no evaluator override when <paramref name="decisions"/> is
+        /// off, and otherwise with a <see cref="DecisionJudge"/> and the identity its report header names it by.
+        /// </summary>
+        /// <param name="decisions">Whether <c>--decisions</c> was passed.</param>
+        /// <param name="runCalibration">The calibration to run, given the evaluator override and its identity.</param>
+        /// <param name="resolveOptions">The transport source; <see langword="null"/> reads the environment.</param>
+        /// <param name="createClient">Builds the client from the options; <see langword="null"/> builds the HTTP client.</param>
+        /// <returns>
+        /// What <paramref name="runCalibration"/> returned, or <see cref="ExitCodes.RuntimeError"/> when
+        /// <c>--decisions</c> was passed and no decision-model transport is configured.
+        /// </returns>
+        internal static async Task<int> RunAsync(
+            bool decisions,
+            Func<IEvaluator?, CalibrationJudgeIdentity?, Task<int>> runCalibration,
+            Func<(SystemOneClientOptions? Options, string? Diagnostic)>? resolveOptions = null,
+            Func<SystemOneClientOptions, IDecisionClient>? createClient = null)
+        {
+            ArgumentNullException.ThrowIfNull(runCalibration);
+            if (!decisions)
+                return await runCalibration(null, null);
+
+            resolveOptions ??= static () => DecisionClientFactory.TryResolve();
+            createClient ??= static options => new SystemOneDecisionClient(options);
+
+            var (decisionOptions, decisionDiagnostic) = resolveOptions();
+            if (decisionOptions is null)
+            {
+                Console.Error.WriteLine($"✖ --decisions needs a decision-model transport: {decisionDiagnostic} Set {DecisionClientFactory.RequiredVariables}.");
+                return ExitCodes.RuntimeError;
+            }
+
+            var client = createClient(decisionOptions);
+            try
+            {
+                var judge = new DecisionJudge(client, decisionOptions.Model);
+                Console.Error.WriteLine($"✔ Decision-model judge configured — {decisionOptions.ProviderName}, model={decisionOptions.Model} (requested; the provider may serve a different build under this name).");
+                return await runCalibration(judge, IdentityOf(decisionOptions));
+            }
+            finally
+            {
+                (client as IDisposable)?.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// What the calibration report names the decision judge: the provider, and the model requested from it. The
+        /// provider may answer with a different build under that name (an alias such as <c>jev-latest</c> moves), so
+        /// the model is labelled as requested. Never the key and never the endpoint.
+        /// </summary>
+        internal static CalibrationJudgeIdentity IdentityOf(SystemOneClientOptions options)
+        {
+            ArgumentNullException.ThrowIfNull(options);
+            var provider = options.ProviderName switch
+            {
+                "typesafe" => "TypeSafe",
+                "openrouter" => "OpenRouter",
+                var other => other,
+            };
+            return new CalibrationJudgeIdentity(
+                $"{provider} decision model (--decisions)",
+                $"{options.Model} (requested; the provider may serve a different build under this name)");
+        }
+    }
+}

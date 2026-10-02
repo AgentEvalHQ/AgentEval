@@ -68,4 +68,3 @@ agenteval bench eu-ai-act calibrate
 | 6 — GPAI Self-Awareness | Art 51-55 (probe-only) | 0.10 | Low |
 
 - [Full getting-started guide](../../docs/benchmarks/eu-ai-act/getting-started.md)
-- [Implementation plan](../../strategy/FutureFeatures/todo/04-EuAiAct-Evals-CompositeEvals-Benchmark-Reporting-ImplementationPlan.md)

@@ -66,7 +66,7 @@ internal static class AgenticBenchmarkRegistration
             ],
             compositeFactory: (preset, judge) => BuildPreset(preset, judge),
             evaluateAsync: null,  // Each preset returns a CompositeEval; consumers call CompositeEval.EvaluateAsync directly.
-            docLinkUrl: "https://github.com/joslat/AgentEval/blob/main/docs/agentic-benchmark.md",
+            docLinkUrl: "https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/agentic/getting-started.md",
             owningAssemblyName: typeof(AgenticBenchmark).Assembly.GetName().Name));
     }
 

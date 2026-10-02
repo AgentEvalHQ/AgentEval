@@ -427,8 +427,9 @@ public class TypedMemEvalDiscriminationTests
     {
         // V1 − V9 is what a PERFECT selector buys. A real retriever returns gold plus whatever else
         // it ranks highly, so it cannot beat having everything — its ceiling is V8, not V1. Where
-        // those diverge the published headroom is unreachable, and a consumer reading it would buy
-        // retrieval work that cannot help: prospective/due-window reads 0.94 and can reach 0.17.
+        // those diverge part of the published headroom is unreachable, and a consumer reading it would
+        // buy retrieval work that cannot help: in the shipped v5 sidecar prospective/due-window reads
+        // 0.9444 and can reach 0.8333, so 0.11 of it is beyond any real retriever.
         foreach (var (shape, record) in ByShape(vertical))
         {
             if (!record.TryGetProperty("headroom_perfect_selector", out _))

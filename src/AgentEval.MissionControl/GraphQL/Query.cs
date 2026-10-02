@@ -409,8 +409,8 @@ public sealed class Query
 
     /// <summary>
     /// Returns the subjects × controls matrix for a regulation. The portal's
-    /// <c>&lt;ComplianceMatrix/&gt;</c> Visx heatmap (plan-07 §10) renders
-    /// directly from this shape.
+    /// <c>&lt;ComplianceMatrix/&gt;</c> component (a CSS grid heatmap, no chart
+    /// library) renders directly from this shape.
     /// </summary>
     public Task<ComplianceMatrix> ComplianceMatrix(
         [Service] ComplianceMatrixService service,

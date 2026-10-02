@@ -1,0 +1,35 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>AgentEval.ReadmeSnippets</RootNamespace>
+    <AssemblyName>AgentEval.ReadmeSnippets</AssemblyName>
+
+    <!-- Compile-only gate for the C# blocks in the repository README.md. Each README block is a
+         `// begin-snippet: <name>` region in this project, so a README example that names a type or member
+         that does not exist breaks the solution build, and ReadmeSnippetsTests (tests/AgentEval.Tests/Docs)
+         fails when a README block and its region stop matching. Nothing here calls a model: the methods are
+         compiled, never run. A library, so there is no entry point to keep in step. -->
+  </PropertyGroup>
+
+  <!-- Consumes AgentEval; does NOT modify it. Versions come from Directory.Packages.props (CPM). -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AgentEval.Abstractions\AgentEval.Abstractions.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.Core\AgentEval.Core.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.DataLoaders\AgentEval.DataLoaders.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.MAF\AgentEval.MAF.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.Memory\AgentEval.Memory.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.RedTeam\AgentEval.RedTeam.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.RedTeam.Gatekeeper\AgentEval.RedTeam.Gatekeeper.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Agents.AI" />
+    <PackageReference Include="Microsoft.Extensions.AI" />
+  </ItemGroup>
+
+</Project>

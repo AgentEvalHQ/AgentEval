@@ -147,7 +147,8 @@ public sealed class GatekeeperOptions
 #pragma warning disable AGENTEVAL_GATEKEEPER_PREVIEW001 // ICalibrationReportStore/CalibrationReport are preview; P1-1 opts into them deliberately.
 
     /// <summary>Optional calibration-report store used by <see cref="ValidateInlineJudgesAsync"/> to prove an inline
-    /// LLM judge (any <see cref="IRequiresCalibration"/> pre/post gate) has earned the right to block.</summary>
+    /// LLM judge (any <see cref="IRequiresCalibration"/> judge in a pre, post or approval gate, including one inside a
+    /// cache or panel) has earned the right to decide.</summary>
     public ICalibrationReportStore? CalibrationReportStore { get; set; }
 
     /// <summary>Escape hatch (Fable 5 §9 / P1-1): when <see langword="true"/>, <see cref="ValidateInlineJudgesAsync"/>
@@ -156,12 +157,19 @@ public sealed class GatekeeperOptions
     public bool AllowUncalibratedInlineJudge { get; set; }
 
     /// <summary>
-    /// Refuses to promote an inline LLM judge that has not earned the right to block. For every registered pre/post
-    /// gate implementing <see cref="IRequiresCalibration"/>, loads its axis's latest report from
-    /// <see cref="CalibrationReportStore"/> and throws <see cref="UncalibratedInlineJudgeException"/> unless the
-    /// report exists and is <see cref="CalibrationReport.IsInlineReady"/>. Async by design (the store is I/O-bound,
-    /// so this is NOT folded into the synchronous <c>UseGatekeeper</c> preflight) — call it before you trust a judge
-    /// fleet inline. A no-op when <see cref="AllowUncalibratedInlineJudge"/> is set or no such judge is registered.
+    /// Refuses to promote an inline LLM judge that has not earned the right to decide. For every
+    /// <see cref="IRequiresCalibration"/> judge in the registered <see cref="PreGates"/>, <see cref="PostGates"/> and
+    /// <see cref="ApprovalGates"/>, loads its axis's latest report from <see cref="CalibrationReportStore"/> and
+    /// throws <see cref="UncalibratedInlineJudgeException"/> unless the report exists and is
+    /// <see cref="CalibrationReport.IsInlineReady"/>. The check looks through wrappers at any depth: a judge inside a
+    /// <see cref="JudgeVerdictCache"/> (which every stock judge factory returns by default), on a
+    /// <see cref="ParallelJudgeFanOut"/> panel, inside an outbound inter-agent boundary gate, or behind
+    /// <see cref="ToolArgumentGoalCoherenceApprovalGate"/> (whose allow verdict auto-approves a tool call) is checked
+    /// like a judge registered directly. Only AgentEval's own wrapper types can be looked through: a judge inside a
+    /// gate you wrote yourself is not visible to this check unless your gate is itself
+    /// <see cref="IRequiresCalibration"/>. Async by design (the store is I/O-bound, so this is NOT folded into the
+    /// synchronous <c>UseGatekeeper</c> preflight) — call it before you trust a judge fleet inline. A no-op when
+    /// <see cref="AllowUncalibratedInlineJudge"/> is set or no such judge is registered.
     /// </summary>
     public async Task ValidateInlineJudgesAsync(CancellationToken cancellationToken = default)
     {
@@ -170,30 +178,43 @@ public sealed class GatekeeperOptions
             return;
         }
 
-        foreach (var gate in PreGates.Concat(PostGates))
+        var registered = PreGates.Select(g => (Gate: (object?)g, Seam: "pre", Name: g?.PolicyName))
+            .Concat(PostGates.Select(g => (Gate: (object?)g, Seam: "post", Name: g?.PolicyName)))
+            .Concat(ApprovalGates.Select(g => (Gate: (object?)g, Seam: "approval", Name: g?.PolicyName)));
+
+        foreach (var (gate, seam, name) in registered)
         {
-            if (gate is not IRequiresCalibration calibratable)
+            foreach (var calibratable in CalibrationRequirements.FindIn(gate))
             {
-                continue;
+                // A judge registered directly as a pre/post gate keeps the original message. A judge found inside a
+                // wrapper, or behind an approval gate, also says where it was found: the axis alone does not tell an
+                // operator which registered gate to look at.
+                var where = seam == "approval"
+                    ? $" (found in approval gate '{name}', where its allow verdict auto-approves a tool call)"
+                    : ReferenceEquals(calibratable, gate) ? string.Empty : $" (found inside {seam} gate '{name}')";
+                await EnsureInlineReadyAsync(calibratable.AxisName, where, cancellationToken).ConfigureAwait(false);
             }
+        }
+    }
 
-            if (CalibrationReportStore is null)
-            {
-                throw new UncalibratedInlineJudgeException(calibratable.AxisName,
-                    "no CalibrationReportStore is configured, so this inline judge cannot be proven calibration-ready");
-            }
+    private async Task EnsureInlineReadyAsync(string axis, string where, CancellationToken cancellationToken)
+    {
+        if (CalibrationReportStore is null)
+        {
+            throw new UncalibratedInlineJudgeException(axis,
+                "no CalibrationReportStore is configured, so this inline judge cannot be proven calibration-ready" + where);
+        }
 
-            var report = await CalibrationReportStore.LoadLatestAsync(calibratable.AxisName, cancellationToken).ConfigureAwait(false);
-            if (report is null)
-            {
-                throw new UncalibratedInlineJudgeException(calibratable.AxisName, "no calibration report was found for this axis");
-            }
+        var report = await CalibrationReportStore.LoadLatestAsync(axis, cancellationToken).ConfigureAwait(false);
+        if (report is null)
+        {
+            throw new UncalibratedInlineJudgeException(axis, "no calibration report was found for this axis" + where);
+        }
 
-            if (!report.IsInlineReady)
-            {
-                throw new UncalibratedInlineJudgeException(calibratable.AxisName,
-                    "the latest calibration report is not inline-ready (it has not beaten its deterministic baseline on a gold set)");
-            }
+        if (!report.IsInlineReady)
+        {
+            throw new UncalibratedInlineJudgeException(axis,
+                "the latest calibration report is not inline-ready (it has not beaten its deterministic baseline on a gold set)" + where);
         }
     }
 #pragma warning restore AGENTEVAL_GATEKEEPER_PREVIEW001
@@ -295,7 +316,10 @@ public sealed class GatekeeperOptions
     /// stay in sync: if this list is stale or partial (e.g. missing a tool added to <c>ChatOptions.Tools</c>
     /// later), <see cref="RefuseUnprotectedHighRiskTools"/> checks only what you passed here and can pass a
     /// build that actually exposes an unprotected high-risk tool. It also cannot see a tool an
-    /// <see cref="Microsoft.Agents.AI.AIContextProvider"/> contributes dynamically — see
+    /// <see cref="Microsoft.Agents.AI.AIContextProvider"/> contributes dynamically — when one is wired, set
+    /// <see cref="AnalyzeOptions.HasDynamicToolProvider"/> on <see cref="CoverageAnalyzeOptions"/> so
+    /// <see cref="CoverageReport"/> says the injected tools were not inventoried (and, under
+    /// <see cref="RefuseUnprotectedHighRiskTools"/>, an empty list is refused rather than certified) — see
     /// <see cref="GatekeeperCoverageAnalyzer"/> remarks.
     /// <para><b>This staleness risk cannot be structurally eliminated at THIS call site</b> — re-deriving from
     /// the live agent instead of trusting <see cref="KnownTools"/> would need a built <see cref="AIAgent"/>,

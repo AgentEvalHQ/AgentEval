@@ -18,8 +18,7 @@ internal interface ISutTargetOptions { }
 
 /// <summary>
 /// A built-in system-under-test reachable from MULTIPLE verbs (<c>eval</c>, <c>bench</c>) via a shared
-/// <c>--sut</c> flag — Track 2 of the Copilot Studio integration plan
-/// (<c>strategy/CopilotStudio/Bench-Eval-Integration-and-Live-Connector-Plan.md</c> §3). Generalizes the
+/// <c>--sut</c> flag — Track 2 of the Copilot Studio integration plan. Generalizes the
 /// already-shipped <c>redteam --sut</c> pattern WITHOUT touching
 /// <c>AgentEval.Cli.Commands.RedTeamTargets.IRedTeamBuiltInTarget</c>, <c>RedTeamOptions</c>, or
 /// <c>RedTeamCommand.cs</c> — a target that wants BOTH surfaces implements both interfaces via EXPLICIT

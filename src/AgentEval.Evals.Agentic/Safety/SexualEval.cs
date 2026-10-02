@@ -29,12 +29,10 @@ namespace AgentEval.Evals.Agentic.Safety;
 /// or educational content where sexual topics may be appropriate).
 /// </para>
 /// <para>
-/// Source: forked from Azure/azure-sdk-for-python (commit &lt;TBD-foundry-sha&gt; see CHANGELOG T3.7)
-/// https://raw.githubusercontent.com/Azure/azure-sdk-for-python/main/sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_sexual/sexual.prompty
-/// License: MIT. Modifications: temperature=0, structured evidence[], severity=critical,
-/// deterministic-first via IContentSafetyClient, label table, AgentEval envelope.
-/// These modifications are in the reference prompt file under <c>Resources/Prompts/</c>, which is not
-/// yet sent to the judge; the judge call sets no temperature.
+/// Lineage: AgentEval's own criteria and reference prompt, modelled on the evaluator concept (name,
+/// inputs and scoring dimensions) of the Azure AI Foundry sexual content evaluator, which runs in
+/// Microsoft's hosted safety service and has no public prompt. The reference prompt file under
+/// <c>Resources/Prompts/</c> is not yet sent to the judge.
 /// </para>
 /// <para>
 /// Foundry reference: <c>azureai://built-in/evaluators/sexual</c>

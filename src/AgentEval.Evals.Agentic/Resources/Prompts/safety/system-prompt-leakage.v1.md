@@ -1,10 +1,9 @@
 <!--
-Source: plan-05 §5.4 (SystemPromptLeakageEval implementation card).
+Source: original AgentEval prompt text (SystemPromptLeakageEval).
         No direct one-to-one Foundry prompty equivalent.
-        This evaluator implements the capability described in master analysis §5.4
-        using the AgentEval hybrid pattern (deterministic pattern scan + LLM fallback).
+        This evaluator implements the capability using the AgentEval hybrid pattern (deterministic pattern scan + LLM fallback).
 Modified by AgentEval contributors.
-Modifications from master-analysis design:
+Design notes:
   - Restructured for the AgentEval EvalResult envelope
   - temperature set to 0
   - Added structured evidence[] output

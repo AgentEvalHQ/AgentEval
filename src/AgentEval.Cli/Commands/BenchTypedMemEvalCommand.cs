@@ -24,9 +24,11 @@ namespace AgentEval.Cli.Commands;
 /// <c>report-native.json</c> beside the canonical run manifest.
 /// </para>
 /// <para>
-/// REQUIRES Azure OpenAI. One answer call plus one judge call per question, with bounded judge
-/// retries increasing the total. All three <c>AZURE_OPENAI_*</c> env vars must be set; there is no
-/// stub fallback because the judge round-trip IS the correctness signal.
+/// Needs a real model, from whichever provider <c>AI_INFERENCE_PROVIDER</c> selects (or
+/// auto-detects) via <see cref="AzureChatAgentFactory.TryBuildChatClientFromEnv"/>; the one client
+/// both answers and judges. One answer call plus one judge call per question, with bounded judge
+/// retries increasing the total. There is no stub fallback because the judge round-trip IS the
+/// correctness signal.
 /// </para>
 /// <para>
 /// The corpora are embedded in the package, so unlike LongMemEval there is no dataset path, no
@@ -88,7 +90,7 @@ public static class BenchTypedMemEvalCommand
         if (string.IsNullOrWhiteSpace(subject))
         {
             Console.Error.WriteLine("Error: --subject is required.");
-            return 1;
+            return ExitCodes.UsageError;
         }
 
         // ── Resolve the vertical ─────────────────────────────────────────────
@@ -100,7 +102,7 @@ public static class BenchTypedMemEvalCommand
         {
             Console.Error.WriteLine($"Unknown TypedMemEval vertical '{vertical}'. Known: " +
                 string.Join(", ", TypedMemEvalVerticals.All.Select(d => d.Slug)));
-            return 1;
+            return ExitCodes.UsageError;
         }
 
         // ── Workspace setup ──────────────────────────────────────────────────

@@ -1,5 +1,7 @@
 <!--
-Source: original AgentEval evaluator (no direct Foundry equivalent).
+Source: original AgentEval evaluator. The Azure AI Evaluation SDK's task-navigation-efficiency
+        evaluator is code-only (it matches agent steps against ground-truth steps) and has no
+        prompt, so there is no upstream prompt equivalent.
         New evaluator for agentic action-path quality assessment.
 License: MIT (AgentEval Contributors, 2026)
 Modifications vs. baseline:

@@ -22,11 +22,11 @@ namespace AgentEval.Evals.Agentic.Process;
 /// yet applied.
 /// </para>
 /// <para>
-/// Source: forked from Azure/azure-sdk-for-python
-/// sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_tool_selection/tool_selection.prompty
-/// License: MIT. Modifications listed in the corresponding prompt file at
-/// Resources/Prompts/process/tool-selection.v1.md.
-/// That prompt file is a reference only and is not yet sent to the judge.
+/// Lineage: AgentEval's own criteria and reference prompt, modelled on the evaluator concept (name,
+/// inputs and scoring dimensions) of Azure/azure-sdk-for-python
+/// <c>sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_tool_selection/tool_selection.prompty</c>.
+/// A 2026-10-02 check found no upstream prompt text in the reference prompt file
+/// <c>Resources/Prompts/process/tool-selection.v1.md</c>, which is not yet sent to the judge.
 /// </para>
 /// <para>
 /// Foundry reference: <c>azureai://built-in/evaluators/tool_selection</c>

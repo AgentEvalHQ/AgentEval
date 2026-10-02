@@ -81,6 +81,49 @@ public class JsonFileBaselineStoreTests : IDisposable
     }
 
     [Fact]
+    public void IncludeArchetypes_DefaultsToFalse()
+    {
+        // archetypes.json is read by nothing — not report.html, not any AgentEval code — so it is
+        // opt-in. Was true, which wrote an unused file into every report directory.
+        Assert.False(new MemoryReportingOptions().IncludeArchetypes);
+    }
+
+    [Fact]
+    public async Task SaveAsync_ByDefault_DoesNotCopyArchetypes_AndManifestDoesNotNameThem()
+    {
+        await _store.SaveAsync(CreateBaseline("Test"));
+
+        var reportDir = _store.GetReportDirectory("TestAgent");
+        Assert.False(File.Exists(Path.Combine(reportDir, "archetypes.json")));
+
+        var manifestJson = await File.ReadAllTextAsync(Path.Combine(reportDir, "manifest.json"));
+        var manifest = JsonSerializer.Deserialize<BenchmarkManifest>(manifestJson, JsonFileBaselineStore.JsonOptions);
+        Assert.NotNull(manifest);
+        // The manifest must never point at a file the store did not write.
+        Assert.Null(manifest.Archetypes);
+    }
+
+    [Fact]
+    public async Task SaveAsync_WithIncludeArchetypes_CopiesFileAndNamesItInManifest()
+    {
+        var store = new JsonFileBaselineStore(new MemoryReportingOptions
+        {
+            OutputPath = Path.Combine(_tempDir, "{AgentName}"),
+            IncludeArchetypes = true
+        });
+
+        await store.SaveAsync(CreateBaseline("Test"));
+
+        var reportDir = store.GetReportDirectory("TestAgent");
+        Assert.True(File.Exists(Path.Combine(reportDir, "archetypes.json")));
+
+        var manifestJson = await File.ReadAllTextAsync(Path.Combine(reportDir, "manifest.json"));
+        var manifest = JsonSerializer.Deserialize<BenchmarkManifest>(manifestJson, JsonFileBaselineStore.JsonOptions);
+        Assert.NotNull(manifest);
+        Assert.Equal("archetypes.json", manifest.Archetypes);
+    }
+
+    [Fact]
     public async Task SaveAsync_DoesNotOverwriteExistingReportHtml()
     {
         var agentDir = Path.Combine(_tempDir, "testagent");

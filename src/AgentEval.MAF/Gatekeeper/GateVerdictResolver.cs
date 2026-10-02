@@ -6,10 +6,16 @@ namespace AgentEval.MAF.Gatekeeper;
 
 /// <summary>
 /// A bounded, TTL'd, in-memory <c>referenceId → </c><see cref="GateEvidence"/> index (Phase 3, P3-1). The
-/// model-facing refusal shows only an opaque <c>referenceId</c>; an operator (or the <c>agenteval trace
-/// find-reference</c> CLI) resolves that id back to the full audit record in O(1) here — <b>without needing the
-/// trace</b>, because the resolver is fed directly from the evidence stream. Bounded (FIFO eviction past a max
-/// count) and TTL'd so it can run continuously without unbounded growth; thread-safe.
+/// model-facing refusal shows only an opaque <c>referenceId</c>; operator code in the same process resolves that id
+/// back to the full audit record in O(1) with <see cref="TryResolve"/> — <b>without needing the trace</b>, because the
+/// resolver is fed directly from the evidence stream (register a <see cref="GateReferenceLedger"/> as
+/// <c>GatekeeperOptions.EvidenceSink</c> and read its <see cref="GateReferenceLedger.Resolver"/>). There is no CLI
+/// command for this lookup. The index is in memory only: a record is resolvable until it expires or is evicted, and
+/// not after the process ends. For a later or out-of-process lookup, give the ledger a JSONL index writer and read
+/// the file back with <see cref="GateReferenceIndexAggregator.Read"/>, filtering on
+/// <see cref="GateReferenceLedger.GateReferenceIndexEntry.ReferenceId"/>; that index holds enforced refusals only, as
+/// summary rows, not the full record. Bounded (FIFO eviction past a max count) and TTL'd so it can run continuously
+/// without unbounded growth; thread-safe.
 /// </summary>
 public sealed class GateVerdictResolver
 {

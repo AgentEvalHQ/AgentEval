@@ -10,8 +10,7 @@ namespace AgentEval.RedTeam.Attacks;
 /// Skill-description-injection attacks — a malicious/poisoned MAF Agent Skill's <c>description</c> or
 /// <c>read_skill_resource</c> output tries to instruct/manipulate the agent (OWASP LLM01, indirect; also
 /// LLM03-adjacent: a poisoned THIRD-PARTY skill is a supply-chain vector). This is the differentiated
-/// half of Skills Phase 3
-/// (<c>strategy/FutureFeatures/Skills/AgentEval-AgentSkills-Evals-Design-and-Plan.md</c> §6.1): a skill's
+/// half of Skills Phase 3 (see <c>docs/agent-skills.md</c> §3): a skill's
 /// description/instructions are spliced into the SYSTEM PROMPT via the <c>{skills}</c> placeholder on
 /// <c>load_skill</c> — a HIGHER-trust position than a retrieved document — and <c>read_skill_resource</c>
 /// output is ingested as an ordinary tool result. Two new <see cref="InjectionSurface"/> values

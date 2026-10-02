@@ -8,7 +8,7 @@
 
 The performance benchmark exercises the agent under test via direct `IEvaluableAgent.InvokeAsync` calls and records timing + token-usage telemetry. The `EvaluateAsync` adapter (Convention 2) runs all three measurements (latency, throughput, cost) and aggregates them into a 3-leaf composite `EvalResult` via `CapByWorst` — a single high-severity leaf caps the composite.
 
-What IS tested: per-call latency (P50 / P90 / P99 + mean, time-to-first-token when the agent implements `IStreamableAgent`), sustained throughput under a configurable concurrent-worker pool, and per-prompt cost based on the `ModelPricing` table. What is NOT tested: process-level memory pressure, GC pause durations, cold-start latency on fresh process spawn, long-tail endurance under sustained load (>15s), network-egress costs, multi-region latency variance, or anything outside the agent invocation boundary (HTTP / Azure SDK / connection pool internals all fall under the per-call latency number but cannot be decomposed by this benchmark).
+What IS tested: per-call latency (P50 / P90 / P99 + mean, time-to-first-token when the agent implements `IStreamableAgent`), sustained throughput under a configurable concurrent-worker pool, and per-prompt cost based on the `ModelPricing` table. What is NOT tested: process-level memory pressure, GC pause durations, cold-start latency on fresh process spawn, long-tail endurance under sustained load (>15s), network-egress costs, multi-region latency variance, or anything outside the agent invocation boundary (HTTP / provider SDK / connection pool internals all fall under the per-call latency number but cannot be decomposed by this benchmark).
 
 ## Scope and omissions
 
@@ -24,7 +24,7 @@ What IS tested: per-call latency (P50 / P90 / P99 + mean, time-to-first-token wh
   - Cold-start latency — the benchmark warms the agent before timed runs; cold-start measurement requires fresh process spawn per measurement.
   - Sustained-load endurance (>15s) — out of scope for a CLI-driven smoke; use a dedicated load tool (k6, NBomber, JMeter) for that.
   - Multi-region latency variance — single-process invocation only.
-  - Network egress accounting — the USD-cost estimate covers LLM tokens only; egress to / from your Azure tenant is not tracked.
+  - Network egress accounting — the USD-cost estimate covers LLM tokens only; egress to / from your model provider is not tracked.
 
 ## Presets
 
@@ -42,7 +42,7 @@ Default thresholds (overridable via `PerformanceBenchmarkEvaluateOptions`):
 - Maximum cost: $0.10 USD → score = 1 - (cost / 0.10), clamped [0, 1]. When pricing data is missing for the model, cost-leaf defaults to pass with score 1.0.
 - Composite pass threshold: 0.6.
 
-Note: the `EvaluateAsync` adapter runs ALL THREE leaves (latency, throughput, cost) regardless of which sub-preset name is supplied — the sub-preset name is currently a label rather than a filter (the sub-preset selection is wired via the CLI subcommand structure; tighter per-preset scoping is a roadmap item).
+Note: the `EvaluateAsync` adapter runs ALL THREE leaves (latency, throughput, cost) regardless of which sub-preset name is supplied — the sub-preset name is currently a label rather than a filter (the sub-preset selection is wired via the CLI subcommand structure, and no subcommand restricts which measurements run).
 
 ## CLI usage
 
@@ -54,7 +54,7 @@ agenteval bench perf latency --subject MyAgent
 agenteval bench perf throughput --subject MyAgent
 agenteval bench perf cost --subject MyAgent
 
-# Real agent via Azure OpenAI env vars
+# Real model from the configured inference provider
 agenteval bench perf latency --subject MyAgent --azure-from-env
 agenteval bench perf throughput --subject MyAgent --azure-from-env --prompt "Summarise the last quarter's earnings."
 agenteval bench perf cost --subject MyAgent --azure-from-env --prompt "Hello!"
@@ -62,15 +62,17 @@ agenteval bench perf cost --subject MyAgent --azure-from-env --prompt "Hello!"
 
 The `--prompt` flag overrides the default `"Hello!"` prompt. The benchmark uses the same prompt for latency + throughput + cost measurements within a single run.
 
-`--azure-from-env` requires all three of `AZURE_OPENAI_ENDPOINT` + `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_DEPLOYMENT`. Without it, the CLI falls back to the built-in `EchoAgent` stub (50 ms synthetic delay + prompt echo) with a prominent banner warning that the measurements do not reflect a real agent.
+`--azure-from-env` builds the agent from whichever provider `AI_INFERENCE_PROVIDER` selects — Azure OpenAI, Bitdeer, OpenAI, Azure AI Foundry or any OpenAI-compatible host; see the [provider table](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to) for the variables each one needs. Despite its name, the flag is not Azure-only: with the selector unset, the first fully configured provider in that table's order is used, so an environment with only the `AZURE_OPENAI_*` trio still gets Azure OpenAI. If no provider is configured, the command fails and names what is missing. Without the flag, the CLI falls back to the built-in `EchoAgent` stub (50 ms synthetic delay + prompt echo) with a prominent banner warning that the measurements do not reflect a real agent.
+
+With `--azure-from-env`, the cost leaf looks the model up in the pricing table first by the name in `AZURE_OPENAI_DEPLOYMENT` when that variable is set, whichever provider served the run (otherwise by the `--subject` name), and then by the model id the provider reported in its response. If neither name is in the table, the leaf reports "Cost unknown" with a passing score of 1.0 (see [Limitations](#limitations)); read that as not measured. If `AZURE_OPENAI_DEPLOYMENT` is set while another provider is selected and that name is in the table, the price shown is for the Azure deployment's model, not for the model that ran.
 
 ## Output
 
 Each run writes to the canonical run dir under `.agenteval/subjects/agents/{subject}/runs/{runId}/`:
 
 - `report.json` — canonical eval-result shape (3-leaf composite, one leaf per metric).
-- `report.html` — HTML report (T0.5 v1.1, shipped 2026-05-24 via `GenericReportRenderer`).
-- `report.pdf` — PDF report (T0.5 v1.1, generated via `AgentEval.Rendering.Pdf` / QuestPDF).
+- `report.html` — HTML report, rendered by `GenericReportRenderer`.
+- `report.pdf` — PDF report, generated via `AgentEval.Rendering.Pdf` / QuestPDF.
 - The canonical `summary.json` / `manifest.json` carry the run-level audit-chain metadata (run ID, content hash, timestamp).
 
 The perf family does NOT emit a separate `report.md` markdown sidecar (unlike OWASP / MITRE / GDPR) — the canonical store entry + the HTML/PDF render covers the documented operator scenarios. HTML and PDF emission is best-effort with warning-fallback — failures do not abort the run.
@@ -155,20 +157,15 @@ Perf runs are stored canonically under `.agenteval/subjects/agents/{subject}/run
 - Mission Control — renders runs with per-leaf detail; visual diff across runs by selecting two runs.
 - Programmatic post-processing of the canonical `EvalResult.Details.Dimensions` dictionary (`p99_ms`, `rps`, `cost_usd`) for time-series tracking outside AgentEval.
 
-## Limitations and roadmap
+## Limitations
 
 Known limitations:
-- The sub-preset names (`latency`, `throughput`, `cost`) currently label the run but do not filter the measurements — the `EvaluateAsync` adapter always runs all three. Tighter per-preset scoping is a roadmap item.
+- The sub-preset names (`latency`, `throughput`, `cost`) currently label the run but do not filter the measurements — the `EvaluateAsync` adapter always runs all three; there is no latency-only, throughput-only or cost-only execution path.
 - The throughput measurement window is fixed at 5 seconds by default — not suitable for endurance / soak testing.
 - Cold-start latency is explicitly excluded (the warmup iteration runs first).
 - Cost estimation requires the agent's model name to appear in `ModelPricing.GetPricing` — unknown models default the cost leaf to pass with score 1.0.
 - Per-prompt input is single-string only; multi-prompt CSV / metadata override (via `EvalInput.Metadata["prompts"]`) is supported programmatically but not exposed on the CLI subcommands.
-
-Tracking backlog (see `strategy/FutureFeatures/todo/13-pending-issues-tasks.md`):
-- T0.2 — `--azure-from-env` flag on `bench perf` (shipped 2026-05-24).
-- T0.5 — `report.html` + `report.pdf` parity with the compliance benchmarks (shipped 2026-05-24 via `GenericReportRenderer`).
-- T3.11 — Multi-provider agent-manifest schema (would let `--agent-config <path>` resolve non-Azure agents).
-- Per-preset measurement scoping (latency-only / throughput-only / cost-only execution paths) remains roadmap.
+- The CLI can measure the built-in `EchoAgent` stub or a plain chat model built with `--azure-from-env` from any configured provider. There is no option that loads an agent from a manifest file. An agent with its own tools, memory or a non-chat interface is measured from a small program that wraps it as an `IEvaluableAgent` — see `samples/AgentEval.Samples/Benchmarks/02_PerformanceBenchmark.cs` and [Programmatic use](#programmatic-use).
 
 See also:
 - [OWASP getting-started](../owasp/getting-started.md) — security red-team family.

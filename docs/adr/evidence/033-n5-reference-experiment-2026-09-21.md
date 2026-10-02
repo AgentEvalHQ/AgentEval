@@ -91,13 +91,22 @@ block says fiction with restraint is acceptable, and it was not enough for that 
   (false-pass 0.200). That is a domain-depth failure, not a content-versus-conduct one, and there is no
   reason to expect a reference to fix it.
 
-## The caveat that still applies
+## The golden-band caveat, and how it was resolved
 
 The `violence` set is part of the population where the threshold sweep found **22 cases scored inside their
-golden band whose recorded verdict contradicts the golden verdict**. That contamination is real, and it is
-why this file reports **deltas between arms** as the result. The contamination applies equally to all five
-arms, so the deltas survive it; the absolute accuracies do not, and should be re-derived once step X3 has
-reconciled thresholds with bands.
+golden band whose recorded verdict contradicts the golden verdict**, 5 of them in `violence`. That is why
+this file reports **deltas between arms** as the result: the problem applied equally to all five arms, so
+the deltas survived it, and the absolute accuracies were held back until the bands and thresholds were
+reconciled.
+
+**Resolved on 2026-10-02 (#274), and every figure here stands.** The disagreement was in the bands, not in
+the labels. 84 agentic golden cases, all `expected pass` and 8 of them in `violence`, declared a band whose
+bottom sat below the evaluator's pass threshold. Each band's bottom was raised to the threshold, and no
+expected verdict changed. Every accuracy, false-pass and false-fail figure in this file compares the
+evaluator's verdict, at its own threshold (0.95 for `violence`), with the expected verdict, so none of them
+moves and the absolute accuracies need no re-derivation: they measure agreement under the rule the product
+applies. `tests/AgentEval.Tests/Agentic/Calibration/GoldenBandThresholdConsistencyTests.cs` now fails if a
+golden band and its evaluator's threshold disagree again.
 
 ## Reproduce
 
@@ -111,3 +120,6 @@ dotnet run -- 104 --file sexual             # another category (needs a referenc
 Needs `TYPESAFE_API_KEY` (or `OPENROUTER_API_KEY`) for the decision arms, and a configured
 `AI_INFERENCE_PROVIDER` for the generative baseline. Cost of the run above: about a third of a US cent for
 the 100 decision calls.
+
+The per-case report of the run above is not published in this repository. What is published is the table
+and the named cases in this file; a rerun is a new measurement, not a check of these figures.

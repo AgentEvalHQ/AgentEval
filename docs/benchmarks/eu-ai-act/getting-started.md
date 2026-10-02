@@ -22,8 +22,8 @@ The following obligations are **highly or partially testable from agent dialog b
 
 - **Art 5 — Prohibited Practices** (Pillar 1, weight 0.30, severity Critical): whether the agent refuses subliminal or manipulative techniques causing significant harm, exploitation of vulnerabilities based on age, disability, or socio-economic status, social scoring leading to detrimental treatment, predictive policing based solely on profiling, untargeted scraping of facial images for biometric databases, emotion recognition in workplace or educational settings, biometric categorization for race, religion, sexual orientation, or political views, and real-time remote biometric identification in publicly accessible spaces.
 - **Art 50 — Transparency to Natural Persons** (Pillar 2, weight 0.20, severity High): whether the agent discloses its AI nature when interacting with humans (Art 50(1)), labels AI-generated or manipulated audio, image, and video content as deepfakes (Art 50(2)), discloses use of emotion recognition or biometric categorization systems (Art 50(3)), and identifies AI-generated text in informational contexts (Art 50(4)).
-- **Art 9 + Art 14 — Human Oversight** (Pillar 3, weight 0.15, severity High): whether the agent acknowledges its limits, offers human-review pathways, and refuses to issue final binding decisions in legally significant contexts such as employment, credit, and education (Art 14 human oversight, weight 0.50 within pillar), and whether the agent can describe the Art 9 iterative risk-management lifecycle, the Art 9(2)(c) post-market re-evaluation loop, the Art 9(5) residual-risk acceptability bar, and the Art 9(9) vulnerable-group obligation (Art 9 risk-management dialog-awareness, weight 0.50 within pillar). v1.1 ships dialog-awareness only; upstream-process attestation remains out of scope.
-- **Art 10 + Art 13 + Annex III — Risk-Tier Behavior** (Pillar 4, weight 0.10, severity High): whether the agent recognizes when asked to act in a high-risk Annex III role — employment, credit, education, healthcare — and applies stricter constraints accordingly (Annex III recognition, weight 0.40 within pillar); whether the agent provides clear information about its capabilities, limits, and intended purpose (Art 13 deployer transparency, weight 0.30 within pillar); and whether the agent can describe the Art 10 data-governance obligations covering Art 10(2)(a)-(h) elements, Art 10(3) representativeness, Art 10(4) setting-specific consideration, and the narrow Art 10(5) special-category-data exception for bias detection (Art 10 data-governance dialog-awareness, weight 0.30 within pillar). v1.1 ships Art 10 as dialog-awareness only; upstream-process attestation remains out of scope.
+- **Art 9 + Art 14 — Human Oversight** (Pillar 3, weight 0.15, severity High): whether the agent acknowledges its limits, offers human-review pathways, and refuses to issue final binding decisions in legally significant contexts such as employment, credit, and education (Art 14 human oversight, weight 0.50 within pillar), and whether the agent can describe the Art 9 iterative risk-management lifecycle, the Art 9(2)(c) post-market re-evaluation loop, the Art 9(5) residual-risk acceptability bar, and the Art 9(9) vulnerable-group obligation (Art 9 risk-management dialog-awareness, weight 0.50 within pillar). Art 9 is covered by dialog-awareness only; upstream-process attestation remains out of scope.
+- **Art 10 + Art 13 + Annex III — Risk-Tier Behavior** (Pillar 4, weight 0.10, severity High): whether the agent recognizes when asked to act in a high-risk Annex III role — employment, credit, education, healthcare — and applies stricter constraints accordingly (Annex III recognition, weight 0.40 within pillar); whether the agent provides clear information about its capabilities, limits, and intended purpose (Art 13 deployer transparency, weight 0.30 within pillar); and whether the agent can describe the Art 10 data-governance obligations covering Art 10(2)(a)-(h) elements, Art 10(3) representativeness, Art 10(4) setting-specific consideration, and the narrow Art 10(5) special-category-data exception for bias detection (Art 10 data-governance dialog-awareness, weight 0.30 within pillar). Art 10 is covered by dialog-awareness only; upstream-process attestation remains out of scope.
 - **Art 15 — Robustness and Accuracy** (Pillar 5, weight 0.15, severity Medium): consistency of behavior, refusal of confidently-wrong answers in high-stakes contexts, and stability under adversarial or ambiguous input. Note that full robustness under the AI Act requires cybersecurity and architectural verification; this pillar covers only the dialog-observable portion.
 - **Art 51–55 — GPAI Self-Awareness Probe** (Pillar 6, weight 0.10, severity Low): whether the agent can accurately represent its own model provenance, capabilities, and training-data origin when queried. This is a weak-signal probe; see Known Limitations.
 
@@ -34,8 +34,8 @@ The following obligations are **highly or partially testable from agent dialog b
 The following are not in scope for any automated dialog benchmark:
 
 - **Risk classification** of your AI system (Art 6, Art 7, Annex III) — a legal and architectural exercise requiring human judgment.
-- **Risk management system** under Art 9 — an iterative organisational process spanning identification, analysis, estimation, and mitigation over the system's lifecycle. The end-to-end process cannot be substantiated from dialog behaviour alone. **v1.1 (T1.2) ships an `eu_ai.art9.risk_management` dialog-awareness probe** under Pillar 3 Human Oversight that tests whether the agent can describe the Art 9(2)(a)-(d) iterative cycle, the Art 9(2)(c) post-market re-evaluation loop, the Art 9(5) residual-risk acceptability bar, and the Art 9(9) vulnerable-group obligation. The probe grades the agent's ability to describe the obligation; upstream-process attestation (i.e., that the organisation actually maintains the risk-management system) remains out of scope.
-- **Data governance** under Art 10 — training-data quality, representativeness, and bias mitigation are upstream-process obligations. **v1.1 (T1.2) ships an `eu_ai.art10.data_governance` dialog-awareness probe** under Pillar 4 Risk-Tier Behavior that tests whether the agent can describe the Art 10(2)(a)-(h) data-governance elements, the Art 10(3) representativeness criteria, the Art 10(4) setting-specific consideration, and the narrow Art 10(5) special-category-data exception for bias detection. The probe grades the agent's ability to describe the obligation; upstream-process attestation (i.e., that the organisation actually curates training data accordingly) remains out of scope.
+- **Risk management system** under Art 9 — an iterative organisational process spanning identification, analysis, estimation, and mitigation over the system's lifecycle. The end-to-end process cannot be substantiated from dialog behaviour alone. **The `eu_ai.art9.risk_management` dialog-awareness probe** under Pillar 3 Human Oversight tests whether the agent can describe the Art 9(2)(a)-(d) iterative cycle, the Art 9(2)(c) post-market re-evaluation loop, the Art 9(5) residual-risk acceptability bar, and the Art 9(9) vulnerable-group obligation. The probe grades the agent's ability to describe the obligation; upstream-process attestation (i.e., that the organisation actually maintains the risk-management system) remains out of scope.
+- **Data governance** under Art 10 — training-data quality, representativeness, and bias mitigation are upstream-process obligations. **The `eu_ai.art10.data_governance` dialog-awareness probe** under Pillar 4 Risk-Tier Behavior tests whether the agent can describe the Art 10(2)(a)-(h) data-governance elements, the Art 10(3) representativeness criteria, the Art 10(4) setting-specific consideration, and the narrow Art 10(5) special-category-data exception for bias detection. The probe grades the agent's ability to describe the obligation; upstream-process attestation (i.e., that the organisation actually curates training data accordingly) remains out of scope.
 - **Conformity assessment** procedures under Art 43 — a documented process, not a dialog test.
 - **Technical documentation** under Art 11 — a documentation artifact produced by your organization.
 - **Quality management system** under Art 17 — an organizational process.
@@ -46,9 +46,9 @@ The following are not in scope for any automated dialog benchmark:
 
 ---
 
-## v1 access path
+## Access path
 
-> The EU AI Act benchmark currently runs through the `agenteval` CLI binaries. Programmatic access via NuGet (`using AgentEval.EuAiActBenchmark;`) is planned for v1.1.
+> The EU AI Act benchmark runs through the `agenteval` CLI binaries. Its assembly also ships inside the `AgentEval` NuGet package: the preset factory is `EuAiActBenchmark` in the `AgentEval.Benchmarks` namespace, and the article, pillar and reporting types are under `AgentEval.Compliance.EuAiAct`. The CLI is the path these pages document.
 
 ---
 
@@ -56,7 +56,7 @@ The following are not in scope for any automated dialog benchmark:
 
 - .NET 10.0.x SDK (or 8.x / 9.x).
 - An initialized `.agenteval` workspace in your repository root.
-- **Azure OpenAI** resource with a deployed GPT-4o-class model (see Configuration below). Real judging **requires all three** of `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, and `AZURE_OPENAI_DEPLOYMENT`. If any are unset, the CLI refuses to run (exit code 3 — see [Exit codes](../../cli.md#exit-codes)). To exercise the pipeline without LLM cost — smoke-test mode only, **not for CI** — set `AGENTEVAL_ALLOW_STUB_JUDGE=1`; stub-mode results are deterministic placeholders and must not be relied on as compliance evidence. See [CLI Reference — Environment variables](../../cli.md#environment-variables) for the full resolution-order contract.
+- A configured inference provider with a GPT-4o-class model for the judge (see Configuration below): the one `AI_INFERENCE_PROVIDER` selects — Azure OpenAI, Bitdeer, OpenAI, Azure AI Foundry or any OpenAI-compatible host; see the [provider table](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to) — or a judge-only Azure OpenAI endpoint set with all three `AZURE_OPENAI_JUDGE_*` variables. If no provider is configured, or a selected provider is missing variables, the CLI refuses to run (exit code 3 — see [Exit codes](../../cli.md#exit-codes)). To exercise the pipeline without LLM cost — smoke-test mode only, **not for CI** — set `AGENTEVAL_ALLOW_STUB_JUDGE=1` on a machine with no provider variables set; stub-mode results are deterministic placeholders and must not be relied on as compliance evidence. See [CLI Reference — Environment variables](../../cli.md#environment-variables) for the full resolution-order contract.
 
 ---
 
@@ -64,7 +64,7 @@ The following are not in scope for any automated dialog benchmark:
 
 ```bash
 # Initialize the .agenteval workspace if not already done
-agenteval init --name MySolution
+agenteval init-workspace --name MySolution
 
 # Run the Smoke preset (5 controls, ~$0.05 with real LLM)
 agenteval bench eu-ai-act --preset smoke --subject MyAgent
@@ -140,7 +140,7 @@ EU AI Act is a compliance benchmark — like GDPR, it does **not** expose a `--b
 
 ### Known cost pitfall — multi-judge × Mode-B mutual exclusivity
 
-When `audit` preset runs with both 3-judge consensus AND Mode-B per-criterion split configured, multi-judge takes precedence and Mode-B is silently skipped — you don't pay the 3 × N call cost simultaneously. This is a deliberate v1 cost control documented in `samples/AgentEval.EuAiActBenchmark/Articles/Building/ScenarioToAtomicEval.cs` (KNOWN v1 LIMITATION block). See Known Limitations below.
+When `audit` preset runs with both 3-judge consensus AND Mode-B per-criterion split configured, multi-judge takes precedence and Mode-B is silently skipped — you don't pay the 3 × N call cost simultaneously. This is a deliberate cost control documented in `src/AgentEval.Compliance.EuAiAct/Articles/Building/ScenarioToAtomicEval.cs` (KNOWN v1 LIMITATION block). See Known Limitations below.
 
 For per-evaluator cost classification of the agentic benchmark suite (`bench agentic`), see [`docs/benchmarks/agentic/cost-guidance.md`](../agentic/cost-guidance.md).
 
@@ -152,7 +152,7 @@ Each run writes to `.agenteval/compliance/EU-AI-Act/{subject}/{timestamp}/`. The
 
 ```
 .agenteval/compliance/EU-AI-Act/MyAgent/2026-05-09_10-15-00/
-├── evidence.json           # Standard plan-01 ComplianceEvidence (audit-chain-validated)
+├── evidence.json           # Standard ComplianceEvidence (the file `agenteval doctor` checks)
 ├── eu-ai-act-evidence.json # EU AI Act wrapper: composite tree, pillar summary, critical findings,
 │                           #   recommendations, disclaimer, attestation
 ├── report.md               # PR-friendly markdown report
@@ -170,7 +170,7 @@ The EU AI Act-specific wrapper document. Contains:
 - `compositeTree` — the full recursive `EvalResult` tree, one node per pillar and per control.
 - `summary` — per-pillar and per-article scores, pass/fail/warn status, and overall verdict (`PASS`, `WARN`, or `FAIL`).
 - `criticalFindings` — list of controls that scored below threshold at `high` or `critical` severity.
-- `recommendations` — array of structured `{ controlId, severity, text, metadata? }` objects, one per failing article, sorted alphabetically by `controlId`. The schema accepts both this v1.1+ shape and the legacy v0.8.1-beta `string[]` shape via `anyOf` at the `items` level for backward compatibility. The optional `metadata: { string: string }` is reserved for v1.2+ extensions.
+- `recommendations` — array of structured `{ controlId, severity, text, metadata? }` objects, one per failing article, sorted alphabetically by `controlId`. The schema accepts both this structured shape and the legacy `string[]` shape written by v0.8.1-beta, via `anyOf` at the `items` level, so older files still validate. The schema also accepts an optional `metadata: { string: string }` object on each entry; the built-in recommendation extractor does not write it.
 - `disclaimer` — the verbatim disclaimer text from the Scope section above.
 - `attestation` — `{ "judgeMode": "...", "promptVersions": { ... } }`.
 
@@ -186,13 +186,15 @@ A PDF report for boardroom presentation or compliance-officer review. Sections: 
 
 ### Audit chain
 
-`agenteval doctor` validates the audit chain for every `eu-ai-act-evidence.json` file in the workspace. For each file it locates the corresponding run manifest, computes the `contentHash`, and compares it to the stored value. A hash mismatch — caused by modifying any run file after the run completes — is reported as a `Hash mismatch` error. Re-rendering a report using `agenteval compliance render` does not affect the source run and does not break the audit chain.
+`agenteval doctor` validates the audit chain. It reads `evidence.json` — not `eu-ai-act-evidence.json` — in every `.agenteval/compliance/{regulation}/{subject}/{timestamp}/` directory, so every EU AI Act run's evidence is covered. For each `evidence.json` it validates the file against `evidence.schema.json`, locates the source run's `manifest.json` from `sourceRun.runId`, and reports an error if the run cannot be found or a `hash mismatch` error if the run's `contentHash` differs from `sourceRun.manifestHash`. Separately, it re-hashes each run's files against the `contentHash` in that run's `manifest.json`, so modifying any run file after the run completes is reported as a `Hash mismatch` for that run. Re-rendering a report using `agenteval compliance render` does not affect the source run and does not break the audit chain.
+
+`report.md` and `report.pdf` record the source run ID and the manifest hash in their audit-chain section, but they do not verify them: a report renderer has only the reference copied into the evidence, not the run files the hash covers. The section therefore says "hash recorded, not verified in this report" (or "no hash recorded" when the evidence carries none) and points to `agenteval doctor`, which is the check. Run it inside the solution whose `.agenteval/` workspace holds the source run.
 
 ---
 
 ## Configuration
 
-Set the following environment variables before running to use a real LLM judge:
+The judge comes from the provider `AI_INFERENCE_PROVIDER` selects — Azure OpenAI, Bitdeer, OpenAI, Azure AI Foundry or any OpenAI-compatible host; see the [provider table](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to) for the variables each needs. With the selector unset, the first fully configured provider in that table's order is used. All three `AZURE_OPENAI_JUDGE_*` variables, when set, point the judge at its own Azure OpenAI endpoint and win over the selector. For example, to judge with Azure OpenAI (auto-detected when only these three are set):
 
 ```
 AZURE_OPENAI_ENDPOINT=https://<your-resource>.openai.azure.com/
@@ -200,7 +202,7 @@ AZURE_OPENAI_API_KEY=<your-key>
 AZURE_OPENAI_DEPLOYMENT=<your-gpt-4o-deployment>
 ```
 
-If any of the three `AZURE_OPENAI_*` variables are unset, the CLI exits **2** with a diagnostic listing the missing variable(s). To exercise the pipeline without LLM cost, set `AGENTEVAL_ALLOW_STUB_JUDGE=1` — the CLI prints a warning to stderr on every run and returns deterministic placeholder scores. **Stub-mode results must not be used for compliance or decision-making purposes.** See [CLI Reference — Environment variables](../../cli.md#environment-variables) for the full contract.
+If no provider is configured, or the selected provider is missing variables, the CLI exits **3** with a diagnostic naming what is missing. To exercise the pipeline without LLM cost, set `AGENTEVAL_ALLOW_STUB_JUDGE=1` on a machine with no provider variables set — the CLI prints a warning to stderr on every run and returns deterministic placeholder scores. **Stub-mode results must not be used for compliance or decision-making purposes.** See [CLI Reference — Environment variables](../../cli.md#environment-variables) for the full contract.
 
 ---
 
@@ -214,7 +216,7 @@ agenteval bench eu-ai-act calibrate
 
 The golden dataset contains hand-labeled scenario/response pairs distributed across the 6 EU AI Act pillars. Each pillar's dataset is mixed-class by design (both pass-labeled and fail-labeled examples with regulator-grade citations) — single-class datasets would make the kappa math collapse trivially. For each entry, the calibration runner asks the judge to score the response and compares that score to the human label. For a plain-English walkthrough of *how* calibration works and *what kappa means*, see [`how-it-works.md`](how-it-works.md).
 
-The calibration report records per-pillar accuracy (fraction of entries within an acceptable score band) and Cohen's kappa (inter-rater agreement). The command passes (exit 0) only when every pillar meets the following; otherwise it exits 9, which fails the CI workflow above:
+The calibration report records per-pillar accuracy (fraction of entries within an acceptable score band) and Cohen's kappa (inter-rater agreement). Its header names the judge provider (and how it was chosen) and the judge model or deployment, so reports produced by different judges can be told apart, including in a diff. When the environment no longer resolves to the model the judge was built with, the provider is reported as unknown rather than guessed; a stub-judge run says that its figures measure no model. The command passes (exit 0) only when every pillar meets the following; otherwise it exits 9, which fails the CI workflow above:
 
 - Accuracy ≥ 85% per pillar.
 - Cohen's kappa ≥ 0.70 per pillar.
@@ -232,11 +234,11 @@ A pillar that fails any threshold fails the command. The golden datasets are emb
 
 ## Known Limitations
 
-- **Multi-judge x Mode-B mutual exclusivity** — when both multi-judge (3 judges for Critical articles) and Mode-B (per-criterion split) are configured for the same scenario, multi-judge takes precedence and Mode-B is silently skipped. Full multi-judge x Mode-B would require 3 judges x N criteria = 3N LLM calls per scenario. This is an accepted v1 cost trade-off, documented inline in `samples/AgentEval.EuAiActBenchmark/Articles/Building/ScenarioToAtomicEval.cs` (KNOWN v1 LIMITATION block). A full fix is tracked as a Phase 11+ enhancement.
+- **Multi-judge x Mode-B mutual exclusivity** — when both multi-judge (3 judges for Critical articles) and Mode-B (per-criterion split) are configured for the same scenario, multi-judge takes precedence and Mode-B is silently skipped. Full multi-judge x Mode-B would require 3 judges x N criteria = 3N LLM calls per scenario. This is an accepted cost trade-off, documented inline in `src/AgentEval.Compliance.EuAiAct/Articles/Building/ScenarioToAtomicEval.cs` (KNOWN v1 LIMITATION block); there is no mode that runs both.
 - **Pillar 6 (GPAI) is probe-only / weak signal** — Art 51–55 obligations apply to model providers (the entity that trains or fine-tunes the model), not to deployers building agents on top. The pillar probes the agent's self-reported provenance and uncertainty about its own model — useful behavioral signal, but the agent cannot speak authoritatively about training data, evaluation methodology, or systemic risk classification. Pillar 6 weight is 0.10 and its scenarios are tagged `probe-only: true`.
 - **Pillar 5 (Robustness) is partly testable from dialog only** — Art 15 covers cybersecurity, model accuracy on validated test sets, and adversarial robustness, most of which is architectural and cannot be observed from dialog. This benchmark tests the dialog-observable portion only. Pillar 5 weight is 0.15.
 - **English-only scenarios** — all benchmark scenarios are authored in English. Multi-language scenario packs are deferred.
-- **Four Annex III high-risk areas not packaged in v1** — law enforcement, migration and border management, administration of justice, and critical infrastructure scenarios are explicitly out of scope for the current release. Community contributions are welcome.
+- **Four Annex III high-risk areas not packaged** — law enforcement, migration and border management, administration of justice, and critical infrastructure scenarios are explicitly out of scope for the current release. Community contributions are welcome.
 
 ---
 

@@ -19,19 +19,28 @@ public class CategoryScoreEntry
     /// <summary>Whether this category was skipped.</summary>
     public required bool Skipped { get; init; }
 
-    /// <summary>Number of scenarios run for this category (1 for Quick, 2+ for Standard/Full).</summary>
+    /// <summary>
+    /// Number of items behind this score. External-benchmark baselines set it to the category's
+    /// question count. The native memory benchmark's <c>ToBaseline</c> does not set it, so native
+    /// baselines carry the default of 1 whatever the preset ran.
+    /// </summary>
     public int ScenarioCount { get; init; } = 1;
 
     /// <summary>Actionable recommendation for this category, if score is weak.</summary>
     public string? Recommendation { get; init; }
 
-    /// <summary>Stochastic data from multi-run evaluation. Null for single-run (default).</summary>
+    /// <summary>
+    /// Multi-run statistics for this category. Not populated by any shipped runner: no AgentEval code
+    /// path sets it, so it is <see langword="null"/> on every baseline AgentEval produces, and the
+    /// shipped report does not read it. It exists so a caller that runs the benchmark several times
+    /// can record its own statistics on the baseline.
+    /// </summary>
     public StochasticData? Stochastic { get; init; }
 }
 
 /// <summary>
 /// Statistical data from running the same benchmark multiple times.
-/// Forward-compatible — populated by future stochastic evaluation mode.
+/// Not populated by any shipped runner; see <see cref="CategoryScoreEntry.Stochastic"/>.
 /// </summary>
 public class StochasticData
 {

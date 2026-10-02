@@ -23,8 +23,7 @@
     Phase 1 (assertions + progressive-disclosure efficiency metric) needs only Microsoft.Agents.AI +
     Azure OpenAI. Phase 2 (compliance scanner, AgentEval.MAF.Skills.MafSkillScanner) adds the
     AgentEval.MAF reference above. Phase 3 (skill-injection red-team + run_skill_script governance
-    gates) adds AgentEval.RedTeam / AgentEval.RedTeam.Gatekeeper. See
-    strategy/FutureFeatures/Skills/AgentEval-AgentSkills-Evals-Design-and-Plan.md.
+    gates) adds AgentEval.RedTeam / AgentEval.RedTeam.Gatekeeper. See docs/agent-skills.md.
   -->
   <ItemGroup>
     <PackageReference Include="Microsoft.Agents.AI" />

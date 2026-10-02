@@ -1,6 +1,6 @@
 # AEVP 0.1 — Agent Evidence Profile
 
-**Status:** draft profile — not a standard; no standards body or AGENT-HOOKS maintainer has reviewed it · **Applies to:** AGENT-HOOKS-0.1 · **Schema:** `aevp-0.1.schema.json`
+**Status:** draft profile, published in this repository — not a standard; no standards body or AGENT-HOOKS maintainer has reviewed it (see §7) · **Applies to:** AGENT-HOOKS-0.1 · **Schema:** `src/AgentEval.MAF.AgentHooks/Aevp/aevp-0.1.schema.json`
 
 A **profile** for the evidence an interceptor attaches to its verdicts. It is offered as an *interceptor
 specification* in the sense AGENT-HOOKS-0.1 §1 intends, but it is one project's proposal, not a standard:
@@ -98,7 +98,8 @@ Deliberately capped. Each answers a question an auditor must ask and cannot ask 
    - The address is `sha256:<hex>` over the profile's **RFC 8785 (JCS)** canonical UTF-8 bytes, so any JCS
      implementation computes the same address (**AEVP-007**).
    - The reference interceptor writes each profile to an `IAevpArtifactStore` before it returns the address, so
-     the address resolves (**AEVP-008**).
+     the address resolves. `GatekeeperInterceptorPipelineParityTests.EveryVerdictsEvidence_ResolvesToBytesThatHashToItsAddress`
+     checks this for an allow, a deny, a transform and an unenforced point.
    - The default store is in-memory; supply a durable one when auditors outside the process must resolve it.
 5. **Absent `calibration` is not "fine".** It means the decider never underwent calibration.
 
@@ -120,19 +121,22 @@ falsify is worth nothing.
 | AEVP-005 | Unknown fields are rejected (the cap) |
 | AEVP-006 | Calibration round-trips and validates |
 | AEVP-007 | Content address is stable and content-sensitive |
-| AEVP-008 | The reference interceptor emits a resolvable profile on every verdict |
+| AEVP-008 | The reference interceptor attaches a profile address to an enforced allow and to an unenforced point's allow, and the two addresses differ |
 
 ---
 
 ## 6. Reference implementation
 
-`AgentEval.MAF.AgentHooks` — Gatekeeper exposed as an AGENT-HOOKS-0.1 interceptor. It attaches a profile to
-every verdict it produces:
+`AgentEval.MAF.AgentHooks` — Gatekeeper exposed as an AGENT-HOOKS-0.1 interceptor. It is in this repository,
+marked experimental (`AGENTEVAL_AGENTHOOKS_PREVIEW001`), built on the alpha `ResponsibleAI.AgentHooks` package,
+and not included in the `AgentEval` NuGet package. It attaches a profile to the verdicts it produces:
 
 - decided at the tool seam → `evaluated: true`, `enforcement_capability: transform`,
-  `evidence_tier: intent_to_act`, `judge: { id: <gate policy name> }`
-- an interception point with no gate registered → `evaluated: false`,
-  `enforcement_capability: observe`, **no tier**
+  `evidence_tier: intent_to_act`, `judge: { id: <gate policy name> }` (for an allow, the last gate in the chain)
+- an interception point with no gate to run (every point other than `pre_tool_call`, and `pre_tool_call` when
+  the interceptor was given no gates) → `evaluated: false`, `enforcement_capability: observe`, **no tier**
+- two fail-closed denies carry **no** evidence: a `pre_tool_call` context without a readable `tool_call.name`,
+  and a gate that returns an action the adapter does not recognise
 
 Deterministic gates emit **no `calibration`** — asserting a calibration record they never underwent would be
 exactly the fabrication this profile prevents.
@@ -141,6 +145,14 @@ exactly the fabrication this profile prevents.
 
 ## 7. Status and non-goals
 
-Draft, and deliberately unpublished pending a decision on the upstream route. AEVP does **not** define policy
-languages, interception points, verdict semantics, or host obligations — those are AGENT-HOOKS-0.1's, and
-duplicating them would be a competing contract rather than a complementary profile.
+**Status (checked 2026-10-02).** Published in this repository as a draft profile. It is not a standard, and no
+standards body or AGENT-HOOKS maintainer has reviewed it. AEVP itself has not been submitted upstream. The
+upstream route is AGENT-HOOKS's written-proposal process (`docs/proposals/` in responsibleai/agent-hooks), and
+the first proposal from this project is open there as
+[responsibleai/agent-hooks#104](https://github.com/responsibleai/agent-hooks/pull/104), awaiting maintainer
+review. That proposal, P-005, makes retractability a declared host capability (whether a seam's verdict can
+still prevent the effect it guards) and does not include AEVP.
+
+**Non-goals.** AEVP does **not** define policy languages, interception points, verdict semantics, or host
+obligations — those are AGENT-HOOKS-0.1's, and duplicating them would be a competing contract rather than a
+complementary profile.

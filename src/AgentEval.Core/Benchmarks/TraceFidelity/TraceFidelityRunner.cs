@@ -15,10 +15,15 @@ namespace AgentEval.Benchmarks;
 /// <remarks>
 /// Reconciliation reads tool <em>calls</em> (<see cref="TraceEntry.ToolCalls"/>), per-turn finish reasons,
 /// and token usage — never tool <em>definition schemas</em>, so tool-definition de-dup never affects fidelity.
-/// Argument comparison is by serialized-string equality (a documented v1 heuristic).
+/// Argument comparison is by serialized-string equality (a documented v1 heuristic). Finish reasons are compared
+/// as reported strings, case-insensitively, so a framework that reports the same reason under another label is
+/// counted as not reporting it.
 /// </remarks>
 public sealed class TraceFidelityRunner
 {
+    // Provider-side interventions on a model turn (filtered / cut off) that suppressed_finish_reason checks for.
+    private static readonly string[] InterventionFinishReasons = { "content_filter", "length" };
+
     private readonly SamplePreset _preset;
 
     /// <summary>Creates a runner. The preset is informational for reconciliation (it does not change scoring).</summary>
@@ -45,7 +50,7 @@ public sealed class TraceFidelityRunner
         discrepancies.Add(ArgumentDrift(chatByName, agentByName));
         discrepancies.Add(HiddenRetries(chatByName, agentByName));
         discrepancies.Add(TokenUnderReporting(agentTrace, chatTrace));
-        discrepancies.Add(SuppressedFinishReason(chatTrace));
+        discrepancies.Add(SuppressedFinishReason(agentTrace, chatTrace));
 
         var root = 1.0 - discrepancies.Sum(d => TraceFidelityRubric.Weight(d.ClassKey) * (1.0 - d.Score));
         return new TraceFidelityReport(discrepancies, Math.Clamp(root, 0.0, 1.0));
@@ -165,16 +170,50 @@ public sealed class TraceFidelityRunner
         return Build(TraceFidelityRubric.TokenUnderReporting, count, examples);
     }
 
-    private static TraceFidelityDiscrepancy SuppressedFinishReason(AgentTrace chatTrace)
+    private static TraceFidelityDiscrepancy SuppressedFinishReason(AgentTrace agentTrace, AgentTrace chatTrace)
     {
-        var suppressed = chatTrace.Entries
+        var chatTurns = chatTrace.Entries
             .Where(e => e.EffectiveScope == TraceEntryScope.ChatTurn && e.Type == TraceEntryType.Response)
-            .Where(e => string.Equals(e.FinishReason, "content_filter", StringComparison.OrdinalIgnoreCase)
-                     || string.Equals(e.FinishReason, "length", StringComparison.OrdinalIgnoreCase))
-            .Select(e => $"turn {e.Index} finished with '{e.FinishReason}' (not reflected at the agent boundary)")
             .ToList();
-        return Build(TraceFidelityRubric.SuppressedFinishReason, suppressed.Count, suppressed);
+
+        // Agent boundary: the finish reason(s) the framework reported, read from any Response entry (the same
+        // entries the agent-side tool calls are read from). A missing reason stays null — it reported none.
+        var agentReasons = agentTrace.Entries
+            .Where(e => e.Type == TraceEntryType.Response)
+            .Select(e => e.FinishReason)
+            .ToList();
+
+        // A chat turn that ended in content_filter/length is suppressed only when the agent boundary did NOT report
+        // that same reason (it reported stop, another reason, or none). Turns cannot be paired across the layers by
+        // index (agent entries are per invocation, chat entries per model round-trip), so reconcile by count per
+        // reason: each agent-boundary report of a reason accounts for one chat turn that ended with it. Directional,
+        // like token_under_reporting — the agent reporting a reason the chat boundary never saw is not counted here.
+        var count = 0;
+        var examples = new List<string>();
+        foreach (var reason in InterventionFinishReasons)
+        {
+            var turns = chatTurns
+                .Where(e => string.Equals(e.FinishReason, reason, StringComparison.OrdinalIgnoreCase))
+                .Select(e => e.Index)
+                .ToList();
+            var reported = agentReasons.Count(r => string.Equals(r, reason, StringComparison.OrdinalIgnoreCase));
+            var unreflected = turns.Count - reported;
+            if (unreflected > 0)
+            {
+                count += unreflected;
+                examples.Add($"'{reason}' ended {turns.Count} chat turn(s) (turn {string.Join(", ", turns)}) but the agent boundary reported it {reported}× (agent reported: {AgentFinishLabel(agentReasons)})");
+            }
+        }
+
+        return Build(TraceFidelityRubric.SuppressedFinishReason, count, examples);
     }
+
+    // Renders the agent boundary's reported finish reasons for evidence. A missing reason is shown as <null>, not
+    // an empty string, because "reported none" is itself the suppression signal.
+    private static string AgentFinishLabel(IReadOnlyList<string?> agentReasons)
+        => agentReasons.Count == 0
+            ? "no response entries"
+            : string.Join(", ", agentReasons.Select(r => r is null ? "<null>" : $"'{r}'").Distinct(StringComparer.Ordinal));
 
     private static TraceFidelityDiscrepancy Build(string classKey, int count, IEnumerable<string> examples)
         => new(classKey, TraceFidelityRubric.Severity(classKey), count, TraceFidelityRubric.ChildValue(classKey, count), examples.ToList());

@@ -112,4 +112,3 @@ The portal's GraphQL schema auto-discovers the `EvaluatorCard` C# record, so add
 
 - [`getting-started.md`](getting-started.md) — running the portal.
 - [`charting.md`](charting.md) — what `recommendedVisualization` values mean in the SPA.
-- [Plan-07 §11](../../strategy/FutureFeatures/todo/07-AgentEval-MissionControl-Design.md#11-evaluatorcard--the-missing-primitive-for-schema-driven-ui) — design rationale.

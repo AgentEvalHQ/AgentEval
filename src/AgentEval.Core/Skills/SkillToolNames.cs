@@ -18,8 +18,7 @@ namespace AgentEval.Skills;
 /// the live <c>Microsoft.Agents.AI 1.13.0</c> assembly.
 /// </para>
 /// <para>
-/// <b>Argument names</b> — the design doc that scoped this feature
-/// (<c>strategy/FutureFeatures/Skills/AgentEval-AgentSkills-Evals-Design-and-Plan.md</c>) flagged these as
+/// <b>Argument names</b> — the design doc that scoped this feature flagged these as
 /// unverified (open item "(a)") with a value-based-matching fallback. They have since been <b>verified
 /// against the live MAF 1.13.0 assembly</b> (reflection over <c>AgentSkillsProvider</c>'s private
 /// <c>BuildTools</c> method, inspecting the real emitted <c>AIFunction.JsonSchema</c>

@@ -11,7 +11,7 @@ using Xunit;
 namespace AgentEval.Tests.MAF.CopilotStudio;
 
 /// <summary>
-/// P6 item B (<c>strategy/CopilotStudio/Copilot-Studio-P6-Connector-Health-and-Resilience-Design.md</c> §1B):
+/// P6 item B (Copilot Studio connector health and resilience):
 /// <c>CopilotStudioChatClient</c>'s retry wiring, exercised against <see cref="MockCopilotStudioConversationClient"/>'s
 /// existing rate-limit injection (built Stage 4, unused for this purpose until now — exactly what it was built
 /// for). Verified against the mock only, per the class's own honesty boundary — a real Copilot Studio 429

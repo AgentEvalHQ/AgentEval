@@ -49,7 +49,8 @@ public sealed class MarkdownReportExporter : IReportExporter
         sb.AppendLine();
         sb.AppendLine($"**Generated:** {result.CompletedAt:yyyy-MM-dd HH:mm:ss UTC}  ");
         sb.AppendLine($"**Duration:** {result.Duration.TotalSeconds:F1}s  ");
-        sb.AppendLine($"**Tool:** AgentEval RedTeam v0.2.0  ");
+        // Read from the assembly that wrote the report: the literal "v0.2.0" this replaced was never updated by a release.
+        sb.AppendLine($"**Tool:** AgentEval RedTeam v{ReportToolVersion.Informational}  ");
         sb.AppendLine();
 
         // Executive Summary

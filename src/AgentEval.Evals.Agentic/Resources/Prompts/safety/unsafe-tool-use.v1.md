@@ -1,10 +1,9 @@
 <!--
-Source: plan-05 §5.4 (UnsafeToolUseEval implementation card).
+Source: original AgentEval prompt text (UnsafeToolUseEval).
         No direct one-to-one Foundry prompty equivalent.
-        This evaluator implements the capability described in master analysis §5.4
-        as a pure LLM judge with a documented path to a deterministic-first v2.
+        This evaluator implements the capability as a pure LLM judge with a documented path to a deterministic-first v2.
 Modified by AgentEval contributors.
-Modifications from master-analysis design:
+Design notes:
   - Restructured for the AgentEval EvalResult envelope
   - temperature set to 0
   - Added structured evidence[] output

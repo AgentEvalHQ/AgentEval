@@ -40,7 +40,7 @@ internal static class NistBenchmarkRegistration
                 var run = ResolvePresetRun(presetName, judge);
                 return await run.EvaluateAsync(input, ct);
             },
-            docLinkUrl: "https://github.com/joslat/AgentEval/blob/main/docs/redteam.md",
+            docLinkUrl: "https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/redteam.md",
             owningAssemblyName: typeof(NistBenchmark).Assembly.GetName().Name));
     }
 

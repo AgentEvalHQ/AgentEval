@@ -173,6 +173,25 @@ public class WorkflowTraceFidelityReconcilerTests
     }
 
     [Fact]
+    public void Reconcile_FinishReasonDiffersOnlyInCase_IsAgree_ButAnotherLabelIsStillAMismatch()
+    {
+        // Finish reasons are compared case-insensitively, like TraceFidelityRunner and MEAI's ChatFinishReason
+        // equality, so "Content_Filter" against chat truth "content_filter" is the same reason. The old ordinal
+        // comparison scored it as a FinishMismatch (0.5).
+        var sameReason = Assert.Single(new WorkflowTraceFidelityReconciler().Reconcile(
+            Result(Step("a", 0, 10, 5, "Content_Filter")),
+            new Dictionary<string, AgentTrace> { ["a"] = ChatTrace(15, "content_filter") }).Executors);
+        Assert.Equal(WorkflowFidelityDiff.Agree, sameReason.DiffKind);
+        Assert.Equal(1.0, sameReason.Score);
+
+        // Ignoring case does not map labels: a framework that reports "MaxTokens" for "length" did not report it.
+        var otherLabel = Assert.Single(new WorkflowTraceFidelityReconciler().Reconcile(
+            Result(Step("a", 0, 10, 5, "MaxTokens")),
+            new Dictionary<string, AgentTrace> { ["a"] = ChatTrace(15, "length") }).Executors);
+        Assert.Equal(WorkflowFidelityDiff.FinishMismatch, otherLabel.DiffKind);
+    }
+
+    [Fact]
     public void Reconcile_ChatTraceWithNoResponses_IsNoTruth_NotTokenMismatch()
     {
         // A supplied trace with zero ChatTurn responses is not "truth" — comparing framework tokens against a

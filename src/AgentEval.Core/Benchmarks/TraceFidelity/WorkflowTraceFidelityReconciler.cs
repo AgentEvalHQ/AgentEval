@@ -159,12 +159,16 @@ public sealed class WorkflowTraceFidelityReconciler
                 var shortfall = (tokensChatTruth - tokensFramework) / (double)Math.Max(tokensChatTruth, 1);
                 var tokenMismatch = shortfall > TraceFidelityRubric.TokenToleranceFraction;
 
-                // Suppressed finish reason is the headline deception: chat truth reports a terminal reason
-                // (e.g. content_filter / length) while the framework ledger reports null. So a mismatch fires
-                // whenever chat truth HAS a finish reason and the framework's differs — INCLUDING when the
-                // framework's is null (suppression). Mirrors TraceFidelityRunner.SuppressedFinishReason.
+                // Compares the executor's terminal finish reasons: the last non-null reason at the chat boundary
+                // against the framework's last-step reason. A mismatch fires whenever chat truth HAS a reason (any
+                // value, stop included) and the framework's differs from it — INCLUDING when the framework's is
+                // null (suppression, the headline deception for content_filter / length). Reasons are compared
+                // as reported strings, case-insensitively, like TraceFidelityRunner and MEAI's ChatFinishReason
+                // equality; a reason reported under another label (MaxTokens for length) is a mismatch. Unlike
+                // TraceFidelityRunner.SuppressedFinishReason, this is not limited to content_filter / length and
+                // is not counted per reason.
                 var finishMismatch = finishChatTruth is not null
-                    && !string.Equals(finishFramework, finishChatTruth, StringComparison.Ordinal);
+                    && !string.Equals(finishFramework, finishChatTruth, StringComparison.OrdinalIgnoreCase);
 
                 var diff = (tokenMismatch, finishMismatch) switch
                 {

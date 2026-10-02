@@ -61,7 +61,7 @@ internal static class OwaspBenchmarkRegistration
                 var run = ResolvePresetRun(presetName, judge);
                 return await run.EvaluateAsync(input, ct);
             },
-            docLinkUrl: "https://github.com/joslat/AgentEval/blob/main/docs/redteam/owasp.md",
+            docLinkUrl: "https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/redteam/owasp.md",
             owningAssemblyName: typeof(OwaspBenchmark).Assembly.GetName().Name));
     }
 

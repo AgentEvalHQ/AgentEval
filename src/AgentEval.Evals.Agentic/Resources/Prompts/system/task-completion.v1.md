@@ -1,11 +1,11 @@
 <!--
-Source: forked from Azure/azure-sdk-for-python (commit <TBD-foundry-sha> see CHANGELOG T3.7)
-        sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_task_completion/task_completion.prompty
-License: MIT (https://github.com/Azure/azure-sdk-for-python/blob/main/LICENSE)
-Modified by AgentEval contributors. See CHANGELOG.md.
-Modifications:
+Lineage: original AgentEval prompt text, modelled on the evaluator concept (name, inputs and
+         scoring dimensions) of Azure/azure-sdk-for-python
+         sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_task_completion/task_completion.prompty
+         Checked 2026-10-02: no upstream prompt text is reproduced.
+License: MIT (https://github.com/AgentEvalHQ/AgentEval/blob/main/LICENSE)
+Differences from the upstream evaluator:
   - Restructured for the AgentEval EvalResult envelope
-  - temperature 1.0 → 0
   - Added completion_state taxonomy (complete | partial | blocked_requires_user | blocked_requires_tool | safe_refusal | failed)
   - Added explicit external-claim verification rubric (cross-reference response claims against tool_calls)
   - Added actionability sub-score

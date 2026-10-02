@@ -28,12 +28,13 @@ public class TraceFidelityTests
             toolCalls: calls?.Select(c => new TraceToolCall { Name = c.Name, Arguments = c.Args }).ToList(),
             finishReason: finish, providerMetadata: null);
 
-    private static TraceEntry AgentResp(int i, IEnumerable<(string Name, string Args)>? calls = null)
+    private static TraceEntry AgentResp(int i, IEnumerable<(string Name, string Args)>? calls = null, string? finish = null)
         => new()
         {
             Type = TraceEntryType.Response,
             Index = i,
             ToolCalls = calls?.Select(c => new TraceToolCall { Name = c.Name, Arguments = c.Args }).ToList(),
+            FinishReason = finish,
         };
 
     private static TraceFidelityReport Reconcile(AgentTrace agent, AgentTrace chat)
@@ -115,11 +116,60 @@ public class TraceFidelityTests
     [Fact]
     public void SuppressedFinishReason_DetectedWhenChatSawContentFilter()
     {
+        // The agent boundary reports NO finish reason: "reported none" does not reflect the content_filter turn.
         var report = Reconcile(
             agent: Agent(null, AgentResp(0)),
             chat: Chat(ChatResp(0, finish: "content_filter")));
         Assert.Equal(1, Class(report, TraceFidelityRubric.SuppressedFinishReason).Count);
         Assert.Equal("Critical", Class(report, TraceFidelityRubric.SuppressedFinishReason).Severity);
+        Assert.Contains("agent reported: <null>", Assert.Single(Class(report, TraceFidelityRubric.SuppressedFinishReason).Examples));
+    }
+
+    [Theory]
+    [InlineData("content_filter", "content_filter")]
+    [InlineData("length", "length")]
+    [InlineData("content_filter", "CONTENT_FILTER")]   // compared case-insensitively
+    public void SuppressedFinishReason_NotFlaggedWhenAgentReportsTheSameReason(string chatFinish, string agentFinish)
+    {
+        // A faithful report: the framework passed the provider's intervention through, so nothing was suppressed.
+        var report = Reconcile(
+            agent: Agent(null, AgentResp(0, finish: agentFinish)),
+            chat: Chat(ChatResp(0, finish: chatFinish)));
+        var suppressed = Class(report, TraceFidelityRubric.SuppressedFinishReason);
+        Assert.Equal(0, suppressed.Count);
+        Assert.Empty(suppressed.Examples);
+        Assert.Equal(1.0, report.OverallScore, 6);
+    }
+
+    [Theory]
+    [InlineData("content_filter", "stop")]
+    [InlineData("length", "stop")]
+    [InlineData("content_filter", "length")]   // a different intervention is not the reason the turn ended with
+    public void SuppressedFinishReason_DetectedWhenAgentReportsADifferentReason(string chatFinish, string agentFinish)
+    {
+        var report = Reconcile(
+            agent: Agent(null, AgentResp(0, finish: agentFinish)),
+            chat: Chat(ChatResp(0, finish: chatFinish)));
+        var suppressed = Class(report, TraceFidelityRubric.SuppressedFinishReason);
+        Assert.Equal(1, suppressed.Count);
+        Assert.Equal("Critical", suppressed.Severity);
+        var example = Assert.Single(suppressed.Examples);
+        Assert.Contains($"'{chatFinish}'", example);
+        Assert.Contains($"agent reported: '{agentFinish}'", example);
+        Assert.Equal(0.85, report.OverallScore, 6);   // root = 1 - 0.15 x (1 - 0)
+    }
+
+    [Fact]
+    public void SuppressedFinishReason_CountsOnlyTheTurnsTheAgentBoundaryDidNotReport()
+    {
+        // Two invocations each ended in content_filter at the chat boundary; the agent boundary reported it for one
+        // and 'stop' for the other. Reconciled by count per reason, so exactly one turn is suppressed, not two.
+        var report = Reconcile(
+            agent: Agent(null, AgentResp(0, finish: "content_filter"), AgentResp(1, finish: "stop")),
+            chat: Chat(ChatResp(0, finish: "content_filter"), ChatResp(1, finish: "content_filter")));
+        var suppressed = Class(report, TraceFidelityRubric.SuppressedFinishReason);
+        Assert.Equal(1, suppressed.Count);
+        Assert.Contains("reported it 1×", Assert.Single(suppressed.Examples));
     }
 
     [Fact]

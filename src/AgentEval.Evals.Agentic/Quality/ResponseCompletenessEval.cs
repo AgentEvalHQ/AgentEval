@@ -25,12 +25,11 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// infers expected facts from the query alone, which may undercount expectations.
 /// </para>
 /// <para>
-/// Source: forked from Azure/azure-sdk-for-python (commit &lt;TBD-foundry-sha&gt; see CHANGELOG T3.7)
-/// sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_response_completeness/response_completeness.prompty
-/// License: MIT. Modifications: temperature=0, critical/optional gap classification,
-/// missing_facts[] array, structured evidence[], label table, severity=medium.
-/// These modifications are in the reference prompt file under <c>Resources/Prompts/</c>, which is not
-/// yet sent to the judge; the judge call sets no temperature.
+/// Lineage: AgentEval's own criteria and reference prompt, modelled on the evaluator concept (name,
+/// inputs and scoring dimensions) of Azure/azure-sdk-for-python
+/// <c>sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_response_completeness/response_completeness.prompty</c>.
+/// A 2026-10-02 check found no upstream prompt text in the reference prompt file under
+/// <c>Resources/Prompts/</c>, which is not yet sent to the judge.
 /// </para>
 /// </summary>
 public sealed class ResponseCompletenessEval : IEval

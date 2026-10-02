@@ -43,7 +43,7 @@ internal static class MitreBenchmarkRegistration
                 var run = ResolvePresetRun(presetName, judge);
                 return await run.EvaluateAsync(input, ct);
             },
-            docLinkUrl: "https://github.com/joslat/AgentEval/blob/main/docs/redteam/mitre.md",
+            docLinkUrl: "https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/mitre/getting-started.md",
             owningAssemblyName: typeof(MitreBenchmark).Assembly.GetName().Name));
     }
 

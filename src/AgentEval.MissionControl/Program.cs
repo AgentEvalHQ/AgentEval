@@ -57,7 +57,7 @@ for (var i = 0; i < args.Length - 1; i++)
         if (status == AgentEval.Output.WorkspaceRootDiscovery.PathStatus.NotFound)
         {
             Console.Error.WriteLine($"--workspace path '{raw}' (canonicalised to '{detail}') does not exist.");
-            Console.Error.WriteLine("    Run `agenteval init` to create a workspace at that path, or point --workspace at an existing one.");
+            Console.Error.WriteLine("    Run `agenteval init-workspace` to create a workspace at that path, or point --workspace at an existing one.");
             Environment.Exit(1);
             return;
         }

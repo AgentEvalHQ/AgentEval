@@ -46,8 +46,28 @@ jobs:
       run: python tools/check_tag_has_changelog_section.py
     # Runs in the SAME job because it needs the same full-depth checkout: the history half of
     # the check reads `git log --all`, which a shallow clone cannot answer.
-    - name: No private path is tracked in this public repository
+    - name: No private path is tracked or cited in this public repository
       run: python tools/check_no_private_paths.py
+    # The step above passing is also what a mention scan that reads nothing would print. Dropping
+    # .gitignore from the allowlist leaves its real ignore rule as a citation, so the same script
+    # must now exit 1 and name .gitignore. Exit 0 or 2 here means the mention check cannot fail.
+    # This runs only after the real check passed, so its exit 1 can only come from the ablation.
+    - name: The private-path mention check can fail (ablation self-test)
+      shell: bash
+      run: |
+        set +e
+        out="$(python tools/check_no_private_paths.py --ablate-mention .gitignore)"
+        rc=$?
+        set -e
+        printf '%s\n' "$out"
+        if [ "$rc" -ne 1 ]; then
+          echo "::error::With .gitignore dropped from the mention allowlist the check exited $rc, not 1: it cannot fail on a real citation."
+          exit 1
+        fi
+        if ! grep -q '^  \.gitignore:[0-9]' <<< "$out"; then
+          echo "::error::The ablation exited 1 but did not report .gitignore, so the failure came from something else."
+          exit 1
+        fi
     # Needs no credentials and no network: the check pins the resolved model and every
     # vector is synthetic. It spawns two child interpreters to prove that concurrent writers
     # do not lose each other's work, which is why it takes a few seconds rather than none.

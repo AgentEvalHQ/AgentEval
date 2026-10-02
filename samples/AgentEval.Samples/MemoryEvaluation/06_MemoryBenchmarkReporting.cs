@@ -229,8 +229,8 @@ public static class MemoryBenchmarkReporting
         Console.WriteLine(new string('=', 70));
         Console.WriteLine("KEY TAKEAWAYS:");
         Console.WriteLine("   * Multi-model comparison: same prompt, 3 models, side-by-side");
-        Console.WriteLine("   * GPT-4o-mini is significantly weaker at memory recall under context pressure");
-        Console.WriteLine("   * GPT-4.1 excels but differences emerge in temporal + conflict resolution");
+        Console.WriteLine("   * Which model led each category is in the comparison table above: measured in");
+        Console.WriteLine("     this run, on this benchmark, not assumed from the model names");
         Console.WriteLine("   * MemoryBenchmarkRunner.Create(chatClient) — zero boilerplate");
         Console.WriteLine("   * .ToBaseline(name, config) snapshots scores + full agent metadata");
         Console.WriteLine("   * ConfigurationId routes: same config -> timeline, different -> radar");

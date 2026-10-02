@@ -24,8 +24,10 @@ namespace AgentEval.Rendering.Pdf;
 ///   <item>Audit chain appendix — audit hash, AgentEval version, generation timestamp.</item>
 /// </list>
 /// <para>
-/// The QuestPDF Community license is accepted in the static constructor so that
-/// callers and unit tests do not need to set it manually.
+/// The static constructor declares the QuestPDF Community licence when no licence type
+/// has been set yet, so callers and unit tests do not need to set it manually.
+/// <c>QuestPDF.Settings.License</c> is process-wide: a licence type the host application
+/// set earlier (for example Professional) is left unchanged.
 /// </para>
 /// <para>
 /// <b>Relationship to family-specific renderers</b>: <c>GDPRPdfRenderer</c>,
@@ -40,7 +42,7 @@ public sealed class PdfEvalResultRenderer : IEvalResultRenderer
 {
     static PdfEvalResultRenderer()
     {
-        QuestPDF.Settings.License = LicenseType.Community;
+        QuestPDF.Settings.License ??= LicenseType.Community;
     }
 
     /// <inheritdoc/>

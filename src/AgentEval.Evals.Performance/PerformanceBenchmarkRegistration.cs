@@ -79,7 +79,7 @@ internal static class PerformanceBenchmarkRegistration
                 });
                 return await bench.EvaluateAsync(input, ct);
             },
-            docLinkUrl: "https://github.com/joslat/AgentEval/blob/main/docs/perf-benchmark.md",
+            docLinkUrl: "https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/perf/getting-started.md",
             owningAssemblyName: typeof(PerformanceBenchmark).Assembly.GetName().Name));
     }
 

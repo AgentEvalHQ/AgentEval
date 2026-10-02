@@ -12,7 +12,7 @@ public enum ReplayVerdict
     /// <summary>Tool calls, finish reason, and response shape all matched the capture.</summary>
     Pass,
 
-    /// <summary>Tool calls and finish reason matched, but response shape (length bucket / structural markers) diverged — worth a look, not a behavioral regression.</summary>
+    /// <summary>Tool calls and finish reason matched, but response shape (length bucket / structural markers) diverged, or could not be compared because the list-marker scan timed out — worth a look, not a behavioral regression.</summary>
     Flag,
 
     /// <summary>Tool calls or finish reason diverged from the capture (or, under <c>--strict-text</c>, exact text diverged) — the replay target behaved differently.</summary>

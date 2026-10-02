@@ -58,11 +58,14 @@ public static class BenchCalibrateCommand
         CancellationToken ct = default)
         => RunCoreAsync(rootOverride, outPathOverride, evaluatorOverride, ct);
 
+    // evaluatorOverrideIdentity: the provider and model behind evaluatorOverride, for the report header. Without it a
+    // supplied evaluator is reported as unknown; it is ignored when evaluatorOverride is null.
     internal static async Task<int> RunCoreAsync(
         string? rootOverride,
         string? outPathOverride,
         IEvaluator? evaluatorOverride,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        CalibrationJudgeIdentity? evaluatorOverrideIdentity = null)
     {
         // ── Workspace root canonicalisation ──────────────────────────────────
         if (rootOverride is not null)
@@ -82,6 +85,8 @@ public static class BenchCalibrateCommand
         var (resolvedJudge, judgeModelName, exitCode) = JudgeFactory.ResolveGdpr(evaluatorOverride, "GDPR calibration");
         if (resolvedJudge is null) return exitCode;
         IEvaluator judge = resolvedJudge;
+        // Which judge produced this report goes into its header: a calibration describes one judge model.
+        var judgeIdentity = CalibrationJudgeIdentity.Of(evaluatorOverride, evaluatorOverrideIdentity, judge, judgeModelName);
 
         // ── Load GDPR article registry ───────────────────────────────────────
         ArticlesRegistry articles;
@@ -151,7 +156,7 @@ public static class BenchCalibrateCommand
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
-            var md = BuildMarkdownReport(report);
+            var md = BuildMarkdownReport(report, judgeIdentity);
             await File.WriteAllTextAsync(outPath, md);
             Console.WriteLine($"Calibration report: {outPath}");
         }
@@ -203,13 +208,14 @@ public static class BenchCalibrateCommand
         => double.IsNaN(kappa) ? "UNDEFINED" : kappa.ToString("F3", System.Globalization.CultureInfo.InvariantCulture);
 
 
-    private static string BuildMarkdownReport(CalibrationReport report)
+    private static string BuildMarkdownReport(CalibrationReport report, CalibrationJudgeIdentity judge)
     {
         var sb = new StringBuilder();
         sb.AppendLine("# GDPR Calibration Report");
         sb.AppendLine();
         sb.AppendLine($"Generated: {report.GeneratedAt:yyyy-MM-dd HH:mm:ss} UTC");
         sb.AppendLine();
+        judge.AppendMarkdownHeader(sb);
         sb.AppendLine($"Thresholds: accuracy >= {AccuracyThreshold:P0}, Cohen's kappa >= {KappaThreshold:F2}");
         sb.AppendLine();
 

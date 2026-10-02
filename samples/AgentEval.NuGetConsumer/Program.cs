@@ -413,7 +413,7 @@ static void ShowSummary(bool useMock)
     ║                                                                                ║
     ╠════════════════════════════════════════════════════════════════════════════════╣
     ║   📦 Install: dotnet add package AgentEval --prerelease                        ║
-    ║   📖 Docs:    https://github.com/joslat/AgentEval                              ║
+    ║   📖 Docs:    https://github.com/AgentEvalHQ/AgentEval                         ║
     ╚════════════════════════════════════════════════════════════════════════════════╝
 
     """);

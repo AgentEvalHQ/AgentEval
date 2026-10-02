@@ -66,7 +66,7 @@ public static class BenchEuAiActCommand
         var agentEvalDir = Path.Combine(workspaceRoot, ".agenteval");
         if (!Directory.Exists(agentEvalDir))
         {
-            Console.Error.WriteLine($".agenteval/ not found at {agentEvalDir}. Run `agenteval init` first.");
+            Console.Error.WriteLine($".agenteval/ not found at {agentEvalDir}. Run `agenteval init-workspace` first.");
             return 1;
         }
 

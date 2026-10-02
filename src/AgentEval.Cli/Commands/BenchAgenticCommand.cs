@@ -64,7 +64,7 @@ public static class BenchAgenticCommand
         var agentEvalDir = Path.Combine(workspaceRoot, ".agenteval");
         if (!Directory.Exists(agentEvalDir))
         {
-            Console.Error.WriteLine($".agenteval/ not found at {agentEvalDir}. Run `agenteval init` first.");
+            Console.Error.WriteLine($".agenteval/ not found at {agentEvalDir}. Run `agenteval init-workspace` first.");
             return 1;
         }
 
@@ -99,7 +99,7 @@ public static class BenchAgenticCommand
             if (!TryParseBudgetTier(budgetTier, out var tier))
             {
                 Console.Error.WriteLine($"Invalid --budget-tier '{budgetTier}'. Allowed values: trivial | low | medium | high | all.");
-                return 1;
+                return ExitCodes.UsageError;
             }
             try
             {

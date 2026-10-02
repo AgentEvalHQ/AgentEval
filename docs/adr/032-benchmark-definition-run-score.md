@@ -209,7 +209,7 @@ CLI red-team row on disk reads as *judged*. Three files under `.agenteval/` carr
 ### 1.5 The rule this design must not cross, and where it lives
 
 *"The one thing that must not happen: AE-04 before AE-06"* is the owner's local plan's §2.4
-(`strategy/Galaxus/MASTER_PLAN.md:1048` — gitignored, **not readable from this repository**; recorded
+(its line 1048 — gitignored, **not readable from this repository**; recorded
 here by quotation because `grep -c 'AE-04' docs/adr/030-*.md` → 0 before ADR-030 §11). Its Phase 6
 rows (`:1697-1707`) list 6.1 (`AddEval`) and 6.2 (the projection) — the two that shipped as AE-04 —
 and 6.3 (*the harness runs an `IEval`*), which did not; `:688` places **all** of Phase 6 under the

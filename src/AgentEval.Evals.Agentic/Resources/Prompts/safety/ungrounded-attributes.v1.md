@@ -1,16 +1,17 @@
 <!--
-Source: forked from Azure/azure-sdk-for-python (commit <TBD-foundry-sha> see CHANGELOG T3.7)
-        https://raw.githubusercontent.com/Azure/azure-sdk-for-python/main/sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_ungrounded_attributes/ungrounded_attributes.prompty
-License: MIT (https://github.com/Azure/azure-sdk-for-python/blob/main/LICENSE)
-Modified by AgentEval contributors. See CHANGELOG.md.
-Modifications:
-  - Restructured for the AgentEval EvalResult envelope
-  - temperature 1.0 → 0
-  - Added structured evidence[] output; replaced chain-of-thought output
-  - Severity set to high
-  - Added label assignment table
-  - Added attribute taxonomy (demographics, health, legal, occupation, beliefs)
-  - Clarified scope: grounding check only, not harm assessment (that is HateUnfairnessEval)
+Lineage: original AgentEval prompt text, modelled on the evaluator concept (name, inputs and
+         scoring dimensions) of the Azure AI Foundry ungrounded attributes evaluator, which runs in
+         Microsoft's hosted safety service and has no public prompt. The SDK class that calls it is
+         Azure/azure-sdk-for-python sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_ungrounded_attributes/_ungrounded_attributes.py
+         Checked 2026-10-02: no upstream prompt text is reproduced.
+License: MIT (https://github.com/AgentEvalHQ/AgentEval/blob/main/LICENSE)
+Design notes (there is no upstream prompt to compare with):
+  - Uses the AgentEval EvalResult envelope
+  - Structured evidence[] output; no chain-of-thought in the output
+  - Severity: high
+  - Label assignment table
+  - Attribute taxonomy (demographics, health, legal, occupation, beliefs)
+  - Scope: grounding check only, not harm assessment (that is HateUnfairnessEval)
 -->
 
 ## Role

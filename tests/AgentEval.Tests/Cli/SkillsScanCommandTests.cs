@@ -11,7 +11,7 @@ namespace AgentEval.Tests.Cli;
 
 /// <summary>
 /// <c>agenteval skills scan</c> — closes the "reachable from the CLI" gap for the Phase 2 compliance
-/// scanner (<c>strategy/FutureFeatures/Skills/Skills-Scan-CLI-Verb-Design.md</c>). Credential-free by
+/// scanner (see <c>docs/agent-skills.md</c> §2). Credential-free by
 /// construction: the command's no-op agent is never invoked (see <see cref="SkillsScanCommand"/>'s own
 /// remarks for the empirically-confirmed reason <c>--fail-on-noncompliant</c> is tested against a
 /// hand-built report here rather than a real malformed fixture).

@@ -107,7 +107,7 @@ Three independent reasons converge:
 
 1. **CLI dependency reality.** The shipping CLI takes hard `ProjectReference`s to both compliance projects. They ship to consumers via the umbrella NuGet whether labelled "sample" or not. The label is fictional.
 
-2. **Marketing-credibility reality.** "AgentEval ships compliance benchmarks for GDPR and the EU AI Act" reads quite differently from "AgentEval has GDPR and EU AI Act sample projects you might fork". The first is a product claim; the second is a hobbyist signal. The compliance benchmarks have professional-grade calibration baselines (cf. `strategy/FutureFeatures/calibration-baselines/`), regulator-grade article YAML, signed PDF reports, and audit-chain evidence files. They are products.
+2. **Marketing-credibility reality.** "AgentEval ships compliance benchmarks for GDPR and the EU AI Act" reads quite differently from "AgentEval has GDPR and EU AI Act sample projects you might fork". The first is a product claim; the second is a hobbyist signal. The compliance benchmarks have professional-grade calibration baselines, regulator-grade article YAML, signed PDF reports, and audit-chain evidence files. They are products.
 
 3. **Future-roadmap reality.** HIPAA, PCI-DSS, ISO 42001, NIS2, the UK AI Bill — each is a candidate sibling. Building them as `samples/AgentEval.HipaaBenchmark/` etc. perpetuates the wrong category; building them as `src/AgentEval.Evals.Compliance.Hipaa/` etc. names them what they are.
 
@@ -228,7 +228,7 @@ Every architectural phase (Phase 1 onward in v0.10.0-beta; future similar arcs) 
 1. Reads what the executing agent landed
 2. Verifies the phase's stated acceptance criteria
 3. Actively tries to find what the executing agent missed (it does NOT default to "looks fine to me")
-4. Writes a sign-off doc in `strategy/FutureFeatures/todo/lastreview/{N}-phase{M}-gate-review.md`
+4. Writes a sign-off document (kept with the maintainer's local planning notes, not in this repository)
 
 Gate-review verdicts:
 - ✅ **GO** — advance to next phase, all criteria met
@@ -248,7 +248,7 @@ Each of the four conventions is pinned by a dedicated contract test that fails t
 | **1** — Top-level factory namespace = `AgentEval.Benchmarks` | `BenchmarkNamespaceContractTests` (P4.6, extended P4b.5) | `tests/AgentEval.Tests/Benchmarks/` | Reflection enumerates every `*Benchmark`-suffixed factory type across the umbrella's sub-assemblies and asserts each lives in `AgentEval.Benchmarks` (with a documented exception list for domain types like `*BenchmarkRunner` / `*BenchmarkResult`). `MemoryBenchmarkNamespaceContractTest` covers `MemoryBenchmark` + `LongMemEvalBenchmark` in `AgentEval.Memory.Tests` (the umbrella's `PrivateAssets="all"` referencing pattern means main contract test can't reach Memory types directly). |
 | **2** — `EvaluateAsync(EvalInput) → EvalResult` adapter | `PerformanceBenchmarkAdapterTests`, `OwaspBenchmarkTests` round-trip, `MitreBenchmarkTests` round-trip | `tests/AgentEval.Tests/Benchmarks/` (all three; OWASP relocated here in Phase 6) | Calls `EvaluateAsync` against a synthetic `EvalInput`, asserts the returned `EvalResult` has the expected `SubResults` shape (one leaf per category / metric), and round-trips through `EvalResultPersistence.ToScenarioResult/FromScenarioResult` so audit-chain hashing succeeds. The Performance variant additionally asserts the `CapByWorst` aggregation caps the composite on a single critical-fail leaf. |
 | **3** — `BenchmarkFamilyRegistry` canonical | `BenchmarkFamilyRegistryTests` (14 tests as of plan-13 T4.1b item 17) + `BenchListCommandTests.OutputComesFromRegistry` (extensibility) + `BenchmarkFamilyRegistryIntegrationTests` (Memory.Tests, 5 tests) | `tests/AgentEval.Tests/Benchmarks/` and `tests/AgentEval.Memory.Tests/Benchmarks/` | Asserts that registration / lookup / enumerate-all / unique-name / preset-overlap / extensibility / thread-safety invariants hold; `AllEightDefaultFamilies_AppearInRegistry` confirms the eight default families register on assembly load; `OutputComesFromRegistry` proves `bench --list` is genuinely registry-sourced (not a hardcoded constant) by registering a synthetic UUID-named family at runtime and asserting it appears in CLI output. |
-| **4** — Opus gate-review after every phase | Sign-off docs under `strategy/FutureFeatures/todo/lastreview/{N}-phase{M}-gate-review.md` | (process, not code) | Documents 1-9 in the `lastreview/` directory cover Phases 1 through 8 plus 5b. Each gate-review documents the gates that passed, anything Opus would push back on, and items to fold into the next phase's brief. Phase 9 is reviewed by `18-phase9-gate-review.md`. Phase 10 (final pre-merge) is reviewed by a follow-up document at tag time. |
+| **4** — Opus gate-review after every phase | Sign-off documents, kept with the maintainer's local planning notes (not in this repository) | (process, not code) | Nine documents cover Phases 1 through 8 plus 5b. Each gate-review documents the gates that passed, anything Opus would push back on, and items to fold into the next phase's brief. Phase 9 has its own review document. Phase 10 (final pre-merge) is reviewed by a follow-up document at tag time. |
 
 The Verification subsection means a future contributor adding (say) a `HipaaBenchmark` family
 needs to satisfy all four contract tests — name in `AgentEval.Benchmarks` (1), `EvaluateAsync`
@@ -257,13 +257,12 @@ build fails. Process convention (4) is enforced by the review workflow, not the 
 
 ## Implementation note
 
-The detailed migration plan, file-move list, and step-by-step implementation order live (archived) at `strategy/FutureFeatures/done/lastreview/10-unified-benchmarks-architecture-proposal.md` §4 ("Migration plan") and §"Next steps if accepted". (That path is local-only — the `strategy/` tree is gitignored — the proposal was archived to `done/` after the v0.10.0-beta migration shipped.) This ADR captures the decision and rationale; the now-archived proposal doc captured the execution plan.
+The detailed migration plan, file-move list, and step-by-step implementation order live in an architecture proposal (its §4, "Migration plan", and "Next steps if accepted") that is a local planning document and is not in this repository; it was archived after the v0.10.0-beta migration shipped. This ADR captures the decision and rationale; the proposal captured the execution plan.
 
 Estimated effort: ~28-32 hours of focused engineering, plus a final Opus pre-merge review pass. Realistic calendar time: 4-5 working days on `feature/v0.10.0-unified-benchmarks`.
 
 ## References
 
-- `strategy/FutureFeatures/done/lastreview/10-unified-benchmarks-architecture-proposal.md` — full architectural proposal (archived after v0.10.0-beta migration shipped) with three options weighed, OWASP/MITRE attack-mapping table, and step-by-step migration plan. Local-only (strategy/ is gitignored).
-- `strategy/FutureFeatures/todo/lastreview/09-v0.9.0-cleanup-review.md` — the prior review that surfaced this need by removing the legacy library-API `AgenticBenchmark`.
+- The full architectural proposal (three options weighed, an OWASP/MITRE attack-mapping table, and a step-by-step migration plan) and the v0.9.0 cleanup review that surfaced this need by removing the legacy library-API `AgenticBenchmark` are local planning documents; neither is in this repository.
 - `CHANGELOG.md` — the v0.9.0-beta removal entry establishes the precedent for breaking namespace changes in the 0.x-beta channel.
 - ADR-009 (Superseded) — the original benchmark strategy decision, now superseded by the v0.9.0-beta legacy removal and this ADR.

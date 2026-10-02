@@ -95,7 +95,7 @@ public static class MafSkillScanner
     /// MAF's own confirmed discovery convention) over <paramref name="skillPath"/> and reconciles it against
     /// what <see cref="AgentFileSkillsSource.GetSkillsAsync"/> actually returned. Any folder present on disk
     /// but absent from MAF's returned set is a skill MAF silently excluded — see
-    /// <c>strategy/FutureFeatures/Skills/Skill-Discovery-Exclusion-Detection-Design.md</c>. Each becomes a
+    /// <c>docs/agent-skills.md</c> §5. Each becomes a
     /// <see cref="SkillComplianceRule.SkillExcludedFromDiscovery"/> High finding whose message is built by
     /// re-running the raw-parsed frontmatter through the SAME rule set <see cref="SkillComplianceValidator"/>
     /// applies to every normally-discovered skill (<see cref="SkillComplianceValidator.ValidateSingle"/>) —

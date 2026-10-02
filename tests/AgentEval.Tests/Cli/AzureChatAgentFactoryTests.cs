@@ -97,7 +97,13 @@ public class AzureChatAgentFactoryTests
             Assert.Contains("OWASP", err);
             Assert.Contains("TestStubAgent", err);
             Assert.Contains("--azure-from-env", err);
-            Assert.Contains("AZURE_OPENAI_ENDPOINT", err);
+            // --azure-from-env resolves whichever provider AI_INFERENCE_PROVIDER selects, so the recovery path
+            // names the selector and the provider table, not the Azure trio the banner used to list.
+            Assert.Contains("AI_INFERENCE_PROVIDER", err);
+            Assert.Contains("docs/cli.md", err);
+            Assert.DoesNotContain("AZURE_OPENAI_ENDPOINT", err);
+            // Every line fits the box: an over-long line is cut with an ellipsis, which would drop the advice.
+            Assert.DoesNotContain("…", err);
             // The banner is intended to be highly visible — sanity-check it includes the warning glyph.
             Assert.Contains("⚠", err);
         }
