@@ -112,6 +112,23 @@
     <EmbeddedResource Include="Resources/*" />
   </ItemGroup>
 
+  <!-- The calibration golden sets ship INSIDE the CLI, so `bench gdpr|eu-ai-act|agentic calibrate` works from the
+       installed tool: users are told to calibrate the judges for their own model, and through 0.42.0-beta the
+       goldens existed only in AgentEval.Tests.dll, so calibrate failed outside a source checkout. One source of
+       truth: the files stay in the test project, which embeds the same files for its own tests. Each logical name
+       keeps the fragment its loader filters on (.Compliance.Gdpr.Calibration.Golden. and so on). -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\tests\AgentEval.Tests\Compliance\Gdpr\Calibration\Golden\*.jsonl"
+                      LogicalName="AgentEval.Cli.Goldens.Compliance.Gdpr.Calibration.Golden.%(Filename)%(Extension)"
+                      Visible="false" />
+    <EmbeddedResource Include="..\..\tests\AgentEval.Tests\Compliance\EuAiAct\Calibration\Golden\*.jsonl"
+                      LogicalName="AgentEval.Cli.Goldens.Compliance.EuAiAct.Calibration.Golden.%(Filename)%(Extension)"
+                      Visible="false" />
+    <EmbeddedResource Include="..\..\tests\AgentEval.Tests\Agentic\Calibration\Golden\*.jsonl"
+                      LogicalName="AgentEval.Cli.Goldens.Agentic.Calibration.Golden.%(Filename)%(Extension)"
+                      Visible="false" />
+  </ItemGroup>
+
   <ItemGroup>
     <!-- The versioned gatekeeper verdict JSON schema ships beside the binary so non-.NET consumers can validate.
          CopyToPublishDirectory too, so `dotnet publish` / tool packaging carries it, not just plain build output. -->
