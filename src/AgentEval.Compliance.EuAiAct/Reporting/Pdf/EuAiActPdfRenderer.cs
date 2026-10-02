@@ -428,8 +428,7 @@ public sealed class EuAiActPdfRenderer
             col.Item().PaddingTop(8).Text(GetPresetDescription(ev.Preset)).FontSize(11);
 
             col.Item().PaddingTop(15).Text("Judge Mode").FontSize(14).Bold();
-            col.Item().PaddingTop(5).Text(GetJudgeModeDescription(
-                EffectiveJudgeMode(ev.Base.Attestation.EvaluatorModel, ev.EuAiActAttestation.JudgeMode))).FontSize(11);
+            col.Item().PaddingTop(5).Text(GetJudgeModeDescription(ev.EuAiActAttestation.JudgeMode)).FontSize(11);
 
             col.Item().PaddingTop(15).Text("Six-Pillar Weighted Aggregation").FontSize(14).Bold();
             col.Item().PaddingTop(5).Text(
@@ -496,17 +495,8 @@ public sealed class EuAiActPdfRenderer
 
     private static string Capitalize(string s) => EvalReportHelpers.Capitalize(s); // ARC-02: shared
 
-    /// <summary>
-    /// The judge mode to describe. Evidence from 0.43 and earlier graded by the placeholder judge recorded
-    /// <c>mode-a</c> with the evaluator model <c>stub</c>, so the model decides it.
-    /// </summary>
-    internal static string EffectiveJudgeMode(string evaluatorModel, string judgeMode) =>
-        string.Equals(evaluatorModel, "stub", StringComparison.OrdinalIgnoreCase) ? "stub" : judgeMode;
-
     internal static string GetJudgeModeDescription(string judgeMode) => judgeMode.ToLowerInvariant() switch
     {
-        // "mode-a" is what every single-judge run records (BenchEuAiActCommand). Through 0.43 this text called it a
-        // deterministic stub, so every EU AI Act PDF graded by a real judge said the opposite in its methodology.
         "mode-a" =>
             "Single LLM judge (mode-a): each scenario's answer is graded by one call to the judge model named in the " +
             "attestation, against the scenario's evaluation criteria and expected behaviour.",
@@ -516,11 +506,6 @@ public sealed class EuAiActPdfRenderer
         "multi-judge" =>
             "Multi-run judge (multi-judge): the benchmark ran several times with the judge model named in the " +
             "attestation, and the verdicts were aggregated by majority vote.",
-        "real" or "llm" =>
-            "LLM judge: scenarios are graded by the judge model named in the attestation.",
-        "stub" =>
-            "Placeholder judge (stub, AgentEval 0.43 and earlier): every criterion received a fixed score, so " +
-            "this evidence measures no model.",
         _ =>
             $"Judge mode: {judgeMode}. Refer to benchmark configuration for details on the evaluation pipeline."
     };

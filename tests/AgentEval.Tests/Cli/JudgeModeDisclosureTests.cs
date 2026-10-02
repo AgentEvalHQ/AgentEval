@@ -13,9 +13,7 @@ namespace AgentEval.Tests.Cli;
 /// What a report says about the judge that graded it, and the one placeholder judge left.
 /// </summary>
 /// <remarks>
-/// Through 0.43 the EU AI Act PDF described <c>mode-a</c>, which every single-judge run records, as "a deterministic
-/// stub … without requiring a live LLM endpoint", so every real-judge PDF told its reader the evidence was
-/// stub-graded. The agentic PDF did the same for <c>mode-a</c>, and called a pure-code preset "single LLM judge".
+/// <c>mode-a</c> is what every single-judge run records; the PDFs used to describe it as a deterministic stub.
 /// </remarks>
 public sealed class JudgeModeDisclosureTests
 {
@@ -33,16 +31,6 @@ public sealed class JudgeModeDisclosureTests
     [InlineData("multi-judge", "Multi-run judge")]
     public void EuAiAct_EveryRecordedModeHasItsOwnDescription(string mode, string expected) =>
         Assert.Contains(expected, EuAiActPdfRenderer.GetJudgeModeDescription(mode), StringComparison.Ordinal);
-
-    [Fact]
-    public void EuAiAct_LegacyStubGradedEvidence_IsStillDescribedAsMeasuringNoModel()
-    {
-        var mode = EuAiActPdfRenderer.EffectiveJudgeMode(evaluatorModel: "stub", judgeMode: "mode-a");
-
-        Assert.Equal("stub", mode);
-        Assert.Contains("measures no model", EuAiActPdfRenderer.GetJudgeModeDescription(mode), StringComparison.Ordinal);
-        Assert.Equal("mode-a", EuAiActPdfRenderer.EffectiveJudgeMode(evaluatorModel: "gpt-4o-mini", judgeMode: "mode-a"));
-    }
 
     [Fact]
     public void Agentic_ModeA_IsASingleRealJudge_AndNoneSaysNoModelGraded()

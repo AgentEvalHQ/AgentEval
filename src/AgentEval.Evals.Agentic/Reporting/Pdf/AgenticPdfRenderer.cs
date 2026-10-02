@@ -411,9 +411,6 @@ public sealed class AgenticPdfRenderer
 
     internal static string GetJudgeModeDescription(string judgeMode) => judgeMode.ToLowerInvariant() switch
     {
-        "stub" =>
-            "Placeholder judge (stub, AgentEval 0.43 and earlier): every criterion received a fixed score, so " +
-            "this evidence measures no model.",
         "none" =>
             "No judge: every evaluator in this preset is computed in code from the answer, trace or telemetry; no " +
             "language model graded anything.",

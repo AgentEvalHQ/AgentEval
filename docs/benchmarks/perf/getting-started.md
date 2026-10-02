@@ -62,7 +62,7 @@ The `--prompt` flag overrides the default `"Hello!"` prompt. The benchmark uses 
 
 `--azure-from-env` builds the agent from whichever provider `AI_INFERENCE_PROVIDER` selects — Azure OpenAI, Bitdeer, OpenAI, Azure AI Foundry or any OpenAI-compatible host; see the [provider table](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to) for the variables each one needs. Despite its name, the flag is not Azure-only: with the selector unset, the first fully configured provider in that table's order is used, so an environment with only the `AZURE_OPENAI_*` trio still gets Azure OpenAI. If no provider is configured, the command fails and names what is missing. Without a target the command refuses (exit 2). `--sut mock` measures a built-in stand-in (a 50 ms echo) instead: the run says MOCK, exits 11 whatever it scores, and nothing is written to `.agenteval/`, because it measures no agent.
 
-The cost leaf prices the model the agent used: the model the provider resolved for `--azure-from-env` (the Azure deployment, the Bitdeer model id, and so on), or `--model` for an `--endpoint` target. A `--sut` target names no model, so the leaf falls back to the `--subject` name and then to the model id the provider reported in its response. If no name is in the pricing table, the leaf reports "Cost unknown" with a passing score of 1.0 (see [Limitations](#limitations)); read that as not measured.
+The cost leaf prices the model the agent used: the model the provider resolved for `--azure-from-env` (the Azure deployment, the Bitdeer model id, and so on), or `--model` for an `--endpoint` target. A `--sut` target names no model, so the leaf falls back to the `--subject` name and then to the model id the provider reported in its response. If no name is in the pricing table, the cost is not measured: the cost leaf is skipped, no cost is reported, and a warning names the model.
 
 ## Output
 
@@ -161,7 +161,7 @@ Known limitations:
 - The sub-preset names (`latency`, `throughput`, `cost`) currently label the run but do not filter the measurements — the `EvaluateAsync` adapter always runs all three; there is no latency-only, throughput-only or cost-only execution path.
 - The throughput measurement window is fixed at 5 seconds by default — not suitable for endurance / soak testing.
 - Cold-start latency is explicitly excluded (the warmup iteration runs first).
-- Cost estimation requires the agent's model name to appear in `ModelPricing.GetPricing` — unknown models default the cost leaf to pass with score 1.0.
+- Cost estimation requires the agent's model name to appear in `ModelPricing.GetPricing`. For any other model the cost is not measured and the cost leaf is skipped.
 - Per-prompt input is single-string only; multi-prompt CSV / metadata override (via `EvalInput.Metadata["prompts"]`) is supported programmatically but not exposed on the CLI subcommands.
 - The CLI measures a plain chat model: built with `--azure-from-env` from any configured provider, an OpenAI-compatible `--endpoint`, or a built-in `--sut` target. There is no option that loads an agent from a manifest file. An agent with its own tools, memory or a non-chat interface is measured from a small program that wraps it as an `IEvaluableAgent` — see `samples/AgentEval.Samples/Benchmarks/02_PerformanceBenchmark.cs` and [Programmatic use](#programmatic-use).
 
