@@ -13,12 +13,15 @@ namespace AgentEval.Guardrails.Judges;
 /// <para>Compose many <b>single-axis</b> judges here rather than widening one rubric — the repo's grading work
 /// proved single-axis decomposition is the active ingredient; a fan-out keeps each axis honest.</para>
 /// </summary>
-public sealed class ParallelJudgeFanOut : IChatGate
+public sealed class ParallelJudgeFanOut : IChatGate, IDelegatingGate
 {
     private readonly IReadOnlyList<IChatGate> _judges;
 
     /// <inheritdoc/>
     public string PolicyName { get; }
+
+    // Every judge on the panel can block on its own, so the inline-judge calibration check must see each of them.
+    IEnumerable<object> IDelegatingGate.InnerGates => _judges;
 
     /// <summary>Creates the panel from the judge gates (at least one required).</summary>
     public ParallelJudgeFanOut(IEnumerable<IChatGate> judges, string? policyName = null)

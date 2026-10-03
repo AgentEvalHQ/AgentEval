@@ -205,15 +205,58 @@ public class MemoryJudgeTests
     }
 
     [Fact]
-    public async Task JudgeAsync_FallbackParsing_NoScorePattern_DefaultsTo50()
+    public async Task JudgeAsync_FallbackParsing_NoScorePattern_IsNotMeasured()
     {
+        // Through 0.42 a reply with no score defaulted to 50: a number no judge gave.
         var chatClient = new CustomResponseChatClient("The response was adequate.");
         var judge = new MemoryJudge(chatClient, NullLogger<MemoryJudge>.Instance);
         var query = MemoryQuery.Create("Test?", MemoryFact.Create("fact"));
 
         var result = await judge.JudgeAsync("response", query);
 
-        Assert.Equal(50, result.Score);
+        Assert.False(result.Measured);
+        Assert.Equal(0, result.Score);
+        Assert.Contains("Not measured", result.Explanation);
+    }
+
+    [Theory]
+    [InlineData("The agent recalled 2 out of 3 facts. Score: 67", 67)]
+    [InlineData("{ \"score\": 92, \"explanation\": \"recalled 100% of it, \"mostly\" }", 92)]
+    [InlineData("I would put this at 75/100.", 75)]
+    public async Task JudgeAsync_FallbackParsing_ReadsOnlyAnExplicitScore(string reply, double expected)
+    {
+        // Through 0.42 the first number followed by "out of" or "%" was read as the score: "2 out of 3" scored 2,
+        // and a "100%" in the explanation of a malformed JSON reply scored 100.
+        var judge = new MemoryJudge(new CustomResponseChatClient(reply), NullLogger<MemoryJudge>.Instance);
+
+        var result = await judge.JudgeAsync("response", MemoryQuery.Create("Test?", MemoryFact.Create("fact")));
+
+        Assert.True(result.Measured);
+        Assert.Equal(expected, result.Score);
+    }
+
+    [Fact]
+    public async Task JudgeAsync_FallbackParsing_ProseWithNumbersButNoScore_IsNotMeasured()
+    {
+        var judge = new MemoryJudge(new CustomResponseChatClient("The agent recalled 2 out of 3 facts, about 66% of them."),
+            NullLogger<MemoryJudge>.Instance);
+
+        var result = await judge.JudgeAsync("response", MemoryQuery.Create("Test?", MemoryFact.Create("fact")));
+
+        Assert.False(result.Measured);
+    }
+
+    [Fact]
+    public async Task JudgeAsync_FallbackParsing_WithAScorePattern_IsMeasured()
+    {
+        var chatClient = new CustomResponseChatClient("Overall score: 85 out of 100.");
+        var judge = new MemoryJudge(chatClient, NullLogger<MemoryJudge>.Instance);
+        var query = MemoryQuery.Create("Test?", MemoryFact.Create("fact"));
+
+        var result = await judge.JudgeAsync("response", query);
+
+        Assert.True(result.Measured);
+        Assert.Equal(85, result.Score);
     }
 
     [Fact]
@@ -226,11 +269,13 @@ public class MemoryJudgeTests
 
         var result = await judge.JudgeAsync("response", query);
 
+        // A failed judge call measured nothing: the 0 is a placeholder, not a score.
+        Assert.False(result.Measured);
         Assert.Equal(0, result.Score);
         Assert.Empty(result.FoundFacts);
         Assert.Single(result.MissingFacts);
         Assert.Same(expectedFact, result.MissingFacts[0]);
-        Assert.Contains("Error during judgment", result.Explanation);
+        Assert.Contains("Not measured", result.Explanation);
     }
 
     [Fact]

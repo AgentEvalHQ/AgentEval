@@ -120,7 +120,7 @@ public class MafSkillScannerTests
     }
 
     // ── Item 5: silent-discovery-exclusion detection ──
-    // strategy/FutureFeatures/Skills/Skill-Discovery-Exclusion-Detection-Design.md. These replace the
+    // See docs/agent-skills.md §5. These replace the
     // "unreachable via a REAL on-disk scan" honesty finding documented on SkillsScanCommand.ExecuteAsync:
     // that gap is now CLOSED for ScanFileSkillsAsync specifically (the CLI verb's entry point).
 

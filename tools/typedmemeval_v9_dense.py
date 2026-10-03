@@ -25,6 +25,10 @@ A one-directional result on at-risk shapes alone could not tell those apart.
     python typedmemeval_v9_dense.py --dry-run     # stub model, spends nothing
     python typedmemeval_v9_dense.py --limit 1     # one question per shape
     python typedmemeval_v9_dense.py
+
+The dense retriever is the one `typedmemeval_dense_retrieval.py` resolves (AI_INFERENCE_PROVIDER and
+TYPEDMEMEVAL_EMBEDDING_MODEL; see its PROVIDER section), and the answers it buys are cached under a key
+that names it.
 """
 import argparse
 import collections
@@ -35,6 +39,7 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import typedmemeval_common as tmc                      # noqa: E402
+import inference_provider as ip                        # noqa: E402
 import run_typedmemeval_probes as probes               # noqa: E402
 import typedmemeval_dense_retrieval as dense           # noqa: E402
 
@@ -79,6 +84,22 @@ def published_v9(vertical, shape):
             block.get('v1_passed'), block.get('v1_applicable'))
 
 
+#: The retriever whose answers were cached under the bare `<question>:v9dense` key before the key named
+#: one (the 2026-09-14 runs). Every other retriever's answers carry its identity in the key.
+LEGACY_DENSE_IDENTITY = 'azure:text-embedding-ada-002'
+
+
+def answer_key_suffix(identity: str) -> str:
+    """What follows `v9dense` in this arm's answer-cache keys.
+
+    THE ANSWER DEPENDS ON THE RETRIEVER: the model reads the top-K this retriever chose. The key was
+    `<question>:v9dense` with no retriever in it, so a second embedding model's run would have been
+    served the first model's answers -- the probe cache's own defect (no model in its key), one arm
+    down. The legacy retriever keeps the bare key, so its banked answers stay reachable.
+    """
+    return '' if identity == LEGACY_DENSE_IDENTITY else ':' + ip.slug(identity)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--dry-run', action='store_true')
@@ -91,6 +112,19 @@ def main():
         # whose whole purpose is to spend none.
         probes.__dict__["_DRY_RUN"] = True
         assert probes._DRY_RUN is True
+
+    print('dense retriever: %s' % dense.describe_target(args.dry_run))
+    if args.dry_run:
+        print('  DRY RUN: every vector is the 3-gram stub and every answer the probe stub; nothing is '
+              'sent, and no shard or cache is read or written.')
+        identity, suffix = 'STUB (3-gram hash, no semantics)', ':stub'
+    else:
+        identity = dense.embedding_identity()
+        if not identity:
+            raise SystemExit('the embedding deployment did not resolve to a model, so the answers this '
+                             'run would buy could not be keyed to the retriever that chose their context.')
+        suffix = answer_key_suffix(identity)
+    print()
 
     targets = [(v, s, 'at-risk') for v, s in AT_RISK] + [(v, s, 'control') for v, s in CONTROLS]
     by_vertical = collections.defaultdict(list)
@@ -155,7 +189,7 @@ def main():
 
             key = probes.question_key(entry)
             answer = probes.complete(probes.ask(question, date, probes.subset(entry, ranked)),
-                                     cache_key='%s:v9dense' % key)
+                                     cache_key='%s:v9dense%s' % (key, suffix))
             cell['n'] += 1
             if not answer:
                 cell['silent'] += 1
@@ -165,7 +199,7 @@ def main():
             # Passing it here added a second grading gate the arm being compared against does
             # not have, so the run would have changed the RETRIEVER and the GRADING POLICY
             # together and neither could be attributed. Caught in review of PR #237.
-            if probes.produced_gold(question, gold, answer, '%s:v9dense:judge' % key,
+            if probes.produced_gold(question, gold, answer, '%s:v9dense%s:judge' % (key, suffix),
                                     require_distinctive=needs_value, already_known=known):
                 cell['passed'] += 1
         # PERSIST WHAT THIS VERTICAL BOUGHT. Without this an interrupted run re-embedded every
@@ -177,6 +211,7 @@ def main():
 
     print()
     print('V9 MEASURED UNDER A DENSE RETRIEVER  (same documents, K=%d, same judge)' % tmc.K_REF)
+    print('  dense retriever: %s' % identity)
     print()
     print('%-9s %-14s %-24s %14s %14s %12s' %
           ('kind', 'vertical', 'shape', 'V9 published', 'V9 dense', 'predicted'))

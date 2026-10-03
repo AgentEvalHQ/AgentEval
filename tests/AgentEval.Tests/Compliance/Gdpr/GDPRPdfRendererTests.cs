@@ -17,6 +17,10 @@ namespace AgentEval.Tests.Compliance.Gdpr;
 /// <summary>
 /// Unit and integration tests for <see cref="GDPRPdfRenderer"/> (Phase 6, G6.1-G6.8).
 /// </summary>
+// Rendered PDFs are read back as text. Under a fully parallel run the text came back as NUL characters (seen once
+// on net8.0, never alone), so these render outside the parallel phase, with the other tests that touch QuestPDF's
+// process-wide state.
+[Collection(AgentEval.Tests.Rendering.Pdf.QuestPdfLicenceCollection.Name)]
 public class GDPRPdfRendererTests : IDisposable
 {
     private readonly string _tempDir;
@@ -37,7 +41,8 @@ public class GDPRPdfRendererTests : IDisposable
 
     private static GdprComplianceEvidence MakeMinimalEvidence(
         string preset = "standard",
-        bool hasPillars = false)
+        bool hasPillars = false,
+        string? manifestHash = null)
     {
         var subject = new SubjectIdentity(SubjectKind.Agent, "PdfTestAgent");
         var baseEvidence = new ComplianceEvidence(
@@ -45,7 +50,7 @@ public class GDPRPdfRendererTests : IDisposable
             Regulation: "GDPR",
             Subject: subject,
             GeneratedAt: DateTimeOffset.UtcNow,
-            SourceRun: new SourceRunRef("run-pdf-001", "sha256:" + new string('a', 64)),
+            SourceRun: new SourceRunRef("run-pdf-001", manifestHash ?? "sha256:" + new string('a', 64)),
             Controls: [],
             Summary: new EvidenceSummary(1, 1, 0, 0, "PASS"),
             Attestation: new Attestation("0.0.0", null, "AgentEval.Compliance.Gdpr", "stub"));
@@ -273,5 +278,81 @@ public class GDPRPdfRendererTests : IDisposable
         // Assert
         Assert.True(File.Exists(outputPath));
         Assert.True(new FileInfo(outputPath).Length > 0);
+    }
+
+    // ── Audit-chain appendix: never claims a check it did not run ──────────
+    //
+    // The renderer only has the hash copied into the evidence, never the source run, so it cannot
+    // verify the chain. The appendix used to print the hash alone (an empty string when absent), which
+    // left a reader to assume the "Audit Chain" had been checked.
+
+    [Fact]
+    public void AuditChainLines_RecordedHash_SaysNotVerified_AndHowToVerify()
+    {
+        var lines = GDPRPdfRenderer.AuditChainLines(new SourceRunRef("run-pdf-001", "sha256:abc"));
+
+        Assert.Equal(
+            new[]
+            {
+                "Manifest hash: sha256:abc",
+                "Chain status: hash recorded, not verified in this report.",
+            },
+            lines.Take(2));
+        Assert.Contains("'agenteval doctor'", lines[2], StringComparison.Ordinal);
+        Assert.DoesNotContain(lines, l => l.Contains("VALID", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void AuditChainLines_NoHash_SaysNoHashRecorded(string manifestHash)
+    {
+        var lines = GDPRPdfRenderer.AuditChainLines(new SourceRunRef("run-pdf-001", manifestHash));
+
+        Assert.Equal(
+            new[]
+            {
+                "Manifest hash: —",
+                "Chain status: no hash recorded, so this evidence cannot be checked against its source run.",
+            },
+            lines);
+    }
+
+    [Fact]
+    public async Task RenderAsync_RecordedHash_AppendixSaysNotVerifiedInThisReport()
+    {
+        var outputPath = Path.Combine(_tempDir, "chain-recorded.pdf");
+        await new GDPRPdfRenderer().RenderAsync(MakeMinimalEvidence(), outputPath);
+
+        var text = ExtractTextWithoutWhitespace(outputPath);
+
+        // Whitespace is stripped because PDF text extraction does not promise to keep word spacing or
+        // line wraps; fragments avoid "fi"/"fl" so a typographic ligature cannot split them.
+        Assert.Contains("hashrecorded,not", text, StringComparison.Ordinal);
+        Assert.Contains("inthisreport", text, StringComparison.Ordinal);
+        Assert.Contains("agentevaldoctor", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("nohashrecorded", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RenderAsync_NoHash_AppendixSaysNoHashRecorded()
+    {
+        var outputPath = Path.Combine(_tempDir, "chain-absent.pdf");
+        await new GDPRPdfRenderer().RenderAsync(MakeMinimalEvidence(manifestHash: ""), outputPath);
+
+        var text = ExtractTextWithoutWhitespace(outputPath);
+
+        Assert.Contains("nohashrecorded", text, StringComparison.Ordinal);
+        Assert.Contains("cannotbechecked", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("agentevaldoctor", text, StringComparison.Ordinal);
+    }
+
+    private static string ExtractTextWithoutWhitespace(string pdfPath)
+    {
+        var sb = new System.Text.StringBuilder();
+        using var doc = UglyToad.PdfPig.PdfDocument.Open(File.ReadAllBytes(pdfPath));
+        foreach (var page in doc.GetPages())
+            sb.Append(page.Text);
+        return new string(sb.ToString().Where(c => !char.IsWhiteSpace(c)).ToArray());
     }
 }

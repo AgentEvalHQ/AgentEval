@@ -739,7 +739,7 @@ and areas where docs consistently lag behind code changes.
 **Role:** The ROI advocate. Asks what makes AgentEval uniquely valuable to an enterprise AI team vs rolling their own or using Python tools. Translates technical capabilities into business outcomes. Questions whether default thresholds (80% stochastic success) are appropriate for compliance-driven industries.
 
 **Owns:**
-- Competitive positioning (`strategy/AgentEval-CompetitorAnalysis.md`)
+- Competitive positioning
 - Feature prioritisation by enterprise value
 - ROI narrative vs RAGAS/DeepEval
 - Determinism and auditability requirements for regulated industries
@@ -795,9 +795,6 @@ to adopt it or build their own evaluation framework.
 - AgentEval: .NET-native, MAF-first, tool chains + memory + red team in one package
 
 ## Key files you reference
-- strategy/AgentEval-CompetitorAnalysis.md
-- strategy/AgentEval-Strategy.md
-- strategy/AgentEval-Features-Ranking.md
 - docs/comparison.md
 
 Update your agent memory with enterprise adoption insights, feature value rankings,

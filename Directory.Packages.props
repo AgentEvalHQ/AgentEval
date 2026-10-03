@@ -67,7 +67,7 @@
     <PackageVersion Include="Azure.AI.OpenAI" Version="2.8.0-beta.1" />
     <PackageVersion Include="Azure.Identity" Version="1.18.0" />
 
-    <!-- Copilot Studio live connector (Track 1 — strategy/CopilotStudio/Bench-Eval-Integration-and-Live-Connector-Plan.md).
+    <!-- Copilot Studio live connector (Track 1 of the Copilot Studio integration plan).
          1.3.171-beta is the actual latest version published to nuget.org (verified against the local package
          cache + decompiled source); the plan doc's "v1.6.150" reference does not exist on nuget.org and was a
          doc error. Microsoft.Agents.Core is CopilotStudio.Client's own required dependency — pinned to the exact

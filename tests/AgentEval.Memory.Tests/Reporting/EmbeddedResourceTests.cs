@@ -27,6 +27,22 @@ public class EmbeddedResourceTests
     }
 
     [Fact]
+    public void ReportHtml_DoesNotReadArchetypesOrStochasticData()
+    {
+        // The docs, MemoryReportingOptions.IncludeArchetypes (default false) and
+        // CategoryScoreEntry.Stochastic all state that the shipped report reads neither. If the
+        // report starts using them, this fails: update those statements and reconsider the default.
+        var assembly = typeof(MemoryBaseline).Assembly;
+        var name = assembly.GetManifestResourceNames().First(n => n.EndsWith("report.html"));
+        using var stream = assembly.GetManifestResourceStream(name)!;
+        using var reader = new StreamReader(stream);
+        var content = reader.ReadToEnd();
+
+        Assert.DoesNotContain("archetype", content, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("stochastic", content, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void ArchetypesJson_IsAccessibleAsEmbeddedResource()
     {
         var assembly = typeof(MemoryBaseline).Assembly;

@@ -41,7 +41,7 @@ Sourced verbatim from `BenchmarkFamilyRegistry` (see `src/AgentEval.Memory/Memor
 
 Cost estimates assume `gpt-4o-mini` judge pricing and depend heavily on the agent's response length + the chosen context-pressure target. Diagnostic and overflow presets are POWER-USER — they stress the agent's reducer / summarisation / vector-store path past nominal limits and are designed to surface failure modes that the standard preset masks; expect notably higher cost.
 
-> **Why is `quick` `CostTier.Medium` if it's CI-friendly?** `quick` makes ~15 LLM round-trips (~$0.20 - $0.80 at gpt-4o-mini pricing) — small in absolute terms but well above the `CostTier.Low` budget used by `bench owasp smoke` (zero LLM cost) or `bench perf latency` (telemetry-only). It IS CI-tractable when the CI budget allows ~$1/run; consider running `quick` on the main branch + nightly rather than on every commit if the budget is tighter. The other 4 presets are `High` and not intended for any commit-time CI.
+> **Why is `quick` `CostTier.Medium` if it's CI-friendly?** `quick` makes ~15 LLM round-trips (~$0.20 - $0.80 at gpt-4o-mini pricing) — small in absolute terms but above the `CostTier.Low` budget used by `bench owasp smoke` (23 short agent calls, plus a judge call only for a PII probe its checks cannot decide) or `bench perf latency` (telemetry-only). It IS CI-tractable when the CI budget allows ~$1/run; consider running `quick` on the main branch + nightly rather than on every commit if the budget is tighter. The other 4 presets are `High` and not intended for any commit-time CI.
 
 ## CLI usage
 
@@ -62,9 +62,17 @@ agenteval bench memory --preset diagnostic --subject MyAgent
 agenteval bench memory --preset overflow --subject MyAgent
 ```
 
-REQUIRES Azure OpenAI — no stub fallback. All three of `AZURE_OPENAI_ENDPOINT` + `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_DEPLOYMENT` must be set; the benchmark needs a real LLM-backed agent under test plus a real LLM judge for grading.
+Needs a real model — there is no stub fallback. The command takes its model from whichever provider
+`AI_INFERENCE_PROVIDER` selects: Azure OpenAI, Bitdeer, OpenAI, Azure AI Foundry, or any OpenAI-compatible
+endpoint. With the selector unset it auto-detects, so a machine that sets only `AZURE_OPENAI_ENDPOINT` +
+`AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_DEPLOYMENT` works as before. The variables each provider needs are listed in
+[CLI Reference — `AI_INFERENCE_PROVIDER`](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to).
+When no provider resolves, the command prints why (for example, which variables are missing) and exits 3 (`RuntimeError`).
 
-The CLI runs the agent-under-test via `chatClient.AsEvaluableAgent(name: subject, includeHistory: true)` against the resolved Azure deployment. The system prompt is fixed to `"You are a helpful assistant. Use what you remember from our conversation to answer."` Programmatic callers can compose a different `IEvaluableAgent` and pass it to `MemoryBenchmarkRunner.Create(chatClient).RunBenchmarkAsync(agent, preset)` directly.
+One client plays both roles: the same model is the agent under test and the `MemoryJudge` that grades it. The
+`AZURE_OPENAI_JUDGE_*` override in the CLI reference is not read by this command.
+
+The CLI runs the agent-under-test via `chatClient.AsEvaluableAgent(name: subject, includeHistory: true)` against the resolved provider's model. The system prompt is fixed to `"You are a helpful assistant. Use what you remember from our conversation to answer."` Programmatic callers can compose a different `IEvaluableAgent` and pass it to `MemoryBenchmarkRunner.Create(chatClient).RunBenchmarkAsync(agent, preset)` directly.
 
 The `overflow` preset is designed for ~128K-context models (such as gpt-4o-mini) where setting `TargetTokensOverride = 128_000` + `OverflowCallsOverride = 20` deliberately fills 75% of the window via injection, then pushes past the limit via filler calls. On larger-context models the overflow effect attenuates; treat the result as model-specific rather than absolute.
 
@@ -75,7 +83,7 @@ Each run writes to the canonical run dir under `.agenteval/subjects/agents/{subj
 - `report-native.json` — the native `MemoryBenchmarkResult` (Shape B, ADR-017 Convention 3): per-category scores, overall score, grade, total duration.
 - The canonical `manifest.json` / `summary.json` carry the run-level audit-chain metadata (run ID, content hash, timestamp, verdict, metrics).
 
-Memory is a Shape B family (per ADR-017): its multi-scenario, multi-turn, agent-stateful semantics do not map onto the single-shot Convention-2 `(EvalInput) → EvalResult` shape that OWASP / MITRE / Perf use, so no `report.json` / `report.md` / `report.html` / `report.pdf` sidecars are emitted. Mission Control renders the native shape directly.
+Memory is a Shape B family (per ADR-017): its multi-scenario, multi-turn, agent-stateful semantics do not map onto the single-shot Convention-2 `(EvalInput) → EvalResult` shape that OWASP / MITRE / Perf use, so no `report.json` / `report.md` / `report.html` / `report.pdf` sidecars are emitted. Nothing in AgentEval reads `report-native.json` back — Mission Control included — so the per-category scores live only in that file and in the console output; the canonical summary carries the verdict and `overall_score`.
 
 CLI verdict mapping (aligned with `MemoryBenchmarkResult.Passed` canonical semantics at `src/AgentEval.Memory/Models/MemoryBenchmarkResult.cs:75`):
 - `overall_score >= 70` → `PASS`
@@ -106,6 +114,12 @@ Per-category interpretation:
 CLI exit codes: `PASS` → exit 0, `WARN` → exit 10 (`GateWarning`), `FAIL` → exit 9 (`GateFailed`) — see
 [CLI Reference — Exit codes](../../cli.md#exit-codes). (This previously said WARN maps to exit 0 alongside
 PASS — that was never accurate; WARN has always been non-zero, distinct from a clean PASS.)
+
+A run in which something was not measured is **INCOMPLETE** and exits 11 (`GateIndeterminate`): a category crashed,
+or the judge produced no score for one or more questions (a failed judge call, or a reply with no score in it). The
+console lists what was not measured and prints no grade; the stored verdict is `WARN`, the schema's indeterminate
+value. An unscored question is left out of its category's score, never counted as 0 or 50. Fix the cause (usually
+the judge configuration) and re-run.
 
 ## How to act on findings
 
@@ -176,12 +190,12 @@ The runner accepts any `IEvaluableAgent` — the `chatClient.AsEvaluableAgent(..
 Memory runs are stored canonically under `.agenteval/subjects/agents/{subject}/runs/{runId}/`. Compare runs via:
 
 - `git diff` on `report-native.json` — surfaces per-category score changes plus overall score + grade deltas.
-- Mission Control — renders the native shape; visual diff across runs.
+- Mission Control — does not read `report-native.json`, so it cannot compare per-category scores; the canonical summary carries the verdict and `overall_score` only.
 - Programmatic post-processing of `MemoryBenchmarkResult.CategoryResults` for per-category tracking outside AgentEval.
 
-The `AgentEval.Memory` assembly also ships a `BaselineComparer` + `JsonFileBaselineStore` for per-agent baseline persistence and regression detection — see `src/AgentEval.Memory/Reporting/` for the surface (not yet exposed via CLI for the memory family specifically).
+The `AgentEval.Memory` assembly also ships a `BaselineComparer` + `JsonFileBaselineStore` for per-agent baseline persistence and an HTML comparison report — see [Memory Evaluation](../../memory-evaluation.md) for a working example. The CLI does not expose them; use them from your own program.
 
-## Limitations and roadmap
+## Limitations
 
 Known limitations:
 - LLM-judge cost dominates; diagnostic + overflow presets are notably more expensive than Standard. Budget accordingly.
@@ -189,13 +203,10 @@ Known limitations:
 - Memory architecture introspection (reducer impl, vector store, embedding model) is inferred from end-to-end behaviour, not directly inspected.
 - The `overflow` preset's saturation effect attenuates on larger-context models; treat results as model-specific.
 - No code-grader fallback — judge-failure entries fall through with a judge-failure marker.
-- CLI verdict thresholds (70 PASS / 50 WARN) are aligned with the canonical `MemoryBenchmarkResult.Passed` boundary at `MemoryBenchmarkResult.cs:75`; pre-v1.1 CLI used 80/50 which made canonical Passed=true scores of 75 render as WARN.
-
-Tracking backlog (see `strategy/FutureFeatures/todo/13-pending-issues-tasks.md`):
-- T0.6 — `agenteval bench memory` CLI command (shipped 2026-05-24).
-- T3.13 — Multi-turn calibration entry schema extension (open; would re-enable carved-out memory evaluators in the agentic calibration sweep).
-- T3.11 — Multi-provider agent-manifest schema (would let the memory benchmark target non-Azure agents directly).
-- Per-category drill-down rendering in Mission Control remains roadmap.
+- CLI verdict thresholds (70 PASS / 50 WARN) are aligned with the canonical `MemoryBenchmarkResult.Passed` boundary at `MemoryBenchmarkResult.cs:75`; an earlier CLI used 80/50, which made canonical Passed=true scores of 75 render as WARN.
+- The CLI drives a plain chat model with a fixed system prompt. It can reach any provider `AI_INFERENCE_PROVIDER` supports, but it cannot load an agent that brings its own reducer, vector store or tools; to benchmark one, call `MemoryBenchmarkRunner` from your own program (see [Programmatic use](#programmatic-use)).
+- The five multi-turn memory evaluators of the agentic family are skipped by `agenteval bench agentic calibrate` (`BenchAgenticCalibrateCommand.s_carveOutKeys`), because a calibration entry holds a single input/response pair and cannot carry conversation history. That runner therefore measures none of them.
+- Mission Control does not read `report-native.json`, so it has no per-category view of a memory run.
 
 See also:
 - [LongMemEval getting-started](../longmemeval/getting-started.md) — sister memory family targeting paper-comparable academic baselines.

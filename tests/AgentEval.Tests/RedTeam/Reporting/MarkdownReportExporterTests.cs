@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 // tests/AgentEval.Tests/RedTeam/Reporting/MarkdownReportExporterTests.cs
+using System.Reflection;
 using AgentEval.RedTeam;
 using AgentEval.RedTeam.Reporting;
 
@@ -33,6 +34,20 @@ public class MarkdownReportExporterTests
         var md = exporter.Export(result);
 
         Assert.Contains("# 🛡️ Red Team Report: TestAgent", md);
+    }
+
+    [Fact]
+    public void Export_ToolLine_IsTheAssemblysInformationalVersion_NotAStaleLiteral()
+    {
+        // The **Tool:** line was a hard-coded "v0.2.0" that no release updated, so every Markdown report named a
+        // version the tool had not been at for dozens of releases. It must be read from the assembly that ran.
+        var expected = typeof(MarkdownReportExporter).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
+
+        var md = new MarkdownReportExporter().Export(CreateTestResult());
+
+        Assert.Contains($"**Tool:** AgentEval RedTeam v{expected}  ", md, StringComparison.Ordinal);
+        Assert.DoesNotContain("v0.2.0", md, StringComparison.Ordinal);
     }
 
     [Fact]

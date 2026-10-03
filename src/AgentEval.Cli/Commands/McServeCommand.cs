@@ -48,7 +48,7 @@ public static class McServeCommand
         if (!Directory.Exists(agenteval))
         {
             Console.Error.WriteLine($"⚠  No .agenteval/ folder found at '{resolvedRoot}'.");
-            Console.Error.WriteLine("    Run `agenteval init` first, or pass --workspace <path> to point at an initialized workspace.");
+            Console.Error.WriteLine("    Run `agenteval init-workspace` first, or pass --workspace <path> to point at an initialized workspace.");
             // We still serve — the SPA renders a graceful empty / landing
             // state — but warn the user so they're not surprised.
         }

@@ -66,7 +66,7 @@ public class BenchEuAiActCalibrateCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task BenchEuAiActCalibrate_NoEnvVars_NoStubOptIn_ReturnsExitCode3()
+    public async Task BenchEuAiActCalibrate_NoProvider_ReturnsExitCode3()
     {
         // env already scrubbed by ctor
         var exit = await BenchEuAiActCalibrateCommand.RunAsync(_root, outPathOverride: null);
@@ -102,5 +102,24 @@ public class BenchEuAiActCalibrateCommandTests : IDisposable
         // With no --out, the report goes to the workspace folder, never a repository-internal path.
         var written = Directory.GetFiles(Path.Combine(_root, ".agenteval", "calibration"), "eu-ai-act-calibration-*.md");
         Assert.Single(written);
+    }
+
+    [Fact]
+    public async Task BenchEuAiActCalibrate_ReportHeader_NamesTheJudgeProviderAndModel()
+    {
+        var outPath = Path.Combine(_root, "report-judge.md");
+
+        await BenchEuAiActCalibrateCommand.RunCoreAsync(
+            rootOverride: _root,
+            outPathOverride: outPath,
+            evaluatorOverride: new AlwaysPassEvaluator(),
+            evaluatorOverrideIdentity: new CalibrationJudgeIdentity("Test Provider", "test-model-7"));
+
+        var content = await File.ReadAllTextAsync(outPath);
+        Assert.Contains("Judge provider: Test Provider", content);
+        Assert.Contains("Judge model: test-model-7", content);
+        Assert.True(
+            content.IndexOf("Judge model:", StringComparison.Ordinal) < content.IndexOf("## ", StringComparison.Ordinal),
+            "The judge lines must be in the report header, before the first pillar section.");
     }
 }

@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Text.Json;
 using AgentEval.Cli.Commands;
 using AgentEval.Core;
 using Xunit;
@@ -63,7 +64,7 @@ public class BenchAgenticCalibrateCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task BenchAgenticCalibrate_NoEnvVars_NoStubOptIn_ReturnsExitCode3()
+    public async Task BenchAgenticCalibrate_NoProvider_ReturnsExitCode3()
     {
         var exit = await BenchAgenticCalibrateCommand.RunAsync(_root, outPathOverride: null);
         Assert.Equal(3, exit);
@@ -96,5 +97,35 @@ public class BenchAgenticCalibrateCommandTests : IDisposable
         // With no --out, the report goes to the workspace folder, never a repository-internal path.
         var written = Directory.GetFiles(Path.Combine(_root, ".agenteval", "calibration"), "agentic-calibration-*.md");
         Assert.Single(written);
+    }
+
+    [Fact]
+    public async Task BenchAgenticCalibrate_ReportAndEveryRecord_NameTheJudge()
+    {
+        var outPath = Path.Combine(_root, "report-judge.md");
+        var recordsPath = Path.Combine(_root, "records.jsonl");
+
+        await BenchAgenticCalibrateCommand.RunCoreAsync(
+            rootOverride: _root,
+            outPathOverride: outPath,
+            evaluatorOverride: new AlwaysPassEvaluator(),
+            recordsPath: recordsPath,
+            limitPerCategory: 1,
+            evaluatorOverrideIdentity: new CalibrationJudgeIdentity("Test Provider", "test-model-7"));
+
+        var content = await File.ReadAllTextAsync(outPath);
+        Assert.Contains("Judge provider: Test Provider", content);
+        Assert.Contains("Judge model: test-model-7", content);
+
+        // Every per-case line names the judge too, beside the runner's own fields.
+        var lines = (await File.ReadAllLinesAsync(recordsPath)).Where(l => l.Length > 0).ToList();
+        Assert.NotEmpty(lines);
+        foreach (var line in lines)
+        {
+            using var doc = JsonDocument.Parse(line);
+            Assert.Equal("Test Provider", doc.RootElement.GetProperty("judgeProvider").GetString());
+            Assert.Equal("test-model-7", doc.RootElement.GetProperty("judgeModel").GetString());
+            Assert.True(doc.RootElement.TryGetProperty("evaluatorKey", out _), "The runner's own fields must still be written.");
+        }
     }
 }

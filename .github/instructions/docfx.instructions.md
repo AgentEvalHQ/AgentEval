@@ -152,10 +152,10 @@ Before committing documentation changes:
 ## GitHub Pages Deployment
 
 Deployment is automatic via `.github/workflows/docs.yml`:
-1. Push to `main` branch
+1. Push to `main` that changes `docs/**` or `src/AgentEval/**/*.xml` (the workflow also runs when a release is published, and can be run by hand)
 2. Workflow builds documentation
 3. Publishes to GitHub Pages
-4. Available at `https://joslat.github.io/AgentEval/`
+4. Available at `https://agenteval.dev/` (the custom domain set by `docs/CNAME`)
 
 **Manual deployment is not needed** - just push to main.
 

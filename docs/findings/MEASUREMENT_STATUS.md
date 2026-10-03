@@ -2278,8 +2278,8 @@ only thing that moved it, and 19.3 says how.
    machine that made it.
 4. **The live-run (model-backed) figures in the README were not re-derived.** Only the offline and
    dry-run paths were re-measured here.
-5. **`strategy/Galaxus/Galaxus_RecommendationAgent_Design.md` §8.1 was NOT updated** — that tree is
-   gitignored and local-only, so its B-6/B-7 rows still carry §17's refuted attribution.
+5. **A local design document's §8.1 was NOT updated** — it is gitignored and local-only, so its
+   B-6/B-7 rows still carry §17's refuted attribution.
 
 ### 19.9 How to re-derive §19
 
@@ -2733,17 +2733,17 @@ That is why the §19.7 item 1 finding is a **Demo 01** finding, and this is the 
    owed a paid re-run.
 5. **`--real-vectors` still must not enter CI** — it needs credentials, it spends, and a scored run under
    it is not reproducible off the machine that made it. The old reason (it exits 1) stays refuted.
-6. ✅ **CLOSED 2026-09-06 (Wave 5, plan item 1.9).** `Galaxus_RecommendationAgent_Design.md` §8.1's
+6. ✅ **CLOSED 2026-09-06 (Wave 5, plan item 1.9).** In the local design document of item 5, §8.1's
    **thirteen** stale `OPEN` statuses are re-derived from the tree by measurement (a symbol grep per
    fix, plus B-1's own acceptance test EXECUTED), §8.4 **D-i** is closed — the `wahl` decision shipped
    in `8b38b2a2` and the sentence *"the term is still at `SensitiveInferenceBlocklist.cs:140`"* was
    standing in **four** places — and §8.1 now carries a banner: *statuses are derived from the tree,
    never quoted from this table*. ⚠️ **The file is gitignored, so nothing in CI will ever catch the
    next stale status there**; the banner is the whole defence. *Superseded text:*
-   *"§8.1 is still not updated — gitignored, local-only."* `strategy/Galaxus/Galaxus_Retrieval_Explained.html` **was** rewritten against §19 + §20 in
-   the same change that added this section. ⚠ **`strategy/Galaxus/MASTER_PLAN.md` is stale too and was
-   NOT named here before**: its architecture row still reads *"the embedding assets do not exist —
-   `samples/Galaxus.RecommendationAgent/Data/` is absent"* and its phase table still lists generating
+   *"§8.1 is still not updated — gitignored, local-only."* A local explainer page **was** rewritten
+   against §19 + §20 in the same change that added this section. ⚠ **The local plan (`MASTER_PLAN`) is
+   stale too and was NOT named here before**: its architecture row still says the embedding assets do
+   not exist and the sample's `Data/` directory is absent, and its phase table still lists generating
    them as open subtask 2.1. Both were false from B-6 onward and B-21 then deleted one of the two
    assets. Same lane, same gitignore, and the omission is the point: a "what is still stale" list that
    names one local document and not its sibling reads as complete when it is not.
@@ -6884,7 +6884,7 @@ Measured at `HEAD` of the Wave-5 review, by the command below:
 | `docs/adr/030-*.md` | 4 | 0 | — |
 | `docs/adr/031-*.md` | 1 | 0 | — |
 | `MASTER_PLAN.md` | 80 | **1 — `b41262e2`** | ✅ yes — §0.4's correction row |
-| `Galaxus_RecommendationAgent_Design.md` | 13 | 0 | — |
+| `<private-design-doc>` | 13 | 0 | — |
 
 ⚠️ **Both hits are FALSE POSITIVES and they are recorded so the next sweep does not "fix" them.** The
 `b41262e2` in `MASTER_PLAN` §0.4 and the two in `MEASUREMENT_STATUS` §47.4 are the wrong sha quoted
@@ -7796,7 +7796,7 @@ unchanged, because §54.11 introduces no sha the page did not already carry.
 | `docs/adr/030-*.md` | 4 | 0 | — |
 | `docs/adr/031-*.md` | 1 | 0 | — |
 | `MASTER_PLAN.md` | 85 *(was 80)* | **1 — `b41262e2`** | ✅ §0.4's correction row |
-| `Galaxus_RecommendationAgent_Design.md` | 13 | 0 | — |
+| `<private-design-doc>` | 13 | 0 | — |
 
 ✅ **The invariant holds; `b41262e2` survives a SIXTH sweep and is still the same false positive.**
 ⚠️ **Two of the seven counts moved within a day of being published, as predicted** — 41 → 50 and
@@ -7805,7 +7805,7 @@ stamped and the invariant is the thing checked.** The command:
 
 ```bash
 for f in samples/Galaxus.RecommendationAgent.Evals/Docs/{MEASUREMENT_STATUS,SUITE_SUMMARY,RUN_PROTOCOL}.md \
-         docs/adr/03{0,1}-*.md strategy/Galaxus/{MASTER_PLAN,Galaxus_RecommendationAgent_Design}.md; do
+         docs/adr/03{0,1}-*.md <private-plan> <private-design-doc>; do
   bad=""; for s in $(grep -oE '`[0-9a-f]{8}`' "$f" | tr -d '`' | sort -u); do
     git rev-parse --quiet --verify "$s^{commit}" >/dev/null || bad="$bad $s"; done
   printf '%-40s unresolvable:%s\n' "$(basename $f)" "${bad:- none}"
@@ -8838,7 +8838,7 @@ honest source of truth for *"what deployment is this process configured with"* i
   rows, real trips three.
 * **Write ledger unchanged:** `eval03_controls`, `eval04_injection`, `eval07_topology`.
 * **Credentials:** the scanner was **proven able to hit first** (two planted files, two hits), then
-  **0** in `.agenteval/samples`, **0** in `samples/`, **0** in `docs/` and **0** in `strategy/Galaxus`
+  **0** in `.agenteval/samples`, **0** in `samples/`, **0** in `docs/` and **0** in `<private-subdir>`
   — counts only, no value printed. ⚠ Two files under `.agenteval/gatekeeper/certs/` carry the endpoint
   host, one **in its filename**; they are dated 2026-07-11 and 2026-07-17, predate all of this work,
   and are named here so the next scanner does not attribute them to this wave.
@@ -9351,7 +9351,7 @@ named, re-dated here at **2026-07-17T20:12:10Z** and **2026-07-11T21:55:04Z**, s
 sixteen commits wrote either**. ✅ **§57.4a's cleanup HELD: not one snapshot in the store carries the
 host**, including the three this sweep rewrote.
 
-**The repository:** `samples/` **0** host / **0** key · `docs/` **0** / **0** · `strategy/Galaxus`
+**The repository:** `samples/` **0** host / **0** key · `docs/` **0** / **0** · `<private-subdir>`
 **0** / **0**. Twelve `*.openai.azure.com` URL-shape hits were classified rather than counted:
 **all twelve are documentation placeholders** — `https://xxx.openai.azure.com/` and
 `https://your-resource.openai.azure.com/` in three sample READMEs and nine docs pages.
@@ -9535,7 +9535,7 @@ date -u -r $S/eval02c_held_out.json    '+%Y-%m-%dT%H:%M:%SZ'        # -> 2026-09
 # The tree, re-derived in the same breath it is quoted — never copied from a document.
 git rev-list --count main..HEAD ; git rev-list --count @{u}..HEAD ; git status --porcelain | wc -l
 git diff --name-status @{u}..HEAD -- tests/ src/    # -> empty
-git log  --oneline      @{u}..HEAD -- strategy/     # -> empty
+git log  --oneline      @{u}..HEAD -- <private-tree>     # -> empty
 ```
 
 ---
@@ -9605,7 +9605,7 @@ git log -1 --format=%s ac2fb507
 **`ac2fb507` is the commit that introduced §31.3 THE DECISION.** The plan row is corrected on disk.
 
 🔴 **AND THE TASK THAT COMMISSIONED THIS ITEM WAS ITSELF WRONG.** It states that *"`MASTER_PLAN` row
-8.21 **and §0.4** cite `513dc887`"*. Measured — `grep -n "513dc887" strategy/Galaxus/MASTER_PLAN.md`
+8.21 **and §0.4** cite `513dc887`"*. Measured — `grep -n "513dc887" <private-plan>`
 returns **three** lines, 950, 1179 and 1350. §0.4 spans lines 242–419, so **§0.4 cites it nowhere**;
 lines 950 and 1179 are 2.11's rows, where the sha is **correct**. Only line 1350 — row 8.21 — is
 wrong. Blast radius: one cell, not two, and the two correct citations must not be "fixed".
@@ -9734,7 +9734,7 @@ dotnet run --project $E -- 3 | grep -E "Refusal(Detectors|Codes)"     # -> two �
 # 63.2 — the sha, resolved rather than read.
 git rev-parse --short 513dc887 ; git show 513dc887 | grep -c "8\.21"  # -> resolves ; 0
 git show ac2fb507 | grep -c "8\.21"                                   # -> 8
-grep -n "513dc887" strategy/Galaxus/MASTER_PLAN.md                    # -> 950, 1179 (correct), 1350 (wrong)
+grep -n "513dc887" <private-plan>                                     # -> 950, 1179 (correct), 1350 (wrong)
 
 # 63.3 — 8.14, from the tool source and the PERSISTED paid records. No re-run.
 grep -n "PersonalizationOptOut) return PersonalizationDisabled" $A/Tools/GalaxusTools.cs
@@ -10119,7 +10119,7 @@ there is no join to break. Named here so the next reader does not have to re-der
   all five patterns fired (1 · 1 · 1 · 1 · 1), the file was deleted in the same command and its path
   re-scanned to 0 — `RUN_PROTOCOL` stage 0c's stronger form, so there was never anything real to
   clean up.
-* **`git log main..HEAD -- strategy/` is still EMPTY.** The plan is edited on disk only.
+* **`git log main..HEAD -- <private-tree>` is still EMPTY.** The plan is edited on disk only.
 
 ### 65.9 What this review does NOT claim
 
@@ -10194,7 +10194,7 @@ git diff --numstat main..HEAD -- tests/     # every row is  N  0  — additions 
 for s in "" "--real-vectors"; do for c in "1 --dry-run" "1 --dry-run --judge" "2 --dry-run" \
   "2b --dry-run" "2c --dry-run" 3 4 "5 --dry-run" "6 --dry-run" 7 "8 --dry-run" "9 --dry-run" \
   "--ci --dry-run"; do dotnet run --project $E --no-build -- $c $s >/dev/null 2>&1; echo "$c $s -> $?"; done; done
-git log --oneline main..HEAD -- strategy/   # -> empty
+git log --oneline main..HEAD -- <private-tree>   # -> empty
 ```
 
 ---
@@ -10518,7 +10518,7 @@ grep -rn "AgentEval\.Evals\.Meta\." $E --include=*.cs   # -> 4, all ObservationC
 grep -rn "namespace AgentEval.Packs" src/               # -> nothing; ADR-031 has no surface
 
 # 66.10 - the sha sweep, with the pattern named beside the count.
-for f in strategy/Galaxus/MASTER_PLAN.md $E/Docs/MEASUREMENT_STATUS.md; do
+for f in <private-plan> $E/Docs/MEASUREMENT_STATUS.md; do
   grep -ohE '`[0-9a-f]{8}`' "$f" | tr -d '`' | sort -u | while read s; do
     git cat-file -e "$s^{commit}" 2>/dev/null || echo "UNRESOLVED $s in $f"; done; done
                                                        # -> b41262e2 in both, and nothing else
@@ -10869,7 +10869,7 @@ Green baselines that make those denominators readable: `ComparabilityFactsTests`
 net10 **9,843/0/2 of 9,845**, net9 and net8 **9,625/0/1 of 9,626** · exit codes both spaces
 `-- 3` **0** · `-- 3 --real-vectors` **0** · `-- 4` **0** · `-- 7` **1** · `-- 7 --real-vectors` **1**
 · `--ci --dry-run` **1** · panel **42 gating by distinct row name, `NOT CAUGHT` 0**, both spaces ·
-`git log main..HEAD -- strategy/` **empty** · `git diff --numstat main..HEAD -- tests/` deletion column
+`git log main..HEAD -- <private-tree>` **empty** · `git diff --numstat main..HEAD -- tests/` deletion column
 **0 for every path**, and no existing test file is touched by Wave 8 at all.
 
 **After all three fixes:** build 0 errors · net10 **9,853/0/2 of 9,855** · net9 and net8
@@ -10942,7 +10942,7 @@ grep -rEl "^[[:space:]]*(public|internal)[[:space:]]+(sealed[[:space:]]+|abstrac
 grep -rl "ChanceFloor" --include=*.cs src/ | wc -l                               # -> 4, intersection 0
 
 # 68.5 - the invariants, derived in the same breath as they are quoted.
-git log main..HEAD --oneline -- strategy/ | wc -l                                # -> 0
+git log main..HEAD --oneline -- <private-tree> | wc -l                           # -> 0
 git diff --numstat main..HEAD -- tests/ | awk '{print $2}' | sort -u             # -> 0
 ```
 
@@ -11004,7 +11004,7 @@ times. This reproduces §68's post-fix figures to the digit, from a tree this cl
   additions with zero deletions. **No existing assertion has ever been weakened or rewritten anywhere
   on this branch.** ⚠️ The path count was **28** at the Wave-7 close-out; Wave 8 added four test files.
   Count it, never quote it.
-* `git log --oneline main..HEAD -- strategy/` is **empty**. Sixth consecutive taking.
+* `git log --oneline main..HEAD -- <private-tree>` is **empty**. Sixth consecutive taking.
 
 🔴 **ONE §0.1 INVARIANT HAS DECAYED AND IS CORRECTED HERE.** The plan says *"`src/` has been modified
 only by the **NINE** library commits implementing the ADRs"* and lists them. It is **THIRTEEN**:
@@ -11137,7 +11137,7 @@ twice for doing so).
 was checked non-empty before the zero was believed.
 
 **Repo-wide, counts only:** tracked files carrying the real host **0**, the real key **0**;
-`strategy/Galaxus` host **0**; the branch diff `main..HEAD` host **0**; `.agenteval/` key **0**, host
+`<private-subdir>` host **0**; the branch diff `main..HEAD` host **0**; `.agenteval/` key **0**, host
 **2** — and those two are §57.4a's known pre-existing pair under `gatekeeper/certs/`, dated
 **2026-07-17** and **2026-07-11**, so no run of this branch wrote either.
 
@@ -11299,7 +11299,7 @@ dotnet build AgentEval.sln --no-incremental 2>&1 \
 for t in net10.0 net9.0 net8.0; do dotnet test tests/AgentEval.Tests -f $t --no-build; done
 git diff --numstat main..HEAD -- tests/ | awk '$2!=0' | wc -l                    # -> 0
 git log --oneline main..HEAD -- src/ | wc -l                                     # -> 13, NOT 9
-git log --oneline main..HEAD -- strategy/ | wc -l                                # -> 0
+git log --oneline main..HEAD -- <private-tree> | wc -l                           # -> 0
 
 # 69.3 — 26 eval exit codes both spaces + 4 agent lanes, $? on every one.
 for s in "" "--real-vectors"; do for c in "1 --dry-run" "1 --dry-run --judge" "2 --dry-run" \
@@ -11360,7 +11360,7 @@ dotnet run --project src/AgentEval.Cli --no-build -f net8.0 -- doctor \
 find .agenteval/subjects -name 'baseline.json' -o -path '*/baselines/*.json' | wc -l     # -> 0
 
 # 69.14 — the sha sweep, with the pattern named beside the count.
-for f in strategy/Galaxus/MASTER_PLAN.md $E/Docs/MEASUREMENT_STATUS.md; do
+for f in <private-plan> $E/Docs/MEASUREMENT_STATUS.md; do
   grep -ohE '`[0-9a-f]{8}`' "$f" | tr -d '`' | sort -u | while read s; do
     git cat-file -e "$s^{commit}" 2>/dev/null || echo "UNRESOLVED $s in $f"; done; done
                                                     # -> b41262e2 in both, and nothing else
@@ -11628,7 +11628,7 @@ output. The standing rule is *never printed*.
 | `tests/AgentEval.Tests` net10.0 | **9,928 / 0 / 2** of 9,930 |
 | net9.0 · net8.0 | **9,710 / 0 / 1** of 9,711, both |
 | `git diff --numstat main..HEAD -- tests/` | **36** paths, **0** with any deletion |
-| `git log --oneline main..HEAD -- strategy/` | **0** |
+| `git log --oneline main..HEAD -- <private-tree>` | **0** |
 | `git log --oneline main..HEAD -- src/` | **16** at the wave's final commit (was 13 at §69). 🔴 **This cell said 15 and was WRONG WITHIN ONE COMMIT OF BEING WRITTEN** — the §70 commit itself touched `src/` to remove the CS1734, which is the fourth time this number has needed a bump (six → nine → thirteen → fifteen → sixteen). §69 already said it: **the count is not the invariant, the rule is** — *`src/` is touched only by the library commits* — and a document cannot hold a count that its own writing changes. Derive it in the same breath you quote it. |
 | `-- 3` · `-- 3 --real-vectors` | **0** · **0** |
 | `-- 4` · `-- 4 --real-vectors` | **0** · **0** |
@@ -11715,7 +11715,7 @@ dotnet build AgentEval.sln --no-incremental 2>&1 \
   | grep -oE "[^ ]+\.cs\([0-9]+,[0-9]+\): warning [A-Z]+[0-9]+" | sort -u | wc -l  # -> 70
 for t in net10.0 net9.0 net8.0; do dotnet test tests/AgentEval.Tests -f $t --no-build; done
 git diff --numstat main..HEAD -- tests/ | awk '$2!=0' | wc -l                      # -> 0
-git log --oneline main..HEAD -- strategy/ | wc -l                                  # -> 0
+git log --oneline main..HEAD -- <private-tree> | wc -l                             # -> 0
 git log --oneline main..HEAD -- src/ | wc -l                                       # -> 16 at the final commit
 
 # 70.4 / 70.5 - credentials. COUNTS ONLY, and never echo a matched line.
@@ -11907,7 +11907,7 @@ and the first one on the delta side rather than the comparability side.
 | `agenteval --help \| grep -c compare` | 1 | **1** ✅ |
 | `Comparability` in the repo's `.agenteval` | 0 | **0** ✅ |
 | `git diff --numstat main..HEAD -- tests/` | 36 paths, 0 deletions | **36 · 0** ✅ |
-| `git log --oneline main..HEAD -- strategy/` | 0 | **0** ✅ |
+| `git log --oneline main..HEAD -- <private-tree>` | 0 | **0** ✅ |
 | `git log --oneline main..HEAD -- src/` | 16 | **16** ✅ — none of this review's three commits touches `src/` |
 
 **Did any existing test's output move?** **No.** The three TFM totals are identical before and after
@@ -11953,7 +11953,7 @@ of the paths would itself carry the host.** `-- 3 --real-vectors` carried **none
 * **No Eval 02 coverage cell was re-derived**, and Eval 07 GATE B is still red by decision
   (`MASTER_PLAN` §0.3). `-- 7` and `--ci --dry-run` exiting 1 is the honest state of the instrument.
 * **`MASTER_PLAN` §0.5's (d) cell is still stale in the pessimistic direction** and this review did
-  not edit it either, for §70's reason: `strategy/` is gitignored and historyless.
+  not edit it either, for §70's reason: `<private-tree>` is gitignored and historyless.
 
 ## §71.9 How to re-derive §71
 
@@ -12084,7 +12084,7 @@ Reproduces §71 to the digit from a tree this close-out built itself.
   column**. No existing assertion has ever been weakened or rewritten on this branch. ⚠️ The path count
   was 32 at the Wave-8 close-out — count it, never quote it; the zero deletion column is the invariant,
   now held over **seven** takings.
-* `git log --oneline main..HEAD -- strategy/` is **empty**. Seventh consecutive taking.
+* `git log --oneline main..HEAD -- <private-tree>` is **empty**. Seventh consecutive taking.
 
 ## §72.3 Exit codes — **30** commands, both spaces, every one OBSERVED with `$?`
 
@@ -12259,7 +12259,7 @@ unclassified one by SHAPE (length only). There were none.
 | this wave's 55 artifacts | **0** | **0** | **0** |
 | tracked repository (`git grep -l`) | **0** | **0** | **0** |
 | `git diff main..HEAD` | — | **0** | **0** |
-| `strategy/Galaxus` | — | **0** | **0** |
+| `<private-subdir>` | — | **0** | **0** |
 | `.agenteval/` | — | **2** | **0** |
 
 **The two `.agenteval` hits are reported by COUNT and by DATE and are NOT resolved to a path** —
@@ -12466,7 +12466,7 @@ dotnet build AgentEval.sln --no-incremental 2>&1 \
 # 72.2 - tests after the full build, then the invariants.
 for t in net10.0 net9.0 net8.0; do dotnet test tests/AgentEval.Tests -f $t --no-build; done
 git diff --numstat main..HEAD -- tests/ | cut -f2 | grep -vc '^0$'     # -> 0 paths with a deletion
-git log --oneline main..HEAD -- strategy/ | wc -l                      # -> 0
+git log --oneline main..HEAD -- <private-tree> | wc -l                 # -> 0
 git log --oneline main..HEAD -- src/ | wc -l                           # -> 16
 git log --oneline main..HEAD -- src/ | grep -c '^[0-9a-f]* docs'       # -> 1   <-- 72.12
 
@@ -12694,7 +12694,7 @@ nothing in front of it ⇒ category (d).**
   which is 9,928 + 14. The per-commit figures inside `53da7df5` and `dac7a137` are right; the
   summary over both is not.
 * `git diff --numstat main..HEAD -- tests/` → **41** paths, **not one with a non-zero deletion
-  column**. Ninth consecutive taking. `git log --oneline main..HEAD -- strategy/` → **empty**,
+  column**. Ninth consecutive taking. `git log --oneline main..HEAD -- <private-tree>` → **empty**,
   eighth.
 * **`compare` driven on runs produced this session:** exit **0** on four comparable pairs and exit
   **13** on a pair sharing no scenario id.
@@ -12846,7 +12846,7 @@ rebuilt. **Both takings are identical**, which is the evidence that the census l
   column**. No existing assertion has ever been weakened or rewritten on this branch — **tenth
   consecutive taking**. ⚠️ The path count was 36 at the Wave-9 close-out and 32 at Wave 8's: count it,
   never quote it. The zero deletion column is the invariant.
-* `git log --oneline main..HEAD -- strategy/` is **empty**. **Ninth** consecutive taking.
+* `git log --oneline main..HEAD -- <private-tree>` is **empty**. **Ninth** consecutive taking.
 
 ## §74.3 Exit codes — **30** commands, both spaces, every one OBSERVED with `$?`
 
@@ -13051,7 +13051,7 @@ as COUNTS ONLY:**
 | whole shared scratchpad | **0** | — | **0** | — |
 | tracked repository (`git grep -lF`) | **0** | **0** | **0** | **0** |
 | `git diff main..HEAD` (**7,045,349** bytes, taken AFTER all seven commits exist) | **0** | — | **0** | **0** |
-| `strategy/Galaxus` | **0** | — | **0** | — |
+| `<private-subdir>` | **0** | — | **0** | — |
 | `.agenteval/` | **2** | — | **0** | — |
 
 **The two `.agenteval` hits are reported by COUNT and by DATE and are NOT resolved to a path** —
@@ -13292,7 +13292,7 @@ diff id.set id.set.previous          # MUST be empty; a moved identity is a find
 grep -c ": error" build.log                                            # must be 0 (exits 1 on zero)
 for t in net10.0 net9.0 net8.0; do $SCRUB dotnet test tests/AgentEval.Tests -f $t --no-build; done
 git diff --numstat main..HEAD -- tests/ | cut -f2 | grep -vc '^0$'     # -> 0 paths with a deletion
-git log --oneline main..HEAD -- strategy/ | wc -l                      # -> 0
+git log --oneline main..HEAD -- <private-tree> | wc -l                 # -> 0
 git log --format='%h %s' main..HEAD -- src/ | grep -vcE '^[0-9a-f]+ (feat|fix|refactor|perf|chore)[(:]' # 2
 #   NOTE the [(:] and not \( — requiring a parenthesised scope reads `b573bc19 fix:` as a violation
 #   and returns 3. The arbiter was wrong in its first draft and running it before publishing is what
@@ -13487,7 +13487,7 @@ to a safety evaluator with a decision attached, and authoring a matching `jailbr
 `evaluatorKey` values, **40** dispatched keys carrying goldens, **336** dispatched records.
 
 **Blast radius: bounded to this document.** No tracked doc publishes an agentic `WithinScoreRange`,
-`Accuracy` or `MeanScoreDelta` figure — the calibration report is written to gitignored `strategy/`
+`Accuracy` or `MeanScoreDelta` figure — the calibration report is written to the gitignored `<private-tree>`
 — and the three CLI renderers print `Within score range` and `Mean score delta` with a bare em-dash
 in both the threshold and the status column, so neither is gated anywhere. Verified by grep across
 `docs/`, `samples/` and `README.md`.
@@ -13686,7 +13686,7 @@ binary otherwise, and it did so once in the Wave-10 session.
 * **0 failures on all three TFMs.**
 * `git diff --numstat main..HEAD -- tests/` → **42** paths, **0** with a non-zero deletion column.
   **Eleventh consecutive taking.** ⚠️ Count the paths, never quote them: 32 → 36 → 41 → 42 across waves.
-* `git log --oneline main..HEAD -- strategy/` → **0**. **Tenth** consecutive taking.
+* `git log --oneline main..HEAD -- <private-tree>` → **0**. **Tenth** consecutive taking.
 * `git rev-list --count main..HEAD` → **156**; `@{u}..HEAD` → **4**, derived in the same breath (§0.1).
 
 ## §76.3 Exit codes — **30** commands, both spaces, every one OBSERVED with `$?`
@@ -14120,7 +14120,7 @@ for t in net10.0 net9.0 net8.0; do $SCRUB dotnet test tests/AgentEval.Tests --no
 $SCRUB dotnet test tests/AgentEval.Tests --no-build -f net10.0 \
    --filter "FullyQualifiedName~AgenticGoldenCoverageTests"                      # 12 of 12
 git diff --numstat main..HEAD -- tests/ | cut -f2 | grep -vc '^0$'               # 0
-git log --oneline main..HEAD -- strategy/ | wc -l                                # 0
+git log --oneline main..HEAD -- <private-tree> | wc -l                           # 0
 
 # 76.3 - 26 eval commands both spaces + 4 agent lanes, $? on EVERY one.
 #   ⚠ THE CONCEPT HALF IS SCRUBBED. THE REAL HALF NEEDS AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY
@@ -14377,7 +14377,7 @@ above are not zeros from a dead needle.
 
 **+1 on each TFM** against the build phase's 9,962 / 9,744 / 9,744 — exactly the one test added here.
 
-`git log main..HEAD -- strategy/` gives **0 commits**, over the whole branch. Golden corpus this wave:
+`git log main..HEAD -- <private-tree>` gives **0 commits**, over the whole branch. Golden corpus this wave:
 **2 added lines, 0 deleted**. Census at HEAD: **338 dispatched records — Judged 298,
 JudgedWithoutTheResponse 0, DecidedFromResponse 12, ResponseBlind 3, Skipped 25**, 40 carved out, 0 bar
 violations. Classification is **deterministic**: every record classified twice, 0 disagreements.
@@ -14499,7 +14499,7 @@ Filters, all net10, all green: `Agentic.Calibration` **34 / 34** · `GoldenReach
 dispatched 40** — d-4 stays built.
 
 **Branch invariants:** `git rev-list --count main..HEAD` → **164**; `@{u}..HEAD` → **7**;
-`git log --oneline main..HEAD -- strategy/` → **0** (ELEVENTH consecutive taking); tree clean.
+`git log --oneline main..HEAD -- <private-tree>` → **0** (ELEVENTH consecutive taking); tree clean.
 
 ⚠️ **`git diff --numstat main..HEAD -- tests/` reads 45 paths, 0 with a non-zero deletion column — and
 it is BLIND, exactly as the build phase declared.** The within-branch diff `46315e00..HEAD -- tests/`
@@ -15056,7 +15056,7 @@ grep -oE '[^ ]+[.]cs[(][0-9]+,[0-9]+[)]: warning [A-Za-z]+[0-9]+' build.log | so
 for t in net10.0 net9.0 net8.0; do $SCRUB dotnet test tests/AgentEval.Tests --no-build -f $t; done
 git diff --numstat main..HEAD -- tests/ | cut -f2 | grep -vc '^0$'   # 0 - AND IT IS BLIND, use:
 git diff --numstat 46315e00..HEAD -- tests/                          # 17 real deletions
-git log --oneline main..HEAD -- strategy/ | wc -l                    # 0
+git log --oneline main..HEAD -- <private-tree> | wc -l               # 0
 
 # 78.3 - 26 eval commands both spaces + 4 agent lanes, $? on EVERY one.
 #   ⚠ THE REAL HALF NEEDS AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY PRESENT and IT SPENDS.

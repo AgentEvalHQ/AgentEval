@@ -44,7 +44,7 @@ internal static class EuAiActBenchmarkRegistration
             ],
             compositeFactory: (preset, judge) => BuildPreset(preset, RequireJudge(judge, preset)),
             evaluateAsync: null,
-            docLinkUrl: "https://github.com/joslat/AgentEval/blob/main/docs/compliance/eu-ai-act.md",
+            docLinkUrl: "https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/eu-ai-act/getting-started.md",
             owningAssemblyName: typeof(EuAiActBenchmark).Assembly.GetName().Name));
     }
 

@@ -173,7 +173,6 @@ dotnet run --project samples/AgentEval.Samples
 .agenteval/benchmarks/{agent-slug}/
 ├── manifest.json              # Index of all baselines for this agent
 ├── report.html                # Interactive HTML report (auto-copied from embedded resource)
-├── archetypes.json            # Reference/archetype baselines (optional)
 └── baselines/
     ├── 2026-04-17_name-1.json
     ├── 2026-04-18_name-2.json
@@ -181,6 +180,8 @@ dotnet run --project samples/AgentEval.Samples
 ```
 
 Each agent gets its own directory under `.agenteval/benchmarks/`. The agent slug is derived from the `AgentBenchmarkConfig.AgentName` (e.g., `LongMemEval-gpt-4o` → `longmemeval-gpt-4o`).
+
+`archetypes.json` is not part of the folder by default. `JsonFileBaselineStore` copies it, and names it in `manifest.json`, only when `MemoryReportingOptions.IncludeArchetypes` is `true` (the default is `false`). Neither `report.html` nor any other AgentEval code reads it: its `expected_scores` are hand-written reference numbers that gate nothing. Turn it on only for your own tooling that reads the file, and never present its numbers as measured results.
 
 ### Saving Baselines
 ```csharp

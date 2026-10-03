@@ -86,6 +86,9 @@
 
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
+    <!-- Third-party notices (dependency list, licences, and the licence texts that must travel with
+         the packages) from the repo root, at the package root. -->
+    <None Include="..\..\THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="\" Visible="false" />
   </ItemGroup>
 
 </Project>

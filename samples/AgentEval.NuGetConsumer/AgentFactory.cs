@@ -20,7 +20,7 @@ public static class AgentFactory
     /// <summary>
     /// Creates a travel booking agent with tools.
     /// </summary>
-    /// <param name="useMock">True for mock mode (no LLM calls), false for real Azure OpenAI.</param>
+    /// <param name="useMock">True for mock mode (no LLM calls), false for the configured inference provider.</param>
     /// <param name="modelDeployment">Optional model deployment name (defaults to Config.Model).</param>
     public static IStreamableAgent CreateTravelAgent(bool useMock, string? modelDeployment = null)
     {
@@ -58,7 +58,7 @@ public static class AgentFactory
     /// <summary>
     /// Creates a travel booking agent as a raw MAF <see cref="AIAgent"/> (no AgentEval wrapper).
     /// </summary>
-    /// <param name="useMock">True for mock mode (no LLM calls), false for real Azure OpenAI.</param>
+    /// <param name="useMock">True for mock mode (no LLM calls), false for the configured inference provider.</param>
     /// <param name="modelDeployment">Optional model deployment name (defaults to Config.Model).</param>
     public static AIAgent CreateTravelAIAgent(bool useMock, string? modelDeployment = null)
     {
@@ -94,7 +94,7 @@ public static class AgentFactory
     /// <summary>
     /// Creates a calculator agent with a single tool.
     /// </summary>
-    /// <param name="useMock">True for mock mode, false for real Azure OpenAI.</param>
+    /// <param name="useMock">True for mock mode, false for the configured inference provider.</param>
     /// <param name="modelDeployment">Optional model deployment name (defaults to Config.Model).</param>
     public static IStreamableAgent CreateCalculatorAgent(bool useMock, string? modelDeployment = null)
     {
@@ -121,7 +121,7 @@ public static class AgentFactory
     public static List<IAgentFactory> CreateCalculatorAgentFactories()
     {
         if (!Config.IsConfigured)
-            throw new InvalidOperationException("Azure OpenAI is not configured.");
+            throw new InvalidOperationException(Config.NotConfiguredMessage);
 
         return new List<IAgentFactory>
         {
@@ -142,11 +142,10 @@ public static class AgentFactory
     public static IChatClient CreateEvaluatorChatClient()
     {
         if (!Config.IsConfigured)
-            throw new InvalidOperationException("Azure OpenAI is not configured. Set environment variables.");
+            throw new InvalidOperationException(Config.NotConfiguredMessage);
 
-        var azureClient = new AzureOpenAIClient(Config.Endpoint, Config.KeyCredential);
         // Use the primary model for evaluation (could also use a separate evaluator model)
-        return azureClient.GetChatClient(Config.Model).AsIChatClient();
+        return Config.CreateChatClient();
     }
 
     private static string GetModelDisplayName(string deployment) => deployment switch
@@ -161,10 +160,9 @@ public static class AgentFactory
     private static IChatClient CreateRealChatClient(string? modelDeployment = null)
     {
         if (!Config.IsConfigured)
-            throw new InvalidOperationException("Azure OpenAI is not configured. Set environment variables.");
+            throw new InvalidOperationException(Config.NotConfiguredMessage);
 
-        var azureClient = new AzureOpenAIClient(Config.Endpoint, Config.KeyCredential);
-        return azureClient.GetChatClient(modelDeployment ?? Config.Model).AsIChatClient();
+        return Config.CreateChatClient(modelDeployment);
     }
 
     private static IChatClient CreateMockChatClient()

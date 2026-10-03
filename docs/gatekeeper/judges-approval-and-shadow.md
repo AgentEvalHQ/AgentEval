@@ -85,7 +85,8 @@ native approval pause as evidence that a Gatekeeper execution gate ran.
 | Human approves an escalated continuation | Execute once | The effect must occur only after the resumed approval path |
 
 Sample [28](../../samples/AgentEval.Samples/Gatekeeper/28_GatekeeperApprovalDecisionMatrix.cs) exercises this matrix
-offline with measured fake effects.
+with measured fake effects. With a provider configured, the configured model judges the goal-coherence cell and
+proposes the refund in the human moment; without one (and in CI) a deterministic scripted path runs.
 
 ## Shadow judgment
 

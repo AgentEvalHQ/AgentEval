@@ -15,8 +15,8 @@ namespace AgentEval.Cli;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>BUG-22 — RESOLVED 2026-07-19.</b> Code 2 used to be overloaded: System.CommandLine
-/// automatically returns <see cref="UsageError"/> (2) for bad arguments, but the
+/// <b>BUG-22 — RESOLVED 2026-07-19.</b> Code 2 used to be overloaded: it was documented as
+/// <see cref="UsageError"/> (bad arguments), but the
 /// <c>bench</c>/<c>calibrate</c> command family also returned 2 to mean "benchmark gate
 /// FAIL/WARN", AND <c>JudgeFactory</c> config failures also returned 2. CI could not
 /// distinguish "invoked wrong" from "agent failed the gate" from "judge misconfigured"
@@ -38,6 +38,15 @@ namespace AgentEval.Cli;
 /// exits 9/10/11 or 3 respectively. External CI pipelines that branch on exit code 2 from these
 /// commands must be updated to check the new codes. See CHANGELOG.md.
 /// </para>
+/// <para>
+/// <b>Parse errors.</b> System.CommandLine (2.0) does NOT return 2 for bad arguments: its parse-error
+/// action prints the errors to stderr and the help to stdout, then returns 1 — the value of
+/// <see cref="TestFailure"/> — for an unknown command or option, a value that does not convert, a
+/// missing required option, or no command at all. <c>Program.cs</c> detects that action and returns
+/// <see cref="UsageError"/> (2) instead, keeping System.CommandLine's output unchanged. <c>--help</c>
+/// and <c>--version</c> are not parse errors and exit 0. A required option a command checks itself
+/// (for example <c>bench … --subject</c>) also returns <see cref="UsageError"/>.
+/// </para>
 /// </remarks>
 public static class ExitCodes
 {
@@ -47,7 +56,10 @@ public static class ExitCodes
     /// <summary>One or more tests failed.</summary>
     public const int TestFailure = 1;
 
-    /// <summary>CLI usage error (bad arguments) — set by System.CommandLine automatically.</summary>
+    /// <summary>
+    /// CLI usage error (bad arguments). System.CommandLine's own parse-error action returns 1, so
+    /// <c>Program.cs</c> maps a parse error to this code — see the remarks on <see cref="ExitCodes"/>.
+    /// </summary>
     public const int UsageError = 2;
 
     /// <summary>Runtime error (connection failure, file not found, etc.).</summary>

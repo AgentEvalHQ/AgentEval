@@ -194,12 +194,56 @@ public static class AIConfig
         Console.WriteLine("║   openai-compatible  OPENAI_COMPATIBLE_ENDPOINT + _MODEL  (_API_KEY optional) ║");
         Console.WriteLine("║                                                                              ║");
         Console.WriteLine("║  or pass --provider <name> for one run.                                       ║");
-        Console.WriteLine("║  Samples that need a model run in MOCK MODE or stop without one.              ║");
+        Console.WriteLine("║  Samples that need a model stop without one. The Getting Started samples     ║");
+        Console.WriteLine("║  also have an offline walkthrough with canned replies: pass --mock.          ║");
         Console.WriteLine("╚══════════════════════════════════════════════════════════════════════════════╝");
         if (Settings.Diagnostic is { } why)
             Console.WriteLine($"   ↳ {why}");
         Console.ResetColor();
         Console.WriteLine();
+    }
+
+    // ── Mock mode (Getting Started and the auto-audit sample) ────────────────
+
+    /// <summary>The variable <c>--mock</c> sets. Read once per call, so a test or the runner can flip it.</summary>
+    public const string MockVariable = "AGENTEVAL_SAMPLES_MOCK";
+
+    /// <summary>
+    /// True only when the user asked for the offline walkthrough (<c>--mock</c>). A sample never picks it by itself:
+    /// through 0.42 the Getting Started samples switched to canned replies whenever no provider was set and printed
+    /// ✅ PASSED over them.
+    /// </summary>
+    public static bool UseMock => Env(MockVariable) == "1";
+
+    /// <summary>Appended to every pass/fail line a mock run prints, so a canned reply never reads as a result.</summary>
+    public static string MockLabel => UseMock ? " (MOCK: a canned reply, not a measurement)" : "";
+
+    /// <summary>
+    /// The gate at the top of a Getting Started sample. True to run: against the configured model, or against the
+    /// mock when the user passed <c>--mock</c> (said loudly). False when neither, after saying how to get either.
+    /// </summary>
+    public static bool StartModelSample()
+    {
+        if (UseMock)
+        {
+            Console.ForegroundColor = ConsoleColor.Magenta;
+            Console.WriteLine("   🎭 MOCK MODE (--mock): the agent returns canned replies. Nothing here measures a model.");
+            Console.ResetColor();
+            Console.WriteLine();
+            return true;
+        }
+
+        if (IsConfigured)
+        {
+            Console.WriteLine($"   🔗 {Describe()}");
+            Console.WriteLine();
+            return true;
+        }
+
+        PrintMissingCredentialsWarning();
+        Console.WriteLine("   This sample runs a real model. Configure a provider above and re-run,");
+        Console.WriteLine("   or pass --mock for an offline walkthrough with canned replies.\n");
+        return false;
     }
 
     private static string? Env(string name)

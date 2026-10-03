@@ -585,10 +585,9 @@ MAF-free, reusable for a future MCP-tool-description equivalent) back
 `AgentEval.Skills.SkillManifestPoisoningGate` + `SkillManifestBaseline` — deterministic trust-time drift
 detection for a rug-pulled skill, JSON-persisted (mirrors the RedTeam baseline/diff CI pattern). Phase 4c
 (fuzzing, canary-skill honeypot, typosquat detection, load-storm-as-denial-of-wallet) was deprioritized
-per the design doc's own scoring — see `strategy/TODO.md` for what remains.
+per the design doc's own scoring; the remaining items are tracked privately.
 
-See `strategy/FutureFeatures/Skills/AgentEval-AgentSkills-Evals-Design-and-Plan.md` (local-only) for the
-full multi-phase design.
+The full multi-phase design is a private planning document and is not published.
 
 ### 4. Registry Pattern
 
@@ -614,7 +613,7 @@ var exporters = serviceProvider.GetRequiredService<IExporterRegistry>();
 var jsonExporter = exporters.GetRequired("Json");
 var allFormats = exporters.GetRegisteredFormats(); // Json, Junit, Markdown, Csv, Trx, ...
 
-// Attack type registry (pre-populated with the 13 built-in attacks + DI-registered)
+// Attack type registry (pre-populated with the 14 built-in attacks + DI-registered)
 var attacks = serviceProvider.GetRequiredService<IAttackTypeRegistry>();
 var promptInjection = attacks.GetRequired("PromptInjection");
 var llm01 = attacks.GetByOwaspId("LLM01"); // All attacks for OWASP LLM01
@@ -954,7 +953,7 @@ internal static class OwaspBenchmarkRegistration
                 var run = ResolvePresetRun(presetName, judge);
                 return await run.EvaluateAsync(input, ct);
             },
-            docLinkUrl: "https://github.com/joslat/AgentEval/blob/main/docs/redteam/owasp.md",
+            docLinkUrl: "https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/redteam/owasp.md",
             owningAssemblyName: typeof(OwaspBenchmark).Assembly.GetName().Name));
     }
 }
@@ -1009,7 +1008,7 @@ ADR-017 establishes four durable conventions that apply to every benchmark famil
 1. **Top-level factory namespace** = `AgentEval.Benchmarks`. The factory class is `public static partial class {Family}Benchmark`. Pinned by `BenchmarkNamespaceContractTests`.
 2. **`EvaluateAsync(EvalInput, CT) → EvalResult` adapter** is the canonical result-type homogenisation primitive. Every benchmark family that ships a non-`CompositeEval`-native result type (e.g. `LatencyBenchmarkResult`, `OWASPComplianceReport`, `MITREATLASReport`) provides this adapter so its results flow through the same `IRunOutputStore` / audit-chain / Mission Control rendering pipeline. The natural result type is preserved in `Provenance` for downstream consumers that want richer data. Pinned by `PerformanceBenchmarkAdapterTests` + `OwaspBenchmarkTests` round-trip + `MitreBenchmarkTests` round-trip.
 3. **`BenchmarkFamilyRegistry` is canonical**. Every family auto-registers via `[ModuleInitializer]`. The CLI / Mission Control read from the registry. ⚠️ **RETRACTED 2026-09-07:** this sentence used to end "— there are no hardcoded family lists anywhere", and that is false. `grep -c 'new Command(' src/AgentEval.Cli/Program.cs` → **27**, and `Program.cs:72` calls `BenchListCommand.AnchorAssemblies()`, whose body (`src/AgentEval.Cli/Commands/BenchListCommand.cs:81-89`) hard-codes **nine** `typeof(...)` assemblies to force module load. The only `Assembly.LoadFrom` in `src/` is `CalibrationGoldenAssembly.cs:45`, which is not a benchmark path. Registration is dynamic; **discovery and the CLI surface are not**. Pinned by `BenchmarkFamilyRegistryTests` (12 tests) + `BenchListCommandTests.OutputComesFromRegistry` (extensibility test that registers a synthetic UUID-named family at runtime and asserts it appears in `bench --list`).
-4. **Opus gate-review after every phase** of an architectural arc. Process convention, not code. Sign-off docs live in `strategy/FutureFeatures/todo/lastreview/`.
+4. **Opus gate-review after every phase** of an architectural arc. Process convention, not code. Sign-off docs are kept privately and are not published.
 
 See [ADR-017 §"Conventions established by this ADR"](adr/017-unified-benchmarks-namespace.md#conventions-established-by-this-adr) for the full normative text and [§"Verification"](adr/017-unified-benchmarks-namespace.md#verification) for the contract-test mapping.
 

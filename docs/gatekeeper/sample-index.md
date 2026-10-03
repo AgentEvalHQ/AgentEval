@@ -13,17 +13,21 @@ For concepts, start with the [introduction](introduction.md). For gate contracts
 
 | Mode | Meaning |
 |---|---|
-| **Offline** | Scripted/fake components; no network or destructive effect |
-| **Live model** | Calls the explicitly configured Azure OpenAI deployment; tool effects remain local/fake |
+| **Offline** | Never calls a model provider; no network or destructive effect. Most drive the gate directly and print `NO MODEL`; 21 uses a scripted model by design, for a same-batch race a real model would not produce on demand |
+| **Live model** | Calls the configured model provider; tool effects remain local/fake |
 | **Live boundary** | Also contacts an explicitly configured and consented remote boundary |
-| **Hybrid** | Has a useful offline path and an optional live overlay |
+| **Hybrid** | Live-first: runs on the configured model provider when one is configured, and on a deterministic scripted path otherwise |
 
 A sample passes only when an internal invariant proves the claimed behavior. Console text, model compliance, or the
 absence of an exception is not a sufficient oracle.
 
-Samples 00–10 choose the deterministic offline path when Azure OpenAI is not configured. Set
-`AGENTEVAL_GATEKEEPER_FORCE_OFFLINE=true` to force that release oracle even on a configured workstation; otherwise
-the optional live overlay runs. Both paths use fake/local tool effects.
+The hybrid samples (00–10, 14–17, 25, 28) run on the configured model when a provider is configured: any provider
+`AI_INFERENCE_PROVIDER` selects, not only Azure OpenAI. A live run calls and bills that model. Without a provider, or
+with `AGENTEVAL_GATEKEEPER_FORCE_OFFLINE=true`, they run the deterministic scripted path and print `SCRIPTED (…)`.
+Both paths use fake/local tool effects. A live run of 14–17, 25 or 28 reports each scene as ✅ attempted and blocked,
+➖ no attempt or not measured (this says nothing about the gate), or ❌ the effect the attack seeks happened, or the
+gate blocked a benign control (the sample fails). In sample 25 the judge is the configured model, not a calibrated trajectory judge, and the run says
+so.
 
 Every sample prints a compact two-line threat/guarantee contract by default; set
 `AGENTEVAL_GATEKEEPER_SHOW_CONTRACTS=true` for the full audited contract. The offline invariants are not
@@ -70,10 +74,10 @@ Stable IDs preserve the two historical `11_` source files as **11A** and **11B**
 | 11A | [Real A2A Boundary](../../samples/AgentEval.Samples/Gatekeeper/11_GatekeeperA2ABoundary.cs) | Advanced | Live boundary | construction, A2A run-pre/post | calibrated inbound/outbound boundary judges | Menu |
 | 11B | [A2A Calibration](../../samples/AgentEval.Samples/Gatekeeper/11_GatekeeperA2ACalibration.cs) | Advanced | Live model | construction, A2A promotion | both calibration corpora + thresholds | Direct |
 | 13 | [Mocked Dangerous Tools](../../samples/AgentEval.Samples/Gatekeeper/13_GatekeeperMockedDangerousTools.cs) | Intermediate | Offline | tool, evidence | sample-local SQL/browser/cloud/package fixtures | Menu |
-| 14 | [Poisoned Tool Kill Chain](../../samples/AgentEval.Samples/Gatekeeper/14_GatekeeperPoisonedToolKillChain.cs) | Advanced | Offline | construction, tool, result, containment | result injection, contracts, taint, containment, block storm | Menu |
-| 15 | [Harness-Owned Tool Misuse](../../samples/AgentEval.Samples/Gatekeeper/15_GatekeeperHarnessOwnedToolMisuse.cs) | Intermediate | Offline | run, tool, autonomous harness | discovered runtime capability + deny/budget | Menu |
-| 16 | [Jailbreak and Tool Abuse](../../samples/AgentEval.Samples/Gatekeeper/16_GatekeeperJailbreakAndToolAbuse.cs) | Intermediate | Offline | construction, run, tool | input marker + authoritative contracts + coverage | Menu |
-| 17 | [Tool Result Admission](../../samples/AgentEval.Samples/Gatekeeper/17_GatekeeperToolResultAdmission.cs) | Intermediate | Offline | tool result | secret masking + fixed-size truncation | Menu |
+| 14 | [Poisoned Tool Kill Chain](../../samples/AgentEval.Samples/Gatekeeper/14_GatekeeperPoisonedToolKillChain.cs) | Advanced | Hybrid | construction, tool, result, containment | result injection, contracts, taint, containment, block storm | Menu |
+| 15 | [Harness-Owned Tool Misuse](../../samples/AgentEval.Samples/Gatekeeper/15_GatekeeperHarnessOwnedToolMisuse.cs) | Intermediate | Hybrid | run, tool, autonomous harness | discovered runtime capability + deny/budget | Menu |
+| 16 | [Jailbreak and Tool Abuse](../../samples/AgentEval.Samples/Gatekeeper/16_GatekeeperJailbreakAndToolAbuse.cs) | Intermediate | Hybrid | construction, run, tool | input marker + authoritative contracts + coverage | Menu |
+| 17 | [Tool Result Admission](../../samples/AgentEval.Samples/Gatekeeper/17_GatekeeperToolResultAdmission.cs) | Intermediate | Hybrid | tool result | secret masking + fixed-size truncation | Menu |
 | 18 | [Hosted Tool Coverage Boundary](../../samples/AgentEval.Samples/Gatekeeper/18_GatekeeperHostedToolCoverageBoundary.cs) | Intermediate | Offline | construction, coverage | hosted-tool classification + promotion refusal | Menu |
 | 19 | [Bulkhead + Containment Isolation](../../samples/AgentEval.Samples/Gatekeeper/19_GatekeeperBulkheadIsolation.cs) | Advanced | Offline | construction, tool-resource, containment, evidence | separate normal/isolated HTTP pools + measured concurrency | Menu |
 | 20 | [Stateful Gate Timeline](../../samples/AgentEval.Samples/Gatekeeper/20_GatekeeperStatefulTimeline.cs) | Advanced | Offline | tool-call, run, session, durable containment | run budget, session rate state, signed containment persistence | Menu |
@@ -81,10 +85,10 @@ Stable IDs preserve the two historical `11_` source files as **11A** and **11B**
 | 22 | [Security Graph Incident Response](../../samples/AgentEval.Samples/Gatekeeper/22_GatekeeperSecurityGraphIncident.cs) | Advanced | Offline | ingestion, durable graph, containment, tool-call | bounded ingestion/store/compute, read-only projection, containment bridge | Menu |
 | 23 | [HTTP Wire Boundary](../../samples/AgentEval.Samples/Gatekeeper/23_GatekeeperHttpWireBoundary.cs) | Advanced | Offline | HTTP wire, DNS, redirect, cancellation | `GatekeeperHttpMessageHandler` + fake DNS/transport | Menu |
 | 24 | [Dynamic Context Provider Boundary](../../samples/AgentEval.Samples/Gatekeeper/24_GatekeeperDynamicContextProviderBoundary.cs) | Advanced | Offline | construction, AIContextProvider, dynamic tool | static inventory refusal + real provider-boundary filtering | Menu |
-| 25 | [Crescendo Trajectory](../../samples/AgentEval.Samples/Gatekeeper/25_GatekeeperCrescendoTrajectory.cs) | Advanced | Offline | shadow, run pre, session | trajectory judge + shadow pump + next-run quarantine | Menu |
+| 25 | [Crescendo Trajectory](../../samples/AgentEval.Samples/Gatekeeper/25_GatekeeperCrescendoTrajectory.cs) | Advanced | Hybrid | shadow, run pre, session | trajectory judge + shadow pump + next-run quarantine | Menu |
 | 26 | [Session Identity Takeover and Reload](../../samples/AgentEval.Samples/Gatekeeper/26_GatekeeperSessionIdentityTakeover.cs) | Advanced | Offline | session, run pre, concurrency | stable logical identity + atomic actor binding | Menu |
 | 27 | [Prompt and MCP Manifest Provenance Drift](../../samples/AgentEval.Samples/Gatekeeper/27_GatekeeperManifestProvenanceDrift.cs) | Advanced | Offline | construction, prompt, MCP discovery | prompt pin + qualified MCP manifest | Menu |
-| 28 | [Approval Decision Matrix](../../samples/AgentEval.Samples/Gatekeeper/28_GatekeeperApprovalDecisionMatrix.cs) | Advanced | Offline | approval, tool, human continuation | deterministic + semantic gates and real continuation | Menu |
+| 28 | [Approval Decision Matrix](../../samples/AgentEval.Samples/Gatekeeper/28_GatekeeperApprovalDecisionMatrix.cs) | Advanced | Hybrid | approval, tool, human continuation | deterministic + semantic gates and real continuation | Menu |
 | 29 | [Tool Result Behavioral Anomaly](../../samples/AgentEval.Samples/Gatekeeper/29_GatekeeperToolResultBehavioralAnomaly.cs) | Advanced | Offline | result, run, state | fixed cap + per-tool running anomaly | Menu |
 
 ## Boundary coverage
@@ -147,7 +151,7 @@ A check means the sample executes or directly evaluates the boundary; a type men
 | Security-graph incident response | 22 | Durable multi-session path through honest compute, read-only ops, containment, and refusal |
 | HTTP redirect/DNS wire boundary | 23 | Deterministic redirect, private-DNS, limit, cancellation, and disclosure checks |
 | Dynamic AIContextProvider tool coverage | 24 | Static promotion refuses unknown inventory; real provider boundary filters unsupported tools |
-| Crescendo/slow-burn trajectory | 25 | Deterministic shadow timing, one-time arm, next-run quarantine, and safe-frustration control |
+| Crescendo/slow-burn trajectory | 25 | Scripted path: deterministic shadow timing, one-time arm, next-run quarantine, and safe-frustration control. A live run uses the configured model as the judge, not a calibrated trajectory judge |
 | Session actor takeover/reload | 26 | Weak-object limitation contrasted with stable reload, poisoning, and concurrent-race defense |
 | Prompt/MCP manifest and provenance drift | 27 | Prompt registration pin plus canonical schema and qualified server identity checks |
 | Approval edge-case matrix | 28 | Every risky/inconclusive path pauses; reject/approve effects measured |
@@ -161,7 +165,7 @@ The core catalog does not duplicate these specialized suites:
 |---|---|---|
 | Memory security | Eight offline scenarios covering recall, write, tenant, provenance, lifecycle, MCP, tool, and context-provider adapters | [Memory-security samples](memory-security-samples.md) |
 | Agent Skills | Manifest/content construction checks plus deterministic script execution and approval postures | [Agent Skills documentation](../agent-skills.md) and [`04_AgentSkillsSkillGate`](../../samples/AgentEval.Samples/AgentSkills/04_AgentSkillsSkillGate.cs) |
-| Attack the Gate | Credential-free red-team regression target and baseline comparison | [Attack the Gate](attack-the-gate.md) |
+| Attack the Gate | Red-team regression target on the configured model, or on a scripted model (`--scripted`: credential-free, deterministic) for a stable CI baseline | [Attack the Gate](attack-the-gate.md) |
 
 ## Using the manifest
 

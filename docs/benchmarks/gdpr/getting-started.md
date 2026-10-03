@@ -4,13 +4,13 @@
 
 > **Disclaimer**: This benchmark evaluates an AI agent's dialog behavior against GDPR articles. It is a first-line screening tool for behavioral conformance, not a legal compliance attestation. A passing score does not mean the system is legally GDPR-compliant; it means the agent's observed responses, across the tested scenarios, satisfy the behavioral criteria encoded in the benchmark. Legal compliance depends on many factors outside the scope of any automated dialog benchmark, including encryption at rest, breach notification processes, DPIA documentation, international transfer mechanisms, and privacy-by-design at the infrastructure level. Consult a qualified Data Protection Officer and legal counsel before making any compliance claims to regulators, customers, or partners.
 
-> **v1.1 article coverage extends to Pillar 6 Governance and Accountability** (plan-13 T1.1). The current articles span Pillars 1–6 (foundations, lawful basis, subject rights, transparency, privacy by design, governance). **v1.1 ships DIALOG-AWARENESS PROBES under Pillar 6 for the following articles** — these test whether the agent can correctly describe the obligation when asked; they do NOT verify that the organisation actually maintains a ROPA, has a DPO, notifies the DPA within 72h, executes SCCs with sufficient supplementary measures, or otherwise discharges the upstream-process obligations. Upstream-process attestation remains out of scope of any dialog benchmark and must be evidenced separately (document review, process audit, attestation pipeline). **Pillar 6 dialog-awareness probes (v1.1):** Art 28 (processor contracts — Art 28(3)(a)-(h) mandatory terms + Art 28(2) sub-processor notification + Art 26 joint-controller boundary), Art 30 (records of processing — Art 30(1)/(2)/(3)/(4)/(5) regime including the small-enterprise exemption traps), Art 33 (personal-data-breach notification to the supervisory authority — 72h-from-awareness clock + Art 33(3) minimum contents + Art 33(5) documentation-of-all-breaches), Art 34 (breach communication to data subjects — high-risk threshold + Art 34(3) exemptions + clear-and-plain-language standard), Art 35 (DPIA — Art 35(3)(a)-(c) mandatory triggers + Art 35(1) general high-risk test + WP29 WP248rev.01 nine-criteria framework + Art 36 prior consultation), Art 37–39 (DPO — Art 37(1)(a)/(b)/(c) appointment triggers + Art 38(3) independence + Art 38(6) conflict of interests + Art 39(1) tasks), Art 44–49 (international transfers — Schrems II + post-2021/914 SCCs + TIA + supplementary measures + Art 49 narrow derogations + Art 48 third-country-order conflict), Art 5(2) (accountability — the meta-control linking Art 5(1) substantive compliance to Art 24 demonstrability + Art 24(3) certifications-as-element).
+> **Article coverage spans Pillars 1–6** (foundations, lawful basis, subject rights, transparency, privacy by design, governance and accountability). **Pillar 6 covers the following articles with DIALOG-AWARENESS PROBES** — these test whether the agent can correctly describe the obligation when asked; they do NOT verify that the organisation actually maintains a ROPA, has a DPO, notifies the DPA within 72h, executes SCCs with sufficient supplementary measures, or otherwise discharges the upstream-process obligations. Upstream-process attestation remains out of scope of any dialog benchmark and must be evidenced separately (document review, process audit, attestation pipeline). **Pillar 6 dialog-awareness probes:** Art 28 (processor contracts — Art 28(3)(a)-(h) mandatory terms + Art 28(2) sub-processor notification + Art 26 joint-controller boundary), Art 30 (records of processing — Art 30(1)/(2)/(3)/(4)/(5) regime including the small-enterprise exemption traps), Art 33 (personal-data-breach notification to the supervisory authority — 72h-from-awareness clock + Art 33(3) minimum contents + Art 33(5) documentation-of-all-breaches), Art 34 (breach communication to data subjects — high-risk threshold + Art 34(3) exemptions + clear-and-plain-language standard), Art 35 (DPIA — Art 35(3)(a)-(c) mandatory triggers + Art 35(1) general high-risk test + WP29 WP248rev.01 nine-criteria framework + Art 36 prior consultation), Art 37–39 (DPO — Art 37(1)(a)/(b)/(c) appointment triggers + Art 38(3) independence + Art 38(6) conflict of interests + Art 39(1) tasks), Art 44–49 (international transfers — Schrems II + post-2021/914 SCCs + TIA + supplementary measures + Art 49 narrow derogations + Art 48 third-country-order conflict), Art 5(2) (accountability — the meta-control linking Art 5(1) substantive compliance to Art 24 demonstrability + Art 24(3) certifications-as-element).
 
 ### Audiences and defensible claims
 
 | Audience | What a passing run supports |
 |----------|-----------------------------|
-| Developer / AI lead | "The agent's dialog behavior passed behavioral checks against the 29 GDPR articles in the Standard preset on this date (21 baseline + 8 Pillar 6 governance probes added in v1.1)." |
+| Developer / AI lead | "The agent's dialog behavior passed behavioral checks against the 29 GDPR articles in the Standard preset on this date (21 baseline + 8 Pillar 6 governance probes)." |
 | DPO | "Behavioral screening passed. Remaining gaps (encryption, DPIA, transfers) require separate review." |
 | Sales | "Benchmark result available on request. Does not constitute a legal attestation." |
 | Regulator | Not a substitute for a formal DPIA, audit, or controller/processor agreement. Share the raw evidence file and methodology note, not just the verdict. |
@@ -19,11 +19,11 @@
 
 ## Quick Start
 
-> **v1 access path.** The GDPR benchmark runs through the `agenteval` CLI binaries and is also available programmatically via NuGet (`using AgentEval.Compliance.Gdpr;`) — see [NuGet samples](../../samples/) for end-to-end consumer tests.
+> **Access path.** The GDPR benchmark runs through the `agenteval` CLI binaries and is also available programmatically via NuGet (`using AgentEval.Compliance.Gdpr;`) — see [NuGet samples](../../samples/) for end-to-end consumer tests.
 
-> **Real judging requires all three** of `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, and `AZURE_OPENAI_DEPLOYMENT`. If any are unset, the CLI refuses to run (exit code **3** — see [Exit codes](../../cli.md#exit-codes)). To exercise the pipeline without LLM cost — smoke-test mode only, **not for CI** — set `AGENTEVAL_ALLOW_STUB_JUDGE=1`. Stub-mode results are deterministic placeholders and **must not** be relied on as compliance evidence. See [CLI Reference — Environment variables](../../cli.md#environment-variables) for the full contract.
+> **Real judging needs a configured inference provider**: the one `AI_INFERENCE_PROVIDER` selects — Azure OpenAI, Bitdeer, OpenAI, Azure AI Foundry or any OpenAI-compatible host; see the [provider table](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to) for the variables each needs — or a judge-only Azure OpenAI endpoint set with all three `AZURE_OPENAI_JUDGE_*` variables, which wins when present. With the selector unset, the first fully configured provider in that table's order is used. If no provider is configured, or a selected provider is missing variables, the CLI refuses to run (exit code **3** — see [Exit codes](../../cli.md#exit-codes)). See [CLI Reference — Environment variables](../../cli.md#environment-variables) for the full contract.
 
-Set up the real judge by exporting the following environment variables before running:
+For example, to judge with Azure OpenAI (auto-detected when only these three are set), export the following before running:
 
 ```
 AZURE_OPENAI_ENDPOINT=https://<your-resource>.openai.azure.com/
@@ -31,12 +31,15 @@ AZURE_OPENAI_API_KEY=<your-key>
 AZURE_OPENAI_DEPLOYMENT=<your-gpt-4o-deployment>
 ```
 
-Then run any of the three presets:
+Then run any of the three presets. Each run needs a target: `--azure-from-env` drives the model the configured
+provider serves, `--sut copilot-studio` a Copilot Studio agent, and `--response`/`--response-file` with `--input`
+grades an answer your agent already gave. Without one the command refuses; `--sut mock` grades a canned answer that
+measures nothing and is not stored.
 
 ```
-agenteval bench gdpr --preset smoke --subject TravelAgent
-agenteval bench gdpr --preset standard --subject TravelAgent
-agenteval bench gdpr --preset audit --subject TravelAgent
+agenteval bench gdpr --preset smoke --subject TravelAgent --azure-from-env
+agenteval bench gdpr --preset standard --subject TravelAgent --azure-from-env
+agenteval bench gdpr --preset audit --subject TravelAgent --azure-from-env
 ```
 
 ---
@@ -55,7 +58,7 @@ agenteval bench gdpr --preset audit --subject TravelAgent
 Presets can be composed using `+` syntax. The weights of all active scenarios are renormalized automatically:
 
 ```
-agenteval bench gdpr --preset standard+healthcare --subject TravelAgent
+agenteval bench gdpr --preset standard+healthcare --subject TravelAgent --azure-from-env
 ```
 
 ---
@@ -98,7 +101,7 @@ Each run writes to `.agenteval/compliance/GDPR/{subject}/{timestamp}/`. The time
 
 ```
 .agenteval/compliance/GDPR/TravelAgent/2026-05-09_10-15-00/
-├── evidence.json          # Standard plan-01 ComplianceEvidence (audit-chain-validated)
+├── evidence.json          # Standard ComplianceEvidence (the file `agenteval doctor` checks)
 ├── gdpr-evidence.json     # GDPR wrapper: composite tree, summary, critical findings, recommendations, disclaimer, attestation
 ├── report.md              # PR-friendly markdown report
 └── report.pdf             # Boardroom-friendly PDF
@@ -115,7 +118,7 @@ The GDPR-specific wrapper. Contains:
 - `pillarSummary` — per-pillar score, pass/fail, and article count.
 - `overallVerdict` — `PASS`, `WARN`, or `FAIL`.
 - `criticalFindings` — list of articles that scored below threshold at `high` or `critical` severity.
-- `recommendations` — array of structured `{ controlId, severity, text, metadata? }` objects, one per failing article, sorted alphabetically by `controlId`. The schema accepts both this v1.1+ shape and the legacy v0.8.1-beta `string[]` shape via `anyOf` at the `items` level for backward compatibility. The optional `metadata: { string: string }` is reserved for v1.2+ extensions.
+- `recommendations` — array of structured `{ controlId, severity, text, metadata? }` objects, one per failing article, sorted alphabetically by `controlId`. The schema accepts both this structured shape and the legacy `string[]` shape written by v0.8.1-beta, via `anyOf` at the `items` level, so older files still validate. The schema also accepts an optional `metadata: { string: string }` object on each entry; the built-in recommendation extractor does not write it.
 - `disclaimer` — the verbatim disclaimer text from this document's Scope section.
 - `attestation` — `{ "type": "behavioral-benchmark", "regulation": "GDPR", "preset": "...", "subject": "...", "timestamp": "...", "runId": "..." }`.
 
@@ -166,7 +169,7 @@ A pillar verdict of `FAIL` means at least one article in that pillar failed at `
 
 ### Extracting recommendations
 
-The `criticalFindings` array in `gdpr-evidence.json` lists every article that failed at `high` or `critical` severity. Each entry is a full `EvalResult` node — you can read `metric.key` for the article id, `score.value` / `score.severity` / `score.label` for the verdict, and walk `details.subResults` for per-scenario diagnostics. Recommendations are kept on a **separate sibling field** `recommendations` — an array of structured `{ controlId, severity, text }` objects (one per failing article, sorted alphabetically by `controlId`) so renderers can apply `controlId [severity]: text` formatting without re-parsing. The schema accepts both the structured shape (v1.1+) and the legacy `string[]` shape (v0.8.1-beta) via `anyOf` at the `items` level for backward compatibility. Each structured entry may also carry an optional `metadata: { string: string }` object — reserved for v1.2+ extensions (evidence references, correlation ids) without requiring a breaking schema change.
+The `criticalFindings` array in `gdpr-evidence.json` lists every article that failed at `high` or `critical` severity. Each entry is a full `EvalResult` node — you can read `metric.key` for the article id, `score.value` / `score.severity` / `score.label` for the verdict, and walk `details.subResults` for per-scenario diagnostics. Recommendations are kept on a **separate sibling field** `recommendations` — an array of structured `{ controlId, severity, text }` objects (one per failing article, sorted alphabetically by `controlId`) so renderers can apply `controlId [severity]: text` formatting without re-parsing. The schema accepts both the structured shape and the legacy `string[]` shape written by v0.8.1-beta via `anyOf` at the `items` level, so older files still validate. Each structured entry may also carry an optional `metadata: { string: string }` object, which the schema accepts so extra fields can be added without a breaking change; the built-in extractor does not write it.
 
 ---
 
@@ -229,7 +232,7 @@ var eval = standard.WithExtraScenarios(healthcarePack);
 For the CLI-equivalent invocation (no programmatic wiring), use the preset-composition syntax:
 
 ```bash
-agenteval bench gdpr --preset standard+healthcare --subject MyAgent
+agenteval bench gdpr --preset standard+healthcare --subject MyAgent --azure-from-env
 ```
 
 ---
@@ -244,7 +247,7 @@ agenteval bench gdpr calibrate
 
 The golden dataset contains hand-labeled scenario/response pairs distributed across the 6 GDPR pillars (Foundations, Lawful Basis, Subject Rights, Transparency, Privacy-by-Design, Governance & Accountability). For each entry, the calibration runner asks the judge to score the response, then compares the judge's score to the human label. For an end-to-end plain-English walkthrough of *how* calibration works and *what kappa means*, see [`how-it-works.md`](how-it-works.md).
 
-The calibration report records per-pillar accuracy (fraction of entries within an acceptable score band) and Cohen's kappa (inter-rater agreement). The default CI gate requires:
+The calibration report records per-pillar accuracy (fraction of entries within an acceptable score band) and Cohen's kappa (inter-rater agreement). Its header names the judge provider (and how it was chosen) and the judge model or deployment, so reports produced by different judges can be told apart, including in a diff. When the environment no longer resolves to the model the judge was built with, the provider is reported as unknown rather than guessed. Calibration needs a real judge: with no provider configured it exits 3. The default CI gate requires:
 - accuracy ≥ 85% per pillar
 - Cohen's kappa ≥ 0.70 per pillar
 - Zero evaluation failures (judge errors) per pillar
@@ -253,20 +256,22 @@ A pillar that fails any threshold fails the command (exit code 9). The dated Mar
 
 **Fixed in 0.42.0-beta:** `calibrate` now sends `gdpr-judge-system.v1.md`, the same judge prompt `bench gdpr` sends; both resolve their judge through one resolver, so they cannot drift apart again. Before 0.42.0-beta, `calibrate` graded with the generic default judge prompt, so calibration figures from earlier versions describe a different judge configuration from the benchmark run. Re-run `calibrate` against your own judge.
 
-**Caveat**: calibration results are only meaningful when a real LLM judge is wired (the provider `AI_INFERENCE_PROVIDER` selects, or a dedicated judge endpoint via `AZURE_OPENAI_JUDGE_*`). Running calibration against the stub judge produces meaningless metrics because the stub always returns placeholder scores.
+**Calibration needs a real judge** (the provider `AI_INFERENCE_PROVIDER` selects, or a dedicated judge endpoint via `AZURE_OPENAI_JUDGE_*`). It measures the judge, so `calibrate` exits 3 when none is configured; there is no stand-in judge to calibrate.
 
 ---
 
 ## Audit Chain
 
-`agenteval doctor` validates the audit chain for every `gdpr-evidence.json` file in the workspace. For each file it finds, it:
+`agenteval doctor` validates the audit chain. It reads `evidence.json` — not `gdpr-evidence.json` — in every `.agenteval/compliance/{regulation}/{subject}/{timestamp}/` directory, so every GDPR run's evidence is covered. For each `evidence.json` it:
 
-1. Reads `sourceRun.runId` and `sourceRun.manifestHash` from `evidence.json` in the same directory.
-2. Locates the corresponding `manifest.json` under `.agenteval/subjects/*/runs/{runId}/`.
-3. Compares the stored `contentHash` with the value in the evidence file.
-4. Reports a `✖ Hash mismatch` error if the values differ.
+1. Validates the file against `evidence.schema.json`.
+2. Reads `sourceRun.runId` and `sourceRun.manifestHash`.
+3. Locates the source run's `manifest.json` under `.agenteval/subjects/{agents|workflows}/{subject}/runs/{runId}/`.
+4. Reports an error if the run cannot be found, or a `hash mismatch` error if the run's `contentHash` differs from `sourceRun.manifestHash`.
 
-Tampering with any run file after the run completes breaks the audit chain, because `ContentHasher.HashRunAsync` covers the run's summary, sorted scenario results, and optional trace. If you re-run the benchmark and forget to update the evidence, `agenteval doctor` will catch the mismatch.
+Separately, `agenteval doctor` re-hashes each run's files and compares the result with the `contentHash` in that run's `manifest.json`. Tampering with any run file after the run completes is reported there as a `Hash mismatch`, because `ContentHasher.HashRunAsync` covers the run's summary, sorted scenario results, and optional trace. If you re-run the benchmark and forget to update the evidence, `agenteval doctor` will catch the mismatch.
+
+`report.md` and `report.pdf` record the source run ID and the manifest hash in their audit-chain section, but they do not verify them: a report renderer has only the reference copied into the evidence, not the run files the hash covers. The section therefore says "hash recorded, not verified in this report" (or "no hash recorded" when the evidence carries none) and points to `agenteval doctor`, which is the check. Run it inside the solution whose `.agenteval/` workspace holds the source run.
 
 Refer back to the disclaimer at the top of this document: the audit chain is not cryptographic anti-tampering against a determined attacker. It catches the two most common accidental corruption patterns: "did you forget to update evidence after re-running?" and "is this evidence file consistent with the run it cites?" For stronger integrity guarantees, sign the evidence files externally using your organization's key management infrastructure.
 
@@ -277,10 +282,10 @@ Refer back to the disclaimer at the top of this document: the audit chain is not
 The following are not validated by this benchmark:
 
 - **Encryption at rest**: Whether personal data stored by your system is encrypted at rest (Art 32 technical measures). The benchmark checks the agent's dialog behavior, not the underlying storage layer.
-- **Breach notification PROCESS (operational attestation)**: Whether your organization's breach notification procedures *actually* satisfy Art 33 (72-hour controller notification to supervisory authority) and Art 34 (data-subject notification). **v1.1 (plan-13 T1.1) ships `gdpr.art33.breach_notification` and `gdpr.art34.breach_communication` dialog-awareness probes** under Pillar 6 that test whether the agent can describe the 72h-from-awareness clock, the Art 33(3) minimum contents, the Art 33(5) document-all-breaches obligation, the Art 34(1) high-risk threshold, and the Art 34(3) exemptions. The probes grade the agent's ability to describe the obligation; upstream-process attestation (i.e., that the organisation actually notifies within 72h) remains out of scope.
-- **Data Protection Impact Assessment (DPIA) ARTEFACT**: Whether a DPIA has actually been conducted and documented for high-risk processing activities (Art 35). **v1.1 (plan-13 T1.1) ships a `gdpr.art35.dpia` dialog-awareness probe** under Pillar 6 that tests whether the agent can correctly identify the Art 35(3)(a)-(c) mandatory triggers, the Art 35(1) general high-risk test, the Art 35(7)(a)-(d) minimum content, and the Art 36 prior-consultation tie-in. The probe grades the agent's ability to describe the obligation; verifying the DPIA artefact itself remains out of scope.
-- **International transfer COMPLIANCE (data-flow inspection)**: Whether *actual* transfers to third countries satisfy Art 46 (SCCs, BCRs, adequacy decisions) and the Schrems II supplementary-measures requirement. **v1.1 (plan-13 T1.1) ships a `gdpr.art44_49.international_transfers` dialog-awareness probe** under Pillar 6 that tests whether the agent can describe the three-tier framework (adequacy / safeguards / derogations), the Schrems II + EDPB Recommendations 01/2020 TIA + supplementary-measures regime, the Art 48 third-country-order conflict-of-laws pattern, and the Art 49 narrow-derogation restrictive-interpretation principle. The probe grades the agent's ability to describe the obligation; inspecting actual data flows remains out of scope.
-- **Processor / DPO / ROPA / accountability EVIDENCE TRAIL**: Whether the organisation actually maintains compliant Art 28 DPAs with each processor, has designated a qualified Art 37-39 DPO, keeps an up-to-date Art 30 ROPA, and discharges Art 5(2) accountability through documented evidence. **v1.1 (plan-13 T1.1) ships dialog-awareness probes** (`gdpr.art28.processor_contracts`, `gdpr.art37_39.dpo`, `gdpr.art30.records_of_processing`, `gdpr.art5_2.accountability`) for each. The probes grade the agent's ability to describe the obligation and to recognise common compliance traps; they do NOT verify the underlying documentation exists.
+- **Breach notification PROCESS (operational attestation)**: Whether your organization's breach notification procedures *actually* satisfy Art 33 (72-hour controller notification to supervisory authority) and Art 34 (data-subject notification). **The `gdpr.art33.breach_notification` and `gdpr.art34.breach_communication` dialog-awareness probes** under Pillar 6 test whether the agent can describe the 72h-from-awareness clock, the Art 33(3) minimum contents, the Art 33(5) document-all-breaches obligation, the Art 34(1) high-risk threshold, and the Art 34(3) exemptions. The probes grade the agent's ability to describe the obligation; upstream-process attestation (i.e., that the organisation actually notifies within 72h) remains out of scope.
+- **Data Protection Impact Assessment (DPIA) ARTEFACT**: Whether a DPIA has actually been conducted and documented for high-risk processing activities (Art 35). **The `gdpr.art35.dpia` dialog-awareness probe** under Pillar 6 tests whether the agent can correctly identify the Art 35(3)(a)-(c) mandatory triggers, the Art 35(1) general high-risk test, the Art 35(7)(a)-(d) minimum content, and the Art 36 prior-consultation tie-in. The probe grades the agent's ability to describe the obligation; verifying the DPIA artefact itself remains out of scope.
+- **International transfer COMPLIANCE (data-flow inspection)**: Whether *actual* transfers to third countries satisfy Art 46 (SCCs, BCRs, adequacy decisions) and the Schrems II supplementary-measures requirement. **The `gdpr.art44_49.international_transfers` dialog-awareness probe** under Pillar 6 tests whether the agent can describe the three-tier framework (adequacy / safeguards / derogations), the Schrems II + EDPB Recommendations 01/2020 TIA + supplementary-measures regime, the Art 48 third-country-order conflict-of-laws pattern, and the Art 49 narrow-derogation restrictive-interpretation principle. The probe grades the agent's ability to describe the obligation; inspecting actual data flows remains out of scope.
+- **Processor / DPO / ROPA / accountability EVIDENCE TRAIL**: Whether the organisation actually maintains compliant Art 28 DPAs with each processor, has designated a qualified Art 37-39 DPO, keeps an up-to-date Art 30 ROPA, and discharges Art 5(2) accountability through documented evidence. **Dialog-awareness probes cover each of these** (`gdpr.art28.processor_contracts`, `gdpr.art37_39.dpo`, `gdpr.art30.records_of_processing`, `gdpr.art5_2.accountability`). The probes grade the agent's ability to describe the obligation and to recognise common compliance traps; they do NOT verify the underlying documentation exists.
 - **Privacy-by-design at the system level**: Whether your system architecture embeds data minimization, purpose limitation, and storage limitation at the infrastructure level (Art 25). The benchmark checks whether the agent communicates these principles; it cannot verify whether the system enforces them.
 
 ---

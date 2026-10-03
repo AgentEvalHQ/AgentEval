@@ -23,11 +23,23 @@ namespace AgentEval.Cli.Infrastructure;
 public static class LogFileReplayer
 {
     /// <summary>Replays every "response"-kind entry in <paramref name="entries"/> against <paramref name="against"/>.</summary>
-    public static async Task<ReplayReport> ReplayAsync(
+    public static Task<ReplayReport> ReplayAsync(
         IReadOnlyList<FixtureCaptureEntry> entries, IChatClient against, bool strictText, CancellationToken cancellationToken = default)
+        => ReplayAsync(entries, against, strictText, static (regex, input) => regex.IsMatch(input), cancellationToken);
+
+    /// <summary>
+    /// <see cref="ReplayAsync(IReadOnlyList{FixtureCaptureEntry}, IChatClient, bool, CancellationToken)"/> with the
+    /// list-marker regex match injected. Test seam only: a test passes a matcher that throws
+    /// <see cref="RegexMatchTimeoutException"/>, so the timeout path is exercised deterministically instead of
+    /// depending on machine load.
+    /// </summary>
+    internal static async Task<ReplayReport> ReplayAsync(
+        IReadOnlyList<FixtureCaptureEntry> entries, IChatClient against, bool strictText,
+        Func<Regex, string, bool> regexIsMatch, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(entries);
         ArgumentNullException.ThrowIfNull(against);
+        ArgumentNullException.ThrowIfNull(regexIsMatch);
 
         var rows = new List<ReplayRow>();
         var skipped = 0;
@@ -55,7 +67,7 @@ public static class LogFileReplayer
             }
 
             sw.Stop();
-            rows.Add(BuildRow(entry, actual, error, sw.ElapsedMilliseconds, strictText));
+            rows.Add(BuildRow(entry, actual, error, sw.ElapsedMilliseconds, strictText, regexIsMatch));
         }
 
         return new ReplayReport(rows, skipped);
@@ -91,7 +103,8 @@ public static class LogFileReplayer
     }
 
     private static ReplayRow BuildRow(
-        FixtureCaptureEntry entry, ChatResponse? actual, Exception? error, long actualElapsedMs, bool strictText)
+        FixtureCaptureEntry entry, ChatResponse? actual, Exception? error, long actualElapsedMs, bool strictText,
+        Func<Regex, string, bool> regexIsMatch)
     {
         if (error is not null)
         {
@@ -128,10 +141,20 @@ public static class LogFileReplayer
             details.Add($"FinishReason differs: captured={capturedFinish ?? "(none)"} actual={actualFinish ?? "(none)"}");
         }
 
-        var capturedShape = ResponseShape(entry.Response.Text);
-        var actualShape = ResponseShape(response.Text);
-        var shapeMatches = string.Equals(capturedShape, actualShape, StringComparison.Ordinal);
-        if (!shapeMatches)
+        var (capturedShape, capturedListUnknown) = ResponseShape(entry.Response.Text, regexIsMatch);
+        var (actualShape, actualListUnknown) = ResponseShape(response.Text, regexIsMatch);
+        // A timed-out list-marker scan leaves that side's shape unknown, and comparing it anyway could flip the row
+        // either way: a captured list and an actual non-list in the same length bucket would both read "no list" and
+        // Pass. So the shape is not compared, the details say why, and the row can be at best a Flag.
+        var shapeCompared = !capturedListUnknown && !actualListUnknown;
+        var shapeMatches = shapeCompared && string.Equals(capturedShape, actualShape, StringComparison.Ordinal);
+        if (!shapeCompared)
+        {
+            details.Add(
+                $"Response shape not compared: the list-marker scan timed out (captured={capturedShape} " +
+                $"actual={actualShape}; 'list?' = unknown).");
+        }
+        else if (!shapeMatches)
         {
             details.Add($"Response shape differs: captured={capturedShape} actual={actualShape}");
         }
@@ -163,7 +186,10 @@ public static class LogFileReplayer
 
         if (!shapeMatches)
         {
-            return new ReplayRow(entry.Index, ReplayVerdict.Flag, "Response shape diverged (tool calls / finish reason matched)", details, entry.ElapsedMs, actualElapsedMs);
+            var summary = shapeCompared
+                ? "Response shape diverged (tool calls / finish reason matched)"
+                : "Response shape not compared: list-marker scan timed out (tool calls / finish reason matched)";
+            return new ReplayRow(entry.Index, ReplayVerdict.Flag, summary, details, entry.ElapsedMs, actualElapsedMs);
         }
 
         return new ReplayRow(entry.Index, ReplayVerdict.Pass, "Matched (tool calls, finish reason, response shape)", details, entry.ElapsedMs, actualElapsedMs);
@@ -198,23 +224,28 @@ public static class LogFileReplayer
     private static readonly Regex BulletListPattern = new(@"(?m)^\s*[-*]\s", RegexOptions.Compiled, TimeSpan.FromSeconds(1));
 
     // Coarse shape comparison, not a diff library on prose — a length bucket plus presence of key structural
-    // markers (numbered list, code block).
-    private static string ResponseShape(string? text)
+    // markers (numbered list, code block). ListUnknown is true when the list-marker scan timed out: the shape then
+    // carries "list?" and must not be compared as if no list were present.
+    private static (string Shape, bool ListUnknown) ResponseShape(string? text, Func<Regex, string, bool> regexIsMatch)
     {
         text ??= string.Empty;
         var bucket = text.Length < 100 ? "short" : text.Length <= 500 ? "medium" : "long";
 
         var markers = new List<string>();
+        var listUnknown = false;
         try
         {
-            if (NumberedListPattern.IsMatch(text) || BulletListPattern.IsMatch(text))
+            if (regexIsMatch(NumberedListPattern, text) || regexIsMatch(BulletListPattern, text))
             {
                 markers.Add("list");
             }
         }
         catch (RegexMatchTimeoutException)
         {
-            // Adversarial/pathological input — treat as "no marker detected" rather than failing the whole replay.
+            // Adversarial/pathological input. Not "no marker detected": that reading could turn a real shape
+            // divergence into a Pass. Reported as unknown instead, without failing the whole replay.
+            markers.Add("list?");
+            listUnknown = true;
         }
 
         if (text.Contains("```", StringComparison.Ordinal))
@@ -222,7 +253,7 @@ public static class LogFileReplayer
             markers.Add("code");
         }
 
-        return markers.Count == 0 ? bucket : $"{bucket}+{string.Join('+', markers)}";
+        return (markers.Count == 0 ? bucket : $"{bucket}+{string.Join('+', markers)}", listUnknown);
     }
 
     /// <summary>

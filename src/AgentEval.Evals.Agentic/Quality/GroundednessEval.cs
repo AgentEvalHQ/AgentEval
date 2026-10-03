@@ -32,11 +32,12 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// response alone and will typically return low scores for grounded claims.
 /// </para>
 /// <para>
-/// Source: forked from Azure/azure-sdk-for-python (commit &lt;TBD-foundry-sha&gt; see CHANGELOG T3.7)
-/// sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_groundedness/groundedness.prompty
-/// License: MIT. Modifications: temperature=0, 4 sub-dimensions, structured evidence[], severity rubric.
-/// These modifications are in the reference prompt file under <c>Resources/Prompts/</c>, which is not
-/// yet sent to the judge; the judge call sets no temperature.
+/// Lineage: AgentEval's own criteria and reference prompt, modelled on the evaluator concept (name,
+/// inputs and scoring dimensions) of Azure/azure-sdk-for-python
+/// <c>sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_groundedness/</c>
+/// (<c>groundedness_with_query.prompty</c> and <c>groundedness_without_query.prompty</c>).
+/// A 2026-10-02 check found no upstream prompt text in the reference prompt file under
+/// <c>Resources/Prompts/</c>, which is not yet sent to the judge.
 /// </para>
 /// </summary>
 public sealed class GroundednessEval : IEval

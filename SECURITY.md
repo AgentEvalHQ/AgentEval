@@ -2,12 +2,12 @@
 
 ## Supported Versions
 
-AgentEval is currently in alpha. Security updates are provided for the following versions:
+AgentEval is preview software (see [DISCLAIMER.md](DISCLAIMER.md)). Security fixes are released in new versions, so use the latest published version:
 
 | Version | Supported          |
 | ------- | ------------------ |
-| 0.2.0-beta    | :white_check_mark: |
-| 0.1.x-alpha   | :white_check_mark: |
+| Latest version published on NuGet | :white_check_mark: |
+| Earlier versions | :x: (upgrade to the latest version) |
 
 Once AgentEval reaches stable release (1.0.0), we will support:
 - Current major version (e.g., 1.x)
@@ -132,19 +132,14 @@ Check [Security Advisories](https://github.com/AgentEvalHQ/AgentEval/security/ad
 
 AgentEval includes:
 
-- **No network calls** - AgentEval itself makes no network calls; it only observes your agent's calls
-- **No data collection** - No telemetry or data collection
+- **No telemetry** - No telemetry, analytics, crash reporting or update check; no usage data is sent to the authors or to anyone else
+- **Opt-in network use** - Besides the model calls you configure, AgentEval opens network connections only for the features listed in [PRIVACY.md](PRIVACY.md) (benchmark pack downloads, the live package-registry check, the decision-model judge, the Copilot Studio connector), each of which stays off until you turn it on
+- **Local output** - Results, transcripts and reports are written to local files and are not uploaded
 - **Transparent** - Open source under MIT license
-- **Minimal dependencies** - Only trusted Microsoft libraries
 
 ## Dependencies
 
-AgentEval depends on:
-
-- `Microsoft.Extensions.AI.Abstractions` - Microsoft's AI abstractions
-- `System.Text.Json` - .NET JSON library
-
-Both are maintained by Microsoft with regular security updates.
+AgentEval depends on Microsoft .NET libraries and on third-party packages, including packages that are not from Microsoft and packages under licences other than MIT. [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) lists the packages in each published package, with their versions and licences; the same file ships inside the `AgentEval` and `AgentEval.Cli` NuGet packages. `Directory.Packages.props` pins the versions. The weekly security scan checks them for known vulnerabilities (`dotnet list package --vulnerable --include-transitive`).
 
 ## Questions?
 
@@ -154,4 +149,4 @@ For private security matters, email: **joslat@gmail.com**
 
 ---
 
-*Last updated: January 7, 2026*
+*Last updated: October 2026*

@@ -3,7 +3,6 @@
 **Status:** Accepted  
 **Date:** 2026-02-24  
 **Decision Makers:** AgentEval Contributors  
-**Related Document:** `strategy/AgentEval-dataloader-Implementation-Review-and-Refinement.md` (Conflicts C, D)
 
 ---
 

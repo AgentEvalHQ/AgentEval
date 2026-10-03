@@ -10,8 +10,8 @@ using Xunit;
 namespace AgentEval.Tests.Cli.CopilotStudio;
 
 /// <summary>
-/// P6 item C1 (narrow cut — <c>strategy/CopilotStudio/Copilot-Studio-P6-Connector-Health-and-Resilience-Design.md</c>
-/// §1C): <c>CopilotStudioRedTeamTarget.WritePostScanSummary</c> now renders the aggregate
+/// P6 item C1 (narrow cut, Copilot Studio connector health and resilience):
+/// <c>CopilotStudioRedTeamTarget.WritePostScanSummary</c> now renders the aggregate
 /// <see cref="EvidenceFidelity"/> breakdown. A snapshot-style test on the target's own summary output — does
 /// NOT touch the shared RedTeam report renderers (that's C2, explicitly out of scope here).
 /// </summary>

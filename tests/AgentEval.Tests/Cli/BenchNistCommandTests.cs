@@ -62,13 +62,118 @@ public class BenchNistCommandTests : IDisposable
 
     // ── Env-gate parity ───────────────────────────────────────────────────────
 
+    private string[] WorkspaceFiles() =>
+        Directory.GetFileSystemEntries(Path.Combine(_root, ".agenteval"), "*", SearchOption.AllDirectories)
+            .Select(f => Path.GetRelativePath(_root, f))
+            .OrderBy(f => f, StringComparer.Ordinal)
+            .ToArray();
+
+    private sealed class CountingJudge : Microsoft.Extensions.AI.IChatClient
+    {
+        private int _calls;
+        public int Calls => _calls;
+
+        public Task<Microsoft.Extensions.AI.ChatResponse> GetResponseAsync(
+            IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages, Microsoft.Extensions.AI.ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            Interlocked.Increment(ref _calls);
+            return Task.FromResult(new Microsoft.Extensions.AI.ChatResponse(new Microsoft.Extensions.AI.ChatMessage(
+                Microsoft.Extensions.AI.ChatRole.Assistant, "VERDICT: INCONCLUSIVE\nCONFIDENCE: 0.5\nREASON: test")));
+        }
+
+        public IAsyncEnumerable<Microsoft.Extensions.AI.ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages, Microsoft.Extensions.AI.ChatOptions? options = null,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+        public void Dispose() { }
+    }
+
     [Fact]
-    public async Task BenchNist_NoEnvVars_NoStubOptIn_ReturnsExitCode3()
+    public async Task BenchNist_GradesTheAttacksWithTheJudge()
+    {
+        // Through 0.42 bench nist resolved a judge and never called it.
+        InitWorkspace();
+        var judge = new CountingJudge();
+
+        var result = await BenchNistCommand.RunAsync(
+            preset: "rmf-baseline", subject: "NistJudgedAgent", rootOverride: _root, inputText: null,
+            evaluatorOverride: null, agentOverride: new SafeRefusalAgent("NistJudgedAgent"), judgeClientOverride: judge);
+
+        Assert.True(result.ExitCode is 0 or 9 or 10 or 11, $"Expected a gate verdict; got {result.ExitCode}.");
+        Assert.True(judge.Calls > 1, "The judge graded nothing beyond the preflight call.");
+    }
+
+    [Fact]
+    public async Task BenchNist_NoTarget_Refuses_AndStoresNothing()
+    {
+        // Through 0.42 a run with no target scanned a built-in agent that refuses everything (a red-team PASS)
+        // and stored it as the subject's result.
+        InitWorkspace();
+        var before = WorkspaceFiles();
+
+        var result = await BenchNistCommand.RunAsync(
+            preset: "rmf-smoke", subject: "NistNoTargetAgent", rootOverride: _root, inputText: null,
+            evaluatorOverride: new PassingStubEvaluator(), agentOverride: null);
+
+        Assert.Equal(AgentEval.Cli.ExitCodes.UsageError, result.ExitCode);
+        Assert.Null(result.ReportDir);
+        Assert.Equal(before, WorkspaceFiles());
+    }
+
+    [Fact]
+    public async Task BenchNist_Mock_NeedsNoJudgeOrProvider()
+    {
+        // A selector naming a provider with no variables makes any real judge resolution fail closed (exit 3).
+        // A mock run must not reach it.
+        InitWorkspace();
+        using var env = new ProviderEnvironmentScope(("AI_INFERENCE_PROVIDER", "foundry"));
+
+        var result = await BenchNistCommand.RunAsync(
+            preset: "rmf-smoke", subject: "NistMockNoProviderAgent", rootOverride: _root, inputText: null,
+            evaluatorOverride: null, agentOverride: null, mock: true);
+
+        Assert.Equal(AgentEval.Cli.ExitCodes.GateIndeterminate, result.ExitCode);
+    }
+
+    [Fact]
+    public async Task BenchNist_MockWithARealTarget_IsRefusedByTheCommandItself()
+    {
+        InitWorkspace();
+        var before = WorkspaceFiles();
+
+        var result = await BenchNistCommand.RunAsync(
+            preset: "rmf-smoke", subject: "NistMockPlusTargetAgent", rootOverride: _root, inputText: null,
+            evaluatorOverride: new PassingStubEvaluator(), agentOverride: new SafeRefusalAgent("NistReal"), mock: true);
+
+        Assert.Equal(AgentEval.Cli.ExitCodes.UsageError, result.ExitCode);
+        Assert.Equal(before, WorkspaceFiles());
+    }
+
+    [Fact]
+    public async Task BenchNist_Mock_ExitsIndeterminate_AndStoresNothing()
+    {
+        InitWorkspace();
+        var before = WorkspaceFiles();
+
+        var result = await BenchNistCommand.RunAsync(
+            preset: "rmf-smoke", subject: "NistMockAgent", rootOverride: _root, inputText: null,
+            evaluatorOverride: new PassingStubEvaluator(), agentOverride: null, mock: true);
+
+        Assert.Equal(AgentEval.Cli.ExitCodes.GateIndeterminate, result.ExitCode);
+        Assert.Null(result.ReportDir);
+        Assert.Equal(before, WorkspaceFiles());
+    }
+
+    [Fact]
+    public async Task BenchNist_NoProvider_ReturnsExitCode3()
     {
         InitWorkspace();
         var result = await BenchNistCommand.RunAsync(
             preset: "rmf-smoke", subject: "NistGateAgent", rootOverride: _root, inputText: null,
-            evaluatorOverride: null, agentOverride: null);
+            evaluatorOverride: null, agentOverride: new SafeRefusalAgent("NistTargetAgent"));
         Assert.Equal(3, result.ExitCode);
     }
 
@@ -79,8 +184,19 @@ public class BenchNistCommandTests : IDisposable
         Directory.CreateDirectory(noWorkspaceRoot);
         var result = await BenchNistCommand.RunAsync(
             preset: "rmf-smoke", subject: "NistMissingAgent", rootOverride: noWorkspaceRoot, inputText: null,
-            evaluatorOverride: new PassingStubEvaluator(), agentOverride: null);
+            evaluatorOverride: new PassingStubEvaluator(), agentOverride: new SafeRefusalAgent("NistTargetAgent"));
         Assert.Equal(1, result.ExitCode);
+    }
+
+    [Fact]
+    public async Task BenchNist_UnknownPreset_IsAUsageError_NotATestFailure()
+    {
+        // An unknown preset is a rejected argument. It used to exit 1, which CI reads as a failed evaluation.
+        InitWorkspace();
+        var result = await BenchNistCommand.RunAsync(
+            preset: "no-such-preset", subject: "NistPresetAgent", rootOverride: _root, inputText: null,
+            evaluatorOverride: new PassingStubEvaluator(), agentOverride: new SafeRefusalAgent("NistTargetAgent"));
+        Assert.Equal(AgentEval.Cli.ExitCodes.UsageError, result.ExitCode);
     }
 
     // ── Preset arg parsing ────────────────────────────────────────────────────

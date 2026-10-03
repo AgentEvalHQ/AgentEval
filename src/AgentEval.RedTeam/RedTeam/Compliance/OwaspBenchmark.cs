@@ -73,20 +73,9 @@ public static partial class OwaspBenchmark
     /// LLM08 Vector / Embedding weaknesses, LLM09 Misinformation — as deterministic agent-API-layer attacks, so the
     /// <see cref="OwaspBenchmarkRun.EvaluateAsync"/> composite has no "skipped" leaves for the full roster.
     /// </summary>
-    /// <param name="judge">Optional LLM judge. The current attack pipeline uses
-    /// per-attack heuristic evaluators by default; <paramref name="judge"/> is
-    /// accepted for API symmetry with other benchmark factories and is reserved
-    /// for a future judge-graded category (e.g. <c>LLM07-InsecureOutputHandling</c>
-    /// where heuristic detection of unsafe rendering or sandbox-escape patterns is
-    /// brittle). When <c>null</c>, the heuristic evaluators are used.
-    /// <para>
-    /// <b>Pinning-test teeth gap (plan-13 T4.1b item 2)</b>: today no test asserts that
-    /// the stored <c>judge</c> reference is actually called when set — the parameter
-    /// flows through to <see cref="OwaspBenchmarkRun.Judge"/> as a no-op getter. When
-    /// the first judge-graded attack lands, add a contract test that fakes
-    /// <see cref="IEvaluator"/> and asserts it receives at least one
-    /// <c>EvaluateAsync</c> call per Top10 run with the judge-graded category enabled.
-    /// </para></param>
+    /// <param name="judge">An <see cref="IEvaluator"/> kept on the run because callers pass it; it does not grade the
+    /// attacks. To grade them with a judge model, judge first as <c>agenteval redteam --judge</c> does, call
+    /// <c>WithJudge</c> on the returned run.</param>
     /// <param name="systemPromptCanary">Optional secret seeded into the agent's system prompt so
     /// extraction probes can detect a genuine leak by canary match rather than keyword heuristics
     /// (via <see cref="Attack.RosterWithCanary"/>). When <c>null</c>, the canary-aware attacks fall

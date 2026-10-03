@@ -21,5 +21,12 @@ export function restUrl(suffix: string): string {
   return env.apiBase + env.restPath + suffix;
 }
 
-/** GraphQL endpoint URL (for `new GraphQLClient(url)`). */
-export const graphqlUrl = env.apiBase + env.graphqlPath;
+/**
+ * GraphQL endpoint URL (for `new GraphQLClient(url)`), always ABSOLUTE.
+ *
+ * graphql-request 7 builds its request with `new URL(url)` and no base, so a relative "/graphql" throws
+ * "Invalid URL" in the browser and every query fails: the portal rendered blank for any user. Resolving
+ * against the page's origin keeps the same-origin default (and an absolute `VITE_API_BASE` still wins,
+ * because `new URL(absolute, base)` ignores the base).
+ */
+export const graphqlUrl = new URL(env.apiBase + env.graphqlPath, globalThis.location?.origin ?? "http://localhost").toString();

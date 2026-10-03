@@ -90,15 +90,18 @@ public class CrossSessionEvaluator : ICrossSessionEvaluator
                     Fact = fact.Content,
                     Query = question,
                     Response = response.Text,
-                    Recalled = judgment.Score >= 80,
-                    Score = judgment.Score
+                    Recalled = judgment.Measured && judgment.Score >= 80,
+                    Score = judgment.Score,
+                    Measured = judgment.Measured
                 });
             }
 
             stopwatch.Stop();
 
-            var passRate = factResults.Count > 0
-                ? factResults.Count(r => r.Recalled) / (double)factResults.Count
+            // Over the measured facts only: a fact the judge produced no score for is counted, not failed.
+            var measuredFacts = factResults.Count(r => r.Measured);
+            var passRate = measuredFacts > 0
+                ? factResults.Count(r => r.Recalled) / (double)measuredFacts
                 : 0;
 
             var result = new CrossSessionResult

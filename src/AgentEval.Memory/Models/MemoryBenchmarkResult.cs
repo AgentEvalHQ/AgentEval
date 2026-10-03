@@ -62,7 +62,20 @@ public class MemoryBenchmarkResult
         }
     }
 
-    /// <summary>Categories whose run threw. Each counts as 0 in <see cref="OverallScore"/>.</summary>
+    /// <summary>Questions the judge produced no score for, across all categories.</summary>
+    public int UnmeasuredQueries => CategoryResults.Sum(c => c.UnmeasuredQueries);
+
+    /// <summary>
+    /// True when every category ran and every question was scored. Otherwise the scores are partial: a crashed or
+    /// wholly unmeasured category counts as 0 in <see cref="OverallScore"/> (a lower bound) and is left out of
+    /// <see cref="CapabilityScore"/>, and an unscored question is left out of its category. Report an incomplete run
+    /// as such, never as a pass or a fail.
+    /// </summary>
+    public bool IsComplete => !CategoryResults.Any(c => c.Errored) && UnmeasuredQueries == 0;
+
+    /// <summary>
+    /// Categories whose run threw, or in which nothing was measured. Each counts as 0 in <see cref="OverallScore"/>.
+    /// </summary>
     public IReadOnlyList<string> ErroredCategories => CategoryResults
         .Where(c => c.Errored)
         .Select(c => c.CategoryName)
@@ -107,7 +120,7 @@ public class MemoryBenchmarkResult
     /// <summary>
     /// Whether the benchmark passed (overall score >= 70).
     /// </summary>
-    public bool Passed => OverallScore >= 70;
+    public bool Passed => IsComplete && OverallScore >= 70;
 
     /// <summary>
     /// Total execution time for the entire benchmark.
@@ -145,8 +158,8 @@ public class MemoryBenchmarkResult
         // Crashed categories first: they are a run failure to fix, and they count as 0 in the score.
         foreach (var cat in CategoryResults.Where(c => c.Errored))
         {
-            recommendations.Add($"{cat.CategoryName} crashed ({cat.SkipReason ?? "error"}). It counts as 0 in the overall " +
-                                "score; fix the run and re-measure.");
+            recommendations.Add($"{cat.CategoryName} was not measured ({cat.SkipReason ?? "error"}). It counts as 0 in the " +
+                                "overall score; fix the run and re-measure.");
         }
 
         // Then categories the agent does not support. Only these may default to "not supported".
@@ -253,4 +266,10 @@ public class BenchmarkCategoryResult
     /// <see cref="MemoryBenchmarkResult.OverallScore"/> instead of leaving the denominator.
     /// </summary>
     public bool Errored { get; init; }
+
+    /// <summary>
+    /// Questions in this category the judge produced no score for. They are left out of <see cref="Score"/>; any of
+    /// them makes the run incomplete (<see cref="MemoryBenchmarkResult.IsComplete"/>).
+    /// </summary>
+    public int UnmeasuredQueries { get; init; }
 }

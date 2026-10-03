@@ -5,6 +5,7 @@
 /src/AgentEval.Abstractions/ @joslat
 /src/AgentEval.MAF/ @joslat
 /src/AgentEval.Core/ @joslat
-/src/AgentEval.RedTean/ @joslat
+/src/AgentEval.RedTeam/ @joslat
+/src/AgentEval.RedTeam.Gatekeeper/ @joslat
 /src/AgentEval/ @joslat
 /.github/ @joslat

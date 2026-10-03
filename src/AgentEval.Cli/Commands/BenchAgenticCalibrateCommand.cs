@@ -47,9 +47,9 @@ public static class BenchAgenticCalibrateCommand
     /// <para><b>calibration</b> (T1.3 NEW) — meta-calibration evaluators
     /// (confidence_calibration, uncertainty_acknowledgment) are a calibration-of-
     /// calibration meta loop: a judge that grades how well-calibrated the agent's
-    /// confidence is. Per playbook (Part 4 §"likely-too-noisy candidates"), these
-    /// rank among the noisiest evaluators because the judge must reason about the
-    /// agent's epistemic stance rather than a factual claim. Override 0.75 / 0.55
+    /// confidence is. They were expected (in a local calibration playbook, not in
+    /// this repository) to rank among the noisiest evaluators because the judge
+    /// must reason about the agent's epistemic stance rather than a factual claim. Override 0.75 / 0.55
     /// reflects expected n=~20 stochasticity on first real-LLM measurement; T1.4
     /// will tighten if real data clears the higher gate.</para>
     /// <para><b>safety</b> (T1.3 NEW) — content-classifier evaluators
@@ -60,8 +60,8 @@ public static class BenchAgenticCalibrateCommand
     /// one category report multiplies the at-bat count for borderline labels.
     /// Refresh after T1.4 real-LLM sweep — if accuracy clears 0.90 this override
     /// retires. NOTE: safety + adversarial currently INFRA-FAIL on Azure due to
-    /// content-filter blocking the judge call on harmful-content goldens — see
-    /// follow-up R1 (T0.10) in strategy/futurefeatures/todo/13-pending-issues-tasks.md.</para>
+    /// content-filter blocking the judge call on harmful-content goldens (an open
+    /// follow-up, R1 / T0.10, tracked outside this repository).</para>
     /// <para><b>reasoning</b> (Path A' v1.1) — after carving out the 3 trace-
     /// dependent reasoning evaluators (R4: intermediate_step_hallucination,
     /// plan_formulation_quality, self_correction_quality) the remaining 2 evaluators
@@ -76,8 +76,8 @@ public static class BenchAgenticCalibrateCommand
     /// semantics (per R3). Override 0.65 / 0.40 reflects honest measured floor;
     /// the proper fix is per-evaluator overrides (R3 follow-up T3.14).</para>
     /// <para><b>Override ceiling</b> — total of 6 overrides (process + system +
-    /// calibration + safety + reasoning + quality) exceeds the original Part 4
-    /// §"Cross-family takeaways" #6 ceiling of ≤4. Justified by Path A' analysis:
+    /// calibration + safety + reasoning + quality) exceeds the original design
+    /// ceiling of ≤4 overrides. Justified by Path A' analysis:
     /// the category bucket itself is the wrong granularity (R3); per-evaluator
     /// overrides will reduce the count once T3.14 lands. ux / adversarial run
     /// against the default 0.85 / 0.70 gate.</para>
@@ -214,13 +214,17 @@ public static class BenchAgenticCalibrateCommand
         int? limitPerCategory = null)
         => RunCoreAsync(rootOverride, outPathOverride, evaluatorOverride, ct, recordsPath, limitPerCategory);
 
+    // evaluatorOverrideIdentity: the provider and model behind evaluatorOverride, for the report header and the
+    // per-case records. Without it a supplied evaluator is reported as unknown; it is ignored when evaluatorOverride
+    // is null.
     internal static async Task<int> RunCoreAsync(
         string? rootOverride,
         string? outPathOverride,
         IEvaluator? evaluatorOverride,
         CancellationToken ct = default,
         string? recordsPath = null,
-        int? limitPerCategory = null)
+        int? limitPerCategory = null,
+        CalibrationJudgeIdentity? evaluatorOverrideIdentity = null)
     {
         if (limitPerCategory is < 1)
         {
@@ -243,11 +247,12 @@ public static class BenchAgenticCalibrateCommand
         }
 
         // ── Judge / evaluator ────────────────────────────────────────────────
-        // Calibration requires AGENTEVAL_ALLOW_STUB_JUDGE=1 to use stub mode —
-        // stub-graded calibration gates the wrong thing.
+        // Calibration measures a judge, so it needs a real one: there is no stand-in judge.
         var (resolvedJudge, judgeModelName, exitCode) = JudgeFactory.Resolve(evaluatorOverride, "agentic calibration");
         if (resolvedJudge is null) return exitCode;
         IEvaluator judge = resolvedJudge;
+        // Which judge produced this run goes into the report header and every per-case record.
+        var judgeIdentity = CalibrationJudgeIdentity.Of(evaluatorOverride, evaluatorOverrideIdentity, judge, judgeModelName);
 
         // ── Resolve the evaluator dispatch table from IEvalRegistry ──────────
         // ADR-031 C1. The 40-entry hand-authored `Dictionary<string, IEval>`
@@ -343,7 +348,12 @@ public static class BenchAgenticCalibrateCommand
                     datasets,
                     async (record, token) =>
                     {
-                        await writer.WriteLineAsync(System.Text.Json.JsonSerializer.Serialize(record, jsonOptions).AsMemory(), token);
+                        // The record type belongs to the runner and knows nothing of providers, so the judge is
+                        // added here, on every line: a records file must say which judge produced it on its own.
+                        var line = System.Text.Json.JsonSerializer.SerializeToNode(record, jsonOptions)!.AsObject();
+                        line["judgeProvider"] = judgeIdentity.Provider;
+                        line["judgeModel"] = judgeIdentity.Model;
+                        await writer.WriteLineAsync(line.ToJsonString(jsonOptions).AsMemory(), token);
                         await writer.FlushAsync(token);
                     },
                     limitPerCategory,
@@ -367,7 +377,7 @@ public static class BenchAgenticCalibrateCommand
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
-            var md = BuildMarkdownReport(report);
+            var md = BuildMarkdownReport(report, judgeIdentity);
             if (limitPerCategory is int lim)
                 md = $"> ⚠️ **LIMITED RUN — at most {lim} entr{(lim == 1 ? "y" : "ies")} per category.** A wiring check, not a baseline: " +
                      "accuracy and kappa on this few cases mean nothing, and the calibration gate is not applied." + Environment.NewLine + Environment.NewLine + md;
@@ -448,13 +458,15 @@ public static class BenchAgenticCalibrateCommand
 
 
     private static string BuildMarkdownReport(
-        AgentEval.Evals.Agentic.Calibration.CalibrationReport report)
+        AgentEval.Evals.Agentic.Calibration.CalibrationReport report,
+        CalibrationJudgeIdentity judge)
     {
         var sb = new StringBuilder();
         sb.AppendLine("# Agentic Evaluator Calibration Report");
         sb.AppendLine();
         sb.AppendLine($"Generated: {report.GeneratedAt:yyyy-MM-dd HH:mm:ss} UTC");
         sb.AppendLine();
+        judge.AppendMarkdownHeader(sb);
         sb.AppendLine($"Thresholds: accuracy >= {AccuracyThreshold:P0}, Cohen's kappa >= {KappaThreshold:F2}");
         sb.AppendLine();
 

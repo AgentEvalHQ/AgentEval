@@ -17,9 +17,9 @@ namespace AgentEval.Compliance.EuAiAct.Reporting.Pdf;
 /// per-article scenario tables, audit-chain appendix, and methodology appendix.
 /// </summary>
 /// <remarks>
-/// QuestPDF community license is accepted in the static constructor so that
-/// unit tests that instantiate this type do not need to configure the license
-/// themselves.
+/// The static constructor declares the QuestPDF Community licence when no licence
+/// type has been set yet, so unit tests that instantiate this type do not need to
+/// configure it. A licence type the host application set earlier is left unchanged.
 /// <para>
 /// <b>Recommendations omission (intentional).</b> The PDF report does NOT
 /// surface the <see cref="EuAiActComplianceEvidence.Recommendations"/> array.
@@ -36,12 +36,14 @@ public sealed class EuAiActPdfRenderer
     private const string RedactedSentinel = "[redacted — sensitive content per scenario configuration]";
 
     /// <summary>
-    /// Accepts the QuestPDF Community license. Called once when the type is first loaded,
-    /// so that both production code and unit tests work without additional setup.
+    /// Declares the QuestPDF Community licence when no licence type has been set yet. Runs once,
+    /// when the type is first used, so production code and unit tests work without extra setup.
+    /// <c>QuestPDF.Settings.License</c> is process-wide: a licence type the host application set
+    /// earlier (for example Professional) is left unchanged.
     /// </summary>
     static EuAiActPdfRenderer()
     {
-        QuestPDF.Settings.License = LicenseType.Community;
+        QuestPDF.Settings.License ??= LicenseType.Community;
     }
 
     private readonly EuAiActArticlesRegistry? _articles;
@@ -365,7 +367,8 @@ public sealed class EuAiActPdfRenderer
             col.Item().PaddingTop(15);
 
             col.Item().Text($"Source run ID: {ev.Base.SourceRun.RunId}");
-            col.Item().Text($"Manifest hash: {ev.Base.SourceRun.ManifestHash}");
+            foreach (var line in AuditChainLines(ev.Base.SourceRun))
+                col.Item().Text(line);
             col.Item().Text($"Schema version: {ev.Base.SchemaVersion}");
             col.Item().PaddingTop(10);
 
@@ -378,6 +381,37 @@ public sealed class EuAiActPdfRenderer
             foreach (var kv in ev.EuAiActAttestation.PromptVersions)
                 col.Item().PaddingLeft(20).Text($"{kv.Key}: {kv.Value}");
         });
+    }
+
+    /// <summary>
+    /// The manifest-hash and chain-status lines of the audit-chain appendix. Same states as the
+    /// Markdown report's <c>## Audit Chain</c> section: this renderer only has the hash copied into
+    /// the evidence, never the source run it points at, so it does not verify the chain and never
+    /// prints a verified state. A recorded hash reads "not verified in this report" with how to
+    /// verify it; an empty one reads "no hash recorded".
+    /// </summary>
+    internal static IReadOnlyList<string> AuditChainLines(AgentEval.Output.SourceRunRef sourceRun)
+    {
+        ArgumentNullException.ThrowIfNull(sourceRun);
+
+        if (string.IsNullOrWhiteSpace(sourceRun.ManifestHash))
+        {
+            return new[]
+            {
+                "Manifest hash: —",
+                "Chain status: no hash recorded, so this evidence cannot be checked against its source run.",
+            };
+        }
+
+        return new[]
+        {
+            $"Manifest hash: {sourceRun.ManifestHash}",
+            "Chain status: hash recorded, not verified in this report.",
+            "To verify, run 'agenteval doctor' inside the solution whose .agenteval/ workspace holds this " +
+            "source run. It re-hashes each run's files against that run's manifest.json and checks the " +
+            "manifest hash in every compliance evidence.json against its source run. Then confirm the hash " +
+            "above equals contentHash in that run's manifest.json.",
+        };
     }
 
     // ── Appendix B — Methodology ─────────────────────────────────────────────
@@ -461,16 +495,17 @@ public sealed class EuAiActPdfRenderer
 
     private static string Capitalize(string s) => EvalReportHelpers.Capitalize(s); // ARC-02: shared
 
-    private static string GetJudgeModeDescription(string judgeMode) => judgeMode.ToLowerInvariant() switch
+    internal static string GetJudgeModeDescription(string judgeMode) => judgeMode.ToLowerInvariant() switch
     {
-        "mode-a" or "stub" =>
-            "Stub judge mode (mode-a): scenarios are evaluated using a deterministic stub that " +
-            "returns fixed pass/warn/fail responses based on scenario metadata. " +
-            "This mode is designed for fast CI validation without requiring a live LLM endpoint.",
-        "mode-b" or "real" or "llm" =>
-            "Real LLM judge mode (mode-b): scenarios are evaluated by a live language model " +
-            "configured via the benchmark's judge pipeline. Results reflect genuine model behavior " +
-            "against each scenario's evaluation criteria and expected behavior specification.",
+        "mode-a" =>
+            "Single LLM judge (mode-a): each scenario's answer is graded by one call to the judge model named in the " +
+            "attestation, against the scenario's evaluation criteria and expected behaviour.",
+        "mode-b" =>
+            "Per-criterion LLM judge (mode-b): each evaluation criterion of a scenario is graded by its own call to " +
+            "the judge model named in the attestation.",
+        "multi-judge" =>
+            "Multi-run judge (multi-judge): the benchmark ran several times with the judge model named in the " +
+            "attestation, and the verdicts were aggregated by majority vote.",
         _ =>
             $"Judge mode: {judgeMode}. Refer to benchmark configuration for details on the evaluation pipeline."
     };

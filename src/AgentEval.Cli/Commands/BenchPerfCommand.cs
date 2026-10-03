@@ -27,13 +27,13 @@ public static class BenchPerfCommand
         string? rootOverride,
         bool azureFromEnv = false,
         CancellationToken ct = default) =>
-        RunAsync(preset, subject, prompt, rootOverride, agentOverride: null, azureFromEnv, ct);
+        RunAsync(preset, subject, prompt, rootOverride, agentOverride: null, azureFromEnv, mock: false, ct: ct);
 
     /// <summary>
     /// Internal overload exposed for tests; allows agent injection. <paramref name="azureFromEnv"/>
-    /// builds an Azure OpenAI chat agent from <c>AZURE_OPENAI_*</c> env vars when
-    /// <paramref name="agentOverride"/> is null; otherwise falls back to the <c>EchoAgent</c> stub
-    /// with a prominent warning banner.
+    /// builds a chat agent from the configured provider when <paramref name="agentOverride"/> is null.
+    /// With neither, the command refuses (usage error) unless <paramref name="mock"/> asks for the
+    /// stand-in by name (<c>--sut mock</c>); a mock run is labelled and not stored (see <see cref="MockTarget"/>).
     /// </summary>
     internal static async Task<int> RunAsync(
         string preset,
@@ -42,8 +42,19 @@ public static class BenchPerfCommand
         string? rootOverride,
         IEvaluableAgent? agentOverride,
         bool azureFromEnv = false,
+        bool mock = false,
+        string? agentModel = null,
         CancellationToken ct = default)
     {
+        if (mock && (agentOverride is not null || azureFromEnv))
+        {
+            return MockTarget.RefuseMockWithRealTarget();
+        }
+        if (agentOverride is null && !azureFromEnv && !mock)
+        {
+            return MockTarget.RefuseWithoutTarget($"bench perf {preset}", MockTarget.AgentTargets);
+        }
+
         // ── Workspace setup ──────────────────────────────────────────────────
         if (rootOverride is not null)
         {
@@ -62,7 +73,7 @@ public static class BenchPerfCommand
         var agentEvalDir = Path.Combine(workspaceRoot, ".agenteval");
         if (!Directory.Exists(agentEvalDir))
         {
-            Console.Error.WriteLine($".agenteval/ not found at {agentEvalDir}. Run `agenteval init` first.");
+            Console.Error.WriteLine($".agenteval/ not found at {agentEvalDir}. Run `agenteval init-workspace` first.");
             return 1;
         }
 
@@ -82,12 +93,11 @@ public static class BenchPerfCommand
         {
             Console.Error.WriteLine($"Unknown perf preset '{preset}'. Known presets: " +
                 $"{string.Join(", ", family.Presets.Select(p => p.Name))}.");
-            return 1;
+            return ExitCodes.UsageError;
         }
 
         // ── Resolve target agent ─────────────────────────────────────────────
-        // Default is the deterministic EchoAgent stub (50ms-delay echo). --azure-from-env
-        // builds a real Azure OpenAI agent. Tests inject via agentOverride.
+        // --sut <target> / --endpoint (agentOverride) > --azure-from-env > the stand-in, only when asked for.
         IEvaluableAgent agent;
         if (agentOverride is not null)
         {
@@ -95,24 +105,21 @@ public static class BenchPerfCommand
         }
         else if (azureFromEnv)
         {
-            var (azureAgent, azureExitCode) = AzureChatAgentFactory.TryBuildFromEnv(subject);
+            var (azureAgent, envModel, azureExitCode) = AzureChatAgentFactory.TryBuildFromEnvWithModel(subject);
             if (azureAgent is null) return azureExitCode;
             agent = azureAgent;
+            agentModel = envModel;
         }
         else
         {
-            AzureChatAgentFactory.PrintStubAgentWarning(
-                benchmarkName: "Performance",
-                stubAgentDescription: "EchoAgent stub",
-                sampleFileName: "02_PerformanceBenchmark.cs");
-            agent = new EchoAgent(subject);
+            MockTarget.PrintBanner($"bench perf {preset}", "a stand-in that echoes the prompt after 50 ms");
+            agent = new MockTarget.EchoingAgent(subject);
         }
 
         // ── Build EvalInput from prompt(s) ───────────────────────────────────
-        // P0-1: when running against a real Azure OpenAI deployment we know the
-        // model name from AZURE_OPENAI_DEPLOYMENT. Surface it as costModelName so
-        // the perf cost-leaf can do a real pricing-table lookup rather than falling
-        // back to agent.Name (which never matches a pricing entry → silent $0 / PASS).
+        // P0-1: price the model the agent actually used: --model for an --endpoint target, the model the provider
+        // resolved for --azure-from-env. Without it the cost leaf falls back to agent.Name, which never matches a
+        // pricing entry.
         var resolvedPrompt = string.IsNullOrWhiteSpace(prompt) ? "Hello!" : prompt;
         var metadata = new Dictionary<string, object>
         {
@@ -121,16 +128,32 @@ public static class BenchPerfCommand
             [AgentEval.Evals.EvalInputAgentBinding.AgentMetadataKey] = agent,
             ["preset"] = preset,
         };
-        var deploymentEnv = Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT");
-        if (azureFromEnv && !string.IsNullOrWhiteSpace(deploymentEnv))
+        if (!string.IsNullOrWhiteSpace(agentModel))
         {
-            metadata["costModelName"] = deploymentEnv;
+            metadata["costModelName"] = agentModel;
         }
         var input = new EvalInput(
             Query: resolvedPrompt,
             Metadata: metadata);
 
         // ── Run via the registry's EvaluateAsync adapter ─────────────────────
+        if (agent is MockTarget.EchoingAgent)
+        {
+            EvalResult mockResult;
+            try
+            {
+                mockResult = await family.EvaluateAsync!(input, null, ct);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Performance benchmark failed: {ex.Message}");
+                return 1;
+            }
+
+            return MockTarget.Finish($"bench perf {preset}",
+                $"{mockResult.Score.Label.ToUpperInvariant()} (score {mockResult.Score.Value:F3}) for the echo stand-in");
+        }
+
         var store = new FileSystemOutputStore(agentEvalDir);
         await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
@@ -230,25 +253,5 @@ public static class BenchPerfCommand
         // Reuse fix (BUG-22 follow-up): was an inlined duplicate of BenchExitCodes.FromLabel
         // (identical pass=>0/fail=>2/_=>2 mapping, now split 9/10/11 — see that class's own remarks).
         return BenchExitCodes.FromLabel(result.Score.Label);
-    }
-
-    /// <summary>
-    /// Deterministic echo agent used by the CLI when no real target is supplied. Each call
-    /// returns the prompt itself with a synthetic 50 ms latency so the perf adapter
-    /// produces meaningful (if uninteresting) metrics.
-    /// </summary>
-    internal sealed class EchoAgent : IEvaluableAgent
-    {
-        public string Name { get; }
-        public EchoAgent(string name) { Name = name; }
-        public async Task<AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)
-        {
-            await Task.Delay(50, cancellationToken);
-            return new AgentResponse
-            {
-                Text = prompt,
-                TokenUsage = new TokenUsage { PromptTokens = prompt.Length / 4, CompletionTokens = prompt.Length / 4 }
-            };
-        }
     }
 }

@@ -46,8 +46,19 @@ public static class BenchEuAiActCommand
         IEvaluableAgent? agentOverride = null,
         string? responseText = null,
         bool azureFromEnv = false,
+        bool mock = false,
         CancellationToken ct = default)
     {
+        var gradesSuppliedResponse = !string.IsNullOrWhiteSpace(responseText);
+        if (mock && (agentOverride is not null || azureFromEnv || gradesSuppliedResponse))
+        {
+            return MockTarget.RefuseMockWithRealTarget();
+        }
+        if (agentOverride is null && !azureFromEnv && !gradesSuppliedResponse && !mock)
+        {
+            return MockTarget.RefuseWithoutTarget("bench eu-ai-act", MockTarget.ComplianceTargets);
+        }
+
         // ── Workspace setup ──────────────────────────────────────────────────
         if (rootOverride is not null)
         {
@@ -66,7 +77,7 @@ public static class BenchEuAiActCommand
         var agentEvalDir = Path.Combine(workspaceRoot, ".agenteval");
         if (!Directory.Exists(agentEvalDir))
         {
-            Console.Error.WriteLine($".agenteval/ not found at {agentEvalDir}. Run `agenteval init` first.");
+            Console.Error.WriteLine($".agenteval/ not found at {agentEvalDir}. Run `agenteval init-workspace` first.");
             return 1;
         }
 
@@ -74,9 +85,9 @@ public static class BenchEuAiActCommand
         // Phase-6 Task 6.8: load the embedded EU AI Act judge system prompt and pass
         // it through. See BenchCommand for rationale.
         // The same resolver `bench eu-ai-act calibrate` uses, so the calibrated judge is the judge that runs.
-        var (resolvedJudge, judgeModelName, exitCode) = JudgeFactory.ResolveEuAiAct(
-            evaluatorOverride,
-            judgeKind: "EU AI Act benchmark");
+        var (resolvedJudge, judgeModelName, exitCode) = mock && evaluatorOverride is null
+            ? MockTarget.JudgeResolution
+            : JudgeFactory.ResolveEuAiAct(evaluatorOverride, judgeKind: "EU AI Act benchmark");
         if (resolvedJudge is null) return exitCode;
         IEvaluator judge = resolvedJudge;
 
@@ -114,6 +125,12 @@ public static class BenchEuAiActCommand
         {
             benchmark = ResolvePreset(preset, articles, scenarioBuilder);
         }
+        catch (ArgumentException ex)
+        {
+            // An unknown preset or domain pack is a rejected argument: a usage error, not a failed run.
+            Console.Error.WriteLine($"Failed to build EU AI Act preset '{preset}': {ex.Message}");
+            return ExitCodes.UsageError;
+        }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Failed to build EU AI Act preset '{preset}': {ex.Message}");
@@ -122,7 +139,7 @@ public static class BenchEuAiActCommand
 
         // ── Build input ──────────────────────────────────────────────────────
         // Phase-7 Task 7.22: --input is now required at the CLI level (see Program.cs).
-        // The prior hard-coded fixture was removed because it produced
+        // The prior hard-coded input fixture was removed because it produced
         // identical evidence across every run, defeating the point of a per-
         // subject benchmark. The internal RunAsync still accepts null inputText
         // for in-process callers; in that case we hold the line by failing fast
@@ -152,17 +169,30 @@ public static class BenchEuAiActCommand
         }
         else
         {
-            // No real response supplied: grade a built-in FIXTURE. Warn loudly — the produced
-            // compliance evidence does NOT reflect the named subject agent (BUG-18).
+            // --sut mock, asked for by name: a canned answer, graded, labelled and not stored.
+            MockTarget.PrintBanner("bench eu-ai-act", "a canned answer");
             agentResponse =
                 "I should clearly identify myself as an AI assistant when interacting with users. " +
                 "For high-risk decisions, I'll defer to human review.";
-            Console.Error.WriteLine(
-                $"[bench eu-ai-act] WARNING: no --response/--response-file supplied — grading a built-in " +
-                $"FIXTURE response, not a real agent output. The produced compliance evidence does NOT reflect " +
-                $"subject '{subject}'. Pass --response-file <path> (or --response \"...\") with the agent's actual answer.");
         }
         var evalInput = new EvalInput(Query: inputText, Response: agentResponse);
+
+        if (agent is null && !gradesSuppliedResponse)
+        {
+            EvalResult mockResult;
+            try
+            {
+                mockResult = await benchmark.EvaluateAsync(evalInput, ct);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Benchmark run failed: {ex.Message}");
+                return 1;
+            }
+
+            return MockTarget.Finish("bench eu-ai-act",
+                $"{mockResult.Score.Label.ToUpperInvariant()} (score {mockResult.Score.Value:F3}) for a canned answer");
+        }
 
         // ── Run benchmark ────────────────────────────────────────────────────
         var store = new FileSystemOutputStore(agentEvalDir);

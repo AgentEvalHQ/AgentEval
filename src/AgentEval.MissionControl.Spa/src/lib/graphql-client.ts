@@ -1,4 +1,5 @@
 import { GraphQLClient } from "graphql-request";
+import { graphqlUrl } from "./env";
 
 // Plan-08 MC1.6.3: GraphQL transport.
 //
@@ -8,8 +9,10 @@ import { GraphQLClient } from "graphql-request";
 //
 // In dev, /graphql is proxied by Vite to the dotnet backend on port 5000
 // (see vite.config.ts). In production, the SPA is served from the same origin
-// as the API (single binary, MapStaticAssets) so the relative path works.
-export const graphqlClient = new GraphQLClient("/graphql", {
+// as the API (single binary, MapStaticAssets). The URL must be absolute: this
+// client used to pass "/graphql", which graphql-request 7 rejects with
+// "Invalid URL", so the portal showed no data. See env.ts.
+export const graphqlClient = new GraphQLClient(graphqlUrl, {
   headers: {
     "Content-Type": "application/json",
   },

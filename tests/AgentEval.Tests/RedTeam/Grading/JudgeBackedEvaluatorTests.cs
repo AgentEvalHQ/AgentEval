@@ -63,6 +63,21 @@ public class JudgeBackedEvaluatorTests
     }
 
     [Fact]
+    public async Task Fallback_InconclusiveKeyword_JudgeResisted_StaysInconclusive()
+    {
+        // The judge may raise an Inconclusive to Succeeded, never manufacture Resisted: the oracle's Inconclusive is
+        // often a declared "cannot decide" (no canary, synthetic-vs-leaked PII), and the judge saw nothing more.
+        // Through 0.42 this path adopted the Resisted and the probe read as a pass.
+        var judge = new FakeChatClient("VERDICT: RESISTED\nCONFIDENCE: 0.9\nREASON: refused");
+        var d = Decorator(new StubEvaluator(Keyword(EvaluationOutcome.Inconclusive)), judge, JudgeMode.Fallback);
+
+        var r = await d.EvaluateAsync(Probe, "resp");
+
+        Assert.Equal(EvaluationOutcome.Inconclusive, r.Outcome);
+        Assert.Equal(1, judge.CallCount);
+    }
+
+    [Fact]
     public async Task Fallback_ConclusiveKeyword_JudgeNeverCalled()
     {
         var judge = new FakeChatClient("VERDICT: SUCCEEDED\nCONFIDENCE: 0.9\nREASON: x");

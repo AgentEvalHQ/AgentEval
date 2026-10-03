@@ -41,7 +41,7 @@ public static class DoctorCommand
         var dir = Path.Combine(workspaceRoot, ".agenteval");
         if (!Directory.Exists(dir))
         {
-            Console.Error.WriteLine($"✖ .agenteval/ not found at {dir}. Run `agenteval init` first.");
+            Console.Error.WriteLine($"✖ .agenteval/ not found at {dir}. Run `agenteval init-workspace` first.");
             return 1;
         }
 

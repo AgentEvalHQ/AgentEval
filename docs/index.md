@@ -36,7 +36,6 @@ result.ToolUsage!.Should()
         .WithArgument("method", "OAuth2")
     .And()
     .HaveCalledTool("SendNotification")
-        .AtLeastTimes(1)
     .And()
     .HaveNoErrors();
 ```
@@ -50,8 +49,9 @@ var result = await stochasticRunner.RunStochasticTestAsync(
     agent, testCase,
     new StochasticOptions(Runs: 10, SuccessRateThreshold: 0.85));
 
-result.Statistics.SuccessRate.Should().BeGreaterThan(0.85);
-result.Statistics.StandardDeviation.Should().BeLessThan(10);
+result.Should()
+    .HavePassRateAtLeast(0.85)
+    .HaveStandardDeviationAtMost(10);
 ```
 
 **Run the same evaluation 10 times. Know your actual success rate, not your lucky-run rate.**
@@ -86,49 +86,47 @@ result.ExecutionResult!.Should()
 
 ```csharp
 result.Performance!.Should()
-    .HaveFirstTokenUnder(TimeSpan.FromMilliseconds(500),
+    .HaveTimeToFirstTokenUnder(TimeSpan.FromMilliseconds(500),
         because: "streaming responsiveness matters")
     .HaveTotalDurationUnder(TimeSpan.FromSeconds(5))
     .HaveEstimatedCostUnder(0.05m,
         because: "stay within budget");
 ```
 
-**Know before production if your agent is too slow or too expensive.**
+**Know before production if your agent is too slow or too expensive.** A metric that was not captured cannot fail its check: time to first token is recorded only on streaming runs, and cost only when `EvaluationOptions.ModelName` names a model in the price table. Inside an `AgentEvalScope` such a check is recorded as inconclusive; outside one it is skipped.
 
 ### Compare Models, Get a Winner
 
 ```csharp
-var result = await comparer.CompareModelsAsync(
-    factories: new[] { gpt4o, gpt4oMini, claude },
+var stochasticRunner = new StochasticRunner(harness);
+var comparer = new ModelComparer(stochasticRunner);
+
+// CreateAgent(deployment) is your code: it returns an IEvaluableAgent for that model
+var results = await comparer.CompareModelsAsync(
+    factories: new IAgentFactory[]
+    {
+        new DelegateAgentFactory("gpt-4o", "GPT-4o", () => CreateAgent("gpt-4o")),
+        new DelegateAgentFactory("gpt-4o-mini", "GPT-4o Mini", () => CreateAgent("gpt-4o-mini"))
+    },
     testCases: testSuite,
-    metrics: new[] { new ToolSuccessMetric(), new RelevanceMetric(eval) },
-    options: new ComparisonOptions(RunsPerModel: 5));
+    options: new ModelComparisonOptions(RunsPerModel: 5));
 
-Console.WriteLine(result.ToMarkdown());
+Console.WriteLine(results.ToMarkdown());
 ```
 
-**Output:**
-```markdown
-| Rank | Model         | Tool Accuracy | Relevance | Cost/1K Req |
-|------|---------------|---------------|-----------|-------------|
-| 🥇   | GPT-4o        | 94.2%         | 91.5      | $0.0150     |
-| 🥈   | GPT-4o Mini   | 87.5%         | 84.2      | $0.0003     |
-
-**Recommendation:** GPT-4o - Highest accuracy
-**Best Value:** GPT-4o Mini - 87.5% accuracy at 50x lower cost
-```
+Every model runs each test case five times. The Markdown report counts each model's wins, averages its composite, quality, speed, cost and reliability scores, and ranks the models on every test case. The scores rank the models against each other (best 100, worst 0), so check the raw pass rates and latencies in each result's `ModelResults` too: [how the scores are computed](model-comparison.md#how-the-scores-are-computed).
 
 ### Record Once, Replay Forever (No API Costs)
 
 ```csharp
 // RECORD once (live API call)
-var recorder = new TraceRecordingAgent(realAgent);
-await recorder.ExecuteAsync("Book a flight to Paris");
-TraceSerializer.Save(recorder.GetTrace(), "booking-trace.json");
+await using var recorder = new TraceRecordingAgent(realAgent, "booking");
+await recorder.InvokeAsync("Book a flight to Paris");
+await recorder.SaveAsync("booking.trace.json");
 
 // REPLAY forever (no API call, instant, free)
-var replayer = new TraceReplayingAgent(trace);
-var response = await replayer.ReplayNextAsync();  // Identical every time
+var replayer = await TraceReplayingAgent.FromFileAsync("booking.trace.json");
+var response = await replayer.InvokeAsync("Book a flight to Paris");  // Identical every time
 ```
 
 **Save API costs. Run evaluations in CI. Get consistent results.**
@@ -165,8 +163,9 @@ var result = await AttackPipeline
     .WithIntensity(Intensity.Comprehensive)
     .ScanAsync(agent);
 
-// Export compliance reports
-await result.ExportAsync("security-report.pdf", ExportFormat.Pdf);
+// Export an executive PDF report (AgentEval.RedTeam.Reporting.Pdf); JSON, Markdown,
+// JUnit and SARIF exporters live in AgentEval.RedTeam.Reporting
+await new PdfReportGenerator().ExportToFileAsync(result, "security-report.pdf");
 ```
 
 [Red Team Evaluation →](redteam.md)
@@ -180,19 +179,23 @@ await result.ExportAsync("security-report.pdf", ExportFormat.Pdf);
 ```csharp
 // One-line benchmark with grade
 var runner = MemoryBenchmarkRunner.Create(chatClient);
-var result = await runner.RunBenchmarkAsync(agent, MemoryBenchmark.Standard);
+var agent  = chatClient.AsEvaluableAgent(name: "MemoryAgent", includeHistory: true);
 
+var result = await runner.RunBenchmarkAsync(agent, MemoryBenchmark.Standard);
 Console.WriteLine($"Memory: {result.OverallScore:F1}% ({result.Grade})");
 
-// Generate an interactive HTML pentagon report
-await result.ExportHtmlReportAsync("memory-report.html");
+// Save a baseline. SaveAsync also places the interactive HTML pentagon report
+// (report.html) in the same folder; it reads every baseline saved there.
+var store = new JsonFileBaselineStore();
+await store.SaveAsync(result.ToBaseline("GPT-4o", new AgentBenchmarkConfig { AgentName = "MemoryAgent" }));
+Console.WriteLine($"Report folder: {store.GetReportDirectory("MemoryAgent")}");
 ```
 
 **What ships:**
 - **5 memory metrics** — retention, reach-back, temporal, noise resilience, reducer fidelity
 - **5 benchmark presets** — Quick / Standard / Full / Diagnostic / Overflow (up to 192K tokens)
-- **HTML pentagon reports** — multi-model overlay, baseline diffs, drill-down explanations
-- **LongMemEval (ICLR 2025)** — fully re-implemented in .NET, paper-comparable scoring
+- **HTML pentagon reports** — saved baselines overlaid, per-category deltas between any two, a score timeline (a baseline stores scores, not transcripts, so there is no per-scenario drill-down)
+- **LongMemEval (ICLR 2025)** — re-implemented in .NET, with the paper's published scores (GPT-4o: 57.7%, S mode) shipped as a reference
 - **MAF-native** — works with `AIContextProvider`, `ChatHistoryProvider`, `CompactionStrategy`
 
 > **Honest note:** use the native `Standard` benchmark primarily as a regression gate for changes in your own agent, and use **LongMemEval** when you need broader cross-platform comparability.
@@ -268,7 +271,7 @@ await result.ExportHtmlReportAsync("memory-report.html");
 
 -   **🖥️ CLI Tool**
     
-    `agenteval init / doctor / bench / redteam / gatekeeper / mc serve` — workspace, benchmarks, red team scans, runtime gates, Mission Control
+    `agenteval init-workspace / doctor / bench / redteam / gatekeeper / mc serve` — workspace, benchmarks, red team scans, runtime gates, Mission Control
 
 -   **🔌 Cross-Framework**
     
@@ -325,17 +328,18 @@ dotnet run --project samples/AgentEval.Samples
 ## Mission Control + Compliance Benchmarks
 
 Mission Control is the read-only web portal over your `.agenteval/` workspace —
-GraphQL, REST, and SPA on one port. Eight benchmark families ship: the three
-compliance + agentic benchmarks (**Agentic** 60 evaluators / 11 presets, **EU
-AI Act** 6 pillars / 15 controls, **GDPR** 6 pillars / 29 articles + 3 domain
-packs) plus the security + performance + memory families (**OWASP** LLM Top 10
-v2.0, **MITRE ATLAS**, **Performance**, **LongMemEval**, **Memory**). All
-benchmarks produce audit-chained evidence under `.agenteval/`. (For
-version-specific counts, run `agenteval bench --list` against the installed
-tool.)
+GraphQL, REST, and SPA on one port. The benchmark families: the compliance +
+agentic benchmarks (**Agentic** 60 evaluators / 12 presets, **EU AI Act** 6
+pillars / 15 controls, **GDPR** 6 pillars / 29 articles + 3 domain packs), the
+security families (**OWASP** LLM Top 10 v2.0, **MITRE ATLAS**, **NIST AI RMF**),
+**Performance**, the memory families (**LongMemEval**, **TypedMemEval**,
+**Memory**), and two pure-code trace reconciliation families (**Trace
+Fidelity**, **Workflow Trace Fidelity**). All benchmarks produce audit-chained
+evidence under `.agenteval/`. (For version-specific counts, run
+`agenteval bench --list` against the installed tool.)
 
 ```bash
-agenteval init                       # one-time workspace bootstrap
+agenteval init-workspace             # one-time workspace bootstrap
 agenteval bench agentic   --preset agentic-execution --subject MyAgent
 agenteval bench eu-ai-act --preset standard          --subject MyAgent
 agenteval bench gdpr      --preset standard          --subject MyAgent

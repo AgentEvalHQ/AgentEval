@@ -11,7 +11,7 @@ Mission Control is the visualisation, aggregation, and governance layer on top o
 
 ## 30-second quickstart (Mode A — local viewer)
 
-From inside any solution that has run `agenteval init`:
+From inside any solution that has run `agenteval init-workspace`:
 
 ```bash
 agenteval mc serve
@@ -34,7 +34,7 @@ Same endpoints, same port, same behaviour.
 
 ### Docker (single-binary container)
 
-A multi-stage `Dockerfile` ships at the repo root. **Prerequisite**: run `agenteval init` in the host directory first — without an existing `.agenteval/` the container will render the empty-workspace landing page.
+A multi-stage `Dockerfile` ships at the repo root. **Prerequisite**: run `agenteval init-workspace` in the host directory first — without an existing `.agenteval/` the container will render the empty-workspace landing page.
 
 To build + run with your `.agenteval/` mounted read-only:
 
@@ -61,7 +61,7 @@ docker buildx build --platform linux/amd64,linux/arm64 -t agenteval/mc:latest --
 
 ### First run — empty workspace?
 
-If `.agenteval/` doesn't exist yet (or exists but isn't initialised), the SPA renders a guided welcome page with the three-step `init → bench → refresh` workflow instead of an empty dashboard. Run `agenteval init` then refresh.
+If `.agenteval/` doesn't exist yet (or exists but isn't initialised), the SPA renders a guided welcome page with the three-step `init → bench → refresh` workflow instead of an empty dashboard. Run `agenteval init-workspace` then refresh.
 
 ---
 
@@ -173,7 +173,7 @@ REST stays for binary streams because GraphQL doesn't do streams cleanly. See [`
 
 ## Architecture
 
-- **Frontend** (when SPA ships): React 19 + Vite 6 + TypeScript 5.5 + Tailwind 4 + Recharts + Visx + TanStack Query + `graphql-request` (GraphQL transport) + GraphQL Code Generator (typed React hooks).
+- **Frontend** (`src/AgentEval.MissionControl.Spa`): React 19 + Vite 8 + TypeScript 5.7 + Tailwind 4 + Recharts (the only chart library) + TanStack Query 5 + react-router 8 + `graphql-request` (GraphQL transport, with hand-written queries). `npm run build` writes the bundle into `src/AgentEval.MissionControl/wwwroot/`, and the backend serves it on the same port as the API.
 - **Backend**: .NET 10 + ASP.NET Minimal API + Hot Chocolate 16 (ChilliCream — *not* Microsoft) for GraphQL.
 - **Storage**: filesystem-only in Mode A/B (the `.agenteval/` folder is the source of truth). Mode C adds SQLite (default) or PostgreSQL (config) as a hot-path index.
 
@@ -197,7 +197,7 @@ Mission Control consumes only `IOutputStoreReader` (the read-only abstraction). 
 
 ## Troubleshooting
 
-**`Query.solution` returns `null`** — your `.agenteval/` folder isn't initialised. Run `agenteval init` in the solution root.
+**`Query.solution` returns `null`** — your `.agenteval/` folder isn't initialised. Run `agenteval init-workspace` in the solution root.
 
 **Empty subjects / runs** — verify `.agenteval/subjects/` exists and contains `agents/` or `workflows/` subfolders.
 
@@ -211,5 +211,5 @@ Mission Control consumes only `IOutputStoreReader` (the read-only abstraction). 
 
 - [`api-design.md`](api-design.md) — REST + GraphQL hybrid split.
 - [`portal-ready-evaluators.md`](portal-ready-evaluators.md) — how to write an evaluator that renders well in the portal.
-- [`charting.md`](charting.md) — Recharts vs Visx component mapping.
+- [`charting.md`](charting.md) — what each SPA view draws, and with which Recharts component.
 - [`agenteval-workspace.md`](../agenteval-workspace.md) — the on-disk standard Mission Control reads from.

@@ -189,6 +189,22 @@ public class BaselineExtensionsTests
         Assert.Null(baseline.CategoryResults["Basic Retention"].Recommendation);
     }
 
+    [Fact]
+    public void ToBaseline_LeavesStochasticNullAndScenarioCountAtDefault()
+    {
+        // Pins what CategoryScoreEntry's doc comments state: no shipped runner fills Stochastic, and
+        // the native ToBaseline does not set ScenarioCount. If either starts being populated, those
+        // comments (and any docs that repeat them) must be updated with it.
+        var baseline = CreateBenchmarkResult().ToBaseline("Test", TestConfig);
+
+        Assert.NotEmpty(baseline.CategoryResults);
+        Assert.All(baseline.CategoryResults.Values, entry =>
+        {
+            Assert.Null(entry.Stochastic);
+            Assert.Equal(1, entry.ScenarioCount);
+        });
+    }
+
     // --- Helpers ---
 
     private static MemoryBenchmarkResult CreateBenchmarkResult() => new()

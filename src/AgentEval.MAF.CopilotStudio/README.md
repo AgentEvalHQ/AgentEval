@@ -69,6 +69,3 @@ Copilot Credit consumption through Power Platform's own admin tooling.
   tool/connector/knowledge calls are never surfaced to the client. Evidence fidelity tops out at `Verbal`.
 - **Live-tenant verification.** The device-code prompt, silent-refresh, and persisted-cache round trip are
   unit-tested against a fake conversation client but have not been exercised against a real MCS agent.
-
-See [`strategy/CopilotStudio/`](https://github.com/AgentEvalHQ/AgentEval) (local-only planning docs, not
-part of this package) in the main repo for the full backlog.

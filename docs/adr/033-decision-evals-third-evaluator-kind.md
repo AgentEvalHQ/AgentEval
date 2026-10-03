@@ -225,7 +225,14 @@ must sample past.
 | | |
 |---|---|
 | **Accepted** | `IDecisionClient` as its own transport; `DecisionEval` as its own leaf; `provenance.type = "atomic-decision"`; `DecisionJudge` as a calibration-and-comparison adapter, never a tree judge |
-| **Measured, per lane** | GDPR 3/6 pillars at the incumbent gate · EU AI Act 2/6 · agentic 79.2% vs 92.3% · red-team and safety false-pass 0 of 53 · memory discrimination 100% of 84 clean items vs 96.3%, and 0 unparseable verdicts against the generative judge's 4 |
+| **Measured, per lane** | GDPR 3/6 pillars at the incumbent gate · EU AI Act 2/6 · agentic 79.2% vs 92.3% · red-team and safety false-pass 0 of 53 · memory discrimination on clean items 100% of 84 vs 96.3% of 80, both including 10 withdrawn preference items ([N4](evidence/033-n4-memory-judge-2026-09-21.md)), and 0 unparseable verdicts against the generative judge's 4 |
 | **Not accepted** | any criterion switching from its generative judge to a decision model; any gate, cascade or escalation; any citable score produced by a decision model alone |
 | **Known no-go** | EU AI Act prohibited practices (20% vs an 84% baseline): that pillar grades an agent's *refusal*, and a decision model grades the thing being refused |
+
+> **Corrected 2026-10-02.** The memory entry in the *Measured, per lane* row read *"memory discrimination
+> 100% of 84 clean items vs 96.3%"*. That overstated it in two ways. The generative judge's 96.3% is of the
+> 80 items it could score, not of 84: its other 4 verdicts were unparseable. And both figures include the 10
+> `single-session-preference` items that the N4 evidence file withdraws, because that type's gold answer is a
+> rubric rather than an answer, so feeding it back as the response measures nothing. N4 keeps both figures as
+> measured; excluding those items would change the 96.3% and needs a re-run, not an edit.
 

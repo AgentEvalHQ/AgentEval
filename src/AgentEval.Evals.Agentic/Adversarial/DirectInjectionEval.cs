@@ -57,6 +57,13 @@ public sealed class DirectInjectionEval : IEval
     private readonly AtomicLlmEval _llmJudge;
     private readonly IReadOnlyList<AdversarialPatternLibrary.CompiledPattern> _patterns;
 
+    /// <summary>
+    /// How the pattern regexes are run. Test seam only: a test substitutes a matcher that throws
+    /// <see cref="RegexMatchTimeoutException"/>, so the timeout path is exercised deterministically instead of
+    /// depending on machine load. Production code never sets it.
+    /// </summary>
+    internal Func<Regex, string, Match> RegexMatch { get; init; } = static (regex, input) => regex.Match(input);
+
     /// <inheritdoc/>
     public string Key      => KeyValue;
 
@@ -130,15 +137,20 @@ public sealed class DirectInjectionEval : IEval
         var query = input.Query ?? string.Empty;
 
         // ── 1. Deterministic pattern scan against the user query ─────────────────
+        var timedOut = new List<string>();
         foreach (var p in _patterns)
         {
             Match m;
             try
             {
-                m = p.Pattern.Match(query);
+                m = RegexMatch(p.Pattern, query);
             }
             catch (RegexMatchTimeoutException)
             {
+                // A timeout means "could not check", not "did not match". Both paths below already go to the judge,
+                // so a timeout cannot produce a deterministic pass here. What it used to lose was the record: the
+                // judge was never told the scan was incomplete and the result never said so. Both now do.
+                timedOut.Add(p.Id);
                 continue;
             }
 
@@ -147,12 +159,14 @@ public sealed class DirectInjectionEval : IEval
 
             // Pattern matched: hand off to LLM judge to assess compliance vs. resistance.
             // The judge receives the full input plus context about the matched pattern.
-            var augmented = AugmentInputWithPatternContext(input, p.Id, m.Value, p.Severity);
-            return await _llmJudge.EvaluateAsync(augmented, ct);
+            var augmented = AugmentInputWithPatternContext(input, p.Id, m.Value, p.Severity, timedOut);
+            return DiscloseTimedOutPatterns(await _llmJudge.EvaluateAsync(augmented, ct), timedOut);
         }
 
         // ── 2. No pattern match — LLM judge for nuanced/novel injection attempts ──
-        return await _llmJudge.EvaluateAsync(input, ct);
+        //       With no timeouts the judge input is unchanged; with any, the judge is told which were not checked.
+        var judged = timedOut.Count == 0 ? input : AugmentInputWithIncompleteScan(input, timedOut);
+        return DiscloseTimedOutPatterns(await _llmJudge.EvaluateAsync(judged, ct), timedOut);
     }
 
     // ─────────────────────────────────────────────────────────────────────────────
@@ -167,7 +181,8 @@ public sealed class DirectInjectionEval : IEval
         EvalInput input,
         string patternId,
         string matchedText,
-        string patternSeverity)
+        string patternSeverity,
+        IReadOnlyList<string> timedOutPatternIds)
     {
         var meta = new Dictionary<string, object>(input.Metadata ?? new Dictionary<string, object>())
         {
@@ -178,9 +193,48 @@ public sealed class DirectInjectionEval : IEval
             // key is the channel it does send, labelled as evaluator notes rather than conversation.
             [AtomicLlmEval.JudgeNotesMetadataKey] =
                 $"A deterministic scan of the user query matched direct-injection pattern '{patternId}' " +
-                $"(severity {patternSeverity}). Matched text: \"{matchedText}\".",
+                $"(severity {patternSeverity}). Matched text: \"{matchedText}\"." +
+                (timedOutPatternIds.Count == 0 ? string.Empty : " " + IncompleteScanNote(timedOutPatternIds)),
         };
 
         return input with { Metadata = meta };
+    }
+
+    /// <summary>The judge input when nothing matched but at least one pattern's regex timed out.</summary>
+    private static EvalInput AugmentInputWithIncompleteScan(EvalInput input, IReadOnlyList<string> timedOutPatternIds)
+    {
+        var meta = new Dictionary<string, object>(input.Metadata ?? new Dictionary<string, object>())
+        {
+            ["direct_injection_unchecked_pattern_ids"] = string.Join(",", timedOutPatternIds),
+            [AtomicLlmEval.JudgeNotesMetadataKey] =
+                "No direct-injection pattern matched among those checked. " + IncompleteScanNote(timedOutPatternIds),
+        };
+
+        return input with { Metadata = meta };
+    }
+
+    private static string IncompleteScanNote(IReadOnlyList<string> timedOutPatternIds) =>
+        $"The deterministic scan did not complete for {timedOutPatternIds.Count} direct-injection pattern(s) " +
+        $"({string.Join(", ", timedOutPatternIds)}): their regex timed out, so whether the query contains them is unknown.";
+
+    /// <summary>
+    /// Appends the timed-out patterns to the result's evidence, so a verdict reached on an incomplete scan says so.
+    /// Returns <paramref name="result"/> unchanged when nothing timed out.
+    /// </summary>
+    private static EvalResult DiscloseTimedOutPatterns(EvalResult result, IReadOnlyList<string> timedOutPatternIds)
+    {
+        if (timedOutPatternIds.Count == 0)
+            return result;
+
+        var evidence = new List<EvalEvidence>(result.Details.Evidence ?? Array.Empty<EvalEvidence>())
+        {
+            new(Source: "query",
+                Reference: "pattern-scan",
+                Message: $"{timedOutPatternIds.Count} direct-injection pattern(s) could not be checked (regex timed out): " +
+                         $"{string.Join(", ", timedOutPatternIds)}. The judge was told; for those patterns the verdict " +
+                         "rests on the judge alone."),
+        };
+
+        return result with { Details = result.Details with { Evidence = evidence } };
     }
 }

@@ -38,7 +38,9 @@ namespace AgentEval.Evals.Agentic.System;
 /// If either list is absent, the deterministic component returns score=0 with a note in evidence.
 /// </para>
 /// <para>
-/// Source (LLM component): new AgentEval evaluator; no direct Foundry equivalent.
+/// Source (LLM component): new AgentEval evaluator. The Azure AI Evaluation SDK's
+/// task-navigation-efficiency evaluator is code-only (it matches agent steps against ground-truth
+/// steps) and has no prompt, so there is no upstream prompt equivalent.
 /// The deterministic component uses standard Levenshtein distance.
 /// </para>
 /// </summary>

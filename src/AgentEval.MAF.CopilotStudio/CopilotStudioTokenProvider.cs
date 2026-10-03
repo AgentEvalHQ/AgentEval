@@ -25,9 +25,11 @@ namespace AgentEval.MAF.CopilotStudio;
 /// <list type="number">
 /// <item>Lazily build (once, memoized) an <see cref="IPublicClientApplication"/> for the configured tenant + app
 /// client id, with its user token cache registered against a persisted, OS-encrypted store via
-/// <c>Microsoft.Identity.Client.Extensions.Msal</c> — DPAPI on Windows, Keychain on macOS, libsecret on Linux
-/// (falling back to an unencrypted file only where none of those are available, matching MSAL's own published
-/// samples for this package).</item>
+/// <c>Microsoft.Identity.Client.Extensions.Msal</c> — DPAPI on Windows, Keychain on macOS, libsecret on Linux.
+/// There is no plain-text fallback: the storage builder never calls <c>WithUnprotectedFile</c>, so the cache is
+/// never written unencrypted. Persistence is also never checked (<c>VerifyPersistence</c> is not called), so where
+/// none of those stores is usable (for example Linux over SSH without a keyring) what happens to the cache is left
+/// to MSAL's cache helper; that case has not been tested.</item>
 /// <item>If a cached account exists, try <c>AcquireTokenSilent</c>. MSAL itself handles silent refresh-token
 /// renewal, so this succeeds on every run after the first, as long as the refresh token is still valid.</item>
 /// <item>On <see cref="MsalUiRequiredException"/> (no cached account, or silent renewal failed), fall back to
@@ -45,7 +47,8 @@ namespace AgentEval.MAF.CopilotStudio;
 /// <b>NOT independently live-verified.</b> The device-code prompt, the silent-refresh path, and the persisted-cache
 /// round-trip all require a real Entra app registration plus a human completing the device-code sign-in in a
 /// browser — none of which is available in this environment. What <b>is</b> verified: this compiles against the
-/// real MSAL 4.84.2 + Microsoft.Identity.Client.Extensions.Msal 4.84.2 API surface, and constructs the
+/// real MSAL + Microsoft.Identity.Client.Extensions.Msal API surface (versions pinned in
+/// <c>Directory.Packages.props</c>), and constructs the
 /// app/cache/scopes exactly as MSAL's own documentation and samples prescribe for a public-client desktop/CLI app.
 /// <see cref="ComputeCacheFileName"/> (the one pure, offline-testable piece of this flow) has unit tests; the
 /// device-code/silent-acquisition flow itself needs a real credentialed smoke test before this is trusted in

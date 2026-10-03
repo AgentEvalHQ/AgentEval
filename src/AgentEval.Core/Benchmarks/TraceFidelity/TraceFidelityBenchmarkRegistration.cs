@@ -36,6 +36,6 @@ internal static class TraceFidelityBenchmarkRegistration
             _ => throw new ArgumentException($"Unknown trace-fidelity preset '{preset}'. Known: smoke, standard, audit-grade."),
         },
         evaluateAsync: null,   // Shape B — two-trace input doesn't map onto a single EvalInput
-        docLinkUrl: "https://github.com/joslat/AgentEval/blob/main/docs/benchmarks/trace-fidelity.md",
+        docLinkUrl: "https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/trace-fidelity.md",
         owningAssemblyName: typeof(TraceFidelityBenchmark).Assembly.GetName().Name));
 }

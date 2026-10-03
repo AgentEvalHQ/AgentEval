@@ -83,31 +83,6 @@ public class AzureChatAgentFactoryTests
     }
 
     [Fact]
-    public void PrintStubAgentWarning_WritesBannerToStderr()
-    {
-        var stderr = new StringWriter();
-        var prev = Console.Error;
-        Console.SetError(stderr);
-        try
-        {
-            AzureChatAgentFactory.PrintStubAgentWarning("OWASP", "TestStubAgent");
-
-            var err = stderr.ToString();
-            // The banner must mention the benchmark name, the stub agent, and the recovery path.
-            Assert.Contains("OWASP", err);
-            Assert.Contains("TestStubAgent", err);
-            Assert.Contains("--azure-from-env", err);
-            Assert.Contains("AZURE_OPENAI_ENDPOINT", err);
-            // The banner is intended to be highly visible — sanity-check it includes the warning glyph.
-            Assert.Contains("⚠", err);
-        }
-        finally
-        {
-            Console.SetError(prev);
-        }
-    }
-
-    [Fact]
     public void TryBuildChatClientFromEnv_LogFileActive_ReturnedClientIsVerboseLogWrapped()
     {
         // AzureOpenAIClient construction (and .GetChatClient(...).AsIChatClient()) makes no network call — same

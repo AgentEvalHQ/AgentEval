@@ -40,13 +40,17 @@ namespace AgentEval.MAF.Gatekeeper;
 /// <see cref="OperationCanceledException"/> for its own token is never swallowed as an escalation — that
 /// matches this codebase's own established convention, not a bug).</para>
 /// </remarks>
-public sealed class ToolArgumentGoalCoherenceApprovalGate : IToolApprovalGate
+public sealed class ToolArgumentGoalCoherenceApprovalGate : IToolApprovalGate, IDelegatingGate
 {
     private readonly IChatGate _judge;
     private readonly string _goal;
 
     /// <inheritdoc/>
     public string PolicyName { get; }
+
+    // The judge's allow verdict auto-approves a tool call with no human in the loop, so
+    // GatekeeperOptions.ValidateInlineJudgesAsync must see it through this gate (and through its cache).
+    IEnumerable<object> IDelegatingGate.InnerGates => new object[] { _judge };
 
     /// <summary>Creates the gate from a fast model and the fixed goal it judges every pending call against.</summary>
     /// <param name="fastModel">The fast/mini chat model the underlying judge calls.</param>

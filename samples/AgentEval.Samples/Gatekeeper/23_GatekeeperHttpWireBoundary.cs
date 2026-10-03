@@ -14,6 +14,7 @@ public static class GatekeeperHttpWireBoundary
     {
         GatekeeperSampleContractRenderer.Print("23");
         Console.WriteLine("\n=== Gatekeeper — HTTP Wire Boundary (offline) ===\n");
+        GatekeeperLiveMode.PrintNoModel("a fake DNS resolver and a scripted HTTP message handler");
 
         await AllowedHostAsync();
         await RedirectEscapeAsync();

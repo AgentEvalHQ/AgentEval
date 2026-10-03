@@ -22,16 +22,21 @@ This guide walks you through installing AgentEval and writing your first AI agen
 
 AgentEval follows the principle: **"Evaluation Always Real, Structure Optionally Mock"**
 
-| Component | Mock Mode | Real Mode |
-|-----------|-----------|-----------|
-| Tool tracking & assertions | ✅ Works | ✅ Works |
-| Performance metrics | ✅ Simulated | ✅ Real timing |
-| Conversation flows | ✅ Works | ✅ Works |
-| LLM-as-judge evaluation | ❌ Skipped | ✅ Real scores |
-| RAG quality metrics | ❌ Skipped | ✅ Real evaluation |
-| Model comparison | ❌ Skipped | ✅ Real comparison |
+The Getting Started samples (group A in `samples/AgentEval.Samples`) run against a real model by default.
+Mock mode is an offline walkthrough with canned replies. It runs only when you pass `--mock`, and it says so.
 
-**Without credentials:** Samples 1-4, 25, 26, and 27 work fully in mock/offline mode; samples 5-24 gracefully skip or show credential-required messages.
+| Component | Real (default) | `--mock` (on request) |
+|-----------|----------------|-----------------------|
+| Agent replies | From the configured model | Canned replies |
+| Tool tracking & assertions | ✅ Real tool calls | Scripted tool calls; labelled MOCK |
+| Performance metrics | ✅ Real timing and tokens | From a canned reply; labelled MOCK |
+| LLM-as-judge evaluation (A5) | ✅ Real scores | ❌ Not run; the bundles are listed |
+
+A mock run prints `🎭 MOCK MODE (--mock): the agent returns canned replies. Nothing here measures a model.`
+Every pass/fail line ends with `(MOCK: a canned reply, not a measurement)`.
+Through 0.42 these samples switched to canned replies by themselves when no provider was set, and printed ✅ passes.
+
+**Without credentials:** the Getting Started samples stop and say what to set, unless you pass `--mock`. Other samples that need a model stop too. Some samples run offline by design, such as Dataset Loaders and Extensibility (group F) and H1 Registry Discovery; the [samples README](../samples/AgentEval.Samples/README.md) lists each sample's requirement.
 
 ### Required Environment Variables
 
@@ -58,18 +63,26 @@ export AZURE_OPENAI_DEPLOYMENT="gpt-4o"
 OpenAI, Azure AI Foundry or any OpenAI-compatible endpoint. Leaving the selector unset keeps the
 Azure behaviour above exactly as it is. See
 [CLI Reference → Environment variables](cli.md#environment-variables) for each provider's variables.
+The samples read the same selector (`bitdeer` | `openai` | `foundry` | `azure` | `openai-compatible`), or take
+`--provider <name>` for one run; see [Choosing a provider](../samples/AgentEval.Samples/README.md#choosing-a-provider).
 
-### Running Without Credentials (Mock Mode)
+### Running Without Credentials (`--mock`)
 
-If you just want to explore AgentEval's API without Azure credentials:
+With no provider configured, a Getting Started sample stops. It prints the "No chat provider configured" box, then:
 
-```bash
-# Run the samples project
-cd samples/AgentEval.Samples
-dotnet run
+```
+This sample runs a real model. Configure a provider above and re-run,
+or pass --mock for an offline walkthrough with canned replies.
 ```
 
-You'll see samples 1-4 demonstrate tool tracking, performance metrics, and more—all without real LLM calls. Samples 25-27 also run offline (dataset loaders, extensibility, and cross-framework evaluation). Samples 5-24 will show informative "credentials required" messages.
+To explore AgentEval's API without a model, ask for the offline walkthrough:
+
+```bash
+dotnet run --project samples/AgentEval.Samples -- 1 --mock   # Hello World (A1) with canned replies
+dotnet run --project samples/AgentEval.Samples -- --mock     # the interactive menu, same flag
+```
+
+`--mock` covers the Getting Started samples A1–A5. They run the same assertions on canned replies; nothing in a mock run measures a model. In mock mode A5 does not run its LLM-judged demo (Quality/Safety); it lists the bundles instead. A6 Session Lifecycle and A7 Advanced MAF Features need a provider.
 
 ## Installation
 

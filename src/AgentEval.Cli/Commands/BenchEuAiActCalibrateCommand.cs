@@ -41,18 +41,16 @@ public static class BenchEuAiActCalibrateCommand
     /// / 0.426 on Pillar 1 (the Art 5 borderline finding — clears 0.65/0.35
     /// with margin). Against gpt-4o-mini: pillar 1 drops to 68% / 0.375
     /// AND pillars 3-5 ALSO drop from 96%/100%/100% PASS to 71%/78%/73%
-    /// FAIL. The load-bearing variable is the judge model — and the
-    /// calibration system trusts whatever env var is set at run time
-    /// without recording the resolved model identity in the baseline
-    /// markdown. The 0.65 / 0.35 override is a HONEST floor that admits
-    /// both models on Art 5 borderline cases;
-    /// the proper fix is T0.11 which (a) records the resolved judge model in
-    /// the baseline header so silent env-var swaps surface in git diff, and
-    /// (b) supports a versioned deployment id (gpt-5-chat-YYYY-MM-DD) to
-    /// pin against Azure rotation. After T0.11 ships, re-measure against a
-    /// pinned deployment and the gate may return to 0.85 / 0.70 or land at
-    /// a documented intermediate floor. See R5 in
-    /// strategy/futurefeatures/todo/13-pending-issues-tasks.md.</para>
+    /// FAIL. The load-bearing variable is the judge model. Those two
+    /// baselines were written before the report recorded which judge
+    /// produced it; the report header now names the judge provider and
+    /// model (<see cref="CalibrationJudgeIdentity"/>), so a swapped
+    /// deployment shows up in a diff of two reports. The 0.65 / 0.35
+    /// override is a HONEST floor that admits both models on Art 5
+    /// borderline cases. Still open: pinning a versioned deployment id
+    /// (gpt-5-chat-YYYY-MM-DD) against Azure rotation and re-measuring
+    /// against it, after which the gate may return to 0.85 / 0.70 or land
+    /// at a documented intermediate floor.</para>
     /// <para><b>pillar6-gpai-12</b> — GPAI Arts 51-55 apply to the model PROVIDER,
     /// not the deployer/agent. The embedded judge prompt
     /// (<c>eu-ai-act-judge-system.v1.md</c> Rule #5) explicitly labels GPAI as
@@ -83,15 +81,17 @@ public static class BenchEuAiActCalibrateCommand
         CancellationToken ct = default)
         => RunCoreAsync(rootOverride, outPathOverride, evaluatorOverride, ct);
 
+    // evaluatorOverrideIdentity: the provider and model behind evaluatorOverride, for the report header. Without it a
+    // supplied evaluator is reported as unknown; it is ignored when evaluatorOverride is null.
     internal static async Task<int> RunCoreAsync(
         string? rootOverride,
         string? outPathOverride,
         IEvaluator? evaluatorOverride,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        CalibrationJudgeIdentity? evaluatorOverrideIdentity = null)
     {
         // ── Judge / evaluator ────────────────────────────────────────────────
-        // Calibration requires AGENTEVAL_ALLOW_STUB_JUDGE=1 to use stub mode —
-        // stub-graded calibration gates the wrong thing.
+        // Calibration measures a judge, so it needs a real one: there is no stand-in judge.
         // Workspace root canonicalisation (defense-in-depth against --root traversal).
         if (rootOverride is not null)
         {
@@ -105,6 +105,8 @@ public static class BenchEuAiActCalibrateCommand
         var (resolvedJudge, judgeModelName, exitCode) = JudgeFactory.ResolveEuAiAct(evaluatorOverride, "EU AI Act calibration");
         if (resolvedJudge is null) return exitCode;
         IEvaluator judge = resolvedJudge;
+        // Which judge produced this report goes into its header: a calibration describes one judge model.
+        var judgeIdentity = CalibrationJudgeIdentity.Of(evaluatorOverride, evaluatorOverrideIdentity, judge, judgeModelName);
 
         // ── Load EU AI Act article registry ──────────────────────────────────
         EuAiActArticlesRegistry articles;
@@ -183,7 +185,7 @@ public static class BenchEuAiActCalibrateCommand
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
-            var md = BuildMarkdownReport(report);
+            var md = BuildMarkdownReport(report, judgeIdentity);
             await File.WriteAllTextAsync(outPath, md);
             Console.WriteLine($"Calibration report: {outPath}");
         }
@@ -234,13 +236,14 @@ public static class BenchEuAiActCalibrateCommand
         => double.IsNaN(kappa) ? "UNDEFINED" : kappa.ToString("F3", System.Globalization.CultureInfo.InvariantCulture);
 
 
-    private static string BuildMarkdownReport(CalibrationReport report)
+    private static string BuildMarkdownReport(CalibrationReport report, CalibrationJudgeIdentity judge)
     {
         var sb = new StringBuilder();
         sb.AppendLine("# EU AI Act Calibration Report");
         sb.AppendLine();
         sb.AppendLine($"Generated: {report.GeneratedAt:yyyy-MM-dd HH:mm:ss} UTC");
         sb.AppendLine();
+        judge.AppendMarkdownHeader(sb);
         sb.AppendLine($"Thresholds: accuracy >= {AccuracyThreshold:P0}, Cohen's kappa >= {KappaThreshold:F2}");
         sb.AppendLine();
 

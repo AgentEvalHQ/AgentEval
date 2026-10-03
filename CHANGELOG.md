@@ -6,6 +6,376 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+### No real target, no run: `bench` stops measuring built-in stand-ins
+
+#### Fixed
+- **Seven `bench` commands measured a built-in stand-in when no target was given, and stored the result as a
+  measurement.**
+  - `bench owasp`, `mitre` and `nist` scanned an agent that refuses everything, which passes a red-team scan by
+    construction (exit 0). `bench perf` measured an agent that echoes the prompt. `bench gdpr`, `eu-ai-act` and
+    `agentic` graded a built-in answer. Each printed a warning, but the run was written to `.agenteval/` and
+    appeared in Mission Control and `compare` like any other.
+  - **Behaviour change:** without a target these commands now exit 2 (usage error) and name the options.
+    `--sut mock` runs the stand-in only when asked for by name: the run says MOCK, exits 11 (indeterminate)
+    whatever it scores, and nothing is written to `.agenteval/`. `--sut mock` together with another target is a
+    usage error.
+  - A mock run uses a mock judge too: it reads no provider settings, calls no model and costs nothing. A mock run
+    combined with a real target is refused by the commands themselves as well, not only by the command line.
+  - A `--response` supplied to `bench gdpr` or `bench agentic` now needs the `--input` it answered. It used to be
+    graded against a built-in question.
+  - `bench agentic --trace` without `--response` grades the question and final answer the trace recorded. It used
+    to grade a built-in answer next to the real trace. `bench agentic` takes `--sut mock` as its only `--sut`.
+  - `bench perf` takes `--sut` and `--endpoint`/`--model`/`--api-key`, like `bench owasp`. Its cost leaf prices the
+    model the agent used (`--model`, or the model the provider resolved for `--azure-from-env`), not
+    `AZURE_OPENAI_DEPLOYMENT` whichever provider served the run.
+  - The public `RunAsync` entry points of these commands refuse in the same way when given no target.
+  - A live `bench gdpr` run (`--sut` or `--azure-from-env`) without `--input` records a placeholder input instead of
+    the built-in question it never sent, so `compare` treats such runs from before and after this change as
+    different stimuli.
+
+### The Gatekeeper demo red-teams a real model
+
+#### Fixed
+- **`redteam --sut gatekeeper-demo` only ever ran a scripted, fully compromised model.** It now runs the
+  Gatekeeper-gated agent on the configured provider's model, with the forbidden exfiltration tool offered as a lure,
+  so the scan shows what a real model attempts and what the gate stops. With no provider configured it falls back
+  to the scripted model and says so (`SCRIPTED (…)`). Every probe runs in a fresh conversation. The run, its saved
+  report and its baseline are named `gatekeeper-demo (real model <model>@<provider>)` or `gatekeeper-demo (scripted)`,
+  and comparing a baseline taken on one with a run on the other is refused (exit 3): they are different instruments.
+  - **Behaviour change:** where a provider is configured (a developer machine, a CI job with secrets) the demo now
+    calls that model and costs accordingly. `--scripted` runs the scripted model anyway: deterministic and free, the
+    stable baseline for a CI regression loop.
+  - Other agents whose baseline was taken under a different name now get a note saying so.
+- The Gatekeeper samples 00–10 already ran on the configured model and used their scripted path only without one.
+  That path now opens with `SCRIPTED (…)`: a scripted model proposes the attack, so it checks the gate, not a model.
+- **Gatekeeper scenario samples 14–17, 25 and 28 run on the configured model.** Through 0.42 they ran a scripted
+  model only. The model now gets the scenario's attack and the sample's fake tools, and the gate decides on whatever
+  it proposes. Each scene reports what happened, counting the effect the attack seeks by any route, not only the
+  shapes the gate's rules match: blocked, no attempt (which says nothing about the gate), not measured (for example a
+  judge that gave no usable verdict), or the effect happened (the sample fails). The scripted path stays as the
+  labelled fallback without a provider, and as the CI offline suite. In sample 25 the judge is the configured model,
+  not a calibrated trajectory judge, and the run says so. Samples 13, 18–20, 22–24, 26, 27 and 29 involve no model
+  and now say so; 21 says its scripted model is incidental to the batch race it tests.
+  - A live run of sample 28 found that its approval pattern (`"amount":\s*[0-9]{4,}`) missed an amount sent as a
+    JSON string (`"amount":"5000"`): the gate auto-approved it and a $5,000 refund ran with no human. The pattern now
+    names what is routine (a plain amount below 1000) and escalates everything else, a missing amount included; the
+    same pattern replaces the old one in sample 03 and the offline suite. `ArgumentPatternApprovalGate`
+    auto-approves whatever its pattern does not match, so a pattern must be written that way round.
+  - `dotnet run --project samples/AgentEval.Samples -- <n>` exits 1 when the sample fails and 2 for an unknown
+    number; it exited 0 in both cases.
+- **The memory-security test doubles no longer ship in the `AgentEval` package.** `MockMemorySqlStore`,
+  `MockMemoryMcpEndpoint`, `MockMemoryAIContextProvider` and the other `MockMemory*` types (namespace
+  `AgentEval.MAF.Gatekeeper.MemorySecurity`) were public in the Gatekeeper assembly beside the real gates. They moved
+  to the Gatekeeper validation sample (`AgentEval.Gatekeeper.Validation.Fixtures`). **Breaking** for code that used
+  them; copy the file from `samples/AgentEval.Gatekeeper.Validation/` if you relied on it.
+
+### `bench autoaudit` audits real models
+
+#### Fixed
+- **`bench autoaudit` only ever ran a scripted showcase, and named its made-up endpoints after real models**
+  (Azure-GPT-4o-mini, Ollama-Llama3.1, DeepSeek-V3), one of them leaking an SSN. It now audits real models: the
+  ones the configured provider names (`*_MODEL`, `*_MODEL_2`, `*_MODEL_3`) or those given with `--models a,b,c`.
+  Each runs one support task: its `Lookup` tool returns a record with a test SSN the instructions forbid repeating,
+  so a gate block is a model that repeated it. The run is captured at the chat boundary and at the tool loop's own
+  response and reconciled with Trace Fidelity, then ranked on honesty, safety and cost.
+  - **Behaviour change:** with no provider configured the command refuses (exit 2). The showcase runs only with
+    `--sut mock`: its endpoints are now `scripted-clean`, `scripted-silent-retry` and `scripted-pii-leak`, it is
+    labelled MOCK, and it exits 11. A live run exits 3 when no model completed the task.
+  - A model that answers without calling the tool never sees the SSN, so it did not do the task: it is reported as
+    not completed and never wins. The report names no winner among runs that did not complete (two empty traces
+    reconcile to 100%) and shows their fidelity as "not measured".
+  - A copy of the SSN that reaches the caller in a form the PII gate misses (`123 45 6789`, `123456789`) is reported
+    as a leak past the gate and ranks below every run that leaked nothing.
+  - Only the models the environment names are audited: an unset `*_MODEL_2`/`*_MODEL_3` is skipped, where the
+    provider settings would substitute a default (for Azure, deployments called `gpt-4o-mini` and `gpt-4.1`). New:
+    `InferenceProviderEnvironment.NamedModels`. The tool loop is capped at four iterations per model.
+  - Trace Fidelity in a live run reconciles the tool loop's own account with the chat boundary; a standard loop
+    agrees with it, so it is 100% unless a turn ended on a content filter or a length limit. The report says so.
+  - Library: `AutoAuditLive.EvaluateAsync(endpoint, chatClient)` runs the task against any `IChatClient`;
+    `AutoAuditDemo.CleanEndpoint`/`RetryEndpoint`/`LeakEndpoint` name the scripted endpoints.
+  - The Observability sample *Auto-Audit* audits the configured models; `--mock` shows the showcase.
+
+### The Getting Started samples run a real model
+
+#### Fixed
+- **Samples A1–A5 switched to canned replies whenever no provider was configured, and printed ✅ PASSED over them.**
+  They now run against the configured model. With no provider they stop and say how to configure one. The canned
+  walkthrough runs only on request (`dotnet run --project samples/AgentEval.Samples -- 1 --mock`): it opens with a
+  MOCK MODE banner and every pass or fail line says "(MOCK: a canned reply, not a measurement)". The flag applies to
+  those samples and the Observability Auto-Audit only; the runner says so, since other samples run on the
+  configured model as usual.
+  - The samples guidance for contributors and coding agents (`.github/instructions/samples.instructions.md`,
+    `.github/agents/agenteval-samples.agent.md`) told them to add mock fallbacks for missing credentials. It now
+    says the opposite: a sample with no provider stops; a mock runs only on request and is labelled.
+
+### `redteam` and `eval` without a target are a usage error
+
+#### Fixed
+- `agenteval redteam` and `agenteval eval` with no `--endpoint`, `--azure` or `--sut` refused, but exited 3 (runtime
+  error). With no target at all they now exit 2 (usage error), as every `bench` family that grades an agent does.
+  `redteam --pack list` needs no target and still prints the catalog.
+
+### `bench memory` scores only what the judge scored
+
+#### Fixed
+- **`bench memory` turned a missing judgement into a score.** A failed judge call scored the question 0, and a judge
+  reply with no score in it scored **50**. Both went into every average and the overall grade.
+  - Such a question is now **not measured**: left out of its scenario and category scores, and counted. A category
+    in which nothing was measured is reported like a crashed one. This covers every judged category, the reducer
+    and reach-back ones included.
+  - A judge reply that is not valid JSON is read for an explicit score only (`score: 85`, `"score": 85`, `85/100`).
+    Before, the first number followed by "out of" or "%" was taken: "2 out of 3 facts" scored 2.
+  - **Behaviour change:** a run with a crashed or unmeasured category, or with unscored questions, is
+    **INCOMPLETE**: the console says so and lists what was not measured, prints no grade, shows the overall (each
+    unmeasured category at 0) beside the score over the measured categories, and exits 11. Its stored verdict is
+    `WARN`, the schema's indeterminate value. Unmeasured categories count as skipped in the run's stats and get no
+    scenario result, so `compare` does not read them as a drop to 0. `MemoryBenchmarkResult.Passed` is false for
+    an incomplete run.
+  - The memory metrics (`MemoryRetentionMetric`, `MemoryNoiseResilienceMetric`, `MemoryReachBackMetric`) fail
+    with "Not measured" when no question was scored, and the temporal scores average the measured questions only.
+  - Library: `MemoryJudgmentResult.Measured`, `MemoryQueryResult.Measured`,
+    `MemoryEvaluationResult.UnmeasuredQueries`/`IsMeasured`, `BenchmarkCategoryResult.UnmeasuredQueries`,
+    `MemoryBenchmarkResult.UnmeasuredQueries`/`IsComplete`, `ReducerFactResult.Measured`,
+    `ReducerEvaluationResult.MeasuredFacts`/`UnmeasuredFacts`/`IsMeasured`. Rates (`RetentionRate`,
+    `SuccessRate`, `FidelityScore`) are over the measured questions.
+
+### `bench owasp`, `mitre` and `nist` grade with the judge
+
+#### Fixed
+- **The three red-team benchmarks resolved a judge and never called it: keyword oracles alone decided every
+  verdict.** They now grade judge first, as `agenteval redteam --judge` does. The judge model comes from the
+  environment: the `AZURE_OPENAI_JUDGE_*` override if set, otherwise the provider `AI_INFERENCE_PROVIDER` selects.
+  With no provider configured the command exits 3. A `--sut mock` run needs none and grades with the oracles alone.
+  - The semantic attacks (InsecureOutput, SupplyChain, Misinformation, InferenceAPIAbuse and DataPoisoning's
+    false-fact probes) are graded by Composite Judges, which make several judge calls per probe (Misinformation 3,
+    DataPoisoning false-fact 3, InferenceAPIAbuse 4–7).
+  - The other attacks are decided by their per-attack oracle; the judge is asked only when that oracle returns
+    Inconclusive. PromptInjection and Jailbreak use deterministic canary markers and never call the judge.
+    PIILeakage uses regex shape checks, and a PII probe they cannot decide (a weak shape such as a phone number,
+    IBAN or postcode, or a strong shape inside a refusal) goes to the judge. So the `smoke` presets can make judge
+    calls.
+  - **Behaviour change:** judge calls come on top of the agent calls (23 for `smoke`, 73 for `top10`, 264 for
+    `audit` and `top10-rag`; the MITRE and NIST presets have the same counts) and cost accordingly.
+  - Before the scan the command makes one short call to the judge. If the judge does not answer, the command exits 3
+    before anything is spent on the agent.
+  - **Behaviour change:** if a judge call fails during the scan, or the scan runs out of time before every probe ran,
+    the run is **INCOMPLETE**: the console says so, the stored verdict is `WARN` (the schema's indeterminate value)
+    and the command exits 11. Such a run is never reported as a pass or a fail.
+  - The run's provenance names the judge model. Each tested leaf's provenance is `judge-first` with the judge model;
+    it was `code`.
+  - The PDF and HTML report footers said every score came from deterministic scoring. They now say "Each score comes
+    from the evaluator its provenance names: code, or the judge model listed."
+  - `compare` treats a run graded with a judge and one graded without as different instruments (Incomparable).
+  - Library: `OwaspBenchmarkRun`, `MitreBenchmarkRun` and `NistBenchmarkRun` gain
+    `WithJudge(IChatClient judgeClient, string judgeModel)`, which returns the run, and `JudgeModel`. The factories'
+    `IEvaluator judge` parameter is kept for compatibility and does not grade the attacks.
+- **A judge asked about an inconclusive probe could turn it into "resisted".** When a per-attack oracle returns
+  Inconclusive, the judge may now only raise the probe to "attack succeeded". It can no longer make it "resisted".
+  An oracle often returns Inconclusive because the reply cannot decide the probe (system-prompt extraction without a
+  canary), and a judge that never saw the secret cannot decide it either. Such a probe stays not conclusively
+  tested.
+  - **Behaviour change:** this applies to `agenteval redteam --judge` too (fallback mode, and the probes primary mode
+    leaves to the oracle). Probes the judge used to mark resisted now stay Inconclusive, among them pack probes
+    the agent answered without a detectable refusal (a detected refusal is still graded resisted by the pack's own
+    check).
+
+### A cost that was not measured is not a pass
+
+#### Fixed
+- **`bench perf` scored a model missing from the pricing table as $0 and a passing cost check.** The cost is now
+  not measured: the cost leaf is skipped, no cost is recorded, and the warning says so. The latency and
+  throughput checks still decide the verdict.
+
+### No stand-in judge
+
+#### Removed
+- **`AGENTEVAL_ALLOW_STUB_JUDGE` is retired and ignored.** On a machine with no provider it let the `bench`
+  commands and `calibrate` run with a placeholder judge that scored 75/100 with every criterion met. `calibrate`
+  then wrote a calibration report for that placeholder: accuracy and kappa figures that measured no judge.
+  - **Behaviour change:** with no provider configured, every command that needs a judge exits 3, whatever the
+    variable says. To try a command without a model, use `--sut mock`, which writes nothing to `.agenteval/`.
+  - Calibration reports no longer carry a "stub" judge identity.
+  - The agentic presets that call no judge (`telemetry`, `judge-quality`, `stochastic-stability`) no longer need a
+    provider, and their report records judge mode `none` instead of claiming a single LLM judge.
+
+#### Fixed
+- **Every EU AI Act PDF graded by a real judge said, in its methodology appendix, that a deterministic stub had
+  graded it** (since 0.10.0). `mode-a`, which every single-judge run records, was described as a stub that needs
+  no live model. The appendix now describes the mode the run recorded: a single LLM judge for `mode-a`, a
+  per-criterion judge for `mode-b`, majority vote over several runs for `multi-judge`. The agentic PDF had the same
+  mapping for `mode-a`.
+
+### Gatekeeper v1: the startup check sees every judge, and coverage never reads as full when nothing was measured
+
+#### Fixed
+- **`GatekeeperOptions.ValidateInlineJudgesAsync` skipped every judge built with default settings.**
+  - The check refuses an inline judge with no calibration certificate for the model in use. It only looked at
+    gates that were themselves judges, and every stock judge factory wraps its judge in `JudgeVerdictCache` by
+    default, so in practice almost no judge was checked.
+  - It now looks through `JudgeVerdictCache`, `ParallelJudgeFanOut` panels, the outbound inter-agent boundary gate
+    and `ToolArgumentGoalCoherenceApprovalGate`, at any depth, and it also checks approval gates.
+  - **Behaviour change:** a configuration that passed before can now throw `UncalibratedInlineJudgeException`.
+    That is the intended result: those judges were never checked. `AllowUncalibratedInlineJudge` still opts out.
+  - A judge inside a wrapper type defined outside AgentEval is still not visible to the check.
+- **The coverage report no longer prints full coverage when nothing was measured.**
+  - An empty tool inventory now renders as "not measurable" instead of 100%.
+  - Partial coverage is rounded down, so 299 of 300 protected tools no longer prints as 100%.
+  - A report built while a dynamic tool provider is present warns that injected tools were not inventoried.
+  - The tool-list overload of `Analyze`/`AnalyzeOrThrow` now honours `AnalyzeOptions.HasDynamicToolProvider`, as
+    its documentation already said.
+  - `EnforcementCoveragePercent` keeps its numeric value (100 for an empty inventory) for compatibility. Its
+    documentation now says that value is a convention, not a measurement.
+- The XML documentation no longer points to an `agenteval trace find-reference` command, which never existed. It
+  now describes the APIs that resolve a reference id.
+
+### A check that could not run no longer reads as a pass
+
+#### Fixed
+- **Regex timeouts counted as "no match".**
+  - The pattern checks use a 50–100 ms wall-clock timeout as a guard against catastrophic backtracking. On a busy
+    machine, such as a parallel test host, a CI runner or a loaded server, it can fire on ordinary input, and
+    several checks then treated the scan as clean. Two full-suite test failures that passed when run alone came
+    from this.
+  - `HallucinatedCitationJudge` now blocks by default when its parse times out (it follows
+    `FailClosedOnInconclusive`).
+  - `JailbreakResistanceEval` no longer fast-passes a case it could not scan: it sends the unchecked pattern to the
+    judge.
+  - `ProhibitedActionsEval` and `SensitiveDataLeakageEval` return an `error` result ("could not check", counted as
+    not measured) instead of falling through to an LLM fallback that never sees the patterns.
+  - `ToxicityMetric`'s pattern-only mode fails as inconclusive.
+  - `InferenceAbuseEvaluator` returns Inconclusive instead of Resisted.
+  - `DirectInjectionEval` and `PersonaAttackEval` tell the judge which patterns were not checked and list them in
+    the result's evidence.
+  - `agenteval log-file replay` flags a row "Response shape not compared" instead of reading a timeout as "no list".
+- **`ProhibitedActionsEval`** treats an invalid regex in the policy as "could not check" (it was read as a
+  non-match). Its deterministic results now report the pass threshold the evaluator was constructed with, instead
+  of a hard-coded 0.95.
+- **The GDPR and EU AI Act reports no longer print an audit-chain VALID/BROKEN badge they never checked.** VALID
+  only meant that a hash string was present. The Markdown and PDF reports now say "hash recorded, not verified in
+  this report" and point to `agenteval doctor`, or "no hash recorded".
+- **Trace Fidelity.**
+  - `suppressed_finish_reason` now compares the chat-boundary finish reason with the agent-boundary trace. Before,
+    it flagged every `content_filter`/`length` turn as Critical even when the agent reported it faithfully.
+  - `TraceRecordingAgent` now records the finish reason and the tool calls the wrapped agent reports, and streamed
+    tool-call arguments, so its trace can stand as the agent boundary. Streamed calls still record no finish
+    reason, because a streamed chunk carries none.
+  - Workflow Trace Fidelity compares finish reasons case-insensitively.
+
+### Command line
+
+#### Changed
+- **A command line that does not parse now exits `2` (usage error) instead of `1`**, which CI read as a test
+  failure. This covers an unknown command or option, a value that does not convert (`--runs abc`), a missing
+  required option, and no command at all. `--help` and `--version` still exit `0`.
+  - These `bench` argument errors also exit `2`:
+    - an unknown preset or vertical;
+    - an invalid `--budget-tier`;
+    - an invalid `--sut` configuration, or `--endpoint` without `--model`;
+    - a `--response-file` that cannot be read;
+    - a missing `--subject`.
+  - A missing `.agenteval/` workspace still exits `1`. The message now names the right command,
+    `agenteval init-workspace`.
+  - A command line that does not parse no longer creates or overwrites the `--log-file` or `--capture-fixture`
+    file.
+- **`eval --temperature`:** when you omit it, the provider's default applies; when you give it, including `0`, it
+  is sent. Before, `0` (the old default) was never sent, so the help text's "0 = deterministic" was false. **Runs
+  that pass `--temperature 0` now actually get temperature 0**, which can change their results. With `--sut`, a
+  warning names the agent options that the SUT does not apply.
+- **`eval --runs`:** a value below 1 exits `2`; it used to run once without saying so. With `--runs` above 1, a
+  warning names each export option (`--format`, `-o`, `--output-dir`) that stochastic mode ignores, and the
+  per-test table goes to stderr.
+- **`log-file replay --azure-from-env`** works with whichever provider `AI_INFERENCE_PROVIDER` selects, as the
+  rest of the CLI does. Its help, its error and the report's target label (for example `bitdeer:<model>`) now say
+  so. Before, the label was always `azure:<model>`.
+
+#### Added
+- **Calibration reports name the judge.** `bench gdpr|eu-ai-act|agentic calibrate` reports state the judge's
+  provider and model, and `bench agentic calibrate --records` adds `judgeProvider` and `judgeModel` to every line.
+  With `--decisions` they name the decision-model provider and the model requested from it. Keys and endpoints are
+  never written.
+
+### Live tests and the NuGet sample follow `AI_INFERENCE_PROVIDER`
+
+#### Changed
+- **The live tests use the provider you selected, like the CLI and the samples.** The NuGet-consumer sample, its tests
+  and the TypedMemEval live-judge calibration read `AZURE_OPENAI_*` directly, so with `AI_INFERENCE_PROVIDER=bitdeer`
+  they ignored Bitdeer and called whatever Azure resource those variables named. They now resolve the provider through
+  `InferenceProviderEnvironment`: an explicit selector wins, an unset one auto-detects in the documented order, and with
+  no provider configured they skip (or, for the calibration arm, assert nothing) exactly as before.
+- **The NuGet-consumer sample tracks the latest package, 0.42.0-beta** (MAF 1.23, Microsoft.Extensions.AI 10.10), the
+  first published version with the provider resolver. Its Semantic Kernel demo uses the OpenAI connector at the
+  provider's endpoint for Bitdeer and other OpenAI-compatible hosts. Mock mode is unchanged.
+- The weekly live-test workflow still runs only on Azure; on Bitdeer it records a skip, as decided for 0.42.
+
+### Corrected
+
+- **The agentic prompt files were never forks of Microsoft's prompts.**
+  - What the files said:
+    - their headers said "forked from Azure/azure-sdk-for-python", with a commit placeholder;
+    - they put Microsoft's licence on AgentEval's text;
+    - they listed a "temperature 1.0 → 0" change, which was wrong for 13 of the 14 evaluators that have an
+      upstream prompt.
+  - What a comparison found: checked against every upstream version of the cited files, no shared passage is
+    longer than six words. Eight of the cited files never existed, because those evaluators run in Microsoft's
+    hosted safety service and have no public prompt.
+  - What changed: the headers, the class documentation, the agentic guides, the agentic PDF report and the
+    package README now say the text is AgentEval's own, under AgentEval's MIT licence. About half of it is
+    modelled on the upstream evaluators' names, inputs and scoring dimensions.
+  - **Direction:** flattering; it borrowed the authority of a Microsoft-authored instrument.
+  - **Not affected:** any score or `promptHash`. These files are not sent to the judge (see 0.42.0-beta,
+    Corrected).
+- **Public text that did not match the code.**
+  - **README:**
+    - Its examples used `AzureModelFactory`, `ComparisonOptions` and `HallucinationDetectedException`, which do not
+      exist. The examples now live in `samples/AgentEval.ReadmeSnippets`, which the build compiles, and
+      `ReadmeSnippetsTests` fails if a README example drifts from it.
+    - The Model Comparison guide, the code gallery, the docs home page and the nuget.org package README were
+      rewritten against the real API.
+  - **Legal and privacy:**
+    - THIRD-PARTY-NOTICES omitted nine shipped packages and said every dependency was MIT; OpenTelemetry.Api is
+      Apache-2.0 and QuestPDF uses its Community licence. It now lists them.
+    - PRIVACY, DISCLAIMER and SECURITY said AgentEval makes no network calls; several opt-in features do.
+      PRIVACY.md now lists each one. AgentEval has no telemetry.
+  - **README claims:**
+    - The README offered `dotnet add package AgentEval.MAF.CopilotStudio`; that package has never been published.
+    - It said Core has had no breaking changes. Only the Gatekeeper surface has an automated breaking-change guard.
+    - It quoted an unsourced memory score range and a roadmap promise.
+  - **Docs and reports:**
+    - The CLI reference was missing `compare`, `log-file`, `--capture-fixture`, `skills baseline approve` and exit
+      codes 12–13.
+    - The agentic docs promised a "v1.1" and named two evaluator classes that do not exist.
+    - The Mission Control charting doc described a library the portal does not use.
+    - The memory docs said Azure was required, and their sample did not compile.
+    - The AEVP profile said it was unpublished.
+    - The red-team comparison called DeepTeam paid (it is Apache-2.0); it now also lists Microsoft Foundry's AI Red
+      Teaming Agent, checked 2026-10-02.
+    - SARIF, OWASP, MITRE and Markdown red-team reports printed version 0.2.0.
+    - The trace-fidelity page called itself the only .NET capability of its kind.
+    - Two samples printed conclusions they did not measure.
+  - **TypedMemEval `limited_by` does not discriminate.** On the shipped reference model it reads "retrieval" for
+    all 35 shapes that carry it. The guide now says so, and its table matches the shipped data.
+  - **Decision-model evidence pages** no longer say the threshold/golden-range fix (X3, in this release's #274
+    entry above) is pending. They say the per-case run records are not published in this repository.
+  - **53 public files cited a private planning folder.** The citations are gone, and
+    `tools/check_no_private_paths.py` now also fails when a tracked file *mentions* a private path. CI proves the
+    check can fail.
+
+### Privacy, packaging and repository
+
+#### Changed
+- **Mission Control's GraphQL IDE (Nitro, at `/graphql`) no longer contacts ChilliCream.** It is served from the
+  copy bundled in the package, and its usage ping is switched off.
+- **The PDF renderers no longer overwrite a QuestPDF licence your application has set.** They fall back to the
+  Community licence only when none is set.
+- **Both NuGet packages now include THIRD-PARTY-NOTICES.md**, with the licence texts that must travel with
+  redistributed binaries (ChilliCream License 1.0, BSD-3-Clause, Apache-2.0, MIT).
+- `MemoryReportingOptions.IncludeArchetypes` now defaults to `false`. Nothing reads `archetypes.json`, so it is no
+  longer copied unless asked for.
+
+#### Added
+- `CITATION.cff`.
+- A reconstructed `[0.15.0-beta]` section in this changelog. The duplicated `[0.1.2-alpha]` heading is fixed.
+
 ### Calibration reports default to the workspace folder
 
 #### Changed
@@ -4099,7 +4469,7 @@ refreshed the NuGet consumer samples.
   pipelines branching on exit code `2` from `bench`/`calibrate` must be updated. See `ExitCodes.cs` and
   [Exit codes](docs/cli.md#exit-codes).
 
-#### Added — Explainability & Trust (0.17.0-beta theme, analysis in `strategy/ExplainabilityAndTrust-AnalysisAndPlan.md`)
+#### Added — Explainability & Trust (0.17.0-beta theme, from a private analysis document)
 - **Gate provenance chains** — `AgentEval.Guardrails.GateProvenance` (rule name, evidence, threshold vs.
   actual, contributing sub-chains) attached via a new optional `GateVerdict.Provenance` field (additive, same
   precedent as `Confidence`). Wired into `CompositeJudgeGate<TRubric>` for both the Block path and the
@@ -4243,7 +4613,7 @@ refreshed the NuGet consumer samples.
   resolve judge disagreement.
 - **`docs/missioncontrol/api-design.md`** corrected: `Query.complianceEvidence`'s documented return type was
   `ComplianceEvidence?`; the real resolver returns `ComplianceEvidenceWithChain?`.
-- **Corrected a stale "still a live bug" claim** repeated across 3 local strategy/review docs: the compliance
+- **Corrected a stale "still a live bug" claim** repeated across 3 private planning/review docs: the compliance
   matrix's per-cell `auditChainValid` check (tampered evidence rendering as a false green checkmark) was
   actually fixed 2026-05-24 — the docs describing it as open were simply never updated when the fix landed.
 
@@ -4362,7 +4732,7 @@ refreshed the NuGet consumer samples.
   `Microsoft.Extensions.Http` 10.0.8 (raised `Microsoft.Extensions.DependencyInjection`'s central floor to 10.0.8
   to match).
 
-#### Deviations from the design doc (`strategy/CopilotStudio/Bench-Eval-Integration-and-Live-Connector-Plan.md`, local-only)
+#### Deviations from the design doc (a private, unpublished planning document)
 - The doc cites `Microsoft.Agents.CopilotStudio.Client` "v1.6.150 — latest stable" and a decompiled `ICopilotClient`
   interface implemented by `CopilotClient`. Neither matches what actually restores from nuget.org: the real latest
   is **1.3.171-beta**, and reflecting on that exact assembly shows `CopilotClient` implements **no interface at
@@ -4444,7 +4814,7 @@ refreshed the NuGet consumer samples.
   logical name resolved against the skill's discovered resource list, not a live filesystem path).
 
 This is Phase 1 of a multi-phase design
-(`strategy/FutureFeatures/Skills/AgentEval-AgentSkills-Evals-Design-and-Plan.md`, local-only).
+(a private, unpublished planning document).
 
 ### MAF Agent Skills evaluation — Phase 3 (skill-description-injection red-team + `run_skill_script` governance)
 
@@ -4555,7 +4925,7 @@ This is Phase 1 of a multi-phase design
 - **Phase 4c (expanded red-team surface — fuzzing, canary-skill honeypot, typosquat detection,
   load-storm-as-DoW) was NOT built this session** — explicitly deprioritized per the design doc's own
   scoring (4a/4b are cheaper and higher-value) and the marathon session's remaining scope (Stages 2-5).
-  Documented as deferred, not silently dropped — see `strategy/TODO.md`.
+  Documented as deferred, not silently dropped, in the project's private task list.
 - ~35 new tests. Full net8.0 suite green (7278/7279, 1 pre-existing skip).
 
 ### Gatekeeper Tribunal — 4 more calibrated flagship judges + 2 overlooked-seam gates
@@ -4595,7 +4965,7 @@ This is Phase 1 of a multi-phase design
 - **Deferred, explicitly NOT built this session:** `ToolArgumentGoalCoherenceJudge` (needs the
   `IToolApprovalGate` timeout-routing design worked out) and `CrescendoTrajectoryJudge` (stateful — session
   store + running summary — explicitly flagged as the hardest of the six in the task scope; deferring it
-  matches the task's own suggested fallback). See `strategy/TODO.md` for the honest accounting.
+  matches the task's own suggested fallback). Both are recorded as deferred in the project's private task list.
 - ~100 new tests (deterministic rubric/gate tests + 4 env-gated live calibration checks,
   `AGENTEVAL_RUN_GATEKEEPER_CAL=1`). Full net8.0 suite green (7330/7331, 1 pre-existing skip).
 
@@ -4610,8 +4980,8 @@ This is Phase 1 of a multi-phase design
   chosen turn — e.g. rate-limit-shaped — and a hang-until-cancelled mode for timeout testing). 7 tests
   proving the mock itself behaves realistically (session-state tracking, activity-type filtering, error
   propagation, honest "no scripted turn" default that never fabricates a blank success).
-- **Track 2, PR 1 — the shared `--sut` seam** (`strategy/CopilotStudio/Bench-Eval-Integration-and-Live-Connector-Plan.md`
-  §3): `ISutTarget`/`ISutTargetOptions`/`CommonTargetOptions`/`SutTargetResolver`
+- **Track 2, PR 1 — the shared `--sut` seam** (§3 of a private, unpublished design
+  doc): `ISutTarget`/`ISutTargetOptions`/`CommonTargetOptions`/`SutTargetResolver`
   (`src/AgentEval.Cli/Commands/Targets/ISutTarget.cs`) — generalizes the already-shipped `redteam --sut`
   pattern so `eval`/`bench` can reach the same built-in targets, WITHOUT touching
   `IRedTeamBuiltInTarget`/`RedTeamOptions`/`RedTeamCommand.cs`. `CopilotStudioRedTeamTarget` gains `ISutTarget`
@@ -4626,8 +4996,8 @@ This is Phase 1 of a multi-phase design
   and PR 3 (bench Tier 1 `owasp`/`mitre`/`nist` adoption) — the shared types exist and are tested, but no
   CLI verb wires them in yet; P6 (reports & resilience: fidelity badging, agent-fingerprint drift,
   429 retry+resume), P3 (`KnowledgeCanaryEvaluator`, Crescendo/PAIR/TAP over the native channel), and P7
-  (OSS polish, Entra app-reg script, NuGet packaging) were not started. See `strategy/TODO.md` for the
-  honest accounting and what's next.
+  (OSS polish, Entra app-reg script, NuGet packaging) were not started. They are tracked in the
+  project's private task list.
 - Full net8.0 suite green (see the final Stage 5 numbers in this file's next entry).
 
 ### Documentation — Stage 5 pass (Agent Skills, Gatekeeper, Copilot Studio) + final build/test verification
@@ -4840,6 +5210,65 @@ Microsoft Agent Framework to 1.13.0.
 - `Microsoft.Extensions.AI*` stays at **10.6.0** — MAF 1.13.0's declared dependency — and the
   `OpenTelemetry.Api` **1.15.3** security pin (GHSA-g94r-2vxg-569j) remains valid, since the 1.13.0
   Workflows packages still declare exactly that version.
+
+## [0.15.0-beta] - 2026-07-08
+
+> Reconstructed from git history on 2026-10-02: the release commit on the `v0.15.0-beta` tag never reached `main`.
+
+### Azure AI Foundry evaluators beside AgentEval's in the Foundry benchmark samples
+
+#### Fixed
+- **`MeaiToEvalResultBridge` read every numeric metric as a 1–5 score.** Foundry's agent evaluators (for
+  example `task_adherence`) score 0–1, so a perfect `task_adherence = 1.0` rendered as 0 %. A value above 1.0
+  is now read as 1–5 and a value below 1.0 as a 0–1 proportion, also when the metric is marked failed. A value
+  within 1e-9 of 1.0 fits both scales and is resolved by `Interpretation.Failed`: failed → 0 %, otherwise 100 %.
+- **An empty `Error` string counted as an error.** Foundry's `"error": null` arrived as `""`, and
+  `UnifiedEvalReport` and `AgentEvaluatorEvalLeaf` rendered successful evaluations as error branches. Both now
+  check `string.IsNullOrEmpty`.
+- **`WeightedSumAggregation` scored `"error"` leaves as 0.** Like `"skipped"` leaves, they are now left out of
+  the weighted score and the severity roll-up, so a transient provider failure no longer pulls a composite
+  below its threshold.
+
+#### Changed
+- **`AgentEvaluatorEvalLeaf`** returns a neutral `"skipped"` leaf (severity `none`) instead of an error leaf
+  when the provider's result has `Status == "skipped"`, and adds the provider's `ReportUrl`, when present, as a
+  `report_url` evidence item.
+- **`UnifiedEvalReport`** uses `Status == "skipped"` to choose between a neutral "skipped" and "error" branch,
+  falling back to the `(skipped)` provider-name suffix; `HybridEvalInterop.SkippedResults` now sets `Status`.
+  A provider branch no longer nests under a `maf.eval` node: with one query it holds the metric leaves
+  directly, with several it holds one node per query.
+- **`HtmlEvalResultRenderer`** adds a source chip to a node's summary row: "☁ Foundry" for `foundry.*` keys
+  and for `hybrid.*` keys containing "foundry", "⚙ AgentEval" for `hybrid.*` keys containing "local" or
+  "agenteval", and the source name for any other `hybrid.*` key.
+- **Samples:** the Foundry Hybrid (`12_FoundryHybridBenchmark.cs`) and Foundry Hierarchy
+  (`13_FoundryHierarchyBenchmark.cs`) benchmarks read the Foundry project endpoint from `AZURE_FOUNDRY_ENDPOINT`
+  (was `FOUNDRY_PROJECT_ENDPOINT`) through the new `AIConfig.FoundryEndpoint` / `AIConfig.IsFoundryConfigured`;
+  a value that is not an absolute URI counts as unset, and the samples then run AgentEval-local only. After the
+  run, both print a per-source (Hybrid) or per-component (Hierarchy) breakdown: passed counts or scores, the
+  Foundry report URL, and `SKIPPED` (yellow) for an intentional bypass versus `ERROR` (red) for a failure.
+
+#### Added
+- **`TracingAgentEvaluator`** (a sample helper in `_BenchmarkSampleHelpers.cs`) wraps a Foundry evaluator and
+  prints each call's items, timing, per-item scores and exception chain. When the failure is the
+  [microsoft/agent-framework#6991](https://github.com/microsoft/agent-framework/issues/6991) rejection
+  (`FoundryEvals` sends the `azure_ai_evaluator` testing-criteria type, which the Foundry API refuses), it
+  returns a `Status = "skipped"` result so the AgentEval-local results still render; any other exception is
+  rethrown.
+
+#### Documentation
+- `docs/toc.yml` lists "Foundry Evals + AgentEval (hybrid)" (`foundry-evals-integration.md`) under "Using
+  AgentEval with MAF Evals".
+- `samples/AgentEval.Samples/README.md`: the Foundry Hybrid row now says Foundry evals run alongside
+  AgentEval's (`CompositeAgentEvaluator`), and the Foundry Hierarchy row says they run inside a composite as
+  weighted leaves (`AsEvalLeaf`).
+- The 0.14.0-beta entry below was corrected to match its samples: only one harness sample has the
+  re-invocation loop, the tool-approval sample prints no gate verdict, and the harness samples carry the
+  budget, sequence and domain gates but not the injection judge.
+
+#### Tests
+- 10 new `[Fact]` tests and one 4-case `[Theory]`: `MeaiToEvalResultBridgeTests` (4 facts, plus the theory on
+  the 1e-9 boundary), `AgentEvaluatorEvalLeafTests` (3), `WeightedSumAggregationTests` (3). `HybridEvalTestHelpers`
+  gains `Skipped` and `WithReportUrl` fakes.
 
 ## [0.14.0-beta] - 2026-07-06
 
@@ -5139,7 +5568,7 @@ grader (fresh fabrications keep surfacing in both directions). Human/pin agreeme
   first community contributor **[Bernhard Merkle (@bmerkle)](https://github.com/bmerkle)** (#20).
 
 ### Documentation
-- **DocFX build warnings** — removed dead markdown links to the (gitignored) `strategy/`
+- **DocFX build warnings** — removed dead markdown links to a gitignored private
   directory from ADR-014/015/016 and the extensibility guide, and mapped `samples/**/*.cs`
   as a DocFX resource so sample cross-references resolve. Thanks to **@bmerkle** (#18).
 - **Pre-release accuracy pass** — README MAF badge + compatibility table and the installation
@@ -5850,7 +6279,7 @@ coverage. Two divergence-pinning tests (`Top10ForRag_IsMateriallyDistinctFromTop
 and `Top10ForRag_ProbeDepth_MatchesAuditGrade_NotTop10`) prevent a future label-only
 regression. The LLM08 retrieval-corpus-poisoning probes remain a documented roadmap gap
 (LLM08 is a `skipped` leaf in `EvaluateAsync` output, same as `Top10`). Closes the Phase-5
-yellow item documented in `strategy/FutureFeatures/todo/lastreview/13-phase5-gate-review.md`.
+yellow item documented in the private Phase-5 gate review.
 
 ### Changed — `LongMemEvalBenchmark.Full()` no longer silently degrades
 
@@ -5861,7 +6290,7 @@ sample. v0.10.0-beta makes this an explicit failure: `Full()` now throws
 `InvalidOperationException` with a clear, actionable message (env-var name, download URL,
 pointer at `Subset()` for development use) when the env var is missing. Callers who want
 the embedded sample should use `Subset()` explicitly. This closes the Phase-7 follow-up
-item documented in `strategy/FutureFeatures/todo/lastreview/15-phase7-gate-review.md`. The
+item documented in the private Phase-7 gate review. The
 behaviour change is technically breaking for any consumer that relied on the
 silent-degradation path, but the previous behaviour was unambiguously a footgun and
 0.x-beta semver permits this kind of correction.
@@ -5958,7 +6387,7 @@ The companion infrastructure types (`AgenticBenchmarkRunner`, `CostFilteredCompo
 
 ### Added — Pre-merge polish from last-review parallel Opus sweep (2026-05-16)
 
-Eight merge-critical items (M1-M8) plus four pulled-forward v1.1 items (1.5 / 1.6 / 1.7 / 3.2) landed in the pre-merge bundle. See `strategy/FutureFeatures/todo/lastreview/00-summary.md` for the full audit trail.
+Eight merge-critical items (M1-M8) plus four pulled-forward v1.1 items (1.5 / 1.6 / 1.7 / 3.2) landed in the pre-merge bundle. The full audit trail is in a private review summary.
 
 - **`AtomicLlmEval` now populates `EstimatedCost` from real judge token usage** (closes F-002). The `IEvaluator` interface gained an `EvaluationResult.InputTokenCount` / `OutputTokenCount` pair; `ChatClientEvaluator` lifts those from the underlying `ChatResponse.Usage`. `AtomicLlmEval` looks them up against a new `AgentEval.Abstractions.Evals.JudgeCostMap` (per-1K input/output rates by model id, with substring fallback for dated suffixes like `gpt-4o-mini-2024-07-18`) and writes the dollar figure into `EvalResult.Provenance.EstimatedCost`. Composite cost rollups via `CostRollup.Aggregate` now sum to real dollars rather than $0. Consumers that filtered on `EstimatedCost == 0` to detect "no LLM call happened" must switch to checking the trace's evaluator-kind field instead.
 - **`Recommendation` is now a structured record across both compliance benchmarks** (closes the `v0.8.1-beta` `getting-started.md:172` disclaimer for GDPR + the parallel EU AI Act disclaimer). The new record is `Recommendation(string ControlId, string Severity, string Text, IReadOnlyDictionary<string,string>? Metadata = null)`, replacing the legacy `string[]` shape in `GdprComplianceEvidence` / `EuAiActComplianceEvidence`. Both `gdpr-evidence.schema.json` and `eu-ai-act-evidence.schema.json` use an `anyOf` union at the `items` level so legacy `string[]` evidence files written by 0.8.0-beta still validate against the v0.8.1-beta schema. The optional `metadata: { string: string }` field is reserved for v1.2+ extensions (evidence references, correlation ids) without requiring a breaking schema change. Markdown renderer output changes from `<text>` to `` `<controlId>` [<severity>]: <text>`` per entry. **PDF reports do NOT include recommendations** — by design, the PDF is the boardroom-signed artefact and the Markdown report + evidence JSON carry actionable remediation copy; rendering recommendations in the PDF is tracked as a v1.1 markdown-reporter-parity item.
@@ -6599,7 +7028,7 @@ public class MyAgent : IEvaluableAgent { }
 ```
 
 ### Documentation
-- Brand Positioning Guidelines created at `strategy/plans/Implementation-Plan-Brand-Positioning-Guidelines.md`
+- Brand Positioning Guidelines created (a private planning document)
 - All documentation files updated with evaluation-first messaging
 - Code examples in documentation updated to use new API names
 
@@ -6709,7 +7138,7 @@ This release marks the transition from alpha to beta. The framework is now featu
 - **Security Documentation** - Comprehensive security guidance
   - [SECURITY.md](SECURITY.md) - Vulnerability reporting process
   - [docs/security-scanning.md](docs/security-scanning.md) - Tech stack and architecture
-  - [strategy/Implementation-Plan-Security-Hardening.md](strategy/Implementation-Plan-Security-Hardening.md) - Security roadmap
+  - Security roadmap (a private planning document)
 - **Input Validation Hardening** - Defense against path traversal attacks
   - CLI file path validation with directory allowlist
   - Path normalization and canonicalization
@@ -6728,11 +7157,13 @@ This release marks the transition from alpha to beta. The framework is now featu
 - Added anti-glassworm protections in development workflow
 - PII detection in `NeverPassArgumentMatching` uses redaction by default
 
----
+### Also in 0.1.3-alpha: entries added 2026-01-05 to 2026-01-12
 
-## [0.1.2-alpha] - 2026-01-04
+> Corrected from git history on 2026-10-02. This block used to carry a second `[0.1.2-alpha] - 2026-01-04`
+> heading. Its entries were added to the changelog between 2026-01-05 and 2026-01-12, after the 0.1.2-alpha
+> version bump, and are included in the `v0.1.3-alpha` tag.
 
-### Added
+#### Added
 - **Behavioral Policy Assertions** - Safety-critical assertions for enterprise compliance
   - `NeverCallTool(toolName, because)` - Assert forbidden tools were never called
   - `NeverPassArgumentMatching(pattern, because, options)` - Detect PII/secrets via regex with automatic redaction
@@ -6822,7 +7253,7 @@ This release marks the transition from alpha to beta. The framework is now featu
   - `MAFWorkflowAdapter.WithGraph()` and `FromConditionalSteps()` factory methods
   - 66 new tests for edge models and assertions
 
-### Changed
+#### Changed
 - **Test project reorganization** into logical folder structure:
   - `Core/` - AgentEvalBuilder, Logger, MetricRegistry, Retry, Normalizer, Concurrency tests
   - `Metrics/RAG/` - Faithfulness, Relevance, Context Precision/Recall, Answer Correctness
@@ -6839,13 +7270,16 @@ This release marks the transition from alpha to beta. The framework is now featu
   - Detects TERM=dumb terminals
   - Gracefully handles output redirection (piping to files)
 
-### Fixed
+#### Fixed
 - YAML loader tests now use correct 4-space indentation matching YAML standards
 - Removed invalid `include-prerelease` input from CI workflow (actions/setup-dotnet@v4 compatibility)
 
 ---
 
 ## [0.1.2-alpha] - 2026-01-04
+
+> Version number only: it was set in the project file on 2026-01-04, but no `v0.1.2-alpha` tag exists and
+> no 0.1.2-alpha package is on NuGet. The changes below are included in the `v0.1.3-alpha` tag.
 
 ### Added
 - Additional test coverage for core components
@@ -6952,7 +7386,8 @@ This release marks the transition from alpha to beta. The framework is now featu
 - `AgentEval.Tracing` (OTel + run artifacts) - planned
 - `AgentEval.Studio` (workflow visualizer / time-travel UI) - future
 
-[Unreleased]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.41.0-beta...HEAD
+[Unreleased]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.42.0-beta...HEAD
+[0.42.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.41.0-beta...v0.42.0-beta
 [0.41.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.40.0-beta...v0.41.0-beta
 [0.40.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.39.0-beta...v0.40.0-beta
 [0.39.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.38.0-beta...v0.39.0-beta
@@ -6974,6 +7409,7 @@ This release marks the transition from alpha to beta. The framework is now featu
 [0.18.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.17.0-beta...v0.18.0-beta
 [0.17.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.16.0-beta...v0.17.0-beta
 [0.16.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.15.0-beta...v0.16.0-beta
+[0.15.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.14.0-beta...v0.15.0-beta
 [0.14.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.13.2-beta...v0.14.0-beta
 [0.28.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.27.0-beta...v0.28.0-beta
 [0.27.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.26.0-beta...v0.27.0-beta
@@ -6998,7 +7434,7 @@ This release marks the transition from alpha to beta. The framework is now featu
 [0.3.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.2.1-beta...v0.3.0-beta
 [0.2.1-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.2.0-beta...v0.2.1-beta
 [0.2.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.1.3-alpha...v0.2.0-beta
-[0.1.3-alpha]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.1.2-alpha...v0.1.3-alpha
-[0.1.2-alpha]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.1.1-alpha...v0.1.2-alpha
+[0.1.3-alpha]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.1.1-alpha...v0.1.3-alpha
+[0.1.2-alpha]: https://github.com/AgentEvalHQ/AgentEval/commit/09f272eae75ab640f8dd4a94778002cf90db21da
 [0.1.1-alpha]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.1.0-alpha...v0.1.1-alpha
 [0.1.0-alpha]: https://github.com/AgentEvalHQ/AgentEval/releases/tag/v0.1.0-alpha

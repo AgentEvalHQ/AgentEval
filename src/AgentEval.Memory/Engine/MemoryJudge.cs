@@ -83,14 +83,15 @@ public class MemoryJudge : IMemoryJudge
         {
             _logger.LogError(ex, "Error during memory judgment for query: {Question}", query.Question);
             
-            // Return a safe fallback result
+            // The judge produced no score: not measured, so no aggregate counts it as a 0.
             return new MemoryJudgmentResult
             {
                 Score = 0,
+                Measured = false,
                 FoundFacts = Array.Empty<MemoryFact>(),
                 MissingFacts = query.ExpectedFacts.ToArray(),
                 ForbiddenFound = Array.Empty<MemoryFact>(),
-                Explanation = $"Error during judgment: {ex.Message}",
+                Explanation = $"Not measured: the judge call failed ({ex.Message}).",
                 TokensUsed = 0
             };
         }
@@ -293,19 +294,20 @@ Be strict — any specific fabricated detail (a name, address, number, food item
     /// </summary>
     private static JudgmentResponseData FallbackParseResponse(string responseText)
     {
-        // Look for explicit score patterns like "score: 85", "Score: 85%", "85/100", "85 out of 100"
+        // Only an EXPLICIT score: `score: 85`, `"score": 85` (a JSON reply that failed to parse as a whole), or
+        // `85/100`. "2 out of 3 facts" or a "100%" inside the explanation is not the judge's score; reading the first
+        // such number as one turned prose into a measurement.
         var scoreMatch = System.Text.RegularExpressions.Regex.Match(
             responseText,
-            @"(?:score\s*[:=]\s*(\d{1,3})|(\d{1,3})\s*[/]\s*100|(\d{1,3})\s*(?:out of|percent|%))",
+            @"(?:""?score""?\s*[:=]\s*(\d{1,3})|\b(\d{1,3})\s*/\s*100\b)",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
 
-        var score = 50; // Default when no score pattern is found
+        // No score in the reply means no score: never a default (this used to be 50, a number no judge gave).
+        double? score = null;
         if (scoreMatch.Success)
         {
-            var matched = scoreMatch.Groups[1].Success ? scoreMatch.Groups[1].Value
-                        : scoreMatch.Groups[2].Success ? scoreMatch.Groups[2].Value
-                        : scoreMatch.Groups[3].Value;
-            score = int.Parse(matched);
+            var matched = scoreMatch.Groups[1].Success ? scoreMatch.Groups[1].Value : scoreMatch.Groups[2].Value;
+            score = Math.Min(100, Math.Max(0, int.Parse(matched)));
         }
 
         return new JudgmentResponseData
@@ -313,8 +315,10 @@ Be strict — any specific fabricated detail (a name, address, number, food item
             FoundFacts = Array.Empty<string>(),
             MissingFacts = Array.Empty<string>(),
             ForbiddenFound = Array.Empty<string>(),
-            Score = Math.Min(100, Math.Max(0, score)),
-            Explanation = "Fallback parsing - LLM response was not in expected JSON format"
+            Score = score,
+            Explanation = score is null
+                ? "Not measured: the judge's reply held no score."
+                : "Fallback parsing - LLM response was not in expected JSON format"
         };
     }
 
@@ -354,7 +358,9 @@ Be strict — any specific fabricated detail (a name, address, number, food item
             // trusted the judge's number verbatim (the regex fallback already clamped), so a
             // judge emitting e.g. 150 or -40 propagated unbounded into MemoryQueryResult.Score
             // and silently skewed category weighting and the final OverallScore/Grade (BUG-09).
-            Score = double.IsFinite(data.Score) ? Math.Clamp(data.Score, 0, 100) : 0,
+            Score = data.Score is { } s && double.IsFinite(s) ? Math.Clamp(s, 0, 100) : 0,
+            // A reply with no score (or a non-finite one) measured nothing.
+            Measured = data.Score is { } m && double.IsFinite(m),
             FoundFacts = foundFacts,
             MissingFacts = missingFacts,
             ForbiddenFound = forbiddenFound,
@@ -493,7 +499,7 @@ internal class JudgmentResponseData
     public IReadOnlyList<string> ForbiddenFound { get; set; } = Array.Empty<string>();
     
     [JsonPropertyName("score")]
-    public double Score { get; set; }
+    public double? Score { get; set; }
     
     [JsonPropertyName("explanation")]
     public string? Explanation { get; set; }

@@ -58,27 +58,45 @@ Three tiers + diagnostics:
 | `MemoryBenchmark.Diagnostic` | 12 + ~50K-token context pressure | Deep limits analysis |
 | `MemoryBenchmark.Overflow` | 8 + 192K-token haystacks | Long-context stress |
 
-### 📊 HTML Reporting Engine — Pentagon Comparison
+### 📊 Baselines and the HTML Comparison Report
 
-The most spectacular piece. Run your benchmark, save a baseline, then **visually compare configurations and models** with overlaid pentagon charts:
+Run your benchmark, save the result as a named baseline, then **compare configurations and models** in a static HTML report:
 
 ```csharp
-var store = new JsonFileBaselineStore();
-await store.SaveAsync(result.ToBaseline(label: "GPT-4o-mini"));
+using AgentEval.Memory.Models;
+using AgentEval.Memory.Reporting;
 
-// Generate an interactive HTML report comparing baselines
-await result.ExportHtmlReportAsync("memory-report.html", new MemoryReportingOptions
+// Default output root: .agenteval/benchmarks/{AgentName}/
+var store = new JsonFileBaselineStore();
+
+var config = new AgentBenchmarkConfig
 {
-    OverlayBaselines = await store.LoadAllAsync()
-});
+    AgentName = "MemoryAgent",          // names the report folder
+    ModelId = "gpt-4o-mini",
+    MemoryProvider = "InMemoryChatHistory",
+};
+
+// Writes baselines/<date>_<name>.json, rebuilds manifest.json, and copies report.html
+// into the agent's folder the first time.
+await store.SaveAsync(result.ToBaseline("GPT-4o-mini", config, tags: ["nightly"]));
+
+// Compare every baseline saved for this agent in code...
+var baselines = await store.ListAsync(agentName: "MemoryAgent");
+var comparison = new BaselineComparer().Compare(baselines);
+Console.WriteLine($"Best: {baselines.First(b => b.Id == comparison.BestBaselineId).Name}");
+
+// ...or open the report. report.html fetches manifest.json, so it must be served over HTTP;
+// OpenReport starts a local server bound to 127.0.0.1 and opens the browser.
+var server = store.OpenReport("MemoryAgent");
 ```
 
-The report includes:
-- **Pentagon overlay charts** — see strengths and gaps across categories
-- **Per-category scores** with grades (A+ → F)
-- **Baseline diffs** — what changed since the last run
-- **Model comparison** — overlay GPT-4o-mini, GPT-4o, GPT-4.1 on the same chart
-- **Drill-down** — failing scenarios, judge explanations, response excerpts
+The report (`report.html`) reads `manifest.json` and the baseline files, and shows:
+- **Pentagon chart** — the five dimension scores, overlaying the baselines you select
+- **Per-category score bars** for the baselines you select
+- **Timeline** — overall score across the saved baselines
+- **Comparer** — per-category deltas between any two baselines
+
+Baseline grades are A–F (`MemoryBenchmarkResult.ComputeGrade`). A baseline stores per-category scores and recommendations, not scenario transcripts, so the report has no per-scenario drill-down, judge explanations or response excerpts. `MemoryReportingOptions` controls the output path (`OutputPath`), whether `report.html` is copied (`AutoCopyReportTemplate`), and whether the embedded `archetypes.json` is copied (`IncludeArchetypes`, default `false` — the shipped report does not read that file).
 
 ### 🌍 LongMemEval — First-Class .NET Re-implementation
 
@@ -86,7 +104,7 @@ The biggest research-grade memory benchmark, **fully re-implemented in .NET** wi
 
 ```csharp
 var runner = LongMemEvalBenchmarkRunner.Create(chatClient, datasetPath);
-var config = new AgentBenchmarkConfig { ConfigurationId = "my-agent", ModelId = "gpt-4o" };
+var config = new AgentBenchmarkConfig { AgentName = "my-agent", ModelId = "gpt-4o" };
 
 var result = await runner.RunAsync(agent, config, new ExternalBenchmarkOptions
 {
@@ -273,11 +291,11 @@ AgentEval.Memory works **without modification** with MAF's pipeline (`ChatHistor
 
 We hold ourselves to the same evaluation rigor we ship. A few candid notes:
 
-### ⚠️ The Native Benchmark Currently Scores High
+### ⚠️ The Native Benchmark Is a Regression Gate, Not a Model Ranking
 
-Our curated `Standard` benchmark scores roughly **88–93% on GPT-4.1** in our reference runs. Strong models clear it comfortably — which is **less useful as a discriminator** than we want it to be.
+This page used to quote a score range for the `Standard` preset on one model. No run backing that figure is recorded in the repository, so it has been removed; measure the models you care about rather than relying on a quoted range.
 
-**Why:** the native scenarios were initially designed to test *retrieval* (find a fact, return it) more than *reasoning* (synthesise fragments across sessions, resolve conflicts, infer unstated conclusions). Strong base models retrieve very well.
+**Why:** the native scenarios were designed to test *retrieval* (find a fact, return it) more than *reasoning* (synthesise fragments across sessions, resolve conflicts, infer unstated conclusions). A model that retrieves well can therefore score high without that score saying much about how it reasons across sessions.
 
 **What we recommend today:**
 - Use the native benchmark as a **regression gate** — track your own delta over time, not the absolute number.

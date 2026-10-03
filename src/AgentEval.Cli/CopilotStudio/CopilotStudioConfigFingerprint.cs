@@ -9,7 +9,7 @@ using AgentEval.MAF.CopilotStudio;
 namespace AgentEval.Cli.CopilotStudio;
 
 /// <summary>
-/// P6 item A (<c>strategy/CopilotStudio/Copilot-Studio-P6-Connector-Health-and-Resilience-Design.md</c> §1A):
+/// P6 item A (Copilot Studio connector health and resilience):
 /// deterministic hash-pin-and-diff drift detection over a Copilot Studio config's AGENT IDENTITY — catches
 /// pointing a baseline comparison at a config that silently now targets a different agent (a rug-pull, or
 /// simply a mistake — comparing today's attack results against a stale baseline from a DIFFERENT agent is

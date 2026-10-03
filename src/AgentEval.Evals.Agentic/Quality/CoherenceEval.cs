@@ -23,12 +23,11 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// <see cref="EvalInput.Response"/>.
 /// </para>
 /// <para>
-/// Source: forked from Azure/azure-sdk-for-python (commit &lt;TBD-foundry-sha&gt; see CHANGELOG T3.7)
-/// sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_coherence/coherence.prompty
-/// License: MIT. Modifications: temperature=0, 5-point ordinal normalized to 0..1,
-/// structured evidence[], both ordinal and score in output, label table, severity=low.
-/// These modifications are in the reference prompt file under <c>Resources/Prompts/</c>, which is not
-/// yet sent to the judge; the judge call sets no temperature.
+/// Lineage: AgentEval's own criteria and reference prompt, modelled on the evaluator concept (name,
+/// inputs and scoring dimensions) of Azure/azure-sdk-for-python
+/// <c>sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_coherence/coherence.prompty</c>.
+/// A 2026-10-02 check found no upstream prompt text in the reference prompt file under
+/// <c>Resources/Prompts/</c>, which is not yet sent to the judge.
 /// </para>
 /// </summary>
 public sealed class CoherenceEval : IEval

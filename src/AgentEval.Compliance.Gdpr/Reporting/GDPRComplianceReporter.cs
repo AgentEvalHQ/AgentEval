@@ -108,8 +108,7 @@ public sealed class GDPRComplianceReporter
                 ConfigurationId: null,
                 Evaluator: "AgentEval.Compliance.Gdpr",
                 // EvaluatorModel records the actual judge deployment name when the JudgeFactory
-                // resolved an Azure OpenAI judge; "stub" when the operator opted into the stub
-                // via AGENTEVAL_ALLOW_STUB_JUDGE; "internal" only as a legacy fallback when no
+                // resolved a judge; "internal" only as a legacy fallback when no
                 // JudgeModel was provided (kept for backward compat with callers pre-pass-3).
                 EvaluatorModel: options.JudgeModel ?? "internal"));
 

@@ -16,6 +16,7 @@ public static class GatekeeperManifestProvenanceDrift
     {
         GatekeeperSampleContractRenderer.Print("27");
         Console.WriteLine("\n=== Gatekeeper — Prompt + MCP Manifest Provenance Drift (offline) ===\n");
+        GatekeeperLiveMode.PrintNoModel("fixed prompt and MCP manifests (its scripted client is never called)");
 
         VerifyPromptConstructionBoundary();
         VerifyMcpQualifiedManifestBoundary();

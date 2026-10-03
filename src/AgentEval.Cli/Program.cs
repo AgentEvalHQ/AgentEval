@@ -90,12 +90,12 @@ static string PresetsHelpFromRegistry(string familyName)
 var benchPresetOpt = new Option<string?>("--preset") { Description = PresetsHelpFromRegistry("gdpr") + Environment.NewLine + "Default: standard. Domain-pack composition: standard+healthcare | standard+hr | standard+childrens (multi-pack composition like standard+healthcare+hr also supported)." };
 var benchSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent or workflow under evaluation). REQUIRED — no default; previously defaulted to 'default-agent'." };
 var benchRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
-var benchInputOpt = new Option<string?>("--input") { Description = "Agent input text for the evaluation (default: built-in fixture)" };
-var benchResponseOpt = new Option<string?>("--response") { Description = "The agent's actual RESPONSE to grade. If omitted, a built-in fixture is graded and a warning is emitted (the evidence then reflects no real agent)." };
+var benchInputOpt = new Option<string?>("--input") { Description = "The question the agent answered. Required with --response/--response-file; with --sut or --azure-from-env each scenario sends its own prompt." };
+var benchResponseOpt = new Option<string?>("--response") { Description = "The agent's actual RESPONSE to grade (needs --input). Without it, --sut or --azure-from-env must name a live agent; --sut mock grades a canned answer that measures nothing and is not stored." };
 var benchResponseFileOpt = new Option<string?>("--response-file") { Description = "Path to a file containing the agent's actual response to grade (alternative to --response, for multi-line output)." };
 var benchRunsOpt = new Option<int?>("--runs") { Description = "Number of stochastic runs (default: 1). When > 1, runs the benchmark N times and aggregates via MajorityVote." };
 var benchGdprAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Drive a live agent from the environment (the provider AI_INFERENCE_PROVIDER selects) per scenario: each scenario's own prompt is sent to the agent and its real answer is graded, instead of grading a single --response. The judge resolves AZURE_OPENAI_JUDGE_* first, then the selected provider, so agent and judge can target different endpoints." };
-var benchGdprCmd = new Command("gdpr", "Run the GDPR compliance benchmark. Grades the supplied --response by default; --sut or --azure-from-env drives a live agent per scenario instead.");
+var benchGdprCmd = new Command("gdpr", "Run the GDPR compliance benchmark. Needs a target: --sut or --azure-from-env drives a live agent per scenario, or --response/--response-file grades an answer the agent gave (with its --input). Without one it refuses; --sut mock grades a canned answer that measures nothing and is not stored.");
 benchGdprCmd.Add(benchPresetOpt);
 benchGdprCmd.Add(benchSubjectOpt);
 benchGdprCmd.Add(benchRootOpt);
@@ -111,8 +111,8 @@ benchGdprCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     var subject = parseResult.GetValue(benchSubjectOpt);
     if (string.IsNullOrWhiteSpace(subject))
     {
-        Console.Error.WriteLine("Error: --subject is required. (Phase-7 7.21: the previous 'default-agent' default has been removed.)");
-        return 1;
+        Console.Error.WriteLine("Error: --subject is required. (There is no default subject.)");
+        return AgentEval.Cli.ExitCodes.UsageError;
     }
     var root = parseResult.GetValue(benchRootOpt);
     var input = parseResult.GetValue(benchInputOpt);
@@ -122,8 +122,17 @@ benchGdprCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     // Bench Tier 2 (§2.2): reuses BenchTier1SutResolver.Resolve verbatim — its logic is verb/tier-agnostic,
     // nothing Tier-1-specific about it. Only --sut is exposed here (endpoint/model/apiKey null) — a generic
     // OpenAI-compatible endpoint for bench gdpr/eu-ai-act was not requested; --sut copilot-studio is.
-    var (agentOverride, sutError) = BenchTier1SutResolver.Resolve(
+    var (mock, sut, mockError) = MockTarget.Parse(
         parseResult.GetValue(benchGdprSutOpt),
+        anotherTargetNamed: azureFromEnv || parseResult.GetValue(benchResponseOpt) is not null || parseResult.GetValue(benchResponseFileOpt) is not null);
+    if (mockError is not null)
+    {
+        Console.Error.WriteLine($"Error: {mockError}");
+        return AgentEval.Cli.ExitCodes.UsageError;
+    }
+
+    var (agentOverride, sutError) = BenchTier1SutResolver.Resolve(
+        sut,
         benchGdprSutTargets.ToDictionary(t => t.Sut, t => t.BindOptions(parseResult), StringComparer.OrdinalIgnoreCase),
         benchGdprSutTargets,
         endpoint: null,
@@ -133,12 +142,12 @@ benchGdprCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     if (sutError is not null)
     {
         Console.Error.WriteLine($"Error: {sutError}");
-        return 1;
+        return AgentEval.Cli.ExitCodes.UsageError;
     }
 
     var response = await ResolveBenchResponseAsync(parseResult.GetValue(benchResponseOpt), parseResult.GetValue(benchResponseFileOpt), ct);
-    if (response.Error) return 1;
-    return await BenchCommand.RunGdprAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride: agentOverride, runs: runs, responseText: response.Text, azureFromEnv: azureFromEnv, ct: ct);
+    if (response.Error) return AgentEval.Cli.ExitCodes.UsageError;
+    return await BenchCommand.RunGdprAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride: agentOverride, runs: runs, responseText: response.Text, azureFromEnv: azureFromEnv, mock: mock, ct: ct);
 });
 
 // bench gdpr calibrate
@@ -153,19 +162,12 @@ calibrateCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
     var root = parseResult.GetValue(calibrateRootOpt);
     var outPath = parseResult.GetValue(calibrateOutOpt);
-    AgentEval.Core.IEvaluator? decisionJudge = null;
-    if (parseResult.GetValue(calibrateDecisionsOpt))
-    {
-        var (decisionOptions, decisionDiagnostic) = DecisionClientFactory.TryResolve();
-        if (decisionOptions is null)
-        {
-            Console.Error.WriteLine($"✖ --decisions needs a decision-model transport: {decisionDiagnostic} Set {DecisionClientFactory.RequiredVariables}.");
-            return AgentEval.Cli.ExitCodes.RuntimeError;
-        }
-        decisionJudge = new AgentEval.Decisions.DecisionJudge(new AgentEval.Decisions.SystemOneDecisionClient(decisionOptions), decisionOptions.Model);
-        Console.Error.WriteLine($"✔ Decision-model judge configured — {decisionOptions.ProviderName}, model={decisionOptions.Model} (requested; provenance records what the provider echoes).");
-    }
-    return await BenchCalibrateCommand.RunAsync(root, outPath, evaluatorOverride: decisionJudge, ct: ct);
+    // With --decisions the report names the decision model's provider and requested model; without the identity it
+    // said "unknown" for both, because the judge arrives as a caller-supplied evaluator.
+    return await DecisionCalibration.RunAsync(
+        parseResult.GetValue(calibrateDecisionsOpt),
+        (decisionJudge, decisionJudgeIdentity) => BenchCalibrateCommand.RunCoreAsync(
+            root, outPath, evaluatorOverride: decisionJudge, ct: ct, evaluatorOverrideIdentity: decisionJudgeIdentity));
 });
 benchGdprCmd.Add(calibrateCmd);
 
@@ -176,11 +178,11 @@ benchCmd.Add(benchGdprCmd);
 var benchEuAiActPresetOpt = new Option<string?>("--preset") { Description = PresetsHelpFromRegistry("eu-ai-act") + Environment.NewLine + "Default: standard. Domain-pack composition: standard+high-risk-employment | standard+high-risk-credit | standard+high-risk-education (multi-pack composition like standard+high-risk-employment+high-risk-credit also supported)." };
 var benchEuAiActSubjectOpt = new Option<string?>("--subject") { Description = "Subject name. REQUIRED — no default; previously defaulted to 'default-agent'." };
 var benchEuAiActRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
-var benchEuAiActInputOpt = new Option<string?>("--input") { Description = "Agent input text for the evaluation. REQUIRED — no default; previously a hard-coded fixture was used." };
-var benchEuAiActResponseOpt = new Option<string?>("--response") { Description = "The agent's actual RESPONSE to grade. If omitted, a built-in fixture is graded and a warning is emitted (the evidence then reflects no real agent)." };
+var benchEuAiActInputOpt = new Option<string?>("--input") { Description = "Agent input text for the evaluation. REQUIRED; there is no default." };
+var benchEuAiActResponseOpt = new Option<string?>("--response") { Description = "The agent's actual RESPONSE to grade. Without it, --sut or --azure-from-env must name a live agent; --sut mock grades a canned answer that measures nothing and is not stored." };
 var benchEuAiActResponseFileOpt = new Option<string?>("--response-file") { Description = "Path to a file containing the agent's actual response to grade (alternative to --response)." };
 var benchEuAiActAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Drive a live agent from the environment (the provider AI_INFERENCE_PROVIDER selects) per scenario: each scenario's own prompt is sent to the agent and its real answer is graded, instead of grading a single --response. The judge resolves AZURE_OPENAI_JUDGE_* first, then the selected provider, so agent and judge can target different endpoints." };
-var benchEuAiActCmd = new Command("eu-ai-act", "Run the EU AI Act compliance benchmark. Grades the supplied --response by default; --sut or --azure-from-env drives a live agent per scenario instead.");
+var benchEuAiActCmd = new Command("eu-ai-act", "Run the EU AI Act compliance benchmark. Needs a target: --sut or --azure-from-env drives a live agent per scenario, or --response/--response-file grades an answer the agent gave. Without one it refuses; --sut mock grades a canned answer that measures nothing and is not stored.");
 benchEuAiActCmd.Add(benchEuAiActPresetOpt);
 benchEuAiActCmd.Add(benchEuAiActSubjectOpt);
 benchEuAiActCmd.Add(benchEuAiActRootOpt);
@@ -196,20 +198,29 @@ benchEuAiActCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) 
     var input = parseResult.GetValue(benchEuAiActInputOpt);
     if (string.IsNullOrWhiteSpace(subject))
     {
-        Console.Error.WriteLine("Error: --subject is required. (Phase-7 7.21: 'default-agent' default removed.)");
-        return 1;
+        Console.Error.WriteLine("Error: --subject is required. (There is no default subject.)");
+        return AgentEval.Cli.ExitCodes.UsageError;
     }
     if (string.IsNullOrWhiteSpace(input))
     {
-        Console.Error.WriteLine("Error: --input is required. (Phase-7 7.22: built-in fixture removed.)");
-        return 1;
+        Console.Error.WriteLine("Error: --input is required. (There is no built-in input fixture.)");
+        return AgentEval.Cli.ExitCodes.UsageError;
     }
     var root = parseResult.GetValue(benchEuAiActRootOpt);
     var azureFromEnv = parseResult.GetValue(benchEuAiActAzureFromEnvOpt);
 
     // Bench Tier 2 (§2.2): same reasoning as bench gdpr above.
-    var (agentOverride, sutError) = BenchTier1SutResolver.Resolve(
+    var (mock, sut, mockError) = MockTarget.Parse(
         parseResult.GetValue(benchEuAiActSutOpt),
+        anotherTargetNamed: azureFromEnv || parseResult.GetValue(benchEuAiActResponseOpt) is not null || parseResult.GetValue(benchEuAiActResponseFileOpt) is not null);
+    if (mockError is not null)
+    {
+        Console.Error.WriteLine($"Error: {mockError}");
+        return AgentEval.Cli.ExitCodes.UsageError;
+    }
+
+    var (agentOverride, sutError) = BenchTier1SutResolver.Resolve(
+        sut,
         benchEuAiActSutTargets.ToDictionary(t => t.Sut, t => t.BindOptions(parseResult), StringComparer.OrdinalIgnoreCase),
         benchEuAiActSutTargets,
         endpoint: null,
@@ -219,12 +230,12 @@ benchEuAiActCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) 
     if (sutError is not null)
     {
         Console.Error.WriteLine($"Error: {sutError}");
-        return 1;
+        return AgentEval.Cli.ExitCodes.UsageError;
     }
 
     var response = await ResolveBenchResponseAsync(parseResult.GetValue(benchEuAiActResponseOpt), parseResult.GetValue(benchEuAiActResponseFileOpt), ct);
-    if (response.Error) return 1;
-    return await BenchEuAiActCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride: agentOverride, responseText: response.Text, azureFromEnv: azureFromEnv, ct: ct);
+    if (response.Error) return AgentEval.Cli.ExitCodes.UsageError;
+    return await BenchEuAiActCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride: agentOverride, responseText: response.Text, azureFromEnv: azureFromEnv, mock: mock, ct: ct);
 });
 // bench eu-ai-act calibrate
 var euCalibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };
@@ -238,19 +249,11 @@ euCalibrateCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =
 {
     var root = parseResult.GetValue(euCalibrateRootOpt);
     var outPath = parseResult.GetValue(euCalibrateOutOpt);
-    AgentEval.Core.IEvaluator? decisionJudge = null;
-    if (parseResult.GetValue(euCalibrateDecisionsOpt))
-    {
-        var (decisionOptions, decisionDiagnostic) = DecisionClientFactory.TryResolve();
-        if (decisionOptions is null)
-        {
-            Console.Error.WriteLine($"✖ --decisions needs a decision-model transport: {decisionDiagnostic} Set {DecisionClientFactory.RequiredVariables}.");
-            return AgentEval.Cli.ExitCodes.RuntimeError;
-        }
-        decisionJudge = new AgentEval.Decisions.DecisionJudge(new AgentEval.Decisions.SystemOneDecisionClient(decisionOptions), decisionOptions.Model);
-        Console.Error.WriteLine($"✔ Decision-model judge configured — {decisionOptions.ProviderName}, model={decisionOptions.Model} (requested; provenance records what the provider echoes).");
-    }
-    return await BenchEuAiActCalibrateCommand.RunAsync(root, outPath, evaluatorOverride: decisionJudge, ct: ct);
+    // Same as bench gdpr calibrate: with --decisions the report names the decision model, not "unknown".
+    return await DecisionCalibration.RunAsync(
+        parseResult.GetValue(euCalibrateDecisionsOpt),
+        (decisionJudge, decisionJudgeIdentity) => BenchEuAiActCalibrateCommand.RunCoreAsync(
+            root, outPath, evaluatorOverride: decisionJudge, ct: ct, evaluatorOverrideIdentity: decisionJudgeIdentity));
 });
 benchEuAiActCmd.Add(euCalibrateCmd);
 
@@ -260,12 +263,13 @@ benchCmd.Add(benchEuAiActCmd);
 var benchAgenticPresetOpt = new Option<string?>("--preset") { Description = PresetsHelpFromRegistry("agentic") + Environment.NewLine + "Default: agentic-execution. judge-quality / telemetry / stochastic-stability are pure-code (no LLM cost); safety needs a programmatic policy resolver." };
 var benchAgenticSubjectOpt = new Option<string?>("--subject") { Description = "Subject name. REQUIRED — no default; previously defaulted to 'default-agent'." };
 var benchAgenticRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
-var benchAgenticInputOpt = new Option<string?>("--input") { Description = "Agent input text for the evaluation (default: built-in fixture)" };
-var benchAgenticResponseOpt = new Option<string?>("--response") { Description = "The agent's actual RESPONSE to grade. If omitted, a built-in fixture is graded and a warning is emitted (the evidence then reflects no real agent)." };
+var benchAgenticInputOpt = new Option<string?>("--input") { Description = "The question the agent answered. Required with --response/--response-file." };
+var benchAgenticResponseOpt = new Option<string?>("--response") { Description = "The agent's actual RESPONSE to grade (needs --input). This or --response-file is required; --sut mock grades a canned answer that measures nothing and is not stored." };
+var benchAgenticSutOpt = MockTarget.MockOnlySutOption();
 var benchAgenticResponseFileOpt = new Option<string?>("--response-file") { Description = "Path to a file containing the agent's actual response to grade (alternative to --response, for multi-line output)." };
 var benchAgenticBudgetTierOpt = new Option<string?>("--budget-tier") { Description = "Budget tier filter: trivial | low | medium | high | all (default: all). Components with a cost tier above the budget are filtered out and remaining weights are renormalized. Use 'low' or 'medium' for fast feedback loops; 'all' for full audit runs." };
 var benchAgenticTraceOpt = new Option<string?>("--trace") { Description = "Path to a captured Glass Box trace (JSON). Attaches the dual-boundary trace to the evaluation so trace-aware evaluators (e.g. the glass-box-diagnostics preset) read real chat/tool-boundary data instead of skipping." };
-var benchAgenticCmd = new Command("agentic", "Run the agentic behavior benchmark");
+var benchAgenticCmd = new Command("agentic", "Run the agentic behavior benchmark on an answer the agent gave (--response/--response-file with its --input) or a captured run (--trace). Without one it refuses; --sut mock grades a canned answer that measures nothing and is not stored.");
 benchAgenticCmd.Add(benchAgenticPresetOpt);
 benchAgenticCmd.Add(benchAgenticSubjectOpt);
 benchAgenticCmd.Add(benchAgenticRootOpt);
@@ -274,22 +278,33 @@ benchAgenticCmd.Add(benchAgenticResponseOpt);
 benchAgenticCmd.Add(benchAgenticResponseFileOpt);
 benchAgenticCmd.Add(benchAgenticBudgetTierOpt);
 benchAgenticCmd.Add(benchAgenticTraceOpt);
+benchAgenticCmd.Add(benchAgenticSutOpt);
 benchAgenticCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
     var preset = parseResult.GetValue(benchAgenticPresetOpt) ?? "agentic-execution";
     var subject = parseResult.GetValue(benchAgenticSubjectOpt);
     if (string.IsNullOrWhiteSpace(subject))
     {
-        Console.Error.WriteLine("Error: --subject is required. (Phase-7 7.21: 'default-agent' default removed.)");
-        return 1;
+        Console.Error.WriteLine("Error: --subject is required. (There is no default subject.)");
+        return AgentEval.Cli.ExitCodes.UsageError;
     }
     var root = parseResult.GetValue(benchAgenticRootOpt);
     var input = parseResult.GetValue(benchAgenticInputOpt);
     var response = await ResolveBenchResponseAsync(parseResult.GetValue(benchAgenticResponseOpt), parseResult.GetValue(benchAgenticResponseFileOpt), ct);
-    if (response.Error) return 1;
+    if (response.Error) return AgentEval.Cli.ExitCodes.UsageError;
     var budgetTier = parseResult.GetValue(benchAgenticBudgetTierOpt);
     var traceFile = parseResult.GetValue(benchAgenticTraceOpt);
-    return await BenchAgenticCommand.RunAsync(preset, subject, root, input, response.Text, budgetTier, traceFile, ct);
+    var (mock, otherSut, mockError) = MockTarget.Parse(parseResult.GetValue(benchAgenticSutOpt), anotherTargetNamed: response.Text is not null);
+    if (otherSut is not null)
+    {
+        mockError = $"Unknown --sut value: '{otherSut}'. Valid here: {MockTarget.Sut}.";
+    }
+    if (mockError is not null)
+    {
+        Console.Error.WriteLine($"Error: {mockError}");
+        return AgentEval.Cli.ExitCodes.UsageError;
+    }
+    return await BenchAgenticCommand.RunAsync(preset, subject, root, input, response.Text, evaluatorOverride: null, budgetTier, traceFile, mock, ct);
 });
 // bench agentic calibrate
 var agenticCalibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };
@@ -319,11 +334,11 @@ var benchOwaspPresetOpt = new Option<string?>("--preset") { Description = Preset
 var benchOwaspSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent or workflow under evaluation). REQUIRED." };
 var benchOwaspRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
 var benchOwaspInputOpt = new Option<string?>("--input") { Description = "Provenance text for the run (the OWASP attack pipeline generates its own probes; --input is recorded for traceability, not consumed by attacks)." };
-var benchOwaspAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Build a chat agent from the environment (the provider AI_INFERENCE_PROVIDER selects) instead of scanning the built-in stub. Requires a configured provider; run with none set to see what is missing." };
+var benchOwaspAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Scan a chat agent built from the environment (the provider AI_INFERENCE_PROVIDER selects). Requires a configured provider; run with none set to see what is missing." };
 var benchOwaspEndpointOpt = new Option<string?>("--endpoint") { Description = "OpenAI-compatible API endpoint URL (Ollama, LM Studio, vLLM, Groq, Together.ai, Mistral, etc.) — an alternative to --azure-from-env. Requires --model." };
 var benchOwaspModelOpt = new Option<string?>("--model") { Description = "Model name (required with --endpoint)." };
 var benchOwaspApiKeyOpt = new Option<string?>("--api-key") { Description = "API key for --endpoint (or set OPENAI_API_KEY env var)." };
-var benchOwaspCmd = new Command("owasp", "Run the OWASP LLM Top 10 red-team benchmark. Target is the built-in stub agent unless --sut, --endpoint/--model, or --azure-from-env (the provider AI_INFERENCE_PROVIDER selects) is set; there is still no --judge here — use `agenteval redteam` for a fully-parameterised scan.");
+var benchOwaspCmd = new Command("owasp", "Run the OWASP LLM Top 10 red-team benchmark. Needs a target: --sut, --endpoint/--model, or --azure-from-env (the provider AI_INFERENCE_PROVIDER selects); without one it refuses. --sut mock runs a stand-in that measures nothing and is not stored. Attacks are graded judge first by the judge the environment configures (AZURE_OPENAI_JUDGE_*, else AI_INFERENCE_PROVIDER), as `agenteval redteam --judge` grades them; use `agenteval redteam` for a fully-parameterised scan.");
 benchOwaspCmd.Add(benchOwaspPresetOpt);
 benchOwaspCmd.Add(benchOwaspSubjectOpt);
 benchOwaspCmd.Add(benchOwaspRootOpt);
@@ -340,14 +355,22 @@ benchOwaspCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     if (string.IsNullOrWhiteSpace(subject))
     {
         Console.Error.WriteLine("Error: --subject is required.");
-        return 1;
+        return AgentEval.Cli.ExitCodes.UsageError;
     }
     var root = parseResult.GetValue(benchOwaspRootOpt);
     var input = parseResult.GetValue(benchOwaspInputOpt);
     var azureFromEnv = parseResult.GetValue(benchOwaspAzureFromEnvOpt);
+    var (mock, sut, mockError) = MockTarget.Parse(
+        parseResult.GetValue(benchOwaspSutOpt),
+        anotherTargetNamed: azureFromEnv || !string.IsNullOrWhiteSpace(parseResult.GetValue(benchOwaspEndpointOpt)));
+    if (mockError is not null)
+    {
+        Console.Error.WriteLine($"Error: {mockError}");
+        return AgentEval.Cli.ExitCodes.UsageError;
+    }
 
     var (agentOverride, error) = BenchTier1SutResolver.Resolve(
-        parseResult.GetValue(benchOwaspSutOpt),
+        sut,
         benchOwaspSutTargets.ToDictionary(t => t.Sut, t => t.BindOptions(parseResult), StringComparer.OrdinalIgnoreCase),
         benchOwaspSutTargets,
         parseResult.GetValue(benchOwaspEndpointOpt),
@@ -357,10 +380,11 @@ benchOwaspCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     if (error is not null)
     {
         Console.Error.WriteLine($"Error: {error}");
-        return 1;
+        return AgentEval.Cli.ExitCodes.UsageError;
     }
 
-    var (exitCode, _) = await BenchOwaspCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride, azureFromEnv, ct);
+    var (exitCode, _) = await BenchOwaspCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride, azureFromEnv, mock,
+        agentModel: agentOverride is not null && sut is null ? parseResult.GetValue(benchOwaspModelOpt) : null, ct: ct);
     return exitCode;
 });
 benchCmd.Add(benchOwaspCmd);
@@ -371,11 +395,11 @@ var benchMitrePresetOpt = new Option<string?>("--preset") { Description = Preset
 var benchMitreSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent or workflow under evaluation). REQUIRED." };
 var benchMitreRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
 var benchMitreInputOpt = new Option<string?>("--input") { Description = "Provenance text for the run (the MITRE ATLAS attack pipeline generates its own probes; --input is recorded for traceability, not consumed by attacks)." };
-var benchMitreAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Build a chat agent from the environment (the provider AI_INFERENCE_PROVIDER selects) instead of scanning the built-in stub. Requires a configured provider; run with none set to see what is missing." };
+var benchMitreAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Scan a chat agent built from the environment (the provider AI_INFERENCE_PROVIDER selects). Requires a configured provider; run with none set to see what is missing." };
 var benchMitreEndpointOpt = new Option<string?>("--endpoint") { Description = "OpenAI-compatible API endpoint URL (Ollama, LM Studio, vLLM, Groq, Together.ai, Mistral, etc.) — an alternative to --azure-from-env. Requires --model." };
 var benchMitreModelOpt = new Option<string?>("--model") { Description = "Model name (required with --endpoint)." };
 var benchMitreApiKeyOpt = new Option<string?>("--api-key") { Description = "API key for --endpoint (or set OPENAI_API_KEY env var)." };
-var benchMitreCmd = new Command("mitre", "Run the MITRE ATLAS red-team benchmark. Target is the built-in stub agent unless --sut, --endpoint/--model, or --azure-from-env (the provider AI_INFERENCE_PROVIDER selects) is set; there is still no --judge here — use `agenteval redteam` for a fully-parameterised scan.");
+var benchMitreCmd = new Command("mitre", "Run the MITRE ATLAS red-team benchmark. Needs a target: --sut, --endpoint/--model, or --azure-from-env (the provider AI_INFERENCE_PROVIDER selects); without one it refuses. --sut mock runs a stand-in that measures nothing and is not stored. Attacks are graded judge first by the judge the environment configures (AZURE_OPENAI_JUDGE_*, else AI_INFERENCE_PROVIDER), as `agenteval redteam --judge` grades them; use `agenteval redteam` for a fully-parameterised scan.");
 benchMitreCmd.Add(benchMitrePresetOpt);
 benchMitreCmd.Add(benchMitreSubjectOpt);
 benchMitreCmd.Add(benchMitreRootOpt);
@@ -392,14 +416,22 @@ benchMitreCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     if (string.IsNullOrWhiteSpace(subject))
     {
         Console.Error.WriteLine("Error: --subject is required.");
-        return 1;
+        return AgentEval.Cli.ExitCodes.UsageError;
     }
     var root = parseResult.GetValue(benchMitreRootOpt);
     var input = parseResult.GetValue(benchMitreInputOpt);
     var azureFromEnv = parseResult.GetValue(benchMitreAzureFromEnvOpt);
+    var (mock, sut, mockError) = MockTarget.Parse(
+        parseResult.GetValue(benchMitreSutOpt),
+        anotherTargetNamed: azureFromEnv || !string.IsNullOrWhiteSpace(parseResult.GetValue(benchMitreEndpointOpt)));
+    if (mockError is not null)
+    {
+        Console.Error.WriteLine($"Error: {mockError}");
+        return AgentEval.Cli.ExitCodes.UsageError;
+    }
 
     var (agentOverride, error) = BenchTier1SutResolver.Resolve(
-        parseResult.GetValue(benchMitreSutOpt),
+        sut,
         benchMitreSutTargets.ToDictionary(t => t.Sut, t => t.BindOptions(parseResult), StringComparer.OrdinalIgnoreCase),
         benchMitreSutTargets,
         parseResult.GetValue(benchMitreEndpointOpt),
@@ -409,10 +441,11 @@ benchMitreCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     if (error is not null)
     {
         Console.Error.WriteLine($"Error: {error}");
-        return 1;
+        return AgentEval.Cli.ExitCodes.UsageError;
     }
 
-    var (exitCode, _) = await BenchMitreCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride, azureFromEnv, ct);
+    var (exitCode, _) = await BenchMitreCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride, azureFromEnv, mock,
+        agentModel: agentOverride is not null && sut is null ? parseResult.GetValue(benchMitreModelOpt) : null, ct: ct);
     return exitCode;
 });
 benchCmd.Add(benchMitreCmd);
@@ -422,11 +455,11 @@ var benchNistPresetOpt = new Option<string?>("--preset") { Description = Presets
 var benchNistSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent or workflow under evaluation). REQUIRED." };
 var benchNistRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
 var benchNistInputOpt = new Option<string?>("--input") { Description = "Provenance text for the run (the attack pipeline generates its own probes; --input is recorded for traceability, not consumed by attacks)." };
-var benchNistAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Build a chat agent from the environment (the provider AI_INFERENCE_PROVIDER selects) instead of scanning the built-in stub. Requires a configured provider; run with none set to see what is missing." };
+var benchNistAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Scan a chat agent built from the environment (the provider AI_INFERENCE_PROVIDER selects). Requires a configured provider; run with none set to see what is missing." };
 var benchNistEndpointOpt = new Option<string?>("--endpoint") { Description = "OpenAI-compatible API endpoint URL (Ollama, LM Studio, vLLM, Groq, Together.ai, Mistral, etc.) — an alternative to --azure-from-env. Requires --model." };
 var benchNistModelOpt = new Option<string?>("--model") { Description = "Model name (required with --endpoint)." };
 var benchNistApiKeyOpt = new Option<string?>("--api-key") { Description = "API key for --endpoint (or set OPENAI_API_KEY env var)." };
-var benchNistCmd = new Command("nist", "Run the NIST AI RMF (AI 100-1) red-team benchmark. Target is the built-in stub agent unless --sut, --endpoint/--model, or --azure-from-env (the provider AI_INFERENCE_PROVIDER selects) is set; there is still no --judge here — use `agenteval redteam` for a fully-parameterised scan.");
+var benchNistCmd = new Command("nist", "Run the NIST AI RMF (AI 100-1) red-team benchmark. Needs a target: --sut, --endpoint/--model, or --azure-from-env (the provider AI_INFERENCE_PROVIDER selects); without one it refuses. --sut mock runs a stand-in that measures nothing and is not stored. Attacks are graded judge first by the judge the environment configures (AZURE_OPENAI_JUDGE_*, else AI_INFERENCE_PROVIDER), as `agenteval redteam --judge` grades them; use `agenteval redteam` for a fully-parameterised scan.");
 benchNistCmd.Add(benchNistPresetOpt);
 benchNistCmd.Add(benchNistSubjectOpt);
 benchNistCmd.Add(benchNistRootOpt);
@@ -443,14 +476,22 @@ benchNistCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     if (string.IsNullOrWhiteSpace(subject))
     {
         Console.Error.WriteLine("Error: --subject is required.");
-        return 1;
+        return AgentEval.Cli.ExitCodes.UsageError;
     }
     var root = parseResult.GetValue(benchNistRootOpt);
     var input = parseResult.GetValue(benchNistInputOpt);
     var azureFromEnv = parseResult.GetValue(benchNistAzureFromEnvOpt);
+    var (mock, sut, mockError) = MockTarget.Parse(
+        parseResult.GetValue(benchNistSutOpt),
+        anotherTargetNamed: azureFromEnv || !string.IsNullOrWhiteSpace(parseResult.GetValue(benchNistEndpointOpt)));
+    if (mockError is not null)
+    {
+        Console.Error.WriteLine($"Error: {mockError}");
+        return AgentEval.Cli.ExitCodes.UsageError;
+    }
 
     var (agentOverride, error) = BenchTier1SutResolver.Resolve(
-        parseResult.GetValue(benchNistSutOpt),
+        sut,
         benchNistSutTargets.ToDictionary(t => t.Sut, t => t.BindOptions(parseResult), StringComparer.OrdinalIgnoreCase),
         benchNistSutTargets,
         parseResult.GetValue(benchNistEndpointOpt),
@@ -460,10 +501,11 @@ benchNistCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     if (error is not null)
     {
         Console.Error.WriteLine($"Error: {error}");
-        return 1;
+        return AgentEval.Cli.ExitCodes.UsageError;
     }
 
-    var (exitCode, _) = await BenchNistCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride, azureFromEnv, ct);
+    var (exitCode, _) = await BenchNistCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride, azureFromEnv, mock,
+        agentModel: agentOverride is not null && sut is null ? parseResult.GetValue(benchNistModelOpt) : null, ct: ct);
     return exitCode;
 });
 benchCmd.Add(benchNistCmd);
@@ -475,7 +517,10 @@ benchCmd.Add(benchNistCmd);
     var benchPerfSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent or workflow under evaluation). REQUIRED." };
     var benchPerfPromptOpt = new Option<string?>("--prompt") { Description = "Prompt to measure against (default: 'Hello!')." };
     var benchPerfRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
-    var benchPerfAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Measure a real chat agent built from the environment (the provider AI_INFERENCE_PROVIDER selects) instead of the built-in EchoAgent stub. Requires a configured provider; run with none set to see what is missing." };
+    var benchPerfAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Measure a chat agent built from the environment (the provider AI_INFERENCE_PROVIDER selects). Requires a configured provider; run with none set to see what is missing." };
+    var benchPerfEndpointOpt = new Option<string?>("--endpoint") { Description = "OpenAI-compatible API endpoint URL (Ollama, LM Studio, vLLM, Groq, Together.ai, Mistral, etc.) — an alternative to --azure-from-env. Requires --model." };
+    var benchPerfModelOpt = new Option<string?>("--model") { Description = "Model name (required with --endpoint)." };
+    var benchPerfApiKeyOpt = new Option<string?>("--api-key") { Description = "API key for --endpoint (or set OPENAI_API_KEY env var)." };
 
     // bench longmemeval — T0.6 (v1.1): closes CLI ↔ registry gap.
     {
@@ -494,7 +539,7 @@ benchCmd.Add(benchNistCmd);
             if (string.IsNullOrWhiteSpace(subject))
             {
                 Console.Error.WriteLine("Error: --subject is required.");
-                return 1;
+                return AgentEval.Cli.ExitCodes.UsageError;
             }
             var root = parseResult.GetValue(benchLmeRootOpt);
             return await BenchLongMemEvalCommand.RunAsync(preset, subject, root, ct);
@@ -520,13 +565,13 @@ benchCmd.Add(benchNistCmd);
             if (string.IsNullOrWhiteSpace(vertical))
             {
                 Console.Error.WriteLine("Error: --vertical is required. Known: prospective, episodic, arithmetic, workingmemory, forgetting.");
-                return 1;
+                return AgentEval.Cli.ExitCodes.UsageError;
             }
             var subject = parseResult.GetValue(benchTmeSubjectOpt);
             if (string.IsNullOrWhiteSpace(subject))
             {
                 Console.Error.WriteLine("Error: --subject is required.");
-                return 1;
+                return AgentEval.Cli.ExitCodes.UsageError;
             }
             var root = parseResult.GetValue(benchTmeRootOpt);
 
@@ -538,7 +583,7 @@ benchCmd.Add(benchNistCmd);
             {
                 Console.Error.WriteLine(
                     $"Error: --evidence-detail must be 'references' or 'content', not '{evidenceDetail}'.");
-                return 1;
+                return AgentEval.Cli.ExitCodes.UsageError;
             }
 
             return await BenchTypedMemEvalCommand.RunAsync(
@@ -564,7 +609,7 @@ benchCmd.Add(benchNistCmd);
             if (string.IsNullOrWhiteSpace(subject))
             {
                 Console.Error.WriteLine("Error: --subject is required.");
-                return 1;
+                return AgentEval.Cli.ExitCodes.UsageError;
             }
             var root = parseResult.GetValue(benchMemRootOpt);
             return await BenchMemoryCommand.RunAsync(preset, subject, root, ct);
@@ -594,13 +639,13 @@ benchCmd.Add(benchNistCmd);
             if (string.IsNullOrWhiteSpace(agentTrace) || string.IsNullOrWhiteSpace(chatTrace))
             {
                 Console.Error.WriteLine("Error: --agent-trace and --chat-trace are required.");
-                return 1;
+                return AgentEval.Cli.ExitCodes.UsageError;
             }
 
             if (string.IsNullOrWhiteSpace(subject))
             {
                 Console.Error.WriteLine("Error: --subject is required.");
-                return 1;
+                return AgentEval.Cli.ExitCodes.UsageError;
             }
 
             var preset = parseResult.GetValue(tfPresetOpt) ?? "standard";
@@ -629,13 +674,13 @@ benchCmd.Add(benchNistCmd);
             if (string.IsNullOrWhiteSpace(workflowTrace))
             {
                 Console.Error.WriteLine("Error: --workflow-trace is required.");
-                return 1;
+                return AgentEval.Cli.ExitCodes.UsageError;
             }
 
             if (string.IsNullOrWhiteSpace(subject))
             {
                 Console.Error.WriteLine("Error: --subject is required.");
-                return 1;
+                return AgentEval.Cli.ExitCodes.UsageError;
             }
 
             var preset = parseResult.GetValue(wtfPresetOpt) ?? "standard";
@@ -645,17 +690,31 @@ benchCmd.Add(benchNistCmd);
         benchCmd.Add(benchWorkflowTraceFidelityCmd);
     }
 
-    // bench autoaudit — Glass Box flagship: cross-endpoint honesty/safety/cost comparison (offline demo).
+    // bench autoaudit — Glass Box flagship: cross-endpoint honesty/safety/cost comparison of real models.
     {
         var aaOutOpt = new Option<string?>("--out") { Description = "Path to write the Markdown comparison report (optional; also printed to stdout)." };
-        var benchAutoAuditCmd = new Command("autoaudit", "Cross-endpoint Glass Box comparison — honesty (Trace Fidelity) + safety (gate blocks) + cost (tokens/latency), ranked. Offline demo over 3 scripted endpoints (no credentials).");
+        var aaModelsOpt = new Option<string?>("--models") { Description = "Comma-separated models to audit on the configured provider. Default: the models the provider names (*_MODEL, *_MODEL_2, *_MODEL_3)." };
+        var aaSutOpt = new Option<string?>("--sut") { Description = $"Only '{MockTarget.Sut}' here: the scripted showcase over three made-up endpoints, labelled MOCK. It measures no model." };
+        var benchAutoAuditCmd = new Command("autoaudit", "Glass Box auto-audit of the configured provider's models: one support task each, ranked on safety (PII gate blocks, and any leak the gate missed), Trace Fidelity (the tool loop's account vs the chat boundary) and cost (tokens/latency). A model that never does the task is not ranked. Without a provider it refuses. --sut mock runs the scripted showcase.");
         benchAutoAuditCmd.Add(aaOutOpt);
+        benchAutoAuditCmd.Add(aaModelsOpt);
+        benchAutoAuditCmd.Add(aaSutOpt);
         benchAutoAuditCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
-            await BenchAutoAuditCommand.RunAsync(parseResult.GetValue(aaOutOpt), ct));
+        {
+            var sut = parseResult.GetValue(aaSutOpt);
+            if (sut is not null && !MockTarget.IsRequested(sut))
+            {
+                Console.Error.WriteLine($"Error: Unknown --sut value: '{sut}'. Valid: {MockTarget.Sut}.");
+                return AgentEval.Cli.ExitCodes.UsageError;
+            }
+            var models = parseResult.GetValue(aaModelsOpt)?
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            return await BenchAutoAuditCommand.RunAsync(parseResult.GetValue(aaOutOpt), models, mock: sut is not null, ct);
+        });
         benchCmd.Add(benchAutoAuditCmd);
     }
 
-    var benchPerfCmd = new Command("perf", "Run a performance benchmark (latency, throughput, cost)");
+    var benchPerfCmd = new Command("perf", "Run a performance benchmark (latency, throughput, cost). Needs a target: --sut, --endpoint/--model, or --azure-from-env; without one it refuses. --sut mock measures a stand-in and is not stored.");
 
     foreach (var presetName in new[] { "latency", "throughput", "cost" })
     {
@@ -664,6 +723,10 @@ benchCmd.Add(benchNistCmd);
         presetCmd.Add(benchPerfPromptOpt);
         presetCmd.Add(benchPerfRootOpt);
         presetCmd.Add(benchPerfAzureFromEnvOpt);
+        presetCmd.Add(benchPerfEndpointOpt);
+        presetCmd.Add(benchPerfModelOpt);
+        presetCmd.Add(benchPerfApiKeyOpt);
+        var (presetSutOpt, presetSutTargets) = SutTargetResolver.AddOptionsTo(presetCmd, "bench");
         var capturedPreset = presetName;
         presetCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
         {
@@ -671,12 +734,37 @@ benchCmd.Add(benchNistCmd);
             if (string.IsNullOrWhiteSpace(subject))
             {
                 Console.Error.WriteLine("Error: --subject is required.");
-                return 1;
+                return AgentEval.Cli.ExitCodes.UsageError;
             }
             var prompt = parseResult.GetValue(benchPerfPromptOpt);
             var root = parseResult.GetValue(benchPerfRootOpt);
             var azureFromEnv = parseResult.GetValue(benchPerfAzureFromEnvOpt);
-            return await BenchPerfCommand.RunAsync(capturedPreset, subject, prompt, root, azureFromEnv, ct);
+            var (mock, sut, mockError) = MockTarget.Parse(
+                parseResult.GetValue(presetSutOpt),
+                anotherTargetNamed: azureFromEnv || !string.IsNullOrWhiteSpace(parseResult.GetValue(benchPerfEndpointOpt)));
+            if (mockError is not null)
+            {
+                Console.Error.WriteLine($"Error: {mockError}");
+                return AgentEval.Cli.ExitCodes.UsageError;
+            }
+
+            var (agentOverride, error) = BenchTier1SutResolver.Resolve(
+                sut,
+                presetSutTargets.ToDictionary(t => t.Sut, t => t.BindOptions(parseResult), StringComparer.OrdinalIgnoreCase),
+                presetSutTargets,
+                parseResult.GetValue(benchPerfEndpointOpt),
+                parseResult.GetValue(benchPerfModelOpt),
+                parseResult.GetValue(benchPerfApiKeyOpt),
+                subject);
+            if (error is not null)
+            {
+                Console.Error.WriteLine($"Error: {error}");
+                return AgentEval.Cli.ExitCodes.UsageError;
+            }
+
+            // The --endpoint target's model prices the run; a --sut target names no model.
+            var agentModel = agentOverride is not null && sut is null ? parseResult.GetValue(benchPerfModelOpt) : null;
+            return await BenchPerfCommand.RunAsync(capturedPreset, subject, prompt, root, agentOverride, azureFromEnv, mock, agentModel, ct);
         });
         benchPerfCmd.Add(presetCmd);
     }
@@ -692,7 +780,7 @@ benchCmd.SetAction((ParseResult parseResult, CancellationToken ct) =>
         return Task.FromResult(BenchListCommand.Run());
     }
     Console.Error.WriteLine("Usage: agenteval bench {family} [--preset NAME] ... | agenteval bench --list");
-    return Task.FromResult(1);
+    return Task.FromResult(AgentEval.Cli.ExitCodes.UsageError);
 });
 
 // ─── compliance ───────────────────────────────────────────────────────────────
@@ -715,7 +803,7 @@ renderCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     if (string.IsNullOrWhiteSpace(regulation) || string.IsNullOrWhiteSpace(subject))
     {
         Console.Error.WriteLine("Error: --regulation and --subject are required.");
-        return 1;
+        return AgentEval.Cli.ExitCodes.UsageError;
     }
     var ts = parseResult.GetValue(renderTsOpt);
     var root = parseResult.GetValue(renderRootOpt);
@@ -740,7 +828,7 @@ renderBenchCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =
     if (string.IsNullOrWhiteSpace(benchmark) || string.IsNullOrWhiteSpace(subject))
     {
         Console.Error.WriteLine("Error: --benchmark and --subject are required.");
-        return 1;
+        return AgentEval.Cli.ExitCodes.UsageError;
     }
     var ts = parseResult.GetValue(renderBenchTsOpt);
     var root = parseResult.GetValue(renderBenchRootOpt);
@@ -795,8 +883,10 @@ rootCmd.Options.Add(logFileOpt);
 var captureFixtureOpt = new Option<string?>("--capture-fixture")
 {
     Description = "Write a structured JSONL capture of every LLM round-trip (full message array, full response) to " +
-                   "this file, for later replay or fixture generation via 'agenteval log-file to-fixture'. Off by " +
-                   "default. Same raw, UNREDACTED content warning as --log-file. Overwritten on each invocation.",
+                   "this file, for 'agenteval log-file to-fixture' or 'agenteval log-file replay'. Off by default. " +
+                   "Strings matching known credential formats are masked; prompts and responses are otherwise " +
+                   "written as-is, so treat it like --log-file output: never share or commit it. Overwritten on " +
+                   "each invocation.",
     Recursive = true,
 };
 rootCmd.Options.Add(captureFixtureOpt);
@@ -830,6 +920,97 @@ rootCmd.Add(SkillsScanCommand.Create());
 rootCmd.Add(LogFileCommand.Create());
 
 var parseResult = rootCmd.Parse(args);
+
+// A parse error — an unknown command or option, a value that does not convert (`--runs abc`), a missing required
+// option, no command at all — exits ExitCodes.UsageError (2). System.CommandLine's own ParseErrorAction prints the
+// errors to stderr and the help to stdout, then returns 1, which this CLI's contract reserves for a failed evaluation
+// (ExitCodes.TestFailure): CI could not tell a typo from a failing run. Its output is kept; only the code changes.
+// --help and --version are not parse errors: their actions clear the errors and return 0.
+// This runs before --log-file and --capture-fixture are read: reading an option whose own value failed to parse
+// throws, and an invocation that never started must not create or truncate either file.
+if (parseResult.Action is System.CommandLine.Invocation.ParseErrorAction)
+{
+    await parseResult.InvokeAsync();
+    return AgentEval.Cli.ExitCodes.UsageError;
+}
+
 using var logWriter = VerboseLog.Initialize(parseResult.GetValue(logFileOpt));
 using var fixtureWriter = FixtureCapture.Initialize(parseResult.GetValue(captureFixtureOpt));
 return await parseResult.InvokeAsync();
+
+namespace AgentEval.Cli.Commands
+{
+    using AgentEval.Core;
+    using AgentEval.Decisions;
+
+    /// <summary>
+    /// The <c>--decisions</c> switch of <c>bench gdpr calibrate</c> and <c>bench eu-ai-act calibrate</c>: grades the
+    /// golden datasets with the decision model instead of the generative judge, and names that judge in the report.
+    /// </summary>
+    internal static class DecisionCalibration
+    {
+        /// <summary>
+        /// Runs <paramref name="runCalibration"/> with no evaluator override when <paramref name="decisions"/> is
+        /// off, and otherwise with a <see cref="DecisionJudge"/> and the identity its report header names it by.
+        /// </summary>
+        /// <param name="decisions">Whether <c>--decisions</c> was passed.</param>
+        /// <param name="runCalibration">The calibration to run, given the evaluator override and its identity.</param>
+        /// <param name="resolveOptions">The transport source; <see langword="null"/> reads the environment.</param>
+        /// <param name="createClient">Builds the client from the options; <see langword="null"/> builds the HTTP client.</param>
+        /// <returns>
+        /// What <paramref name="runCalibration"/> returned, or <see cref="ExitCodes.RuntimeError"/> when
+        /// <c>--decisions</c> was passed and no decision-model transport is configured.
+        /// </returns>
+        internal static async Task<int> RunAsync(
+            bool decisions,
+            Func<IEvaluator?, CalibrationJudgeIdentity?, Task<int>> runCalibration,
+            Func<(SystemOneClientOptions? Options, string? Diagnostic)>? resolveOptions = null,
+            Func<SystemOneClientOptions, IDecisionClient>? createClient = null)
+        {
+            ArgumentNullException.ThrowIfNull(runCalibration);
+            if (!decisions)
+                return await runCalibration(null, null);
+
+            resolveOptions ??= static () => DecisionClientFactory.TryResolve();
+            createClient ??= static options => new SystemOneDecisionClient(options);
+
+            var (decisionOptions, decisionDiagnostic) = resolveOptions();
+            if (decisionOptions is null)
+            {
+                Console.Error.WriteLine($"✖ --decisions needs a decision-model transport: {decisionDiagnostic} Set {DecisionClientFactory.RequiredVariables}.");
+                return ExitCodes.RuntimeError;
+            }
+
+            var client = createClient(decisionOptions);
+            try
+            {
+                var judge = new DecisionJudge(client, decisionOptions.Model);
+                Console.Error.WriteLine($"✔ Decision-model judge configured — {decisionOptions.ProviderName}, model={decisionOptions.Model} (requested; the provider may serve a different build under this name).");
+                return await runCalibration(judge, IdentityOf(decisionOptions));
+            }
+            finally
+            {
+                (client as IDisposable)?.Dispose();
+            }
+        }
+
+        /// <summary>
+        /// What the calibration report names the decision judge: the provider, and the model requested from it. The
+        /// provider may answer with a different build under that name (an alias such as <c>jev-latest</c> moves), so
+        /// the model is labelled as requested. Never the key and never the endpoint.
+        /// </summary>
+        internal static CalibrationJudgeIdentity IdentityOf(SystemOneClientOptions options)
+        {
+            ArgumentNullException.ThrowIfNull(options);
+            var provider = options.ProviderName switch
+            {
+                "typesafe" => "TypeSafe",
+                "openrouter" => "OpenRouter",
+                var other => other,
+            };
+            return new CalibrationJudgeIdentity(
+                $"{provider} decision model (--decisions)",
+                $"{options.Model} (requested; the provider may serve a different build under this name)");
+        }
+    }
+}

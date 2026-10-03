@@ -20,9 +20,11 @@ namespace AgentEval.Evals.Agentic.System;
 /// fix from an intent that was never correctly understood.
 /// </para>
 /// <para>
-/// Source: forked from Azure/azure-sdk-for-python
-/// sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_intent_resolution/intent_resolution.prompty
-/// License: MIT. Modifications: split into two independent sub-dimensions; structured evidence output.
+/// Lineage: AgentEval's own criteria and reference prompt, modelled on the evaluator concept (name,
+/// inputs and scoring dimensions) of Azure/azure-sdk-for-python
+/// <c>sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_intent_resolution/intent_resolution.prompty</c>.
+/// A 2026-10-02 check found no upstream prompt text in the reference prompt file
+/// <c>Resources/Prompts/system/intent-resolution.v1.md</c>, which is not yet sent to the judge.
 /// </para>
 /// </summary>
 public sealed class IntentResolutionEval : IEval

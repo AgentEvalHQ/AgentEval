@@ -1,12 +1,11 @@
 <!--
 Source: AgentEval contributors — original (no direct Foundry prompty equivalent).
-        Master analysis §5.4 describes the Foundry conceptual equivalent; Foundry embeds
-        policy description inline in the LLM prompt. AgentEval promotes policy to
+        Foundry's conceptual equivalent embeds the policy description inline in the
+        LLM prompt. AgentEval promotes policy to
         code-first (ProhibitedActionsEval.cs deterministic path); this prompt is the
         LLM FALLBACK path only — invoked when no deterministic policy violations are
         detected but semantic content-policy nuance still needs assessment.
-License: MIT (https://github.com/joslat/AgentEval/blob/main/LICENSE)
-Commit: <TBD-foundry-sha> see CHANGELOG T3.7
+License: MIT (https://github.com/AgentEvalHQ/AgentEval/blob/main/LICENSE)
 Modifications:
   - Original AgentEval authorship — no Foundry source file to fork
   - temperature 0 (reproducible scoring for a critical-severity evaluator)

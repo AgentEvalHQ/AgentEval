@@ -16,7 +16,7 @@ namespace AgentEval.NuGetConsumer.Tests;
 /// <remarks>
 /// <para>
 /// 🔴 <b>These are the only tests in this project that run unconditionally.</b> The other nine are
-/// credential-gated and skip on any machine without Azure OpenAI configured, which is every CI run —
+/// credential-gated and skip on any machine without an inference provider configured, which is every CI run —
 /// so before this file the package-consumer suite reported <b>0 passed / 9 skipped</b> and proved
 /// nothing about the package. A suite in which everything skips is not a suite.
 /// </para>
@@ -36,7 +36,7 @@ namespace AgentEval.NuGetConsumer.Tests;
 public class PackageReachabilityTests
 {
     /// <summary>The package version this project pins. One place, so the pin and the assertion move together.</summary>
-    private const string ExpectedPackageVersion = "0.35.0-beta";
+    private const string ExpectedPackageVersion = "0.42.0-beta";
 
     private sealed class ContainsEval(string needle)
         : AtomicCodeEval("consumer.contains", "Response contains the needle", "test", "1.0.0")

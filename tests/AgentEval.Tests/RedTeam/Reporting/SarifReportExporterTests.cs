@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 // tests/AgentEval.Tests/RedTeam/Reporting/SarifReportExporterTests.cs
+using System.Reflection;
 using System.Text.Json;
 using AgentEval.RedTeam;
 using AgentEval.RedTeam.Reporting;
@@ -61,6 +62,22 @@ public class SarifReportExporterTests
 
         var tool = doc.RootElement.GetProperty("runs")[0].GetProperty("tool").GetProperty("driver");
         Assert.Equal("AgentEval RedTeam", tool.GetProperty("name").GetString());
+    }
+
+    [Fact]
+    public void Export_ToolDriverVersion_IsTheAssemblysInformationalVersion_NotAStaleLiteral()
+    {
+        // tool.driver.version was a hard-coded "0.2.0" that no release updated, so every SARIF upload named a
+        // version the tool had not been at for dozens of releases. It must be read from the assembly that ran.
+        var expected = typeof(SarifReportExporter).Assembly
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion;
+
+        var driver = JsonDocument.Parse(new SarifReportExporter().Export(CreateTestResult())).RootElement
+            .GetProperty("runs")[0].GetProperty("tool").GetProperty("driver");
+        var version = driver.GetProperty("version").GetString();
+
+        Assert.Equal(expected, version);
+        Assert.NotEqual("0.2.0", version);
     }
 
     [Fact]

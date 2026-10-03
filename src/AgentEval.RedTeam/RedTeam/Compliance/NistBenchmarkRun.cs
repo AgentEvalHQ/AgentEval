@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using Microsoft.Extensions.AI;
 using AgentEval.Core;
 using AgentEval.Evals;
 using AgentEval.RedTeam;
@@ -31,8 +32,41 @@ public sealed class NistBenchmarkRun
     /// <summary>The preset name used to build this run ("RmfBaseline", "RmfSmoke", "RmfAuditGrade").</summary>
     public string PresetName { get; }
 
-    /// <summary>The optional LLM judge supplied to the factory (retained for API symmetry).</summary>
+    /// <summary>
+    /// The <see cref="IEvaluator"/> supplied to the factory, kept because callers pass it. It does not grade the attacks:
+    /// a judge model given to <see cref="WithJudge"/> does.
+    /// </summary>
     public IEvaluator? Judge { get; }
+
+    /// <summary>
+    /// The model that grades the attacks when <see cref="WithJudge"/> was called; <see langword="null"/> when the run
+    /// grades with the keyword oracles alone.
+    /// </summary>
+    public string? JudgeModel { get; private set; }
+
+    /// <summary>
+    /// Grades this run's attacks with <paramref name="judgeClient"/>, judge first: the Composite Judges decide each
+    /// probe and the keyword oracle is the fallback. This is the grading <c>agenteval redteam --judge</c> uses; keyword
+    /// oracles alone were shown unable to be made honest (ADR-023). <paramref name="judgeModel"/> names the judge in
+    /// the result's provenance.
+    /// </summary>
+    /// <returns>This run, for chaining.</returns>
+    public NistBenchmarkRun WithJudge(IChatClient judgeClient, string judgeModel)
+    {
+        ArgumentNullException.ThrowIfNull(judgeClient);
+        ArgumentException.ThrowIfNullOrWhiteSpace(judgeModel);
+        _pipeline.WithJudge(judgeClient);
+        JudgeModel = judgeModel;
+        return this;
+    }
+
+    /// <summary>
+    /// The judge that graded <paramref name="scan"/>, read from the scan itself rather than this run's state: a run
+    /// scanned before <see cref="WithJudge"/> was called graded without one, and a judge set on <see cref="Pipeline"/>
+    /// directly graded with one this run never named.
+    /// </summary>
+    private string? GradingJudge(RedTeamResult scan) =>
+        scan.Options?.JudgeClient is null ? null : JudgeModel ?? "unnamed judge";
 
     /// <summary>Convenience: the configured attack pipeline (read-only access for tests).</summary>
     public AttackPipeline Pipeline => _pipeline;
@@ -105,9 +139,10 @@ public sealed class NistBenchmarkRun
 
     private EvalResult BuildComposite(RedTeamResult redTeamResult, NistAiRmfComplianceReport report)
     {
+        var judgeModel = GradingJudge(redTeamResult);
         var attacksByName = redTeamResult.AttackResults.ToDictionary(a => a.AttackName, StringComparer.OrdinalIgnoreCase);
 
-        var leaves = report.Controls.Select(c => BuildLeaf(c, attacksByName)).ToList();
+        var leaves = report.Controls.Select(c => BuildLeaf(c, attacksByName, judgeModel)).ToList();
 
         // Weights only: aggregation reads nothing else from a component, so no throwing
         // IEval stub is needed to carry one. Every leaf weighs the same here.
@@ -156,8 +191,8 @@ public sealed class NistBenchmarkRun
                 Recommendations: report.Recommendations.Count > 0 ? report.Recommendations.ToList() : null,
                 SubResults: leaves,
                 AggregationStrategy: "Min"),
-            // JudgeModel is NEVER a judge name: the IEvaluator this run holds is never invoked.
-            Provenance: new("composite", null, null, null, null, 0.0, false),
+            // The judge model only when one graded the attacks (WithJudge); never the unused IEvaluator.
+            Provenance: new("composite", judgeModel, null, null, null, 0.0, false),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 
@@ -191,7 +226,7 @@ public sealed class NistBenchmarkRun
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 
-    private static EvalResult BuildLeaf(ControlStatus control, IReadOnlyDictionary<string, AttackResult> attacksByName)
+    private static EvalResult BuildLeaf(ControlStatus control, IReadOnlyDictionary<string, AttackResult> attacksByName, string? judgeModel)
     {
         // Governance / not-evaluated controls are skipped leaves (never passes-by-default).
         if (control.Status is ControlEvaluationStatus.NotApplicable or ControlEvaluationStatus.NotEvaluated)
@@ -211,7 +246,7 @@ public sealed class NistBenchmarkRun
         var leaf = RedTeamComplianceLeaf.BuildTestedLeaf(
             "nist", "compliance.nist", control.Control.ControlId, control.Control.ControlName,
             subjectLabel: $"{control.Control.ControlName} ({control.Control.Fidelity})",
-            control.TotalTests, control.PassedTests, attacks);
+            control.TotalTests, control.PassedTests, attacks, judgeModel);
 
         // H6 / Jun14-M6 / Jun14v2-H4+L6: re-derive the leaf label from the SAME ComplianceStatusPolicy the human NIST
         // report uses, for BOTH Supporting and Tested fidelity, so the audit-chain leaf and the report can never

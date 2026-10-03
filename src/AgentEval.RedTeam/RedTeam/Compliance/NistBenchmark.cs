@@ -26,7 +26,9 @@ public static partial class NistBenchmark
     private static readonly TimeSpan ThoroughTimeout = TimeSpan.FromMinutes(30);
 
     /// <summary>All 14 built-in attacks at <see cref="Intensity.Quick"/> — the default NIST AI RMF preset.</summary>
-    /// <param name="judge">Optional LLM judge (accepted for API symmetry; heuristic evaluators are used by default).</param>
+    /// <param name="judge">An <see cref="IEvaluator"/> kept on the run because callers pass it; it does not grade the
+    /// attacks. To grade them with a judge model, judge first as <c>agenteval redteam --judge</c> does, call
+    /// <c>WithJudge</c> on the returned run.</param>
     /// <param name="systemPromptCanary">Optional system-prompt canary; instruments SystemPromptExtraction (privacy/2.10).</param>
     public static NistBenchmarkRun RmfBaseline(IEvaluator? judge = null, string? systemPromptCanary = null)
     {

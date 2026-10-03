@@ -10,9 +10,13 @@ namespace AgentEval.MAF.Gatekeeper;
 /// An <see cref="IGateEvidenceSink"/> (Phase 3, P3-1) that indexes every gate finding into a
 /// <see cref="GateVerdictResolver"/> for O(1) <c>referenceId</c> lookup, and — opt-in — appends every enforced
 /// REFUSAL (an <c>action="Block"</c> record) as one JSON line to a caller-supplied index writer. Register it as a
-/// Gatekeeper evidence sink so a refusal's opaque reference id can later be resolved back to the full record
-/// (<c>agenteval trace find-reference &lt;id&gt;</c>) even when tracing is off — the resolver is fed here directly,
-/// not from the trace.
+/// Gatekeeper evidence sink (<c>GatekeeperOptions.EvidenceSink</c>) so a refusal's opaque reference id can later be
+/// resolved back to the full record even when tracing is off — the resolver is fed here directly, not from the
+/// trace. To resolve an id in the same process, call <see cref="GateVerdictResolver.TryResolve"/> on
+/// <see cref="Resolver"/> (in memory, bounded and TTL'd). To find a refusal later, read the JSONL index with
+/// <see cref="GateReferenceIndexAggregator.Read"/> and filter on <see cref="GateReferenceLedger.GateReferenceIndexEntry.ReferenceId"/>; each
+/// row is a summary (time, run, policy, stage, tool, agent, severity, config fingerprint), not the full record. There
+/// is no CLI command for either lookup.
 /// </summary>
 public sealed class GateReferenceLedger : IGateEvidenceSink
 {

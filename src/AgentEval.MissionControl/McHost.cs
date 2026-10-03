@@ -7,6 +7,7 @@ using AgentEval.MissionControl.GraphQL;
 using AgentEval.MissionControl.Rest;
 using AgentEval.MissionControl.Services;
 using AgentEval.Output;
+using ChilliCream.Nitro.App;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace AgentEval.MissionControl;
@@ -200,9 +201,25 @@ public static class McHost
             await next();
         });
 
-        // GraphQL endpoint at /graphql. The embedded "Nitro" UI (Hot Chocolate's
-        // successor to BananaCakePop) is reachable at /graphql in dev mode.
-        app.MapGraphQL("/graphql");
+        // GraphQL endpoint at /graphql. A browser GET to /graphql/ gets Hot Chocolate's
+        // Nitro GraphQL IDE (ChilliCream.Nitro.App, successor to BananaCakePop).
+        // Two Nitro defaults are overridden so opening the IDE does not contact ChilliCream:
+        //   - ServeMode: the default (ServeMode.Latest) makes this server proxy the IDE's
+        //     files from https://cdn.chillicream.com/web/ on each request. Embedded serves
+        //     the copy bundled inside ChilliCream.Nitro.App.dll, so the server makes no
+        //     outbound request.
+        //   - DisableTelemetry: when unset, the IDE's browser code POSTs a device id, the
+        //     OS, the user agent and the Nitro version to telemetry.chillicream.com. The
+        //     value is served to the IDE in /graphql/nitro-config.json.
+        // Nitro's browser code still polls https://api.chillicream.cloud/status for an
+        // online check; no Nitro option turns that off. The CSP above (connect-src 'self')
+        // tells the browser to block it (not verified in a browser). The two options are
+        // pinned by NitroIdePrivacyTests; PRIVACY.md describes all three.
+        app.MapGraphQL("/graphql").WithOptions((NitroAppOptions nitro) =>
+        {
+            nitro.ServeMode = ServeMode.Embedded;
+            nitro.DisableTelemetry = true;
+        });
 
         // REST: minimal binary + version surface (plan-07 §8.2).
         // Plan-08 portal-review B4 (T2.2, 2026-05-25): the deployment mode is
@@ -262,12 +279,21 @@ public static class McHost
         // `dotnet run --project src/AgentEval.MissionControl` boots the whole
         // portal (GraphQL + REST + UI) on one port.
         //
-        // Order matters: UseDefaultFiles must come BEFORE MapStaticAssets, else
-        // requests for "/" are 404'd. MapFallbackToFile handles SPA routes
-        // (e.g. /subjects/agent/Foo) by serving index.html so client-side
-        // react-router takes over.
+        // Order matters: UseDefaultFiles must come BEFORE the static-file
+        // middleware, else requests for "/" are 404'd. MapFallbackToFile handles
+        // SPA routes (e.g. /subjects/agent/Foo) by serving index.html so
+        // client-side react-router takes over.
+        //
+        // UseStaticFiles, not MapStaticAssets. MapStaticAssets serves from the
+        // build's static-web-assets manifest, which also lists pre-compressed
+        // .br/.gz variants. The copy `agenteval mc serve` launches has the files
+        // but not those variants, so a browser (which always sends
+        // Accept-Encoding: gzip, br) got 200 with an empty body and no content
+        // type for every asset: the JS bundle never ran and the portal was blank.
+        // UseStaticFiles serves what is actually under wwwroot/, with the content
+        // type taken from the file extension.
         app.UseDefaultFiles();
-        app.MapStaticAssets();
+        app.UseStaticFiles();
         app.MapFallbackToFile("index.html");
     }
 

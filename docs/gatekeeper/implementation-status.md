@@ -3,7 +3,7 @@
 > **Status:** **Gatekeeper v1**: the public surface is frozen (snapshot-tested) and stable-labelled inside
 > the `AgentEval` package. One live promotion validation (remote A2A) remains deferred.
 >
-> **Updated:** 2026-10-01
+> **Updated:** 2026-10-03
 >
 > **Publication target:** the current main branch
 
@@ -95,8 +95,13 @@ discoverable demonstrations and records review evidence separately.
 | 11 | 11.6 | Tool-result behavioral anomaly | 100% | ✅ | Contrasts a fixed cap with per-tool run baselines, repeated non-poisoning anomaly handling, and run reset |
 | 11 | 11.R | Specialized-showcase promotion review | 100% | ✅ | Six launcher oracles pass; synchronized manifest/catalog has 30 entries; Release build 0 warnings; regressions, formatter, DocFX, and scoped MAF review are green |
 
-The Crescendo sample intentionally stays deterministic and offline. Live semantic promotion remains owned by the
-calibrated-corpus workflow, avoiding a second uncalibrated model path that could be mistaken for production evidence.
+When phase 11 closed, the Crescendo sample (25) stayed deterministic and offline on purpose: live semantic promotion
+is owned by the calibrated-corpus workflow, and a second, uncalibrated model path could be mistaken for production
+evidence. The owner reversed that decision on 2026-10-02 under the rule "Gatekeeper samples: real by default,
+scripted as a labelled fallback". Sample 25 now runs live by default on the configured model, and the run states
+that its judge is the configured model, not a calibrated trajectory judge: it shows the mechanism, not production
+detection quality. The scripted path remains the deterministic evidence, and the CI suite runs it. Samples 14–17 and
+28 became live-first in the same change; the rows above record the scripted paths those phases delivered.
 
 ## Documentation and sample usability consolidation
 

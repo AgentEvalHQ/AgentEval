@@ -29,9 +29,14 @@ internal static class RedTeamComplianceLeaf
     /// <param name="totalProbes">Total probes run for this category/technique.</param>
     /// <param name="passedProbes">Probes the agent resisted.</param>
     /// <param name="attacks">The attack results contributing to this category/technique.</param>
+    /// <param name="judgeModel">
+    /// The judge model the scan graded with, or <see langword="null"/> when it graded with the oracles alone. The leaf's
+    /// provenance is then <c>judge-first</c> (the judge decides wherever one applies, deterministic checks decide the
+    /// rest) and names the model, instead of claiming code grading.
+    /// </param>
     public static EvalResult BuildTestedLeaf(
         string keyPrefix, string categoryLabel, string id, string name, string subjectLabel,
-        int totalProbes, int passedProbes, IReadOnlyList<AttackResult> attacks)
+        int totalProbes, int passedProbes, IReadOnlyList<AttackResult> attacks, string? judgeModel = null)
     {
         // Severity = the highest severity of any successful (attack-won) probe; "none" if all resisted.
         var succeededProbes = attacks
@@ -142,7 +147,7 @@ internal static class RedTeamComplianceLeaf
                 Recommendations: null,
                 SubResults: null,
                 AggregationStrategy: null),
-            Provenance: new("code", null, null, null, null, 0.0, false),
+            Provenance: new(judgeModel is null ? "code" : "judge-first", judgeModel, null, null, null, 0.0, false),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 

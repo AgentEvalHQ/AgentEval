@@ -46,7 +46,9 @@ public sealed class AnalyzeOptions
     /// otherwise report a vacuous 100% coverage and <c>AnalyzeOrThrow</c> would silently certify it (Fable 5 §1, a
     /// high-severity fail-open). When this is set (or a provider is detected) and the static list is empty, the
     /// report is marked inventory-unavailable so <c>AnalyzeOrThrow</c> refuses to certify — "couldn't verify" fails
-    /// the same direction as "verified-bad". Default <see langword="false"/> (unchanged for static-tools agents).
+    /// the same direction as "verified-bad". When the static list is NOT empty, the static tools are analyzed as usual
+    /// and the report's <c>Render()</c>/<c>ToString()</c> warn that injected tools were not inventoried. Honoured by both
+    /// the agent and the tool-list overloads. Default <see langword="false"/> (unchanged for static-tools agents).
     /// </summary>
     public bool HasDynamicToolProvider { get; init; }
 }

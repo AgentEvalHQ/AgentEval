@@ -61,34 +61,22 @@ fragment and the diagnostic reaches stderr.
 An optional **judge override**, independent of the selector above. When all three are set they win
 outright, so a capable grader can face a cheap subject in a single run. The same endpoint policy applies.
 
-### `AGENTEVAL_ALLOW_STUB_JUDGE`
+### `AGENTEVAL_ALLOW_STUB_JUDGE` (retired)
 
-Opt-in escape valve for running benchmarks **without any provider configured**. Set to `1` or `true`
-(case-insensitive) to fall back to a deterministic placeholder evaluator that returns score **75/100** and
-"criterion met" for every criterion.
-
-**Do NOT use in CI.** Stub-mode results are not real judgements; the CLI prints a warning to stderr on
-every run, and the produced evidence is unsuitable for any compliance claim. Use this only for
-smoke-testing the pipeline end-to-end without LLM cost.
-
-| Platform | Set the variable |
-|---|---|
-| Linux / macOS (bash, zsh) | `export AGENTEVAL_ALLOW_STUB_JUDGE=1` |
-| Windows (PowerShell) | `$env:AGENTEVAL_ALLOW_STUB_JUDGE = "1"` |
-| Windows (cmd) | `set AGENTEVAL_ALLOW_STUB_JUDGE=1` |
-| GitHub Actions | `env: AGENTEVAL_ALLOW_STUB_JUDGE: "1"` *(don't — set a provider's secrets instead)* |
+Ignored since 0.43. Through 0.42 it let the `bench` commands, and `calibrate`, run with a placeholder judge that
+scored 75/100 with every criterion met, so the results and calibration figures measured no judge. There is no
+stand-in judge now: with no provider configured, every command that needs a judge exits 3. To try a command
+without a model, use `--sut mock` (see [`agenteval bench`](#agenteval-bench)): it runs a built-in stand-in agent
+and a placeholder judge, says MOCK, exits 11 and writes nothing to `.agenteval/`.
 
 **Resolution order** (exit codes per [Exit codes](#exit-codes)):
 
 1. Test override (programmatic; not user-visible).
 2. All three `AZURE_OPENAI_JUDGE_*` set → that judge, whatever the selector says.
 3. A provider resolves with credentials → the real judge for that provider.
-4. **Any provider variable or the selector is set, but a provider could not be built → exit 3
-   (`RuntimeError`), even with `AGENTEVAL_ALLOW_STUB_JUDGE=1`.** The stub rescues an *unconfigured*
-   machine, never a *misconfigured* one: before v0.41.0-beta, `AI_INFERENCE_PROVIDER=foundry` with its
-   variables missing would fall through to the stub and produce stub-graded evidence from a typo.
-5. Nothing configured at all + `AGENTEVAL_ALLOW_STUB_JUDGE=1` → stub judge, with a stderr warning.
-6. Nothing configured + no opt-in → exit 3, listing each provider and the variables it would need.
+4. Any provider variable or the selector is set, but a provider could not be built → exit 3
+   (`RuntimeError`), saying the provider is misconfigured.
+5. Nothing configured → exit 3, listing each provider and the variables it would need.
 
 ### `AgentEval__Root`
 
@@ -114,6 +102,38 @@ Covers every LLM call the CLI makes for the invoked command — the agent/SUT un
 **⚠️ Contains raw, unredacted content.** The log file includes the full text of every prompt and response — which can carry secrets, PII, or anything else present in your data or the model's output. `--log-file` is opt-in specifically for troubleshooting: turning it on means you want to see exactly what was sent and received. **Never commit or share the resulting file.** The file is overwritten on each invocation, so a fresh run always starts clean.
 
 An unwritable `--log-file` path (missing parent directory, no permissions) never fails the command — it prints one warning to stderr and the invoked command runs exactly as it would without `--log-file` at all. Verbose logging is a debugging aid; it must never be why an otherwise-successful run fails.
+
+A command line that does not parse exits `2` before `--log-file` or `--capture-fixture` is opened, so neither file is created or overwritten — see [Exit codes](#exit-codes).
+
+---
+
+## Fixture capture
+
+`--capture-fixture <path>` is a global option, available on every command. It writes one JSON line per LLM
+round-trip to `<path>`, for [`agenteval log-file`](#agenteval-log-file) to turn into a test fixture or to
+replay against another model. It is separate from `--log-file`, and the two can be passed together:
+`--log-file` is a log for reading, while each `--capture-fixture` line is a self-contained record of one
+round-trip, including every message the request sent.
+
+```bash
+agenteval eval --dataset my-data.jsonl --azure --deployment-name gpt-4o-mini --capture-fixture capture.jsonl
+```
+
+Each line has these fields:
+
+| Field | Content |
+|---|---|
+| `Index`, `Label` | The round-trip's position among those of the same client, and the client's role (`agent`, `judge`, …). |
+| `Kind` | `response`; `error` (the call threw); or `abandoned` (a streamed response the caller stopped reading before it ended). |
+| `TimestampUtc`, `ElapsedMs` | When the line was written, and how long the round-trip took. |
+| `Request` | The instructions, the options (temperature, max output tokens, model id, tool definitions) and every message sent, as role and text. |
+| `Response` | Text, tool calls, finish reason and token usage. Only on `response` lines. |
+| `Error` | The full exception text, stack trace included. Only on `error` lines. |
+
+**Treat the file like a `--log-file`.** Strings that match known credential formats are masked before each line
+is written; everything else — prompts, responses, personal data — is written as it was sent or received. Never
+commit or share the file. It is overwritten on each invocation, and an unwritable path prints one warning and the
+command runs without capture.
 
 ---
 
@@ -202,8 +222,8 @@ agenteval eval --dataset <path> --endpoint <url> [--model <name>] [--azure --dep
 **What it does**
 
 Loads a YAML, JSON, JSONL, CSV, or TSV dataset, evaluates the agent, and exports results as JSON,
-JUnit/XML, Markdown, TRX, CSV, or a structured directory. It supports stochastic reruns,
-LLM-as-judge, custom metrics, and the `--output-dir` ADR-002 directory export.
+JUnit/XML, Markdown, TRX, CSV, or a structured directory. It supports stochastic reruns (`--runs`),
+LLM-as-judge, named metrics (`--metrics`), and the `--output-dir` ADR-002 directory export.
 
 **Key options**
 
@@ -214,22 +234,45 @@ LLM-as-judge, custom metrics, and the `--output-dir` ADR-002 directory export.
 | `--model <name>` | Required for non-Azure endpoints. |
 | `--api-key <key>` | API key or environment variable fallback. |
 | `--sut copilot-studio` | Evaluate a live Microsoft Copilot Studio agent instead of `--endpoint`/`--azure` — bring your own dataset (prompts + judge criteria); requires `--copilotstudio-config`/`--i-understand-live-side-effects`. See [Copilot Studio](copilot-studio.md). |
-| `--system-prompt` / `--system-prompt-file` | Set the agent system prompt inline or from file. |
-| `--temperature` / `--max-tokens` | Sampling and output-length controls. |
-| `--metrics <list>` | Comma-separated named metrics to score ADDITIONALLY, alongside the normal pass/fail gate (e.g. `llm_relevance,code_tool_success`) — each is scored against the SAME captured response, never a second agent call. An unknown name fails fast, before any network call. **Resolvable names today** (v1, not the same list `agenteval list --type metrics` prints — that list is broader/aspirational, see the note below): `llm_relevance`, `llm_faithfulness`, `llm_context_precision`, `llm_context_recall`, `llm_answer_correctness`, `llm_groundedness`, `llm_coherence`, `llm_fluency`, `llm_bias`, `llm_misinformation`, `llm_task_completion`, `code_tool_success`, `code_tool_efficiency`, `code_toxicity`, `code_skill_disclosure_efficiency`. LLM-based (`llm_*`) names need `--judge` (or fall back to the SUT's own model on the `--endpoint`/`--azure` path); code-based (`code_*`) names need neither. Not yet wired for `--runs > 1` (stochastic mode warns and ignores it), and a handful of names `agenteval list --type metrics` shows are not yet resolvable via `--metrics` at all — `code_tool_selection`/`code_tool_arguments` (need per-test-case config `--metrics` has no source for), `code_mrr`/`code_recall_at_k`/`embed_*` (parametrized or embedding-only), and `ConversationCompleteness` (a different evaluation shape, not the standard metric interface). |
-| `--runs <N>` / `--success-threshold <N>` | Stochastic evaluation controls. |
+| `--system-prompt` / `--system-prompt-file` | Set the agent system prompt inline or from file. A `--system-prompt-file` that does not exist is ignored. |
+| `--temperature <value>` | Sampling temperature sent with every agent call. Omitted: nothing is sent and the provider's default applies. Given: the value is sent as given, `0` included. `0` narrows sampling; it does not guarantee identical outputs. |
+| `--max-tokens <n>` | Maximum output tokens per agent call. Omitted: nothing is sent. |
+| `--metrics <list>` | Comma-separated named metrics to score in addition to the normal pass/fail check (e.g. `llm_relevance,code_tool_success`). Each is scored against the same captured response; the agent is not called again. Omitted: no named metric is scored. An unknown name fails before any network call. Accepted names: `llm_relevance`, `llm_faithfulness`, `llm_context_precision`, `llm_context_recall`, `llm_answer_correctness`, `llm_groundedness`, `llm_coherence`, `llm_fluency`, `llm_bias`, `llm_misinformation`, `llm_task_completion`, `code_tool_success`, `code_tool_efficiency`, `code_toxicity`, `code_skill_disclosure_efficiency`. `agenteval list --type metrics` prints these and also names `--metrics` does not accept, each marked `[library only: not available via --metrics]`: `embed_answer_similarity`, `embed_response_context`, `embed_query_context`, `code_tool_selection`, `code_tool_arguments`, `code_recall_at_k`, `code_mrr` and `ConversationCompleteness`. They need input `--metrics` has no source for (expected tools, an embedding generator, a K; `ConversationCompleteness` scores a multi-turn conversation, not a single response), so construct them in code. LLM-based (`llm_*`) names need `--judge`, or on the `--endpoint`/`--azure` path fall back to the agent's own model; code-based (`code_*`) names need neither. Ignored, with a warning, when `--runs` is greater than 1. |
+| `--runs <N>` | Runs per test case. Default `1`. Must be at least `1`; greater than `1` is stochastic mode (below), which needs at least 3 runs. |
+| `--success-threshold <0..1>` | Stochastic mode only: the share of a test case's runs that must pass for the test case to pass. Default `0.8`. Not used, and not checked, when `--runs` is `1`. |
 | `--judge` / `--judge-model` | Separate LLM-as-judge endpoint/model. |
-| `--format <fmt>` | Export format. |
-| `-o, --output <path>` | Output file for single-file formats. |
-| `--output-dir <path>` | Structured directory output (`results.jsonl`, `summary.json`, `run.json`). |
+| `--format <fmt>` | Export format. Default `json`. Not written in stochastic mode. |
+| `-o, --output <path>` | Output file for single-file formats. Default: stdout. Not written in stochastic mode. |
+| `--output-dir <path>` | Structured directory output (`results.jsonl`, `summary.json`, `run.json`). Not written in stochastic mode. |
+| `--quiet` | Suppress the header, progress, summary, and the `--metrics` and `--sut` warnings. Errors, and the stochastic-mode export warning below, are still printed. |
+
+**Stochastic mode (`--runs` greater than 1)**
+
+Each test case is run N times. A test case passes when the share of its runs that passed is at least
+`--success-threshold`, and the command exits `1` when any test case does not. The stochastic runner needs at
+least 3 runs, so `--runs 2` is a usage error (exit `2`), as are `0` and negative values; in this mode a
+`--success-threshold` outside 0–1 is a usage error too. These checks run before anything is loaded or called.
+
+A table and a pass/fail line per test case, and a closing summary, are printed to stderr. **No export is
+written**: nothing goes to stdout, to `-o`, or to `--output-dir`, because no exporter accepts a stochastic
+result — the report the exporters take holds one score per test, and the JUnit, TRX, CSV and Markdown
+exporters do not write its metadata, so a stochastic result would read as a single run. When `--format`, `-o` or
+`--output-dir` is given, a warning names each one with its value before the first agent call, and a file
+already at one of those paths is left unchanged. `--metrics` is ignored in this mode, with a warning.
+
+**With `--sut`**
+
+The target configures its own model, so `--temperature`, `--max-tokens`, `--system-prompt` and
+`--system-prompt-file` are not applied. A warning names the ones given (not printed with `--quiet`).
 
 **Exit codes**
 
 | Code | Meaning |
 |------|---------|
-| `0` | Evaluation completed successfully. |
-| `1` | Test failure or validation error. |
-| `3` | Runtime error. |
+| `0` | Every test case passed. |
+| `1` | At least one test case failed — in stochastic mode, its pass rate was below `--success-threshold`. |
+| `2` | Usage error: a missing `--dataset`, an unknown option, a value that does not parse (such as `--runs abc`), `--runs` below 1, or a `--runs` or `--success-threshold` value stochastic mode does not accept. |
+| `3` | Runtime or configuration error — including a missing `--endpoint`/`--azure`/`--model`, a dataset that does not exist or is empty, an unknown `--metrics` name, and an unknown `--format`, which is reported only after the evaluation has run. |
 
 ---
 
@@ -326,21 +369,77 @@ Warnings (e.g. a subject folder with a missing `subject.json`) do not affect the
 
 ---
 
+### `agenteval compare`
+
+Compare two runs from the `.agenteval/` store, and print score deltas only when the two runs can be shown to
+have measured the same thing.
+
+**Synopsis**
+
+```
+agenteval compare --baseline <run-dir> --candidate <run-dir> [--strict] [--json]
+```
+
+**What it does**
+
+Reads the scenario files of two run directories — the folders under
+`.agenteval/subjects/<kind>/<name>/runs/<runId>/` that hold `manifest.json`, `summary.json` and `scenarios/`.
+Pointing at the `scenarios/` folder itself also works. Nothing else is read: no manifest, no workspace
+discovery, no network. The `eval --output-dir` layout (`results.jsonl`, `summary.json`, `run.json`) is a
+different format with no scenario files.
+
+The comparison is **refused** — the reasons are printed and no delta is — when:
+
+- the two runs do not hold the same set of scenario ids, or share none;
+- either run recorded no comparability facts for a shared scenario (runs written before those facts existed); or
+- for a shared scenario, one of these axes differs between the runs, or only one run recorded it: `evalKey`,
+  `evalVersion`, `effectiveBar` (the pass bar applied, compared exactly), `judge` (judged by a model or not),
+  `judge.modelId`, `judge.rubricDigest`, and `stimulus` (a hash of what the scenario was asked).
+
+An axis that **neither** run recorded is not counted as a match: it is printed as a blind spot, before the
+deltas. `--strict` refuses on it instead. When neither run used a judge, `judge` matches but `judge.modelId` is
+such a blind spot, so `--strict` refuses two runs that were both graded without a judge.
+
+When the runs are comparable, the report lists each shared scenario's baseline score, candidate score and delta,
+then the mean delta and how many scenarios recovered (failed, then passed) or regressed (passed, then failed).
+A delta too small to show at four decimal places is printed in scientific notation rather than as `0.0000`. Two
+findings are printed without blocking the comparison: scenarios where a run recorded no usable chance floor, so
+the delta cannot be read against chance, and scenarios graded by a judge running the subject's own model.
+
+**Options**
+
+| Option | Description |
+|--------|-------------|
+| `--baseline <path>` | Required. The baseline run directory. |
+| `--candidate <path>` | Required. The candidate run directory. |
+| `--strict` | Also refuse when an axis was recorded by neither run. |
+| `--json` | Print the comparison as JSON on stdout instead of the report. `deltas` is `null` when the comparison is refused. |
+
+**Exit codes**
+
+| Code | Meaning |
+|------|---------|
+| `0` | Comparable; the deltas are printed. |
+| `2` | A path is missing or not a directory, holds no scenario files, or holds a file that is not a readable scenario; or a run repeats a scenario id. |
+| `13` | Incomparable; the reasons are printed and no delta is. |
+
+---
+
 ### `agenteval bench`
 
 Run benchmark families against a subject (agent or workflow). The benchmark registry now includes
 GDPR, EU AI Act, Agentic, OWASP, MITRE, NIST, Performance, LongMemEval, TypedMemEval, Memory,
 Trace Fidelity, and AutoAudit. Results flow into `.agenteval/` so Mission Control and
-`agenteval doctor` can read them.
+`agenteval doctor` can read them (except `autoaudit`, which prints its report and writes it with `--out`).
 
 **Synopsis**
 
 ```
 agenteval bench --list
 agenteval bench <family> [family-specific options]
-agenteval bench gdpr calibrate [--root <path>] [--out <path>]
-agenteval bench eu-ai-act calibrate [--root <path>] [--out <path>]
-agenteval bench agentic calibrate [--root <path>] [--out <path>]
+agenteval bench gdpr calibrate [--root <path>] [--out <path>] [--decisions]
+agenteval bench eu-ai-act calibrate [--root <path>] [--out <path>] [--decisions]
+agenteval bench agentic calibrate [--root <path>] [--out <path>] [--records <path>] [--limit <n>]
 ```
 
 **Families**
@@ -359,17 +458,19 @@ agenteval bench agentic calibrate [--root <path>] [--out <path>]
 | `memory` | Memory retention / cross-session benchmark. |
 | `trace-fidelity` | Chat-boundary vs agent-boundary trace reconciliation. |
 | `workflow-trace-fidelity` | Per-executor workflow ledger (tokens + finish reason) vs chat-boundary truth. |
-| `autoaudit` | GlassBox-style multi-endpoint workflow auto-audit. |
+| `autoaudit` | Glass Box auto-audit of the configured models (or `--models a,b`): one support task each, ranked on honesty, safety and cost. Without a provider it refuses; `--sut mock` runs the scripted showcase, labelled MOCK. |
 
 **Notes**
 
 - `agenteval bench --list` prints the registry-backed family catalog.
-- **Exit codes:** `bench <family>` and `bench <regulation> calibrate` return **9** (FAIL), **10** (WARN — `bench <family>` only), or **11** (indeterminate) for a benchmark gate outcome, and **3** if the judge fails to configure — see [Exit codes](#exit-codes).
-- Compliance and agentic families support calibration helpers where available.
+- **Exit codes:** `bench <family>` and `bench <regulation> calibrate` return **9** (FAIL), **10** (WARN — `bench <family>` only), or **11** (indeterminate) for a benchmark gate outcome, and **3** if the judge fails to configure — see [Exit codes](#exit-codes). A missing required option (`--subject`, and for some families `--input`, `--vertical`, `--agent-trace`/`--chat-trace` or `--workflow-trace`), an `--evidence-detail` value other than `references` or `content`, and `agenteval bench` with no family and no `--list` return **2**.
+- Compliance and agentic families support calibration helpers where available. Each calibration report names the judge's provider and model in its header.
+- **`bench gdpr calibrate --decisions` and `bench eu-ai-act calibrate --decisions`** grade the golden datasets with the decision model (TypeSafe Jev) instead of the generative judge. The transport is read from `TYPESAFE_API_KEY` or `OPENROUTER_API_KEY` (`JEV_TRANSPORT` forces one, `JEV_MODEL` pins a build); with neither configured the command exits **3**. The report header names the provider (TypeSafe or OpenRouter) and the model that was requested, marked as requested, because the provider may serve a different build under that name. It never contains the key or the endpoint.
 - **`typedmemeval` takes `--vertical <prospective|episodic|arithmetic|workingmemory|forgetting>` and `--subject`, both required** — the verticals measure different mechanisms, so there is no default. Corpora are embedded (no download, no dataset path); `AZURE_OPENAI_*` is required and there is no stub fallback. It prints the typed outcome vector with every denominator and gates on nothing: the family publishes no pass threshold, so a run exits **0** when it measured anything and **11** (`GateIndeterminate`) when it measured nothing, and its run summary is recorded as `WARN` (indeterminate) rather than PASS/FAIL. Cite results as `TypedMemEval-<Vertical> v5 (AgentEval)` — never summed or averaged with LongMemEval numbers. `--vertical prospective` additionally requires the agent under test to implement `ITimestampedHistoryInjectableAgent`; the run refuses before its first provider call otherwise.
 - Family-specific options and presets are documented under [Benchmarks](benchmarks.md) and the family pages in the TOC.
 - For the Trace Fidelity and AutoAudit families, see the historical design docs under `docs/glassbox-history/` (linked in the TOC under Resources).
-- **`owasp`/`mitre`/`nist` reach a live target** beyond the default built-in stub / `--azure-from-env`: `--sut copilot-studio` (same flags as `eval`/`redteam`) or a generic `--endpoint <url> --model <name> [--api-key <key>]` OpenAI-compatible endpoint. **`gdpr`/`eu-ai-act` also support `--sut copilot-studio`** (drives the live agent per-scenario instead of grading a static `--response`) — no generic `--endpoint` for these two yet. `agentic`/`memory`/`perf` do not have `--sut` at all — whether they ever should is an open product question, not just unbuilt.
+- **Every `bench` family that grades an agent needs a real target, or it refuses (exit 2).** `owasp`/`mitre`/`nist`/`perf` take `--azure-from-env` (the configured provider), `--sut copilot-studio` (same flags as `eval`/`redteam`) or a generic `--endpoint <url> --model <name> [--api-key <key>]` OpenAI-compatible endpoint. `gdpr`/`eu-ai-act` take `--azure-from-env` or `--sut copilot-studio` (each scenario's prompt is sent to the live agent), or the agent's real answer with `--response`/`--response-file` plus the `--input` it answered. `agentic` grades a supplied `--response`/`--response-file` with its `--input`. `--sut mock` runs a built-in stand-in instead of an agent: the run says MOCK, exits 11 whatever it scores, and nothing is written to `.agenteval/`. Through 0.42 these commands quietly fell back to a stand-in and stored the result as a measurement.
+- **`owasp`/`mitre`/`nist` grade judge first, as `redteam --judge` does.** The judge model comes from the environment (the `AZURE_OPENAI_JUDGE_*` override if set, otherwise the provider `AI_INFERENCE_PROVIDER` selects); there is no option to pick it. With no provider configured the command exits **3**; `--sut mock` needs none and grades with the oracles alone. Before the scan the command makes one short call to the judge and exits **3** if it does not answer. The semantic attacks are graded by Composite Judges (several judge calls per probe); the other attacks by their per-attack oracle, which asks the judge only when it is inconclusive, and the judge may then only raise the probe to "attack succeeded". If a judge call fails during the scan, or the scan runs out of time, the run is INCOMPLETE: stored as `WARN` and exit **11**, never a pass or a fail. See the [OWASP](benchmarks/owasp/getting-started.md#presets) and [MITRE](benchmarks/mitre/getting-started.md#presets) pages for probe counts.
 
 ---
 
@@ -388,11 +489,18 @@ agenteval list [--type metrics|attacks|exporters|datasets]
 Prints the available metrics, attack types, export formats, and dataset formats. With no filter it
 prints all four catalogues.
 
+The metrics catalogue marks every name that `eval --metrics` cannot resolve with
+`[library only: not available via --metrics]`. Whether a name carries the marker is read from the same table
+`--metrics` resolves against, so the listing cannot offer a name the command then refuses. Marked names need
+input `--metrics` has no source for (expected tools, an embedding generator, a K); construct them in code.
+
 **Options**
 
 | Option | Description |
 |--------|-------------|
 | `--type <metrics|attacks|exporters|datasets>` | Print a single catalogue instead of all four. |
+
+**Exit codes:** `0` when the catalogue is printed; `2` for an unknown `--type`.
 
 ---
 
@@ -413,7 +521,8 @@ agenteval redteam [--azure] [--endpoint <url>] [--model <name>] [--deployment-na
 |--------|-------------|
 | `--azure` / `--endpoint` / `--deployment-name` | Azure OpenAI mode. |
 | `--endpoint` / `--model` | OpenAI-compatible mode (OpenAI, Ollama, Groq, vLLM, LM Studio, etc.). |
-| `--sut` | Built-in target instead of an endpoint: `gatekeeper-demo` (credential-free demo) or `copilot-studio` (a live Microsoft Copilot Studio agent). |
+| `--sut` | Built-in target instead of an endpoint: `gatekeeper-demo` (the Gatekeeper demo: the configured model behind the gate, or a labelled scripted model when no provider is configured) or `copilot-studio` (a live Microsoft Copilot Studio agent). |
+| `--scripted` | With `--sut gatekeeper-demo`: run the scripted model even when a provider is configured. Deterministic and free; use it for stable CI baselines. A baseline taken on one model is refused against a run on another (exit 3). See [Attack the gate](gatekeeper/attack-the-gate.md). |
 | `--attacks` | Comma-separated attack list; `--pack` imports external benchmark packs. |
 | `--judge` / `--attacker` | Separate judge/attacker models for LLM-as-judge and attacker-LLM flows. |
 | `--format` / `-o` | Export format and output destination. |
@@ -563,9 +672,11 @@ NOT have this limitation. See [Agent Skills](agent-skills.md#2--compliance-scann
 
 ### `agenteval skills baseline`
 
-Inspects the multi-snapshot skill baseline ledger `agenteval skills scan --write-baseline` writes to. Each
-snapshot is a full point-in-time capture (structural fingerprint + file-content hash per skill, plus that
-skill's compliance findings at the time) — never overwritten, so the ledger accumulates history across scans.
+`list`, `diff` and `history` inspect the multi-snapshot skill baseline ledger that
+`agenteval skills scan --write-baseline` writes to. Each snapshot is a full point-in-time capture (structural
+fingerprint + file-content hash per skill, plus that skill's compliance findings at the time) — never
+overwritten, so the ledger accumulates history across scans. `approve` works on a different file: the
+single-file manifest baseline that Gatekeeper's skill check reads.
 
 **Synopsis**
 
@@ -573,6 +684,7 @@ skill's compliance findings at the time) — never overwritten, so the ledger ac
 agenteval skills baseline list  [--baseline-root <dir>]
 agenteval skills baseline diff  [--baseline-root <dir>] [--since <id>] [--skill <name>] [--hash structural|content]
 agenteval skills baseline history <skill-name> [--baseline-root <dir>]
+agenteval skills baseline approve <skill-name> --skill-path <dir> --baseline <file> [--note <text>]
 ```
 
 **`list`** — every captured snapshot (Id, capture time, scanned root, skill count), oldest listed first.
@@ -587,16 +699,28 @@ for a cosmetic-only edit) — this is the "don't cry wolf on every cosmetic edit
 **`history <skill-name>`** — walks the ledger chronologically and reports every point where that skill's
 content hash changed, with any High-severity findings present at each change point.
 
-**Options common to all three**
+**`approve <skill-name>`** — re-pins one skill in a manifest baseline file: the `SkillManifestBaseline` JSON that
+`skills scan --save-manifest-baseline` writes and `GatekeeperOptions.SkillBaselinePath` points at. Use it after
+reviewing a change to that skill, for example when Gatekeeper's skill check has raised a `SkillDriftException`.
+It scans `--skill-path` offline (no model call), finds the skill whose manifest name equals `<skill-name>`
+exactly (case-sensitive), and replaces that skill's structural fingerprint — and its content hash, when the
+skill has a folder on disk. Every other skill's pinned entries are left as they were. The file's capture time
+is set to now; `--note` replaces the stored note, and without it the existing note is kept. A missing file or
+parent directory is created.
+
+**Options**
 
 | Option | Description |
 |--------|-------------|
-| `--baseline-root <dir>` | Baseline ledger root directory. Default `.agenteval/skills-baselines` (must match what `scan --write-baseline` used). |
+| `--baseline-root <dir>` (`list`, `diff`, `history`) | Baseline ledger root directory. Default `.agenteval/skills-baselines` (must match what `scan --write-baseline` used). |
 | `--since <id>` (`diff` only) | Diff this snapshot's Id against the most recent snapshot, instead of the two most recent. |
 | `--skill <name>` (`diff` only) | Only show the diff for this skill. |
 | `--hash structural\|content` (`diff` only) | Which hash to diff. Default `content`. |
+| `--skill-path <dir>` (`approve` only) | Required. The skill's directory, or a parent directory holding many skills. |
+| `--baseline <file>` (`approve` only) | Required. The manifest baseline file to update. |
+| `--note <text>` (`approve` only) | A note stored on the baseline — who approved it, and why. |
 
-**Exit codes:** `0` on success (including "nothing to diff yet" — informational, not an error); `3` on a runtime error (e.g. `--since <id>` not found in the ledger).
+**Exit codes:** `0` on success (including "nothing to diff yet" — informational, not an error); `3` on a runtime error (e.g. `--since <id>` not found in the ledger, or for `approve`, no skill named `<skill-name>` under `--skill-path`).
 
 ---
 
@@ -617,6 +741,8 @@ agenteval compliance render --regulation <reg> --subject <name> [--ts <timestamp
 | `--ts <timestamp>` | Timestamp directory (`yyyy-MM-dd_HH-mm-ss`). Defaults to most recent. |
 | `--root <path>` | Workspace root. Default: auto-detected. |
 
+A missing `--regulation` or `--subject` exits `2`.
+
 ---
 
 ### `agenteval render`
@@ -635,6 +761,61 @@ agenteval render --benchmark <kind> --subject <name> [--ts <timestamp>] [--root 
 | `--subject <name>` | Required. Subject name to render results for. |
 | `--ts <timestamp>` | Timestamp directory. Defaults to most recent. |
 | `--root <path>` | Workspace root. Default: auto-detected. |
+
+A missing `--benchmark` or `--subject` exits `2`.
+
+---
+
+### `agenteval log-file`
+
+Work with a file written by [`--capture-fixture`](#fixture-capture).
+
+**Synopsis**
+
+```
+agenteval log-file to-fixture <captured.jsonl> --out <fixture.json>
+agenteval log-file replay     <captured.jsonl> --out <report.md> (--azure-from-env | --endpoint <url> --model <name> [--api-key <key>]) [--strict-text]
+```
+
+**`to-fixture`** writes a JSON array of scripted turns that `ScriptedChatClient.FromFixture` loads, so a test
+can play back real model responses with no model behind it. A fixture scripts what the model answered, not what
+it was asked, so only responses are kept: each `response` line becomes a turn (text, tool calls, finish reason,
+token counts); each `error` line becomes a turn that throws the first line of the captured exception; and
+`abandoned` lines are skipped, with a note on stderr saying how many.
+
+**`replay`** reads the capture itself — not a `to-fixture` output, which no longer holds the requests — and
+resends the request of each `response` line to another target, one at a time and independently: the same
+messages, instructions, temperature, max output tokens, model id and tool definitions. Tools are declared to
+the target but never run. Each round-trip is compared on structure, not wording:
+
+| Verdict | When |
+|---|---|
+| Fail | The target threw; the tool calls differ (tool names and argument names, with the number of calls); the finish reason differs; or, with `--strict-text`, the text differs. |
+| Flag | Tool calls and finish reason match, but the response shape differs — a length bucket (under 100, up to 500, or over 500 characters) plus whether the text has a list or a code block. |
+| Pass | Tool calls, finish reason and response shape all match. |
+
+Token usage and latency are shown for information and never change a verdict. `error` and `abandoned` lines
+are not replayed; the report counts them as skipped. The Markdown report is written to `--out` and also printed
+to stdout.
+
+**Options**
+
+| Option | Description |
+|--------|-------------|
+| `<captured>` | Required, positional. A file written by `--capture-fixture`. |
+| `--out <path>` | Required. `to-fixture`: the fixture JSON array. `replay`: the Markdown report. A missing parent directory is created. |
+| `--azure-from-env` (`replay`) | Replay against the provider `AI_INFERENCE_PROVIDER` selects (see [Environment variables](#environment-variables)) — despite its name, not only Azure OpenAI. Checked before `--endpoint`. |
+| `--endpoint <url>` / `--model <name>` / `--api-key <key>` (`replay`) | Replay against an OpenAI-compatible endpoint. `--model` is required with `--endpoint`. Without `--api-key`, `OPENAI_API_KEY` is used, and without that a placeholder key for keyless local servers. |
+| `--strict-text` (`replay`) | Also fail a round-trip whose text is not identical. Off by default: model output is not reproducible, even against the same model with the same settings. |
+
+**Exit codes**
+
+| Code | Meaning |
+|------|---------|
+| `0` | `to-fixture`: the fixture was written. `replay`: no round-trip failed (flags do not fail the run). |
+| `1` | `replay`: at least one round-trip failed. |
+| `2` | `replay`: no target was given, `--endpoint` was given without `--model`, or `--azure-from-env` found no configured provider. |
+| `3` | The capture file does not exist, or another error occurred (for example, a line that is not a capture record). |
 
 ---
 
@@ -694,8 +875,8 @@ The CLI's exit-code contract, so CI can branch on the outcome. Source of truth: 
 |---|---|
 | `0` | Success — passed / allowed / no gate blocked. |
 | `1` | Test failure — one or more evaluations failed (`eval`, `redteam`). |
-| `2` | Usage error (bad flags, malformed input). Reserved strictly for bad-argument paths — see BUG-22 below. |
-| `3` | Runtime error (connection/model/IO failure). **Also** returned when a judge fails to build (`JudgeFactory` — missing or partial Azure OpenAI credentials, or a thrown exception constructing the client): that's a runtime/config problem, not a bad CLI argument. |
+| `2` | Usage error (bad flags, malformed input). Reserved strictly for bad-argument paths — see BUG-22 below. Every command returns it for a parse error (see below). `bench`, `compliance render` and `render` also return it for an argument they reject themselves before the run starts: a missing `--subject`; an unknown preset or domain pack (every `bench` family) or vertical (`bench typedmemeval`); an invalid `--budget-tier`; an invalid `--sut` configuration or `--endpoint` without `--model`; a `--response-file` that cannot be read; no target at all (every `bench` family that grades an agent, and `redteam` and `eval`), `--sut mock` together with a real target, or a `--response` without the `--input` it answered. A missing `.agenteval/` workspace is not an argument error: those commands exit `1` and tell you to run `agenteval init-workspace`. |
+| `3` | Runtime error (connection/model/IO failure). **Also** returned when a judge fails to build (`JudgeFactory` — missing or partial Azure OpenAI credentials, or a thrown exception constructing the client): that's a runtime/config problem, not a bad CLI argument. `redteam --sut gatekeeper-demo --baseline` also returns it when the baseline was taken on a different model (scripted vs real, or another real model). |
 | `4` | Regression vs a supplied `--baseline` — `redteam --fail-on regression` gate (a NEW finding vs pre-existing). |
 | `5` | `gatekeeper inspect` — a gate **Blocked** on real evidence. |
 | `6` | `gatekeeper inspect` — **fail-closed**: the CLI could not evaluate (e.g. a history gate with no `messages`). Not a policy block. |
@@ -703,7 +884,15 @@ The CLI's exit-code contract, so CI can branch on the outcome. Source of truth: 
 | `8` | `redteam --sut copilot-studio` — a live scan hit its `--max-credits` cap (BudgetExceeded). Enforced as an ESTIMATE (turns counted, not metered spend — the SDK exposes no real credit-cost field); see [Copilot Studio](copilot-studio.md#what---max-credits-does-today). |
 | `9` | `bench <family>` / `bench <reg> calibrate` — the composite/calibration gate is a hard **FAIL**. |
 | `10` | `bench <family>` — the composite gate is a **WARN** (soft finding, below ideal but not a hard failure). Calibration commands never return this — their thresholds are pass/fail binary. |
-| `11` | `bench <family>` — the composite gate could not produce a conclusive verdict (e.g. `skipped`). |
+| `11` | `bench <family>` — the composite gate could not produce a conclusive verdict (e.g. `skipped`). Every `--sut mock` run exits `11` whatever it scores: it measured no agent. |
+| `12` | Reserved by [ADR-031](adr/031-eval-packs-ship-reduced.md). No command returns it. |
+| `13` | `compare` — **incomparable**: the two runs could not be shown to have measured the same thing, so no delta was emitted (`Incomparable`). Distinct from `11`, which means a run produced nothing scoreable: here both runs produced verdicts, and comparing them would be meaningless. See [`agenteval compare`](#agenteval-compare). |
+
+**Parse errors exit `2`.** An unknown command or option, a value that does not parse (`--runs abc`), a missing
+required option, or no command at all exits `2`. System.CommandLine prints the errors to stderr and the command's
+help to stdout, as it always has; only the exit code differs from System.CommandLine's default, which is `1` and
+would read as a test failure. `--help` exits `0`, including on an otherwise incomplete command line
+(`agenteval eval --help` without `--dataset`), and so does `agenteval --version`.
 
 `redteam` uses `1` for failure, `3` for runtime error, and `4` for a `--fail-on regression` gate. Code `8` is
 returned by a live `--sut copilot-studio` scan that hits `--max-credits` (BudgetExceeded) — an estimate, not a

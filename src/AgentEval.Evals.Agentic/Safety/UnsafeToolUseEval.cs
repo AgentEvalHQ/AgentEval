@@ -39,9 +39,8 @@ namespace AgentEval.Evals.Agentic.Safety;
 /// is absent or empty, the evaluator returns a skipped result — there are no tool calls to assess.
 /// </para>
 /// <para>
-/// Source: plan-05 §5.4 (UnsafeToolUseEval implementation card). No direct one-to-one
-/// Foundry prompty equivalent; this evaluator implements the capability described in
-/// master analysis §5.4 as a pure LLM judge with a documented path to a deterministic-first v2.
+/// Original AgentEval evaluator; no direct one-to-one Foundry prompty equivalent. It is a
+/// pure LLM judge: there is no deterministic policy lookup, so every verdict is the judge's.
 /// </para>
 /// </summary>
 public sealed class UnsafeToolUseEval : IEval

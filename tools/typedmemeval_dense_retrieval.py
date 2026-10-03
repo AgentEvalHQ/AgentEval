@@ -41,6 +41,27 @@ SAME documents V9 uses (`render([session], [date])`, one per session):
 If DENSE does not clearly beat RANDOM the run is a wiring fault, not a finding, and the summary
 says so rather than printing a number.
 
+PROVIDER
+--------
+The embedding provider follows `AI_INFERENCE_PROVIDER`, by the rules `inference_provider.py` shares with
+the CLI -- with one deliberate difference: an UNSET selector means azure, never auto-detection. The
+retriever's identity is published, and auto-detection would let whichever keys sit in the shell pick it.
+
+    unset / azure   AZURE_OPENAI_ENDPOINT + AZURE_OPENAI_API_KEY + AZURE_OPENAI_EMBEDDING_DEPLOYMENT,
+                    api-version 2024-02-01, exactly as before. Vectors bank under
+                    .typedmemeval_embeddings/<model behind the deployment>/, so every shard banked
+                    before providers existed here stays where its readers look.
+    bitdeer         BITDEER_API_KEY (BITDEER_ENDPOINT optional). Model: TYPEDMEMEVAL_EMBEDDING_MODEL,
+                    default BAAI/bge-m3.
+    openai, foundry, openai-compatible
+                    that provider's variables (inference_provider.py); TYPEDMEMEVAL_EMBEDDING_MODEL is
+                    REQUIRED -- no default, because a guessed embedding model is a guessed retriever.
+
+Every provider but azure banks under .typedmemeval_embeddings/<provider_model slug>/ (bitdeer +
+BAAI/bge-m3 -> bitdeer_BAAI_bge-m3/), and each shard is stamped with provider and model. A shard's keys
+are text hashes, identical under every model, so without both guards one model's vectors would be
+served as another's -- the probe cache's lesson (no model in its key), not repeated here.
+
 USAGE
 -----
     python typedmemeval_dense_retrieval.py --dry-run            # stub embedder, spends nothing
@@ -54,6 +75,7 @@ import base64
 import collections
 import glob
 import hashlib
+import http.client
 import json
 import os
 import random
@@ -73,9 +95,22 @@ if hasattr(sys.stderr, "reconfigure"):
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import typedmemeval_common as tmc  # noqa: E402
+import inference_provider as ip    # noqa: E402
 
 CORPORA = os.path.join(os.path.dirname(HERE), 'src', 'AgentEval.Memory', 'Data', 'typedmemeval')
-API_VERSION = "2024-02-01"
+API_VERSION = "2024-02-01"         # the azure embeddings path's api-version, unchanged
+
+#: The embedding model for every provider except azure, which names a DEPLOYMENT in
+#: AZURE_OPENAI_EMBEDDING_DEPLOYMENT as it always has (and ignores this variable).
+EMBEDDING_MODEL_VARIABLE = 'TYPEDMEMEVAL_EMBEDDING_MODEL'
+
+#: A default only where the project chose one (TME-2, 2026-10-03). Anywhere else the model must be named.
+DEFAULT_EMBEDDING_MODEL = {'bitdeer': 'BAAI/bge-m3'}
+
+#: Retried statuses: rate limits, server faults, and 520-524 -- Cloudflare's "the origin did not answer
+#: properly", which a provider behind it (Bitdeer's edge) returns for a transient fault. Same set as the
+#: probe runner, where one of them ended a full baseline pass partway through.
+_TRANSIENT = (408, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524)
 
 #: Embedding cache directory, one file per vertical.
 #:
@@ -109,6 +144,7 @@ _stats = collections.Counter()
 
 
 def _config():
+    """The azure path's credentials, exactly as before providers existed here."""
     endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT", "").rstrip("/")
     key = os.environ.get("AZURE_OPENAI_API_KEY", "")
     deployment = os.environ.get("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "")
@@ -119,6 +155,99 @@ def _config():
             "Without them there is no dense arm, and a run that silently fell back to BM25 would "
             "report 'no difference' -- the most misleading answer available.")
     return endpoint, key, deployment
+
+
+#: The embedding provider's tag, resolved once per process. None = not yet resolved. Pinnable: the
+#: contract check pins it (as it pins `_resolved_model`) so its result cannot depend on the shell.
+_provider_tag = None
+
+
+def _embedding_provider() -> str:
+    """`azure` unless AI_INFERENCE_PROVIDER names another provider. Never auto-detected (module docstring)."""
+    global _provider_tag
+    if _provider_tag is None:
+        _provider_tag = ip.selected_tag() or 'azure'
+    return _provider_tag
+
+
+def _requested_model() -> str:
+    """The model a non-azure provider is asked for, or '' when none is named and there is no default."""
+    return (os.environ.get(EMBEDDING_MODEL_VARIABLE, '').strip()
+            or DEFAULT_EMBEDDING_MODEL.get(_embedding_provider(), ''))
+
+
+def cache_root_for(tag: str, model: str) -> str:
+    """Where one provider's model banks its vectors.
+
+    Azure keeps the layout it has always had, CACHE_DIR/<model>, so the ada-002 and 3-small shards stay
+    valid where they are. Every other provider gets CACHE_DIR/<slug of provider:model>: bge-m3 on bitdeer
+    and bge-m3 on a local server are different deployments of one weight file, quantised and served
+    differently, and they bank apart.
+    """
+    if tag == 'azure':
+        return os.path.join(CACHE_DIR, model)
+    return os.path.join(CACHE_DIR, ip.slug('%s:%s' % (tag, model)))
+
+
+def embedding_identity() -> str:
+    """`provider:model` of the dense arm -- the name a vector, a cached answer or a record must carry.
+    '' when the model is unknown (an azure deployment whose model could not be resolved)."""
+    model = _resolve_deployment_model()
+    return '%s:%s' % (_embedding_provider(), model) if model else ''
+
+
+def _embedding_request():
+    """(url, headers, extra body fields) for one embeddings call, or exit naming what is missing.
+
+    Reads the environment only; sends nothing. Nothing it returns is ever recorded -- the key and the
+    endpoint stay in this process.
+    """
+    tag = _embedding_provider()
+    if tag == 'azure':
+        endpoint, key, deployment = _config()
+        return (f"{endpoint}/openai/deployments/{deployment}/embeddings?api-version={API_VERSION}",
+                {"Content-Type": "application/json", "api-key": key}, {})
+    model = _resolve_deployment_model()
+    if not model:
+        sys.exit('%s=%s has no default embedding model, so %s must name one. Refusing to guess: a '
+                 'guessed embedding model is a guessed retriever.'
+                 % (ip.SELECTOR_VARIABLE, tag, EMBEDDING_MODEL_VARIABLE))
+    try:
+        provider = ip.resolve()
+    except ip.ProviderNotConfigured as error:
+        sys.exit('Embedding credentials are not set: %s\nWithout them there is no dense arm, and a run '
+                 'that silently fell back to BM25 would report "no difference".' % error)
+    if provider.tag != tag:
+        sys.exit('the embedding provider is %r but the environment resolves %r' % (tag, provider.tag))
+    # `headers()` carries an explicit User-Agent: Bitdeer's Cloudflare edge refuses urllib's default
+    # with 403 / error 1010 before the request reaches the API.
+    return provider.embeddings_url(), provider.headers(), {'model': model}
+
+
+def describe_target(dry_run: bool) -> str:
+    """One line naming the retriever this run would use. Never an endpoint or a key.
+
+    A dry run never resolves an azure deployment to its model: that is a network call, and a dry run
+    sends nothing.
+    """
+    tag = _embedding_provider()
+    if tag == 'azure':
+        ignored = (' (%s is ignored for azure: the deployment names the model)' % EMBEDDING_MODEL_VARIABLE
+                   if os.environ.get(EMBEDDING_MODEL_VARIABLE, '').strip() else '')
+        if dry_run:
+            return ('azure deployment %r, api-version %s; the model behind it is resolved from the '
+                    'deployments listing on a real run, not in a dry run%s'
+                    % (_deployment_name(), API_VERSION, ignored))
+        return ('%s (deployment %r, api-version %s), banked under %s%s'
+                % (embedding_identity() or 'azure:(model unresolved)', _deployment_name(), API_VERSION,
+                   os.path.relpath(_cache_root(), HERE), ignored))
+    model = _resolve_deployment_model()
+    if not model:
+        return '%s: NO MODEL -- set %s (this provider has no default)' % (tag, EMBEDDING_MODEL_VARIABLE)
+    source = (EMBEDDING_MODEL_VARIABLE if os.environ.get(EMBEDDING_MODEL_VARIABLE, '').strip()
+              else "the %s default" % tag)
+    return ('%s (model from %s), banked under %s'
+            % (embedding_identity(), source, os.path.relpath(cache_root_for(tag, model), HERE)))
 
 
 def _pack(vector) -> str:
@@ -142,10 +271,15 @@ def _cache_root() -> str:
 
     Falls back to the flat directory when the model cannot be resolved, so an unreachable
     deployments listing degrades to the previous behaviour rather than writing into a directory
-    named ''.
+    named ''. AZURE ONLY: the flat directory holds pre-split azure shards, and a non-azure provider
+    with no model has nothing to bank, so it stops instead.
     """
     model = _resolve_deployment_model()
-    return os.path.join(CACHE_DIR, model) if model else CACHE_DIR
+    tag = _embedding_provider()
+    if tag != 'azure' and not model:
+        raise SystemExit('%s names no embedding model for %s, so there is no directory its vectors '
+                         'belong in.' % (EMBEDDING_MODEL_VARIABLE, tag))
+    return cache_root_for(tag, model) if model else CACHE_DIR
 
 
 def _shard(name: str) -> str:
@@ -165,8 +299,14 @@ def _flat_shard(name: str) -> str:
 #: cost nothing, and the dense arm would be a comparison between two retrievers that were never
 #: the same one. Found in review of PR #238.
 #:
-#: The deployment NAME is recorded, never the endpoint or the key.
+#: The deployment NAME is recorded, never the endpoint or the key. Off azure there is no alias, and
+#: this key holds the identity itself, `provider:model` (`bitdeer:BAAI/bge-m3`) -- which no azure
+#: deployment name can spell, so the two can never match each other.
 _PROVENANCE_KEY = '__embedding_deployment__'
+
+#: The provider that produced a shard's vectors. Absent on every shard banked before providers existed
+#: here, all of which came from azure, so absent reads as `azure` -- and nothing else does.
+_PROVIDER_KEY = '__embedding_provider__'
 
 
 #: Keys under which a shard records WHAT its vectors are, as opposed to where they came from.
@@ -192,6 +332,10 @@ _loaded_from_disk = False
 
 
 def _deployment_name() -> str:
+    """The stamp `_PROVENANCE_KEY` carries: the azure deployment alias, or `provider:model` elsewhere."""
+    tag = _embedding_provider()
+    if tag != 'azure':
+        return '%s:%s' % (tag, _resolve_deployment_model() or '(unset)')
     return os.environ.get("AZURE_OPENAI_EMBEDDING_DEPLOYMENT", "") or "(unset)"
 
 
@@ -201,9 +345,16 @@ def _resolve_deployment_model() -> str:
     Returns '' rather than falling back to the deployment name. A retriever identity built from
     an alias identifies nothing, and one that GUESSES is worse than one that is absent: a reader
     can act on a missing field and cannot act on a wrong one.
+
+    Off azure there is no alias to resolve: the request names the model, so the model is what the
+    caller asked for (TYPEDMEMEVAL_EMBEDDING_MODEL or the provider's default) -- the same standing
+    the probe runner gives its `reference_model`. No network call either way off azure.
     """
     global _resolved_model
     if _resolved_model is not None:
+        return _resolved_model
+    if _embedding_provider() != 'azure':
+        _resolved_model = _requested_model()
         return _resolved_model
     _resolved_model = ''
     endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT", "").rstrip("/")
@@ -227,7 +378,7 @@ def _resolve_deployment_model() -> str:
     return _resolved_model
 
 
-def dense_retriever_id(model: str, dims: int) -> str:
+def dense_retriever_id(model: str, dims: int, provider: str = 'azure') -> str:
     """A versioned identity for the dense arm, in the shape `tmc.RETRIEVER_ID` uses for BM25.
 
     WHY THIS EXISTS. `RETRIEVER_ID` is `bm25-okapi-k1.5-b0.75`: the algorithm plus the two knobs
@@ -238,7 +389,10 @@ def dense_retriever_id(model: str, dims: int) -> str:
     It was measured but not VERSIONED, which is the open half of the C-B row.
 
     Each field is here because it changes the ranking, not because it was available:
-      * model  -- the whole retriever. This family's is `text-embedding-ada-002`, which a reader
+      * provider -- who served the model. `azure` for every id published before 2026-10, whose
+                  spelling is therefore unchanged (`azure-emb-...`); `bitdeer-emb-BAAI/bge-m3-...`
+                  after TME-2. One weight file served by two providers is two retrievers.
+      * model  -- the whole retriever. This family's was `text-embedding-ada-002`, which a reader
                   seeing only the word "azure-openai-embeddings" would have had no way to know.
       * dims   -- the width of the space the cosine is taken in.
       * cosine -- the similarity, taken over L2-normalised vectors (`cosine_rank` normalises at
@@ -250,7 +404,49 @@ def dense_retriever_id(model: str, dims: int) -> str:
     """
     if not model:
         return ''
-    return 'azure-emb-%s-d%d-cosine-f16' % (model, dims)
+    return '%s-emb-%s-d%d-cosine-f16' % (provider, model, dims)
+
+
+#: The dense column published until 2026-10. The stamp's 2026-09-14 model-comparison figures were
+#: measured against it and are written only beside it.
+_ADA_REFERENCE_ID = dense_retriever_id('text-embedding-ada-002', 1536)
+
+
+def _stamp_refusal(shard: dict):
+    """Why a shard's vectors must NOT be used by this run, or None when its stamp names this run's
+    provider, deployment and model. The ONE rule both the loader and the saver apply: a shard the
+    loader refuses must not be laundered back in by the merge-on-save under this run's stamp."""
+    stamped = shard.get(_PROVENANCE_KEY)
+    stamped_model = shard.get(_MODEL_KEY)
+    if stamped is None or stamped_model is None:
+        # UNSTAMPED IS REFUSED, not accepted. The guard used to read `if stamped is not None`,
+        # which accepts a shard carrying no provenance at all under ANY deployment -- and the
+        # one such file, `_migrated.json`, was read for every vertical. It was back-stamped on
+        # 2026-09-14 after re-embedding one of its own texts, so every shard on disk now
+        # carries provenance and requiring it costs nothing.
+        #
+        # It also closes the hole for callers that never reach `_verify_cache_matches_live`:
+        # `typedmemeval_v9_dense.py` loads this cache directly, and a structural refusal
+        # protects it whether or not it runs the live probe.
+        return ('no model provenance. Re-embed it, or delete it -- a shard that cannot say which '
+                'model produced it cannot be ranked against one.')
+    stamped_provider = shard.get(_PROVIDER_KEY) or 'azure'
+    if stamped_provider != _embedding_provider():
+        # A DIFFERENT PROVIDER IS A DIFFERENT RETRIEVER, whatever the names say. Checked first so the
+        # refusal names the real difference rather than a deployment string that merely differs.
+        return ('built on provider %r, this run embeds on %r'
+                % (stamped_provider, _embedding_provider()))
+    if stamped != _deployment_name():
+        # REFUSE RATHER THAN MIX. Two models' vectors in one ranking is not a weaker
+        # measurement, it is not a measurement.
+        return 'built by deployment %r, this run uses %r' % (stamped, _deployment_name())
+    live_model = _resolve_deployment_model()
+    if stamped_model and live_model and stamped_model != live_model:
+        # The alias matched and the MODEL did not, which is the case the deployment-name
+        # check above cannot see: someone repointed the alias. Same refusal, different
+        # operand -- and this is the operand that actually gets published.
+        return 'built by model %r, this deployment now serves %r' % (stamped_model, live_model)
+    return None
 
 
 def _load_cache(names, dry_run: bool = False) -> None:
@@ -278,47 +474,23 @@ def _load_cache(names, dry_run: bool = False) -> None:
             # PRE-SPLIT SHARDS ARE READ, NEVER WRITTEN BACK. They are accepted only when their
             # stamp matches; the one unstamped file, `_migrated.json`, was back-stamped on
             # 2026-09-14 after re-embedding one of its own texts and measuring the agreement.
+            # Azure only: every pre-split shard is an azure one.
             flat = _flat_shard(name)
-            if not os.path.exists(flat):
+            if _embedding_provider() != 'azure' or not os.path.exists(flat):
                 continue
             path = flat
         try:
             shard = json.loads(open(path, encoding='utf-8').read())
         except json.JSONDecodeError:
             continue                  # a torn shard is re-embedded, never half-trusted
-        # POPPED BEFORE THE UPDATE, ALL THREE. A provenance key left in the shard becomes a
+        refusal = _stamp_refusal(shard)
+        # POPPED BEFORE THE UPDATE, ALL FOUR. A provenance key left in the shard becomes a
         # cache entry keyed by a string that is not a text hash, and `_save_shard` would write it
         # back as if it were a vector.
-        stamped = shard.pop(_PROVENANCE_KEY, None)
-        stamped_model = shard.pop(_MODEL_KEY, None)
-        shard.pop(_DIMS_KEY, None)
-        if stamped is None or stamped_model is None:
-            # UNSTAMPED IS REFUSED, not accepted. The guard used to read `if stamped is not None`,
-            # which accepts a shard carrying no provenance at all under ANY deployment -- and the
-            # one such file, `_migrated.json`, was read for every vertical. It was back-stamped on
-            # 2026-09-14 after re-embedding one of its own texts, so every shard on disk now
-            # carries provenance and requiring it costs nothing.
-            #
-            # It also closes the hole for callers that never reach `_verify_cache_matches_live`:
-            # `typedmemeval_v9_dense.py` loads this cache directly, and a structural refusal
-            # protects it whether or not it runs the live probe.
-            print('    ignoring shard %s: no model provenance. Re-embed it, or delete it -- a '
-                  'shard that cannot say which model produced it cannot be ranked against one.'
-                  % name, flush=True)
-            continue
-        if stamped != _deployment_name():
-            # REFUSE RATHER THAN MIX. Two models' vectors in one ranking is not a weaker
-            # measurement, it is not a measurement.
-            print('    ignoring shard %s: built by deployment %r, this run uses %r'
-                  % (name, stamped, _deployment_name()), flush=True)
-            continue
-        live_model = _resolve_deployment_model()
-        if stamped_model and live_model and stamped_model != live_model:
-            # The alias matched and the MODEL did not, which is the case the deployment-name
-            # check above cannot see: someone repointed the alias. Same refusal, different
-            # operand -- and this is the operand that actually gets published.
-            print('    ignoring shard %s: built by model %r, this deployment now serves %r'
-                  % (name, stamped_model, live_model), flush=True)
+        for key in (_PROVENANCE_KEY, _MODEL_KEY, _DIMS_KEY, _PROVIDER_KEY):
+            shard.pop(key, None)
+        if refusal:
+            print('    ignoring shard %s: %s' % (name, refusal), flush=True)
             continue
         _cache.update(shard)
         _loaded_from_disk = _loaded_from_disk or bool(shard)
@@ -354,7 +526,8 @@ def _save_shard(name: str, keys) -> None:
         # only when its own stamp matches -- a mismatched one was already refused at load and must
         # not be resurrected here. Found in review of PR #245.
         flat = _flat_shard(name)
-        if not os.path.exists(existing) and os.path.exists(flat):
+        if (_embedding_provider() == 'azure'
+                and not os.path.exists(existing) and os.path.exists(flat)):
             try:
                 legacy = json.loads(open(flat, encoding='utf-8').read())
             except json.JSONDecodeError:
@@ -367,14 +540,27 @@ def _save_shard(name: str, keys) -> None:
                 prior = json.loads(open(existing, encoding='utf-8').read())
             except json.JSONDecodeError:
                 prior = {}          # a torn shard is replaced, never half-merged
-            # `__`-prefixed provenance is re-derived below, never carried forward: a stale model
-            # stamp surviving a merge would be a claim about vectors it no longer describes.
-            payload.update({k: v for k, v in prior.items() if not k.startswith('__')})
+            refusal = _stamp_refusal(prior) if prior else None
+            if refusal:
+                # A SHARD THE LOADER REFUSED MUST NOT BE MERGED BACK UNDER THIS RUN'S STAMP. The merge
+                # used to take whatever sat in the directory and re-stamp it -- so a shard copied into
+                # the wrong model's directory was refused at load and then laundered at save: its
+                # vectors not re-embedded this run (a --limit run, say) would be published as this
+                # model's. Set aside rather than deleted: they were paid for, by some model.
+                aside = '%s.refused-%d' % (existing, os.getpid())
+                os.replace(existing, aside)
+                print('    not merging shard %s (%s); moved aside to %s'
+                      % (name, refusal, os.path.basename(aside)), flush=True)
+            else:
+                # `__`-prefixed provenance is re-derived below, never carried forward: a stale model
+                # stamp surviving a merge would be a claim about vectors it no longer describes.
+                payload.update({k: v for k, v in prior.items() if not k.startswith('__')})
         payload.update({k: _cache[k] for k in keys if k in _cache})
         sample = next(iter(payload.values()), None)
         payload[_PROVENANCE_KEY] = _deployment_name()
         payload[_MODEL_KEY] = _resolve_deployment_model() or None
         payload[_DIMS_KEY] = len(_unpack(sample)) if sample else None
+        payload[_PROVIDER_KEY] = _embedding_provider()
         # PER-PROCESS TEMP NAME. A single `.tmp` is a second way two writers destroy each other,
         # independent of the merge: both write the same scratch file and the first replace consumes
         # it, so the second gets FileNotFoundError and loses its whole run. The lock above makes
@@ -407,10 +593,24 @@ def _stub_vector(text: str) -> list[float]:
 
 def _retry_delay(error, attempt: int) -> int:
     """Seconds to wait, preferring what the service asked for over what we guessed."""
-    hinted = error.headers.get('Retry-After') if error.headers else None
+    headers = getattr(error, 'headers', None)       # a dropped connection carries none
+    hinted = headers.get('Retry-After') if headers else None
     if hinted and str(hinted).strip().isdigit():
         return min(90, max(5, int(str(hinted).strip())))
     return min(60, 5 * 2 ** attempt)
+
+
+#: Model names a non-azure provider REPORTED serving, where they differ from the one requested.
+#: `_stamp` refuses on any: the identity names the requested model, so it must be the one that answered.
+_served_mismatch: set = set()
+
+
+def _same_model(requested: str, served: str) -> bool:
+    """Whether a provider's reported model is the requested one. Lenient on spelling only -- case, and an
+    organisation prefix some providers drop (`BAAI/bge-m3` vs `bge-m3`) -- never on the model."""
+    def norm(name):
+        return name.strip().lower().rsplit('/', 1)[-1]
+    return norm(requested) == norm(served)
 
 
 def embed_all(texts: list[str], dry_run: bool) -> None:
@@ -424,19 +624,23 @@ def embed_all(texts: list[str], dry_run: bool) -> None:
             _stats['stub'] += 1
         return
 
-    endpoint, key, deployment = _config()
-    url = f"{endpoint}/openai/deployments/{deployment}/embeddings?api-version={API_VERSION}"
+    url, headers, fields = _embedding_request()
     for start in range(0, len(todo), BATCH):
         batch = todo[start:start + BATCH]
-        body = json.dumps({"input": batch}).encode('utf-8')
-        request = urllib.request.Request(
-            url, data=body, method='POST',
-            headers={"Content-Type": "application/json", "api-key": key})
+        # `fields` is empty on azure (the URL names the deployment), so its body is byte-for-byte
+        # what it always was; every other provider names the model here.
+        body = json.dumps(dict(fields, input=batch)).encode('utf-8')
+        request = urllib.request.Request(url, data=body, method='POST', headers=headers)
         # RETRY ON THE SERVICE'S OWN TIMESCALE, NOT ON A GUESS. The first version backed off
         # 1/2/4/8 seconds and lost a full-family run to a 429: the limit is a TOKENS-PER-MINUTE
         # window, so every retry inside the first fifteen seconds is spent against a window that
         # has not moved. Retry-After is honoured where the service sends it, and the fallback
         # grows to a minute, which is the granularity the limit is enforced at.
+        #
+        # A DROPPED CONNECTION IS TRANSIENT TOO. Only HTTP statuses were retried, so a connection
+        # reset or a read timeout -- routine on a long run through a CDN edge -- ended the run with
+        # a traceback. Retried on the same schedule as the probe runner's; a non-transient status
+        # (400, 401, 403) still stops at once, naming itself.
         payload = None
         for attempt in range(8):
             try:
@@ -444,15 +648,28 @@ def embed_all(texts: list[str], dry_run: bool) -> None:
                     payload = json.loads(response.read().decode('utf-8'))
                 break
             except urllib.error.HTTPError as error:
-                if error.code not in (429, 500, 502, 503, 504) or attempt == 7:
-                    raise
-                delay = _retry_delay(error, attempt)
-                _stats['throttled'] += 1
-                print('    %d, waiting %ds' % (error.code, delay), flush=True)
-                time.sleep(delay)
+                if error.code not in _TRANSIENT:
+                    detail = error.read().decode('utf-8', 'replace')[:300]
+                    raise SystemExit('embeddings request rejected (%d): %s' % (error.code, detail))
+                reason, delay = str(error.code), _retry_delay(error, attempt)
+            except (urllib.error.URLError, TimeoutError, ConnectionError,
+                    http.client.HTTPException) as error:
+                reason, delay = type(error).__name__, _retry_delay(error, attempt)
+            if attempt == 7:
+                break
+            _stats['throttled'] += 1
+            print('    %s, waiting %ds' % (reason, delay), flush=True)
+            time.sleep(delay)
         if payload is None:
             raise SystemExit(
-                'embeddings kept refusing after 8 attempts. Every vertical that finished is banked, so re-running resumes rather than restarts.')
+                'embeddings kept failing after 8 attempts. Every vertical that finished is banked, so re-running resumes rather than restarts.')
+        served = payload.get('model')
+        if (served and _embedding_provider() != 'azure'
+                and not _same_model(_resolve_deployment_model(), served)
+                and served not in _served_mismatch):
+            _served_mismatch.add(served)
+            print('    ⚠ asked for %r, the provider reports serving %r. --stamp will refuse.'
+                  % (_resolve_deployment_model(), served), flush=True)
         rows = sorted(payload['data'], key=lambda d: d['index'])
         if len(rows) != len(batch):
             raise SystemExit('embeddings returned %d vectors for %d inputs' % (len(rows), len(batch)))
@@ -494,7 +711,7 @@ def _verify_cache_matches_live(texts) -> None:
         raise SystemExit(
             'the banked vectors are %d-dimensional and this deployment returns %d. They are '
             'different retrievers; a ranking mixing them is not a weaker measurement, it is not '
-            'a measurement. Delete %s and re-embed.' % (len(stored), len(fresh), CACHE_DIR))
+            'a measurement. Delete %s and re-embed.' % (len(stored), len(fresh), _cache_root()))
     num = sum(a * b for a, b in zip(stored, fresh))
     den = ((sum(a * a for a in stored) ** 0.5) * (sum(b * b for b in fresh) ** 0.5)) or 1.0
     agreement = num / den
@@ -509,7 +726,7 @@ def _verify_cache_matches_live(texts) -> None:
         raise SystemExit(
             'banked vectors disagree with the live deployment (cosine %.4f). The shards were not '
             'built by the model this run would name. Delete %s and re-embed rather than publish '
-            'a retriever id that describes neither.' % (agreement, CACHE_DIR))
+            'a retriever id that describes neither.' % (agreement, _cache_root()))
 
 
 def _key(text: str) -> str:
@@ -593,12 +810,18 @@ def _stamp(by_shape, args, k: int) -> None:
 
     sample = next(iter(_cache.values()), None)
     dense_dims = len(_unpack(sample)) if sample else 0
-    dense_id = dense_retriever_id(_resolve_deployment_model(), dense_dims)
+    provider, model = _embedding_provider(), _resolve_deployment_model()
+    dense_id = dense_retriever_id(model, dense_dims, provider)
     if not dense_id:
         raise SystemExit(
             'refusing to stamp: the embedding deployment did not resolve to a model, so the dense '
             'arm has no identity to record. The numbers would sit in a sidecar beside the name of '
             'a retriever nobody can reproduce, which is the defect this field exists to fix.')
+    if _served_mismatch:
+        raise SystemExit(
+            'refusing to stamp: this run asked %s for %r and the provider reported serving %s. The '
+            'id would name a model that did not answer. Confirm what the endpoint serves first.'
+            % (provider, model, ', '.join(repr(s) for s in sorted(_served_mismatch))))
     if _loaded_from_disk and not _provenance_checked:
         raise SystemExit(
             'refusing to stamp: vectors were read from disk but none was re-embedded against the '
@@ -628,17 +851,45 @@ def _stamp(by_shape, args, k: int) -> None:
         "published figures, over-stating by +0.032. A shape with "
         "`discriminates_under_dense: false` can still rank two systems for a BM25 consumer and "
         "cannot for an embedding one. This is a PREDICTION from retrieval, not a probe run, and "
-        "it says nothing about any consumer's chunking, reranking or query rewriting. "
-        "HOW MUCH OF THIS BELONGS TO THE MODEL RATHER THAN TO 'DENSE': re-run on 2026-09-14 "
-        "against a second embedding model, text-embedding-3-small, over the same documents "
-        "and the same budget. Family ALLgold 0.575 against this block's 0.540, so 'dense "
-        "closes 21% of the headroom BM25 leaves open' becomes 27%. Per shape it is larger and "
-        "not uniform: 25 of 35 shapes move, 6 flip the SIGN of whether dense beats BM25 (in "
-        "both directions), and 4 flip `discriminates_under_dense` itself -- "
-        "forgetting/still-valid, temporal/interval-position and workingmemory/distance-25 go "
-        "true->false, workingmemory/distance-40 goes false->true. So read every figure here "
-        "as a property of the NAMED retriever, not of dense retrieval. Reproduce with "
-        "tools/typedmemeval_retriever_compare.py.")
+        "it says nothing about any consumer's chunking, reranking or query rewriting. ")
+    if dense_id == _ADA_REFERENCE_ID:
+        # THE 2026-09-14 COMPARISON'S FIGURES DESCRIBE THE ADA-002 BLOCK AND NO OTHER. "this
+        # block's 0.540" is ada-002's family ALLgold; written beside any other retriever's column it
+        # would be a number about a model the block does not contain.
+        reading += (
+            "HOW MUCH OF THIS BELONGS TO THE MODEL RATHER THAN TO 'DENSE': re-run on 2026-09-14 "
+            "against a second embedding model, text-embedding-3-small, over the same documents "
+            "and the same budget. Family ALLgold 0.575 against this block's 0.540, so 'dense "
+            "closes 21% of the headroom BM25 leaves open' becomes 27%. Per shape it is larger and "
+            "not uniform: 25 of 35 shapes move, 6 flip the SIGN of whether dense beats BM25 (in "
+            "both directions), and 4 flip `discriminates_under_dense` itself -- "
+            "forgetting/still-valid, temporal/interval-position and workingmemory/distance-25 go "
+            "true->false, workingmemory/distance-40 goes false->true. So read every figure here "
+            "as a property of the NAMED retriever, not of dense retrieval. Reproduce with "
+            "tools/typedmemeval_retriever_compare.py.")
+    else:
+        reading += (
+            "HOW MUCH OF THIS BELONGS TO THE MODEL RATHER THAN TO 'DENSE': an earlier comparison "
+            "of two embedding models found the per-shape verdict moves with the model (shapes "
+            "flip `discriminates_under_dense` and the sign of dense-vs-BM25), but it was made "
+            "against a different reference retriever and none of its figures describe this block. "
+            "Read every figure here as a property of the NAMED retriever, not of dense retrieval. "
+            "Compare against another model with tools/typedmemeval_retriever_compare.py.")
+    if provider == 'azure':
+        dense_note = (
+            'Resolved from the deployment alias to the underlying model, and the banked '
+            'vectors were re-checked against the live deployment before this stamp was '
+            'written. Fields: model, dimensions, similarity, stored precision -- each one '
+            'changes the ranking. Supersedes the prose string "azure-openai-embeddings, '
+            'cosine, same documents and budget", which pinned no model at all.')
+    else:
+        dense_note = (
+            'The model id requested from %s -- an OpenAI-compatible endpoint names the model in '
+            'each request, so there is no deployment alias to resolve; the model the provider '
+            'reported serving, where it reported one, was checked against it, and any banked '
+            'vectors were re-checked against the live provider before this stamp was written. '
+            'Fields: provider, model, dimensions, similarity, stored precision -- each one '
+            'changes the ranking.' % provider)
 
     # SHAPES THIS MEASUREMENT CANNOT COVER ARE DECLARED, NOT OMITTED. A question with no gold is
     # skipped everywhere in this tool, correctly -- but a shape where EVERY question has no gold then
@@ -704,12 +955,10 @@ def _stamp(by_shape, args, k: int) -> None:
             'reference_retriever': tmc.RETRIEVER_ID,
             'reference_k': tmc.K_REF,
             'dense_retriever': dense_id,
-            'dense_retriever_note': (
-                'Resolved from the deployment alias to the underlying model, and the banked '
-                'vectors were re-checked against the live deployment before this stamp was '
-                'written. Fields: model, dimensions, similarity, stored precision -- each one '
-                'changes the ranking. Supersedes the prose string "azure-openai-embeddings, '
-                'cosine, same documents and budget", which pinned no model at all.'),
+            # Mirrors the probe records' reference_provider / reference_model. Never an endpoint.
+            'dense_provider': provider,
+            'dense_model': model,
+            'dense_retriever_note': dense_note,
             'operand': 'ALLgold -- gold.issubset(top_k), the quantity V9 tracks',
             'reading': reading,
             'by_shape': dict(sorted(
@@ -761,6 +1010,23 @@ def main():
     ap.add_argument('--k-sweep', metavar='K,K,...',
                     help='also report ALLgold at these retrieval budgets. K_ref=5 is a single point, and the identity makes headroom a statement about the BUDGET first.')
     args = ap.parse_args()
+
+    # NAME THE RETRIEVER BEFORE ANY NUMBER. The table's DENSE column is one model, and a summary that
+    # did not say which one let a reader assume the published one.
+    print('dense retriever: %s' % describe_target(args.dry_run))
+    if args.dry_run:
+        try:
+            _embedding_request()          # reads the environment only; sends nothing
+            configuration = 'complete'
+        except SystemExit as error:
+            configuration = ('INCOMPLETE, a real run would stop here: %s'
+                             % str(error).splitlines()[0].rstrip('.'))
+        print('  configuration: %s. DRY RUN: nothing is sent, every vector is the 3-gram stub, and '
+              'no shard is read or written.' % configuration)
+        dense_label = 'STUB (3-gram hash, no semantics)'
+    else:
+        dense_label = embedding_identity() or 'azure deployment %r, model unresolved' % _deployment_name()
+    print()
 
     rng = random.Random(args.seed)  # DevSkim: ignore DS148264 - a control arm, not a secret
 
@@ -857,6 +1123,7 @@ def main():
               % (k, tmc.K_REF))
         print('  family publishes is the K_ref point; this table is a different budget.')
     print('SS88.12: V9\'s pass rate EQUALS this, so 1 - ALLgold predicts headroom.')
+    print('DENSE = %s' % dense_label)
     print()
     print('%-14s %-24s %4s   %-17s %-17s %-17s' %
           ('vertical', 'shape', 'n', 'RANDOM all/share', 'BM25 all/share', 'DENSE all/share'))
@@ -918,8 +1185,8 @@ def main():
         _stamp(by_shape, args, k)
 
     print('WHAT IT MEANS FOR PUBLISHED HEADROOM  (prediction, not measurement)')
-    print('  predicted headroom = 1 - ALLgold      BM25 %.3f   ->   DENSE %.3f'
-          % (1 - b_all, 1 - d_all))
+    print('  predicted headroom = 1 - ALLgold      BM25 %.3f   ->   DENSE %.3f   [%s]'
+          % (1 - b_all, 1 - d_all, dense_label))
     # SIGN SPELLED OUT RATHER THAN LEFT TO A %+.3f. A dense arm can land on either side of BM25,
     # and 'closes -0.224 of headroom' is a sentence a reader has to decode instead of read.
     # d_all - b_all, NOT the other way round. I wrote this subtraction backwards and the

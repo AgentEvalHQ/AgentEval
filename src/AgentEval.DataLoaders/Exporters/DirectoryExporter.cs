@@ -36,7 +36,7 @@ namespace AgentEval.Exporters;
 /// <para>
 /// <b>CLI usage:</b>
 /// <code>
-/// agenteval bench agentic --subject MyAgent --input "..."   // writes results under .agenteval/
+/// agenteval bench agentic --subject MyAgent --input "..." --response-file answer.txt   // writes results under .agenteval/
 /// agenteval render --benchmark agentic --subject MyAgent    // re-renders (no LLM cost)
 /// </code>
 /// </para>

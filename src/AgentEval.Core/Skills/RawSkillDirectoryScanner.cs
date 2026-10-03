@@ -9,7 +9,7 @@ namespace AgentEval.Skills;
 /// path, mirroring <b>exactly</b> the candidate set <c>Microsoft.Agents.AI.AgentFileSkillsSource</c> itself
 /// would consider — confirmed against the live <c>Microsoft.Agents.AI 1.13.0</c> assembly this session
 /// (temporary diagnostic tests, deleted before commit), not assumed from documentation. See
-/// <c>strategy/FutureFeatures/Skills/Skill-Discovery-Exclusion-Detection-Design.md</c>.
+/// <c>docs/agent-skills.md</c> §5.
 /// </summary>
 /// <remarks>
 /// <b>Empirically confirmed discovery convention (not documented anywhere in MAF's public API surface):</b>

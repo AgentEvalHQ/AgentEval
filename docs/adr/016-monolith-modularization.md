@@ -94,8 +94,6 @@ Completed in 5 phases (Phase 0–4):
 | 3 | Extract MAF + RedTeam | 7 + 61 files → two projects, umbrella finalized |
 | 4 | Validate, Document, CI | Full validation, docs updated, ADR recorded |
 
-See `strategy/impl/` for detailed phase plans.
-
 ---
 
 ## References

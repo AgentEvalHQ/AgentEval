@@ -93,7 +93,7 @@ can make total judge calls exceed one call per selected question, so use
 
 ```powershell
 # Initialize the canonical store once.
-agenteval init
+agenteval init-workspace
 
 # Default 50-question stratified run.
 agenteval bench longmemeval --preset subset --subject MyAgent
@@ -103,9 +103,20 @@ $env:LONGMEMEVAL_DATASET_PATH = "C:\data\longmemeval_s_cleaned.json"
 agenteval bench longmemeval --preset full --subject MyAgent
 ```
 
-The built-in CLI binding requires `AZURE_OPENAI_ENDPOINT`,
-`AZURE_OPENAI_API_KEY`, and `AZURE_OPENAI_DEPLOYMENT`. Programmatic callers can
-use any `IChatClient` and any `IEvaluableAgent`.
+The CLI binding needs a real model and has no stub fallback. It uses whichever
+provider `AI_INFERENCE_PROVIDER` selects — Azure OpenAI, Bitdeer, OpenAI, Azure
+AI Foundry, or any OpenAI-compatible endpoint — and auto-detects when the
+selector is unset, so the `AZURE_OPENAI_ENDPOINT` + `AZURE_OPENAI_API_KEY` +
+`AZURE_OPENAI_DEPLOYMENT` trio alone still works. See
+[CLI Reference — `AI_INFERENCE_PROVIDER`](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to)
+for each provider's variables. When no provider resolves, the command prints
+why (for example, which variables are missing) and exits 3 (`RuntimeError`).
+
+The CLI uses one client for both roles: the same model answers the questions
+and judges the answers. The `AZURE_OPENAI_JUDGE_*` override in the CLI
+reference is not read by this command, so a separate judge needs the
+programmatic path. Programmatic callers can use any `IChatClient` and any
+`IEvaluableAgent`.
 
 The CLI writes a canonical manifest, summary, and `report-native.json`. The
 native report intentionally preserves questions, gold answers, agent responses,

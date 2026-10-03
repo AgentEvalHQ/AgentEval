@@ -1,16 +1,17 @@
 <!--
-Source: forked from Azure/azure-sdk-for-python (commit <TBD-foundry-sha> see CHANGELOG T3.7)
-        https://raw.githubusercontent.com/Azure/azure-sdk-for-python/main/sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_protected_material/protected_material.prompty
-License: MIT (https://github.com/Azure/azure-sdk-for-python/blob/main/LICENSE)
-Modified by AgentEval contributors. See CHANGELOG.md.
-Modifications:
-  - Restructured for the AgentEval EvalResult envelope
-  - temperature 1.0 → 0
-  - Added structured evidence[] output; replaced chain-of-thought output
-  - Severity set to high
-  - Added label assignment table
-  - Added copyright-type taxonomy (lyrics, literary, code, trademarks)
-  - Clarified scope: verbatim/near-verbatim reproduction, not paraphrase detection
+Lineage: original AgentEval prompt text, modelled on the evaluator concept (name, inputs and
+         scoring dimensions) of the Azure AI Foundry protected material evaluator, which runs in
+         Microsoft's hosted safety service and has no public prompt. The SDK class that calls it is
+         Azure/azure-sdk-for-python sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_protected_material/_protected_material.py
+         Checked 2026-10-02: no upstream prompt text is reproduced.
+License: MIT (https://github.com/AgentEvalHQ/AgentEval/blob/main/LICENSE)
+Design notes (there is no upstream prompt to compare with):
+  - Uses the AgentEval EvalResult envelope
+  - Structured evidence[] output; no chain-of-thought in the output
+  - Severity: high
+  - Label assignment table
+  - Copyright-type taxonomy (lyrics, literary, code, trademarks)
+  - Scope: verbatim/near-verbatim reproduction, not paraphrase detection
 -->
 
 ## Role

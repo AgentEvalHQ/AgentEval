@@ -29,6 +29,9 @@ public static class LightPathMAFIntegration
     {
         PrintHeader();
 
+        if (!AIConfig.StartModelSample())
+            return;
+
         // ════════════════════════════════════════════════════════════
         // STEP 1: Create a MAF agent with tools
         // ════════════════════════════════════════════════════════════
@@ -58,7 +61,7 @@ public static class LightPathMAFIntegration
             queries,
             AgentEvalEvaluators.Agentic(["SearchFlights"]));
 
-        Console.WriteLine($"   📊 Results: {results.Passed}/{results.Total} passed");
+        Console.WriteLine($"   📊 Results: {results.Passed}/{results.Total} passed{AIConfig.MockLabel}");
         foreach (var item in results.Items)
         {
             Console.WriteLine($"      Query: \"{Truncate(item.Query, 60)}\"");
@@ -67,14 +70,14 @@ public static class LightPathMAFIntegration
                 if (metric is NumericMetric num)
                 {
                     var icon = num.Interpretation?.Failed != true ? "✅" : "❌";
-                    Console.WriteLine($"      {icon} {name}: {num.Value:F1}/5.0");
+                    Console.WriteLine($"      {icon} {name}: {num.Value:F1}/5.0{AIConfig.MockLabel}");
                 }
             }
         }
 
         results.AssertAllPassed();
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine("\n   ✅ results.AssertAllPassed() — no exception thrown!\n");
+        Console.WriteLine($"\n   ✅ results.AssertAllPassed() — no exception thrown!{AIConfig.MockLabel}\n");
         Console.ResetColor();
 
         // ════════════════════════════════════════════════════════════
@@ -105,7 +108,7 @@ public static class LightPathMAFIntegration
         for (int i = 0; i < multiResults.Count; i++)
         {
             var r = multiResults[i];
-            Console.WriteLine($"   📊 Evaluator {i + 1}: {r.Passed}/{r.Total} passed");
+            Console.WriteLine($"   📊 Evaluator {i + 1}: {r.Passed}/{r.Total} passed{AIConfig.MockLabel}");
             foreach (var item in r.Items)
             {
                 foreach (var (name, metric) in item.Metrics)
@@ -113,7 +116,7 @@ public static class LightPathMAFIntegration
                     if (metric is NumericMetric num)
                     {
                         var icon = num.Interpretation?.Failed != true ? "✅" : "❌";
-                        Console.WriteLine($"      {icon} {name}: {num.Value:F1}/5.0");
+                        Console.WriteLine($"      {icon} {name}: {num.Value:F1}/5.0{AIConfig.MockLabel}");
                     }
                 }
             }
@@ -126,7 +129,7 @@ public static class LightPathMAFIntegration
 
         Console.WriteLine("━━━ DEMO 3: LLM-judged Quality + Safety evaluation ━━━━━━━━━━\n");
 
-        if (AIConfig.IsConfigured)
+        if (!AIConfig.UseMock)
         {
                         var judgeClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
@@ -181,7 +184,7 @@ public static class LightPathMAFIntegration
                     if (metric is NumericMetric num)
                     {
                         var icon = num.Interpretation?.Failed != true ? "✅" : "❌";
-                        Console.WriteLine($"      {icon} {name}: {num.Value:F1}/5.0");
+                        Console.WriteLine($"      {icon} {name}: {num.Value:F1}/5.0{AIConfig.MockLabel}");
                     }
                 }
             }
@@ -193,7 +196,7 @@ public static class LightPathMAFIntegration
         else
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("   ⚠️  No model provider configured. Available LLM-judged bundles:\n");
+            Console.WriteLine("   ⚠️  Mock mode: the LLM-judged bundles need a real model. They are:\n");
             Console.ResetColor();
             Console.WriteLine("   AgentEvalEvaluators.Quality(judgeClient)   → faithfulness, relevance, coherence, fluency");
             Console.WriteLine("   AgentEvalEvaluators.RAG(judgeClient)       → + context precision/recall, answer correctness");
@@ -228,7 +231,7 @@ public static class LightPathMAFIntegration
 
     private static AIAgent CreateTravelAgent()
     {
-        if (!AIConfig.IsConfigured)
+        if (AIConfig.UseMock)
             return CreateMockTravelAgent();
 
                 var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);

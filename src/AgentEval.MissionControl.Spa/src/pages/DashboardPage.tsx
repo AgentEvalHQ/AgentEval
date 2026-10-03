@@ -176,7 +176,7 @@ export function DashboardPage() {
           emptyMessage={
             <div>
               No subjects registered. Run{" "}
-              <code className="bg-slate-100 px-1 rounded">agenteval init</code>{" "}
+              <code className="bg-slate-100 px-1 rounded">agenteval init-workspace</code>{" "}
               in the solution root + ship at least one evaluation, then refresh.
             </div>
           }

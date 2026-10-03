@@ -203,6 +203,7 @@ registered gate; it does not prove the policy is semantically sufficient.
 These five are a deep-dive continuation once the recommended tour (00 → 16 → 14 → 04 → 10 → 23) is done, not a
 competing entry point. Continue with samples 19–23 for resource, state, concurrency, graph, and HTTP architecture,
 then 24–29 for dynamic providers, trajectory, identity, construction integrity, approval, and adaptive result
-state. All are deterministic and offline. Harmful operations use fake counters, and pass/fail is derived from
-evidence and effect invariants rather than model compliance. Use the
+state. Samples 14–17, 25 and 28 run on the configured model when a provider is configured, and on a deterministic
+scripted path otherwise; the rest are deterministic and never call a model provider. Harmful operations use fake
+counters, and pass/fail is derived from evidence and effect invariants rather than model compliance. Use the
 [curated learning paths](examples.md#pick-a-learning-path) instead of running the entire catalog at once.

@@ -2,7 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using AgentEval.MAF.Gatekeeper.MemorySecurity;
+using AgentEval.Gatekeeper.Validation.Fixtures;
 using AgentEval.RedTeam.MemorySecurity;
 using AgentEval.Testing;
 using Microsoft.Agents.AI;

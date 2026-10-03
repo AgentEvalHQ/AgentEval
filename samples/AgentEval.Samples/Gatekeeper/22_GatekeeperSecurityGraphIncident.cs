@@ -19,6 +19,7 @@ public static class GatekeeperSecurityGraphIncident
     {
         GatekeeperSampleContractRenderer.Print("22");
         Console.WriteLine("\n=== Gatekeeper — Security Graph Incident Response (offline) ===\n");
+        GatekeeperLiveMode.PrintNoModel("a fixed security-graph incident");
 
         var directory = Path.Combine(
             Path.GetTempPath(),

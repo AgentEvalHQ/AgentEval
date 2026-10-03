@@ -57,6 +57,8 @@ import urllib.error
 import urllib.request
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, os.path.dirname(HERE))
+import inference_provider as ip  # noqa: E402  (tools/inference_provider.py: the CLI's provider rules)
 SAMPLE = os.path.join(HERE, 'judge-sample-50.json')
 OUT = os.path.join(HERE, 'judge-agreement-results.json')
 
@@ -94,6 +96,18 @@ def ask(model, question, gold, response, dry, provider='openai'):
     if dry:
         return DRY_STUB
     content = PROMPT.format(question=question, gold=gold, response=response)
+
+    if provider == 'env':
+        # The provider the environment selects (AI_INFERENCE_PROVIDER), as the CLI resolves it. On an
+        # OpenAI-compatible provider such as Bitdeer the model string IS the model id, not an alias, so
+        # nothing needs resolving; several vendors' models sit behind one key.
+        target = ip.resolve()
+        req = urllib.request.Request(
+            target.chat_url(),
+            data=json.dumps(target.chat_body(
+                [{'role': 'user', 'content': content}], 2000) | ({} if target.is_azure else {'model': model})).encode('utf-8'),
+            headers=target.headers())
+        return _send(req)
 
     if provider == 'azure':
         endpoint = os.environ.get('AZURE_OPENAI_ENDPOINT', '').rstrip('/')
@@ -282,12 +296,16 @@ def main():
                     help='stub every call; exercises the real path and writes nothing')
     ap.add_argument('--one', action='store_true', help='one real call, then stop')
     ap.add_argument('--models', default=','.join(SECOND_JUDGES))
-    ap.add_argument('--provider', choices=('openai', 'azure'), default='openai',
+    ap.add_argument('--out', default=OUT,
+                    help='results file; use a new one per judged lineage so a run never overwrites '
+                         "another model's published verdicts")
+    ap.add_argument('--provider', choices=('openai', 'azure', 'env'), default='openai',
                     help="'openai' = o3/o4-mini, a different MODEL LINE (needs credits). "
                          "'azure' = a second DEPLOYMENT of the shipped judge's own family, "
                          'which supports only the weaker "deployment variance within one '
-                         'family" claim. The provider chosen CHANGES WHAT MAY BE CLAIMED and is '
-                         'recorded in the results file.')
+                         'family" claim. \'env\' = the provider AI_INFERENCE_PROVIDER selects (e.g. '
+                         'bitdeer), where each model id names its vendor. The provider chosen CHANGES '
+                         'WHAT MAY BE CLAIMED and is recorded in the results file.')
     args = ap.parse_args()
 
     cases = json.load(open(SAMPLE, encoding='utf-8'))['cases']
@@ -351,10 +369,11 @@ def main():
               % (len(cases), len(models)))
         return
 
-    json.dump({'models': models, 'provider': args.provider, 'claim_supported': claim,
-               'cases': results}, open(OUT, 'w', encoding='utf-8'),
+    provider_identity = ip.resolve().identity if args.provider == 'env' else args.provider
+    json.dump({'models': models, 'provider': provider_identity, 'claim_supported': claim,
+               'cases': results}, open(args.out, 'w', encoding='utf-8'),
               ensure_ascii=False, indent=2)
-    print('calls=%d  written: %s' % (calls, OUT))
+    print('calls=%d  written: %s' % (calls, args.out))
 
 
 main()

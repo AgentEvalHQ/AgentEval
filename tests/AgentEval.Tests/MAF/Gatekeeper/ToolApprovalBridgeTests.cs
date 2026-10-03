@@ -21,8 +21,11 @@ namespace AgentEval.Tests.MAF.Gatekeeper;
 [Experimental("AEGK001")]
 public class ToolApprovalBridgeTests
 {
-    // Escalate only large refunds (amount with 4+ digits, i.e. 1000+); a small refund is routine.
-    private const string EscalateLargeRefund = "\"amount\":\\s*[0-9]{4,}";
+    // Escalate unless the amount is a plain number below 1000 (and when there is none). The gate auto-approves what its
+    // pattern does not match, so the pattern names what is routine: the earlier "amount":\s*[0-9]{4,} let
+    // "amount":"5000" (a JSON string) through.
+    private const string EscalateLargeRefund =
+        @"^(?![\s\S]*""amount""\s*:)|""amount""\s*:(?!\s*[0-9]{1,3}(?:\.[0-9]+)?\s*[,}])";
 
     private static (AIAgent Agent, Func<int> Executed) BuildGatedAgent(
         IReadOnlyList<IToolApprovalGate> gates, IDictionary<string, object?> callArgs, AgentTrace? trace = null)
@@ -57,6 +60,19 @@ public class ToolApprovalBridgeTests
 
         Assert.Equal(1, executed());   // routine ⇒ auto-approved ⇒ the tool ran
         Assert.DoesNotContain(response.Messages.SelectMany(m => m.Contents), c => c is ToolApprovalRequestContent);
+    }
+
+    [Theory]
+    [InlineData(5000)]
+    [InlineData("5000")]
+    [InlineData("5,000")]
+    public async Task LargeAmount_InAnySpelling_Escalates(object amount)
+    {
+        // A large amount sent as a JSON string auto-approved under the old pattern, and the tool still read it as 5000.
+        var gate = new ArgumentPatternApprovalGate(EscalateLargeRefund);
+
+        Assert.False(await gate.IsAutoApprovableAsync(
+            new FunctionCallContent("c1", "issue_refund", new Dictionary<string, object?> { ["amount"] = amount })));
     }
 
     [Fact]

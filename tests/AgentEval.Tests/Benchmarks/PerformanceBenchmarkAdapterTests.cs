@@ -51,6 +51,7 @@ public class PerformanceBenchmarkAdapterTests
                 ThroughputDuration = TimeSpan.FromMilliseconds(100),
                 MaxCostUSD = 1.0,
                 CompositePassThreshold = 0.6,
+                CostModelName = "gpt-4o-mini",          // a priced model, so the cost is measured
             }
         };
         return new PerformanceBenchmark(agent, opts);
@@ -63,6 +64,34 @@ public class PerformanceBenchmarkAdapterTests
     /// EvaluateAsync should produce a CompositeEval-shaped EvalResult with three
     /// leaf sub-results (latency, throughput, cost), all passing against generous thresholds.
     /// </summary>
+    [Fact]
+    public async Task EvaluateAsync_UnpricedModel_CostIsNotMeasured_NotAZeroDollarPass()
+    {
+        // Through 0.42 a model missing from the pricing table gave the cost leaf $0 and a passing score of 1.0.
+        var agent = new MockTestableAgent("UnpricedAgent", "Success response");
+        var benchmark = FastBenchmark(agent, new PerformanceBenchmarkEvaluateOptions
+        {
+            P99LatencyThresholdMs = 60_000,
+            LatencyIterationsPerPrompt = 2,
+            WarmupIterations = 0,
+            MinThroughputRps = 0.01,
+            ThroughputConcurrentRequests = 1,
+            ThroughputDuration = TimeSpan.FromMilliseconds(100),
+            MaxCostUSD = 1.0,
+            CompositePassThreshold = 0.6,
+            CostModelName = "no-such-model-in-the-pricing-table",
+        });
+
+        var result = await benchmark.EvaluateAsync(new EvalInput("Test prompt"));
+
+        var costLeaf = result.Details.SubResults!.Single(r => r.Metric.Key == "perf_cost");
+        Assert.Equal("skipped", costLeaf.Score.Label);
+        Assert.False(costLeaf.Score.Passed);
+        Assert.False(costLeaf.Details.Dimensions!.ContainsKey("cost_usd"));
+        Assert.False(result.Details.Dimensions!.ContainsKey("cost_usd"));
+        Assert.Contains("not measured", costLeaf.Details.Recommendations![0], StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task EvaluateAsync_HappyPath_ReturnsCompositeWithThreeLeaves()
     {

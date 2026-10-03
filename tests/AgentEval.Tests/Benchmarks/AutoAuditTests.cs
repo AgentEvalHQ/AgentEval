@@ -66,6 +66,24 @@ public class AutoAuditTests
     }
 
     [Fact]
+    public void WhenNothingCompleted_ThereIsNoWinner_AndNoFidelityIsShown()
+    {
+        // A run that never completed has two empty traces, which reconcile to 100%. Through 0.42 such a run could
+        // top the table and be named the winner.
+        var report = AutoAuditRunner.Compare(new[]
+        {
+            new AutoAuditEndpointResult("down-a", 1.00, 0, 0, 0, 0, false, Array.Empty<string>()),
+            new AutoAuditEndpointResult("down-b", 1.00, 0, 0, 0, 0, false, Array.Empty<string>()),
+        });
+
+        Assert.Null(report.Winner);
+        var markdown = report.ToMarkdown();
+        Assert.DoesNotContain("Winner", markdown);
+        Assert.DoesNotContain("100%", markdown);
+        Assert.Contains("not measured", markdown);
+    }
+
+    [Fact]
     public async Task OfflineDemo_RanksCleanAboveRetryAboveLeak_AndRendersMarkdown()
     {
         // Act
@@ -73,18 +91,18 @@ public class AutoAuditTests
 
         // Assert — three endpoints, the clean one wins, the PII-leaking one has a gate block
         Assert.Equal(3, report.Results.Count);
-        Assert.Equal("Azure-GPT-4o-mini", report.Winner!.Endpoint);
+        Assert.Equal(AutoAuditDemo.CleanEndpoint, report.Winner!.Endpoint);
         Assert.Equal(1.0, report.Winner.FidelityScore, 6);
 
-        var leak = report.Results.Single(r => r.Endpoint == "DeepSeek-V3");
+        var leak = report.Results.Single(r => r.Endpoint == AutoAuditDemo.LeakEndpoint);
         Assert.Equal(1, leak.GateBlocks);                  // SSN caught by the PII post-gate
         Assert.True(leak.FidelityScore < 1.0);             // suppressed content_filter
 
-        var retry = report.Results.Single(r => r.Endpoint == "Ollama-Llama3.1");
+        var retry = report.Results.Single(r => r.Endpoint == AutoAuditDemo.RetryEndpoint);
         Assert.Equal(0.90, retry.FidelityScore, 6);        // one hidden retry
 
         var markdown = report.ToMarkdown();
         Assert.Contains("Auto-Audit", markdown);
-        Assert.Contains("Winner: Azure-GPT-4o-mini", markdown);
+        Assert.Contains($"Winner: {AutoAuditDemo.CleanEndpoint}", markdown);
     }
 }

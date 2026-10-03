@@ -48,8 +48,25 @@ public static class BenchCommand
         int runs = 1,
         string? responseText = null,
         bool azureFromEnv = false,
+        bool mock = false,
         CancellationToken ct = default)
     {
+        var gradesSuppliedResponse = !string.IsNullOrWhiteSpace(responseText);
+        if (mock && (agentOverride is not null || azureFromEnv || gradesSuppliedResponse))
+        {
+            return MockTarget.RefuseMockWithRealTarget();
+        }
+        if (agentOverride is null && !azureFromEnv && !gradesSuppliedResponse && !mock)
+        {
+            return MockTarget.RefuseWithoutTarget("bench gdpr", MockTarget.ComplianceTargets);
+        }
+        if (agentOverride is null && !azureFromEnv && gradesSuppliedResponse && string.IsNullOrWhiteSpace(inputText))
+        {
+            // A supplied answer is graded against the question it answered, never a built-in one.
+            Console.Error.WriteLine("Error: --input is required with --response/--response-file: the question the response answers.");
+            return ExitCodes.UsageError;
+        }
+
         // ── Workspace setup ──────────────────────────────────────────────────
         if (rootOverride is not null)
         {
@@ -68,7 +85,7 @@ public static class BenchCommand
         var agentEvalDir = Path.Combine(workspaceRoot, ".agenteval");
         if (!Directory.Exists(agentEvalDir))
         {
-            Console.Error.WriteLine($".agenteval/ not found at {agentEvalDir}. Run `agenteval init` first.");
+            Console.Error.WriteLine($".agenteval/ not found at {agentEvalDir}. Run `agenteval init-workspace` first.");
             return 1;
         }
 
@@ -78,9 +95,9 @@ public static class BenchCommand
         // provenance but never reached the LLM — the "Cite articles / Be conservative /
         // Flag evasive responses" rules had no actual effect on judgements.
         // The same resolver `bench gdpr calibrate` uses, so the calibrated judge is the judge that runs.
-        var (resolvedJudge, judgeModelName, exitCode) = JudgeFactory.ResolveGdpr(
-            evaluatorOverride,
-            judgeKind: "GDPR benchmark");
+        var (resolvedJudge, judgeModelName, exitCode) = mock && evaluatorOverride is null
+            ? MockTarget.JudgeResolution
+            : JudgeFactory.ResolveGdpr(evaluatorOverride, judgeKind: "GDPR benchmark");
         if (resolvedJudge is null) return exitCode;
         IEvaluator judge = resolvedJudge;
 
@@ -119,6 +136,12 @@ public static class BenchCommand
         {
             benchmark = ResolvePreset(preset, articles, scenarioBuilder);
         }
+        catch (ArgumentException ex)
+        {
+            // An unknown preset or domain pack is a rejected argument: a usage error, not a failed run.
+            Console.Error.WriteLine($"Failed to build benchmark preset '{preset}': {ex.Message}");
+            return ExitCodes.UsageError;
+        }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Failed to build benchmark preset '{preset}': {ex.Message}");
@@ -126,8 +149,10 @@ public static class BenchCommand
         }
 
         // ── Build input ──────────────────────────────────────────────────────
-        var query = inputText ??
-            "Please help me understand what personal data you store about me and how I can request its deletion.";
+        var isMock = agent is null && !gradesSuppliedResponse;
+        var query = inputText ?? (isMock
+            ? "Please help me understand what personal data you store about me and how I can request its deletion."
+            : "(each scenario sends its own prompt to the live agent)");
         string agentResponse;
         if (agent is not null)
         {
@@ -145,17 +170,31 @@ public static class BenchCommand
         }
         else
         {
-            // No real response supplied: grade a built-in FIXTURE. Warn loudly — the produced
-            // compliance evidence does NOT reflect the named subject agent (BUG-18).
+            // --sut mock, asked for by name: a canned answer, graded, labelled and not stored.
+            MockTarget.PrintBanner("bench gdpr", "a canned answer");
             agentResponse =
                 "I can help with that. We store your name and email. " +
                 "You can request deletion by contacting privacy@example.com.";
-            Console.Error.WriteLine(
-                $"[bench gdpr] WARNING: no --response/--response-file supplied — grading a built-in FIXTURE " +
-                $"response, not a real agent output. The produced compliance evidence does NOT reflect subject " +
-                $"'{subject}'. Pass --response-file <path> (or --response \"...\") with the agent's actual answer.");
         }
         var evalInput = new EvalInput(Query: query, Response: agentResponse);
+
+        if (isMock)
+        {
+            EvalResult mockResult;
+            try
+            {
+                mockResult = await benchmark.EvaluateAsync(evalInput, ct);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Benchmark run failed: {ex.Message}");
+                return 1;
+            }
+
+            return MockTarget.Finish("bench gdpr",
+                $"{mockResult.Score.Label.ToUpperInvariant()} (score {mockResult.Score.Value:F3}) for a canned answer" +
+                (runs > 1 ? " (--runs is ignored for a mock run)" : ""));
+        }
 
         // ── Run benchmark ────────────────────────────────────────────────────
         var store = new FileSystemOutputStore(agentEvalDir);

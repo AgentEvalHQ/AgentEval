@@ -217,9 +217,8 @@ public static class InferenceProviderEnvironment
 
     /// <summary>
     /// True when someone tried to configure a provider: the selector is set, or any provider has at least
-    /// one of its variables. The difference matters to a caller that may fall back to a stub — an
-    /// unconfigured machine is a legitimate fallback, a MISCONFIGURED one is a typo that must fail closed,
-    /// or the run silently produces stub-graded evidence from a mistake.
+    /// one of its variables. It separates an unconfigured machine from a MISCONFIGURED one, so a caller can say
+    /// "this provider is missing variables" (a typo to fix) instead of "nothing is configured".
     /// </summary>
     public static bool AnyConfigurationAttempted(Func<string, string?> getEnvironmentVariable)
     {
@@ -228,8 +227,7 @@ public static class InferenceProviderEnvironment
         if (Set(SelectorVariable)) return true;
         // EVERY variable a provider reads, not only its required credentials. Someone who set
         // OPENAI_BASE_URL or BITDEER_MODEL and nothing else has tried to configure a provider and made a
-        // mistake; counting only credentials would let the stub rescue exactly that case, which is the hole
-        // this predicate exists to close.
+        // mistake; counting only credentials would report that case as "nothing configured".
         foreach (var name in AllProviderVariables)
         {
             if (Set(name)) return true;
@@ -305,6 +303,42 @@ public static class InferenceProviderEnvironment
         "OPENAI_COMPATIBLE_ENDPOINT", "OPENAI_COMPATIBLE_API_KEY", "OPENAI_COMPATIBLE_MODEL",
         "OPENAI_COMPATIBLE_MODEL_2", "OPENAI_COMPATIBLE_MODEL_3",
     ];
+
+    /// <summary>
+    /// The models the environment actually names for <paramref name="settings"/>' provider: the primary model, then
+    /// the <c>_2</c>/<c>_3</c> variables only when they are set. <see cref="InferenceProviderSettings.SecondaryModel"/>
+    /// and <see cref="InferenceProviderSettings.TertiaryModel"/> fall back to defaults (for Azure, deployments named
+    /// <c>gpt-4o-mini</c> and <c>gpt-4.1</c> that may not exist); a caller that runs every configured model must not run
+    /// those. Distinct, in order; empty when no provider is configured.
+    /// </summary>
+    public static IReadOnlyList<string> NamedModels(InferenceProviderSettings settings, Func<string, string?> getEnvironmentVariable)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        ArgumentNullException.ThrowIfNull(getEnvironmentVariable);
+        if (!settings.IsConfigured || string.IsNullOrWhiteSpace(settings.Model))
+            return [];
+
+        var prefix = settings.Provider switch
+        {
+            InferenceProvider.AzureOpenAI => "AZURE_OPENAI_DEPLOYMENT",
+            InferenceProvider.Bitdeer => "BITDEER_MODEL",
+            InferenceProvider.OpenAI => "OPENAI_MODEL",
+            InferenceProvider.Foundry => "FOUNDRY_MODEL",
+            InferenceProvider.OpenAICompatible => "OPENAI_COMPATIBLE_MODEL",
+            _ => null,
+        };
+        var named = new List<string> { settings.Model.Trim() };
+        if (prefix is not null)
+        {
+            foreach (var suffix in new[] { "_2", "_3" })
+            {
+                var value = getEnvironmentVariable(prefix + suffix);
+                if (!string.IsNullOrWhiteSpace(value) && !named.Contains(value.Trim(), StringComparer.Ordinal))
+                    named.Add(value.Trim());
+            }
+        }
+        return named;
+    }
 
     /// <summary>True when <paramref name="provider"/> has every variable it requires.</summary>
     public static bool HasCredentials(InferenceProvider provider, Func<string, string?> getEnvironmentVariable)

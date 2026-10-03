@@ -50,7 +50,7 @@ internal static class MemoryBenchmarkRegistration
             runnerType: typeof(MemoryBenchmark),
             runnerFactory: preset => ResolvePreset(preset),
             evaluateAsync: null,  // Shape B; no Convention-2 adapter (see remarks).
-            docLinkUrl: "https://github.com/joslat/AgentEval/blob/main/docs/memory-benchmark.md",
+            docLinkUrl: "https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/memory/getting-started.md",
             owningAssemblyName: typeof(MemoryBenchmark).Assembly.GetName().Name));
     }
 

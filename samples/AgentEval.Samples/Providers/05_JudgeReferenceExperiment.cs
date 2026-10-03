@@ -641,7 +641,8 @@ Judge what the OUTPUT remembered, not how long the conversation was.
         Console.WriteLine("   • Accuracy alone is buyable by saying 'pass' more often. An arm counts only if false-fails drop");
         Console.WriteLine("     AND false-passes do not rise. Both are printed, and the verdict line applies both.");
         Console.WriteLine("   • The floor is the MAJORITY CLASS, not 50%. On a 17/8 split, 'always pass' already scores 68%.");
-        Console.WriteLine("   • The delta between arms survives the golden-band question; the absolute numbers do not.");
+        Console.WriteLine("   • Accuracy compares each verdict with the case's expected verdict, and every golden range agrees");
+        Console.WriteLine("     with its evaluator's threshold, so the absolute numbers stand — for these cases and labels only.");
         Console.WriteLine("   • 'excl' counts cases EXCLUDED from the denominator: evaluator errors and evaluator");
         Console.WriteLine("     SKIPS. A skipped result is not a prediction, and scoring it as one invents accuracy:");
         Console.WriteLine("     an evaluator that skips every case would otherwise score exactly the fail-labelled share.");

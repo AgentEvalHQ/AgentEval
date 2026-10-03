@@ -3,7 +3,7 @@
 
 using AgentEval.MAF.Gatekeeper;
 using AgentEval.MAF.Gatekeeper.Memory;
-using AgentEval.MAF.Gatekeeper.MemorySecurity;
+using AgentEval.Gatekeeper.Validation.Fixtures;
 using AgentEval.RedTeam.MemorySecurity;
 using AgentEval.Testing;
 using AgentEval.Tracing;
