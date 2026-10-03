@@ -726,7 +726,7 @@ The interactive menu lets you select a **group** (A–K), then a **sample** with
 
 | Group | Focus |
 |-------|-------|
-| **A — Getting Started** ★ mostly no credentials | Hello World, tool tracking, performance basics, MAF integration patterns |
+| **A — Getting Started** 🔑 real model; `--mock` for an offline walkthrough | Hello World, tool tracking, performance basics, MAF integration patterns |
 | **B — Metrics & Quality** | RAG evaluation, quality metrics, judge calibration, responsible AI |
 | **C — Workflows & Conversations** | Multi-turn conversations, MAF workflows, source-gen executors |
 | **D — Performance & Statistics** | Latency profiling, stochastic evaluation, model comparison, streaming |

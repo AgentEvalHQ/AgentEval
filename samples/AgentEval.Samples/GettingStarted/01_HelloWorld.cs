@@ -25,6 +25,9 @@ public static class HelloWorld
     {
         PrintHeader();
 
+        if (!AIConfig.StartModelSample())
+            return;
+
         var agent = CreateGreetingAgent();
         PrintStepComplete("Step 1", $"Agent '{agent.Name}' created");
 
@@ -72,12 +75,12 @@ public static class HelloWorld
         if (result.Passed)
         {
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("✅ PASSED");
+            Console.WriteLine($"✅ PASSED{AIConfig.MockLabel}");
         }
         else
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine("❌ FAILED");
+            Console.WriteLine($"❌ FAILED{AIConfig.MockLabel}");
         }
         Console.ResetColor();
         
@@ -106,9 +109,9 @@ public static class HelloWorld
 
     private static AIAgent CreateGreetingAgent()
     {
-        if (!AIConfig.IsConfigured)
+        if (AIConfig.UseMock)
         {
-            // Return a mock agent for demo purposes
+            // The offline walkthrough, only when the user passed --mock
             return CreateMockAgent();
         }
 

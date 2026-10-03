@@ -28,6 +28,9 @@ public static class AgentWithOneTool
     {
         PrintHeader();
 
+        if (!AIConfig.StartModelSample())
+            return;
+
         var agent = CreateCalculatorAgent();
         PrintAgentCreated(agent);
 
@@ -110,7 +113,7 @@ public static class AgentWithOneTool
                     .HaveNoErrors(because: "all tool calls must succeed");
 
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("   ✅ All assertions passed!");
+                Console.WriteLine($"   ✅ All assertions passed!{AIConfig.MockLabel}");
                 Console.WriteLine(@"
    CODE USED:
    ┌─────────────────────────────────────────────────────────────┐
@@ -158,7 +161,7 @@ public static class AgentWithOneTool
 
     private static AIAgent CreateCalculatorAgent()
     {
-        if (!AIConfig.IsConfigured)
+        if (AIConfig.UseMock)
         {
             return CreateMockCalculatorAgent();
         }
@@ -223,12 +226,12 @@ public static class AgentWithOneTool
         if (passed)
         {
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("✅ PASSED");
+            Console.WriteLine($"✅ PASSED{AIConfig.MockLabel}");
         }
         else
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine("❌ FAILED");
+            Console.WriteLine($"❌ FAILED{AIConfig.MockLabel}");
         }
         Console.ResetColor();
     }

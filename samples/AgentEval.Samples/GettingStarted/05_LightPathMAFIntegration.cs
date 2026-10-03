@@ -29,6 +29,9 @@ public static class LightPathMAFIntegration
     {
         PrintHeader();
 
+        if (!AIConfig.StartModelSample())
+            return;
+
         // ════════════════════════════════════════════════════════════
         // STEP 1: Create a MAF agent with tools
         // ════════════════════════════════════════════════════════════
@@ -74,7 +77,7 @@ public static class LightPathMAFIntegration
 
         results.AssertAllPassed();
         Console.ForegroundColor = ConsoleColor.Green;
-        Console.WriteLine("\n   ✅ results.AssertAllPassed() — no exception thrown!\n");
+        Console.WriteLine($"\n   ✅ results.AssertAllPassed() — no exception thrown!{AIConfig.MockLabel}\n");
         Console.ResetColor();
 
         // ════════════════════════════════════════════════════════════
@@ -126,7 +129,7 @@ public static class LightPathMAFIntegration
 
         Console.WriteLine("━━━ DEMO 3: LLM-judged Quality + Safety evaluation ━━━━━━━━━━\n");
 
-        if (AIConfig.IsConfigured)
+        if (!AIConfig.UseMock)
         {
                         var judgeClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
@@ -193,7 +196,7 @@ public static class LightPathMAFIntegration
         else
         {
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("   ⚠️  No model provider configured. Available LLM-judged bundles:\n");
+            Console.WriteLine("   ⚠️  Mock mode: the LLM-judged bundles need a real model. They are:\n");
             Console.ResetColor();
             Console.WriteLine("   AgentEvalEvaluators.Quality(judgeClient)   → faithfulness, relevance, coherence, fluency");
             Console.WriteLine("   AgentEvalEvaluators.RAG(judgeClient)       → + context precision/recall, answer correctness");
@@ -228,7 +231,7 @@ public static class LightPathMAFIntegration
 
     private static AIAgent CreateTravelAgent()
     {
-        if (!AIConfig.IsConfigured)
+        if (AIConfig.UseMock)
             return CreateMockTravelAgent();
 
                 var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);

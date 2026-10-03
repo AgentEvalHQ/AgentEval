@@ -246,6 +246,11 @@ public static class Program
             }
         }
 
+        // Forward `--mock` the same way: the Getting Started samples' offline walkthrough. Only on request; a sample
+        // with no provider configured stops instead of switching to canned replies.
+        if (args.Any(a => string.Equals(a, "--mock", StringComparison.OrdinalIgnoreCase)))
+            Environment.SetEnvironmentVariable(AIConfig.MockVariable, "1");
+
         // Forward `--dry-run` the same way (group N: render every provider payload, send nothing).
         if (args.Any(a => string.Equals(a, "--dry-run", StringComparison.OrdinalIgnoreCase)))
             Environment.SetEnvironmentVariable("AGENTEVAL_SAMPLES_DRY_RUN", "1");

@@ -61,11 +61,12 @@ You **review, plan, and improve** the sample projects to ensure they effectively
 ### 2. Implementation Phase  
 - Follow `.github/instructions/samples.instructions.md` guidelines
 - Use required header template with time estimates
-- Implement mock fallbacks for samples 01-13 using `AIConfig.IsConfigured`
+- Run against the configured model; with no provider the sample stops (`AIConfig.IsConfigured`). Never add a silent
+  mock fallback: a mock runs only on request (`--mock`, `AIConfig.UseMock`) and is labelled MOCK
 - Register in `Program.cs` menu with clear description
 
 ### 3. Testing Phase
-- Verify sample works in both mock and real modes (if applicable)
+- Verify the sample against a real provider; if it has a `--mock` walkthrough, check that every result line says MOCK
 - Test time estimates are accurate
 - Ensure console output is clear and educational
 - Validate prerequisites and error handling
@@ -80,9 +81,13 @@ You **review, plan, and improve** the sample projects to ensure they effectively
 ### AgentEval.Samples (`samples/AgentEval.Samples/`)
 **Purpose:** Educational learning library with focused, progressive samples.
 
-**Principle: "Evaluation Always Real, Structure Optionally Mock"**
-- Samples 01-13: Work fully without credentials (mock-friendly)
-- Samples 14-21: Require Azure OpenAI for meaningful results
+**Principle: evaluation is always real.** Samples run against the configured model (`AIConfig`); a sample with no
+provider stops and says so. Only the Getting Started samples (A1–A5) and the Glass Box auto-audit sample have a `--mock`
+walkthrough, on request and labelled MOCK. Samples that need no model at all (dataset loaders, registry discovery)
+run offline by design. Through 0.42 the Getting Started samples switched to canned replies silently and printed
+✅ PASSED; that is the defect this principle rules out.
+
+The current catalog is `samples/AgentEval.Samples/README.md`. The table below is historical (pre-group numbering):
 
 | Sample | Feature | Mock-Safe |
 |--------|---------|-----------|
@@ -136,7 +141,7 @@ All samples use the `AIConfig` class for credential detection and graceful fallb
 if (!AIConfig.IsConfigured)
 {
     AIConfig.PrintMissingCredentialsWarning();
-    // Provide mock implementation or skip real evaluation
+    // Stop here: never substitute a mock for a missing provider
     return;
 }
 
@@ -197,7 +202,7 @@ When reviewing samples:
 
 - [ ] **Progressive Learning**: Does it build on previous samples?
 - [ ] **Single Concept**: Does it focus on one main feature?
-- [ ] **Mock Fallback**: Does it work without credentials (if designed to)?
+- [ ] **No Silent Fallback**: With no provider, does it stop (or run a labelled `--mock` only on request)?
 - [ ] **AIConfig Usage**: Uses `AIConfig.IsConfigured` pattern correctly?
 - [ ] **Menu Registration**: Added to `Program.cs` with clear description?
 - [ ] **Header Template**: Follows `.github/instructions/samples.instructions.md` format?
@@ -218,8 +223,8 @@ Track which samples depend on others:
 - Samples 14+ require understanding of 01-13 for full context
 
 Environment dependencies:
-- Samples 01-13: Work in mock mode (`AIConfig.IsConfigured` = false)
-- Samples 14-21: Require `AZURE_OPENAI_*` environment variables
+- Samples that use a model need a configured provider: `AI_INFERENCE_PROVIDER` and its variables (see `AIConfig`)
+- Samples that use no model run offline by design
 - Sample 05: May require `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` for RAG metrics
 
 ## AgentEval Principles (Apply to Code)
@@ -294,7 +299,7 @@ modelResults.PrintComparisonTable();
 
 ## Common Issues to Watch For
 
-1. **Missing Mock Fallback**: Samples 01-13 must work without Azure credentials
+1. **Silent Mock Fallback**: a sample that switches to a mock or scripted model when no provider is set (it must stop)
 2. **Manual Output Formatting**: Should use built-in `PrintTable()` methods
 3. **Testing Terminology**: Should use "evaluation" language
 4. **Missing Because**: Assertions should include `because:` parameters
@@ -315,7 +320,7 @@ dotnet build samples/AgentEval.Samples
 dotnet build samples/AgentEval.NuGetConsumer
 
 # Test sample in both modes
-# Mock mode (no credentials)
+# No provider: the sample must stop and say how to configure one (or run with --mock, labelled MOCK)
 unset AZURE_OPENAI_ENDPOINT AZURE_OPENAI_API_KEY AZURE_OPENAI_DEPLOYMENT
 dotnet run --project samples/AgentEval.Samples -- 3
 

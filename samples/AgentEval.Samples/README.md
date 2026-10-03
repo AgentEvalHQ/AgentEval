@@ -9,7 +9,10 @@
 - **Evaluation** (LLM-as-judge scores, metrics) → always real or gracefully skipped
 - **Structure** (tool ordering, workflows, conversations) → can be demonstrated with mock data
 
-Group A samples A1–A4 run fully without credentials (A5 Light Path, A6 Session Lifecycle, and A7 Advanced MAF Features require Azure), as do Dataset Loaders / Extensibility in Group F.
+Group A (Getting Started) runs against a real model. With no provider configured, A1–A5 stop and say what to set;
+pass `--mock` for an offline walkthrough with canned replies, labelled MOCK on every result. A6 Session Lifecycle and
+A7 Advanced MAF Features need a provider.
+Dataset Loaders / Extensibility in Group F run without credentials.
 Sample H1 (Registry Discovery) and H13 (Report Browser), plus all of Group J (Gatekeeper) except 11A (which
 needs a separately consented remote A2A endpoint), also run without credentials.
 Most other samples need a model provider — Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint, selected with `--provider` (see [Choosing a provider](#choosing-a-provider)); check each group's **Azure?** column for the authoritative per-sample requirement.
@@ -48,15 +51,15 @@ family-specific — see H1 Registry Discovery or `Benchmarks/README.md` for the 
 
 ## Sample Groups
 
-### A — Getting Started  ★ mostly no credentials needed
+### A — Getting Started  🔑 real model — `--mock` for an offline walkthrough (A1–A5)
 
 | # | Sample | What You'll Learn | Azure? | Time |
 |---|--------|-------------------|--------|------|
-| 1 | **Hello World** | Basic test setup, TestCase, TestResult, pass/fail | No | 2 min |
-| 2 | **Agent + One Tool** | Tool tracking, fluent assertions (`HaveCalledTool`, `WithoutError`) | No | 5 min |
-| 3 | **Agent + Multiple Tools** | Tool ordering (`BeforeTool`/`AfterTool`), visual timeline | No | 7 min |
-| 4 | **Performance Metrics** | Latency, cost, TTFT, token budget — basic assertions | No | 5 min |
-| 5 | **Light Path (MEAI)** | AgentEval as MEAI `IEvaluator` — plug into MAF's evaluation pipeline | Yes | 5 min |
+| 1 | **Hello World** | Basic test setup, TestCase, TestResult, pass/fail | Yes (or `--mock`) | 2 min |
+| 2 | **Agent + One Tool** | Tool tracking, fluent assertions (`HaveCalledTool`, `WithoutError`) | Yes (or `--mock`) | 5 min |
+| 3 | **Agent + Multiple Tools** | Tool ordering (`BeforeTool`/`AfterTool`), visual timeline | Yes (or `--mock`) | 7 min |
+| 4 | **Performance Metrics** | Latency, cost, TTFT, token budget — basic assertions | Yes (or `--mock`) | 5 min |
+| 5 | **Light Path (MEAI)** | AgentEval as MEAI `IEvaluator` — plug into MAF's evaluation pipeline | Yes (or `--mock`, without the LLM-judged demo) | 5 min |
 | 6 | **Session Lifecycle** | MAF `AgentSession`: create → multi-turn → reset → isolation | Yes | 8 min |
 | 7 | **Advanced MAF Features** | ChatHistory, middleware, structured output, approval, agent-as-tool | Yes | 10 min |
 
@@ -354,19 +357,47 @@ export AZURE_OPENAI_API_KEY="your-api-key"
 export AZURE_OPENAI_DEPLOYMENT="gpt-4o"
 ```
 
-### Without Azure (mock mode — Group A samples A1–A4 + H1 + H13 + all of Group J)
+### Without a provider (Group A with `--mock`; H1 + H13 + all of Group J)
 
-Samples in **Group A (A1–A4)**, **H1 Registry Discovery**, **H13 Report Browser**, and all of **Group J (Gatekeeper)**
-work fully without credentials. You'll see:
+**H1 Registry Discovery**, **H13 Report Browser**, and all of **Group J (Gatekeeper)** work fully without credentials.
+Samples that need a model stop. You'll see:
 
 ```
-╔══════════════════════════════════════════════════════════════╗
-║  ⚠️  Azure OpenAI credentials not configured                  ║
-║  All samples will run in MOCK MODE without real AI.          ║
-╚══════════════════════════════════════════════════════════════╝
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  ⚠️  No chat provider configured                                             ║
+║                                                                              ║
+║  AI_INFERENCE_PROVIDER = bitdeer | openai | foundry | azure | openai-compatible ║
+║                                                                              ║
+║   bitdeer            BITDEER_API_KEY                                          ║
+║   openai             OPENAI_API_KEY                                           ║
+║   foundry            FOUNDRY_ENDPOINT + FOUNDRY_API_KEY + FOUNDRY_MODEL       ║
+║   azure              AZURE_OPENAI_ENDPOINT + _API_KEY + _DEPLOYMENT           ║
+║   openai-compatible  OPENAI_COMPATIBLE_ENDPOINT + _MODEL  (_API_KEY optional) ║
+║                                                                              ║
+║  or pass --provider <name> for one run.                                       ║
+║  Samples that need a model stop without one. The Getting Started samples     ║
+║  also have an offline walkthrough with canned replies: pass --mock.          ║
+╚══════════════════════════════════════════════════════════════════════════════╝
 ```
 
-Samples requiring credentials show a skip banner and return gracefully.
+The Getting Started samples (A1–A5) then say:
+
+```
+   This sample runs a real model. Configure a provider above and re-run,
+   or pass --mock for an offline walkthrough with canned replies.
+```
+
+The offline walkthrough runs only when you ask for it:
+
+```bash
+dotnet run -- 1 --mock    # Hello World (A1) with canned replies
+dotnet run -- --mock      # the interactive menu, same flag
+```
+
+A mock run prints `🎭 MOCK MODE (--mock): the agent returns canned replies. Nothing here measures a model.`, and every
+pass/fail line ends with `(MOCK: a canned reply, not a measurement)`. In mock mode A5 does not run its LLM-judged demo
+(Quality/Safety); it lists the bundles instead. A6 and A7 have no mock mode. Through 0.42, A1–A5 switched to canned
+replies by themselves when no provider was set, and printed ✅ passes.
 
 ---
 
@@ -506,7 +537,7 @@ Mission Control, and **H1 Registry Discovery** all walk this registry. Plug new 
 
 ## Next Steps
 
-1. Run Group A (no credentials) to understand the core API
+1. Run Group A against your provider (or with `--mock` for the offline walkthrough) to understand the core API
 2. Run **H1 Registry Discovery** (no credentials) to see every benchmark family
 3. Add Azure creds and walk Group H end-to-end — every family produces a canonical audit-chained run
 4. Copy patterns into your own test project

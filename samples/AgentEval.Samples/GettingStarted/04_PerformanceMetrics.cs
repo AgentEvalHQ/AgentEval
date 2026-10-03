@@ -28,6 +28,9 @@ public static class PerformanceMetrics
     {
         PrintHeader();
 
+        if (!AIConfig.StartModelSample())
+            return;
+
         var agent = CreateAgent();
         Console.WriteLine($"\ud83d\udcdd Step 1: Agent '{agent.Name}' created\n");
 
@@ -111,7 +114,7 @@ public static class PerformanceMetrics
                     .HaveTokenCountUnder(5000);
 
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("   \u2705 Performance assertions passed!");
+                Console.WriteLine($"   \u2705 Performance assertions passed!{AIConfig.MockLabel}");
                 Console.ResetColor();
             }
             catch (PerformanceAssertionException ex)
@@ -175,7 +178,7 @@ public static class PerformanceMetrics
 
     private static AIAgent CreateAgent()
     {
-        if (!AIConfig.IsConfigured)
+        if (AIConfig.UseMock)
         {
             return CreateMockAgent();
         }

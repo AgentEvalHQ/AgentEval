@@ -33,6 +33,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     the built-in question it never sent, so `compare` treats such runs from before and after this change as
     different stimuli.
 
+### The Getting Started samples run a real model
+
+#### Fixed
+- **Samples A1–A5 switched to canned replies whenever no provider was configured, and printed ✅ PASSED over them.**
+  They now run against the configured model. With no provider they stop and say how to configure one. The canned
+  walkthrough runs only on request (`dotnet run --project samples/AgentEval.Samples -- 1 --mock`): it opens with a
+  MOCK MODE banner and every pass or fail line says "(MOCK: a canned reply, not a measurement)".
+  - The samples guidance for contributors and coding agents (`.github/instructions/samples.instructions.md`,
+    `.github/agents/agenteval-samples.agent.md`) told them to add mock fallbacks for missing credentials. It now
+    says the opposite: a sample with no provider stops; a mock runs only on request and is labelled.
+
 ### `redteam` and `eval` without a target are a usage error
 
 #### Fixed
