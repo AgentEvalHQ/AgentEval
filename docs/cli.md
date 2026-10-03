@@ -521,7 +521,7 @@ agenteval redteam [--azure] [--endpoint <url>] [--model <name>] [--deployment-na
 |--------|-------------|
 | `--azure` / `--endpoint` / `--deployment-name` | Azure OpenAI mode. |
 | `--endpoint` / `--model` | OpenAI-compatible mode (OpenAI, Ollama, Groq, vLLM, LM Studio, etc.). |
-| `--sut` | Built-in target instead of an endpoint: `gatekeeper-demo` (credential-free demo) or `copilot-studio` (a live Microsoft Copilot Studio agent). |
+| `--sut` | Built-in target instead of an endpoint: `gatekeeper-demo` (the Gatekeeper demo: the configured model behind the gate, or a labelled scripted model when no provider is configured) or `copilot-studio` (a live Microsoft Copilot Studio agent). |
 | `--attacks` | Comma-separated attack list; `--pack` imports external benchmark packs. |
 | `--judge` / `--attacker` | Separate judge/attacker models for LLM-as-judge and attacker-LLM flows. |
 | `--format` / `-o` | Export format and output destination. |

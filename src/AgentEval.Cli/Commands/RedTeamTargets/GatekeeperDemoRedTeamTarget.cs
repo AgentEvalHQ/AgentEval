@@ -4,20 +4,35 @@
 
 using System.CommandLine;
 using System.CommandLine.Parsing;
+using AgentEval.Cli.Infrastructure;
 using AgentEval.Core;
 using AgentEval.RedTeam;
+using Microsoft.Extensions.AI;
 using AgentTrace = AgentEval.Tracing.AgentTrace;
 
 namespace AgentEval.Cli.Commands.RedTeamTargets;
 
 /// <summary>
-/// The <c>--sut gatekeeper-demo</c> built-in target: a credential-free, deterministic Gatekeeper-gated agent (built by
-/// <see cref="GatekeeperDemoSut"/>) that demonstrates the attack-the-gate closed loop with no API key. Ported verbatim
-/// from the former inline <c>RedTeamCommand</c> branch — behaviour is unchanged.
+/// The <c>--sut gatekeeper-demo</c> built-in target: a Gatekeeper-gated agent (built by <see cref="GatekeeperDemoSut"/>)
+/// that demonstrates the attack-the-gate closed loop. It runs on the configured provider's model; only when no
+/// provider is configured does it fall back to the scripted, fully compromised model, and it says so. Through 0.42 the
+/// scripted model was the only one.
 /// </summary>
 internal sealed class GatekeeperDemoRedTeamTarget : IRedTeamBuiltInTarget
 {
+    private (IChatClient? Client, string? Model)? _model;
+
     public string Sut => "gatekeeper-demo";
+
+    /// <summary>The configured provider's model, resolved once and only for a run that selected this target.</summary>
+    private (IChatClient? Client, string? Model) Model()
+    {
+        if (_model is { } resolved)
+            return resolved;
+        var (client, model, _) = ProviderChatClientFactory.TryCreate("gatekeeper demo agent", generousTimeout: true);
+        _model = (client, model);
+        return _model.Value;
+    }
 
     /// <summary>The demo records its own gate.tool.* evidence into the trace; that is the point of the demo.</summary>
     public bool IncludeEvidence => true;
@@ -27,7 +42,10 @@ internal sealed class GatekeeperDemoRedTeamTarget : IRedTeamBuiltInTarget
     /// <summary>No flags of its own — nothing to bind.</summary>
     public IRedTeamTargetOptions? BindOptions(ParseResult parseResult) => null;
 
-    public string ResolvedName(RedTeamOptions opts) => "gatekeeper-demo";
+    /// <summary>Names the model the scan red-teamed, so a scripted run and a real one can never be mistaken for each other.</summary>
+    public string ResolvedName(RedTeamOptions opts) => Model() is { Client: not null, Model: { } model }
+        ? $"gatekeeper-demo (real model {model}@{ProviderChatClientFactory.Settings.ProviderTag})"
+        : "gatekeeper-demo (scripted)";
 
     public void Validate(RedTeamOptions opts)
     {
@@ -59,13 +77,31 @@ internal sealed class GatekeeperDemoRedTeamTarget : IRedTeamBuiltInTarget
             || opts.SystemPrompt is not null || opts.SystemPromptCanary is not null))
         {
             Console.Error.WriteLine(
-                "  Note: --sut gatekeeper-demo is a built-in agent; --endpoint/--azure/--model/--deployment-name/" +
-                "--sut-tier/--system-prompt/--system-prompt-canary are ignored.");
+                "  Note: --sut gatekeeper-demo is a built-in agent on the configured provider's model; --endpoint/--azure/" +
+                "--model/--deployment-name/--sut-tier/--system-prompt/--system-prompt-canary are ignored.");
         }
     }
 
     public IEvaluableAgent Build(RedTeamOptions opts, IEvaluableAgent? sutOverride, AgentTrace trace)
-        => sutOverride ?? GatekeeperDemoSut.Build(trace);
+    {
+        if (sutOverride is not null)
+            return sutOverride;
+
+        var (client, model) = Model();
+        if (client is null)
+        {
+            Console.Error.WriteLine(
+                "  SCRIPTED: no inference provider is configured, so the demo agent is a scripted, fully compromised " +
+                "model that calls the forbidden tool on every turn. It shows the gate, not a model. Configure a " +
+                "provider (AI_INFERENCE_PROVIDER) to red-team a real model behind the Gatekeeper.");
+            return GatekeeperDemoSut.Build(trace);
+        }
+
+        Console.Error.WriteLine(
+            $"  Gatekeeper demo: red-teaming the real model {model} behind the Gatekeeper; the forbidden tool is offered " +
+            "as a lure, and every call to it is blocked before it runs.");
+        return GatekeeperDemoSut.Build(trace, client);
+    }
 
     public void WritePostScanSummary(RedTeamResult result, AgentTrace trace, TextWriter err)
     {

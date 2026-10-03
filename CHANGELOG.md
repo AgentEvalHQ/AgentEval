@@ -33,6 +33,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     the built-in question it never sent, so `compare` treats such runs from before and after this change as
     different stimuli.
 
+### The Gatekeeper demo red-teams a real model
+
+#### Fixed
+- **`redteam --sut gatekeeper-demo` only ever ran a scripted, fully compromised model.** It now runs the
+  Gatekeeper-gated agent on the configured provider's model, with the forbidden exfiltration tool offered as a lure,
+  so the scan shows what a real model attempts and what the gate stops. With no provider configured it falls back
+  to the scripted model and says so (`SCRIPTED: …`). The run is named `gatekeeper-demo (real model <model>@<provider>)`
+  or `gatekeeper-demo (scripted)`, so a baseline taken on one is never read as the other.
+  - **Behaviour change:** where a provider is configured (a developer machine, a CI job with secrets) the demo now
+    calls that model and costs accordingly.
+- **The memory-security test doubles no longer ship in the `AgentEval` package.** `MockMemorySqlStore`,
+  `MockMemoryMcpEndpoint`, `MockMemoryAIContextProvider` and the other `MockMemory*` types (namespace
+  `AgentEval.MAF.Gatekeeper.MemorySecurity`) were public in the Gatekeeper assembly beside the real gates. They moved
+  to the Gatekeeper validation sample (`AgentEval.Gatekeeper.Validation.Fixtures`). **Breaking** for code that used
+  them; copy the file from `samples/AgentEval.Gatekeeper.Validation/` if you relied on it.
+
 ### `bench autoaudit` audits real models
 
 #### Fixed

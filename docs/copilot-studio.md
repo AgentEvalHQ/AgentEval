@@ -315,7 +315,7 @@ is no supported way, as a CLI user, to substitute your own pre-built agent for `
 isn't exposed as a flag.
 
 If you don't yet have Entra credentials for a non-prod MCS agent, use `--endpoint`/`--azure` against your own
-agent, or the credential-free `--sut gatekeeper-demo` target, to exercise the rest of the red-team suite in the
+agent, or the `--sut gatekeeper-demo` target, to exercise the rest of the red-team suite in the
 meantime — the connector itself is wired, but the live network path described above still awaits its first
 real-credential run.
 
@@ -451,5 +451,5 @@ AgentEval's red-team scoring is honest about *how much* evidence a verdict is ba
 - [Red Team Security](redteam.md) — the full scanner: attacks, evidence fidelity, judge modes, CI baseline gate.
 - [CLI Reference — Exit codes](cli.md#exit-codes) — the full exit-code table, including `8`
   (`BudgetExceeded`) — returned when a live `redteam --sut copilot-studio` scan hits its `--max-credits` cap.
-- [Attack the gate](gatekeeper/attack-the-gate.md) — the credential-free `--sut gatekeeper-demo` closed loop,
+- [Attack the gate](gatekeeper/attack-the-gate.md) — the `--sut gatekeeper-demo` closed loop,
   useful for CI where a live Copilot Studio agent + credentials aren't available.

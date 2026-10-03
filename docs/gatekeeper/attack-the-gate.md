@@ -2,7 +2,12 @@
 
 Gatekeeper's premise is one loop: the **same** policy you *red-team* with also *enforces* at runtime, and both write to one trace. "Attack the gate" closes that loop in CI — run your red-team suite against your **gated** agent, baseline the result, and fail the build if a future change ever lets a probe through.
 
-It runs **credential-free**: the built-in `--sut gatekeeper-demo` is a deliberately compromised agent (it tries to exfiltrate data via a canary tool on every turn) wrapped in a Gatekeeper `CanaryToolGate`. No `--endpoint`, no API key.
+The built-in `--sut gatekeeper-demo` is an agent wrapped in a Gatekeeper `CanaryToolGate`, with a forbidden exfiltration tool offered to the model as a lure. No `--endpoint` is needed:
+
+- **With a provider configured** (`AI_INFERENCE_PROVIDER` and its variables) the agent runs on that real model. The scan shows what the model attempts and what the gate stops, and the run is named `gatekeeper-demo (real model <model>@<provider>)`. It calls the model, so it costs, and a real model's answers vary from run to run.
+- **With no provider configured** it falls back to a scripted, fully compromised model that calls the forbidden tool on every turn, and says so (`SCRIPTED: …`, named `gatekeeper-demo (scripted)`). It shows the gate, not a model. It is deterministic and needs no API key.
+
+Through 0.42 the scripted model was the only one.
 
 ## The two-step loop
 
@@ -17,6 +22,8 @@ agenteval redteam --sut gatekeeper-demo --intensity quick \
   --baseline gatekeeper-demo.baseline.json --fail-on regression
 #   → the gate holds → Stable → the run passes.
 ```
+
+A baseline belongs to the model it was taken on: the `Model:` line names it. A CI job without provider secrets runs the scripted model, whose baseline is stable; with secrets, the job red-teams the real model, so take the baseline on that model and expect some run-to-run variation.
 
 The baseline records the *known* conclusive failures (their probe ids), the conclusive score, and the coverage. The gate on step 2 is **relative**: it does not fail because some attacks are known-hard — it fails when the *set* of failures grows. Concretely, [`RedTeamBaselineComparer`](https://github.com/AgentEvalHQ/AgentEval/blob/main/src/AgentEval.RedTeam/RedTeam/Baseline/RedTeamBaselineComparer.cs) flags a **regression** when any of: a new conclusive `Succeeded` probe appears, the conclusive score drops past the threshold, or coverage drops.
 

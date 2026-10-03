@@ -55,6 +55,9 @@
     <ProjectReference Include="..\..\src\AgentEval.MAF.AgentHooks\AgentEval.MAF.AgentHooks.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.RedTeam\AgentEval.RedTeam.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.RedTeam.Gatekeeper\AgentEval.RedTeam.Gatekeeper.csproj" />
+
+    <!-- The memory-security test doubles live with the validation sample, out of the shipped package. -->
+    <Compile Include="..\..\samples\AgentEval.Gatekeeper.Validation\MemorySecurityMockComponents.cs" Link="MAF\Gatekeeper\MemorySecurityMockComponents.cs" />
     <ProjectReference Include="..\..\src\AgentEval\AgentEval.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Cli\AgentEval.Cli.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Compliance.Gdpr\AgentEval.Compliance.Gdpr.csproj" />

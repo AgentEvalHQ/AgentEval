@@ -60,7 +60,7 @@ internal static class RedTeamCommand
         var systemPromptCanaryOpt = new Option<string?>("--system-prompt-canary")
             { Description = "Secret token embedded in the SUT system prompt; SystemPromptExtraction then proves a leak only when this exact token appears in a response (otherwise Inconclusive)." };
         var sutOpt = new Option<string?>("--sut")
-            { Description = "Built-in system-under-test. 'gatekeeper-demo' runs a credential-free, deterministic Gatekeeper-gated agent (no --endpoint needed) to demonstrate the attack-the-gate closed loop. 'copilot-studio' red-teams a LIVE Microsoft Copilot Studio agent (text-only/Verbal fidelity; requires --copilotstudio-config and --i-understand-live-side-effects)." };
+            { Description = "Built-in system-under-test. 'gatekeeper-demo' runs a Gatekeeper-gated agent on the configured provider's model (no --endpoint needed) to demonstrate the attack-the-gate closed loop; with no provider configured it falls back to a scripted, fully compromised model and says so. 'copilot-studio' red-teams a LIVE Microsoft Copilot Studio agent (text-only/Verbal fidelity; requires --copilotstudio-config and --i-understand-live-side-effects)." };
 
         // Built-in SUT targets (--sut <id>): each owns its own options + validation + construction (SRP; see
         // IRedTeamBuiltInTarget). The endpoint/--azure path is NOT a target — it stays as the red-team-core default.
@@ -321,7 +321,7 @@ internal static class RedTeamCommand
         if (selectedTarget is null)
         {
             if (opts.Endpoint is null && !opts.Azure)
-                throw new InvalidOperationException("Specify --endpoint <url> or --azure (or --sut gatekeeper-demo for a credential-free demo).");
+                throw new InvalidOperationException("Specify --endpoint <url> or --azure (or --sut gatekeeper-demo for the Gatekeeper demo).");
             if (opts.Azure && opts.Endpoint is null)
                 throw new InvalidOperationException(
                     "--azure requires --endpoint <url> (your Azure OpenAI resource endpoint, e.g. https://myresource.openai.azure.com/).");
@@ -817,7 +817,7 @@ internal static class RedTeamCommand
     };
 
     /// <summary>
-    /// The built-in <c>--sut</c> targets (gatekeeper-demo — the credential-free demo — first, then copilot-studio; no
+    /// The built-in <c>--sut</c> targets (gatekeeper-demo — the Gatekeeper demo — first, then copilot-studio; no
     /// ordering is relied upon). A fresh list per call so the option-holding targets aren't shared across command
     /// builds; the dispatch (Validate/Build) reads only <see cref="RedTeamOptions"/>.
     /// </summary>
