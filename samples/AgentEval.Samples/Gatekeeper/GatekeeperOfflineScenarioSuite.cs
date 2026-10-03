@@ -33,7 +33,23 @@ internal static class GatekeeperOfflineScenarioSuite
             "true",
             StringComparison.OrdinalIgnoreCase);
 
-    public static Task ExecuteAsync(string id) => id switch
+    /// <summary>
+    /// Runs a sample's scripted fallback, saying first that it is one: a scripted model proposes the attack, so the run
+    /// checks the gate's mechanics and measures no model.
+    /// </summary>
+    public static Task ExecuteAsync(string id)
+    {
+        var why = AIConfig.IsConfigured
+            ? "AGENTEVAL_GATEKEEPER_FORCE_OFFLINE is set"
+            : "no model provider is configured";
+        Console.ForegroundColor = ConsoleColor.DarkYellow;
+        Console.WriteLine($"   SCRIPTED ({why}): a scripted model proposes the attack and the benign control. This checks");
+        Console.WriteLine("   the gate's mechanics, not a model. Configure a provider to run this sample on a real model.");
+        Console.ResetColor();
+        return Execute(id);
+    }
+
+    private static Task Execute(string id) => id switch
     {
         "00" => ProbeEvaluatorAsync(),
         "01" => ForbiddenToolAsync(),

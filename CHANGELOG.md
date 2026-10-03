@@ -43,6 +43,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   or `gatekeeper-demo (scripted)`, so a baseline taken on one is never read as the other.
   - **Behaviour change:** where a provider is configured (a developer machine, a CI job with secrets) the demo now
     calls that model and costs accordingly.
+- The Gatekeeper samples 00–10 already ran on the configured model and used their scripted path only without one.
+  That path now opens with `SCRIPTED (…)`: a scripted model proposes the attack, so it checks the gate, not a model.
 - **The memory-security test doubles no longer ship in the `AgentEval` package.** `MockMemorySqlStore`,
   `MockMemoryMcpEndpoint`, `MockMemoryAIContextProvider` and the other `MockMemory*` types (namespace
   `AgentEval.MAF.Gatekeeper.MemorySecurity`) were public in the Gatekeeper assembly beside the real gates. They moved
