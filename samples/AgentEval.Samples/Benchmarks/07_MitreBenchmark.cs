@@ -23,6 +23,7 @@ namespace AgentEval.Samples.Benchmarks;
 ///   <item><see cref="SamplePreset.Standard"/> → <see cref="MitreBenchmark.AtlasBaseline"/></item>
 ///   <item><see cref="SamplePreset.AuditGrade"/> → <see cref="MitreBenchmark.AtlasAuditGrade"/></item>
 /// </list>
+/// The run is graded judge first via <see cref="MitreBenchmarkRun.WithJudge"/>, with the configured model as the judge.
 /// </summary>
 /// <remarks>
 /// Requires a model provider (see AIConfig). Skips gracefully when missing.
@@ -45,12 +46,16 @@ public static class MitreBenchmarkSample
         BenchmarkSampleHelpers.PrintPreset(preset);
 
         var agent = CreateAgent();
-        var run = preset switch
+
+        // Grade judge first, as `agenteval bench mitre` does. Without WithJudge the per-attack oracles grade alone.
+        // This sample uses the configured model as its judge.
+        var judgeModel = AIConfig.ModelDeployment;
+        var run = (preset switch
         {
             SamplePreset.Standard => MitreBenchmark.AtlasBaseline(),
             SamplePreset.AuditGrade => MitreBenchmark.AtlasAuditGrade(),
             _ => MitreBenchmark.AtlasSmoke(),
-        };
+        }).WithJudge(AIConfig.CreateChatClient(judgeModel), judgeModel);
 
         Console.WriteLine($"Scanning {agent.Name} with {run.PresetName} preset...");
         Console.WriteLine($"Covered ATLAS techniques: {string.Join(", ", run.CoveredAtlasIds)}");
@@ -74,7 +79,7 @@ public static class MitreBenchmarkSample
             includePdf: true,
             regulationCodeForEvidence: null,
             presetLabel: preset.ToString().ToLowerInvariant(),
-            judgeModel: AIConfig.ModelDeployment);
+            judgeModel: judgeModel);
 
         try
         {
@@ -92,8 +97,10 @@ public static class MitreBenchmarkSample
         Console.WriteLine();
         Console.WriteLine("   KEY TAKEAWAYS:");
         Console.WriteLine("   - MITRE ATLAS catalogues adversarial techniques against AI systems.");
-        Console.WriteLine("   - Non-applicable techniques (e.g. AML.T0044 Full Model Replication) render");
-        Console.WriteLine("     honestly as 'NOT TESTED' rather than passing by default.");
+        Console.WriteLine("   - Techniques not observable through dialog (e.g. AML.T0044 Full AI Model Access)");
+        Console.WriteLine("     render as skipped, 'not applicable at the agent-API layer', never as a pass.");
+        Console.WriteLine("   - Graded judge first: Composite Judges decide the semantic attacks; the other attacks");
+        Console.WriteLine("     are decided by their oracle, which asks the judge only when it is inconclusive.");
         Console.WriteLine("   - Smoke → AtlasSmoke; Standard → AtlasBaseline; AuditGrade → AtlasAuditGrade.");
         Console.WriteLine("   - Composite aggregation uses MinAggregation: a single failure fails the run.");
 

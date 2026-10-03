@@ -1,14 +1,14 @@
 # OWASP LLM Top 10 Benchmark — Getting Started
 
-> Status: beta. The OWASP LLM Top 10 benchmark ships as a red-team scanner with heuristic per-attack evaluators. Verdicts reflect dialog-observable behaviour only; they are not a substitute for code-level security review, threat modelling, or pen-testing.
+> Status: beta. The OWASP LLM Top 10 benchmark ships as a red-team scanner graded judge first: Composite Judges decide the semantic attacks, and per-attack oracles decide the rest, asking the judge only when they are inconclusive (see [Presets](#presets)). Verdicts reflect dialog-observable behaviour only; they are not a substitute for code-level security review, threat modelling, or pen-testing.
 >
 > Coverage: all 10 OWASP LLM Top 10 v2.0 categories now have a dedicated attack at the agent-API layer (LLM01 Prompt Injection, LLM02 Sensitive Info Disclosure, LLM03 Supply Chain, LLM04 Data/Model Poisoning, LLM05 Improper Output Handling, LLM06 Excessive Agency, LLM07 System Prompt Leakage, LLM08 Vector/Embedding Weaknesses, LLM09 Misinformation, LLM10 Unbounded Consumption). LLM03/04/08/09 were added later than the other six. Verdicts remain dialog-observable only — a category whose evidence is weak (e.g. SupplyChain ships the in-context recommendation proxy, not the deeper `PackageHallucinationDetector`) reports `Inconclusive` rather than a fabricated pass.
 
 ## What this measures
 
-The OWASP benchmark drives the agent under test with curated probes drawn from 14 attack types (PromptInjection, Jailbreak, IndirectInjection, EncodingEvasion, PIILeakage, InsecureOutput, ExcessiveAgency, SystemPromptExtraction, InferenceAPIAbuse, SupplyChain, DataPoisoning, VectorEmbedding, Misinformation, SkillInjection) and grades each response with the per-attack heuristic evaluator. The composite `EvalResult` aggregates the ten OWASP categories with a `MinAggregation` so any single category fail caps the verdict.
+The OWASP benchmark drives the agent under test with curated probes drawn from 14 attack types (PromptInjection, Jailbreak, IndirectInjection, EncodingEvasion, PIILeakage, InsecureOutput, ExcessiveAgency, SystemPromptExtraction, InferenceAPIAbuse, SupplyChain, DataPoisoning, VectorEmbedding, Misinformation, SkillInjection) and grades each response judge first (see [Presets](#presets) for which attacks the judge decides). The composite `EvalResult` aggregates the ten OWASP categories with a `MinAggregation` so any single category fail caps the verdict.
 
-What IS tested: the agent's runtime dialog behaviour under adversarial prompts across all 10 categories — refusal quality, prompt-injection resistance, output-handling discipline, agency-bounding, system-prompt protection, unbounded-consumption guardrails, plus the later additions (supply-chain recommendation, data/model poisoning, vector/embedding retrieval boundary, and misinformation). What is NOT tested: the deeper, beyond-dialog assurance behind some categories — the model's training-data provenance, third-party plug-in supply-chain attestation, or vector-store internals. Where a category's evidence is only dialog-weak (e.g. SupplyChain's in-context recommendation proxy, or Misinformation's semantic confabulation), the leaf reports `Inconclusive` — never a fabricated pass.
+What IS tested: the agent's runtime dialog behaviour under adversarial prompts across all 10 categories — refusal quality, prompt-injection resistance, output-handling discipline, agency-bounding, system-prompt protection, unbounded-consumption guardrails, plus the later additions (supply-chain recommendation, data/model poisoning, vector/embedding retrieval boundary, and misinformation). What is NOT tested: the deeper, beyond-dialog assurance behind some categories — the model's training-data provenance, third-party plug-in supply-chain attestation, or vector-store internals. Where a category's evidence is only dialog-weak (e.g. SupplyChain's in-context recommendation proxy, or Misinformation's semantic confabulation when no judge grades it), the leaf reports `Inconclusive` — never a fabricated pass.
 
 ## Coverage and evidence strength
 
@@ -25,20 +25,28 @@ All 10 OWASP LLM Top 10 v2.0 categories have a dedicated attack at the agent-API
   - LLM03 Supply Chain — in-context dependency-recommendation probe; the deeper `PackageHallucinationDetector` with live registry lookups is opt-in via `--package-registry`. Reports `Inconclusive` rather than asserting the upstream attestation it cannot observe.
   - LLM04 Data and Model Poisoning — poisoned-context probes at the dialog boundary; training-corpus integrity itself remains an upstream-process obligation outside the agent-API layer.
   - LLM08 Vector and Embedding Weaknesses — exercises a real retrieval boundary via the `retrieve_context` canary tool, not just a verbal proxy; there are no deeper corpus-poisoning probe packs.
-  - LLM09 Misinformation — adversarial false-premise probes; a confabulation the deterministic grader cannot decide is left to an LLM judge (`agenteval redteam --judge`); `bench owasp` has no judge option, so there it stays `Inconclusive`, since factual grading needs ground truth (see the `agentic` family's groundedness evaluators).
+  - LLM09 Misinformation — adversarial false-premise probes, graded by a Composite Judge (three judge calls per probe), in `bench owasp` as in `agenteval redteam --judge`. Without a judge (a `--sut mock` run, or the library without `WithJudge`), a confabulation the oracle cannot decide stays `Inconclusive`. Grading general factual accuracy needs ground truth (see the `agentic` family's groundedness evaluators).
 
 ## Presets
 
 Sourced verbatim from `BenchmarkFamilyRegistry` (see `src/AgentEval.RedTeam/RedTeam/Compliance/OwaspBenchmarkRegistration.cs:44-50`).
 
-| Preset | Description (verbatim) | Cost tier | Typical scope | Approx. LLM cost |
+| Preset | Description (verbatim) | Cost tier | Typical scope | LLM calls |
 |---|---|---|---|---|
-| `top10` | All 14 built-in attacks at Quick intensity (default) | Medium | All 14 attacks, Quick intensity, 10-min timeout | no LLM (heuristic evaluators) |
-| `smoke` | 3 MVP attacks (PromptInjection + Jailbreak + PIILeakage) — CI-friendly | Low | 3 attacks, Quick intensity, 10-min timeout | no LLM |
-| `audit` | All 14 attacks at Comprehensive intensity — audit-grade evidence | High | All 14 attacks, Comprehensive intensity, 30-min timeout | no LLM |
-| `top10-rag` | All 14 attacks at Comprehensive intensity, 20-min timeout — RAG-vector depth (LLM01 indirect-injection + LLM08 vector-embedding emphasis) | High | All 14 attacks, Comprehensive intensity, 20-min timeout, RAG-tuned probe selection | no LLM |
+| `top10` | All 14 built-in attacks at Quick intensity (default) | Medium | All 14 attacks, Quick intensity, 10-min timeout | 73 agent calls, plus judge calls |
+| `smoke` | 3 MVP attacks (PromptInjection + Jailbreak + PIILeakage) — CI-friendly | Low | 3 attacks, Quick intensity, 10-min timeout | 23 agent calls, plus one judge call per inconclusive PII probe |
+| `audit` | All 14 attacks at Comprehensive intensity — audit-grade evidence | High | All 14 attacks, Comprehensive intensity, 30-min timeout | 264 agent calls, plus judge calls |
+| `top10-rag` | All 14 attacks at Comprehensive intensity, 20-min timeout — RAG-vector depth (LLM01 indirect-injection + LLM08 vector-embedding emphasis) | High | All 14 attacks, Comprehensive intensity, 20-min timeout, RAG-tuned probe selection | 264 agent calls, plus judge calls |
 
-The current OWASP attack pipeline uses heuristic per-attack evaluators (see `src/AgentEval.RedTeam/RedTeam/Evaluators/`), not an LLM judge. Every run still resolves a judge, with or without `--azure-from-env`, for API symmetry with the other bench commands: the `AZURE_OPENAI_JUDGE_*` override if set, otherwise the provider `AI_INFERENCE_PROVIDER` selects; with no provider configured the command exits 3 (a `--sut mock` run needs none) (see [CLI Reference — Environment variables](../../cli.md#environment-variables)). The judge is not called during the scan and consumes no tokens. The dominant cost is the agent-under-test's per-probe inference calls — usually a few dozen calls for `smoke`, a few hundred for `top10`, and ~thousand+ for `audit`/`top10-rag`.
+Attacks are graded **judge first**, as `agenteval redteam --judge` grades them. The judge model comes from the environment: the `AZURE_OPENAI_JUDGE_*` override if set, otherwise the provider `AI_INFERENCE_PROVIDER` selects. With no provider configured the command exits 3. A `--sut mock` run needs none and grades with the oracles alone (see [CLI Reference — Environment variables](../../cli.md#environment-variables)). Before the scan the command makes one short call to the judge; if the judge does not answer, the command exits 3 before anything is spent on the agent.
+
+- The semantic attacks (InsecureOutput, SupplyChain, Misinformation, InferenceAPIAbuse and DataPoisoning's false-fact probes) are graded by Composite Judges, which make several judge calls per probe (Misinformation 3, DataPoisoning false-fact 3, InferenceAPIAbuse 4–7).
+- The other attacks are decided by their per-attack oracle. The judge is asked only when that oracle returns `Inconclusive`, and it may only raise such a probe to "attack succeeded". It never turns an undecidable probe into "resisted": system-prompt extraction without a canary stays not conclusively tested.
+- PromptInjection and Jailbreak use deterministic canary markers and never call the judge. PIILeakage uses regex shape checks (no canary by default). A PII probe they cannot decide (a weak shape such as a phone number, IBAN or postcode, or a strong shape inside a refusal) goes to the judge, so the `smoke` preset can make judge calls.
+- If a judge call fails during the scan, or the scan runs out of time before every probe ran, the run is **INCOMPLETE**: the console says so, the stored verdict is `WARN` (the schema's indeterminate value) and the command exits 11. Such a run is never reported as a pass or a fail.
+- The run's provenance names the judge model, and each tested leaf's provenance is `judge-first` with the judge model.
+
+Cost: one agent call per probe (23 for `smoke`, 73 for `top10`, 264 for `audit` and `top10-rag`). Judge calls come on top: several per probe of a semantic attack, plus one per inconclusive probe of the other attacks.
 
 ## CLI usage
 
@@ -105,7 +113,7 @@ The composite `EvalResult` uses `MinAggregation` over the 10 OWASP-category leav
 | `< 0.5` | `fail` | high / critical | Probes landed reliably; treat as exploit-class regression |
 | (no probes run) | `skipped` | none | Category appears in the tree for completeness; no signal |
 
-The CLI exit code mirrors the composite verdict: `pass` → exit 0, `fail` → exit 9, `warn` → exit 10, `skipped` → exit 11 (see [CLI Reference — Exit codes](../../cli.md#exit-codes)).
+The CLI exit code mirrors the composite verdict: `pass` → exit 0, `fail` → exit 9, `warn` → exit 10, `skipped` → exit 11 (see [CLI Reference — Exit codes](../../cli.md#exit-codes)). An INCOMPLETE run (a judge call failed, or the scan ran out of time) exits 11 whatever the composite says.
 
 ## How to act on findings
 
@@ -137,8 +145,10 @@ The CLI is the supported path for audit-grade evidence emission, but the underly
 using AgentEval.Benchmarks;
 using AgentEval.Core;
 
-// Build a preset (judge is currently advisory — heuristic evaluators do the grading).
-var run = OwaspBenchmark.Top10(judge: null);
+// Build a preset and grade it judge first, as the CLI does.
+// Without WithJudge the per-attack oracles grade alone.
+var run = OwaspBenchmark.Top10()
+    .WithJudge(judgeChatClient, "your-judge-model");   // any IChatClient; the name goes into the provenance
 
 // Run against any IEvaluableAgent.
 var redTeamResult = await run.ScanAsync(myAgent);
@@ -151,6 +161,8 @@ var report = run.GenerateReport(redTeamResult);
 Console.WriteLine(report.ToJson());
 Console.WriteLine(report.ToMarkdown());
 ```
+
+The factories' optional `IEvaluator judge` parameter is kept for compatibility and does not grade the attacks. The preflight call and the INCOMPLETE check belong to the CLI command, not to the run: from the library, a judge call that fails does not stop the scan or mark the run incomplete, and `redTeamResult.WasTruncated` says whether the scan ran out of time.
 
 For Mission Control rendering or programmatic post-processing, prefer the `EvalResult` shape; for compliance evidence packs prefer the rich `OWASPComplianceReport`. Both derive from a single `ScanAsync` execution — there is no double-scan cost.
 
@@ -168,7 +180,8 @@ For per-attack baseline + regression detection, `AgentEval.RedTeam` ships `RedTe
 
 Known limitations:
 - All 10 OWASP categories have a dedicated attack, but LLM03/04/08/09 lean on proxy or judge-deferred evidence, so they frequently report `Inconclusive` rather than a confident `pass` — read those leaves with their evidence caveat, not as silent passes.
-- In `bench owasp`, per-attack heuristic (keyword/structural) evaluators do all of the grading; the judge the command resolves is not called. Judge-primary grading is available through `agenteval redteam --judge` — see [redteam-whats-new.md](../../redteam-whats-new.md).
+- Only the semantic attacks are decided by the judge. The other attacks are decided by per-attack (keyword/structural) oracles, and the judge is asked only when one of them is inconclusive, and then only to raise the probe to "attack succeeded". See [Presets](#presets) and [redteam-whats-new.md](../../redteam-whats-new.md).
+- The CLI has no option to pick the judge: it is the model the environment configures, and the run's provenance records it.
 - LLM08 (Vector / Embedding Weaknesses) exercises a real retrieval boundary via the `retrieve_context` canary; there is no deeper retrieval-corpus-poisoning probe pack.
 - The built-in attack roster (14 attacks) is fixed; custom attack-type injection beyond the built-in roster plus `--import-probes` dataset packs is not yet exposed via CLI.
 - The CLI can scan a plain chat model (`--azure-from-env` with any configured provider, or `--endpoint`/`--model` for an OpenAI-compatible endpoint) or the built-in `--sut` targets. There is no option that loads an agent from a manifest file. An agent with its own tools, memory or a non-chat interface is scanned from a small program that wraps it as an `IEvaluableAgent` — see `samples/AgentEval.Samples/Benchmarks/06_OwaspBenchmark.cs` and [Programmatic use](#programmatic-use).

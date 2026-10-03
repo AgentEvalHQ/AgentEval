@@ -68,6 +68,44 @@ public class BenchNistCommandTests : IDisposable
             .OrderBy(f => f, StringComparer.Ordinal)
             .ToArray();
 
+    private sealed class CountingJudge : Microsoft.Extensions.AI.IChatClient
+    {
+        private int _calls;
+        public int Calls => _calls;
+
+        public Task<Microsoft.Extensions.AI.ChatResponse> GetResponseAsync(
+            IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages, Microsoft.Extensions.AI.ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            Interlocked.Increment(ref _calls);
+            return Task.FromResult(new Microsoft.Extensions.AI.ChatResponse(new Microsoft.Extensions.AI.ChatMessage(
+                Microsoft.Extensions.AI.ChatRole.Assistant, "VERDICT: INCONCLUSIVE\nCONFIDENCE: 0.5\nREASON: test")));
+        }
+
+        public IAsyncEnumerable<Microsoft.Extensions.AI.ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages, Microsoft.Extensions.AI.ChatOptions? options = null,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+        public void Dispose() { }
+    }
+
+    [Fact]
+    public async Task BenchNist_GradesTheAttacksWithTheJudge()
+    {
+        // Through 0.42 bench nist resolved a judge and never called it.
+        InitWorkspace();
+        var judge = new CountingJudge();
+
+        var result = await BenchNistCommand.RunAsync(
+            preset: "rmf-baseline", subject: "NistJudgedAgent", rootOverride: _root, inputText: null,
+            evaluatorOverride: null, agentOverride: new SafeRefusalAgent("NistJudgedAgent"), judgeClientOverride: judge);
+
+        Assert.True(result.ExitCode is 0 or 9 or 10 or 11, $"Expected a gate verdict; got {result.ExitCode}.");
+        Assert.True(judge.Calls > 1, "The judge graded nothing beyond the preflight call.");
+    }
+
     [Fact]
     public async Task BenchNist_NoTarget_Refuses_AndStoresNothing()
     {

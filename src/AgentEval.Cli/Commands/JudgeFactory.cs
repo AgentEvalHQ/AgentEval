@@ -104,6 +104,22 @@ internal static class JudgeFactory
         if (evaluatorOverride is not null)
             return (evaluatorOverride, "override", 0);
 
+        var (client, model, exitCode) = ResolveChatClient(judgeKind, systemPrompt?.Length);
+        return client is null
+            ? (null, "", exitCode)
+            : (new ChatClientEvaluator(client, systemPrompt, systemPromptId), model, 0);
+    }
+
+    /// <summary>
+    /// The judge's chat client, resolved from the environment exactly as <see cref="Resolve"/> resolves the judge:
+    /// the <c>AZURE_OPENAI_JUDGE_*</c> override first, then the provider <c>AI_INFERENCE_PROVIDER</c> selects. For a
+    /// caller that hands the model itself to a pipeline (the red-team benches' attack judge) rather than wrapping it
+    /// in an <see cref="IEvaluator"/>. On failure the reason is already written to stderr.
+    /// </summary>
+    internal static (IChatClient? Client, string JudgeModel, int ExitCode) ResolveChatClient(
+        string judgeKind = "benchmark",
+        int? systemPromptLength = null)
+    {
         // AZURE_OPENAI_JUDGE_* still wins outright, so the judge and the agent-under-test can point at
         // DIFFERENT endpoints in the same run — a capable grader against a cheap subject. It is the only
         // path that still hard-codes a provider, because naming a judge endpoint is the whole point of it.
@@ -133,11 +149,10 @@ internal static class JudgeFactory
             {
                 var azureClient = new AzureOpenAIClient(new Uri(endpoint!), new AzureKeyCredential(apiKey!));
                 IChatClient chatClient = CliChatClientDiagnostics.Wrap(azureClient.GetChatClient(deployment!).AsIChatClient(), "judge");
-                IEvaluator real = new ChatClientEvaluator(chatClient, systemPrompt, systemPromptId);
                 Console.Error.WriteLine(
                     $"✔ Azure OpenAI judge configured — endpoint={ProviderChatClientFactory.SafeEndpoint(new Uri(endpoint!))}, deployment={deployment} ({judgeKind})" +
-                    (systemPrompt is null ? "." : $" [system prompt: {systemPrompt.Length} chars]."));
-                return (real, deployment!, 0);
+                    (systemPromptLength is null ? "." : $" [system prompt: {systemPromptLength} chars]."));
+                return (chatClient, deployment!, 0);
             }
             catch (Exception ex)
             {
@@ -173,11 +188,10 @@ internal static class JudgeFactory
         var (providerClient, providerModel, diagnostic) = ProviderChatClientFactory.TryCreate("judge");
         if (providerClient is not null)
         {
-            IEvaluator providerJudge = new ChatClientEvaluator(providerClient, systemPrompt, systemPromptId);
             Console.Error.WriteLine(
                 $"{ProviderChatClientFactory.Describe($"{judgeKind} judge", providerModel!)}" +
-                (systemPrompt is null ? "" : $" [system prompt: {systemPrompt.Length} chars]"));
-            return (providerJudge, providerModel!, 0);
+                (systemPromptLength is null ? "" : $" [system prompt: {systemPromptLength} chars]"));
+            return (providerClient, providerModel!, 0);
         }
 
         // A provider WAS named or half-configured and could not be built: that is a typo, not an

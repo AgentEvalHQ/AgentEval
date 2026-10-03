@@ -41,7 +41,7 @@ Sourced verbatim from `BenchmarkFamilyRegistry` (see `src/AgentEval.Memory/Memor
 
 Cost estimates assume `gpt-4o-mini` judge pricing and depend heavily on the agent's response length + the chosen context-pressure target. Diagnostic and overflow presets are POWER-USER — they stress the agent's reducer / summarisation / vector-store path past nominal limits and are designed to surface failure modes that the standard preset masks; expect notably higher cost.
 
-> **Why is `quick` `CostTier.Medium` if it's CI-friendly?** `quick` makes ~15 LLM round-trips (~$0.20 - $0.80 at gpt-4o-mini pricing) — small in absolute terms but well above the `CostTier.Low` budget used by `bench owasp smoke` (zero LLM cost) or `bench perf latency` (telemetry-only). It IS CI-tractable when the CI budget allows ~$1/run; consider running `quick` on the main branch + nightly rather than on every commit if the budget is tighter. The other 4 presets are `High` and not intended for any commit-time CI.
+> **Why is `quick` `CostTier.Medium` if it's CI-friendly?** `quick` makes ~15 LLM round-trips (~$0.20 - $0.80 at gpt-4o-mini pricing) — small in absolute terms but above the `CostTier.Low` budget used by `bench owasp smoke` (23 short agent calls, plus a judge call only for a PII probe its checks cannot decide) or `bench perf latency` (telemetry-only). It IS CI-tractable when the CI budget allows ~$1/run; consider running `quick` on the main branch + nightly rather than on every commit if the budget is tighter. The other 4 presets are `High` and not intended for any commit-time CI.
 
 ## CLI usage
 

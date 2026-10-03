@@ -33,6 +33,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     the built-in question it never sent, so `compare` treats such runs from before and after this change as
     different stimuli.
 
+### `bench owasp`, `mitre` and `nist` grade with the judge
+
+#### Fixed
+- **The three red-team benchmarks resolved a judge and never called it: keyword oracles alone decided every
+  verdict.** They now grade judge first, as `agenteval redteam --judge` does. The judge model comes from the
+  environment: the `AZURE_OPENAI_JUDGE_*` override if set, otherwise the provider `AI_INFERENCE_PROVIDER` selects.
+  With no provider configured the command exits 3. A `--sut mock` run needs none and grades with the oracles alone.
+  - The semantic attacks (InsecureOutput, SupplyChain, Misinformation, InferenceAPIAbuse and DataPoisoning's
+    false-fact probes) are graded by Composite Judges, which make several judge calls per probe (Misinformation 3,
+    DataPoisoning false-fact 3, InferenceAPIAbuse 4–7).
+  - The other attacks are decided by their per-attack oracle; the judge is asked only when that oracle returns
+    Inconclusive. PromptInjection and Jailbreak use deterministic canary markers and never call the judge.
+    PIILeakage uses regex shape checks, and a PII probe they cannot decide (a weak shape such as a phone number,
+    IBAN or postcode, or a strong shape inside a refusal) goes to the judge. So the `smoke` presets can make judge
+    calls.
+  - **Behaviour change:** judge calls come on top of the agent calls (23 for `smoke`, 73 for `top10`, 264 for
+    `audit` and `top10-rag`; the MITRE and NIST presets have the same counts) and cost accordingly.
+  - Before the scan the command makes one short call to the judge. If the judge does not answer, the command exits 3
+    before anything is spent on the agent.
+  - **Behaviour change:** if a judge call fails during the scan, or the scan runs out of time before every probe ran,
+    the run is **INCOMPLETE**: the console says so, the stored verdict is `WARN` (the schema's indeterminate value)
+    and the command exits 11. Such a run is never reported as a pass or a fail.
+  - The run's provenance names the judge model. Each tested leaf's provenance is `judge-first` with the judge model;
+    it was `code`.
+  - The PDF and HTML report footers said every score came from deterministic scoring. They now say "Each score comes
+    from the evaluator its provenance names: code, or the judge model listed."
+  - `compare` treats a run graded with a judge and one graded without as different instruments (Incomparable).
+  - Library: `OwaspBenchmarkRun`, `MitreBenchmarkRun` and `NistBenchmarkRun` gain
+    `WithJudge(IChatClient judgeClient, string judgeModel)`, which returns the run, and `JudgeModel`. The factories'
+    `IEvaluator judge` parameter is kept for compatibility and does not grade the attacks.
+- **A judge asked about an inconclusive probe could turn it into "resisted".** When a per-attack oracle returns
+  Inconclusive, the judge may now only raise the probe to "attack succeeded". It can no longer make it "resisted".
+  An oracle often returns Inconclusive because the reply cannot decide the probe (system-prompt extraction without a
+  canary), and a judge that never saw the secret cannot decide it either. Such a probe stays not conclusively
+  tested.
+  - **Behaviour change:** this applies to `agenteval redteam --judge` too (fallback mode, and the probes primary mode
+    leaves to the oracle). Probes the judge used to mark resisted now stay Inconclusive, among them pack probes
+    the agent answered without a detectable refusal (a detected refusal is still graded resisted by the pack's own
+    check).
+
 ### A cost that was not measured is not a pass
 
 #### Fixed

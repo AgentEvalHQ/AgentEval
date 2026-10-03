@@ -613,7 +613,7 @@ var exporters = serviceProvider.GetRequiredService<IExporterRegistry>();
 var jsonExporter = exporters.GetRequired("Json");
 var allFormats = exporters.GetRegisteredFormats(); // Json, Junit, Markdown, Csv, Trx, ...
 
-// Attack type registry (pre-populated with the 13 built-in attacks + DI-registered)
+// Attack type registry (pre-populated with the 14 built-in attacks + DI-registered)
 var attacks = serviceProvider.GetRequiredService<IAttackTypeRegistry>();
 var promptInjection = attacks.GetRequired("PromptInjection");
 var llm01 = attacks.GetByOwaspId("LLM01"); // All attacks for OWASP LLM01

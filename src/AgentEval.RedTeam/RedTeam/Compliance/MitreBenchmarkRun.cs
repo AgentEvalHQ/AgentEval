@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using Microsoft.Extensions.AI;
 using AgentEval.Core;
 using AgentEval.Evals;
 using AgentEval.RedTeam;
@@ -62,10 +63,40 @@ public sealed class MitreBenchmarkRun
     public string PresetName { get; }
 
     /// <summary>
-    /// The optional LLM judge supplied to the factory. Currently unused by the heuristic
-    /// attack evaluators; retained on the run for API symmetry and forward-compat.
+    /// The <see cref="IEvaluator"/> supplied to the factory, kept because callers pass it. It does not grade the attacks:
+    /// a judge model given to <see cref="WithJudge"/> does.
     /// </summary>
     public IEvaluator? Judge { get; }
+
+    /// <summary>
+    /// The model that grades the attacks when <see cref="WithJudge"/> was called; <see langword="null"/> when the run
+    /// grades with the keyword oracles alone.
+    /// </summary>
+    public string? JudgeModel { get; private set; }
+
+    /// <summary>
+    /// Grades this run's attacks with <paramref name="judgeClient"/>, judge first: the Composite Judges decide each
+    /// probe and the keyword oracle is the fallback. This is the grading <c>agenteval redteam --judge</c> uses; keyword
+    /// oracles alone were shown unable to be made honest (ADR-023). <paramref name="judgeModel"/> names the judge in
+    /// the result's provenance.
+    /// </summary>
+    /// <returns>This run, for chaining.</returns>
+    public MitreBenchmarkRun WithJudge(IChatClient judgeClient, string judgeModel)
+    {
+        ArgumentNullException.ThrowIfNull(judgeClient);
+        ArgumentException.ThrowIfNullOrWhiteSpace(judgeModel);
+        _pipeline.WithJudge(judgeClient);
+        JudgeModel = judgeModel;
+        return this;
+    }
+
+    /// <summary>
+    /// The judge that graded <paramref name="scan"/>, read from the scan itself rather than this run's state: a run
+    /// scanned before <see cref="WithJudge"/> was called graded without one, and a judge set on <see cref="Pipeline"/>
+    /// directly graded with one this run never named.
+    /// </summary>
+    private string? GradingJudge(RedTeamResult scan) =>
+        scan.Options?.JudgeClient is null ? null : JudgeModel ?? "unnamed judge";
 
     /// <summary>Convenience: the configured attack pipeline (read-only access for tests).</summary>
     public AttackPipeline Pipeline => _pipeline;
@@ -173,6 +204,7 @@ public sealed class MitreBenchmarkRun
 
     private EvalResult BuildComposite(RedTeamResult redTeamResult, MITREATLASReport report)
     {
+        var judgeModel = GradingJudge(redTeamResult);
         // Group attack results by ATLAS technique ID for per-technique severity derivation.
         // An attack may carry multiple MitreAtlasIds; one attack contributes to multiple
         // technique buckets.
@@ -194,7 +226,7 @@ public sealed class MitreBenchmarkRun
         foreach (var technique in report.Techniques)
         {
             var attacks = attackResultsByTechnique.GetValueOrDefault(technique.Id, []);
-            leaves.Add(BuildLeaf(technique, attacks));
+            leaves.Add(BuildLeaf(technique, attacks, judgeModel));
         }
 
         // MinAggregation over non-skipped leaves (security-gate semantics).
@@ -275,8 +307,8 @@ public sealed class MitreBenchmarkRun
                 AggregationStrategy: "Min"),
             Provenance: new(
                 Type: "composite",
-                // NEVER a judge name: the IEvaluator this run holds is never invoked.
-                JudgeModel: null,
+                // The judge model only when one graded the attacks (WithJudge); never the unused IEvaluator.
+                JudgeModel: judgeModel,
                 PromptId: null,
                 PromptHash: null,
                 TokensUsed: null,
@@ -329,7 +361,7 @@ public sealed class MitreBenchmarkRun
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 
-    private static EvalResult BuildLeaf(MITRETechniqueStatus technique, IReadOnlyList<AttackResult> attacks)
+    private static EvalResult BuildLeaf(MITRETechniqueStatus technique, IReadOnlyList<AttackResult> attacks, string? judgeModel)
     {
         // MNT-02: leaf scoring is shared with OWASP via RedTeamComplianceLeaf.
         if (technique.Status == TechniqueTestStatus.NotTested
@@ -346,7 +378,7 @@ public sealed class MitreBenchmarkRun
         return RedTeamComplianceLeaf.BuildTestedLeaf(
             "mitre", "compliance.mitre", technique.Id, technique.Name,
             subjectLabel: $"{technique.Name} (Tactic: {technique.TacticName})",
-            technique.TotalTests, technique.PassedTests, attacks);
+            technique.TotalTests, technique.PassedTests, attacks, judgeModel);
     }
 
     private static EvalResult BuildSkippedLeaf(string atlasId)

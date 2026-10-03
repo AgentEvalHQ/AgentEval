@@ -70,6 +70,113 @@ public class BenchOwaspCommandTests : IDisposable
             .OrderBy(f => f, StringComparer.Ordinal)
             .ToArray();
 
+    private sealed class CountingJudge : Microsoft.Extensions.AI.IChatClient
+    {
+        private int _calls;
+        public int Calls => _calls;
+
+        public Task<Microsoft.Extensions.AI.ChatResponse> GetResponseAsync(
+            IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages, Microsoft.Extensions.AI.ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            Interlocked.Increment(ref _calls);
+            return Task.FromResult(new Microsoft.Extensions.AI.ChatResponse(new Microsoft.Extensions.AI.ChatMessage(
+                Microsoft.Extensions.AI.ChatRole.Assistant, "VERDICT: INCONCLUSIVE\nCONFIDENCE: 0.5\nREASON: test")));
+        }
+
+        public IAsyncEnumerable<Microsoft.Extensions.AI.ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages, Microsoft.Extensions.AI.ChatOptions? options = null,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+        public void Dispose() { }
+    }
+
+    /// <summary>Answers the preflight call, then fails every grading call, as an expired key or a quota would.</summary>
+    private sealed class FailsAfterPreflightJudge : Microsoft.Extensions.AI.IChatClient
+    {
+        private int _calls;
+
+        public Task<Microsoft.Extensions.AI.ChatResponse> GetResponseAsync(
+            IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages, Microsoft.Extensions.AI.ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            if (Interlocked.Increment(ref _calls) == 1)
+                return Task.FromResult(new Microsoft.Extensions.AI.ChatResponse(new Microsoft.Extensions.AI.ChatMessage(
+                    Microsoft.Extensions.AI.ChatRole.Assistant, "OK")));
+            throw new HttpRequestException("429 quota exceeded");
+        }
+
+        public IAsyncEnumerable<Microsoft.Extensions.AI.ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages, Microsoft.Extensions.AI.ChatOptions? options = null,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+        public void Dispose() { }
+    }
+
+    private sealed class DeadJudge : Microsoft.Extensions.AI.IChatClient
+    {
+        public Task<Microsoft.Extensions.AI.ChatResponse> GetResponseAsync(
+            IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages, Microsoft.Extensions.AI.ChatOptions? options = null,
+            CancellationToken cancellationToken = default) => throw new HttpRequestException("401 invalid api key");
+
+        public IAsyncEnumerable<Microsoft.Extensions.AI.ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages, Microsoft.Extensions.AI.ChatOptions? options = null,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+        public void Dispose() { }
+    }
+
+    [Fact]
+    public async Task BenchOwasp_AJudgeThatCannotAnswer_StopsTheRunBeforeTheScan()
+    {
+        InitWorkspace();
+        var before = WorkspaceFiles();
+
+        var result = await BenchOwaspCommand.RunAsync(
+            preset: "top10", subject: "OwaspDeadJudgeAgent", rootOverride: _root, inputText: null,
+            evaluatorOverride: null, agentOverride: new SafeRefusalAgent("OwaspDeadJudgeAgent"), judgeClientOverride: new DeadJudge());
+
+        Assert.Equal(AgentEval.Cli.ExitCodes.RuntimeError, result.ExitCode);
+        Assert.Equal(before, WorkspaceFiles());
+    }
+
+    [Fact]
+    public async Task BenchOwasp_AJudgeThatFailsMidScan_IsIncomplete_NotAPass()
+    {
+        // Through 0.42 a failing judge turned the semantic categories into skipped leaves and the composite read PASS.
+        InitWorkspace();
+
+        var result = await BenchOwaspCommand.RunAsync(
+            preset: "top10", subject: "OwaspFlakyJudgeAgent", rootOverride: _root, inputText: null,
+            evaluatorOverride: null, agentOverride: new SafeRefusalAgent("OwaspFlakyJudgeAgent"),
+            judgeClientOverride: new FailsAfterPreflightJudge());
+
+        Assert.Equal(AgentEval.Cli.ExitCodes.GateIndeterminate, result.ExitCode);
+        var summary = Directory.GetFiles(Path.Combine(_root, ".agenteval"), "summary.json", SearchOption.AllDirectories).Single();
+        Assert.Contains("\"WARN\"", File.ReadAllText(summary));
+    }
+
+    [Fact]
+    public async Task BenchOwasp_GradesTheAttacksWithTheJudge()
+    {
+        // Through 0.42 bench owasp resolved a judge and never called it.
+        InitWorkspace();
+        var judge = new CountingJudge();
+
+        var result = await BenchOwaspCommand.RunAsync(
+            preset: "top10", subject: "OwaspJudgedAgent", rootOverride: _root, inputText: null,
+            evaluatorOverride: null, agentOverride: new SafeRefusalAgent("OwaspJudgedAgent"), judgeClientOverride: judge);
+
+        Assert.True(result.ExitCode is 0 or 9 or 10 or 11, $"Expected a gate verdict; got {result.ExitCode}.");
+        Assert.True(judge.Calls > 0, "The judge was never called.");
+    }
+
     [Fact]
     public async Task BenchOwasp_NoTarget_Refuses_AndStoresNothing()
     {

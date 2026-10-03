@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using Microsoft.Extensions.AI;
 using AgentEval.Benchmarks;
 using AgentEval.Core;
 using AgentEval.Evals;
@@ -28,7 +29,7 @@ public static class BenchNistCommand
         bool azureFromEnv = false,
         CancellationToken ct = default)
     {
-        var (exitCode, _) = await RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, agentOverride: null, azureFromEnv, mock: false, ct).ConfigureAwait(false);
+        var (exitCode, _) = await RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, agentOverride: null, azureFromEnv, mock: false, ct: ct).ConfigureAwait(false);
         return exitCode;
     }
 
@@ -43,6 +44,8 @@ public static class BenchNistCommand
         IEvaluableAgent? agentOverride,
         bool azureFromEnv = false,
         bool mock = false,
+        IChatClient? judgeClientOverride = null,
+        string? agentModel = null,
         CancellationToken ct = default)
     {
         if (mock && (agentOverride is not null || azureFromEnv))
@@ -76,17 +79,26 @@ public static class BenchNistCommand
             return (1, null);
         }
 
-        // ── Judge / evaluator (accepted for API symmetry; heuristic evaluators today) ──
-        var (resolvedJudge, _, exitCode) = mock && evaluatorOverride is null
-            ? MockTarget.JudgeResolution
-            : JudgeFactory.Resolve(evaluatorOverride, judgeKind: "NIST AI RMF benchmark");
-        if (resolvedJudge is null) return (exitCode, null);
+        // ── Judge ────────────────────────────────────────────────────────────
+        // The attacks are graded judge first, as `agenteval redteam --judge` grades them: the judge model the
+        // environment configures (AZURE_OPENAI_JUDGE_*, else the provider AI_INFERENCE_PROVIDER selects), with the
+        // keyword oracles as the fallback. A mock run reads no environment and grades with the oracles alone, as does
+        // a caller that supplies its own evaluator and no judge client (the test seam).
+        IChatClient? judgeClient = judgeClientOverride;
+        string? judgeModelName = judgeClientOverride is null ? null : "override";
+        if (judgeClient is null && !mock && evaluatorOverride is null)
+        {
+            var (client, model, judgeExit) = JudgeFactory.ResolveChatClient("NIST AI RMF benchmark");
+            if (client is null) return (judgeExit, null);
+            judgeClient = client;
+            judgeModelName = model;
+        }
 
         // ── Select preset ────────────────────────────────────────────────────
         NistBenchmarkRun benchmark;
         try
         {
-            benchmark = ResolvePreset(preset, resolvedJudge);
+            benchmark = ResolvePreset(preset, evaluatorOverride);
         }
         catch (ArgumentException ex)
         {
@@ -100,6 +112,13 @@ public static class BenchNistCommand
             return (1, null);
         }
 
+        JudgeCallLedger? judgeLedger = null;
+        if (judgeClient is not null)
+        {
+            judgeLedger = new JudgeCallLedger(judgeClient);
+            benchmark.WithJudge(judgeLedger, judgeModelName!);
+        }
+
         // ── Resolve target agent ─────────────────────────────────────────────
         _ = inputText;   // recorded for provenance only — the pipeline generates its own probes
         IEvaluableAgent agent;
@@ -109,9 +128,10 @@ public static class BenchNistCommand
         }
         else if (azureFromEnv)
         {
-            var (azureAgent, azureExitCode) = AzureChatAgentFactory.TryBuildFromEnv(subject);
+            var (azureAgent, envModel, azureExitCode) = AzureChatAgentFactory.TryBuildFromEnvWithModel(subject);
             if (azureAgent is null) return (azureExitCode, null);
             agent = azureAgent;
+            agentModel = envModel;
         }
         else
         {
@@ -119,6 +139,15 @@ public static class BenchNistCommand
             agent = new MockTarget.RefusingAgent(subject);
         }
         var isMock = agent is MockTarget.RefusingAgent;
+
+        // One cheap call before the scan: a judge that cannot answer (a wrong key, deployment or quota) stops the run
+        // here instead of turning every semantic probe into "inconclusive" and the composite into a pass.
+        if (judgeLedger is not null && await judgeLedger.PreflightAsync(ct).ConfigureAwait(false) is { } judgeDown)
+        {
+            Console.Error.WriteLine(
+                $"Error: the judge ({judgeModelName}) did not answer a test call, so the attacks cannot be graded: {judgeDown}");
+            return (ExitCodes.RuntimeError, null);
+        }
 
         // ── Run benchmark ────────────────────────────────────────────────────
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
@@ -153,6 +182,17 @@ public static class BenchNistCommand
                 $"{compositeEval.Score.Label.ToUpperInvariant()} (score {compositeEval.Score.Value:F3}) for a stand-in that refuses every request"), null);
         }
 
+        var incompleteReasons = new List<string>();
+        if (judgeLedger is { Failures: > 0 } ledger)
+        {
+            incompleteReasons.Add($"the judge failed {ledger.Failures} of {ledger.Calls} grading calls");
+        }
+        if (redTeamResult.WasTruncated)
+        {
+            incompleteReasons.Add("the scan ran out of time before every probe ran");
+        }
+        var incomplete = incompleteReasons.Count > 0;
+
         // ── Persist through the unified output-store ─────────────────────────
         string runId;
         try
@@ -171,10 +211,11 @@ public static class BenchNistCommand
             var scenarioResult = EvalResultPersistence.ToScenarioResult(
                 compositeEval,
                 scenarioId: $"nist-{preset.ToLowerInvariant()}",
-                scenarioName: $"NIST AI RMF — {preset}");
+                scenarioName: $"NIST AI RMF — {preset}",
+                subjectModel: agentModel);
             await store!.WriteScenarioResultAsync(runId, scenarioResult);
 
-            var verdict = compositeEval.Score.Label.ToUpperInvariant() switch
+            var verdict = incomplete ? "WARN" : compositeEval.Score.Label.ToUpperInvariant() switch
             {
                 "PASS" => "PASS",
                 "WARN" => "WARN",
@@ -252,15 +293,22 @@ public static class BenchNistCommand
             $"({report.Summary.CriticalFindings} needs-improvement / {report.Summary.HighFindings} partially-effective); " +
             $"composite verdict {compositeEval.Score.Label.ToUpperInvariant()}");
 
+        if (incomplete)
+        {
+            // A judge that failed, or a scan that ran out of time, leaves categories ungraded; the composite above
+            // cannot say pass or fail. Stored as WARN, the schema's indeterminate value.
+            Console.WriteLine($"INCOMPLETE: {string.Join("; ", incompleteReasons)}. This run is neither a pass nor a fail.");
+            return (ExitCodes.GateIndeterminate, outputDir);
+        }
+
         var finalExit = BenchExitCodes.FromLabel(compositeEval.Score.Label);  // pass → 0, fail → 9 (GateFailed), warn → 10 (GateWarning), skipped → 11 (GateIndeterminate) — BUG-22
         return (finalExit, outputDir);
     }
 
     /// <summary>Resolves a NIST AI RMF preset spec into a <see cref="NistBenchmarkRun"/>.</summary>
-    internal static NistBenchmarkRun ResolvePreset(string presetSpec, IEvaluator judge)
+    internal static NistBenchmarkRun ResolvePreset(string presetSpec, IEvaluator? judge = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(presetSpec);
-        ArgumentNullException.ThrowIfNull(judge);
 
         return presetSpec.Trim().ToLowerInvariant() switch
         {

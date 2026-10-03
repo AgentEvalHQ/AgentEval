@@ -338,7 +338,7 @@ var benchOwaspAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Descripti
 var benchOwaspEndpointOpt = new Option<string?>("--endpoint") { Description = "OpenAI-compatible API endpoint URL (Ollama, LM Studio, vLLM, Groq, Together.ai, Mistral, etc.) — an alternative to --azure-from-env. Requires --model." };
 var benchOwaspModelOpt = new Option<string?>("--model") { Description = "Model name (required with --endpoint)." };
 var benchOwaspApiKeyOpt = new Option<string?>("--api-key") { Description = "API key for --endpoint (or set OPENAI_API_KEY env var)." };
-var benchOwaspCmd = new Command("owasp", "Run the OWASP LLM Top 10 red-team benchmark. Needs a target: --sut, --endpoint/--model, or --azure-from-env (the provider AI_INFERENCE_PROVIDER selects); without one it refuses. --sut mock runs a stand-in that measures nothing and is not stored. There is still no --judge here — use `agenteval redteam` for a fully-parameterised scan.");
+var benchOwaspCmd = new Command("owasp", "Run the OWASP LLM Top 10 red-team benchmark. Needs a target: --sut, --endpoint/--model, or --azure-from-env (the provider AI_INFERENCE_PROVIDER selects); without one it refuses. --sut mock runs a stand-in that measures nothing and is not stored. Attacks are graded judge first by the judge the environment configures (AZURE_OPENAI_JUDGE_*, else AI_INFERENCE_PROVIDER), as `agenteval redteam --judge` grades them; use `agenteval redteam` for a fully-parameterised scan.");
 benchOwaspCmd.Add(benchOwaspPresetOpt);
 benchOwaspCmd.Add(benchOwaspSubjectOpt);
 benchOwaspCmd.Add(benchOwaspRootOpt);
@@ -383,7 +383,8 @@ benchOwaspCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
         return AgentEval.Cli.ExitCodes.UsageError;
     }
 
-    var (exitCode, _) = await BenchOwaspCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride, azureFromEnv, mock, ct);
+    var (exitCode, _) = await BenchOwaspCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride, azureFromEnv, mock,
+        agentModel: agentOverride is not null && sut is null ? parseResult.GetValue(benchOwaspModelOpt) : null, ct: ct);
     return exitCode;
 });
 benchCmd.Add(benchOwaspCmd);
@@ -398,7 +399,7 @@ var benchMitreAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Descripti
 var benchMitreEndpointOpt = new Option<string?>("--endpoint") { Description = "OpenAI-compatible API endpoint URL (Ollama, LM Studio, vLLM, Groq, Together.ai, Mistral, etc.) — an alternative to --azure-from-env. Requires --model." };
 var benchMitreModelOpt = new Option<string?>("--model") { Description = "Model name (required with --endpoint)." };
 var benchMitreApiKeyOpt = new Option<string?>("--api-key") { Description = "API key for --endpoint (or set OPENAI_API_KEY env var)." };
-var benchMitreCmd = new Command("mitre", "Run the MITRE ATLAS red-team benchmark. Needs a target: --sut, --endpoint/--model, or --azure-from-env (the provider AI_INFERENCE_PROVIDER selects); without one it refuses. --sut mock runs a stand-in that measures nothing and is not stored. There is still no --judge here — use `agenteval redteam` for a fully-parameterised scan.");
+var benchMitreCmd = new Command("mitre", "Run the MITRE ATLAS red-team benchmark. Needs a target: --sut, --endpoint/--model, or --azure-from-env (the provider AI_INFERENCE_PROVIDER selects); without one it refuses. --sut mock runs a stand-in that measures nothing and is not stored. Attacks are graded judge first by the judge the environment configures (AZURE_OPENAI_JUDGE_*, else AI_INFERENCE_PROVIDER), as `agenteval redteam --judge` grades them; use `agenteval redteam` for a fully-parameterised scan.");
 benchMitreCmd.Add(benchMitrePresetOpt);
 benchMitreCmd.Add(benchMitreSubjectOpt);
 benchMitreCmd.Add(benchMitreRootOpt);
@@ -443,7 +444,8 @@ benchMitreCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
         return AgentEval.Cli.ExitCodes.UsageError;
     }
 
-    var (exitCode, _) = await BenchMitreCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride, azureFromEnv, mock, ct);
+    var (exitCode, _) = await BenchMitreCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride, azureFromEnv, mock,
+        agentModel: agentOverride is not null && sut is null ? parseResult.GetValue(benchMitreModelOpt) : null, ct: ct);
     return exitCode;
 });
 benchCmd.Add(benchMitreCmd);
@@ -457,7 +459,7 @@ var benchNistAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Descriptio
 var benchNistEndpointOpt = new Option<string?>("--endpoint") { Description = "OpenAI-compatible API endpoint URL (Ollama, LM Studio, vLLM, Groq, Together.ai, Mistral, etc.) — an alternative to --azure-from-env. Requires --model." };
 var benchNistModelOpt = new Option<string?>("--model") { Description = "Model name (required with --endpoint)." };
 var benchNistApiKeyOpt = new Option<string?>("--api-key") { Description = "API key for --endpoint (or set OPENAI_API_KEY env var)." };
-var benchNistCmd = new Command("nist", "Run the NIST AI RMF (AI 100-1) red-team benchmark. Needs a target: --sut, --endpoint/--model, or --azure-from-env (the provider AI_INFERENCE_PROVIDER selects); without one it refuses. --sut mock runs a stand-in that measures nothing and is not stored. There is still no --judge here — use `agenteval redteam` for a fully-parameterised scan.");
+var benchNistCmd = new Command("nist", "Run the NIST AI RMF (AI 100-1) red-team benchmark. Needs a target: --sut, --endpoint/--model, or --azure-from-env (the provider AI_INFERENCE_PROVIDER selects); without one it refuses. --sut mock runs a stand-in that measures nothing and is not stored. Attacks are graded judge first by the judge the environment configures (AZURE_OPENAI_JUDGE_*, else AI_INFERENCE_PROVIDER), as `agenteval redteam --judge` grades them; use `agenteval redteam` for a fully-parameterised scan.");
 benchNistCmd.Add(benchNistPresetOpt);
 benchNistCmd.Add(benchNistSubjectOpt);
 benchNistCmd.Add(benchNistRootOpt);
@@ -502,7 +504,8 @@ benchNistCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
         return AgentEval.Cli.ExitCodes.UsageError;
     }
 
-    var (exitCode, _) = await BenchNistCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride, azureFromEnv, mock, ct);
+    var (exitCode, _) = await BenchNistCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride, azureFromEnv, mock,
+        agentModel: agentOverride is not null && sut is null ? parseResult.GetValue(benchNistModelOpt) : null, ct: ct);
     return exitCode;
 });
 benchCmd.Add(benchNistCmd);

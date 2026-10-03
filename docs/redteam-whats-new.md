@@ -99,7 +99,7 @@ So our honest position: **on raw probe breadth, garak leads; on attacker-LLM orc
 
 ### Practical guidance
 
-- **Configure `--judge`.** This is now where the honesty lives: with a judge set, Composite Judges *lead* the semantic verdicts. Without one, AgentEval falls back to the deterministic keyword oracle — best-effort only — and the cases it can't be sure about honestly report as a coverage gap, not a fake pass. (Use `--judge-mode fallback` if you want the old judge-as-tiebreaker behavior.)
+- **Configure `--judge`.** This is now where the honesty lives: with a judge set, Composite Judges *lead* the semantic verdicts. Without one, AgentEval falls back to the deterministic keyword oracle — best-effort only — and the cases it can't be sure about honestly report as a coverage gap, not a fake pass. (Use `--judge-mode fallback` if you want the judge only to adjudicate Inconclusive verdicts. Since 0.43 it can raise one to Succeeded, never to Resisted.)
 - **Trust the structural signals on their own** — exact markers, canary-tool execution, real payloads. Those don't depend on reading prose.
 - **Read the verdict *and* its fidelity label.** "Succeeded (Behavioral)" is a proven compromise; "Succeeded (Verbal)" is a strong signal worth a human look.
 

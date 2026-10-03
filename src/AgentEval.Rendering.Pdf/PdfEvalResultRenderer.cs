@@ -308,11 +308,13 @@ public sealed class PdfEvalResultRenderer : IEvalResultRenderer
             col.Item().Text($"Generated: {generatedAt:O}").FontSize(11);
             col.Item().Text($"Root key: {root.Metric.Key}").FontSize(11);
             col.Item().Text($"Root evaluator: {root.Provenance.Type}").FontSize(11);
+            if (!string.IsNullOrEmpty(root.Provenance.JudgeModel))
+                col.Item().Text($"Judge model: {root.Provenance.JudgeModel}").FontSize(11);
             col.Item().Text($"Leaf count: {CountLeaves(root, 0)}").FontSize(11);
 
             col.Item().PaddingTop(20).Text(
-                "This report was produced by AgentEval and reflects the deterministic scoring " +
-                "of the underlying evaluators. It does not constitute legal advice.")
+                "This report was produced by AgentEval. Each score comes from the evaluator its provenance names: " +
+                "code, or the judge model listed. It does not constitute legal advice.")
                 .FontSize(9).Italic().FontColor(Colors.Grey.Darken1);
         });
     }
