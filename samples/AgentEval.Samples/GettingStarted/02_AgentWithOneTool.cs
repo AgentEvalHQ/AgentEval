@@ -82,7 +82,7 @@ public static class AgentWithOneTool
         Console.WriteLine(new string('─', 60));
         
         PrintPassFail(result.Passed);
-        Console.WriteLine($"   Score: {result.Score}/100");
+        Console.WriteLine($"   Score: {result.Score}/100{AIConfig.MockLabel}");
         
         if (result.ToolUsage != null && result.ToolUsage.Count > 0)
         {
@@ -131,7 +131,7 @@ public static class AgentWithOneTool
             catch (ToolAssertionException ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"   ❌ Assertion failed: {ex.Message}");
+                Console.WriteLine($"   ❌ Assertion failed: {ex.Message}{AIConfig.MockLabel}");
                 Console.ResetColor();
             }
         }

@@ -695,7 +695,7 @@ benchCmd.Add(benchNistCmd);
         var aaOutOpt = new Option<string?>("--out") { Description = "Path to write the Markdown comparison report (optional; also printed to stdout)." };
         var aaModelsOpt = new Option<string?>("--models") { Description = "Comma-separated models to audit on the configured provider. Default: the models the provider names (*_MODEL, *_MODEL_2, *_MODEL_3)." };
         var aaSutOpt = new Option<string?>("--sut") { Description = $"Only '{MockTarget.Sut}' here: the scripted showcase over three made-up endpoints, labelled MOCK. It measures no model." };
-        var benchAutoAuditCmd = new Command("autoaudit", "Cross-endpoint Glass Box comparison — honesty (Trace Fidelity) + safety (gate blocks) + cost (tokens/latency), ranked. Audits real models on the configured provider (one support task each); without a provider it refuses. --sut mock runs the scripted showcase.");
+        var benchAutoAuditCmd = new Command("autoaudit", "Glass Box auto-audit of the configured provider's models: one support task each, ranked on safety (PII gate blocks, and any leak the gate missed), Trace Fidelity (the tool loop's account vs the chat boundary) and cost (tokens/latency). A model that never does the task is not ranked. Without a provider it refuses. --sut mock runs the scripted showcase.");
         benchAutoAuditCmd.Add(aaOutOpt);
         benchAutoAuditCmd.Add(aaModelsOpt);
         benchAutoAuditCmd.Add(aaSutOpt);

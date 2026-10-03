@@ -32,15 +32,17 @@ public static class AutoAudit
         }
         else
         {
-            var models = new[] { AIConfig.ModelDeployment, AIConfig.SecondaryModelDeployment, AIConfig.TertiaryModelDeployment }
-                .Distinct(StringComparer.Ordinal)
-                .ToList();
+            // Only the models the environment names; the provider's fallback second and third models are defaults
+            // nobody configured (for Azure, deployments that may not exist).
+            var models = AgentEval.Providers.InferenceProviderEnvironment.NamedModels(
+                AIConfig.Settings, Environment.GetEnvironmentVariable);
             var results = new List<AutoAuditEndpointResult>();
             foreach (var model in models)
             {
                 var endpoint = $"{model} ({AIConfig.ProviderTag})";
                 Console.WriteLine($"  ⏳ auditing {endpoint} ...");
-                var (result, failure) = await AutoAuditLive.EvaluateAsync(endpoint, AIConfig.CreateChatClient(model));
+                using var client = AIConfig.CreateChatClient(model);
+                var (result, failure) = await AutoAuditLive.EvaluateAsync(endpoint, client);
                 if (failure is not null)
                     Console.WriteLine($"     did not complete: {failure.GetType().Name}: {failure.Message}");
                 results.Add(result);
@@ -51,8 +53,14 @@ public static class AutoAudit
 
         foreach (var r in report.Ranking)
         {
+            if (!r.Completed)
+            {
+                Console.WriteLine($"  {r.Endpoint,-32} did not complete the task: not measured{AIConfig.MockLabel}");
+                continue;
+            }
             var top = r.TopDiscrepancies.Count > 0 ? string.Join(", ", r.TopDiscrepancies) : "none";
-            Console.WriteLine($"  {r.Endpoint,-32} fidelity={r.FidelityScore * 100,3:F0}%  gateBlocks={r.GateBlocks}  tokens={r.TotalTokens}  discrepancies: {top}{AIConfig.MockLabel}");
+            var leak = r.LeakedPastGate ? "  LEAKED the SSN past the gate" : "";
+            Console.WriteLine($"  {r.Endpoint,-32} fidelity={r.FidelityScore * 100,3:F0}%  gateBlocks={r.GateBlocks}{leak}  tokens={r.TotalTokens}  discrepancies: {top}{AIConfig.MockLabel}");
         }
 
         Console.WriteLine();

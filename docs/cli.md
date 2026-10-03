@@ -430,7 +430,7 @@ the delta cannot be read against chance, and scenarios graded by a judge running
 Run benchmark families against a subject (agent or workflow). The benchmark registry now includes
 GDPR, EU AI Act, Agentic, OWASP, MITRE, NIST, Performance, LongMemEval, TypedMemEval, Memory,
 Trace Fidelity, and AutoAudit. Results flow into `.agenteval/` so Mission Control and
-`agenteval doctor` can read them.
+`agenteval doctor` can read them (except `autoaudit`, which prints its report and writes it with `--out`).
 
 **Synopsis**
 

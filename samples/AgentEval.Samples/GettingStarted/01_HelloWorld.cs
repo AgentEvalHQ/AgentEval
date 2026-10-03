@@ -84,7 +84,7 @@ public static class HelloWorld
         }
         Console.ResetColor();
         
-        Console.WriteLine($"   Score: {result.Score}/100");
+        Console.WriteLine($"   Score: {result.Score}/100{AIConfig.MockLabel}");
         Console.WriteLine($"   Details: {result.Details}");
         
         if (!string.IsNullOrEmpty(result.ActualOutput))

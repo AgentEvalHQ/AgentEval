@@ -83,6 +83,16 @@ public sealed class BenchTargetCommandLineTests : IDisposable
         Assert.Contains("Specify --endpoint <url> or --azure, or --sut <target>.", stderr, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task RedTeamPackList_NeedsNoTarget()
+    {
+        // `--pack list` evaluates nothing; the no-target guard must not stand in front of it.
+        var (exit, stdout, _) = await CliParseErrorExitCodeTests.RunCliAsync(["redteam", "--pack", "list"]);
+
+        Assert.Equal(ExitCodes.Success, exit);
+        Assert.Contains("Available benchmark packs", stdout, StringComparison.Ordinal);
+    }
+
     public static TheoryData<string[]> MockWithARealTarget => new()
     {
         new[] { "bench", "owasp", "--subject", "A", "--sut", "mock", "--azure-from-env" },

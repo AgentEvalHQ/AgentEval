@@ -176,7 +176,7 @@ public static class AgentWithMultipleTools
             catch (ToolAssertionException ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"   ❌ Assertion failed: {ex.Message}");
+                Console.WriteLine($"   ❌ Assertion failed: {ex.Message}{AIConfig.MockLabel}");
                 Console.ResetColor();
             }
         }

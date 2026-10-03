@@ -61,7 +61,7 @@ public static class LightPathMAFIntegration
             queries,
             AgentEvalEvaluators.Agentic(["SearchFlights"]));
 
-        Console.WriteLine($"   📊 Results: {results.Passed}/{results.Total} passed");
+        Console.WriteLine($"   📊 Results: {results.Passed}/{results.Total} passed{AIConfig.MockLabel}");
         foreach (var item in results.Items)
         {
             Console.WriteLine($"      Query: \"{Truncate(item.Query, 60)}\"");
@@ -70,7 +70,7 @@ public static class LightPathMAFIntegration
                 if (metric is NumericMetric num)
                 {
                     var icon = num.Interpretation?.Failed != true ? "✅" : "❌";
-                    Console.WriteLine($"      {icon} {name}: {num.Value:F1}/5.0");
+                    Console.WriteLine($"      {icon} {name}: {num.Value:F1}/5.0{AIConfig.MockLabel}");
                 }
             }
         }
@@ -108,7 +108,7 @@ public static class LightPathMAFIntegration
         for (int i = 0; i < multiResults.Count; i++)
         {
             var r = multiResults[i];
-            Console.WriteLine($"   📊 Evaluator {i + 1}: {r.Passed}/{r.Total} passed");
+            Console.WriteLine($"   📊 Evaluator {i + 1}: {r.Passed}/{r.Total} passed{AIConfig.MockLabel}");
             foreach (var item in r.Items)
             {
                 foreach (var (name, metric) in item.Metrics)
@@ -116,7 +116,7 @@ public static class LightPathMAFIntegration
                     if (metric is NumericMetric num)
                     {
                         var icon = num.Interpretation?.Failed != true ? "✅" : "❌";
-                        Console.WriteLine($"      {icon} {name}: {num.Value:F1}/5.0");
+                        Console.WriteLine($"      {icon} {name}: {num.Value:F1}/5.0{AIConfig.MockLabel}");
                     }
                 }
             }
@@ -184,7 +184,7 @@ public static class LightPathMAFIntegration
                     if (metric is NumericMetric num)
                     {
                         var icon = num.Interpretation?.Failed != true ? "✅" : "❌";
-                        Console.WriteLine($"      {icon} {name}: {num.Value:F1}/5.0");
+                        Console.WriteLine($"      {icon} {name}: {num.Value:F1}/5.0{AIConfig.MockLabel}");
                     }
                 }
             }

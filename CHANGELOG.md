@@ -61,8 +61,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Behaviour change:** with no provider configured the command refuses (exit 2). The showcase runs only with
     `--sut mock`: its endpoints are now `scripted-clean`, `scripted-silent-retry` and `scripted-pii-leak`, it is
     labelled MOCK, and it exits 11. A live run exits 3 when no model completed the task.
-  - The report no longer names a winner among runs that did not complete (two empty traces reconcile to 100%), and
-    shows their fidelity as "not measured".
+  - A model that answers without calling the tool never sees the SSN, so it did not do the task: it is reported as
+    not completed and never wins. The report names no winner among runs that did not complete (two empty traces
+    reconcile to 100%) and shows their fidelity as "not measured".
+  - A copy of the SSN that reaches the caller in a form the PII gate misses (`123 45 6789`, `123456789`) is reported
+    as a leak past the gate and ranks below every run that leaked nothing.
+  - Only the models the environment names are audited: an unset `*_MODEL_2`/`*_MODEL_3` is skipped, where the
+    provider settings would substitute a default (for Azure, deployments called `gpt-4o-mini` and `gpt-4.1`). New:
+    `InferenceProviderEnvironment.NamedModels`. The tool loop is capped at four iterations per model.
+  - Trace Fidelity in a live run reconciles the tool loop's own account with the chat boundary; a standard loop
+    agrees with it, so it is 100% unless a turn ended on a content filter or a length limit. The report says so.
   - Library: `AutoAuditLive.EvaluateAsync(endpoint, chatClient)` runs the task against any `IChatClient`;
     `AutoAuditDemo.CleanEndpoint`/`RetryEndpoint`/`LeakEndpoint` name the scripted endpoints.
   - The Observability sample *Auto-Audit* audits the configured models; `--mock` shows the showcase.
@@ -73,7 +81,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Samples A1–A5 switched to canned replies whenever no provider was configured, and printed ✅ PASSED over them.**
   They now run against the configured model. With no provider they stop and say how to configure one. The canned
   walkthrough runs only on request (`dotnet run --project samples/AgentEval.Samples -- 1 --mock`): it opens with a
-  MOCK MODE banner and every pass or fail line says "(MOCK: a canned reply, not a measurement)".
+  MOCK MODE banner and every pass or fail line says "(MOCK: a canned reply, not a measurement)". The flag applies to
+  those samples and the Observability Auto-Audit only; the runner says so, since other samples run on the
+  configured model as usual.
   - The samples guidance for contributors and coding agents (`.github/instructions/samples.instructions.md`,
     `.github/agents/agenteval-samples.agent.md`) told them to add mock fallbacks for missing credentials. It now
     says the opposite: a sample with no provider stops; a mock runs only on request and is labelled.
@@ -82,7 +92,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 #### Fixed
 - `agenteval redteam` and `agenteval eval` with no `--endpoint`, `--azure` or `--sut` refused, but exited 3 (runtime
-  error). They now exit 2 (usage error), as every `bench` family that grades an agent does.
+  error). With no target at all they now exit 2 (usage error), as every `bench` family that grades an agent does.
+  `redteam --pack list` needs no target and still prints the catalog.
 
 ### `bench memory` scores only what the judge scored
 

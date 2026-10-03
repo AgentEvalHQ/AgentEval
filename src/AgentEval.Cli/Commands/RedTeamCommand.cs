@@ -263,8 +263,9 @@ internal static class RedTeamCommand
 
             // No target at all is a usage error (exit 2), as for every command that evaluates an agent: there is
             // nothing to evaluate. ExecuteAsync still throws for it, for its direct callers; through 0.42 the
-            // command line reported that throw as a runtime error (exit 3).
-            if (opts.Sut is null && opts.Endpoint is null && !opts.Azure)
+            // command line reported that throw as a runtime error (exit 3). `--pack list` evaluates nothing and needs
+            // no target: ExecuteAsync prints the catalog before anything else.
+            if (opts.Sut is null && opts.Endpoint is null && !opts.Azure && !IsPackList(opts))
             {
                 Console.Error.WriteLine("  Error: Specify --endpoint <url> or --azure, or --sut <target>.");
                 return ExitCodes.UsageError;
@@ -296,10 +297,13 @@ internal static class RedTeamCommand
     /// non-null, is used as the system-under-test instead of constructing one — the credential-free test seam that
     /// lets a fake agent drive a full built-in-target scan offline.
     /// </summary>
+    private static bool IsPackList(RedTeamOptions opts) =>
+        string.Equals(opts.Pack?.Trim(), "list", StringComparison.OrdinalIgnoreCase);
+
     internal static async Task<int> ExecuteAsync(RedTeamOptions opts, CancellationToken ct, IEvaluableAgent? sutOverride = null)
     {
         // 0. `--pack list`: print the benchmark-pack catalog and exit (no scan, no endpoint required).
-        if (string.Equals(opts.Pack?.Trim(), "list", StringComparison.OrdinalIgnoreCase))
+        if (IsPackList(opts))
         {
             Console.WriteLine("Available benchmark packs (run with --pack <name> --accept-license to download + scan):");
             foreach (var p in PackCatalog.All)

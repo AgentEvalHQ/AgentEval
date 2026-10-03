@@ -72,7 +72,7 @@ public static class PerformanceMetrics
 
     private static void PrintPerformanceMetrics(TestResult result)
     {
-        Console.WriteLine("\ud83d\udcca PERFORMANCE METRICS:");
+        Console.WriteLine($"\ud83d\udcca PERFORMANCE METRICS:{AIConfig.MockLabel}");
         Console.WriteLine(new string('\u2500', 60));
         
         if (result.Performance != null)
@@ -120,7 +120,7 @@ public static class PerformanceMetrics
             catch (PerformanceAssertionException ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"   \u274c Assertion failed: {ex.Message}");
+                Console.WriteLine($"   \u274c Assertion failed: {ex.Message}{AIConfig.MockLabel}");
                 Console.ResetColor();
             }
         }

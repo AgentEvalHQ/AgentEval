@@ -33,7 +33,7 @@ public static class Program
 
     private static readonly IReadOnlyList<SampleGroup> Groups =
     [
-        new('A', "Getting Started", "★ mostly no credentials (A5–A7 need a model provider)",
+        new('A', "Getting Started", "🔑 a model provider (A1–A5: --mock for a labelled offline walkthrough)",
         [
             new("Hello World",               "Minimal AgentEval test — TestCase, TestResult, pass/fail",               HelloWorld.RunAsync),
             new("Agent + One Tool",          "Tool tracking and fluent assertions (HaveCalledTool, WithoutError)",      AgentWithOneTool.RunAsync),
@@ -129,7 +129,7 @@ public static class Program
             new("Report Browser",            "Open previously-generated JSON / HTML / PDF runs",                    ReportBrowserBenchmark.RunAsync),
         ]),
 
-        new('I', "Observability (Glass Box)", "★ 1-2,4 offline · 3 needs Azure",
+        new('I', "Observability (Glass Box)", "★ 1,4 offline · 2-3 need a model provider (2: --mock)",
         [
             new("Glass Box Full Stack",      "Per-turn tracing + injection pre-gate + PII post-gate + wrapped tool (offline; API tour)",     GlassBoxFullStack.RunAsync),
             new("Auto-Audit",                "Ranked honesty/safety/cost over your configured models (--mock: 3 scripted endpoints, labelled)", AutoAudit.RunAsync),
@@ -249,7 +249,14 @@ public static class Program
         // Forward `--mock` the same way: the Getting Started samples' offline walkthrough. Only on request; a sample
         // with no provider configured stops instead of switching to canned replies.
         if (args.Any(a => string.Equals(a, "--mock", StringComparison.OrdinalIgnoreCase)))
+        {
             Environment.SetEnvironmentVariable(AIConfig.MockVariable, "1");
+            // Every other sample ignores the flag: with a provider configured it runs (and spends) for real.
+            Console.ForegroundColor = ConsoleColor.Magenta;
+            Console.WriteLine("🎭 --mock applies to Getting Started A1–A5 and Observability Auto-Audit only. Every other sample");
+            Console.WriteLine("   runs as usual: on your configured model if there is one, which calls (and bills) that model.\n");
+            Console.ResetColor();
+        }
 
         // Forward `--dry-run` the same way (group N: render every provider payload, send nothing).
         if (args.Any(a => string.Equals(a, "--dry-run", StringComparison.OrdinalIgnoreCase)))
