@@ -18,6 +18,7 @@ public static class GatekeeperSameBatchRace
     {
         GatekeeperSampleContractRenderer.Print("21");
         Console.WriteLine("\n=== Gatekeeper — Same-Batch Exfiltration Race (offline) ===\n");
+        GatekeeperLiveMode.PrintScriptedByDesign("one assistant turn with concurrent read_secrets and send_email calls", "how the gate handles sibling calls in one batch");
 
         Console.WriteLine("── One assistant turn proposes read_secrets AND send_email as concurrent siblings ──");
         var batch = AssistantBatch("read_secrets", "send_email");

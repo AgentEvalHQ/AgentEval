@@ -504,6 +504,8 @@ public static class Program
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"\n  ❌ Error: {ex.Message}");
             Console.ResetColor();
+            // A sample that fails says so to whatever ran it: `dotnet run -- <n>` used to exit 0 over a thrown ❌.
+            Environment.ExitCode = 1;
         }
 
         Console.WriteLine("\n  Press any key to continue...");
@@ -516,8 +518,9 @@ public static class Program
 
     /// <summary>
     /// Runs every offline-capable Gatekeeper sample non-interactively so CI executes their
-    /// deterministic invariants. Samples 00–10 run their forced-offline oracles; 13–29 are
-    /// offline by design. Sample 11A is excluded because it requires a consented live endpoint.
+    /// deterministic invariants, forced offline: samples 00–10 and the live-first scenario samples (14–17, 25, 28) run
+    /// their labelled scripted fallbacks; the rest involve no model, or a scripted one by design. Sample 11A is
+    /// excluded because it requires a consented live endpoint.
     /// </summary>
     private static async Task<int> RunGatekeeperOfflineSuiteAsync()
     {

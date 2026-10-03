@@ -17,6 +17,7 @@ public static class GatekeeperStatefulTimeline
     {
         GatekeeperSampleContractRenderer.Print("20");
         Console.WriteLine("\n=== Gatekeeper — Stateful Gate Timeline (offline) ===\n");
+        GatekeeperLiveMode.PrintNoModel("a fixed timeline of gate inputs");
         PrintTimelineHeader();
 
         await RunScopedBudgetTimelineAsync();

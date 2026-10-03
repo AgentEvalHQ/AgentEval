@@ -19,6 +19,7 @@ public static class GatekeeperBulkheadIsolation
     {
         GatekeeperSampleContractRenderer.Print("19");
         Console.WriteLine("\n=== Gatekeeper — Bulkhead + Containment Isolation (offline) ===\n");
+        GatekeeperLiveMode.PrintNoModel("fake blocking HTTP handlers");
 
         var normal = new BlockingHandler("normal");
         var isolated = new BlockingHandler("isolated");

@@ -21,6 +21,7 @@ public static class GatekeeperHostedToolCoverageBoundary
     {
         GatekeeperSampleContractRenderer.Print("18");
         Console.WriteLine("\n=== Gatekeeper — Hosted Tool Coverage Boundary (offline) ===\n");
+        GatekeeperLiveMode.PrintNoModel("a local tool and a provider-hosted tool descriptor");
 
         var localInvocations = 0;
         var localTool = AIFunctionFactory.Create(

@@ -17,6 +17,7 @@ public static class GatekeeperMockedDangerousTools
     {
         GatekeeperSampleContractRenderer.Print("13");
         Console.WriteLine("\n=== Gatekeeper — Mocked Dangerous-Tool Contracts ===\n");
+        GatekeeperLiveMode.PrintNoModel("fixed calls to mocked dangerous tools");
         Console.WriteLine(
             "   Scope: offline contract fixture only. No database, browser, cloud account, or package manager is contacted.\n");
 

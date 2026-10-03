@@ -9,13 +9,19 @@ using Microsoft.Extensions.AI;
 
 namespace AgentEval.Samples;
 
-/// <summary>Offline dynamic-tool inventory and context-provider boundary demonstration.</summary>
+/// <summary>
+/// Dynamic-tool inventory and context-provider boundary demonstration. No model is involved: the sample runs the
+/// static coverage analyzer and calls the gated provider's real invocation seam directly, with a fixed provider that
+/// contributes two tools. The agent's placeholder chat client is never called, and no model decision changes any
+/// check here (the exclusion happens before a model would see the tools).
+/// </summary>
 public static class GatekeeperDynamicContextProviderBoundary
 {
     public static async Task RunAsync()
     {
         GatekeeperSampleContractRenderer.Print("24");
-        Console.WriteLine("\n=== Gatekeeper — Dynamic Context Provider Boundary (offline) ===\n");
+        Console.WriteLine("\n=== Gatekeeper — Dynamic Context Provider Boundary (no model) ===\n");
+        GatekeeperLiveMode.PrintNoModel("a fixed dynamic-tool provider");
 
         var weather = Function("weather");
         var unsupportedMemoryTool = Function("remember_unknown");
