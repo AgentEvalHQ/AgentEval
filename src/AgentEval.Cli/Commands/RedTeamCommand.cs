@@ -261,6 +261,15 @@ internal static class RedTeamCommand
                 Quiet = parseResult.GetValue(quietFlag),
             };
 
+            // No target at all is a usage error (exit 2), as for every command that evaluates an agent: there is
+            // nothing to evaluate. ExecuteAsync still throws for it, for its direct callers; through 0.42 the
+            // command line reported that throw as a runtime error (exit 3).
+            if (opts.Sut is null && opts.Endpoint is null && !opts.Azure)
+            {
+                Console.Error.WriteLine("  Error: Specify --endpoint <url> or --azure, or --sut <target>.");
+                return ExitCodes.UsageError;
+            }
+
             try
             {
                 return await ExecuteAsync(opts, ct);

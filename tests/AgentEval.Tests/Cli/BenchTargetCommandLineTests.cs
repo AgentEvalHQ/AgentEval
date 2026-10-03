@@ -64,6 +64,25 @@ public sealed class BenchTargetCommandLineTests : IDisposable
         Assert.Contains("--sut mock", stderr, StringComparison.Ordinal);
     }
 
+    public static TheoryData<string[]> NoTargetOutsideBench => new()
+    {
+        new[] { "redteam" },
+        new[] { "redteam", "--attacks", "PromptInjection" },
+        new[] { "eval", "--dataset", "cases.jsonl" },
+    };
+
+    [Theory]
+    [MemberData(nameof(NoTargetOutsideBench))]
+    public async Task NoTarget_OutsideBench_IsAUsageError(string[] args)
+    {
+        // redteam and eval refused too, but as a runtime error (exit 3). The message is asserted so a parse error,
+        // which also exits 2, cannot pass for the guard.
+        var (exit, _, stderr) = await CliParseErrorExitCodeTests.RunCliAsync(args);
+
+        Assert.Equal(ExitCodes.UsageError, exit);
+        Assert.Contains("Specify --endpoint <url> or --azure, or --sut <target>.", stderr, StringComparison.Ordinal);
+    }
+
     public static TheoryData<string[]> MockWithARealTarget => new()
     {
         new[] { "bench", "owasp", "--subject", "A", "--sut", "mock", "--azure-from-env" },

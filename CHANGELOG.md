@@ -33,6 +33,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     the built-in question it never sent, so `compare` treats such runs from before and after this change as
     different stimuli.
 
+### `redteam` and `eval` without a target are a usage error
+
+#### Fixed
+- `agenteval redteam` and `agenteval eval` with no `--endpoint`, `--azure` or `--sut` refused, but exited 3 (runtime
+  error). They now exit 2 (usage error), as every `bench` family that grades an agent does.
+
 ### `bench memory` scores only what the judge scored
 
 #### Fixed
