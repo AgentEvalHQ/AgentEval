@@ -34,8 +34,10 @@ screen, and both stages are recorded:
 
 A question only counts as "matched" when stage 2 says so. Stage 1 alone never decides anything.
 
-Credentials come from the environment (AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY,
-AZURE_OPENAI_DEPLOYMENT). Nothing is written to the repository except the probe records.
+The reference model is the one the environment selects, by the same rules as the AgentEval CLI
+(`AI_INFERENCE_PROVIDER`: azure, bitdeer, openai, foundry or openai-compatible; see
+`inference_provider.py`). Completions are cached PER MODEL: an answer cached for one model is never
+served as another's. Nothing is written to the repository except the probe records.
 
 Usage:
     python tools/run_typedmemeval_probes.py                  # all verticals
@@ -47,6 +49,7 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import http.client
 import json
 import math
 import os
@@ -61,9 +64,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from threading import Lock
 
+import inference_provider as ip
 import typedmemeval_common as tmc
 
-API_VERSION = "2024-12-01-preview"
 V2_SAMPLES = 10
 V2_REJECT_AT = 2
 
@@ -73,7 +76,29 @@ V2_REJECT_AT = 2
 #: single sample can MISS a leak that is there. The gutter/inspection leak in Prospective was caught
 #: by one sample and could as easily have been missed by it.
 ABLATION_SAMPLES = 3
-CACHE_PATH = Path(__file__).resolve().parent / ".typedmemeval_probe_cache.json"
+_TOOLS_DIR = Path(__file__).resolve().parent
+
+#: The reference model of the published 0.36-lineage probe records (`reference_deployment: gpt-5.5`).
+#: The original cache file holds its completions and keeps its name; every other model gets its own.
+LEGACY_REFERENCE_IDENTITY = "azure:gpt-5.5"
+
+
+def _cache_paths_for(identity: str) -> tuple[Path, Path]:
+    """The (probe, experiment) cache files for one reference model.
+
+    The cache key is the question and the arm, with no model in it, so ONE file holding two models'
+    answers would serve the old model's answers as the new model's: a new baseline that measured the
+    old model. One file per model makes that impossible.
+    """
+    if identity == LEGACY_REFERENCE_IDENTITY:
+        return (_TOOLS_DIR / ".typedmemeval_probe_cache.json",
+                _TOOLS_DIR / ".typedmemeval_experiment_cache.json")
+    s = ip.slug(identity)
+    return (_TOOLS_DIR / f".typedmemeval_probe_cache.{s}.json",
+            _TOOLS_DIR / f".typedmemeval_experiment_cache.{s}.json")
+
+
+CACHE_PATH, _ = _cache_paths_for(LEGACY_REFERENCE_IDENTITY)
 
 #: The arms a shipped corpus is accepted on. An ALLOW-list: anything else is an experiment.
 #:
@@ -99,8 +124,8 @@ _PROBE_KEY = re.compile(r"^[0-9a-f]{16}$")
 
 #: Where an unrecognised arm's completions go instead. Same format, same merge discipline, simply
 #: not the file a population is drawn from.
-EXPERIMENT_CACHE_PATH = (Path(__file__).resolve().parent
-                         / ".typedmemeval_experiment_cache.json")
+_, EXPERIMENT_CACHE_PATH = _cache_paths_for(LEGACY_REFERENCE_IDENTITY)
+_cache_bound = False
 
 
 def is_experimental(cache_key: str) -> bool:
@@ -123,18 +148,43 @@ _stats = Counter()
 # Provider
 # --------------------------------------------------------------------------------------
 
-def _config() -> tuple[str, str, str]:
-    endpoint = os.environ.get("AZURE_OPENAI_ENDPOINT", "").rstrip("/")
-    key = os.environ.get("AZURE_OPENAI_API_KEY", "")
-    deployment = os.environ.get("AZURE_OPENAI_DEPLOYMENT", "")
-    if not (endpoint and key and deployment):
-        sys.exit(
-            "Reference-model credentials are not set. The probes need AZURE_OPENAI_ENDPOINT, "
-            "AZURE_OPENAI_API_KEY and AZURE_OPENAI_DEPLOYMENT.\n"
-            "Without them the probe records stay 'not_run', which is the honest state -- a "
-            "recorded pass that nothing produced would be worse than no record at all."
-        )
-    return endpoint, key, deployment
+_provider: "ip.Provider | None" = None
+
+
+def _config() -> "ip.Provider":
+    """The reference model's provider, resolved once by the CLI's rules, or exit naming what is missing."""
+    global _provider
+    if _provider is None:
+        try:
+            _provider = ip.resolve()
+        except ip.ProviderNotConfigured as error:
+            sys.exit(
+                f"Reference-model credentials are not set: {error}\n"
+                "Without them the probe records stay 'not_run', which is the honest state -- a "
+                "recorded pass that nothing produced would be worse than no record at all."
+            )
+    return _provider
+
+
+def reference_identity() -> str:
+    """`provider:model` of the reference model, or the legacy identity when no provider is configured.
+
+    Only offline operations (recomputing from the cache) reach the fallback: `complete` resolves the
+    provider itself and exits without one.
+    """
+    try:
+        return ip.resolve().identity
+    except ip.ProviderNotConfigured:
+        return LEGACY_REFERENCE_IDENTITY
+
+
+def _bind_cache_paths() -> None:
+    """Point the cache at the reference model's own files. Idempotent; called before any cache I/O."""
+    global CACHE_PATH, EXPERIMENT_CACHE_PATH, _cache_bound
+    if _cache_bound:
+        return
+    CACHE_PATH, EXPERIMENT_CACHE_PATH = _cache_paths_for(reference_identity())
+    _cache_bound = True
 
 
 #: Completions between cache flushes. Small enough that a kill costs a minute of work, large
@@ -150,6 +200,7 @@ _CACHE_FLUSH_EVERY = 10
 
 def _flush_cache() -> None:
     """Atomically persist the cache. Caller holds `_cache_lock`."""
+    _bind_cache_paths()
     # MERGE, never replace. Two ways this file used to be destroyed, both of which happened:
     #
     #   - The cache was loaded only inside main(), so ANY importer -- a one-off measurement script
@@ -203,6 +254,7 @@ def load_cache() -> None:
     the module actively dangerous to import: a script that reused `complete()` got an empty cache,
     paid for every call again, and then flushed its handful of entries over the real file.
     """
+    _bind_cache_paths()
     with _cache_lock:
         if _cache:
             return
@@ -359,11 +411,11 @@ def complete(prompt: str, *, cache_key: str, max_tokens: int = 900) -> str:
         if cache_key in _cache:
             _stats["empty_cache_entry_repaid"] += 1
 
-    endpoint, key, deployment = _config()
-    url = f"{endpoint}/openai/deployments/{deployment}/chat/completions?api-version={API_VERSION}"
-    # Temperature is deliberately not sent: this deployment family rejects explicit values, and the
+    provider = _config()
+    url = provider.chat_url()
+    # Temperature is deliberately not sent: reasoning deployments reject explicit values, and the
     # provider default is what V2 wants to sample at anyway.
-    body = {"messages": [{"role": "user", "content": prompt}], "max_completion_tokens": max_tokens}
+    body = provider.chat_body([{"role": "user", "content": prompt}], max_tokens)
 
     last_error = None
     length_retries = 0
@@ -372,7 +424,7 @@ def complete(prompt: str, *, cache_key: str, max_tokens: int = 900) -> str:
             request = urllib.request.Request(
                 url,
                 data=json.dumps(body).encode("utf-8"),
-                headers={"Content-Type": "application/json", "api-key": key},
+                headers=provider.headers(),
                 method="POST",
             )
             with urllib.request.urlopen(request, timeout=180) as response:
@@ -424,6 +476,11 @@ def complete(prompt: str, *, cache_key: str, max_tokens: int = 900) -> str:
                     "usage": payload.get("usage"),
                 }
 
+            # Tokens bought, so a run reports its own cost instead of leaving it to be estimated.
+            usage = payload.get("usage") or {}
+            _stats["prompt_tokens"] += int(usage.get("prompt_tokens") or 0)
+            _stats["completion_tokens"] += int(usage.get("completion_tokens") or 0)
+
             with _cache_lock:
                 _cache[cache_key] = text
                 _stats["call"] += 1
@@ -437,7 +494,9 @@ def complete(prompt: str, *, cache_key: str, max_tokens: int = 900) -> str:
             return text
         except urllib.error.HTTPError as error:
             detail = error.read().decode("utf-8", "replace")[:400]
-            if error.code in (429, 500, 502, 503, 504):
+            # 520-524 are Cloudflare's "the origin did not answer properly" codes, which a provider behind it
+            # returns for a transient fault; one of them ended a full baseline pass partway through.
+            if error.code in (408, 429, 500, 502, 503, 504, 520, 521, 522, 523, 524):
                 time.sleep(min(2 ** attempt * 2, 45))
                 last_error = detail
                 continue
@@ -446,7 +505,7 @@ def complete(prompt: str, *, cache_key: str, max_tokens: int = 900) -> str:
                 body["max_tokens"] = max_tokens
                 continue
             raise SystemExit(f"reference model rejected a call ({error.code}): {detail}")
-        except (urllib.error.URLError, TimeoutError) as error:
+        except (urllib.error.URLError, TimeoutError, ConnectionError, http.client.HTTPException) as error:
             last_error = str(error)
             time.sleep(min(2 ** attempt * 2, 45))
     raise SystemExit(f"reference model unreachable after retries: {last_error}")
@@ -1602,10 +1661,13 @@ def probe_vertical(vertical: str, limit: int | None, workers: int) -> dict:
         # The deployment NAME, which is what the caller controls and not a model identity: a
         # deployment can be renamed or repointed at a different model without the record changing.
         # Stated as what it is so nobody reads it as a pinned model version.
-        "reference_deployment": os.environ.get("AZURE_OPENAI_DEPLOYMENT", "unknown"),
+        "reference_provider": _config().tag,
+        "reference_model": _config().model,
+        # Kept for readers of the 0.36-lineage records, which carried only this key.
+        "reference_deployment": _config().model,
         "reference_model_note": (
-            "Azure deployment name, not a model identity — a deployment may be repointed at a "
-            "different model without this value changing."
+            "The model id the provider was asked for (an Azure deployment name for azure) -- what "
+            "the caller controls, not a pinned model version: a deployment can be repointed."
         ),
         "run_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "questions_probed": len(entries),
@@ -3001,7 +3063,9 @@ def main() -> None:
         with _cache_lock:
             _flush_cache()
         print(f"calls={_stats['call']} cached={_stats['cache_hit']} "
-              f"screened-out={_stats['screen_rejected']} escalated={_stats['escalated']}")
+              f"screened-out={_stats['screen_rejected']} escalated={_stats['escalated']} "
+              f"prompt_tokens={_stats['prompt_tokens']} completion_tokens={_stats['completion_tokens']} "
+              f"reference={reference_identity()}")
 
 
 if __name__ == "__main__":
