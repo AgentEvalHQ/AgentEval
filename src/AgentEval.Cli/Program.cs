@@ -690,13 +690,27 @@ benchCmd.Add(benchNistCmd);
         benchCmd.Add(benchWorkflowTraceFidelityCmd);
     }
 
-    // bench autoaudit — Glass Box flagship: cross-endpoint honesty/safety/cost comparison (offline demo).
+    // bench autoaudit — Glass Box flagship: cross-endpoint honesty/safety/cost comparison of real models.
     {
         var aaOutOpt = new Option<string?>("--out") { Description = "Path to write the Markdown comparison report (optional; also printed to stdout)." };
-        var benchAutoAuditCmd = new Command("autoaudit", "Cross-endpoint Glass Box comparison — honesty (Trace Fidelity) + safety (gate blocks) + cost (tokens/latency), ranked. Offline demo over 3 scripted endpoints (no credentials).");
+        var aaModelsOpt = new Option<string?>("--models") { Description = "Comma-separated models to audit on the configured provider. Default: the models the provider names (*_MODEL, *_MODEL_2, *_MODEL_3)." };
+        var aaSutOpt = new Option<string?>("--sut") { Description = $"Only '{MockTarget.Sut}' here: the scripted showcase over three made-up endpoints, labelled MOCK. It measures no model." };
+        var benchAutoAuditCmd = new Command("autoaudit", "Cross-endpoint Glass Box comparison — honesty (Trace Fidelity) + safety (gate blocks) + cost (tokens/latency), ranked. Audits real models on the configured provider (one support task each); without a provider it refuses. --sut mock runs the scripted showcase.");
         benchAutoAuditCmd.Add(aaOutOpt);
+        benchAutoAuditCmd.Add(aaModelsOpt);
+        benchAutoAuditCmd.Add(aaSutOpt);
         benchAutoAuditCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
-            await BenchAutoAuditCommand.RunAsync(parseResult.GetValue(aaOutOpt), ct));
+        {
+            var sut = parseResult.GetValue(aaSutOpt);
+            if (sut is not null && !MockTarget.IsRequested(sut))
+            {
+                Console.Error.WriteLine($"Error: Unknown --sut value: '{sut}'. Valid: {MockTarget.Sut}.");
+                return AgentEval.Cli.ExitCodes.UsageError;
+            }
+            var models = parseResult.GetValue(aaModelsOpt)?
+                .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            return await BenchAutoAuditCommand.RunAsync(parseResult.GetValue(aaOutOpt), models, mock: sut is not null, ct);
+        });
         benchCmd.Add(benchAutoAuditCmd);
     }
 

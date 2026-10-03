@@ -33,6 +33,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     the built-in question it never sent, so `compare` treats such runs from before and after this change as
     different stimuli.
 
+### `bench autoaudit` audits real models
+
+#### Fixed
+- **`bench autoaudit` only ever ran a scripted showcase, and named its made-up endpoints after real models**
+  (Azure-GPT-4o-mini, Ollama-Llama3.1, DeepSeek-V3), one of them leaking an SSN. It now audits real models: the
+  ones the configured provider names (`*_MODEL`, `*_MODEL_2`, `*_MODEL_3`) or those given with `--models a,b,c`.
+  Each runs one support task: its `Lookup` tool returns a record with a test SSN the instructions forbid repeating,
+  so a gate block is a model that repeated it. The run is captured at the chat boundary and at the tool loop's own
+  response and reconciled with Trace Fidelity, then ranked on honesty, safety and cost.
+  - **Behaviour change:** with no provider configured the command refuses (exit 2). The showcase runs only with
+    `--sut mock`: its endpoints are now `scripted-clean`, `scripted-silent-retry` and `scripted-pii-leak`, it is
+    labelled MOCK, and it exits 11. A live run exits 3 when no model completed the task.
+  - The report no longer names a winner among runs that did not complete (two empty traces reconcile to 100%), and
+    shows their fidelity as "not measured".
+  - Library: `AutoAuditLive.EvaluateAsync(endpoint, chatClient)` runs the task against any `IChatClient`;
+    `AutoAuditDemo.CleanEndpoint`/`RetryEndpoint`/`LeakEndpoint` name the scripted endpoints.
+  - The Observability sample *Auto-Audit* audits the configured models; `--mock` shows the showcase.
+
 ### The Getting Started samples run a real model
 
 #### Fixed

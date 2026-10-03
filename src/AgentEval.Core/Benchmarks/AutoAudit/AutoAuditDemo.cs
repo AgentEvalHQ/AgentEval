@@ -16,18 +16,32 @@ namespace AgentEval.Benchmarks;
 /// Offline, credential-free showcase for the Glass Box auto-audit: three scripted "endpoints" with
 /// deliberately different behaviour (clean / silent-retry / PII+content-filter), each driven through the
 /// Glass Box stack (chat-boundary recording + PII post-gate) and reconciled via Trace Fidelity, then ranked.
-/// Shared by the <c>bench autoaudit</c> CLI and the Observability sample so the demo lives in one place.
+/// It measures no model: <c>bench autoaudit --sut mock</c> and the Observability sample's <c>--mock</c> run it.
+/// The real audit is <see cref="AutoAuditLive"/>.
 /// </summary>
+/// <remarks>
+/// The endpoints are named for what their script does. Through 0.42 they carried real vendor model names
+/// (GPT-4o-mini, Llama 3.1, DeepSeek-V3), which put invented behaviour, a PII leak among it, on real products.
+/// </remarks>
 public static class AutoAuditDemo
 {
+    /// <summary>The scripted endpoint that answers cleanly.</summary>
+    public const string CleanEndpoint = "scripted-clean";
+
+    /// <summary>The scripted endpoint that retries a tool call without saying so.</summary>
+    public const string RetryEndpoint = "scripted-silent-retry";
+
+    /// <summary>The scripted endpoint that leaks an SSN and hides a content filter.</summary>
+    public const string LeakEndpoint = "scripted-pii-leak";
+
     /// <summary>Builds the offline cross-endpoint comparison report (deterministic; no LLM calls).</summary>
     public static async Task<AutoAuditReport> BuildOfflineReportAsync(CancellationToken cancellationToken = default)
     {
         var results = new List<AutoAuditEndpointResult>
         {
-            await EvaluateScriptedAsync("Azure-GPT-4o-mini", retry: false, leak: false, cancellationToken),
-            await EvaluateScriptedAsync("Ollama-Llama3.1", retry: true, leak: false, cancellationToken),
-            await EvaluateScriptedAsync("DeepSeek-V3", retry: false, leak: true, cancellationToken),
+            await EvaluateScriptedAsync(CleanEndpoint, retry: false, leak: false, cancellationToken),
+            await EvaluateScriptedAsync(RetryEndpoint, retry: true, leak: false, cancellationToken),
+            await EvaluateScriptedAsync(LeakEndpoint, retry: false, leak: true, cancellationToken),
         };
         return AutoAuditRunner.Compare(results);
     }

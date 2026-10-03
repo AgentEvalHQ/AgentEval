@@ -7,7 +7,7 @@ using System.Text;
 namespace AgentEval.Benchmarks;
 
 /// <summary>One endpoint's row in an auto-audit comparison (Glass Box flagship).</summary>
-/// <param name="Endpoint">Endpoint display name (e.g. "Ollama-Llama3.1", "Azure-GPT-4o-mini").</param>
+/// <param name="Endpoint">Endpoint display name (e.g. "zai-org/GLM-5.3-Flash (bitdeer)", or a scripted demo endpoint).</param>
 /// <param name="FidelityScore">Trace Fidelity root score, 0–1 (reported vs observed).</param>
 /// <param name="GateBlocks">Number of gate Block verdicts recorded (PII / injection / safety).</param>
 /// <param name="PromptTokens">Total prompt tokens across the run.</param>
@@ -43,8 +43,11 @@ public sealed record AutoAuditReport(IReadOnlyList<AutoAuditEndpointResult> Resu
         .ThenBy(r => r.TotalTokens)
         .ToList();
 
-    /// <summary>The winning endpoint (top of <see cref="Ranking"/>), or null when there are no results.</summary>
-    public AutoAuditEndpointResult? Winner => Ranking.FirstOrDefault();
+    /// <summary>
+    /// The winning endpoint: the top of <see cref="Ranking"/> among those that completed, or null when none did. A run
+    /// that never completed has empty traces, which reconcile perfectly; it cannot win on that.
+    /// </summary>
+    public AutoAuditEndpointResult? Winner => Ranking.FirstOrDefault(r => r.Completed);
 
     /// <summary>Renders the comparison as a Markdown report.</summary>
     public string ToMarkdown()
@@ -58,7 +61,9 @@ public sealed record AutoAuditReport(IReadOnlyList<AutoAuditEndpointResult> Resu
         foreach (var r in Ranking)
         {
             var top = r.TopDiscrepancies.Count > 0 ? string.Join("; ", r.TopDiscrepancies) : "—";
-            sb.AppendLine($"| {rank++} | {r.Endpoint} | {r.FidelityScore * 100:F0}% | {r.GateBlocks} | {r.TotalTokens} | {r.LatencyMs} | {(r.Completed ? "yes" : "no")} | {top} |");
+            // An incomplete run's fidelity reconciles two empty traces: not a measurement, so it is not shown as one.
+            var fidelity = r.Completed ? $"{r.FidelityScore * 100:F0}%" : "not measured";
+            sb.AppendLine($"| {rank++} | {r.Endpoint} | {fidelity} | {r.GateBlocks} | {r.TotalTokens} | {r.LatencyMs} | {(r.Completed ? "yes" : "no")} | {top} |");
         }
 
         sb.AppendLine();

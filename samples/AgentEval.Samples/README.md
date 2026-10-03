@@ -168,7 +168,7 @@ The dual-boundary trace that records what an agent actually did, turn by turn �
 | # | Sample | What It Exercises | Azure? | Time |
 |---|--------|-------------------|--------|------|
 | 1 | **Glass Box Full Stack** | Per-turn tracing + injection pre-gate + PII post-gate + a wrapped tool (offline API tour) | No | <2 min |
-| 2 | **Auto-Audit (synthetic)** | Ranked honesty / safety / cost over 3 scripted endpoints — offline preview of the table shape | No | <2 min |
+| 2 | **Auto-Audit** | Ranked honesty / safety / cost over your configured models, one support task each (`--mock`: 3 scripted endpoints, labelled MOCK) | Yes (or `--mock`) | <2 min |
 | 3 | **Real vs Framework: Agent** | A REAL travel agent — MAF's account vs the Glass Box: what the framework hides per turn | Yes | 1–5 min |
 | 4 | **Real vs Framework: Workflow** | Per-executor ledger vs chat truth — what a multi-agent workflow hides (offline; scripted) | No | <2 min |
 
