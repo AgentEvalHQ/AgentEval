@@ -68,7 +68,7 @@ public class MemoryBenchmarkCrashVsUnsupportedTests
             Category("Crashed", 0, 0.3, errored: true, reason: "Error: socket closed"),
             Category("Unsupported", 0, 0.3, skipped: true));
 
-        Assert.Contains(result.Recommendations, r => r.StartsWith("Crashed crashed (Error: socket closed). It counts as 0", StringComparison.Ordinal));
+        Assert.Contains(result.Recommendations, r => r.StartsWith("Crashed was not measured (Error: socket closed). It counts as 0", StringComparison.Ordinal));
         Assert.Contains("Unsupported was skipped: not supported by this agent.", result.Recommendations);
         Assert.DoesNotContain(result.Recommendations, r => r.StartsWith("Crashed was skipped", StringComparison.Ordinal));
     }

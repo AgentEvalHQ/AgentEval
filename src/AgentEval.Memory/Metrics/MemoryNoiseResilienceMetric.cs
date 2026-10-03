@@ -39,6 +39,12 @@ public class MemoryNoiseResilienceMetric : IMemoryMetric
                 return Task.FromResult(MetricResult.Fail(Name, "MemoryEvaluationResult not found in evaluation context."));
             }
 
+            if (!memoryResult.IsMeasured)
+            {
+                return Task.FromResult(MetricResult.Fail(Name,
+                    "Not measured: the judge produced no score for any query."));
+            }
+
             // Check if this was a noise resilience test (chatty/buried facts scenario)
             var isNoiseTest = IsNoiseResilienceScenario(memoryResult.ScenarioName, memoryResult.Metadata);
             if (!isNoiseTest)

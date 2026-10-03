@@ -33,6 +33,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     the built-in question it never sent, so `compare` treats such runs from before and after this change as
     different stimuli.
 
+### `bench memory` scores only what the judge scored
+
+#### Fixed
+- **`bench memory` turned a missing judgement into a score.** A failed judge call scored the question 0, and a judge
+  reply with no score in it scored **50**. Both went into every average and the overall grade.
+  - Such a question is now **not measured**: left out of its scenario and category scores, and counted. A category
+    in which nothing was measured is reported like a crashed one. This covers every judged category, the reducer
+    and reach-back ones included.
+  - A judge reply that is not valid JSON is read for an explicit score only (`score: 85`, `"score": 85`, `85/100`).
+    Before, the first number followed by "out of" or "%" was taken: "2 out of 3 facts" scored 2.
+  - **Behaviour change:** a run with a crashed or unmeasured category, or with unscored questions, is
+    **INCOMPLETE**: the console says so and lists what was not measured, prints no grade, shows the overall (each
+    unmeasured category at 0) beside the score over the measured categories, and exits 11. Its stored verdict is
+    `WARN`, the schema's indeterminate value. Unmeasured categories count as skipped in the run's stats and get no
+    scenario result, so `compare` does not read them as a drop to 0. `MemoryBenchmarkResult.Passed` is false for
+    an incomplete run.
+  - The memory metrics (`MemoryRetentionMetric`, `MemoryNoiseResilienceMetric`, `MemoryReachBackMetric`) fail
+    with "Not measured" when no question was scored, and the temporal scores average the measured questions only.
+  - Library: `MemoryJudgmentResult.Measured`, `MemoryQueryResult.Measured`,
+    `MemoryEvaluationResult.UnmeasuredQueries`/`IsMeasured`, `BenchmarkCategoryResult.UnmeasuredQueries`,
+    `MemoryBenchmarkResult.UnmeasuredQueries`/`IsComplete`, `ReducerFactResult.Measured`,
+    `ReducerEvaluationResult.MeasuredFacts`/`UnmeasuredFacts`/`IsMeasured`. Rates (`RetentionRate`,
+    `SuccessRate`, `FidelityScore`) are over the measured questions.
+
 ### `bench owasp`, `mitre` and `nist` grade with the judge
 
 #### Fixed

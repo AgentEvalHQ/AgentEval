@@ -155,6 +155,7 @@ public class ReachBackEvaluator : IReachBackEvaluator
             {
                 Depth = depth,
                 Score = firstQueryResult?.Score ?? 0,
+                Measured = firstQueryResult?.Measured ?? false,
                 Response = firstQueryResult?.Response ?? string.Empty,
                 Duration = depthStopwatch.Elapsed
             };
@@ -168,6 +169,7 @@ public class ReachBackEvaluator : IReachBackEvaluator
             {
                 Depth = depth,
                 Score = 0,
+                Measured = false,
                 Response = $"Error: {ex.Message}",
                 Duration = depthStopwatch.Elapsed
             };

@@ -146,35 +146,48 @@ public static class BenchMemoryCommand
             // Pre-fix the CLI used 80/50 thresholds which made a canonical Passed=true score
             // of 75 render as "WARN" — confusing for operators reading both the native
             // report-native.json and the CLI summary. Now consistent.
-            var verdict = result.OverallScore >= 70 ? "PASS" : result.OverallScore >= 50 ? "WARN" : "FAIL";
+            // An incomplete run (a category that crashed or measured nothing, or questions the judge produced no score
+            // for) is neither a pass nor a fail. The stored verdict is WARN, the schema's indeterminate value (as for
+            // bench typedmemeval); the console says INCOMPLETE and the exit code is GateIndeterminate (11).
+            var verdict = !result.IsComplete ? "INCOMPLETE"
+                : result.OverallScore >= 70 ? "PASS" : result.OverallScore >= 50 ? "WARN" : "FAIL";
             var summary = new RunSummary(
                 SchemaVersion: "1.0",
                 RunId: runId,
-                Verdict: verdict,
+                Verdict: verdict == "INCOMPLETE" ? "WARN" : verdict,
+                // A skipped, crashed or wholly unmeasured category is neither passed nor failed: it is Skipped.
                 Stats: new RunStats(
                     Total: result.CategoryResults.Count,
-                    Passed: result.CategoryResults.Count(c => c.Score >= 70),
-                    Failed: result.CategoryResults.Count(c => c.Score < 50),
-                    Warnings: result.CategoryResults.Count(c => c.Score >= 50 && c.Score < 70)),
+                    Passed: result.CategoryResults.Count(c => !c.Skipped && c.Score >= 70),
+                    Failed: result.CategoryResults.Count(c => !c.Skipped && c.Score < 50),
+                    Warnings: result.CategoryResults.Count(c => !c.Skipped && c.Score >= 50 && c.Score < 70),
+                    Skipped: result.CategoryResults.Count(c => c.Skipped)),
                 Metrics: new Dictionary<string, double>
                 {
                     ["overall_score"] = result.OverallScore,
+                    ["unmeasured_queries"] = result.UnmeasuredQueries,
+                    ["errored_categories"] = result.ErroredCategories.Count,
                 });
-            // One scenario result per measured category, so `agenteval compare` can diff two memory runs per
-            // category (before this, a memory run had no scenarios/ and compare could not read it). A skipped
-            // category measured nothing and is left out; an errored one is a 0 and not passed, as in the overall
-            // score. Score is on the 0..1 scale every other scenario result uses.
-            foreach (var category in result.CategoryResults.Where(c => !c.Skipped || c.Errored))
+            // One scenario result per MEASURED category, so `agenteval compare` can diff two memory runs per category
+            // (before this, a memory run had no scenarios/ and compare could not read it). A skipped, crashed or wholly
+            // unmeasured category measured nothing and is left out: written as a 0 it would read as a regression in
+            // compare. Score is on the 0..1 scale every other scenario result uses.
+            foreach (var category in result.CategoryResults.Where(c => !c.Skipped))
             {
-                var scenarioScore = category.Errored ? 0.0 : Math.Clamp(category.Score / 100.0, 0.0, 1.0);
+                var scenarioScore = Math.Clamp(category.Score / 100.0, 0.0, 1.0);
                 await store.WriteScenarioResultAsync(runId, new ScenarioResult(
                     Id: "memory-" + category.CategoryName.ToLowerInvariant().Replace(' ', '-'),
                     Name: category.CategoryName,
                     Input: category.ScenarioType.ToString(),
-                    Output: category.Errored ? "errored" : $"score {category.Score:F1}",
-                    Passed: !category.Errored && category.Score >= 70,
+                    Output: $"score {category.Score:F1}",
+                    Passed: category.Score >= 70,
                     Score: scenarioScore,
-                    Metrics: new Dictionary<string, double> { ["score"] = category.Errored ? 0.0 : category.Score, ["weight"] = category.Weight },
+                    Metrics: new Dictionary<string, double>
+                    {
+                        ["score"] = category.Score,
+                        ["weight"] = category.Weight,
+                        ["unmeasured_queries"] = category.UnmeasuredQueries,
+                    },
                     Assertions: [],
                     Duration: category.Duration,
                     EstimatedCost: 0.0), ct);
@@ -191,11 +204,34 @@ public static class BenchMemoryCommand
                 JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }));
 
             Console.WriteLine();
-            Console.WriteLine($"   Overall score: {result.OverallScore:F1}%  Grade: {result.Grade}");
+            var anythingMeasured = result.CategoryResults.Any(c => !c.Skipped);
+            if (result.IsComplete)
+            {
+                Console.WriteLine($"   Overall score: {result.OverallScore:F1}%  Grade: {result.Grade}");
+            }
+            else if (anythingMeasured)
+            {
+                // Incomplete: no grade. The overall counts each unmeasured category as 0; the measured-only figure
+                // leaves them out. Neither is the true score, which is why the verdict is INCOMPLETE.
+                Console.WriteLine($"   Overall score: {result.OverallScore:F1}% with unmeasured categories at 0; " +
+                                  $"{result.CapabilityScore:F1}% over the measured ones only");
+            }
             Console.WriteLine($"   Verdict:       {verdict}");
+            if (!result.IsComplete)
+            {
+                if (result.ErroredCategories.Count > 0)
+                {
+                    Console.WriteLine($"   Not measured:  {string.Join(", ", result.ErroredCategories)} (the run failed, or no question produced a score)");
+                }
+                if (result.UnmeasuredQueries > 0)
+                {
+                    Console.WriteLine($"   Unscored:      {result.UnmeasuredQueries} question(s) produced no score; left out of their category");
+                }
+            }
             foreach (var cat in result.CategoryResults)
             {
-                Console.WriteLine($"   {cat.CategoryName,-30} {cat.Score:F1}%");
+                var shown = cat.Errored ? "not measured" : cat.Skipped ? "skipped" : $"{cat.Score:F1}%";
+                Console.WriteLine($"   {cat.CategoryName,-30} {shown}");
             }
             Console.WriteLine();
             Console.WriteLine($"   Run ID: {runId}");
@@ -205,8 +241,8 @@ public static class BenchMemoryCommand
             // Align with the family convention via the shared BenchExitCodes helper: PASS=>0,
             // WARN=>GateWarning (10), FAIL=>GateFailed (9). Previously WARN returned 0, so a memory
             // run in the 50–69 band silently passed CI while the identical band failed CI for every
-            // other benchmark family (BUG-23). The verdict is always exactly "PASS"/"WARN"/"FAIL".
-            return BenchExitCodes.FromLabel(verdict);
+            // other benchmark family (BUG-23). An INCOMPLETE run exits GateIndeterminate (11).
+            return verdict == "INCOMPLETE" ? ExitCodes.GateIndeterminate : BenchExitCodes.FromLabel(verdict);
         }
         catch (Exception ex)
         {

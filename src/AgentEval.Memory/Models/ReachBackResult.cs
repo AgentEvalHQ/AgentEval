@@ -22,7 +22,7 @@ public class ReachBackResult
     /// Maximum depth where the agent reliably recalled the fact (score >= 80).
     /// </summary>
     public int MaxReliableDepth => DepthResults
-        .Where(d => d.Score >= 80)
+        .Where(d => d.Recalled)
         .Select(d => d.Depth)
         .DefaultIfEmpty(0)
         .Max();
@@ -33,16 +33,22 @@ public class ReachBackResult
     /// </summary>
     public int? FailurePoint => DepthResults
         .OrderBy(d => d.Depth)
-        .Where(d => d.Score < 80)
+        .Where(d => d.Measured && d.Score < 80)
         .Select(d => (int?)d.Depth)
         .FirstOrDefault();
 
     /// <summary>
     /// Overall score (0-100) as the average of per-depth raw scores.
     /// </summary>
-    public double OverallScore => DepthResults.Count > 0
-        ? DepthResults.Average(d => d.Score)
+    public double OverallScore => DepthResults.Any(d => d.Measured)
+        ? DepthResults.Where(d => d.Measured).Average(d => d.Score)
         : 0;
+
+    /// <summary>Depths whose question the judge produced no score for, or whose run failed; left out of the score.</summary>
+    public int UnmeasuredDepths => DepthResults.Count(d => !d.Measured);
+
+    /// <summary>True when at least one depth was measured, so <see cref="OverallScore"/> means something.</summary>
+    public bool IsMeasured => DepthResults.Any(d => d.Measured);
 
     /// <summary>
     /// Whether the evaluation passed (max reliable depth meets minimum threshold).
@@ -71,9 +77,14 @@ public class DepthResult
     public required double Score { get; init; }
 
     /// <summary>
-    /// Whether the fact was recalled at this depth (score >= 80).
+    /// <see langword="false"/> when nothing was measured at this depth: the judge produced no score, or the run failed.
     /// </summary>
-    public bool Recalled => Score >= 80;
+    public bool Measured { get; init; } = true;
+
+    /// <summary>
+    /// Whether the fact was recalled at this depth (score >= 80). An unmeasured depth is not recalled.
+    /// </summary>
+    public bool Recalled => Measured && Score >= 80;
 
     /// <summary>
     /// The agent's response to the query at this depth.

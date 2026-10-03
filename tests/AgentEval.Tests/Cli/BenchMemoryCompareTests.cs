@@ -34,10 +34,12 @@ public sealed class BenchMemoryCompareTests : IDisposable
         try { if (Directory.Exists(_root)) Directory.Delete(_root, recursive: true); } catch { /* best-effort cleanup */ }
     }
 
+    /// <summary>Stands in for both the agent and the judge; its reply carries a score, so every question is measured.</summary>
     private sealed class FixedReplyChatClient : IChatClient
     {
         public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
-            => Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "I remember that. The answer is 42.")));
+            => Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant,
+                "{\"found_facts\":[],\"missing_facts\":[],\"forbidden_found\":[],\"score\":80,\"explanation\":\"I remember that.\"}")));
 
         public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
@@ -70,6 +72,43 @@ public sealed class BenchMemoryCompareTests : IDisposable
 
         Assert.NotEqual(ExitCodes.UsageError, exit);
         Assert.NotEqual(ExitCodes.RuntimeError, exit);
+    }
+
+    private sealed class NoScoreChatClient : IChatClient
+    {
+        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+            => Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, "I remember that. The answer is 42.")));
+
+        public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+        public void Dispose() { }
+    }
+
+    [Fact]
+    public async Task ARunWhoseJudgeNeverScores_IsIncomplete_NotAFail()
+    {
+        // Through 0.42 every question here scored 50 (the default for a reply with no score) and the run read WARN.
+        var previous = Console.Out;
+        using var stdout = new StringWriter();
+        Console.SetOut(stdout);
+        int exit;
+        try
+        {
+            exit = await BenchMemoryCommand.RunAsync("quick", "mem-incomplete", _root, new NoScoreChatClient());
+        }
+        finally
+        {
+            Console.SetOut(previous);
+        }
+
+        Assert.Equal(ExitCodes.GateIndeterminate, exit);
+        Assert.Contains("INCOMPLETE", stdout.ToString(), StringComparison.Ordinal);
+        Assert.DoesNotContain("Grade:", stdout.ToString(), StringComparison.Ordinal);
+        var summary = Directory.GetFiles(_root, "summary.json", SearchOption.AllDirectories).Single();
+        Assert.Contains("\"WARN\"", File.ReadAllText(summary));
     }
 
     [Fact]

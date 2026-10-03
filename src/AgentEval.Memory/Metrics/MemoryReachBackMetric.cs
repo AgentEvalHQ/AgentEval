@@ -67,8 +67,15 @@ public class MemoryReachBackMetric : IMemoryMetric
 
         // Simple heuristic: if agent can answer multiple queries about established facts,
         // it demonstrates reach-back capability
-        var successfulReachBack = queryResults.Count(r => r.Passed);
-        var reachBackScore = (double)successfulReachBack / queryResults.Length * 100;
+        // Over the measured questions only; with none measured there is no score to give.
+        var measured = queryResults.Where(r => r.Measured).ToArray();
+        if (measured.Length == 0)
+        {
+            return Task.FromResult(MetricResult.Fail(Name,
+                "Not measured: the judge produced no score for any query."));
+        }
+        var successfulReachBack = measured.Count(r => r.Passed);
+        var reachBackScore = (double)successfulReachBack / measured.Length * 100;
 
         var details = new Dictionary<string, object>
         {

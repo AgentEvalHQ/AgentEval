@@ -53,10 +53,19 @@ public class CrossSessionResult
     /// </summary>
     public int RetainedCount => FactResults.Count(f => f.Recalled);
 
+    /// <summary>Facts the judge produced no score for; left out of <see cref="OverallScore"/> and reported.</summary>
+    public int UnmeasuredFacts => FactResults.Count(f => !f.Measured);
+
+    /// <summary>
+    /// True when the run produced a score at all: no error, and at least one fact measured. An errored or wholly
+    /// unmeasured run's <see cref="OverallScore"/> is a placeholder 0, not a measurement.
+    /// </summary>
+    public bool IsMeasured => ErrorMessage is null && FactResults.Any(f => f.Measured);
+
     /// <summary>
     /// Number of facts lost across sessions.
     /// </summary>
-    public int LostCount => FactResults.Count(f => !f.Recalled);
+    public int LostCount => FactResults.Count(f => f.Measured && !f.Recalled);
 }
 
 /// <summary>
@@ -88,4 +97,7 @@ public class CrossSessionFactResult
     /// Score (0-100) for this fact's recall.
     /// </summary>
     public required double Score { get; init; }
+
+    /// <summary><see langword="false"/> when the judge produced no score for this fact.</summary>
+    public bool Measured { get; init; } = true;
 }

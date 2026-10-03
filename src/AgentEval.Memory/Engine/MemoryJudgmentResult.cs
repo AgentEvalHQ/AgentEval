@@ -14,6 +14,13 @@ public class MemoryJudgmentResult
     /// Score (0-100) for how well the response demonstrates memory of expected facts.
     /// </summary>
     public required double Score { get; init; }
+
+    /// <summary>
+    /// <see langword="false"/> when the judge produced no score: the call failed, or its reply held none.
+    /// <see cref="Score"/> is then 0 as a placeholder, not a measurement, and aggregates leave the question out and
+    /// count it. Through 0.42 a failed call scored 0 and a reply with no score scored 50.
+    /// </summary>
+    public bool Measured { get; init; } = true;
     
     /// <summary>
     /// Expected facts that were found in the response.

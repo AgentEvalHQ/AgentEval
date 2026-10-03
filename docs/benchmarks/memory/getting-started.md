@@ -115,6 +115,12 @@ CLI exit codes: `PASS` → exit 0, `WARN` → exit 10 (`GateWarning`), `FAIL` �
 [CLI Reference — Exit codes](../../cli.md#exit-codes). (This previously said WARN maps to exit 0 alongside
 PASS — that was never accurate; WARN has always been non-zero, distinct from a clean PASS.)
 
+A run in which something was not measured is **INCOMPLETE** and exits 11 (`GateIndeterminate`): a category crashed,
+or the judge produced no score for one or more questions (a failed judge call, or a reply with no score in it). The
+console lists what was not measured and prints no grade; the stored verdict is `WARN`, the schema's indeterminate
+value. An unscored question is left out of its category's score, never counted as 0 or 50. Fix the cause (usually
+the judge configuration) and re-run.
+
 ## How to act on findings
 
 - Low Basic Retention — the agent isn't holding even single-session state; verify the chat-client adapter has `includeHistory: true` and the history isn't being aggressively truncated.

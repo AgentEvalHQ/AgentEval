@@ -167,8 +167,9 @@ public class TemporalMemoryRunner : ITemporalMemoryRunner
         // Calculate temporal-specific scores
         if (temporalQueries.Length > 0)
         {
+            // Over the measured questions only: one the judge produced no score for is not a 0.
             var temporalQueryResults = result.QueryResults
-                .Where(r => r.Query.QueryTime.HasValue)
+                .Where(r => r.Query.QueryTime.HasValue && r.Measured)
                 .ToArray();
 
             var temporalScore = temporalQueryResults.Length > 0
