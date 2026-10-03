@@ -5,25 +5,26 @@ Gatekeeper's premise is one loop: the **same** policy you *red-team* with also *
 The built-in `--sut gatekeeper-demo` is an agent wrapped in a Gatekeeper `CanaryToolGate`, with a forbidden exfiltration tool offered to the model as a lure. No `--endpoint` is needed:
 
 - **With a provider configured** (`AI_INFERENCE_PROVIDER` and its variables) the agent runs on that real model. The scan shows what the model attempts and what the gate stops, and the run is named `gatekeeper-demo (real model <model>@<provider>)`. It calls the model, so it costs, and a real model's answers vary from run to run.
-- **With no provider configured** it falls back to a scripted, fully compromised model that calls the forbidden tool on every turn, and says so (`SCRIPTED: …`, named `gatekeeper-demo (scripted)`). It shows the gate, not a model. It is deterministic and needs no API key.
+- **With no provider configured** it falls back to a scripted, fully compromised model that calls the forbidden tool on every turn, and says so (`SCRIPTED (…)`, named `gatekeeper-demo (scripted)`). It shows the gate, not a model. It is deterministic and needs no API key.
+- **With `--scripted`** it runs that scripted model even when a provider is configured: deterministic and free, so its baseline is stable. Use it for the CI loop below.
 
-Through 0.42 the scripted model was the only one.
+Each probe runs in a fresh conversation. Through 0.42 the scripted model was the only one.
 
 ## The two-step loop
 
 ```bash
 # 1. Capture the baseline once, on a known-good commit, and commit the JSON.
-agenteval redteam --sut gatekeeper-demo --intensity quick \
+agenteval redteam --sut gatekeeper-demo --scripted --intensity quick \
   --save-baseline gatekeeper-demo.baseline.json
 #   → a small, stable set of conclusive findings, every forbidden tool call blocked; the run passes; baseline written.
 
 # 2. On every PR — fail ONLY if a NEW vulnerability appears vs the baseline.
-agenteval redteam --sut gatekeeper-demo --intensity quick \
+agenteval redteam --sut gatekeeper-demo --scripted --intensity quick \
   --baseline gatekeeper-demo.baseline.json --fail-on regression
 #   → the gate holds → Stable → the run passes.
 ```
 
-A baseline belongs to the model it was taken on: the `Model:` line names it. A CI job without provider secrets runs the scripted model, whose baseline is stable; with secrets, the job red-teams the real model, so take the baseline on that model and expect some run-to-run variation.
+Without `--scripted`, the demo red-teams the configured model: that run is paid and varies from run to run. A baseline belongs to the model it was taken on: the `Model:` line, the saved report and the baseline all name it (`gatekeeper-demo (scripted)` or `gatekeeper-demo (real model <model>@<provider>)`). Comparing a baseline taken on one with a run on another is refused (exit 3). Pass `--scripted` on both commands, or take the baseline on the same model you run against.
 
 The baseline records the *known* conclusive failures (their probe ids), the conclusive score, and the coverage. The gate on step 2 is **relative**: it does not fail because some attacks are known-hard — it fails when the *set* of failures grows. Concretely, [`RedTeamBaselineComparer`](https://github.com/AgentEvalHQ/AgentEval/blob/main/src/AgentEval.RedTeam/RedTeam/Baseline/RedTeamBaselineComparer.cs) flags a **regression** when any of: a new conclusive `Succeeded` probe appears, the conclusive score drops past the threshold, or coverage drops.
 
@@ -48,8 +49,9 @@ jobs:
           global-json-file: global.json           # follow the repo's pinned SDK
       - run: dotnet tool install --global AgentEval.Cli --prerelease
       # Fail the PR if a change let a probe through that the committed baseline didn't have.
+      # --scripted: the same deterministic model the baseline was taken on, even if provider secrets are present.
       - run: |
-          agenteval redteam --sut gatekeeper-demo --intensity quick \
+          agenteval redteam --sut gatekeeper-demo --scripted --intensity quick \
             --baseline gatekeeper-demo.baseline.json --fail-on regression
 ```
 

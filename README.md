@@ -378,7 +378,7 @@ language-neutral runtime-policy service — pipe a JSON payload to `agenteval ga
 bash, or a CI step and get back a versioned verdict + exit code, no .NET reference required. See
 [docs/gatekeeper-cli.md](docs/gatekeeper-cli.md).
 
-**✅ See it:** `dotnet run --project samples/AgentEval.Samples` → group **J** opens on the six-sample 15-minute tour — all six run **without credentials** (hybrid entries add a live overlay when Azure OpenAI is configured) — or via `agenteval redteam --sut gatekeeper-demo` • [docs/gatekeeper/introduction.md](docs/gatekeeper/introduction.md)
+**✅ See it:** `dotnet run --project samples/AgentEval.Samples` → group **J** opens on the six-sample 15-minute tour — with a model provider configured, the hybrids among them (00, 04, 10, 14, 16) run on that model and bill it; without one, or with `AGENTEVAL_GATEKEEPER_FORCE_OFFLINE=true`, they run a labelled scripted path, and 23 needs no model at all — or via `agenteval redteam --sut gatekeeper-demo` (add `--scripted` for a free, deterministic run) • [docs/gatekeeper/introduction.md](docs/gatekeeper/introduction.md)
 
 ---
 
@@ -735,7 +735,7 @@ The interactive menu lets you select a **group** (A–K), then a **sample** with
 | **G — Memory Evaluation** | Memory basics, benchmarks, scenarios, DI, cross-session, HTML reports, LongMemEval (ICLR 2025) |
 | **H — Benchmarks** | Compliance & performance benchmark families → JSON / HTML / PDF reports |
 | **I — Observability (Glass Box)** | Dual-boundary per-turn tracing, trace fidelity, auto-audit |
-| **J — Gatekeeper (Runtime Protection)** ★ 17 of 29 offline by design | Fail-closed runtime enforcement: a six-sample 15-minute tour (smallest gate → jailbreak vs authorization → the poisoned-tool kill chain → calibrated Tribunal judges → replay & trust → the HTTP wire), plus attack showcases, architecture proofs, and the consent-gated A2A boundary |
+| **J — Gatekeeper (Runtime Protection)** ★ real model when configured, scripted fallback without one; 11 of 29 always run offline | Fail-closed runtime enforcement: a six-sample 15-minute tour (smallest gate → jailbreak vs authorization → the poisoned-tool kill chain → calibrated Tribunal judges → replay & trust → the HTTP wire), plus attack showcases, architecture proofs, and the consent-gated A2A boundary |
 | **K — Agent Skills** 🔑 real agents | Evaluate & govern MAF Agent Skills: a Hello World on-ramp, the disclosure-efficiency metric, the compliance scanner, and the composite Skill Security Index |
 
 See [samples/AgentEval.Samples/README.md](samples/AgentEval.Samples/README.md) for the full listing with per-sample descriptions, timing, and credential requirements.

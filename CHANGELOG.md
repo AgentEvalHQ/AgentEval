@@ -39,24 +39,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`redteam --sut gatekeeper-demo` only ever ran a scripted, fully compromised model.** It now runs the
   Gatekeeper-gated agent on the configured provider's model, with the forbidden exfiltration tool offered as a lure,
   so the scan shows what a real model attempts and what the gate stops. With no provider configured it falls back
-  to the scripted model and says so (`SCRIPTED: …`). The run is named `gatekeeper-demo (real model <model>@<provider>)`
-  or `gatekeeper-demo (scripted)`, so a baseline taken on one is never read as the other.
+  to the scripted model and says so (`SCRIPTED (…)`). Every probe runs in a fresh conversation. The run, its saved
+  report and its baseline are named `gatekeeper-demo (real model <model>@<provider>)` or `gatekeeper-demo (scripted)`,
+  and comparing a baseline taken on one with a run on the other is refused (exit 3): they are different instruments.
   - **Behaviour change:** where a provider is configured (a developer machine, a CI job with secrets) the demo now
-    calls that model and costs accordingly.
+    calls that model and costs accordingly. `--scripted` runs the scripted model anyway: deterministic and free, the
+    stable baseline for a CI regression loop.
+  - Other agents whose baseline was taken under a different name now get a note saying so.
 - The Gatekeeper samples 00–10 already ran on the configured model and used their scripted path only without one.
   That path now opens with `SCRIPTED (…)`: a scripted model proposes the attack, so it checks the gate, not a model.
 - **Gatekeeper scenario samples 14–17, 25 and 28 run on the configured model.** Through 0.42 they ran a scripted
   model only. The model now gets the scenario's attack and the sample's fake tools, and the gate decides on whatever
-  it proposes; each scene reports what happened: blocked, the model declined (nothing reached the gate, which says
-  nothing about the gate), or the forbidden action ran (the sample fails). The scripted path stays as the labelled
-  fallback without a provider, and as the CI offline suite. Samples 13, 18–20, 22–24 and 29 involve no model and now
-  say so; 21, 26 and 27 say their scripted model is incidental to the harness mechanism they test.
+  it proposes. Each scene reports what happened, counting the effect the attack seeks by any route, not only the
+  shapes the gate's rules match: blocked, no attempt (which says nothing about the gate), not measured (for example a
+  judge that gave no usable verdict), or the effect happened (the sample fails). The scripted path stays as the
+  labelled fallback without a provider, and as the CI offline suite. In sample 25 the judge is the configured model,
+  not a calibrated trajectory judge, and the run says so. Samples 13, 18–20, 22–24, 26, 27 and 29 involve no model
+  and now say so; 21 says its scripted model is incidental to the batch race it tests.
   - A live run of sample 28 found that its approval pattern (`"amount":\s*[0-9]{4,}`) missed an amount sent as a
     JSON string (`"amount":"5000"`): the gate auto-approved it and a $5,000 refund ran with no human. The pattern now
-    names what is routine (a plain amount below 1000) and escalates everything else, a missing amount included.
-    `ArgumentPatternApprovalGate` auto-approves whatever its pattern does not match, so a pattern must be written that
-    way round.
-  - `dotnet run --project samples/AgentEval.Samples -- <n>` exits 1 when the sample fails; it exited 0.
+    names what is routine (a plain amount below 1000) and escalates everything else, a missing amount included; the
+    same pattern replaces the old one in sample 03 and the offline suite. `ArgumentPatternApprovalGate`
+    auto-approves whatever its pattern does not match, so a pattern must be written that way round.
+  - `dotnet run --project samples/AgentEval.Samples -- <n>` exits 1 when the sample fails and 2 for an unknown
+    number; it exited 0 in both cases.
 - **The memory-security test doubles no longer ship in the `AgentEval` package.** `MockMemorySqlStore`,
   `MockMemoryMcpEndpoint`, `MockMemoryAIContextProvider` and the other `MockMemory*` types (namespace
   `AgentEval.MAF.Gatekeeper.MemorySecurity`) were public in the Gatekeeper assembly beside the real gates. They moved

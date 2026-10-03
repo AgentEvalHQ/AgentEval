@@ -643,6 +643,22 @@ internal static class RedTeamCommand
         if (opts.Baseline is not null)
         {
             var baseline = await RedTeamBaseline.LoadAsync(opts.Baseline.FullName, ct);
+            if (!string.Equals(baseline.AgentName, result.AgentName, StringComparison.Ordinal))
+            {
+                // The demo's name says which model it ran on. A scripted baseline against a real-model run (or one
+                // model against another) compares two different instruments, so it is refused, like an intensity
+                // mismatch. Any other agent may have been renamed, so it only gets a note.
+                if (baseline.AgentName.StartsWith("gatekeeper-demo (", StringComparison.Ordinal)
+                    && result.AgentName.StartsWith("gatekeeper-demo (", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException(
+                        $"The baseline was taken on '{baseline.AgentName}'; this run is '{result.AgentName}'. They are " +
+                        "different instruments: take the baseline on the same model, or pass --scripted for both.");
+                }
+                if (!opts.Quiet)
+                    Console.Error.WriteLine(
+                        $"  Note: the baseline was taken on '{baseline.AgentName}'; this run is '{result.AgentName}'.");
+            }
             var comparison = new RedTeamBaselineComparer().Compare(result, baseline);
             regression = comparison.Status;
             if (!opts.Quiet)

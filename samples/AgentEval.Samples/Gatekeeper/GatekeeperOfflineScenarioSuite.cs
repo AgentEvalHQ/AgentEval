@@ -204,7 +204,9 @@ internal static class GatekeeperOfflineScenarioSuite
         var refund = AIFunctionFactory.Create(
             (int amount) => { issued.Add(amount); return $"fake refund {amount}"; },
             "issue_refund");
-        var gate = new ArgumentPatternApprovalGate("\"amount\":\\s*[0-9]{4,}", "offline-large-refund");
+        // The pattern names what is routine (a plain amount below 1000) and escalates everything else; see sample 03.
+        var gate = new ArgumentPatternApprovalGate(
+            @"^(?![\s\S]*""amount""\s*:)|""amount""\s*:(?!\s*[0-9]{1,3}(?:\.[0-9]+)?\s*[,}])", "offline-large-refund");
 
         var routineClient = new ScriptedChatClient()
             .AddToolCall("03-routine", "issue_refund", new Dictionary<string, object?> { ["amount"] = 20 })

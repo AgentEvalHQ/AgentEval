@@ -34,9 +34,12 @@ internal static class GatekeeperDemoSut
 
     /// <summary>
     /// Builds the gated demo agent on <paramref name="model"/>, or on the scripted compromised model when it is null,
-    /// recording gate verdicts into <paramref name="trace"/>.
+    /// recording gate verdicts into <paramref name="trace"/>. Every call runs in a fresh session.
     /// </summary>
-    public static IEvaluableAgent Build(AgentTrace trace, IChatClient? model = null)
+    /// <param name="trace">Where the gate records its verdicts.</param>
+    /// <param name="model">The real model, or null for the scripted one.</param>
+    /// <param name="name">The name the run reports, e.g. which model it red-teamed.</param>
+    public static IEvaluableAgent Build(AgentTrace trace, IChatClient? model = null, string name = "gatekeeper-demo")
     {
         ArgumentNullException.ThrowIfNull(trace);
 
@@ -63,7 +66,25 @@ internal static class GatekeeperDemoSut
             .UseAgentEvalToolGate([new CanaryToolGate([canary])], ToolGatePolicy.Terminate, trace)
             .Build();
 
-        return new MAFAgentAdapter(agent);
+        return new FreshSessionPerCall(new MAFAgentAdapter(agent), name);
+    }
+
+    /// <summary>
+    /// Runs every call in a fresh session. The red-team runner sends each probe as its own call, and a multi-turn
+    /// attack flattens its transcript into each call's prompt, so one shared session conditioned every probe on all
+    /// the earlier attacks and replies, and grew the cost with each probe. The scripted model ignores history, which
+    /// is how the shared session went unnoticed until the demo ran on a real model.
+    /// </summary>
+    private sealed class FreshSessionPerCall(MAFAgentAdapter inner, string name) : IEvaluableAgent
+    {
+        /// <summary>The run's name, not the MAF agent's: a provider may restrict the characters of the latter.</summary>
+        public string Name => name;
+
+        public async Task<AgentEval.Core.AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default)
+        {
+            await inner.ResetSessionAsync(cancellationToken).ConfigureAwait(false);
+            return await inner.InvokeAsync(prompt, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     /// <summary>

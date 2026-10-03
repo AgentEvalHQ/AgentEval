@@ -593,6 +593,7 @@ public static class Program
         if (n < 1 || n > all.Count)
         {
             Console.WriteLine($"  ❌ Sample {n} not found. Valid range: 1–{all.Count}");
+            Environment.ExitCode = 2;
             return;
         }
         await RunEntry(all[n - 1]);

@@ -452,4 +452,5 @@ AgentEval's red-team scoring is honest about *how much* evidence a verdict is ba
 - [CLI Reference — Exit codes](cli.md#exit-codes) — the full exit-code table, including `8`
   (`BudgetExceeded`) — returned when a live `redteam --sut copilot-studio` scan hits its `--max-credits` cap.
 - [Attack the gate](gatekeeper/attack-the-gate.md) — the `--sut gatekeeper-demo` closed loop,
-  useful for CI where a live Copilot Studio agent + credentials aren't available.
+  useful for CI where a live Copilot Studio agent + credentials aren't available (with `--scripted` it needs no
+  credentials at all).

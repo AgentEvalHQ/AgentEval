@@ -20,9 +20,11 @@ manifest contains one more entry than the menu.
 | Semantic judgment and approval | **03 → 28 → 25 → 04** | Human continuation, approval failure modes, Crescendo timing, and calibrated judges |
 | Operations and assurance | **10 → 20 → 22** | Provenance/replay, lifecycle evidence, and read-only incident projection |
 
-Every path runs without credentials: the hybrid samples (00–10) execute deterministic offline oracles when Azure
-OpenAI is not configured and add an optional live overlay when it is. Sample 11A is intentionally absent because
-it requires a separately authorized remote A2A endpoint.
+Every path can run without credentials: with no provider configured, or in the offline suite. The hybrid samples (00–10, 14–17, 25, 28) are live-first: with a model
+provider configured (any provider `AI_INFERENCE_PROVIDER` selects) they run on that model and bill it; without one,
+or with `AGENTEVAL_GATEKEEPER_FORCE_OFFLINE=true`, they run a deterministic scripted path and print `SCRIPTED (…)`.
+The other samples on these paths never call a model provider. Sample 11A is intentionally absent because it
+requires a separately authorized remote A2A endpoint.
 
 Start the interactive launcher and open group **J**:
 
@@ -146,9 +148,12 @@ without losing coverage or changing legacy numeric execution order.
 ## From the CLI
 
 ```bash
-agenteval redteam --sut gatekeeper-demo --intensity quick \
+agenteval redteam --sut gatekeeper-demo --scripted --intensity quick \
   --baseline gatekeeper-demo.baseline.json --fail-on regression
 ```
+
+`--scripted` keeps the run deterministic and free; take the baseline with it too. Without it, the demo red-teams
+the configured model.
 
 For language-neutral deterministic inspection, use `agenteval gatekeeper inspect`. See
 [Attack the Gate](attack-the-gate.md) and the [Gatekeeper CLI](../gatekeeper-cli.md).

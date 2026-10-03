@@ -522,6 +522,7 @@ agenteval redteam [--azure] [--endpoint <url>] [--model <name>] [--deployment-na
 | `--azure` / `--endpoint` / `--deployment-name` | Azure OpenAI mode. |
 | `--endpoint` / `--model` | OpenAI-compatible mode (OpenAI, Ollama, Groq, vLLM, LM Studio, etc.). |
 | `--sut` | Built-in target instead of an endpoint: `gatekeeper-demo` (the Gatekeeper demo: the configured model behind the gate, or a labelled scripted model when no provider is configured) or `copilot-studio` (a live Microsoft Copilot Studio agent). |
+| `--scripted` | With `--sut gatekeeper-demo`: run the scripted model even when a provider is configured. Deterministic and free; use it for stable CI baselines. A baseline taken on one model is refused against a run on another (exit 3). See [Attack the gate](gatekeeper/attack-the-gate.md). |
 | `--attacks` | Comma-separated attack list; `--pack` imports external benchmark packs. |
 | `--judge` / `--attacker` | Separate judge/attacker models for LLM-as-judge and attacker-LLM flows. |
 | `--format` / `-o` | Export format and output destination. |
@@ -875,7 +876,7 @@ The CLI's exit-code contract, so CI can branch on the outcome. Source of truth: 
 | `0` | Success — passed / allowed / no gate blocked. |
 | `1` | Test failure — one or more evaluations failed (`eval`, `redteam`). |
 | `2` | Usage error (bad flags, malformed input). Reserved strictly for bad-argument paths — see BUG-22 below. Every command returns it for a parse error (see below). `bench`, `compliance render` and `render` also return it for an argument they reject themselves before the run starts: a missing `--subject`; an unknown preset or domain pack (every `bench` family) or vertical (`bench typedmemeval`); an invalid `--budget-tier`; an invalid `--sut` configuration or `--endpoint` without `--model`; a `--response-file` that cannot be read; no target at all (every `bench` family that grades an agent, and `redteam` and `eval`), `--sut mock` together with a real target, or a `--response` without the `--input` it answered. A missing `.agenteval/` workspace is not an argument error: those commands exit `1` and tell you to run `agenteval init-workspace`. |
-| `3` | Runtime error (connection/model/IO failure). **Also** returned when a judge fails to build (`JudgeFactory` — missing or partial Azure OpenAI credentials, or a thrown exception constructing the client): that's a runtime/config problem, not a bad CLI argument. |
+| `3` | Runtime error (connection/model/IO failure). **Also** returned when a judge fails to build (`JudgeFactory` — missing or partial Azure OpenAI credentials, or a thrown exception constructing the client): that's a runtime/config problem, not a bad CLI argument. `redteam --sut gatekeeper-demo --baseline` also returns it when the baseline was taken on a different model (scripted vs real, or another real model). |
 | `4` | Regression vs a supplied `--baseline` — `redteam --fail-on regression` gate (a NEW finding vs pre-existing). |
 | `5` | `gatekeeper inspect` — a gate **Blocked** on real evidence. |
 | `6` | `gatekeeper inspect` — **fail-closed**: the CLI could not evaluate (e.g. a history gate with no `messages`). Not a policy block. |

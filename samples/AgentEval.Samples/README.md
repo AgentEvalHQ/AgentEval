@@ -13,8 +13,9 @@ Group A (Getting Started) runs against a real model. With no provider configured
 pass `--mock` for an offline walkthrough with canned replies, labelled MOCK on every result. A6 Session Lifecycle and
 A7 Advanced MAF Features need a provider.
 Dataset Loaders / Extensibility in Group F run without credentials.
-Sample H1 (Registry Discovery) and H13 (Report Browser), plus all of Group J (Gatekeeper) except 11A (which
-needs a separately consented remote A2A endpoint), also run without credentials.
+Sample H1 (Registry Discovery) and H13 (Report Browser), plus Group J (Gatekeeper) except 11A and 11B, also run
+without credentials. With a provider configured, the Group J hybrids call (and bill) that model; see group J
+below.
 Most other samples need a model provider — Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint, selected with `--provider` (see [Choosing a provider](#choosing-a-provider)); check each group's **Azure?** column for the authoritative per-sample requirement.
 
 ---
@@ -174,16 +175,32 @@ The dual-boundary trace that records what an agent actually did, turn by turn �
 
 ---
 
-### J — Gatekeeper (Runtime Protection)  ★ no credentials needed — fail-closed runtime enforcement
+### J — Gatekeeper (Runtime Protection)  ★ real model when configured, scripted or model-free otherwise — fail-closed runtime enforcement
 
 AgentEval doesn't only MEASURE agents — it can STOP them. The same probes/evaluators you red-team with become
 runtime gates that block bad actions before they happen. See **`docs/gatekeeper/introduction.md`** for the developer guide.
 
 The launcher opens group J on the **six recommended samples** (the 15-minute tour `00 → 16 → 14 → 04 → 10 → 23`,
-marked ★ below); press **M** for all 29, **P** for the named learning paths. 17 of 29 are offline by design;
-samples 00–10 are hybrids that run a deterministic offline oracle without credentials (or under
-`AGENTEVAL_GATEKEEPER_FORCE_OFFLINE=true`) and add a live Azure OpenAI overlay when configured. Only 11A needs a
-separately consented remote endpoint. CI executes all 28 offline-capable samples on every PR.
+marked ★ below); press **M** for all 29, **P** for the named learning paths.
+
+How each sample runs (the **Execution** column):
+
+- **Hybrid** (00–10, 14–17, 25, 28): live-first. With a model provider configured (any provider
+  `AI_INFERENCE_PROVIDER` selects, not only Azure OpenAI), the sample runs on that model, so it calls and bills it.
+  Without a provider, or with `AGENTEVAL_GATEKEEPER_FORCE_OFFLINE=true`, it runs a deterministic scripted path and
+  prints `SCRIPTED (…)`. A live run of 14–17, 25 or 28 reports each scene as ✅ attempted and blocked, ➖ no attempt
+  or not measured (this says nothing about the gate), or ❌ the effect the attack seeks happened, or the gate
+  blocked a benign control (the sample fails). In 25 the judge is the configured model, not a calibrated
+  trajectory judge, and the run says so.
+- **Offline (no model)** (13, 18–20, 22–24, 26, 27, 29): the sample drives the gate directly and prints `NO MODEL`.
+  Deterministic and free.
+- **Offline (scripted)** (21): scripted by design. Its scripted model supplies a same-batch race that a real model
+  would not produce on demand.
+- **Live boundary** (11A) needs a separately consented remote endpoint; **Live model** (11B, direct-only) needs a
+  provider.
+
+Without a provider, every sample except 11A and 11B runs free. With one, the hybrids call the model. CI runs all 28
+offline-capable samples on every PR with the offline path forced: deterministic, no provider needed.
 
 | ID | Sample | What it exercises | Execution | Time |
 |----|--------|-------------------|-----------|------|
@@ -200,23 +217,23 @@ separately consented remote endpoint. CI executes all 28 offline-capable samples
 | 10 | **Explainability & Trust** ★ | `GateProvenance` → `GateReplayer` counterfactual → `TrustScoreCalculator` — see [docs/gatekeeper/explainability-and-trust.md](../../docs/gatekeeper/explainability-and-trust.md) | Hybrid | 4 min |
 | 11A | **Real A2A Boundary** | Calibrate, then guard a consented real remote agent-to-agent call | Live boundary | 5 min |
 | 11B | **A2A Calibration** | Both A2A boundary judges calibrated (direct-only, via the validation runner) | Live model | 5 min |
-| 13 | **Mocked Dangerous Tools** | SQL/browser/cloud/package narrow-contract fixtures — no side effects | Offline | 2 min |
-| 14 | **Poisoned Tool Kill Chain** ★ | Poison, exfil, delete, worm — all zeroed, with an effect-ledger proof | Offline | 5 min |
-| 15 | **Harness-Owned Tool Misuse** | A runtime-injected capability discovered, its misuse blocked | Offline | 2 min |
-| 16 | **Jailbreak + Tool Abuse** ★ | The paraphrase gets through — authorization still holds | Offline | 3 min |
-| 17 | **Tool Result Admission** | Secrets masked + oversized results truncated before model context | Offline | 2 min |
-| 18 | **Hosted Tool Coverage** | Honesty: hosted code execution cannot be claimed as covered | Offline | 2 min |
-| 19 | **Bulkhead + Containment** | Contained saturation cannot starve normal work — measured peaks | Offline | 2 min |
-| 20 | **Stateful Gate Timeline** | Call/run/session/durable state resets, reloads, containment | Offline | 2 min |
-| 21 | **Same-Batch Exfil Race** | The sibling-call race `SequenceGate` honestly cannot stop | Offline | 2 min |
-| 22 | **Security Graph Incident** | Observations → graph → containment; incomplete evidence mints no verdict | Offline | 2 min |
-| 23 | **HTTP Wire Boundary** ★ | DNS rebind + redirect escape blocked at the actual wire | Offline | 2 min |
-| 24 | **Dynamic Context Provider** | Dynamic tool inventory refused; the real provider seam filtered | Offline | 2 min |
-| 25 | **Crescendo Trajectory** | Slow-burn escalation → shadow verdict → next-run quarantine | Offline | 2 min |
-| 26 | **Session Identity Takeover** | Reload, poisoning, and concurrent actor-drift defenses | Offline | 2 min |
-| 27 | **Manifest Provenance Drift** | Prompt rug-pulls and MCP drift fail construction closed | Offline | 2 min |
-| 28 | **Approval Decision Matrix** | Auto/escalate/error/reject/approve — judge failure escalates | Offline | 2 min |
-| 29 | **Result Behavioral Anomaly** | Fixed cap vs per-tool learned baseline for result anomalies | Offline | 2 min |
+| 13 | **Mocked Dangerous Tools** | SQL/browser/cloud/package narrow-contract fixtures — no side effects | Offline (no model) | 2 min |
+| 14 | **Poisoned Tool Kill Chain** ★ | Poison, exfil, delete, worm — all zeroed, with an effect-ledger proof | Hybrid | 5 min |
+| 15 | **Harness-Owned Tool Misuse** | A runtime-injected capability discovered, its misuse blocked | Hybrid | 2 min |
+| 16 | **Jailbreak + Tool Abuse** ★ | The paraphrase gets through — authorization still holds | Hybrid | 3 min |
+| 17 | **Tool Result Admission** | Secrets masked + oversized results truncated before model context | Hybrid | 2 min |
+| 18 | **Hosted Tool Coverage** | Honesty: hosted code execution cannot be claimed as covered | Offline (no model) | 2 min |
+| 19 | **Bulkhead + Containment** | Contained saturation cannot starve normal work — measured peaks | Offline (no model) | 2 min |
+| 20 | **Stateful Gate Timeline** | Call/run/session/durable state resets, reloads, containment | Offline (no model) | 2 min |
+| 21 | **Same-Batch Exfil Race** | The sibling-call race `SequenceGate` honestly cannot stop | Offline (scripted) | 2 min |
+| 22 | **Security Graph Incident** | Observations → graph → containment; incomplete evidence mints no verdict | Offline (no model) | 2 min |
+| 23 | **HTTP Wire Boundary** ★ | DNS rebind + redirect escape blocked at the actual wire | Offline (no model) | 2 min |
+| 24 | **Dynamic Context Provider** | Dynamic tool inventory refused; the real provider seam filtered | Offline (no model) | 2 min |
+| 25 | **Crescendo Trajectory** | Slow-burn escalation → shadow verdict → next-run quarantine | Hybrid | 2 min |
+| 26 | **Session Identity Takeover** | Reload, poisoning, and concurrent actor-drift defenses | Offline (no model) | 2 min |
+| 27 | **Manifest Provenance Drift** | Prompt rug-pulls and MCP drift fail construction closed | Offline (no model) | 2 min |
+| 28 | **Approval Decision Matrix** | Auto/escalate/error/reject/approve — judge failure escalates | Hybrid | 2 min |
+| 29 | **Result Behavioral Anomaly** | Fixed cap vs per-tool learned baseline for result anomalies | Offline (no model) | 2 min |
 
 Knobs: `AGENTEVAL_GATEKEEPER_SHOW_CONTRACTS=true` prints each sample's full audited threat/guarantee contract
 (a compact two-line version prints by default); `dotnet run -- --gatekeeper-offline-suite` runs all 28
@@ -357,9 +374,10 @@ export AZURE_OPENAI_API_KEY="your-api-key"
 export AZURE_OPENAI_DEPLOYMENT="gpt-4o"
 ```
 
-### Without a provider (Group A with `--mock`; H1 + H13 + all of Group J)
+### Without a provider (Group A with `--mock`; H1 + H13 + Group J except 11A/11B)
 
-**H1 Registry Discovery**, **H13 Report Browser**, and all of **Group J (Gatekeeper)** work fully without credentials.
+**H1 Registry Discovery**, **H13 Report Browser**, and **Group J (Gatekeeper)** except 11A and 11B work without
+credentials. The Group J hybrids then run their scripted path and print `SCRIPTED (…)`.
 Samples that need a model stop. You'll see:
 
 ```
