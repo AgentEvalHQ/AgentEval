@@ -18,6 +18,16 @@ Three things this pins, each found or built on 2026-09-14.
    unknown, and `_stamp` refuses on ''. A sidecar naming no retriever is a gap a reader can act
    on; a sidecar naming the wrong one is not.
 
+And one added on 2026-10-03 (TME-2), when the dense arm moved off azure to bitdeer's BAAI/bge-m3:
+
+4. ONE PROVIDER'S MODEL IS NEVER SERVED ANOTHER'S VECTORS. Shard keys are text hashes, identical
+   under every model -- the probe cache's defect, which had no model in its key. A bge-m3 run must
+   bank apart from ada-002, refuse an ada-002 shard even when it sits in the bge-m3 directory, and
+   not launder one back in through the merge-on-save.
+
+The checks pin the provider and model, so they run the same in CI and in a shell where
+AI_INFERENCE_PROVIDER selects a provider (the owner's does).
+
 Each `--ablate-*` flag reinstates the corresponding defect and requires the check to FAIL. An
 ablation that passes means the check is decorative, and the run reports that as the failure.
 
@@ -42,6 +52,8 @@ FULL = ['alpha text', 'beta text', 'gamma text', 'delta text']
 PARTIAL = ['alpha text']
 LIVE_MODEL = 'test-embedding-model'
 OTHER_MODEL = 'some-other-embedding-model'
+ADA = 'text-embedding-ada-002'
+BGE = 'BAAI/bge-m3'
 
 
 def _replace_save(name, keys):
@@ -123,6 +135,7 @@ def check_model_mismatch_is_refused(failures, ablate_model_check):
                 stamped = data.pop(dr._PROVENANCE_KEY, None)
                 data.pop(dr._MODEL_KEY, None)
                 data.pop(dr._DIMS_KEY, None)
+                data.pop(dr._PROVIDER_KEY, None)   # a later key; popped so the count is vectors only
                 if stamped is not None and stamped != dr._deployment_name():
                     continue
                 dr._cache.update(data)
@@ -293,12 +306,74 @@ def check_identity_refuses_to_guess(failures):
         failures.append('the identity does not name the similarity')
 
 
+def check_providers_bank_apart(failures):
+    """A bge-m3 run on bitdeer must never be served ada-002's vectors (TME-2).
+
+    Two guards, each checked: a directory per provider:model, and a stamp naming provider and model
+    that the loader AND the saver enforce. The directory cannot see a shard COPIED into the wrong
+    one; the stamp can, and the saver must not merge it back in under the new model's name.
+    """
+    saved = (dr._provider_tag, dr._resolved_model)
+    try:
+        ada_root = dr.cache_root_for('azure', ADA)
+        dr._provider_tag, dr._resolved_model = 'bitdeer', BGE
+        bge_root = dr._cache_root()
+        print('7. ada-002 on azure banks in %s/, bge-m3 on bitdeer in %s/'
+              % (os.path.basename(ada_root), os.path.basename(bge_root)))
+        if bge_root == ada_root:
+            failures.append('two providers\' models bank in ONE directory')
+
+        # The copied-shard case: an ada-002 shard, stamped the way every pre-provider shard is (no
+        # provider key), sitting in the bge-m3 directory.
+        os.makedirs(bge_root, exist_ok=True)
+        foreign = {dr._key(t): dr._pack([0.5] * 4) for t in FULL}
+        foreign.update({dr._PROVENANCE_KEY: ADA, dr._MODEL_KEY: ADA, dr._DIMS_KEY: 4})
+        with open(dr._shard('split'), 'w', encoding='utf-8') as fh:
+            json.dump(foreign, fh)
+        dr._cache.clear()
+        dr._load_cache(['split'])
+        print('   an ada-002 shard copied into the bge-m3 directory -> %d vector(s) loaded'
+              % len(dr._cache))
+        if dr._cache:
+            failures.append('ada-002 vectors were loaded into a bge-m3 run')
+
+        # A partial bge-m3 run then saves over it. Only its own vector may come out the other side.
+        dr._cache.clear()
+        _bank(PARTIAL)
+        dr._save_shard('split', [dr._key(t) for t in PARTIAL])
+        shard = json.loads(open(dr._shard('split'), encoding='utf-8').read())
+        laundered = [t for t in FULL if t not in PARTIAL and dr._key(t) in shard]
+        print('   a partial bge-m3 run saved over it -> %d ada-002 vector(s) re-stamped as bge-m3; '
+              'stamp deployment=%r provider=%r model=%r'
+              % (len(laundered), shard.get(dr._PROVENANCE_KEY), shard.get(dr._PROVIDER_KEY),
+                 shard.get(dr._MODEL_KEY)))
+        if laundered:
+            failures.append('%d ada-002 vector(s) were merged into the bge-m3 shard under its stamp'
+                            % len(laundered))
+        if (shard.get(dr._PROVENANCE_KEY), shard.get(dr._PROVIDER_KEY), shard.get(dr._MODEL_KEY)) \
+                != ('bitdeer:' + BGE, 'bitdeer', BGE):
+            failures.append('the bge-m3 shard does not name its provider and model')
+
+        # The published id names the provider -- and the azure spelling every sidecar carries today
+        # is unchanged, because the compare tool refuses a reference column it cannot re-derive.
+        bge_id, ada_id = dr.dense_retriever_id(BGE, 1024, 'bitdeer'), dr.dense_retriever_id(ADA, 1536)
+        print('   id(bge-m3) = %r, id(ada-002) = %r' % (bge_id, ada_id))
+        if 'bitdeer' not in bge_id or BGE not in bge_id:
+            failures.append('the bge-m3 id does not name its provider and model')
+        if ada_id != 'azure-emb-text-embedding-ada-002-d1536-cosine-f16':
+            failures.append('the published azure id changed spelling: %r' % ada_id)
+    finally:
+        dr._provider_tag, dr._resolved_model = saved
+
+
 def run(ablate_replace=False, ablate_model_check=False, ablate_lock=False) -> int:
     sandbox = tempfile.mkdtemp(prefix='densecache-')
-    saved = (dr.CACHE_DIR, dr._save_shard, dr._load_cache, dr._resolved_model)
+    saved = (dr.CACHE_DIR, dr._save_shard, dr._load_cache, dr._resolved_model, dr._provider_tag)
     # The model lookup is a network call and every check here is about local behaviour. Pinned so
     # the result cannot depend on whether a deployment happens to be reachable.
-    dr.CACHE_DIR, dr._resolved_model = sandbox, LIVE_MODEL
+    # THE PROVIDER IS PINNED TOO. Unpinned, it follows AI_INFERENCE_PROVIDER, and in a shell that
+    # selects bitdeer every shard moved to bitdeer's layout while check 6 looked in azure's.
+    dr.CACHE_DIR, dr._resolved_model, dr._provider_tag = sandbox, LIVE_MODEL, 'azure'
     failures: list[str] = []
     try:
         check_partial_is_non_destructive(failures, ablate_replace)
@@ -306,8 +381,10 @@ def run(ablate_replace=False, ablate_model_check=False, ablate_lock=False) -> in
         check_identity_refuses_to_guess(failures)
         check_unstamped_is_refused(failures)
         check_concurrent_writers_do_not_lose_vectors(failures, ablate_lock)
+        check_providers_bank_apart(failures)
     finally:
-        dr.CACHE_DIR, dr._save_shard, dr._load_cache, dr._resolved_model = saved
+        (dr.CACHE_DIR, dr._save_shard, dr._load_cache, dr._resolved_model,
+         dr._provider_tag) = saved
         dr._cache.clear()
         shutil.rmtree(sandbox, ignore_errors=True)
 
@@ -317,8 +394,8 @@ def run(ablate_replace=False, ablate_model_check=False, ablate_lock=False) -> in
             print('FAIL: %s' % f)
         return 1
     print('PASS: partial runs are non-destructive, concurrent writers keep each other\'s '
-          'vectors, shards name their model, unstamped shards are refused, and the published '
-          'identity refuses to guess.')
+          'vectors, shards name their model, unstamped shards are refused, the published '
+          'identity refuses to guess, and one provider\'s model is never served another\'s vectors.')
     return 0
 
 
@@ -328,6 +405,7 @@ def main() -> int:
     if '--writer' in sys.argv:
         dr.CACHE_DIR = os.environ['AGENTEVAL_CONTRACT_SANDBOX']
         dr._resolved_model = os.environ['AGENTEVAL_CONTRACT_MODEL']
+        dr._provider_tag = 'azure'          # as the parent pins it; the shell's selector must not move it
         return _write_as_child(sys.argv[sys.argv.index('--writer') + 1])
 
     ap = argparse.ArgumentParser(description=__doc__,

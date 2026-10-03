@@ -166,6 +166,30 @@ def _build(tag: str, env: Mapping[str, str]) -> Provider:
                     _set(env, "OPENAI_COMPATIBLE_MODEL") or "")
 
 
+def canonical_tag(name: str) -> str | None:
+    """The provider tag a name or alias stands for (``azure-openai`` -> ``azure``), or None if it names none."""
+    return _ALIASES.get(name.strip().lower())
+
+
+def selected_tag(env: Mapping[str, str] | None = None) -> str | None:
+    """The provider ``AI_INFERENCE_PROVIDER`` names, or None when it is unset. Reads no other variable.
+
+    For a tool that must NOT auto-detect -- an embedding retriever whose identity is published: with the
+    selector unset, ``resolve`` takes the first provider whose keys happen to be in the shell, and that would
+    let the shell pick a published column. Such a tool keeps its own default instead. A name that is not a
+    provider is still an error, never a silent default.
+    """
+    env = os.environ if env is None else env
+    selector = _set(env, SELECTOR_VARIABLE)
+    if not selector:
+        return None
+    tag = canonical_tag(selector)
+    if tag is None:
+        raise ProviderNotConfigured(
+            f"{SELECTOR_VARIABLE}={selector!r} is not a provider. Use one of: {', '.join(ORDER)}.")
+    return tag
+
+
 def resolve(env: Mapping[str, str] | None = None) -> Provider:
     """Resolve the provider from ``env`` (default ``os.environ``), or exit naming what is missing."""
     env = os.environ if env is None else env
