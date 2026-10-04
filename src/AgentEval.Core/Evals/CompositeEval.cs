@@ -305,7 +305,9 @@ public sealed class CompositeEval : IEval
             .Where(p => !(p.Component.OnFailure == ComponentFailureEffect.Fail && p.Sub.Score.Label == "fail"))
             .Select(p => p.Sub.Metric.Key)
             .ToArray();
-        if (failingAccuracy.Length > 0 && label is "pass" or "warn")
+        // A required part that errored does not change it either (B6c-10): more measurement cannot turn a measured
+        // accuracy failure into a pass, so the label is the fail, not "error".
+        if (failingAccuracy.Length > 0 && label is "pass" or "warn" or "error")
             label = "fail";
         else if (notOptimal.Length > 0 && label == "pass")
             label = "warn";
@@ -359,8 +361,11 @@ public sealed class CompositeEval : IEval
         string? partialCoverageNote = nothingMeasured
             ? null
             : hasRequiredError
-                ? $"A required component errored, so no pass/fail verdict is reported. Measured {measuredCount} of " +
-                  $"{subs.Length} component(s); {unmeasured.Length} produced no measurement {breakdown}."
+                ? (label == "fail"
+                    ? $"A required component errored and produced no measurement {breakdown}; the measured failure above " +
+                      "decides the verdict regardless."
+                    : $"A required component errored, so no pass/fail verdict is reported. Measured {measuredCount} of " +
+                      $"{subs.Length} component(s); {unmeasured.Length} produced no measurement {breakdown}.")
                 : passUnattested
                     // Both bars can fire at once; say both, so neither reason is lost.
                     ? $"Required component(s) that did not run or could not attest their own pass: " +

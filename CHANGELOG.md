@@ -31,6 +31,10 @@ third-party exporter on our public interfaces.
     calls reach the unsafe-tool-use check — `bench agentic` does not pass a trace's tool calls to it), Reasoning (a
     response without plan or list markers skips the plan and goal-decomposition checks), Telemetry (zero calls), Judge
     Quality (a missing input), and Tool Call Accuracy / Agentic Execution (no tool definitions captured, or definitions with no tool calls).
+- **A required part that errored hid a measured accuracy failure.** The composite read `error` (exit 11) while its
+  summary said both "the verdict is fail" and "no pass/fail verdict is reported". A measured failure of a `Fail`
+  dimension is now the verdict even when a required part errored (further measurement cannot make it a pass), and the
+  summary says the errored part did not change that.
 - **Memory benchmarks could pass on what they did not measure.** `bench longmemeval` passed (exit 0) when accuracy over
   the SCORED questions met 50%, with no coverage floor — the default `RetryThenInconclusive` policy leaves judge failures
   and agent errors unscored, so 1 scored question and 499 inconclusive passed. A pass on part of the questions is now

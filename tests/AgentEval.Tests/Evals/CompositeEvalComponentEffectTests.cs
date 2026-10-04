@@ -186,6 +186,24 @@ public class CompositeEvalComponentEffectTests
     }
 
     [Fact]
+    public async Task AMeasuredAccuracyFailure_IsTheVerdict_EvenWhenARequiredPartErrored()
+    {
+        // B6c-10 (mid-branch review): the errored part made the label "error" (exit 11) while the summary said "verdict is
+        // fail" and "no pass/fail verdict is reported". More measurement cannot turn a measured accuracy failure into a pass.
+        var components = new List<EvalComponent>
+        {
+            new(new Fixed("judge", "error", 0.0), 0.5),
+            new(new WithSeverity("accuracy", "fail", 0.3, "high"), 0.5) { OnFailure = ComponentFailureEffect.Fail },
+        };
+        var result = await new CompositeEval("p", "P", "test", "1.0.0", components, WeightedSumAggregation.Instance, threshold: 0.7)
+            .EvaluateAsync(Input);
+
+        Assert.Equal("fail", result.Score.Label);
+        Assert.Contains("Failed: accuracy", result.Details.Summary!, StringComparison.Ordinal);
+        Assert.DoesNotContain("no pass/fail verdict is reported", result.Details.Summary!, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TheEffect_SurvivesACopy()
     {
         var component = new EvalComponent(new Fixed("x", "pass", 1.0), 0.5) { OnFailure = ComponentFailureEffect.Fail };
