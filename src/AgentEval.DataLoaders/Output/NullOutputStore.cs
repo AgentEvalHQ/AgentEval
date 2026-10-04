@@ -65,7 +65,9 @@ public sealed class NullOutputStore : IOutputStore
 
     public Task<BaselineComparison> CompareToBaselineAsync(string runId, CancellationToken ct = default)
     {
-        var defaultSummary = new RunSummary("1.0", runId, "PASS", new RunStats(0, 0, 0, 0), new Dictionary<string, double>());
+        // The null store holds no run, so it knows no verdict: PENDING ("no verdict"), as InMemoryOutputStore reports for
+        // a run it does not have. It used to say PASS — a pass nothing measured, served to anything that compared.
+        var defaultSummary = new RunSummary("1.0", runId, "PENDING", new RunStats(0, 0, 0, 0), new Dictionary<string, double>());
         return Task.FromResult(new BaselineComparison("<null>", null, defaultSummary, new Dictionary<string, double>(), false));
     }
 

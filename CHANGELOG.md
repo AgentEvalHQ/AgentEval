@@ -35,6 +35,8 @@ third-party exporter on our public interfaces.
   PASS when every measured check passed and ignored the rest, so a skipped or errored check never kept the run from
   passing. **Behaviour change:** any not-measured row makes the run WARN; inapplicable rows (the case could not test
   them) still stay out of the verdict. ADR-032 carries a dated amendment.
+- **The null output store described any run as PASS when compared with a baseline.** It stores nothing, so it
+  now reports `PENDING` (no verdict), as the in-memory store does for a run without a summary.
 - **Benchmark run statistics counted leaves that were not measured as failures.** The agentic, GDPR and EU AI Act
   runners filed every `inapplicable` and `error` leaf under Failed. They now go in the single Skipped bucket, as
   ADR-030 specifies, so Failed counts only measured failures.
