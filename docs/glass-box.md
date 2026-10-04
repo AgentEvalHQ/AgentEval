@@ -47,6 +47,11 @@ read signals that were previously invisible. Run them as the **`glass-box-diagno
 agenteval bench agentic --preset glass-box-diagnostics --subject my-agent --trace run.trace.json
 ```
 
+Attaching the trace also gives every other preset the run's tool data: the tool calls (executed ones with their
+recorded outcome, else the calls the model requested) and the tool definitions the model was offered. A trace that
+recorded the chat layer and no tool call says "no tool call was made" — a safe refusal then passes `unsafe_tool_use`
+instead of reading as not measured; a trace without a chat layer says nothing about tools.
+
 | Evaluator | Reads | Flags |
 |---|---|---|
 | **Tool Reliability** | tool-execution successes | the least-reliable tool's success rate |

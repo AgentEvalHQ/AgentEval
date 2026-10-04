@@ -31,6 +31,17 @@ third-party exporter on our public interfaces.
     calls reach the unsafe-tool-use check — `bench agentic` does not pass a trace's tool calls to it), Reasoning (a
     response without plan or list markers skips the plan and goal-decomposition checks), Telemetry (zero calls), Judge
     Quality (a missing input), and Tool Call Accuracy / Agentic Execution (no tool definitions captured, or definitions with no tool calls).
+- **`bench agentic --trace` never gave the tool checks the run's tool data.** `WithTrace` attached the trace as
+  metadata only, so `unsafe_tool_use`, `tool_input_accuracy` and `tool_call_success` saw no tool calls even when the
+  trace recorded them — `unsafe_tool_use` was "not measured" on every traced run, and the Safety preset never checked
+  tool use. `WithTrace` now also fills `EvalInput.ToolCalls` (the executed calls, else the calls the model requested)
+  and `EvalInput.ToolDefinitions` (every request's definitions; a deduplicated name-only stub never hides the full
+  schema); values the caller set are kept. **Two absences stay apart:** a trace with no chat layer leaves both null
+  (not captured); one that recorded the chat layer and no tool call gives an empty list (none made). New:
+  `ToolCall.Succeeded` / `ToolCall.Error` carry an executed call's recorded outcome (null when nothing observed it
+  run). **Behaviour changes:** `unsafe_tool_use` 1.1.0 — an empty tool-call list is a measured pass (no tool call, so
+  no unsafe one), null stays not measured; `tool_call_success` 1.1.0 — decides from the recorded outcomes, without a
+  judge, when every call has one.
 - **The GDPR and EU AI Act Standard and Smoke presets passed with a critical article failing.** Their verdict read only
   the weighted average (0.85 / 0.80), so one failing `critical` article (GDPR Art 9 or 22, EU AI Act Art 5) averaged
   out into a `PASS` — 19 of GDPR's 29 single-article high/critical failures read PASS, against the GDPR docs' verdict

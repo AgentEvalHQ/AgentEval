@@ -18,7 +18,9 @@ namespace AgentEval.Evals.Agentic.Process;
 /// fall back to an inner <see cref="AtomicLlmEval"/> that interprets free-text results.
 /// </para>
 /// <para>
-/// Deterministic path:
+/// Deterministic path, in order: <c>Metadata["tool_call_statuses"]</c>; then the outcome each call's capture RECORDED
+/// (<see cref="ToolCall.Succeeded"/> / <see cref="ToolCall.Error"/> — a Glass Box trace's tool-execution layer
+/// fills them, #203 review B5) when every call has one; then <c>status</c> fields in the results.
 /// <list type="bullet">
 ///   <item>All calls have <c>status: "success"</c> (case-insensitive) → score 1.0, severity none.</item>
 ///   <item>Any call has <c>status: "error"</c> or non-null <c>error</c> → score 0.0, severity high.</item>
@@ -40,7 +42,7 @@ public sealed class ToolCallSuccessEval : IEval
     private const string KeyValue      = "tool_call_success";
     private const string NameValue     = "Tool Call Success";
     private const string CategoryValue = "agentic-process";
-    private const string VersionValue  = "1.0.0";
+    private const string VersionValue  = "1.1.0";
 
     /// <summary>
     /// Conventional key for supplying per-call status records via <see cref="EvalInput.Metadata"/>.
@@ -100,11 +102,15 @@ public sealed class ToolCallSuccessEval : IEval
         if (TryReadStatusFromMetadata(input, out var metaResult))
             return metaResult!;
 
-        // ── 2. Try status fields embedded in ToolCall.Result (structured JSON) ──
+        // ── 2. The outcome the capture recorded for every call (e.g. a trace's tool-execution layer) ──
+        if (TryReadRecordedOutcomes(input, out var recordedResult))
+            return recordedResult!;
+
+        // ── 3. Try status fields embedded in ToolCall.Result (structured JSON) ──
         if (TryReadStatusFromToolCalls(input, out var tcResult))
             return tcResult!;
 
-        // ── 3. LLM fallback — no structured status available ─────────────────────
+        // ── 4. LLM fallback — no structured status available ─────────────────────
         return await _llmFallback.EvaluateAsync(input, ct);
     }
 
@@ -124,6 +130,22 @@ public sealed class ToolCallSuccessEval : IEval
             return false;
 
         return BuildFromStatusRecords(statusRecords, out result);
+    }
+
+    // Only when EVERY call has a recorded outcome: a partial record cannot say the rest succeeded.
+    private static bool TryReadRecordedOutcomes(EvalInput input, out EvalResult? result)
+    {
+        result = null;
+
+        if (input.ToolCalls is null or { Count: 0 } || input.ToolCalls.Any(tc => tc.Succeeded is null))
+            return false;
+
+        var statuses = input.ToolCalls
+            .Select(tc => new ToolCallStatus(tc.Name, tc.Succeeded == true ? "success" : "error",
+                tc.Succeeded == true ? null : tc.Error ?? "(the call failed; no error message was recorded)"))
+            .ToList();
+
+        return BuildFromStatusRecords(statuses, out result);
     }
 
     private static bool TryReadStatusFromToolCalls(EvalInput input, out EvalResult? result)

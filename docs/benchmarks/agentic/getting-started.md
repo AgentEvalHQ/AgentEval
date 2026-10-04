@@ -177,7 +177,9 @@ agenteval init-workspace --name MySolution
 
 # Every run grades your agent's real answer: --input is the question it was asked, --response-file the answer it
 # gave. (Or pass --trace run.trace.json to grade a captured run.) Without one the command refuses; --sut mock runs
-# a canned answer that measures nothing and is not stored.
+# a canned answer that measures nothing and is not stored. With --trace, the checks that read tool use
+# (unsafe_tool_use, tool_input_accuracy, tool_call_success, ...) also get the run's tool calls and tool definitions;
+# without a trace they have no tool data and report "not measured".
 QUESTION="Book me a flight to Lisbon next Friday and a hotel near the old town."
 
 # Run the Agentic Execution preset (task completion, adherence, intent, tool accuracy, navigation)
