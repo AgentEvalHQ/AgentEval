@@ -11,6 +11,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Reported in [#203](https://github.com/AgentEvalHQ/AgentEval/issues/203), by an independent contributor building a
 third-party exporter on our public interfaces.
 
+#### Verdict changes at a glance
+
+Runs that passed before can now read WARN, FAIL or INCONCLUSIVE — each because something failed or was not measured
+that the old verdict hid. The entries below give the cause and the evidence for each.
+
+- **A part that did not run never leaves a clean PASS.** A composite with a required component that was not measured
+  reads `warn` (exit 10), at every level. The runners follow the same rule: a benchmark run with a row not measured,
+  `bench gdpr --runs N` with runs that gave no verdict, and `bench longmemeval` with unscored questions read WARN; a
+  memory benchmark category with missing scenario data errors; a red-team attack that measured nothing makes the run
+  INCONCLUSIVE and withholds the OWASP / MITRE pass. A run in which nothing was measured is never a pass.
+- **A failing check never hides under an average.** In every agentic preset, and inside the seven evaluators built
+  from sub-dimensions, a failing *accuracy* dimension fails the verdict and a failing *quality* dimension makes it
+  `warn`, naming it (tables in the agentic getting-started guide). The Safety and AdversarialDirect gates fail on any
+  failing check; Glass Box fails on an injection, an argument leak or an unreliable tool and warns, naming it, on its
+  other checks. GDPR and EU AI Act Standard and Smoke fail on a high or critical article failure and
+  warn on a medium one; in AuditGrade, a judge panel that passes its scenario's bar over a high or critical dissent is
+  withheld (WARN, the dissent named) rather than failing through the worst judge's severity.
+- **Judges see what they grade.** With `bench agentic --trace`, the tool checks receive the run's tool calls and
+  definitions, and the judges whose rubric names tool calls are shown them.
+- **Calibration reports only measured verdicts.** A judge outage is INFRA-FAIL; an evaluator not measured on every
+  record is left out whole (INCOMPLETE).
+- **Versions** (the ones this release ships): `unsafe_tool_use` 1.2.0, `tool_call_success` 1.2.0,
+  `tool_input_accuracy` 2.5.0, `task_adherence` / `intent_resolution` / `task_navigation_efficiency` 1.2.0, the other
+  tool-aware and sub-dimension evaluators 1.1.0; all 12 agentic presets 1.1.0; GDPR Standard 1.2.0 and Smoke 1.1.0, GDPR
+  AuditGrade 1.2.0; EU AI Act Standard, Smoke and AuditGrade 1.1.0. Entries below may name the version a fix first
+  carried on this branch; the list above is what ships.
+
 #### Fixed
 - **A composite passed even when one of its required components never ran.** Only a required component labelled
   `error` blocked the verdict. One that returned `skipped` — because a required input, trace or telemetry was not
@@ -26,9 +53,8 @@ third-party exporter on our public interfaces.
   - **Components are `Required` by default**, so `MinimumMeasuredShare = 0` no longer means "pass on any measured
     component": mark a component `Required: false` if the composite may pass without it.
   - Agentic presets whose required components skip on common inputs now report `warn` where they passed:
-    Glass Box Diagnostics (no tool executions in the trace, fewer than 2 system prompts or 3 turns; built without a
-    judge and with no trusted baseline its prompt-injection check always skips, so it cannot pass), Safety (no tool
-    calls reach the unsafe-tool-use check — `bench agentic` does not pass a trace's tool calls to it), Reasoning (a
+    Glass Box Diagnostics (no tool executions in the trace, fewer than 2 system prompts or 3 turns), Safety (no tool
+    data captured: run with `--trace`, which now passes the trace's tool calls — see below), Reasoning (a
     response without plan or list markers skips the plan and goal-decomposition checks), Telemetry (zero calls), Judge
     Quality (a missing input), and Tool Call Accuracy / Agentic Execution (no tool definitions captured, or definitions with no tool calls).
 - **`tool_input_accuracy` (2.5.0) and the trace projection, three smaller gaps.** A case declaring no tools while the agent
@@ -105,7 +131,7 @@ third-party exporter on our public interfaces.
   and were weighted sums: `task_adherence`'s authorization leaf (high) failing read 0.82 = PASS, so an unauthorized
   action never reached the preset; `qa_composite` reported PASS 0.948 with F1 failing. **Behaviour change:** every
   sub-dimension is classified with `OnFailure` (table in the agentic getting-started guide): `task_adherence` 1.2.0,
-  `intent_resolution` 1.2.0, `groundedness` 1.1.0, `qa_composite` 1.1.0, `tool_input_accuracy` 2.4.0,
+  `intent_resolution` 1.2.0, `groundedness` 1.1.0, `qa_composite` 1.1.0, `tool_input_accuracy` 2.5.0,
   `task_navigation_efficiency` 1.2.0, `tool_call_accuracy` 1.1.0. Their verdicts can change where a sub-dimension
   failed; their scores do not.
 - **GDPR and EU AI Act AuditGrade passed with an article failing at medium severity.** CapByWorst caps only
@@ -126,7 +152,7 @@ third-party exporter on our public interfaces.
   distribution) warn instead of passing.
 - **Copies of a composite dropped its verdict settings; the Glass Box checks had no cost tier and no card.** The
   cost filter behind `bench agentic --max-cost-tier` rebuilt a preset from its constructor and dropped
-  `SeverityCapsThreshold` and `MinimumMeasuredShare` (so a filtered Glass Box run lost "medium → WARN"), as
+  `SeverityCapsThreshold` and `MinimumMeasuredShare` (so a filtered preset lost its severity cap), as
   `WithExtraScenarios` did before B4. New `CompositeEval.WithComponents(...)` copies every setting; both sites use
   it, components are copied with `with`, and a reflection test fails when a future init-only setting is not copied.
   The eight Glass Box evaluators were missing from `EvaluatorCostMap` — silently Medium, so `--max-cost-tier low`
@@ -138,14 +164,15 @@ third-party exporter on our public interfaces.
   self-harm, hate, sexual or violent, a data leak, an unsafe tool call or an indirect attack, at score 0.5, read
   0.95–0.98. With the default fake judge in our own end-to-end runs, five critical checks were failing (0.90 against
   a 0.95 bar) under a printed "PASS (score 91%)". AdversarialDirect averaged out a critical injection failure at
-  0.90 the same way. **Behaviour change (1.1.0):** both gates use `CapByWorstAggregation` — every check in them is
-  high or critical, so any measured failure caps the score (0.69 / 0.40) and fails the gate.
+  0.90 the same way. **Behaviour change (1.1.0):** any measured failure of a check fails both gates (each check's
+  `OnFailure` is `Fail`), and `CapByWorstAggregation` caps the reported score on a high or critical failure (0.69 /
+  0.40); a content-safety check failing at low severity still fails the gate, with an uncapped score.
 - **The Glass Box diagnostics preset could not pass without a judge, and passed with a detected injection.** Built
   without a judge (the API default), its injection check could not run without a trusted baseline, and as a required
   component it kept the preset from ever passing. And as a weighted sum at 0.80, a DETECTED injection (weight 0.12)
   read 0.88 = PASS, an argument leak 0.86 = PASS. **Behaviour change (1.1.0):** the injection check is required only
   when a judge is supplied; the preset uses `CapByWorstAggregation` (a measured high-severity failure — injection,
-  argument leak, unreliable tool — fails it, optional or not) and `SeverityCapsThreshold` (a medium one warns). It
+  argument leak, unreliable tool — fails it, optional or not) and each check's `OnFailure` (any other failing check warns, named). It
   passes only on a run that exercises its checks.
 - **Judges asked about tool use were never shown the tool calls.** `AtomicLlmEval` sent the judge the query, context
   and response only, while 14 shipped rubrics name tool calls as an input (`unsafe-tool-use`: "the primary input").
@@ -156,13 +183,13 @@ third-party exporter on our public interfaces.
   `unsafe_tool_use`. New: `AtomicLlmEval.JudgeSeesToolData` (`JudgeToolData.ToolCalls` / `ToolDefinitions`) adds a
   labelled section — the calls in order with arguments, result and recorded outcome; "none were made" for an empty
   list; nothing for a null one; the offered tools where the rubric names them; cuts stated — marked as recorded data,
-  not instructions. **Behaviour change:** those 13 evaluators set it and bump a minor version (`unsafe_tool_use` 1.2.0,
-  `tool_call_success` 1.2.0, `tool_input_accuracy` 2.3.0, the rest 1.1.0); their `PromptHash` moves, every other
+  not instructions. **Behaviour change:** those 13 evaluators set it and bump a minor version (the shipped versions
+  are listed at the top of this section); their `PromptHash` moves, every other
   leaf's does not. Their verdicts on runs with tool data can change. A census test driven by the shipped rubric files
   checks both directions: every evaluator whose rubric names tool data shows it to its judge, and no other does.
 - **`tool_input_accuracy` passed tool calls it could not check.** A tool definition with no parameter schema — or
   a `required` list in a shape the check could not read, including the `JsonElement` that System.Text.Json gives a
-  `Dictionary<string, object>` value — made every call to that tool PASS. **Behaviour change (2.2.0):** such calls
+  `Dictionary<string, object>` value — made every call to that tool PASS. **Behaviour change:** such calls
   are not counted and are named in the evidence (`calls_unverifiable`); when no call is checkable the schema leaf is
   skipped, so the composite cannot pass on the judge alone. A schema without `required` still requires nothing (a
   checked pass). Two definitions whose names differ only in case no longer throw; the one with a schema is used.
@@ -174,8 +201,8 @@ third-party exporter on our public interfaces.
   schema); values the caller set are kept. **Two absences stay apart:** a trace with no chat layer leaves both null
   (not captured); one that recorded the chat layer and no tool call gives an empty list (none made). New:
   `ToolCall.Succeeded` / `ToolCall.Error` carry an executed call's recorded outcome (null when nothing observed it
-  run). **Behaviour changes:** `unsafe_tool_use` 1.1.0 — an empty tool-call list is a measured pass (no tool call, so
-  no unsafe one), null stays not measured; `tool_call_success` 1.1.0 — decides from the recorded outcomes, without a
+  run). **Behaviour changes:** `unsafe_tool_use` — an empty tool-call list is a measured pass (no tool call, so
+  no unsafe one), null stays not measured; `tool_call_success` — decides from the recorded outcomes, without a
   judge, when every call has one.
 - **The GDPR and EU AI Act Standard and Smoke presets passed with a critical article failing.** Their verdict read only
   the weighted average (0.85 / 0.80), so one failing `critical` article (GDPR Art 9 or 22, EU AI Act Art 5) averaged
@@ -224,13 +251,13 @@ third-party exporter on our public interfaces.
   loaders by their `Format`. Built-in names still win.
 
 #### Changed
-- `ToolInputAccuracyEval` 2.1.0: the schema check tells "not captured" from "declared none". Tool definitions that
+- `ToolInputAccuracyEval`: the schema check tells "not captured" from "declared none". Tool definitions that
   were not captured (`null`) leave it `skipped` (not measured); an empty list — the case declares no tools — makes it
   `inapplicable`, and the composite is the judge alone; definitions with no tool calls stay `skipped`. The leaf is
   required, so a skipped schema check keeps `tool_input_accuracy` and the presets that nest it (Tool Call Accuracy,
-  Agentic Execution) from passing on the judge alone. **No AgentEval pipeline passes tool definitions yet**
-  (`bench agentic`, calibration and the run projection build the input from the query and response), so those
-  presets report `warn` there until tool data is supplied.
+  Agentic Execution) from passing on the judge alone. Only `bench agentic --trace` passes tool definitions (from the
+  trace); calibration and the run projection build the input from the query and response, so there those presets
+  report `warn` until tool data is supplied.
 
 #### Documentation
 - `docs/export.md` says what an exporter receives — the flat `EvaluationReport`, not the `EvalResult` model with its
