@@ -110,9 +110,14 @@ public class CompositeEvalCopyTests
         var filtered = CostFilteredCompositeBuilder.FilterByBudget(preset, EvaluatorCostTier.Trivial);
 
         Assert.NotSame(preset, filtered);
-        Assert.True(filtered.SeverityCapsThreshold);
         Assert.Same(preset.Aggregation, filtered.Aggregation);
         Assert.Equal(preset.MinimumMeasuredShare, filtered.MinimumMeasuredShare);
+        Assert.Equal(preset.SeverityCapsThreshold, filtered.SeverityCapsThreshold);
+        // What each check's failure does to the verdict (B6b) survives the rebuild too — a positional
+        // `new EvalComponent(eval, weight, required)` would have reset every one to Averaged.
+        foreach (var c in filtered.Components)
+            Assert.Equal(preset.Components.Single(p => p.Eval.Key == c.Eval.Key).OnFailure, c.OnFailure);
+        Assert.Contains(filtered.Components, c => c.OnFailure != ComponentFailureEffect.Averaged);
     }
 
     [Fact]

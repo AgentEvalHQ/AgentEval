@@ -285,13 +285,38 @@ public sealed class CompositeEval : IEval
         var passUnattested = label == "pass" && requiredUnattested.Length > 0;
         if (underCovered || passUnattested)
             label = "warn";
+
+        // What a component's own measured failure does to the verdict (#203 review, B6b — the owner's rule: keep
+        // working and say the answer is not optimal because of the failed dimension, unless that failure means the
+        // answer cannot be trusted). Before, every component was "averaged": one dimension could fail and the
+        // composite still read PASS. Only a MEASURED failure counts (skipped and errored components are the rules
+        // above), and the effect only escalates. A component that only warned passes a warn up, never a fail.
+        var effectsFired = Components.Zip(subs, (c, s) => (Component: c, Sub: s))
+            .Where(p => p.Component.OnFailure != ComponentFailureEffect.Averaged
+                        && p.Sub.Score.CountsTowardAggregate()
+                        && !p.Sub.Score.Passed
+                        && p.Sub.Score.Label is "fail" or "warn")
+            .ToArray();
+        var failingAccuracy = effectsFired
+            .Where(p => p.Component.OnFailure == ComponentFailureEffect.Fail && p.Sub.Score.Label == "fail")
+            .Select(p => p.Sub.Metric.Key)
+            .ToArray();
+        var notOptimal = effectsFired
+            .Where(p => !(p.Component.OnFailure == ComponentFailureEffect.Fail && p.Sub.Score.Label == "fail"))
+            .Select(p => p.Sub.Metric.Key)
+            .ToArray();
+        if (failingAccuracy.Length > 0 && label is "pass" or "warn")
+            label = "fail";
+        else if (notOptimal.Length > 0 && label == "pass")
+            label = "warn";
         var passed = label == "pass";
 
         // The composite's own measurement state, which is how a parent tells "withheld" from "measured" — never by the
         // label (see requiredUnattested). NotMeasured: this composite withheld its pass because a required component
         // did not run. NotApplicable: nothing was measured and the case cannot test what it requires. Otherwise the
         // default (Measured; written to JSON only when it is not), so every other result serialises as before.
-        var measurement = passUnattested
+        // A measured accuracy failure is a verdict in its own right, whatever else did not run.
+        var measurement = passUnattested && label != "fail"
             ? MeasurementState.NotMeasured
             : nothingMeasured && requiredAllInapplicable && !hasRequiredError
                 ? MeasurementState.NotApplicable
@@ -351,7 +376,17 @@ public sealed class CompositeEval : IEval
                               $"so the verdict is warn; {unmeasured.Length} left out of the score {breakdown}."
                             : $"Measured {measuredCount} of {subs.Length} component(s); {unmeasured.Length} left out of the score " +
                               $"{breakdown}, so this verdict covers only the measured part.";
-        var coverageNote = nothingMeasuredNote ?? partialCoverageNote;
+        // Name the dimensions that decided an escalated verdict, so a FAIL or WARN says why at the top.
+        string? effectNote = failingAccuracy.Length > 0
+            ? $"Failed: {string.Join(", ", failingAccuracy)} — a dimension whose failure means the answer cannot be " +
+              "trusted, so the verdict is fail." +
+              (notOptimal.Length > 0 ? $" Also not optimal: {string.Join(", ", notOptimal)}." : "")
+            : notOptimal.Length > 0
+                ? $"Not optimal: {string.Join(", ", notOptimal)} did not pass — the answer is usable, so the verdict is " +
+                  "warn, not fail."
+                : null;
+        var coverageNote = string.Join(" ", new[] { effectNote, nothingMeasuredNote ?? partialCoverageNote }.Where(n => n is not null))
+                           is { Length: > 0 } joined ? joined : null;
 
         return new EvalResult(
             Metric: new(Key, Name, Category, Version),

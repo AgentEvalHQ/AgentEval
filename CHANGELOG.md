@@ -31,6 +31,15 @@ third-party exporter on our public interfaces.
     calls reach the unsafe-tool-use check — `bench agentic` does not pass a trace's tool calls to it), Reasoning (a
     response without plan or list markers skips the plan and goal-decomposition checks), Telemetry (zero calls), Judge
     Quality (a missing input), and Tool Call Accuracy / Agentic Execution (no tool definitions captured, or definitions with no tool calls).
+- **A failing check could hide under an agentic preset's average.** Every component of every agentic preset was
+  only averaged, so one could fail and the preset read PASS (fluency 0.30 with the rest perfect: RAG Quality 0.965;
+  intent resolution failing: the standard agent gate 0.85). New `EvalComponent.OnFailure` (`Averaged` — the old
+  behaviour and the default — `Warn`, `Fail`) says what a component's own measured failure does: `Fail` fails the
+  composite (the answer cannot be trusted), `Warn` makes a pass a warn and the summary names the component (usable,
+  not optimal); it only escalates, and a component that only warned passes a warn up. **Behaviour change:** all 12
+  agentic presets classify every check (docs: "What a preset's verdict means"); versions 1.1.0. The Glass Box
+  preset now uses this instead of `SeverityCapsThreshold`, and its low-severity checks (truncation, token
+  distribution) warn instead of passing.
 - **Copies of a composite dropped its verdict settings; the Glass Box checks had no cost tier and no card.** The
   cost filter behind `bench agentic --max-cost-tier` rebuilt a preset from its constructor and dropped
   `SeverityCapsThreshold` and `MinimumMeasuredShare` (so a filtered Glass Box run lost "medium → WARN"), as

@@ -117,6 +117,12 @@ The composite verdict is determined after aggregation. `warn` is a soft fail: `P
 | 6 | the label would be `"pass"`, but a `Required` component did not run (`skipped`, or any not-measured result) or is a nested composite that withheld its own pass for that reason (it records `measurement: notMeasured`) | `"warn"` | `false` |
 | 7 | the label would be `"pass"`, but fewer than `MinimumMeasuredShare` (default **0.5**) of the components produced a measurement | `"warn"` | `false` |
 
+After the matrix, each component's `EvalComponent.OnFailure` applies to a component that ran and failed: `Fail`
+makes the composite `"fail"`, `Warn` turns a `"pass"` into `"warn"` and the summary names the component, and
+`Averaged` (the default) leaves it to the score. The effect only escalates, and a component that only warned
+passes a warn up, never a fail. The agentic presets set it on every component (see the agentic getting-started
+guide, "What a preset's verdict means").
+
 Skipped, inapplicable and errored components are left out of the score, so they never count as 0. Rows 6 and 7 stop
 that from turning into a pass on whatever is left. Row 6: a pass cannot rest on a required component that never ran
 — components are `Required` by default, so mark a component `Required: false` if the composite may pass without it.

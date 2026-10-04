@@ -50,8 +50,8 @@ agenteval bench agentic --preset glass-box-diagnostics --subject my-agent --trac
 **What its verdict means.** The preset passes only on a run that exercises its checks: a check that cannot run on
 this trace (fewer than three turns with token usage for token distribution, no tool executions for the tool checks)
 reads "not measured" and keeps it from passing. A measured high-severity finding — an injected system prompt, a
-secret or PII in tool arguments, an unreliable tool — fails it however clean the rest is; a medium one (error
-patterns, provider safety interventions, prompt drift) makes it WARN. The injection check compares the trace's
+secret or PII in tool arguments, an unreliable tool — fails it however clean the rest is; any other failing check
+(error patterns, provider safety interventions, prompt drift, truncation, token skew) makes it WARN and is named. The injection check compares the trace's
 system prompts with a trusted baseline (`trusted_system_prompt` in the input metadata) or, without one, asks the
 judge; built without a judge (the API default, `AgenticBenchmark.GlassBoxDiagnostics()`), it is optional — it runs
 when a baseline is supplied, and decides the verdict when it finds an injection — and otherwise shows as skipped.
