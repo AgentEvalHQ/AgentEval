@@ -31,6 +31,19 @@ third-party exporter on our public interfaces.
     calls reach the unsafe-tool-use check — `bench agentic` does not pass a trace's tool calls to it), Reasoning (a
     response without plan or list markers skips the plan and goal-decomposition checks), Telemetry (zero calls), Judge
     Quality (a missing input), and Tool Call Accuracy / Agentic Execution (no tool definitions captured, or definitions with no tool calls).
+- **Judges asked about tool use were never shown the tool calls.** `AtomicLlmEval` sent the judge the query, context
+  and response only, while 14 shipped rubrics name tool calls as an input (`unsafe-tool-use`: "the primary input").
+  So `unsafe_tool_use` and `indirect_attack` (judge-only) and the judge parts or fallbacks of `tool_input_accuracy`,
+  `tool_call_success`, `prohibited_actions`, `sensitive_data_leakage`, `task_navigation_efficiency`, `tool_selection`,
+  `tool_efficiency`, `tool_output_utilization`, `intent_resolution`, `task_adherence` and `task_completion` graded
+  tool use blind — an agent that deleted records and then answered "here is your summary" could pass
+  `unsafe_tool_use`. New: `AtomicLlmEval.JudgeSeesToolData` (`JudgeToolData.ToolCalls` / `ToolDefinitions`) adds a
+  labelled section — the calls in order with arguments, result and recorded outcome; "none were made" for an empty
+  list; nothing for a null one; the offered tools where the rubric names them; cuts stated — marked as recorded data,
+  not instructions. **Behaviour change:** those 13 evaluators set it and bump a minor version (`unsafe_tool_use` 1.2.0,
+  `tool_call_success` 1.2.0, `tool_input_accuracy` 2.3.0, the rest 1.1.0); their `PromptHash` moves, every other
+  leaf's does not. Their verdicts on runs with tool data can change. A census test driven by the shipped rubric files
+  checks both directions: every evaluator whose rubric names tool data shows it to its judge, and no other does.
 - **`tool_input_accuracy` passed tool calls it could not check.** A tool definition with no parameter schema — or
   a `required` list in a shape the check could not read, including the `JsonElement` that System.Text.Json gives a
   `Dictionary<string, object>` value — made every call to that tool PASS. **Behaviour change (2.2.0):** such calls

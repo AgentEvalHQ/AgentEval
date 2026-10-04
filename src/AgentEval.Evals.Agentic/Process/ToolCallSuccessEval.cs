@@ -42,7 +42,7 @@ public sealed class ToolCallSuccessEval : IEval
     private const string KeyValue      = "tool_call_success";
     private const string NameValue     = "Tool Call Success";
     private const string CategoryValue = "agentic-process";
-    private const string VersionValue  = "1.1.0";
+    private const string VersionValue  = "1.2.0";
 
     /// <summary>
     /// Conventional key for supplying per-call status records via <see cref="EvalInput.Metadata"/>.
@@ -90,7 +90,7 @@ public sealed class ToolCallSuccessEval : IEval
             passThreshold: 0.70,
             judgeModel: judgeModel,
             promptId: "agenteval.tool_call_success.v1",
-            failureSeverity: "high");
+            failureSeverity: "high") { JudgeSeesToolData = JudgeToolData.ToolCalls };
     }
 
     /// <inheritdoc/>

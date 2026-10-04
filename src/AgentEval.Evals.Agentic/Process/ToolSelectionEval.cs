@@ -62,7 +62,7 @@ public sealed class ToolSelectionEval : IEval
             key: "tool_selection",
             name: "Tool Selection",
             category: "agentic-process",
-            version: "1.0.0",
+            version: "1.1.0",
             criteria: new[]
             {
                 "All required tools (per expected_actions.required_tools) were called",
@@ -73,7 +73,7 @@ public sealed class ToolSelectionEval : IEval
             passThreshold: passThreshold,
             judgeModel: judgeModel,
             promptId: "agenteval.tool_selection.v1",
-            failureSeverity: "medium");
+            failureSeverity: "medium") { JudgeSeesToolData = JudgeToolData.ToolCalls | JudgeToolData.ToolDefinitions };
     }
 
     /// <inheritdoc/>

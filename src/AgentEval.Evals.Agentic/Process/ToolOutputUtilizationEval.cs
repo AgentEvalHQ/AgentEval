@@ -62,7 +62,7 @@ public sealed class ToolOutputUtilizationEval : IEval
             key: "tool_output_utilization",
             name: "Tool Output Utilization",
             category: "agentic-process",
-            version: "1.0.0",
+            version: "1.1.0",
             criteria: new[]
             {
                 "Data returned by tool calls is referenced or acted upon in subsequent reasoning or final response",
@@ -73,7 +73,7 @@ public sealed class ToolOutputUtilizationEval : IEval
             passThreshold: passThreshold,
             judgeModel: judgeModel,
             promptId: "agenteval.tool_output_utilization.v1",
-            failureSeverity: "medium");
+            failureSeverity: "medium") { JudgeSeesToolData = JudgeToolData.ToolCalls | JudgeToolData.ToolDefinitions };
     }
 
     /// <inheritdoc/>

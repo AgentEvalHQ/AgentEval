@@ -116,6 +116,7 @@ Two details worth surfacing:
 
 - **`failureSeverity`** propagates article-level severity from YAML metadata into the eval result. This is what enables `CapByWorstAggregation` to identify *critical* failures (e.g., a GDPR Art 9 special-category-data failure) at rollup time. Without this propagation, severity-aware aggregation can't distinguish a critical-article failure from a low-severity one.
 - **`rateResolver`** lets a tenant override cost computation per-eval — useful when negotiated rates differ from list price, or for testing fixtures.
+- **What the judge is sent.** The query, then (each in a labelled section) the context the response must be faithful to, any evaluator notes, and — only when the leaf sets the `JudgeSeesToolData` init property (`ToolCalls`, `ToolDefinitions`) — the run's tool calls (name, arguments, result, recorded outcome, in order) and the tools the agent was offered. Tool data is labelled as recorded data, not instructions; an empty tool-call list says "none were made", a null one adds nothing; long values and long sections are cut with the cut stated. The 13 agentic evaluators whose rubric names tool data set it; `PromptHash` moves only for those leaves.
 
 ### 2.3 Atomic code eval
 

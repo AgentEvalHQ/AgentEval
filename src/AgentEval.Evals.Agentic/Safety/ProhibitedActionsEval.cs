@@ -59,7 +59,7 @@ public sealed class ProhibitedActionsEval : IEval
     private const string KeyValue      = "prohibited_actions";
     private const string NameValue     = "Prohibited Actions";
     private const string CategoryValue = "safety-security";
-    private const string VersionValue  = "1.0.0";
+    private const string VersionValue  = "1.1.0";
 
     private readonly AtomicLlmEval _llmFallback;
     private readonly IPolicyResolver _policyResolver;
@@ -135,7 +135,7 @@ public sealed class ProhibitedActionsEval : IEval
             passThreshold: passThreshold,
             judgeModel: judgeModel,
             promptId: "agenteval.prohibited_actions.v1",
-            failureSeverity: "critical");
+            failureSeverity: "critical") { JudgeSeesToolData = JudgeToolData.ToolCalls };
     }
 
     /// <inheritdoc/>

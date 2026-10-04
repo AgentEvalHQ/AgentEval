@@ -61,7 +61,7 @@ public sealed class IntentResolutionEval : IEval
                     key: "intent_identified",
                     name: "Intent Identified",
                     category: "system-outcome",
-                    version: "1.0.0",
+                    version: "1.1.0",
                     criteria: new[]
                     {
                         "The agent's response demonstrates that it correctly understood the user's primary intent",
@@ -70,7 +70,7 @@ public sealed class IntentResolutionEval : IEval
                     passThreshold: passThreshold,
                     judgeModel: judgeModel,
                     promptId: "agenteval.intent_resolution.v1",
-                    failureSeverity: "medium"),
+                    failureSeverity: "medium") { JudgeSeesToolData = JudgeToolData.ToolCalls },
                 Weight: 0.50),
 
             new EvalComponent(
@@ -79,7 +79,7 @@ public sealed class IntentResolutionEval : IEval
                     key: "intent_resolved",
                     name: "Intent Resolved",
                     category: "system-outcome",
-                    version: "1.0.0",
+                    version: "1.1.0",
                     criteria: new[]
                     {
                         "The agent's response fully resolves the identified intent",
@@ -89,7 +89,7 @@ public sealed class IntentResolutionEval : IEval
                     passThreshold: passThreshold,
                     judgeModel: judgeModel,
                     promptId: "agenteval.intent_resolution.v1",
-                    failureSeverity: "medium"),
+                    failureSeverity: "medium") { JudgeSeesToolData = JudgeToolData.ToolCalls },
                 Weight: 0.50),
         };
 
@@ -97,7 +97,7 @@ public sealed class IntentResolutionEval : IEval
             key: "intent_resolution",
             name: "Intent Resolution",
             category: "system-outcome",
-            version: "1.0.0",
+            version: "1.1.0",
             components: components,
             aggregation: WeightedSumAggregation.Instance,
             threshold: passThreshold);

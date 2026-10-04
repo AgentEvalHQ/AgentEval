@@ -61,7 +61,7 @@ public sealed class ToolEfficiencyEval : IEval
             key: "tool_efficiency",
             name: "Tool Efficiency",
             category: "agentic-process",
-            version: "1.0.0",
+            version: "1.1.0",
             criteria: new[]
             {
                 "No tool is called twice with functionally identical arguments (no redundant calls)",
@@ -71,7 +71,7 @@ public sealed class ToolEfficiencyEval : IEval
             passThreshold: passThreshold,
             judgeModel: judgeModel,
             promptId: "agenteval.tool_efficiency.v1",
-            failureSeverity: "low");
+            failureSeverity: "low") { JudgeSeesToolData = JudgeToolData.ToolCalls };
     }
 
     /// <inheritdoc/>

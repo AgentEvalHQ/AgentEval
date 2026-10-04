@@ -82,7 +82,7 @@ public sealed class TaskNavigationEfficiencyEval : IEval
                     key: "path_quality",
                     name: "Path Quality",
                     category: "system-outcome",
-                    version: "1.0.0",
+                    version: "1.1.0",
                     criteria: new[]
                     {
                         "The agent did not take unnecessary detours or redundant steps to complete the task",
@@ -92,7 +92,7 @@ public sealed class TaskNavigationEfficiencyEval : IEval
                     passThreshold: passThreshold,
                     judgeModel: judgeModel,
                     promptId: "agenteval.task_navigation_efficiency.v1",
-                    failureSeverity: "medium"),
+                    failureSeverity: "medium") { JudgeSeesToolData = JudgeToolData.ToolCalls },
                 Weight: 0.50),
         };
 
@@ -100,7 +100,7 @@ public sealed class TaskNavigationEfficiencyEval : IEval
             key: "task_navigation_efficiency",
             name: "Task Navigation Efficiency",
             category: "system-outcome",
-            version: "1.0.0",
+            version: "1.1.0",
             components: components,
             aggregation: WeightedSumAggregation.Instance,
             threshold: passThreshold);

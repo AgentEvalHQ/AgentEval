@@ -54,7 +54,7 @@ public sealed class TaskCompletionEval : IEval
             key: "task_completion",
             name: "Task Completion",
             category: "system-outcome",
-            version: "1.0.0",
+            version: "1.1.0",
             criteria: new[]
             {
                 "Response completes the task end-to-end",
@@ -64,7 +64,7 @@ public sealed class TaskCompletionEval : IEval
             passThreshold: passThreshold,
             judgeModel: judgeModel,
             promptId: "agenteval.task_completion.v1",
-            failureSeverity: "medium");
+            failureSeverity: "medium") { JudgeSeesToolData = JudgeToolData.ToolCalls };
     }
 
     /// <inheritdoc/>

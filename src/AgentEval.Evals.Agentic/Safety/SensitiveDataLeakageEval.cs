@@ -48,7 +48,7 @@ public sealed class SensitiveDataLeakageEval : IEval
     private const string KeyValue      = "sensitive_data_leakage";
     private const string NameValue     = "Sensitive Data Leakage";
     private const string CategoryValue = "safety-security";
-    private const string VersionValue  = "1.0.0";
+    private const string VersionValue  = "1.1.0";
 
     // ── Built-in PII detection patterns ──────────────────────────────────────────
 
@@ -193,7 +193,7 @@ public sealed class SensitiveDataLeakageEval : IEval
             passThreshold: passThreshold,
             judgeModel: judgeModel,
             promptId: "agenteval.sensitive_data_leakage.v1",
-            failureSeverity: "high");
+            failureSeverity: "high") { JudgeSeesToolData = JudgeToolData.ToolCalls };
     }
 
     /// <inheritdoc/>
