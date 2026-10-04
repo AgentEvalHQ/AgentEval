@@ -88,8 +88,21 @@ public static class BenchEuAiActCalibrateCommand
         string? outPathOverride,
         IEvaluator? evaluatorOverride,
         CancellationToken ct = default,
-        CalibrationJudgeIdentity? evaluatorOverrideIdentity = null)
+        CalibrationJudgeIdentity? evaluatorOverrideIdentity = null,
+        int? limitPerPillar = null)
     {
+        if (limitPerPillar is < 1)
+        {
+            Console.Error.WriteLine("--limit must be at least 1.");
+            return ExitCodes.UsageError;
+        }
+        if (limitPerPillar is not null && outPathOverride is null)
+        {
+            // A limited run must never land on the default dated baseline path and overwrite that day's full run.
+            Console.Error.WriteLine("--limit requires --out: a limited run is a wiring check, not a baseline, and must not overwrite the day's report.");
+            return ExitCodes.UsageError;
+        }
+
         // ── Judge / evaluator ────────────────────────────────────────────────
         // Calibration measures a judge, so it needs a real one: there is no stand-in judge.
         // Workspace root canonicalisation (defense-in-depth against --root traversal).
@@ -167,7 +180,7 @@ public static class BenchEuAiActCalibrateCommand
         try
         {
             var runner = new CalibrationRunner(articles, judge);
-            report = await runner.RunAsync(datasets, ct);
+            report = await runner.RunAsync(datasets, limitPerPillar, ct);
         }
         catch (Exception ex)
         {
@@ -186,6 +199,9 @@ public static class BenchEuAiActCalibrateCommand
         {
             Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
             var md = BuildMarkdownReport(report, judgeIdentity);
+            if (limitPerPillar is int lim)
+                md = $"> ⚠️ **LIMITED RUN — at most {lim} entr{(lim == 1 ? "y" : "ies")} per pillar.** A wiring check, not a baseline: " +
+                     "accuracy and kappa on this few cases mean nothing, and the calibration gate is not applied." + Environment.NewLine + Environment.NewLine + md;
             await File.WriteAllTextAsync(outPath, md);
             Console.WriteLine($"Calibration report: {outPath}");
         }
@@ -226,6 +242,16 @@ public static class BenchEuAiActCalibrateCommand
         Console.WriteLine(allPass
             ? "EU AI Act calibration gate PASSED — all pillars meet thresholds with zero evaluation failures."
             : $"EU AI Act calibration gate FAILED — one or more pillars below accuracy>={AccuracyThreshold:P0} or kappa>={KappaThreshold:F2}, or had non-zero evaluation_failures.");
+
+        if (limitPerPillar is not null)
+        {
+            // At one entry per pillar kappa is undefined, so the gate would fail every pillar by construction. A limited
+            // run checks the wiring; it passes when nothing errored, and says the gate was not applied.
+            var anyFailures = report.PerPillar.Values.Any(p => p.EvaluationFailures > 0);
+            Console.WriteLine($"Limited run (--limit {limitPerPillar}): the calibration gate is NOT applied. " +
+                              (anyFailures ? "Evaluation failures occurred — the wiring is not clean." : "No evaluation failures — the wiring is clean."));
+            return anyFailures ? ExitCodes.GateFailed : ExitCodes.Success;
+        }
 
         return allPass ? ExitCodes.Success : ExitCodes.GateFailed;
     }

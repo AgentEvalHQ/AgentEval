@@ -39,10 +39,23 @@ public sealed class CalibrationRunner
     /// <param name="datasets">One dataset per pillar to evaluate.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>A report containing per-pillar accuracy, kappa, and score delta statistics.</returns>
-    public async Task<CalibrationReport> RunAsync(
+    public Task<CalibrationReport> RunAsync(
         IReadOnlyList<CalibrationDataset> datasets, CancellationToken ct = default)
+        => RunAsync(datasets, limitPerPillar: null, ct);
+
+    /// <summary>
+    /// Runs calibration, evaluating at most <paramref name="limitPerPillar"/> entries per pillar when it is set — the
+    /// one-item stage before a full paid run (the three-stage protocol: dry run, one item, full run).
+    /// </summary>
+    /// <param name="datasets">One dataset per pillar to evaluate.</param>
+    /// <param name="limitPerPillar">At most this many entries per pillar; <see langword="null"/> for all.</param>
+    /// <param name="ct">Cancellation token.</param>
+    public async Task<CalibrationReport> RunAsync(
+        IReadOnlyList<CalibrationDataset> datasets, int? limitPerPillar, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(datasets);
+        if (limitPerPillar is < 1)
+            throw new ArgumentOutOfRangeException(nameof(limitPerPillar), limitPerPillar, "must be at least 1.");
 
         var perPillar = new Dictionary<string, CalibrationPillarReport>();
 
@@ -57,7 +70,7 @@ public sealed class CalibrationRunner
             int notMeasured = 0;
             int notApplicable = 0;
 
-            foreach (var entry in ds.Entries)
+            foreach (var entry in limitPerPillar is int limit ? ds.Entries.Take(limit) : ds.Entries)
             {
                 // Defensive skip: calibration data may contain synthetic IDs not in the registry.
                 if (!_articles.All.TryGetValue(entry.ArticleControlId, out _))

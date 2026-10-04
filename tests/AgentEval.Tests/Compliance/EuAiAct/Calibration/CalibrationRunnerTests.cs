@@ -233,4 +233,37 @@ public class CalibrationRunnerTests
         Assert.Equal(0, pillar.EntryCount);
         Assert.Equal(0, pillar.WithinScoreRange);   // the old runner credited the 0.0 as inside the [0, 0.30] fail bands
     }
+
+    // ── --limit: the one-item stage before a full paid run (B12, the three-stage protocol) ─────────────────────────
+
+    [Fact]
+    public async Task TheLimit_IsPerPillar()
+    {
+        var judge = new AlwaysPassEvaluator();
+        var runner = new CalibrationRunner(BuildRegistry(judge), judge);
+
+        var report = await runner.RunAsync([BuildPassDataset(count: 4)], limitPerPillar: 1);
+
+        Assert.Equal(1, report.PerPillar["eu-test-pillar"].EntryCount);
+    }
+
+    [Fact]
+    public async Task WithoutALimit_EveryEntryRuns()
+    {
+        var judge = new AlwaysPassEvaluator();
+        var runner = new CalibrationRunner(BuildRegistry(judge), judge);
+
+        var report = await runner.RunAsync([BuildPassDataset(count: 4)], limitPerPillar: null);
+
+        Assert.Equal(4, report.PerPillar["eu-test-pillar"].EntryCount);
+    }
+
+    [Fact]
+    public async Task ALimitBelowOne_IsRejected()
+    {
+        var judge = new AlwaysPassEvaluator();
+        var runner = new CalibrationRunner(BuildRegistry(judge), judge);
+
+        await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => runner.RunAsync([BuildPassDataset()], limitPerPillar: 0));
+    }
 }

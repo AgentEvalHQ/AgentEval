@@ -158,6 +158,8 @@ var calibrateCmd = new Command("calibrate", "Run GDPR judge calibration against 
 calibrateCmd.Add(calibrateRootOpt);
 calibrateCmd.Add(calibrateOutOpt);
 calibrateCmd.Add(calibrateDecisionsOpt);
+var calibrateLimitOpt = new Option<int?>("--limit") { Description = "Evaluate at most N entries per pillar (the one-item stage before a full paid run; requires --out)" };
+calibrateCmd.Add(calibrateLimitOpt);
 calibrateCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
     var root = parseResult.GetValue(calibrateRootOpt);
@@ -167,7 +169,8 @@ calibrateCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     return await DecisionCalibration.RunAsync(
         parseResult.GetValue(calibrateDecisionsOpt),
         (decisionJudge, decisionJudgeIdentity) => BenchCalibrateCommand.RunCoreAsync(
-            root, outPath, evaluatorOverride: decisionJudge, ct: ct, evaluatorOverrideIdentity: decisionJudgeIdentity));
+            root, outPath, evaluatorOverride: decisionJudge, ct: ct, evaluatorOverrideIdentity: decisionJudgeIdentity,
+            limitPerPillar: parseResult.GetValue(calibrateLimitOpt)));
 });
 benchGdprCmd.Add(calibrateCmd);
 
@@ -245,6 +248,8 @@ var euCalibrateCmd = new Command("calibrate", "Run EU AI Act judge calibration a
 euCalibrateCmd.Add(euCalibrateRootOpt);
 euCalibrateCmd.Add(euCalibrateOutOpt);
 euCalibrateCmd.Add(euCalibrateDecisionsOpt);
+var euCalibrateLimitOpt = new Option<int?>("--limit") { Description = "Evaluate at most N entries per pillar (the one-item stage before a full paid run; requires --out)" };
+euCalibrateCmd.Add(euCalibrateLimitOpt);
 euCalibrateCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
     var root = parseResult.GetValue(euCalibrateRootOpt);
@@ -253,7 +258,8 @@ euCalibrateCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =
     return await DecisionCalibration.RunAsync(
         parseResult.GetValue(euCalibrateDecisionsOpt),
         (decisionJudge, decisionJudgeIdentity) => BenchEuAiActCalibrateCommand.RunCoreAsync(
-            root, outPath, evaluatorOverride: decisionJudge, ct: ct, evaluatorOverrideIdentity: decisionJudgeIdentity));
+            root, outPath, evaluatorOverride: decisionJudge, ct: ct, evaluatorOverrideIdentity: decisionJudgeIdentity,
+            limitPerPillar: parseResult.GetValue(euCalibrateLimitOpt)));
 });
 benchEuAiActCmd.Add(euCalibrateCmd);
 

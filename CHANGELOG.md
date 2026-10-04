@@ -31,6 +31,10 @@ third-party exporter on our public interfaces.
     calls reach the unsafe-tool-use check — `bench agentic` does not pass a trace's tool calls to it), Reasoning (a
     response without plan or list markers skips the plan and goal-decomposition checks), Telemetry (zero calls), Judge
     Quality (a missing input), and Tool Call Accuracy / Agentic Execution (no tool definitions captured, or definitions with no tool calls).
+- **`bench gdpr calibrate` and `bench eu-ai-act calibrate` take `--limit N`** (at most N entries per pillar), as
+  `bench agentic calibrate` already did: the one-item stage of a paid calibration (dry run, one item, full run).
+  A limited run needs `--out` (it never overwrites the day's baseline report), is bannered as a wiring check, and
+  does not apply the calibration gate — it passes when nothing errored.
 - **A failing sub-dimension could hide inside an evaluator.** Seven evaluators are composites of sub-dimensions
   and were weighted sums: `task_adherence`'s authorization leaf (high) failing read 0.82 = PASS, so an unauthorized
   action never reached the preset; `qa_composite` reported PASS 0.948 with F1 failing. **Behaviour change:** every
