@@ -116,11 +116,17 @@ public sealed class ToolInputAccuracyEval : IEval
     /// shipped evidence reading "schema validation skipped" beside that 1.0. A check that did not run has
     /// no score, so it stays out of the composite's denominator instead of lifting it by half its weight.
     /// <para>
-    /// 2.1.0 checks the CASE before the ANSWER (ADR-030: applicability is a property of the case). No tool
-    /// definitions means the case cannot test schema validity, whatever the agent did: that is
-    /// <b>inapplicable</b>, and the composite is the judge alone. Definitions but no tool calls is about the
-    /// answer: that stays <b>skipped</b>, and since this leaf is required, the composite cannot pass on the
-    /// judge alone (#203).
+    /// 2.1.0 checks the CASE before the ANSWER (ADR-030: applicability is a property of the case), and tells
+    /// "not captured" from "declared none" (the rule the Safety preset follows, #203 review):
+    /// <list type="bullet">
+    ///   <item><c>ToolDefinitions == null</c> — nothing captured the tool definitions (no shipped pipeline fills them
+    ///   today): <b>skipped</b>, not measured. The pipeline's gap, not the case's.</item>
+    ///   <item>an empty list — the case declares no tools, so it cannot test schema validity: <b>inapplicable</b>, and
+    ///   the composite is the judge alone.</item>
+    ///   <item>definitions but no tool calls — about the answer: <b>skipped</b>.</item>
+    /// </list>
+    /// This leaf is required, so a skipped schema check keeps the composite (and every preset that nests it) from
+    /// passing on the judge alone.
     /// </para>
     /// </remarks>
     private sealed class ToolInputSchemaEval : AtomicCodeEval
@@ -130,14 +136,17 @@ public sealed class ToolInputAccuracyEval : IEval
 
         protected override EvalResult Evaluate(EvalInput input)
         {
-            // The case first: without definitions there is no schema to validate against, so callers that only
-            // supply ToolCalls are neither penalised nor flattered: the composite is the judge alone. (Was
-            // Build(1.0, true, "none"), defect D-c; then Skipped, which a required leaf can no longer be and pass.)
+            // The case first. Not captured is not the same as declared none (was: both inapplicable, which let the
+            // tool presets pass on the judge alone in every shipped pipeline — none of them fills ToolDefinitions).
             // TODO (A1.7 / plan-13 T4.1e item 37 / lastreview/19 §2): full JSON Schema validation once
             // `ToolDefinition.Parameters` carries a schema object (today a free-form
             // `IReadOnlyDictionary<string, object>` — see ToolDefinition in AgentEval.Abstractions).
-            if (input.ToolDefinitions is null or { Count: 0 })
-                return NotApplicable("No tool definitions supplied, so this case cannot test schema validity.");
+            if (input.ToolDefinitions is null)
+                return EvalResult.Skipped(this,
+                    "No tool definitions were captured for this case, so schema validity was not checked. Supply them " +
+                    "(or a trace that records them) to measure it.");
+            if (input.ToolDefinitions.Count == 0)
+                return NotApplicable("The case declares no tools, so it cannot test schema validity.");
 
             // Then the answer: nothing to validate, so nothing is scored (was Build(1.0, true, "none")).
             if (input.ToolCalls is null or { Count: 0 })

@@ -30,7 +30,7 @@ third-party exporter on our public interfaces.
     judge and with no trusted baseline its prompt-injection check always skips, so it cannot pass), Safety (no tool
     calls reach the unsafe-tool-use check — `bench agentic` does not pass a trace's tool calls to it), Reasoning (a
     response without plan or list markers skips the plan and goal-decomposition checks), Telemetry (zero calls), Judge
-    Quality (a missing input), and Tool Call Accuracy / Agentic Execution (tool definitions with no tool calls).
+    Quality (a missing input), and Tool Call Accuracy / Agentic Execution (no tool definitions captured, or definitions with no tool calls).
 - **A multi-judge panel passed when none of its judges answered.** `MultiJudgeWrapper` and
   `AdjudicatedMultiJudgeWrapper` (used for critical GDPR/EU AI Act articles) read the empty aggregate of a panel whose
   judges all errored or skipped as a pass. Such a panel now reports `error` (any judge errored) or `skipped`, and
@@ -60,10 +60,13 @@ third-party exporter on our public interfaces.
   loaders by their `Format`. Built-in names still win.
 
 #### Changed
-- `ToolInputAccuracyEval` 2.1.0: the schema check looks at the case before the answer. With no tool definitions
-  supplied it cannot test schema validity, so the check is `inapplicable` (it was `skipped`; ADR-030 names "no tool
-  definitions supplied" as its example) and the composite is the judge alone, as documented. Definitions with no tool
-  calls stays `skipped`, so that composite — and the presets that nest it — can no longer pass on the judge alone.
+- `ToolInputAccuracyEval` 2.1.0: the schema check tells "not captured" from "declared none". Tool definitions that
+  were not captured (`null`) leave it `skipped` (not measured); an empty list — the case declares no tools — makes it
+  `inapplicable`, and the composite is the judge alone; definitions with no tool calls stay `skipped`. The leaf is
+  required, so a skipped schema check keeps `tool_input_accuracy` and the presets that nest it (Tool Call Accuracy,
+  Agentic Execution) from passing on the judge alone. **No AgentEval pipeline passes tool definitions yet**
+  (`bench agentic`, calibration and the run projection build the input from the query and response), so those
+  presets report `warn` there until tool data is supplied.
 
 #### Documentation
 - `docs/export.md` says what an exporter receives — the flat `EvaluationReport`, not the `EvalResult` model with its

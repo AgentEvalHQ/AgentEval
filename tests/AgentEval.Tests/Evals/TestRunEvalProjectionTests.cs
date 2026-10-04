@@ -209,9 +209,9 @@ public class TestRunEvalProjectionTests
         var schemaWhenAbsent = SchemaLeafOf(await sut.EvaluateAsync(withoutDefinitions));
         var schemaWhenNamesOnly = SchemaLeafOf(await sut.EvaluateAsync(withNamesOnlyDefinitions));
 
-        // As shipped: with no definitions the case cannot test schema validity, so the leaf is inapplicable
-        // (2.1.0; skipped before) and stays out of the denominator.
-        Assert.Equal("inapplicable", schemaWhenAbsent.Score.Label);
+        // As shipped: with no definitions captured the schema check does not run, so the leaf is skipped (not
+        // measured) and stays out of the denominator.
+        Assert.Equal("skipped", schemaWhenAbsent.Score.Label);
         Assert.False(schemaWhenAbsent.Score.CountsTowardAggregate());
         Assert.False(schemaWhenAbsent.Score.Passed);
 

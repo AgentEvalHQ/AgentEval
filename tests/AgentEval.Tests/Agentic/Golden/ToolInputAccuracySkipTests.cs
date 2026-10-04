@@ -43,28 +43,71 @@ public class ToolInputAccuracySkipTests
 
         var result = await eval.EvaluateAsync(input);
 
+        // Nothing captured the definitions (null): the schema check did not run — skipped, NOT inapplicable (B3).
         var schema = SchemaLeaf(result);
-        Assert.Equal("inapplicable", schema.Score.Label);
+        Assert.Equal("skipped", schema.Score.Label);
         Assert.False(schema.Score.Passed);
         Assert.NotEqual(1.0, schema.Score.Value);
-        Assert.Equal(AgentEval.Evals.Meta.MeasurementState.NotApplicable, schema.Score.Measurement);
+        Assert.Equal(AgentEval.Evals.Meta.MeasurementState.NotMeasured, schema.Score.CensusBucket());
         Assert.Contains(schema.Details.Recommendations!, r => r.Contains("tool definitions", StringComparison.OrdinalIgnoreCase));
 
-        // The composite is now the judge alone: 0.40, below the 0.70 threshold.
+        // The score is the judge's 0.40, below the 0.70 threshold: a measured fail stays a fail.
         Assert.Equal(0.40, result.Score.Value, precision: 10);
         Assert.False(result.Score.Passed);
     }
 
-    [Fact]
-    public async Task NoToolDefinitions_AGoodJudgeScore_PassesOnTheJudgeAlone()
+    // Every input shape, the schema leaf's state (B3): the case first (null = not captured, empty = declares none), then
+    // the answer (no calls), then a real measurement.
+    [Theory]
+    [InlineData("null", false, "skipped")]
+    [InlineData("null", true, "skipped")]
+    [InlineData("empty", false, "inapplicable")]
+    [InlineData("empty", true, "inapplicable")]
+    [InlineData("declared", false, "skipped")]
+    [InlineData("declared", true, "pass")]
+    public async Task EveryInputShape_GivesTheStatedSchemaState(string definitions, bool withCalls, string expectedLabel)
     {
-        // The documented intent for callers that only supply ToolCalls: neither penalised nor flattered. An
-        // inapplicable leaf never blocks the composite, so a good judge score is a pass.
+        var eval = new ToolInputAccuracyEval(new FixedScoreEvaluator(100));
+        IReadOnlyList<ToolDefinition>? defs = definitions switch
+        {
+            "null" => null,
+            "empty" => Array.Empty<ToolDefinition>(),
+            _ => new[] { new ToolDefinition("search_flights", "Search", new Dictionary<string, object> { ["required"] = new object[] { "origin" } }) },
+        };
+        var input = new EvalInput(Query: "q", Response: "r", ToolCalls: withCalls ? OneCall() : null, ToolDefinitions: defs);
+
+        var result = await eval.EvaluateAsync(input);
+
+        Assert.Equal(expectedLabel, SchemaLeaf(result).Score.Label);
+    }
+
+    [Fact]
+    public async Task NoToolDefinitionsCaptured_AGoodJudgeScore_CannotPassOnTheJudgeAlone()
+    {
+        // B3 (#203 review, round 2 H-B): no shipped pipeline fills ToolDefinitions, so "inapplicable" here let the tool
+        // presets pass without the schema check everywhere. Not captured is not measured, and the leaf is required.
         var eval = new ToolInputAccuracyEval(new FixedScoreEvaluator(100));
         var input = new EvalInput(Query: "Find flights", Response: "Called search_flights.", ToolCalls: OneCall());
 
         var result = await eval.EvaluateAsync(input);
 
+        Assert.Equal("warn", result.Score.Label);
+        Assert.False(result.Score.Passed);
+        Assert.Equal(AgentEval.Evals.Meta.MeasurementState.NotMeasured, result.Score.Measurement);
+    }
+
+    [Fact]
+    public async Task ACaseThatDeclaresNoTools_AGoodJudgeScore_PassesOnTheJudgeAlone()
+    {
+        // An EMPTY list is the case declaring no tools: it cannot test schema validity, so the leaf is inapplicable and
+        // the composite is the judge alone — callers are neither penalised nor flattered.
+        var eval = new ToolInputAccuracyEval(new FixedScoreEvaluator(100));
+        var input = new EvalInput(Query: "Find flights", Response: "Called search_flights.", ToolCalls: OneCall(),
+            ToolDefinitions: Array.Empty<ToolDefinition>());
+
+        var result = await eval.EvaluateAsync(input);
+
+        Assert.Equal("inapplicable", SchemaLeaf(result).Score.Label);
         Assert.Equal("pass", result.Score.Label);
         Assert.True(result.Score.Passed);
     }

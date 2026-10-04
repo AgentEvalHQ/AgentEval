@@ -61,8 +61,12 @@ public class GoldenBandThresholdConsistencyTests(ITestOutputHelper output)
                     continue;
 
                 var result = await eval.EvaluateAsync(new EvalInput(Query: entry.Input, Response: entry.AgentResponse));
-                if (judge.Calls == 0 || result.Score.Label is not ("pass" or "fail" or "warn"))
-                    continue;   // decided without the judge, or no verdict at all: not a band question
+                // Decided without the judge, or no verdict at all — by STATE, not label: a composite that withheld its pass
+                // because a required component did not run (e.g. tool_input_accuracy on a text-only golden record, whose
+                // schema check has no tool definitions to read) reports warn but measured nothing it could stand on.
+                if (judge.Calls == 0 || result.Score.Label is not ("pass" or "fail" or "warn")
+                    || result.Score.CensusBucket() != AgentEval.Evals.Meta.MeasurementState.Measured)
+                    continue;   // not a band question
 
                 checkedCases++;
                 var verdict = result.Score.Passed ? "pass" : "fail";
