@@ -1,14 +1,14 @@
 # Agentic Benchmark — Evaluator Cards
 
-The 60 evaluators that have an `EvaluatorCard` are listed below by category, with their key and
+The 68 evaluators that have an `EvaluatorCard` are listed below by category, with their key and
 implementing class. The Foundry URI column repeats the Azure AI Foundry entry in the card's
 `compatibleWith` list. Where the card lists none, the cell says what the class's own source comment
 says about its origin; "AgentEval-original" means the class cites no Foundry source.
 
-The assembly also contains the eight Glass Box Diagnostics evaluators that
-`AgenticBenchmark.GlassBoxDiagnostics` uses (tool reliability, tool error pattern, safety
-intervention, argument sanitization, system-prompt drift, system-prompt injection, truncation
-detection, token distribution). They have no card and are not listed here.
+The eight Glass Box Diagnostics evaluators that `AgenticBenchmark.GlassBoxDiagnostics` uses gained
+cards in 0.44 (they had none, and none had a cost tier, so a cost cap dropped all eight); they are
+listed under [Glass Box Diagnostics](#glass-box-diagnostics-8-evaluators). They read the trace attached
+to the input, not the key registry, so they are not resolved by key.
 
 The authoritative source for each evaluator's full metadata — score formula, severity, pass
 threshold, expected inputs, recommended visualisation, and external compatibility — is the
@@ -88,6 +88,21 @@ calibration, UX, adversarial, efficiency) are listed in [Cost Guidance](cost-gui
 | Key | Class | Score formula |
 |-----|-------|---------------|
 | `stochastic_stability` | `StochasticStabilityEval` | Weighted sum: success_rate 0.50 + variance_inverse 0.30 + failure_mode_consistency 0.20 |
+
+---
+
+## Glass Box Diagnostics (8 evaluators)
+
+| Key | Class | Score formula |
+|-----|-------|---------------|
+| `tool_reliability` | `ToolReliabilityEval` | Lowest per-tool success rate across the trace's tool executions (bar 0.90; high) |
+| `tool_error_pattern` | `ToolErrorPatternEval` | 1 − largest (tool, normalised error) failure cluster / all tool calls (bar 0.80; medium) |
+| `safety_intervention` | `SafetyInterventionEval` | 1 − `content_filter` turns / chat responses (bar 1.0; medium) |
+| `argument_sanitization` | `ArgumentSanitizationEval` | PII / secret markers in tool arguments on the wire (bar 1.0; high) |
+| `system_prompt_drift` | `SystemPromptDriftEval` | 1.0 when every chat request has the same system prompt, else 0.0 (bar 1.0; medium) |
+| `system_prompt_injection` | `SystemPromptInjectionEval` | System prompts vs a trusted baseline (bar 1.0), else the judge (bar 0.75); high |
+| `truncation_detection` | `TruncationDetectionEval` | 1 − `length`-finish turns / chat responses (bar 1.0; low) |
+| `token_distribution` | `TokenDistributionEval` | 1 − largest turn's completion tokens / all, 3+ turns (bar 0.5; low) |
 
 ---
 

@@ -89,6 +89,20 @@ public sealed class CompositeEval : IEval
     /// </remarks>
     public bool SeverityCapsThreshold { get; init; }
 
+    /// <summary>
+    /// A copy of this composite with <paramref name="components"/> in place of its own and every other setting kept —
+    /// key, name, category, version, aggregation, threshold and each init-only setting. Code that rebuilds a composite
+    /// (domain packs' <c>WithExtraScenarios</c>, the cost filter) goes through here: two such sites rebuilt it from the
+    /// constructor and silently dropped <see cref="MinimumMeasuredShare"/> and <see cref="SeverityCapsThreshold"/>
+    /// (#203 review, B4 and B6b). A setting added later is guarded by a reflection test over the init-only properties.
+    /// </summary>
+    public CompositeEval WithComponents(IReadOnlyList<EvalComponent> components) =>
+        new(Key, Name, Category, Version, components, Aggregation, Threshold)
+        {
+            MinimumMeasuredShare = MinimumMeasuredShare,
+            SeverityCapsThreshold = SeverityCapsThreshold,
+        };
+
     /// <summary>Initialises a new <see cref="CompositeEval"/>.</summary>
     public CompositeEval(
         string key,

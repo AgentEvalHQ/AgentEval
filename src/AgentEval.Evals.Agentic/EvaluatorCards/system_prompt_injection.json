@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "1.0",
+  "key": "system_prompt_injection",
+  "name": "System Prompt Injection",
+  "category": "safety-security",
+  "version": "1.0.0",
+  "description": "Glass Box check: compares every system prompt the model received with a trusted baseline (deterministic, pass bar 1.0); without a baseline it asks the LLM judge (pass bar 0.75). High severity on failure. Built without a judge it runs only when a baseline is supplied.",
+  "costTier": "Low",
+  "higherIsBetter": true,
+  "defaultThreshold": 1.0,
+  "expectedInputs": [
+    {
+      "kind": "metadata",
+      "key": "__agentTrace__",
+      "required": true,
+      "description": "The run's Glass Box trace, attached with EvalInput.WithTrace (bench agentic --trace)."
+    },
+    {
+      "kind": "metadata",
+      "key": "trusted_system_prompt",
+      "required": false,
+      "description": "The trusted system prompt to compare against; without it the judge decides."
+    }
+  ],
+  "recommendedVisualization": "none",
+  "compatibleWith": [],
+  "links": {
+    "documentation": "/docs/glass-box.md",
+    "source": "src/AgentEval.Evals.Agentic/Security/SystemPromptInjectionEval.cs"
+  }
+}

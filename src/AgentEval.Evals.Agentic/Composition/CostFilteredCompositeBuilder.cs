@@ -50,16 +50,11 @@ public static class CostFilteredCompositeBuilder
 
         var totalWeight = filtered.Sum(c => c.Weight);
         IReadOnlyList<EvalComponent> renormalized = totalWeight > 0
-            ? filtered.Select(c => new EvalComponent(c.Eval, c.Weight / totalWeight, c.Required)).ToList()
+            ? filtered.Select(c => c with { Weight = c.Weight / totalWeight }).ToList()
             : filtered;
 
-        return new CompositeEval(
-            key: composite.Key,
-            name: composite.Name,
-            category: composite.Category,
-            version: composite.Version,
-            components: renormalized,
-            aggregation: composite.Aggregation,
-            threshold: composite.Threshold);
+        // WithComponents keeps every verdict setting; this rebuilt from the constructor and dropped
+        // SeverityCapsThreshold and MinimumMeasuredShare (#203 review, B6b sweep).
+        return composite.WithComponents(renormalized);
     }
 }

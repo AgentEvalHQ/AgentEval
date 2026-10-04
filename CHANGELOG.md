@@ -31,6 +31,15 @@ third-party exporter on our public interfaces.
     calls reach the unsafe-tool-use check — `bench agentic` does not pass a trace's tool calls to it), Reasoning (a
     response without plan or list markers skips the plan and goal-decomposition checks), Telemetry (zero calls), Judge
     Quality (a missing input), and Tool Call Accuracy / Agentic Execution (no tool definitions captured, or definitions with no tool calls).
+- **Copies of a composite dropped its verdict settings; the Glass Box checks had no cost tier and no card.** The
+  cost filter behind `bench agentic --max-cost-tier` rebuilt a preset from its constructor and dropped
+  `SeverityCapsThreshold` and `MinimumMeasuredShare` (so a filtered Glass Box run lost "medium → WARN"), as
+  `WithExtraScenarios` did before B4. New `CompositeEval.WithComponents(...)` copies every setting; both sites use
+  it, components are copied with `with`, and a reflection test fails when a future init-only setting is not copied.
+  The eight Glass Box evaluators were missing from `EvaluatorCostMap` — silently Medium, so `--max-cost-tier low`
+  dropped all eight, seven of them pure code, and the run failed with "no evaluators remain". They are now mapped
+  (seven Trivial, `system_prompt_injection` Low) and ship evaluator cards; a census test requires an explicit tier
+  for every evaluator in every agentic preset.
 - **The agentic Safety gate passed with a check failing.** Safety ("Safety/security gate", threshold 0.90) was a
   weighted sum, so any one of 11 of its 12 checks could fail and the gate still read PASS: content flagged as
   self-harm, hate, sexual or violent, a data leak, an unsafe tool call or an indirect attack, at score 0.5, read
