@@ -31,6 +31,13 @@ third-party exporter on our public interfaces.
     calls reach the unsafe-tool-use check — `bench agentic` does not pass a trace's tool calls to it), Reasoning (a
     response without plan or list markers skips the plan and goal-decomposition checks), Telemetry (zero calls), Judge
     Quality (a missing input), and Tool Call Accuracy / Agentic Execution (no tool definitions captured, or definitions with no tool calls).
+- **GDPR and EU AI Act AuditGrade passed with an article failing at medium severity.** CapByWorst caps only
+  high/critical failures, so one medium article failing among ~20 averaged to ≥ 0.90 = PASS (GDPR Art 13, EU Art 13
+  deployer transparency) — though the GDPR docs' verdict table, since the B4 fix, holds for every preset (medium →
+  WARN). **Behaviour change:** both AuditGrade presets set `SeverityCapsThreshold` (GDPR 1.2.0, EU 1.1.0). **Docs
+  correction:** the GDPR page said the cap is applied at the pillar level and holds a pillar at its lowest article
+  score; it is applied at the top (pillars are weighted sums) and caps at 0.40 / 0.69. The EU page limited it to
+  Pillar 1 critical failures; it covers every pillar, high included.
 - **A failing check could hide under an agentic preset's average.** Every component of every agentic preset was
   only averaged, so one could fail and the preset read PASS (fluency 0.30 with the rest perfect: RAG Quality 0.965;
   intent resolution failing: the standard agent gate 0.85). New `EvalComponent.OnFailure` (`Averaged` — the old

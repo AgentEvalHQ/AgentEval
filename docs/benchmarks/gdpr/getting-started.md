@@ -156,7 +156,7 @@ Articles 9 and 22 are designated Critical. A failure on either article is always
 
 ### CapByWorst rule (`AuditGrade` preset)
 
-When using the `audit` preset, `CapByWorstAggregation` is applied at the pillar level. This means the pillar score is capped at the lowest article score within the pillar. Any critical-severity failure caps the overall verdict at `FAIL`, regardless of how well other articles scored. The `audit` preset is the only one that applies this rule; the `standard` preset uses `WeightedSumAggregation` at all levels.
+The `audit` preset combines its six pillars with `CapByWorstAggregation`: a critical-severity failure anywhere caps the overall score at 0.40 and a high-severity one at 0.69 — both below its 0.90 threshold, so either reads `FAIL` however well the other articles scored. Within each pillar the articles are a weighted sum, as in `standard`. Like every preset it follows the verdict table above, so an article failing at medium severity reads `WARN` (until 0.44 it could average out to `PASS` here). Earlier versions of this page said the cap was applied at the pillar level and held a pillar at its lowest article score; the code has never done either.
 
 ### Reading the per-pillar table
 

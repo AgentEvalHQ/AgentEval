@@ -114,14 +114,18 @@ public class CompositeAttestationPresetTests
     }
 
     [Theory]
-    [InlineData("gdpr")]
-    [InlineData("euaiact")]
-    public async Task OneArticleFailing_TheStandardVerdictFollowsTheDocsTable(string pack)
+    [InlineData("gdpr", false)]
+    [InlineData("euaiact", false)]
+    [InlineData("gdpr", true)]
+    [InlineData("euaiact", true)]
+    public async Task OneArticleFailing_TheVerdictFollowsTheDocsTable(string pack, bool auditGrade)
     {
         // B4 (#203 review): Standard's 0.85 weighted average absorbed every single-article failure — 19 high/critical
         // GDPR ones read PASS, though the GDPR docs' verdict table says FAIL for any high or critical article failure.
         // The threshold pass is now capped by severity: high/critical → fail, medium → warn, none/low → pass.
-        var sweep = await SweepAsync(pack, auditGrade: false);
+        // B6d: the docs say EVERY preset applies the table; AuditGrade's CapByWorst caps only high/critical, so a
+        // medium article failing among ~20 averaged to ≥ 0.90 = PASS.
+        var sweep = await SweepAsync(pack, auditGrade);
 
         // Only articles the preset contains AND that really failed at this score: an article with a low pass threshold
         // (EU GPAI self-provenance passes at 0.50) is not failing here, so the preset's pass is correct for it.
