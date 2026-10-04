@@ -275,7 +275,8 @@ services.AddAgentEvalDataLoaders(); // Loader auto-wired into IDatasetLoaderFact
 
 // Later, loading works automatically:
 var factory = serviceProvider.GetRequiredService<IDatasetLoaderFactory>();
-var loader = factory.CreateFromExtension(".parquet"); // Finds your custom loader
+var loader = factory.CreateFromExtension(".parquet"); // Finds your custom loader by extension...
+var same = factory.Create("parquet");                 // ...or by its Format name
 ```
 
 > **Note:** DI-registered loaders do not override built-in loaders (`.jsonl`, `.json`, `.csv`, `.yaml`). Use `factory.Register()` to explicitly replace a built-in.

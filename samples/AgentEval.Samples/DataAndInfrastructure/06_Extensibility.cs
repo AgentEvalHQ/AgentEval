@@ -177,27 +177,13 @@ public static class Extensibility
             Console.WriteLine($"      • {fmt,-8} → {loader.GetType().Name}");
         }
 
-        // Custom loader is wired via IEnumerable<IDatasetLoader> injection
+        // A DI-registered loader is wired in by its Format name and by each of its extensions
         Console.WriteLine("\n   Custom loader (via DI):");
-        try
-        {
-            var mdLoader = factory.Create("markdown");
-            Console.WriteLine($"      • markdown → {mdLoader.GetType().Name} ← CUSTOM");
-            Console.WriteLine($"        Supported extensions: {string.Join(", ", mdLoader.SupportedExtensions)}");
-        }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"      ⚠️  Not auto-registered by format name: {ex.Message}");
-            Console.WriteLine("      (Custom loaders are available via IEnumerable<IDatasetLoader> DI injection)");
-
-            // Show it's available through DI directly
-            var loaders = provider.GetServices<IDatasetLoader>().ToList();
-            Console.WriteLine($"      DI-registered loaders: {loaders.Count}");
-            foreach (var l in loaders)
-            {
-                Console.WriteLine($"         • {l.GetType().Name} (format: {l.Format})");
-            }
-        }
+        var mdLoader = factory.Create("markdown");
+        Console.WriteLine($"      • markdown → {mdLoader.GetType().Name} ← CUSTOM");
+        Console.WriteLine($"        Supported extensions: {string.Join(", ", mdLoader.SupportedExtensions)}");
+        foreach (var ext in mdLoader.SupportedExtensions)
+            Console.WriteLine($"        CreateFromExtension(\"{ext}\") → {factory.CreateFromExtension(ext).GetType().Name}");
     }
 
     // ═══════════════════════════════════════════════════════════════════════

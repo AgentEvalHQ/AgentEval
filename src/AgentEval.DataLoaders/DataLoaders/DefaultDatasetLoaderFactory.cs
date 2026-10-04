@@ -9,7 +9,7 @@ namespace AgentEval.DataLoaders;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Registered as a singleton in DI via <c>services.AddAgentEval()</c>.
+/// Registered as a singleton in DI via <c>services.AddAgentEvalDataLoaders()</c> (or <c>AddAgentEvalAll()</c>).
 /// The static <see cref="DatasetLoaderFactory"/> class delegates to a
 /// shared instance of this class for backwards compatibility.
 /// </para>
@@ -35,6 +35,9 @@ public sealed class DefaultDatasetLoaderFactory : IDatasetLoaderFactory
         [".yml"] = () => new YamlDatasetLoader(),
     };
 
+    // Format name → DI-registered loader, for Create(format) (see the constructor).
+    private readonly Dictionary<string, Func<IDatasetLoader>> _formats = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>
     /// Creates a new factory with only built-in loaders (backward compatible).
     /// </summary>
@@ -46,7 +49,8 @@ public sealed class DefaultDatasetLoaderFactory : IDatasetLoaderFactory
     /// </summary>
     /// <param name="additionalLoaders">
     /// DI-registered loaders. Each loader's <see cref="IDatasetLoader.SupportedExtensions"/>
-    /// are used as keys. Built-in defaults are not overridden; use <see cref="Register"/>
+    /// are used as keys for <see cref="CreateFromExtension"/>, and its <see cref="IDatasetLoader.Format"/>
+    /// for <see cref="Create"/>. Built-in defaults are not overridden; use <see cref="Register"/>
     /// to explicitly replace a built-in loader.
     /// </param>
     public DefaultDatasetLoaderFactory(IEnumerable<IDatasetLoader> additionalLoaders) : this()
@@ -60,6 +64,11 @@ public sealed class DefaultDatasetLoaderFactory : IDatasetLoaderFactory
                 // DI-registered loaders don't override built-in defaults
                 _loaders.TryAdd(ext, () => loader);
             }
+
+            // ...and are reachable by their own Format name too. Create() checks the built-in names first, so a
+            // DI loader that reuses one ("csv") cannot replace the built-in; the first loader with a name wins.
+            if (!string.IsNullOrWhiteSpace(loader.Format))
+                _formats.TryAdd(loader.Format, () => loader);
         }
     }
 
@@ -82,6 +91,7 @@ public sealed class DefaultDatasetLoaderFactory : IDatasetLoaderFactory
         "csv" => new CsvDatasetLoader(),
         "tsv" => new CsvDatasetLoader('\t'),
         "yaml" or "yml" => new YamlDatasetLoader(),
+        _ when _formats.TryGetValue(format, out var factory) => factory(),
         _ => throw new ArgumentException($"Unknown format: {format}", nameof(format))
     };
 

@@ -742,6 +742,33 @@ public class ServiceCollectionExtensionsTests
         Assert.True(provider.GetRequiredService<IAttackTypeRegistry>().Contains("CustomAttack"));
     }
 
+    // A DI-registered loader declares a Format, but Create(format) used to know only the built-in names, so it
+    // threw "Unknown format" for every custom loader (the Extensibility sample printed a ⚠️ about it).
+
+    [Fact]
+    public void DiRegisteredLoader_IsReachableByItsFormatName()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IDatasetLoader>(new FakeDatasetLoader("custom_loader", [".customdata"]));
+        services.AddAgentEvalDataLoaders();
+        var factory = services.BuildServiceProvider().GetRequiredService<IDatasetLoaderFactory>();
+
+        Assert.Equal("custom_loader", factory.Create("custom_loader").Format);
+        Assert.Equal("custom_loader", factory.Create("CUSTOM_LOADER").Format); // case-insensitive, like the built-ins
+        Assert.Throws<ArgumentException>(() => factory.Create("not_registered"));
+    }
+
+    [Fact]
+    public void DiRegisteredLoader_ReusingABuiltInFormatName_DoesNotReplaceTheBuiltIn()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IDatasetLoader>(new FakeDatasetLoader("csv", [".customcsv"]));
+        services.AddAgentEvalDataLoaders();
+        var factory = services.BuildServiceProvider().GetRequiredService<IDatasetLoaderFactory>();
+
+        Assert.IsType<CsvDatasetLoader>(factory.Create("csv"));
+    }
+
     // Fake test harness for testing
     private class FakeTestHarness : IEvaluationHarness
     {
