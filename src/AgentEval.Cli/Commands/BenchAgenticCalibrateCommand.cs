@@ -428,7 +428,8 @@ public static class BenchAgenticCalibrateCommand
             Console.WriteLine(
                 $"  [{status}] {category}: accuracy={categoryReport.Accuracy:P1}, " +
                 $"kappa={FormatKappa(categoryReport.CohensKappa)}, entries={categoryReport.EntryCount}, " +
-                $"failures={categoryReport.EvaluationFailures}{thrSuffix}");
+                $"failures={categoryReport.EvaluationFailures}, not_measured={categoryReport.NotMeasured}, " +
+                $"inapplicable={categoryReport.NotApplicable}{thrSuffix}");
             if (!accOk || !kappaOk || !noInfraFail) allPass = false;
         }
 
@@ -502,6 +503,9 @@ public static class BenchAgenticCalibrateCommand
             sb.AppendLine($"|--------|-------|-----------|--------|");
             sb.AppendLine($"| Entries evaluated | {cr.EntryCount} | — | — |");
             sb.AppendLine($"| Evaluation failures | {cr.EvaluationFailures} | == 0 | {(noInfraFail ? "OK" : "INFRA-FAIL")} |");
+            // Not scored (B3a): no verdict to compare with gold — reported, never counted as agreement or disagreement.
+            sb.AppendLine($"| Not measured (not scored) | {cr.NotMeasured} | — | info |");
+            sb.AppendLine($"| Inapplicable (not scored) | {cr.NotApplicable} | — | info |");
             sb.AppendLine($"| Accuracy | {cr.Accuracy:P1} | >= {accThr:P0} | {(accOk ? "OK" : "BELOW")} |");
             sb.AppendLine($"| Cohen's kappa | {FormatKappa(cr.CohensKappa)} | >= {kapThr:F2} | {(kappaOk ? "OK" : "BELOW")} |");
             sb.AppendLine($"| Within score range | {cr.WithinScoreRange} / {cr.EntryCount} | — | — |");

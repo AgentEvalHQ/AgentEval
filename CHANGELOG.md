@@ -31,6 +31,17 @@ third-party exporter on our public interfaces.
     calls reach the unsafe-tool-use check — `bench agentic` does not pass a trace's tool calls to it), Reasoning (a
     response without plan or list markers skips the plan and goal-decomposition checks), Telemetry (zero calls), Judge
     Quality (a missing input), and Tool Call Accuracy / Agentic Execution (no tool definitions captured, or definitions with no tool calls).
+- **Calibration scored results that were never measured.** The agentic, GDPR and EU AI Act calibration runners added
+  every result to the accuracy and kappa pairs: a skipped, inapplicable or withheld result never equals a gold label,
+  so it counted as a disagreement, and its 0.0 placeholder was credited "within score range" whenever a band started
+  at 0. Only measured verdicts are scored now; the others are reported in their own counts (`not_measured`,
+  `inapplicable`) on the console and in the Markdown report. A judge that answered with no usable verdict (`error`)
+  counts as an evaluation failure (INFRA-FAIL), so an outage cannot raise accuracy by dropping out.
+  - Affected golden sets: `golden-unsafe-tool-use.jsonl` (all 20 records are unreachable from text-only records and
+    were scored as disagreements), `golden-reasoning.jsonl` (5 records), and `tool_input_accuracy`, which on text-only
+    records can now confirm fails but never passes (a passing judge leaves its schema check unmeasured). Published
+    agentic calibration figures from runs before this change include those records; GDPR/EU AI Act runs may have
+    counted judge errors as disagreements.
 - **A multi-judge panel passed when none of its judges answered.** `MultiJudgeWrapper` and
   `AdjudicatedMultiJudgeWrapper` (used for critical GDPR/EU AI Act articles) read the empty aggregate of a panel whose
   judges all errored or skipped as a pass. Such a panel now reports `error` (any judge errored) or `skipped`, and

@@ -4,6 +4,7 @@
 
 using AgentEval.Core;
 using AgentEval.Evals;
+using AgentEval.Evals.Meta;
 using AgentEval.Compliance.Gdpr.Articles;
 using AgentEval.Compliance.Gdpr.Articles.Building;
 using AgentEval.Compliance.Gdpr.Articles.Models;
@@ -53,6 +54,8 @@ public sealed class CalibrationRunner
             var scoreDeltas = new List<double>();
             int withinScoreRange = 0;
             int evaluationFailures = 0;
+            int notMeasured = 0;
+            int notApplicable = 0;
 
             foreach (var entry in ds.Entries)
             {
@@ -126,6 +129,24 @@ public sealed class CalibrationRunner
                     continue;
                 }
 
+                // Only a MEASURED verdict is calibration evidence (ADR-030; #203 review, B3a). A result that reached no
+                // verdict never equals a gold label and its 0.0 is a placeholder, so counting it made a judge outage read
+                // as disagreement and a placeholder as an in-band score. A judge that answered with no usable verdict
+                // ("error") IS an evaluation failure — counted with the thrown ones, so an outage cannot raise accuracy by
+                // dropping out; anything else not measured or inapplicable is reported in its own count, never scored.
+                switch (result.Score.CensusBucket())
+                {
+                    case MeasurementState.NotMeasured when result.Score.Label == "error":
+                        evaluationFailures++;
+                        continue;
+                    case MeasurementState.NotMeasured:
+                        notMeasured++;
+                        continue;
+                    case MeasurementState.NotApplicable:
+                        notApplicable++;
+                        continue;
+                }
+
                 pairs.Add((entry.ExpectedVerdict, result.Score.Label));
 
                 if (result.Score.Value >= entry.ExpectedScoreMin &&
@@ -143,7 +164,9 @@ public sealed class CalibrationRunner
                 CohensKappa: CalibrationMetrics.CohensKappa(pairs),
                 WithinScoreRange: withinScoreRange,
                 MeanScoreDelta: scoreDeltas.Count > 0 ? scoreDeltas.Average() : 0.0,
-                EvaluationFailures: evaluationFailures);
+                EvaluationFailures: evaluationFailures,
+                NotMeasured: notMeasured,
+                NotApplicable: notApplicable);
         }
 
         return new CalibrationReport(DateTimeOffset.UtcNow, perPillar);
@@ -163,4 +186,6 @@ public sealed record CalibrationPillarReport(
     double CohensKappa,
     int WithinScoreRange,
     double MeanScoreDelta,
-    int EvaluationFailures = 0);
+    int EvaluationFailures = 0,
+    int NotMeasured = 0,
+    int NotApplicable = 0);

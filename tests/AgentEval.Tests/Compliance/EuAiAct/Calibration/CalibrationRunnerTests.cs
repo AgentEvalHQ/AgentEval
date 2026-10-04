@@ -207,4 +207,30 @@ public class CalibrationRunnerTests
             CancellationToken cancellationToken = default) =>
             Task.FromException<EvaluationResult>(new InvalidOperationException("simulated judge outage"));
     }
+
+    // ── B3a (#203 review): a judge that answered with no usable verdict is an evaluation failure ─────────────────
+    // AtomicLlmEval turns EvaluationFailed into the "error" label without throwing. The runner used to add that label to
+    // the accuracy pairs — a judge outage read as disagreement and was never counted as a failure.
+
+    private sealed class NoVerdictEvaluator : IEvaluator
+    {
+        public Task<EvaluationResult> EvaluateAsync(
+            string input, string output, IEnumerable<string> criteria,
+            CancellationToken cancellationToken = default) =>
+            Task.FromResult(new EvaluationResult { OverallScore = 0, Summary = "unparseable", EvaluationFailed = true });
+    }
+
+    [Fact]
+    public async Task RunAsync_JudgeReturnsNoVerdict_IsAnEvaluationFailure_NotADisagreement()
+    {
+        var registry = BuildRegistry(new AlwaysPassEvaluator());
+        var runner = new CalibrationRunner(registry, new NoVerdictEvaluator());
+
+        var report = await runner.RunAsync([BuildMixedDataset()]);
+
+        var pillar = report.PerPillar.Values.Single();
+        Assert.Equal(4, pillar.EvaluationFailures);
+        Assert.Equal(0, pillar.EntryCount);
+        Assert.Equal(0, pillar.WithinScoreRange);   // the old runner credited the 0.0 as inside the [0, 0.30] fail bands
+    }
 }

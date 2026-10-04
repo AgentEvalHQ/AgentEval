@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using AgentEval.Evals;
+using AgentEval.Evals.Meta;
 
 namespace AgentEval.Evals.Agentic.Calibration;
 
@@ -99,6 +100,8 @@ public sealed class CalibrationRunner
             int withinScoreRange = 0;
             int evaluationFailures = 0;
             int skippedUnknownKey = 0;
+            int notMeasured = 0;
+            int notApplicable = 0;
 
             var entries = limitPerCategory is int limit ? ds.Entries.Take(limit) : ds.Entries;
             foreach (var entry in entries)
@@ -140,6 +143,25 @@ public sealed class CalibrationRunner
                 if (caseSink is not null)
                     await caseSink(CalibrationCaseRecord.From(ds.CategoryKey, entry, result), ct).ConfigureAwait(false);
 
+                // Only a MEASURED verdict is calibration evidence (ADR-030; #203 review, B3a). A result that reached no
+                // verdict never equals a gold label and its 0.0 is a placeholder, so counting it made a judge outage read
+                // as disagreement and a placeholder as an in-band score. A judge that answered with no usable verdict
+                // ("error") IS an evaluation failure — counted with the thrown ones, so an outage cannot raise accuracy by
+                // dropping out; anything else not measured (skipped, a composite that withheld its pass) or inapplicable
+                // is reported in its own count, never scored.
+                switch (result.Score.CensusBucket())
+                {
+                    case MeasurementState.NotMeasured when result.Score.Label == "error":
+                        evaluationFailures++;
+                        continue;
+                    case MeasurementState.NotMeasured:
+                        notMeasured++;
+                        continue;
+                    case MeasurementState.NotApplicable:
+                        notApplicable++;
+                        continue;
+                }
+
                 pairs.Add((entry.ExpectedVerdict, result.Score.Label));
 
                 if (result.Score.Value >= entry.ExpectedScoreMin &&
@@ -158,7 +180,9 @@ public sealed class CalibrationRunner
                 WithinScoreRange: withinScoreRange,
                 MeanScoreDelta: scoreDeltas.Count > 0 ? scoreDeltas.Average() : 0.0,
                 EvaluationFailures: evaluationFailures,
-                SkippedUnknownKey: skippedUnknownKey);
+                SkippedUnknownKey: skippedUnknownKey,
+                NotMeasured: notMeasured,
+                NotApplicable: notApplicable);
         }
 
         return new CalibrationReport(DateTimeOffset.UtcNow, perCategory);
@@ -179,7 +203,9 @@ public sealed record CalibrationCategoryReport(
     int WithinScoreRange,
     double MeanScoreDelta,
     int EvaluationFailures = 0,
-    int SkippedUnknownKey = 0);
+    int SkippedUnknownKey = 0,
+    int NotMeasured = 0,
+    int NotApplicable = 0);
 
 /// <summary>
 /// One evaluated calibration case, as a record that can be written to JSONL and analysed offline.
