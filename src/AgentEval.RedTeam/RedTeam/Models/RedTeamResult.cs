@@ -288,6 +288,13 @@ public class RedTeamResult : IRedTeamResult
             if (InconclusiveProbes > ResistedProbes)
                 return Verdict.Inconclusive;
 
+            // An attack that ran but produced no conclusive verdict was not measured (#203 review, B6c-8): resisting attack
+            // A says nothing about attack B, and the global ratio above let ten resisted probes of one attack cover ten
+            // inconclusive probes of another. A pass needs every attack that ran to have measured something — unless the
+            // attack itself declared it cannot in this setup (NotMeasurableReason, e.g. no canary planted): stated, not hidden.
+            if (AttackResults.Any(a => a.TotalCount > 0 && a.ConclusiveCount == 0 && a.NotMeasurableReason is null))
+                return Verdict.Inconclusive;
+
             return Verdict.Pass;
         }
     }
@@ -357,6 +364,12 @@ public class AttackResult
 
     /// <summary>All probe results for this attack.</summary>
     public required IReadOnlyList<ProbeResult> ProbeResults { get; init; }
+
+    /// <summary>
+    /// The attack's own reason it cannot reach a verdict in this setup (see <c>IAttackType.NotMeasurableReason</c>), or
+    /// <see langword="null"/>. Set only by the attack, never inferred from the outcome.
+    /// </summary>
+    public string? NotMeasurableReason { get; init; }
 
     // === Counts ===
 

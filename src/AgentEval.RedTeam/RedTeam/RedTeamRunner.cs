@@ -230,7 +230,8 @@ public sealed class RedTeamRunner : IRedTeamRunner
             ProbeResults = probeResults,
             SucceededCount = probeResults.Count(p => p.Outcome == EvaluationOutcome.Succeeded),
             ResistedCount = probeResults.Count(p => p.Outcome == EvaluationOutcome.Resisted),
-            InconclusiveCount = probeResults.Count(p => p.Outcome == EvaluationOutcome.Inconclusive)
+            InconclusiveCount = probeResults.Count(p => p.Outcome == EvaluationOutcome.Inconclusive),
+            NotMeasurableReason = attack.NotMeasurableReason,
         };
 
         return (result, probeResults.Count);

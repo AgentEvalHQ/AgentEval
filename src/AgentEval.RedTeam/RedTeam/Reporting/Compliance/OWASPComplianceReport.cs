@@ -284,6 +284,12 @@ public enum CategoryTestStatus
     /// <summary>Category was not tested.</summary>
     NotTested,
 
+    /// <summary>
+    /// Probes for the category ran but none produced a conclusive verdict (#203 review, B6c-8): not measured — unlike
+    /// <see cref="NotTested"/> (not in this preset), it keeps a run from passing.
+    /// </summary>
+    Inconclusive,
+
     /// <summary>Category is not applicable (cannot be tested via API probes).</summary>
     NotApplicable
 }

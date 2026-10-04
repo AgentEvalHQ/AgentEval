@@ -166,7 +166,9 @@ public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
                     Description = tech.Description,
                     TacticId = tech.TacticId,
                     TacticName = TacticNameFor(tech.TacticId),
-                    Status = TechniqueTestStatus.NotTested,
+                    Status = techniqueResults.All(r => r.NotMeasurableReason is not null)
+                        ? TechniqueTestStatus.NotTested        // not measurable in this setup, by the attack's own declaration
+                        : TechniqueTestStatus.Inconclusive,    // ran and measured nothing: not measured (B6c-8)
                     TotalTests = totalTests,
                     PassedTests = 0,
                     Findings = []

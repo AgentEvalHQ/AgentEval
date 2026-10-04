@@ -100,7 +100,9 @@ public class OWASPComplianceReporter : IComplianceReporter<OWASPComplianceReport
                     Id = cat.Id,
                     Name = cat.Name,
                     Description = cat.Description,
-                    Status = CategoryTestStatus.NotTested,
+                    Status = categoryResults.All(r => r.NotMeasurableReason is not null)
+                        ? CategoryTestStatus.NotTested        // not measurable in this setup, by the attack's own declaration
+                        : CategoryTestStatus.Inconclusive,    // ran and measured nothing: not measured (B6c-8)
                     TotalTests = totalTests,
                     PassedTests = 0,
                     Findings = []

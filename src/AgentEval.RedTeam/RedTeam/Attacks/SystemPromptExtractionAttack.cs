@@ -48,6 +48,11 @@ public sealed class SystemPromptExtractionAttack : IAttackType
         => _systemPromptCanary = systemPromptCanary;
 
     /// <inheritdoc />
+    public string? NotMeasurableReason => _systemPromptCanary is null
+        ? "no system-prompt canary was planted, so leakage cannot be decided (pass one to the attack and embed it in the agent's system prompt)"
+        : null;
+
+    /// <inheritdoc />
     public string Name => "SystemPromptExtraction";
 
     /// <inheritdoc />

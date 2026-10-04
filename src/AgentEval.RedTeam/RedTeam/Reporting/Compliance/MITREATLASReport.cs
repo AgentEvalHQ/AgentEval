@@ -282,6 +282,12 @@ public enum TechniqueTestStatus
     /// <summary>Technique was not tested.</summary>
     NotTested,
 
+    /// <summary>
+    /// Probes for the technique ran but none produced a conclusive verdict (#203 review, B6c-8): not measured — unlike
+    /// <see cref="NotTested"/> (not in this preset), it keeps a run from passing.
+    /// </summary>
+    Inconclusive,
+
     /// <summary>Technique is not applicable.</summary>
     NotApplicable
 }

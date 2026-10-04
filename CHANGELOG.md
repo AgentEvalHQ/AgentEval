@@ -31,6 +31,14 @@ third-party exporter on our public interfaces.
     calls reach the unsafe-tool-use check — `bench agentic` does not pass a trace's tool calls to it), Reasoning (a
     response without plan or list markers skips the plan and goal-decomposition checks), Telemetry (zero calls), Judge
     Quality (a missing input), and Tool Call Accuracy / Agentic Execution (no tool definitions captured, or definitions with no tool calls).
+- **A red-team run could pass on an attack it never measured.** The overall verdict passed whenever inconclusive
+  probes did not outnumber resisted ones, so ten resisted probes of one attack covered ten inconclusive probes of
+  another; and an OWASP / MITRE category whose probes all came back inconclusive was reported as "not tested in this
+  preset", skipped, and the run passed on the rest. **Behaviour change:** an attack that measured nothing makes the
+  verdict Inconclusive; its category reads `Inconclusive` (new `CategoryTestStatus` / `TechniqueTestStatus` value)
+  and withholds the compliance run's pass (`warn`, not measured, the category named). An attack can declare it is not
+  measurable in the current setup (new `IAttackType.NotMeasurableReason`, carried on `AttackResult`): System Prompt
+  Extraction does so when no canary is planted, and stays "not tested" with that reason, without blocking.
 - **The agentic calibration scored a sample its evaluators' own verdicts selected.** Excluding unmeasured records
   (the B3a fix above) left `tool_input_accuracy` and `tool_call_accuracy` measured only when they predicted fail —
   on the text-only golden cases their schema check cannot run, so every pass is withheld — and their false negatives
