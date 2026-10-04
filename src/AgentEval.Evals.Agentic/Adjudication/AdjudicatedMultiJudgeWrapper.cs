@@ -118,6 +118,13 @@ public sealed class AdjudicatedMultiJudgeWrapper : IEval
         var subTasks = _judges.Select(j => j.Eval.EvaluateAsync(input, ct)).ToArray();
         var panelResults = await Task.WhenAll(subTasks);
 
+        // ── 1b. A panel none of whose judges produced a measurement has no verdict ────────────
+        // Every judge errored or skipped: their labels all agree ("error"), so the panel read as undisputed, the
+        // aggregation returned (0, "none") and the severity switch made that a PASS (#203 review, round 2 M-1). No
+        // verdict instead, and no adjudicator call: there is no disagreement to settle, only nothing to go on.
+        if (!panelResults.Any(r => r.Score.CountsTowardAggregate()))
+            return NoVerdict(panelResults);
+
         // ── 2. Compute inter-rater agreement ──────────────────────────────────
         var (agreement, agreementMethod) = ComputeAgreement(panelResults);
 
@@ -177,6 +184,40 @@ public sealed class AdjudicatedMultiJudgeWrapper : IEval
                 SubResults: allSubResults,
                 AggregationStrategy: finalAggStrategy),
             Provenance: new("multi-judge-adjudicated", null, null, null, null, cost, false),
+            EvaluatedAt: DateTimeOffset.UtcNow);
+    }
+
+    // No panel judge produced a measurement: "error" when any errored, else "skipped" — and NotApplicable, which never
+    // blocks a parent, only when every judge said the case cannot test this.
+    private EvalResult NoVerdict(EvalResult[] panelResults)
+    {
+        var errored = panelResults.Count(r => r.Score.Label == "error");
+        var allInapplicable = panelResults.All(r => r.Score.CensusBucket() == AgentEval.Evals.Meta.MeasurementState.NotApplicable);
+        var label = errored > 0 ? "error" : "skipped";
+        var note = allInapplicable
+            ? $"All {panelResults.Length} panel judge(s) were inapplicable — the case cannot test this — so no verdict is reported."
+            : $"No panel judge produced a measurement ({errored} errored, {panelResults.Length - errored} skipped or not " +
+              "measured), so no verdict is reported and the adjudicator was not asked.";
+
+        return new EvalResult(
+            Metric: new(Key, Name, Category, Version),
+            Score: new EvalScore(0.0, null, label, false, _agreementThreshold, "none", null)
+            {
+                Measurement = allInapplicable
+                    ? AgentEval.Evals.Meta.MeasurementState.NotApplicable
+                    : AgentEval.Evals.Meta.MeasurementState.Measured,
+            },
+            Details: new(
+                Dimensions: null,
+                Evidence: null,
+                Recommendations: [note],
+                SubResults: panelResults,
+                AggregationStrategy: _aggregation.Name)
+            {
+                Summary = note,
+            },
+            Provenance: new("multi-judge-adjudicated", null, null, null, null,
+                panelResults.Sum(r => r.Provenance.EstimatedCost), false),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 

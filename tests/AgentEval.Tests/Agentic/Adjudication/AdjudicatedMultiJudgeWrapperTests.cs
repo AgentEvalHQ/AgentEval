@@ -147,4 +147,41 @@ public class AdjudicatedMultiJudgeWrapperTests
         // SubResults should include panel (3) + adjudicator (1) = 4
         Assert.Equal(4, result.Details.SubResults!.Count);
     }
+
+    // ── Nothing measured is no verdict (#203 review, round 2 M-1) ─────────────────────────────────
+    // Every judge errored: their labels all agree ("error"), the panel read as undisputed, the aggregation returned
+    // (0, "none") and the severity switch made it a PASS.
+
+    [Fact]
+    public async Task EveryPanelJudgeErrored_IsError_AndTheAdjudicatorIsNotAsked()
+    {
+        var judges = new EvalComponent[]
+        {
+            new(new StubEval("error", 0.0), 1.0),
+            new(new StubEval("error", 0.0), 1.0),
+            new(new StubEval("error", 0.0), 1.0),
+        };
+        var wrapper = BuildWrapper(judges, new ThrowingAdjudicator());
+
+        var result = await wrapper.EvaluateAsync(new EvalInput(Query: "q", Response: "r"));
+
+        Assert.Equal("error", result.Score.Label);
+        Assert.False(result.Score.Passed);
+    }
+
+    [Fact]
+    public async Task EveryPanelJudgeSkipped_IsSkipped_NotPass()
+    {
+        var judges = new EvalComponent[]
+        {
+            new(new StubEval("skipped", 0.0), 1.0),
+            new(new StubEval("skipped", 0.0), 1.0),
+        };
+        var wrapper = BuildWrapper(judges, new ThrowingAdjudicator());
+
+        var result = await wrapper.EvaluateAsync(new EvalInput(Query: "q", Response: "r"));
+
+        Assert.Equal("skipped", result.Score.Label);
+        Assert.False(result.Score.Passed);
+    }
 }

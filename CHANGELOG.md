@@ -31,6 +31,14 @@ third-party exporter on our public interfaces.
     calls reach the unsafe-tool-use check — `bench agentic` does not pass a trace's tool calls to it), Reasoning (a
     response without plan or list markers skips the plan and goal-decomposition checks), Telemetry (zero calls), Judge
     Quality (a missing input), and Tool Call Accuracy / Agentic Execution (tool definitions with no tool calls).
+- **A multi-judge panel passed when none of its judges answered.** `MultiJudgeWrapper` and
+  `AdjudicatedMultiJudgeWrapper` (used for critical GDPR/EU AI Act articles) read the empty aggregate of a panel whose
+  judges all errored or skipped as a pass. Such a panel now reports `error` (any judge errored) or `skipped`, and
+  the adjudicator is not asked; a partly measured panel is unchanged.
+- **The performance budget checks called a run nobody timed "inapplicable".** With no performance data, or no token
+  usage from the provider, the latency, token and first-token checks now report `skipped` (not measured), so a
+  benchmark run with them cannot pass. A run that was measured but not streamed is still inapplicable for time to
+  first token.
 - **A benchmark run passed with checks that never ran.** `BenchmarkRunner` (ADR-032 benchmark definitions) read
   PASS when every measured check passed and ignored the rest, so a skipped or errored check never kept the run from
   passing. **Behaviour change:** any not-measured row makes the run WARN; inapplicable rows (the case could not test

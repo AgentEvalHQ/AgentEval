@@ -329,4 +329,77 @@ public class MultiJudgeWrapperTests
 
         Assert.False(result.Provenance.CacheHit);
     }
+
+    // ── Nothing measured is no verdict (#203 review, round 2 M-1) ─────────────────────────────────
+    // Every judge errored or skipped: the aggregation returned (0, "none") and both verdict paths read it as a pass,
+    // so a panel none of whose judges answered passed its parent.
+
+    [Fact]
+    public async Task EveryJudgeErrored_IsError_NotPass()
+    {
+        var sut = MakeWrapper([JudgeComp("a", 0, label: "error"), JudgeComp("b", 0, label: "error")]);
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("error", result.Score.Label);
+        Assert.False(result.Score.Passed);
+        Assert.Contains("No judge produced a measurement", result.Details.Summary!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task EveryJudgeSkipped_WithAThreshold_IsSkipped_NotPass()
+    {
+        var sut = new MultiJudgeWrapper("k", "n", "c", "1.0.0",
+            [JudgeComp("a", 0, label: "skipped"), JudgeComp("b", 0, label: "skipped")],
+            WeightedMedianAggregation.Instance, threshold: 0.0);
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("skipped", result.Score.Label);
+        Assert.False(result.Score.Passed);
+        Assert.Equal(AgentEval.Evals.Meta.MeasurementState.NotMeasured, result.Score.CensusBucket());
+    }
+
+    [Fact]
+    public async Task EveryJudgeInapplicable_IsNotApplicable_AndDoesNotBlockAParent()
+    {
+        var panel = MakeWrapper([JudgeComp("a", 0, label: "inapplicable"), JudgeComp("b", 0, label: "inapplicable")]);
+        var parent = new CompositeEval("p", "P", "test", "1.0.0", new EvalComponent[]
+        {
+            new(new FixedResultEval("x", MakeResult("x", 1.0))),
+            new(panel),
+        }, WeightedSumAggregation.Instance);
+
+        var panelResult = await panel.EvaluateAsync(Input);
+        var parentResult = await parent.EvaluateAsync(Input);
+
+        Assert.Equal(AgentEval.Evals.Meta.MeasurementState.NotApplicable, panelResult.Score.Measurement);
+        Assert.Equal("pass", parentResult.Score.Label);
+    }
+
+    [Fact]
+    public async Task APanelThatDidNotAnswer_KeepsARequiringParentFromPassing()
+    {
+        var panel = MakeWrapper([JudgeComp("a", 0, label: "skipped"), JudgeComp("b", 0, label: "skipped")]);
+        var parent = new CompositeEval("p", "P", "test", "1.0.0", new EvalComponent[]
+        {
+            new(new FixedResultEval("x", MakeResult("x", 1.0))),
+            new(panel),
+        }, WeightedSumAggregation.Instance);
+
+        var result = await parent.EvaluateAsync(Input);
+
+        Assert.Equal("warn", result.Score.Label);
+        Assert.False(result.Score.Passed);
+    }
+
+    [Fact]
+    public async Task APartlyMeasuredPanel_IsDecidedByTheJudgesThatAnswered()
+    {
+        var sut = MakeWrapper([JudgeComp("a", 0.9), JudgeComp("b", 0, label: "error")]);
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("pass", result.Score.Label);
+    }
 }

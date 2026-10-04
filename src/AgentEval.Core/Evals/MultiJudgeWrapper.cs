@@ -2,6 +2,8 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using AgentEval.Evals.Meta;
+
 namespace AgentEval.Evals;
 
 /// <summary>
@@ -106,6 +108,13 @@ public sealed class MultiJudgeWrapper : IEval
         // every judge was a cache hit.
         var (cost, allCacheHits) = CostRollup.Aggregate(subs);
 
+        // Nothing measured is no verdict — CompositeEval's ADR-030 rule, which this wrapper lacked. The aggregation
+        // returns (0, "none") when every judge errored or skipped, and both verdict paths below read that as a pass, so
+        // a panel none of whose judges answered passed its parent (#203 review, round 2 M-1). A partly measured panel
+        // is unchanged: the judges that answered decide.
+        if (!subs.Any(s => s.Score.CountsTowardAggregate()))
+            return NoVerdict(subs, cost, allCacheHits);
+
         // Honour the optional Threshold parameter (when supplied) — falls
         // back to the severity-driven verdict matrix otherwise. Mirrors
         // CompositeEval's behaviour so consumers can pick whichever shape
@@ -129,6 +138,37 @@ public sealed class MultiJudgeWrapper : IEval
                 Recommendations: null,
                 SubResults: subs,
                 AggregationStrategy: Aggregation.Name),
+            Provenance: new("composite", null, null, null, null, cost, allCacheHits),
+            EvaluatedAt: DateTimeOffset.UtcNow);
+    }
+
+    // No judge produced a measurement: "error" when any errored, else "skipped" — and NotApplicable, which never blocks
+    // a parent, only when every judge said the case cannot test this.
+    private EvalResult NoVerdict(EvalResult[] subs, double cost, bool allCacheHits)
+    {
+        var errored = subs.Count(s => s.Score.Label == "error");
+        var allInapplicable = subs.All(s => s.Score.CensusBucket() == MeasurementState.NotApplicable);
+        var label = errored > 0 ? "error" : "skipped";
+        var note = allInapplicable
+            ? $"All {subs.Length} judge(s) were inapplicable — the case cannot test this — so no verdict is reported."
+            : $"No judge produced a measurement ({errored} errored, {subs.Length - errored} skipped or not measured), " +
+              "so no verdict is reported.";
+
+        return new EvalResult(
+            Metric: new(Key, Name, Category, Version),
+            Score: new(0.0, null, label, false, Threshold, "none", null)
+            {
+                Measurement = allInapplicable ? MeasurementState.NotApplicable : MeasurementState.Measured,
+            },
+            Details: new(
+                Dimensions: null,
+                Evidence: null,
+                Recommendations: [note],
+                SubResults: subs,
+                AggregationStrategy: Aggregation.Name)
+            {
+                Summary = note,
+            },
             Provenance: new("composite", null, null, null, null, cost, allCacheHits),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
