@@ -95,18 +95,61 @@ public class AtomicLlmEvalToolSectionTests
     }
 
     [Fact]
-    public async Task ManyCalls_StopAtTheSectionLimit_AndTheRestAreCounted()
+    public async Task ManyCalls_AreAllNamed_AndTheirResultsAreWhatIsCut()
     {
+        // B6c-4 (mid-branch review): the bound used to drop whole calls from the end.
         var calls = Enumerable.Range(0, 40)
             .Select(i => new ToolCall($"step_{i}", null, new string('y', 1_000)))
             .ToList();
 
         var text = await JudgeInputFor(new EvalInput("q", "r", ToolCalls: calls), JudgeToolData.ToolCalls);
 
-        Assert.Contains("\"name\":\"step_0\"", text, StringComparison.Ordinal);
-        Assert.DoesNotContain("\"name\":\"step_39\"", text, StringComparison.Ordinal);
-        Assert.Matches(@"…\[\d+ more call\(s\) not shown", text);
-        Assert.True(text.Length < AtomicLlmEval.ToolSectionCharacterLimit + 500, $"length {text.Length}");
+        Assert.All(Enumerable.Range(0, 40), i => Assert.Contains($"\"name\":\"step_{i}\"", text, StringComparison.Ordinal));
+        Assert.Contains("[cut:", text, StringComparison.Ordinal);
+        Assert.True(text.Length < AtomicLlmEval.ToolSectionCharacterLimit + 2_000, $"length {text.Length}");
+    }
+
+    [Fact]
+    public async Task ALateDestructiveCall_AfterLongReads_ReachesTheJudge_WithItsArguments()
+    {
+        // The reviewer's probe: 8 reads with 2,000-character results, then delete_records — which the old bound cut.
+        var calls = Enumerable.Range(0, 8)
+            .Select(i => new ToolCall("read_doc", new Dictionary<string, object> { ["id"] = $"doc-{i}" }, new string('z', 2_000)))
+            .Append(new ToolCall("delete_records", new Dictionary<string, object> { ["table"] = "customers" }, "deleted 4210 rows"))
+            .ToList();
+
+        var text = await JudgeInputFor(new EvalInput("q", "r", ToolCalls: calls), JudgeToolData.ToolCalls);
+
+        Assert.Contains("\"name\":\"delete_records\"", text, StringComparison.Ordinal);
+        Assert.Contains("\"table\":\"customers\"", text, StringComparison.Ordinal);
+        Assert.True(text.Length < AtomicLlmEval.ToolSectionCharacterLimit + 2_000, $"length {text.Length}");
+    }
+
+    [Fact]
+    public async Task AFloodOfCalls_KeepsEveryName_AndSaysTheArgumentsWereLeftOut()
+    {
+        var calls = Enumerable.Range(0, 700)
+            .Select(i => new ToolCall($"t{i}", new Dictionary<string, object> { ["payload"] = new string('a', 100) }, "ok"))
+            .ToList();
+
+        var text = await JudgeInputFor(new EvalInput("q", "r", ToolCalls: calls), JudgeToolData.ToolCalls);
+
+        Assert.Contains("\"name\":\"t0\"", text, StringComparison.Ordinal);
+        Assert.Contains("\"name\":\"t699\"", text, StringComparison.Ordinal);
+        Assert.Contains("arguments not shown", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ToolDefinitionsBeyondTheLimit_AreStillNamed()
+    {
+        var definitions = Enumerable.Range(0, 30)
+            .Select(i => new ToolDefinition($"tool_{i}", new string('d', 1_500), null))
+            .ToList();
+
+        var text = await JudgeInputFor(new EvalInput("q", "r", ToolDefinitions: definitions), JudgeToolData.ToolDefinitions);
+
+        Assert.Contains("tool_29", text, StringComparison.Ordinal);
+        Assert.Contains("details not shown", text, StringComparison.Ordinal);
     }
 
     [Fact]

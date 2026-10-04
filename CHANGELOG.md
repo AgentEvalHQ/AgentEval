@@ -31,6 +31,10 @@ third-party exporter on our public interfaces.
     calls reach the unsafe-tool-use check — `bench agentic` does not pass a trace's tool calls to it), Reasoning (a
     response without plan or list markers skips the plan and goal-decomposition checks), Telemetry (zero calls), Judge
     Quality (a missing input), and Tool Call Accuracy / Agentic Execution (no tool definitions captured, or definitions with no tool calls).
+- **The judge's tool-call section could drop a late destructive call.** Its size bound kept the first calls and cut
+  the rest, so eight long reads followed by `delete_records` showed the judge only the reads. Every call is now listed
+  in order with its name and recorded outcome; arguments stay unless the calls alone overflow the section (then that is
+  stated); the results are what gets cut, sharing the room left. Tool definitions past the bound are still named.
 - **GDPR and EU AI Act presets could FAIL with every article passing.** Since the severity cap above, the verdict read
   severity from every required part, passed or not, and a PASSING article still reported the severity of a scenario
   failure its own scoring absorbed: 28 GDPR and 11 EU single-scenario cases read FAIL with no article failing, while
