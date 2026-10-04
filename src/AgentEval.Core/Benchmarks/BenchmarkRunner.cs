@@ -259,6 +259,13 @@ public sealed class BenchmarkRunner
     /// <c>VOID</c>: no exit code and no control ledger are claimed here (Q5).
     /// </para>
     /// <para>
+    /// ⚠ <b><c>WARN</c>, not <c>PASS</c>, when a row was NOT MEASURED.</b> Skipped stays one bucket for both states,
+    /// but the verdict tells them apart: a <see cref="MeasurementState.NotApplicable"/> row is a corpus finding and stays
+    /// out of the verdict; a <see cref="MeasurementState.NotMeasured"/> row is a check that did not run (skipped,
+    /// errored, or a composite that withheld its pass) and keeps the run from passing. It used to be ignored, so a run
+    /// passed with checks that never ran.
+    /// </para>
+    /// <para>
     /// <c>Metrics</c> carries the CENSUS and nothing else. An aggregate score across checks would
     /// pool rows whose floors differ — a mean over incomparable things — and the census is the number
     /// that has to sit beside any such mean anyway.
@@ -290,7 +297,10 @@ public sealed class BenchmarkRunner
         var verdict =
             failed > 0 ? "FAIL"
             : passed + failed + warnings == 0 ? "PENDING"
-            : warnings > 0 ? "WARN"
+            // A row whose check did not run (skipped, errored, or a composite that withheld its pass) is not a pass:
+            // the run is WARN, not PASS — the same rule a composite applies to a required component that did not run
+            // (#203). An inapplicable row stays out: the case could not test it, which is a corpus finding.
+            : warnings > 0 || notMeasured > 0 ? "WARN"
             : "PASS";
 
         return new RunSummary(

@@ -16,6 +16,10 @@
   §6's answer table for what each answer refused, **in code and not only in prose**.
   <br/>⚠ Accepted describes the contract, not the stop rule: Q6 is *yes on the principle, staged in
   execution*, so `BenchmarkRunner` still applies **no** floor to any verdict.
+  <br/>**Amended 2026-10-04 (#203 review):** the run verdict below read "WARN if warnings > 0 · else PASS", so a
+  row whose check did not run (`NotMeasured`: skipped or errored) was ignored and the run passed without it. The
+  verdict is now WARN when any row is `NotMeasured`, as a composite treats a required component that did not run.
+  `skipped` stays one bucket for both states; only `NotApplicable` rows (a corpus finding) stay out of the verdict.
   <br/>_Superseded status, kept because the reasoning still holds: **Proposed.** Proposed is a gate,
   not a placeholder (the ADR-026 / ADR-030 precedent). Accepting this document funds Waves 0 and 1 of
   §3.3 … Wave 2, the benchmark contract itself, is gated on one question only the owner can answer
@@ -726,7 +730,7 @@ Everything else in Waves 0–3 edits **no** existing test file. Wave 4's list is
 | **Q4(ii)** (ADR-030) | Write `measurement` unconditionally and bump `$id` | a typed definition identity and rep index on the manifest (`additionalProperties:false` at `manifest.schema.json:6,12,22,36,54,64,73`); a finer `RunStats` bucket than `skipped`; on-disk visibility of `NotApplicable` rows without reading `label` | Nothing here changes a historical content hash: `NotApplicable` writes `measurement` only when non-default, as the two shipped consumers already do |
 | **Q5** (ADR-030) | Fund negative controls? | any `Controls` slot on `BenchmarkDefinition` (deliberately absent); `VOID`, exit 12 (`ExitCodes.cs:153-154`), a control ledger; whether the join wave's local ablations become durable controls | `PENDING` for a run with nothing measured is "no verdict", not VOID; `grep -rn controlLedger src` → 1 hit, the reservation comment |
 | **Q6** (ADR-030) | Does the stop rule bind — does any `FloorComparison` gate a verdict? | whether `BenchmarkScore` ever gates (today it reports); Slice 2.6's acceptance; Wave 4(b) (`AgentEvalCompositeEvaluator` taking a floor) | `SignTestAtEqualK` is live at `PairedCoverageReport.cs:463` with **11** call sites (`Eval02_LatentInterestCoverage.cs` ×4, `Eval09_HypothesisComparison.cs` ×4, `NegativeControls.cs:1845,:2897,:3320`), so 2.6's precondition is two deletions, not one (ADR-030 §11.2 row 11). `IsUsableAsABar && Passed` with no comparison is now countable and, on this tree, is every admitted pass |
-| **Q8** (ADR-030) | Quotation of the four UNKNOWN figures | nothing here quotes them | unchanged |
+| **Q8** (ADR-030) | Quotation of the four UNKNOWN figures | nothing here quotes them | unchanged |
 
 ### ✅ §6 ANSWERED 2026-09-07 — every question in this table now has the owner's answer
 

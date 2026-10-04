@@ -31,6 +31,10 @@ third-party exporter on our public interfaces.
     calls reach the unsafe-tool-use check — `bench agentic` does not pass a trace's tool calls to it), Reasoning (a
     response without plan or list markers skips the plan and goal-decomposition checks), Telemetry (zero calls), Judge
     Quality (a missing input), and Tool Call Accuracy / Agentic Execution (tool definitions with no tool calls).
+- **A benchmark run passed with checks that never ran.** `BenchmarkRunner` (ADR-032 benchmark definitions) read
+  PASS when every measured check passed and ignored the rest, so a skipped or errored check never kept the run from
+  passing. **Behaviour change:** any not-measured row makes the run WARN; inapplicable rows (the case could not test
+  them) still stay out of the verdict. ADR-032 carries a dated amendment.
 - **Benchmark run statistics counted leaves that were not measured as failures.** The agentic, GDPR and EU AI Act
   runners filed every `inapplicable` and `error` leaf under Failed. They now go in the single Skipped bucket, as
   ADR-030 specifies, so Failed counts only measured failures.
