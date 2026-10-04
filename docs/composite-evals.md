@@ -111,7 +111,7 @@ The composite verdict is determined after aggregation. `warn` is a soft fail: `P
 |---|-----------|---------|----------|
 | 1 | a `Required` component errored | `"error"` | `false` |
 | 2 | no component produced a measurement | `"error"` if any errored, else `"skipped"` | `false` |
-| 3 | threshold set, `score >= threshold` | `"pass"` (see rows 6–7) | `true` |
+| 3 | threshold set, `score >= threshold` | `"pass"` (see rows 6–7); with `SeverityCapsThreshold = true`, required-component severity still decides as in row 5 (`critical`/`high` → `"fail"`, `medium` → `"warn"`) | `true` only on pass |
 | 4 | threshold set, `score < threshold` | `"fail"` | `false` |
 | 5 | no threshold: severity `critical` or `high` → `"fail"`; `medium` → `"warn"`; `none` or `low` → `"pass"` (see rows 6–7) | as stated | |
 | 6 | the label would be `"pass"`, but a `Required` component did not run (`skipped`, or any not-measured result) or is a nested composite that withheld its own pass for that reason (it records `measurement: notMeasured`) | `"warn"` | `false` |

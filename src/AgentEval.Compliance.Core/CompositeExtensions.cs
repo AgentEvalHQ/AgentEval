@@ -76,7 +76,12 @@ public static class CompositeExtensions
                 version: node.Version,
                 components: normalised,
                 aggregation: node.Aggregation,
-                threshold: node.Threshold);
+                threshold: node.Threshold)
+            {
+                // A copy keeps the node's verdict settings; it used to drop them (#203 review, B4).
+                MinimumMeasuredShare = node.MinimumMeasuredShare,
+                SeverityCapsThreshold = node.SeverityCapsThreshold,
+            };
         }
 
         // Otherwise, recurse into child composites (children of this node that ARE composites).
@@ -93,6 +98,10 @@ public static class CompositeExtensions
             version: node.Version,
             components: newComponents,
             aggregation: node.Aggregation,
-            threshold: node.Threshold);
+            threshold: node.Threshold)
+        {
+            MinimumMeasuredShare = node.MinimumMeasuredShare,
+            SeverityCapsThreshold = node.SeverityCapsThreshold,
+        };
     }
 }

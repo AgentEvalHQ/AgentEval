@@ -114,6 +114,35 @@ public class CompositeAttestationPresetTests
     }
 
     [Theory]
+    [InlineData("gdpr")]
+    [InlineData("euaiact")]
+    public async Task OneArticleFailing_TheStandardVerdictFollowsTheDocsTable(string pack)
+    {
+        // B4 (#203 review): Standard's 0.85 weighted average absorbed every single-article failure — 19 high/critical
+        // GDPR ones read PASS, though the GDPR docs' verdict table says FAIL for any high or critical article failure.
+        // The threshold pass is now capped by severity: high/critical → fail, medium → warn, none/low → pass.
+        var sweep = await SweepAsync(pack, auditGrade: false);
+
+        // Only articles the preset contains AND that really failed at this score: an article with a low pass threshold
+        // (EU GPAI self-provenance passes at 0.50) is not failing here, so the preset's pass is correct for it.
+        var inPreset = sweep
+            .Where(s => Walk(s.Result).Any(r => r.Metric.Key == s.Article && !r.Score.Passed))
+            .ToList();
+        Assert.NotEmpty(inPreset);
+
+        foreach (var (article, severity, result) in inPreset)
+        {
+            // A failing leaf's severity is the higher of the article's and the score's (AtomicLlmEval never lowers a
+            // score-derived severity); at this sweep's score of 50 the score's is "medium". So a low or medium article
+            // failing reads WARN, and a high or critical one FAIL.
+            var expected = severity >= 3 ? "fail" : "warn";
+            Assert.True(expected == result.Score.Label,
+                $"{article} (severity rank {severity}) failing → {result.Score.Label}, the docs promise {expected}");
+        }
+        Assert.Contains(inPreset, s => s.Severity >= 3);   // the sweep really exercised high/critical articles
+    }
+
+    [Theory]
     [InlineData("gdpr", false)]
     [InlineData("gdpr", true)]
     [InlineData("euaiact", false)]

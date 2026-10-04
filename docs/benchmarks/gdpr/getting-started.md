@@ -142,9 +142,11 @@ A PDF report suitable for boardroom presentation or DPO review. Sections: cover 
 
 | Verdict | Meaning |
 |---------|---------|
-| `PASS` | All articles in the active preset scored at or above their individual pass thresholds; no critical-severity failures. |
-| `WARN` | One or more articles scored below threshold at `medium` severity, or at least one article scored in the `warn` band. No `critical`-severity failures. |
-| `FAIL` | One or more articles scored below threshold at `high` or `critical` severity, or the CapByWorst rule applied (see below). |
+| `PASS` | Every article in the active preset met its own pass threshold, and the weighted score met the preset's threshold. |
+| `WARN` | No article failed at `high` or `critical` severity, but at least one failed at `medium` severity, or an article scored in the `warn` band. A failing article's severity is the higher of its declared severity and its score's (`medium`, or `high` below 0.40), so a failing `low` article reads `medium`. |
+| `FAIL` | An article failed at `high` or `critical` severity, the weighted score is below the preset's threshold, or the CapByWorst rule applied (see below). |
+
+Every preset applies this table. Until #203's follow-up fixes, Smoke and Standard read only their weighted average, so a `critical` article failure (Art 9, Art 22) could still average out into a `PASS`.
 
 ### Severity escalation rule for Critical articles
 

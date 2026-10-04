@@ -67,7 +67,11 @@ public static partial class GdprBenchmark
                 new(Pillar6Governance.Build(articles),      0.15),
             ],
             aggregation: WeightedSumAggregation.Instance,
-            threshold: 0.85);
+            threshold: 0.85)
+        {
+            // A severe article failure cannot average out into a pass (#203 review, B4; the docs' verdict table).
+            SeverityCapsThreshold = true,
+        };
     }
 
     /// <summary>
@@ -93,7 +97,11 @@ public static partial class GdprBenchmark
                 new(articles.Get("gdpr.art22.automated"),         0.20),
             ],
             aggregation: WeightedSumAggregation.Instance,
-            threshold: 0.80);
+            threshold: 0.80)
+        {
+            // A severe article failure cannot average out into a pass (#203 review, B4; the docs' verdict table).
+            SeverityCapsThreshold = true,
+        };
     }
 
     /// <summary>

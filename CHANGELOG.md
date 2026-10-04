@@ -31,6 +31,13 @@ third-party exporter on our public interfaces.
     calls reach the unsafe-tool-use check — `bench agentic` does not pass a trace's tool calls to it), Reasoning (a
     response without plan or list markers skips the plan and goal-decomposition checks), Telemetry (zero calls), Judge
     Quality (a missing input), and Tool Call Accuracy / Agentic Execution (no tool definitions captured, or definitions with no tool calls).
+- **The GDPR and EU AI Act Standard and Smoke presets passed with a critical article failing.** Their verdict read only
+  the weighted average (0.85 / 0.80), so one failing `critical` article (GDPR Art 9 or 22, EU AI Act Art 5) averaged
+  out into a `PASS` — 19 of GDPR's 29 single-article high/critical failures read PASS, against the GDPR docs' verdict
+  table. **Behaviour change:** these presets now cap a threshold pass by severity — `high`/`critical` → `FAIL`,
+  `medium` → `WARN` — through a new opt-in `CompositeEval.SeverityCapsThreshold`. The AuditGrade presets were already
+  strict. `WithExtraScenarios` (domain packs) now keeps a copied composite's `MinimumMeasuredShare` and
+  `SeverityCapsThreshold`; it used to drop them.
 - **Calibration scored results that were never measured.** The agentic, GDPR and EU AI Act calibration runners added
   every result to the accuracy and kappa pairs: a skipped, inapplicable or withheld result never equals a gold label,
   so it counted as a disagreement, and its 0.0 placeholder was credited "within score range" whenever a band started

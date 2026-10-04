@@ -77,6 +77,18 @@ public sealed class CompositeEval : IEval
     }
     private readonly double _minimumMeasuredShare = 0.5;
 
+    /// <summary>
+    /// When <see langword="true"/> and a <see cref="Threshold"/> is set, a score at or above the threshold still has to
+    /// clear the required components' severity, exactly as the severity path does: <c>critical</c>/<c>high</c> → fail,
+    /// <c>medium</c> → warn. Default <see langword="false"/> (score alone decides, as before).
+    /// </summary>
+    /// <remarks>
+    /// Without it, a weighted average can absorb a severe failure: GDPR Standard (threshold 0.85) passed with one
+    /// critical article failing, though its docs promise FAIL for any high or critical article failure (#203 review,
+    /// B4). Set it on a preset whose docs make that promise.
+    /// </remarks>
+    public bool SeverityCapsThreshold { get; init; }
+
     /// <summary>Initialises a new <see cref="CompositeEval"/>.</summary>
     public CompositeEval(
         string key,
@@ -249,13 +261,8 @@ public sealed class CompositeEval : IEval
             : nothingMeasured
                 ? (erroredCount > 0 && !requiredAllInapplicable ? "error" : "skipped")
                 : Threshold is { } t
-                    ? (score >= t ? "pass" : "fail")
-                    : verdictSeverity switch
-                    {
-                        "critical" or "high" => "fail",
-                        "medium" => "warn",
-                        _ => "pass"
-                    };
+                    ? (score < t ? "fail" : SeverityCapsThreshold ? SeverityLabel(verdictSeverity) : "pass")
+                    : SeverityLabel(verdictSeverity);
 
         // A pass that rests on a minority of the components is not the composite's pass. Nothing failed, so it is a
         // soft finding (warn → exit 10 through BenchExitCodes), not a fail.
@@ -354,4 +361,12 @@ public sealed class CompositeEval : IEval
                 CacheHit: allCacheHits),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
+
+    // The severity path's verdict: high or critical fails, medium warns, none or low passes.
+    private static string SeverityLabel(string severity) => severity switch
+    {
+        "critical" or "high" => "fail",
+        "medium" => "warn",
+        _ => "pass",
+    };
 }

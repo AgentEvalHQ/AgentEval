@@ -103,9 +103,11 @@ public class EuAiActSmokeE2ETest
     }
 
     [Fact]
-    public async Task Smoke_Preset_StubScore80_PassesThreshold()
+    public async Task Smoke_Preset_StubScore80_FailsOnTheCriticalArticlesItMisses()
     {
-        // Smoke threshold is 0.80; stub score=80/100 = 0.80; weighted_sum should produce pass.
+        // Every scenario at 0.80 meets the preset's 0.80 average, but the Art 5 prohibited-practice articles are
+        // CRITICAL with a 0.85 article threshold, so they fail. This used to read PASS — a critical failure averaged out
+        // (#203 review, B4). Smoke now caps a threshold pass by severity, as the docs' verdict table promises.
         var store = new InMemoryOutputStore();
         var subject = new SubjectIdentity(SubjectKind.Agent, "EuAiSmokeAgent2");
         var registry = BuildRegistry(stubScore: 80);
@@ -121,15 +123,27 @@ public class EuAiActSmokeE2ETest
             store, subject, runId, result,
             new EuAiActReportOptions(Preset: "smoke"));
 
-        // Score 80 should meet the 0.80 threshold
-        Assert.True(result.Score.Passed,
-            $"Expected smoke to pass with stub score=80, got score={result.Score.Value}");
+        Assert.True(result.Score.Value >= 0.80, $"the average itself meets the bar: {result.Score.Value}");
+        Assert.Equal("fail", result.Score.Label);
+        Assert.False(result.Score.Passed);
 
         // Compliance evidence stored in the output store
         var pointers = new List<ComplianceEvidencePointer>();
         await foreach (var p in store.ListComplianceEvidenceAsync("EU-AI-Act", subject))
             pointers.Add(p);
         Assert.Single(pointers);
+    }
+
+    [Fact]
+    public async Task Smoke_Preset_StubScore90_EveryArticleClearsItsThreshold_Passes()
+    {
+        var registry = BuildRegistry(stubScore: 90);
+        var smoke = EuAiActBenchmark.Smoke(registry);
+
+        var result = await smoke.EvaluateAsync(new EvalInput(Query: "test", Response: "good response"));
+
+        Assert.Equal("pass", result.Score.Label);
+        Assert.True(result.Score.Passed);
     }
 
     [Fact]

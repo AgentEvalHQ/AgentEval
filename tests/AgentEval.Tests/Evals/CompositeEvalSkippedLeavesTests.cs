@@ -540,4 +540,55 @@ public class CompositeEvalSkippedLeavesTests
         Assert.Contains("could not attest their own pass: judge", result.Details.Summary!, StringComparison.Ordinal);
         Assert.Contains("below the 50", result.Details.Summary!, StringComparison.Ordinal);
     }
+
+    // ── SeverityCapsThreshold (#203 review, B4) ───────────────────────────────────────────────────
+    // A weighted average can absorb a severe failure: three passes and one HIGH failure at 0.5 average 0.875 and clear a
+    // 0.8 threshold. With the setting, the threshold pass is capped by severity as the severity path is.
+
+    private static IReadOnlyList<EvalComponent> ThreePassesAnd(string severity) =>
+    [
+        new(new FixedEval("a", 1.0, passed: true)),
+        new(new FixedEval("b", 1.0, passed: true)),
+        new(new FixedEval("c", 1.0, passed: true)),
+        new(new FixedEval("d", 0.5, passed: false, severity: severity)),
+    ];
+
+    [Theory]
+    [InlineData("critical", "fail")]
+    [InlineData("high", "fail")]
+    [InlineData("medium", "warn")]
+    [InlineData("low", "pass")]
+    public async Task SeverityCapsThreshold_ASevereFailureCannotAverageOutIntoAPass(string severity, string expected)
+    {
+        var sut = new CompositeEval("c", "C", "test", "1.0.0", ThreePassesAnd(severity), WeightedSumAggregation.Instance, threshold: 0.8)
+        {
+            SeverityCapsThreshold = true,
+        };
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal(expected, result.Score.Label);
+    }
+
+    [Fact]
+    public async Task WithoutSeverityCapsThreshold_TheScoreAloneDecides_AsBefore()
+    {
+        var sut = Composite(ThreePassesAnd("critical"), threshold: 0.8);
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("pass", result.Score.Label);   // unchanged default; presets opt in
+    }
+
+    [Fact]
+    public async Task SeverityCapsThreshold_BelowTheThreshold_IsStillAFail()
+    {
+        var sut = new CompositeEval("c", "C", "test", "1.0.0",
+            [new(new FixedEval("a", 0.5, passed: false, severity: "low"))], WeightedSumAggregation.Instance, threshold: 0.8)
+        {
+            SeverityCapsThreshold = true,
+        };
+
+        Assert.Equal("fail", (await sut.EvaluateAsync(Input)).Score.Label);
+    }
 }
