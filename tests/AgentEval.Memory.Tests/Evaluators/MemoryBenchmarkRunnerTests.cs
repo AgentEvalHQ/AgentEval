@@ -512,4 +512,26 @@ public class MemoryBenchmarkRunnerTests
         Assert.Equal(192_000, overflow.TargetTokensOverride);
         Assert.Equal(20, overflow.OverflowCallsOverride);
     }
+
+    // ── B6c-9 (mid-branch review): a broken configuration errors the category; it is not a designed skip ──────────
+    // A missing scenario data file (and an unknown scenario type) returned "skipped": the category left the weights and the
+    // run could PASS. All four such paths now throw, which the runner records as an errored category (counted as 0, the
+    // run incomplete). The data files are embedded, so this test drives the same path through an unknown type.
+
+    [Fact]
+    public async Task RunBenchmarkAsync_AnUnknownScenarioType_ErrorsTheCategory_AndTheRunIsIncomplete()
+    {
+        var benchmark = new MemoryBenchmark
+        {
+            Name = "broken",
+            Categories = [new MemoryBenchmarkCategory { Name = "Broken", Weight = 1.0, ScenarioType = (BenchmarkScenarioType)999 }],
+        };
+
+        var result = await _runner.RunBenchmarkAsync(_agent, benchmark);
+
+        var category = Assert.Single(result.CategoryResults);
+        Assert.True(category.Errored);
+        Assert.StartsWith("Error: Unknown scenario type", category.SkipReason, StringComparison.Ordinal);
+        Assert.False(result.IsComplete);
+    }
 }

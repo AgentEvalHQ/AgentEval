@@ -282,7 +282,8 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
                 BenchmarkScenarioType.ConflictResolution => await RunConflictResolutionAsync(agent, presetName, overrides, cancellationToken),
                 BenchmarkScenarioType.MultiSessionReasoning => await RunMultiSessionReasoningAsync(agent, presetName, cancellationToken),
                 BenchmarkScenarioType.PreferenceExtraction => await RunPreferenceExtractionAsync(agent, presetName, overrides, cancellationToken),
-                _ => (Score: 0.0, Skipped: true, SkipReason: $"Unknown scenario type: {category.ScenarioType}")
+                // A preset naming a type this runner does not know is a broken configuration, not a skip (B6c-9).
+                _ => throw new InvalidOperationException($"Unknown scenario type: {category.ScenarioType}")
             };
 
             catStopwatch.Stop();
@@ -561,8 +562,9 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
         var jsonResult = await TryRunFromJsonAsync(agent, "preference-extraction", presetName, overrides, ct);
         if (jsonResult.HasValue) return jsonResult.Value;
 
-        // No hardcoded fallback — preference extraction is JSON-only
-        return (0, true, "Preference extraction scenario JSON not found");
+        // No hardcoded fallback — preference extraction is JSON-only.
+        // A missing data file is a broken install, not a designed skip (#203 review, B6c-9): it errors the category, which counts as 0 and makes the run incomplete. As a skip it left the weights and the run could PASS.
+        throw new FileNotFoundException("Preference extraction scenario JSON not found");
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -986,9 +988,10 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
             var result = await _runner.RunAsync(agent, scenario, ct);
             return Single(result);
         }
-        catch (FileNotFoundException)
+        catch (FileNotFoundException ex)
         {
-            return (0, true, "Multi-session reasoning scenario JSON not found");
+            // A missing data file is a broken install, not a designed skip (#203 review, B6c-9): it errors the category, which counts as 0 and makes the run incomplete. As a skip it left the weights and the run could PASS.
+            throw new FileNotFoundException("Multi-session reasoning scenario JSON not found", ex);
         }
     }
 
@@ -998,8 +1001,9 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
         var jsonResult = await TryRunFromJsonAsync(agent, "conflict-resolution", presetName, overrides, ct);
         if (jsonResult.HasValue) return jsonResult.Value;
 
-        // No hardcoded fallback — conflict resolution is JSON-only
-        return (0, true, "Conflict resolution scenario JSON not found");
+        // No hardcoded fallback — conflict resolution is JSON-only.
+        // A missing data file is a broken install, not a designed skip (#203 review, B6c-9): it errors the category, which counts as 0 and makes the run incomplete. As a skip it left the weights and the run could PASS.
+        throw new FileNotFoundException("Conflict resolution scenario JSON not found");
     }
 
     private async Task<(double Score, bool Skipped, string? SkipReason)> RunAbstentionAsync(

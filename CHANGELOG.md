@@ -31,6 +31,12 @@ third-party exporter on our public interfaces.
     calls reach the unsafe-tool-use check — `bench agentic` does not pass a trace's tool calls to it), Reasoning (a
     response without plan or list markers skips the plan and goal-decomposition checks), Telemetry (zero calls), Judge
     Quality (a missing input), and Tool Call Accuracy / Agentic Execution (no tool definitions captured, or definitions with no tool calls).
+- **Memory benchmarks could pass on what they did not measure.** `bench longmemeval` passed (exit 0) when accuracy over
+  the SCORED questions met 50%, with no coverage floor — the default `RetryThenInconclusive` policy leaves judge failures
+  and agent errors unscored, so 1 scored question and 499 inconclusive passed. A pass on part of the questions is now
+  `WARN` (exit 10), naming how many were not scored; a fail stays a fail. The memory benchmark turned a missing scenario
+  data file (and an unknown scenario type) into a designed skip: the category left the weights and the run could PASS.
+  Those paths now error the category (it counts as 0 and the run is incomplete).
 - **A red-team run could pass on an attack it never measured.** The overall verdict passed whenever inconclusive
   probes did not outnumber resisted ones, so ten resisted probes of one attack covered ten inconclusive probes of
   another; and an OWASP / MITRE category whose probes all came back inconclusive was reported as "not tested in this

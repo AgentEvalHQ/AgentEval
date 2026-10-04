@@ -36,7 +36,9 @@ public sealed class BenchLongMemEvalCommandTests
                 rootOverride: fixture.Root,
                 chatClientOverride: client));
 
-        Assert.Equal(0, invocation.ExitCode);
+        // B6c-9: 1 of 3 questions is inconclusive, so the 50% pass rests on part of them: a warn, exit 10 (it was PASS, 0).
+        Assert.Equal(AgentEval.Cli.ExitCodes.GateWarning, invocation.ExitCode);
+        Assert.Contains("1 of 3 questions were not scored", invocation.Output);
         Assert.Contains("Overall accuracy:        50.0%", invocation.Output);
         Assert.Contains("(1/2 scored, 3 selected)", invocation.Output);
         Assert.Contains("Inconclusive judgments:  1", invocation.Output);
@@ -55,7 +57,7 @@ public sealed class BenchLongMemEvalCommandTests
         var runDirectory = Assert.Single(fixture.RunDirectories());
         var summary = JsonDocument.Parse(
             await File.ReadAllTextAsync(Path.Combine(runDirectory, "summary.json")));
-        Assert.Equal("PASS", summary.RootElement.GetProperty("verdict").GetString());
+        Assert.Equal("WARN", summary.RootElement.GetProperty("verdict").GetString());
         var stats = summary.RootElement.GetProperty("stats");
         Assert.Equal(3, stats.GetProperty("total").GetInt32());
         Assert.Equal(1, stats.GetProperty("passed").GetInt32());
@@ -244,4 +246,14 @@ public sealed class BenchLongMemEvalCommandTests
             }
         }
     }
+
+    // ── B6c-9 (mid-branch review): a pass on part of the questions is a warn ───────────────────────────────────────
+
+    [Theory]
+    [InlineData(null, 0, "INCONCLUSIVE")]
+    [InlineData(60.0, 0, "PASS")]
+    [InlineData(60.0, 499, "WARN")]   // 1 scored + 499 inconclusive used to PASS
+    [InlineData(40.0, 5, "FAIL")]     // a fail stays a fail
+    public void TheVerdict_IsAPass_OnlyWhenEveryQuestionWasScored(double? accuracy, int unscored, string expected)
+        => Assert.Equal(expected, AgentEval.Cli.Commands.BenchLongMemEvalCommand.LongMemEvalVerdict(accuracy, unscored));
 }
