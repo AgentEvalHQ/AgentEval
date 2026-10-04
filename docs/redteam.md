@@ -881,7 +881,8 @@ public class MyService(IRedTeamRunner runner)
 ```csharp
 // Register a custom attack type
 services.AddSingleton<IAttackType, CustomPhishingAttack>();
-services.AddAgentEval(); // Auto-populates IAttackTypeRegistry with built-ins + DI attacks
+services.AddAgentEvalRedTeam(); // Builds IAttackTypeRegistry with built-ins + DI attacks
+                                // (AddAgentEval() alone does not; AddAgentEvalAll() does)
 
 // Later, resolve and use the registry
 var registry = serviceProvider.GetRequiredService<IAttackTypeRegistry>();

@@ -24,10 +24,11 @@ namespace AgentEval.Samples;
 /// - Custom attack types registered via DI (auto-discovered by IAttackTypeRegistry)
 /// - FormatName default interface member on IResultExporter
 /// - Registry inspection: listing all registered components
-/// - BONUS: Live LLM evaluation with a custom letter-counting metric (when Azure configured)
+/// - BONUS: Live LLM evaluation with a custom letter-counting metric on the configured model
 ///
 /// ⚡ Steps 1-6: No model provider required — runs fully offline.
-/// 🤖 Step 7: Uses the configured provider (or mock fallback if not configured).
+/// 🤖 Step 7: Runs on the configured model. With no provider it is skipped with setup instructions;
+///    <c>--mock</c> runs it on a canned reply, labelled MOCK.
 /// ⏱️ Time to understand: 5 minutes
 /// ⏱️ Time to run: &lt;2 seconds
 /// </summary>
@@ -41,15 +42,21 @@ public static class Extensibility
         Console.WriteLine("🔌 STEP 1: Register Custom Extensions via DI\n");
         var services = new ServiceCollection();
 
-        // Register custom extensions BEFORE calling AddAgentEval()
+        // Register custom extensions BEFORE the AddAgentEval* calls
         // so the registries auto-discover them during initialization.
         services.AddSingleton<IMetric, WordCountMetric>();
         services.AddSingleton<IResultExporter, HtmlExporter>();
         services.AddSingleton<IDatasetLoader, MarkdownDatasetLoader>();
         services.AddSingleton<IAttackType, SocialEngineeringAttack>();
 
-        // AddAgentEval() wires everything: built-in + custom
+        // Each registry comes from the package that owns it:
+        //   AddAgentEval()            → core services + IMetricRegistry
+        //   AddAgentEvalDataLoaders() → IExporterRegistry + IDatasetLoaderFactory
+        //   AddAgentEvalRedTeam()     → IAttackTypeRegistry
+        // (AddAgentEvalAll(), in the AgentEval umbrella assembly, registers all of them at once.)
         services.AddAgentEval();
+        services.AddAgentEvalDataLoaders();
+        services.AddAgentEvalRedTeam();
 
         var provider = services.BuildServiceProvider();
 
@@ -58,7 +65,7 @@ public static class Extensibility
         Console.WriteLine("      • HtmlExporter          → IResultExporter");
         Console.WriteLine("      • MarkdownDatasetLoader  → IDatasetLoader");
         Console.WriteLine("      • SocialEngineeringAttack → IAttackType");
-        Console.WriteLine("      • Called services.AddAgentEval()");
+        Console.WriteLine("      • Called AddAgentEval(), AddAgentEvalDataLoaders(), AddAgentEvalRedTeam()");
         Console.WriteLine();
 
         // ── Step 2: Inspect IMetricRegistry ───────────────────────────────────
@@ -284,16 +291,24 @@ public static class Extensibility
         // Create the custom metric
         var letterMetric = new LetterCountAccuracyMetric(targetWord, targetLetter);
 
+        // Steps 1-6 needed no model; this one does. With no provider it stops here and says how to configure
+        // one (or to pass --mock); it never swaps in a canned reply on its own.
+        if (!AIConfig.StartModelSample())
+            return;
+
         string agentResponse;
         string agentLabel;
 
-        if (AIConfig.IsConfigured)
+        if (AIConfig.UseMock)
+        {
+            // ── Mock path (--mock only) ──
+            // The classic LLM mistake: many models say "2" for Strawberry
+            agentResponse = "2";
+            agentLabel = "Mock (canned wrong answer)";
+        }
+        else
         {
             // ── Real LLM path ──
-            Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"   ✅ {AIConfig.ProviderName} configured — calling real LLM!");
-            Console.ResetColor();
-
             var chatClient = AIConfig.CreateChatClient(AIConfig.ModelDeployment);
 
             agentLabel = $"{AIConfig.ProviderName} ({AIConfig.ModelDeployment})";
@@ -301,17 +316,6 @@ public static class Extensibility
             // Ask the LLM
             var response = await chatClient.GetResponseAsync(question);
             agentResponse = response.Text ?? "(no response)";
-        }
-        else
-        {
-            // ── Mock path ──
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("   ⚠️  No model provider — using mock response for demo.");
-            Console.ResetColor();
-
-            // Simulate the classic LLM mistake: many models say "2" for Strawberry
-            agentResponse = "2";
-            agentLabel = "Mock (simulated wrong answer)";
         }
 
         Console.WriteLine($"\n   🤖 Agent ({agentLabel}): \"{agentResponse}\"");
@@ -331,12 +335,12 @@ public static class Extensibility
         if (result.Passed)
         {
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine($"✅ PASSED (score={result.Score})");
+            Console.WriteLine($"✅ PASSED (score={result.Score}){AIConfig.MockLabel}");
         }
         else
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine($"❌ FAILED (score={result.Score})");
+            Console.WriteLine($"❌ FAILED (score={result.Score}){AIConfig.MockLabel}");
         }
         Console.ResetColor();
         Console.WriteLine($"      Explanation: {result.Explanation}");
@@ -675,7 +679,7 @@ public static class Extensibility
 ║                                                                               ║
 ║   🔌 SAMPLE F6: EXTENSIBILITY — DI REGISTRIES & CUSTOM EXTENSIONS            ║
 ║   Custom metrics, exporters, loaders, attack types via Dependency Injection   ║
-║   Steps 1-6: Offline | Step 7: Live LLM (or mock fallback)                   ║
+║   Steps 1-6: Offline | Step 7: Live LLM (--mock for a canned reply)          ║
 ║                                                                               ║
 ╚═══════════════════════════════════════════════════════════════════════════════╝
 ");
@@ -686,10 +690,12 @@ public static class Extensibility
     {
         Console.WriteLine("\n\n💡 KEY TAKEAWAYS:");
         Console.WriteLine("   • Register custom IMetric / IResultExporter / IDatasetLoader / IAttackType via DI");
-        Console.WriteLine("   • Call services.AddAgentEval() — it auto-discovers DI-registered extensions");
+        Console.WriteLine("   • Each registry comes from its package: AddAgentEval() → metrics,");
+        Console.WriteLine("     AddAgentEvalDataLoaders() → exporters + loaders, AddAgentEvalRedTeam() → attacks");
+        Console.WriteLine("     (AddAgentEvalAll() registers them all); each auto-discovers DI-registered extensions");
         Console.WriteLine("   • IMetricRegistry, IExporterRegistry, IAttackTypeRegistry expose all components");
         Console.WriteLine("   • FormatName DIM lets custom exporters define their own registry key");
-        Console.WriteLine("   • TryAdd semantics: register YOUR overrides BEFORE AddAgentEval()");
+        Console.WriteLine("   • TryAdd semantics: register YOUR overrides BEFORE the AddAgentEval* calls");
         Console.WriteLine("   • Built-in + custom components coexist — no conflicts");
         Console.WriteLine("   • Custom metrics can evaluate real LLM responses (Step 7)");
         Console.WriteLine("   • See ADR-006 for DI architecture, ADR-015 for extensibility plan");

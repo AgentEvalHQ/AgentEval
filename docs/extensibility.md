@@ -196,7 +196,16 @@ public class ToolLatencyMetric : IAgenticMetric
 
 ## DI-Based Extension Registration
 
-AgentEval supports registering extensions via dependency injection. When you call `services.AddAgentEval()`, the framework auto-discovers DI-registered metrics, exporters, dataset loaders, and attack types.
+AgentEval supports registering extensions via dependency injection. Register your extensions first, then call the method that builds the registry for them; it auto-discovers what you registered:
+
+| Registry | Built by | Assembly (all ship in the `AgentEval` NuGet package) |
+|---|---|---|
+| `IMetricRegistry` | `services.AddAgentEval()` | `AgentEval.Core` |
+| `IExporterRegistry`, `IDatasetLoaderFactory` | `services.AddAgentEvalDataLoaders()` | `AgentEval.DataLoaders` |
+| `IAttackTypeRegistry` | `services.AddAgentEvalRedTeam()` | `AgentEval.RedTeam` |
+| all of the above | `services.AddAgentEvalAll()` | `AgentEval` |
+
+`AddAgentEval()` on its own builds only the metric registry: resolving `IExporterRegistry`, `IDatasetLoaderFactory` or `IAttackTypeRegistry` after it alone fails.
 
 ### Registering Custom Metrics via DI
 
@@ -232,7 +241,7 @@ Custom exporters can be registered as DI services and are automatically added to
 ```csharp
 // In your extension package
 services.AddSingleton<IResultExporter, PowerBIExporter>();
-services.AddAgentEval(); // Exporter auto-registers in IExporterRegistry
+services.AddAgentEvalDataLoaders(); // Exporter auto-registers in IExporterRegistry
 ```
 
 > **Note:** DI-registered exporters do not override built-in exporters (Json, Junit, Markdown, Csv, Trx). To replace a built-in, use `registry.Register(name, exporter)` directly after resolving `IExporterRegistry`.
@@ -262,7 +271,7 @@ Custom dataset loaders are auto-wired into `DefaultDatasetLoaderFactory`:
 ```csharp
 // In your extension package
 services.AddSingleton<IDatasetLoader, ParquetDatasetLoader>();
-services.AddAgentEval(); // Loader auto-wired by extension
+services.AddAgentEvalDataLoaders(); // Loader auto-wired into IDatasetLoaderFactory
 
 // Later, loading works automatically:
 var factory = serviceProvider.GetRequiredService<IDatasetLoaderFactory>();
@@ -278,7 +287,7 @@ Custom red team attack types are auto-wired into `IAttackTypeRegistry`:
 ```csharp
 // In your extension package
 services.AddSingleton<IAttackType, CustomSQLInjectionAttack>();
-services.AddAgentEval(); // Attack auto-registers in IAttackTypeRegistry
+services.AddAgentEvalRedTeam(); // Attack auto-registers in IAttackTypeRegistry
 
 // Later, resolve and use:
 var registry = serviceProvider.GetRequiredService<IAttackTypeRegistry>();

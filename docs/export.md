@@ -227,7 +227,8 @@ The `IExporterRegistry` provides dynamic exporter lookup and registration, analo
 ```csharp
 // Register your custom exporter
 services.AddSingleton<IResultExporter, SarifExporter>();
-services.AddAgentEval(); // Auto-populates IExporterRegistry
+services.AddAgentEvalDataLoaders(); // Builds IExporterRegistry: built-ins + DI-registered exporters
+                                    // (AddAgentEval() alone does not; AddAgentEvalAll() does)
 
 // Resolve and use
 var registry = serviceProvider.GetRequiredService<IExporterRegistry>();
