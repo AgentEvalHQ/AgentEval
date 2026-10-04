@@ -16,11 +16,13 @@ third-party exporter on our public interfaces.
   `error` blocked the verdict. One that returned `skipped` — because a required input, trace or telemetry was not
   supplied — was left out, and the composite passed on the rest ("Measured 1 of 2", label `pass`).
   - **Behaviour change:** a would-be `pass` with a required component that was not measured is now `warn` (not
-    passed; exit 10 through the bench exit codes). So is one with a required nested composite that could not attest
-    its own pass (its `warn`): before, that `warn` carried severity `none` and vanished one level up. The result's
+    passed; exit 10 through the bench exit codes). So is one with a required nested composite that withheld its own pass
+    for the same reason: the nested composite records that in its `measurement` (`notMeasured`) and the parent reads
+    the state, not the label — a nested `warn` from a measured medium-severity failure is unchanged. The result's
     summary names the components. A measured `fail` stays `fail`, a required `error` still wins, and optional
-    components, `inapplicable` ones (the case cannot test the thing, ADR-030) and nested composites whose components
-    are all inapplicable never block.
+    components, `inapplicable` ones (the case cannot test the thing, ADR-030) and nested composites whose required
+    components are all inapplicable (they record `notApplicable`) never block. Stored composite results can now carry
+    `score.measurement` (`notMeasured` / `notApplicable`); the schema has accepted it since v1.1.
   - **Components are `Required` by default**, so `MinimumMeasuredShare = 0` no longer means "pass on any measured
     component": mark a component `Required: false` if the composite may pass without it.
   - Agentic presets whose required components skip on common inputs now report `warn` where they passed:

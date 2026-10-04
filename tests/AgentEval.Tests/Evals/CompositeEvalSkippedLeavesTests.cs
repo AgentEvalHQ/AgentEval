@@ -407,6 +407,122 @@ public class CompositeEvalSkippedLeavesTests
         Assert.True(result.Score.Passed);
     }
 
+    // ── State, not label (review round 2, H-A / M-2) ──────────────────────────────────────────────
+    // A nested composite tells its parent it withheld a pass through Score.Measurement (NotMeasured), and that the case
+    // cannot test it through NotApplicable — never through the label: a warn is as often a measured soft fail.
+
+    private static CompositeEval MediumSeverityChild() =>
+        new("medium_child", "Medium child", "test", "1.0.0", new EvalComponent[]
+        {
+            new(new FixedEval("ok", 1.0, passed: true)),
+            new(new FixedEval("soft_fail", 0.5, passed: false, severity: "medium")),
+        }, WeightedSumAggregation.Instance);
+
+    [Fact]
+    public async Task NestedComposite_ThatWithheldItsPass_RecordsNotMeasured()
+    {
+        var result = await InnerWithARequiredSkip().EvaluateAsync(Input);
+
+        Assert.Equal("warn", result.Score.Label);
+        Assert.Equal(AgentEval.Evals.Meta.MeasurementState.NotMeasured, result.Score.Measurement);
+    }
+
+    [Fact]
+    public async Task NestedMediumSeverityWarn_IsAMeasurement_NotAnAttestationGap()
+    {
+        var child = await MediumSeverityChild().EvaluateAsync(Input);
+        Assert.Equal("warn", child.Score.Label);
+        Assert.Equal(AgentEval.Evals.Meta.MeasurementState.Measured, child.Score.Measurement);
+
+        // Severity path: the parent warns because of the child's medium severity — as before — and says nothing about
+        // a component that did not run.
+        var severityParent = await Composite(new EvalComponent[]
+        {
+            new(new FixedEval("other", 1.0, passed: true)),
+            new(MediumSeverityChild()),
+        }).EvaluateAsync(Input);
+        Assert.Equal("warn", severityParent.Score.Label);
+        Assert.DoesNotContain("could not attest", severityParent.Details.Summary ?? "", StringComparison.Ordinal);
+
+        // Threshold path: the parent reads the score (1.0 and 0.75 → 0.875 ≥ 0.8) and passes, as before. The first version
+        // of the rule turned this into a warn because the child's label was warn.
+        var thresholdParent = await Composite(new EvalComponent[]
+        {
+            new(new FixedEval("other", 1.0, passed: true)),
+            new(MediumSeverityChild()),
+        }, threshold: 0.8).EvaluateAsync(Input);
+        Assert.Equal("pass", thresholdParent.Score.Label);
+    }
+
+    [Fact]
+    public async Task RequiredAllInapplicableChild_WithAnOptionalComponentThatErrored_DoesNotBlock()
+    {
+        var child = new CompositeEval("na_child", "NA child", "test", "1.0.0", new EvalComponent[]
+        {
+            new(new FixedEval("required_na", 0.0, passed: false, label: "inapplicable")),
+            new(new FixedEval("optional_err", 0.0, passed: false, label: "error"), Required: false),
+        }, WeightedSumAggregation.Instance);
+        var sut = Composite(new EvalComponent[]
+        {
+            new(new FixedEval("other", 1.0, passed: true)),
+            new(child),
+        });
+
+        var result = await sut.EvaluateAsync(Input);
+
+        var childResult = result.Details.SubResults![1];
+        Assert.Equal("skipped", childResult.Score.Label);
+        Assert.Equal(AgentEval.Evals.Meta.MeasurementState.NotApplicable, childResult.Score.Measurement);
+        Assert.Equal("pass", result.Score.Label);
+    }
+
+    [Fact]
+    public async Task ReviewRound2_S2_PartlyAndWhollyInapplicableChildren_BothLeaveTheParentAPass()
+    {
+        // The coverage bar is per level: a child that measured 1 of 5 is its own soft finding (warn, measured), not a
+        // component that did not run, so it does not block; a child that can test nothing is inapplicable and does not
+        // block either. (Flattened into one level, both would trip the parent's own coverage bar instead.)
+        var partly = new CompositeEval("partly", "Partly", "test", "1.0.0", new EvalComponent[]
+        {
+            new(new FixedEval("p", 1.0, passed: true)),
+            new(new FixedEval("n1", 0.0, passed: false, label: "inapplicable")),
+            new(new FixedEval("n2", 0.0, passed: false, label: "inapplicable")),
+            new(new FixedEval("n3", 0.0, passed: false, label: "inapplicable")),
+            new(new FixedEval("n4", 0.0, passed: false, label: "inapplicable")),
+        }, WeightedSumAggregation.Instance);
+        var wholly = new CompositeEval("wholly", "Wholly", "test", "1.0.0", Enumerable.Range(0, 5)
+            .Select(i => new EvalComponent(new FixedEval($"n{i}", 0.0, passed: false, label: "inapplicable")))
+            .ToArray(), WeightedSumAggregation.Instance);
+
+        var withPartly = await Composite(new EvalComponent[] { new(new FixedEval("x", 1.0, passed: true)), new(partly) }).EvaluateAsync(Input);
+        var withWholly = await Composite(new EvalComponent[] { new(new FixedEval("x", 1.0, passed: true)), new(wholly) }).EvaluateAsync(Input);
+
+        Assert.Equal("warn", withPartly.Details.SubResults![1].Score.Label);
+        Assert.Equal(AgentEval.Evals.Meta.MeasurementState.Measured, withPartly.Details.SubResults![1].Score.Measurement);
+        Assert.Equal("pass", withPartly.Score.Label);
+        Assert.Equal("pass", withWholly.Score.Label);
+    }
+
+    [Fact]
+    public async Task ReviewRound2_S3_AnOptionalSkipUnderARequiredInapplicable_DoesNotBlockTheGrandparent()
+    {
+        var withOptionalSkip = new CompositeEval("c1", "C1", "test", "1.0.0", new EvalComponent[]
+        {
+            new(new FixedEval("na", 0.0, passed: false, label: "inapplicable")),
+            new(new SkippingEval("opt"), Required: false),
+        }, WeightedSumAggregation.Instance);
+        var withoutIt = new CompositeEval("c2", "C2", "test", "1.0.0", new EvalComponent[]
+        {
+            new(new FixedEval("na", 0.0, passed: false, label: "inapplicable")),
+        }, WeightedSumAggregation.Instance);
+
+        var a = await Composite(new EvalComponent[] { new(new FixedEval("x", 1.0, passed: true)), new(withOptionalSkip) }).EvaluateAsync(Input);
+        var b = await Composite(new EvalComponent[] { new(new FixedEval("x", 1.0, passed: true)), new(withoutIt) }).EvaluateAsync(Input);
+
+        Assert.Equal("pass", a.Score.Label);
+        Assert.Equal("pass", b.Score.Label);
+    }
+
     [Fact]
     public async Task BothBarsFiring_TheSummaryGivesBothReasons()
     {

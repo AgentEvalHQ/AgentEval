@@ -114,14 +114,17 @@ The composite verdict is determined after aggregation. `warn` is a soft fail: `P
 | 3 | threshold set, `score >= threshold` | `"pass"` (see rows 6–7) | `true` |
 | 4 | threshold set, `score < threshold` | `"fail"` | `false` |
 | 5 | no threshold: severity `critical` or `high` → `"fail"`; `medium` → `"warn"`; `none` or `low` → `"pass"` (see rows 6–7) | as stated | |
-| 6 | the label would be `"pass"`, but a `Required` component did not run (`skipped`, or any not-measured result) or is a nested composite that could not attest its own pass (`warn`) | `"warn"` | `false` |
+| 6 | the label would be `"pass"`, but a `Required` component did not run (`skipped`, or any not-measured result) or is a nested composite that withheld its own pass for that reason (it records `measurement: notMeasured`) | `"warn"` | `false` |
 | 7 | the label would be `"pass"`, but fewer than `MinimumMeasuredShare` (default **0.5**) of the components produced a measurement | `"warn"` | `false` |
 
 Skipped, inapplicable and errored components are left out of the score, so they never count as 0. Rows 6 and 7 stop
 that from turning into a pass on whatever is left. Row 6: a pass cannot rest on a required component that never ran
 — components are `Required` by default, so mark a component `Required: false` if the composite may pass without it.
-An `inapplicable` component (the case cannot test the thing), or a nested composite all of whose components are
-inapplicable, does not trigger it. Row 7: a composite whose components mostly report "not applicable" cannot pass on
+A nested composite tells its parent through its **measurement state**, not its label: one that withheld its pass
+this way records `notMeasured`, and one whose required components are all inapplicable records `notApplicable`. A
+nested `warn` from a measured medium-severity failure, or from a nested composite's own coverage bar, is a measurement
+like any other (the coverage bar is per level). An `inapplicable` component (the case cannot test the thing) never
+triggers row 6. Row 7: a composite whose components mostly report "not applicable" cannot pass on
 the few that remain; `MinimumMeasuredShare = 0` drops this bar, not row 6. Only a pass is withheld; a measured
 failure stays a failure. Whenever components were left out, the result's `Details.Summary` says how many were
 measured and why the others were not, and names the required components behind a row-6 `warn`. Through the CLI,

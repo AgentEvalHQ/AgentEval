@@ -57,8 +57,9 @@ public sealed class CompositeEval : IEval
     /// The share of components (0..1) that must produce a measurement for a passing composite to report
     /// <c>pass</c>. Below it the composite reports <c>warn</c>: nothing failed, but the pass would rest on a minority
     /// of what the composite claims to cover. Default 0.5. Set 0 to drop this bar. It is not the only one: a pass also
-    /// needs every <see cref="EvalComponent.Required"/> component to have run (and a nested composite to have passed),
-    /// whatever this share is — and components are required by default.
+    /// needs every <see cref="EvalComponent.Required"/> component to have run — a nested composite counts as not run
+    /// when it withheld its own pass for that reason (it records <see cref="MeasurementState.NotMeasured"/>) — whatever
+    /// this share is, and components are required by default.
     /// </summary>
     /// <remarks>
     /// Leaves that could not measure (skipped, inapplicable, errored) are excluded from the score, which is right:
@@ -178,20 +179,27 @@ public sealed class CompositeEval : IEval
         // measured fail stays a fail, "error" still wins, and NotApplicable (the CASE cannot test the thing,
         // ADR-030) is not this: it never blocks.
         //
-        // One level down it is the same gap. A required NESTED composite that could not attest its own pass reports
-        // warn — with severity "none", because nothing failed — so the severity path above read it as clean and the
-        // parent passed (found reviewing #203: ToolInputAccuracyEval's warn vanished inside the ToolCallAccuracy and
-        // AgenticExecution presets). And a nested composite every leaf of which is inapplicable reports "skipped"
-        // today (Slice 1.4(ii), below) but is a corpus finding, not a component that did not run: it does not block.
+        // One level down it is the same gap, and the parent learns it from STATE, never from the label. A nested
+        // composite that withheld its pass for this reason reports warn with severity "none" — but a warn is just as
+        // often a measured medium-severity fail, and reading the label made GDPR/EU Standard warn on medium article
+        // failures while high/critical ones still passed (#203 review, round 2). So the composite records the reason
+        // in its own Score.Measurement (see `measurement` below): NotMeasured when it withholds a pass because a
+        // required component did not run — its parent blocks on that exactly as on a skipped leaf — and NotApplicable
+        // when every required component could only say "the case cannot test this", which never blocks.
         var requiredUnattested = Components
             .Zip(subs, (c, s) => (Component: c, Sub: s))
             .Where(pair => pair.Component.Required
                            && pair.Sub.Score.Label != "error"
-                           && !IsWhollyInapplicable(pair.Sub)
-                           && (pair.Sub.Score.CensusBucket() == MeasurementState.NotMeasured
-                               || (pair.Sub.Score.Label == "warn" && pair.Sub.Details?.SubResults is { Count: > 0 })))
+                           && pair.Sub.Score.CensusBucket() == MeasurementState.NotMeasured)
             .Select(pair => pair.Sub.Metric.Key)
             .ToArray();
+
+        // "The case cannot test what this composite requires": every REQUIRED component (every component when none
+        // is required) is NotApplicable — a leaf that said so, or a nested composite that recorded it.
+        var gating = Components.Any(c => c.Required)
+            ? Components.Zip(subs, (c, s) => (Component: c, Sub: s)).Where(pair => pair.Component.Required).Select(pair => pair.Sub)
+            : subs;
+        var requiredAllInapplicable = gating.All(s => s.Score.CensusBucket() == MeasurementState.NotApplicable);
 
         // ADR-030 Slice 0.1 (defect D-a): a composite none of whose leaves produced a measurement has
         // nothing to render a verdict on. Every aggregation strategy already excludes "skipped" and
@@ -233,11 +241,13 @@ public sealed class CompositeEval : IEval
         // slice is unfunded, not blocked by an open question. Until it lands this composite reports
         // "skipped" (non-passing, and correct about the one thing that matters here: no verdict) and the
         // note below carries the attribution the label cannot. Behaviour-identical for every pre-existing
-        // label: all-skipped still yields "skipped", and any errored leaf still yields "error".
+        // label: all-skipped still yields "skipped", and any errored leaf still yields "error" — except when every
+        // required component is inapplicable: the composite cannot be tested at all, so an optional component that
+        // errored is not its verdict (it reports "skipped", recorded NotApplicable below, and never blocks a parent).
         var label = hasRequiredError
             ? "error"
             : nothingMeasured
-                ? (erroredCount > 0 ? "error" : "skipped")
+                ? (erroredCount > 0 && !requiredAllInapplicable ? "error" : "skipped")
                 : Threshold is { } t
                     ? (score >= t ? "pass" : "fail")
                     : verdictSeverity switch
@@ -256,6 +266,16 @@ public sealed class CompositeEval : IEval
             label = "warn";
         var passed = label == "pass";
 
+        // The composite's own measurement state, which is how a parent tells "withheld" from "measured" — never by the
+        // label (see requiredUnattested). NotMeasured: this composite withheld its pass because a required component
+        // did not run. NotApplicable: nothing was measured and the case cannot test what it requires. Otherwise the
+        // default (Measured; written to JSON only when it is not), so every other result serialises as before.
+        var measurement = passUnattested
+            ? MeasurementState.NotMeasured
+            : nothingMeasured && requiredAllInapplicable && !hasRequiredError
+                ? MeasurementState.NotApplicable
+                : MeasurementState.Measured;
+
         // Say why in the result itself (mirrors EvalResult.Skipped, which writes its reason to
         // Recommendations) so a reader of the artifact sees "nothing ran", not a bare 0.0. The three
         // states have different owners and different fixes — inapplicable is "fix the cases", skipped
@@ -266,8 +286,12 @@ public sealed class CompositeEval : IEval
                 : inapplicableCount == subs.Length
                     ? $"All {subs.Length} component(s) were inapplicable — no case could test the thing, " +
                       "so no verdict is reported. This is a corpus finding, not a run failure."
-                    : $"No component produced a measurement ({erroredCount} errored, " +
-                      $"{skippedCount} skipped, {inapplicableCount} inapplicable); no verdict is reported.")
+                    : requiredAllInapplicable
+                        ? "Every required component was inapplicable — the case cannot test what this composite " +
+                          $"requires — so no verdict is reported ({erroredCount} errored, {skippedCount} skipped among " +
+                          "the optional ones). This is a corpus finding, not a run failure."
+                        : $"No component produced a measurement ({erroredCount} errored, " +
+                          $"{skippedCount} skipped, {inapplicableCount} inapplicable); no verdict is reported.")
             : null;
 
         // Coverage disclosure for a PARTLY measured composite. Excluding skipped, inapplicable and
@@ -310,7 +334,7 @@ public sealed class CompositeEval : IEval
 
         return new EvalResult(
             Metric: new(Key, Name, Category, Version),
-            Score: new(score, null, label, passed, Threshold, severity, null),
+            Score: new(score, null, label, passed, Threshold, severity, null) { Measurement = measurement },
             Details: new(
                 Dimensions: null,
                 Evidence: null,
@@ -330,12 +354,4 @@ public sealed class CompositeEval : IEval
                 CacheHit: allCacheHits),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
-
-    // True when a result only says "the case cannot test this": an inapplicable leaf, or a composite every leaf of
-    // which is (that composite reports "skipped" until ADR-030 Slice 1.4(ii) lands). Depth is bounded by
-    // MaxNestingDepth, which EvaluateAsync enforces on the tree that produced the result.
-    private static bool IsWhollyInapplicable(EvalResult result) =>
-        result.Details?.SubResults is { Count: > 0 } subResults
-            ? subResults.All(IsWhollyInapplicable)
-            : result.Score.CensusBucket() == MeasurementState.NotApplicable;
 }
