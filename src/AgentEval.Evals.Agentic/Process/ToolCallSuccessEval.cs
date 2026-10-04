@@ -141,8 +141,10 @@ public sealed class ToolCallSuccessEval : IEval
             return false;
 
         var statuses = input.ToolCalls
-            .Select(tc => new ToolCallStatus(tc.Name, tc.Succeeded == true ? "success" : "error",
-                tc.Succeeded == true ? null : tc.Error ?? "(the call failed; no error message was recorded)"))
+            // A call with an error is never a success, whatever its Succeeded says (#203 review, B6c-5).
+            .Select(tc => tc.Succeeded == true && tc.Error is null
+                ? new ToolCallStatus(tc.Name, "success", null)
+                : new ToolCallStatus(tc.Name, "error", tc.Error ?? "(the call failed; no error message was recorded)"))
             .ToList();
 
         return BuildFromStatusRecords(statuses, out result);

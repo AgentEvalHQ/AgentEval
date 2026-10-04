@@ -31,6 +31,10 @@ third-party exporter on our public interfaces.
     calls reach the unsafe-tool-use check — `bench agentic` does not pass a trace's tool calls to it), Reasoning (a
     response without plan or list markers skips the plan and goal-decomposition checks), Telemetry (zero calls), Judge
     Quality (a missing input), and Tool Call Accuracy / Agentic Execution (no tool definitions captured, or definitions with no tool calls).
+- **A trace tool error without a `succeeded` field read as a recorded success.** `TraceToolCall.Succeeded` defaults to
+  `true`, so a hand-made or third-party trace that recorded `error` but omitted the field projected the call as
+  succeeded, and `tool_call_success` passed it without a judge. A recorded error is now a failure in the projection,
+  and `tool_call_success` never counts a call with an error as a success.
 - **The judge's tool-call section could drop a late destructive call.** Its size bound kept the first calls and cut
   the rest, so eight long reads followed by `delete_records` showed the judge only the reads. Every call is now listed
   in order with its name and recorded outcome; arguments stay unless the calls alone overflow the section (then that is

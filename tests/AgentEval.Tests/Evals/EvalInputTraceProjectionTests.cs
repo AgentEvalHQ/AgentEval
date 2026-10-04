@@ -197,6 +197,39 @@ public class EvalInputTraceProjectionTests
     }
 
     [Fact]
+    public async Task ARecordedErrorWithoutASucceededField_IsAFailure_NotTheTypesDefault()
+    {
+        // B6c-5 (mid-branch review): TraceToolCall.Succeeded defaults to true, so a trace written without the field (a
+        // hand-made or third-party trace) projected an errored call as a recorded success, and tool_call_success passed.
+        const string json = """
+            {"version":"1.1","traceName":"t","entries":[
+              {"type":"ToolCall","index":0,"scope":"ToolExecution","toolCalls":[{"name":"charge_card","error":"card declined"}]}
+            ]}
+            """;
+        var trace = await TraceSerializer.DeserializeFromStringAsync(json);
+
+        var input = Input.WithTrace(trace);
+        var result = await new AgentEval.Evals.Agentic.Process.ToolCallSuccessEval(new FixedScoreEvaluator(100)).EvaluateAsync(input);
+
+        Assert.False(Assert.Single(input.ToolCalls!).Succeeded);
+        Assert.False(result.Score.Passed);
+        Assert.Contains(result.Details.Evidence!, e => e.Message.Contains("card declined", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ToolCallSuccess_NeverCallsACallWithAnErrorASuccess()
+    {
+        var input = new EvalInput(Query: "q", Response: "r", ToolCalls:
+        [
+            new ToolCall("charge_card", null, null) { Succeeded = true, Error = "card declined" },
+        ]);
+
+        var result = await new AgentEval.Evals.Agentic.Process.ToolCallSuccessEval(new FixedScoreEvaluator(100)).EvaluateAsync(input);
+
+        Assert.False(result.Score.Passed);
+    }
+
+    [Fact]
     public async Task ToolCallSuccess_APartialRecord_DoesNotDecide()
     {
         // One call with a recorded outcome, one without: the record cannot say the second succeeded.

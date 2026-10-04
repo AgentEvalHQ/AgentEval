@@ -98,7 +98,13 @@ public static class EvalInputTraceAccessor
             .SelectMany(e => e.ToolCalls!);
 
         var executed = Calls(trace.Entries.Where(e => e.EffectiveScope == TraceEntryScope.ToolExecution))
-            .Select(c => new ToolCall(c.Name, JsonObjectOrNull(c.Arguments), c.Result) { Succeeded = c.Succeeded, Error = c.Error })
+            // A recorded error is a failure whatever Succeeded says: the trace type defaults it to true, so a trace written
+            // without the field read an errored call as a recorded success (#203 review, B6c-5).
+            .Select(c => new ToolCall(c.Name, JsonObjectOrNull(c.Arguments), c.Result)
+            {
+                Succeeded = c.Succeeded && c.Error is null,
+                Error = c.Error,
+            })
             .ToList();
         if (executed.Count > 0)
             return executed;
