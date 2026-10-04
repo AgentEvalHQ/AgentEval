@@ -128,4 +128,26 @@ public class BenchAgenticCalibrateCommandTests : IDisposable
             Assert.True(doc.RootElement.TryGetProperty("evaluatorKey", out _), "The runner's own fields must still be written.");
         }
     }
+
+    [Fact]
+    public async Task TheToolDataKeys_AreNotDispatched_OnTheseGoldens_AndTheReportSaysSo()
+    {
+        // B6c-7: the goldens carry no tool calls or definitions, so these keys are left out by KEY — not, as before,
+        // scored on the records their own verdict let through.
+        var outPath = Path.Combine(_root, "report-tool-keys.md");
+        var recordsPath = Path.Combine(_root, "records-tool-keys.jsonl");
+
+        await BenchAgenticCalibrateCommand.RunCoreAsync(
+            rootOverride: _root, outPathOverride: outPath, evaluatorOverride: new AlwaysPassEvaluator(), recordsPath: recordsPath);
+
+        var keys = (await File.ReadAllLinesAsync(recordsPath)).Where(l => l.Length > 0)
+            .Select(l => JsonDocument.Parse(l).RootElement)
+            .Select(r => r.TryGetProperty("evaluatorKey", out var k) ? k.GetString() : r.GetProperty("EvaluatorKey").GetString())
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        Assert.NotEmpty(keys);
+        Assert.All(BenchAgenticCalibrateCommand.s_notCalibratableOnTheseGoldens, k => Assert.DoesNotContain(k, keys));
+        Assert.All(BenchAgenticCalibrateCommand.s_notCalibratableOnTheseGoldens,
+            k => Assert.NotNull(AgentEval.Evals.EvalRegistry.Shared.TryGet(k)));   // still registered for every other use
+        Assert.Contains("Carved out by key (not dispatched)", await File.ReadAllTextAsync(outPath), StringComparison.Ordinal);
+    }
 }

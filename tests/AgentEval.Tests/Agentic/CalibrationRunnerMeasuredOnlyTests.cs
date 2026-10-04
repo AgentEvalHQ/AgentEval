@@ -90,4 +90,58 @@ public class CalibrationRunnerMeasuredOnlyTests
         Assert.Equal(1, report.EntryCount);
         Assert.Equal(0, report.NotMeasured);
     }
+
+    // ── B6c-7 (mid-branch review): exclusion is by KEY, never by outcome ───────────────────────────────────────────
+
+    /// <summary>Withholds its pass (the tool composites on text-only goldens), and measures only a fail.</summary>
+    private sealed class SelectiveEval : IEval
+    {
+        public string Key => "selective";
+        public string Name => "selective";
+        public string Category => "test";
+        public string Version => "1.0.0";
+
+        public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default) =>
+            Task.FromResult(new EvalResult(
+                new(Key, Name, Category, Version),
+                input.Query == "would-pass"
+                    ? new EvalScore(0.95, null, "warn", false, null, "none", null) { Measurement = MeasurementState.NotMeasured }
+                    : new EvalScore(0.2, null, "fail", false, 0.7, "high", null),
+                new(null, null, null, null, null),
+                new("atomic-llm", "judge-x", null, null, null, 0, false), DateTimeOffset.UtcNow));
+    }
+
+    [Fact]
+    public async Task AKeyMeasuredOnlyOnSomeRecords_IsLeftOutWhole_NotScoredOnTheRecordsItsOutcomeSelected()
+    {
+        var runner = new CalibrationRunner(key => key == "selective" ? new SelectiveEval() : Evals.GetValueOrDefault(key));
+        var report = Assert.Single((await runner.RunAsync([new CalibrationDataset("process",
+        [
+            new CalibrationEntry("s-pass", "selective", "would-pass", "r", "pass", 0.7, 1.0, "gold pass, withheld"),
+            new CalibrationEntry("s-fail", "selective", "would-fail", "r", "fail", 0.0, 0.3, "gold fail, measured"),
+            Entry("m1", "measured_pass", "pass", 0.7, 1.0),
+            Entry("m2", "measured_pass", "pass", 0.7, 1.0),
+        ])], caseSink: null, limitPerCategory: null)).PerCategory.Values);
+
+        // Before: the withheld gold-pass dropped out, the gold-fail stayed, and "selective" looked perfect (1 of 1).
+        Assert.Equal(["selective"], report.ExcludedKeys);
+        Assert.Equal(2, report.EntryCount);               // only the clean key is scored
+        Assert.Equal(1, report.ExcludedMeasuredRecords);  // the measured fail left with its key
+        Assert.Equal(1, report.NotMeasured);
+    }
+
+    [Theory]
+    [InlineData(0, false, 1.0, 1.0, "PASS")]
+    [InlineData(0, true, 1.0, 1.0, "INCOMPLETE")]   // a key left out: not a measured PASS, whatever the metrics say
+    [InlineData(2, true, 1.0, 1.0, "INFRA-FAIL")]   // an evaluation failure first
+    [InlineData(0, false, 0.5, 0.2, "FAIL")]
+    public void TheCategoryStatus_IsNeverPassWithAKeyLeftOut(int failures, bool excluded, double accuracy, double kappa, string expected)
+    {
+        var report = new CalibrationCategoryReport("process", 10, accuracy, kappa, 10, 0.0, EvaluationFailures: failures)
+        {
+            ExcludedKeys = excluded ? ["selective"] : [],
+        };
+
+        Assert.Equal(expected, AgentEval.Cli.Commands.BenchAgenticCalibrateCommand.CategoryStatus(report, 0.85, 0.70));
+    }
 }

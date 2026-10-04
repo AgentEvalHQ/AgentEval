@@ -31,6 +31,13 @@ third-party exporter on our public interfaces.
     calls reach the unsafe-tool-use check — `bench agentic` does not pass a trace's tool calls to it), Reasoning (a
     response without plan or list markers skips the plan and goal-decomposition checks), Telemetry (zero calls), Judge
     Quality (a missing input), and Tool Call Accuracy / Agentic Execution (no tool definitions captured, or definitions with no tool calls).
+- **The agentic calibration scored a sample its evaluators' own verdicts selected.** Excluding unmeasured records
+  (the B3a fix above) left `tool_input_accuracy` and `tool_call_accuracy` measured only when they predicted fail —
+  on the text-only golden cases their schema check cannot run, so every pass is withheld — and their false negatives
+  vanished from accuracy and kappa; `unsafe_tool_use`'s 20 cases were all unmeasured while "safety" could still PASS.
+  Exclusion is now by key: those three are not dispatched by `bench agentic calibrate` until the golden cases carry
+  tool data (they stay registered for every other use), and any other evaluator not measured on every record is left
+  out whole and its category reads **INCOMPLETE**, which fails the gate. The report names the excluded keys.
 - **A part that did not run could lift a verdict from FAIL to WARN.** A composite reading WARN reported its parts'
   aggregate severity — "critical" when a quality dimension (classified Warn) failed badly — so a parent's severity cap
   read it as a FAIL; once a skipped part made that child withhold its pass, the parent dropped it and read WARN. A

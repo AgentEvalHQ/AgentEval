@@ -177,6 +177,30 @@ public static class BenchAgenticCalibrateCommand
     };
 
     /// <summary>
+    /// A category's gate status. INFRA-FAIL: an evaluation failed. INCOMPLETE: a key was left out of the scoring because
+    /// it was not measured on every record (#203 review, B6c-7) — scoring the rest would score a sample selected on the
+    /// evaluator's own verdict, so the category is not a measured PASS. Otherwise PASS or FAIL on accuracy and kappa.
+    /// </summary>
+    internal static string CategoryStatus(CalibrationCategoryReport report, double accuracyThreshold, double kappaThreshold) =>
+        report.EvaluationFailures > 0 ? "INFRA-FAIL"
+        : report.ExcludedKeys.Count > 0 ? "INCOMPLETE"
+        : report.Accuracy >= accuracyThreshold && report.CohensKappa >= kappaThreshold ? "PASS"
+        : "FAIL";
+
+    /// <summary>
+    /// Registered evaluators the golden cases cannot calibrate, left out by KEY (#203 review, B6c-7). The goldens carry no
+    /// tool calls or tool definitions: <c>unsafe_tool_use</c> measures nothing on them (20 of 20 not measured), and
+    /// <c>tool_input_accuracy</c> / <c>tool_call_accuracy</c> withhold every PASS (their schema leaf cannot run), so only
+    /// their FAIL predictions were measured — a sample selected on their own verdict, in which their false negatives
+    /// vanished. They stay registered for every other use; only this command does not dispatch them, until the golden
+    /// schema carries tool data.
+    /// </summary>
+    internal static readonly IReadOnlySet<string> s_notCalibratableOnTheseGoldens = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "unsafe_tool_use", "tool_input_accuracy", "tool_call_accuracy",
+    };
+
+    /// <summary>
     /// Categories that represent dispatch-coverage skips (not real measurement).
     /// Filtered from the gate evaluation so an empty bucket doesn't fail the run.
     /// <para>
@@ -285,7 +309,8 @@ public static class BenchAgenticCalibrateCommand
         {
             if (!resolved.TryGetValue(key, out var eval))
             {
-                eval = EvalRegistry.Shared.Resolve(key, judge, judgeModelName);
+                // Not dispatched on these goldens (B6c-7): left out by key, counted as carved_out in the report.
+                eval = s_notCalibratableOnTheseGoldens.Contains(key) ? null : EvalRegistry.Shared.Resolve(key, judge, judgeModelName);
                 resolved[key] = eval;
             }
             return eval;
@@ -416,12 +441,8 @@ public static class BenchAgenticCalibrateCommand
             var (accThr, kapThr) = s_categoryOverrides.TryGetValue(category, out var ov)
                 ? ov
                 : (AccuracyThreshold, KappaThreshold);
-            var accOk = categoryReport.Accuracy >= accThr;
-            var kappaOk = categoryReport.CohensKappa >= kapThr;
-            var noInfraFail = categoryReport.EvaluationFailures == 0;
-            var status = !noInfraFail
-                ? "INFRA-FAIL"
-                : (accOk && kappaOk ? "PASS" : "FAIL");
+            var complete = categoryReport.ExcludedKeys.Count == 0;
+            var status = CategoryStatus(categoryReport, accThr, kapThr);
             var thrSuffix = s_categoryOverrides.ContainsKey(category)
                 ? $" [override: acc>={accThr:P0} kappa>={kapThr:F2}]"
                 : string.Empty;
@@ -429,14 +450,16 @@ public static class BenchAgenticCalibrateCommand
                 $"  [{status}] {category}: accuracy={categoryReport.Accuracy:P1}, " +
                 $"kappa={FormatKappa(categoryReport.CohensKappa)}, entries={categoryReport.EntryCount}, " +
                 $"failures={categoryReport.EvaluationFailures}, not_measured={categoryReport.NotMeasured}, " +
-                $"inapplicable={categoryReport.NotApplicable}{thrSuffix}");
-            if (!accOk || !kappaOk || !noInfraFail) allPass = false;
+                $"inapplicable={categoryReport.NotApplicable}, carved_out={categoryReport.SkippedUnknownKey}{thrSuffix}" +
+                (complete ? "" : $" — excluded keys (not measured on every record): {string.Join(", ", categoryReport.ExcludedKeys)}"));
+            if (status != "PASS") allPass = false;
         }
 
         Console.WriteLine(allPass
             ? "Agentic calibration gate PASSED — all categories meet thresholds with zero evaluation failures."
             : $"Agentic calibration gate FAILED — one or more categories below " +
-              $"accuracy>={AccuracyThreshold:P0} or kappa>={KappaThreshold:F2}, or had non-zero evaluation_failures.");
+              $"accuracy>={AccuracyThreshold:P0} or kappa>={KappaThreshold:F2}, had non-zero evaluation_failures, " +
+              "or was INCOMPLETE (a key not measured on every record).");
 
         if (limitPerCategory is not null)
         {
@@ -492,9 +515,7 @@ public static class BenchAgenticCalibrateCommand
             var accOk = cr.Accuracy >= accThr;
             var kappaOk = cr.CohensKappa >= kapThr;
             var noInfraFail = cr.EvaluationFailures == 0;
-            var badge = !noInfraFail
-                ? "INFRA-FAIL"
-                : (accOk && kappaOk ? "PASS" : "FAIL");
+            var badge = CategoryStatus(cr, accThr, kapThr);   // the gate's own function: the report cannot disagree with it
             var thrTag = s_categoryOverrides.ContainsKey(category) ? " (relaxed per-category override)" : string.Empty;
 
             sb.AppendLine($"## {category} [{badge}]{thrTag}");
@@ -506,6 +527,8 @@ public static class BenchAgenticCalibrateCommand
             // Not scored (B3a): no verdict to compare with gold — reported, never counted as agreement or disagreement.
             sb.AppendLine($"| Not measured (not scored) | {cr.NotMeasured} | — | info |");
             sb.AppendLine($"| Inapplicable (not scored) | {cr.NotApplicable} | — | info |");
+            sb.AppendLine($"| Carved out by key (not dispatched) | {cr.SkippedUnknownKey} | — | info |");
+            sb.AppendLine($"| Keys excluded (not measured on every record) | {(cr.ExcludedKeys.Count == 0 ? "none" : string.Join(", ", cr.ExcludedKeys))} | none | {(cr.ExcludedKeys.Count == 0 ? "OK" : "INCOMPLETE")} |");
             sb.AppendLine($"| Accuracy | {cr.Accuracy:P1} | >= {accThr:P0} | {(accOk ? "OK" : "BELOW")} |");
             sb.AppendLine($"| Cohen's kappa | {FormatKappa(cr.CohensKappa)} | >= {kapThr:F2} | {(kappaOk ? "OK" : "BELOW")} |");
             sb.AppendLine($"| Within score range | {cr.WithinScoreRange} / {cr.EntryCount} | — | — |");

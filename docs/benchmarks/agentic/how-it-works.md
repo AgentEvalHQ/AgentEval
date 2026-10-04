@@ -152,7 +152,7 @@ Calibration coverage is reported **per evaluator category**, and it is partial. 
 - **Dispatched** — the evaluator has hand-labelled golden entries, and `bench agentic calibrate` runs them through the judge and gates the category on the result.
 - **Carved out** — the evaluator exists, is wired, and produces a verdict at runtime, but `calibrate` skips it: it is pure code, a meta-evaluator, or it needs conversation history or a reasoning trace that a single-turn golden entry cannot carry. The verdict at runtime is still real (its criteria are still graded); there is just no measurement of how often its judge matches a human.
 
-The dispatched evaluators are registered in `src/AgentEval.Evals.Agentic/AgenticEvalRegistration.cs`; the carved-out ones, each with its reason, are in `s_carveOutKeys` in `src/AgentEval.Cli/Commands/BenchAgenticCalibrateCommand.cs`. The table below summarises both by category.
+The dispatched evaluators are registered in `src/AgentEval.Evals.Agentic/AgenticEvalRegistration.cs`; the carved-out ones, each with its reason, are in `s_carveOutKeys` and `s_notCalibratableOnTheseGoldens` in `src/AgentEval.Cli/Commands/BenchAgenticCalibrateCommand.cs`. The table below summarises both by category.
 
 ### Calibration quality today
 
@@ -160,11 +160,11 @@ The project's calibration reports are not published. The qualitative picture by 
 
 | Category | Calibration status | Notes |
 |---|---|---|
-| System and Process | **Dispatched, relaxed gates** | All five system and all six process evaluators run in `calibrate`; process is gated at 0.85 / 0.65 and system at 0.70 / 0.45 |
+| System and Process | **Dispatched, relaxed gates** | All five system evaluators and four of the six process evaluators run in `calibrate`; Tool Input Accuracy and Tool Call Accuracy are left out by key, because the golden cases carry no tool definitions — their schema check cannot run, so they withhold every pass and only their fail predictions could be scored. Process is gated at 0.85 / 0.65 and system at 0.70 / 0.45 |
 | RAG Quality | **Dispatched, relaxed gate** | Six of the seven run in `calibrate`; F1 Score is pure code and is carved out. Gated at 0.65 / 0.40 |
 | Judge Quality | **N/A — meta** | Meta-evaluators have no separate judge to calibrate |
 | Operational / Telemetry | **N/A — code-only** | No LLM judge to calibrate; deterministic from trace metadata |
-| Safety | **Dispatched, relaxed gate** | Eleven of the twelve run in `calibrate`; Prohibited Actions needs a policy resolver and a subject id, so it is not dispatched. Gated at 0.80 / 0.60. See the content-filter note below |
+| Safety | **Dispatched, relaxed gate** | Ten of the twelve run in `calibrate`; Prohibited Actions needs a policy resolver and a subject id, and Unsafe Tool Use needs tool calls the golden cases do not carry, so neither is dispatched. Gated at 0.80 / 0.60. See the content-filter note below |
 | Memory | **Not calibrated (carved out)** | Memory Recall Accuracy and Long Conversation Coherence grade recall of earlier turns; a golden entry is single-turn, so `calibrate` skips them and reports the category as SKIP |
 | Multi-turn | **Not calibrated (carved out)** | Same reason as Memory; `calibrate` files these three under its `memory` category |
 | Reasoning | **Partly dispatched, relaxed gate** | Reasoning Correctness and Goal Decomposition run in `calibrate`; Plan Formulation and Intermediate-Step Hallucination need the agent's reasoning trace and are carved out. Gated at 0.70 / 0.40 |
@@ -173,7 +173,7 @@ The project's calibration reports are not published. The qualitative picture by 
 | Adversarial | **Dispatched, default gate** | All three run in `calibrate`, plus two calibration-only keys (`prompt_leak`, graded by System Prompt Leakage, and `escalation_resistance`, graded by Jailbreak Resistance); default 0.85 / 0.70. See the content-filter note below |
 | Efficiency | **N/A — code-only** | Deterministic from cost and score |
 
-Every category in this table runs at runtime and produces verdicts, whether or not `calibrate` covers it. Six of the eight categories `calibrate` scores are held to relaxed gates rather than the 0.85 / 0.70 default. Before the memory and multi-turn evaluators were carved out, the judge scored 14.3% accuracy on their 21 single-turn entries — below chance — which is why they are skipped rather than gated (the measurement is recorded in the `s_carveOutKeys` remarks).
+Every category in this table runs at runtime and produces verdicts, whether or not `calibrate` covers it. A category reads **INCOMPLETE** (and fails the gate) when one of its dispatched evaluators was not measured on every record: that evaluator is left out of the scoring whole — scoring only its measured records would score a sample selected by its own verdicts. Six of the eight categories `calibrate` scores are held to relaxed gates rather than the 0.85 / 0.70 default. Before the memory and multi-turn evaluators were carved out, the judge scored 14.3% accuracy on their 21 single-turn entries — below chance — which is why they are skipped rather than gated (the measurement is recorded in the `s_carveOutKeys` remarks).
 
 **Content-filter note.** An evaluation that throws (for example, a judge call the provider rejects) counts as an evaluation failure, which makes its category report INFRA-FAIL and fails the command. The calibrate command's own notes record that on Azure OpenAI the provider's content filter has blocked judge calls on the harmful-content goldens in the Safety and Adversarial categories.
 
