@@ -47,6 +47,15 @@ read signals that were previously invisible. Run them as the **`glass-box-diagno
 agenteval bench agentic --preset glass-box-diagnostics --subject my-agent --trace run.trace.json
 ```
 
+**What its verdict means.** The preset passes only on a run that exercises its checks: a check that cannot run on
+this trace (fewer than three turns with token usage for token distribution, no tool executions for the tool checks)
+reads "not measured" and keeps it from passing. A measured high-severity finding — an injected system prompt, a
+secret or PII in tool arguments, an unreliable tool — fails it however clean the rest is; a medium one (error
+patterns, provider safety interventions, prompt drift) makes it WARN. The injection check compares the trace's
+system prompts with a trusted baseline (`trusted_system_prompt` in the input metadata) or, without one, asks the
+judge; built without a judge (the API default, `AgenticBenchmark.GlassBoxDiagnostics()`), it is optional — it runs
+when a baseline is supplied, and decides the verdict when it finds an injection — and otherwise shows as skipped.
+
 Attaching the trace also gives every other preset the run's tool data: the tool calls (executed ones with their
 recorded outcome, else the calls the model requested) and the tool definitions the model was offered. A trace that
 recorded the chat layer and no tool call says "no tool call was made" — a safe refusal then passes `unsafe_tool_use`

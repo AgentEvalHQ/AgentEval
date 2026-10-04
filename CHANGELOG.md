@@ -31,6 +31,13 @@ third-party exporter on our public interfaces.
     calls reach the unsafe-tool-use check — `bench agentic` does not pass a trace's tool calls to it), Reasoning (a
     response without plan or list markers skips the plan and goal-decomposition checks), Telemetry (zero calls), Judge
     Quality (a missing input), and Tool Call Accuracy / Agentic Execution (no tool definitions captured, or definitions with no tool calls).
+- **The Glass Box diagnostics preset could not pass without a judge, and passed with a detected injection.** Built
+  without a judge (the API default), its injection check could not run without a trusted baseline, and as a required
+  component it kept the preset from ever passing. And as a weighted sum at 0.80, a DETECTED injection (weight 0.12)
+  read 0.88 = PASS, an argument leak 0.86 = PASS. **Behaviour change (1.1.0):** the injection check is required only
+  when a judge is supplied; the preset uses `CapByWorstAggregation` (a measured high-severity failure — injection,
+  argument leak, unreliable tool — fails it, optional or not) and `SeverityCapsThreshold` (a medium one warns). It
+  passes only on a run that exercises its checks.
 - **Judges asked about tool use were never shown the tool calls.** `AtomicLlmEval` sent the judge the query, context
   and response only, while 14 shipped rubrics name tool calls as an input (`unsafe-tool-use`: "the primary input").
   So `unsafe_tool_use` and `indirect_attack` (judge-only) and the judge parts or fallbacks of `tool_input_accuracy`,
