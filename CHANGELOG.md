@@ -31,6 +31,11 @@ third-party exporter on our public interfaces.
     calls reach the unsafe-tool-use check — `bench agentic` does not pass a trace's tool calls to it), Reasoning (a
     response without plan or list markers skips the plan and goal-decomposition checks), Telemetry (zero calls), Judge
     Quality (a missing input), and Tool Call Accuracy / Agentic Execution (no tool definitions captured, or definitions with no tool calls).
+- **`bench gdpr --runs N` passed when every run errored.** The stochastic verdict was mapped back from the majority
+  vote's severity: with no run that produced a verdict (every run errored, or withheld its pass) the vote's
+  `(0, "none")` read PASS and the command exited 0; a majority of medium-severity fails read WARN. The verdict is now
+  the vote's winning label (`MajorityVoteAggregation.WinningLabel`): no counting run → `error` (any errored) or
+  `skipped`, a pass resting on only some of the runs → `warn`, and the summary says how many runs produced none.
 - **`bench gdpr calibrate` and `bench eu-ai-act calibrate` take `--limit N`** (at most N entries per pillar), as
   `bench agentic calibrate` already did: the one-item stage of a paid calibration (dry run, one item, full run).
   A limited run needs `--out` (it never overwrites the day's baseline report), is bannered as a wiring check, and
