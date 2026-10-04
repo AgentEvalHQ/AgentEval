@@ -135,7 +135,11 @@ public sealed class ScenarioToAtomicEval
             category: $"compliance.{article.Pillar}",
             version: "1.0.0",
             judges: judgeComponents,
-            aggregation: WeightedMedianAggregation.Instance);
+            aggregation: WeightedMedianAggregation.Instance,
+            // The panel judges its median against the scenario's own bar, as Mode-B does (#203 review, B6c-3). Without
+            // one it took the severity path: its score was the median (0.95) but its label the worst judge's (fail), and
+            // the article averaged the 0.95 into a pass. A severe dissent now withholds the panel's pass instead.
+            threshold: article.PassThreshold);
     }
 
     private IEval BuildModeB(ArticleMetadata article, ScenarioSpec scenario)

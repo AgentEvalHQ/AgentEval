@@ -29,10 +29,12 @@ public class CompositeAttestationPresetTests
     {
         public HashSet<string> Fail { get; set; } = new(StringComparer.Ordinal);
 
+        public int FailScore { get; set; } = 50;
+
         public Task<EvaluationResult> EvaluateAsync(string input, string output, IEnumerable<string> criteria, CancellationToken ct = default)
         {
             var list = criteria.ToList();
-            var score = Fail.Contains(string.Join("\u0001", list)) ? 50 : 100;
+            var score = Fail.Contains(string.Join("\u0001", list)) ? FailScore : 100;
             return Task.FromResult(new EvaluationResult
             {
                 OverallScore = score,
@@ -162,5 +164,73 @@ public class CompositeAttestationPresetTests
                     VerdictRank(worse.Result.Score.Label) >= VerdictRank(milder.Result.Score.Label),
                     $"{worse.Article} (severity {worse.Severity}) → {worse.Result.Score.Label}, but the milder " +
                     $"{milder.Article} (severity {milder.Severity}) → {milder.Result.Score.Label}");
+    }
+
+    // ── B6c-3 (mid-branch review): a failing SCENARIO inside an article that still passes is not a preset failure ────
+    // The verdict read severity from every required part, passed or not, and a passing article still carried its failing
+    // scenario's severity: in 54 of 58 GDPR Standard cases the article met its own threshold and the preset read FAIL or
+    // WARN with no article failing — and Art 16 passing with one scenario at 0.30 read FAIL while Art 16 failing as a
+    // whole read WARN. The docs' table: PASS = every article met its own pass threshold.
+
+    private static async Task<List<(string Article, EvalResult? ArticleResult, EvalResult Root)>> OneScenarioSweepAsync(string pack, bool auditGrade)
+    {
+        var judge = new TargetedJudge { FailScore = 30 };
+        var sweep = new List<(string, EvalResult?, EvalResult)>();
+        CompositeEval preset;
+        List<(string Id, string FirstScenarioKey)> articles;
+        if (pack == "gdpr")
+        {
+            var loader = new AgentEval.Compliance.Gdpr.Articles.Loading.ArticleScenarioYamlLoader();
+            var scenarios = new AgentEval.Compliance.Gdpr.Articles.Building.ScenarioToAtomicEval(judge, judgeModel: "fixed");
+            var registry = new AgentEval.Compliance.Gdpr.Articles.ArticlesRegistry(
+                loader, new AgentEval.Compliance.Gdpr.Articles.Building.ArticleCompositeBuilder(scenarios));
+            preset = auditGrade ? GdprBenchmark.AuditGrade(registry) : GdprBenchmark.Standard(registry);
+            articles = registry.All.Keys.OrderBy(k => k, StringComparer.Ordinal)
+                .Select(id => (id, string.Join("\u0001", registry.GetSpec(id).Scenarios[0].EvaluationCriteria)))
+                .ToList();
+        }
+        else
+        {
+            var loader = new AgentEval.Compliance.EuAiAct.Articles.Loading.ArticleScenarioYamlLoader();
+            var scenarios = new AgentEval.Compliance.EuAiAct.Articles.Building.ScenarioToAtomicEval(judge, judgeModel: "fixed");
+            var registry = new AgentEval.Compliance.EuAiAct.Articles.EuAiActArticlesRegistry(
+                loader, new AgentEval.Compliance.EuAiAct.Articles.Building.ArticleCompositeBuilder(scenarios));
+            preset = auditGrade ? EuAiActBenchmark.AuditGrade(registry) : EuAiActBenchmark.Standard(registry);
+            articles = registry.All.Keys.OrderBy(k => k, StringComparer.Ordinal)
+                .Select(id => (id, string.Join("\u0001", registry.GetSpec(id).Scenarios[0].EvaluationCriteria)))
+                .ToList();
+        }
+
+        foreach (var (id, firstScenario) in articles)
+        {
+            judge.Fail = [firstScenario];
+            var root = await preset.EvaluateAsync(Input);
+            sweep.Add((id, Walk(root).FirstOrDefault(r => r.Metric.Key == id), root));
+        }
+        return sweep;
+    }
+
+    [Theory]
+    [InlineData("gdpr", false)]
+    [InlineData("gdpr", true)]
+    [InlineData("euaiact", false)]
+    [InlineData("euaiact", true)]
+    public async Task OneScenarioFailing_TheVerdictFollowsTheArticles_NotTheScenarios(string pack, bool auditGrade)
+    {
+        var sweep = await OneScenarioSweepAsync(pack, auditGrade);
+        var wrong = new List<string>();
+
+        foreach (var (article, articleResult, root) in sweep)
+        {
+            if (articleResult is null)
+                continue;   // not in this preset
+            if (articleResult.Score.Passed && root.Score.Label != "pass")
+                wrong.Add($"{article} passed its own threshold ({articleResult.Score.Value:0.00}), yet the preset read {root.Score.Label}");
+            if (!articleResult.Score.Passed && root.Score.Label == "pass")
+                wrong.Add($"{article} failed ({articleResult.Score.Value:0.00}), yet the preset read pass");
+        }
+
+        Assert.True(sweep.Any(s => s.ArticleResult is { Score.Passed: true }), "the sweep must exercise articles that still pass");
+        Assert.True(wrong.Count == 0, $"{wrong.Count} wrong verdict(s): " + string.Join("; ", wrong.Take(6)));
     }
 }

@@ -136,6 +136,55 @@ public class CompositeEvalComponentEffectTests
         Assert.Equal("fail", result.Score.Label);
     }
 
+    // ── B6c-3 (mid-branch review): a verdict reads the parts that did not pass, and a pass reports no severity ───────
+
+    private sealed class WithSeverity(string key, string label, double value, string severity) : IEval
+    {
+        public string Key => key;
+        public string Name => key;
+        public string Category => "test";
+        public string Version => "1.0.0";
+
+        public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default) => Task.FromResult(new EvalResult(
+            new(key, key, "test", "1.0.0"),
+            new EvalScore(value, null, label, label == "pass", null, severity, null),
+            new(null, null, null, null, null),
+            new("atomic-code", null, null, null, null, 0, false),
+            DateTimeOffset.UtcNow));
+    }
+
+    [Fact]
+    public async Task APassingPartCarryingAnAbsorbedSeverity_DoesNotFailTheParent()
+    {
+        // An article that passed its own threshold while one of its scenarios failed reported that scenario's "high":
+        // the parent's severity cap then failed a preset in which every article passed.
+        var parent = new CompositeEval("p", "P", "test", "1.0.0",
+            [new EvalComponent(new WithSeverity("article", "pass", 0.86, "high"), 0.5), new EvalComponent(new Fixed("other", "pass", 1.0), 0.5)],
+            WeightedSumAggregation.Instance, threshold: 0.8) { SeverityCapsThreshold = true };
+
+        var result = await parent.EvaluateAsync(Input);
+
+        Assert.Equal("pass", result.Score.Label);
+    }
+
+    [Fact]
+    public async Task APassingComposite_ReportsNoSeverity_AFailingOne_AtLeastMedium()
+    {
+        // Inside: one part fails at high but the composite passes; the other case fails on score with no failing part.
+        var absorbing = new CompositeEval("absorbing", "A", "test", "1.0.0",
+            [new EvalComponent(new WithSeverity("weak", "fail", 0.5, "high"), 0.1), new EvalComponent(new Fixed("strong", "pass", 1.0), 0.9)],
+            WeightedSumAggregation.Instance, threshold: 0.8);
+        var underBar = new CompositeEval("under", "U", "test", "1.0.0",
+            [new EvalComponent(new Fixed("ok", "pass", 0.75), 1.0)],
+            WeightedSumAggregation.Instance, threshold: 0.8);
+
+        var passing = await absorbing.EvaluateAsync(Input);
+        var failing = await underBar.EvaluateAsync(Input);
+
+        Assert.Equal(("pass", "none"), (passing.Score.Label, passing.Score.Severity));
+        Assert.Equal(("fail", "medium"), (failing.Score.Label, failing.Score.Severity));
+    }
+
     [Fact]
     public void TheEffect_SurvivesACopy()
     {

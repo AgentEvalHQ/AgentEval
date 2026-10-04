@@ -107,35 +107,59 @@ public class E2E_AuditGradeMultiJudgeTest
     }
 
     [Fact]
-    public async Task AuditGrade_MultiJudge_DissentingJudge_CapByWorstSemanticsApply()
+    public async Task AuditGrade_MultiJudge_OneCriticalDissent_WithholdsThePass_ItDoesNotPassOrFail()
     {
-        // Arrange — 2 judges agree on PASS (95), 1 dissents with 20 (fail).
-        // Critical-severity articles (Art 5, Art 9) produce critical-severity sub-results
-        // from the dissenting judge; CapByWorst then caps the composite score at 0.40
-        // and forces the overall verdict to fail.
+        // B6c-3 (mid-branch review). Two judges pass a scenario (95), one finds a critical failure (20). This used to
+        // FAIL through a side effect: the panel took the severity path (score = the median, label = the worst judge),
+        // and a passing article carried the dissent's "critical" up to the cap. The panel now judges its median against
+        // the scenario's own bar and, with a severe dissent below that bar, withholds its pass — so every level above
+        // reads "not attested" and the preset is WARN: needs review, neither a pass nor a fail one judge invented.
         var agreeingJudge = new FixedScoreJudge(95);
         var dissentingJudge = new FixedScoreJudge(20);
-
         var judges = new (AgentEval.Core.IEvaluator Judge, double Weight)[]
         {
             (agreeingJudge, 1.0),
             (agreeingJudge, 1.0),
             (dissentingJudge, 1.0),
         };
-
         var registry = BuildMultiJudgeRegistry(agreeingJudge, judges);
         var auditGrade = EuAiActBenchmark.AuditGrade(registry, new MultiJudgeOptions(judges));
 
-        // Act
         var result = await auditGrade.EvaluateAsync(BenchmarkInput);
 
-        // Assert — CapByWorstAggregation must cap the composite at 0.40 and surface
-        // the critical severity from the dissenting judge.
-        Assert.False(result.Score.Passed,
-            $"Expected fail under CapByWorst with dissenting critical judge, got {result.Score.Label} (score={result.Score.Value:F3})");
+        Assert.Equal("warn", result.Score.Label);
+        Assert.False(result.Score.Passed);
+        Assert.Contains(Walk(result), r => r.Details.Summary?.Contains("judges found a critical failure", StringComparison.Ordinal) == true);
+    }
+
+    [Fact]
+    public async Task AuditGrade_MultiJudge_ACriticalMajority_FailsAndIsCapped()
+    {
+        // Two of three judges find the critical failure: the median fails, and CapByWorst caps the preset at 0.40.
+        var agreeingJudge = new FixedScoreJudge(95);
+        var failingJudge = new FixedScoreJudge(20);
+        var judges = new (AgentEval.Core.IEvaluator Judge, double Weight)[]
+        {
+            (agreeingJudge, 1.0),
+            (failingJudge, 1.0),
+            (failingJudge, 1.0),
+        };
+        var registry = BuildMultiJudgeRegistry(failingJudge, judges);
+        var auditGrade = EuAiActBenchmark.AuditGrade(registry, new MultiJudgeOptions(judges));
+
+        var result = await auditGrade.EvaluateAsync(BenchmarkInput);
+
+        Assert.Equal("fail", result.Score.Label);
         Assert.Equal("critical", result.Score.Severity);
-        Assert.True(result.Score.Value <= 0.40,
-            $"Expected CapByWorst to cap score at 0.40, got {result.Score.Value:F3}");
+        Assert.True(result.Score.Value <= 0.40, $"Expected CapByWorst to cap score at 0.40, got {result.Score.Value:F3}");
+    }
+
+    private static IEnumerable<EvalResult> Walk(EvalResult r)
+    {
+        yield return r;
+        foreach (var s in r.Details.SubResults ?? [])
+            foreach (var d in Walk(s))
+                yield return d;
     }
 
     [Fact]

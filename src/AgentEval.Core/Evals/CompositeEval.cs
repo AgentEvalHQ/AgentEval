@@ -172,18 +172,18 @@ public sealed class CompositeEval : IEval
         // The aggregation strategy still sees the optional component's score
         // (it shapes the weighted-sum / median / etc.), but the verdict-level
         // severity considers only required-component severities.
-        var verdictSeverity = severity;
-        if (Components.Any(c => !c.Required))
-        {
-            var requiredSeverities = subs
-                .Zip(Components, (s, c) => (Sub: s, Component: c))
-                .Where(pair => pair.Component.Required)
-                .Select(pair => pair.Sub.Score.Severity)
-                .ToArray();
-            verdictSeverity = requiredSeverities.Length > 0
-                ? SeverityRollup.Max(requiredSeverities)
-                : "none";
-        }
+        // And the verdict reads only the parts that did NOT pass (#203 review, B6c-3). The aggregations roll severity up
+        // over every measured part, so a PASSING article still carried the severity of a scenario failure its own
+        // scoring absorbed — and a preset failed with every article passing (GDPR Standard: 28 such single-scenario
+        // cases), while the same article failing as a whole read only a warn.
+        var failingSeverities = subs
+            .Zip(Components, (s, c) => (Sub: s, Component: c))
+            .Where(pair => (pair.Component.Required || Components.All(c => c.Required))
+                           && pair.Sub.Score.CountsTowardAggregate()
+                           && !pair.Sub.Score.Passed)
+            .Select(pair => pair.Sub.Score.Severity)
+            .ToArray();
+        var verdictSeverity = failingSeverities.Length > 0 ? SeverityRollup.Max(failingSeverities) : "none";
 
         // A REQUIRED sub-result that itself errored (an infrastructure/judge failure, not a real low score —
         // see AtomicLlmEval's own "error" label) must propagate honestly, overriding either verdict path
@@ -390,7 +390,7 @@ public sealed class CompositeEval : IEval
 
         return new EvalResult(
             Metric: new(Key, Name, Category, Version),
-            Score: new(score, null, label, passed, Threshold, severity, null) { Measurement = measurement },
+            Score: new(score, null, label, passed, Threshold, ReportedSeverity(label, severity), null) { Measurement = measurement },
             Details: new(
                 Dimensions: null,
                 Evidence: null,
@@ -410,6 +410,16 @@ public sealed class CompositeEval : IEval
                 CacheHit: allCacheHits),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
+
+    // The severity a composite reports is the one its verdict implies (#203 review, B6c-3): a pass reports "none" — a
+    // failure its scoring absorbed stays absorbed, instead of reaching a parent as if it were the composite's own — and a
+    // fail reports at least "medium", so a parent's severity cap never reads a failed composite as harmless.
+    private static string ReportedSeverity(string label, string aggregated) => label switch
+    {
+        "pass" => "none",
+        "fail" => SeverityRollup.Max([aggregated, "medium"]),
+        _ => aggregated,
+    };
 
     // The severity path's verdict: high or critical fails, medium warns, none or low passes.
     private static string SeverityLabel(string severity) => severity switch

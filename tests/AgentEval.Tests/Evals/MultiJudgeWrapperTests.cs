@@ -402,4 +402,41 @@ public class MultiJudgeWrapperTests
 
         Assert.Equal("pass", result.Score.Label);
     }
+
+    // ── B6c-3 (mid-branch review): a pass the panel cannot agree on is withheld ────────────────────────────────────
+
+    private static MultiJudgeWrapper ThresholdPanel(params EvalComponent[] judges) =>
+        new("panel", "Panel", "test", "1.0.0", judges, WeightedMedianAggregation.Instance, threshold: 0.80);
+
+    [Fact]
+    public async Task ASevereDissentBelowThePanelsBar_WithholdsThePass_AndNamesIt()
+    {
+        var result = await ThresholdPanel(
+            JudgeComp("j1", 0.95), JudgeComp("j2", 0.95), JudgeComp("j3", 0.20, "critical", "fail")).EvaluateAsync(Input);
+
+        Assert.Equal("warn", result.Score.Label);
+        Assert.False(result.Score.Passed);
+        Assert.Equal(AgentEval.Evals.Meta.MeasurementState.NotMeasured, result.Score.CensusBucket());
+        Assert.Equal("critical", result.Score.Severity);
+        Assert.Contains("1 of 3 judges found a critical failure", result.Details.Summary!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AMildDissent_IsAbsorbedByTheMedian_AndThePassReportsNoSeverity()
+    {
+        var result = await ThresholdPanel(
+            JudgeComp("j1", 0.95), JudgeComp("j2", 0.95), JudgeComp("j3", 0.50, "medium", "fail")).EvaluateAsync(Input);
+
+        Assert.Equal("pass", result.Score.Label);
+        Assert.Equal("none", result.Score.Severity);   // the absorbed dissent does not ride along on the pass
+    }
+
+    [Fact]
+    public async Task AJudgeFailingOnlyItsOwnStricterBar_IsNotADissent()
+    {
+        // Above the panel's 0.80 bar, below the judge's own: the panel's bar is the configured rule.
+        var result = await ThresholdPanel(JudgeComp("j1", 0.85, "high", "fail")).EvaluateAsync(Input);
+
+        Assert.Equal("pass", result.Score.Label);
+    }
 }

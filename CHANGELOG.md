@@ -31,6 +31,16 @@ third-party exporter on our public interfaces.
     calls reach the unsafe-tool-use check — `bench agentic` does not pass a trace's tool calls to it), Reasoning (a
     response without plan or list markers skips the plan and goal-decomposition checks), Telemetry (zero calls), Judge
     Quality (a missing input), and Tool Call Accuracy / Agentic Execution (no tool definitions captured, or definitions with no tool calls).
+- **GDPR and EU AI Act presets could FAIL with every article passing.** Since the severity cap above, the verdict read
+  severity from every required part, passed or not, and a PASSING article still reported the severity of a scenario
+  failure its own scoring absorbed: 28 GDPR and 11 EU single-scenario cases read FAIL with no article failing, while
+  the same article failing as a whole read only WARN. A composite's verdict now reads only the parts that did not
+  pass, and a composite reports the severity its verdict implies (a pass: none; a fail: at least medium). **Multi-judge
+  (AuditGrade):** the scenario panel took the severity path — score the median, label the worst judge — and one
+  critical dissent failed the preset only through that smuggled severity. The panel now judges its median against the
+  scenario's own bar (as Mode-B did), and a pass with a high or critical dissent below that bar is withheld (`warn`,
+  not measured, the dissent named), so the preset reads WARN: review it. A critical majority still fails and caps at
+  0.40.
 - **A trace with chat requests but no responses read as "no tool call was made".** Since the `--trace` projection
   above, any chat-layer entry made an empty tool-call list, so a request whose response was never recorded (a
   cancelled stream; in-workflow capture, which records no responses) passed `unsafe_tool_use` in code and told every

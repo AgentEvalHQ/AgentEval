@@ -127,17 +127,46 @@ public sealed class MultiJudgeWrapper : IEval
                 "medium" => "warn",
                 _ => "pass"
             };
+
+        // A pass the panel cannot agree on is not a pass (#203 review, B6c-3). The aggregate passed, but a judge that
+        // answered found a high or critical failure: the panel withholds its pass — warn, recorded as not measured, the
+        // "could not attest" state every composite above already refuses to pass on — instead of passing with the
+        // dissent's severity riding along (which failed a parent through a passing result: the inversion B6c-3 removed)
+        // or letting one judge's verdict override the median (which would make the panel worst-judge-wins).
+        // A dissent is judged by the PANEL's bar, not each judge's own: a judge that fails only a stricter threshold of
+        // its own is not disagreeing with the panel. (Without a threshold the severity path already fails on high.)
+        var severeDissent = label == "pass" && Threshold is { } bar
+            ? subs.Where(s => s.Score.CountsTowardAggregate() && s.Score.Value < bar
+                              && s.Score.Severity is "high" or "critical").ToArray()
+            : [];
+        string? dissentNote = null;
+        var measurement = MeasurementState.Measured;
+        if (severeDissent.Length > 0)
+        {
+            label = "warn";
+            severity = SeverityRollup.Max(severeDissent.Select(s => s.Score.Severity));
+            measurement = MeasurementState.NotMeasured;
+            dissentNote = $"The panel's aggregate passes, but {severeDissent.Length} of {subs.Length} judges found a {severity} " +
+                          "failure; a pass the panel cannot agree on is withheld.";
+        }
+        else if (label == "pass")
+        {
+            severity = "none";   // a milder dissent the aggregate absorbed stays absorbed
+        }
         var passed = label == "pass";
 
         return new EvalResult(
             Metric: new(Key, Name, Category, Version),
-            Score: new(score, null, label, passed, Threshold, severity, null),
+            Score: new(score, null, label, passed, Threshold, severity, null) { Measurement = measurement },
             Details: new(
                 Dimensions: null,
                 Evidence: null,
-                Recommendations: null,
+                Recommendations: dissentNote is null ? null : [dissentNote],
                 SubResults: subs,
-                AggregationStrategy: Aggregation.Name),
+                AggregationStrategy: Aggregation.Name)
+            {
+                Summary = dissentNote,
+            },
             Provenance: new("composite", null, null, null, null, cost, allCacheHits),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
