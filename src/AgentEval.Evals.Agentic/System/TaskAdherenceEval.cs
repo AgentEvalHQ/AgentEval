@@ -69,7 +69,7 @@ public sealed class TaskAdherenceEval : IEval
                     judgeModel: judgeModel,
                     promptId: "agenteval.task_adherence.v1",
                     failureSeverity: "medium"),
-                Weight: 0.20),
+                Weight: 0.20) { OnFailure = ComponentFailureEffect.Fail },
 
             new EvalComponent(
                 Eval: new AtomicLlmEval(
@@ -88,7 +88,7 @@ public sealed class TaskAdherenceEval : IEval
                     promptId: "agenteval.task_adherence.v1",
                     // Safety rule violations escalate to high
                     failureSeverity: "high") { JudgeSeesToolData = JudgeToolData.ToolCalls },
-                Weight: 0.20),
+                Weight: 0.20) { OnFailure = ComponentFailureEffect.Fail },
 
             new EvalComponent(
                 Eval: new AtomicLlmEval(
@@ -107,7 +107,7 @@ public sealed class TaskAdherenceEval : IEval
                     promptId: "agenteval.task_adherence.v1",
                     // Safety procedure violations escalate to high
                     failureSeverity: "high") { JudgeSeesToolData = JudgeToolData.ToolCalls },
-                Weight: 0.20),
+                Weight: 0.20) { OnFailure = ComponentFailureEffect.Fail },
 
             new EvalComponent(
                 Eval: new AtomicLlmEval(
@@ -126,7 +126,7 @@ public sealed class TaskAdherenceEval : IEval
                     promptId: "agenteval.task_adherence.v1",
                     // Presentation failures are low-severity
                     failureSeverity: "low"),
-                Weight: 0.20),
+                Weight: 0.20) { OnFailure = ComponentFailureEffect.Warn },
 
             new EvalComponent(
                 Eval: new AtomicLlmEval(
@@ -146,14 +146,14 @@ public sealed class TaskAdherenceEval : IEval
                     promptId: "agenteval.task_adherence.v1",
                     // Authorization violations are always high severity
                     failureSeverity: "high") { JudgeSeesToolData = JudgeToolData.ToolCalls },
-                Weight: 0.20),
+                Weight: 0.20) { OnFailure = ComponentFailureEffect.Fail },
         };
 
         _inner = new CompositeEval(
             key: "task_adherence",
             name: "Task Adherence",
             category: "system-outcome",
-            version: "1.1.0",
+            version: "1.2.0",
             components: components,
             aggregation: WeightedSumAggregation.Instance,
             threshold: passThreshold);

@@ -260,6 +260,20 @@ from passing when it is required. The gates (`safety`, `adversarial-direct`, `gl
 reported score on a high or critical failure, so a `FAIL` never sits next to a 96%. In code, the effect is
 `EvalComponent.OnFailure` (`Fail`, `Warn`, or `Averaged` — the old behaviour, the default for your own composites).
 
+The same rule holds one level down, inside the seven evaluators built from sub-dimensions — so a failure cannot
+hide inside an evaluator either (before 0.44, an unauthorized action averaged out inside `task_adherence`, and the
+preset above it never saw a failure):
+
+| Evaluator | Fails it | Warns, naming the sub-dimension |
+|-----------|----------|---------------------------------|
+| `task_adherence` | goal, rule, procedural and authorization adherence | presentation adherence |
+| `intent_resolution` | intent identified, intent resolved | — |
+| `groundedness` | claim support, claim contradicted, citation accuracy | evidence coverage |
+| `qa_composite` | groundedness, response completeness, relevance | similarity, F1, coherence, fluency |
+| `tool_input_accuracy` | schema validity, semantic grounding of the arguments | — |
+| `task_navigation_efficiency` | — | action-sequence edit distance, path quality |
+| `tool_call_accuracy` | tool selection, input accuracy, output utilization, call success | efficiency |
+
 ---
 
 ## Cost-Aware Execution

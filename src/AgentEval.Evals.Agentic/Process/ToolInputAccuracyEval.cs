@@ -88,11 +88,11 @@ public sealed class ToolInputAccuracyEval : IEval
             key: "tool_input_accuracy",
             name: "Tool Input Accuracy",
             category: "agentic-process",
-            version: "2.3.0",
+            version: "2.4.0",
             components: new[]
             {
-                new EvalComponent(schemaValidation, Weight: 0.50),
-                new EvalComponent(semanticGroundedness, Weight: 0.50),
+                new EvalComponent(schemaValidation, Weight: 0.50) { OnFailure = ComponentFailureEffect.Fail },
+                new EvalComponent(semanticGroundedness, Weight: 0.50) { OnFailure = ComponentFailureEffect.Fail },
             },
             aggregation: WeightedSumAggregation.Instance,
             threshold: passThreshold);

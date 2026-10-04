@@ -71,7 +71,7 @@ public sealed class IntentResolutionEval : IEval
                     judgeModel: judgeModel,
                     promptId: "agenteval.intent_resolution.v1",
                     failureSeverity: "medium") { JudgeSeesToolData = JudgeToolData.ToolCalls },
-                Weight: 0.50),
+                Weight: 0.50) { OnFailure = ComponentFailureEffect.Fail },
 
             new EvalComponent(
                 Eval: new AtomicLlmEval(
@@ -90,14 +90,14 @@ public sealed class IntentResolutionEval : IEval
                     judgeModel: judgeModel,
                     promptId: "agenteval.intent_resolution.v1",
                     failureSeverity: "medium") { JudgeSeesToolData = JudgeToolData.ToolCalls },
-                Weight: 0.50),
+                Weight: 0.50) { OnFailure = ComponentFailureEffect.Fail },
         };
 
         _inner = new CompositeEval(
             key: "intent_resolution",
             name: "Intent Resolution",
             category: "system-outcome",
-            version: "1.1.0",
+            version: "1.2.0",
             components: components,
             aggregation: WeightedSumAggregation.Instance,
             threshold: passThreshold);

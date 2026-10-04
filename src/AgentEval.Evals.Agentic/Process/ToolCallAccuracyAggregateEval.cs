@@ -85,14 +85,14 @@ public sealed class ToolCallAccuracyAggregateEval : IEval
             key: "tool_call_accuracy",
             name: "Tool Call Accuracy",
             category: "agentic-process",
-            version: "1.0.0",
+            version: "1.1.0",
             components: new[]
             {
-                new EvalComponent(toolSelection,         Weight: 0.25),
-                new EvalComponent(toolInputAccuracy,     Weight: 0.25),
-                new EvalComponent(toolOutputUtilization, Weight: 0.20),
-                new EvalComponent(toolCallSuccess,       Weight: 0.15),
-                new EvalComponent(toolEfficiency,        Weight: 0.15),
+                new EvalComponent(toolSelection,         Weight: 0.25) { OnFailure = ComponentFailureEffect.Fail },
+                new EvalComponent(toolInputAccuracy,     Weight: 0.25) { OnFailure = ComponentFailureEffect.Fail },
+                new EvalComponent(toolOutputUtilization, Weight: 0.20) { OnFailure = ComponentFailureEffect.Fail },
+                new EvalComponent(toolCallSuccess,       Weight: 0.15) { OnFailure = ComponentFailureEffect.Fail },
+                new EvalComponent(toolEfficiency,        Weight: 0.15) { OnFailure = ComponentFailureEffect.Warn },
             },
             aggregation: WeightedSumAggregation.Instance,
             threshold: passThreshold);

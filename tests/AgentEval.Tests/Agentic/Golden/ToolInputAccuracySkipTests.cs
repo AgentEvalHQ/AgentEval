@@ -207,7 +207,7 @@ public class ToolInputAccuracySkipTests
     {
         var eval = new ToolInputAccuracyEval(new FixedScoreEvaluator(100));
 
-        Assert.Equal("2.3.0", eval.Version);
+        Assert.Equal("2.4.0", eval.Version);
     }
 
     // ── B5a (#203 review): a call is checked only against a schema the check can read ──────────────────────────

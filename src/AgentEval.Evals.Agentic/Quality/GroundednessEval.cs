@@ -87,7 +87,7 @@ public sealed class GroundednessEval : IEval
                     judgeModel: judgeModel,
                     promptId: "agenteval.groundedness.v1",
                     failureSeverity: "medium"),
-                Weight: 0.30),
+                Weight: 0.30) { OnFailure = ComponentFailureEffect.Fail },
 
             new EvalComponent(
                 Eval: new AtomicLlmEval(
@@ -106,7 +106,7 @@ public sealed class GroundednessEval : IEval
                     promptId: "agenteval.groundedness.v1",
                     // Contradictions are more severe — escalate to high
                     failureSeverity: "high"),
-                Weight: 0.25),
+                Weight: 0.25) { OnFailure = ComponentFailureEffect.Fail },
 
             new EvalComponent(
                 Eval: new AtomicLlmEval(
@@ -124,7 +124,7 @@ public sealed class GroundednessEval : IEval
                     judgeModel: judgeModel,
                     promptId: "agenteval.groundedness.v1",
                     failureSeverity: "medium"),
-                Weight: 0.20),
+                Weight: 0.20) { OnFailure = ComponentFailureEffect.Fail },
 
             new EvalComponent(
                 Eval: new AtomicLlmEval(
@@ -142,14 +142,14 @@ public sealed class GroundednessEval : IEval
                     judgeModel: judgeModel,
                     promptId: "agenteval.groundedness.v1",
                     failureSeverity: "medium"),
-                Weight: 0.25),
+                Weight: 0.25) { OnFailure = ComponentFailureEffect.Warn },
         };
 
         _inner = new CompositeEval(
             key: "groundedness",
             name: "Groundedness",
             category: "rag",
-            version: "1.0.0",
+            version: "1.1.0",
             components: components,
             aggregation: WeightedSumAggregation.Instance,
             threshold: passThreshold);

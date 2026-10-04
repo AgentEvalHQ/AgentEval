@@ -31,6 +31,13 @@ third-party exporter on our public interfaces.
     calls reach the unsafe-tool-use check — `bench agentic` does not pass a trace's tool calls to it), Reasoning (a
     response without plan or list markers skips the plan and goal-decomposition checks), Telemetry (zero calls), Judge
     Quality (a missing input), and Tool Call Accuracy / Agentic Execution (no tool definitions captured, or definitions with no tool calls).
+- **A failing sub-dimension could hide inside an evaluator.** Seven evaluators are composites of sub-dimensions
+  and were weighted sums: `task_adherence`'s authorization leaf (high) failing read 0.82 = PASS, so an unauthorized
+  action never reached the preset; `qa_composite` reported PASS 0.948 with F1 failing. **Behaviour change:** every
+  sub-dimension is classified with `OnFailure` (table in the agentic getting-started guide): `task_adherence` 1.2.0,
+  `intent_resolution` 1.2.0, `groundedness` 1.1.0, `qa_composite` 1.1.0, `tool_input_accuracy` 2.4.0,
+  `task_navigation_efficiency` 1.2.0, `tool_call_accuracy` 1.1.0. Their verdicts can change where a sub-dimension
+  failed; their scores do not.
 - **GDPR and EU AI Act AuditGrade passed with an article failing at medium severity.** CapByWorst caps only
   high/critical failures, so one medium article failing among ~20 averaged to ≥ 0.90 = PASS (GDPR Art 13, EU Art 13
   deployer transparency) — though the GDPR docs' verdict table, since the B4 fix, holds for every preset (medium →
