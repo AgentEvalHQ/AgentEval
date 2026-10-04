@@ -16,11 +16,22 @@ third-party exporter on our public interfaces.
   `error` blocked the verdict. One that returned `skipped` — because a required input, trace or telemetry was not
   supplied — was left out, and the composite passed on the rest ("Measured 1 of 2", label `pass`).
   - **Behaviour change:** a would-be `pass` with a required component that was not measured is now `warn` (not
-    passed; exit 10 through the bench exit codes). The result's summary names the components. A measured `fail`
-    stays `fail`, a required `error` still wins, optional components and `inapplicable` ones (the case cannot test
-    the thing, ADR-030) never block.
-  - Composites whose required components often skip report `warn` more often. The Glass Box Diagnostics preset is
-    the main one: its tool diagnostics skip on a trace with no tool executions, and two others need several turns.
+    passed; exit 10 through the bench exit codes). So is one with a required nested composite that could not attest
+    its own pass (its `warn`): before, that `warn` carried severity `none` and vanished one level up. The result's
+    summary names the components. A measured `fail` stays `fail`, a required `error` still wins, and optional
+    components, `inapplicable` ones (the case cannot test the thing, ADR-030) and nested composites whose components
+    are all inapplicable never block.
+  - **Components are `Required` by default**, so `MinimumMeasuredShare = 0` no longer means "pass on any measured
+    component": mark a component `Required: false` if the composite may pass without it.
+  - Agentic presets whose required components skip on common inputs now report `warn` where they passed:
+    Glass Box Diagnostics (no tool executions in the trace, fewer than 2 system prompts or 3 turns; built without a
+    judge and with no trusted baseline its prompt-injection check always skips, so it cannot pass), Safety (no tool
+    calls reach the unsafe-tool-use check — `bench agentic` does not pass a trace's tool calls to it), Reasoning (a
+    response without plan or list markers skips the plan and goal-decomposition checks), Telemetry (zero calls), Judge
+    Quality (a missing input), and Tool Call Accuracy / Agentic Execution (tool definitions with no tool calls).
+- **Benchmark run statistics counted leaves that were not measured as failures.** The agentic, GDPR and EU AI Act
+  runners filed every `inapplicable` and `error` leaf under Failed. They now go in the single Skipped bucket, as
+  ADR-030 specifies, so Failed counts only measured failures.
 - **The Extensibility sample stopped with an error, and the docs named the wrong registration call.**
   `docs/export.md`, `docs/extensibility.md`, `docs/redteam.md` and the sample said `services.AddAgentEval()` builds
   the exporter, dataset-loader and attack registries. It builds only `IMetricRegistry`; the sample exited with "No
@@ -33,19 +44,19 @@ third-party exporter on our public interfaces.
   loaders by their `Format`. Built-in names still win.
 
 #### Changed
-- `ToolInputAccuracyEval` 2.1.0: the schema check looks at the case before the answer. No tool definitions means the
-  case cannot test schema validity, so the check is `inapplicable` (it was `skipped`) and the composite is the judge
-  alone, as documented. Definitions with no tool calls stays `skipped`, so that composite can no longer pass on the
-  judge alone.
-- `UnsafeToolUseEval` 1.1.0: a case that gives the agent no tools (no definitions, no calls) is `inapplicable` (it was
-  `skipped`), so it does not block the agentic Safety preset. A case that declares tools and gets no calls stays
-  `skipped`.
+- `ToolInputAccuracyEval` 2.1.0: the schema check looks at the case before the answer. With no tool definitions
+  supplied it cannot test schema validity, so the check is `inapplicable` (it was `skipped`; ADR-030 names "no tool
+  definitions supplied" as its example) and the composite is the judge alone, as documented. Definitions with no tool
+  calls stays `skipped`, so that composite — and the presets that nest it — can no longer pass on the judge alone.
 
 #### Documentation
-- `docs/export.md` says what an exporter receives: the flat `EvaluationReport`, not the `EvalResult` model with its
-  measurement states, labels, trees and provenance, and where to get that model instead.
-  [ADR-034](docs/adr/034-exporters-and-the-result-model.md) (Proposed) records why the two are separate and the path
-  to export the result model through a registry.
+- `docs/export.md` says what an exporter receives — the flat `EvaluationReport`, not the `EvalResult` model with its
+  measurement states, labels, trees and provenance — where to get that model instead, and that `agenteval eval
+  --format` takes only the built-in formats: a custom exporter registered through `IExporterRegistry` runs when your
+  own code resolves and calls it. [ADR-034](docs/adr/034-exporters-and-the-result-model.md) (Proposed) records why the
+  two are separate and the path to export the result model through a registry.
+- `docs/composite-evals.md`: the verdict matrix has a row for the required-component rule, and says what
+  `MinimumMeasuredShare = 0` does and does not drop.
 
 ### No real target, no run: `bench` stops measuring built-in stand-ins
 

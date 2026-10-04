@@ -42,8 +42,8 @@ public static class Extensibility
         Console.WriteLine("🔌 STEP 1: Register Custom Extensions via DI\n");
         var services = new ServiceCollection();
 
-        // Register custom extensions BEFORE the AddAgentEval* calls
-        // so the registries auto-discover them during initialization.
+        // Register custom extensions as services. Each registry reads them when it is first resolved,
+        // so they are picked up whether they are registered before or after the AddAgentEval* calls.
         services.AddSingleton<IMetric, WordCountMetric>();
         services.AddSingleton<IResultExporter, HtmlExporter>();
         services.AddSingleton<IDatasetLoader, MarkdownDatasetLoader>();
@@ -288,7 +288,7 @@ public static class Extensibility
         if (AIConfig.UseMock)
         {
             // ── Mock path (--mock only) ──
-            // The classic LLM mistake: many models say "2" for Strawberry
+            // A canned wrong answer (the correct count of 'a' is 1), so the metric has something to fail
             agentResponse = "2";
             agentLabel = "Mock (canned wrong answer)";
         }
@@ -340,8 +340,10 @@ public static class Extensibility
         }
 
         Console.WriteLine();
-        Console.WriteLine("   💡 This demonstrates a custom code_* metric evaluating a real LLM response.");
-        Console.WriteLine("      The 'Strawberry' question is a classic LLM reasoning challenge!");
+        Console.WriteLine(AIConfig.UseMock
+            ? "   💡 This demonstrates a custom code_* metric on a canned reply (MOCK); run without --mock to grade a real model."
+            : "   💡 This demonstrates a custom code_* metric evaluating a real LLM response.");
+        Console.WriteLine("      Letter-counting questions like this one are a classic LLM reasoning challenge!");
     }
 
     // ═════════════════════════════════════════════════════════════════════    // CUSTOM IMPLEMENTATIONS (inline for sample clarity)

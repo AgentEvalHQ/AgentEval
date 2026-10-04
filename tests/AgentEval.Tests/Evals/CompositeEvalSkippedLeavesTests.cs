@@ -221,7 +221,7 @@ public class CompositeEvalSkippedLeavesTests
         Assert.Equal("warn", result.Score.Label);
         Assert.False(result.Score.Passed);
         Assert.Equal(1.0, result.Score.Value, precision: 10); // the score is still the measured part's
-        Assert.Contains("Required component(s) not measured: judge", result.Details.Summary!, StringComparison.Ordinal);
+        Assert.Contains("could not attest their own pass: judge", result.Details.Summary!, StringComparison.Ordinal);
         Assert.Equal(result.Details.Summary, Assert.Single(result.Details.Recommendations!));
     }
 
@@ -319,5 +319,109 @@ public class CompositeEvalSkippedLeavesTests
         Assert.Equal("skipped", result.Details.SubResults![1].Score.Label);
         Assert.Equal("warn", result.Score.Label);
         Assert.Contains("inner", result.Details.Summary!, StringComparison.Ordinal);
+    }
+
+    // ── One level down (found reviewing #203) ─────────────────────────────────────────────────────
+    // A nested composite that could not attest its own pass reports warn with severity "none" (nothing failed),
+    // so the parent's severity path read it as clean and passed: the warn vanished one level up.
+
+    private static CompositeEval InnerWithARequiredSkip() =>
+        new("inner", "Inner", "test", "1.0.0", new EvalComponent[]
+        {
+            new(new FixedEval("exact", 1.0, passed: true)),
+            new(new SkippingEval("judge")),
+        }, WeightedSumAggregation.Instance);
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData(0.5)]
+    public async Task RequiredNestedCompositeThatCouldNotAttestItsPass_KeepsTheParentFromPassing(double? threshold)
+    {
+        var sut = Composite(new EvalComponent[]
+        {
+            new(new FixedEval("other", 1.0, passed: true)),
+            new(InnerWithARequiredSkip()),
+        }, threshold: threshold);
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("warn", result.Details.SubResults![1].Score.Label);
+        Assert.Equal("warn", result.Score.Label);
+        Assert.False(result.Score.Passed);
+        Assert.Contains("inner", result.Details.Summary!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TwoLevelsDown_TheWarnStillReachesTheTop()
+    {
+        var middle = new CompositeEval("middle", "Middle", "test", "1.0.0", new EvalComponent[]
+        {
+            new(new FixedEval("m", 1.0, passed: true)),
+            new(InnerWithARequiredSkip()),
+        }, WeightedSumAggregation.Instance);
+        var sut = Composite(new EvalComponent[]
+        {
+            new(new FixedEval("top", 1.0, passed: true)),
+            new(middle),
+        });
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("warn", result.Score.Label);
+    }
+
+    [Fact]
+    public async Task OptionalNestedCompositeThatCouldNotAttestItsPass_DoesNotBlock()
+    {
+        var sut = Composite(new EvalComponent[]
+        {
+            new(new FixedEval("other", 1.0, passed: true)),
+            new(InnerWithARequiredSkip(), Required: false),
+        });
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("pass", result.Score.Label);
+    }
+
+    [Fact]
+    public async Task RequiredNestedCompositeWhoseLeavesAreAllInapplicable_DoesNotBlock()
+    {
+        // Such a composite reports "skipped" today (ADR-030 Slice 1.4(ii) is unbuilt), but it is a corpus finding —
+        // the case cannot test any of it — not a component that did not run.
+        var inner = new CompositeEval("na_inner", "NA inner", "test", "1.0.0", new EvalComponent[]
+        {
+            new(new FixedEval("a", 0.0, passed: false, label: "inapplicable")),
+            new(new FixedEval("b", 0.0, passed: false, label: "inapplicable")),
+        }, WeightedSumAggregation.Instance);
+        var sut = Composite(new EvalComponent[]
+        {
+            new(new FixedEval("other", 1.0, passed: true)),
+            new(inner),
+        });
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("skipped", result.Details.SubResults![1].Score.Label);
+        Assert.Equal("pass", result.Score.Label);
+        Assert.True(result.Score.Passed);
+    }
+
+    [Fact]
+    public async Task BothBarsFiring_TheSummaryGivesBothReasons()
+    {
+        var sut = Composite(new EvalComponent[]
+        {
+            new(new FixedEval("exact", 1.0, passed: true)),
+            new(new SkippingEval("judge")),
+            new(new SkippingEval("telemetry"), Required: false),
+            new(new SkippingEval("trace"), Required: false),
+        });
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("warn", result.Score.Label);
+        Assert.Contains("could not attest their own pass: judge", result.Details.Summary!, StringComparison.Ordinal);
+        Assert.Contains("below the 50", result.Details.Summary!, StringComparison.Ordinal);
     }
 }

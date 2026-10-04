@@ -111,17 +111,21 @@ The composite verdict is determined after aggregation. `warn` is a soft fail: `P
 |---|-----------|---------|----------|
 | 1 | a `Required` component errored | `"error"` | `false` |
 | 2 | no component produced a measurement | `"error"` if any errored, else `"skipped"` | `false` |
-| 3 | threshold set, `score >= threshold` | `"pass"` (see row 6) | `true` |
+| 3 | threshold set, `score >= threshold` | `"pass"` (see rows 6–7) | `true` |
 | 4 | threshold set, `score < threshold` | `"fail"` | `false` |
-| 5 | no threshold: severity `critical` or `high` → `"fail"`; `medium` → `"warn"`; `none` or `low` → `"pass"` (see row 6) | as stated | |
-| 6 | the label would be `"pass"`, but fewer than `MinimumMeasuredShare` (default **0.5**) of the components produced a measurement | `"warn"` | `false` |
+| 5 | no threshold: severity `critical` or `high` → `"fail"`; `medium` → `"warn"`; `none` or `low` → `"pass"` (see rows 6–7) | as stated | |
+| 6 | the label would be `"pass"`, but a `Required` component did not run (`skipped`, or any not-measured result) or is a nested composite that could not attest its own pass (`warn`) | `"warn"` | `false` |
+| 7 | the label would be `"pass"`, but fewer than `MinimumMeasuredShare` (default **0.5**) of the components produced a measurement | `"warn"` | `false` |
 
-Skipped, inapplicable and errored components are left out of the score, so they never count as 0. Row 6 stops that
-from turning into a pass on whatever is left: a composite whose components mostly report "not applicable" cannot
-pass on the few that remain. Only a pass is withheld; a measured failure stays a failure. Set
-`MinimumMeasuredShare = 0` to accept a pass on any measured component. Whenever components were left out, the
-result's `Details.Summary` says how many were measured and why the others were not. Through the CLI, `warn` exits
-with code 10 (`GateWarning`), which CI can treat as blocking or not.
+Skipped, inapplicable and errored components are left out of the score, so they never count as 0. Rows 6 and 7 stop
+that from turning into a pass on whatever is left. Row 6: a pass cannot rest on a required component that never ran
+— components are `Required` by default, so mark a component `Required: false` if the composite may pass without it.
+An `inapplicable` component (the case cannot test the thing), or a nested composite all of whose components are
+inapplicable, does not trigger it. Row 7: a composite whose components mostly report "not applicable" cannot pass on
+the few that remain; `MinimumMeasuredShare = 0` drops this bar, not row 6. Only a pass is withheld; a measured
+failure stays a failure. Whenever components were left out, the result's `Details.Summary` says how many were
+measured and why the others were not, and names the required components behind a row-6 `warn`. Through the CLI,
+`warn` exits with code 10 (`GateWarning`), which CI can treat as blocking or not.
 
 Composite severity is the maximum severity across all sub-results (`none < low < medium < high < critical`), computed by `SeverityRollup.Max`.
 

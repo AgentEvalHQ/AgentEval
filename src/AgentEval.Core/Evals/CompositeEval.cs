@@ -56,7 +56,9 @@ public sealed class CompositeEval : IEval
     /// <summary>
     /// The share of components (0..1) that must produce a measurement for a passing composite to report
     /// <c>pass</c>. Below it the composite reports <c>warn</c>: nothing failed, but the pass would rest on a minority
-    /// of what the composite claims to cover. Default 0.5. Set 0 to accept a pass on any measured component.
+    /// of what the composite claims to cover. Default 0.5. Set 0 to drop this bar. It is not the only one: a pass also
+    /// needs every <see cref="EvalComponent.Required"/> component to have run (and a nested composite to have passed),
+    /// whatever this share is — and components are required by default.
     /// </summary>
     /// <remarks>
     /// Leaves that could not measure (skipped, inapplicable, errored) are excluded from the score, which is right:
@@ -175,11 +177,19 @@ public sealed class CompositeEval : IEval
         // 2", label pass; reported in #203). It cannot attest a pass, so a would-be pass becomes warn below. A
         // measured fail stays a fail, "error" still wins, and NotApplicable (the CASE cannot test the thing,
         // ADR-030) is not this: it never blocks.
-        var requiredNotMeasured = Components
+        //
+        // One level down it is the same gap. A required NESTED composite that could not attest its own pass reports
+        // warn — with severity "none", because nothing failed — so the severity path above read it as clean and the
+        // parent passed (found reviewing #203: ToolInputAccuracyEval's warn vanished inside the ToolCallAccuracy and
+        // AgenticExecution presets). And a nested composite every leaf of which is inapplicable reports "skipped"
+        // today (Slice 1.4(ii), below) but is a corpus finding, not a component that did not run: it does not block.
+        var requiredUnattested = Components
             .Zip(subs, (c, s) => (Component: c, Sub: s))
             .Where(pair => pair.Component.Required
                            && pair.Sub.Score.Label != "error"
-                           && pair.Sub.Score.CensusBucket() == MeasurementState.NotMeasured)
+                           && !IsWhollyInapplicable(pair.Sub)
+                           && (pair.Sub.Score.CensusBucket() == MeasurementState.NotMeasured
+                               || (pair.Sub.Score.Label == "warn" && pair.Sub.Details?.SubResults is { Count: > 0 })))
             .Select(pair => pair.Sub.Metric.Key)
             .ToArray();
 
@@ -213,7 +223,8 @@ public sealed class CompositeEval : IEval
         //   No leaf measured     -> error when any leaf errored, else skipped; never pass/fail
         //   Threshold set        -> score >= threshold ? pass : fail
         //   Threshold null       -> severity is { high|critical -> fail, medium -> warn, _ -> pass }
-        //   then a pass becomes warn when a required component was not measured, or under MinimumMeasuredShare
+        //   then a pass becomes warn when a required component did not run or could not attest its own pass (a
+        //   nested composite's warn), or when less than MinimumMeasuredShare of the components was measured
         // "warn" is a soft fail: passed = false but label distinguishes from a hard fail.
         //
         // An all-inapplicable composite is a CORPUS finding and its true label is "inapplicable". The
@@ -239,9 +250,9 @@ public sealed class CompositeEval : IEval
         // A pass that rests on a minority of the components is not the composite's pass. Nothing failed, so it is a
         // soft finding (warn → exit 10 through BenchExitCodes), not a fail.
         var underCovered = label == "pass" && measuredCount < MinimumMeasuredShare * subs.Length;
-        // Nor is a pass that leaves out a required component that did not run (see requiredNotMeasured).
-        var requiredUnattested = label == "pass" && requiredNotMeasured.Length > 0;
-        if (underCovered || requiredUnattested)
+        // Nor is a pass that leaves out a required component that did not run (see requiredUnattested).
+        var passUnattested = label == "pass" && requiredUnattested.Length > 0;
+        if (underCovered || passUnattested)
             label = "warn";
         var passed = label == "pass";
 
@@ -273,21 +284,28 @@ public sealed class CompositeEval : IEval
             s.Score.Label != "error" && s.Score.CensusBucket() == MeasurementState.NotApplicable);
         var unmeasuredOther = unmeasured.Length - unmeasuredErrored - unmeasuredInapplicable;
         var breakdown = $"({unmeasuredOther} skipped or not measured, {unmeasuredInapplicable} inapplicable, {unmeasuredErrored} errored)";
-        string? partialCoverageNote = nothingMeasured || unmeasured.Length == 0
+        var share = MinimumMeasuredShare.ToString("P0", System.Globalization.CultureInfo.InvariantCulture);
+        var leftOut = unmeasured.Length == 0 ? "" : $"; {unmeasured.Length} left out of the score {breakdown}";
+        string? partialCoverageNote = nothingMeasured
             ? null
             : hasRequiredError
                 ? $"A required component errored, so no pass/fail verdict is reported. Measured {measuredCount} of " +
                   $"{subs.Length} component(s); {unmeasured.Length} produced no measurement {breakdown}."
-                : requiredUnattested
-                    ? $"Required component(s) not measured: {string.Join(", ", requiredNotMeasured)}. A pass cannot rest " +
-                      $"on a required component that did not run, so the verdict is warn. Measured {measuredCount} of " +
-                      $"{subs.Length} component(s); {unmeasured.Length} left out of the score {breakdown}."
-                    : underCovered
-                        ? $"Passed on only {measuredCount} of {subs.Length} component(s), below the " +
-                          $"{MinimumMeasuredShare.ToString("P0", System.Globalization.CultureInfo.InvariantCulture)} a pass needs, " +
-                          $"so the verdict is warn; {unmeasured.Length} left out of the score {breakdown}."
-                        : $"Measured {measuredCount} of {subs.Length} component(s); {unmeasured.Length} left out of the score " +
-                          $"{breakdown}, so this verdict covers only the measured part.";
+                : passUnattested
+                    // Both bars can fire at once; say both, so neither reason is lost.
+                    ? $"Required component(s) that did not run or could not attest their own pass: " +
+                      $"{string.Join(", ", requiredUnattested)}. A pass cannot rest on them, so the verdict is warn. " +
+                      (underCovered
+                          ? $"It also rests on only {measuredCount} of {subs.Length} component(s), below the {share} a pass needs"
+                          : $"Measured {measuredCount} of {subs.Length} component(s)") +
+                      $"{leftOut}."
+                    : unmeasured.Length == 0
+                        ? null
+                        : underCovered
+                            ? $"Passed on only {measuredCount} of {subs.Length} component(s), below the {share} a pass needs, " +
+                              $"so the verdict is warn; {unmeasured.Length} left out of the score {breakdown}."
+                            : $"Measured {measuredCount} of {subs.Length} component(s); {unmeasured.Length} left out of the score " +
+                              $"{breakdown}, so this verdict covers only the measured part.";
         var coverageNote = nothingMeasuredNote ?? partialCoverageNote;
 
         return new EvalResult(
@@ -312,4 +330,12 @@ public sealed class CompositeEval : IEval
                 CacheHit: allCacheHits),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
+
+    // True when a result only says "the case cannot test this": an inapplicable leaf, or a composite every leaf of
+    // which is (that composite reports "skipped" until ADR-030 Slice 1.4(ii) lands). Depth is bounded by
+    // MaxNestingDepth, which EvaluateAsync enforces on the tree that produced the result.
+    private static bool IsWhollyInapplicable(EvalResult result) =>
+        result.Details?.SubResults is { Count: > 0 } subResults
+            ? subResults.All(IsWhollyInapplicable)
+            : result.Score.CensusBucket() == MeasurementState.NotApplicable;
 }

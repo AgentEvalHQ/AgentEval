@@ -203,11 +203,15 @@ The `FormatName` property is a default interface member that returns the enum na
 
 ### What an exporter receives (and what it does not)
 
-An exporter receives the flat `EvaluationReport` that `agenteval eval` builds from its test harness and metrics: per
-test a 0–100 score, `Passed`, `Skipped`, an error, the output, metric scores and assertions. It does **not** receive
-the result model — `EvalResult` trees with `MeasurementState`, the `warn` / `error` / `skipped` / `inapplicable`
-labels, composite sub-results and judge provenance. Those come from the eval pipeline (`IEval`, `CompositeEval`, the
-bench commands), which does not call exporters.
+An exporter receives a flat `EvaluationReport`, the shape `agenteval eval` builds from its test harness and metrics:
+per test a 0–100 score, `Passed`, `Skipped`, an error, the output, metric scores and assertions. It does **not**
+receive the result model — `EvalResult` trees with `MeasurementState`, the `warn` / `error` / `skipped` /
+`inapplicable` labels, composite sub-results and judge provenance. Those come from the eval pipeline (`IEval`,
+`CompositeEval`, the bench commands), which does not call exporters.
+
+Who calls a custom exporter: **your code.** `agenteval eval --format` accepts only the built-in names above; it does
+not look in `IExporterRegistry`. Register a custom exporter, resolve it from the registry and call `ExportAsync`
+yourself, as in the example below.
 
 So a format that needs to keep "not measured" apart from "failed" cannot get it through `IResultExporter`. Take the
 `EvalResult` trees directly instead — from `IEval.EvaluateAsync`, or from a stored run — and serialise them against

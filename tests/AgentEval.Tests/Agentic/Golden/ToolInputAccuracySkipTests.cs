@@ -90,6 +90,21 @@ public class ToolInputAccuracySkipTests
     }
 
     [Fact]
+    public async Task DefinitionsButNoToolCalls_InsideTheShippedPreset_TheWarnReachesThePreset()
+    {
+        // Found reviewing #203: ToolInputAccuracyEval's warn vanished inside the ToolCallAccuracy preset, which nests
+        // it, so the preset passed on the judge alone. The preset must not pass either.
+        var preset = AgentEval.Benchmarks.AgenticBenchmark.ToolCallAccuracy(new FixedScoreEvaluator(100));
+        var definitions = new[] { new ToolDefinition("search_flights", "Search", new Dictionary<string, object>()) };
+        var input = new EvalInput(Query: "Find flights", Response: "I did not call any tool.", ToolDefinitions: definitions);
+
+        var result = await preset.EvaluateAsync(input);
+
+        Assert.False(result.Score.Passed);
+        Assert.NotEqual("pass", result.Score.Label);
+    }
+
+    [Fact]
     public async Task EmptyToolDefinitions_IsAbsentInput_NotPerfect()
     {
         var eval = new ToolInputAccuracyEval(new FixedScoreEvaluator(100));

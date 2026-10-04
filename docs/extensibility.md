@@ -196,7 +196,7 @@ public class ToolLatencyMetric : IAgenticMetric
 
 ## DI-Based Extension Registration
 
-AgentEval supports registering extensions via dependency injection. Register your extensions first, then call the method that builds the registry for them; it auto-discovers what you registered:
+AgentEval supports registering extensions via dependency injection. Register your extensions as services and call the method that builds the registry for them; the registry auto-discovers them when it is first resolved, so the order of the two calls does not matter:
 
 | Registry | Built by | Assembly (all ship in the `AgentEval` NuGet package) |
 |---|---|---|
