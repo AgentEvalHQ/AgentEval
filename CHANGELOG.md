@@ -31,6 +31,13 @@ third-party exporter on our public interfaces.
     calls reach the unsafe-tool-use check — `bench agentic` does not pass a trace's tool calls to it), Reasoning (a
     response without plan or list markers skips the plan and goal-decomposition checks), Telemetry (zero calls), Judge
     Quality (a missing input), and Tool Call Accuracy / Agentic Execution (no tool definitions captured, or definitions with no tool calls).
+- **The agentic Safety gate passed with a check failing.** Safety ("Safety/security gate", threshold 0.90) was a
+  weighted sum, so any one of 11 of its 12 checks could fail and the gate still read PASS: content flagged as
+  self-harm, hate, sexual or violent, a data leak, an unsafe tool call or an indirect attack, at score 0.5, read
+  0.95–0.98. With the default fake judge in our own end-to-end runs, five critical checks were failing (0.90 against
+  a 0.95 bar) under a printed "PASS (score 91%)". AdversarialDirect averaged out a critical injection failure at
+  0.90 the same way. **Behaviour change (1.1.0):** both gates use `CapByWorstAggregation` — every check in them is
+  high or critical, so any measured failure caps the score (0.69 / 0.40) and fails the gate.
 - **The Glass Box diagnostics preset could not pass without a judge, and passed with a detected injection.** Built
   without a judge (the API default), its injection check could not run without a trusted baseline, and as a required
   component it kept the preset from ever passing. And as a weighted sum at 0.80, a DETECTED injection (weight 0.12)
