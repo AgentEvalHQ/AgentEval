@@ -148,9 +148,10 @@ public class CompositeEvalCoverageDisclosureTests
     public async Task NineOfTenUnmeasured_IsAWarn_AndSaysHowLittleWasMeasured()
     {
         // E7: a 9-of-10-unmeasured composite used to pass, and a CI gate keyed on the label exited 0. The score is
-        // still the measured part's; the label no longer claims the composite passed.
+        // still the measured part's; the label no longer claims the composite passed. The skipped leaves are
+        // optional so this exercises the coverage bar on its own; required ones withhold the pass anyway (#203).
         var components = new List<EvalComponent> { Leaf("measured", Pass(1.0)) };
-        components.AddRange(Enumerable.Range(0, 9).Select(i => Leaf($"s{i}", Skipped())));
+        components.AddRange(Enumerable.Range(0, 9).Select(i => Leaf($"s{i}", Skipped(), required: false)));
         var composite = new CompositeEval("c", "C", "test", "1.0.0", components, WeightedSumAggregation.Instance);
 
         var result = await composite.EvaluateAsync(new EvalInput("q"));
@@ -181,8 +182,9 @@ public class CompositeEvalCoverageDisclosureTests
     [Fact]
     public async Task HalfMeasured_StillPasses_AtTheDefaultBar()
     {
+        // Optional skipped leaves: this pins the coverage bar at exactly half. Required ones withhold the pass (#203).
         var components = Enumerable.Range(0, 5).Select(i => Leaf($"m{i}", Pass(1.0)))
-            .Concat(Enumerable.Range(0, 5).Select(i => Leaf($"s{i}", Skipped())))
+            .Concat(Enumerable.Range(0, 5).Select(i => Leaf($"s{i}", Skipped(), required: false)))
             .ToList();
         var composite = new CompositeEval("c", "C", "test", "1.0.0", components, WeightedSumAggregation.Instance);
 

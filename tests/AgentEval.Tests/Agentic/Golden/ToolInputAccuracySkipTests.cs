@@ -14,6 +14,11 @@ namespace AgentEval.Tests.Agentic.Golden;
 /// checked — and line 129 shipped evidence reading "schema validation skipped" beside a 1.0. Supply
 /// no <c>ToolDefinitions</c> and the leaf reported perfect, forever, lifting the composite by 0.5
 /// of its weight. Absent input is <c>label:"skipped"</c>, and version 1.0.0 → 2.0.0.
+/// <para>
+/// 2.1.0 (#203) checks the case before the answer: no tool definitions is <c>"inapplicable"</c> (the case
+/// cannot test schema validity; the composite is the judge alone), definitions without tool calls stays
+/// <c>"skipped"</c> — and because the schema leaf is required, that composite can no longer pass.
+/// </para>
 /// </summary>
 public class ToolInputAccuracySkipTests
 {
@@ -39,10 +44,10 @@ public class ToolInputAccuracySkipTests
         var result = await eval.EvaluateAsync(input);
 
         var schema = SchemaLeaf(result);
-        Assert.Equal("skipped", schema.Score.Label);
+        Assert.Equal("inapplicable", schema.Score.Label);
         Assert.False(schema.Score.Passed);
         Assert.NotEqual(1.0, schema.Score.Value);
-        Assert.Equal("skipped", schema.Provenance.Type);
+        Assert.Equal(AgentEval.Evals.Meta.MeasurementState.NotApplicable, schema.Score.Measurement);
         Assert.Contains(schema.Details.Recommendations!, r => r.Contains("tool definitions", StringComparison.OrdinalIgnoreCase));
 
         // The composite is now the judge alone: 0.40, below the 0.70 threshold.
@@ -51,10 +56,27 @@ public class ToolInputAccuracySkipTests
     }
 
     [Fact]
-    public async Task NoToolCalls_SchemaLeafIsSkipped_NotPerfect()
+    public async Task NoToolDefinitions_AGoodJudgeScore_PassesOnTheJudgeAlone()
     {
+        // The documented intent for callers that only supply ToolCalls: neither penalised nor flattered. An
+        // inapplicable leaf never blocks the composite, so a good judge score is a pass.
         var eval = new ToolInputAccuracyEval(new FixedScoreEvaluator(100));
-        var input = new EvalInput(Query: "Find flights", Response: "I did not call any tool.");
+        var input = new EvalInput(Query: "Find flights", Response: "Called search_flights.", ToolCalls: OneCall());
+
+        var result = await eval.EvaluateAsync(input);
+
+        Assert.Equal("pass", result.Score.Label);
+        Assert.True(result.Score.Passed);
+    }
+
+    [Fact]
+    public async Task DefinitionsButNoToolCalls_SchemaLeafIsSkipped_AndTheCompositeCannotPass()
+    {
+        // The case could test schema validity (it declares the tool) and the answer called nothing: the
+        // required schema leaf did not run, so the judge's 100 alone is not the composite's pass (#203).
+        var eval = new ToolInputAccuracyEval(new FixedScoreEvaluator(100));
+        var definitions = new[] { new ToolDefinition("search_flights", "Search", new Dictionary<string, object>()) };
+        var input = new EvalInput(Query: "Find flights", Response: "I did not call any tool.", ToolDefinitions: definitions);
 
         var result = await eval.EvaluateAsync(input);
 
@@ -62,6 +84,9 @@ public class ToolInputAccuracySkipTests
         Assert.Equal("skipped", schema.Score.Label);
         Assert.False(schema.Score.Passed);
         Assert.Contains(schema.Details.Recommendations!, r => r.Contains("no tool calls", StringComparison.OrdinalIgnoreCase));
+        Assert.Equal("warn", result.Score.Label);
+        Assert.False(result.Score.Passed);
+        Assert.Contains(SchemaLeafKey, result.Details.Summary!, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -72,7 +97,7 @@ public class ToolInputAccuracySkipTests
 
         var result = await eval.EvaluateAsync(input);
 
-        Assert.Equal("skipped", SchemaLeaf(result).Score.Label);
+        Assert.Equal("inapplicable", SchemaLeaf(result).Score.Label);
     }
 
     [Fact]
@@ -120,10 +145,10 @@ public class ToolInputAccuracySkipTests
     }
 
     [Fact]
-    public void Version_IsBumpedToTwo_BecauseTheScoreShapeChanged()
+    public void Version_IsBumped_BecauseTheVerdictChanged()
     {
         var eval = new ToolInputAccuracyEval(new FixedScoreEvaluator(100));
 
-        Assert.Equal("2.0.0", eval.Version);
+        Assert.Equal("2.1.0", eval.Version);
     }
 }

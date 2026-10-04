@@ -81,11 +81,13 @@ public sealed class ToolInputAccuracyEval : IEval
         // 2.0.0 (ADR-030 Slice 0.3): the schema leaf no longer scores a perfect 1.0 on absent input
         // (no tool calls / no tool definitions); it skips. A composite that read 0.5 * 1.0 from a check
         // that did not run now reads the judge alone, so scores move and the version says so.
+        // 2.1.0 (#203): no tool definitions is inapplicable (the judge alone, as before); tool definitions but no
+        // tool calls stays skipped, and a required leaf that did not run means the composite cannot pass.
         _inner = new CompositeEval(
             key: "tool_input_accuracy",
             name: "Tool Input Accuracy",
             category: "agentic-process",
-            version: "2.0.0",
+            version: "2.1.0",
             components: new[]
             {
                 new EvalComponent(schemaValidation, Weight: 0.50),
@@ -109,38 +111,37 @@ public sealed class ToolInputAccuracyEval : IEval
     /// <see cref="EvalInput.ToolDefinitions"/>.
     /// </summary>
     /// <remarks>
-    /// Absent input is <b>skipped</b>, not perfect (ADR-030 Slice 0.3, defect D-c). Before 2.0.0 this
-    /// leaf returned <c>1.0 / pass</c> when there were no tool calls, no tool definitions, or zero calls
-    /// to check — and shipped evidence reading "schema validation skipped" beside that 1.0. A check that
-    /// did not run has no score; <see cref="EvalResult.Skipped(IEval, string)"/> keeps it out of the
-    /// composite's denominator instead of lifting the composite by half its weight.
+    /// Absent input is not perfect (ADR-030 Slice 0.3, defect D-c). Before 2.0.0 this leaf returned
+    /// <c>1.0 / pass</c> when there were no tool calls, no tool definitions, or zero calls to check — and
+    /// shipped evidence reading "schema validation skipped" beside that 1.0. A check that did not run has
+    /// no score, so it stays out of the composite's denominator instead of lifting it by half its weight.
+    /// <para>
+    /// 2.1.0 checks the CASE before the ANSWER (ADR-030: applicability is a property of the case). No tool
+    /// definitions means the case cannot test schema validity, whatever the agent did: that is
+    /// <b>inapplicable</b>, and the composite is the judge alone. Definitions but no tool calls is about the
+    /// answer: that stays <b>skipped</b>, and since this leaf is required, the composite cannot pass on the
+    /// judge alone (#203).
+    /// </para>
     /// </remarks>
     private sealed class ToolInputSchemaEval : AtomicCodeEval
     {
         public ToolInputSchemaEval()
-            : base("tool_input_accuracy_schema", "Tool Input Accuracy (Schema)", "agentic-process", "2.0.0") { }
+            : base("tool_input_accuracy_schema", "Tool Input Accuracy (Schema)", "agentic-process", "2.1.0") { }
 
         protected override EvalResult Evaluate(EvalInput input)
         {
-            // Absent input: nothing to validate, so nothing is scored (was Build(1.0, true, "none")).
+            // The case first: without definitions there is no schema to validate against, so callers that only
+            // supply ToolCalls are neither penalised nor flattered: the composite is the judge alone. (Was
+            // Build(1.0, true, "none"), defect D-c; then Skipped, which a required leaf can no longer be and pass.)
+            // TODO (A1.7 / plan-13 T4.1e item 37 / lastreview/19 §2): full JSON Schema validation once
+            // `ToolDefinition.Parameters` carries a schema object (today a free-form
+            // `IReadOnlyDictionary<string, object>` — see ToolDefinition in AgentEval.Abstractions).
+            if (input.ToolDefinitions is null or { Count: 0 })
+                return NotApplicable("No tool definitions supplied, so this case cannot test schema validity.");
+
+            // Then the answer: nothing to validate, so nothing is scored (was Build(1.0, true, "none")).
             if (input.ToolCalls is null or { Count: 0 })
                 return EvalResult.Skipped(this, "No tool calls to validate; schema validation was not run.");
-
-            if (input.ToolDefinitions is null or { Count: 0 })
-            {
-                // TODO (A1.7 / plan-13 T4.1e item 37 / lastreview/19 §2):
-                // Implement full JSON Schema validation once `ToolDefinition.Parameters`
-                // carries a schema object that can be validated against (today it's a
-                // free-form `IReadOnlyDictionary<string, object>` — see ToolDefinition
-                // in AgentEval.Abstractions). Deferred until the ToolDefinition.Parameters
-                // typing sweep lands in v0.11+ (no concrete task ID yet).
-                //
-                // Until then, no definitions means the check cannot run. It is SKIPPED — not passed
-                // through at score 1.0 as before — so callers that only supply ToolCalls are neither
-                // penalised nor flattered: the composite is the judge alone.
-                return EvalResult.Skipped(this,
-                    "No tool definitions supplied; schema validation was not run (a 1.0 here was defect D-c, ADR-030).");
-            }
 
             // Build a lookup: tool name → definition.
             var defByName = input.ToolDefinitions

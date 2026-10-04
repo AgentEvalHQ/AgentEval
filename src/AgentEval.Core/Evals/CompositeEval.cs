@@ -168,6 +168,21 @@ public sealed class CompositeEval : IEval
             .Zip(subs, (c, s) => (Component: c, Sub: s))
             .Any(pair => pair.Component.Required && pair.Sub.Score.Label == "error");
 
+        // The same rule for a REQUIRED component that did not run for any other reason: a skipped leaf (a
+        // required input, trace or telemetry was not supplied), a nested composite that measured nothing, any
+        // score whose measurement is NotMeasured. Only "error" was checked above, so a required component that
+        // returned EvalResult.Skipped was simply left out and the composite passed on the rest ("Measured 1 of
+        // 2", label pass; reported in #203). It cannot attest a pass, so a would-be pass becomes warn below. A
+        // measured fail stays a fail, "error" still wins, and NotApplicable (the CASE cannot test the thing,
+        // ADR-030) is not this: it never blocks.
+        var requiredNotMeasured = Components
+            .Zip(subs, (c, s) => (Component: c, Sub: s))
+            .Where(pair => pair.Component.Required
+                           && pair.Sub.Score.Label != "error"
+                           && pair.Sub.Score.CensusBucket() == MeasurementState.NotMeasured)
+            .Select(pair => pair.Sub.Metric.Key)
+            .ToArray();
+
         // ADR-030 Slice 0.1 (defect D-a): a composite none of whose leaves produced a measurement has
         // nothing to render a verdict on. Every aggregation strategy already excludes "skipped" and
         // "error" leaves from the score and returns (0, "none") when nothing is left — and that
@@ -198,6 +213,7 @@ public sealed class CompositeEval : IEval
         //   No leaf measured     -> error when any leaf errored, else skipped; never pass/fail
         //   Threshold set        -> score >= threshold ? pass : fail
         //   Threshold null       -> severity is { high|critical -> fail, medium -> warn, _ -> pass }
+        //   then a pass becomes warn when a required component was not measured, or under MinimumMeasuredShare
         // "warn" is a soft fail: passed = false but label distinguishes from a hard fail.
         //
         // An all-inapplicable composite is a CORPUS finding and its true label is "inapplicable". The
@@ -223,7 +239,9 @@ public sealed class CompositeEval : IEval
         // A pass that rests on a minority of the components is not the composite's pass. Nothing failed, so it is a
         // soft finding (warn → exit 10 through BenchExitCodes), not a fail.
         var underCovered = label == "pass" && measuredCount < MinimumMeasuredShare * subs.Length;
-        if (underCovered)
+        // Nor is a pass that leaves out a required component that did not run (see requiredNotMeasured).
+        var requiredUnattested = label == "pass" && requiredNotMeasured.Length > 0;
+        if (underCovered || requiredUnattested)
             label = "warn";
         var passed = label == "pass";
 
@@ -260,12 +278,16 @@ public sealed class CompositeEval : IEval
             : hasRequiredError
                 ? $"A required component errored, so no pass/fail verdict is reported. Measured {measuredCount} of " +
                   $"{subs.Length} component(s); {unmeasured.Length} produced no measurement {breakdown}."
-                : underCovered
-                    ? $"Passed on only {measuredCount} of {subs.Length} component(s), below the " +
-                      $"{MinimumMeasuredShare.ToString("P0", System.Globalization.CultureInfo.InvariantCulture)} a pass needs, " +
-                      $"so the verdict is warn; {unmeasured.Length} left out of the score {breakdown}."
-                    : $"Measured {measuredCount} of {subs.Length} component(s); {unmeasured.Length} left out of the score " +
-                      $"{breakdown}, so this verdict covers only the measured part.";
+                : requiredUnattested
+                    ? $"Required component(s) not measured: {string.Join(", ", requiredNotMeasured)}. A pass cannot rest " +
+                      $"on a required component that did not run, so the verdict is warn. Measured {measuredCount} of " +
+                      $"{subs.Length} component(s); {unmeasured.Length} left out of the score {breakdown}."
+                    : underCovered
+                        ? $"Passed on only {measuredCount} of {subs.Length} component(s), below the " +
+                          $"{MinimumMeasuredShare.ToString("P0", System.Globalization.CultureInfo.InvariantCulture)} a pass needs, " +
+                          $"so the verdict is warn; {unmeasured.Length} left out of the score {breakdown}."
+                        : $"Measured {measuredCount} of {subs.Length} component(s); {unmeasured.Length} left out of the score " +
+                          $"{breakdown}, so this verdict covers only the measured part.";
         var coverageNote = nothingMeasuredNote ?? partialCoverageNote;
 
         return new EvalResult(

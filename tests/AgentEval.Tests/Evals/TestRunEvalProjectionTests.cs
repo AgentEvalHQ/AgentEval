@@ -196,7 +196,7 @@ public class TestRunEvalProjectionTests
     /// <c>ToolInputAccuracyEval</c> both ways, with a stub judge so nothing is purchased.
     /// </summary>
     [Fact]
-    public async Task Measured_ProjectingNamesOnlyToolDefinitions_FlipsARealEvalFromSkippedToPassing()
+    public async Task Measured_ProjectingNamesOnlyToolDefinitions_FlipsARealEvalFromNotCountedToPassing()
     {
         var call = new ToolCall("delete_account", new Dictionary<string, object>(), "ok");
         var withoutDefinitions = new EvalInput("q", "r", ToolCalls: new[] { call });
@@ -209,14 +209,16 @@ public class TestRunEvalProjectionTests
         var schemaWhenAbsent = SchemaLeafOf(await sut.EvaluateAsync(withoutDefinitions));
         var schemaWhenNamesOnly = SchemaLeafOf(await sut.EvaluateAsync(withNamesOnlyDefinitions));
 
-        // As shipped: the check cannot run, so it is SKIPPED and stays out of the denominator.
-        Assert.Equal("skipped", schemaWhenAbsent.Provenance.Type);
+        // As shipped: with no definitions the case cannot test schema validity, so the leaf is inapplicable
+        // (2.1.0; skipped before) and stays out of the denominator.
+        Assert.Equal("inapplicable", schemaWhenAbsent.Score.Label);
+        Assert.False(schemaWhenAbsent.Score.CountsTowardAggregate());
         Assert.False(schemaWhenAbsent.Score.Passed);
 
         // With names-only definitions: `if (schemaParams is null) { passedCalls++; }` fires and the
         // leaf reports a perfect pass on a check that validated nothing. That lift is what this
         // projection would have manufactured, and it is why ToolDefinitions is not carried.
-        Assert.NotEqual("skipped", schemaWhenNamesOnly.Provenance.Type);
+        Assert.True(schemaWhenNamesOnly.Score.CountsTowardAggregate());
         Assert.True(schemaWhenNamesOnly.Score.Passed);
         Assert.Equal(1.0, schemaWhenNamesOnly.Score.Value, 10);
     }

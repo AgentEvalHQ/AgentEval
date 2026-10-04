@@ -138,12 +138,13 @@ public class CompositeEvalSkippedLeavesTests
     public async Task OneRealLeafAmongSkipped_StillYieldsARealVerdict()
     {
         // The skipped siblings stay out of the denominator, so the one measured leaf still sets the score. With
-        // MinimumMeasuredShare = 0 it decides the label exactly as it did before that bar existed.
+        // MinimumMeasuredShare = 0 it decides the label exactly as it did before that bar existed. The skipped
+        // siblings are OPTIONAL: a required one that did not run withholds the pass (the tests below, #203).
         var sut = new CompositeEval("composite", "Composite", "test", "1.0.0", new EvalComponent[]
         {
-            new(new SkippingEval("a")),
+            new(new SkippingEval("a"), Required: false),
             new(new FixedEval("b", 0.9, passed: true)),
-            new(new SkippingEval("c")),
+            new(new SkippingEval("c"), Required: false),
         }, WeightedSumAggregation.Instance) { MinimumMeasuredShare = 0 };
 
         var result = await sut.EvaluateAsync(Input);
@@ -198,5 +199,125 @@ public class CompositeEvalSkippedLeavesTests
         Assert.Equal("composite", result.Provenance.Type);
         Assert.All(result.Details.SubResults!, s => Assert.Equal("skipped", s.Score.Label));
         Assert.Equal(WeightedSumAggregation.Instance.Name, result.Details.AggregationStrategy);
+    }
+
+    // ── A REQUIRED component that did not run (#203) ──────────────────────────────────────────────
+    // Only a required "error" used to block the verdict. A required component that returned
+    // EvalResult.Skipped (a required input, trace or telemetry missing) was left out and the composite
+    // passed on the rest: q7 in the EvalPort adapter's sample, "exact pass + required judge skipped → pass,
+    // Measured 1 of 2". A pass cannot rest on a required component that did not run.
+
+    [Fact]
+    public async Task RequiredSkipped_WithAPassingSibling_IsAWarn_NamingTheComponent()
+    {
+        var sut = new CompositeEval("composite", "Composite", "test", "1.0.0", new EvalComponent[]
+        {
+            new(new FixedEval("exact", 1.0, passed: true)),
+            new(new SkippingEval("judge")),
+        }, WeightedSumAggregation.Instance);
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("warn", result.Score.Label);
+        Assert.False(result.Score.Passed);
+        Assert.Equal(1.0, result.Score.Value, precision: 10); // the score is still the measured part's
+        Assert.Contains("Required component(s) not measured: judge", result.Details.Summary!, StringComparison.Ordinal);
+        Assert.Equal(result.Details.Summary, Assert.Single(result.Details.Recommendations!));
+    }
+
+    [Fact]
+    public async Task RequiredSkipped_WithAThresholdMet_IsStillAWarn()
+    {
+        var sut = Composite(new EvalComponent[]
+        {
+            new(new FixedEval("exact", 1.0, passed: true)),
+            new(new SkippingEval("judge")),
+        }, threshold: 0.5);
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("warn", result.Score.Label);
+        Assert.False(result.Score.Passed);
+    }
+
+    [Fact]
+    public async Task OptionalSkipped_WithAPassingSibling_StillPasses()
+    {
+        var sut = Composite(new EvalComponent[]
+        {
+            new(new FixedEval("exact", 1.0, passed: true)),
+            new(new SkippingEval("judge"), Required: false),
+        });
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("pass", result.Score.Label);
+        Assert.True(result.Score.Passed);
+    }
+
+    [Fact]
+    public async Task RequiredSkipped_DoesNotSoftenAMeasuredFailure()
+    {
+        var sut = Composite(new EvalComponent[]
+        {
+            new(new FixedEval("exact", 0.1, passed: false, severity: "high")),
+            new(new SkippingEval("judge")),
+        });
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("fail", result.Score.Label);
+    }
+
+    [Fact]
+    public async Task RequiredErrored_StillWinsOverRequiredSkipped()
+    {
+        var sut = Composite(new EvalComponent[]
+        {
+            new(new FixedEval("exact", 1.0, passed: true)),
+            new(new FixedEval("judge", 0.0, passed: false, label: "error")),
+            new(new SkippingEval("telemetry")),
+        });
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("error", result.Score.Label);
+    }
+
+    [Fact]
+    public async Task RequiredInapplicable_NeverBlocksThePass()
+    {
+        // NotApplicable is the CASE not being able to test the thing (ADR-030), not a component that did not run.
+        var sut = Composite(new EvalComponent[]
+        {
+            new(new FixedEval("exact", 1.0, passed: true)),
+            new(new FixedEval("judge", 0.0, passed: false, label: "inapplicable")),
+        });
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("pass", result.Score.Label);
+        Assert.True(result.Score.Passed);
+    }
+
+    [Fact]
+    public async Task RequiredNestedCompositeThatMeasuredNothing_KeepsTheParentFromPassing()
+    {
+        var inner = new CompositeEval("inner", "Inner", "test", "1.0.0", new EvalComponent[]
+        {
+            new(new SkippingEval("a")),
+            new(new SkippingEval("b")),
+        }, WeightedSumAggregation.Instance);
+        var sut = Composite(new EvalComponent[]
+        {
+            new(new FixedEval("exact", 1.0, passed: true)),
+            new(inner),
+        });
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("skipped", result.Details.SubResults![1].Score.Label);
+        Assert.Equal("warn", result.Score.Label);
+        Assert.Contains("inner", result.Details.Summary!, StringComparison.Ordinal);
     }
 }

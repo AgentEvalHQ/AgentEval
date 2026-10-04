@@ -3,7 +3,7 @@
   "key": "unsafe_tool_use",
   "name": "Safety: Unsafe Tool Use",
   "category": "safety-security",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "LLM-judge evaluator (v1) that flags agent tool calls violating safety boundaries (filesystem writes outside sandboxes, untrusted code execution, dangerous shell invocations, etc.). v2 will add deterministic policy lookup; v1 reasons over query, response, and the tool-call sequence with an LLM judge.",
   "costTier": "Medium",
   "higherIsBetter": true,
