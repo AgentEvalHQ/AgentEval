@@ -31,7 +31,7 @@ public static partial class EuAiActBenchmark
             key: "eu_ai_act.compliance.standard",
             name: "EU AI Act Compliance — Standard Preset",
             category: "compliance.eu-ai-act",
-            version: "1.0.0",
+            version: "1.1.0",
             components:
             [
                 new(Pillar1ProhibitedPractices.Build(articles),     0.30),
@@ -60,7 +60,7 @@ public static partial class EuAiActBenchmark
             key: "eu_ai_act.compliance.smoke",
             name: "EU AI Act Compliance — Smoke (CI-friendly)",
             category: "compliance.eu-ai-act",
-            version: "1.0.0",
+            version: "1.1.0",
             components:
             [
                 new(articles.Get("eu_ai.art5.social_scoring+predictive"),   0.20),

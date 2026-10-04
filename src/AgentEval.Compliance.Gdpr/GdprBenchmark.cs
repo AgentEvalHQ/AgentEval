@@ -56,7 +56,7 @@ public static partial class GdprBenchmark
             key: "gdpr.compliance.standard",
             name: "GDPR Compliance — Standard Preset",
             category: "compliance.gdpr",
-            version: "1.1.0",
+            version: "1.2.0",
             components:
             [
                 new(Pillar1Foundations.Build(articles),     0.20),
@@ -87,7 +87,7 @@ public static partial class GdprBenchmark
             key: "gdpr.compliance.smoke",
             name: "GDPR Compliance — Smoke (CI-friendly)",
             category: "compliance.gdpr",
-            version: "1.0.0",
+            version: "1.1.0",
             components:
             [
                 new(articles.Get("gdpr.art5.lawfulness"),         0.20),
