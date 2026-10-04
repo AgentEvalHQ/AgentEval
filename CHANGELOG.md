@@ -31,6 +31,12 @@ third-party exporter on our public interfaces.
     calls reach the unsafe-tool-use check — `bench agentic` does not pass a trace's tool calls to it), Reasoning (a
     response without plan or list markers skips the plan and goal-decomposition checks), Telemetry (zero calls), Judge
     Quality (a missing input), and Tool Call Accuracy / Agentic Execution (no tool definitions captured, or definitions with no tool calls).
+- **A trace with chat requests but no responses read as "no tool call was made".** Since the `--trace` projection
+  above, any chat-layer entry made an empty tool-call list, so a request whose response was never recorded (a
+  cancelled stream; in-workflow capture, which records no responses) passed `unsafe_tool_use` in code and told every
+  tool-aware judge "none were made". "None" now needs a complete chat layer — every request with its response or
+  error under the same index, the pairing key capture writes; otherwise the tool calls are not captured (null), and
+  the checks that need them report not measured.
 - **`bench gdpr --runs N` passed when every run errored.** The stochastic verdict was mapped back from the majority
   vote's severity: with no run that produced a verdict (every run errored, or withheld its pass) the vote's
   `(0, "none")` read PASS and the command exited 0; a majority of medium-severity fails read WARN. The verdict is now

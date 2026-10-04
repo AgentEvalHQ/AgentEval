@@ -85,8 +85,9 @@ public static class EvalInputTraceAccessor
     /// has that layer — each with its recorded outcome (<see cref="ToolCall.Succeeded"/>, <see cref="ToolCall.Error"/>) —
     /// else the calls the model requested on its chat responses, with NO outcome: nothing observed them run, and a
     /// requested call's <c>Succeeded</c> is the type's default, not an observation. An EMPTY list means the trace recorded
-    /// the chat layer and no tool call happened; <see langword="null"/> means the trace did not capture tool calls at
-    /// all (no chat-turn layer), so nothing here can say whether any were made.
+    /// a complete chat layer — every request with its response — and no tool call happened; <see langword="null"/> means
+    /// the trace did not capture tool calls: no chat-turn layer, or a request without its response, so nothing here can
+    /// say whether (or which) calls were made.
     /// </summary>
     public static IReadOnlyList<ToolCall>? ToolCallsFrom(AgentTrace trace)
     {
@@ -102,14 +103,20 @@ public static class EvalInputTraceAccessor
         if (executed.Count > 0)
             return executed;
 
-        var requested = Calls(trace.Entries.Where(e => e.EffectiveScope == TraceEntryScope.ChatTurn
-                                                        && e.Type == TraceEntryType.Response))
+        // Without the execution layer, the chat layer is the record — and only a COMPLETE one: every request the model
+        // was sent must have its response (or error) under the same index, the pairing key capture writes. A request
+        // without one (a cancelled stream, in-workflow capture that records no responses) says nothing about the calls
+        // the model made in that turn, so the trace did not capture them: null, not "none" — and not the calls the other
+        // turns happened to record, which could leave out the very call a check is looking for (#203 review, B6c-2).
+        var chat = trace.Entries.Where(e => e.EffectiveScope == TraceEntryScope.ChatTurn).ToList();
+        var answered = chat.Where(e => e.Type == TraceEntryType.Response).Select(e => e.Index).ToHashSet();
+        var requests = chat.Where(e => e.Type == TraceEntryType.Request).ToList();
+        if (requests.Count == 0 || !requests.All(e => answered.Contains(e.Index)))
+            return null;
+
+        return Calls(chat.Where(e => e.Type == TraceEntryType.Response))
             .Select(c => new ToolCall(c.Name, JsonObjectOrNull(c.Arguments), c.Result))
             .ToList();
-        if (requested.Count > 0)
-            return requested;
-
-        return trace.Entries.Any(e => e.EffectiveScope == TraceEntryScope.ChatTurn) ? [] : null;
     }
 
     /// <summary>
