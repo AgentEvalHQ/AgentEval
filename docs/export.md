@@ -201,6 +201,20 @@ public interface IResultExporter
 
 The `FormatName` property is a default interface member that returns the enum name for built-in exporters. Custom exporters can override it to provide a meaningful string name for registry lookup.
 
+### What an exporter receives (and what it does not)
+
+An exporter receives the flat `EvaluationReport` that `agenteval eval` builds from its test harness and metrics: per
+test a 0–100 score, `Passed`, `Skipped`, an error, the output, metric scores and assertions. It does **not** receive
+the result model — `EvalResult` trees with `MeasurementState`, the `warn` / `error` / `skipped` / `inapplicable`
+labels, composite sub-results and judge provenance. Those come from the eval pipeline (`IEval`, `CompositeEval`, the
+bench commands), which does not call exporters.
+
+So a format that needs to keep "not measured" apart from "failed" cannot get it through `IResultExporter`. Take the
+`EvalResult` trees directly instead — from `IEval.EvaluateAsync`, or from a stored run — and serialise them against
+`eval-result.schema.json` (v1, embedded in `AgentEval.DataLoaders`). See
+[ADR-034](adr/034-exporters-and-the-result-model.md) for why the two are separate and the planned path to export the
+result model through a registry.
+
 ### Creating Custom Exporters
 
 Implement `IResultExporter` to add new formats. Use the `FormatName` property for registry identification:
