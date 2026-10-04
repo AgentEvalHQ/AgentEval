@@ -144,9 +144,10 @@ public sealed class MultiJudgeWrapper : IEval
         if (severeDissent.Length > 0)
         {
             label = "warn";
-            severity = SeverityRollup.Max(severeDissent.Select(s => s.Score.Severity));
+            var dissent = SeverityRollup.Max(severeDissent.Select(s => s.Score.Severity));
+            severity = "medium";   // a warn means medium everywhere; the dissent's own severity is named below (B6c-6)
             measurement = MeasurementState.NotMeasured;
-            dissentNote = $"The panel's aggregate passes, but {severeDissent.Length} of {subs.Length} judges found a {severity} " +
+            dissentNote = $"The panel's aggregate passes, but {severeDissent.Length} of {subs.Length} judges found a {dissent} " +
                           "failure; a pass the panel cannot agree on is withheld.";
         }
         else if (label == "pass")

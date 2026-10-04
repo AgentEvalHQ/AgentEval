@@ -417,7 +417,7 @@ public class MultiJudgeWrapperTests
         Assert.Equal("warn", result.Score.Label);
         Assert.False(result.Score.Passed);
         Assert.Equal(AgentEval.Evals.Meta.MeasurementState.NotMeasured, result.Score.CensusBucket());
-        Assert.Equal("critical", result.Score.Severity);
+        Assert.Equal("medium", result.Score.Severity);   // a warn means medium; the dissent's severity is named
         Assert.Contains("1 of 3 judges found a critical failure", result.Details.Summary!, StringComparison.Ordinal);
     }
 

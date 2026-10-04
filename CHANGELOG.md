@@ -31,6 +31,12 @@ third-party exporter on our public interfaces.
     calls reach the unsafe-tool-use check — `bench agentic` does not pass a trace's tool calls to it), Reasoning (a
     response without plan or list markers skips the plan and goal-decomposition checks), Telemetry (zero calls), Judge
     Quality (a missing input), and Tool Call Accuracy / Agentic Execution (no tool definitions captured, or definitions with no tool calls).
+- **A part that did not run could lift a verdict from FAIL to WARN.** A composite reading WARN reported its parts'
+  aggregate severity — "critical" when a quality dimension (classified Warn) failed badly — so a parent's severity cap
+  read it as a FAIL; once a skipped part made that child withhold its pass, the parent dropped it and read WARN. A
+  composite that reads WARN now reports at most `medium` (what a warn means everywhere; the dimension's own severity
+  stays on its sub-result), and so does a multi-judge panel withholding a pass over a dissent (the dissent's severity is
+  named in its summary). A property test checks over 108 two-level shapes that a skipped part never improves a verdict.
 - **A trace tool error without a `succeeded` field read as a recorded success.** `TraceToolCall.Succeeded` defaults to
   `true`, so a hand-made or third-party trace that recorded `error` but omitted the field projected the call as
   succeeded, and `tool_call_success` passed it without a judge. A recorded error is now a failure in the projection,

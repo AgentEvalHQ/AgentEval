@@ -414,10 +414,15 @@ public sealed class CompositeEval : IEval
     // The severity a composite reports is the one its verdict implies (#203 review, B6c-3): a pass reports "none" — a
     // failure its scoring absorbed stays absorbed, instead of reaching a parent as if it were the composite's own — and a
     // fail reports at least "medium", so a parent's severity cap never reads a failed composite as harmless.
+    // A warn reports at most "medium" — the severity a warn means everywhere (high/critical → fail, medium → warn): a warn
+    // carrying "critical" (a quality dimension that failed badly, classified Warn) was read as a FAIL by a parent's
+    // severity cap, and once a skipped part made that child withhold its pass, the parent dropped it and read WARN — a
+    // part that did not run lifting the verdict (B6c-6). The dimension's own severity stays on the sub-result.
     private static string ReportedSeverity(string label, string aggregated) => label switch
     {
         "pass" => "none",
         "fail" => SeverityRollup.Max([aggregated, "medium"]),
+        "warn" => aggregated is "high" or "critical" ? "medium" : aggregated,
         _ => aggregated,
     };
 
