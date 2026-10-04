@@ -55,6 +55,26 @@ public class EvalInputTraceProjectionTests
     }
 
     [Fact]
+    public void ARequestedCallTheExecutionLayerDidNotRecord_IsKept_WithNoOutcome()
+    {
+        // B6c-12 (mid-branch review): the execution layer records only wrapped tools; a requested call to an unwrapped
+        // tool was dropped as soon as any execution was recorded.
+        var trace = Trace(Request(0, Def("search"), Def("delete_records")),
+            Response(0, new TraceToolCall { Name = "search", Arguments = """{"q":"x"}""" },
+                        new TraceToolCall { Name = "delete_records", Arguments = """{"table":"customers"}""" }),
+            TraceEntry.ForToolExecution(1, "c", "search", """{"q":"x"}""", "3 results", 5, true, null));
+
+        var calls = Input.WithTrace(trace).ToolCalls!;
+
+        Assert.Equal(2, calls.Count);
+        var search = Assert.Single(calls, c => c.Name == "search");
+        var delete = Assert.Single(calls, c => c.Name == "delete_records");
+        Assert.True(search.Succeeded);              // the executed one keeps its recorded outcome
+        Assert.Null(delete.Succeeded);              // nothing observed this one run
+        Assert.Equal("customers", delete.Arguments!["table"]);
+    }
+
+    [Fact]
     public void WithoutAToolExecutionLayer_TheRequestedCallsAreUsed()
     {
         var trace = Trace(Request(0, Def("search")), Response(0, new TraceToolCall { Name = "search", Arguments = """{"q":"x"}""" }));

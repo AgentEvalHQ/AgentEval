@@ -31,6 +31,12 @@ third-party exporter on our public interfaces.
     calls reach the unsafe-tool-use check — `bench agentic` does not pass a trace's tool calls to it), Reasoning (a
     response without plan or list markers skips the plan and goal-decomposition checks), Telemetry (zero calls), Judge
     Quality (a missing input), and Tool Call Accuracy / Agentic Execution (no tool definitions captured, or definitions with no tool calls).
+- **`tool_input_accuracy` (2.5.0) and the trace projection, three smaller gaps.** A case declaring no tools while the agent
+  called some read inapplicable, so the judge alone decided — those calls are to undeclared tools and now fail, like a
+  call to an undeclared tool beside declared ones. Parameters that are not a JSON Schema (a name→type map, an empty
+  object) had no `required` and read as a checked pass; a schema now needs `type`, `properties` or `required`, and any
+  other call is left unchecked and named. And once a trace recorded any tool execution, calls the model requested to
+  an unwrapped tool were dropped from `EvalInput.ToolCalls`; they are kept, with no outcome, in time order.
 - **A required part that errored hid a measured accuracy failure.** The composite read `error` (exit 11) while its
   summary said both "the verdict is fail" and "no pass/fail verdict is reported". A measured failure of a `Fail`
   dimension is now the verdict even when a required part errored (further measurement cannot make it a pass), and the

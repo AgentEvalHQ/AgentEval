@@ -83,7 +83,8 @@ public static class EvalInputTraceAccessor
     /// <summary>
     /// The tool calls a trace recorded: the executed ones (<see cref="TraceEntryScope.ToolExecution"/>) when the trace
     /// has that layer — each with its recorded outcome (<see cref="ToolCall.Succeeded"/>, <see cref="ToolCall.Error"/>) —
-    /// else the calls the model requested on its chat responses, with NO outcome: nothing observed them run, and a
+    /// plus, in time order, any call the model requested that no execution record matches (an unwrapped tool), with NO
+    /// outcome; without that layer, the calls the model requested on its chat responses, with NO outcome: nothing observed them run, and a
     /// requested call's <c>Succeeded</c> is the type's default, not an observation. An EMPTY list means the trace recorded
     /// a complete chat layer — every request with its response — and no tool call happened; <see langword="null"/> means
     /// the trace did not capture tool calls: no chat-turn layer, or a request without its response, so nothing here can
@@ -97,17 +98,37 @@ public static class EvalInputTraceAccessor
             .Where(e => e.ToolCalls is { Count: > 0 })
             .SelectMany(e => e.ToolCalls!);
 
-        var executed = Calls(trace.Entries.Where(e => e.EffectiveScope == TraceEntryScope.ToolExecution))
-            // A recorded error is a failure whatever Succeeded says: the trace type defaults it to true, so a trace written
-            // without the field read an errored call as a recorded success (#203 review, B6c-5).
-            .Select(c => new ToolCall(c.Name, JsonObjectOrNull(c.Arguments), c.Result)
-            {
-                Succeeded = c.Succeeded && c.Error is null,
-                Error = c.Error,
-            })
+        var executed = trace.Entries
+            .Where(e => e.EffectiveScope == TraceEntryScope.ToolExecution && e.ToolCalls is { Count: > 0 })
+            .SelectMany(e => e.ToolCalls!.Select(c => (e.Timestamp,
+                // A recorded error is a failure whatever Succeeded says: the trace type defaults it to true, so a trace
+                // written without the field read an errored call as a recorded success (#203 review, B6c-5).
+                Call: new ToolCall(c.Name, JsonObjectOrNull(c.Arguments), c.Result)
+                {
+                    Succeeded = c.Succeeded && c.Error is null,
+                    Error = c.Error,
+                })))
             .ToList();
         if (executed.Count > 0)
-            return executed;
+        {
+            // The execution layer records only the tools it wraps. A call the model requested that no execution record
+            // matches (an unwrapped tool) was dropped (#203 review, B6c-12): it is kept, with no outcome, in time order.
+            var unmatched = executed.GroupBy(x => x.Call.Name, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+            var requestedOnly = new List<(DateTimeOffset Timestamp, ToolCall Call)>();
+            foreach (var response in trace.Entries.Where(e => e.EffectiveScope == TraceEntryScope.ChatTurn
+                                                              && e.Type == TraceEntryType.Response && e.ToolCalls is { Count: > 0 }))
+            {
+                foreach (var c in response.ToolCalls!)
+                {
+                    if (unmatched.TryGetValue(c.Name, out var left) && left > 0)
+                        unmatched[c.Name] = left - 1;   // this request is accounted for by an execution record
+                    else
+                        requestedOnly.Add((response.Timestamp, new ToolCall(c.Name, JsonObjectOrNull(c.Arguments), c.Result)));
+                }
+            }
+            return executed.Concat(requestedOnly).OrderBy(x => x.Timestamp).Select(x => x.Call).ToList();
+        }
 
         // Without the execution layer, the chat layer is the record — and only a COMPLETE one: every request the model
         // was sent must have its response (or error) under the same index, the pairing key capture writes. A request

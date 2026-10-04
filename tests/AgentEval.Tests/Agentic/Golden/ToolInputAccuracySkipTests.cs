@@ -62,7 +62,7 @@ public class ToolInputAccuracySkipTests
     [InlineData("null", false, "skipped")]
     [InlineData("null", true, "skipped")]
     [InlineData("empty", false, "inapplicable")]
-    [InlineData("empty", true, "inapplicable")]
+    [InlineData("empty", true, "fail")]            // B6c-12: a call when the case declares no tools is to an undeclared tool
     [InlineData("declared", false, "skipped")]
     [InlineData("declared", true, "pass")]
     public async Task EveryInputShape_GivesTheStatedSchemaState(string definitions, bool withCalls, string expectedLabel)
@@ -99,10 +99,10 @@ public class ToolInputAccuracySkipTests
     [Fact]
     public async Task ACaseThatDeclaresNoTools_AGoodJudgeScore_PassesOnTheJudgeAlone()
     {
-        // An EMPTY list is the case declaring no tools: it cannot test schema validity, so the leaf is inapplicable and
-        // the composite is the judge alone — callers are neither penalised nor flattered.
+        // An EMPTY list is the case declaring no tools: with no call made it cannot test schema validity, so the leaf is
+        // inapplicable and the composite is the judge alone — callers are neither penalised nor flattered.
         var eval = new ToolInputAccuracyEval(new FixedScoreEvaluator(100));
-        var input = new EvalInput(Query: "Find flights", Response: "Called search_flights.", ToolCalls: OneCall(),
+        var input = new EvalInput(Query: "What is the capital of France?", Response: "Paris.", ToolCalls: [],
             ToolDefinitions: Array.Empty<ToolDefinition>());
 
         var result = await eval.EvaluateAsync(input);
@@ -155,7 +155,10 @@ public class ToolInputAccuracySkipTests
 
         var result = await eval.EvaluateAsync(input);
 
-        Assert.Equal("inapplicable", SchemaLeaf(result).Score.Label);
+        // B6c-12: the case declares no tools, yet the agent called one — a call to an undeclared tool, measured as a
+        // failure (it read inapplicable, and the judge alone could pass the evaluator).
+        Assert.Equal("fail", SchemaLeaf(result).Score.Label);
+        Assert.False(result.Score.Passed);
     }
 
     [Fact]
@@ -207,7 +210,7 @@ public class ToolInputAccuracySkipTests
     {
         var eval = new ToolInputAccuracyEval(new FixedScoreEvaluator(100));
 
-        Assert.Equal("2.4.0", eval.Version);
+        Assert.Equal("2.5.0", eval.Version);
     }
 
     // ── B5a (#203 review): a call is checked only against a schema the check can read ──────────────────────────
@@ -291,6 +294,25 @@ public class ToolInputAccuracySkipTests
         var leaf = SchemaLeaf(await eval.EvaluateAsync(input));
 
         Assert.Equal(checkedPass ? "pass" : "skipped", leaf.Score.Label);
+    }
+
+    [Theory]
+    [InlineData(true)]    // a name→type map: not a JSON Schema
+    [InlineData(false)]   // an empty object
+    public async Task ParametersThatAreNotASchema_LeaveTheCallUnchecked_NotAPass(bool nameToTypeMap)
+    {
+        // B6c-12 (mid-branch review): with no "required" key these read as "requires nothing" — a checked pass.
+        var parameters = nameToTypeMap
+            ? new Dictionary<string, object> { ["flight_id"] = "string" }
+            : new Dictionary<string, object>();
+        var eval = new ToolInputAccuracyEval(new FixedScoreEvaluator(100));
+        var input = new EvalInput(Query: "q", Response: "r",
+            ToolCalls: [new ToolCall("book", new Dictionary<string, object>(), null)],
+            ToolDefinitions: [Def("book", parameters)]);
+
+        var leaf = SchemaLeaf(await eval.EvaluateAsync(input));
+
+        Assert.Equal("skipped", leaf.Score.Label);
     }
 
     [Fact]

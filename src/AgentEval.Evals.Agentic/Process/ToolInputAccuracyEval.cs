@@ -88,7 +88,7 @@ public sealed class ToolInputAccuracyEval : IEval
             key: "tool_input_accuracy",
             name: "Tool Input Accuracy",
             category: "agentic-process",
-            version: "2.4.0",
+            version: "2.5.0",
             components: new[]
             {
                 new EvalComponent(schemaValidation, Weight: 0.50) { OnFailure = ComponentFailureEffect.Fail },
@@ -151,7 +151,10 @@ public sealed class ToolInputAccuracyEval : IEval
                 return EvalResult.Skipped(this,
                     "No tool definitions were captured for this case, so schema validity was not checked. Supply them " +
                     "(or a trace that records them) to measure it.");
-            if (input.ToolDefinitions.Count == 0)
+            // A case that declares no tools cannot test schema validity — unless the agent called tools anyway: those calls
+            // are to undeclared tools, measured as failures like a call to an undeclared tool next to declared ones
+            // (#203 review, B6c-12; it read inapplicable and the judge alone decided).
+            if (input.ToolDefinitions.Count == 0 && input.ToolCalls is null or { Count: 0 })
                 return NotApplicable("The case declares no tools, so it cannot test schema validity.");
 
             // Then the answer: nothing to validate, so nothing is scored (was Build(1.0, true, "none")).
@@ -268,7 +271,9 @@ public sealed class ToolInputAccuracyEval : IEval
         private static bool TryReadRequired(IReadOnlyDictionary<string, object>? schema, out IReadOnlyList<string> required)
         {
             required = [];
-            if (schema is null)
+            // Only a JSON Schema object is a schema (B6c-12): a name→type map or an empty object has no "required", and it
+            // used to read as "requires nothing" — a checked pass of a call nothing checked.
+            if (schema is null || !(schema.ContainsKey("type") || schema.ContainsKey("properties") || schema.ContainsKey("required")))
                 return false;
             if (!schema.TryGetValue("required", out var raw) || raw is null)
                 return true;
