@@ -159,6 +159,35 @@ public class JudgeSeesToolDataCensusTests
         Assert.True(blind.Count == 0, "judges asked about tool definitions they are not shown: " + string.Join("; ", blind));
     }
 
+    /// <summary>Records each judge call's criteria with its input, so a LEAF can be told from its evaluator.</summary>
+    private sealed class CriteriaRecordingJudge : IEvaluator
+    {
+        public List<(IReadOnlyList<string> Criteria, string Input)> Calls { get; } = [];
+
+        public Task<EvaluationResult> EvaluateAsync(string input, string output, IEnumerable<string> criteria, CancellationToken ct = default)
+        {
+            Calls.Add((criteria.ToList(), input));
+            return Task.FromResult(new EvaluationResult { OverallScore = 42, Summary = "recording-stub" });
+        }
+    }
+
+    [Theory]
+    [InlineData("authorization boundaries", true)]   // the motivating leaf (an unauthorized action)
+    [InlineData("system rules specified", true)]
+    [InlineData("prescribed procedure", true)]
+    [InlineData("user's stated goal", false)]        // grades the answer text
+    [InlineData("format, tone, and style", false)]
+    public async Task TaskAdherence_EachLeaf_SeesTheToolCallsExactlyWhenItGradesActions(string criterionPhrase, bool seesToolCalls)
+    {
+        // B6c-11 (mid-branch review): the census above asks whether ANY of an evaluator's judge calls saw the tool calls,
+        // so removing the authorization leaf's opt-in stayed green. This pins it per leaf.
+        var judge = new CriteriaRecordingJudge();
+        await new AgentEval.Evals.Agentic.System.TaskAdherenceEval(judge).EvaluateAsync(CanaryInput());
+
+        var call = Assert.Single(judge.Calls, c => c.Criteria.Any(x => x.Contains(criterionPhrase, StringComparison.Ordinal)));
+        Assert.Equal(seesToolCalls, call.Input.Contains(CanaryTool, StringComparison.Ordinal));
+    }
+
     [Fact]
     public async Task NoOtherJudge_IsSentToolData()
     {

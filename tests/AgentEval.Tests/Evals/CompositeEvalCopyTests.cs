@@ -121,6 +121,27 @@ public class CompositeEvalCopyTests
     }
 
     [Fact]
+    public void TheCostFilter_KeepsNonDefaultVerdictSettings()
+    {
+        // B6c-11 (mid-branch review): the Glass Box test above asserts settings that are at their defaults there, so
+        // reverting the filter to `new CompositeEval(...)` stayed green. Here they are not defaults.
+        var composite = new CompositeEval("c", "C", "test", "1.0.0",
+            [new EvalComponent(new Leaf("latency"), 0.5), new EvalComponent(new Leaf("unsafe_tool_use"), 0.5)],
+            CapByWorstAggregation.Instance, threshold: 0.8)
+        {
+            SeverityCapsThreshold = true,
+            MinimumMeasuredShare = 0.75,
+        };
+
+        // latency is Trivial, unsafe_tool_use Medium: a Low budget drops one, so the filter really rebuilds.
+        var filtered = CostFilteredCompositeBuilder.FilterByBudget(composite, EvaluatorCostTier.Low);
+
+        Assert.Equal("latency", Assert.Single(filtered.Components).Eval.Key);
+        Assert.True(filtered.SeverityCapsThreshold);
+        Assert.Equal(0.75, filtered.MinimumMeasuredShare);
+    }
+
+    [Fact]
     public void TheCostFilter_KeepsEachComponentsRequiredFlag()
     {
         var preset = AgenticBenchmark.GlassBoxDiagnostics();
