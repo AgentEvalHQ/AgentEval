@@ -4,6 +4,7 @@
 
 using AgentEval.Core;
 using AgentEval.Evals;
+using STJ = global::System.Text.Json;
 
 namespace AgentEval.Evals.Agentic.Process;
 
@@ -87,7 +88,7 @@ public sealed class ToolInputAccuracyEval : IEval
             key: "tool_input_accuracy",
             name: "Tool Input Accuracy",
             category: "agentic-process",
-            version: "2.1.0",
+            version: "2.2.0",
             components: new[]
             {
                 new EvalComponent(schemaValidation, Weight: 0.50),
@@ -119,12 +120,17 @@ public sealed class ToolInputAccuracyEval : IEval
     /// 2.1.0 checks the CASE before the ANSWER (ADR-030: applicability is a property of the case), and tells
     /// "not captured" from "declared none" (the rule the Safety preset follows, #203 review):
     /// <list type="bullet">
-    ///   <item><c>ToolDefinitions == null</c> — nothing captured the tool definitions (no shipped pipeline fills them
-    ///   today): <b>skipped</b>, not measured. The pipeline's gap, not the case's.</item>
+    ///   <item><c>ToolDefinitions == null</c> — nothing captured the tool definitions (supply them, or attach a trace
+    ///   that recorded them: <c>bench agentic --trace</c>): <b>skipped</b>, not measured. The pipeline's gap, not the
+    ///   case's.</item>
     ///   <item>an empty list — the case declares no tools, so it cannot test schema validity: <b>inapplicable</b>, and
     ///   the composite is the judge alone.</item>
     ///   <item>definitions but no tool calls — about the answer: <b>skipped</b>.</item>
     /// </list>
+    /// 2.2.0 (#203 review, B5a): a call is checked only against a parameter schema whose <c>required</c> list this check
+    /// can read (CLR list or JSON array). A tool with no schema, or an unreadable <c>required</c>, made every call to it
+    /// PASS; such calls are now not counted and named in the evidence, and when no call is checkable the leaf is
+    /// <b>skipped</b>. A schema without <c>required</c> still requires nothing — a checked pass.
     /// This leaf is required, so a skipped schema check keeps the composite (and every preset that nests it) from
     /// passing on the judge alone.
     /// </para>
@@ -132,7 +138,7 @@ public sealed class ToolInputAccuracyEval : IEval
     private sealed class ToolInputSchemaEval : AtomicCodeEval
     {
         public ToolInputSchemaEval()
-            : base("tool_input_accuracy_schema", "Tool Input Accuracy (Schema)", "agentic-process", "2.1.0") { }
+            : base("tool_input_accuracy_schema", "Tool Input Accuracy (Schema)", "agentic-process", "2.2.0") { }
 
         protected override EvalResult Evaluate(EvalInput input)
         {
@@ -152,26 +158,40 @@ public sealed class ToolInputAccuracyEval : IEval
             if (input.ToolCalls is null or { Count: 0 })
                 return EvalResult.Skipped(this, "No tool calls to validate; schema validation was not run.");
 
-            // Build a lookup: tool name → definition.
+            // Build a lookup: tool name → definition. Names are matched case-insensitively, so two definitions that
+            // differ only in case are one tool — the one with a schema wins (ToDictionary threw on them).
             var defByName = input.ToolDefinitions
-                .ToDictionary(d => d.Name, StringComparer.OrdinalIgnoreCase);
+                .GroupBy(d => d.Name, StringComparer.OrdinalIgnoreCase)
+                .ToDictionary(g => g.Key, g => g.FirstOrDefault(d => d.Parameters is not null) ?? g.First(),
+                    StringComparer.OrdinalIgnoreCase);
 
             var evidence = new List<EvalEvidence>();
+            var unverifiable = new List<string>();
             int totalCalls = 0;
             int passedCalls = 0;
 
             foreach (var call in input.ToolCalls)
             {
-                totalCalls++;
-
                 if (!defByName.TryGetValue(call.Name, out var def))
                 {
+                    totalCalls++;
                     evidence.Add(new EvalEvidence(
                         Source: "tool_call",
                         Reference: call.Name,
                         Message: $"Tool '{call.Name}' not found in provided tool definitions."));
                     continue;
                 }
+
+                // A call is checked only against a schema this check can read (#203 review, B5a). No parameter schema,
+                // or a "required" entry in a shape it cannot read, is not a pass (was: passedCalls++ for both) and not
+                // a fail: the call is not counted, and the evidence names it.
+                if (!TryReadRequired(def.Parameters, out var requiredKeys))
+                {
+                    unverifiable.Add(call.Name);
+                    continue;
+                }
+
+                totalCalls++;
 
                 // Check that every required parameter (declared in ToolDefinition.Parameters)
                 // is present in the call's Arguments.
@@ -182,23 +202,7 @@ public sealed class ToolInputAccuracyEval : IEval
                 // shape. For now we perform a simple required-key presence check; type / shape
                 // violations slip through with a passing score. Deferred until the
                 // ToolDefinition.Parameters typing sweep lands.
-                var schemaParams = def.Parameters;
-                if (schemaParams is null)
-                {
-                    // No parameter schema → treat as passing.
-                    passedCalls++;
-                    continue;
-                }
-
-                // Attempt to read a "required" array from the parameters dictionary.
-                IReadOnlyList<string>? requiredKeys = null;
-                if (schemaParams.TryGetValue("required", out var reqObj)
-                    && reqObj is IEnumerable<object> reqArr)
-                {
-                    requiredKeys = reqArr.Select(o => o?.ToString() ?? "").ToList();
-                }
-
-                if (requiredKeys is null or { Count: 0 })
+                if (requiredKeys.Count == 0)
                 {
                     passedCalls++;
                     continue;
@@ -226,10 +230,22 @@ public sealed class ToolInputAccuracyEval : IEval
                 }
             }
 
-            // Unreachable while the ToolCalls guard above holds, but kept as a defensive rail: zero calls
-            // checked is not a perfect score (was Build(1.0, true, "none")).
+            if (unverifiable.Count > 0)
+            {
+                evidence.Add(new EvalEvidence(
+                    Source: "tool_definition",
+                    Reference: string.Join(", ", unverifiable.Distinct(StringComparer.OrdinalIgnoreCase)),
+                    Message: $"{unverifiable.Count} call(s) not checked: the tool's definition has no parameter schema " +
+                             "this check can read."));
+            }
+
+            // Zero calls checked is not a perfect score (was Build(1.0, true, "none")): every call was to a tool
+            // without a readable schema.
             if (totalCalls == 0)
-                return EvalResult.Skipped(this, "No tool calls were checked; schema validation was not run.");
+                return EvalResult.Skipped(this,
+                    "No called tool has a parameter schema this check can read " +
+                    $"({string.Join(", ", unverifiable.Distinct(StringComparer.OrdinalIgnoreCase))}), so schema validity " +
+                    "was not checked.");
 
             double score = (double)passedCalls / totalCalls;
             bool passed = score >= 0.70;
@@ -241,8 +257,46 @@ public sealed class ToolInputAccuracyEval : IEval
                     ["schema_pass_rate"] = score,
                     ["calls_checked"]    = totalCalls,
                     ["calls_passed"]     = passedCalls,
+                    ["calls_unverifiable"] = unverifiable.Count,
                 },
                 evidence: evidence.Count > 0 ? evidence : null);
+        }
+
+        // The "required" list of a parameter schema: CLR lists (as EvalInputTraceAccessor projects) or a JSON array (as
+        // System.Text.Json gives Dictionary<string, object> values). No schema, or "required" in any other shape → false.
+        // A schema with no "required" key requires nothing → true, empty.
+        private static bool TryReadRequired(IReadOnlyDictionary<string, object>? schema, out IReadOnlyList<string> required)
+        {
+            required = [];
+            if (schema is null)
+                return false;
+            if (!schema.TryGetValue("required", out var raw) || raw is null)
+                return true;
+
+            static string? AsName(object? item) => item switch
+            {
+                string name => name,
+                STJ.JsonElement { ValueKind: STJ.JsonValueKind.String } e => e.GetString(),
+                _ => null,
+            };
+
+            IEnumerable<object?>? items = raw switch
+            {
+                STJ.JsonElement { ValueKind: STJ.JsonValueKind.Array } array =>
+                    array.EnumerateArray().Select(e => (object?)e),
+                string => null,
+                IEnumerable<object?> list => list,
+                _ => null,
+            };
+            if (items is null)
+                return false;
+
+            var names = items.Select(AsName).ToList();
+            if (names.Any(n => n is null))
+                return false;
+
+            required = names!;
+            return true;
         }
     }
 }

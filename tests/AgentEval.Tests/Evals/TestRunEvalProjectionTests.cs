@@ -193,10 +193,12 @@ public class TestRunEvalProjectionTests
 
     /// <summary>
     /// The refutation MEASURED rather than asserted: running the real
-    /// <c>ToolInputAccuracyEval</c> both ways, with a stub judge so nothing is purchased.
+    /// <c>ToolInputAccuracyEval</c> both ways, with a stub judge so nothing is purchased. Until 2.2.0 (#203 review,
+    /// B5a) names-only definitions flipped the leaf to a perfect pass; the eval now treats a schema-less definition
+    /// as an unchecked call, so both ways stay not counted — the projection still has nothing to carry.
     /// </summary>
     [Fact]
-    public async Task Measured_ProjectingNamesOnlyToolDefinitions_FlipsARealEvalFromNotCountedToPassing()
+    public async Task Measured_ProjectingNamesOnlyToolDefinitions_NoLongerFlipsARealEvalToPassing()
     {
         var call = new ToolCall("delete_account", new Dictionary<string, object>(), "ok");
         var withoutDefinitions = new EvalInput("q", "r", ToolCalls: new[] { call });
@@ -215,12 +217,12 @@ public class TestRunEvalProjectionTests
         Assert.False(schemaWhenAbsent.Score.CountsTowardAggregate());
         Assert.False(schemaWhenAbsent.Score.Passed);
 
-        // With names-only definitions: `if (schemaParams is null) { passedCalls++; }` fires and the
-        // leaf reports a perfect pass on a check that validated nothing. That lift is what this
-        // projection would have manufactured, and it is why ToolDefinitions is not carried.
-        Assert.True(schemaWhenNamesOnly.Score.CountsTowardAggregate());
-        Assert.True(schemaWhenNamesOnly.Score.Passed);
-        Assert.Equal(1.0, schemaWhenNamesOnly.Score.Value, 10);
+        // With names-only definitions: before 2.2.0 `if (schemaParams is null) { passedCalls++; }` fired and the
+        // leaf reported a perfect pass on a check that validated nothing — the lift this projection would have
+        // manufactured. Now the call is not checkable, so the leaf is skipped and stays out of the denominator.
+        Assert.Equal("skipped", schemaWhenNamesOnly.Score.Label);
+        Assert.False(schemaWhenNamesOnly.Score.CountsTowardAggregate());
+        Assert.False(schemaWhenNamesOnly.Score.Passed);
     }
 
     private static EvalResult SchemaLeafOf(EvalResult composite) =>

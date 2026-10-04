@@ -207,6 +207,108 @@ public class ToolInputAccuracySkipTests
     {
         var eval = new ToolInputAccuracyEval(new FixedScoreEvaluator(100));
 
-        Assert.Equal("2.1.0", eval.Version);
+        Assert.Equal("2.2.0", eval.Version);
+    }
+
+    // ── B5a (#203 review): a call is checked only against a schema the check can read ──────────────────────────
+    // Before, a definition with no parameter schema — or a "required" in a shape the check could not read, such as
+    // the JsonElement System.Text.Json gives a Dictionary<string, object> value — made every call to that tool PASS.
+
+    private static ToolDefinition Def(string name, IReadOnlyDictionary<string, object>? parameters) => new(name, name, parameters);
+
+    private static IReadOnlyDictionary<string, object> JsonSchema(string json) =>
+        System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, object>>(json)!;
+
+    [Fact]
+    public async Task EveryCallToAToolWithoutASchema_IsNotChecked_SoTheLeafIsSkipped_NotPassed()
+    {
+        // A 0.40 judge: had the schema leaf passed, (1.0 + 0.4) / 2 = 0.70 would pass the composite on a check that
+        // looked at nothing.
+        var eval = new ToolInputAccuracyEval(new FixedScoreEvaluator(40));
+        var input = new EvalInput(Query: "Find flights", Response: "Called search_flights.", ToolCalls: OneCall(),
+            ToolDefinitions: [Def("search_flights", null)]);
+
+        var result = await eval.EvaluateAsync(input);
+
+        var leaf = SchemaLeaf(result);
+        Assert.Equal("skipped", leaf.Score.Label);
+        Assert.Contains("search_flights", leaf.Details.Summary!, StringComparison.Ordinal);
+        Assert.False(result.Score.Passed);
+    }
+
+    [Fact]
+    public async Task MixedCalls_AreScoredOverTheCheckableOnes_AndTheOthersAreNamed()
+    {
+        var eval = new ToolInputAccuracyEval(new FixedScoreEvaluator(100));
+        var input = new EvalInput(Query: "q", Response: "r",
+            ToolCalls:
+            [
+                new ToolCall("search_flights", new Dictionary<string, object> { ["origin"] = "NYC" }, null),
+                new ToolCall("book", new Dictionary<string, object>(), null),        // misses its required "flight_id"
+                new ToolCall("notes", new Dictionary<string, object>(), null),       // no schema: not checked
+            ],
+            ToolDefinitions:
+            [
+                Def("search_flights", new Dictionary<string, object> { ["required"] = new object[] { "origin" } }),
+                Def("book", new Dictionary<string, object> { ["required"] = new object[] { "flight_id" } }),
+                Def("notes", null),
+            ]);
+
+        var leaf = SchemaLeaf(await eval.EvaluateAsync(input));
+
+        Assert.Equal(0.5, leaf.Score.Value, 3);                 // 1 of 2 checkable calls, not 2 of 3
+        Assert.Equal(1, leaf.Details.Dimensions!["calls_unverifiable"]);
+        Assert.Contains(leaf.Details.Evidence!, e => e.Source == "tool_definition" && e.Reference == "notes");
+    }
+
+    [Fact]
+    public async Task AJsonDeserializedSchema_IsRead_NotTakenAsRequiringNothing()
+    {
+        var eval = new ToolInputAccuracyEval(new FixedScoreEvaluator(100));
+        var input = new EvalInput(Query: "q", Response: "r",
+            ToolCalls: [new ToolCall("book", new Dictionary<string, object>(), null)],
+            ToolDefinitions: [Def("book", JsonSchema("""{"type":"object","required":["flight_id"]}"""))]);
+
+        var leaf = SchemaLeaf(await eval.EvaluateAsync(input));
+
+        // A measured fail — read, and the required key is missing — not a skip (a skip also scores 0 and does not pass).
+        Assert.Equal("fail", leaf.Score.Label);
+        Assert.Equal(1, leaf.Details.Dimensions!["calls_checked"]);
+        Assert.Contains(leaf.Details.Evidence!, e => e.Message.Contains("flight_id", StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("""{"type":"object"}""", true)]                       // no "required": requires nothing — a checked pass
+    [InlineData("""{"type":"object","required":"flight_id"}""", false)] // a string, not a list: unreadable
+    [InlineData("""{"type":"object","required":[1]}""", false)]        // not names: unreadable
+    public async Task ASchemaWithoutRequired_IsACheckedPass_AnUnreadableRequired_IsNotChecked(string schema, bool checkedPass)
+    {
+        var eval = new ToolInputAccuracyEval(new FixedScoreEvaluator(100));
+        var input = new EvalInput(Query: "q", Response: "r",
+            ToolCalls: [new ToolCall("book", new Dictionary<string, object>(), null)],
+            ToolDefinitions: [Def("book", JsonSchema(schema))]);
+
+        var leaf = SchemaLeaf(await eval.EvaluateAsync(input));
+
+        Assert.Equal(checkedPass ? "pass" : "skipped", leaf.Score.Label);
+    }
+
+    [Fact]
+    public async Task DefinitionsThatDifferOnlyInCase_AreOneTool_AndDoNotThrow()
+    {
+        var eval = new ToolInputAccuracyEval(new FixedScoreEvaluator(100));
+        var input = new EvalInput(Query: "q", Response: "r",
+            ToolCalls: [new ToolCall("Book", new Dictionary<string, object>(), null)],
+            ToolDefinitions:
+            [
+                Def("book", null),
+                Def("BOOK", new Dictionary<string, object> { ["required"] = new object[] { "flight_id" } }),
+            ]);
+
+        var leaf = SchemaLeaf(await eval.EvaluateAsync(input));
+
+        // Checked against the definition that has a schema: a measured fail, not the skip the schema-less one would give.
+        Assert.Equal("fail", leaf.Score.Label);
+        Assert.Equal(1, leaf.Details.Dimensions!["calls_checked"]);
     }
 }

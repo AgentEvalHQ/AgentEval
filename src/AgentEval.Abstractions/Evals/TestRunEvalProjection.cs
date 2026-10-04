@@ -85,7 +85,9 @@ using AgentEval.Models;
 /// as passing". That is a silent lift in the flattering direction, manufactured by this projection,
 /// on an eval that was deliberately fixed to skip rather than flatter (ADR-030 Slice 0.3, defect
 /// D-c). Leaving it <see langword="null"/> keeps that leaf honestly skipped. Read availability from
-/// <see cref="TestResult.ToolUsage"/> directly instead.
+/// <see cref="TestResult.ToolUsage"/> directly instead. (Since <c>ToolInputAccuracyEval</c> 2.2.0 — #203 review,
+/// B5a — a definition with no schema is no longer a pass but an unchecked call, so names alone would no longer
+/// flatter; they would still carry nothing to check, so the projection stays null.)
 /// </para>
 /// <para>
 /// <b>Pure.</b> No I/O, no clock, no ambient state; the same pair of inputs yields an equal

@@ -31,6 +31,12 @@ third-party exporter on our public interfaces.
     calls reach the unsafe-tool-use check — `bench agentic` does not pass a trace's tool calls to it), Reasoning (a
     response without plan or list markers skips the plan and goal-decomposition checks), Telemetry (zero calls), Judge
     Quality (a missing input), and Tool Call Accuracy / Agentic Execution (no tool definitions captured, or definitions with no tool calls).
+- **`tool_input_accuracy` passed tool calls it could not check.** A tool definition with no parameter schema — or
+  a `required` list in a shape the check could not read, including the `JsonElement` that System.Text.Json gives a
+  `Dictionary<string, object>` value — made every call to that tool PASS. **Behaviour change (2.2.0):** such calls
+  are not counted and are named in the evidence (`calls_unverifiable`); when no call is checkable the schema leaf is
+  skipped, so the composite cannot pass on the judge alone. A schema without `required` still requires nothing (a
+  checked pass). Two definitions whose names differ only in case no longer throw; the one with a schema is used.
 - **`bench agentic --trace` never gave the tool checks the run's tool data.** `WithTrace` attached the trace as
   metadata only, so `unsafe_tool_use`, `tool_input_accuracy` and `tool_call_success` saw no tool calls even when the
   trace recorded them — `unsafe_tool_use` was "not measured" on every traced run, and the Safety preset never checked
