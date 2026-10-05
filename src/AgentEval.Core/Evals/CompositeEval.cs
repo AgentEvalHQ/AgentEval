@@ -297,19 +297,27 @@ public sealed class CompositeEval : IEval
                     : SeverityLabel(verdictSeverity);
 
         // A required part that errored does not hide a failure the measured parts already decide (#203 review round 3,
-        // B10b; B6c-10 covered Fail-effect components only). Under the severity rule — no threshold, or
-        // SeverityCapsThreshold — a high or critical failure decides the verdict whatever the missing part would have
-        // scored, including one inside an errored nested composite: its severity reflects only its measured parts (an
-        // errored leaf carries "none"). A GDPR run with one article errored and another failing at critical read ERROR,
-        // and its stored summary WARN.
-        var erroredSeverities = subs
-            .Zip(Components, (s, c) => (Sub: s, Component: c))
-            .Where(pair => (pair.Component.Required || noneRequired) && pair.Sub.Score.Label == "error")
-            .Select(pair => pair.Sub.Score.Severity);
-        var decidedSeverity = SeverityRollup.Max(failingSeverities.Concat(erroredSeverities).DefaultIfEmpty("none"));
-        var decidedDespiteError = label == "error"
-                                  && (Threshold is null || SeverityCapsThreshold)
-                                  && SeverityLabel(decidedSeverity) == "fail";
+        // B10b; B6c-10 covers Fail-effect components below). Decided means the composite fails even if every required
+        // part that errored had passed perfectly: under the severity rule (no threshold, or SeverityCapsThreshold) a
+        // high or critical failure among the measured required parts; under a threshold, a score that cannot reach it
+        // with those parts at 1.0. An errored nested composite counts as such a part, never by its severity: it decided
+        // nothing (had it, it would read fail), and reading the severity of its measured parts — a scenario failure its
+        // threshold would have absorbed, an optional part's failure — sent an undecided failure up as a decided one
+        // (review round 4 H1: a GDPR article [error, critical scenario failure, pass] made its pillar and preset FAIL).
+        var decidedSeverity = SeverityRollup.Max(failingSeverities.DefaultIfEmpty("none"));
+        var decidedBySeverity = (Threshold is null || SeverityCapsThreshold) && SeverityLabel(decidedSeverity) == "fail";
+        var decidedByThreshold = false;
+        if (label == "error" && !decidedBySeverity && Threshold is { } bar && hasRequiredError)
+        {
+            var bestCase = subs
+                .Zip(Components, (s, c) => c.Required && s.Score.Label == "error"
+                    ? s with { Score = new EvalScore(1.0, null, "pass", true, s.Score.Threshold, "none", null) }
+                    : s)
+                .ToArray();
+            decidedByThreshold = bestCase.Any(s => s.Score.CountsTowardAggregate())
+                                 && Aggregation.Aggregate(bestCase, Components).Score < bar;
+        }
+        var decidedDespiteError = label == "error" && (decidedBySeverity || decidedByThreshold);
         if (decidedDespiteError)
         {
             label = "fail";
@@ -475,7 +483,10 @@ public sealed class CompositeEval : IEval
                   (label == "warn" ? ", so the verdict is warn, not fail." : ".")
                 : null;
         string? decidedNote = decidedDespiteError
-            ? $"A required part produced no verdict, but a {decidedSeverity} failure the measured parts show decides it: fail."
+            ? decidedBySeverity
+                ? $"A required part produced no verdict, but a {decidedSeverity} failure the measured parts show decides it: fail."
+                : $"A required part produced no verdict, but the score cannot reach the threshold ({Threshold:0.##}) even if it " +
+                  "had passed: fail."
             : null;
         var coverageNote = string.Join(" ", new[] { decidedNote, effectNote, nothingMeasuredNote ?? partialCoverageNote }.Where(n => n is not null))
                            is { Length: > 0 } joined ? joined : null;
@@ -510,11 +521,14 @@ public sealed class CompositeEval : IEval
     // carrying "critical" (a quality dimension that failed badly, classified Warn) was read as a FAIL by a parent's
     // severity cap, and once a skipped part made that child withhold its pass, the parent dropped it and read WARN — a
     // part that did not run lifting the verdict (B6c-6). The dimension's own severity stays on the sub-result.
+    // An error has no verdict, so no severity, like an errored leaf (B10k): the severity of its measured parts — a
+    // failure its threshold would have absorbed — read as a finding of its own.
     private static string ReportedSeverity(string label, string aggregated) => label switch
     {
         "pass" => "none",
         "fail" => SeverityRollup.Max([aggregated, "medium"]),
         "warn" => aggregated is "high" or "critical" ? "medium" : aggregated,
+        "error" => "none",
         _ => aggregated,
     };
 

@@ -88,8 +88,8 @@ public class ReportStatusTests
         Assert.Contains(recommendations, r => r.StartsWith("hate_unfairness produced no verdict", StringComparison.Ordinal));
     }
 
-    private static EvalResult Severe(string key, string label, bool passed, string severity) => new(
-        new(key, key, "test", "1.0.0"), new EvalScore(passed ? 1.0 : 0.1, null, label, passed, null, severity, null),
+    private static EvalResult Severe(string key, string label, bool passed, string severity, double? value = null) => new(
+        new(key, key, "test", "1.0.0"), new EvalScore(value ?? (passed ? 1.0 : 0.1), null, label, passed, null, severity, null),
         new(null, null, null, null, null), new("atomic-llm", null, null, null, null, 0, false), DateTimeOffset.UtcNow);
 
     private sealed class Fixed(EvalResult result) : IEval
@@ -104,9 +104,9 @@ public class ReportStatusTests
     [Fact]
     public async Task AMeasuredCriticalFailure_DecidesTheVerdict_EvenBesideAnErroredArticle()
     {
-        // Review round 3 H2: a GDPR-shaped run — one article's judge errored, another article failed at critical. The pillar
-        // (threshold only) cannot decide and reads error; the severity-capped preset above it can, and must read FAIL. It
-        // read ERROR, and its stored summary WARN.
+        // Review round 3 H2: one article's judge errored, another article failed at critical (0.1). Even had the errored
+        // article passed, the pillar's average is 0.55 against its 0.85: the threshold decides the fail at the pillar
+        // itself (B10k), and the preset reads it. It read ERROR, and its stored summary WARN.
         var pillar = new CompositeEval("pillar", "Pillar", "test", "1.0.0",
             [new EvalComponent(new Fixed(Severe("art.a", "error", false, "none")), 0.5),
              new EvalComponent(new Fixed(Severe("art.b", "fail", false, "critical")), 0.5)],
@@ -118,26 +118,76 @@ public class ReportStatusTests
         var pillarResult = await pillar.EvaluateAsync(input);
         var result = await preset.EvaluateAsync(input);
 
-        Assert.Equal("error", pillarResult.Score.Label);         // the threshold alone cannot decide without art.a
+        Assert.Equal("fail", pillarResult.Score.Label);
+        Assert.Contains("cannot reach the threshold", pillarResult.Details.Summary);
         Assert.Equal("fail", result.Score.Label);
         Assert.Equal("critical", result.Score.Severity);
-        Assert.Contains("decides", result.Details.Summary);
         Assert.Equal("FAIL", AgentEval.Compliance.Gdpr.Articles.GdprBenchmarkRunner.BuildSummary(result, "run").Verdict);
     }
 
     [Theory]
-    [InlineData(null, false, "critical", "fail")]   // severity rule: the critical failure decides
-    [InlineData(null, false, "medium", "error")]    // a medium failure under the severity rule is a warn at most: the error stands
-    [InlineData(0.85, false, "critical", "error")]  // threshold only: the missing part could still move the average
-    [InlineData(0.85, true, "critical", "fail")]    // threshold + SeverityCapsThreshold: decided
-    public async Task ARequiredError_GivesWayOnlyToAFailureTheSeverityRuleDecides(double? threshold, bool caps, string severity, string label)
+    [InlineData(null, false, "critical", 0.10, "fail")]   // severity rule: the critical failure decides
+    [InlineData(null, false, "medium", 0.10, "error")]    // a medium failure under the severity rule is a warn at most: the error stands
+    [InlineData(0.85, false, "critical", 0.80, "error")]  // threshold only: (1.0 + 0.80) / 2 = 0.90, the missing part could pass it
+    [InlineData(0.85, false, "critical", 0.10, "fail")]   // threshold only: (1.0 + 0.10) / 2 = 0.55, decided whatever it scored (B10k)
+    [InlineData(0.85, true, "critical", 0.80, "fail")]    // threshold + SeverityCapsThreshold: the severity decides
+    public async Task ARequiredError_GivesWayOnlyToAFailureThatIsDecided(double? threshold, bool caps, string severity, double failedValue, string label)
     {
         var composite = new CompositeEval("c", "C", "test", "1.0.0",
             [new EvalComponent(new Fixed(Severe("errored", "error", false, "none")), 0.5),
-             new EvalComponent(new Fixed(Severe("failed", "fail", false, severity)), 0.5)],
+             new EvalComponent(new Fixed(Severe("failed", "fail", false, severity, failedValue)), 0.5)],
             WeightedSumAggregation.Instance, threshold) { SeverityCapsThreshold = caps };
 
         Assert.Equal(label, (await composite.EvaluateAsync(new EvalInput("q", "r"))).Score.Label);
+    }
+
+    // The real GDPR / EU tree: threshold-only articles of scenarios, severity-rule pillars, a severity-capped preset.
+    private static (CompositeEval Article, CompositeEval Pillar, CompositeEval Preset) GdprShape(EvalResult firstScenario)
+    {
+        var article = new CompositeEval("art.x", "Art X", "test", "1.0.0",
+            [new EvalComponent(new Fixed(firstScenario), 1.0),
+             new EvalComponent(new Fixed(Severe("s2", "fail", false, "critical", 0.60)), 1.0),
+             new EvalComponent(new Fixed(Severe("s3", "pass", true, "none")), 1.0)],
+            WeightedSumAggregation.Instance, threshold: 0.70);
+        var pillar = new CompositeEval("pillar", "Pillar", "test", "1.0.0",
+            [new EvalComponent(article, 1.0), new EvalComponent(new Fixed(Severe("art.y", "pass", true, "none")), 1.0)],
+            WeightedSumAggregation.Instance, threshold: null);
+        var preset = new CompositeEval("preset", "Preset", "test", "1.0.0",
+            [new EvalComponent(pillar, 1.0)], WeightedSumAggregation.Instance, threshold: 0.85) { SeverityCapsThreshold = true };
+        return (article, pillar, preset);
+    }
+
+    [Fact]
+    public async Task AnErroredArticle_DecidesNothingAboveIt_ThoughItsThresholdAbsorbedACriticalScenarioFailure()
+    {
+        // Review round 4 H1: since B10b the pillar read the errored article's severity (critical, from s2, a scenario
+        // failure the article's 0.70 threshold absorbs: with s1 passing it reads pass 0.867) as decided, so one judge
+        // glitch turned ERROR (exit 11) into FAIL (exit 9).
+        var input = new EvalInput("q", "r");
+        var (article, pillar, preset) = GdprShape(Severe("s1", "error", false, "none"));
+        var (_, okPillar, okPreset) = GdprShape(Severe("s1", "pass", true, "none"));
+
+        var articleResult = await article.EvaluateAsync(input);
+        Assert.Equal("error", articleResult.Score.Label);
+        Assert.Equal("none", articleResult.Score.Severity);     // an error has no verdict, so no severity
+        Assert.Equal("error", (await pillar.EvaluateAsync(input)).Score.Label);
+        Assert.Equal("error", (await preset.EvaluateAsync(input)).Score.Label);
+        Assert.Equal("pass", (await okPillar.EvaluateAsync(input)).Score.Label);   // the counterfactual: nothing was decided
+        Assert.Equal("pass", (await okPreset.EvaluateAsync(input)).Score.Label);
+    }
+
+    [Fact]
+    public async Task AnOptionalFailure_InsideAnErroredChild_DecidesNothingAboveIt()
+    {
+        var child = new CompositeEval("child", "Child", "test", "1.0.0",
+            [new EvalComponent(new Fixed(Severe("judge", "error", false, "none")), 1.0),
+             new EvalComponent(new Fixed(Severe("extra", "fail", false, "critical")), 1.0) { Required = false }],
+            WeightedSumAggregation.Instance, threshold: null);
+        var parent = new CompositeEval("parent", "Parent", "test", "1.0.0",
+            [new EvalComponent(child, 1.0)], WeightedSumAggregation.Instance, threshold: null);
+
+        Assert.Equal("error", (await child.EvaluateAsync(new EvalInput("q", "r"))).Score.Label);
+        Assert.Equal("error", (await parent.EvaluateAsync(new EvalInput("q", "r"))).Score.Label);
     }
 
     [Theory]

@@ -112,9 +112,12 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   but not the flag scored three "permission denied" calls as fully reliable (1.0, PASS). A recorded error is now a
   failure everywhere a call's outcome is read (`TraceToolCall.Failed`). Versions 1.1.0.
 - **A measured critical failure beside an errored part read as "no verdict".** A composite with a required part that
-  errored reported `error` even when a high or critical failure in its measured parts already decided the verdict under
-  the severity rule (no threshold, or `SeverityCapsThreshold`): a GDPR run with one article's judge errored and another
-  article failing at critical read ERROR, and its stored summary WARN. Such a composite now reads `fail` and says so;
+  errored reported `error` even when its measured parts already decided a failure: a GDPR run with one article's judge
+  errored and another article failing at critical read ERROR, and its stored summary WARN. Decided means the composite
+  fails even if every errored required part had passed perfectly: under the severity rule (no threshold, or
+  `SeverityCapsThreshold`) a high or critical failure among the measured required parts; under a threshold, a score
+  that cannot reach it. Such a composite now reads `fail` and says so. An errored nested composite decides nothing
+  above it and reports no severity: a scenario failure its own threshold would have absorbed is not a decided one;
   a run summary whose root has no verdict reads FAIL when a check failed (as `BenchmarkRunner` already did). And a
   composite with no component marked required ignored every failure in the severity rule — every check failing at
   critical read PASS; none marked required now means every component counts, as everywhere else.
