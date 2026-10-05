@@ -37,7 +37,8 @@ public static class NistAiRmfControls
             Fidelity = ControlFidelity.Tested,
             // SkillInjection (LLM01 / AML.T0051, injection through a skill's description) was missing: the rmf presets run
             // every attack, so a critical skill-injection compromise never reached the NIST verdict (#203 review round 9 H1).
-            RelevantAttacks = ["PromptInjection", "Jailbreak", "IndirectInjection", "EncodingEvasion", "ExcessiveAgency", "InsecureOutput", "SupplyChain", "DataPoisoning", "VectorEmbedding", "InferenceAPIAbuse", "SkillInjection"],
+            RelevantAttacks = ["PromptInjection", "Jailbreak", "IndirectInjection", "EncodingEvasion", "ExcessiveAgency", "InsecureOutput", "SupplyChain", "DataPoisoning", "VectorEmbedding", "InferenceAPIAbuse", "SkillInjection",
+                                "Crescendo", "PAIR", "TAP", "ToolEscalation"],   // the opt-in jailbreak / agency attacks (B10ax)
         },
         new()
         {

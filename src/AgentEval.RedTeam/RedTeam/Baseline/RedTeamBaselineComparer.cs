@@ -42,7 +42,7 @@ public class RedTeamBaselineComparer
         if (requireMatchingIntensity && current.WasTruncated)
         {
             throw new InvalidOperationException(
-                $"Cannot compare a FailFast-truncated scan ({current.TotalProbes}/{current.PlannedProbes} probes " +
+                $"Cannot compare a truncated scan (FailFast or the overall timeout; {current.TotalProbes}/{current.PlannedProbes} probes " +
                 "executed) against a baseline: the truncated probe set makes score/ASR deltas non-comparable (RA3-06). " +
                 "Re-run without FailFast, or call Compare(..., requireMatchingIntensity: false) to override.");
         }

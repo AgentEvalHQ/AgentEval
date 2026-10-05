@@ -25,13 +25,17 @@ internal static class IncompleteRunPolicy
         ArgumentNullException.ThrowIfNull(reasons);
         // A composite that already withheld its own pass (warn, not measured — e.g. a truncated scan, B10ar) still gets the
         // note: it named only what it saw, not a judge failure in the same run (#203 self-review, B10at).
-        var alreadyWithheld = composite.Score.Label == "warn" && composite.Score.Measurement == MeasurementState.NotMeasured;
-        if (reasons.Count == 0 || (composite.Score.Label != "pass" && !alreadyWithheld))
+        if (reasons.Count == 0)
             return composite;
 
         var note = $"INCOMPLETE: {string.Join("; ", reasons)}. The pass is withheld: this run is neither a pass nor a fail.";
-        if (alreadyWithheld)
+        if (composite.Score.Label != "pass")
         {
+            // Any other verdict keeps its label but says the run was incomplete (B10ax: a measured warn kept "✅ Strong
+            // security posture" and no word of it while the CLI said "neither a pass nor a fail"); a measured failure
+            // stays one, and says so.
+            if (composite.Score.Label == "fail")
+                note = $"INCOMPLETE: {string.Join("; ", reasons)}. What was measured already fails the run.";
             return composite with
             {
                 Details = composite.Details with

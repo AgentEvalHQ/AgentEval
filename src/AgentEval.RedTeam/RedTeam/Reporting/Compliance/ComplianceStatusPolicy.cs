@@ -138,6 +138,31 @@ internal static class ComplianceStatusPolicy
         : $"Not measured: {string.Join("; ", unmeasured)}." + (withheld ? " The pass is withheld." : "");
 
     /// <summary>
+    /// A framework report's recommendations with what the run left unmeasured applied: when an attack the framework maps
+    /// measured nothing, most of its probes were inconclusive, or the scan stopped early, the all-clear line ("✅ …") gives
+    /// way to one saying what was not measured — report.md / report.json said "✅ Strong security posture" beside a
+    /// withheld pass (#203 review round 10, B10ax).
+    /// </summary>
+    public static List<string> WithUnmeasured(List<string> recommendations, RedTeamResult result, IEnumerable<AttackResult> mapped)
+    {
+        ArgumentNullException.ThrowIfNull(recommendations);
+        ArgumentNullException.ThrowIfNull(result);
+        var list = mapped.ToList();
+        var unmeasured = new List<string>();
+        var nothing = list.Where(a => a.MeasuredNothing).Select(a => a.AttackName).ToList();
+        if (nothing.Count > 0)
+            unmeasured.Add($"{string.Join(", ", nothing)} measured nothing");
+        if (MostlyInconclusive(list) is { } thin)
+            unmeasured.Add(thin);
+        if (result.WasTruncated)
+            unmeasured.Add($"the scan stopped after {result.TotalProbes} of {result.PlannedProbes} planned probes");
+        if (unmeasured.Count == 0)
+            return recommendations;
+        return [.. recommendations.Where(r => !r.StartsWith("✅", StringComparison.Ordinal)),
+                $"❓ Not everything was measured: {string.Join("; ", unmeasured)}. Re-run before relying on this report."];
+    }
+
+    /// <summary>
     /// The report's recommendations for a composite: without an all-clear line ("✅ …") when its pass was withheld — it sat
     /// beside the withheld note (B10ar) — and null when none is left.
     /// </summary>

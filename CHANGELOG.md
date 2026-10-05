@@ -107,8 +107,11 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   (`agenteval redteam` sets no overall timeout, and `FailFast` stops only after a success, so its exit codes are
   unchanged.) The compliance composites also name what they left unmeasured when they already warn or fail (a NIST run that warned
   on MEASURE.2.5 did not mention MEASURE.2.10, all inconclusive), drop the "✅ Strong security posture" / "All
-  evaluated … meet thresholds" line when their pass is withheld, and a NIST control whose attack declared it cannot
-  measure here says so instead of "no mapped attack ran".
+  evaluated … meet thresholds" line when their pass is withheld — so do the five frameworks' `report.md` /
+  `report.json`, which say instead what was not measured — and a NIST control whose attack declared it cannot measure
+  here says so instead of "no mapped attack ran". An incomplete `bench owasp|mitre|nist` run's warn or fail composite
+  now says it was incomplete too. Truncation messages name both causes (`FailFast` or the overall timeout), and the
+  `HavePassed()` / `BeConclusive()` assertions fail a timed-out scan saying where it stopped.
 - **The compliance verdicts passed a red-team run that read INCONCLUSIVE.** A run with no successful probe and more
   inconclusive probes than resisted is INCONCLUSIVE, but no compliance composite or evidence applied that rule: one
   resisted and five inconclusive probes in each of two attacks passed `bench owasp`, `bench mitre` and `bench nist`
@@ -121,8 +124,12 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   built-in attack, but no NIST control listed `SkillInjection`, so a critical skill-injection compromise left the NIST
   verdict at WARN (exit 10) — the warn those presets always give when the misinformation check runs — and a
   skill-injection attack that measured nothing never withheld a NIST pass. It now maps to MEASURE.2.7 (security and
-  resilience), and to SOC 2 CC6.6 and ISO 27001 A.8.3 beside the other injection attacks; a test checks that every
-  built-in attack maps to a NIST control and an OWASP category.
+  resilience), and to SOC 2 CC6.6 and ISO 27001 A.8.3 beside the other injection attacks. The opt-in attacks map where
+  their default-roster counterparts do (Crescendo, PAIR and TAP beside `Jailbreak`, `ToolEscalation` beside
+  `ExcessiveAgency`; ISO 27001 A.8.3 also takes `IndirectInjection`). A test checks that every built-in attack, opt-in
+  ones included, maps to a NIST control and an OWASP category; SOC 2 and ISO 27001 map a subset, and the attacks they
+  leave out (supply chain, data poisoning, vector embedding, misinformation; for ISO also inference-API abuse) are
+  listed in that test.
 - **OWASP and MITRE evidence stored WARN for runs that failed.** The evidence bucketed categories (techniques) as
   failed only at a 0% pass rate, so 9 resisted probes and 1 critical success, or 1 resisted and 3 medium successes —
   each a FAIL composite, exit 9 — were stored as WARN. The evidence now uses the composite's own rule: a high or

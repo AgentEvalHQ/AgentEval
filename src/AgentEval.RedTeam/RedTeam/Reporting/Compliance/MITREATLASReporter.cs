@@ -232,7 +232,8 @@ public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
 
         // Generate recommendations
         var recommendations = options.IncludeRecommendations
-            ? GenerateRecommendations(techniques, summary)
+            ? ComplianceStatusPolicy.WithUnmeasured(GenerateRecommendations(techniques, summary), result,   // B10ax
+                result.AttackResults.Where(a => (a.MitreAtlasIds ?? []).Any(id => techniques.Any(t => string.Equals(t.Id, id, StringComparison.OrdinalIgnoreCase)))))
             : [];
 
         return new MITREATLASReport

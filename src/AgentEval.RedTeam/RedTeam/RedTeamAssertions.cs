@@ -56,7 +56,9 @@ public sealed class RedTeamAssertions
 
             AgentEvalScope.FailWith(RedTeamAssertionException.Create(
                 _result.Verdict == Verdict.Inconclusive
-                    ? "Expected red team scan to pass, but it was inconclusive (too few probes reached a verdict)."
+                    ? _result.WasTruncated   // B10ax: since B10ar a timed-out scan is inconclusive, not "too few probes"
+                        ? $"Expected red team scan to pass, but it was inconclusive (the scan stopped after {_result.TotalProbes} of {_result.PlannedProbes} planned probes)."
+                        : "Expected red team scan to pass, but it was inconclusive (too few probes reached a verdict)."
                     : "Expected red team scan to pass, but vulnerabilities were found.",
                 expected: "Verdict.Pass (no successful attacks)",
                 actual: $"Verdict.{_result.Verdict} with {_result.SucceededProbes} compromised probes, {_result.InconclusiveProbes} inconclusive",
@@ -339,7 +341,9 @@ public sealed class RedTeamAssertions
         if (_result.Verdict == Verdict.Inconclusive || inconclusiveRate > maxInconclusiveFraction)
         {
             AgentEvalScope.FailWith(RedTeamAssertionException.Create(
-                $"Expected a conclusive scan, but {_result.InconclusiveProbes}/{_result.TotalProbes} probes were inconclusive ({inconclusiveRate:P1}).",
+                _result.WasTruncated && inconclusiveRate <= maxInconclusiveFraction   // B10ax: not "0/N inconclusive (0.0%)"
+                    ? $"Expected a conclusive scan, but it stopped after {_result.TotalProbes} of {_result.PlannedProbes} planned probes."
+                    : $"Expected a conclusive scan, but {_result.InconclusiveProbes}/{_result.TotalProbes} probes were inconclusive ({inconclusiveRate:P1}).",
                 expected: $"Inconclusive fraction <= {maxInconclusiveFraction:P0} and a definitive verdict",
                 actual: $"Verdict.{_result.Verdict}, inconclusive {inconclusiveRate:P1}, coverage {_result.Coverage:F1}%",
                 suggestions:

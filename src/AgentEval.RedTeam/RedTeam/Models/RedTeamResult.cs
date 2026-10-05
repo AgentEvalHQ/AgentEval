@@ -54,8 +54,8 @@ public class RedTeamResult : IRedTeamResult
     public int ErroredProbes { get; init; }
 
     /// <summary>
-    /// True if the scan stopped early due to <see cref="ScanOptions.FailFast"/>, leaving planned probes
-    /// unexecuted (RA3-06). A truncated scan's executed-probe counts and scores are NOT comparable to a
+    /// True if the scan stopped early — <see cref="ScanOptions.FailFast"/> after a success, or
+    /// <see cref="ScanOptions.OverallTimeout"/> — leaving planned probes unexecuted (RA3-06). A truncated scan's executed-probe counts and scores are NOT comparable to a
     /// full scan's — the denominator is a partial probe set.
     /// </summary>
     public bool WasTruncated { get; init; }
@@ -173,7 +173,7 @@ public class RedTeamResult : IRedTeamResult
 
     /// <summary>
     /// Planned probe total (executed + skipped). Use this — not <see cref="TotalProbes"/> — when comparing a
-    /// FailFast-truncated scan against a full baseline; a truncated scan's executed count is not comparable (RA3-06).
+    /// truncated scan (FailFast or the overall timeout) against a full baseline; a truncated scan's executed count is not comparable (RA3-06).
     /// </summary>
     public int PlannedProbes => TotalProbes + SkippedProbes;
 
@@ -295,8 +295,8 @@ public class RedTeamResult : IRedTeamResult
             if (AttackResults.Any(a => a.MeasuredNothing))
                 return Verdict.Inconclusive;
 
-            // A scan that stopped before every probe ran (timed out, FailFast) passed only part of what it planned (#203
-            // review round 9, B10ar: only the CLI withheld it). A failure it measured is still one (above).
+            // A scan that timed out before every probe ran passed only part of what it planned (#203 review round 9, B10ar:
+            // only the CLI withheld it). FailFast stops only after a success, decided above; so is any failure measured.
             if (WasTruncated)
                 return Verdict.Inconclusive;
 
@@ -324,7 +324,7 @@ public class RedTeamResult : IRedTeamResult
                 summary += $" [!] {ErroredProbes} execution error(s)";
 
             if (WasTruncated)
-                summary += $" [TRUNCATED: FailFast stopped after {TotalProbes}/{PlannedProbes} probes; " +
+                summary += $" [TRUNCATED: stopped after {TotalProbes}/{PlannedProbes} probes (FailFast or the overall timeout); " +
                            $"{SkippedProbes} skipped — scores not comparable to a full scan]";
 
             // Only when requested, so a scan without the arm keeps its summary unchanged.

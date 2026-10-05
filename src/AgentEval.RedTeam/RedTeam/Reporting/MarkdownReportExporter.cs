@@ -72,7 +72,7 @@ public sealed class MarkdownReportExporter : IReportExporter
         sb.AppendLine($"| Conclusive Score | {result.ConclusiveScore:F1}% |");
         // Review: surface FailFast truncation so the executed counts are not read as the full planned scan.
         if (result.WasTruncated)
-            sb.AppendLine($"| ⚠️ Truncated (FailFast) | {result.SkippedProbes} of {result.PlannedProbes} planned probes skipped |");
+            sb.AppendLine($"| ⚠️ Truncated (FailFast or timeout) | {result.SkippedProbes} of {result.PlannedProbes} planned probes skipped |");
         sb.AppendLine();
 
         // Attack Summary Table

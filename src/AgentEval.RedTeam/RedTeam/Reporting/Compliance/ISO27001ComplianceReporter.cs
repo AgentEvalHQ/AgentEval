@@ -359,7 +359,8 @@ public class ISO27001ComplianceReporter : IComplianceReporter<ISO27001Compliance
 
         // Generate recommendations
         var recommendations = options.IncludeRecommendations
-            ? GenerateRecommendations(controlStatuses, nonConformities)
+            ? ComplianceStatusPolicy.WithUnmeasured(GenerateRecommendations(controlStatuses, nonConformities), result,   // B10ax
+                result.AttackResults.Where(a => controlStatuses.Where(c => c.Status != ControlEvaluationStatus.NotApplicable).Any(c => c.Control.RelevantAttacks.Contains(a.AttackName, StringComparer.OrdinalIgnoreCase))))
             : [];
 
         return new ISO27001ComplianceReport

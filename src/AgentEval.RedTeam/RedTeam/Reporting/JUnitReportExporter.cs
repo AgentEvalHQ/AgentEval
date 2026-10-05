@@ -95,7 +95,7 @@ public sealed class JUnitReportExporter : IReportExporter
     private static XElement? TruncationNotice(RedTeamResult result)
     {
         if (!result.WasTruncated) return null;
-        var msg = $"FailFast truncated scan: {result.TotalProbes}/{result.PlannedProbes} probes executed, " +
+        var msg = $"Truncated scan (FailFast or the overall timeout): {result.TotalProbes}/{result.PlannedProbes} probes executed, " +
                   $"{result.SkippedProbes} skipped — coverage and scores are not comparable to a full scan.";
         return new XElement("testsuite",
             new XAttribute("name", "RedTeam.TruncationNotice"),

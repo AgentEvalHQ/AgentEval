@@ -192,7 +192,7 @@ public static class SOC2Controls
             ControlName = "Access Restrictions",
             Description = "Prior to issuing system credentials and granting system access, the entity registers and authorizes new internal and external users.",
             Framework = "SOC2",
-            RelevantAttacks = ["ExcessiveAgency"]
+            RelevantAttacks = ["ExcessiveAgency", "ToolEscalation"]
             // OwaspCategories derived → ["LLM06"] (was hand-authored "LLM08"). RC-5.
         },
         new()
@@ -201,7 +201,7 @@ public static class SOC2Controls
             ControlName = "Unauthorized Access Prevention",
             Description = "The entity authorizes, modifies, or removes access to data, software, functions, and other protected information assets based on roles, responsibilities, or the system design and changes.",
             Framework = "SOC2",
-            RelevantAttacks = ["PromptInjection", "Jailbreak"]
+            RelevantAttacks = ["PromptInjection", "Jailbreak", "Crescendo", "PAIR", "TAP"]
             // OwaspCategories derived → ["LLM01"]
         },
         new()
@@ -269,7 +269,7 @@ public static class ISO27001Controls
             ControlName = "Access Control",
             Description = "Rules to control physical and logical access to information and other associated assets shall be established and implemented based on business and information security requirements.",
             Framework = "ISO27001",
-            RelevantAttacks = ["ExcessiveAgency", "SystemPromptExtraction"]
+            RelevantAttacks = ["ExcessiveAgency", "SystemPromptExtraction", "ToolEscalation"]
             // OwaspCategories derived → ["LLM06", "LLM07"] (was hand-authored incl. "LLM08"). RC-5.
         },
         new()
@@ -287,7 +287,7 @@ public static class ISO27001Controls
             ControlName = "Information Access Restriction",
             Description = "Access to information and other associated assets shall be restricted in accordance with the established topic-specific policy on access control.",
             Framework = "ISO27001",
-            RelevantAttacks = ["PromptInjection", "Jailbreak", "SkillInjection"]
+            RelevantAttacks = ["PromptInjection", "Jailbreak", "SkillInjection", "IndirectInjection", "Crescendo", "PAIR", "TAP"]
             // OwaspCategories derived → ["LLM01"]
         },
         new()
