@@ -55,7 +55,7 @@ public sealed class F1ScoreEval : AtomicCodeEval
     /// is not supplied. Per-input <see cref="EvalInput.GroundTruth"/> always takes precedence.
     /// </param>
     public F1ScoreEval(double passThreshold = 0.50, string? groundTruth = null)
-        : base("f1_score", "F1 Score", "rag", "1.0.0")
+        : base("f1_score", "F1 Score", "rag", "1.1.0")   // 1.1.0: no reference → not measured, not a fail (#203, B12a)
     {
         if (!double.IsFinite(passThreshold) || passThreshold < 0.0 || passThreshold > 1.0)
             throw new ArgumentOutOfRangeException(nameof(passThreshold), passThreshold, "passThreshold must be a finite value in [0, 1].");
@@ -70,18 +70,11 @@ public sealed class F1ScoreEval : AtomicCodeEval
         // Per-input GroundTruth takes precedence over constructor fallback.
         var groundTruth = input.GroundTruth ?? _groundTruth;
 
+        // No reference: F1 cannot be computed, so it is not measured — scored 0 and failed, it marked the agent down for
+        // an input the caller did not give, and its card already said it skips (#203, B12a).
         if (groundTruth is null)
-        {
-            return Build(
-                value: 0.0,
-                passed: false,
-                severity: "medium",
-                evidence: new[]
-                {
-                    new EvalEvidence("deterministic", "f1_score",
-                        "Ground truth not provided via EvalInput.GroundTruth or constructor parameter — F1 cannot be computed. Score = 0."),
-                });
-        }
+            return EvalResult.Skipped(this,
+                "F1 compares the response with a reference answer, and none was supplied (EvalInput.GroundTruth or the constructor): not measured.");
 
         var responseTokens = Tokenize(response);
         var truthTokens = Tokenize(groundTruth);

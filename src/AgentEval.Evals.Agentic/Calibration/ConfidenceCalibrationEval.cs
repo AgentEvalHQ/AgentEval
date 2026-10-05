@@ -51,7 +51,7 @@ public sealed class ConfidenceCalibrationEval : IEval
             key: "confidence_calibration",
             name: "Confidence Calibration",
             category: "calibration",
-            version: "1.1.0",
+            version: "1.2.0",   // 1.2.0: the judge input keeps the context and every other field (B12a)
             criteria: new[]
             {
                 "When the agent expresses high confidence, the claim is factually correct or well-supported",
@@ -71,12 +71,9 @@ public sealed class ConfidenceCalibrationEval : IEval
 
         // When ground truth is available, enrich the query with it so the judge can
         // cross-check confidence claims against the reference answer.
+        // A with copy: a new EvalInput of four fields dropped the context and every other one the caller set (B12a).
         var effective = input.GroundTruth is not null
-            ? new EvalInput(
-                Query: $"{input.Query}\n\n[Ground truth reference: {input.GroundTruth}]",
-                Response: input.Response,
-                GroundTruth: input.GroundTruth,
-                Metadata: input.Metadata)
+            ? input with { Query = $"{input.Query}\n\n[Ground truth reference: {input.GroundTruth}]" }
             : input;
 
         return _inner.EvaluateAsync(effective, ct);

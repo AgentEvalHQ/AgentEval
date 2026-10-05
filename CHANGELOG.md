@@ -36,15 +36,29 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   anything short of a pass.
 - **Calibration reports only measured verdicts.** A judge outage is INFRA-FAIL; an evaluator not measured on every
   record is left out whole (INCOMPLETE).
+- **A missing reference answer is not a failure.** `similarity` and `f1_score` without `EvalInput.GroundTruth` are
+  not measured (`skipped`); the QA composite withholds its pass naming them. With one, the judge now receives it.
 - **Versions** (the ones this release ships): `unsafe_tool_use` 1.2.0, `tool_call_success` 1.2.0,
   `tool_input_accuracy` 2.6.0, `task_adherence` / `intent_resolution` / `task_navigation_efficiency` 1.2.0, the other
   tool-aware and sub-dimension evaluators 1.1.0, every other agentic LLM check one minor version up for its rubric (1.1.0;
-  `direct_injection`, `jailbreak_resistance` and `persona_attack` 1.2.0); `stochastic_stability` 1.1.0; the
+  `direct_injection`, `jailbreak_resistance` and `persona_attack` 1.2.0; `similarity`, `response_completeness`,
+  `confidence_calibration`, `self_correction_quality` and `qa_composite` 1.2.0; `f1_score` 1.1.0); `stochastic_stability` 1.1.0; the
   memory-security composite 1.1.0; all 12 agentic presets 1.1.0; GDPR Standard 1.2.0 and Smoke 1.1.0, GDPR
   AuditGrade 1.2.0; EU AI Act Standard, Smoke and AuditGrade 1.1.0. Entries below may name the version a fix first
   carried on this branch; the list above is what ships.
 
 #### Fixed
+- **`similarity` never sent the reference answer to its judge.** `SimilarityEval` and `ResponseCompletenessEval`
+  documented that they read `EvalInput.GroundTruth`, but the judge received only the query, the response and the
+  context. Similarity's judge therefore improvised a comparison — the calibration case "Paris is the capital of France"
+  scored 0.98 with nothing to compare against — and once this release sent it its rubric, whose missing-reference rule
+  scores 0, it failed every input, even one with a reference. The reference now reaches the judge (after the query);
+  similarity without one is not measured and makes no judge call, and `F1ScoreEval` without one is not measured instead
+  of failing at 0. `ConfidenceCalibrationEval` and `SelfCorrectionQualityEval` built a new input of four fields for
+  their judge and dropped the context and every other field; they keep them now. The agentic calibration goldens can
+  carry a `groundTruth` (`CalibrationEntry.GroundTruth`), and the similarity and response-completeness cases do; the
+  similarity, response-completeness and QA-composite cards name `EvalInput.GroundTruth`, not a metadata key nothing
+  read. Found by the release's own recalibration round.
 - **A composite passed even when one of its required components never ran.** Only a required component labelled
   `error` blocked the verdict. One that returned `skipped` — because a required input, trace or telemetry was not
   supplied — was left out, and the composite passed on the rest ("Measured 1 of 2", label `pass`).

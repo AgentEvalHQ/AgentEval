@@ -62,7 +62,7 @@ public sealed class ResponseCompletenessEval : IEval
             key: "response_completeness",
             name: "Response Completeness",
             category: "rag",
-            version: "1.1.0",
+            version: "1.2.0",   // 1.2.0: a supplied reference answer reaches the judge (B12a)
             criteria: new[]
             {
                 "All critical facts expected from the query are covered in the response",
@@ -76,6 +76,10 @@ public sealed class ResponseCompletenessEval : IEval
     }
 
     /// <inheritdoc/>
-    public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default) =>
-        _inner.EvaluateAsync(input, ct);
+    public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        // The reference answer derives the expected facts when supplied; it was never sent (#203, B12a).
+        return _inner.EvaluateAsync(GroundTruthInput.Fold(input), ct);
+    }
 }

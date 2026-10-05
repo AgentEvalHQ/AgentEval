@@ -223,7 +223,8 @@ public class GoldenReachabilityTests
         return (Reach.ResponseBlind, result);
     }
 
-    private static EvalInput ToInput(CalibrationEntry e) => new(Query: e.Input, Response: e.AgentResponse);
+    // As CalibrationRunner builds it — the reference answer too (B12a).
+    private static EvalInput ToInput(CalibrationEntry e) => new(Query: e.Input, Response: e.AgentResponse, GroundTruth: e.GroundTruth);
 
     private static IReadOnlyList<CalibrationEntry> GoldenEntries()
         => new CalibrationDatasetLoader()

@@ -88,7 +88,7 @@ public sealed class QaCompositeEval : IEval
             key: "qa_composite",
             name: "QA Composite",
             category: "rag",
-            version: "1.1.0",
+            version: "1.2.0",   // 1.2.0: similarity / F1 without a reference are not measured, so the composite withholds its pass naming them (B12a)
             components: new[]
             {
                 new EvalComponent(groundedness,         Weight: 0.30) { OnFailure = ComponentFailureEffect.Fail },

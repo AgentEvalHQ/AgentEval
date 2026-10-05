@@ -51,6 +51,10 @@ Covers retrieval-augmented generation quality:
 - **Response Completeness** — whether the response covers all expected facts, distinguishing critical from optional gaps.
 - **F1 Score** — deterministic token-level overlap between response and ground truth.
 
+Similarity and F1 compare the response with a reference answer, `EvalInput.GroundTruth`; response completeness uses it
+when supplied. Without one, similarity and F1 are not measured (`skipped`), never a fail, and the QA composite withholds
+its pass naming them.
+
 ### Judge Quality (Phase 3)
 
 Meta-evaluators for evaluator health monitoring (no LLM invocation):

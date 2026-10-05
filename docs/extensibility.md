@@ -729,10 +729,13 @@ public class MyMetric : IMetric
 ```csharp
 public Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken ct)
 {
-    // ✅ Good: Check and fail gracefully
+    // A missing input is not the agent's failure. The IEval API reports it as not measured:
+    //     return Task.FromResult(EvalResult.Skipped(this, "Ground truth is required and was not supplied."));
+    // The legacy IMetric API has no such state - fail with an explanation that names the missing input, and
+    // prefer IEval for new evaluators.
     if (string.IsNullOrEmpty(context.GroundTruth))
     {
-        return Task.FromResult(MetricResult.Fail(Name, "Ground truth is required."));
+        return Task.FromResult(MetricResult.Fail(Name, "Not measured: ground truth is required and was not supplied."));
     }
     
     // Continue with evaluation...
