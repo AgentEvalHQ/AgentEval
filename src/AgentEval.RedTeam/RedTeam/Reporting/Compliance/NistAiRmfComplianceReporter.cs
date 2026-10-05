@@ -269,7 +269,8 @@ public class NistAiRmfComplianceReporter : IComplianceReporter<NistAiRmfComplian
         // Honesty (RC-6): never persist PASS when nothing was conclusively evaluated. A run where every probe
         // was Inconclusive (e.g. a timed-out/unreachable SUT) yields passed=warnings=failed=0 and must record
         // NOT_EVALUATED, not a fabricated green PASS in the audit-grade evidence pointer.
-        var overallStatus = failed > 0 ? "FAIL" : warnings > 0 ? "WARN" : passed > 0 ? "PASS" : "NOT_EVALUATED";
+        var overallStatus = ComplianceStatusPolicy.OverallEvidenceStatus(passed, warnings, failed,
+            report.Controls.Count(c => c.RanInconclusive));   // B10ai: a control that ran inconclusive withholds the PASS
 
         // T4-4: the disclaimer lives in the markdown footer, NOT as a synthetic control row. ControlsTotal == Controls.Count.
         var evidence = new AgentEval.Output.ComplianceEvidence(

@@ -109,6 +109,13 @@ public class ControlStatus
     /// </summary>
     public int ConclusiveTests { get; init; } = -1;
 
+    /// <summary>
+    /// Probes for this control ran but none reached a conclusive verdict. Its status is <see cref="ControlEvaluationStatus.NotEvaluated"/>,
+    /// the same as a control no mapped attack exercised, but unlike that one it keeps a run from passing — the OWASP /
+    /// MITRE <c>Inconclusive</c> rule (#203 review, B6c-8), swept to NIST, ISO 27001 and SOC 2 (round 7, B10ai).
+    /// </summary>
+    public bool RanInconclusive => Status == ControlEvaluationStatus.NotEvaluated && TotalTests > 0 && ConclusiveTests == 0;
+
     private int EffectiveConclusive => ConclusiveTests >= 0 ? ConclusiveTests : TotalTests;
 
     /// <summary>Tests that passed.</summary>

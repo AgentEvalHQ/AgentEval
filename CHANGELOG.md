@@ -81,6 +81,10 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   `skipped` with "No component produced a measurement (0 errored, 0 skipped, 0 inapplicable)", though the parts inside
   were measured — the Tool Call Accuracy preset did this whenever no tool definitions were captured. It now withholds
   too (`warn`, recorded `notMeasured`) and names the components; a breakdown counts the withheld ones.
+- **NIST, ISO 27001 and SOC 2 passed over a control whose probes all came back inconclusive.** Such a control was
+  "not evaluated", the same as a control no attack exercised, so `bench nist` passed on the rest and the stored
+  evidence of all three read PASS (the OWASP / MITRE rule never reached them). `ControlStatus.RanInconclusive` now
+  tells them apart: the NIST run withholds its pass (warn, naming the controls) and the evidence reads WARN.
 - **`bench owasp` and `bench mitre` stored PASS evidence for a run that withheld its pass.** A category (technique)
   whose probes all came back inconclusive makes the run WARN (exit 10), but the stored compliance evidence counted only
   the tested categories and read PASS. It now reads WARN (`ComplianceStatusPolicy.OverallEvidenceStatus`).

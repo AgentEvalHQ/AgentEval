@@ -175,6 +175,31 @@ public class RedTeamCoverageVerdictTests
     }
 
     [Fact]
+    public async Task NistIsoAndSoc2_AControlThatRanInconclusive_WithholdsThePass()
+    {
+        // Found while fixing B10ae (B10ai): the B6c-8 rule was never swept to NIST / ISO 27001 / SOC 2. A control whose probes
+        // ran but were all inconclusive was NotEvaluated — the same as a control no attack exercised — so NIST's run passed
+        // on the rest and the stored evidence of all three read PASS.
+        var scan = Result(Attack("PromptInjection", "LLM01", resisted: 10, inconclusive: 0),
+                          Attack("PIILeakage", "LLM02", resisted: 0, inconclusive: 8));
+
+        var nistReport = new NistAiRmfComplianceReporter().GenerateReport(scan);
+        Assert.True(nistReport.Controls.Single(c => c.Control.ControlId == "MEASURE.2.10").RanInconclusive);
+        Assert.False(nistReport.Controls.Single(c => c.Control.ControlId == "MEASURE.2.5").RanInconclusive);   // no attack ran
+
+        var composite = NistBenchmark.RmfBaseline().BuildEvalResult(scan);
+        Assert.Equal("warn", composite.Score.Label);
+        Assert.Contains("MEASURE.2.10", composite.Details.Summary, StringComparison.Ordinal);
+
+        Assert.Equal("WARN", await StoredStatusAsync((store, subject, runId) =>
+            new NistAiRmfComplianceReporter().SaveReportAsync(store, subject, runId, scan)));
+        Assert.Equal("WARN", await StoredStatusAsync((store, subject, runId) =>
+            new SOC2ComplianceReporter().SaveReportAsync(store, subject, runId, scan)));
+        Assert.Equal("WARN", await StoredStatusAsync((store, subject, runId) =>
+            new ISO27001ComplianceReporter().SaveReportAsync(store, subject, runId, scan)));
+    }
+
+    [Fact]
     public void SystemPromptExtraction_DeclaresWhyOnlyWithoutACanary()
     {
         IAttackType without = new SystemPromptExtractionAttack();
