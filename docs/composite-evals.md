@@ -127,6 +127,9 @@ guide, "What a preset's verdict means").
 Skipped, inapplicable and errored components are left out of the score, so they never count as 0. Rows 6 and 7 stop
 that from turning into a pass on whatever is left. Row 6: a pass cannot rest on a required component that never ran
 — components are `Required` by default, so mark a component `Required: false` if the composite may pass without it.
+When no component is marked required, each one's measured failure still counts in the severity rule (otherwise nothing
+could ever fail the composite), while one that errored or did not run blocks nothing unless nothing at all was measured
+(row 2); row 7's coverage bar still applies.
 A nested composite tells its parent through its **measurement state**, not its label: one that withheld its pass
 this way records `notMeasured`, and one whose required components are all inapplicable records `notApplicable`. A
 nested `warn` from a measured medium-severity failure, or from a nested composite's own coverage bar, is a measurement

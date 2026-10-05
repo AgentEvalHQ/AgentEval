@@ -361,6 +361,24 @@ public class CompositeEvalTests
         Assert.Equal("critical", result.Score.Severity);
     }
 
+    [Theory]
+    [InlineData(1, "pass")]   // 2 of 3 measured: an optional error blocks nothing
+    [InlineData(2, "warn")]   // 1 of 3 measured: under the coverage bar (MinimumMeasuredShare 0.5)
+    public async Task AllOptional_AnErrorBlocksNothing_ButTheCoverageBarStands(int errored, string label)
+    {
+        // Review round 4 L (B10s): with none marked required, measured FAILURES count (B10b); a component that errored
+        // still blocks nothing unless nothing was measured. The CHANGELOG claimed "every component counts" outright.
+        var components = Enumerable.Range(0, 3).Select(i => new EvalComponent(
+            i < errored
+                ? new StubAtomic($"opt-{i}", 0.0, passed: false, label: "error")
+                : new StubAtomic($"opt-{i}", 0.95),
+            Weight: 1.0, Required: false)).ToArray();
+
+        var result = await MakeComposite(components).EvaluateAsync(Input);
+
+        Assert.Equal(label, result.Score.Label);
+    }
+
     [Fact]
     public async Task OneOptionalFailing_BesideARequiredPass_StillDoesNotDecide()
     {

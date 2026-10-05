@@ -456,14 +456,28 @@ public sealed class CompositeEval : IEval
         // A check whose failure would fail this composite but that only warned — a judge score in its rubric's
         // needs-review band, or a nested composite that warned — is not "usable but not optimal": it is unconfirmed, and
         // the note says so (#203 review, B9). Warn-effect dimensions keep the "not optimal" wording.
-        var unconfirmed = effectsFired
+        var unconfirmedSubs = effectsFired
             .Where(p => p.Component.OnFailure == ComponentFailureEffect.Fail && p.Sub.Score.Label == "warn")
-            .Select(p => p.Sub.Metric.Key)
+            .Select(p => p.Sub)
             .ToArray();
+        var unconfirmed = unconfirmedSubs.Select(s => s.Metric.Key).ToArray();
         var quality = notOptimal.Except(unconfirmed, StringComparer.Ordinal).ToArray();
+        // Why each came back warn (review round 4, B10s): a judge's warn is its rubric's needs-review band, but a code
+        // check's warn has its own reason — tool_input_accuracy's schema leaf warns when it could check only a minority
+        // of the calls — and read "borderline: needs review" here. A nested composite's reason is in its own summary.
+        static string WhyWarn(EvalResult sub) => sub.Provenance.Type switch
+        {
+            "atomic-code" when sub.Details.Summary is { Length: > 0 } why => why,
+            "composite" => "see its summary",
+            _ => "borderline: needs review",
+        };
+        var reasons = unconfirmedSubs.Select(s => (s.Metric.Key, Why: WhyWarn(s))).ToArray();
         var unconfirmedText = unconfirmed.Length > 0
             ? $"Not confirmed: {string.Join(", ", unconfirmed)} — a check whose failure means the answer cannot be trusted " +
-              "came back warn (borderline: needs review)"
+              "came back warn " +
+              (reasons.All(r => r.Why == "borderline: needs review")
+                  ? "(borderline: needs review)"
+                  : "(" + string.Join("; ", reasons.Select(r => $"{r.Key}: {r.Why}")) + ")")
             : null;
         var qualityText = quality.Length > 0
             ? $"Not optimal: {string.Join(", ", quality)} did not pass — the answer is usable"

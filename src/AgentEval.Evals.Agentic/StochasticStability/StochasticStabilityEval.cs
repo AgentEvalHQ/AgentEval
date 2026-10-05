@@ -102,8 +102,10 @@ public sealed class StochasticStabilityEval : IEval
         // rate as a failure and the variance as a 0 (#203 review round 3, B10i — the B9b class). It is left out, and a
         // pass that rests on part of the runs is a warn.
         var allRuns = ExtractRunResults(input);
-        var unmeasured = allRuns.Count(r => r.Label is "error" or "skipped" or "inapplicable");
-        var runResults = allRuns.Where(r => r.Label is not ("error" or "skipped" or "inapplicable")).ToList();
+        // By measurement state, not label strings (review round 4, B10s): a run that withheld its pass (warn, not
+        // measured) and a JSON run with no label counted as failed runs.
+        var unmeasured = allRuns.Count(r => !r.Measured);
+        var runResults = allRuns.Where(r => r.Measured).ToList();
         if (runResults.Count < 2)
         {
             return Task.FromResult(EvalResult.Skipped(this,
@@ -199,7 +201,8 @@ public sealed class StochasticStabilityEval : IEval
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private sealed record RunSummary(double Score, bool Passed, string Label);
+    // Measured: the run has a verdict to compare (EvalScore.CountsTowardAggregate, or its JSON equivalent).
+    private sealed record RunSummary(double Score, bool Passed, string Label, bool Measured = true);
 
     private static IReadOnlyList<RunSummary> ExtractRunResults(EvalInput input)
     {
@@ -208,7 +211,7 @@ public sealed class StochasticStabilityEval : IEval
 
         return raw switch
         {
-            IEnumerable<EvalResult> results  => results.Select(r => new RunSummary(r.Score.Value, r.Score.Passed, r.Score.Label)).ToList(),
+            IEnumerable<EvalResult> results  => results.Select(Summarise).ToList(),
             IEnumerable<RunSummary> summaries => summaries.ToList(),
             string json                       => ParseJsonRunResults(json),
             _                                 => TryConvertEnumerable(raw),
@@ -229,6 +232,7 @@ public sealed class StochasticStabilityEval : IEval
                 double scoreValue = 0;
                 bool passed = false;
                 string label = "unknown";
+                string? measurement = null;
 
                 // Support both flat {"value":..., "passed":...} and nested {"score":{"value":...}}
                 if (el.TryGetProperty("score", out var scoreEl))
@@ -236,6 +240,8 @@ public sealed class StochasticStabilityEval : IEval
                     if (scoreEl.TryGetProperty("value",  out var v))  scoreValue = v.GetDouble();
                     if (scoreEl.TryGetProperty("passed", out var p))  passed     = p.GetBoolean();
                     if (scoreEl.TryGetProperty("label",  out var l))  label      = l.GetString() ?? "unknown";
+                    if (scoreEl.TryGetProperty("measurement", out var m) && m.ValueKind == JsonValueKind.String)
+                        measurement = m.GetString();
                 }
                 else
                 {
@@ -244,7 +250,10 @@ public sealed class StochasticStabilityEval : IEval
                     if (el.TryGetProperty("label",  out var l))  label      = l.GetString() ?? "unknown";
                 }
 
-                results.Add(new RunSummary(scoreValue, passed, label));
+                // A run with no label states no verdict, and one recorded as not measured has none to compare.
+                var measured = label is not ("unknown" or "error" or "skipped" or "inapplicable")
+                               && measurement is null or "measured" or "Measured";
+                results.Add(new RunSummary(scoreValue, passed, label, measured));
             }
             return results;
         }
@@ -254,6 +263,9 @@ public sealed class StochasticStabilityEval : IEval
         }
     }
 
+    private static RunSummary Summarise(EvalResult r) =>
+        new(r.Score.Value, r.Score.Passed, r.Score.Label, r.Score.CountsTowardAggregate());
+
     private static IReadOnlyList<RunSummary> TryConvertEnumerable(object raw)
     {
         if (raw is global::System.Collections.IEnumerable enumerable)
@@ -262,7 +274,7 @@ public sealed class StochasticStabilityEval : IEval
             foreach (var item in enumerable)
             {
                 if (item is EvalResult er)
-                    result.Add(new RunSummary(er.Score.Value, er.Score.Passed, er.Score.Label));
+                    result.Add(Summarise(er));
             }
             return result;
         }

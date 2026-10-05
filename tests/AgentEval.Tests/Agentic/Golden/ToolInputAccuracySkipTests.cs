@@ -271,6 +271,9 @@ public class ToolInputAccuracySkipTests
         Assert.Contains("Only 1 of 10", leaf.Details.Summary!, StringComparison.Ordinal);
         Assert.Equal("warn", result.Score.Label);
         Assert.False(result.Score.Passed);
+        // The case says why, not "borderline: needs review" (review round 4, B10s).
+        Assert.Contains("Only 1 of 10", result.Details.Summary!, StringComparison.Ordinal);
+        Assert.DoesNotContain("borderline", result.Details.Summary!, StringComparison.Ordinal);
     }
 
     // ── B5a (#203 review): a call is checked only against a schema the check can read ──────────────────────────

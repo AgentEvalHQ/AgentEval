@@ -405,7 +405,8 @@ public sealed class AtomicLlmEval : AtomicEval
                 result = c.Result is null ? null
                     : resultLimit > 0 ? Cut(c.Result, resultLimit)
                     : $"[{c.Result.Length} characters, not shown: the section is limited to {ToolSectionCharacterLimit}]",
-                succeeded = c.Succeeded,
+                // A recorded error is a failure whatever Succeeded says (B10f's rule; the judge was shown "succeeded": true — B10s).
+                succeeded = c.Succeeded is null ? (bool?)null : c.Succeeded == true && c.Error is null,
                 error = Cut(c.Error),
             }, ToolJson);
 

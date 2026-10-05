@@ -48,6 +48,37 @@ public class StochasticStabilityEvalTests
     }
 
     [Fact]
+    public async Task AWithheldRun_IsNotAFailedRun()
+    {
+        // Review round 4 L (B10s): the filter read label strings, so a run that withheld its pass (warn, not measured)
+        // counted as a failed run at its placeholder score.
+        var withheld = MakeResult(false, 0.0, "warn");
+        withheld = withheld with { Score = withheld.Score with { Measurement = AgentEval.Evals.Meta.MeasurementState.NotMeasured } };
+        var stable = new[] { MakeResult(true, 0.95), MakeResult(true, 0.95), MakeResult(true, 0.95) };
+
+        var result = await new StochasticStabilityEval().EvaluateAsync(MakeInput(stable.Append(withheld)));
+
+        Assert.Equal(1, result.Details.Dimensions!["runs_without_verdict"]);
+        Assert.Equal(1.0, result.Details.Dimensions!["success_rate_across_runs"]);
+        Assert.Equal("warn", result.Score.Label);   // a pass on part of the runs
+    }
+
+    [Theory]
+    [InlineData("""{"value":0.0,"passed":false}""")]                                               // no label
+    [InlineData("""{"score":{"value":0.0,"passed":false,"label":"warn","measurement":"notMeasured"}}""")]
+    public async Task AJsonRunWithNoVerdict_IsNotAFailedRun(string unmeasured)
+    {
+        var json = $"""[{"{"}"value":0.95,"passed":true,"label":"pass"{"}"},{"{"}"value":0.95,"passed":true,"label":"pass"{"}"},{unmeasured}]""";
+        var input = new EvalInput(Query: "stability-test",
+            Metadata: new Dictionary<string, object> { [StochasticStabilityEval.MetadataRunResultsKey] = json });
+
+        var result = await new StochasticStabilityEval().EvaluateAsync(input);
+
+        Assert.Equal(1, result.Details.Dimensions!["runs_without_verdict"]);
+        Assert.Equal(1.0, result.Details.Dimensions!["success_rate_across_runs"]);
+    }
+
+    [Fact]
     public async Task FewerThanTwoRunsWithAVerdict_IsSkipped()
     {
         var result = await new StochasticStabilityEval().EvaluateAsync(

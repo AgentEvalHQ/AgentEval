@@ -58,6 +58,18 @@ public class AtomicLlmEvalToolSectionTests
     }
 
     [Fact]
+    public async Task ACallWithARecordedError_IsShownAsFailed_WhateverSucceededSays()
+    {
+        // Review round 4 L (B10s), B10f's rule: the judge was shown "succeeded": true beside the error.
+        var calls = new[] { new ToolCall("pay", null, null) { Succeeded = true, Error = "card declined" } };
+
+        var text = await JudgeInputFor(new EvalInput("q", "r", ToolCalls: calls), JudgeToolData.ToolCalls);
+
+        Assert.Contains("\"succeeded\":false", text, StringComparison.Ordinal);
+        Assert.Contains("\"error\":\"card declined\"", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task AnEmptyList_SaysNoToolWasCalled_ANullList_AddsNothing()
     {
         var none = await JudgeInputFor(new EvalInput("q", "r", ToolCalls: []), JudgeToolData.ToolCalls);
