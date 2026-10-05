@@ -105,7 +105,7 @@ public static class EvalInputTraceAccessor
                 // written without the field read an errored call as a recorded success (#203 review, B6c-5).
                 Call: new ToolCall(c.Name, JsonObjectOrNull(c.Arguments), c.Result)
                 {
-                    Succeeded = c.Succeeded && c.Error is null,
+                    Succeeded = !c.Failed,
                     Error = c.Error,
                 })))
             .ToList();

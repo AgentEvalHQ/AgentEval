@@ -149,7 +149,7 @@ public sealed class WorkflowTraceReplayingAgent : IWorkflowEvaluableAgent
                 CallId = $"replay-{tc.Name}-{s.StepIndex}",
                 Arguments = ParseRecordedArgumentsOrNull(tc.Arguments),
                 Result = tc.Result,
-                Exception = tc.Succeeded ? null : new Exception(tc.Error ?? "Unknown error"),
+                Exception = tc.Failed ? new Exception(tc.Error ?? "Unknown error") : null,   // B10f
                 Order = ++globalToolOrder,
                 StartTime = tc.StartedAt,
                 EndTime = tc.StartedAt?.AddMilliseconds(tc.DurationMs ?? 0)

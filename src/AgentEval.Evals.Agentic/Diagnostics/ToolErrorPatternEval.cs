@@ -21,7 +21,7 @@ public sealed class ToolErrorPatternEval : IEval
     private const string KeyValue = "tool_error_pattern";
     private const string NameValue = "Tool Error Pattern";
     private const string CategoryValue = "agentic-process";
-    private const string VersionValue = "1.0.0";
+    private const string VersionValue = "1.1.0";
     private const double PassThreshold = 0.80;
 
     /// <inheritdoc/>
@@ -63,7 +63,7 @@ public sealed class ToolErrorPatternEval : IEval
 
             totalToolCalls++;
             var call = entry.ToolCalls[0];
-            if (call.Succeeded)
+            if (!call.Failed)   // a recorded error is a failure whatever Succeeded says (B10f)
                 continue;
 
             // Cluster by tool name case-INSENSITIVELY (matching ToolUsageReport.GetCallsByName) so mixed

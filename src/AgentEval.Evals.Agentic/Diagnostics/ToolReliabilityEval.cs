@@ -25,7 +25,7 @@ public sealed class ToolReliabilityEval : IEval
     private const string KeyValue = "tool_reliability";
     private const string NameValue = "Tool Reliability";
     private const string CategoryValue = "agentic-process";
-    private const string VersionValue = "1.0.0";
+    private const string VersionValue = "1.1.0";
     private const double PassThreshold = 0.90;
 
     /// <inheritdoc/>
@@ -66,7 +66,7 @@ public sealed class ToolReliabilityEval : IEval
             var call = entry.ToolCalls[0];
             var name = call.Name ?? "(unnamed)";
             var (succeeded, total) = byTool.TryGetValue(name, out var acc) ? acc : (0, 0);
-            byTool[name] = (succeeded + (call.Succeeded ? 1 : 0), total + 1);
+            byTool[name] = (succeeded + (call.Failed ? 0 : 1), total + 1);   // a recorded error is a failure (B10f)
         }
 
         if (byTool.Count == 0)

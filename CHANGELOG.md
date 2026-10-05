@@ -81,6 +81,10 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   `skipped` with "No component produced a measurement (0 errored, 0 skipped, 0 inapplicable)", though the parts inside
   were measured — the Tool Call Accuracy preset did this whenever no tool definitions were captured. It now withholds
   too (`warn`, recorded `notMeasured`) and names the components; a breakdown counts the withheld ones.
+- **The Glass Box tool checks read an errored call as a success.** `tool_reliability` and `tool_error_pattern` (and the
+  workflow trace replayer) read a call's `succeeded` flag alone. It defaults to true, so a trace that recorded the error
+  but not the flag scored three "permission denied" calls as fully reliable (1.0, PASS). A recorded error is now a
+  failure everywhere a call's outcome is read (`TraceToolCall.Failed`). Versions 1.1.0.
 - **A measured critical failure beside an errored part read as "no verdict".** A composite with a required part that
   errored reported `error` even when a high or critical failure in its measured parts already decided the verdict under
   the severity rule (no threshold, or `SeverityCapsThreshold`): a GDPR run with one article's judge errored and another
