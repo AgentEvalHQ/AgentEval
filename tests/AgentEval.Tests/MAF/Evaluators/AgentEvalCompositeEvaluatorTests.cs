@@ -19,6 +19,38 @@ namespace AgentEval.Tests.MAF.Evaluators;
 /// </summary>
 public class AgentEvalCompositeEvaluatorTests
 {
+    /// <summary>An eval that records the input it was given.</summary>
+    private sealed class CapturingEval : IEval
+    {
+        public EvalInput? Seen { get; private set; }
+        public string Key => "capture";
+        public string Name => "Capture";
+        public string Category => "test";
+        public string Version => "1.0.0";
+        public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)
+        {
+            Seen = input;
+            return Task.FromResult(EvalResult.Skipped(this, "captured"));
+        }
+    }
+
+    [Fact]
+    public async Task TheReferenceAndTheContext_PassedAsAdditionalContext_ReachTheComposite()
+    {
+        // Review round 14 M3 (B12e): the composite bridge built EvalInput(Query, Response) and dropped the
+        // AgentEvalGroundTruthContext / AgentEvalRAGContext the repo documents, so through MAF similarity / F1 read
+        // "none was supplied" and groundedness was graded without its context.
+        var eval = new CapturingEval();
+
+        await new AgentEvalCompositeEvaluator(eval).EvaluateAsync(
+            [new ChatMessage(ChatRole.User, "What is the capital of France?")],
+            new ChatResponse(new ChatMessage(ChatRole.Assistant, "Paris.")),
+            additionalContext: [new AgentEvalGroundTruthContext("REF-4410"), new AgentEvalRAGContext("CTX-4411")]);
+
+        Assert.Equal("REF-4410", eval.Seen!.GroundTruth);
+        Assert.Equal("CTX-4411", eval.Seen.Context);
+    }
+
     /// <summary>An <see cref="IEval"/> that returns a fixed tree (no LLM).</summary>
     private sealed class StubComposite : IEval
     {

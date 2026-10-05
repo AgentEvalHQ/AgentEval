@@ -58,7 +58,9 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   their judge and dropped the context and every other field; they keep them now. The agentic calibration goldens can
   carry a `groundTruth` (`CalibrationEntry.GroundTruth`), and the similarity and response-completeness cases do; the
   similarity, response-completeness and QA-composite cards name `EvalInput.GroundTruth`, not a metadata key nothing
-  read. Found by the release's own recalibration round.
+  read. Through MAF, `AgentEvalCompositeEvaluator` dropped the reference and the retrieved context passed as
+  `AgentEvalGroundTruthContext` / `AgentEvalRAGContext`, so a QA or RAG composite never saw them; it forwards them
+  now. Found by the release's own recalibration round.
 - **The PDF report's cover gave a verdict and no reason.** The cover showed "OVERALL: WARN" and nothing else; the
   overall result's summary and recommendations — for a withheld pass, what was not measured — were rendered on no
   page. They now follow the verdict on the cover (the first five recommendations, the rest counted). Also: a blank

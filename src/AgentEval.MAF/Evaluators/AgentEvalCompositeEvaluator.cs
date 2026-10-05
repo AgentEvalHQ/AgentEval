@@ -29,7 +29,9 @@ namespace AgentEval.MAF.Evaluators;
 /// <para>
 /// The composite's sub-evaluators (e.g. the AgenticBenchmark tool sub-evals) are LLM-judged: they
 /// grade the query + response text, so they work over MAF's evaluation feature even when only the
-/// final response is forwarded. (To also let <i>code-based</i> tool metrics see the calls, run this
+/// final response is forwarded. A reference answer (<see cref="AgentEvalGroundTruthContext"/>) and retrieved
+/// context (<see cref="AgentEvalRAGContext"/>) passed as additional context reach the composite as
+/// <c>EvalInput.GroundTruth</c> / <c>EvalInput.Context</c>. (To also let <i>code-based</i> tool metrics see the calls, run this
 /// through <see cref="AgentEvalAgentEvaluator"/>, which forwards the full conversation.)
 /// </para>
 /// <para>
@@ -162,7 +164,15 @@ public sealed class AgentEvalCompositeEvaluator : MEAIIEvaluator
         var query = ConversationExtractor.ExtractLastUserMessage(messages);
         var output = response.Text ?? string.Empty;
 
-        var input = new EvalInput(Query: query, Response: output);
+        // The reference answer and the retrieved context the caller passes as MEAI additional context
+        // (AgentEvalGroundTruthContext / AgentEvalRAGContext), as AgentEvalEvaluator reads them: they were dropped, so
+        // through MAF similarity and F1 read "none was supplied" and groundedness was graded without its context (#203
+        // review round 14, B12e).
+        var input = new EvalInput(
+            Query: query,
+            Response: output,
+            Context: AdditionalContextHelper.ExtractRAGContext(additionalContext),
+            GroundTruth: AdditionalContextHelper.ExtractGroundTruth(additionalContext));
         EvalResult tree = await _composite.EvaluateAsync(input, cancellationToken).ConfigureAwait(false);
         _captured.Add(tree);
 
