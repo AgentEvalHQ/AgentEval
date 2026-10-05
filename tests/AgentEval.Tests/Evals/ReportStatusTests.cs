@@ -210,6 +210,27 @@ public class ReportStatusTests
     }
 
     [Fact]
+    public void NoReportCountsOrListsAResultWithNoVerdictAsAFailure()
+    {
+        // Review round 4 M6 (B10p), the class: a report that counts or lists "failures" as !Score.Passed takes in errored,
+        // skipped, needs-review and withheld results (the GDPR/EU summaries' ScenariosFailed and two PDFs' "Top criteria
+        // failures" did). A measured failure is ReportStatus() == "FAIL".
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "AgentEval.sln")))
+            dir = dir.Parent;
+        Assert.NotNull(dir);
+        var pattern = new System.Text.RegularExpressions.Regex(@"\.(Where|Count)\(\s*\w+\s*=>\s*!\w+\.Score\.Passed\s*\)");
+        var offenders = Directory.EnumerateFiles(Path.Combine(dir!.FullName, "src"), "*.cs", SearchOption.AllDirectories)
+            .Where(f => f.Contains($"{Path.DirectorySeparatorChar}Reporting{Path.DirectorySeparatorChar}", StringComparison.Ordinal))
+            .SelectMany(f => File.ReadAllLines(f).Select((line, i) => (File: f, Line: i + 1, Text: line)))
+            .Where(x => pattern.IsMatch(x.Text))
+            .Select(x => $"{Path.GetFileName(x.File)}:{x.Line}")
+            .ToList();
+
+        Assert.True(offenders.Count == 0, "failure predicates on !Score.Passed: " + string.Join(", ", offenders));
+    }
+
+    [Fact]
     public async Task AnErroredRoot_IsStoredAsWARN_EvenBesideAFailureTheTreeSaysCannotDecide()
     {
         // Review round 4 M3 (B10m): RunVerdict read FAIL off the leaf counts, so the stored summary contradicted the root

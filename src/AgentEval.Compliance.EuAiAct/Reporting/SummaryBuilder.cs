@@ -72,7 +72,7 @@ public sealed class SummaryBuilder
                     {
                         var articleKey = article.Metric.Key;
                         var scenarios = article.Details.SubResults ?? Array.Empty<EvalResult>();
-                        var failedCount = scenarios.Count(s => !s.Score.Passed);
+                        var failedCount = scenarios.Count(s => s.Score.ReportStatus() == "FAIL");   // a measured failure, not a scenario with no verdict (B10p)
 
                         var status = article.Score.ReportStatus();
                         if (article.Score.Severity == "critical" && status == "FAIL")
@@ -100,7 +100,7 @@ public sealed class SummaryBuilder
             {
                 var articleKey = article.Metric.Key;
                 var scenarios = article.Details.SubResults ?? Array.Empty<EvalResult>();
-                var failedCount = scenarios.Count(s => !s.Score.Passed);
+                var failedCount = scenarios.Count(s => s.Score.ReportStatus() == "FAIL");   // a measured failure, not a scenario with no verdict (B10p)
 
                 var status = article.Score.ReportStatus();
 

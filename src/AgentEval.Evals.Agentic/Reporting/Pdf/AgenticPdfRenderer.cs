@@ -280,8 +280,9 @@ public sealed class AgenticPdfRenderer
             col.Item().PaddingTop(10);
 
             // Top criteria failures — up to 5 failed sub-results
+            // Measured failures only (B10p): an errored, skipped or needs-review check is not a criteria failure.
             var topFailures = subResults
-                .Where(s => !s.Score.Passed)
+                .Where(s => s.Score.ReportStatus() == "FAIL")
                 .Take(5)
                 .ToList();
 
