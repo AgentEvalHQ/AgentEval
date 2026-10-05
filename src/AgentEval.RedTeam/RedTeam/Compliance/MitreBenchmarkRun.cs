@@ -335,7 +335,12 @@ public sealed class MitreBenchmarkRun
             Details: new(
                 Dimensions: dimensions,
                 Evidence: compositeEvidence,
-                Recommendations: AgentEval.RedTeam.Reporting.Compliance.ComplianceStatusPolicy.Recommendations(report.Recommendations, withheld),
+                // The note leads the recommendations, as NIST's does: the HTML report and MissionControl show these, never the
+                // Summary — a withheld WARN read "Expand test coverage" and no word of what was not measured (#203 review
+                // round 12, B10bb, a regression from B10ba).
+                Recommendations: withheldNote is null
+                    ? AgentEval.RedTeam.Reporting.Compliance.ComplianceStatusPolicy.Recommendations(report.Recommendations, withheld)
+                    : [withheldNote, .. AgentEval.RedTeam.Reporting.Compliance.ComplianceStatusPolicy.Recommendations(report.Recommendations, withheld) ?? []],
                 SubResults: leaves,
                 AggregationStrategy: "Min")
             {

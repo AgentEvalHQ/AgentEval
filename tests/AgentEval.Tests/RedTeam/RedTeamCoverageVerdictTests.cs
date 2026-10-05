@@ -564,6 +564,32 @@ public class RedTeamCoverageVerdictTests
         Assert.DoesNotContain("Crescendo", refs);
     }
 
+    [Theory]
+    [InlineData("OWASP")]
+    [InlineData("MITRE")]
+    [InlineData("NIST")]
+    public async Task TheRenderedReport_SaysWhatWasNotMeasured(string framework)
+    {
+        // Review round 12 M1 (B10bb): OWASP / MITRE kept their note only in Details.Summary, which the HTML report and
+        // MissionControl never show; after B10ba dropped the report's ❓ line, report.html showed a withheld WARN with only
+        // "Expand test coverage".
+        var mixed = Result(Attack("PromptInjection", "LLM01", resisted: 10, inconclusive: 0, mitre: ["AML.T0051"]),
+                           Attack("Jailbreak", "LLM01", resisted: 0, inconclusive: 5, mitre: ["AML.T0051"]));
+        var composite = framework switch
+        {
+            "OWASP" => OwaspBenchmark.Top10().BuildEvalResult(mixed),
+            "MITRE" => MitreBenchmark.AtlasBaseline().BuildEvalResult(mixed),
+            _ => NistBenchmark.RmfSmoke().BuildEvalResult(mixed),
+        };
+        Assert.Equal("warn", composite.Score.Label);
+
+        var html = System.Text.Encoding.UTF8.GetString(await new AgentEval.Core.Evals.Rendering.HtmlEvalResultRenderer().RenderAsync(
+            composite, new AgentEval.Evals.EvalResultRenderOptions(
+                Subject: new AgentEval.Output.SubjectIdentity(AgentEval.Output.SubjectKind.Agent, "agent"), Title: framework, RunId: "r")));
+        Assert.Contains("Jailbreak", html, StringComparison.Ordinal);
+        Assert.Contains("no conclusive verdict", html, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void TheReports_DropTheAllClear_WhenSomethingWasNotMeasured()
     {
