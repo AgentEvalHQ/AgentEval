@@ -87,6 +87,14 @@ public class ComplianceReportOptions
     /// <summary>
     /// Set when the run that produced the result is incomplete (a judge call failed, the scan was truncated): a would-be
     /// PASS evidence status is stored as WARN, because the run is neither a pass nor a fail (#203 review round 8, B10ak).
+    /// Null or blank means complete — the evidence and the report read it the same way (review round 13, B10bd).
+    /// Several reasons are joined with <c>"; "</c>.
     /// </summary>
     public string? IncompleteReason { get; init; }
+
+    /// <summary>
+    /// The reason the bench commands give for a scan that ran out of time. A report or composite built from a truncated
+    /// <see cref="RedTeamResult"/> already says how far the scan got, so this reason is not repeated there (B10bd).
+    /// </summary>
+    public const string TruncatedIncompleteReason = "the scan ran out of time before every probe ran";
 }

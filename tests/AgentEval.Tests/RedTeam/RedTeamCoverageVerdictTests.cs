@@ -615,6 +615,44 @@ public class RedTeamCoverageVerdictTests
     }
 
     [Fact]
+    public async Task Round13Lows_OneReadingOfAReason_TruncationNamedOnce_NoEmptyFraction()
+    {
+        // Review round 13 LOWs (B10bd).
+        var clean = Result(Attack("PromptInjection", "LLM01", resisted: 10, inconclusive: 0, mitre: ["AML.T0051"]));
+
+        // L1: a blank reason is no reason - the evidence and the report agree (the evidence read WARN, the report "✅").
+        foreach (var blank in new[] { "", "; ", "  " })
+        {
+            Assert.Contains(OwaspBenchmark.Top10().GenerateReport(clean, blank).Recommendations, r => r.StartsWith("✅", StringComparison.Ordinal));
+            Assert.Equal("PASS", await StoredStatusAsync((store, subject, runId) => new OWASPComplianceReporter()
+                .SaveReportAsync(store, subject, runId, clean, new ComplianceReportOptions { IncompleteReason = blank })));
+        }
+
+        // L1: only the commands' own timeout sentence is left out on a truncated scan, not any reason mentioning time.
+        var truncated = new RedTeamResult
+        {
+            AgentName = "agent", AttackResults = [Attack("PromptInjection", "LLM01", resisted: 4, inconclusive: 0, mitre: ["AML.T0051"])],
+            TotalProbes = 4, ResistedProbes = 4, SkippedProbes = 6, WasTruncated = true,
+        };
+        var line = OwaspBenchmark.Top10().GenerateReport(truncated, "the judge ran out of time on 2 grading calls; "
+                + ComplianceReportOptions.TruncatedIncompleteReason).Recommendations.Single(r => r.StartsWith("❓", StringComparison.Ordinal));
+        Assert.Contains("the judge ran out of time on 2 grading calls", line, StringComparison.Ordinal);
+        Assert.DoesNotContain(ComplianceReportOptions.TruncatedIncompleteReason, line, StringComparison.Ordinal);
+
+        // L2: the CLI's note does not repeat a truncation the composite already names.
+        var composite = AgentEval.Cli.Commands.IncompleteRunPolicy.Withhold(OwaspBenchmark.Top10().BuildEvalResult(truncated),
+            ["the judge failed 1 of 4 grading calls", ComplianceReportOptions.TruncatedIncompleteReason]);
+        var shown = string.Join(" | ", composite.Details.Recommendations!);
+        Assert.Contains("the judge failed 1 of 4 grading calls", shown, StringComparison.Ordinal);
+        Assert.Equal(1, System.Text.RegularExpressions.Regex.Matches(shown, "stopped after|ran out of time").Count);
+
+        // L3: no "0.0% of probes inconclusive" where nothing was inconclusive.
+        var none = new RedTeamResult { AgentName = "agent", AttackResults = [] };
+        foreach (var scan in new[] { none, truncated })
+            Assert.DoesNotContain("0.0% of probes inconclusive", Assert.Throws<RedTeamAssertionException>(() => scan.Should().BeConclusive()).Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TheReports_DropTheAllClear_WhenSomethingWasNotMeasured()
     {
         // Review round 10 LOW (B10ax): report.md / report.json kept "✅ Strong security posture" / "✅ All evaluated ..." for a

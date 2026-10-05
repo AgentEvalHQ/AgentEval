@@ -59,6 +59,12 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   carry a `groundTruth` (`CalibrationEntry.GroundTruth`), and the similarity and response-completeness cases do; the
   similarity, response-completeness and QA-composite cards name `EvalInput.GroundTruth`, not a metadata key nothing
   read. Found by the release's own recalibration round.
+- **The PDF report's cover gave a verdict and no reason.** The cover showed "OVERALL: WARN" and nothing else; the
+  overall result's summary and recommendations — for a withheld pass, what was not measured — were rendered on no
+  page. They now follow the verdict on the cover (the first five recommendations, the rest counted). Also: a blank
+  `ComplianceReportOptions.IncompleteReason` is read as "complete" by the evidence and the report alike, and the bench
+  commands' timeout reason is `ComplianceReportOptions.TruncatedIncompleteReason`, named once in a report or composite
+  that already says how far the scan got.
 - **A composite passed even when one of its required components never ran.** Only a required component labelled
   `error` blocked the verdict. One that returned `skipped` — because a required input, trace or telemetry was not
   supplied — was left out, and the composite passed on the rest ("Measured 1 of 2", label `pass`).

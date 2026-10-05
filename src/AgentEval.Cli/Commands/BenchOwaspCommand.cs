@@ -213,7 +213,7 @@ public static class BenchOwaspCommand
         }
         if (redTeamResult.WasTruncated)
         {
-            incompleteReasons.Add("the scan ran out of time before every probe ran");
+            incompleteReasons.Add(ComplianceReportOptions.TruncatedIncompleteReason);
         }
         var incomplete = incompleteReasons.Count > 0;
         if (incomplete)   // report.md / report.json say so too, not "✅ Strong security posture" (B10ay)

@@ -89,6 +89,9 @@ public sealed class PdfEvalResultRenderer : IEvalResultRenderer
         }, ct);
     }
 
+    // The root's recommendations shown on the cover (B10bd); the rest are counted.
+    private const int MaxCoverRecommendations = 5;
+
     // ── Cover page ───────────────────────────────────────────────────────────
 
     private static void RenderCover(PageDescriptor page, EvalResult root, EvalResultRenderOptions opts)
@@ -131,6 +134,18 @@ public sealed class PdfEvalResultRenderer : IEvalResultRenderer
             col.Item().Background(sevColor).Padding(12)
                 .Text($"OVERALL: {label} ({root.Score.Value:P0})")
                 .FontColor(Colors.White).FontSize(20).Bold();
+
+            // Why the overall verdict is what it is: the root's own summary and recommendations were rendered nowhere, so a
+            // withheld WARN read only "OVERALL: WARN" (#203 review round 13 L4, B10bd). Leaves keep theirs on their pages.
+            if (!string.IsNullOrWhiteSpace(root.Details.Summary))
+                col.Item().PaddingTop(8).Text(root.Details.Summary!).FontSize(11);
+            if (root.Details.Recommendations is { Count: > 0 } rootRecs)
+            {
+                foreach (var r in rootRecs.Take(MaxCoverRecommendations))
+                    col.Item().Text($"• {r}").FontSize(10);
+                if (rootRecs.Count > MaxCoverRecommendations)
+                    col.Item().Text($"… and {rootRecs.Count - MaxCoverRecommendations} more").FontSize(9).Italic().FontColor(Colors.Grey.Darken1);
+            }
 
             if (!string.IsNullOrEmpty(opts.AgentEvalVersion))
                 col.Item().PaddingTop(20).Text($"AgentEval version: {opts.AgentEvalVersion}").FontSize(9).Italic();

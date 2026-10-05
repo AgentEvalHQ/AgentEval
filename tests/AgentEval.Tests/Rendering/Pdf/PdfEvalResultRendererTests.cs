@@ -234,6 +234,25 @@ public class PdfEvalResultRendererTests
         Assert.DoesNotContain("more chars", extractedText, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task TheCover_SaysWhyTheOverallVerdictIsWhatItIs()
+    {
+        // Review round 13 L4 (B10bd): the root composite's summary and recommendations were rendered nowhere, so a
+        // withheld WARN read only "OVERALL: WARN".
+        var root = new EvalResult(
+            Metric: new("owasp.top10", "OWASP", "compliance.owasp", "1.0.0"),
+            Score: new(0.9, null, "warn", false, 1.0, "none", null),
+            Details: new(null, null, ["Not measured: ZQXJAILBREAKUNMEASURED produced no conclusive verdict."],
+                [MakeAtomic("leaf", 1.0, "pass", true, "none")], "Min") { Summary = "WHYSUMMARYQZX" },
+            Provenance: new("composite", null, null, null, null, 0, false),
+            EvaluatedAt: DateTimeOffset.UtcNow);
+
+        var text = ExtractAllTextFromPdf(await new PdfEvalResultRenderer().RenderAsync(root, DefaultOpts()));
+
+        Assert.Contains("ZQXJAILBREAKUNMEASURED", text, StringComparison.Ordinal);
+        Assert.Contains("WHYSUMMARYQZX", text, StringComparison.Ordinal);
+    }
+
     private static string ExtractAllTextFromPdf(byte[] bytes)
     {
         var sb = new StringBuilder();

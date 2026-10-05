@@ -24,6 +24,10 @@ internal static class IncompleteRunPolicy
     {
         ArgumentNullException.ThrowIfNull(composite);
         ArgumentNullException.ThrowIfNull(reasons);
+        // A red-team composite built from a truncated scan already says how far it got ("Not measured: the scan stopped
+        // after ..."), so the commands' timeout sentence is not repeated in this note (review round 13 L2, B10bd: the HTML
+        // named the truncation twice). The run summary, the exit code and the evidence still count it (IsIndeterminate).
+        reasons = reasons.Where(r => r != AgentEval.RedTeam.Reporting.Compliance.ComplianceReportOptions.TruncatedIncompleteReason).ToList();
         if (reasons.Count == 0)
             return composite;
 

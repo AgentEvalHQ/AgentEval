@@ -110,7 +110,16 @@ internal static class ComplianceStatusPolicy
 
     /// <summary>An incomplete run's evidence is never PASS (B10ak): a would-be PASS is WARN.</summary>
     public static string CapForIncompleteRun(string status, ComplianceReportOptions? options, RedTeamResult result) =>
-        status == "PASS" && (options?.IncompleteReason is not null || result.WasTruncated) ? "WARN" : status;   // + a truncated scan (B10ar)
+        status == "PASS" && (IncompleteReasons(options?.IncompleteReason).Count > 0 || result.WasTruncated) ? "WARN" : status;   // B10bd
+
+    /// <summary>
+    /// The reasons in <see cref="ComplianceReportOptions.IncompleteReason"/> (joined with <c>"; "</c>), blank ones dropped:
+    /// one reading for the evidence (<see cref="CapForIncompleteRun"/>) and the report (<see cref="WithUnmeasured"/>) —
+    /// a blank or <c>"; "</c> reason capped the evidence at WARN while the report kept its all-clear (#203 review round 13,
+    /// B10bd).
+    /// </summary>
+    public static IReadOnlyList<string> IncompleteReasons(string? incompleteReason) =>
+        (incompleteReason ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);   // + a truncated scan (B10ar)
 
     /// <summary>
     /// What a compliance composite did not measure, one clause each: the categories / techniques / controls whose probes
@@ -161,8 +170,10 @@ internal static class ComplianceStatusPolicy
             unmeasured.Add($"the scan stopped after {result.TotalProbes} of {result.PlannedProbes} planned probes");
         // A truncation is named above from WasTruncated; the CLI's reason repeats it ("... ran out of time ..."), so the
         // report said it twice (B10bc). The other reasons (a judge call that failed) are what only the caller knows.
-        var other = (incompleteReason ?? "").Split("; ", StringSplitOptions.RemoveEmptyEntries)
-            .Where(r => !(result.WasTruncated && r.Contains("ran out of time", StringComparison.Ordinal))).ToList();
+        // Only the bench commands' own timeout sentence, matched whole (B10bd: a substring match dropped any reason that
+        // mentioned running out of time, e.g. a judge's). A blank reason is none, as CapForIncompleteRun reads it.
+        var other = IncompleteReasons(incompleteReason)
+            .Where(r => !(result.WasTruncated && r == ComplianceReportOptions.TruncatedIncompleteReason)).ToList();
         if (other.Count > 0)
             unmeasured.Add($"the run was incomplete: {string.Join("; ", other)}");
         if (unmeasured.Count == 0)
