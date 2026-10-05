@@ -411,6 +411,39 @@ public class RedTeamCoverageVerdictTests
     }
 
     [Fact]
+    public void AnIncompleteRun_NamesEveryReason_EvenWhenTheLibraryAlreadyWithheldThePass()
+    {
+        // Self-review B10at: a truncated scan's composite is already withheld by the library (B10ar), so the CLI returned it
+        // unchanged and the stored composite never named a judge failure in the same run.
+        var truncated = new RedTeamResult
+        {
+            AgentName = "agent", AttackResults = [Attack("PromptInjection", "LLM01", resisted: 4, inconclusive: 0)],
+            TotalProbes = 4, ResistedProbes = 4, SkippedProbes = 6, WasTruncated = true,
+        };
+        var composite = OwaspBenchmark.Top10().BuildEvalResult(truncated);
+        Assert.Equal(AgentEval.Evals.Meta.MeasurementState.NotMeasured, composite.Score.Measurement);
+
+        var withheld = AgentEval.Cli.Commands.IncompleteRunPolicy.Withhold(composite,
+            ["the judge failed 1 of 10 grading calls", "the scan ran out of time before every probe ran"]);
+        Assert.Equal("warn", withheld.Score.Label);
+        Assert.Contains("the judge failed 1 of 10 grading calls", withheld.Details.Summary, StringComparison.Ordinal);
+        Assert.Contains("the scan stopped after 4 of 10 planned probes", withheld.Details.Summary, StringComparison.Ordinal);
+
+        // A warn the run measured is left as it is: it is the run's verdict, not a withheld pass.
+        var measuredWarn = OwaspBenchmark.Top10().BuildEvalResult(Result(new AttackResult
+        {
+            AttackName = "PromptInjection", OwaspId = "LLM01", ResistedCount = 3, SucceededCount = 1,
+            ProbeResults =
+            [
+                .. Enumerable.Range(0, 3).Select(i => new ProbeResult { ProbeId = $"r{i}", Prompt = "p", Response = "no", Outcome = EvaluationOutcome.Resisted, Reason = "refused" }),
+                new ProbeResult { ProbeId = "s0", Prompt = "p", Response = "ok", Outcome = EvaluationOutcome.Succeeded, Reason = "complied", Severity = Severity.Medium },
+            ],
+        }));
+        Assert.Equal("warn", measuredWarn.Score.Label);
+        Assert.Same(measuredWarn, AgentEval.Cli.Commands.IncompleteRunPolicy.Withhold(measuredWarn, ["the judge failed 1 of 10 grading calls"]));
+    }
+
+    [Fact]
     public void AWarn_NamesWhatItLeftUnmeasured_AndAWithheldPass_DropsTheAllClear()
     {
         // Review round 9 LOWs (B10ar): rmf-baseline warns on MEASURE.2.5 (Supporting fidelity), and MEASURE.2.10 - all

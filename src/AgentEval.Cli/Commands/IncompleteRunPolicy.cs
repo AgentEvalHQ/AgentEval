@@ -15,18 +15,32 @@ namespace AgentEval.Cli.Commands;
 internal static class IncompleteRunPolicy
 {
     /// <summary>
-    /// A passing composite of an incomplete run withholds its pass (warn, not measured) and says why; any other result is
-    /// returned unchanged — a measured failure stays one (#203 review round 8, B10ak: the stored scenario, the HTML and the
+    /// A passing composite of an incomplete run withholds its pass (warn, not measured) and says why; one that already
+    /// withheld its own pass gets the reasons too (B10at); any other result is returned unchanged — a measured failure stays one (#203 review round 8, B10ak: the stored scenario, the HTML and the
     /// PDF read PASS beside the WARN run summary and exit 11).
     /// </summary>
     public static EvalResult Withhold(EvalResult composite, IReadOnlyList<string> reasons)
     {
         ArgumentNullException.ThrowIfNull(composite);
         ArgumentNullException.ThrowIfNull(reasons);
-        if (reasons.Count == 0 || composite.Score.Label != "pass")
+        // A composite that already withheld its own pass (warn, not measured — e.g. a truncated scan, B10ar) still gets the
+        // note: it named only what it saw, not a judge failure in the same run (#203 self-review, B10at).
+        var alreadyWithheld = composite.Score.Label == "warn" && composite.Score.Measurement == MeasurementState.NotMeasured;
+        if (reasons.Count == 0 || (composite.Score.Label != "pass" && !alreadyWithheld))
             return composite;
 
         var note = $"INCOMPLETE: {string.Join("; ", reasons)}. The pass is withheld: this run is neither a pass nor a fail.";
+        if (alreadyWithheld)
+        {
+            return composite with
+            {
+                Details = composite.Details with
+                {
+                    Summary = composite.Details.Summary is null ? note : $"{note} {composite.Details.Summary}",
+                    Recommendations = [note, .. (composite.Details.Recommendations ?? []).Where(r => !r.StartsWith("✅", StringComparison.Ordinal))],
+                },
+            };
+        }
         // Through a variable, as every other non-EvalScore site sets it (MetaLaneArchitectureTests' style rule).
         var withheld = MeasurementState.NotMeasured;
         return composite with
