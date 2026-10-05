@@ -36,6 +36,14 @@ public enum JudgeToolData
 /// be <see langword="null"/> at every production site, which disabled that comparison axis entirely. <c>PromptId</c>
 /// is the evaluator's own name for the system prompt it sends when it reports one; only an evaluator that cannot
 /// name its prompt falls back to the <c>promptId</c> the eval declared.
+/// <para>
+/// <b>A check with a rubric grades with it</b> (#203 review, B9). When <c>promptId</c> names a rubric registered in
+/// <see cref="AgentEval.Core.EvalRubrics"/> and the judge is <see cref="AgentEval.Core.IRubricBindable"/>, the judge
+/// sends that rubric and reads the reply on its scale, and the verdict is the band of the score: pass at or above the
+/// pass threshold, <c>warn</c> (not passed) in the rubric's needs-review band, <c>fail</c> below. The severity is the
+/// rubric's own where it has a table. Before, every agentic check sent a generic default prompt and read any reply as
+/// 0–100.
+/// </para>
 /// </remarks>
 public sealed class AtomicLlmEval : AtomicEval
 {
@@ -77,6 +85,7 @@ public sealed class AtomicLlmEval : AtomicEval
     private readonly Func<string?, JudgeCostMap.ModelRate>? _rateResolver;
     private readonly string _promptMaterial;
     private readonly string? _sentPromptId;
+    private readonly AgentEval.Core.EvalRubric? _rubric;
     private string? _promptHash;
 
     /// <summary>
@@ -130,7 +139,16 @@ public sealed class AtomicLlmEval : AtomicEval
         Func<string?, JudgeCostMap.ModelRate>? rateResolver = null)
         : base(key, name, category, version)
     {
-        _evaluator = evaluator ?? throw new ArgumentNullException(nameof(evaluator));
+        ArgumentNullException.ThrowIfNull(evaluator);
+        // The rubric this check was written for, when its judge can send it (B9). A judge that cannot (a test fake, a
+        // custom IEvaluator) is used as it is; its PromptHash still records what it is.
+        if (AgentEval.Core.EvalRubrics.TryGet(promptId, out var rubric) && evaluator is AgentEval.Core.IRubricBindable bindable)
+        {
+            evaluator = bindable.WithRubric(rubric, key);
+            _rubric = rubric;
+        }
+
+        _evaluator = evaluator;
         // A private copy: the PromptHash below fingerprints these criteria, so a caller mutating the list it passed
         // in must not change what is sent without changing what was recorded.
         _criteria = criteria?.ToArray() ?? throw new ArgumentNullException(nameof(criteria));
@@ -241,6 +259,36 @@ public sealed class AtomicLlmEval : AtomicEval
             .Select(c => new EvalEvidence(Source: "criterion", Reference: c.Criterion, Message: c.Explanation))
             .ToList()
             ?? new List<EvalEvidence>();
+
+        // A rubric verdict (B9): the band of the exact score. The rubric's needs-review band is a warn — not passed, not
+        // a confirmed failure; its severity table, where it has one, sets the severity.
+        if (er.RubricScore is { } rubricScore && !er.EvaluationFailed)
+        {
+            value = rubricScore;
+            passed = value >= _passThreshold;
+            var review = !passed && _rubric?.ReviewAt is { } reviewAt && value >= reviewAt;
+            label = passed ? "pass" : review ? "warn" : "fail";
+            severity = passed
+                ? "none"
+                : er.RubricSeverity ?? (review ? (_failureSeverity == "low" ? "low" : "medium") : severity);
+
+            foreach (var e in er.Evidence)
+                evidence.Add(new EvalEvidence(Source: string.IsNullOrWhiteSpace(e.Source) ? "judge" : "judge:" + e.Source,
+                    Reference: e.Reference, Message: e.Message));
+
+            // The judge's own label is evidence, not the verdict: a label that disagrees with its own score is recorded.
+            var judgeBand = er.JudgeLabel?.Trim().ToLowerInvariant() switch
+            {
+                "pass" => "pass",
+                "fail" => "fail",
+                "warn" or "needs_review" or "needs review" or "review" => "warn",
+                _ => null,
+            };
+            if (er.JudgeLabel is not null && judgeBand != label)
+                evidence.Add(new EvalEvidence(Source: "judge-label", Reference: Key,
+                    Message: $"The judge labelled this '{er.JudgeLabel}', but its score {value.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)} " +
+                             $"is in the rubric's {label} band; the score decides."));
+        }
 
         // An evaluation that failed to produce a usable judgement (no/malformed JSON from the
         // judge) is an INFRASTRUCTURE error, not a low-scoring agent. Surface it as a distinct

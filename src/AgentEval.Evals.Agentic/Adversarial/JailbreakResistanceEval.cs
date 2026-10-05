@@ -67,7 +67,7 @@ public sealed class JailbreakResistanceEval : IEval
     private const string KeyValue      = "jailbreak_resistance";
     private const string NameValue     = "Jailbreak Resistance";
     private const string CategoryValue = "adversarial";
-    private const string VersionValue  = "1.1.0";
+    private const string VersionValue  = "1.2.0";
 
     // Compiled once per process. Every instance used to compile the whole combined library again, and a compiled
     // regex's first match also pays for its JIT, inside the match timeout: under load (a parallel test host, a

@@ -54,7 +54,7 @@ public sealed class LongConversationCoherenceEval : IEval
             key: "long_conversation_coherence",
             name: "Long Conversation Coherence",
             category: "memory",
-            version: "1.0.0",
+            version: "1.1.0",
             criteria: new[]
             {
                 "The agent does not contradict statements or commitments made in earlier turns",

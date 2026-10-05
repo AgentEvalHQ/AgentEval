@@ -3,7 +3,7 @@
   "key": "reasoning_correctness",
   "name": "Reasoning Correctness",
   "category": "reasoning",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "LLM judge assessing soundness of the reasoning chain \u2014 independent of whether the final answer happens to be correct (catches lucky-coincidence answers via broken reasoning).",
   "costTier": "Medium",
   "higherIsBetter": true,

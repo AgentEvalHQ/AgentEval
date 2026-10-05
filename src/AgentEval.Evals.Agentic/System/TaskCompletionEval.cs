@@ -20,8 +20,8 @@ namespace AgentEval.Evals.Agentic.System;
 /// Lineage: AgentEval's own criteria and reference prompt, modelled on the evaluator concept (name,
 /// inputs and scoring dimensions) of Azure/azure-sdk-for-python
 /// <c>sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_task_completion/task_completion.prompty</c>.
-/// A 2026-10-02 check found no upstream prompt text in the reference prompt file
-/// <c>Resources/Prompts/system/task-completion.v1.md</c>, which is not yet sent to the judge.
+/// A 2026-10-02 check found no upstream prompt text in the rubric file
+/// <c>Resources/Prompts/system/task-completion.v1.md</c>, which the judge is sent as its system prompt.
 /// </para>
 /// </summary>
 public sealed class TaskCompletionEval : IEval

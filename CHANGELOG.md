@@ -28,13 +28,16 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   other checks. GDPR and EU AI Act Standard and Smoke fail on a high or critical article failure and
   warn on a medium one; in AuditGrade, a judge panel that passes its scenario's bar over a high or critical dissent is
   withheld (WARN, the dissent named) rather than failing through the worst judge's severity.
-- **Judges see what they grade.** With `bench agentic --trace`, the tool checks receive the run's tool calls and
-  definitions, and the judges whose rubric names tool calls are shown them.
+- **Judges see what they grade, and grade with their own rubric.** With `bench agentic --trace`, the tool checks receive
+  the run's tool calls and definitions, and the judges whose rubric names tool calls are shown them. Every agentic LLM
+  check sends its rubric file as the judge's system prompt and takes its verdict from the rubric's own bands; a score in
+  a rubric's needs-review band is a WARN ("Not confirmed"), not a FAIL.
 - **Calibration reports only measured verdicts.** A judge outage is INFRA-FAIL; an evaluator not measured on every
   record is left out whole (INCOMPLETE).
 - **Versions** (the ones this release ships): `unsafe_tool_use` 1.2.0, `tool_call_success` 1.2.0,
   `tool_input_accuracy` 2.5.0, `task_adherence` / `intent_resolution` / `task_navigation_efficiency` 1.2.0, the other
-  tool-aware and sub-dimension evaluators 1.1.0; all 12 agentic presets 1.1.0; GDPR Standard 1.2.0 and Smoke 1.1.0, GDPR
+  tool-aware and sub-dimension evaluators 1.1.0, every other agentic LLM check one minor version up for its rubric (1.1.0;
+  `direct_injection`, `jailbreak_resistance` and `persona_attack` 1.2.0); all 12 agentic presets 1.1.0; GDPR Standard 1.2.0 and Smoke 1.1.0, GDPR
   AuditGrade 1.2.0; EU AI Act Standard, Smoke and AuditGrade 1.1.0. Entries below may name the version a fix first
   carried on this branch; the list above is what ships.
 
@@ -68,6 +71,25 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   through one exclusive rule, `EvalScore.StatsBucket()` / `ToRunStats()` (not measured → Skipped; else `warn` → Warnings;
   else passed or failed), the one `BenchmarkRunner` already used. The memory baseline store computed its skip count and
   then passed it positionally as `Warnings: 0`, so Skipped always read 0; it is written now.
+- **The agentic judges graded on a generic prompt; their rubrics were never sent.** `bench agentic` and `bench agentic
+  calibrate` resolve one judge with no system prompt, so every agentic LLM check ran on a six-line default and its reply
+  was read as a 0–100 score, while the 46 rubric files under `Resources/Prompts/` shipped as references (and half of
+  them ask for a 0.0–1.0 score: a reply of 0.85 would have read as 0.85 out of 100). **Behaviour change:** each check
+  sends the rubric its `promptId` names as the judge's system prompt (plus the dimension, for the two dimensional
+  rubrics), reads the reply on the rubric's scale — a score off it, or none, is `error`, never a grade — and takes its
+  verdict from the rubric's band table: pass at the check's threshold, the rubric's `needs_review` / `warn` band is a
+  `warn` (not passed, not a confirmed failure), below it fails. The severity is the rubric's own where it has a table. A
+  preset whose accuracy or safety check comes back `warn` reads WARN, "Not confirmed: <check>": borderline content a
+  safety rubric calls `needs_review` (e.g. hate 0.75–0.95, severity low) no longer reads as a critical FAIL. The
+  content-safety classifier path follows the same bands. Three rubrics had contradictory label tables
+  (`system-prompt-leakage`, `ungrounded-attributes`, `unsafe-tool-use`: a fail row overlapping the needs-review rows),
+  fixed to match their severity tables; the Glass Box `system_prompt_injection` check had no rubric and has one now
+  (uncalibrated: no goldens carry system-prompt traces). `PromptHash` covers the rubric, how its reply is read and the
+  dimension, and the result file's `promptVersions` lists the rubric each check sent (it always read
+  `judge-system: default`). Calibration compares labels, so a `warn` agrees with neither gold label. New public API:
+  `EvalRubric`, `EvalRubrics`, `IRubricBindable`, `RubricScoreScale`, `RubricSeverityBand`, `JudgeEvidence`;
+  `EvaluationResult` gains `RubricScore`, `RubricSeverity`, `JudgeLabel` and `Evidence`. Known gap: the rubrics say
+  temperature 0; the judge is called at the provider's default.
 - **Composite edge cases.** A composite whose required components did not run and whose only error was in an optional
   component reported `error`, and its parent read that as a REQUIRED error: nested, the same leaves gave `error` where
   flat they gave `warn`. Nothing measured is now `error` only when a component the verdict rests on errored (any one when

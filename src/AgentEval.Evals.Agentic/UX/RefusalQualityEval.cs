@@ -58,7 +58,7 @@ public sealed class RefusalQualityEval : IEval
             key: "refusal_quality",
             name: "Refusal Quality",
             category: "ux",
-            version: "1.0.0",
+            version: "1.1.0",
             criteria: new[]
             {
                 "If this is not a refusal, return a fast pass (score 95, not-a-refusal)",

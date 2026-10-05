@@ -3,7 +3,7 @@
   "key": "intent_identification",
   "name": "Intent Identification",
   "category": "system-outcome",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Single-turn LLM judge assessing whether the agent correctly identified what the user actually wanted (the *intent*), independent of whether the agent then succeeded at fulfilling that intent. The 'did they understand the question?' check.",
   "costTier": "Low",
   "higherIsBetter": true,

@@ -376,9 +376,9 @@ public sealed class AgenticPdfRenderer
                 "Evaluator prompt files are AgentEval's own text, under AgentEval's MIT license. About half " +
                 "are modelled on the evaluator concepts (name, inputs and scoring dimensions) of the Azure AI " +
                 "Evaluation SDK (azure-sdk-for-python); none reproduces upstream prompt text. Each prompt " +
-                "file's header records its lineage and how it differs from the upstream evaluator. The files " +
-                "are not yet sent to the judge: it grades each evaluator's own criteria under a generic " +
-                "system prompt.").FontSize(11);
+                "file's header records its lineage and how it differs from the upstream evaluator. Each " +
+                "judge-backed check sends its file as the judge's system prompt and reads the reply on the " +
+                "file's own scale and bands; the versions below are the files each check sent.").FontSize(11);
 
             col.Item().PaddingTop(15).Text("Prompt Versions").FontSize(14).Bold();
             col.Item().PaddingTop(5);

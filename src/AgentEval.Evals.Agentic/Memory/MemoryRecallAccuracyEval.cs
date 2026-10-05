@@ -54,7 +54,7 @@ public sealed class MemoryRecallAccuracyEval : IEval
             key: "memory_recall_accuracy",
             name: "Memory Recall Accuracy",
             category: "memory",
-            version: "1.0.0",
+            version: "1.1.0",
             criteria: new[]
             {
                 "The agent correctly recalls facts established in prior conversation turns",

@@ -51,7 +51,7 @@ public sealed class ConfidenceCalibrationEval : IEval
             key: "confidence_calibration",
             name: "Confidence Calibration",
             category: "calibration",
-            version: "1.0.0",
+            version: "1.1.0",
             criteria: new[]
             {
                 "When the agent expresses high confidence, the claim is factually correct or well-supported",

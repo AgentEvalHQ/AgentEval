@@ -53,7 +53,7 @@ public sealed class ClarificationAppropriatenessEval : IEval
             key: "clarification_appropriateness",
             name: "Clarification Appropriateness",
             category: "multi-turn",
-            version: "1.0.0",
+            version: "1.1.0",
             criteria: new[]
             {
                 "When the query is ambiguous, the agent asks exactly the clarifying questions needed — not more, not fewer",

@@ -15,8 +15,8 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// ordinal is emitted.
 /// </para>
 /// <para>
-/// The ordinal-plus-score envelope (normalised score = ordinal / 5.0) is specified in the reference
-/// prompt file, which is not yet sent to the judge.
+/// The ordinal-plus-score envelope (normalised score = ordinal / 5.0) is specified in the rubric the
+/// judge is sent; the result keeps the score, not the ordinal.
 /// </para>
 /// <para>
 /// <b>Input contract</b>: requires <see cref="EvalInput.Query"/> and
@@ -26,8 +26,8 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// Lineage: AgentEval's own criteria and reference prompt, modelled on the evaluator concept (name,
 /// inputs and scoring dimensions) of Azure/azure-sdk-for-python
 /// <c>sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_fluency/fluency.prompty</c>.
-/// A 2026-10-02 check found no upstream prompt text in the reference prompt file under
-/// <c>Resources/Prompts/</c>, which is not yet sent to the judge.
+/// A 2026-10-02 check found no upstream prompt text in the rubric file under
+/// <c>Resources/Prompts/</c>, which the judge is sent as its system prompt.
 /// </para>
 /// </summary>
 public sealed class FluencyEval : IEval
@@ -63,7 +63,7 @@ public sealed class FluencyEval : IEval
             key: "fluency",
             name: "Fluency",
             category: "rag",
-            version: "1.0.0",
+            version: "1.1.0",
             criteria: new[]
             {
                 "Response uses correct grammar throughout (ordinal 1–5: 5=highly fluent, 1=highly disfluent)",

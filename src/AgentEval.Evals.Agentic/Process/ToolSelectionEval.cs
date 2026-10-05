@@ -18,15 +18,15 @@ namespace AgentEval.Evals.Agentic.Process;
 /// Wraps an <see cref="AtomicLlmEval"/> with four criteria: required-tool coverage, no redundant
 /// calls, alignment with the query intent, and credit for acceptable alternatives. The score is the
 /// judge's overall score in <c>[0,1]</c>, with one evidence entry per criterion. The weighted formula
-/// (0.60 / 0.25 / 0.15) and the <c>failure_type</c> field are in the reference prompt file and are not
-/// yet applied.
+/// (0.60 / 0.25 / 0.15) and the <c>failure_type</c> field are in the rubric the judge is sent; the judge
+/// applies the formula, and the result does not keep <c>failure_type</c>.
 /// </para>
 /// <para>
 /// Lineage: AgentEval's own criteria and reference prompt, modelled on the evaluator concept (name,
 /// inputs and scoring dimensions) of Azure/azure-sdk-for-python
 /// <c>sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_tool_selection/tool_selection.prompty</c>.
-/// A 2026-10-02 check found no upstream prompt text in the reference prompt file
-/// <c>Resources/Prompts/process/tool-selection.v1.md</c>, which is not yet sent to the judge.
+/// A 2026-10-02 check found no upstream prompt text in the rubric file
+/// <c>Resources/Prompts/process/tool-selection.v1.md</c>, which the judge is sent as its system prompt.
 /// </para>
 /// <para>
 /// Foundry reference: <c>azureai://built-in/evaluators/tool_selection</c>

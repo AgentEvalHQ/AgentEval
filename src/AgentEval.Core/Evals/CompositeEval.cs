@@ -398,13 +398,28 @@ public sealed class CompositeEval : IEval
                             : $"Measured {measuredCount} of {subs.Length} component(s); {unmeasured.Length} left out of the score " +
                               $"{breakdown}, so this verdict covers only the measured part.";
         // Name the dimensions that decided an escalated verdict, so a FAIL or WARN says why at the top.
+        // A check whose failure would fail this composite but that only warned — a judge score in its rubric's
+        // needs-review band, or a nested composite that warned — is not "usable but not optimal": it is unconfirmed, and
+        // the note says so (#203 review, B9). Warn-effect dimensions keep the "not optimal" wording.
+        var unconfirmed = effectsFired
+            .Where(p => p.Component.OnFailure == ComponentFailureEffect.Fail && p.Sub.Score.Label == "warn")
+            .Select(p => p.Sub.Metric.Key)
+            .ToArray();
+        var quality = notOptimal.Except(unconfirmed, StringComparer.Ordinal).ToArray();
+        var unconfirmedText = unconfirmed.Length > 0
+            ? $"Not confirmed: {string.Join(", ", unconfirmed)} — a check whose failure means the answer cannot be trusted " +
+              "came back warn (borderline: needs review)"
+            : null;
+        var qualityText = quality.Length > 0
+            ? $"Not optimal: {string.Join(", ", quality)} did not pass — the answer is usable"
+            : null;
         string? effectNote = failingAccuracy.Length > 0
             ? $"Failed: {string.Join(", ", failingAccuracy)} — a dimension whose failure means the answer cannot be " +
               "trusted, so the verdict is fail." +
-              (notOptimal.Length > 0 ? $" Also not optimal: {string.Join(", ", notOptimal)}." : "")
-            : notOptimal.Length > 0
-                ? $"Not optimal: {string.Join(", ", notOptimal)} did not pass — the answer is usable, so the verdict is " +
-                  "warn, not fail."
+              (unconfirmed.Length > 0 ? $" Also not confirmed: {string.Join(", ", unconfirmed)}." : "") +
+              (quality.Length > 0 ? $" Also not optimal: {string.Join(", ", quality)}." : "")
+            : unconfirmedText is not null || qualityText is not null
+                ? string.Join("; ", new[] { unconfirmedText, qualityText }.Where(t => t is not null)) + ", so the verdict is warn, not fail."
                 : null;
         var coverageNote = string.Join(" ", new[] { effectNote, nothingMeasuredNote ?? partialCoverageNote }.Where(n => n is not null))
                            is { Length: > 0 } joined ? joined : null;

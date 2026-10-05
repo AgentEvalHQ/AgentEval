@@ -3,7 +3,7 @@
   "key": "long_conversation_coherence",
   "name": "Long Conversation Coherence",
   "category": "memory",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "LLM judge assessing whether the agent stays coherent (no contradictions, no forgetting) across a 10+ turn conversation. Full conversation history embedded in the judge prompt \u2014 high token cost.",
   "costTier": "High",
   "higherIsBetter": true,

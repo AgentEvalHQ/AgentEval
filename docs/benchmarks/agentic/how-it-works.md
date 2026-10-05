@@ -45,7 +45,7 @@ The trace is what the evaluators look at. Some evaluators read the response only
 
 Each atomic evaluator answers one focused question. There are three kinds:
 
-- **LLM-judge evaluators** — a second AI grades the agent's output against a short list of criteria defined in each evaluator (e.g., *Task Completion*, *Groundedness*, *Coherence*), under a generic judge system prompt. Each also has a longer rubric file under `src/AgentEval.Evals.Agentic/Resources/Prompts/<category>/*.v1.md`, written by AgentEval. About half of those files are modelled on the concept of an Azure AI Evaluation SDK evaluator — its name, inputs and scoring dimensions, not its wording — and the rest have no upstream prompt to be modelled on (see [Prompt Provenance](getting-started.md#prompt-provenance)). They ship as references and are **not yet sent to the judge**.
+- **LLM-judge evaluators** — a second AI grades the agent's output against a short list of criteria defined in each evaluator (e.g., *Task Completion*, *Groundedness*, *Coherence*), with the evaluator's rubric file under `src/AgentEval.Evals.Agentic/Resources/Prompts/<category>/*.v1.md`, written by AgentEval, as its system prompt. About half of those files are modelled on the concept of an Azure AI Evaluation SDK evaluator — its name, inputs and scoring dimensions, not its wording — and the rest have no upstream prompt to be modelled on (see [Prompt Provenance](getting-started.md#prompt-provenance)). The verdict is the band of the judge's score in the rubric's own table, and a reply off the rubric's scale is an error — see [What the judge is sent](getting-started.md#what-the-judge-is-sent).
 - **Code-only evaluators** — pure C# code reads the trace and computes a score (e.g., *Latency*, *Cost*, *Token Usage*, *Error Rate*, *F1 Score*). No LLM call, no LLM cost.
 - **Hybrid evaluators** — deterministic check first, LLM fallback only when needed (e.g., *Tool Call Success* reads structured status fields if present, falls back to LLM only on free-text result strings).
 
@@ -113,7 +113,7 @@ The `--budget-tier low` flag filters the preset to keep only LOW and TRIVIAL tie
 
 ## How we know the judges can be trusted — **calibration**
 
-The agentic benchmark uses many judges (one per LLM-graded dimension), each with its own criteria list; all of them share the generic judge system prompt. Each evaluator dispatched for calibration has its own golden dataset; some are carved out (see below).
+The agentic benchmark uses many judges (one per LLM-graded dimension), each with its own criteria list and its own rubric as the system prompt (since 0.44; through 0.43 they shared a generic judge system prompt). A judge's `needs_review` verdict is a warn, which agrees with neither gold label. Each evaluator dispatched for calibration has its own golden dataset; some are carved out (see below).
 
 ### The golden datasets — reference truth per evaluator
 
@@ -184,7 +184,7 @@ Every category in this table runs at runtime and produces verdicts, whether or n
 1. **Coverage.** No single number tells you whether an agent is good. The benchmark gives you many orthogonal angles — task completion, tool accuracy, RAG quality, reasoning, memory, safety — and shows where the agent succeeds and where it breaks.
 2. **Diagnosability.** Composite evaluators surface sub-scores. A 0.4 on Tool Call Accuracy tells you something failed; the sub-scores tell you *which dimension* — selection, inputs, outputs, execution, or efficiency.
 3. **Cost-tiered.** The `--budget-tier low` flag keeps inner-loop runs cheap. Operational evaluators run free (pure-code). Safety and RAG runs reserved for releases.
-4. **Familiar evaluator concepts.** More than a third of the evaluator cards name a corresponding Azure AI Foundry evaluator, and about half of the reference prompt files under `Resources/Prompts/` are modelled on one. The prompt text is AgentEval's own, with its differences from the upstream evaluator listed in each file's header. The judge does not receive that text yet — it grades each evaluator's own criteria. Deterministic-first tool-call success and the sub-dimension splits are implemented in code.
+4. **Familiar evaluator concepts.** More than a third of the evaluator cards name a corresponding Azure AI Foundry evaluator, and about half of the rubric files under `Resources/Prompts/` are modelled on one. The rubric text is AgentEval's own, with its differences from the upstream evaluator listed in each file's header, and it is what the judge is sent, beside each evaluator's own criteria. Deterministic-first tool-call success and the sub-dimension splits are implemented in code.
 5. **Calibration built in.** Golden datasets ship for the dispatched evaluators and `calibrate` measures the judge against them; six of the eight categories it scores are held to relaxed per-category gates (see the table above).
 6. **Open.** Every evaluator card, prompt file, and golden entry is in the repo.
 

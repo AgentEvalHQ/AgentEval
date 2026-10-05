@@ -66,7 +66,7 @@ public sealed class SelfCorrectionQualityEval : IEval
             key: "self_correction_quality",
             name: "Self-Correction Quality",
             category: "calibration",
-            version: "1.0.0",
+            version: "1.1.0",
             criteria: new[]
             {
                 "The agent accepted the user's valid correction without doubling down on an incorrect claim",

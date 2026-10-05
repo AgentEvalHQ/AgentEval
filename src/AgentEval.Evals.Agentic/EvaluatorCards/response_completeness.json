@@ -3,7 +3,7 @@
   "key": "response_completeness",
   "name": "Response Completeness",
   "category": "rag",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "LLM judge assessing whether the response covers all aspects of the user query (no missing parts).",
   "costTier": "Low",
   "higherIsBetter": true,

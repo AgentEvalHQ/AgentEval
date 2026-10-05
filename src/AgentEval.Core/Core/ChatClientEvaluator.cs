@@ -12,10 +12,11 @@ namespace AgentEval.Core;
 /// <remarks>
 /// Implements <see cref="IJudgePromptSource"/> so the evals built on it can record which prompt was sent. With no
 /// system prompt supplied it sends <see cref="DefaultSystemPromptId"/>, a generic instruction that asks for
-/// per-criterion verdicts and an overall 0-100 score; no evaluator-specific rubric reaches the judge unless the
-/// caller passes one here.
+/// per-criterion verdicts and an overall 0-100 score. An eval with a rubric binds one through
+/// <see cref="IRubricBindable.WithRubric"/> (#203 review, B9): the judge then sends the rubric as its system prompt and
+/// reads the reply on the rubric's own scale.
 /// </remarks>
-public class ChatClientEvaluator : IEvaluator, IJudgePromptSource
+public class ChatClientEvaluator : IEvaluator, IJudgePromptSource, IRubricBindable
 {
     /// <summary>The <see cref="IJudgePromptSource.SystemPromptId"/> reported when no system prompt was supplied.</summary>
     public const string DefaultSystemPromptId = "agenteval.judge.default-system.v1";
@@ -34,6 +35,8 @@ public class ChatClientEvaluator : IEvaluator, IJudgePromptSource
     private readonly IChatClient _chatClient;
     private readonly string _systemPrompt;
     private readonly string _systemPromptId;
+    private readonly EvalRubric? _rubric;
+    private readonly string? _dimension;
 
     public ChatClientEvaluator(IChatClient chatClient, string? systemPrompt = null)
         : this(chatClient, systemPrompt, systemPromptId: null) { }
@@ -55,11 +58,34 @@ public class ChatClientEvaluator : IEvaluator, IJudgePromptSource
             : (string.IsNullOrWhiteSpace(systemPromptId) ? UnnamedCustomSystemPromptId : systemPromptId);
     }
 
+    // A judge on the same chat client that grades with `rubric` (see WithRubric).
+    private ChatClientEvaluator(IChatClient chatClient, EvalRubric rubric, string? dimension)
+        : this(chatClient, rubric.Text, rubric.Id)
+    {
+        _rubric = rubric;
+        _dimension = rubric.Dimensional && !string.IsNullOrWhiteSpace(dimension) ? dimension : null;
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>The rubric replaces this judge's system prompt: it is the instrument the check was written for.</remarks>
+    public IEvaluator WithRubric(EvalRubric rubric, string? dimension)
+    {
+        ArgumentNullException.ThrowIfNull(rubric);
+        rubric.Validate();
+        return new ChatClientEvaluator(_chatClient, rubric, dimension);
+    }
+
     /// <inheritdoc/>
     public string? SystemPromptId => _systemPromptId;
 
     /// <inheritdoc/>
-    public string PromptMaterial => "system-prompt:\n" + _systemPrompt + "\nuser-template: " + UserPromptTemplateVersion;
+    // A bound rubric adds how the reply is read and the dimension line the user message carries: both change what is
+    // measured, so both move the PromptHash.
+    public string PromptMaterial => "system-prompt:\n" + _systemPrompt + "\nuser-template: " + UserPromptTemplateVersion
+        + (_rubric is null ? "" :
+            $"\nrubric-reading: scale={_rubric.Scale}; review-at={_rubric.ReviewAt?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "none"}; " +
+            "severity=" + string.Join(",", _rubric.SeverityBands.Select(b => b.AtLeast.ToString(System.Globalization.CultureInfo.InvariantCulture) + ":" + b.Severity)))
+        + (_dimension is null ? "" : "\ndimension: " + _dimension);
 
 
     private const string DefaultSystemPrompt = """
@@ -122,6 +148,9 @@ public class ChatClientEvaluator : IEvaluator, IJudgePromptSource
             CRITERIA TO EVALUATE:
             {criteriaList}
             """;
+        // A dimensional rubric grades one of several named dimensions; the judge has to be told which (B9).
+        if (_dimension is not null)
+            prompt += $"\n\nDIMENSION TO EVALUATE: {_dimension}";
 
         var messages = new List<ChatMessage>
         {
@@ -169,6 +198,10 @@ public class ChatClientEvaluator : IEvaluator, IJudgePromptSource
             // verbatim so the consumer that reports it still can.
             CriteriaResults = CriterionText.RealignToDeclared(parsed.CriteriaResults, declaredCriteria),
             EvaluationFailed = parsed.EvaluationFailed,
+            RubricScore = parsed.RubricScore,
+            RubricSeverity = parsed.RubricSeverity,
+            JudgeLabel = parsed.JudgeLabel,
+            Evidence = parsed.Evidence,
             // Lift token usage (when reported by the model) so downstream consumers — primarily
             // AtomicLlmEval — can attribute real judge spend to EvalProvenance.EstimatedCost.
             // Summed across the initial call and any corrective retry so cost stays honest.
@@ -198,7 +231,7 @@ public class ChatClientEvaluator : IEvaluator, IJudgePromptSource
             // score (it would average the fallback in / never trip its "judges failed" guard).
             response = await _chatClient.GetResponseAsync(messages, cancellationToken: cancellationToken);
         }
-        return (ParseEvaluationResponse(response.Text), response);
+        return (ParseEvaluationResponse(response.Text, _rubric), response);
     }
 
     // A model/endpoint that does not support response_format=json surfaces an HTTP 400
@@ -229,7 +262,7 @@ public class ChatClientEvaluator : IEvaluator, IJudgePromptSource
         if (usage.OutputTokenCount is { } o) output = (output ?? 0) + o;
     }
 
-    private static EvaluationResult ParseEvaluationResponse(string responseText)
+    internal static EvaluationResult ParseEvaluationResponse(string responseText, EvalRubric? rubric = null)
     {
         try
         {
@@ -257,8 +290,19 @@ public class ChatClientEvaluator : IEvaluator, IJudgePromptSource
 
             // A recognisable score field must be present; its absence means the model did not
             // produce a verdict in the expected shape → preserve the failure-score signal.
-            if (!TryGetNumber(props, out var score, "overallscore", "score"))
+            if (!TryGetNumber(props, out var score, rubric is null ? ["overallscore", "score"] : ["score", "overallscore"]))
                 return new EvaluationResult { OverallScore = EvaluationDefaults.DefaultFailureScore, Summary = "Failed to parse evaluation - no score field", EvaluationFailed = true };
+
+            // A rubric states its scale. A score off it is out of contract — an error, never a grade: before B9 every
+            // reply was read as 0–100, so a 0–1 rubric's 0.85 read as 0.85 out of 100.
+            double? rubricScore = null;
+            if (rubric is not null)
+            {
+                if (!TryReadOnScale(score, rubric.Scale, out var unit, out var why))
+                    return new EvaluationResult { OverallScore = EvaluationDefaults.DefaultFailureScore, Summary = $"Out of contract: {why}", EvaluationFailed = true };
+                rubricScore = unit;
+                score = unit * 100.0;
+            }
 
             var criteria = new List<CriterionResult>();
             if (props.TryGetValue("criteriaresults", out var critEl) && critEl.ValueKind == System.Text.Json.JsonValueKind.Array)
@@ -287,12 +331,33 @@ public class ChatClientEvaluator : IEvaluator, IJudgePromptSource
                 }
             }
 
+            var evidence = new List<JudgeEvidence>();
+            if (props.TryGetValue("evidence", out var evEl) && evEl.ValueKind == System.Text.Json.JsonValueKind.Array)
+            {
+                foreach (var item in evEl.EnumerateArray())
+                {
+                    if (item.ValueKind != System.Text.Json.JsonValueKind.Object) continue;
+                    var eprops = NormalisedProps(item);
+                    evidence.Add(new JudgeEvidence
+                    {
+                        Source = GetString(eprops, "source") ?? "",
+                        Reference = GetString(eprops, "reference") ?? "",
+                        Message = GetString(eprops, "message") ?? "",
+                    });
+                }
+            }
+
             return new EvaluationResult
             {
                 OverallScore = (int)Math.Round(Math.Clamp(score, 0, 100)),
-                Summary = GetString(props, "summary") ?? "",
+                // A rubric reply calls its narrative "reasoning"; the default prompt calls it "summary".
+                Summary = (rubric is null ? GetString(props, "summary") : GetString(props, "reasoning", "summary")) ?? "",
                 Improvements = improvements,
                 CriteriaResults = criteria,
+                RubricScore = rubricScore,
+                RubricSeverity = rubricScore is { } u ? rubric!.SeverityFor(u) : null,
+                JudgeLabel = rubric is null ? null : GetString(props, "label"),
+                Evidence = evidence,
             };
         }
         catch
@@ -305,6 +370,48 @@ public class ChatClientEvaluator : IEvaluator, IJudgePromptSource
                 EvaluationFailed = true
             };
         }
+    }
+
+    /// <summary>
+    /// Reads <paramref name="raw"/> on the rubric's scale into 0..1. A 0–1 rubric accepts [0, 1]; a 0–100 rubric accepts
+    /// [0, 100] but refuses a fraction below 1 (0.85 there is a 0–1 score sent to a 0–100 rubric, not 0.85 points).
+    /// </summary>
+    internal static bool TryReadOnScale(double raw, RubricScoreScale scale, out double unit, out string why)
+    {
+        unit = 0;
+        why = "";
+        if (!double.IsFinite(raw) || raw < 0)
+        {
+            why = $"the score {raw} is not a non-negative number";
+            return false;
+        }
+
+        if (scale == RubricScoreScale.Unit)
+        {
+            if (raw > 1.0)
+            {
+                why = $"the score {raw} is off the rubric's 0.0–1.0 scale";
+                return false;
+            }
+
+            unit = raw;
+            return true;
+        }
+
+        if (raw > 100.0)
+        {
+            why = $"the score {raw} is off the rubric's 0–100 scale";
+            return false;
+        }
+
+        if (raw > 0 && raw < 1 && raw != Math.Floor(raw))
+        {
+            why = $"the score {raw} reads as a 0–1 score; the rubric asks for an integer 0–100";
+            return false;
+        }
+
+        unit = raw / 100.0;
+        return true;
     }
 
     /// <summary>Map a JSON object's properties keyed by a normalised name (lower-cased, underscores

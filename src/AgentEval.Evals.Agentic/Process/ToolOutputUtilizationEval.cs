@@ -14,19 +14,20 @@ namespace AgentEval.Evals.Agentic.Process;
 /// Tests: did the agent reference or act on the data returned by each tool call?
 /// Did it ignore tool results and hallucinate the answer instead?
 /// Field-level <c>usage_mappings[]</c> (which tool-output fields were used vs. ignored) are
-/// specified in the reference prompt file but are not produced: the judge does not receive that file yet.
+/// specified in the rubric the judge is sent, but the result does not keep them (it keeps the score, criteria
+/// and evidence).
 /// </para>
 /// <para>
 /// Wraps an <see cref="AtomicLlmEval"/> configured with four tool-output-utilization criteria.
-/// The score is the judge's overall score in <c>[0,1]</c>; the per-call average (1.0 full,
-/// 0.5 partial, 0.0 ignored) is specified in the reference prompt file and is not yet applied.
+/// The score is the judge's score in <c>[0,1]</c>; the rubric asks for the per-call average (1.0 full,
+/// 0.5 partial, 0.0 ignored), and the code does not recompute it.
 /// </para>
 /// <para>
 /// Lineage: AgentEval's own criteria and reference prompt, modelled on the evaluator concept (name,
 /// inputs and scoring dimensions) of Azure/azure-sdk-for-python
 /// <c>sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_tool_output_utilization/tool_output_utilization.prompty</c>.
-/// A 2026-10-02 check found no upstream prompt text in the reference prompt file
-/// <c>Resources/Prompts/process/tool-output-utilization.v1.md</c>, which is not yet sent to the judge.
+/// A 2026-10-02 check found no upstream prompt text in the rubric file
+/// <c>Resources/Prompts/process/tool-output-utilization.v1.md</c>, which the judge is sent as its system prompt.
 /// </para>
 /// <para>
 /// Foundry reference: <c>azureai://built-in/evaluators/tool_output_utilization</c>

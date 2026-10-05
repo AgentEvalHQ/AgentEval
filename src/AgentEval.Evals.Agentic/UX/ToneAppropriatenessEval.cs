@@ -49,7 +49,7 @@ public sealed class ToneAppropriatenessEval : IEval
             key: "tone_appropriateness",
             name: "Tone Appropriateness",
             category: "ux",
-            version: "1.0.0",
+            version: "1.1.0",
             criteria: new[]
             {
                 "The agent's tone matches the user's emotional register and context",

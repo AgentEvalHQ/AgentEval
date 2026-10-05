@@ -81,8 +81,8 @@ internal static class JudgeFactory
     /// Optional system prompt to wire into <see cref="ChatClientEvaluator"/>. Phase-6 Task 6.8:
     /// the GDPR / EU AI Act bench paths load their embedded judge prompts and pass them here
     /// so the LLM is actually steered by the "Cite articles / Be conservative / Flag evasive
-    /// responses" rules. <c>null</c> (the default) preserves the prior behaviour of using
-    /// <see cref="ChatClientEvaluator"/>'s built-in default system prompt.
+    /// responses" rules. <c>null</c> (the default) uses <see cref="ChatClientEvaluator"/>'s built-in default
+    /// system prompt; an agentic check then binds its own rubric over it (B9).
     /// </param>
     /// <param name="systemPromptId">
     /// A stable name for <paramref name="systemPrompt"/>, reported as the judge's

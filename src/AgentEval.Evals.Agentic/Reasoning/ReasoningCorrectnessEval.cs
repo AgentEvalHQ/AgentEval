@@ -95,7 +95,7 @@ public sealed class ReasoningCorrectnessEval : IEval
             key: "reasoning_correctness",
             name: "Reasoning Correctness",
             category: "reasoning",
-            version: "1.0.0",
+            version: "1.1.0",
             criteria: new[]
             {
                 "Each reasoning step follows logically from the prior step or from stated premises",
