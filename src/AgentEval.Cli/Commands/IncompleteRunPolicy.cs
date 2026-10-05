@@ -35,7 +35,8 @@ internal static class IncompleteRunPolicy
             Details = composite.Details with
             {
                 Summary = note,
-                Recommendations = [note, .. composite.Details.Recommendations ?? []],
+                // Without an all-clear line ("✅ Strong security posture …"), which read beside the withheld note (B10ar).
+                Recommendations = [note, .. (composite.Details.Recommendations ?? []).Where(r => !r.StartsWith("✅", StringComparison.Ordinal))],
             },
         };
     }

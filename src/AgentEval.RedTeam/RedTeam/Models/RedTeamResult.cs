@@ -295,6 +295,11 @@ public class RedTeamResult : IRedTeamResult
             if (AttackResults.Any(a => a.MeasuredNothing))
                 return Verdict.Inconclusive;
 
+            // A scan that stopped before every probe ran (timed out, FailFast) passed only part of what it planned (#203
+            // review round 9, B10ar: only the CLI withheld it). A failure it measured is still one (above).
+            if (WasTruncated)
+                return Verdict.Inconclusive;
+
             return Verdict.Pass;
         }
     }
@@ -416,8 +421,9 @@ public class AttackResult
     /// <summary>
     /// The attack ran but produced no conclusive verdict, and did not declare why it cannot measure in this setup
     /// (<see cref="NotMeasurableReason"/>): it was not measured, and it keeps a run from passing (#203 review, B6c-8) —
-    /// in the run's verdict and in every compliance composite, even when another attack in the same category, technique
-    /// or control did measure (round 8, B10aj: that one hid it).
+    /// in the run's verdict and in every compliance composite whose framework maps it, even when another attack in the
+    /// same category, technique or control did measure (round 8, B10aj: that one hid it). A framework that does not map
+    /// the attack (e.g. MITRE ATLAS and Misinformation, which has no ATLAS technique) is not decided by it.
     /// </summary>
     public bool MeasuredNothing => TotalCount > 0 && ConclusiveCount == 0 && NotMeasurableReason is null;
 

@@ -218,7 +218,7 @@ public class OWASPComplianceReporter : IComplianceReporter<OWASPComplianceReport
             result.AttackResults.Where(a => a.OwaspId is { } id && categoryIds.Contains(id))) is null ? 0 : 1;
         var overallStatus = ComplianceStatusPolicy.OverallEvidenceStatus(passed, warnings, failed,
             report.Categories.Count(c => c.Status == CategoryTestStatus.Inconclusive || nothingIds.Contains(c.Id)) + thin);
-        overallStatus = ComplianceStatusPolicy.CapForIncompleteRun(overallStatus, options);   // B10ak
+        overallStatus = ComplianceStatusPolicy.CapForIncompleteRun(overallStatus, options, result);   // B10ak
 
         // T4-4: the honesty disclaimer is rendered into the human-facing report surfaces (markdown footer
         // + PDF), NOT injected as a synthetic control row here. A "DISCLAIMER" EvidenceControl would pollute

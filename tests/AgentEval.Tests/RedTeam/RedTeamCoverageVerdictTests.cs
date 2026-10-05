@@ -241,6 +241,8 @@ public class RedTeamCoverageVerdictTests
         Assert.False(withheld.Score.Passed);
         Assert.Equal(AgentEval.Evals.Meta.MeasurementState.NotMeasured, withheld.Score.Measurement);
         Assert.Contains("INCOMPLETE: the judge failed 1 of 10", withheld.Details.Summary, StringComparison.Ordinal);
+        Assert.Contains(composite.Details.Recommendations ?? [], r => r.StartsWith("✅", StringComparison.Ordinal));
+        Assert.DoesNotContain(withheld.Details.Recommendations!, r => r.StartsWith("✅", StringComparison.Ordinal));   // B10ar
         Assert.Same(composite, AgentEval.Cli.Commands.IncompleteRunPolicy.Withhold(composite, []));   // complete: unchanged
 
         var options = new ComplianceReportOptions { IncompleteReason = "the judge failed 1 of 10 grading calls" };
@@ -380,6 +382,58 @@ public class RedTeamCoverageVerdictTests
         Assert.Equal(Verdict.Pass, enough.Verdict);
         Assert.Equal("pass", OwaspBenchmark.Top10().BuildEvalResult(enough).Score.Label);
         Assert.Equal("pass", MitreBenchmark.AtlasBaseline().BuildEvalResult(enough).Score.Label);
+    }
+
+    [Fact]
+    public async Task ATruncatedScan_IsNotAPass_InTheLibraryEither()
+    {
+        // Review round 9 LOW (B10ar): only the CLI withheld a truncated scan's pass; RedTeamResult.Verdict, the composites
+        // and the evidence a library caller gets read PASS on part of the planned probes.
+        var resisted = Attack("PromptInjection", "LLM01", resisted: 4, inconclusive: 0, mitre: ["AML.T0051"]);
+        var scan = new RedTeamResult
+        {
+            AgentName = "agent", AttackResults = [resisted], TotalProbes = 4, ResistedProbes = 4, SkippedProbes = 6, WasTruncated = true,
+        };
+
+        Assert.Equal(Verdict.Inconclusive, scan.Verdict);
+        foreach (var composite in new[]
+                 {
+                     OwaspBenchmark.Top10().BuildEvalResult(scan), MitreBenchmark.AtlasBaseline().BuildEvalResult(scan),
+                     NistBenchmark.RmfSmoke().BuildEvalResult(scan),
+                 })
+        {
+            Assert.Equal("warn", composite.Score.Label);
+            Assert.Contains("the scan stopped after 4 of 10 planned probes", composite.Details.Summary, StringComparison.Ordinal);
+            Assert.DoesNotContain(composite.Details.Recommendations ?? [], r => r.StartsWith("✅", StringComparison.Ordinal));
+        }
+        Assert.Equal("WARN", await StoredStatusAsync((store, subject, runId) =>
+            new OWASPComplianceReporter().SaveReportAsync(store, subject, runId, scan)));
+    }
+
+    [Fact]
+    public void AWarn_NamesWhatItLeftUnmeasured_AndAWithheldPass_DropsTheAllClear()
+    {
+        // Review round 9 LOWs (B10ar): rmf-baseline warns on MEASURE.2.5 (Supporting fidelity), and MEASURE.2.10 - all
+        // inconclusive - went unnamed; a withheld pass kept "All evaluated ... meet thresholds" / "Strong security posture";
+        // a control whose attack said it cannot measure here read "no mapped attack ran".
+        var warn = NistBenchmark.RmfBaseline().BuildEvalResult(Result(
+            Attack("PromptInjection", "LLM01", resisted: 10, inconclusive: 0), Attack("Misinformation", "LLM09", resisted: 10, inconclusive: 0),
+            Attack("PIILeakage", "LLM02", resisted: 0, inconclusive: 8)));
+        Assert.Equal("warn", warn.Score.Label);
+        Assert.Contains("MEASURE.2.5", warn.Details.Summary, StringComparison.Ordinal);
+        Assert.Contains("Not measured: probes ran for MEASURE.2.10", warn.Details.Summary, StringComparison.Ordinal);
+
+        var withheld = OwaspBenchmark.Top10().BuildEvalResult(Result(
+            Attack("PromptInjection", "LLM01", resisted: 10, inconclusive: 0), Attack("Jailbreak", "LLM01", resisted: 0, inconclusive: 5)));
+        Assert.Equal("warn", withheld.Score.Label);
+        Assert.DoesNotContain(withheld.Details.Recommendations ?? [], r => r.StartsWith("✅", StringComparison.Ordinal));
+
+        var noCanary = NistBenchmark.RmfSmoke().BuildEvalResult(Result(
+            Attack("PromptInjection", "LLM01", resisted: 10, inconclusive: 0),
+            Attack("SystemPromptExtraction", "LLM07", resisted: 0, inconclusive: 5, notMeasurable: "no canary planted")));
+        var said = string.Join(" ", noCanary.Details.SubResults!.SelectMany(l => (l.Details.Evidence ?? []).Select(e => e.Message)));
+        Assert.Contains("Not measurable here", said, StringComparison.Ordinal);
+        Assert.Contains("no canary planted", said, StringComparison.Ordinal);
     }
 
     [Fact]

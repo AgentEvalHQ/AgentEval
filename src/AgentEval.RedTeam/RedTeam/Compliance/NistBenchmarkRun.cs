@@ -188,15 +188,17 @@ public sealed class NistBenchmarkRun
             .SelectMany(c => c.Control.RelevantAttacks).ToHashSet(StringComparer.OrdinalIgnoreCase);
         var mostlyInconclusive = ComplianceStatusPolicy.MostlyInconclusive(
             redTeamResult.AttackResults.Where(a => mapped.Contains(a.AttackName)));
-        var inconclusiveWithheld = compositeLabel == "pass" && (inconclusiveIds.Count > 0 || mostlyInconclusive is not null);
+        var unmeasured = ComplianceStatusPolicy.Unmeasured(inconclusiveIds, mostlyInconclusive, redTeamResult);
+        var inconclusiveWithheld = compositeLabel == "pass" && unmeasured.Count > 0;
         if (inconclusiveWithheld)
         {
             compositeLabel = "warn";
             compositePassed = false;
-            withheldNote = inconclusiveIds.Count > 0
-                ? $"Probes ran for {string.Join(", ", inconclusiveIds)} but produced no conclusive verdict; the pass is withheld."
-                : $"{mostlyInconclusive}, so too little was measured; the pass is withheld.";
         }
+        // A warn names what it left unmeasured beside its partially effective controls (B10ar: MEASURE.2.10, all
+        // inconclusive, went unnamed when MEASURE.2.5 already made the run warn).
+        if (ComplianceStatusPolicy.UnmeasuredNote(unmeasured, inconclusiveWithheld) is { } unmeasuredNote)
+            withheldNote = withheldNote is null ? unmeasuredNote : $"{withheldNote} {unmeasuredNote}";
 
         var dimensions = new Dictionary<string, double>
         {
@@ -234,8 +236,8 @@ public sealed class NistBenchmarkRun
                 Dimensions: dimensions,
                 Evidence: compositeEvidence,
                 Recommendations: withheldNote is null
-                    ? (report.Recommendations.Count > 0 ? report.Recommendations.ToList() : null)
-                    : [withheldNote, .. report.Recommendations],
+                    ? ComplianceStatusPolicy.Recommendations(report.Recommendations, inconclusiveWithheld)
+                    : [withheldNote, .. ComplianceStatusPolicy.Recommendations(report.Recommendations, inconclusiveWithheld) ?? []],
                 SubResults: leaves,
                 AggregationStrategy: "Min")
             {
@@ -285,7 +287,11 @@ public sealed class NistBenchmarkRun
                 ? $"Not applicable — {control.Control.ControlName}: organizational/governance, not testable by a black-box red-team."
                 : control.RanInconclusive
                     ? $"Inconclusive — {control.Control.ControlName}: probes ran but produced no conclusive verdict; the run's pass is withheld."
-                    : $"Not evaluated — {control.Control.ControlName}: no mapped attack ran.";
+                    : control.NotMeasurable   // its attack ran and said why it cannot measure here, not "no attack ran" (B10ar)
+                        ? $"Not measurable here — {control.Control.ControlName}: " + string.Join("; ", control.Control.RelevantAttacks
+                            .Select(n => attacksByName.TryGetValue(n, out var a) ? a.NotMeasurableReason : null)
+                            .OfType<string>().Distinct(StringComparer.Ordinal)) + "."
+                        : $"Not evaluated — {control.Control.ControlName}: no mapped attack ran.";
             return RedTeamComplianceLeaf.BuildSkippedLeaf(
                 "nist", "compliance.nist", control.Control.ControlId,
                 $"{control.Control.ControlId} — {control.Control.ControlName}", message, includeDimensions: true);

@@ -429,7 +429,7 @@ public class ISO27001ComplianceReporter : IComplianceReporter<ISO27001Compliance
             report.Controls.Count(c => c.RanInconclusive
                                        || (c.Status is not (ControlEvaluationStatus.NotApplicable or ControlEvaluationStatus.NotEvaluated)
                                            && c.Control.RelevantAttacks.Any(nothingNames.Contains))) + thin);
-        overallStatus = ComplianceStatusPolicy.CapForIncompleteRun(overallStatus, options);   // B10ak
+        overallStatus = ComplianceStatusPolicy.CapForIncompleteRun(overallStatus, options, result);   // B10ak
 
         // T4-4: the honesty disclaimer is rendered into the human-facing report surfaces (markdown footer
         // + PDF), NOT injected as a synthetic control row here. A "DISCLAIMER" EvidenceControl would pollute

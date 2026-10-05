@@ -99,8 +99,44 @@ internal static class ComplianceStatusPolicy
         : "warn";
 
     /// <summary>An incomplete run's evidence is never PASS (B10ak): a would-be PASS is WARN.</summary>
-    public static string CapForIncompleteRun(string status, ComplianceReportOptions? options) =>
-        status == "PASS" && options?.IncompleteReason is not null ? "WARN" : status;
+    public static string CapForIncompleteRun(string status, ComplianceReportOptions? options, RedTeamResult result) =>
+        status == "PASS" && (options?.IncompleteReason is not null || result.WasTruncated) ? "WARN" : status;   // + a truncated scan (B10ar)
+
+    /// <summary>
+    /// What a compliance composite did not measure, one clause each: the categories / techniques / controls whose probes
+    /// reached no conclusive verdict (B6c-8, B10aj), the run's ratio rule (B10aq), a scan that stopped before every probe
+    /// ran (#203 review round 9, B10ar: a library caller's truncated scan passed).
+    /// </summary>
+    public static List<string> Unmeasured(IReadOnlyCollection<string> inconclusiveIds, string? mostlyInconclusive, RedTeamResult result)
+    {
+        var parts = new List<string>();
+        if (inconclusiveIds.Count > 0)
+            parts.Add($"probes ran for {string.Join(", ", inconclusiveIds)} but produced no conclusive verdict");
+        if (mostlyInconclusive is not null)
+            parts.Add(mostlyInconclusive);
+        if (result.WasTruncated)
+            parts.Add($"the scan stopped after {result.TotalProbes} of {result.PlannedProbes} planned probes");
+        return parts;
+    }
+
+    /// <summary>
+    /// The composite's note on <paramref name="unmeasured"/>: a withheld pass says so; a warn or a fail names what it left
+    /// unmeasured too — its verdict is the measured one, the gap is stated (B10ar: a warn named only its partially effective
+    /// controls, or nothing).
+    /// </summary>
+    public static string? UnmeasuredNote(IReadOnlyList<string> unmeasured, bool withheld) =>
+        unmeasured.Count == 0 ? null
+        : $"Not measured: {string.Join("; ", unmeasured)}." + (withheld ? " The pass is withheld." : "");
+
+    /// <summary>
+    /// The report's recommendations for a composite: without an all-clear line ("✅ …") when its pass was withheld — it sat
+    /// beside the withheld note (B10ar) — and null when none is left.
+    /// </summary>
+    public static IReadOnlyList<string>? Recommendations(IEnumerable<string> recommendations, bool withheld)
+    {
+        var list = recommendations.Where(r => !withheld || !r.StartsWith("✅", StringComparison.Ordinal)).ToList();
+        return list.Count > 0 ? list : null;
+    }
 
     /// <summary>Worst severity among the SUCCEEDED probes across an attack-set, or null if none succeeded.</summary>
     public static Severity? WorstSucceededSeverity(IEnumerable<AttackResult> results)
