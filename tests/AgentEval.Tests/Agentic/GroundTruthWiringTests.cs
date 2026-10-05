@@ -128,6 +128,26 @@ public sealed class GroundTruthWiringTests
         Assert.DoesNotContain("embedding", Description("similarity"), StringComparison.OrdinalIgnoreCase);
     }
 
+    [Theory]
+    [InlineData("?", "")]
+    [InlineData("...", "Paris.")]
+    public async Task AReferenceWithNoWords_IsNoReference(string reference, string response)
+    {
+        // Review round 15 L2 (B12j): a punctuation-only reference passed at 1.0 beside an empty response and failed at 0
+        // beside any answer ("Ground truth is empty"), though it was not empty.
+        var f1 = await new F1ScoreEval().EvaluateAsync(new EvalInput(Query: "q", Response: response, GroundTruth: reference));
+
+        Assert.Equal("skipped", f1.Score.Label);
+    }
+
+    [Fact]
+    public void DecisionEval_DoesNotSendABlankReference()
+    {
+        // Review round 15 L5 (B12j): a blank reference was serialised into the decision judge's state.
+        Assert.Null(DecisionEval.DefaultState(new EvalInput(Query: "q", Response: "r", GroundTruth: "   ")).GroundTruth);
+        Assert.Equal("REF", DecisionEval.DefaultState(new EvalInput(Query: "q", Response: "r", GroundTruth: "REF")).GroundTruth);
+    }
+
     [Fact]
     public void NoCard_SaysAMissingReferenceScoresZero()
     {

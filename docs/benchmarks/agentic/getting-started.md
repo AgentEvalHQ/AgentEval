@@ -189,8 +189,9 @@ QUESTION="Book me a flight to Lisbon next Friday and a hotel near the old town."
 # Run the Agentic Execution preset (task completion, adherence, intent, tool accuracy, navigation)
 agenteval bench agentic --preset agentic-execution --subject MyTravelAgent --input "$QUESTION" --response-file answer.txt
 
-# Run the RAG Quality preset (from the CLI it warns: there is no option yet for a reference answer or retrieved
-# context, so similarity and F1 are not measured; use the library or the MAF bridge to pass them)
+# Run the RAG Quality preset (from the CLI it cannot pass: there is no option yet for a reference answer or retrieved
+# context, so similarity and F1 are not measured (WARN) and groundedness is graded without a context (it can FAIL);
+# use the library or the MAF bridge to pass them)
 agenteval bench agentic --preset rag-quality --subject MyTravelAgent --input "$QUESTION" --response-file answer.txt
 
 # Run the Judge Quality preset (no LLM required)

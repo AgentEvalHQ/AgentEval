@@ -39,7 +39,8 @@ that the old verdict hid. The entries below give the cause and the evidence for 
 - **A missing reference answer or context is not a failure.** `similarity` and `f1_score` without `EvalInput.GroundTruth` (or with a blank one) are
   not measured (`skipped`); the QA composite withholds its pass naming them. With one, the judge now receives it.
   `bench agentic --preset rag-quality` has no option for a reference answer or retrieved context yet, so from the CLI it
-  reads WARN (exit 10); pass them through the library or the MAF bridge.
+  cannot pass: it reads WARN (exit 10), or FAIL (exit 9) when groundedness — graded without a context — fails; pass
+  them through the library or the MAF bridge.
 - **Versions** (the ones this release ships): `unsafe_tool_use` 1.2.0, `tool_call_success` 1.2.0,
   `tool_input_accuracy` 2.6.0, `task_adherence` / `intent_resolution` / `task_navigation_efficiency` 1.2.0, the other
   tool-aware and sub-dimension evaluators 1.1.0, every other agentic LLM check one minor version up for its rubric (1.1.0;

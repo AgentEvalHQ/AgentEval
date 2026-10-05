@@ -240,7 +240,7 @@ public sealed class DecisionEval : AtomicEval
         input.Query,
         input.Response,
         input.Context,
-        input.GroundTruth,
+        string.IsNullOrWhiteSpace(input.GroundTruth) ? null : input.GroundTruth,   // a blank reference is none (review round 15 L5)
         input.SystemMessage);
 
     private static string HashPrompt(string instructions, string? trueCriteria, string? falseCriteria, string? reference)

@@ -23,8 +23,8 @@ namespace AgentEval.Evals;
 ///   <item>Recall    = overlap / |ground_truth_tokens| (counting duplicates)</item>
 ///   <item>F1        = 2 × (precision × recall) / (precision + recall)</item>
 /// </list>
-/// Edge cases: empty response → F1=0; a reference with no word tokens (e.g. punctuation only) → F1=0, or 1.0 when the
-/// response has none either.
+/// Edge cases: empty response → F1=0; a reference with no word tokens (e.g. punctuation only) is no reference — not
+/// measured, like a blank one (review round 15 L2).
 /// </para>
 /// <para>
 /// <b>Ground-truth resolution</b>: uses <see cref="EvalInput.GroundTruth"/> if it is not blank; otherwise falls back to
@@ -81,15 +81,11 @@ public sealed class F1ScoreEval : AtomicCodeEval
         var responseTokens = Tokenize(response);
         var truthTokens = Tokenize(groundTruth);
 
-        // Both empty → trivially perfect.
-        if (responseTokens.Count == 0 && truthTokens.Count == 0)
-        {
-            return BuildWithConfidence(
-                value: 1.0,
-                passed: 1.0 >= _passThreshold,
-                severity: "none",
-                message: "Both response and ground truth are empty; F1 = 1.0 (trivially perfect).");
-        }
+        // A reference with no word tokens ("?", "...") gives nothing to compare: not measured, like a blank one — it passed
+        // at 1.0 beside an empty response and failed at 0 beside any answer (review round 15 L2).
+        if (truthTokens.Count == 0)
+            return EvalResult.Skipped(this,
+                "F1 compares the response with a reference answer, and the one supplied has no words to compare: not measured.");
 
         // Phase-7 Task 7.8: empty-input branches compute `passed = f1 >= threshold`
         // uniformly with the non-empty branch. A threshold of 0.0 makes f1=0.0 a pass
@@ -103,15 +99,6 @@ public sealed class F1ScoreEval : AtomicCodeEval
                 passed: 0.0 >= _passThreshold,
                 severity: _passThreshold <= 0 ? "none" : "medium",
                 message: "Response is empty; F1 = 0.0.");
-        }
-
-        if (truthTokens.Count == 0)
-        {
-            return BuildWithConfidence(
-                value: 0.0,
-                passed: 0.0 >= _passThreshold,
-                severity: _passThreshold <= 0 ? "none" : "medium",
-                message: "Ground truth is empty; F1 = 0.0.");
         }
 
         // Multiset (bag-of-tokens) overlap — standard SQuAD token-F1. For each distinct token the

@@ -14,8 +14,8 @@ namespace AgentEval.MafEvalLightPath;
 /// <remarks>
 /// <para>
 /// <b>Why this property and not a tool-call check.</b> The composite reaches this leaf through
-/// <c>AgentEvalCompositeEvaluator</c>, whose projection is a two-field
-/// <c>EvalInput(Query, Response)</c> (<c>AgentEvalCompositeEvaluator.cs:74</c>): no
+/// <c>AgentEvalCompositeEvaluator</c>, whose projection is an
+/// <c>EvalInput(Query, Response, Context, GroundTruth)</c> (<c>AgentEvalCompositeEvaluator</c>): no
 /// <c>ToolCalls</c>, no <c>CaseId</c>. A tool-record check placed here would be
 /// <see cref="MeasurementState.NotApplicable"/> on every run — true, and useless as a
 /// demonstration. So this leaf measures the one thing that IS visible: the agent is instructed to
@@ -79,7 +79,7 @@ public sealed class ToolFindingsCitedEval()
     {
         ArgumentNullException.ThrowIfNull(input);
 
-        // ⚠ NOT a fail. AgentEvalCompositeEvaluator.cs:74 does `response.Text ?? string.Empty`, so a
+        // ⚠ NOT a fail. AgentEvalCompositeEvaluator does `response.Text ?? string.Empty`, so a
         // run whose response was never captured and a run that genuinely said nothing arrive here as
         // the SAME empty string. Scoring that 0.0 would turn a blindness into a measurement — the
         // same `?? 0` shape this lane exists to remove. Undecidable, with the reason.
@@ -87,8 +87,8 @@ public sealed class ToolFindingsCitedEval()
         {
             var reason =
                 "the response reaching this leaf is empty, and through this door an empty response is "
-                + "ambiguous: AgentEvalCompositeEvaluator collapses a missing response into \"\" "
-                + "(:74), so 'nothing was captured' and 'the agent said nothing' are indistinguishable "
+                + "ambiguous: AgentEvalCompositeEvaluator collapses a missing response into \"\", "
+                + "so 'nothing was captured' and 'the agent said nothing' are indistinguishable "
                 + "here. An absent record is not an empty one.";
             return NotApplicable(reason, new EvalEvidence("response", "empty", reason));
         }

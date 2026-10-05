@@ -31,7 +31,7 @@
       "kind": "groundTruth",
       "key": "",
       "required": false,
-      "description": "Reference answer, from EvalInput.GroundTruth, for similarity and F1. Without one those two parts are not measured and the composite withholds its pass (warn), naming them."
+      "description": "Reference answer, from EvalInput.GroundTruth, for similarity and F1. Without one those two parts are not measured and the composite cannot pass: it withholds its pass (warn), naming them, unless a measured part fails it."
     }
   ],
   "recommendedVisualization": "radar",
