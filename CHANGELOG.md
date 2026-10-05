@@ -20,7 +20,8 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   reads `warn` (exit 10), at every level. The runners follow the same rule: a benchmark run with a row not measured,
   `bench gdpr --runs N` with runs that gave no verdict, and `bench longmemeval` with unscored questions read WARN; a
   memory benchmark category with missing scenario data errors; a red-team attack that measured nothing, or a run with
-  more inconclusive probes than resisted, makes the run INCONCLUSIVE and withholds the OWASP / MITRE / NIST pass. A run in which nothing was measured is never a pass.
+  more inconclusive probes than resisted, makes the run INCONCLUSIVE and withholds the OWASP / MITRE / NIST pass of each
+  framework that maps the attacks (MITRE ATLAS has no technique for misinformation, so that attack does not decide it). A run in which nothing was measured is never a pass.
 - **A failing check never hides under an average.** In every agentic preset, and inside the seven evaluators built
   from sub-dimensions, a failing *accuracy* dimension fails the verdict and a failing *quality* dimension makes it
   `warn`, naming it (tables in the agentic getting-started guide). The Safety and AdversarialDirect gates fail on any
@@ -100,12 +101,11 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   instead of "All evaluated … meet thresholds". A control whose only attack declared it cannot measure here (no
   canary) does not withhold.
 - **A red-team scan that stopped early passed when read through the library.** `bench owasp|mitre|nist` withheld a
-  truncated scan's pass (it timed out, or `FailFast` stopped it, before every probe ran), but `RedTeamResult.Verdict`,
-  the OWASP / MITRE / NIST composites and the stored evidence a library caller gets read PASS on part of the planned
-  probes. They now read INCONCLUSIVE / WARN, saying how far the scan got; a failure it measured still fails.
-  `agenteval redteam` exits 1 for such a scan (it exited 0), as it already did for any INCONCLUSIVE run: exit 1 means
-  vulnerabilities found or no pass verdict, as the red-team guide now says. The
-  compliance composites also name what they left unmeasured when they already warn or fail (a NIST run that warned
+  scan's pass when it timed out before every probe ran, but `RedTeamResult.Verdict`, the OWASP / MITRE / NIST
+  composites and the stored evidence a library caller gets (a scan with an overall timeout) read PASS on part of the
+  planned probes. They now read INCONCLUSIVE / WARN, saying how far the scan got; a failure it measured still fails.
+  (`agenteval redteam` sets no overall timeout, and `FailFast` stops only after a success, so its exit codes are
+  unchanged.) The compliance composites also name what they left unmeasured when they already warn or fail (a NIST run that warned
   on MEASURE.2.5 did not mention MEASURE.2.10, all inconclusive), drop the "✅ Strong security posture" / "All
   evaluated … meet thresholds" line when their pass is withheld, and a NIST control whose attack declared it cannot
   measure here says so instead of "no mapped attack ran".
