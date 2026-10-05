@@ -36,9 +36,10 @@ that the old verdict hid. The entries below give the cause and the evidence for 
 - **Calibration reports only measured verdicts.** A judge outage is INFRA-FAIL; an evaluator not measured on every
   record is left out whole (INCOMPLETE).
 - **Versions** (the ones this release ships): `unsafe_tool_use` 1.2.0, `tool_call_success` 1.2.0,
-  `tool_input_accuracy` 2.5.0, `task_adherence` / `intent_resolution` / `task_navigation_efficiency` 1.2.0, the other
+  `tool_input_accuracy` 2.6.0, `task_adherence` / `intent_resolution` / `task_navigation_efficiency` 1.2.0, the other
   tool-aware and sub-dimension evaluators 1.1.0, every other agentic LLM check one minor version up for its rubric (1.1.0;
-  `direct_injection`, `jailbreak_resistance` and `persona_attack` 1.2.0); all 12 agentic presets 1.1.0; GDPR Standard 1.2.0 and Smoke 1.1.0, GDPR
+  `direct_injection`, `jailbreak_resistance` and `persona_attack` 1.2.0); `stochastic_stability` 1.1.0; the
+  memory-security composite 1.1.0; all 12 agentic presets 1.1.0; GDPR Standard 1.2.0 and Smoke 1.1.0, GDPR
   AuditGrade 1.2.0; EU AI Act Standard, Smoke and AuditGrade 1.1.0. Entries below may name the version a fix first
   carried on this branch; the list above is what ships.
 
