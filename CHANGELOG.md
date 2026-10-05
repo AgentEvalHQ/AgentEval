@@ -36,7 +36,7 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   anything short of a pass.
 - **Calibration reports only measured verdicts.** A judge outage is INFRA-FAIL; an evaluator not measured on every
   record is left out whole (INCOMPLETE).
-- **A missing reference answer is not a failure.** `similarity` and `f1_score` without `EvalInput.GroundTruth` are
+- **A missing reference answer is not a failure.** `similarity` and `f1_score` without `EvalInput.GroundTruth` (or with a blank one) are
   not measured (`skipped`); the QA composite withholds its pass naming them. With one, the judge now receives it.
 - **Versions** (the ones this release ships): `unsafe_tool_use` 1.2.0, `tool_call_success` 1.2.0,
   `tool_input_accuracy` 2.6.0, `task_adherence` / `intent_resolution` / `task_navigation_efficiency` 1.2.0, the other

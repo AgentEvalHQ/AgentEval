@@ -23,12 +23,13 @@ namespace AgentEval.Evals;
 ///   <item>Recall    = overlap / |ground_truth_tokens| (counting duplicates)</item>
 ///   <item>F1        = 2 × (precision × recall) / (precision + recall)</item>
 /// </list>
-/// Edge cases: empty response → F1=0; empty ground truth → F1=0; both empty → F1=1.0.
+/// Edge cases: empty response → F1=0; a reference with no word tokens (e.g. punctuation only) → F1=0, or 1.0 when the
+/// response has none either.
 /// </para>
 /// <para>
-/// <b>Ground-truth resolution</b>: uses <see cref="EvalInput.GroundTruth"/> if set;
-/// otherwise falls back to the constructor-supplied <c>groundTruth</c> parameter.
-/// If neither is available, the evaluator returns score=0 with a note in evidence.
+/// <b>Ground-truth resolution</b>: uses <see cref="EvalInput.GroundTruth"/> if it is not blank; otherwise falls back to
+/// the constructor-supplied <c>groundTruth</c> parameter. If neither is available (null, empty or whitespace), F1 cannot
+/// be computed: the result is <c>skipped</c> (not measured), never a fail (#203, B12a / B12c).
 /// </para>
 /// <para>
 /// <b>Provenance</b>: <c>Score.Confidence = 1.0</c> (deterministic — no sampling variance).
@@ -67,12 +68,13 @@ public sealed class F1ScoreEval : AtomicCodeEval
     protected override EvalResult Evaluate(EvalInput input)
     {
         var response = input.Response ?? string.Empty;
-        // Per-input GroundTruth takes precedence over constructor fallback.
-        var groundTruth = input.GroundTruth ?? _groundTruth;
+        // Per-input GroundTruth takes precedence over constructor fallback; a blank one is none (B12c: "" or spaces failed
+        // the agent at 0 while similarity read them as no reference).
+        var groundTruth = !string.IsNullOrWhiteSpace(input.GroundTruth) ? input.GroundTruth : _groundTruth;
 
         // No reference: F1 cannot be computed, so it is not measured — scored 0 and failed, it marked the agent down for
-        // an input the caller did not give, and its card already said it skips (#203, B12a).
-        if (groundTruth is null)
+        // an input the caller did not give (#203, B12a).
+        if (string.IsNullOrWhiteSpace(groundTruth))
             return EvalResult.Skipped(this,
                 "F1 compares the response with a reference answer, and none was supplied (EvalInput.GroundTruth or the constructor): not measured.");
 

@@ -95,6 +95,42 @@ public sealed class GroundTruthWiringTests
         Assert.Equal("1.1.0", f1.Metric.Version);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task ABlankReference_IsNoReference_Everywhere(string blank)
+    {
+        // Review round 14 M1 (B12c): similarity read "" / spaces as no reference (skipped), F1 failed the agent at 0 and
+        // confidence calibration sent "[Ground truth reference:    ]" - three tests for "no reference".
+        var judge = new CapturingJudge();
+        var input = new EvalInput(Query: "What is the capital of France?", Response: "Paris.", GroundTruth: blank);
+
+        Assert.Equal("skipped", (await new SimilarityEval(judge).EvaluateAsync(input)).Score.Label);
+        Assert.Equal("skipped", (await new F1ScoreEval().EvaluateAsync(input)).Score.Label);
+        Assert.Equal("skipped", (await new F1ScoreEval().EvaluateAsync(input with { Response = "" })).Score.Label);   // was pass 1.0
+        await new ConfidenceCalibrationEval(judge).EvaluateAsync(input);
+        Assert.DoesNotContain(judge.Inputs, i => i.Contains("Ground truth reference", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void NoCard_SaysAMissingReferenceScoresZero()
+    {
+        // Review round 14 M2 (B12d): the f1_score card still said a missing reference "returns 0 with a 'medium'
+        // severity evidence note" after F1 started to skip.
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "AgentEval.sln")))
+            dir = dir.Parent;
+        var cards = Directory.GetFiles(Path.Combine(dir!.FullName, "src", "AgentEval.Evals.Agentic", "EvaluatorCards"), "*.json");
+
+        foreach (var card in cards)
+        {
+            using var json = System.Text.Json.JsonDocument.Parse(File.ReadAllText(card));
+            foreach (var input in json.RootElement.GetProperty("expectedInputs").EnumerateArray()
+                         .Where(i => i.GetProperty("kind").GetString() == "groundTruth"))
+                Assert.DoesNotMatch(@"returns? 0|score\s*=\s*0", input.GetProperty("description").GetString()!);
+        }
+    }
+
     [Fact]
     public async Task WithoutAReference_TheQaComposite_WithholdsItsPass_NamingWhatWasNotMeasured()
     {
