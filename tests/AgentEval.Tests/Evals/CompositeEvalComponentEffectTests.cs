@@ -83,6 +83,23 @@ public class CompositeEvalComponentEffectTests
     }
 
     [Fact]
+    public async Task TheSummary_NeverStatesAVerdictTheLabelContradicts()
+    {
+        // Review round 3 M1: the threshold fails this composite (0.45 < 0.8) while only a Warn-effect dimension failed; the
+        // summary said "…so the verdict is warn, not fail" beside the label fail.
+        var composite = new CompositeEval("c", "C", "test", "1.0.0",
+            [new EvalComponent(new Fixed("accuracy", "pass", 0.6), 0.5) { OnFailure = ComponentFailureEffect.Fail },
+             new EvalComponent(new Fixed("fluency", "fail", 0.3), 0.5) { OnFailure = ComponentFailureEffect.Warn }],
+            WeightedSumAggregation.Instance, threshold: 0.8);
+
+        var result = await composite.EvaluateAsync(Input);
+
+        Assert.Equal("fail", result.Score.Label);
+        Assert.Contains("fluency", result.Details.Summary);
+        Assert.DoesNotContain("verdict is warn", result.Details.Summary);
+    }
+
+    [Fact]
     public async Task Fail_AnAccuracyDimensionFailing_FailsTheComposite_AndSaysWhich()
     {
         var result = await Run("fail", ComponentFailureEffect.Fail);

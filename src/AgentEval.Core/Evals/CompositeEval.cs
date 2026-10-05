@@ -469,7 +469,10 @@ public sealed class CompositeEval : IEval
               (unconfirmed.Length > 0 ? $" Also not confirmed: {string.Join(", ", unconfirmed)}." : "") +
               (quality.Length > 0 ? $" Also not optimal: {string.Join(", ", quality)}." : "")
             : unconfirmedText is not null || qualityText is not null
-                ? string.Join("; ", new[] { unconfirmedText, qualityText }.Where(t => t is not null)) + ", so the verdict is warn, not fail."
+                ? string.Join("; ", new[] { unconfirmedText, qualityText }.Where(t => t is not null)) +
+                  // Only a warn is "warn, not fail": a threshold, the severity rule or an error can make it worse, and the note
+                  // must not contradict the label (#203 review round 3, B10d).
+                  (label == "warn" ? ", so the verdict is warn, not fail." : ".")
                 : null;
         string? decidedNote = decidedDespiteError
             ? $"A required part produced no verdict, but a {decidedSeverity} failure the measured parts show decides it: fail."
