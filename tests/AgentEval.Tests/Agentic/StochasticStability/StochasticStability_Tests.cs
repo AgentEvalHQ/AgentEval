@@ -64,8 +64,10 @@ public class StochasticStabilityEvalTests
     }
 
     [Theory]
-    [InlineData("""{"value":0.0,"passed":false}""")]                                               // no label
+    [InlineData("""{"value":0.0}""")]                                                              // no "passed": no verdict
     [InlineData("""{"score":{"value":0.0,"passed":false,"label":"warn","measurement":"notMeasured"}}""")]
+    [InlineData("""{"score":{"value":0.0,"passed":false,"label":"warn","measurement":1}}""")]       // the enum as a number (B10v)
+    [InlineData("""{"score":{"value":0.0,"passed":false,"label":"error"}}""")]
     public async Task AJsonRunWithNoVerdict_IsNotAFailedRun(string unmeasured)
     {
         var json = $"""[{"{"}"value":0.95,"passed":true,"label":"pass"{"}"},{"{"}"value":0.95,"passed":true,"label":"pass"{"}"},{unmeasured}]""";
@@ -76,6 +78,22 @@ public class StochasticStabilityEvalTests
 
         Assert.Equal(1, result.Details.Dimensions!["runs_without_verdict"]);
         Assert.Equal(1.0, result.Details.Dimensions!["success_rate_across_runs"]);
+    }
+
+    [Fact]
+    public async Task AJsonRunInTheDocumentedMinimalForm_IsAVerdict_AndAFailureCounts()
+    {
+        // Review round 5 M-1 (B10v): the XML doc's minimum is value + passed; B10s dropped such a run as "no verdict" (no
+        // label), so two passes and an explicit failure read WARN 1.000 instead of a failure, and three minimal runs SKIPPED.
+        var json = """[{"value":0.95,"passed":true},{"value":0.95,"passed":true},{"score":{"value":0.10,"passed":false}}]""";
+        var input = new EvalInput(Query: "stability-test",
+            Metadata: new Dictionary<string, object> { [StochasticStabilityEval.MetadataRunResultsKey] = json });
+
+        var result = await new StochasticStabilityEval().EvaluateAsync(input);
+
+        Assert.Equal(0, result.Details.Dimensions!["runs_without_verdict"]);
+        Assert.Equal(2.0 / 3.0, result.Details.Dimensions!["success_rate_across_runs"], 6);
+        Assert.Equal("fail", result.Score.Label);
     }
 
     [Fact]

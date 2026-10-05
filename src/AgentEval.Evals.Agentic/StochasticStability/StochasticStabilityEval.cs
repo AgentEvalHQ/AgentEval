@@ -230,30 +230,34 @@ public sealed class StochasticStabilityEval : IEval
             foreach (var el in doc.RootElement.EnumerateArray())
             {
                 double scoreValue = 0;
-                bool passed = false;
-                string label = "unknown";
-                string? measurement = null;
+                bool? passed = null;
+                string? label = null;
+                var measurementRecorded = true;
 
                 // Support both flat {"value":..., "passed":...} and nested {"score":{"value":...}}
-                if (el.TryGetProperty("score", out var scoreEl))
+                var src = el.TryGetProperty("score", out var scoreEl) ? scoreEl : el;
+                if (src.TryGetProperty("value",  out var v))  scoreValue = v.GetDouble();
+                if (src.TryGetProperty("passed", out var p))  passed     = p.GetBoolean();
+                if (src.TryGetProperty("label",  out var l))  label      = l.GetString();
+                if (src.TryGetProperty("measurement", out var m))
                 {
-                    if (scoreEl.TryGetProperty("value",  out var v))  scoreValue = v.GetDouble();
-                    if (scoreEl.TryGetProperty("passed", out var p))  passed     = p.GetBoolean();
-                    if (scoreEl.TryGetProperty("label",  out var l))  label      = l.GetString() ?? "unknown";
-                    if (scoreEl.TryGetProperty("measurement", out var m) && m.ValueKind == JsonValueKind.String)
-                        measurement = m.GetString();
-                }
-                else
-                {
-                    if (el.TryGetProperty("value",  out var v))  scoreValue = v.GetDouble();
-                    if (el.TryGetProperty("passed", out var p))  passed     = p.GetBoolean();
-                    if (el.TryGetProperty("label",  out var l))  label      = l.GetString() ?? "unknown";
+                    // Written as a name ("notMeasured") by the result store, as a number by default System.Text.Json (B10v):
+                    // anything but Measured (0) is a run with no verdict to compare.
+                    measurementRecorded = m.ValueKind switch
+                    {
+                        JsonValueKind.String => string.Equals(m.GetString(), nameof(AgentEval.Evals.Meta.MeasurementState.Measured), StringComparison.OrdinalIgnoreCase),
+                        JsonValueKind.Number => m.TryGetInt32(out var n) && n == (int)AgentEval.Evals.Meta.MeasurementState.Measured,
+                        _ => true,
+                    };
                 }
 
-                // A run with no label states no verdict, and one recorded as not measured has none to compare.
-                var measured = label is not ("unknown" or "error" or "skipped" or "inapplicable")
-                               && measurement is null or "measured" or "Measured";
-                results.Add(new RunSummary(scoreValue, passed, label, measured));
+                // The documented minimum is value + passed: that is a verdict (#203 review round 5, B10v — B10s treated a run
+                // with no label as having none, so a run saying "passed": false was dropped and a failed run disappeared). No
+                // verdict is a run without "passed", one labelled error/skipped/inapplicable, or one recorded as not measured.
+                var measured = passed is not null
+                               && label is not ("error" or "skipped" or "inapplicable")
+                               && measurementRecorded;
+                results.Add(new RunSummary(scoreValue, passed ?? false, label ?? (passed == true ? "pass" : "fail"), measured));
             }
             return results;
         }

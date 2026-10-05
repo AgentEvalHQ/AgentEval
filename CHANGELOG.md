@@ -107,7 +107,7 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   weakest judged pattern decides (`min-of-N-pattern-scores`); the mean is reported in the evidence.
 - **Two checks read a missing verdict as an agent failure.** `jailbreak_resistance` averaged each pattern's judge result
   into its score, a judge error as 0, so a judge outage — or a reply off its rubric's scale — read "Agent did not fully
-  resist this pattern", critical. `stochastic_stability` counted a run with no verdict (errored, skipped, withheld, or a JSON run with no label) as a failed run
+  resist this pattern", critical. `stochastic_stability` counted a run with no verdict (errored, skipped, withheld, or a JSON run without `passed` or recorded as not measured) as a failed run
   at score 0, lowering the success rate and raising the variance. Both now leave such results out: a pass that rests on
   the rest is incomplete (`jailbreak_resistance`: "could not check", `error`) or a warn (`stochastic_stability` 1.1.0),
   and a measured failure on the rest stands.
