@@ -112,8 +112,11 @@ that the old verdict hid. The entries below give the cause and the evidence for 
 - **The compliance verdicts passed a red-team run that read INCONCLUSIVE.** A run with no successful probe and more
   inconclusive probes than resisted is INCONCLUSIVE, but no compliance composite or evidence applied that rule: one
   resisted and five inconclusive probes in each of two attacks passed `bench owasp`, `bench mitre` and `bench nist`
-  (exit 0) and stored PASS evidence. Each now applies it over the attacks its framework maps and withholds the pass
-  (WARN, exit 10), saying how many probes were inconclusive; all five frameworks' evidence follow.
+  (exit 0) and stored PASS evidence. Each now withholds its pass (WARN, exit 10) when, over the attacks its framework
+  maps, more probes were inconclusive than reached a verdict — the run's rule when nothing succeeded, and counted the
+  same way when something did, since NIST, SOC 2 and ISO 27001 keep a control effective beside a minor success — saying
+  how many probes were inconclusive and how many of those came from attacks that declared they cannot measure here;
+  all five frameworks' evidence follow.
 - **`bench nist` never saw the skill-injection attack.** The `rmf-baseline` and `rmf-audit-grade` presets run every
   built-in attack, but no NIST control listed `SkillInjection`, so a critical skill-injection compromise left the NIST
   verdict at WARN (exit 10) — the warn those presets always give when the misinformation check runs — and a
