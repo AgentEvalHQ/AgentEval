@@ -243,17 +243,13 @@ public static class BenchOwaspCommand
                 subjectModel: agentModel);
             await store!.WriteScenarioResultAsync(runId, scenarioResult);
 
-            var verdict = incomplete ? "WARN" : compositeEval.Score.Label.ToUpperInvariant() switch
-            {
-                "PASS" => "PASS",
-                "WARN" => "WARN",
-                _      => "FAIL"
-            };
+            var runStats = new[] { compositeEval.Score }.ToRunStats();   // a skipped or errored result is not a failure (B8)
+            var verdict = incomplete ? "WARN" : compositeEval.Score.RunVerdict(runStats);   // nor a FAIL verdict (B9b)
             var summary = new RunSummary(
                 SchemaVersion: "1.0",
                 RunId: runId,
                 Verdict: verdict,
-                Stats: new[] { compositeEval.Score }.ToRunStats(),   // a skipped or errored result is not a failure (B8)
+                Stats: runStats,
                 Metrics: new Dictionary<string, double>
                 {
                     ["overallScore"] = compositeEval.Score.Value,

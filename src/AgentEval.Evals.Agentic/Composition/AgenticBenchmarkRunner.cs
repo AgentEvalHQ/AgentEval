@@ -105,12 +105,8 @@ public sealed class AgenticBenchmarkRunner
         // measured, a passed one that was skipped), so the buckets could add up to more than Total.
         var stats = leaves.Select(l => l.Result.Score).ToRunStats();
 
-        var verdict = root.Score.Label.ToUpperInvariant() switch
-        {
-            "PASS" => "PASS",
-            "WARN" => "WARN",
-            _      => "FAIL"
-        };
+        // A root that errored or measured nothing is not a FAIL (B9b): PENDING when nothing was measured, else WARN.
+        var verdict = root.Score.RunVerdict(stats);
 
         return new RunSummary(
             SchemaVersion: "1.0",

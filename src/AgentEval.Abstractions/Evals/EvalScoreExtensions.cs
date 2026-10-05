@@ -140,6 +140,63 @@ public static class EvalScoreExtensions
 
         return new AgentEval.Output.RunStats(total, passed, failed, warnings, skipped);
     }
+
+    /// <summary>
+    /// The status a report shows for a result: <c>PASS</c>, <c>WARN</c> or <c>FAIL</c> for a measured verdict;
+    /// <c>ERROR</c> when it produced no verdict because the judge or its input failed; <c>SKIPPED</c> when nothing was
+    /// measured (skipped or inapplicable).
+    /// </summary>
+    /// <remarks>
+    /// One rule for every report (#203 review, B9b). The agentic, GDPR and EU AI Act reports each mapped every label but
+    /// pass and warn to FAIL, so a judge that answered off its rubric's scale — or did not answer — read as an agent that
+    /// failed: "FAIL 0%", "Review failures in …", and a run with nothing measured read "FAIL (score 100%)". An unknown
+    /// label is read by the score's own pass flag.
+    /// </remarks>
+    public static string ReportStatus(this EvalScore score)
+    {
+        ArgumentNullException.ThrowIfNull(score);
+
+        return score.Label.ToLowerInvariant() switch
+        {
+            "pass" => "PASS",
+            "warn" => "WARN",
+            "fail" => "FAIL",
+            "error" => "ERROR",
+            "skipped" or "inapplicable" => "SKIPPED",
+            _ => score.Passed ? "PASS" : "FAIL",
+        };
+    }
+
+    /// <summary>
+    /// The verdict a run summary can carry (its schema allows <c>PASS</c>, <c>WARN</c>, <c>FAIL</c>, <c>PENDING</c>): the
+    /// root's measured verdict; otherwise <c>PENDING</c> when no check was measured and <c>WARN</c> when some were — a run
+    /// whose verdict errored is not a pass, and it is not a measured failure either (B9b).
+    /// </summary>
+    public static string RunVerdict(this EvalScore root, AgentEval.Output.RunStats stats)
+    {
+        ArgumentNullException.ThrowIfNull(root);
+        ArgumentNullException.ThrowIfNull(stats);
+
+        return root.Label.ToLowerInvariant() switch
+        {
+            "pass" => "PASS",
+            "warn" => "WARN",
+            "fail" => "FAIL",
+            _ => stats.Passed + stats.Failed + stats.Warnings == 0 ? "PENDING" : "WARN",
+        };
+    }
+
+    /// <summary>
+    /// Combines two <see cref="ReportStatus"/> values for a group (a category, a pillar): FAIL, then ERROR, then WARN win;
+    /// a mix of PASS and SKIPPED is WARN — a group that passed on part of its checks is not a clean pass.
+    /// </summary>
+    public static string CombineReportStatus(string a, string b)
+    {
+        if (a == b) return a;
+        if (a == "FAIL" || b == "FAIL") return "FAIL";
+        if (a == "ERROR" || b == "ERROR") return "ERROR";
+        return "WARN";
+    }
 }
 
 /// <summary>The four buckets of <see cref="AgentEval.Output.RunStats"/>; see <see cref="EvalScoreExtensions.StatsBucket"/>.</summary>

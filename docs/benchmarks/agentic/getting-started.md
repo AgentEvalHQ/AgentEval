@@ -262,6 +262,13 @@ warns as the table says, with its score uncapped; a judge score in a check's nee
 so a check that would fail the preset makes it WARN and the summary says "Not confirmed". In code, the effect is
 `EvalComponent.OnFailure` (`Fail`, `Warn`, or `Averaged` — the old behaviour, the default for your own composites).
 
+A report shows five statuses. `PASS`, `WARN` and `FAIL` are verdicts on the agent. `ERROR` means a check produced no
+verdict because its judge or its input failed (for example a judge reply off its rubric's scale); `SKIPPED` means
+nothing was measured. Neither is a verdict on the agent: the overall score then covers only the measured part, an
+errored check is listed as "produced no verdict", not as a failure to review, and `bench agentic` exits `11`
+(indeterminate), not `9` (gate failed). The run's `summary.json`, whose schema has no ERROR, records `WARN` when part
+of the run was measured and `PENDING` when none was.
+
 The same rule holds one level down, inside the seven evaluators built from sub-dimensions — so a failure cannot
 hide inside an evaluator either (before 0.44, an unauthorized action averaged out inside `task_adherence`, and the
 preset above it never saw a failure):

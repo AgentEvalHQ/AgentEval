@@ -104,6 +104,7 @@ public class AgenticBenchmarkReporterTests
     {
         var (_, _, report) = await RunAndReportAsync(stubScore: 100, "ReporterTestAgent4");
 
-        Assert.Contains(report.Summary.OverallStatus, new[] { "PASS", "WARN", "FAIL" });
+        // ERROR and SKIPPED are report statuses too (B9b): a run that errored or measured nothing is not a FAIL.
+        Assert.True(new[] { "PASS", "WARN", "FAIL", "ERROR", "SKIPPED" }.Contains(report.Summary.OverallStatus), $"status {report.Summary.OverallStatus}; root {report.CompositeTree.Score.Label}: {report.CompositeTree.Details.Summary}");
     }
 }

@@ -71,6 +71,15 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   through one exclusive rule, `EvalScore.StatsBucket()` / `ToRunStats()` (not measured → Skipped; else `warn` → Warnings;
   else passed or failed), the one `BenchmarkRunner` already used. The memory baseline store computed its skip count and
   then passed it positionally as `Warnings: 0`, so Skipped always read 0; it is written now.
+- **A judge that failed read as an agent that failed.** The agentic, GDPR and EU AI Act reports and run summaries, and
+  `bench owasp`, `mitre`, `nist` and `perf`, mapped every label but pass and warn to FAIL: a check whose judge answered off
+  its rubric's scale (or not at all) showed "FAIL 0%" and "Review failures in …", and a run with nothing measured read
+  "FAIL (score 100%)", exit 9. **Behaviour change:** reports show `ERROR` (no verdict: the judge or its input failed)
+  and `SKIPPED` (nothing measured) — the agentic, GDPR and EU AI Act result schemas accept both; the overall score is
+  labelled "of the measured part only"; an errored check is listed as "produced no verdict", not as a failure to
+  review; `bench agentic` exits 11 (indeterminate) for both. Run summaries (whose schema has PASS, WARN, FAIL, PENDING)
+  record `WARN` when part of the run was measured and `PENDING` when none was. One rule for all of them:
+  `EvalScore.ReportStatus()`, `RunVerdict()` and `CombineReportStatus()`.
 - **40 evaluator cards stated a threshold the evaluator does not run at.** A card's `defaultThreshold` is the evaluator's
   own pass threshold, and Mission Control prints it as "threshold ≥ x" and draws it on the score chart; coherence's card
   said 0.75 where the check passes at 0.60, `tool_call_success` 0.90 for 0.70, `error_rate` 0.05 for a score that passes

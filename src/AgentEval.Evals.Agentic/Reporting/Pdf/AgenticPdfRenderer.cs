@@ -81,7 +81,7 @@ public sealed class AgenticPdfRenderer
 
             // L2 Evaluator pages — one per failed or warned evaluator
             var failedOrWarnedEvaluators = result.Summary.PerEvaluator
-                .Where(kv => kv.Value.Status is "FAIL" or "WARN")
+                .Where(kv => kv.Value.Status is "FAIL" or "WARN" or "ERROR")
                 .OrderBy(kv => kv.Key, StringComparer.Ordinal)
                 .ToList();
 
@@ -396,7 +396,8 @@ public sealed class AgenticPdfRenderer
     {
         "PASS" => Colors.Green.Medium,
         "WARN" => Colors.Orange.Medium,
-        _ => Colors.Red.Medium
+        "FAIL" => Colors.Red.Medium,
+        _ => Colors.Grey.Medium   // ERROR, SKIPPED: no verdict on the agent (B9b)
     };
 
     private static string FormatPresetTitle(string preset)

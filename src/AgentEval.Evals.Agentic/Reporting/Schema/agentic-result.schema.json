@@ -75,8 +75,8 @@
           "description": "Composite score across all evaluators."
         },
         "overallStatus": {
-          "enum": ["PASS", "FAIL", "WARN"],
-          "description": "Overall verdict."
+          "enum": ["PASS", "FAIL", "WARN", "ERROR", "SKIPPED"],
+          "description": "Overall verdict: a measured PASS, WARN or FAIL; ERROR when a check the verdict rests on produced no verdict; SKIPPED when nothing was measured."
         },
         "perCategory": {
           "type": "object",
@@ -135,7 +135,7 @@
       "required": ["score", "status"],
       "properties": {
         "score":          { "type": "number", "minimum": 0, "maximum": 1 },
-        "status":         { "enum": ["PASS", "FAIL", "WARN"] },
+        "status":         { "enum": ["PASS", "FAIL", "WARN", "ERROR", "SKIPPED"] },
         "criticalFails":  { "type": "array", "items": { "type": "string" } }
       }
     },
@@ -144,7 +144,7 @@
       "required": ["score", "status", "severity"],
       "properties": {
         "score":       { "type": "number", "minimum": 0, "maximum": 1 },
-        "status":      { "enum": ["PASS", "FAIL", "WARN"] },
+        "status":      { "enum": ["PASS", "FAIL", "WARN", "ERROR", "SKIPPED"] },
         "severity":    { "enum": ["none", "low", "medium", "high", "critical"] },
         "confidence":  { "type": ["number", "null"], "minimum": 0, "maximum": 1 }
       }
