@@ -6,8 +6,8 @@
   "version": "1.0.0",
   "description": "Pure-code telemetry evaluator returning prompt + completion token counts from AgenticTelemetry. Lower is better when constrained by budget.",
   "costTier": "Trivial",
-  "higherIsBetter": false,
-  "defaultThreshold": 1.0,
+  "higherIsBetter": true,
+  "defaultThreshold": 0.8,
   "expectedInputs": [
     {
       "kind": "metadata",

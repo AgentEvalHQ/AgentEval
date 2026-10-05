@@ -4,10 +4,10 @@
   "name": "Telemetry: Error Rate",
   "category": "operational",
   "version": "1.0.0",
-  "description": "Pure-code telemetry evaluator computing the fraction of failed agent invocations from AgenticTelemetry. Lower is better.",
+  "description": "Pure-code telemetry evaluator computing the fraction of failed agent invocations from AgenticTelemetry. The rate is better lower; the score is its inverse, so a higher score is better.",
   "costTier": "Trivial",
-  "higherIsBetter": false,
-  "defaultThreshold": 0.05,
+  "higherIsBetter": true,
+  "defaultThreshold": 0.95,
   "expectedInputs": [
     {
       "kind": "metadata",

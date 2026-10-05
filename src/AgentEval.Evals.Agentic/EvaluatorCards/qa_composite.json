@@ -7,7 +7,7 @@
   "description": "Composite of 7 sub-LLM-judges (coherence, fluency, groundedness, relevance, completeness, similarity, response style) producing an aggregate Q&A quality score.",
   "costTier": "High",
   "higherIsBetter": true,
-  "defaultThreshold": 0.78,
+  "defaultThreshold": 0.7,
   "expectedInputs": [
     {
       "kind": "query",

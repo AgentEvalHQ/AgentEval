@@ -71,6 +71,12 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   through one exclusive rule, `EvalScore.StatsBucket()` / `ToRunStats()` (not measured → Skipped; else `warn` → Warnings;
   else passed or failed), the one `BenchmarkRunner` already used. The memory baseline store computed its skip count and
   then passed it positionally as `Warnings: 0`, so Skipped always read 0; it is written now.
+- **40 evaluator cards stated a threshold the evaluator does not run at.** A card's `defaultThreshold` is the evaluator's
+  own pass threshold, and Mission Control prints it as "threshold ≥ x" and draws it on the score chart; coherence's card
+  said 0.75 where the check passes at 0.60, `tool_call_success` 0.90 for 0.70, `error_rate` 0.05 for a score that passes
+  at 0.95. The seven telemetry and drift cards also said lower is better, while their scores are 1 − the rate. Every card
+  now carries the threshold its evaluator's result does, and a test builds each evaluator and compares. No evaluator's
+  behaviour changes.
 - **The agentic judges graded on a generic prompt; their rubrics were never sent.** `bench agentic` and `bench agentic
   calibrate` resolve one judge with no system prompt, so every agentic LLM check ran on a six-line default and its reply
   was read as a 0–100 score, while the 46 rubric files under `Resources/Prompts/` shipped as references (and half of

@@ -7,7 +7,7 @@
   "description": "LLM judge assessing whether the response length matched the user apparent need (not too terse for complex questions; not too verbose for simple ones).",
   "costTier": "Low",
   "higherIsBetter": true,
-  "defaultThreshold": 0.75,
+  "defaultThreshold": 0.7,
   "expectedInputs": [
     {
       "kind": "query",

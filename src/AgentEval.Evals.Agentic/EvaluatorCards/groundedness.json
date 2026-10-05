@@ -7,7 +7,7 @@
   "description": "Composite of 4 sub-LLM-judges checking whether each claim in the response is grounded in the provided context (no hallucinations).",
   "costTier": "Medium",
   "higherIsBetter": true,
-  "defaultThreshold": 0.85,
+  "defaultThreshold": 0.75,
   "expectedInputs": [
     {
       "kind": "response",

@@ -7,7 +7,7 @@
   "description": "Composite of 5 sub-LLM-judges assessing whether the agent stayed within scope, followed instructions, respected constraints, declined out-of-scope requests, and used the right tone. Aggregates into a single adherence score.",
   "costTier": "Medium",
   "higherIsBetter": true,
-  "defaultThreshold": 0.75,
+  "defaultThreshold": 0.7,
   "expectedInputs": [
     {
       "kind": "query",

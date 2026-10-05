@@ -7,7 +7,7 @@
   "description": "Deterministic-first evaluator: counts tool calls that returned errors vs successful results. Pure code; no LLM cost in the common case.",
   "costTier": "Trivial",
   "higherIsBetter": true,
-  "defaultThreshold": 0.9,
+  "defaultThreshold": 0.7,
   "expectedInputs": [
     {
       "kind": "toolCalls",
