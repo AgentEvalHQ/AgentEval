@@ -126,15 +126,17 @@ public sealed class AdjudicatedMultiJudgeWrapper : IEval
             return NoVerdict(panelResults);
 
         // ── 1c. A panel honours each judge's Required, as MultiJudgeWrapper does (#203 review round 3, B10g) ──────
-        // A required judge that errored leaves no verdict — the adjudicator settles disagreement, not a missing judge —
-        // unless the judges that answered already fail at high or critical; one that did not run withholds a pass.
+        // A required judge that errored leaves no verdict — the adjudicator settles disagreement, not a missing judge. No
+        // exception for a failure the answering judges show (B10n): with the missing judge passing, the panel would be
+        // disputed and the adjudicator would decide, so the answering judges decide nothing alone; the exception let a
+        // dispute reach the adjudicator, whose pass then stood over the missing judge. One that did not run withholds a pass.
         var requiredMissing = _judges.Zip(panelResults, (j, r) => (Judge: j, Result: r))
             .Where(p => p.Judge.Required && !p.Result.Score.CountsTowardAggregate()
                         && p.Result.Score.CensusBucket() != AgentEval.Evals.Meta.MeasurementState.NotApplicable)
             .ToArray();
         var requiredErrored = requiredMissing.Where(p => p.Result.Score.Label == "error").Select(p => p.Result.Metric.Key).ToArray();
         var requiredNotRun = requiredMissing.Where(p => p.Result.Score.Label != "error").Select(p => p.Result.Metric.Key).ToArray();
-        if (requiredErrored.Length > 0 && _aggregation.Aggregate(panelResults, _judges).Severity is not ("high" or "critical"))
+        if (requiredErrored.Length > 0)
             return RequiredJudgeErrored(panelResults, requiredErrored);
 
         // ── 2. Compute inter-rater agreement ──────────────────────────────────

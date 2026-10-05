@@ -116,9 +116,8 @@ public sealed class MultiJudgeWrapper : IEval
 
         // A partly measured panel honours each judge's Required, as a composite does (#203 review round 3, B10g): it
         // ignored it, so a GDPR/EU AuditGrade panel — every judge declared required — passed on one judge of three when
-        // the other two errored. A required judge that errored leaves no verdict ("error") unless the judges that answered
-        // already decide a failure under the severity rule; one that did not run otherwise withholds a pass. Optional
-        // judges never block.
+        // the other two errored. A required judge that errored leaves no verdict ("error") unless the panel fails even with
+        // every such judge at its best (B10n); one that did not run otherwise withholds a pass. Optional judges never block.
         var requiredMissing = Judges.Zip(subs, (j, r) => (Judge: j, Result: r))
             .Where(p => p.Judge.Required && !p.Result.Score.CountsTowardAggregate()
                         && p.Result.Score.CensusBucket() != MeasurementState.NotApplicable)
@@ -130,14 +129,7 @@ public sealed class MultiJudgeWrapper : IEval
         // back to the severity-driven verdict matrix otherwise. Mirrors
         // CompositeEval's behaviour so consumers can pick whichever shape
         // is right for their use case.
-        var label = Threshold is { } t
-            ? (score >= t ? "pass" : "fail")
-            : severity switch
-            {
-                "critical" or "high" => "fail",
-                "medium" => "warn",
-                _ => "pass"
-            };
+        var label = PanelLabel(score, severity);
 
         // A pass the panel cannot agree on is not a pass (#203 review, B6c-3). The aggregate passed, but a judge that
         // answered found a high or critical failure: the panel withholds its pass — warn, recorded as not measured, the
@@ -172,8 +164,16 @@ public sealed class MultiJudgeWrapper : IEval
         string? requiredNote = null;
         if (requiredErrored.Length > 0)
         {
-            // The answering judges decide only a failure the severity rule cannot undo; anything else needs them all.
-            var decided = label == "fail" && Threshold is null && severity is "high" or "critical";
+            // The answering judges decide a failure only when the panel fails even if every required judge that errored
+            // had passed perfectly (#203 review round 4, B10n): re-aggregated with them at 1.0. The heuristic it replaces —
+            // a high or critical failure without a threshold — was not decided under MajorityVote, where the missing
+            // judge's vote could flip the majority, and missed a threshold the answering judges cannot reach.
+            var bestCase = Judges.Zip(subs, (j, r) => j.Required && r.Score.Label == "error"
+                    ? r with { Score = new EvalScore(1.0, null, "pass", true, r.Score.Threshold, "none", null) }
+                    : r)
+                .ToArray();
+            var (bestScore, bestSeverity) = Aggregation.Aggregate(bestCase, Judges);
+            var decided = label == "fail" && PanelLabel(bestScore, bestSeverity) == "fail";
             if (!decided)
             {
                 label = "error";
@@ -210,6 +210,16 @@ public sealed class MultiJudgeWrapper : IEval
             Provenance: new("composite", null, null, null, null, cost, allCacheHits),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
+
+    // The panel's verdict path: the threshold when one is set, else the severity rule.
+    private string PanelLabel(double score, string severity) => Threshold is { } t
+        ? (score >= t ? "pass" : "fail")
+        : severity switch
+        {
+            "critical" or "high" => "fail",
+            "medium" => "warn",
+            _ => "pass"
+        };
 
     // No judge produced a measurement: "error" when any errored, else "skipped" — and NotApplicable, which never blocks
     // a parent, only when every judge said the case cannot test this.

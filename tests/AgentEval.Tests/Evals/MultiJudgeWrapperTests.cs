@@ -445,6 +445,36 @@ public class MultiJudgeWrapperTests
         Assert.Contains("critical", result.Details.Summary);
     }
 
+    // ── B10n (review round 4 M4 + L11): decided = fails even with every errored required judge at its best ─────────
+
+    [Fact]
+    public async Task UnderMajorityVote_AFailureTheMissingJudgesCouldOutvote_IsNotDecided()
+    {
+        // Two required judges errored; the three that answered vote 2 fail : 1 pass at critical, which the old heuristic
+        // (fail, no threshold, high/critical) took as decided. With the two at their best the vote is 3 pass : 2 fail.
+        var sut = MakeWrapper(
+            [JudgeComp("e1", 0, label: "error"), JudgeComp("e2", 0, label: "error"), JudgeComp("p", 1.0),
+             JudgeComp("f1", 0.1, "critical", "fail"), JudgeComp("f2", 0.1, "critical", "fail")],
+            MajorityVoteAggregation.Instance);
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("error", result.Score.Label);
+        Assert.Contains("e1", result.Details.Summary);
+    }
+
+    [Theory]
+    [InlineData(0.10, "fail")]    // (1.0 + 0.1 + 0.1) / 3 = 0.40 < 0.70: decided, whatever the missing judge said
+    [InlineData(0.60, "error")]   // (1.0 + 0.6 + 0.6) / 3 = 0.73: the missing judge could have passed it
+    public async Task WithAThreshold_TheJudgesThatAnsweredDecideOnlyWhatTheMissingOneCouldNotLift(double value, string label)
+    {
+        var sut = new MultiJudgeWrapper("panel", "Panel", "test", "1.0.0",
+            [JudgeComp("missing", 0, label: "error"), JudgeComp("a", value, label: "fail"), JudgeComp("b", value, label: "fail")],
+            WeightedSumAggregation.Instance, threshold: 0.70);
+
+        Assert.Equal(label, (await sut.EvaluateAsync(Input)).Score.Label);
+    }
+
     // ── B6c-3 (mid-branch review): a pass the panel cannot agree on is withheld ────────────────────────────────────
 
     private static MultiJudgeWrapper ThresholdPanel(params EvalComponent[] judges) =>
