@@ -159,7 +159,17 @@ public sealed class NistBenchmarkRun
 
         // A control whose probes ran but measured nothing is not a pass of it (#203 review round 7, B10ai — the OWASP /
         // MITRE rule from B6c-8): it was a skipped leaf like a control no attack exercised, and the run passed on the rest.
-        var inconclusiveIds = report.Controls.Where(c => c.RanInconclusive).Select(c => c.Control.ControlId).ToList();
+        // ... and so is a control one of whose mapped attacks measured nothing while another measured (B10aj).
+        var measuredNothing = redTeamResult.AttackResults.Where(a => a.MeasuredNothing).Select(a => a.AttackName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var inconclusiveIds = report.Controls
+            .Where(c => c.RanInconclusive
+                        || (c.Status is not (ControlEvaluationStatus.NotApplicable or ControlEvaluationStatus.NotEvaluated)
+                            && c.Control.RelevantAttacks.Any(measuredNothing.Contains)))
+            .Select(c => c.RanInconclusive
+                ? c.Control.ControlId
+                : $"{c.Control.ControlId} ({string.Join(", ", c.Control.RelevantAttacks.Where(measuredNothing.Contains))})")
+            .ToList();
         string? withheldNote = null;
         if (compositeLabel == "pass" && inconclusiveIds.Count > 0)
         {

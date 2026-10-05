@@ -252,7 +252,15 @@ public sealed class OwaspBenchmarkRun
 
         // A category whose probes ran but measured nothing is not a pass of that category (#203 review, B6c-8): it was
         // reported as "not tested in this preset", skipped, and the run passed on the rest. The pass is withheld.
-        var inconclusiveIds = report.Categories.Where(c => c.Status == CategoryTestStatus.Inconclusive).Select(c => c.Id).ToList();
+        // An attack that measured nothing withholds the pass even when another attack in its category measured (#203
+        // review round 8, B10aj): the category's pass rate covers only the attacks that measured.
+        var reportIds = report.Categories.Select(c => c.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var inconclusiveIds = report.Categories.Where(c => c.Status == CategoryTestStatus.Inconclusive).Select(c => c.Id)
+            .Concat(redTeamResult.AttackResults
+                .Where(a => a.MeasuredNothing && a.OwaspId is { } id && reportIds.Contains(id)
+                            && report.Categories.Any(c => string.Equals(c.Id, id, StringComparison.OrdinalIgnoreCase) && c.Status != CategoryTestStatus.Inconclusive))
+                .Select(a => $"{a.OwaspId} ({a.AttackName})"))
+            .ToList();
         var withheld = compositeLabel == "pass" && inconclusiveIds.Count > 0;
         if (withheld)
         {

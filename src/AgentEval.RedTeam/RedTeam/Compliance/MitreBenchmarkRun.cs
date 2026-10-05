@@ -263,7 +263,15 @@ public sealed class MitreBenchmarkRun
 
         // A category whose probes ran but measured nothing is not a pass of that category (#203 review, B6c-8): it was
         // reported as "not tested in this preset", skipped, and the run passed on the rest. The pass is withheld.
-        var inconclusiveIds = report.Techniques.Where(t => t.Status == TechniqueTestStatus.Inconclusive).Select(t => t.Id).ToList();
+        // An attack that measured nothing withholds the pass even when another attack on its technique measured (B10aj).
+        var inconclusiveTechniques = report.Techniques.Where(t => t.Status == TechniqueTestStatus.Inconclusive).Select(t => t.Id).ToHashSet();
+        var reportTechniques = report.Techniques.Select(t => t.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var inconclusiveIds = inconclusiveTechniques
+            .Concat(redTeamResult.AttackResults
+                .Where(a => a.MeasuredNothing)
+                .SelectMany(a => (a.MitreAtlasIds ?? []).Where(id => reportTechniques.Contains(id) && !inconclusiveTechniques.Contains(id))
+                    .Select(id => $"{id} ({a.AttackName})")))
+            .ToList();
         var withheld = compositeLabel == "pass" && inconclusiveIds.Count > 0;
         if (withheld)
         {

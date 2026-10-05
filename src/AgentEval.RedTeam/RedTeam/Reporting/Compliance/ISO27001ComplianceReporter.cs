@@ -417,8 +417,13 @@ public class ISO27001ComplianceReporter : IComplianceReporter<ISO27001Compliance
         var failed = controls.Count(x => x.Status == ControlEvaluationStatus.NeedsImprovement.ToString());
         // Honesty (RC-6): never persist PASS when nothing was conclusively evaluated (all-inconclusive run
         // yields passed=warnings=failed=0). Record NOT_EVALUATED instead of a fabricated green PASS.
+        var nothingNames = result.AttackResults.Where(a => a.MeasuredNothing).Select(a => a.AttackName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        // B10ai: a control that ran inconclusive withholds the PASS; B10aj: so does one with an attack that measured nothing.
         var overallStatus = ComplianceStatusPolicy.OverallEvidenceStatus(passed, warnings, failed,
-            report.Controls.Count(c => c.RanInconclusive));   // B10ai: a control that ran inconclusive withholds the PASS
+            report.Controls.Count(c => c.RanInconclusive
+                                       || (c.Status is not (ControlEvaluationStatus.NotApplicable or ControlEvaluationStatus.NotEvaluated)
+                                           && c.Control.RelevantAttacks.Any(nothingNames.Contains))));
 
         // T4-4: the honesty disclaimer is rendered into the human-facing report surfaces (markdown footer
         // + PDF), NOT injected as a synthetic control row here. A "DISCLAIMER" EvidenceControl would pollute

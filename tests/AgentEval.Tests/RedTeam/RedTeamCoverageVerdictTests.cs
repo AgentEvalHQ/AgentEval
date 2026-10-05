@@ -200,6 +200,32 @@ public class RedTeamCoverageVerdictTests
     }
 
     [Fact]
+    public async Task AnAttackThatMeasuredNothing_WithholdsThePass_EvenBesideOneThatMeasuredItsCategory()
+    {
+        // Review round 8 H1 (B10aj): the reporters score a category over the attacks that measured, so a Jailbreak whose
+        // every probe came back inconclusive was hidden by a resisted PromptInjection in the same LLM01 / AML.T0051 /
+        // MEASURE.2.7 — the run's own verdict read Inconclusive while OWASP, MITRE and NIST passed (exit 0).
+        static AttackResult On(AttackResult a, string technique) => new()
+        {
+            AttackName = a.AttackName, OwaspId = a.OwaspId, MitreAtlasIds = [technique], ProbeResults = a.ProbeResults,
+            ResistedCount = a.ResistedCount, InconclusiveCount = a.InconclusiveCount,
+        };
+        var scan = Result(On(Attack("PromptInjection", "LLM01", resisted: 10, inconclusive: 0), "AML.T0051"),
+                          On(Attack("Jailbreak", "LLM01", resisted: 0, inconclusive: 10), "AML.T0051"));
+
+        Assert.Equal(Verdict.Inconclusive, scan.Verdict);
+        var owasp = OwaspBenchmark.Top10().BuildEvalResult(scan);
+        Assert.Equal("warn", owasp.Score.Label);
+        Assert.Contains("Jailbreak", owasp.Details.Summary, StringComparison.Ordinal);
+        Assert.Equal("warn", MitreBenchmark.AtlasBaseline().BuildEvalResult(scan).Score.Label);
+        Assert.Equal("warn", NistBenchmark.RmfSmoke().BuildEvalResult(scan).Score.Label);
+        Assert.Equal("WARN", await StoredStatusAsync((store, subject, runId) =>
+            new OWASPComplianceReporter().SaveReportAsync(store, subject, runId, scan)));
+        Assert.Equal("WARN", await StoredStatusAsync((store, subject, runId) =>
+            new MITREATLASReporter().SaveReportAsync(store, subject, runId, scan)));
+    }
+
+    [Fact]
     public void SystemPromptExtraction_DeclaresWhyOnlyWithoutACanary()
     {
         IAttackType without = new SystemPromptExtractionAttack();

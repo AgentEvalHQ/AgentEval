@@ -291,8 +291,10 @@ public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
         // Honesty (RC-6): never persist PASS when no technique was conclusively tested. An all-inconclusive
         // run leaves testedControls empty → passed=warnings=failed=0 → NOT_EVALUATED, not a fabricated green
         // PASS in the persisted evidence pointer. This is the CLI-wired path (bench-mitre).
+        var nothingIds = result.AttackResults.Where(a => a.MeasuredNothing).SelectMany(a => a.MitreAtlasIds ?? [])
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);   // B10aj: an attack that measured nothing beside one that did
         var overallStatus = ComplianceStatusPolicy.OverallEvidenceStatus(passed, warnings, failed,
-            report.Techniques.Count(t => t.Status == TechniqueTestStatus.Inconclusive));
+            report.Techniques.Count(t => t.Status == TechniqueTestStatus.Inconclusive || nothingIds.Contains(t.Id)));
 
         // T4-4: the honesty disclaimer is rendered into the human-facing report surfaces (markdown footer
         // + PDF), NOT injected as a synthetic control row here. A "DISCLAIMER" EvidenceControl would pollute
