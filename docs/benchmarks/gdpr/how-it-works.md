@@ -136,13 +136,13 @@ A pillar that fails any threshold fails `calibrate`. The CI workflow (`.github/w
 
 ### Calibration quality today
 
-The project's calibration figures are not published, so this section states what is known instead of a quality grade:
+The project's latest figures are in [Calibration results](../calibration-results.md): on 2026-10-05, with Bitdeer `zai-org/GLM-5.3-Flash` as the judge, five of six pillars passed, and pillar 4 missed κ ≥ 0.70 by one case. They describe that judge model on that day. What is known about the earlier runs:
 
 - The last recorded runs were in May 2026, on the maintainer's Azure OpenAI deployments. The reports were not committed and do not record which judge model produced them.
 - On those runs pillars 1–5 met the strict gate. Pillar 6 (governance), added later, met only a relaxed κ ≥ 0.60 gate (88.0%, κ 0.658 with gpt-4o-mini).
 - Those runs predate 0.42.0-beta, when `calibrate` graded with the generic default judge prompt rather than the GDPR prompt `bench gdpr` sends, so none of them measured the judge configuration the benchmark uses. From 0.42.0-beta, `calibrate` sends the same prompt.
 
-Treat the judge as uncalibrated for your deployment until you re-run `calibrate` (0.42.0-beta or later) against your own judge, or calibration reports are published.
+Treat the judge as uncalibrated for your deployment until you re-run `calibrate` (0.42.0-beta or later) against your own judge.
 
 ---
 

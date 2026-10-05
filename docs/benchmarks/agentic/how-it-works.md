@@ -156,7 +156,7 @@ The dispatched evaluators are registered in `src/AgentEval.Evals.Agentic/Agentic
 
 ### Calibration quality today
 
-The project's calibration reports are not published. The qualitative picture by category, with the gate each category is held to (`s_categoryOverrides` in `src/AgentEval.Cli/Commands/BenchAgenticCalibrateCommand.cs`; the default is 0.85 / 0.70):
+The project's latest figures, for one judge model on one day, are in [Calibration results](../calibration-results.md). The qualitative picture by category, with the gate each category is held to (`s_categoryOverrides` in `src/AgentEval.Cli/Commands/BenchAgenticCalibrateCommand.cs`; the default is 0.85 / 0.70):
 
 | Category | Calibration status | Notes |
 |---|---|---|

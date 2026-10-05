@@ -254,7 +254,7 @@ The calibration report records per-pillar accuracy (fraction of entries within a
 - Cohen's kappa ≥ 0.70 per pillar
 - Zero evaluation failures (judge errors) per pillar
 
-A pillar that fails any threshold fails the command (exit code 9). The dated Markdown report is written under the working directory unless you pass `--out`; the project's own calibration reports are not published.
+A pillar that fails any threshold fails the command (exit code 9). The dated Markdown report is written under the working directory unless you pass `--out`; the project's own results for its judge are in [Calibration results](../calibration-results.md).
 
 **Fixed in 0.42.0-beta:** `calibrate` now sends `gdpr-judge-system.v1.md`, the same judge prompt `bench gdpr` sends; both resolve their judge through one resolver, so they cannot drift apart again. Before 0.42.0-beta, `calibrate` graded with the generic default judge prompt, so calibration figures from earlier versions describe a different judge configuration from the benchmark run. Re-run `calibrate` against your own judge.
 
