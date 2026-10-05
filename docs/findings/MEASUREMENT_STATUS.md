@@ -14790,6 +14790,10 @@ f1_score/pass: all 2 record(s) asserting 'pass' reach NO verdict
 f1_score: NOT ONE golden record asserts the 'fail' verdict — the set is single-direction
 ```
 
+> **Superseded (2026-10-05, #203 B12a / B12c).** `CalibrationEntry` now carries an optional `GroundTruth` that
+> `CalibrationRunner` passes on, and `F1ScoreEval` without a reference is *not measured* (`skipped`) instead of
+> returning `0.0`. The record below is kept as it was found.
+
 **Its two records classify `ResponseBlind`, not `Judged`.** `F1ScoreEval` needs `EvalInput.GroundTruth`;
 `CalibrationRunner` builds `new EvalInput(Query: entry.Input, Response: entry.AgentResponse)` and
 `CalibrationEntry` has **eight fields and no ground-truth column** (`ScenarioId`, `EvaluatorKey`,

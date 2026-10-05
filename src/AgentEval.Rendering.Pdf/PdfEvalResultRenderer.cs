@@ -139,7 +139,11 @@ public sealed class PdfEvalResultRenderer : IEvalResultRenderer
             // withheld WARN read only "OVERALL: WARN" (#203 review round 13 L4, B10bd). Leaves keep theirs on their pages.
             if (!string.IsNullOrWhiteSpace(root.Details.Summary))
                 col.Item().PaddingTop(8).Text(root.Details.Summary!).FontSize(11);
-            if (root.Details.Recommendations is { Count: > 0 } rootRecs)
+            // A recommendation the summary already states is not printed again: the summary is usually the first
+            // recommendation (a withheld pass, a coverage note, a skipped result) — it read twice (B12f).
+            var summary = root.Details.Summary ?? "";
+            if (root.Details.Recommendations?.Where(r => !summary.Contains(r, StringComparison.Ordinal)).ToList()
+                is { Count: > 0 } rootRecs)
             {
                 foreach (var r in rootRecs.Take(MaxCoverRecommendations))
                     col.Item().Text($"• {r}").FontSize(10);

@@ -113,6 +113,22 @@ public sealed class GroundTruthWiringTests
     }
 
     [Fact]
+    public void TheQaAndSimilarityCards_DescribeWhatTheyRun()
+    {
+        // Review round 14 L3 (B12f): "7 sub-LLM-judges ... response style" and "or embedding-based" described judges and
+        // a path that do not exist.
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "AgentEval.sln")))
+            dir = dir.Parent;
+        string Description(string key) => System.Text.Json.JsonDocument.Parse(File.ReadAllText(Path.Combine(dir!.FullName,
+            "src", "AgentEval.Evals.Agentic", "EvaluatorCards", $"{key}.json"))).RootElement.GetProperty("description").GetString()!;
+
+        Assert.DoesNotContain("response style", Description("qa_composite"), StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("F1", Description("qa_composite"), StringComparison.Ordinal);
+        Assert.DoesNotContain("embedding", Description("similarity"), StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void NoCard_SaysAMissingReferenceScoresZero()
     {
         // Review round 14 M2 (B12d): the f1_score card still said a missing reference "returns 0 with a 'medium'

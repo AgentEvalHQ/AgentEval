@@ -253,6 +253,26 @@ public class PdfEvalResultRendererTests
         Assert.Contains("WHYSUMMARYQZX", text, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task TheCover_NamesTheNoteOnce_WhenTheSummaryIsTheFirstRecommendation()
+    {
+        // Review round 14 L1 (B12f): the summary is usually the first recommendation (a withheld pass, a coverage note,
+        // a skipped result), and the cover printed it twice.
+        const string note = "ONCEONLYNOTEZQ the pass is withheld.";
+        var root = new EvalResult(
+            Metric: new("owasp.top10", "OWASP", "compliance.owasp", "1.0.0"),
+            Score: new(0.9, null, "warn", false, 1.0, "none", null),
+            Details: new(null, null, [note, "SECONDRECZQ re-run."], [MakeAtomic("leaf", 1.0, "pass", true, "none")], "Min") { Summary = note },
+            Provenance: new("composite", null, null, null, null, 0, false),
+            EvaluatedAt: DateTimeOffset.UtcNow);
+
+        using var doc = UglyToad.PdfPig.PdfDocument.Open(await new PdfEvalResultRenderer().RenderAsync(root, DefaultOpts()));
+        var cover = doc.GetPage(1).Text;
+
+        Assert.Equal(1, System.Text.RegularExpressions.Regex.Matches(cover, "ONCEONLYNOTEZQ").Count);
+        Assert.Contains("SECONDRECZQ", cover, StringComparison.Ordinal);
+    }
+
     private static string ExtractAllTextFromPdf(byte[] bytes)
     {
         var sb = new StringBuilder();
