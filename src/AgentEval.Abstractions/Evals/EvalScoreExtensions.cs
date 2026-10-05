@@ -96,4 +96,64 @@ public static class EvalScoreExtensions
 
         return new ObservationCensus(measured, notApplicable, notMeasured);
     }
+
+    /// <summary>
+    /// The ONE <see cref="AgentEval.Output.RunStats"/> bucket a check's score is counted in: not measured (skipped,
+    /// errored, inapplicable, or a composite that withheld its pass) → <see cref="RunStatsBucket.Skipped"/>; else a
+    /// <c>warn</c> → <see cref="RunStatsBucket.Warnings"/>; else <see cref="EvalScore.Passed"/> decides.
+    /// </summary>
+    /// <remarks>
+    /// One exclusive chain, so the buckets always add up to the total (#203 review, B8). The runners used to count four
+    /// independent predicates — a <c>warn</c> that was not measured was both a warning and skipped, a passed one both
+    /// passed and skipped — and a contrived leaf set summed to 6 of 4; and the single-composite commands filed a
+    /// skipped or errored result under Failed.
+    /// </remarks>
+    public static RunStatsBucket StatsBucket(this EvalScore score)
+    {
+        ArgumentNullException.ThrowIfNull(score);
+
+        if (score.CensusBucket() != MeasurementState.Measured) return RunStatsBucket.Skipped;
+        if (string.Equals(score.Label, "warn", StringComparison.Ordinal)) return RunStatsBucket.Warnings;
+        return score.Passed ? RunStatsBucket.Passed : RunStatsBucket.Failed;
+    }
+
+    /// <summary>Counts a set of check scores into <see cref="AgentEval.Output.RunStats"/>, each in its one
+    /// <see cref="StatsBucket"/>.</summary>
+    /// <param name="scores">One score per check.</param>
+    /// <returns>Stats whose four buckets add up to <c>Total</c>.</returns>
+    public static AgentEval.Output.RunStats ToRunStats(this IEnumerable<EvalScore> scores)
+    {
+        ArgumentNullException.ThrowIfNull(scores);
+
+        int total = 0, passed = 0, failed = 0, warnings = 0, skipped = 0;
+        foreach (var score in scores)
+        {
+            total++;
+            switch (score.StatsBucket())
+            {
+                case RunStatsBucket.Passed: passed++; break;
+                case RunStatsBucket.Failed: failed++; break;
+                case RunStatsBucket.Warnings: warnings++; break;
+                default: skipped++; break;
+            }
+        }
+
+        return new AgentEval.Output.RunStats(total, passed, failed, warnings, skipped);
+    }
+}
+
+/// <summary>The four buckets of <see cref="AgentEval.Output.RunStats"/>; see <see cref="EvalScoreExtensions.StatsBucket"/>.</summary>
+public enum RunStatsBucket
+{
+    /// <summary>Measured and passed.</summary>
+    Passed,
+
+    /// <summary>Measured and failed.</summary>
+    Failed,
+
+    /// <summary>Measured, with a <c>warn</c> label.</summary>
+    Warnings,
+
+    /// <summary>Not measured: skipped, errored, inapplicable, or a withheld composite.</summary>
+    Skipped,
 }

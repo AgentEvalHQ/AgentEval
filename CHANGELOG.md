@@ -57,6 +57,13 @@ that the old verdict hid. The entries below give the cause and the evidence for 
     data captured: run with `--trace`, which now passes the trace's tool calls — see below), Reasoning (a
     response without plan or list markers skips the plan and goal-decomposition checks), Telemetry (zero calls), Judge
     Quality (a missing input), and Tool Call Accuracy / Agentic Execution (no tool definitions captured, or definitions with no tool calls).
+- **Run stats: every check in exactly one bucket.** The agentic, GDPR and EU AI Act runners counted passed, failed,
+  warnings and skipped as four independent predicates, so a `warn` that was not measured counted as a warning and as
+  skipped, and the buckets could add up to more than `Total` (four leaves counted six times). `bench owasp`, `mitre`,
+  `nist`, `perf` and the two trace-fidelity commands filed a skipped or errored result under Failed. All of them now count
+  through one exclusive rule, `EvalScore.StatsBucket()` / `ToRunStats()` (not measured → Skipped; else `warn` → Warnings;
+  else passed or failed), the one `BenchmarkRunner` already used. The memory baseline store computed its skip count and
+  then passed it positionally as `Warnings: 0`, so Skipped always read 0; it is written now.
 - **Composite edge cases.** A composite whose required components did not run and whose only error was in an optional
   component reported `error`, and its parent read that as a REQUIRED error: nested, the same leaves gave `error` where
   flat they gave `warn`. Nothing measured is now `error` only when a component the verdict rests on errored (any one when

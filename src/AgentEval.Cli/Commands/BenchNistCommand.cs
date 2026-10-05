@@ -225,11 +225,7 @@ public static class BenchNistCommand
                 SchemaVersion: "1.0",
                 RunId: runId,
                 Verdict: verdict,
-                Stats: new RunStats(
-                    Total: 1,
-                    Passed: compositeEval.Score.Passed ? 1 : 0,
-                    Failed: !compositeEval.Score.Passed && compositeEval.Score.Label != "warn" ? 1 : 0,
-                    Warnings: compositeEval.Score.Label == "warn" ? 1 : 0),
+                Stats: new[] { compositeEval.Score }.ToRunStats(),   // a skipped or errored result is not a failure (B8)
                 Metrics: new Dictionary<string, double>
                 {
                     ["overallScore"] = compositeEval.Score.Value,

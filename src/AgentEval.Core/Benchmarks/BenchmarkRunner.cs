@@ -281,16 +281,17 @@ public sealed class BenchmarkRunner
             var score = observation.Result.Score;
             var bucket = score.CensusBucket();
 
-            if (bucket != MeasurementState.Measured)
-            {
-                skipped++;
-                if (bucket == MeasurementState.NotApplicable) notApplicable++; else notMeasured++;
-                continue;
-            }
+            if (bucket == MeasurementState.NotApplicable) notApplicable++;
+            else if (bucket == MeasurementState.NotMeasured) notMeasured++;
 
-            if (string.Equals(score.Label, "warn", StringComparison.Ordinal)) warnings++;
-            else if (score.Passed) passed++;
-            else failed++;
+            // The shared exclusive chain (B8), which this runner's own chain was the model for.
+            switch (score.StatsBucket())
+            {
+                case RunStatsBucket.Passed: passed++; break;
+                case RunStatsBucket.Failed: failed++; break;
+                case RunStatsBucket.Warnings: warnings++; break;
+                default: skipped++; break;
+            }
         }
 
         var total = observations.Count;

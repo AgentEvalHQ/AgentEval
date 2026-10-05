@@ -112,11 +112,7 @@ public static class BenchWorkflowTraceFidelityCommand
                 SchemaVersion: "1.0",
                 RunId: runId,
                 Verdict: verdict,
-                Stats: new RunStats(
-                    Total: subResults.Count,
-                    Passed: subResults.Count(s => s.Score.Passed),
-                    Failed: subResults.Count(s => !s.Score.Passed),
-                    Warnings: 0),
+                Stats: subResults.Select(s => s.Score).ToRunStats(),   // one bucket per check (B8)
                 Metrics: new Dictionary<string, double> { ["workflow_trace_fidelity_score100"] = result.Score.Value * 100 });
             await store.CompleteRunAsync(manifest, summary, ct);
 

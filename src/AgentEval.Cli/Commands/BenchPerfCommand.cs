@@ -203,11 +203,7 @@ public static class BenchPerfCommand
                 SchemaVersion: "1.0",
                 RunId: runId,
                 Verdict: verdict,
-                Stats: new RunStats(
-                    Total: 1,
-                    Passed: result.Score.Passed ? 1 : 0,
-                    Failed: !result.Score.Passed && result.Score.Label != "warn" ? 1 : 0,
-                    Warnings: result.Score.Label == "warn" ? 1 : 0),
+                Stats: new[] { result.Score }.ToRunStats(),   // a skipped or errored result is not a failure (B8)
                 Metrics: new Dictionary<string, double>
                 {
                     ["overallScore"] = result.Score.Value,
