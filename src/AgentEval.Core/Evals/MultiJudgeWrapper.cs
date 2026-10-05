@@ -182,6 +182,12 @@ public sealed class MultiJudgeWrapper : IEval
                 requiredNote = $"Required judge(s) produced no verdict: {string.Join(", ", requiredErrored)}; the panel " +
                                "reports no verdict on the judges that answered.";
             }
+            else
+            {
+                // A decided failure still says which judge is missing (review round 5 L-5, B10x): it said nothing.
+                requiredNote = $"Required judge(s) produced no verdict: {string.Join(", ", requiredErrored)}; the judges " +
+                               $"that answered fail the panel even if {(requiredErrored.Length == 1 ? "it" : "they")} had passed.";
+            }
         }
         else if (requiredNotRun.Length > 0 && label == "pass")
         {

@@ -475,6 +475,21 @@ public class MultiJudgeWrapperTests
         Assert.Equal(label, (await sut.EvaluateAsync(Input)).Score.Label);
     }
 
+    [Fact]
+    public async Task ADecidedFailure_StillNamesTheRequiredJudgeThatProducedNoVerdict()
+    {
+        // Review round 5 L-5 (B10x): the panel failed and said nothing about the missing judge.
+        var sut = new MultiJudgeWrapper("panel", "Panel", "test", "1.0.0",
+            [JudgeComp("missing", 0, label: "error"), JudgeComp("a", 0.10, label: "fail"), JudgeComp("b", 0.10, label: "fail")],
+            WeightedSumAggregation.Instance, threshold: 0.70);
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("fail", result.Score.Label);
+        Assert.Contains("missing", result.Details.Summary);
+        Assert.Contains("even if it had passed", result.Details.Summary);
+    }
+
     // ── B6c-3 (mid-branch review): a pass the panel cannot agree on is withheld ────────────────────────────────────
 
     private static MultiJudgeWrapper ThresholdPanel(params EvalComponent[] judges) =>

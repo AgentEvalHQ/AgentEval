@@ -103,6 +103,38 @@ public class CompositeEvalComponentEffectTests
     }
 
     [Fact]
+    public async Task AnAveragedPass_NamesWhatItAbsorbed_ButAnEffectOrACleanPassDoesNot()
+    {
+        // The owner's decision on B10h (B10t): Averaged keeps its verdict, but a pass never hides a part whose own verdict
+        // was warn or fail — the summary names it.
+        var child = new CompositeEval("child", "Child", "test", "1.0.0",
+            [new EvalComponent(new Fixed("ok", "pass", 1.0), 0.5),
+             new EvalComponent(new WithSeverity("style", "fail", 0.6, "low"), 0.5) { OnFailure = ComponentFailureEffect.Warn }],
+            WeightedSumAggregation.Instance, threshold: null);
+        var averaged = new CompositeEval("parent", "Parent", "test", "1.0.0",
+            [new EvalComponent(child, 1.0)], WeightedSumAggregation.Instance, threshold: null);
+        var withEffect = new CompositeEval("parent", "Parent", "test", "1.0.0",
+            [new EvalComponent(child, 1.0) { OnFailure = ComponentFailureEffect.Warn }], WeightedSumAggregation.Instance, threshold: null);
+        var flat = new CompositeEval("flat", "Flat", "test", "1.0.0",
+            [new EvalComponent(new Fixed("a", "pass", 1.0), 0.5), new EvalComponent(new Fixed("b", "fail", 0.6), 0.5)],
+            WeightedSumAggregation.Instance, threshold: 0.7);   // 0.80 clears the bar
+        var clean = new CompositeEval("clean", "Clean", "test", "1.0.0",
+            [new EvalComponent(new Fixed("a", "pass", 1.0), 1.0)], WeightedSumAggregation.Instance, threshold: 0.7);
+
+        var nested = await averaged.EvaluateAsync(Input);
+        Assert.Equal("pass", nested.Score.Label);                                   // the verdict is unchanged
+        Assert.Contains("Absorbed by the average", nested.Details.Summary);
+        Assert.Contains("child (warn)", nested.Details.Summary);
+
+        var flatResult = await flat.EvaluateAsync(Input);
+        Assert.Equal("pass", flatResult.Score.Label);
+        Assert.Contains("b (fail)", flatResult.Details.Summary);
+
+        Assert.Null((await clean.EvaluateAsync(Input)).Details.Summary);              // nothing absorbed, nothing said
+        Assert.DoesNotContain("Absorbed", (await withEffect.EvaluateAsync(Input)).Details.Summary ?? "");   // the effect names it
+    }
+
+    [Fact]
     public async Task TheSummary_NeverStatesAVerdictTheLabelContradicts()
     {
         // Review round 3 M1: the threshold fails this composite (0.45 < 0.8) while only a Warn-effect dimension failed; the

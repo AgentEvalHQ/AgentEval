@@ -81,6 +81,11 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   `skipped` with "No component produced a measurement (0 errored, 0 skipped, 0 inapplicable)", though the parts inside
   were measured — the Tool Call Accuracy preset did this whenever no tool definitions were captured. It now withholds
   too (`warn`, recorded `notMeasured`) and names the components; a breakdown counts the withheld ones.
+- **A composite's pass could hide a part that warned or failed under the default `Averaged` effect.** A component left to
+  the score (no `OnFailure` effect, the default for your own composites) whose own verdict was warn or fail was averaged
+  into a parent pass without a word. The verdict is unchanged — averaging is what the author asked for, and the GDPR /
+  EU AI Act articles absorb single scenario failures by design — but the summary now names each one: "Absorbed by the
+  average (OnFailure = Averaged): <key> (fail), <key> (warn)". Set `OnFailure` to `Warn` or `Fail` to make it count.
 - **`bench trace-fidelity` and `bench workflow-trace-fidelity` passed a warn.** A score of 0.80–0.99 was labelled
   `warn` but `Passed = true`, and both commands decided from `Passed`: "Verdict: PASS", a stored PASS, exit 0 — every
   other bench command exits 10 for a warn. `Passed` is now true only on a pass; the commands store the root's verdict

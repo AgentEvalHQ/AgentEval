@@ -142,6 +142,23 @@ public class ReportStatusTests
         Assert.Equal(label, (await composite.EvaluateAsync(new EvalInput("q", "r"))).Score.Label);
     }
 
+    [Fact]
+    public async Task TheDecidedNote_CountsTheErroredParts()
+    {
+        // Review round 5 L-3 (B10x): the note said "even if it had passed" with two required parts errored.
+        var composite = new CompositeEval("c", "C", "test", "1.0.0",
+            [new EvalComponent(new Fixed(Severe("e1", "error", false, "none")), 1.0),
+             new EvalComponent(new Fixed(Severe("e2", "error", false, "none")), 1.0),
+             new EvalComponent(new Fixed(Severe("f", "fail", false, "medium", 0.10)), 1.0)],
+            WeightedSumAggregation.Instance, threshold: 0.85);   // best case (1 + 1 + 0.1) / 3 = 0.70
+
+        var result = await composite.EvaluateAsync(new EvalInput("q", "r"));
+
+        Assert.Equal("fail", result.Score.Label);
+        Assert.Contains("2 required parts produced no verdict", result.Details.Summary);
+        Assert.Contains("even if they had passed", result.Details.Summary);
+    }
+
     // The real GDPR / EU tree: threshold-only articles of scenarios, severity-rule pillars, a severity-capped preset.
     private static (CompositeEval Article, CompositeEval Pillar, CompositeEval Preset) GdprShape(EvalResult firstScenario)
     {

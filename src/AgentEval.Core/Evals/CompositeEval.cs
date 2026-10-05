@@ -496,13 +496,29 @@ public sealed class CompositeEval : IEval
                   // must not contradict the label (#203 review round 3, B10d).
                   (label == "warn" ? ", so the verdict is warn, not fail." : ".")
                 : null;
+        // Singular or plural, as many required parts errored (review round 5 L-3, B10x).
+        var erroredRequired = Components.Zip(subs, (c, s) => (Component: c, Sub: s))
+            .Count(p => p.Component.Required && p.Sub.Score.Label == "error");
+        var (parts, they) = erroredRequired == 1 ? ("A required part", "it") : ($"{erroredRequired} required parts", "they");
         string? decidedNote = decidedDespiteError
             ? decidedBySeverity
-                ? $"A required part produced no verdict, but a {decidedSeverity} failure the measured parts show decides it: fail."
-                : $"A required part produced no verdict, but the score cannot reach the threshold ({Threshold:0.##}) even if it " +
+                ? $"{parts} produced no verdict, but a {decidedSeverity} failure the measured parts show decides it: fail."
+                : $"{parts} produced no verdict, but the score cannot reach the threshold ({Threshold:0.##}) even if {they} " +
                   "had passed: fail."
             : null;
-        var coverageNote = string.Join(" ", new[] { decidedNote, effectNote, nothingMeasuredNote ?? partialCoverageNote }.Where(n => n is not null))
+        // What the default Averaged effect absorbed (the owner's decision on B10h, B10t): a component left to the score
+        // whose own verdict was warn or fail is named, so a pass never hides it. The verdict is unchanged — averaging is
+        // what the composite's author asked for; OnFailure = Warn or Fail makes it count.
+        var absorbed = Components.Zip(subs, (c, s) => (Component: c, Sub: s))
+            .Where(p => p.Component.OnFailure == ComponentFailureEffect.Averaged
+                        && p.Sub.Score.CountsTowardAggregate()
+                        && p.Sub.Score.Label is "fail" or "warn")
+            .Select(p => $"{p.Sub.Metric.Key} ({p.Sub.Score.Label}{(p.Component.Required ? "" : ", optional")})")
+            .ToArray();
+        string? absorbedNote = absorbed.Length > 0 && label is "pass" or "warn"
+            ? $"Absorbed by the average (OnFailure = Averaged): {string.Join(", ", absorbed)}."
+            : null;
+        var coverageNote = string.Join(" ", new[] { decidedNote, effectNote, nothingMeasuredNote ?? partialCoverageNote, absorbedNote }.Where(n => n is not null))
                            is { Length: > 0 } joined ? joined : null;
 
         return new EvalResult(
