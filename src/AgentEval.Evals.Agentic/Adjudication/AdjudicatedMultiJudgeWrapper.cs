@@ -125,8 +125,22 @@ public sealed class AdjudicatedMultiJudgeWrapper : IEval
         if (!panelResults.Any(r => r.Score.CountsTowardAggregate()))
             return NoVerdict(panelResults);
 
+        // ── 1c. A panel honours each judge's Required, as MultiJudgeWrapper does (#203 review round 3, B10g) ──────
+        // A required judge that errored leaves no verdict — the adjudicator settles disagreement, not a missing judge —
+        // unless the judges that answered already fail at high or critical; one that did not run withholds a pass.
+        var requiredMissing = _judges.Zip(panelResults, (j, r) => (Judge: j, Result: r))
+            .Where(p => p.Judge.Required && !p.Result.Score.CountsTowardAggregate()
+                        && p.Result.Score.CensusBucket() != AgentEval.Evals.Meta.MeasurementState.NotApplicable)
+            .ToArray();
+        var requiredErrored = requiredMissing.Where(p => p.Result.Score.Label == "error").Select(p => p.Result.Metric.Key).ToArray();
+        var requiredNotRun = requiredMissing.Where(p => p.Result.Score.Label != "error").Select(p => p.Result.Metric.Key).ToArray();
+        if (requiredErrored.Length > 0 && _aggregation.Aggregate(panelResults, _judges).Severity is not ("high" or "critical"))
+            return RequiredJudgeErrored(panelResults, requiredErrored);
+
         // ── 2. Compute inter-rater agreement ──────────────────────────────────
-        var (agreement, agreementMethod) = ComputeAgreement(panelResults);
+        // Over the judges that answered: an errored or skipped judge is not a vote, and counting its label made three
+        // agreeing judges read as disputed (B10g).
+        var (agreement, agreementMethod) = ComputeAgreement(panelResults.Where(r => r.Score.CountsTowardAggregate()).ToArray());
 
         // ── 3. Decide: aggregate panel or adjudicate ──────────────────────────
         bool disputed = agreement < _agreementThreshold;
@@ -170,6 +184,12 @@ public sealed class AdjudicatedMultiJudgeWrapper : IEval
         var recommendations = disputed
             ? new[] { $"Panel disagreement detected (agreement={agreement:F3} < threshold={_agreementThreshold:F3}). Adjudicator verdict applied." }
             : null;
+        if (requiredNotRun.Length > 0 && finalScore.Label == "pass")
+        {
+            finalScore = finalScore with { Label = "warn", Passed = false, Severity = "none", Measurement = AgentEval.Evals.Meta.MeasurementState.NotMeasured };
+            var note = $"Required judge(s) that did not run: {string.Join(", ", requiredNotRun)}; a pass cannot rest on the judges that answered, so it is withheld.";
+            recommendations = recommendations is null ? [note] : [.. recommendations, note];
+        }
 
         var cost = panelResults.Sum(r => r.Provenance.EstimatedCost)
                  + (adjudicatorResult?.Provenance.EstimatedCost ?? 0.0);
@@ -207,6 +227,27 @@ public sealed class AdjudicatedMultiJudgeWrapper : IEval
                     ? AgentEval.Evals.Meta.MeasurementState.NotApplicable
                     : AgentEval.Evals.Meta.MeasurementState.Measured,
             },
+            Details: new(
+                Dimensions: null,
+                Evidence: null,
+                Recommendations: [note],
+                SubResults: panelResults,
+                AggregationStrategy: _aggregation.Name)
+            {
+                Summary = note,
+            },
+            Provenance: new("multi-judge-adjudicated", null, null, null, null,
+                panelResults.Sum(r => r.Provenance.EstimatedCost), false),
+            EvaluatedAt: DateTimeOffset.UtcNow);
+    }
+
+    private EvalResult RequiredJudgeErrored(EvalResult[] panelResults, string[] errored)
+    {
+        var note = $"Required panel judge(s) produced no verdict: {string.Join(", ", errored)}; no verdict is reported on the " +
+                   "judges that answered, and the adjudicator was not asked.";
+        return new EvalResult(
+            Metric: new(Key, Name, Category, Version),
+            Score: new EvalScore(0.0, null, "error", false, _agreementThreshold, "none", null),
             Details: new(
                 Dimensions: null,
                 Evidence: null,

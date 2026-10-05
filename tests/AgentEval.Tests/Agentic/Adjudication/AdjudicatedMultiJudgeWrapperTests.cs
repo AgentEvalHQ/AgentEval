@@ -170,6 +170,42 @@ public class AdjudicatedMultiJudgeWrapperTests
     }
 
     [Fact]
+    public async Task ARequiredJudgeThatErrored_LeavesNoVerdict_AndTheAdjudicatorIsNotAsked()
+    {
+        // B10g (review round 3 M4, swept): three passes and one errored judge cleared the 0.70 agreement bar and passed.
+        var judges = new EvalComponent[]
+        {
+            new(new StubEval("pass", 1.0), 1.0),
+            new(new StubEval("pass", 1.0), 1.0),
+            new(new StubEval("pass", 1.0), 1.0),
+            new(new StubEval("error", 0.0), 1.0),
+        };
+        var wrapper = BuildWrapper(judges, new ThrowingAdjudicator());
+
+        var result = await wrapper.EvaluateAsync(new EvalInput(Query: "q", Response: "r"));
+
+        Assert.Equal("error", result.Score.Label);
+        Assert.False(result.Score.Passed);
+    }
+
+    [Fact]
+    public async Task AnOptionalJudgeThatErrored_DoesNotBlock()
+    {
+        var judges = new EvalComponent[]
+        {
+            new(new StubEval("pass", 1.0), 1.0),
+            new(new StubEval("pass", 1.0), 1.0),
+            new(new StubEval("pass", 1.0), 1.0),
+            new(new StubEval("error", 0.0), 1.0, Required: false),
+        };
+        var wrapper = BuildWrapper(judges, new ThrowingAdjudicator());
+
+        var result = await wrapper.EvaluateAsync(new EvalInput(Query: "q", Response: "r"));
+
+        Assert.NotEqual("error", result.Score.Label);
+    }
+
+    [Fact]
     public async Task EveryPanelJudgeSkipped_IsSkipped_NotPass()
     {
         var judges = new EvalComponent[]

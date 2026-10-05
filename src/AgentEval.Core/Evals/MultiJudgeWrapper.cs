@@ -110,10 +110,21 @@ public sealed class MultiJudgeWrapper : IEval
 
         // Nothing measured is no verdict — CompositeEval's ADR-030 rule, which this wrapper lacked. The aggregation
         // returns (0, "none") when every judge errored or skipped, and both verdict paths below read that as a pass, so
-        // a panel none of whose judges answered passed its parent (#203 review, round 2 M-1). A partly measured panel
-        // is unchanged: the judges that answered decide.
+        // a panel none of whose judges answered passed its parent (#203 review, round 2 M-1).
         if (!subs.Any(s => s.Score.CountsTowardAggregate()))
             return NoVerdict(subs, cost, allCacheHits);
+
+        // A partly measured panel honours each judge's Required, as a composite does (#203 review round 3, B10g): it
+        // ignored it, so a GDPR/EU AuditGrade panel — every judge declared required — passed on one judge of three when
+        // the other two errored. A required judge that errored leaves no verdict ("error") unless the judges that answered
+        // already decide a failure under the severity rule; one that did not run otherwise withholds a pass. Optional
+        // judges never block.
+        var requiredMissing = Judges.Zip(subs, (j, r) => (Judge: j, Result: r))
+            .Where(p => p.Judge.Required && !p.Result.Score.CountsTowardAggregate()
+                        && p.Result.Score.CensusBucket() != MeasurementState.NotApplicable)
+            .ToArray();
+        var requiredErrored = requiredMissing.Where(p => p.Result.Score.Label == "error").Select(p => p.Result.Metric.Key).ToArray();
+        var requiredNotRun = requiredMissing.Where(p => p.Result.Score.Label != "error").Select(p => p.Result.Metric.Key).ToArray();
 
         // Honour the optional Threshold parameter (when supplied) — falls
         // back to the severity-driven verdict matrix otherwise. Mirrors
@@ -134,9 +145,12 @@ public sealed class MultiJudgeWrapper : IEval
         // dissent's severity riding along (which failed a parent through a passing result: the inversion B6c-3 removed)
         // or letting one judge's verdict override the median (which would make the panel worst-judge-wins).
         // A dissent is judged by the PANEL's bar, not each judge's own: a judge that fails only a stricter threshold of
-        // its own is not disagreeing with the panel. (Without a threshold the severity path already fails on high.)
-        var severeDissent = label == "pass" && Threshold is { } bar
-            ? subs.Where(s => s.Score.CountsTowardAggregate() && s.Score.Value < bar
+        // its own is not disagreeing with the panel. Without a threshold the bar is the judge's own verdict: the severity
+        // path does not fail on a high dissent the aggregation outvotes (majority vote: 2 passes and 1 critical failure
+        // read pass; the comment here used to claim otherwise — B10g).
+        var severeDissent = label == "pass"
+            ? subs.Where(s => s.Score.CountsTowardAggregate()
+                              && (Threshold is { } bar ? s.Score.Value < bar : !s.Score.Passed)
                               && s.Score.Severity is "high" or "critical").ToArray()
             : [];
         string? dissentNote = null;
@@ -154,6 +168,31 @@ public sealed class MultiJudgeWrapper : IEval
         {
             severity = "none";   // a milder dissent the aggregate absorbed stays absorbed
         }
+
+        string? requiredNote = null;
+        if (requiredErrored.Length > 0)
+        {
+            // The answering judges decide only a failure the severity rule cannot undo; anything else needs them all.
+            var decided = label == "fail" && Threshold is null && severity is "high" or "critical";
+            if (!decided)
+            {
+                label = "error";
+                severity = "none";
+                measurement = MeasurementState.Measured;   // "error" is its own not-measured state (CensusBucket)
+                requiredNote = $"Required judge(s) produced no verdict: {string.Join(", ", requiredErrored)}; the panel " +
+                               "reports no verdict on the judges that answered.";
+            }
+        }
+        else if (requiredNotRun.Length > 0 && label == "pass")
+        {
+            label = "warn";
+            severity = "none";
+            measurement = MeasurementState.NotMeasured;
+            requiredNote = $"Required judge(s) that did not run: {string.Join(", ", requiredNotRun)}; a pass cannot rest " +
+                           "on the judges that answered, so it is withheld.";
+        }
+        if (requiredNote is not null)
+            dissentNote = dissentNote is null ? requiredNote : dissentNote + " " + requiredNote;
         var passed = label == "pass";
 
         return new EvalResult(

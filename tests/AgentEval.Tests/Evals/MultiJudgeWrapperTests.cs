@@ -394,13 +394,55 @@ public class MultiJudgeWrapperTests
     }
 
     [Fact]
-    public async Task APartlyMeasuredPanel_IsDecidedByTheJudgesThatAnswered()
+    public async Task APartlyMeasuredPanel_WithOnlyOptionalJudgesMissing_IsDecidedByTheJudgesThatAnswered()
     {
-        var sut = MakeWrapper([JudgeComp("a", 0.9), JudgeComp("b", 0, label: "error")]);
+        var sut = MakeWrapper([JudgeComp("a", 0.9), JudgeComp("b", 0, label: "error") with { Required = false }]);
 
         var result = await sut.EvaluateAsync(Input);
 
         Assert.Equal("pass", result.Score.Label);
+    }
+
+    // ── B10g (review round 3 M4): a panel honours each judge's Required ──────────────────────────────────────────
+
+    [Fact]
+    public async Task ARequiredJudgeThatErrored_LeavesNoVerdict_NotAPassOnTheOthers()
+    {
+        // The GDPR/EU AuditGrade panel declares every judge required; with two of three errored it passed on one judge.
+        var sut = ThresholdPanel(JudgeComp("j1", 0.95), JudgeComp("j2", 0, label: "error"), JudgeComp("j3", 0, label: "error"));
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("error", result.Score.Label);
+        Assert.False(result.Score.Passed);
+        Assert.Contains("j2", result.Details.Summary);
+    }
+
+    [Fact]
+    public async Task ARequiredJudgeThatDidNotRun_WithholdsThePass()
+    {
+        var sut = ThresholdPanel(JudgeComp("j1", 0.95), JudgeComp("j2", 0.9), JudgeComp("j3", 0, label: "skipped"));
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("warn", result.Score.Label);
+        Assert.Equal(AgentEval.Evals.Meta.MeasurementState.NotMeasured, result.Score.Measurement);
+        Assert.Contains("j3", result.Details.Summary);
+    }
+
+    [Fact]
+    public async Task WithoutAThreshold_ACriticalDissentTheVoteOutweighs_WithholdsThePass()
+    {
+        // The comment claimed "without a threshold the severity path already fails on high"; a majority vote of two
+        // passes outweighed a critical failure and read pass.
+        var sut = MakeWrapper(
+            [JudgeComp("j1", 1.0), JudgeComp("j2", 1.0), JudgeComp("j3", 0.1, severity: "critical", label: "fail")],
+            MajorityVoteAggregation.Instance);
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("warn", result.Score.Label);
+        Assert.Contains("critical", result.Details.Summary);
     }
 
     // ── B6c-3 (mid-branch review): a pass the panel cannot agree on is withheld ────────────────────────────────────

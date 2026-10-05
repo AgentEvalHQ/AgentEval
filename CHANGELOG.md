@@ -305,7 +305,14 @@ that the old verdict hid. The entries below give the cause and the evidence for 
 - **A multi-judge panel passed when none of its judges answered.** `MultiJudgeWrapper` and
   `AdjudicatedMultiJudgeWrapper` (used for critical GDPR/EU AI Act articles) read the empty aggregate of a panel whose
   judges all errored or skipped as a pass. Such a panel now reports `error` (any judge errored) or `skipped`, and
-  the adjudicator is not asked; a partly measured panel is unchanged.
+  the adjudicator is not asked. A partly measured panel honours each judge's `Required`, as a composite does: a
+  required judge that errored leaves no verdict (`error`) unless the judges that answered already decide a failure under
+  the severity rule, and one that did not run withholds a pass — the GDPR/EU AuditGrade panel declares every judge
+  required, and it passed on one judge of three when the other two errored. A high or critical dissent withholds a
+  pass without a threshold too: under majority vote two passes outweighed a critical failure.
+  `AdjudicatedMultiJudgeWrapper` follows the same `Required` rule (the adjudicator settles disagreement, not a missing
+  judge), and computes agreement over the judges that answered: an errored judge counted as a dissent, so three
+  agreeing judges beside one error were "disputed" and sent to the adjudicator.
 - **The performance budget checks called a run nobody timed "inapplicable".** With no performance data, or no token
   usage from the provider, the latency, token and first-token checks now report `skipped` (not measured), so a
   benchmark run with them cannot pass. A run that was measured but not streamed is still inapplicable for time to
