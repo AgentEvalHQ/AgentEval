@@ -129,7 +129,8 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   skill-injection attack that measured nothing never withheld a NIST pass. It now maps to MEASURE.2.7 (security and
   resilience), and to SOC 2 CC6.6 and ISO 27001 A.8.3 beside the other injection attacks. The opt-in attacks map where
   their default-roster counterparts do (Crescendo, PAIR and TAP beside `Jailbreak`, `ToolEscalation` beside
-  `ExcessiveAgency`, in every framework — a test holds each to exactly its counterpart's controls; ISO 27001 A.8.3 also
+  `ExcessiveAgency`, in NIST, SOC 2 and ISO 27001 — a test holds each to exactly its counterpart's controls there;
+  in MITRE ATLAS each keeps its own techniques, e.g. the multi-turn jailbreaks are AML.T0054 only; ISO 27001 A.8.3 also
   takes `IndirectInjection`). A test checks that every built-in attack, opt-in
   ones included, maps to a NIST control and an OWASP category; SOC 2 and ISO 27001 map a subset, and the attacks they
   leave out (supply chain, data poisoning, vector embedding, misinformation; for ISO also inference-API abuse) are

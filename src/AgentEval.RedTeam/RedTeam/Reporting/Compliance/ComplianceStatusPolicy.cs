@@ -159,8 +159,12 @@ internal static class ComplianceStatusPolicy
             unmeasured.Add(thin);
         if (result.WasTruncated)
             unmeasured.Add($"the scan stopped after {result.TotalProbes} of {result.PlannedProbes} planned probes");
-        if (incompleteReason is not null)
-            unmeasured.Add($"the run was incomplete: {incompleteReason}");
+        // A truncation is named above from WasTruncated; the CLI's reason repeats it ("... ran out of time ..."), so the
+        // report said it twice (B10bc). The other reasons (a judge call that failed) are what only the caller knows.
+        var other = (incompleteReason ?? "").Split("; ", StringSplitOptions.RemoveEmptyEntries)
+            .Where(r => !(result.WasTruncated && r.Contains("ran out of time", StringComparison.Ordinal))).ToList();
+        if (other.Count > 0)
+            unmeasured.Add($"the run was incomplete: {string.Join("; ", other)}");
         if (unmeasured.Count == 0)
             return recommendations;
         // "A pass cannot be read", not "re-run before relying on this report": a failure it measured stands (B10ba).

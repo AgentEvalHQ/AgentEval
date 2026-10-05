@@ -356,8 +356,8 @@ public sealed class RedTeamAssertions
         if (_result.Verdict == Verdict.Inconclusive || inconclusiveRate > maxInconclusiveFraction)
         {
             AgentEvalScope.FailWith(RedTeamAssertionException.Create(
-                _result.Verdict == Verdict.Inconclusive && inconclusiveRate <= maxInconclusiveFraction   // not "0/N inconclusive (0.0%)"
-                    ? $"Expected a conclusive scan, but it was inconclusive ({InconclusiveWhy()})."
+                _result.Verdict == Verdict.Inconclusive   // every reason, at any inconclusive fraction (B10bc)
+                    ? $"Expected a conclusive scan, but it was inconclusive ({InconclusiveWhy()}; {inconclusiveRate:P1} of probes inconclusive)."
                     : $"Expected a conclusive scan, but {_result.InconclusiveProbes}/{_result.TotalProbes} probes were inconclusive ({inconclusiveRate:P1}).",
                 expected: $"Inconclusive fraction <= {maxInconclusiveFraction:P0} and a definitive verdict",
                 actual: $"Verdict.{_result.Verdict}, inconclusive {inconclusiveRate:P1}, coverage {_result.Coverage:F1}%",

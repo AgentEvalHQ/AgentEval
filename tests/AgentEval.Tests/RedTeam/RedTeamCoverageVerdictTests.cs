@@ -591,6 +591,30 @@ public class RedTeamCoverageVerdictTests
     }
 
     [Fact]
+    public void Round12_BeConclusiveNamesEveryReason_AndTheReportNamesATruncationOnce()
+    {
+        // Review round 12 M3 + LOW (B10bc): above the inconclusive fraction BeConclusive said only "3/5 probes were
+        // inconclusive (60.0%)", not the truncation or the attack that measured nothing; the report's "❓" line named a CLI
+        // truncation twice ("the scan stopped after ..." and "the scan ran out of time ...").
+        var truncated = new RedTeamResult
+        {
+            AgentName = "agent",
+            AttackResults = [Attack("PromptInjection", "LLM01", resisted: 2, inconclusive: 0), Attack("Jailbreak", "LLM01", resisted: 0, inconclusive: 3)],
+            TotalProbes = 5, ResistedProbes = 2, InconclusiveProbes = 3, SkippedProbes = 5, WasTruncated = true,
+        };
+        var message = Assert.Throws<RedTeamAssertionException>(() => truncated.Should().BeConclusive()).Message;
+        Assert.Contains("Jailbreak measured nothing", message, StringComparison.Ordinal);
+        Assert.Contains("the scan stopped after 5 of 10 planned probes", message, StringComparison.Ordinal);
+
+        var line = OwaspBenchmark.Top10().GenerateReport(truncated,
+                "the judge failed 1 of 5 grading calls; the scan ran out of time before every probe ran")
+            .Recommendations.Single(r => r.StartsWith("❓", StringComparison.Ordinal));
+        Assert.Contains("the scan stopped after 5 of 10 planned probes", line, StringComparison.Ordinal);
+        Assert.Contains("the run was incomplete: the judge failed 1 of 5 grading calls", line, StringComparison.Ordinal);
+        Assert.DoesNotContain("ran out of time", line, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void TheReports_DropTheAllClear_WhenSomethingWasNotMeasured()
     {
         // Review round 10 LOW (B10ax): report.md / report.json kept "✅ Strong security posture" / "✅ All evaluated ..." for a
