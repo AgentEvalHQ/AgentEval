@@ -117,9 +117,11 @@ public sealed class AgentEvaluatorEvalLeaf : IEval
 
         return new EvalResult(
             Metric: new EvalMetadata(Key, Name, Category, Version),
+            // The bridged state comes along with the label (B10q): a node that withheld its pass is a warn the parent
+            // must read as not measured, not as a measured warn.
             Score: new EvalScore(
                 Value: agg.Value, Ordinal: null, Label: agg.Label, Passed: agg.Passed,
-                Threshold: _threshold, Severity: agg.Severity, Confidence: null),
+                Threshold: _threshold, Severity: agg.Severity, Confidence: null) { Measurement = agg.Measurement },
             Details: new EvalDetails(
                 Dimensions: null,
                 Evidence: evidence.ToArray(),

@@ -7,6 +7,7 @@ using System.Text.RegularExpressions;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI.Evaluation;
 using AgentEval.Evals;
+using AgentEval.Evals.Meta;
 
 namespace AgentEval.MAF.Evaluators;
 
@@ -88,6 +89,32 @@ public static class MeaiToEvalResultBridge
         double score0To100;
         string? markerLabel = null, markerSeverity = null;
         var marker = reason is null ? Match.Empty : s_scoreMarker.Match(reason);
+
+        // Without AgentEval's marker, a metric MEAI could not score is no verdict (#203 review round 4, B10q): an error
+        // diagnostic (MEAI's quality evaluators record "Failed to parse ... score" or a missing evaluator context that
+        // way and leave the value empty), an Inconclusive rating, or no value at all. All of them fell to the last branch
+        // below and read PASS 100 — a judge whose reply did not parse passed. A metric that is neither numeric nor
+        // boolean and carries no interpretation states no verdict either: not measured, never a pass.
+        if (!marker.Success)
+        {
+            var errors = metric.Diagnostics?
+                .Where(d => d.Severity == EvaluationDiagnosticSeverity.Error)
+                .Select(d => d.Message)
+                .ToList() ?? [];
+            var noValue = metric switch
+            {
+                NumericMetric n => n.Value is null,
+                BooleanMetric b => b.Value is null,
+                _ => false,
+            };
+            if (errors.Count > 0 || noValue || metric.Interpretation?.Rating == EvaluationRating.Inconclusive)
+                return NoVerdictLeaf(key, metric, "error",
+                    errors.Count > 0 ? string.Join(" ", errors) : reason ?? "The metric has no usable value.", judgeModel);
+            if (metric is not (NumericMetric or BooleanMetric) && metric.Interpretation is null)
+                return NoVerdictLeaf(key, metric, "skipped",
+                    reason ?? "The metric carries no score and no interpretation, so it states no verdict.", judgeModel);
+        }
+
         if (marker.Success)
         {
             score0To100 = Math.Clamp(double.Parse(marker.Groups[1].Value, CultureInfo.InvariantCulture), 0, 100);
@@ -112,6 +139,11 @@ public static class MeaiToEvalResultBridge
             score0To100 = (likelyAbove1 || (nearOne && metric.Interpretation?.Failed == true))
                 ? Math.Clamp((v - 1) / 4.0 * 100.0, 0, 100)
                 : Math.Clamp(v * 100.0, 0, 100);
+        }
+        else if (metric is BooleanMetric { Value: { } b })
+        {
+            // A boolean is its own verdict: false read 100 (the last branch) when there was no interpretation.
+            score0To100 = b ? 100 : 0;
         }
         else
         {
@@ -162,27 +194,73 @@ public static class MeaiToEvalResultBridge
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 
+    // A leaf with no verdict: "error" (MEAI could not score it) or "skipped" (it states none). Never a 0 and never a pass.
+    private static EvalResult NoVerdictLeaf(string key, EvaluationMetric metric, string label, string message, string? judgeModel)
+    {
+        var isLlm = metric.Name.StartsWith("llm_", StringComparison.OrdinalIgnoreCase);
+        return new EvalResult(
+            Metric: new EvalMetadata(key, Prettify(metric.Name), CategoryFor(metric.Name), "1.0.0"),
+            Score: new EvalScore(0.0, null, label, false, 0.70, "none", null)
+            {
+                Measurement = label == "skipped" ? MeasurementState.NotMeasured : MeasurementState.Measured,
+            },
+            Details: new EvalDetails(
+                Dimensions: null,
+                Evidence: [new EvalEvidence(Source: isLlm ? "judge" : "code", Reference: metric.Name, Message: message)],
+                Recommendations: null,
+                SubResults: null,
+                AggregationStrategy: null) { Summary = message },
+            Provenance: new EvalProvenance(isLlm ? "atomic-llm" : "atomic-code", isLlm ? judgeModel : null,
+                null, null, null, 0, false),
+            EvaluatedAt: DateTimeOffset.UtcNow);
+    }
+
+    // Every metric is a required part (B10q): the score is the mean of the measured ones; a metric with no verdict is
+    // never averaged in as a 0, never lets the node pass (an error is "error" unless a measured failure decides it; one
+    // that did not run withholds a pass), and nothing measured is no verdict. Before, the mean took the placeholders
+    // and the label was pass/fail only, so an errored metric made its query FAIL.
     private static EvalResult Composite(
         string key, string name, string category, IReadOnlyList<EvalResult> subs, EvalResult? verdictFrom = null)
     {
-        var avg = verdictFrom?.Score.Value ?? (subs.Count == 0 ? 0 : subs.Average(s => s.Score.Value));
-        var passed = verdictFrom?.Score.Passed ?? (subs.Count > 0 && subs.All(s => s.Score.Passed));
+        var measured = subs.Where(s => s.Score.CountsTowardAggregate()).ToList();
+        var failing = measured.Where(s => s.Score.Label is "fail").ToList();
+        var errored = subs.Any(s => s.Score.Label == "error");
+        var notRun = subs.Any(s => !s.Score.CountsTowardAggregate() && s.Score.Label != "error"
+                                   && s.Score.CensusBucket() == MeasurementState.NotMeasured);
+        var derivedLabel =
+            measured.Count == 0 ? (errored ? "error" : "skipped")
+            : failing.Count > 0 ? "fail"
+            : errored ? "error"
+            : notRun || measured.Any(s => s.Score.Label == "warn") ? "warn"
+            : "pass";
+        var label = verdictFrom?.Score.Label ?? derivedLabel;
+        var passed = verdictFrom?.Score.Passed ?? derivedLabel == "pass";
+        var avg = verdictFrom?.Score.Value ?? (measured.Count == 0 ? 0 : measured.Average(s => s.Score.Value));
+        var severity = verdictFrom?.Score.Severity ?? derivedLabel switch
+        {
+            "fail" => SeverityRollup.Max(failing.Select(s => s.Score.Severity).Append("medium")),
+            "warn" => notRun && !measured.Any(s => s.Score.Label == "warn") ? "none" : "medium",
+            _ => "none",
+        };
+        var measurement = verdictFrom is null && derivedLabel == "warn" && notRun && !measured.Any(s => s.Score.Label == "warn")
+            ? MeasurementState.NotMeasured
+            : MeasurementState.Measured;
         return new EvalResult(
             Metric: new EvalMetadata(key, name, category, "1.0.0"),
             Score: new EvalScore(
                 Value: avg,
                 Ordinal: null,
-                Label: verdictFrom?.Score.Label ?? (passed ? "pass" : "fail"),
+                Label: label,
                 Passed: passed,
                 Threshold: 0.70,
-                Severity: verdictFrom?.Score.Severity ?? (passed ? "none" : "high"),
-                Confidence: null),
+                Severity: severity,
+                Confidence: null) { Measurement = verdictFrom?.Score.Measurement ?? measurement },
             Details: new EvalDetails(
                 Dimensions: null,
                 Evidence: null,
                 Recommendations: null,
                 SubResults: subs,
-                AggregationStrategy: "mean"),
+                AggregationStrategy: "mean-of-measured"),
             Provenance: new EvalProvenance("composite", null, null, null, null, 0, false),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }

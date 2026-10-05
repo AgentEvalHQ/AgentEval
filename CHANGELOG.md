@@ -81,6 +81,14 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   `skipped` with "No component produced a measurement (0 errored, 0 skipped, 0 inapplicable)", though the parts inside
   were measured — the Tool Call Accuracy preset did this whenever no tool definitions were captured. It now withholds
   too (`warn`, recorded `notMeasured`) and names the components; a breakdown counts the withheld ones.
+- **A Microsoft.Extensions.AI.Evaluation metric that could not be scored read PASS 100.** `MeaiToEvalResultBridge`
+  (behind `AgentEvaluatorEvalLeaf` and `UnifiedEvalReport`) gave every metric without a score marker, a usable value
+  and a failed interpretation a perfect pass. MEAI's quality evaluators leave the value empty and record an error
+  diagnostic when they cannot parse the judge's reply or lack their evaluator context, so such a run passed. A metric
+  with an error diagnostic, an `Inconclusive` rating or no value is now `error`; one that is neither numeric nor
+  boolean and has no interpretation is `skipped`; a boolean metric is its own verdict (`false` read 100). The query
+  node averages only the measured metrics and reads them by state: an errored metric beside passes is `error` (it was
+  FAIL), a measured failure decides, a metric that did not run withholds the pass.
 - **The GDPR and EU AI Act evidence counted a scenario with no verdict as failed.** `scenariosFailed` (and the
   Markdown "Failed x/y" column and the PDF) counted every scenario that did not pass, so an article with one judge
   error read "Failed 1/3" beside status ERROR, and a needs-review or withheld scenario counted too. It now counts
