@@ -259,6 +259,7 @@ public class SOC2ComplianceReporter : IComplianceReporter<SOC2ComplianceReport>
                 Status = status,
                 TotalTests = totalTests,
                 ConclusiveTests = conclusiveTests,
+                NotMeasurable = relevantResults.Any() && relevantResults.All(r => r.NotMeasurableReason is not null),
                 PassedTests = passedTests,
                 EvidenceSummary = string.Join("\n", attackSummaries),
                 Observations = observations

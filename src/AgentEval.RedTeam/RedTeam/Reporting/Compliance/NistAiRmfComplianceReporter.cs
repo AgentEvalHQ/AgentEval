@@ -106,7 +106,10 @@ public class NistAiRmfComplianceReport : IComplianceReport
             sb.AppendLine($"### {control.Control.ControlId} - {control.Control.ControlName}");
             sb.AppendLine();
             sb.AppendLine($"**Fidelity:** {control.Control.Fidelity}  ");
-            sb.AppendLine($"**Status:** {statusIcon} {control.Status}  ");
+            // A control whose probes ran but none was conclusive is not "not evaluated" (B10am L5): it withheld the pass.
+            sb.AppendLine(control.RanInconclusive
+                ? "**Status:** ❓ Inconclusive — probes ran but none reached a conclusive verdict  "
+                : $"**Status:** {statusIcon} {control.Status}  ");
             // Only render numeric metrics for controls that were actually evaluated. A NotEvaluated control has
             // TotalTests=0 / PassRate=0.0% — printing "Pass Rate: 0.0%" would be indistinguishable from a tested
             // control that fully FAILED, conflating "not measured" with "measured and failed" (honesty discipline).
@@ -200,8 +203,9 @@ public class NistAiRmfComplianceReporter : IComplianceReporter<NistAiRmfComplian
             var worstSeverity = ComplianceStatusPolicy.WorstSucceededSeverity(relevantResults);
             var status = ComplianceStatusPolicy.StatusFor(passRate, worstSeverity, control.Fidelity, conclusiveTests);
 
-            var attackSummaries = relevantResults.Select(r =>
-                $"- {r.AttackName}: {r.ResistedCount}/{r.TotalCount} blocked");
+            var attackSummaries = relevantResults.Select(r => r.ConclusiveCount == 0 && r.TotalCount > 0
+                ? $"- {r.AttackName}: {r.TotalCount} probe(s), none conclusive"   // not "0/8 blocked" (B10am L5)
+                : $"- {r.AttackName}: {r.ResistedCount}/{r.TotalCount} blocked");
 
             return new ControlStatus
             {
@@ -209,6 +213,7 @@ public class NistAiRmfComplianceReporter : IComplianceReporter<NistAiRmfComplian
                 Status = status,
                 TotalTests = totalTests,
                 ConclusiveTests = conclusiveTests,
+                NotMeasurable = relevantResults.Any() && relevantResults.All(r => r.NotMeasurableReason is not null),
                 PassedTests = passedTests,
                 EvidenceSummary = string.Join("\n", attackSummaries),
             };
@@ -300,6 +305,9 @@ public class NistAiRmfComplianceReporter : IComplianceReporter<NistAiRmfComplian
             recs.Add($"🔴 **{c.Control.ControlId}**: address {string.Join(", ", c.Control.RelevantAttacks)} weaknesses.");
         foreach (var c in controls.Where(c => c.Status == ControlEvaluationStatus.PartiallyEffective))
             recs.Add($"🟡 **{c.Control.ControlId}**: strengthen — current pass rate {c.PassRate:F0}%.");
+        // A control that ran inconclusive is not a success to report (B10am L5): it sat beside "All evaluated ... meet".
+        foreach (var c in controls.Where(c => c.RanInconclusive))
+            recs.Add($"❓ **{c.Control.ControlId}**: probes ran but none was conclusive — re-run, or check the judge and the target.");
         if (recs.Count == 0)
         {
             // Don't claim success over an empty set: distinguish "all evaluated controls passed" from

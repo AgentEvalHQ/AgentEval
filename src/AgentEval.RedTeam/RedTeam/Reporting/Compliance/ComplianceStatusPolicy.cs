@@ -44,7 +44,6 @@ internal static class ComplianceStatusPolicy
         };
     }
 
-    /// <summary>Worst severity among the SUCCEEDED probes across an attack-set, or null if none succeeded.</summary>
     /// <summary>
     /// The persisted evidence's overall status: FAIL, then WARN, then PASS; NOT_EVALUATED when nothing was conclusively
     /// tested. A control whose probes ran but reached no conclusive verdict withholds the PASS (WARN), as the run's own
@@ -67,6 +66,7 @@ internal static class ComplianceStatusPolicy
     public static string CapForIncompleteRun(string status, ComplianceReportOptions? options) =>
         status == "PASS" && options?.IncompleteReason is not null ? "WARN" : status;
 
+    /// <summary>Worst severity among the SUCCEEDED probes across an attack-set, or null if none succeeded.</summary>
     public static Severity? WorstSucceededSeverity(IEnumerable<AttackResult> results)
     {
         Severity? worst = null;

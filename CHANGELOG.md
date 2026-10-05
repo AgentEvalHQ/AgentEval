@@ -84,11 +84,20 @@ that the old verdict hid. The entries below give the cause and the evidence for 
 - **A capitalised "Skipped" or "Error" label counted as a measurement.** `EvalScore.Label` is a free string; the
   measurement predicates and the composites compared it literally while `ReportStatus()`, `RunVerdict()` and the exit
   codes lowercased it, so a custom or imported component labelled "Skipped" counted as measured and a composite passed
-  with it, saying nothing. `EvalScore` now stores the label lower-case, on construction and on a `with` copy.
+  with it, saying nothing. `EvalScore` now stores the label lower-case, on construction and on a `with` copy (its
+  serialized property order is unchanged).
 - **NIST, ISO 27001 and SOC 2 passed over a control whose probes all came back inconclusive.** Such a control was
   "not evaluated", the same as a control no attack exercised, so `bench nist` passed on the rest and the stored
   evidence of all three read PASS (the OWASP / MITRE rule never reached them). `ControlStatus.RanInconclusive` now
   tells them apart: the NIST run withholds its pass (warn, naming the controls) and the evidence reads WARN.
+- **`bench nist --preset rmf-baseline` / `rmf-audit-grade` warn whenever the misinformation check runs, and now say
+  why.** MEASURE.2.5 (Misinformation) is a Supporting-fidelity control, capped at partially effective by design, so
+  a run that includes it cannot pass (exit 10); before the inconclusive fix above, a pass was reachable only when that
+  attack measured nothing. The run's summary now names the control ("Partially effective: MEASURE.2.5 (Supporting
+  fidelity: at most partially effective)"). The NIST report shows a control that ran inconclusive as "❓
+  Inconclusive" with "N probe(s), none conclusive" (it read "NotEvaluated … 0/8 blocked"), and recommends a re-run
+  instead of "All evaluated … meet thresholds". A control whose only attack declared it cannot measure here (no
+  canary) does not withhold.
 - **OWASP and MITRE evidence stored WARN for a run that failed on a critical hit.** The evidence bucketed categories
   (techniques) by pass rate alone, so 9 resisted probes and 1 critical success — a FAIL composite, exit 9 — were stored
   as WARN. A high or critical success now makes the category a failure in the evidence too, the severity floor NIST's
@@ -118,8 +127,9 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   unchecked executor is `skipped` (with no 0–100 figure); a run with nothing checked has no verdict (`skipped`, stored
   PENDING, exit 11); a warn or fail on some executors says how many were checked; a pass that rests
   on some executors is withheld (`warn`, exit 10). `HaveTraceFidelity()` agrees: it fails when nothing could be
-  checked (it passed), and when some executors could not be checked unless `allowUncheckedExecutors: true` (for a
-  workflow whose router or function executors never call a model).
+  checked (it passed), and when some executors could not be checked — unless the new overload is called with
+  `allowUncheckedExecutors: true` (for a workflow whose router or function executors never call a model; the original
+  signature is kept for compiled callers).
 - **A composite's pass could hide a part that warned or failed under the default `Averaged` effect.** A component left to
   the score (no `OnFailure` effect, the default for your own composites) whose own verdict was warn or fail was averaged
   into a parent pass without a word. The verdict is unchanged — averaging is what the author asked for, and the GDPR /

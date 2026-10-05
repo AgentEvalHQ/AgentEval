@@ -76,6 +76,11 @@ public sealed record EvalScore(
         init => _label = NormalizeLabel(value);
     }
 
+    // Declared explicitly, right after Label, only to keep the serialized property order every stored result has
+    // ("ordinal, label, severity, value, ..."): declaring Label moved it after the synthesized Severity (review round 8,
+    // B10am), and a reordered property changes the bytes of every new result. Plain init, as before.
+    public string Severity { get; init; } = Severity;
+
     private static string NormalizeLabel(string label) => label?.ToLowerInvariant()!;
 
     /// <inheritdoc cref="EvalScore"/>

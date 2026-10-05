@@ -157,6 +157,23 @@ public class CompositeEvalComponentEffectTests
     }
 
     [Fact]
+    public async Task DecidedBySeverity_NamesAHighPart_BesideAThresholdOrAFailEffectThatAlsoDecided()
+    {
+        // Review round 8 L1 (B10am): B10ah dropped the note whenever a threshold or a Fail effect also decided, so a high
+        // part that alone fails the composite was named nowhere.
+        var thresholdAndSeverity = new CompositeEval("t", "T", "test", "1.0.0",
+            [new EvalComponent(new Fixed("a", "pass", 1.0), 1.0), new EvalComponent(new WithSeverity("hi", "fail", 0.2, "high"), 1.0)],
+            WeightedSumAggregation.Instance, threshold: 0.85) { SeverityCapsThreshold = true };   // 0.60 < 0.85, and high
+        var effectAndSeverity = new CompositeEval("e", "E", "test", "1.0.0",
+            [new EvalComponent(new Fixed("gate", "fail", 0.3), 1.0) { OnFailure = ComponentFailureEffect.Fail },
+             new EvalComponent(new WithSeverity("hi", "fail", 0.2, "high"), 1.0)],
+            WeightedSumAggregation.Instance, threshold: null);
+
+        Assert.Contains("Decided by severity: hi (fail, high)", (await thresholdAndSeverity.EvaluateAsync(Input)).Details.Summary);
+        Assert.Contains("Decided by severity: hi (fail, high)", (await effectAndSeverity.EvaluateAsync(Input)).Details.Summary);
+    }
+
+    [Fact]
     public void ALabelIsStoredLowerCase_OnBothTheConstructorAndTheCopyPath()
     {
         // Review round 7 M-C (B10ag): the measurement predicates compared labels literally, so "Skipped"/"Error" counted
@@ -168,6 +185,17 @@ public class CompositeEvalComponentEffectTests
         Assert.Equal("error", copied.Label);
         Assert.False(built.CountsTowardAggregate());
         Assert.False(copied.CountsTowardAggregate());
+    }
+
+    [Fact]
+    public void TheSerializedScore_KeepsItsPropertyOrder()
+    {
+        // Review round 8 L3 (B10am): declaring Label explicitly (B10ag) moved it after Severity, so every new result's
+        // bytes differed from an identical stored one. The order every stored result has is pinned here.
+        var json = System.Text.Json.JsonSerializer.Serialize(new EvalScore(0.5, null, "warn", false, 0.7, "medium", 0.9),
+            new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web));
+
+        Assert.StartsWith("""{"ordinal":null,"label":"warn","severity":"medium","value":0.5,"threshold":0.7,"confidence":0.9,"passed":false""", json);
     }
 
     [Theory]

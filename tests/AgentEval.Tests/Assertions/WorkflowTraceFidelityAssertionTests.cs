@@ -92,6 +92,17 @@ public class WorkflowTraceFidelityAssertionTests
     }
 
     [Fact]
+    public void TheOriginalSignature_IsKept_ForCompiledCallers()
+    {
+        // Review round 8 L7 (B10am): adding a 4th optional parameter changed the method's signature, a binary break for
+        // callers compiled against (chatTraces, minScore, because).
+        var original = typeof(AgentEval.Assertions.WorkflowAssertionBuilder).GetMethod("HaveTraceFidelity",
+            [typeof(IReadOnlyDictionary<string, AgentTrace>), typeof(double), typeof(string)]);
+
+        Assert.NotNull(original);
+    }
+
+    [Fact]
     public void PartlyChecked_Fails_UnlessUncheckedExecutorsAreAllowed()
     {
         // Review round 7 M-B (B10af): the bench verdict withholds a pass that rests on some executors (warn, exit 10);

@@ -223,16 +223,29 @@ public class WorkflowAssertionBuilder
     /// score. When no executor can be checked (e.g. <c>null</c>), the assertion fails: nothing was checked.</param>
     /// <param name="minScore">Minimum acceptable overall fidelity score in [0, 1]. Defaults to 1.0 (exact).</param>
     /// <param name="because">Optional reason for the assertion.</param>
-    /// <param name="allowUncheckedExecutors">By default an executor that could not be checked fails the assertion, as the
-    /// <c>bench workflow-trace-fidelity</c> verdict withholds its pass (#203 review round 7, B10af). Set <c>true</c> to judge
-    /// only the checked executors — e.g. for a workflow whose router or function executors never call a model and so can
-    /// never carry a chat trace.</param>
     [StackTraceHidden]
     public WorkflowAssertionBuilder HaveTraceFidelity(
         IReadOnlyDictionary<string, AgentTrace>? chatTraces = null,
         double minScore = 1.0,
-        string? because = null,
-        bool allowUncheckedExecutors = false)
+        string? because = null)
+        => HaveTraceFidelity(chatTraces, allowUncheckedExecutors: false, minScore, because);
+
+    /// <summary>
+    /// <see cref="HaveTraceFidelity(IReadOnlyDictionary{string, AgentTrace}?, double, string?)"/>, choosing whether
+    /// executors that could not be checked are allowed (a separate overload so callers compiled against the original
+    /// three-parameter signature keep working — review round 8 L7, B10am).
+    /// </summary>
+    /// <param name="chatTraces">Per-executor chat-boundary traces keyed by executor ID.</param>
+    /// <param name="allowUncheckedExecutors">Judge only the checked executors (e.g. router or function executors that never
+    /// call a model); by default an unchecked executor fails the assertion.</param>
+    /// <param name="minScore">Minimum acceptable overall fidelity score in [0, 1].</param>
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public WorkflowAssertionBuilder HaveTraceFidelity(
+        IReadOnlyDictionary<string, AgentTrace>? chatTraces,
+        bool allowUncheckedExecutors,
+        double minScore = 1.0,
+        string? because = null)
     {
         if (minScore < 0.0 || minScore > 1.0 || double.IsNaN(minScore))
         {

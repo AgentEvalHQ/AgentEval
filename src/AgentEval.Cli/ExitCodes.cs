@@ -123,8 +123,8 @@ public static class ExitCodes
     /// <c>bench &lt;family&gt;</c> / <c>bench &lt;regulation&gt; calibrate</c>: the composite gate (or, for
     /// calibration, one or more pillar's accuracy/kappa thresholds) evaluated to a hard <b>FAIL</b>. Distinct
     /// from <see cref="UsageError"/> (2, bad arguments) and <see cref="GateWarning"/> (10, a soft finding) —
-    /// see <see cref="ExitCodes"/>'s BUG-22 remarks. Also returned by <c>bench workflow-trace-fidelity</c>
-    /// (a binary pass/fail gate with no WARN state).
+    /// see <see cref="ExitCodes"/>'s BUG-22 remarks. Also returned by <c>bench trace-fidelity</c> and
+    /// <c>bench workflow-trace-fidelity</c> below 0.80 (they exit 10 for a warn and 11 when nothing was checked).
     /// </summary>
     public const int GateFailed = 9;
 

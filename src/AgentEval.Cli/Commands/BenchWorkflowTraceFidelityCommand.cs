@@ -127,10 +127,16 @@ public static class BenchWorkflowTraceFidelityCommand
                 ct);
 
             Console.WriteLine();
-            Console.WriteLine($"   Fidelity score: {result.Score.Value * 100:F1}%   Verdict: {verdict}");
+            // Nothing checked has no score to print (B10am L6: it read "0.0%"); the stored metric keeps its placeholder so
+            // a baseline comparison still reads the run as worse than a PASS (fail-closed).
+            Console.WriteLine(result.Score.Label == "skipped"
+                ? $"   Fidelity score: — (nothing checked)   Verdict: {verdict}"
+                : $"   Fidelity score: {result.Score.Value * 100:F1}%   Verdict: {verdict}");
             foreach (var sub in subResults)
             {
-                Console.WriteLine($"   {sub.Metric.Name,-28} {sub.Score.Value * 100,5:F0}%  ({sub.Score.Severity})");
+                Console.WriteLine(sub.Score.Label == "skipped"
+                    ? $"   {sub.Metric.Name,-28}   —    (not checked: no chat-boundary trace)"
+                    : $"   {sub.Metric.Name,-28} {sub.Score.Value * 100,5:F0}%  ({sub.Score.Severity})");
             }
 
             Console.WriteLine();

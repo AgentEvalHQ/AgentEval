@@ -171,7 +171,20 @@ public sealed class NistBenchmarkRun
                 : $"{c.Control.ControlId} ({string.Join(", ", c.Control.RelevantAttacks.Where(measuredNothing.Contains))})")
             .ToList();
         string? withheldNote = null;
-        if (compositeLabel == "pass" && inconclusiveIds.Count > 0)
+        if (compositeLabel == "warn")
+        {
+            // A warn says which controls made it (review round 8 L2, B10am): a Supporting-fidelity control is capped at
+            // PartiallyEffective, so a run with one cannot pass — and it warned with no word why.
+            var partial = report.Controls.Where(c => c.Status == ControlEvaluationStatus.PartiallyEffective)
+                .Select(c => c.Control.Fidelity == ControlFidelity.Supporting
+                    ? $"{c.Control.ControlId} (Supporting fidelity: at most partially effective)"
+                    : $"{c.Control.ControlId} ({c.PassRate:F0}% pass rate)")
+                .ToList();
+            if (partial.Count > 0)
+                withheldNote = $"Partially effective: {string.Join(", ", partial)}; the run warns.";
+        }
+        var inconclusiveWithheld = compositeLabel == "pass" && inconclusiveIds.Count > 0;
+        if (inconclusiveWithheld)
         {
             compositeLabel = "warn";
             compositePassed = false;
@@ -206,9 +219,9 @@ public sealed class NistBenchmarkRun
                 Category: "compliance.nist",
                 Version: "1.0.0"),
             Score: new(compositeScore, null, compositeLabel, compositePassed, 1.0,
-                withheldNote is null ? compositeSeverity : "none", null)
+                inconclusiveWithheld ? "none" : compositeSeverity, null)
             {
-                Measurement = withheldNote is null ? AgentEval.Evals.Meta.MeasurementState.Measured : AgentEval.Evals.Meta.MeasurementState.NotMeasured,
+                Measurement = inconclusiveWithheld ? AgentEval.Evals.Meta.MeasurementState.NotMeasured : AgentEval.Evals.Meta.MeasurementState.Measured,
             },
             Details: new(
                 Dimensions: dimensions,

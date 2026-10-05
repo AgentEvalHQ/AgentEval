@@ -90,7 +90,7 @@ public sealed record WorkflowTraceFidelityReport(IReadOnlyList<WorkflowExecutorF
 /// back without Response entries (the Glass Box Path-2 upstream-MAF-hook gap). Until that hook lands, every
 /// executor in a live run is <see cref="WorkflowFidelityDiff.NoTruth"/> (ledger-only: not checked, so a live run has no
 /// verdict); the reconciler produces real reconciliation only for <b>direct-agent / pre-wired / hand-built</b> traces.
-/// This is a library primitive: it has no registered benchmark family or CLI wiring yet (follow-up P2.B4).
+/// The CLI runs it as <c>agenteval bench workflow-trace-fidelity</c>; it has no registered benchmark family yet.
 /// </para>
 /// </remarks>
 public sealed class WorkflowTraceFidelityReconciler

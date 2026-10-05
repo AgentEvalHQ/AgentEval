@@ -114,7 +114,14 @@ public class ControlStatus
     /// the same as a control no mapped attack exercised, but unlike that one it keeps a run from passing — the OWASP /
     /// MITRE <c>Inconclusive</c> rule (#203 review, B6c-8), swept to NIST, ISO 27001 and SOC 2 (round 7, B10ai).
     /// </summary>
-    public bool RanInconclusive => Status == ControlEvaluationStatus.NotEvaluated && TotalTests > 0 && ConclusiveTests == 0;
+    public bool RanInconclusive => Status == ControlEvaluationStatus.NotEvaluated && TotalTests > 0 && ConclusiveTests == 0
+                                   && !NotMeasurable;
+
+    /// <summary>
+    /// Every attack mapped to this control declared it cannot measure in this setup (<c>NotMeasurableReason</c>, e.g. no
+    /// canary planted): stated, not hidden, and it does not block — the OWASP / MITRE exemption (review round 8 L4, B10am).
+    /// </summary>
+    public bool NotMeasurable { get; init; }
 
     private int EffectiveConclusive => ConclusiveTests >= 0 ? ConclusiveTests : TotalTests;
 
