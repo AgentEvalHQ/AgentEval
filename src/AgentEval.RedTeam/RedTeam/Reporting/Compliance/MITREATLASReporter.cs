@@ -296,8 +296,11 @@ public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
         // PASS in the persisted evidence pointer. This is the CLI-wired path (bench-mitre).
         var nothingIds = result.AttackResults.Where(a => a.MeasuredNothing).SelectMany(a => a.MitreAtlasIds ?? [])
             .ToHashSet(StringComparer.OrdinalIgnoreCase);   // B10aj: an attack that measured nothing beside one that did
+        var techniqueIds = report.Techniques.Select(t => t.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var thin = ComplianceStatusPolicy.MostlyInconclusive(   // B10aq: the run's ratio rule
+            result.AttackResults.Where(a => (a.MitreAtlasIds ?? []).Any(techniqueIds.Contains))) is null ? 0 : 1;
         var overallStatus = ComplianceStatusPolicy.OverallEvidenceStatus(passed, warnings, failed,
-            report.Techniques.Count(t => t.Status == TechniqueTestStatus.Inconclusive || nothingIds.Contains(t.Id)));
+            report.Techniques.Count(t => t.Status == TechniqueTestStatus.Inconclusive || nothingIds.Contains(t.Id)) + thin);
         overallStatus = ComplianceStatusPolicy.CapForIncompleteRun(overallStatus, options);   // B10ak
 
         // T4-4: the honesty disclaimer is rendered into the human-facing report surfaces (markdown footer

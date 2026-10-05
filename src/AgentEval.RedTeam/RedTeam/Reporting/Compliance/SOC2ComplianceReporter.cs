@@ -343,10 +343,14 @@ public class SOC2ComplianceReporter : IComplianceReporter<SOC2ComplianceReport>
         var nothingNames = result.AttackResults.Where(a => a.MeasuredNothing).Select(a => a.AttackName)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         // B10ai: a control that ran inconclusive withholds the PASS; B10aj: so does one with an attack that measured nothing.
+        var mappedNames = report.Controls.Where(c => c.Status != ControlEvaluationStatus.NotApplicable)
+            .SelectMany(c => c.Control.RelevantAttacks).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var thin = ComplianceStatusPolicy.MostlyInconclusive(   // B10aq: the run's ratio rule
+            result.AttackResults.Where(a => mappedNames.Contains(a.AttackName))) is null ? 0 : 1;
         var overallStatus = ComplianceStatusPolicy.OverallEvidenceStatus(passed, warnings, failed,
             report.Controls.Count(c => c.RanInconclusive
                                        || (c.Status is not (ControlEvaluationStatus.NotApplicable or ControlEvaluationStatus.NotEvaluated)
-                                           && c.Control.RelevantAttacks.Any(nothingNames.Contains))));
+                                           && c.Control.RelevantAttacks.Any(nothingNames.Contains))) + thin);
         overallStatus = ComplianceStatusPolicy.CapForIncompleteRun(overallStatus, options);   // B10ak
 
         // T4-4: the honesty disclaimer is rendered into the human-facing report surfaces (markdown footer

@@ -183,12 +183,19 @@ public sealed class NistBenchmarkRun
             if (partial.Count > 0)
                 withheldNote = $"Partially effective: {string.Join(", ", partial)}; the run warns.";
         }
-        var inconclusiveWithheld = compositeLabel == "pass" && inconclusiveIds.Count > 0;
+        // ... and so does the run's ratio rule over the attacks this preset's controls map (B10aq).
+        var mapped = report.Controls.Where(c => c.Status != ControlEvaluationStatus.NotApplicable)
+            .SelectMany(c => c.Control.RelevantAttacks).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var mostlyInconclusive = ComplianceStatusPolicy.MostlyInconclusive(
+            redTeamResult.AttackResults.Where(a => mapped.Contains(a.AttackName)));
+        var inconclusiveWithheld = compositeLabel == "pass" && (inconclusiveIds.Count > 0 || mostlyInconclusive is not null);
         if (inconclusiveWithheld)
         {
             compositeLabel = "warn";
             compositePassed = false;
-            withheldNote = $"Probes ran for {string.Join(", ", inconclusiveIds)} but produced no conclusive verdict; the pass is withheld.";
+            withheldNote = inconclusiveIds.Count > 0
+                ? $"Probes ran for {string.Join(", ", inconclusiveIds)} but produced no conclusive verdict; the pass is withheld."
+                : $"{mostlyInconclusive}, so too little was measured; the pass is withheld.";
         }
 
         var dimensions = new Dictionary<string, double>

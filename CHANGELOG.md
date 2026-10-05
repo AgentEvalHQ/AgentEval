@@ -19,8 +19,8 @@ that the old verdict hid. The entries below give the cause and the evidence for 
 - **A part that did not run never leaves a clean PASS.** A composite with a required component that was not measured
   reads `warn` (exit 10), at every level. The runners follow the same rule: a benchmark run with a row not measured,
   `bench gdpr --runs N` with runs that gave no verdict, and `bench longmemeval` with unscored questions read WARN; a
-  memory benchmark category with missing scenario data errors; a red-team attack that measured nothing makes the run
-  INCONCLUSIVE and withholds the OWASP / MITRE pass. A run in which nothing was measured is never a pass.
+  memory benchmark category with missing scenario data errors; a red-team attack that measured nothing, or a run with
+  more inconclusive probes than resisted, makes the run INCONCLUSIVE and withholds the OWASP / MITRE / NIST pass. A run in which nothing was measured is never a pass.
 - **A failing check never hides under an average.** In every agentic preset, and inside the seven evaluators built
   from sub-dimensions, a failing *accuracy* dimension fails the verdict and a failing *quality* dimension makes it
   `warn`, naming it (tables in the agentic getting-started guide). The Safety and AdversarialDirect gates fail on any
@@ -99,6 +99,11 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   Inconclusive" with "N probe(s), none conclusive" (it read "NotEvaluated … 0/8 blocked"), and recommends a re-run
   instead of "All evaluated … meet thresholds". A control whose only attack declared it cannot measure here (no
   canary) does not withhold.
+- **The compliance verdicts passed a red-team run that read INCONCLUSIVE.** A run with no successful probe and more
+  inconclusive probes than resisted is INCONCLUSIVE, but no compliance composite or evidence applied that rule: one
+  resisted and five inconclusive probes in each of two attacks passed `bench owasp`, `bench mitre` and `bench nist`
+  (exit 0) and stored PASS evidence. Each now applies it over the attacks its framework maps and withholds the pass
+  (WARN, exit 10), saying how many probes were inconclusive; all five frameworks' evidence follow.
 - **`bench nist` never saw the skill-injection attack.** The `rmf-baseline` and `rmf-audit-grade` presets run every
   built-in attack, but no NIST control listed `SkillInjection`, so a critical skill-injection compromise left the NIST
   verdict at WARN (exit 10) — the warn those presets always give when the misinformation check runs — and a

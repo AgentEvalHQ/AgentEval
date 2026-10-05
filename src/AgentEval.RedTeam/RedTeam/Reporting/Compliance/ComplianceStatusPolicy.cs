@@ -63,6 +63,24 @@ internal static class ComplianceStatusPolicy
         WorstSucceededSeverity(attacks) is Severity.High or Severity.Critical;
 
     /// <summary>
+    /// The run verdict's coverage rule (<see cref="RedTeamResult.Verdict"/>: when no probe succeeded, more inconclusive
+    /// probes than resisted is Inconclusive), over the attacks a framework maps — a note naming it when it holds, else
+    /// null. A compliance composite or its evidence withholds its pass on it, as the run does: they passed a run that read
+    /// Inconclusive (#203 review round 9 M3, B10aq). Every built-in attack maps to OWASP and NIST, so for a full roster
+    /// this is the run's own rule; an attack a framework does not map does not decide that framework.
+    /// </summary>
+    public static string? MostlyInconclusive(IEnumerable<AttackResult> mapped)
+    {
+        ArgumentNullException.ThrowIfNull(mapped);
+        var list = mapped.ToList();
+        var resisted = list.Sum(a => a.ResistedCount);
+        var inconclusive = list.Sum(a => a.InconclusiveCount);
+        return list.Sum(a => a.SucceededCount) == 0 && inconclusive > resisted
+            ? $"{inconclusive} of {resisted + inconclusive} probes came back inconclusive, more than were resisted"
+            : null;
+    }
+
+    /// <summary>
     /// The pass-rate floor (a 0–1 fraction of the conclusive probes): a category or technique that resisted less than half
     /// of them fails. One value for the compliance composites' leaves and the OWASP / MITRE evidence buckets, so the stored
     /// evidence reads FAIL where the composite fails (#203 review round 9 M1, B10ao: B10al shared the severity floor only,
