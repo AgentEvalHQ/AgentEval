@@ -121,8 +121,9 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   fails even if every errored required part had passed perfectly: under the severity rule (no threshold, or
   `SeverityCapsThreshold`) a high or critical failure among the measured required parts; under a threshold, a score
   that cannot reach it. Such a composite now reads `fail` and says so. An errored nested composite decides nothing
-  above it and reports no severity: a scenario failure its own threshold would have absorbed is not a decided one;
-  a run summary whose root has no verdict reads FAIL when a check failed (as `BenchmarkRunner` already did). And a
+  above it and reports no severity: a scenario failure its own threshold would have absorbed is not a decided one.
+  The run summary follows the root: FAIL when it fails, WARN when it errored with part of the run measured (a failing
+  check under an errored root decided nothing — one that decides makes the root fail). And a
   composite with no component marked required ignored every failure in the severity rule — every check failing at
   critical read PASS; none marked required now means every component counts, as everywhere else.
 - **A judge that failed read as an agent that failed.** The agentic, GDPR and EU AI Act reports and run summaries, and

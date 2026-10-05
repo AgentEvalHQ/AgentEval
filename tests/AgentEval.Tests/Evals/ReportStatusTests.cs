@@ -38,7 +38,8 @@ public class ReportStatusTests
     [InlineData("warn", 1, 0, 1, "WARN")]
     [InlineData("fail", 0, 1, 0, "FAIL")]
     [InlineData("error", 1, 0, 0, "WARN")]       // some parts measured: not a pass, not a measured failure
-    [InlineData("error", 1, 1, 0, "FAIL")]       // a measured failure under an errored root (review round 3 H2: was WARN)
+    [InlineData("error", 1, 1, 0, "WARN")]       // a failing leaf under an errored root decided nothing: a failure that decides
+                                                 // makes the root itself fail (B10k). B10b stored FAIL here (review round 4, B10m)
     [InlineData("error", 0, 0, 0, "PENDING")]    // nothing measured: no verdict
     [InlineData("skipped", 0, 0, 0, "PENDING")]
     public void RunVerdict_IsAVerdictTheSummarySchemaAllows_AndNeverFAILForANonVerdict(
@@ -206,5 +207,31 @@ public class ReportStatusTests
         };
 
         Assert.Equal("WARN", summary.Verdict);
+    }
+
+    [Fact]
+    public async Task AnErroredRoot_IsStoredAsWARN_EvenBesideAFailureTheTreeSaysCannotDecide()
+    {
+        // Review round 4 M3 (B10m): RunVerdict read FAIL off the leaf counts, so the stored summary contradicted the root
+        // and exit 11. (A) agentic: a Fail-effect check errored, a quality check (Warn effect) failed. (B) GDPR: a scenario
+        // errored beside a medium scenario failure under a severity-rule pillar.
+        var input = new EvalInput("q", "r");
+        var agentic = new CompositeEval("agentic.quality", "Quality", "test", "1.0.0",
+            [new EvalComponent(new Fixed(Severe("groundedness", "error", false, "none")), 1.0) { OnFailure = ComponentFailureEffect.Fail },
+             new EvalComponent(new Fixed(Severe("fluency", "fail", false, "low", 0.3)), 1.0) { OnFailure = ComponentFailureEffect.Warn }],
+            WeightedSumAggregation.Instance, threshold: null);
+        var article = new CompositeEval("art", "Art", "test", "1.0.0",
+            [new EvalComponent(new Fixed(Severe("s1", "error", false, "none")), 1.0),
+             new EvalComponent(new Fixed(Severe("s2", "fail", false, "medium", 0.5)), 1.0)],
+            WeightedSumAggregation.Instance, threshold: null);
+
+        var agenticResult = await agentic.EvaluateAsync(input);
+        var gdprResult = await article.EvaluateAsync(input);
+
+        Assert.Equal("error", agenticResult.Score.Label);
+        Assert.Equal("error", gdprResult.Score.Label);
+        Assert.Equal("WARN", AgentEval.Evals.Agentic.Composition.AgenticBenchmarkRunner.BuildSummary(agenticResult, "run").Verdict);
+        Assert.Equal("WARN", AgentEval.Compliance.Gdpr.Articles.GdprBenchmarkRunner.BuildSummary(gdprResult, "run").Verdict);
+        Assert.Equal("WARN", AgentEval.Compliance.EuAiAct.Articles.EuAiActBenchmarkRunner.BuildSummary(gdprResult, "run").Verdict);
     }
 }

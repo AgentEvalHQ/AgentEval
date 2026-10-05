@@ -168,10 +168,13 @@ public static class EvalScoreExtensions
     }
 
     /// <summary>
-    /// The verdict a run summary can carry (its schema allows <c>PASS</c>, <c>WARN</c>, <c>FAIL</c>, <c>PENDING</c>): the
-    /// root's measured verdict; otherwise <c>FAIL</c> when a check failed (as <c>BenchmarkRunner</c> reads it — review
-    /// round 3 H2: a run with a measured failure was stored WARN), <c>PENDING</c> when no check was measured, and
-    /// <c>WARN</c> when some were — a run whose verdict errored is not a pass (B9b).
+    /// The verdict a run summary can carry (its schema allows <c>PASS</c>, <c>WARN</c>, <c>FAIL</c>, <c>PENDING</c>) for a
+    /// run whose root is a composite: the root's verdict; when the root has none (it errored, or measured nothing),
+    /// <c>PENDING</c> when no check was measured and <c>WARN</c> when some were — a run whose verdict errored is not a
+    /// pass (B9b), and not a FAIL either: the root already weighed every failing leaf, and one that decides the verdict
+    /// makes the root itself <c>fail</c> (CompositeEval, B10k). Reading <c>FAIL</c> off the leaf counts (B10b) stored FAIL
+    /// for failures the tree says cannot decide — a quality check's warn-effect failure, a scenario failure its article's
+    /// threshold absorbs — beside an errored root and exit 11 (review round 4, B10m).
     /// </summary>
     public static string RunVerdict(this EvalScore root, AgentEval.Output.RunStats stats)
     {
@@ -183,7 +186,7 @@ public static class EvalScoreExtensions
             "pass" => "PASS",
             "warn" => "WARN",
             "fail" => "FAIL",
-            _ => stats.Failed > 0 ? "FAIL" : stats.Passed + stats.Warnings == 0 ? "PENDING" : "WARN",
+            _ => stats.Passed + stats.Warnings + stats.Failed == 0 ? "PENDING" : "WARN",
         };
     }
 
