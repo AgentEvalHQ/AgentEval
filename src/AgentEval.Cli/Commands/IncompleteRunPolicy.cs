@@ -26,9 +26,11 @@ internal static class IncompleteRunPolicy
             return composite;
 
         var note = $"INCOMPLETE: {string.Join("; ", reasons)}. The pass is withheld: this run is neither a pass nor a fail.";
+        // Through a variable, as every other non-EvalScore site sets it (MetaLaneArchitectureTests' style rule).
+        var withheld = MeasurementState.NotMeasured;
         return composite with
         {
-            Score = composite.Score with { Label = "warn", Passed = false, Severity = "none", Measurement = MeasurementState.NotMeasured },
+            Score = composite.Score with { Label = "warn", Passed = false, Severity = "none", Measurement = withheld },
             Details = composite.Details with
             {
                 Summary = note,
