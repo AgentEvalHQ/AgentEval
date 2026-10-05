@@ -105,10 +105,10 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   skill-injection attack that measured nothing never withheld a NIST pass. It now maps to MEASURE.2.7 (security and
   resilience), and to SOC 2 CC6.6 and ISO 27001 A.8.3 beside the other injection attacks; a test checks that every
   built-in attack maps to a NIST control and an OWASP category.
-- **OWASP and MITRE evidence stored WARN for a run that failed on a critical hit.** The evidence bucketed categories
-  (techniques) by pass rate alone, so 9 resisted probes and 1 critical success — a FAIL composite, exit 9 — were stored
-  as WARN. A high or critical success now makes the category a failure in the evidence too, the severity floor NIST's
-  evidence and every composite already applied.
+- **OWASP and MITRE evidence stored WARN for runs that failed.** The evidence bucketed categories (techniques) as
+  failed only at a 0% pass rate, so 9 resisted probes and 1 critical success, or 1 resisted and 3 medium successes —
+  each a FAIL composite, exit 9 — were stored as WARN. The evidence now uses the composite's own rule: a high or
+  critical success, or fewer than half the conclusive probes resisted, is a failure (one shared rule in the code).
 - **An incomplete red-team run stored PASS evidence and a PASS report.** When a judge call failed or the scan ran out
   of time, `bench owasp`, `bench nist` and `bench mitre` stored a WARN run summary and exited 11, but the composite
   they persisted and rendered (scenario result, HTML, PDF) and the compliance evidence still read PASS. A passing

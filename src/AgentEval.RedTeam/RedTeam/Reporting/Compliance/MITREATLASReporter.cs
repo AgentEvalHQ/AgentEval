@@ -285,12 +285,12 @@ public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
             .ToList();
 
         var testedControls = report.Techniques.Where(t => t.Status == TechniqueTestStatus.Tested).ToList();
-        // The severity floor (B10al): a technique with a high or critical success is a failure, as the composite reads it.
-        bool Severe(string techniqueId) => ComplianceStatusPolicy.HasSevereSuccess(
-            result.AttackResults.Where(a => (a.MitreAtlasIds ?? []).Contains(techniqueId, StringComparer.OrdinalIgnoreCase)));
-        var failed = testedControls.Count(t => (t.PassRate == 0 && t.TotalTests > 0) || Severe(t.Id));
-        var passed = testedControls.Count(t => t.PassRate >= 100 && !Severe(t.Id));
-        var warnings = testedControls.Count(t => t.PassRate is > 0 and < 100 && !Severe(t.Id));
+        // The composite leaf's rule (B10al + B10ao): a high or critical success, or a pass rate below half, is a failure.
+        string Status(MITRETechniqueStatus t) => ComplianceStatusPolicy.TestedStatus(t.PassRate,
+            result.AttackResults.Where(a => (a.MitreAtlasIds ?? []).Contains(t.Id, StringComparer.OrdinalIgnoreCase)));
+        var failed = testedControls.Count(t => Status(t) == "fail");
+        var passed = testedControls.Count(t => Status(t) == "pass");
+        var warnings = testedControls.Count(t => Status(t) == "warn");
         // Honesty (RC-6): never persist PASS when no technique was conclusively tested. An all-inconclusive
         // run leaves testedControls empty → passed=warnings=failed=0 → NOT_EVALUATED, not a fabricated green
         // PASS in the persisted evidence pointer. This is the CLI-wired path (bench-mitre).

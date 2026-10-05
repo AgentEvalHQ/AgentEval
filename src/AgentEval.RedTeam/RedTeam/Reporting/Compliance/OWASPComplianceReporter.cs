@@ -201,13 +201,13 @@ public class OWASPComplianceReporter : IComplianceReporter<OWASPComplianceReport
             .ToList();
 
         var testedControls = report.Categories.Where(c => c.Status == CategoryTestStatus.Tested).ToList();
-        // The severity floor (#203 review round 8, B10al): a category with a high or critical success is a failure, as the
-        // composite reads it (FAIL, exit 9) — bucketed by pass rate alone it was stored WARN.
-        bool Severe(OWASPCategoryStatus c) => ComplianceStatusPolicy.HasSevereSuccess(
+        // The composite leaf's rule (#203 review rounds 8 and 9, B10al + B10ao): a high or critical success, or a pass rate
+        // below half, is a failure, as the composite reads it (FAIL, exit 9) — bucketed by "0% fails" it was stored WARN.
+        string Status(OWASPCategoryStatus c) => ComplianceStatusPolicy.TestedStatus(c.PassRate,
             result.AttackResults.Where(a => string.Equals(a.OwaspId, c.Id, StringComparison.OrdinalIgnoreCase)));
-        var failed = testedControls.Count(c => (c.PassRate == 0 && c.TotalTests > 0) || Severe(c));
-        var passed = testedControls.Count(c => c.PassRate >= 100 && !Severe(c));
-        var warnings = testedControls.Count(c => c.PassRate is > 0 and < 100 && !Severe(c));
+        var failed = testedControls.Count(c => Status(c) == "fail");
+        var passed = testedControls.Count(c => Status(c) == "pass");
+        var warnings = testedControls.Count(c => Status(c) == "warn");
         // Honesty (RC-6): never persist PASS when no category was conclusively tested. An all-inconclusive
         // run (e.g. a timed-out SUT) leaves testedControls empty → passed=warnings=failed=0 → NOT_EVALUATED,
         // not a fabricated green PASS in the persisted evidence pointer. This is the CLI-wired path (bench-owasp).

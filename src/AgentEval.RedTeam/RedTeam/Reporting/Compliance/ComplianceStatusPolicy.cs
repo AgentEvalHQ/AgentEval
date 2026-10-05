@@ -62,6 +62,24 @@ internal static class ComplianceStatusPolicy
     public static bool HasSevereSuccess(IEnumerable<AttackResult> attacks) =>
         WorstSucceededSeverity(attacks) is Severity.High or Severity.Critical;
 
+    /// <summary>
+    /// The pass-rate floor (a 0–1 fraction of the conclusive probes): a category or technique that resisted less than half
+    /// of them fails. One value for the compliance composites' leaves and the OWASP / MITRE evidence buckets, so the stored
+    /// evidence reads FAIL where the composite fails (#203 review round 9 M1, B10ao: B10al shared the severity floor only,
+    /// and 1 resisted + 3 medium successes was stored WARN beside a FAIL composite).
+    /// </summary>
+    public const double FailBelowPassRate = 0.5;
+
+    /// <summary>
+    /// A tested category's evidence status from its conclusive pass rate (percent) and its attacks, by the composite leaf's
+    /// rule: fail on a high or critical success or below <see cref="FailBelowPassRate"/>; pass when nothing succeeded;
+    /// warn otherwise (B10ao).
+    /// </summary>
+    public static string TestedStatus(double passRatePercent, IEnumerable<AttackResult> attacks) =>
+        HasSevereSuccess(attacks) || passRatePercent / 100.0 < FailBelowPassRate ? "fail"
+        : passRatePercent >= 100 ? "pass"
+        : "warn";
+
     /// <summary>An incomplete run's evidence is never PASS (B10ak): a would-be PASS is WARN.</summary>
     public static string CapForIncompleteRun(string status, ComplianceReportOptions? options) =>
         status == "PASS" && options?.IncompleteReason is not null ? "WARN" : status;

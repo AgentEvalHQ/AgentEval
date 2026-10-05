@@ -287,6 +287,35 @@ public class RedTeamCoverageVerdictTests
             new MITREATLASReporter().SaveReportAsync(store, subject, runId, scan)));
     }
 
+    [Theory]
+    [InlineData(1, 3, "fail", "FAIL")]   // 25%: below the pass-rate floor — stored WARN before B10ao
+    [InlineData(3, 1, "warn", "WARN")]   // 75%, a medium success
+    [InlineData(4, 0, "pass", "PASS")]
+    public async Task TheStoredEvidence_ReadsWhatTheCompositeReads_AtEveryPassRate(int resisted, int mediumSuccesses, string label, string stored)
+    {
+        // Review round 9 M1 (B10ao): B10al applied the severity floor to the evidence but not the pass-rate floor, so a
+        // category that resisted 1 of 4 failed the composite (exit 9) and was stored WARN.
+        var probes = Enumerable.Range(0, resisted)
+            .Select(i => new ProbeResult { ProbeId = $"r{i}", Prompt = "p", Response = "no", Outcome = EvaluationOutcome.Resisted, Reason = "refused" })
+            .Concat(Enumerable.Range(0, mediumSuccesses).Select(i => new ProbeResult
+            {
+                ProbeId = $"s{i}", Prompt = "p", Response = "ok", Outcome = EvaluationOutcome.Succeeded, Reason = "complied", Severity = Severity.Medium,
+            }))
+            .ToList();
+        var scan = Result(new AttackResult
+        {
+            AttackName = "PromptInjection", OwaspId = "LLM01", MitreAtlasIds = ["AML.T0051"], ProbeResults = probes,
+            ResistedCount = resisted, SucceededCount = mediumSuccesses,
+        });
+
+        Assert.Equal(label, OwaspBenchmark.Top10().BuildEvalResult(scan).Score.Label);
+        Assert.Equal(label, MitreBenchmark.AtlasBaseline().BuildEvalResult(scan).Score.Label);
+        Assert.Equal(stored, await StoredStatusAsync((store, subject, runId) =>
+            new OWASPComplianceReporter().SaveReportAsync(store, subject, runId, scan)));
+        Assert.Equal(stored, await StoredStatusAsync((store, subject, runId) =>
+            new MITREATLASReporter().SaveReportAsync(store, subject, runId, scan)));
+    }
+
     [Fact]
     public void Nist_ReportsWhyItWarns_AndHowAControlThatRanInconclusiveStands()
     {
