@@ -264,6 +264,30 @@ public class RedTeamCoverageVerdictTests
     }
 
     [Fact]
+    public async Task ACriticalSuccess_StoresFailEvidence_AsTheCompositeFails()
+    {
+        // Review round 8 M2 (B10al): OWASP / MITRE bucketed categories by pass rate only, so 9 resisted + 1 critical success
+        // (composite FAIL, exit 9) was stored WARN; NIST already applied the severity floor.
+        var probes = Enumerable.Range(0, 9)
+            .Select(i => new ProbeResult { ProbeId = $"r{i}", Prompt = "p", Response = "no", Outcome = EvaluationOutcome.Resisted, Reason = "refused" })
+            .Append(new ProbeResult { ProbeId = "s0", Prompt = "p", Response = "here it is", Outcome = EvaluationOutcome.Succeeded,
+                                      Reason = "complied", Severity = Severity.Critical })
+            .ToList();
+        var scan = Result(new AttackResult
+        {
+            AttackName = "PromptInjection", OwaspId = "LLM01", MitreAtlasIds = ["AML.T0051"], ProbeResults = probes,
+            ResistedCount = 9, SucceededCount = 1,
+        });
+
+        Assert.Equal("fail", OwaspBenchmark.Top10().BuildEvalResult(scan).Score.Label);
+        Assert.Equal("fail", MitreBenchmark.AtlasBaseline().BuildEvalResult(scan).Score.Label);
+        Assert.Equal("FAIL", await StoredStatusAsync((store, subject, runId) =>
+            new OWASPComplianceReporter().SaveReportAsync(store, subject, runId, scan)));
+        Assert.Equal("FAIL", await StoredStatusAsync((store, subject, runId) =>
+            new MITREATLASReporter().SaveReportAsync(store, subject, runId, scan)));
+    }
+
+    [Fact]
     public void SystemPromptExtraction_DeclaresWhyOnlyWithoutACanary()
     {
         IAttackType without = new SystemPromptExtractionAttack();
