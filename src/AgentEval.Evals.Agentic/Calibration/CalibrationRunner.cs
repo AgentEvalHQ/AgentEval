@@ -99,6 +99,7 @@ public sealed class CalibrationRunner
             var keysNotMeasured = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             int evaluationFailures = 0;
             int skippedUnknownKey = 0;
+            var skippedKeys = new SortedDictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             int notMeasured = 0;
             int notApplicable = 0;
 
@@ -112,6 +113,7 @@ public sealed class CalibrationRunner
                         $"[calibration] {ds.CategoryKey} entry {entry.ScenarioId}: " +
                         $"no evaluator dispatched for key '{entry.EvaluatorKey}' (unknown, or carved out) — skipping.");
                     skippedUnknownKey++;
+                    skippedKeys[entry.EvaluatorKey] = skippedKeys.GetValueOrDefault(entry.EvaluatorKey) + 1;
                     continue;
                 }
 
@@ -191,6 +193,7 @@ public sealed class CalibrationRunner
                 NotApplicable: notApplicable)
             {
                 ExcludedKeys = excludedKeys,
+                SkippedKeys = skippedKeys,
                 ExcludedMeasuredRecords = measured.Count - scored.Count,
             };
         }
@@ -225,6 +228,13 @@ public sealed record CalibrationCategoryReport(
 
     /// <summary>Measured records dropped with their key (in addition to <see cref="NotMeasured"/>).</summary>
     public int ExcludedMeasuredRecords { get; init; }
+
+    /// <summary>
+    /// The keys behind <see cref="SkippedUnknownKey"/>, with their entry counts: the resolver dispatched nothing for them.
+    /// The caller knows which of these are carved out on purpose and which are not routed (B6c-15); the count alone
+    /// could not say, and the report called every one of them "not yet routed".
+    /// </summary>
+    public IReadOnlyDictionary<string, int> SkippedKeys { get; init; } = new Dictionary<string, int>();
 }
 
 /// <summary>

@@ -177,6 +177,33 @@ public static class BenchAgenticCalibrateCommand
     };
 
     /// <summary>
+    /// The entries the resolver dispatched nothing for, split by why (B6c-15): carved out on purpose (<see cref="s_carveOutKeys"/>,
+    /// <see cref="s_notCalibratableOnTheseGoldens"/>) or not routed at all — a golden key nothing knows. The report used to
+    /// call every one of them "not yet routed", so a category emptied by deliberate carve-outs read as a wiring gap.
+    /// </summary>
+    internal static (int CarvedOut, string CarvedKeys, int NotRouted, string NotRoutedKeys) SplitUndispatched(CalibrationCategoryReport report)
+    {
+        static bool Carved(string key) => s_carveOutKeys.Contains(key) || s_notCalibratableOnTheseGoldens.Contains(key);
+        var carved = report.SkippedKeys.Where(kv => Carved(kv.Key)).ToList();
+        var notRouted = report.SkippedKeys.Where(kv => !Carved(kv.Key)).ToList();
+        return (carved.Sum(kv => kv.Value), string.Join(", ", carved.Select(kv => kv.Key)),
+                notRouted.Sum(kv => kv.Value), string.Join(", ", notRouted.Select(kv => kv.Key)));
+    }
+
+    // One sentence for a category none of whose entries was dispatched.
+    private static string UndispatchedSentence(CalibrationCategoryReport report)
+    {
+        var (carved, carvedKeys, notRouted, notRoutedKeys) = SplitUndispatched(report);
+        var parts = new List<string>();
+        if (carved > 0)
+            parts.Add($"{carved} entries carved out by key, not calibratable on these goldens ({carvedKeys})");
+        if (notRouted > 0)
+            parts.Add($"{notRouted} entries have a key nothing dispatches ({notRoutedKeys}) — a new golden key not yet routed in " +
+                      "CalibrationDataset.DeriveCategory");
+        return parts.Count == 0 ? "no entries" : string.Join("; ", parts);
+    }
+
+    /// <summary>
     /// A category's gate status. INFRA-FAIL: an evaluation failed. INCOMPLETE: a key was left out of the scoring because
     /// it was not measured on every record (#203 review, B6c-7) — scoring the rest would score a sample selected on the
     /// evaluator's own verdict, so the category is not a measured PASS. Otherwise PASS or FAIL on accuracy and kappa.
@@ -427,15 +454,10 @@ public static class BenchAgenticCalibrateCommand
                 // Path A' (v1.1) carved out 9 more evaluators (5 multi-turn memory +
                 // 3 trace-dependent reasoning + f1_score), trimming dispatch from
                 // 49 → 40 of 60. The carved-key entries route into memory / reasoning
-                // categories where every entry skips — surfaced as SKIP with the
-                // SkippedUnknownKey count. An "unknown" SKIP indicates a future
-                // golden added a brand-new key without extending DeriveCategory.
-                Console.WriteLine(
-                    $"  [SKIP] {category}: {categoryReport.SkippedUnknownKey} entries had no dispatch wiring " +
-                    $"(this means a new golden key is not yet routed in CalibrationDataset.DeriveCategory). " +
-                    $"The 20 evaluators carved out from dispatch (6 pure-code telemetry + StochasticStability + " +
-                    $"CostQualityEfficiency + 3 judge-quality meta + 5 multi-turn memory + 3 trace-dependent " +
-                    $"reasoning + f1_score) do NOT route through this path.");
+                // categories where every entry skips — surfaced as SKIP, naming the
+                // carved-out keys apart from any not routed at all (B6c-15): only the
+                // latter means a golden added a brand-new key without extending DeriveCategory.
+                Console.WriteLine($"  [SKIP] {category}: nothing dispatched — {UndispatchedSentence(categoryReport)}.");
                 continue;
             }
             var (accThr, kapThr) = s_categoryOverrides.TryGetValue(category, out var ov)
@@ -443,6 +465,7 @@ public static class BenchAgenticCalibrateCommand
                 : (AccuracyThreshold, KappaThreshold);
             var complete = categoryReport.ExcludedKeys.Count == 0;
             var status = CategoryStatus(categoryReport, accThr, kapThr);
+            var (carvedOut, _, notRouted, notRoutedKeys) = SplitUndispatched(categoryReport);
             var thrSuffix = s_categoryOverrides.ContainsKey(category)
                 ? $" [override: acc>={accThr:P0} kappa>={kapThr:F2}]"
                 : string.Empty;
@@ -450,7 +473,8 @@ public static class BenchAgenticCalibrateCommand
                 $"  [{status}] {category}: accuracy={categoryReport.Accuracy:P1}, " +
                 $"kappa={FormatKappa(categoryReport.CohensKappa)}, entries={categoryReport.EntryCount}, " +
                 $"failures={categoryReport.EvaluationFailures}, not_measured={categoryReport.NotMeasured}, " +
-                $"inapplicable={categoryReport.NotApplicable}, carved_out={categoryReport.SkippedUnknownKey}{thrSuffix}" +
+                $"inapplicable={categoryReport.NotApplicable}, carved_out={carvedOut}" +
+                (notRouted > 0 ? $", not_routed={notRouted} ({notRoutedKeys})" : "") + thrSuffix +
                 (complete ? "" : $" — excluded keys (not measured on every record): {string.Join(", ", categoryReport.ExcludedKeys)}"));
             if (status != "PASS") allPass = false;
         }
@@ -500,12 +524,7 @@ public static class BenchAgenticCalibrateCommand
             {
                 sb.AppendLine($"## {category} [SKIP]");
                 sb.AppendLine();
-                sb.AppendLine(
-                    $"> {cr.SkippedUnknownKey} entries had no dispatch wiring. Post-Path A' (40 of 60 dispatched), " +
-                    "this means a new golden key is not yet routed in `CalibrationDataset.DeriveCategory`. " +
-                    "The 20 carve-outs (6 pure-code telemetry + StochasticStability + CostQualityEfficiency + " +
-                    "3 judge-quality meta + 5 multi-turn memory + 3 trace-dependent reasoning + f1_score) are " +
-                    "deliberately omitted from the dispatch table and do not surface here.");
+                sb.AppendLine($"> Nothing dispatched: {UndispatchedSentence(cr)}.");
                 sb.AppendLine();
                 continue;
             }
@@ -527,14 +546,15 @@ public static class BenchAgenticCalibrateCommand
             // Not scored (B3a): no verdict to compare with gold — reported, never counted as agreement or disagreement.
             sb.AppendLine($"| Not measured (not scored) | {cr.NotMeasured} | — | info |");
             sb.AppendLine($"| Inapplicable (not scored) | {cr.NotApplicable} | — | info |");
-            sb.AppendLine($"| Carved out by key (not dispatched) | {cr.SkippedUnknownKey} | — | info |");
+            var (carved, carvedKeys, unrouted, unroutedKeys) = SplitUndispatched(cr);
+            sb.AppendLine($"| Carved out by key (not dispatched) | {carved}{(carved > 0 ? $" ({carvedKeys})" : "")} | — | info |");
+            if (unrouted > 0)
+                sb.AppendLine($"| Not routed (a golden key nothing dispatches) | {unrouted} ({unroutedKeys}) | — | info |");
             sb.AppendLine($"| Keys excluded (not measured on every record) | {(cr.ExcludedKeys.Count == 0 ? "none" : string.Join(", ", cr.ExcludedKeys))} | none | {(cr.ExcludedKeys.Count == 0 ? "OK" : "INCOMPLETE")} |");
             sb.AppendLine($"| Accuracy | {cr.Accuracy:P1} | >= {accThr:P0} | {(accOk ? "OK" : "BELOW")} |");
             sb.AppendLine($"| Cohen's kappa | {FormatKappa(cr.CohensKappa)} | >= {kapThr:F2} | {(kappaOk ? "OK" : "BELOW")} |");
             sb.AppendLine($"| Within score range | {cr.WithinScoreRange} / {cr.EntryCount} | — | — |");
             sb.AppendLine($"| Mean score delta | {cr.MeanScoreDelta:+0.000;-0.000;0.000} | — | — |");
-            if (cr.SkippedUnknownKey > 0)
-                sb.AppendLine($"| Skipped (unknown key) | {cr.SkippedUnknownKey} | — | — |");
             sb.AppendLine();
         }
 

@@ -150,4 +150,45 @@ public class BenchAgenticCalibrateCommandTests : IDisposable
             k => Assert.NotNull(AgentEval.Evals.EvalRegistry.Shared.TryGet(k)));   // still registered for every other use
         Assert.Contains("Carved out by key (not dispatched)", await File.ReadAllTextAsync(outPath), StringComparison.Ordinal);
     }
+
+    [Fact]
+    public async Task ACategoryEmptiedByCarveOuts_SaysSo_AndNeverCallsThemUnrouted()
+    {
+        // B6c-15 (found in the B12 pre-flight): memory and reasoning hold only carved-out keys, yet the report said their
+        // entries "had no dispatch wiring (this means a new golden key is not yet routed)", and every category's table
+        // repeated the same count as "Skipped (unknown key)".
+        var outPath = Path.Combine(_root, "report-carved.md");
+
+        await BenchAgenticCalibrateCommand.RunCoreAsync(
+            rootOverride: _root, outPathOverride: outPath, evaluatorOverride: new AlwaysPassEvaluator());
+
+        var report = await File.ReadAllTextAsync(outPath);
+        Assert.Contains("## memory [SKIP]", report, StringComparison.Ordinal);
+        Assert.Contains("## reasoning [SKIP]", report, StringComparison.Ordinal);
+        Assert.Contains("carved out by key, not calibratable on these goldens (", report, StringComparison.Ordinal);
+        Assert.Contains("intermediate_step_hallucination", report, StringComparison.Ordinal);
+        Assert.DoesNotContain("not yet routed", report, StringComparison.Ordinal);       // every golden key is known
+        Assert.DoesNotContain("Skipped (unknown key)", report, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void SplitUndispatched_TellsCarvedOutFromNotRouted()
+    {
+        var report = new AgentEval.Evals.Agentic.Calibration.CalibrationCategoryReport("c", 0, 0, 0, 0, 0, SkippedUnknownKey: 7)
+        {
+            SkippedKeys = new Dictionary<string, int>
+            {
+                ["f1_score"] = 2,                 // s_carveOutKeys
+                ["unsafe_tool_use"] = 3,          // s_notCalibratableOnTheseGoldens
+                ["brand_new_key"] = 2,            // nothing knows it
+            },
+        };
+
+        var (carved, carvedKeys, notRouted, notRoutedKeys) = BenchAgenticCalibrateCommand.SplitUndispatched(report);
+
+        Assert.Equal(5, carved);
+        Assert.Equal("f1_score, unsafe_tool_use", carvedKeys);
+        Assert.Equal(2, notRouted);
+        Assert.Equal("brand_new_key", notRoutedKeys);
+    }
 }
