@@ -194,10 +194,7 @@ public static class BenchCalibrateCommand
                 : (AccuracyThreshold, KappaThreshold);
             var accOk = pillarReport.Accuracy >= accThr;
             var kappaOk = pillarReport.CohensKappa >= kapThr;
-            var noInfraFail = pillarReport.EvaluationFailures == 0;
-            var status = !noInfraFail
-                ? "INFRA-FAIL"
-                : (accOk && kappaOk ? "PASS" : "FAIL");
+            var status = PillarGateStatus(pillarReport.EvaluationFailures, pillarReport.NotMeasured, accOk, kappaOk);
             var thrSuffix = s_pillarOverrides.ContainsKey(pillar)
                 ? $" [override: acc>={accThr:P0} kappa>={kapThr:F2}]"
                 : string.Empty;
@@ -206,12 +203,12 @@ public static class BenchCalibrateCommand
                 $"kappa={FormatKappa(pillarReport.CohensKappa)}, entries={pillarReport.EntryCount}, " +
                 $"failures={pillarReport.EvaluationFailures}, not_measured={pillarReport.NotMeasured}, " +
                 $"inapplicable={pillarReport.NotApplicable}{thrSuffix}");
-            if (!accOk || !kappaOk || !noInfraFail) allPass = false;
+            if (status != "PASS") allPass = false;
         }
 
         Console.WriteLine(allPass
             ? "Calibration gate PASSED — all pillars meet thresholds with zero evaluation failures."
-            : $"Calibration gate FAILED — one or more pillars below accuracy>={AccuracyThreshold:P0} or kappa>={KappaThreshold:F2}, or had non-zero evaluation_failures.");
+            : $"Calibration gate FAILED — one or more pillars below accuracy>={AccuracyThreshold:P0} or kappa>={KappaThreshold:F2}, had non-zero evaluation_failures, or was INCOMPLETE (a record not measured).");
 
         if (limitPerPillar is not null)
         {
@@ -225,6 +222,17 @@ public static class BenchCalibrateCommand
 
         return allPass ? ExitCodes.Success : ExitCodes.GateFailed;
     }
+
+    /// <summary>
+    /// A compliance pillar's calibration gate status. INFRA-FAIL: an evaluation failed. INCOMPLETE: a record reached no
+    /// verdict without erroring (a withheld pass), so the scored sample would be the one the judge's own verdicts
+    /// selected — the agentic rule (B6c-7), which excludes by key, never by outcome; a pillar is one key (#203 review
+    /// round 3, B10j). Only PASS meets the gate. Shared by the GDPR and EU AI Act calibrate commands.
+    /// </summary>
+    internal static string PillarGateStatus(int evaluationFailures, int notMeasured, bool accuracyOk, bool kappaOk) =>
+        evaluationFailures > 0 ? "INFRA-FAIL"
+        : notMeasured > 0 ? "INCOMPLETE"
+        : accuracyOk && kappaOk ? "PASS" : "FAIL";
 
     // F-004 honest surface: NaN comes from CalibrationMetrics.CohensKappa when the dataset
     // is degenerate (single-class → pe ≈ 1 → kappa is mathematically undefined). Render as

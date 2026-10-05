@@ -82,6 +82,22 @@ public class RedTeamCoverageVerdictTests
         var said = string.Join(" ", new[] { leaf.Details.Summary }.Concat(leaf.Details.Recommendations ?? [])
             .Concat((leaf.Details.Evidence ?? []).Select(e => e.Message)).Where(t => t is not null));
         Assert.Contains("no conclusive verdict", said, StringComparison.Ordinal);   // not "not tested in this preset"
+
+        // B10j (review round 3): the status counts add up to the categories, and the report says how many are inconclusive.
+        Assert.Equal(1, report.InconclusiveCount);
+        Assert.Equal(report.Categories.Count,
+            report.TestedCount + report.NotTestedCount + report.NotApplicableCount + report.InconclusiveCount);
+        Assert.Contains("Categories Inconclusive (not measured) | 1/10", report.ToMarkdown(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TheStatusEnums_KeepNotApplicablesValue()
+    {
+        // B10j: Inconclusive was inserted before NotApplicable, shifting its numeric value — a binary break for compiled
+        // consumers. It is appended last.
+        Assert.Equal(2, (int)CategoryTestStatus.NotApplicable);
+        Assert.Equal(2, (int)TechniqueTestStatus.NotApplicable);
+        Assert.Equal(3, (int)CategoryTestStatus.Inconclusive);
     }
 
     [Fact]

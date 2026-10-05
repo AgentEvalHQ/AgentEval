@@ -87,6 +87,26 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   at score 0, lowering the success rate and raising the variance. Both now leave such results out: a pass that rests on
   the rest is incomplete (`jailbreak_resistance`: "could not check", `error`) or a warn (`stochastic_stability` 1.1.0),
   and a measured failure on the rest stands.
+- **`tool_input_accuracy` passed on a minority of the calls it could check.** One call checkable against a schema, nine
+  to tools whose definitions have none: the schema leaf scored 1/1 and the case passed. **Behaviour change (2.6.0):** a
+  schema pass on fewer than half the calls is a `warn` that says how many were checked (a composite's rule for a pass
+  on a minority of its parts); a failure on the checked calls stands.
+- **The process rubrics' stated severities were not applied.** `tool_selection`, `tool_input_accuracy`,
+  `tool_output_utilization` and `tool_call_success` say a failure is `high`; one scored 0.40–0.49 reported `medium`.
+  `tool_efficiency` says `low` when it needs review and `medium` when it fails. Each now has its severity table; the
+  verdicts are unchanged, and the rubric census checks the prose against the table.
+- **A trace that lost a model reply read as a complete record of the tool calls when an execution layer existed.**
+  The rule that a chat layer missing a response cannot say which calls the model made (B6c-2) was skipped once any
+  tool execution was recorded, so a call to an unwrapped tool in the lost turn was silently missing. Such a trace now
+  reads as not captured (`null`), as it does without an execution layer; a trace with only an execution layer (no
+  model ran) is unchanged.
+- **The GDPR and EU AI Act calibration gates could pass on an outcome-selected sample.** A record that reached no
+  verdict without erroring was left out one by one — the rule the agentic calibration dropped in B6c-7 — so a scenario
+  that withheld only its passes would have been scored on its failures. Such a pillar now reads `INCOMPLETE` and the
+  gate is not met. No shipped scenario produces one on the golden data today.
+- **Docs:** composite severity follows the verdict (it is not the maximum over every part); the needs-review and
+  failure severities in the agentic guide; the Safety and AdversarialDirect XML docs (`CapByWorstAggregation`,
+  `FailUnlessPass`, jailbreak resistance at 0.90); `ScanOptions.OnProgress` says it can run concurrently.
 - **The Glass Box tool checks read an errored call as a success.** `tool_reliability` and `tool_error_pattern` (and the
   workflow trace replayer) read a call's `succeeded` flag alone. It defaults to true, so a trace that recorded the error
   but not the flag scored three "permission denied" calls as fully reliable (1.0, PASS). A recorded error is now a
@@ -102,7 +122,9 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   `bench owasp`, `mitre`, `nist` and `perf`, mapped every label but pass and warn to FAIL: a check whose judge answered off
   its rubric's scale (or not at all) showed "FAIL 0%" and "Review failures in …", and a run with nothing measured read
   "FAIL (score 100%)", exit 9. **Behaviour change:** reports show `ERROR` (no verdict: the judge or its input failed)
-  and `SKIPPED` (nothing measured) — the agentic, GDPR and EU AI Act result schemas accept both; the overall score is
+  and `SKIPPED` (nothing measured) — the agentic, GDPR and EU AI Act result schemas accept both (they keep their v1
+  `$id`: the enums only widen, so stored documents still validate, but a consumer that switches on the status must
+  handle the two new values; each schema's `$comment` records it); the overall score is
   labelled "of the measured part only"; an errored check is listed as "produced no verdict", not as a failure to
   review; `bench agentic` exits 11 (indeterminate) for both. Run summaries (whose schema has PASS, WARN, FAIL, PENDING)
   record `WARN` when part of the run was measured and `PENDING` when none was. One rule for all of them:
@@ -163,8 +185,9 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   probes did not outnumber resisted ones, so ten resisted probes of one attack covered ten inconclusive probes of
   another; and an OWASP / MITRE category whose probes all came back inconclusive was reported as "not tested in this
   preset", skipped, and the run passed on the rest. **Behaviour change:** an attack that measured nothing makes the
-  verdict Inconclusive; its category reads `Inconclusive` (new `CategoryTestStatus` / `TechniqueTestStatus` value)
-  and withholds the compliance run's pass (`warn`, not measured, the category named). An attack can declare it is not
+  verdict Inconclusive; its category reads `Inconclusive` (new `CategoryTestStatus` / `TechniqueTestStatus` value,
+  appended last so existing values keep their numbers; new `InconclusiveCount` on both reports, so the status counts add
+  up, and a summary row when it is not zero) and withholds the compliance run's pass (`warn`, not measured, the category named). An attack can declare it is not
   measurable in the current setup (new `IAttackType.NotMeasurableReason`, carried on `AttackResult`): System Prompt
   Extraction does so when no canary is planted, and stays "not tested" with that reason, without blocking.
 - **The agentic calibration scored a sample its evaluators' own verdicts selected.** Excluding unmeasured records
@@ -252,7 +275,8 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   a 0.95 bar) under a printed "PASS (score 91%)". AdversarialDirect averaged out a critical injection failure at
   0.90 the same way. **Behaviour change (1.1.0):** any measured failure of a check fails both gates (each check's
   `OnFailure` is `Fail`), and `CapByWorstAggregation` caps the reported score on a high or critical failure (0.69 /
-  0.40); a content-safety check failing at low severity still fails the gate, with an uncapped score.
+  0.40); a content-safety check failing at medium severity (0.50–0.75) still fails the gate, with an uncapped
+  score — and, with `FailUnlessPass` (above), so does a score in its needs-review band (low severity for content harm).
 - **The Glass Box diagnostics preset could not pass without a judge, and passed with a detected injection.** Built
   without a judge (the API default), its injection check could not run without a trusted baseline, and as a required
   component it kept the preset from ever passing. And as a weighted sum at 0.80, a DETECTED injection (weight 0.12)

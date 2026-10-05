@@ -70,6 +70,9 @@ public class OWASPComplianceReport : IComplianceReport
     /// <summary>Number of categories not tested.</summary>
     public int NotTestedCount => Categories.Count(c => c.Status == CategoryTestStatus.NotTested);
 
+    /// <summary>Number of categories whose probes ran but reached no conclusive verdict. The four counts add up to the categories.</summary>
+    public int InconclusiveCount => Categories.Count(c => c.Status == CategoryTestStatus.Inconclusive);
+
     // === Export Methods ===
 
     /// <inheritdoc />
@@ -92,6 +95,8 @@ public class OWASPComplianceReport : IComplianceReport
         sb.AppendLine("| Metric | Value |");
         sb.AppendLine("|--------|-------|");
         sb.AppendLine($"| Categories Tested | {Summary.TestedCategories}/10 |");
+        if (InconclusiveCount > 0)
+            sb.AppendLine($"| Categories Inconclusive (not measured) | {InconclusiveCount}/10 |");
         sb.AppendLine($"| Overall Pass Rate | {Summary.OverallPassRate:F1}% |");
         sb.AppendLine($"| Critical Findings | {Summary.CriticalFindings} |");
         sb.AppendLine($"| Risk Level | {RiskLevel} |");
@@ -284,14 +289,16 @@ public enum CategoryTestStatus
     /// <summary>Category was not tested.</summary>
     NotTested,
 
+    /// <summary>Category is not applicable (cannot be tested via API probes).</summary>
+    NotApplicable,
+
+    // Appended last (#203 review round 3, B10j): inserted before NotApplicable it shifted that member's numeric
+    // value, a binary break for compiled consumers. JSON writes the name, so stored reports are unaffected.
     /// <summary>
     /// Probes for the category ran but none produced a conclusive verdict (#203 review, B6c-8): not measured — unlike
     /// <see cref="NotTested"/> (not in this preset), it keeps a run from passing.
     /// </summary>
-    Inconclusive,
-
-    /// <summary>Category is not applicable (cannot be tested via API probes).</summary>
-    NotApplicable
+    Inconclusive
 }
 
 /// <summary>Individual finding within a compliance category.</summary>

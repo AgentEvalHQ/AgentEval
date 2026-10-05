@@ -42,6 +42,7 @@ public class EvalInputTraceProjectionTests
     {
         var trace = Trace(
             Request(0, Def("delete_records", """{"type":"object","required":["table"]}""")),
+            Response(0, new TraceToolCall { Name = "delete_records", Arguments = """{"table":"customers"}""" }),
             TraceEntry.ForToolExecution(1, "c", "delete_records", """{"table":"customers"}""", "deleted 4210 rows", 5, true, null));
 
         var input = Input.WithTrace(trace);
@@ -52,6 +53,28 @@ public class EvalInputTraceProjectionTests
         Assert.Equal("deleted 4210 rows", call.Result);
         var definition = Assert.Single(input.ToolDefinitions!);
         Assert.Equal(["table"], ((IEnumerable<object>)definition.Parameters!["required"]).Cast<string>());
+    }
+
+    [Fact]
+    public void AnExecutionLayer_BesideAChatLayerThatLostAResponse_IsNotTheWholeRecord()
+    {
+        // Review round 3 (B10j): the complete-chat-layer rule (B6c-2) was skipped once an execution layer existed, so a
+        // turn whose response was lost — where the model may have requested an unwrapped tool — read as "these calls only".
+        var lostTurn = Trace(Request(0, Def("search"), Def("delete_records")),
+            Response(0, new TraceToolCall { Name = "search" }),
+            TraceEntry.ForToolExecution(1, "c", "search", null, "3 results", 5, true, null),
+            Request(2, Def("search"), Def("delete_records")));
+
+        Assert.Null(Input.WithTrace(lostTurn).ToolCalls);
+    }
+
+    [Fact]
+    public void AnExecutionLayer_WithNoChatLayer_IsTheWholeRecord()
+    {
+        // A tool-only executor: no model ran, so nothing could request an unwrapped tool.
+        var toolOnly = Trace(TraceEntry.ForToolExecution(0, "c", "search", null, "3 results", 5, true, null));
+
+        Assert.Equal("search", Assert.Single(Input.WithTrace(toolOnly).ToolCalls!).Name);
     }
 
     [Fact]
@@ -173,7 +196,7 @@ public class EvalInputTraceProjectionTests
     [Fact]
     public void ExecutedCalls_CarryTheirRecordedOutcome_RequestedCallsDoNot()
     {
-        var executed = Input.WithTrace(Trace(Request(0, Def("pay")),
+        var executed = Input.WithTrace(Trace(Request(0, Def("pay")), Response(0, new TraceToolCall { Name = "pay" }),
             TraceEntry.ForToolExecution(1, "c", "pay", null, null, 5, false, "card declined"))).ToolCalls!;
         var requested = Input.WithTrace(Trace(Request(0, Def("pay")),
             Response(0, new TraceToolCall { Name = "pay" }))).ToolCalls!;
@@ -204,6 +227,7 @@ public class EvalInputTraceProjectionTests
     public async Task ToolCallSuccess_DecidesFromTheTracesRecordedOutcomes_WithoutAJudge(bool first, bool second, bool passes)
     {
         var trace = Trace(Request(0, Def("a"), Def("b")),
+            Response(0, new TraceToolCall { Name = "a" }, new TraceToolCall { Name = "b" }),
             TraceEntry.ForToolExecution(1, "c", "a", null, "plain text", 5, first, first ? null : "boom"),
             TraceEntry.ForToolExecution(2, "c", "b", null, second ? "plain text" : null, 5, second, second ? null : "timeout"));
         var judge = new FixedScoreEvaluator(passes ? 0 : 100);   // would give the opposite verdict if it were asked
@@ -285,6 +309,7 @@ public class EvalInputTraceProjectionTests
     public async Task UnsafeToolUse_ADestructiveCallInATrace_IsJudged()
     {
         var trace = Trace(Request(0, Def("delete_records")),
+            Response(0, new TraceToolCall { Name = "delete_records", Arguments = """{"table":"customers"}""" }),
             TraceEntry.ForToolExecution(1, "c", "delete_records", """{"table":"customers"}""", "deleted", 5, true, null));
         var eval = new UnsafeToolUseEval(new FixedScoreEvaluator(10));
 

@@ -140,7 +140,7 @@ measured and why the others were not, and names the required components that did
 and under a `warn` or `fail` the measured part decided. Through the CLI,
 `warn` exits with code 10 (`GateWarning`), which CI can treat as blocking or not.
 
-Composite severity is the maximum severity across all sub-results (`none < low < medium < high < critical`), computed by `SeverityRollup.Max`.
+Composite severity (`none < low < medium < high < critical`) follows the verdict: a pass reports `none`; a fail reports the aggregation's severity (`SeverityRollup.Max` over the measured parts), at least `medium`; a warn reports that severity capped at `medium`; `error` and `skipped` report it unchanged. A passing composite therefore never carries the severity of a failure its own scoring absorbed.
 
 ---
 

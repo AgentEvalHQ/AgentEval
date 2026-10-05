@@ -84,11 +84,12 @@ public sealed class ToolInputAccuracyEval : IEval
         // that did not run now reads the judge alone, so scores move and the version says so.
         // 2.1.0 (#203): no tool definitions is inapplicable (the judge alone, as before); tool definitions but no
         // tool calls stays skipped, and a required leaf that did not run means the composite cannot pass.
+        // 2.6.0 (#203 review round 3, B10j): a schema pass on fewer than half the calls is a warn, as for a composite.
         _inner = new CompositeEval(
             key: "tool_input_accuracy",
             name: "Tool Input Accuracy",
             category: "agentic-process",
-            version: "2.5.0",
+            version: "2.6.0",
             components: new[]
             {
                 new EvalComponent(schemaValidation, Weight: 0.50) { OnFailure = ComponentFailureEffect.Fail },
@@ -138,7 +139,7 @@ public sealed class ToolInputAccuracyEval : IEval
     private sealed class ToolInputSchemaEval : AtomicCodeEval
     {
         public ToolInputSchemaEval()
-            : base("tool_input_accuracy_schema", "Tool Input Accuracy (Schema)", "agentic-process", "2.2.0") { }
+            : base("tool_input_accuracy_schema", "Tool Input Accuracy (Schema)", "agentic-process", "2.3.0") { }
 
         protected override EvalResult Evaluate(EvalInput input)
         {
@@ -254,7 +255,7 @@ public sealed class ToolInputAccuracyEval : IEval
             bool passed = score >= 0.70;
             string severity = passed ? "none" : (score < 0.40 ? "high" : "medium");
 
-            return Build(score, passed, severity,
+            var built = Build(score, passed, severity,
                 dimensions: new Dictionary<string, double>
                 {
                     ["schema_pass_rate"] = score,
@@ -263,6 +264,21 @@ public sealed class ToolInputAccuracyEval : IEval
                     ["calls_unverifiable"] = unverifiable.Count,
                 },
                 evidence: evidence.Count > 0 ? evidence : null);
+
+            // A pass on fewer than half the calls is not the case's pass (#203 review round 3, B10j): 1 checkable call of
+            // 10 passed it. Nothing failed, so it is a warn — the composite rule for a pass on a minority of its parts
+            // (CompositeEval.MinimumMeasuredShare). A failure on the calls that were checked stands.
+            if (passed && totalCalls < 0.5 * (totalCalls + unverifiable.Count))
+            {
+                var note = $"Only {totalCalls} of {totalCalls + unverifiable.Count} call(s) could be checked against a schema; " +
+                           "a pass on a minority of the calls is not the case's pass.";
+                return built with
+                {
+                    Score = built.Score with { Label = "warn", Passed = false, Severity = "none" },
+                    Details = built.Details with { Recommendations = [note], Summary = note },
+                };
+            }
+            return built;
         }
 
         // The "required" list of a parameter schema: CLR lists (as EvalInputTraceAccessor projects) or a JSON array (as

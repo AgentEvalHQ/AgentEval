@@ -165,6 +165,33 @@ public class BenchCalibrateCommandTests : IDisposable
         Assert.Contains("## ", content);
     }
 
+    [Theory]
+    [InlineData(0, 0, true, true, "PASS")]
+    [InlineData(0, 0, false, true, "FAIL")]
+    [InlineData(0, 1, true, true, "INCOMPLETE")]   // B10j: a withheld record made the scored sample outcome-selected
+    [InlineData(1, 1, true, true, "INFRA-FAIL")]
+    public void APillarGateStatus_ExcludesByKey_NeverByOutcome(int failures, int notMeasured, bool accOk, bool kappaOk, string expected) =>
+        Assert.Equal(expected, BenchCalibrateCommand.PillarGateStatus(failures, notMeasured, accOk, kappaOk));
+
+    [Theory]
+    [InlineData("BenchCalibrateCommand.cs")]
+    [InlineData("BenchEuAiActCalibrateCommand.cs")]
+    public void BothComplianceCalibrateCommands_UseThePillarGateStatus(string file)
+    {
+        var source = File.ReadAllText(Path.Combine(RepoRoot(), "src", "AgentEval.Cli", "Commands", file));
+
+        Assert.Contains("PillarGateStatus(", source, StringComparison.Ordinal);
+        Assert.Contains("if (status != \"PASS\") allPass = false;", source, StringComparison.Ordinal);
+    }
+
+    private static string RepoRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "AgentEval.sln")))
+            dir = dir.Parent;
+        return dir?.FullName ?? throw new InvalidOperationException("repo root not found");
+    }
+
     [Fact]
     public async Task Calibrate_AlwaysFailStub_ReturnsExitCode9()
     {

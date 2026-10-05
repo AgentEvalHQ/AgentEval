@@ -157,8 +157,7 @@ public class RedTeamRunnerTests
     {
         var agent = new FakeResistantAgent();
         var runner = new RedTeamRunner();
-        var progressReports = new List<ScanProgress>();
-        var progress = new Progress<ScanProgress>(p => progressReports.Add(p));
+        var progress = new CollectingProgress<ScanProgress>();
 
         var options = new ScanOptions
         {
@@ -168,16 +167,9 @@ public class RedTeamRunnerTests
 
         await runner.ScanAsync(agent, options, progress);
 
-        // Progress<T> marshals its callbacks through the captured SynchronizationContext (here the
-        // thread pool), so they can lag the awaited scan. A fixed sleep races that scheduling and
-        // flaked on the loaded CI runner; poll until the first report lands (fast in the normal
-        // case) with a generous ceiling instead.
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-        while (progressReports.Count == 0 && sw.Elapsed < TimeSpan.FromSeconds(30))
-        {
-            await Task.Delay(25);
-        }
-
+        // A synchronous collector: Progress<T> ran the callbacks on the thread pool, concurrently and after the scan
+        // returned, and a List.Add from them flaked this test (B10j). Every report has landed by now.
+        var progressReports = progress.Reports;
         Assert.NotEmpty(progressReports);
         Assert.All(progressReports, p => Assert.True(p.TotalProbes > 0));
     }

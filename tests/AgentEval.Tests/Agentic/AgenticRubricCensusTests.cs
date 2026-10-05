@@ -166,6 +166,22 @@ public class AgenticRubricCensusTests
             }
         }
 
+        // Severity stated in prose, per band (the process rubrics) — B10j: the manifest used to have no table for them.
+        var severityProse = Regex.Match(text, @"`severity` is `(\w+)` when passed, `(\w+)` when warned, `(\w+)` when failed");
+        var severityProseCallSuccess = Regex.Match(text, @"`severity` is `(\w+)` on full success, `(\w+)` on any failure, `(\w+)` on ambiguity");
+        if ((severityProse.Success || severityProseCallSuccess.Success) && spec.ReviewAt is { } reviewAt)
+        {
+            var (passed, warned, failed) = severityProse.Success
+                ? (severityProse.Groups[1].Value, severityProse.Groups[2].Value, severityProse.Groups[3].Value)
+                : (severityProseCallSuccess.Groups[1].Value, severityProseCallSuccess.Groups[3].Value, severityProseCallSuccess.Groups[2].Value);
+            foreach (var (score, expected) in new[] { (passAt, passed), (reviewAt, warned), (reviewAt - 0.001, failed) })
+            {
+                checkedRows++;
+                if (rubric.SeverityFor(score) != expected)
+                    problems.Add($"prose severity at {score}: expected {expected}, manifest says {rubric.SeverityFor(score) ?? "(none)"}");
+            }
+        }
+
         var threshold = Regex.Match(text, @"pass threshold for this evaluator is `([\d.]+)`");
         if (threshold.Success && double.Parse(threshold.Groups[1].Value, CultureInfo.InvariantCulture) != passAt)
             problems.Add($"the file's stated pass threshold {threshold.Groups[1].Value} is not {passAt}");

@@ -214,6 +214,10 @@ public class ToolInputAccuracySkipTests
     {
         ["2.5.0"] = "not-captured=skipped; none-declared-no-calls=inapplicable; none-declared-with-calls=fail; " +
                     "schema-ok=pass; required-missing=fail; undeclared-tool=fail; not-a-schema=skipped; declared-no-calls=skipped",
+        // 2.6.0 (B10j): a pass on a minority of the calls warns.
+        ["2.6.0"] = "not-captured=skipped; none-declared-no-calls=inapplicable; none-declared-with-calls=fail; " +
+                    "schema-ok=pass; required-missing=fail; undeclared-tool=fail; not-a-schema=skipped; declared-no-calls=skipped; " +
+                    "minority-checked=warn; half-checked=pass; minority-checked-failing=fail",
     };
 
     private static IEnumerable<(string Name, EvalInput Input)> VersionProbes()
@@ -229,6 +233,11 @@ public class ToolInputAccuracySkipTests
         yield return ("undeclared-tool", new EvalInput("q", "r", ToolCalls: [good, new ToolCall("delete", null, null)], ToolDefinitions: [Def("search", schema)]));
         yield return ("not-a-schema", new EvalInput("q", "r", ToolCalls: [good], ToolDefinitions: [Def("search", new Dictionary<string, object> { ["q"] = "string" })]));
         yield return ("declared-no-calls", new EvalInput("q", "r", ToolCalls: [], ToolDefinitions: [Def("search", schema)]));
+        var noSchema = Def("lookup", new Dictionary<string, object> { ["q"] = "string" });
+        var lookup = new ToolCall("lookup", null, null);
+        yield return ("minority-checked", new EvalInput("q", "r", ToolCalls: [good, lookup, lookup], ToolDefinitions: [Def("search", schema), noSchema]));
+        yield return ("half-checked", new EvalInput("q", "r", ToolCalls: [good, lookup], ToolDefinitions: [Def("search", schema), noSchema]));
+        yield return ("minority-checked-failing", new EvalInput("q", "r", ToolCalls: [missing, lookup, lookup], ToolDefinitions: [Def("search", schema), noSchema]));
     }
 
     [Fact]
@@ -243,6 +252,25 @@ public class ToolInputAccuracySkipTests
         Assert.True(s_verdictsByVersion.TryGetValue(eval.Version, out var recorded),
             $"version {eval.Version} has no recorded verdicts; add them: \"{observed}\"");
         Assert.Equal(recorded, observed);
+    }
+
+    [Fact]
+    public async Task APassOnAMinorityOfTheCalls_WarnsTheCase_AndSaysWhy()
+    {
+        // Review round 3 (B10j): one checkable call of ten passed the schema leaf, and a perfect judge passed the case.
+        var schema = new Dictionary<string, object> { ["type"] = "object", ["required"] = new List<object> { "q" } };
+        var calls = new List<ToolCall> { new("search", new Dictionary<string, object> { ["q"] = "x" }, null) };
+        calls.AddRange(Enumerable.Repeat(new ToolCall("lookup", null, null), 9));
+        var input = new EvalInput("q", "r", ToolCalls: calls,
+            ToolDefinitions: [Def("search", schema), Def("lookup", new Dictionary<string, object> { ["q"] = "string" })]);
+
+        var result = await new ToolInputAccuracyEval(new FixedScoreEvaluator(100)).EvaluateAsync(input);
+
+        var leaf = SchemaLeaf(result);
+        Assert.Equal("warn", leaf.Score.Label);
+        Assert.Contains("Only 1 of 10", leaf.Details.Summary!, StringComparison.Ordinal);
+        Assert.Equal("warn", result.Score.Label);
+        Assert.False(result.Score.Passed);
     }
 
     // ── B5a (#203 review): a call is checked only against a schema the check can read ──────────────────────────

@@ -224,10 +224,7 @@ public static class BenchEuAiActCalibrateCommand
                 : (AccuracyThreshold, KappaThreshold);
             var accOk = pillarReport.Accuracy >= accThr;
             var kappaOk = pillarReport.CohensKappa >= kapThr;
-            var noInfraFail = pillarReport.EvaluationFailures == 0;
-            var status = !noInfraFail
-                ? "INFRA-FAIL"
-                : (accOk && kappaOk ? "PASS" : "FAIL");
+            var status = BenchCalibrateCommand.PillarGateStatus(pillarReport.EvaluationFailures, pillarReport.NotMeasured, accOk, kappaOk);
             var thrSuffix = s_pillarOverrides.ContainsKey(pillar)
                 ? $" [override: acc>={accThr:P0} kappa>={kapThr:F2}]"
                 : string.Empty;
@@ -236,12 +233,12 @@ public static class BenchEuAiActCalibrateCommand
                 $"kappa={FormatKappa(pillarReport.CohensKappa)}, entries={pillarReport.EntryCount}, " +
                 $"failures={pillarReport.EvaluationFailures}, not_measured={pillarReport.NotMeasured}, " +
                 $"inapplicable={pillarReport.NotApplicable}{thrSuffix}");
-            if (!accOk || !kappaOk || !noInfraFail) allPass = false;
+            if (status != "PASS") allPass = false;
         }
 
         Console.WriteLine(allPass
             ? "EU AI Act calibration gate PASSED — all pillars meet thresholds with zero evaluation failures."
-            : $"EU AI Act calibration gate FAILED — one or more pillars below accuracy>={AccuracyThreshold:P0} or kappa>={KappaThreshold:F2}, or had non-zero evaluation_failures.");
+            : $"EU AI Act calibration gate FAILED — one or more pillars below accuracy>={AccuracyThreshold:P0} or kappa>={KappaThreshold:F2}, had non-zero evaluation_failures, or was INCOMPLETE (a record not measured).");
 
         if (limitPerPillar is not null)
         {

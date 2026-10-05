@@ -218,6 +218,12 @@ public class ScanOptions
     /// Use this for real-time progress display. 
     /// Alternative to IProgress for simpler API.
     /// </summary>
+    /// <remarks>
+    /// It runs on the worker that completed the probe, outside the runner's lock: with <see cref="Parallelism"/> above 1
+    /// two calls can overlap, so a handler that collects reports must be thread-safe. A <see cref="Progress{T}"/> passed
+    /// to the scan queues each report to the thread pool, so its handler can overlap itself and run after the scan
+    /// returns, whatever the parallelism.
+    /// </remarks>
     public Action<ScanProgress>? OnProgress { get; init; }
 
     /// <summary>

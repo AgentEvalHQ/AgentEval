@@ -109,8 +109,21 @@ public static class EvalInputTraceAccessor
                     Error = c.Error,
                 })))
             .ToList();
+        // The chat layer is complete when every request the model was sent has its response (or error) under the same
+        // index, the pairing key capture writes.
+        var chat = trace.Entries.Where(e => e.EffectiveScope == TraceEntryScope.ChatTurn).ToList();
+        var answered = chat.Where(e => e.Type == TraceEntryType.Response).Select(e => e.Index).ToHashSet();
+        var requests = chat.Where(e => e.Type == TraceEntryType.Request).ToList();
+        var chatIncomplete = requests.Any(e => !answered.Contains(e.Index));
+
         if (executed.Count > 0)
         {
+            // With no chat layer (a tool-only executor: no model ran) the execution layer is the whole record. With one
+            // that lost a response, a call the model requested in that turn of an unwrapped tool is unknown, and the list
+            // would leave it out — the B6c-2 rule, which this branch skipped (#203 review round 3, B10j): null.
+            if (chatIncomplete)
+                return null;
+
             // The execution layer records only the tools it wraps. A call the model requested that no execution record
             // matches (an unwrapped tool) was dropped (#203 review, B6c-12): it is kept, with no outcome, in time order.
             var unmatched = executed.GroupBy(x => x.Call.Name, StringComparer.OrdinalIgnoreCase)
@@ -135,10 +148,7 @@ public static class EvalInputTraceAccessor
         // without one (a cancelled stream, in-workflow capture that records no responses) says nothing about the calls
         // the model made in that turn, so the trace did not capture them: null, not "none" — and not the calls the other
         // turns happened to record, which could leave out the very call a check is looking for (#203 review, B6c-2).
-        var chat = trace.Entries.Where(e => e.EffectiveScope == TraceEntryScope.ChatTurn).ToList();
-        var answered = chat.Where(e => e.Type == TraceEntryType.Response).Select(e => e.Index).ToHashSet();
-        var requests = chat.Where(e => e.Type == TraceEntryType.Request).ToList();
-        if (requests.Count == 0 || !requests.All(e => answered.Contains(e.Index)))
+        if (requests.Count == 0 || chatIncomplete)
             return null;
 
         return Calls(chat.Where(e => e.Type == TraceEntryType.Response))
