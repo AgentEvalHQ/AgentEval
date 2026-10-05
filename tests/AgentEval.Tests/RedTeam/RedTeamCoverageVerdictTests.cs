@@ -634,6 +634,26 @@ public class RedTeamCoverageVerdictTests
             $"{a.Name}: ISO 27001 maps it {iso.Contains(a.Name)}, listed as not mapped {notInIso.Contains(a.Name)}"));
     }
 
+    [Theory]
+    [InlineData("Crescendo", "Jailbreak")]
+    [InlineData("PAIR", "Jailbreak")]
+    [InlineData("TAP", "Jailbreak")]
+    [InlineData("ToolEscalation", "ExcessiveAgency")]
+    public void AnOptInAttack_MapsToExactlyItsCounterpartsControls(string optIn, string counterpart)
+    {
+        // Review round 11 M2 (B10az): ISO A.5.1 mapped Jailbreak but not Crescendo / PAIR / TAP, so a critical Crescendo
+        // success left A.5.1 Effective while the CHANGELOG said the opt-in attacks map where their counterparts do.
+        foreach (var (name, controls) in new (string, ControlMapping[])[]
+                 {
+                     ("NIST", NistAiRmfControls.All), ("SOC2", SOC2Controls.All), ("ISO27001", ISO27001Controls.All),
+                 })
+        {
+            string[] Of(string attack) => controls
+                .Where(c => c.RelevantAttacks.Contains(attack, StringComparer.OrdinalIgnoreCase)).Select(c => c.ControlId).ToArray();
+            Assert.Equal(Of(counterpart), Of(optIn));
+        }
+    }
+
     [Fact]
     public void ACriticalSkillInjection_FailsNist()
     {

@@ -260,7 +260,7 @@ public static class ISO27001Controls
             ControlName = "Policies for Information Security",
             Description = "Information security policy and topic-specific policies shall be defined, approved by management, published, communicated to and acknowledged by relevant personnel and relevant interested parties.",
             Framework = "ISO27001",
-            RelevantAttacks = ["PromptInjection", "Jailbreak", "PIILeakage"]
+            RelevantAttacks = ["PromptInjection", "Jailbreak", "PIILeakage", "Crescendo", "PAIR", "TAP"]
             // OwaspCategories derived → ["LLM01", "LLM02"]
         },
         new()
