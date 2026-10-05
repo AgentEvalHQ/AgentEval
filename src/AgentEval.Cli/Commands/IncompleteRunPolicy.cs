@@ -8,8 +8,9 @@ using AgentEval.Evals.Meta;
 namespace AgentEval.Cli.Commands;
 
 /// <summary>
-/// An incomplete red-team run — a judge call failed, or the scan ran out of time before every probe ran — is neither a
-/// pass nor a fail (exit 11, run summary WARN). The composite it stores and renders must not say PASS either.
+/// An incomplete red-team run — a judge call failed, or the scan ran out of time before every probe ran — is never a pass:
+/// the composite it stores and renders must not say PASS. It is indeterminate (exit 11, run summary WARN) unless what it
+/// did measure already fails it: a measured failure stays one (FAIL, exit 9).
 /// </summary>
 internal static class IncompleteRunPolicy
 {
@@ -37,5 +38,19 @@ internal static class IncompleteRunPolicy
                 Recommendations = [note, .. composite.Details.Recommendations ?? []],
             },
         };
+    }
+
+    /// <summary>
+    /// Whether the run is indeterminate — run summary WARN, exit 11. An incomplete run is, unless its composite fails: a
+    /// failure it measured stands whatever the unmeasured part would show, so the run reads FAIL and exits 9, as the stored
+    /// composite and evidence already read it (#203 review round 9 M2, B10ap: the summary read WARN and the run exited 11
+    /// beside a FAIL composite and FAIL evidence). A withheld pass, or a warn the rest could still turn into a fail, stays
+    /// indeterminate.
+    /// </summary>
+    public static bool IsIndeterminate(EvalResult composite, IReadOnlyList<string> reasons)
+    {
+        ArgumentNullException.ThrowIfNull(composite);
+        ArgumentNullException.ThrowIfNull(reasons);
+        return reasons.Count > 0 && composite.Score.Label != "fail";
     }
 }

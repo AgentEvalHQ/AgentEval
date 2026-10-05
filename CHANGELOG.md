@@ -113,7 +113,8 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   of time, `bench owasp`, `bench nist` and `bench mitre` stored a WARN run summary and exited 11, but the composite
   they persisted and rendered (scenario result, HTML, PDF) and the compliance evidence still read PASS. A passing
   composite of an incomplete run now withholds its pass (warn, naming the reasons), and the evidence reads WARN
-  (`ComplianceReportOptions.IncompleteReason`); a measured failure stays one.
+  (`ComplianceReportOptions.IncompleteReason`). A measured failure stays one on every surface: the run summary reads
+  FAIL and the command exits 9 — it read WARN and exited 11 beside a FAIL composite and FAIL evidence.
 - **`bench owasp` and `bench mitre` stored PASS evidence for a run that withheld its pass.** A category (technique)
   whose probes all came back inconclusive makes the run WARN (exit 10), but the stored compliance evidence counted only
   the tested categories and read PASS. It now reads WARN (`ComplianceStatusPolicy.OverallEvidenceStatus`).
@@ -647,7 +648,8 @@ that the old verdict hid. The entries below give the cause and the evidence for 
     before anything is spent on the agent.
   - **Behaviour change:** if a judge call fails during the scan, or the scan runs out of time before every probe ran,
     the run is **INCOMPLETE**: the console says so, the stored verdict is `WARN` (the schema's indeterminate value)
-    and the command exits 11. Such a run is never reported as a pass or a fail.
+    and the command exits 11. Such a run is never reported as a pass; it is reported as a fail (exit 9) only when what
+    it did measure already fails it.
   - The run's provenance names the judge model. Each tested leaf's provenance is `judge-first` with the judge model;
     it was `code`.
   - The PDF and HTML report footers said every score came from deterministic scoring. They now say "Each score comes

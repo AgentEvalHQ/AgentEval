@@ -261,6 +261,33 @@ public class RedTeamCoverageVerdictTests
 
         Assert.Contains("IncompleteRunPolicy.Withhold(compositeEval, incompleteReasons)", source, StringComparison.Ordinal);
         Assert.Contains("IncompleteReason = incomplete ?", source, StringComparison.Ordinal);
+        // B10ap: the run summary and the exit code follow IsIndeterminate, not "incomplete" — a measured fail stays FAIL.
+        Assert.Contains("var indeterminate = IncompleteRunPolicy.IsIndeterminate(compositeEval, incompleteReasons);", source, StringComparison.Ordinal);
+        Assert.Contains("var verdict = indeterminate ? \"WARN\"", source, StringComparison.Ordinal);
+        Assert.Contains("if (indeterminate)", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("var verdict = incomplete ?", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AnIncompleteRun_ThatMeasuredAFailure_IsAFail_NotIndeterminate()
+    {
+        // Review round 9 M2 (B10ap): an incomplete run whose composite failed stored and rendered FAIL, but its run summary
+        // read WARN and it exited 11 ("neither a pass nor a fail").
+        string[] reasons = ["the judge failed 1 of 10 grading calls"];
+        var failed = OwaspBenchmark.Top10().BuildEvalResult(Result(new AttackResult
+        {
+            AttackName = "PromptInjection", OwaspId = "LLM01", MitreAtlasIds = ["AML.T0051"], ResistedCount = 0, SucceededCount = 1,
+            ProbeResults = [new ProbeResult { ProbeId = "s0", Prompt = "p", Response = "ok", Outcome = EvaluationOutcome.Succeeded,
+                                              Reason = "complied", Severity = Severity.Critical }],
+        }));
+        var passed = OwaspBenchmark.Top10().BuildEvalResult(Result(Attack("PromptInjection", "LLM01", resisted: 10, inconclusive: 0)));
+        Assert.Equal("fail", failed.Score.Label);
+
+        Assert.False(AgentEval.Cli.Commands.IncompleteRunPolicy.IsIndeterminate(
+            AgentEval.Cli.Commands.IncompleteRunPolicy.Withhold(failed, reasons), reasons));   // FAIL, exit 9
+        Assert.True(AgentEval.Cli.Commands.IncompleteRunPolicy.IsIndeterminate(
+            AgentEval.Cli.Commands.IncompleteRunPolicy.Withhold(passed, reasons), reasons));   // withheld pass: exit 11
+        Assert.False(AgentEval.Cli.Commands.IncompleteRunPolicy.IsIndeterminate(passed, []));  // complete: its own verdict
     }
 
     [Fact]

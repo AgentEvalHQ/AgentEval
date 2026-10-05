@@ -192,8 +192,10 @@ public static class BenchNistCommand
             incompleteReasons.Add("the scan ran out of time before every probe ran");
         }
         var incomplete = incompleteReasons.Count > 0;
-        // An incomplete run is neither a pass nor a fail: its composite must not be stored or rendered as PASS (B10ak).
+        // An incomplete run is never a pass: its composite must not be stored or rendered as PASS (B10ak). It is
+        // indeterminate unless what it measured already fails it (B10ap).
         compositeEval = IncompleteRunPolicy.Withhold(compositeEval, incompleteReasons);
+        var indeterminate = IncompleteRunPolicy.IsIndeterminate(compositeEval, incompleteReasons);
 
         // ── Persist through the unified output-store ─────────────────────────
         string runId;
@@ -218,7 +220,7 @@ public static class BenchNistCommand
             await store!.WriteScenarioResultAsync(runId, scenarioResult);
 
             var runStats = new[] { compositeEval.Score }.ToRunStats();   // a skipped or errored result is not a failure (B8)
-            var verdict = incomplete ? "WARN" : compositeEval.Score.RunVerdict(runStats);   // nor a FAIL verdict (B9b)
+            var verdict = indeterminate ? "WARN" : compositeEval.Score.RunVerdict(runStats);   // nor a FAIL verdict (B9b)
             var summary = new RunSummary(
                 SchemaVersion: "1.0",
                 RunId: runId,
@@ -288,13 +290,15 @@ public static class BenchNistCommand
             $"({report.Summary.CriticalFindings} needs-improvement / {report.Summary.HighFindings} partially-effective); " +
             $"composite verdict {compositeEval.Score.Label.ToUpperInvariant()}");
 
-        if (incomplete)
+        if (indeterminate)
         {
             // A judge that failed, or a scan that ran out of time, leaves categories ungraded; the composite above
             // cannot say pass or fail. Stored as WARN, the schema's indeterminate value.
             Console.WriteLine($"INCOMPLETE: {string.Join("; ", incompleteReasons)}. This run is neither a pass nor a fail.");
             return (ExitCodes.GateIndeterminate, outputDir);
         }
+        if (incomplete)   // a measured failure stands whatever the unmeasured part would show (B10ap): FAIL, exit 9
+            Console.WriteLine($"INCOMPLETE: {string.Join("; ", incompleteReasons)}. What was measured already fails the run.");
 
         var finalExit = BenchExitCodes.FromLabel(compositeEval.Score.Label);  // pass → 0, fail → 9 (GateFailed), warn → 10 (GateWarning), skipped → 11 (GateIndeterminate) — BUG-22
         return (finalExit, outputDir);
