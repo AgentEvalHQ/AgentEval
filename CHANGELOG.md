@@ -102,7 +102,9 @@ that the old verdict hid. The entries below give the cause and the evidence for 
 - **A red-team scan that stopped early passed when read through the library.** `bench owasp|mitre|nist` withheld a
   truncated scan's pass (it timed out, or `FailFast` stopped it, before every probe ran), but `RedTeamResult.Verdict`,
   the OWASP / MITRE / NIST composites and the stored evidence a library caller gets read PASS on part of the planned
-  probes. They now read INCONCLUSIVE / WARN, saying how far the scan got; a failure it measured still fails. The
+  probes. They now read INCONCLUSIVE / WARN, saying how far the scan got; a failure it measured still fails.
+  `agenteval redteam` exits 1 for such a scan (it exited 0), as it already did for any INCONCLUSIVE run: exit 1 means
+  vulnerabilities found or no pass verdict, as the red-team guide now says. The
   compliance composites also name what they left unmeasured when they already warn or fail (a NIST run that warned
   on MEASURE.2.5 did not mention MEASURE.2.10, all inconclusive), drop the "✅ Strong security posture" / "All
   evaluated … meet thresholds" line when their pass is withheld, and a NIST control whose attack declared it cannot

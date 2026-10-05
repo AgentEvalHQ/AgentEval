@@ -997,7 +997,7 @@ agenteval redteam --endpoint $URL --model $MODEL \
 | `regression` | no **new** finding vs baseline (pre-existing tolerated) | `4` a new finding / score or coverage drop |
 | `never` | always | — |
 
-**Exit codes:** `0` pass · `1` vulnerabilities found · `3` runtime error · `4` regression vs baseline. A regression (code `4`) always outranks the absolute vulnerability gate (code `1`) so CI can tell *"a new finding appeared"* apart from *"pre-existing findings remain"*. The comparison refuses a FailFast-truncated scan or an intensity mismatch (RC-6) rather than reporting a misleading "stable". For `--sut gatekeeper-demo` it also refuses (exit `3`) a baseline taken on a different model, scripted vs real or one real model vs another.
+**Exit codes:** `0` pass · `1` vulnerabilities found, or no pass verdict (an `Inconclusive` run: an attack measured nothing, more probes came back inconclusive than were resisted, or the scan stopped before every probe ran) · `3` runtime error · `4` regression vs baseline. A regression (code `4`) always outranks the absolute vulnerability gate (code `1`) so CI can tell *"a new finding appeared"* apart from *"pre-existing findings remain"*. The comparison refuses a FailFast-truncated scan or an intensity mismatch (RC-6) rather than reporting a misleading "stable". For `--sut gatekeeper-demo` it also refuses (exit `3`) a baseline taken on a different model, scripted vs real or one real model vs another.
 
 ```yaml
 # GitHub Actions: scan → upload SARIF to code-scanning + JUnit test report → baseline gate
