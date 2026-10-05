@@ -45,6 +45,17 @@ internal static class ComplianceStatusPolicy
     }
 
     /// <summary>Worst severity among the SUCCEEDED probes across an attack-set, or null if none succeeded.</summary>
+    /// <summary>
+    /// The persisted evidence's overall status: FAIL, then WARN, then PASS; NOT_EVALUATED when nothing was conclusively
+    /// tested. A control whose probes ran but reached no conclusive verdict withholds the PASS (WARN), as the run's own
+    /// composite does (#203 review round 7, B10ae — the evidence read PASS beside a WARN run, exit 10).
+    /// </summary>
+    public static string OverallEvidenceStatus(int passed, int warnings, int failed, int inconclusive) =>
+        failed > 0 ? "FAIL"
+        : warnings > 0 ? "WARN"
+        : passed > 0 ? (inconclusive > 0 ? "WARN" : "PASS")
+        : "NOT_EVALUATED";
+
     public static Severity? WorstSucceededSeverity(IEnumerable<AttackResult> results)
     {
         Severity? worst = null;

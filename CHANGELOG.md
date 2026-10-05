@@ -81,6 +81,9 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   `skipped` with "No component produced a measurement (0 errored, 0 skipped, 0 inapplicable)", though the parts inside
   were measured — the Tool Call Accuracy preset did this whenever no tool definitions were captured. It now withholds
   too (`warn`, recorded `notMeasured`) and names the components; a breakdown counts the withheld ones.
+- **`bench owasp` and `bench mitre` stored PASS evidence for a run that withheld its pass.** A category (technique)
+  whose probes all came back inconclusive makes the run WARN (exit 10), but the stored compliance evidence counted only
+  the tested categories and read PASS. It now reads WARN (`ComplianceStatusPolicy.OverallEvidenceStatus`).
 - **An AgentEval composite's "(overall)" verdict was both lost and over-trusted in the MAF reports.** With one query,
   `UnifiedEvalReport` re-rolled the composite's promoted leaves and dropped its "(overall)" verdict, so a passing
   composite read FAIL with one query and PASS with two. And `MeaiToEvalResultBridge` took the "(overall)" metric's

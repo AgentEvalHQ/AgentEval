@@ -207,7 +207,8 @@ public class OWASPComplianceReporter : IComplianceReporter<OWASPComplianceReport
         // Honesty (RC-6): never persist PASS when no category was conclusively tested. An all-inconclusive
         // run (e.g. a timed-out SUT) leaves testedControls empty → passed=warnings=failed=0 → NOT_EVALUATED,
         // not a fabricated green PASS in the persisted evidence pointer. This is the CLI-wired path (bench-owasp).
-        var overallStatus = failed > 0 ? "FAIL" : warnings > 0 ? "WARN" : passed > 0 ? "PASS" : "NOT_EVALUATED";
+        var overallStatus = ComplianceStatusPolicy.OverallEvidenceStatus(passed, warnings, failed,
+            report.Categories.Count(c => c.Status == CategoryTestStatus.Inconclusive));
 
         // T4-4: the honesty disclaimer is rendered into the human-facing report surfaces (markdown footer
         // + PDF), NOT injected as a synthetic control row here. A "DISCLAIMER" EvidenceControl would pollute
