@@ -79,7 +79,10 @@ public sealed class TraceFidelityRunner
                     // A passing class carries no severity, and severities are lower-case (B10ab: a clean leaf read "Critical").
                     Severity: d.Score >= 0.99 ? "none" : d.Severity.ToLowerInvariant(), Confidence: null),
             Details: new EvalDetails(
-                Dimensions: new Dictionary<string, double> { ["count"] = d.Count, ["score100"] = d.Score * 100 },
+                // A class with nothing to reconcile carries no 0-100 figure (B10ah: it read 100 beside a skipped label).
+                Dimensions: noTruth
+                    ? new Dictionary<string, double> { ["count"] = d.Count }
+                    : new Dictionary<string, double> { ["count"] = d.Count, ["score100"] = d.Score * 100 },
                 Evidence: d.Examples.Select(x => new EvalEvidence(Source: "chat-vs-agent", Reference: d.ClassKey, Message: x)).ToList(),
                 Recommendations: null, SubResults: null, AggregationStrategy: null),
             Provenance: new EvalProvenance(Type: "code", JudgeModel: null, PromptId: null, PromptHash: null, TokensUsed: null, EstimatedCost: 0.0, CacheHit: false),
@@ -98,7 +101,7 @@ public sealed class TraceFidelityRunner
                     Severity: report.OverallScore >= 0.99 ? "none" : report.OverallScore >= 0.8 ? "low" : report.OverallScore >= 0.5 ? "medium" : "high",
                     Confidence: null),
             Details: new EvalDetails(
-                Dimensions: new Dictionary<string, double> { ["score100"] = report.OverallScore * 100 },
+                Dimensions: noTruth ? null : new Dictionary<string, double> { ["score100"] = report.OverallScore * 100 },
                 Evidence: null,
                 Recommendations: noTruth ? ["The chat-boundary trace has no model responses, so there is nothing to reconcile against: no verdict."] : null,
                 SubResults: subResults, AggregationStrategy: "severity-weighted")

@@ -528,8 +528,15 @@ public sealed class CompositeEval : IEval
             .Where(p => !DecidesBySeverity(p))
             .Select(p => $"{p.Sub.Metric.Key} ({p.Sub.Score.Label}{(p.Component.Required ? "" : ", optional")})")
             .ToArray();
+        // Named as the reason only when the severity rule produced this label — not a threshold the score missed, not a
+        // Fail effect — and only the parts at the deciding level: a medium part beside the high one that failed it did not
+        // decide (review round 7 L1, B10ah).
+        var severityDecided = (Threshold is null || SeverityCapsThreshold)
+                              && !(Threshold is { } bar2 && score < bar2)
+                              && failingAccuracy.Length == 0
+                              && label == SeverityLabel(verdictSeverity);
         var decidedBy = averagedNonPasses
-            .Where(DecidesBySeverity)
+            .Where(p => severityDecided && DecidesBySeverity(p) && SeverityLabel(p.Sub.Score.Severity) == label)
             .Select(p => $"{p.Sub.Metric.Key} ({p.Sub.Score.Label}, {p.Sub.Score.Severity})")
             .ToArray();
         string? absorbedNote = absorbed.Length > 0 && label is "pass" or "warn"

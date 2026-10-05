@@ -11,7 +11,8 @@ namespace AgentEval.Tests.Assertions;
 
 /// <summary>
 /// Glass Box Phase 3 (P3.4) — <c>result.Should().HaveTraceFidelity(chatTraces, minScore)</c>: passes on
-/// per-executor agreement, throws on a seeded token divergence, and passes (all-NoTruth) when no chat truth.
+/// per-executor agreement, throws on a seeded token divergence, and fails when no executor (or not every executor,
+/// unless allowed) could be checked.
 /// </summary>
 public class WorkflowTraceFidelityAssertionTests
 {
@@ -66,6 +67,28 @@ public class WorkflowTraceFidelityAssertionTests
         var ex = Assert.Throws<WorkflowAssertionException>(
             () => result.Should().HaveTraceFidelity(chatTraces: null).Validate());
         Assert.Contains("nothing could be checked", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Unchecked_CarriesNoScore100_AndAPartlyCheckedFailSaysSo()
+    {
+        // Review round 7 L2 + L4 (B10ah): skipped results carried score100 = 100 beside Value 0, and a partly checked warn
+        // or fail had no coverage note.
+        var nothing = new AgentEval.Benchmarks.WorkflowTraceFidelityReconciler()
+            .ReconcileToEvalResult(Result(Step("a", 10, 5, "stop")), chatTraces: null);
+        Assert.Equal("skipped", nothing.Score.Label);
+        Assert.False(nothing.Details.Dimensions!.ContainsKey("score100"));
+        Assert.All(nothing.Details.SubResults!, s => Assert.False(s.Details.Dimensions!.ContainsKey("score100")));
+
+        var partlyFailing = new AgentEval.Benchmarks.WorkflowTraceFidelityReconciler().ReconcileToEvalResult(
+            Result(Step("a", 10, 5, "stop"), Step("b", 10, 5, "stop")),
+            new Dictionary<string, AgentTrace> { ["a"] = ChatTrace(99, "stop") });   // a diverges, b unchecked
+        Assert.Equal("fail", partlyFailing.Score.Label);
+        Assert.Contains("1 of 2 executor(s) had no chat-boundary truth", partlyFailing.Details.Summary);
+
+        var agentSide = new AgentEval.Benchmarks.TraceFidelityRunner().ReconcileToEvalResult(new AgentTrace(), new AgentTrace());
+        Assert.Null(agentSide.Details.Dimensions);
+        Assert.All(agentSide.Details.SubResults!, s => Assert.False(s.Details.Dimensions!.ContainsKey("score100")));
     }
 
     [Fact]

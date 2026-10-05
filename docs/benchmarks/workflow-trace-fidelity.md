@@ -32,7 +32,7 @@ scoring), mirroring the single-agent family.
 Inside a live MAF `InProcessExecution` workflow, executor responses are **not** routed back through the
 instrumented chat client today, so per-executor chat traces come back **without** `ChatTurn` Response entries
 (the Glass Box Path-2 upstream-hook gap). Until that hook lands, every executor in a live run is `NoTruth`, so a live
-run has **no verdict** (`skipped`, exit 11) — it used to read PASS at 100% with nothing checked. Real reconciliation occurs
+run has **no verdict** (`skipped`, stored PENDING, exit 11) — it used to read PASS at 100% with nothing checked. Real reconciliation occurs
 only for **direct-agent / pre-wired / hand-built** traces. A run where only some executors have chat truth is scored on
 those, and a pass is withheld (`warn`, exit 10) because the rest were not checked.
 
@@ -42,4 +42,4 @@ those, and a pass is withheld (`warn`, exit 10) because the rest were not checke
 agenteval bench workflow-trace-fidelity --workflow-trace <file> --subject <name> [--preset standard]
 ```
 
-Exit codes: `0` clean (score ≥ 0.99 and every executor checked, PASS), `10` minor discrepancies (0.80–0.99) or a pass with some executors unchecked (WARN), `9` discrepancies (below 0.80, FAIL), `11` nothing checked (no executor had chat truth, SKIPPED), `1` setup/IO error.
+Exit codes: `0` clean (score ≥ 0.99 and every executor checked, PASS), `10` minor discrepancies (0.80–0.99) or a pass with some executors unchecked (WARN), `9` discrepancies (below 0.80, FAIL), `11` nothing checked (no executor had chat truth: no verdict, stored PENDING), `1` setup/IO error.

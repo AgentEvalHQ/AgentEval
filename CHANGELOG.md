@@ -106,7 +106,8 @@ that the old verdict hid. The entries below give the cause and the evidence for 
 - **Trace fidelity passed with nothing checked.** In `bench workflow-trace-fidelity`, an executor with no chat-boundary
   trace (`NoTruth`) scored 1.0 and counted as passed, and a run with none read PASS at 100%, exit 0 — every live MAF
   `InProcessExecution` run today. `bench trace-fidelity` did the same for a chat trace with no model responses. Now an
-  unchecked executor is `skipped`; a run with nothing checked has no verdict (`skipped`, exit 11); a pass that rests
+  unchecked executor is `skipped` (with no 0–100 figure); a run with nothing checked has no verdict (`skipped`, stored
+  PENDING, exit 11); a warn or fail on some executors says how many were checked; a pass that rests
   on some executors is withheld (`warn`, exit 10). `HaveTraceFidelity()` agrees: it fails when nothing could be
   checked (it passed), and when some executors could not be checked unless `allowUncheckedExecutors: true` (for a
   workflow whose router or function executors never call a model).
@@ -116,7 +117,8 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   EU AI Act articles absorb single scenario failures by design — but the summary now names each one: "Absorbed by the
   score (OnFailure = Averaged): <key> (fail), <key> (warn)". Set `OnFailure` to `Warn` or `Fail` to make it count. Under
   the severity rule a required part failing at medium or more decides the label, and the summary names it as the reason
-  ("Decided by severity: <key> (fail, medium)") rather than as absorbed.
+  ("Decided by severity: <key> (fail, medium)") rather than as absorbed — only when the severity rule set the label
+  (not a threshold the score missed, not a `Fail` effect), and only the parts at the deciding level.
 - **`bench trace-fidelity` and `bench workflow-trace-fidelity` passed a warn.** A score of 0.80–0.99 was labelled
   `warn` but `Passed = true`, and both commands decided from `Passed`: "Verdict: PASS", a stored PASS, exit 0 — every
   other bench command exits 10 for a warn. `Passed` is now true only on a pass; the commands store the root's verdict

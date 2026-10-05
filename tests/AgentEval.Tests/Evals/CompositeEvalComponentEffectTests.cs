@@ -135,6 +135,28 @@ public class CompositeEvalComponentEffectTests
     }
 
     [Fact]
+    public async Task DecidedBySeverity_NamesOnlyWhatTheSeverityRuleDecided()
+    {
+        // Review round 7 L1 (B10ah): the note named every medium+ Averaged part, even when a threshold the score missed
+        // decided the fail, and a medium part beside the high one that did.
+        var thresholdMissed = new CompositeEval("t", "T", "test", "1.0.0",
+            [new EvalComponent(new Fixed("a", "pass", 1.0), 1.0), new EvalComponent(new WithSeverity("b", "fail", 0.3, "medium"), 1.0)],
+            WeightedSumAggregation.Instance, threshold: 0.85) { SeverityCapsThreshold = true };   // 0.65 < 0.85
+        var highAndMedium = new CompositeEval("h", "H", "test", "1.0.0",
+            [new EvalComponent(new WithSeverity("hi", "fail", 0.2, "high"), 1.0), new EvalComponent(new WithSeverity("med", "fail", 0.5, "medium"), 1.0)],
+            WeightedSumAggregation.Instance, threshold: null);
+
+        var t = await thresholdMissed.EvaluateAsync(Input);
+        var h = await highAndMedium.EvaluateAsync(Input);
+
+        Assert.Equal("fail", t.Score.Label);
+        Assert.DoesNotContain("Decided by severity", t.Details.Summary ?? "");
+        Assert.Equal("fail", h.Score.Label);
+        Assert.Contains("Decided by severity: hi (fail, high)", h.Details.Summary);
+        Assert.DoesNotContain("med (fail", h.Details.Summary);
+    }
+
+    [Fact]
     public void ALabelIsStoredLowerCase_OnBothTheConstructorAndTheCopyPath()
     {
         // Review round 7 M-C (B10ag): the measurement predicates compared labels literally, so "Skipped"/"Error" counted

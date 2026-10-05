@@ -22,7 +22,7 @@ namespace AgentEval.Cli.Commands;
 public static class BenchWorkflowTraceFidelityCommand
 {
     /// <summary>Runs the reconciliation. Returns 0 (clean, PASS), 10 (minor discrepancies or partly checked, WARN), 9
-    /// (discrepancies, FAIL), 11 (nothing checked, SKIPPED) or 1 (setup/IO error).</summary>
+    /// (discrepancies, FAIL), 11 (nothing checked: no verdict, stored PENDING) or 1 (setup/IO error).</summary>
     public static async Task<int> RunAsync(
         string workflowTraceFile, string preset, string subject, string? rootOverride, CancellationToken ct = default)
     {
@@ -74,13 +74,13 @@ public static class BenchWorkflowTraceFidelityCommand
         }
 
         // Per-executor chat truth comes from the trace's ExecutorTraces (populated MAF-side before persistence).
-        // When absent, the reconciler reports every executor as NoTruth (score 1.0) — a legitimate but trivial result.
+        // When absent, every executor is NoTruth: nothing can be checked, so the run has no verdict (B10y).
         IReadOnlyDictionary<string, AgentTrace>? chatTraces = wfTrace.ExecutorTraces;
         if (chatTraces is null || chatTraces.Count == 0)
         {
             Console.Error.WriteLine(
                 "[bench workflow-trace-fidelity] NOTE: the workflow trace carries no per-executor ExecutorTraces; "
-                + "no executor can be checked, so the run has no verdict (SKIPPED, exit 11). Capture per-executor chat "
+                + "no executor can be checked, so the run has no verdict (stored PENDING, exit 11). Capture per-executor chat "
                 + "traces to get real reconciliation.");
         }
 

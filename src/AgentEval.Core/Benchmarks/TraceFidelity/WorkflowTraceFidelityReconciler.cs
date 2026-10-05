@@ -88,8 +88,8 @@ public sealed record WorkflowTraceFidelityReport(IReadOnlyList<WorkflowExecutorF
 /// <c>InProcessExecution</c> workflow those are NOT available today — <c>WorkflowChatRecording</c> documents
 /// that executor responses are not routed back through the instrumented client, so per-executor traces come
 /// back without Response entries (the Glass Box Path-2 upstream-MAF-hook gap). Until that hook lands, every
-/// executor in a live run is <see cref="WorkflowFidelityDiff.NoTruth"/> (ledger-only, score 1.0); the
-/// reconciler produces real reconciliation only for <b>direct-agent / pre-wired / hand-built</b> traces.
+/// executor in a live run is <see cref="WorkflowFidelityDiff.NoTruth"/> (ledger-only: not checked, so a live run has no
+/// verdict); the reconciler produces real reconciliation only for <b>direct-agent / pre-wired / hand-built</b> traces.
 /// This is a library primitive: it has no registered benchmark family or CLI wiring yet (follow-up P2.B4).
 /// </para>
 /// </remarks>
@@ -192,8 +192,9 @@ public sealed class WorkflowTraceFidelityReconciler
     }
 
     /// <summary>
-    /// Reconciles and projects onto the unified <see cref="EvalResult"/> tree — one leaf per executor,
-    /// root score = mean of the leaves. Mirrors <see cref="TraceFidelityRunner.ReconcileToEvalResult"/>.
+    /// Reconciles and projects onto the unified <see cref="EvalResult"/> tree — one leaf per executor (an executor
+    /// without chat truth is a skipped leaf), root score = mean of the CHECKED leaves; nothing checked is no verdict.
+    /// Mirrors <see cref="TraceFidelityRunner.ReconcileToEvalResult"/>.
     /// </summary>
     public EvalResult ReconcileToEvalResult(
         WorkflowExecutionResult result,
@@ -246,6 +247,12 @@ public sealed class WorkflowTraceFidelityReconciler
             coverageNote = $"{unverified} of {report.Executors.Count} executor(s) had no chat-boundary truth; a pass on the " +
                            $"{report.VerifiedCount} verified is withheld.";
         }
+        else if (unverified > 0)
+        {
+            // A warn or fail on part of the executors says so too (review round 7 L4, B10ah).
+            coverageNote = $"{unverified} of {report.Executors.Count} executor(s) had no chat-boundary truth; the score covers " +
+                           $"the {report.VerifiedCount} verified.";
+        }
         var rootSeverity = label is "pass" or "skipped" || measurement == AgentEval.Evals.Meta.MeasurementState.NotMeasured ? "none"
             : report.OverallScore >= 0.8 ? "low" : report.OverallScore >= 0.5 ? "medium" : "high";
 
@@ -257,9 +264,11 @@ public sealed class WorkflowTraceFidelityReconciler
                 Passed: label == "pass", Threshold: 0.8,
                 Severity: rootSeverity, Confidence: null) { Measurement = measurement },
             Details: new EvalDetails(
-                Dimensions: new Dictionary<string, double>
+                // Nothing checked carries no 0-100 figure (B10ah).
+                Dimensions: new Dictionary<string, double>(label == "skipped"
+                    ? []
+                    : [new("score100", report.OverallScore * 100)])
                 {
-                    ["score100"] = report.OverallScore * 100,
                     ["executors"] = report.Executors.Count,
                     ["verified"] = report.VerifiedCount, // executors with chat-boundary truth; the rest are NoTruth
                 },
@@ -281,8 +290,9 @@ public sealed class WorkflowTraceFidelityReconciler
         var dimensions = new Dictionary<string, double>
         {
             ["frameworkTokens"] = e.TokensFramework,
-            ["score100"] = e.Score * 100,
         };
+        if (e.DiffKind != WorkflowFidelityDiff.NoTruth)
+            dimensions["score100"] = e.Score * 100;   // an unchecked executor carries no 0-100 figure (B10ah)
         if (e.TokensChatTruth is int chatTruth)
         {
             dimensions["chatTruthTokens"] = chatTruth;
