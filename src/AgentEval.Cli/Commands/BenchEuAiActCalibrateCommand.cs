@@ -260,7 +260,7 @@ public static class BenchEuAiActCalibrateCommand
         => double.IsNaN(kappa) ? "UNDEFINED" : kappa.ToString("F3", System.Globalization.CultureInfo.InvariantCulture);
 
 
-    private static string BuildMarkdownReport(CalibrationReport report, CalibrationJudgeIdentity judge)
+    internal static string BuildMarkdownReport(CalibrationReport report, CalibrationJudgeIdentity judge)
     {
         var sb = new StringBuilder();
         sb.AppendLine("# EU AI Act Calibration Report");
@@ -279,9 +279,9 @@ public static class BenchEuAiActCalibrateCommand
             var accOk = pr.Accuracy >= accThr;
             var kappaOk = pr.CohensKappa >= kapThr;
             var noInfraFail = pr.EvaluationFailures == 0;
-            var badge = !noInfraFail
-                ? "INFRA-FAIL"
-                : (accOk && kappaOk ? "PASS" : "FAIL");
+            // The gate's own status (B10o): the report read INFRA-FAIL / PASS / FAIL and showed [PASS] for a pillar the
+            // gate calls INCOMPLETE.
+            var badge = BenchCalibrateCommand.PillarGateStatus(pr.EvaluationFailures, pr.NotMeasured, accOk, kappaOk);
             var thrTag = s_pillarOverrides.ContainsKey(pillar) ? " (relaxed per-pillar override)" : string.Empty;
 
             sb.AppendLine($"## {pillar} [{badge}]{thrTag}");
@@ -291,7 +291,7 @@ public static class BenchEuAiActCalibrateCommand
             sb.AppendLine($"| Entries evaluated | {pr.EntryCount} | — | — |");
             sb.AppendLine($"| Evaluation failures | {pr.EvaluationFailures} | == 0 | {(noInfraFail ? "OK" : "INFRA-FAIL")} |");
             // Not scored (B3a): no verdict to compare with gold — reported, never counted as agreement or disagreement.
-            sb.AppendLine($"| Not measured (not scored) | {pr.NotMeasured} | — | info |");
+            sb.AppendLine($"| Not measured (not scored) | {pr.NotMeasured} | == 0 | {(pr.NotMeasured == 0 ? "OK" : "INCOMPLETE")} |");
             sb.AppendLine($"| Inapplicable (not scored) | {pr.NotApplicable} | — | info |");
             sb.AppendLine($"| Accuracy | {pr.Accuracy:P1} | >= {accThr:P0} | {(accOk ? "OK" : "BELOW")} |");
             sb.AppendLine($"| Cohen's kappa | {FormatKappa(pr.CohensKappa)} | >= {kapThr:F2} | {(kappaOk ? "OK" : "BELOW")} |");

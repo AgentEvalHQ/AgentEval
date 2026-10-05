@@ -106,7 +106,8 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   model ran) is unchanged.
 - **The GDPR and EU AI Act calibration gates could pass on an outcome-selected sample.** A record that reached no
   verdict without erroring was left out one by one — the rule the agentic calibration dropped in B6c-7 — so a scenario
-  that withheld only its passes would have been scored on its failures. Such a pillar now reads `INCOMPLETE` and the
+  that withheld only its passes would have been scored on its failures. Such a pillar now reads `INCOMPLETE` (on the
+  console and in the written report, whose not-measured row now has a status) and the
   gate is not met. No shipped scenario produces one on the golden data today.
 - **Docs:** composite severity follows the verdict (it is not the maximum over every part); the needs-review and
   failure severities in the agentic guide; the Safety and AdversarialDirect XML docs (`CapByWorstAggregation`,

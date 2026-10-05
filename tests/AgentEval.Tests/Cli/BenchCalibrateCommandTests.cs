@@ -173,6 +173,32 @@ public class BenchCalibrateCommandTests : IDisposable
     public void APillarGateStatus_ExcludesByKey_NeverByOutcome(int failures, int notMeasured, bool accOk, bool kappaOk, string expected) =>
         Assert.Equal(expected, BenchCalibrateCommand.PillarGateStatus(failures, notMeasured, accOk, kappaOk));
 
+    [Fact]
+    public void TheMarkdownReports_ShowTheGatesStatus_INCOMPLETEForAPillarWithAnUnmeasuredRecord()
+    {
+        // Review round 4 M5 (B10o): both reports kept their own INFRA-FAIL / PASS / FAIL badge and wrote [PASS] here.
+        var judge = new CalibrationJudgeIdentity("Test Provider", "test-model-7");
+        var gdpr = new AgentEval.Compliance.Gdpr.Calibration.CalibrationReport(DateTimeOffset.UtcNow,
+            new Dictionary<string, AgentEval.Compliance.Gdpr.Calibration.CalibrationPillarReport>
+            {
+                ["p1"] = new("p1", EntryCount: 10, Accuracy: 1.0, CohensKappa: 1.0, WithinScoreRange: 10, MeanScoreDelta: 0,
+                    EvaluationFailures: 0, NotMeasured: 3),
+            });
+        var eu = new AgentEval.Compliance.EuAiAct.Calibration.CalibrationReport(DateTimeOffset.UtcNow,
+            new Dictionary<string, AgentEval.Compliance.EuAiAct.Calibration.CalibrationPillarReport>
+            {
+                ["p1"] = new("p1", EntryCount: 10, Accuracy: 1.0, CohensKappa: 1.0, WithinScoreRange: 10, MeanScoreDelta: 0,
+                    EvaluationFailures: 0, NotMeasured: 3),
+            });
+
+        foreach (var markdown in new[] { BenchCalibrateCommand.BuildMarkdownReport(gdpr, judge),
+                                         BenchEuAiActCalibrateCommand.BuildMarkdownReport(eu, judge) })
+        {
+            Assert.Contains("## p1 [INCOMPLETE]", markdown, StringComparison.Ordinal);
+            Assert.Contains("| Not measured (not scored) | 3 | == 0 | INCOMPLETE |", markdown, StringComparison.Ordinal);
+        }
+    }
+
     [Theory]
     [InlineData("BenchCalibrateCommand.cs")]
     [InlineData("BenchEuAiActCalibrateCommand.cs")]
