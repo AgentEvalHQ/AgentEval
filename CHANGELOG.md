@@ -81,6 +81,10 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   `skipped` with "No component produced a measurement (0 errored, 0 skipped, 0 inapplicable)", though the parts inside
   were measured — the Tool Call Accuracy preset did this whenever no tool definitions were captured. It now withholds
   too (`warn`, recorded `notMeasured`) and names the components; a breakdown counts the withheld ones.
+- **A capitalised "Skipped" or "Error" label counted as a measurement.** `EvalScore.Label` is a free string; the
+  measurement predicates and the composites compared it literally while `ReportStatus()`, `RunVerdict()` and the exit
+  codes lowercased it, so a custom or imported component labelled "Skipped" counted as measured and a composite passed
+  with it, saying nothing. `EvalScore` now stores the label lower-case, on construction and on a `with` copy.
 - **NIST, ISO 27001 and SOC 2 passed over a control whose probes all came back inconclusive.** Such a control was
   "not evaluated", the same as a control no attack exercised, so `bench nist` passed on the rest and the stored
   evidence of all three read PASS (the OWASP / MITRE rule never reached them). `ControlStatus.RanInconclusive` now

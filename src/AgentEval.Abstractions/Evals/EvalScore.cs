@@ -64,6 +64,20 @@ public sealed record EvalScore(
     private readonly MeasurementState _measurement = MeasurementState.Measured;
     private readonly bool _passed = Passed;
 
+    // A label is stored lower-case, on both the constructor and the copy path (#203 review round 7, B10ag). It is a free
+    // string, and the measurement predicates (CountsTowardAggregate, CensusBucket) and the composites compared it
+    // literally while ReportStatus / RunVerdict / FromLabel lowercased it: a component labelled "Skipped" or "Error"
+    // counted as measured, and a composite passed with it, saying nothing. One normal form ends the disagreement.
+    private readonly string _label = NormalizeLabel(Label);
+
+    public string Label
+    {
+        get => _label;
+        init => _label = NormalizeLabel(value);
+    }
+
+    private static string NormalizeLabel(string label) => label?.ToLowerInvariant()!;
+
     /// <inheritdoc cref="EvalScore"/>
     /// <exception cref="ArgumentOutOfRangeException">
     /// Thrown when the value is <c>NaN</c>, <c>+Infinity</c>, or <c>-Infinity</c> — on construction

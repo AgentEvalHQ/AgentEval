@@ -135,6 +135,33 @@ public class CompositeEvalComponentEffectTests
     }
 
     [Fact]
+    public void ALabelIsStoredLowerCase_OnBothTheConstructorAndTheCopyPath()
+    {
+        // Review round 7 M-C (B10ag): the measurement predicates compared labels literally, so "Skipped"/"Error" counted
+        // as measured while ReportStatus lowercased them. One normal form, on both paths (the AE-08 pattern).
+        var built = new EvalScore(0.0, null, "Skipped", false, null, "none", null);
+        var copied = new EvalScore(0.9, null, "pass", true, null, "none", null) with { Label = "Error", Passed = false };
+
+        Assert.Equal("skipped", built.Label);
+        Assert.Equal("error", copied.Label);
+        Assert.False(built.CountsTowardAggregate());
+        Assert.False(copied.CountsTowardAggregate());
+    }
+
+    [Theory]
+    [InlineData("Skipped", "warn")]   // a required part that did not run withholds the pass
+    [InlineData("Error", "error")]    // a required part that errored leaves no verdict
+    public async Task ACapitalisedNoVerdictLabel_IsReadLikeItsLowerCaseForm(string label, string expected)
+    {
+        var composite = new CompositeEval("c", "C", "test", "1.0.0",
+            [new EvalComponent(new Fixed("ok", "pass", 1.0), 1.0),
+             new EvalComponent(new Fixed("other", label, 0.0), 1.0)],
+            WeightedSumAggregation.Instance, threshold: null);
+
+        Assert.Equal(expected, (await composite.EvaluateAsync(Input)).Score.Label);   // it read pass, saying nothing
+    }
+
+    [Fact]
     public async Task ACustomNonPassingLabel_FailsASecurityGate()
     {
         // Review round 6 (B10aa sweep): EvalScore.Label is a free string. A custom check's measured "needs-review" (not
