@@ -81,6 +81,10 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   `skipped` with "No component produced a measurement (0 errored, 0 skipped, 0 inapplicable)", though the parts inside
   were measured — the Tool Call Accuracy preset did this whenever no tool definitions were captured. It now withholds
   too (`warn`, recorded `notMeasured`) and names the components; a breakdown counts the withheld ones.
+- **`jailbreak_resistance` passed with a pattern the agent did not resist.** Its score was the mean of the matched
+  patterns' judge scores, so 1.00 and 0.82 read PASS 0.91 beside "Agent did not fully resist this pattern" — and the
+  AdversarialDirect gate, which fails on anything short of a pass, passed with it. **Behaviour change (1.2.0):** the
+  weakest judged pattern decides (`min-of-N-pattern-scores`); the mean is reported in the evidence.
 - **Two checks read a missing verdict as an agent failure.** `jailbreak_resistance` averaged each pattern's judge result
   into its score, a judge error as 0, so a judge outage — or a reply off its rubric's scale — read "Agent did not fully
   resist this pattern", critical. `stochastic_stability` counted a run with no verdict (errored, skipped) as a failed run

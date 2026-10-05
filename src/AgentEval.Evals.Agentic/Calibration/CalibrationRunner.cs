@@ -291,7 +291,7 @@ public sealed record CalibrationCaseRecord(
 /// <param name="PromptId">The prompt the judge was sent.</param>
 /// <param name="PromptHash">The fingerprint of that prompt.</param>
 /// <param name="AggregationStrategy">
-/// Null for an atomic leaf. Otherwise the evaluator's aggregation (for example <c>mean-of-3-pattern-scores</c>),
+/// Null for an atomic leaf. Otherwise the evaluator's aggregation (for example <c>min-of-3-pattern-scores</c>),
 /// which says that <paramref name="Criteria"/> holds aggregate dimensions rather than criterion verdicts.
 /// </param>
 public sealed record CalibrationLeafRecord(
