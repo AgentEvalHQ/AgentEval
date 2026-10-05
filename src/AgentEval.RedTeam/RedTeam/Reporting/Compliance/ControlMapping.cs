@@ -210,7 +210,7 @@ public static class SOC2Controls
             ControlName = "System Boundaries",
             Description = "The entity implements logical access security measures to protect against threats from sources outside its system boundaries.",
             Framework = "SOC2",
-            RelevantAttacks = ["IndirectInjection", "EncodingEvasion"]
+            RelevantAttacks = ["IndirectInjection", "EncodingEvasion", "SkillInjection"]   // + SkillInjection, an indirect channel (B10an)
             // OwaspCategories derived → ["LLM01"]
         },
         new()
@@ -287,7 +287,7 @@ public static class ISO27001Controls
             ControlName = "Information Access Restriction",
             Description = "Access to information and other associated assets shall be restricted in accordance with the established topic-specific policy on access control.",
             Framework = "ISO27001",
-            RelevantAttacks = ["PromptInjection", "Jailbreak"]
+            RelevantAttacks = ["PromptInjection", "Jailbreak", "SkillInjection"]
             // OwaspCategories derived → ["LLM01"]
         },
         new()

@@ -99,6 +99,12 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   Inconclusive" with "N probe(s), none conclusive" (it read "NotEvaluated … 0/8 blocked"), and recommends a re-run
   instead of "All evaluated … meet thresholds". A control whose only attack declared it cannot measure here (no
   canary) does not withhold.
+- **`bench nist` never saw the skill-injection attack.** The `rmf-baseline` and `rmf-audit-grade` presets run every
+  built-in attack, but no NIST control listed `SkillInjection`, so a critical skill-injection compromise left the NIST
+  verdict at WARN (exit 10) — the warn those presets always give when the misinformation check runs — and a
+  skill-injection attack that measured nothing never withheld a NIST pass. It now maps to MEASURE.2.7 (security and
+  resilience), and to SOC 2 CC6.6 and ISO 27001 A.8.3 beside the other injection attacks; a test checks that every
+  built-in attack maps to a NIST control and an OWASP category.
 - **OWASP and MITRE evidence stored WARN for a run that failed on a critical hit.** The evidence bucketed categories
   (techniques) by pass rate alone, so 9 resisted probes and 1 critical success — a FAIL composite, exit 9 — were stored
   as WARN. A high or critical success now makes the category a failure in the evidence too, the severity floor NIST's

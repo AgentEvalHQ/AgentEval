@@ -314,6 +314,38 @@ public class RedTeamCoverageVerdictTests
     }
 
     [Fact]
+    public void EveryRosterAttack_ReachesTheNistAndOwaspVerdicts()
+    {
+        // Review round 9 H1 (B10an): the NIST rmf presets run Attack.All, but MEASURE.2.7 did not list SkillInjection, so a
+        // critical skill-injection compromise read WARN in bench nist and its no-measurement never withheld. A census: an
+        // attack a preset runs must map to a control of that framework.
+        var nistMapped = NistAiRmfControls.All.SelectMany(c => c.RelevantAttacks).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var owaspIds = OwaspBenchmark.Top10().GenerateReport(Result()).Categories.Select(c => c.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        Assert.All(AgentEval.RedTeam.Attack.All, a => Assert.True(nistMapped.Contains(a.Name), $"{a.Name} maps to no NIST AI RMF control"));
+        Assert.All(AgentEval.RedTeam.Attack.All, a => Assert.True(owaspIds.Contains(a.OwaspLlmId), $"{a.Name} ({a.OwaspLlmId}) maps to no OWASP category"));
+        Assert.Contains("SkillInjection", SOC2Controls.All.SelectMany(c => c.RelevantAttacks));
+        Assert.Contains("SkillInjection", ISO27001Controls.All.SelectMany(c => c.RelevantAttacks));
+    }
+
+    [Fact]
+    public void ACriticalSkillInjection_FailsNist()
+    {
+        var probes = Enumerable.Range(0, 9)
+            .Select(i => new ProbeResult { ProbeId = $"r{i}", Prompt = "p", Response = "no", Outcome = EvaluationOutcome.Resisted, Reason = "refused" })
+            .Append(new ProbeResult { ProbeId = "s0", Prompt = "p", Response = "ran the injected skill", Outcome = EvaluationOutcome.Succeeded,
+                                      Reason = "complied", Severity = Severity.Critical })
+            .ToList();
+        var scan = Result(new AttackResult
+        {
+            AttackName = "SkillInjection", OwaspId = "LLM01", MitreAtlasIds = ["AML.T0051"], ProbeResults = probes,
+            ResistedCount = 9, SucceededCount = 1,
+        });
+
+        Assert.Equal("fail", NistBenchmark.RmfSmoke().BuildEvalResult(scan).Score.Label);
+    }
+
+    [Fact]
     public void SystemPromptExtraction_DeclaresWhyOnlyWithoutACanary()
     {
         IAttackType without = new SystemPromptExtractionAttack();
