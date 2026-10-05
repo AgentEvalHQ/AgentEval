@@ -163,12 +163,50 @@ public class BenchAgenticCalibrateCommandTests : IDisposable
             rootOverride: _root, outPathOverride: outPath, evaluatorOverride: new AlwaysPassEvaluator());
 
         var report = await File.ReadAllTextAsync(outPath);
-        Assert.Contains("## memory [SKIP]", report, StringComparison.Ordinal);
-        Assert.Contains("## reasoning [SKIP]", report, StringComparison.Ordinal);
+        Assert.Contains("## memory [SKIP]", report, StringComparison.Ordinal);   // every memory key is carved out
         Assert.Contains("carved out by key, not calibratable on these goldens (", report, StringComparison.Ordinal);
+        // Reasoning is NOT empty: reasoning_correctness is dispatched and skips 4 of its 9 records (no reasoning-style
+        // phrasing), so the key is excluded and the category is INCOMPLETE. B6c-15 pinned it as SKIP — review round 3 H1.
+        Assert.Contains("## reasoning [INCOMPLETE]", report, StringComparison.Ordinal);
         Assert.Contains("intermediate_step_hallucination", report, StringComparison.Ordinal);
         Assert.DoesNotContain("not yet routed", report, StringComparison.Ordinal);       // every golden key is known
         Assert.DoesNotContain("Skipped (unknown key)", report, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(0, 0, 0, 0, 0, 4, true)]     // nothing dispatched, carved keys only: SKIP
+    [InlineData(0, 0, 4, 0, 5, 4, false)]    // a dispatched key excluded (INCOMPLETE) beside carved ones: not a SKIP
+    [InlineData(0, 13, 0, 0, 0, 7, false)]   // every dispatched entry errored (INFRA-FAIL): not a SKIP
+    [InlineData(5, 0, 0, 0, 0, 4, false)]
+    public void ACategoryIsSkippedOnlyWhenNothingWasDispatched(
+        int scored, int errored, int notMeasured, int inapplicable, int excludedMeasured, int carved, bool skip)
+    {
+        // Review round 3 H1: EntryCount counts scored pairs only, so the old test (EntryCount == 0) skipped categories
+        // that were INCOMPLETE or INFRA-FAIL, and the gate passed them.
+        var report = new AgentEval.Evals.Agentic.Calibration.CalibrationCategoryReport("c", scored, 0, 0, 0, 0,
+            EvaluationFailures: errored, SkippedUnknownKey: carved, NotMeasured: notMeasured, NotApplicable: inapplicable)
+        {
+            ExcludedMeasuredRecords = excludedMeasured,
+            ExcludedKeys = excludedMeasured + notMeasured > 0 ? ["k"] : [],
+        };
+
+        Assert.Equal(skip, BenchAgenticCalibrateCommand.IsAgentInfraSkipCategory("c", report));
+    }
+
+    [Fact]
+    public async Task AJudgeThatAnswersOffItsRubricsScale_IsInfraFail_NotSkip()
+    {
+        // Every reply is {"score": 85}: off the scale of every 0–1 rubric, so those records are errors. Before the fix the
+        // process category (all 0–1 rubrics) printed "[SKIP] nothing dispatched" and the gate could pass.
+        var outPath = Path.Combine(_root, "report-offscale.md");
+        var judge = new ChatClientEvaluator(new AgentEval.Tests.Evals.RubricJudgeTests.RecordingChatClient(_ => """{"score": 85}"""));
+
+        var exit = await BenchAgenticCalibrateCommand.RunCoreAsync(rootOverride: _root, outPathOverride: outPath, evaluatorOverride: judge);
+
+        var report = await File.ReadAllTextAsync(outPath);
+        Assert.Contains("## process [INFRA-FAIL]", report, StringComparison.Ordinal);
+        Assert.DoesNotContain("## process [SKIP]", report, StringComparison.Ordinal);
+        Assert.NotEqual(0, exit);
     }
 
     [Fact]

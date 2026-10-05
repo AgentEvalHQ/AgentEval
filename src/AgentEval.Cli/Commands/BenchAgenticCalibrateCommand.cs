@@ -244,9 +244,17 @@ public static class BenchAgenticCalibrateCommand
     /// </list>
     /// </para>
     /// </summary>
-    private static bool IsAgentInfraSkipCategory(string category, int entryCount, int skippedUnknownKey = 0) =>
-        (category == "unknown" && entryCount == 0)
-        || (entryCount == 0 && skippedUnknownKey > 0);
+    internal static bool IsAgentInfraSkipCategory(string category, CalibrationCategoryReport report) =>
+        DispatchedCount(report) == 0 && (category == "unknown" || report.SkippedUnknownKey > 0);
+
+    /// <summary>
+    /// Entries the resolver DID dispatch: scored, errored, not measured, inapplicable, or dropped with an excluded key.
+    /// <see cref="CalibrationCategoryReport.EntryCount"/> counts only the scored ones, so a category whose dispatched
+    /// entries were all excluded (INCOMPLETE) or all errored (INFRA-FAIL) used to read as "nothing dispatched" — SKIP — and
+    /// pass the gate (#203 review round 3, B10a).
+    /// </summary>
+    internal static int DispatchedCount(CalibrationCategoryReport report) =>
+        report.EntryCount + report.EvaluationFailures + report.NotMeasured + report.NotApplicable + report.ExcludedMeasuredRecords;
 
     /// <summary>Runs the agentic calibrate subcommand.</summary>
     /// <param name="rootOverride">Optional workspace root override (used by tests).</param>
@@ -449,7 +457,7 @@ public static class BenchAgenticCalibrateCommand
         bool allPass = true;
         foreach (var (category, categoryReport) in report.PerCategory.OrderBy(kv => kv.Key))
         {
-            if (IsAgentInfraSkipCategory(category, categoryReport.EntryCount, categoryReport.SkippedUnknownKey))
+            if (IsAgentInfraSkipCategory(category, categoryReport))
             {
                 // Path A' (v1.1) carved out 9 more evaluators (5 multi-turn memory +
                 // 3 trace-dependent reasoning + f1_score), trimming dispatch from
@@ -520,7 +528,7 @@ public static class BenchAgenticCalibrateCommand
 
         foreach (var (category, cr) in report.PerCategory.OrderBy(kv => kv.Key))
         {
-            if (IsAgentInfraSkipCategory(category, cr.EntryCount, cr.SkippedUnknownKey))
+            if (IsAgentInfraSkipCategory(category, cr))
             {
                 sb.AppendLine($"## {category} [SKIP]");
                 sb.AppendLine();

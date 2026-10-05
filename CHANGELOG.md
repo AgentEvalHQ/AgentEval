@@ -61,10 +61,13 @@ that the old verdict hid. The entries below give the cause and the evidence for 
     response without plan or list markers skips the plan and goal-decomposition checks, and one without reasoning-style
     phrasing skips the reasoning-correctness check), Telemetry (zero calls), Judge
     Quality (a missing input), and Tool Call Accuracy / Agentic Execution (no tool definitions captured, or definitions with no tool calls).
-- **`bench agentic calibrate` named deliberate carve-outs as wiring gaps.** A category whose entries are all carved out
-  on purpose (memory, reasoning) said its entries "had no dispatch wiring (this means a new golden key is not yet
-  routed)", and every category's table repeated the carved-out count as "Skipped (unknown key)". The report now names
-  the carved-out keys, and lists a key nothing dispatches separately as not routed.
+- **`bench agentic calibrate` skipped categories it had measured, and named carve-outs as wiring gaps.** A category whose
+  dispatched entries were all left out — every record of a key excluded because it was not measured on all of them, or
+  every record errored — read `[SKIP] … had no dispatch wiring`, was left out of the gate, and the run could pass: the
+  reasoning category hid INCOMPLETE (`reasoning_correctness` skips 4 of its 9 goldens) and a judge answering off its
+  rubrics' scale hid INFRA-FAIL. A category is now skipped only when nothing in it was dispatched (memory: every key is
+  carved out on purpose). Its report names the carved-out keys, and lists a key nothing dispatches separately as not
+  routed; the tables no longer repeat the carved-out count as "Skipped (unknown key)".
 - **Run stats: every check in exactly one bucket.** The agentic, GDPR and EU AI Act runners counted passed, failed,
   warnings and skipped as four independent predicates, so a `warn` that was not measured counted as a warning and as
   skipped, and the buckets could add up to more than `Total` (four leaves counted six times). `bench owasp`, `mitre`,
