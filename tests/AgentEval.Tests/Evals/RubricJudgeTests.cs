@@ -21,10 +21,12 @@ public class RubricJudgeTests
     {
         public List<IList<ChatMessage>> Calls { get; } = [];
 
+        public List<ChatOptions?> Options { get; } = [];
+
         public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
         {
             var sent = messages.ToList();
-            lock (Calls) Calls.Add(sent);
+            lock (Calls) { Calls.Add(sent); Options.Add(options); }
             return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, reply(sent))));
         }
 
@@ -241,6 +243,66 @@ public class RubricJudgeTests
         Assert.Equal(85, parsed.OverallScore);
         Assert.Null(parsed.RubricScore);
         Assert.False(parsed.EvaluationFailed);
+    }
+
+    [Fact]
+    public async Task ARubricCall_SendsTemperatureZero_AndTheDefaultPromptsCallIsUnchanged()
+    {
+        // B9c: the rubrics ask for temperature 0 ("designed for reproducible scoring"); the judge ran at the provider's
+        // default. A judge on any other prompt keeps the default it was calibrated at.
+        var (bound, boundClient) = Leaf(UnitRubric, Reply("0.9"), 0.80);
+        var unboundClient = new RecordingChatClient(_ => """{"overallScore": 90}""");
+        var unbound = new AtomicLlmEval(new ChatClientEvaluator(unboundClient), "k", "n", "c", "1.0.0", ["Is good"],
+            promptId: "test.rubric.not-registered.v1");
+
+        await Run(bound);
+        await Run(unbound);
+
+        Assert.Equal(0f, Assert.Single(boundClient.Options)!.Temperature);
+        Assert.Equal(ChatResponseFormat.Json, boundClient.Options[0]!.ResponseFormat);
+        Assert.Null(Assert.Single(unboundClient.Options)!.Temperature);
+    }
+
+    /// <summary>A reasoning-model endpoint: it rejects any request that sets a temperature.</summary>
+    private sealed class TemperatureRejectingClient : IChatClient
+    {
+        public int Rejections;
+        public List<ChatOptions?> Options { get; } = [];
+
+        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+        {
+            lock (Options) Options.Add(options);
+            if (options?.Temperature is not null)
+            {
+                Interlocked.Increment(ref Rejections);
+                throw new InvalidOperationException("HTTP 400 (invalid_request_error: unsupported_value) Unsupported value: 'temperature'.");
+            }
+
+            return Task.FromResult(new ChatResponse(new ChatMessage(ChatRole.Assistant, Reply("0.9"))));
+        }
+
+        public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
+            => throw new NotSupportedException();
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+        public void Dispose() { }
+    }
+
+    [Fact]
+    public async Task AModelThatRejectsTemperature_IsRetriedWithoutIt_AndNotSentItAgain()
+    {
+        var client = new TemperatureRejectingClient();
+        var judge = new ChatClientEvaluator(client);
+        AtomicLlmEval Check() => new(judge, "k", "n", "c", "1.0.0", ["Is good"], passThreshold: 0.80, promptId: UnitRubric.Id);
+
+        var first = await Run(Check());
+        var second = await Run(Check());
+
+        Assert.Equal("pass", first.Score.Label);
+        Assert.Equal("pass", second.Score.Label);
+        Assert.Equal(1, client.Rejections);             // discovered once, remembered for this client
+        Assert.Null(client.Options[^1]!.Temperature);
     }
 
     [Fact]

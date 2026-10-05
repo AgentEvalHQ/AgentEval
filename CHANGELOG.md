@@ -108,8 +108,10 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   dimension, and the result file's `promptVersions` lists the rubric each check sent (it always read
   `judge-system: default`). Calibration compares labels, so a `warn` agrees with neither gold label. New public API:
   `EvalRubric`, `EvalRubrics`, `IRubricBindable`, `RubricScoreScale`, `RubricSeverityBand`, `JudgeEvidence`;
-  `EvaluationResult` gains `RubricScore`, `RubricSeverity`, `JudgeLabel` and `Evidence`. Known gap: the rubrics say
-  temperature 0; the judge is called at the provider's default.
+  `EvaluationResult` gains `RubricScore`, `RubricSeverity`, `JudgeLabel` and `Evidence`. The rubrics ask for
+  temperature 0 ("designed for reproducible scoring"): a rubric-bound judge now sends it, and a model that rejects a
+  custom temperature (a reasoning model) is retried without it, once per judge client; judges on any other prompt keep
+  the provider default.
 - **Composite edge cases.** A composite whose required components did not run and whose only error was in an optional
   component reported `error`, and its parent read that as a REQUIRED error: nested, the same leaves gave `error` where
   flat they gave `warn`. Nothing measured is now `error` only when a component the verdict rests on errored (any one when

@@ -421,7 +421,9 @@ Every LLM-judge check sends the rubric file its `promptId` names (`agenteval.<na
 - **The verdict is the band of the score**, read in code from the rubric's own table: at or above the check's pass threshold it passes; in the rubric's `needs_review` / `warn` band it is a **warn** — not passed, and not a confirmed failure; below, it fails. A rubric that states no review band (the calibration, UX and task-adherence rubrics) passes or fails on the threshold alone. The judge's own `label` is kept as evidence, and a label that disagrees with its score is recorded.
 - **The severity is the rubric's own** where it has a severity table (the safety and adversarial rubrics); otherwise a needs-review score is `medium` and a failure keeps the check's declared severity.
 - **Provenance:** each result's `PromptId` names the rubric sent, its `PromptHash` covers the rubric, how its reply is read and the dimension, and the result file's `promptVersions` lists the rubric each check sent.
-- **Known gap:** the rubrics say `temperature: 0`; the judge is called at the provider's default temperature.
+- **Temperature 0**, as the rubrics ask: a model that rejects a custom temperature (a reasoning model) is retried
+  without it, once per judge client. Judges on any other prompt (GDPR, EU AI Act) keep the provider default they are
+  calibrated at.
 
 In a preset, a check whose failure fails the preset (an accuracy or safety check) that comes back **warn** makes the preset **WARN**, and the summary says "Not confirmed: <check>" — for example borderline content a safety rubric marks `needs_review`. Calibration compares labels, so a warn agrees with neither gold label.
 

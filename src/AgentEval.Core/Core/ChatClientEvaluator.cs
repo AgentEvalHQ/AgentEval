@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.AI;
 
 namespace AgentEval.Core;
@@ -37,6 +38,10 @@ public class ChatClientEvaluator : IEvaluator, IJudgePromptSource, IRubricBindab
     private readonly string _systemPromptId;
     private readonly EvalRubric? _rubric;
     private readonly string? _dimension;
+
+    // Chat clients whose model rejected `temperature` once (reasoning models answer HTTP 400): not sent it again. Keyed by
+    // the client, as the red-team LLMJudgeEvaluator does, so one discovery covers every check sharing the judge.
+    private static readonly ConditionalWeakTable<IChatClient, System.Runtime.CompilerServices.StrongBox<bool>> s_rejectsTemperature = new();
 
     public ChatClientEvaluator(IChatClient chatClient, string? systemPrompt = null)
         : this(chatClient, systemPrompt, systemPromptId: null) { }
@@ -216,11 +221,32 @@ public class ChatClientEvaluator : IEvaluator, IJudgePromptSource, IRubricBindab
     private async Task<(EvaluationResult Parsed, ChatResponse? Response)> InvokeAndParseAsync(
         List<ChatMessage> messages, CancellationToken cancellationToken)
     {
+        // A rubric asks for temperature 0, "designed for reproducible scoring" (#203 review, B9c): a rubric-bound judge
+        // sends it, unless this client's model has rejected it. A judge on any other prompt keeps the provider default it
+        // was calibrated at, so its call is unchanged.
+        float? temperature = _rubric is not null
+                             && !(s_rejectsTemperature.TryGetValue(_chatClient, out var rejects) && rejects.Value)
+            ? 0f
+            : null;
         ChatResponse response;
         try
         {
-            var jsonOptions = new ChatOptions { ResponseFormat = ChatResponseFormat.Json };
-            response = await _chatClient.GetResponseAsync(messages, jsonOptions, cancellationToken);
+            response = await SendAsync(messages, temperature, cancellationToken);
+        }
+        catch (Exception ex) when (temperature is not null && IsUnsupportedTemperature(ex))
+        {
+            s_rejectsTemperature.GetValue(_chatClient, static _ => new System.Runtime.CompilerServices.StrongBox<bool>(false)).Value = true;
+            response = await SendAsync(messages, temperature: null, cancellationToken);
+        }
+        return (ParseEvaluationResponse(response.Text, _rubric), response);
+    }
+
+    private async Task<ChatResponse> SendAsync(List<ChatMessage> messages, float? temperature, CancellationToken cancellationToken)
+    {
+        try
+        {
+            var jsonOptions = new ChatOptions { ResponseFormat = ChatResponseFormat.Json, Temperature = temperature };
+            return await _chatClient.GetResponseAsync(messages, jsonOptions, cancellationToken);
         }
         catch (Exception ex) when (IsResponseFormatUnsupported(ex))
         {
@@ -229,15 +255,24 @@ public class ChatClientEvaluator : IEvaluator, IJudgePromptSource, IRubricBindab
             // overload) must propagate — otherwise a failed judge silently returns an EvaluationFailed
             // fallback score that callers like CalibratedEvaluator cannot tell apart from a real low
             // score (it would average the fallback in / never trip its "judges failed" guard).
-            response = await _chatClient.GetResponseAsync(messages, cancellationToken: cancellationToken);
+            return await _chatClient.GetResponseAsync(messages,
+                temperature is null ? null : new ChatOptions { Temperature = temperature }, cancellationToken);
         }
-        return (ParseEvaluationResponse(response.Text, _rubric), response);
+    }
+
+    // A model that does not accept a custom temperature (a reasoning model) answers HTTP 400 "unsupported_value", or names
+    // the parameter. A 400 about the response format is IsResponseFormatUnsupported's, handled inside SendAsync first.
+    private static bool IsUnsupportedTemperature(Exception ex)
+    {
+        var m = ex.Message;
+        return m.Contains("temperature", StringComparison.OrdinalIgnoreCase)
+            || m.Contains("unsupported_value", StringComparison.OrdinalIgnoreCase);
     }
 
     // A model/endpoint that does not support response_format=json surfaces an HTTP 400
     // invalid_request_error naming the parameter. Recognise THAT (and only that) so we can retry
     // without the constraint; any other exception is a genuine failure and is left to propagate.
-    // Mirrors the IsUnsupportedTemperature pattern in LLMJudgeEvaluator (reasoning-model work).
+    // The same shape as IsUnsupportedTemperature below and in the red-team LLMJudgeEvaluator.
     private static bool IsResponseFormatUnsupported(Exception ex)
     {
         var m = ex.Message;
