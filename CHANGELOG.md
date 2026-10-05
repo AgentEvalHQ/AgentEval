@@ -62,7 +62,11 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   similarity, response-completeness and QA-composite cards name `EvalInput.GroundTruth`, not a metadata key nothing
   read. Through MAF, `AgentEvalCompositeEvaluator` dropped the reference and the retrieved context passed as
   `AgentEvalGroundTruthContext` / `AgentEvalRAGContext`, so a QA or RAG composite never saw them; it forwards them
-  now. Found by the release's own recalibration round.
+  now (to every composite it wraps: a non-RAG composite's judges see the retrieved context too, as on the library
+  path). On MAF's native path, `AgentEvalAgentEvaluator` dropped `EvalItem.ExpectedOutput` and `EvalItem.Context`
+  (MAF's own adapter forwards no additional context), so faithfulness never had its context and the `Quality`
+  preset failed every item; it forwards both now. A blank carrier no longer hides a real one. Found by the release's
+  own recalibration round.
 - **The PDF report's cover gave a verdict and no reason.** The cover showed "OVERALL: WARN" and nothing else; the
   overall result's summary and recommendations — for a withheld pass, what was not measured — were rendered on no
   page. They now follow the verdict on the cover (the first five recommendations, the rest counted). Also: a blank

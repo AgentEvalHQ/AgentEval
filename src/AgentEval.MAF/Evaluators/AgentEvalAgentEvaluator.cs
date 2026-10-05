@@ -8,6 +8,7 @@ using Microsoft.Extensions.AI.Evaluation;
 
 using MEAIIEvaluator = Microsoft.Extensions.AI.Evaluation.IEvaluator;
 using MEAIEvaluationResult = Microsoft.Extensions.AI.Evaluation.EvaluationResult;
+using MEAIEvaluationContext = Microsoft.Extensions.AI.Evaluation.EvaluationContext;
 
 namespace AgentEval.MAF.Evaluators;
 
@@ -76,11 +77,22 @@ public sealed class AgentEvalAgentEvaluator : IAgentEvaluator
             // KEY DIFFERENCE vs MAF's built-in MEAI adapter: forward the FULL conversation
             // (item.Conversation includes the assistant tool-call + tool-result turns), not just the
             // query half — so AgentEval's ConversationExtractor can recover the tool calls.
+            // MAF puts the reference answer and the retrieved context on the item (agent.EvaluateAsync(...,
+            // expectedOutput:) / EvalItem.Context); MAF's own adapter forwards no additional context, so AgentEval's
+            // evaluators never saw them — similarity / F1 read "none was supplied", faithfulness had no context (#203
+            // review round 15, B12g). They travel as the carriers AgentEval's MEAI evaluators read.
+            var additionalContext = new List<MEAIEvaluationContext>();
+            if (!string.IsNullOrWhiteSpace(item.ExpectedOutput))
+                additionalContext.Add(new AgentEvalGroundTruthContext(item.ExpectedOutput!));
+            if (!string.IsNullOrWhiteSpace(item.Context))
+                additionalContext.Add(new AgentEvalRAGContext(item.Context!));
+
             var result = await _evaluator.EvaluateAsync(
                 item.Conversation,
                 response,
                 _chatConfiguration,
-                cancellationToken: cancellationToken).ConfigureAwait(false);
+                additionalContext.Count > 0 ? additionalContext : null,
+                cancellationToken).ConfigureAwait(false);
 
             results.Add(result);
         }

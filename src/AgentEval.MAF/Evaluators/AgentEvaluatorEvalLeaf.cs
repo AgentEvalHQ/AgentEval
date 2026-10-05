@@ -76,8 +76,8 @@ public sealed class AgentEvaluatorEvalLeaf : IEval
         ArgumentNullException.ThrowIfNull(input);
 
         var item = new EvalItem(input.Query, input.Response ?? string.Empty);
-        if (input.Context is not null) item.Context = input.Context;
-        if (input.GroundTruth is not null) item.ExpectedOutput = input.GroundTruth;
+        if (!string.IsNullOrWhiteSpace(input.Context)) item.Context = input.Context;              // a blank one is none (B12j)
+        if (!string.IsNullOrWhiteSpace(input.GroundTruth)) item.ExpectedOutput = input.GroundTruth;
 
         AgentEvaluationResults results;
         try

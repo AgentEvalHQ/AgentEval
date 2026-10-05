@@ -29,9 +29,10 @@ namespace AgentEval.MAF.Evaluators;
 /// <para>
 /// The composite's sub-evaluators (e.g. the AgenticBenchmark tool sub-evals) are LLM-judged: they
 /// grade the query + response text, so they work over MAF's evaluation feature even when only the
-/// final response is forwarded. A reference answer (<see cref="AgentEvalGroundTruthContext"/>) and retrieved
-/// context (<see cref="AgentEvalRAGContext"/>) passed as additional context reach the composite as
-/// <c>EvalInput.GroundTruth</c> / <c>EvalInput.Context</c>. (To also let <i>code-based</i> tool metrics see the calls, run this
+/// final response is forwarded. A reference answer and retrieved context reach the composite as
+/// <c>EvalInput.GroundTruth</c> / <c>EvalInput.Context</c> — from <see cref="AgentEvalGroundTruthContext"/> /
+/// <see cref="AgentEvalRAGContext"/> on a direct MEAI call, and from <c>EvalItem.ExpectedOutput</c> /
+/// <c>EvalItem.Context</c> when run through <see cref="AgentEvalAgentEvaluator"/> (MAF's own adapter forwards neither). (To also let <i>code-based</i> tool metrics see the calls, run this
 /// through <see cref="AgentEvalAgentEvaluator"/>, which forwards the full conversation.)
 /// </para>
 /// <para>

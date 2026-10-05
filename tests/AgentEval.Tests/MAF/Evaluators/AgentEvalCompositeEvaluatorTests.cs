@@ -35,6 +35,32 @@ public class AgentEvalCompositeEvaluatorTests
     }
 
     [Fact]
+    public async Task OnTheNativeMafPath_TheItemsReferenceAndContext_ReachTheComposite()
+    {
+        // Review round 15 H1 + M1 (B12g): MAF puts the reference and the context on the EvalItem
+        // (agent.EvaluateAsync(..., expectedOutput:) / EvalItem.Context); AgentEvalAgentEvaluator forwarded neither, so
+        // similarity / F1 read "none was supplied" and faithfulness had no context.
+        var eval = new CapturingEval();
+        var item = new EvalItem("What is the capital of France?", "Paris.") { ExpectedOutput = "REF-5510", Context = "CTX-5511" };
+
+        await new AgentEvalAgentEvaluator(new AgentEvalCompositeEvaluator(eval), new ChatConfiguration(new AgentEval.Testing.FakeChatClient("judge")))
+            .EvaluateAsync([item]);
+
+        Assert.Equal("REF-5510", eval.Seen!.GroundTruth);
+        Assert.Equal("CTX-5511", eval.Seen.Context);
+    }
+
+    [Fact]
+    public void ABlankCarrier_DoesNotHideARealOne()
+    {
+        // Review round 15 L3 (B12j): the first carrier won even when blank.
+        Assert.Equal("REF", AdditionalContextHelper.ExtractGroundTruth(
+            [new AgentEvalGroundTruthContext(""), new AgentEvalGroundTruthContext("REF")]));
+        Assert.Equal("CTX", AdditionalContextHelper.ExtractRAGContext(
+            [new AgentEvalRAGContext("   "), new AgentEvalRAGContext("CTX")]));
+    }
+
+    [Fact]
     public async Task TheReferenceAndTheContext_PassedAsAdditionalContext_ReachTheComposite()
     {
         // Review round 14 M3 (B12e): the composite bridge built EvalInput(Query, Response) and dropped the

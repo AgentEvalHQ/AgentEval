@@ -28,8 +28,9 @@ public static class AgentEvalEvaluators
     // ═══════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Quality metrics: faithfulness, relevance, coherence, fluency.
-    /// All work fully through the light path (text-only evaluation).
+    /// Quality metrics: faithfulness, relevance, coherence, fluency. Relevance, coherence and fluency grade the text
+    /// alone; faithfulness grades the response against the retrieved context — <c>EvalItem.Context</c> on the MAF path,
+    /// <see cref="AgentEvalRAGContext"/> on a direct MEAI call — and without one it is not measured (never a failure).
     /// </summary>
     public static AgentEvalEvaluator Quality(IChatClient judgeClient) => new([
         new FaithfulnessMetric(judgeClient),

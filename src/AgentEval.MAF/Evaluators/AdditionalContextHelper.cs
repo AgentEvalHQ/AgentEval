@@ -20,7 +20,7 @@ public static class AdditionalContextHelper
 
         foreach (var ctx in additionalContext)
         {
-            if (ctx is AgentEvalRAGContext ragCtx)
+            if (ctx is AgentEvalRAGContext ragCtx && !string.IsNullOrWhiteSpace(ragCtx.RetrievedContext))   // a blank one is none (B12j)
                 return ragCtx.RetrievedContext;
         }
         return null;
@@ -35,7 +35,7 @@ public static class AdditionalContextHelper
 
         foreach (var ctx in additionalContext)
         {
-            if (ctx is AgentEvalGroundTruthContext gtCtx)
+            if (ctx is AgentEvalGroundTruthContext gtCtx && !string.IsNullOrWhiteSpace(gtCtx.GroundTruth))   // a blank one is none (B12j)
                 return gtCtx.GroundTruth;
         }
         return null;
