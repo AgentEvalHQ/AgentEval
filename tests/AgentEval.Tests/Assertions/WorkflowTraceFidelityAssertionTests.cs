@@ -58,12 +58,14 @@ public class WorkflowTraceFidelityAssertionTests
     }
 
     [Fact]
-    public void NoChatTruth_Passes_AllNoTruth()
+    public void NoChatTruth_Fails_NothingWasChecked()
     {
         var result = Result(Step("a", 10, 5, "stop"));
 
-        // chatTraces == null → every executor NoTruth → overall score 1.0 → passes.
-        result.Should().HaveTraceFidelity(chatTraces: null).Validate();
+        // chatTraces == null → every executor NoTruth → nothing was checked. It passed at score 1.0 (review round 6, B10y).
+        var ex = Assert.Throws<WorkflowAssertionException>(
+            () => result.Should().HaveTraceFidelity(chatTraces: null).Validate());
+        Assert.Contains("nothing could be checked", ex.Message, StringComparison.Ordinal);
     }
 
     [Theory]

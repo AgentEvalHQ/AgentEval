@@ -201,14 +201,17 @@ public sealed class WorkflowTraceFidelityReconciler
     {
         var report = Reconcile(result, chatTraces);
 
+        // An executor with no chat-boundary truth was not checked: skipped, never a pass (#203 review round 6, B10y — it
+        // read pass at 1.00 and counted as passed). A warn is a soft fail (round 5, B10w): Passed only on a pass.
         var subResults = report.Executors.Select(e => new EvalResult(
             Metric: new EvalMetadata(Key: $"workflow_trace_fidelity.executor.{e.ExecutorId}", Name: e.ExecutorId, Category: "TraceFidelity", Version: "1.0"),
-            Score: new EvalScore(
-                Value: e.Score, Ordinal: null,
-                // A warn is a soft fail (#203 review round 5, B10w): Passed only on a pass.
-                Label: e.Score >= 0.99 ? "pass" : e.Score >= 0.8 ? "warn" : "fail",
-                Passed: e.Score >= 0.99, Threshold: 0.8,
-                Severity: e.Score >= 0.99 ? "none" : e.Score >= 0.8 ? "low" : e.Score >= 0.5 ? "medium" : "high", Confidence: null),
+            Score: e.DiffKind == WorkflowFidelityDiff.NoTruth
+                ? new EvalScore(Value: 0.0, Ordinal: null, Label: "skipped", Passed: false, Threshold: 0.8, Severity: "none", Confidence: null)
+                : new EvalScore(
+                    Value: e.Score, Ordinal: null,
+                    Label: e.Score >= 0.99 ? "pass" : e.Score >= 0.8 ? "warn" : "fail",
+                    Passed: e.Score >= 0.99, Threshold: 0.8,
+                    Severity: e.Score >= 0.99 ? "none" : e.Score >= 0.8 ? "low" : e.Score >= 0.5 ? "medium" : "high", Confidence: null),
             Details: new EvalDetails(
                 Dimensions: BuildLeafDimensions(e),
                 Evidence: new List<EvalEvidence>
@@ -225,13 +228,34 @@ public sealed class WorkflowTraceFidelityReconciler
             Provenance: new EvalProvenance(Type: "code", JudgeModel: null, PromptId: null, PromptHash: null, TokensUsed: null, EstimatedCost: 0.0, CacheHit: false),
             EvaluatedAt: DateTimeOffset.UtcNow)).ToList();
 
+        // Nothing checked is no verdict, and a pass on part of the executors is withheld (#203 review round 6, B10y): with
+        // no executor carrying chat truth — every live MAF InProcessExecution run today — OverallScore is 1.0 and the run
+        // read PASS, exit 0. Now: none verified -> skipped (exit 11); some unverified -> a pass is a warn, not measured.
+        var unverified = report.Executors.Count - report.VerifiedCount;
+        var label = report.VerifiedCount == 0 ? "skipped"
+            : report.OverallScore >= 0.99 ? "pass" : report.OverallScore >= 0.8 ? "warn" : "fail";
+        var measurement = AgentEval.Evals.Meta.MeasurementState.Measured;
+        string? coverageNote = null;
+        if (label == "skipped")
+            coverageNote = $"No executor of {report.Executors.Count} had chat-boundary truth to reconcile against, so nothing was " +
+                           "measured. Capture per-executor chat traces (ExecutorTraces) to get a verdict.";
+        else if (label == "pass" && unverified > 0)
+        {
+            label = "warn";
+            measurement = AgentEval.Evals.Meta.MeasurementState.NotMeasured;
+            coverageNote = $"{unverified} of {report.Executors.Count} executor(s) had no chat-boundary truth; a pass on the " +
+                           $"{report.VerifiedCount} verified is withheld.";
+        }
+        var rootSeverity = label is "pass" or "skipped" || measurement == AgentEval.Evals.Meta.MeasurementState.NotMeasured ? "none"
+            : report.OverallScore >= 0.8 ? "low" : report.OverallScore >= 0.5 ? "medium" : "high";
+
         return new EvalResult(
             Metric: new EvalMetadata(Key: "workflow_trace_fidelity", Name: "Workflow Trace Fidelity", Category: "TraceFidelity", Version: "1.0"),
             Score: new EvalScore(
-                Value: report.OverallScore, Ordinal: null,
-                Label: report.OverallScore >= 0.99 ? "pass" : report.OverallScore >= 0.8 ? "warn" : "fail",
-                Passed: report.OverallScore >= 0.99, Threshold: 0.8,
-                Severity: report.OverallScore >= 0.99 ? "none" : report.OverallScore >= 0.8 ? "low" : report.OverallScore >= 0.5 ? "medium" : "high", Confidence: null),
+                Value: label == "skipped" ? 0.0 : report.OverallScore, Ordinal: null,
+                Label: label,
+                Passed: label == "pass", Threshold: 0.8,
+                Severity: rootSeverity, Confidence: null) { Measurement = measurement },
             Details: new EvalDetails(
                 Dimensions: new Dictionary<string, double>
                 {
@@ -239,7 +263,8 @@ public sealed class WorkflowTraceFidelityReconciler
                     ["executors"] = report.Executors.Count,
                     ["verified"] = report.VerifiedCount, // executors with chat-boundary truth; the rest are NoTruth
                 },
-                Evidence: null, Recommendations: null, SubResults: subResults, AggregationStrategy: "per-executor"),
+                Evidence: null, Recommendations: coverageNote is null ? null : [coverageNote], SubResults: subResults,
+                AggregationStrategy: "per-executor") { Summary = coverageNote },
             Provenance: new EvalProvenance(Type: "code", JudgeModel: null, PromptId: null, PromptHash: null, TokensUsed: null, EstimatedCost: 0.0, CacheHit: false),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }

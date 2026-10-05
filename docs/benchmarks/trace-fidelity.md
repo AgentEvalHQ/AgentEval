@@ -42,7 +42,7 @@ agenteval bench trace-fidelity \
   --subject MyAgent
 ```
 
-Writes a run manifest + `report-native.json` under `.agenteval/`. Exit code `0` = clean (score ≥ 0.99, PASS), `10` = minor discrepancies (0.80–0.99, WARN), `9` = discrepancies (below 0.80, FAIL), `1` = setup/IO error.
+Writes a run manifest + `report-native.json` under `.agenteval/`. Exit code `0` = clean (score ≥ 0.99, PASS), `10` = minor discrepancies (0.80–0.99, WARN), `9` = discrepancies (below 0.80, FAIL), `11` = nothing to reconcile (the chat trace has no model responses, SKIPPED), `1` = setup/IO error.
 
 ## The upstream loop with Microsoft Agent Framework
 

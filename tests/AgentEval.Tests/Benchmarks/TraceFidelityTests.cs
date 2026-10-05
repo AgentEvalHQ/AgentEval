@@ -211,6 +211,17 @@ public class TraceFidelityTests
     }
 
     [Fact]
+    public void AChatTraceWithNoResponses_HasNothingToReconcile_NoVerdict()
+    {
+        // Review round 6 (B10y): an empty or failed chat capture scored every class 1.0 and read PASS.
+        var result = new TraceFidelityRunner().ReconcileToEvalResult(new AgentTrace(), new AgentTrace());
+
+        Assert.Equal("skipped", result.Score.Label);
+        Assert.False(result.Score.Passed);
+        Assert.All(result.Details.SubResults!, s => Assert.Equal("skipped", s.Score.Label));
+    }
+
+    [Fact]
     public void ReconcileToEvalResult_EmitsSixSubResultsWithExpectedKeysAndDimensions()
     {
         var chat = Chat(

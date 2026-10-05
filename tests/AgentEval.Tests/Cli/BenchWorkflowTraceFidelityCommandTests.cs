@@ -69,7 +69,7 @@ public class BenchWorkflowTraceFidelityCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task NoExecutorTraces_AllNoTruth_ReturnsExitCode0()
+    public async Task NoExecutorTraces_AllNoTruth_HasNoVerdict_ExitsEleven()
     {
         var trace = new WorkflowTrace
         {
@@ -80,7 +80,25 @@ public class BenchWorkflowTraceFidelityCommandTests : IDisposable
 
         var code = await BenchWorkflowTraceFidelityCommand.RunAsync(path, "standard", "wf", _root);
 
-        Assert.Equal(0, code);
+        // Nothing was checked: no verdict (skipped → exit 11). It exited 0 as a PASS (review round 6, B10y) — the default
+        // live MAF path today, where executor traces carry no responses.
+        Assert.Equal(11, code);
+    }
+
+    [Fact]
+    public async Task APassOnPartOfTheExecutors_IsWithheld_ExitsTen()
+    {
+        var trace = new WorkflowTrace
+        {
+            TraceName = "wtf", OriginalPrompt = "go", FinalOutput = "done",
+            Steps = { Step("a", 10, 5, "stop"), Step("b", 10, 5, "stop") },
+            ExecutorTraces = new Dictionary<string, AgentTrace> { ["a"] = ChatTrace(15, "stop") },   // b has no chat truth
+        };
+        var path = await WriteTraceAsync(trace);
+
+        var code = await BenchWorkflowTraceFidelityCommand.RunAsync(path, "standard", "wf", _root);
+
+        Assert.Equal(10, code);   // the verified executor agrees, but b was never checked: a warn, not a clean pass
     }
 
     [Fact]

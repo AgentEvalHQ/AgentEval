@@ -79,8 +79,8 @@ public static class BenchWorkflowTraceFidelityCommand
         {
             Console.Error.WriteLine(
                 "[bench workflow-trace-fidelity] NOTE: the workflow trace carries no per-executor ExecutorTraces; "
-                + "every executor will be reported as NoTruth (score 100%). Capture per-executor chat traces to get "
-                + "real reconciliation.");
+                + "no executor can be checked, so the run has no verdict (SKIPPED, exit 11). Capture per-executor chat "
+                + "traces to get real reconciliation.");
         }
 
         var result = new WorkflowTraceFidelityReconciler(ParsePreset(preset)).ReconcileToEvalResult(wfResult, chatTraces);

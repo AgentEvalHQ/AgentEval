@@ -88,7 +88,8 @@ turn before a bad action reaches a tool. See the `Glass Box Full Stack` sample (
 Inside a live MAF `InProcessExecution` workflow, executor responses are **not** currently routed back through
 the instrumented chat client, so a live run yields per-executor traces **without** chat-boundary `ChatTurn`
 entries. Until an upstream per-executor forwarding hook lands (tracked upstream in MAF), live workflow runs
-report every executor as `NoTruth`; real per-executor reconciliation works today for **direct-agent, pre-wired,
+report every executor as `NoTruth`, so a live run has no verdict (nothing was checked); real per-executor
+reconciliation works today for **direct-agent, pre-wired,
 or replayed** traces (the offline `Real vs Framework: Workflow` sample, Observability item 4, shows the shape).
 
 ## Try it
