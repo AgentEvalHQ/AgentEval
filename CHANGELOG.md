@@ -264,7 +264,9 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   preset", skipped, and the run passed on the rest. **Behaviour change:** an attack that measured nothing makes the
   verdict Inconclusive; its category reads `Inconclusive` (new `CategoryTestStatus` / `TechniqueTestStatus` value,
   appended last so existing values keep their numbers; new `InconclusiveCount` on both reports, so the status counts add
-  up, and a summary row when it is not zero) and withholds the compliance run's pass (`warn`, not measured, the category named). An attack can declare it is not
+  up, and a summary row when it is not zero) and withholds the compliance run's pass (`warn`, not measured, the category named) — also
+  when another attack in the same category, technique or control did measure (`AttackResult.MeasuredNothing`; the
+  evidence of all five compliance reporters reads WARN). An attack can declare it is not
   measurable in the current setup (new `IAttackType.NotMeasurableReason`, carried on `AttackResult`): System Prompt
   Extraction does so when no canary is planted, and stays "not tested" with that reason, without blocking.
 - **The agentic calibration scored a sample its evaluators' own verdicts selected.** Excluding unmeasured records
