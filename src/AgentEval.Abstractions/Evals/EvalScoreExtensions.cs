@@ -169,8 +169,9 @@ public static class EvalScoreExtensions
 
     /// <summary>
     /// The verdict a run summary can carry (its schema allows <c>PASS</c>, <c>WARN</c>, <c>FAIL</c>, <c>PENDING</c>): the
-    /// root's measured verdict; otherwise <c>PENDING</c> when no check was measured and <c>WARN</c> when some were — a run
-    /// whose verdict errored is not a pass, and it is not a measured failure either (B9b).
+    /// root's measured verdict; otherwise <c>FAIL</c> when a check failed (as <c>BenchmarkRunner</c> reads it — review
+    /// round 3 H2: a run with a measured failure was stored WARN), <c>PENDING</c> when no check was measured, and
+    /// <c>WARN</c> when some were — a run whose verdict errored is not a pass (B9b).
     /// </summary>
     public static string RunVerdict(this EvalScore root, AgentEval.Output.RunStats stats)
     {
@@ -182,7 +183,7 @@ public static class EvalScoreExtensions
             "pass" => "PASS",
             "warn" => "WARN",
             "fail" => "FAIL",
-            _ => stats.Passed + stats.Failed + stats.Warnings == 0 ? "PENDING" : "WARN",
+            _ => stats.Failed > 0 ? "FAIL" : stats.Passed + stats.Warnings == 0 ? "PENDING" : "WARN",
         };
     }
 

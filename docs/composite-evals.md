@@ -109,7 +109,7 @@ The composite verdict is determined after aggregation. `warn` is a soft fail: `P
 
 | # | Condition | `Label` | `Passed` |
 |---|-----------|---------|----------|
-| 1 | a `Required` component errored | `"error"` | `false` |
+| 1 | a `Required` component errored | `"error"` — unless the measured parts already decide `"fail"` under the severity rule (no threshold, or `SeverityCapsThreshold`): a high or critical failure, here or inside an errored nested composite, is the verdict whatever the missing part would have scored | `false` |
 | 2 | no component produced a measurement | `"error"` if a component the verdict rests on errored (a `Required` one is row 1; any one when none is required); `"warn"` (recorded `notMeasured`) if one of them is a nested composite that withheld its own pass — its parts were measured, but a required part inside did not run; else `"skipped"`. An optional component that errored or withheld is not the verdict, so it reads like an optional skip, here and in a parent | `false` |
 | 3 | threshold set, `score >= threshold` | `"pass"` (see rows 6–7); with `SeverityCapsThreshold = true`, required-component severity still decides as in row 5 (`critical`/`high` → `"fail"`, `medium` → `"warn"`) | `true` only on pass |
 | 4 | threshold set, `score < threshold` | `"fail"` | `false` |

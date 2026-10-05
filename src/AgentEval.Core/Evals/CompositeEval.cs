@@ -176,9 +176,13 @@ public sealed class CompositeEval : IEval
         // over every measured part, so a PASSING article still carried the severity of a scenario failure its own
         // scoring absorbed — and a preset failed with every article passing (GDPR Standard: 28 such single-scenario
         // cases), while the same article failing as a whole read only a warn.
+        // "Required" means every component when none is marked required (as `gating` below reads it): the clause used to
+        // be Components.All(c => c.Required), never true then, so an all-optional composite ignored every failure — a
+        // critical one beside a pass read PASS (#203 review round 3, B10b).
+        var noneRequired = !Components.Any(c => c.Required);
         var failingSeverities = subs
             .Zip(Components, (s, c) => (Sub: s, Component: c))
-            .Where(pair => (pair.Component.Required || Components.All(c => c.Required))
+            .Where(pair => (pair.Component.Required || noneRequired)
                            && pair.Sub.Score.CountsTowardAggregate()
                            && !pair.Sub.Score.Passed)
             .Select(pair => pair.Sub.Score.Severity)
@@ -291,6 +295,26 @@ public sealed class CompositeEval : IEval
                 : Threshold is { } t
                     ? (score < t ? "fail" : SeverityCapsThreshold ? SeverityLabel(verdictSeverity) : "pass")
                     : SeverityLabel(verdictSeverity);
+
+        // A required part that errored does not hide a failure the measured parts already decide (#203 review round 3,
+        // B10b; B6c-10 covered Fail-effect components only). Under the severity rule — no threshold, or
+        // SeverityCapsThreshold — a high or critical failure decides the verdict whatever the missing part would have
+        // scored, including one inside an errored nested composite: its severity reflects only its measured parts (an
+        // errored leaf carries "none"). A GDPR run with one article errored and another failing at critical read ERROR,
+        // and its stored summary WARN.
+        var erroredSeverities = subs
+            .Zip(Components, (s, c) => (Sub: s, Component: c))
+            .Where(pair => (pair.Component.Required || noneRequired) && pair.Sub.Score.Label == "error")
+            .Select(pair => pair.Sub.Score.Severity);
+        var decidedSeverity = SeverityRollup.Max(failingSeverities.Concat(erroredSeverities).DefaultIfEmpty("none"));
+        var decidedDespiteError = label == "error"
+                                  && (Threshold is null || SeverityCapsThreshold)
+                                  && SeverityLabel(decidedSeverity) == "fail";
+        if (decidedDespiteError)
+        {
+            label = "fail";
+            severity = SeverityRollup.Max([severity, decidedSeverity]);
+        }
 
         // A pass that rests on a minority of the components is not the composite's pass. Nothing failed, so it is a
         // soft finding (warn → exit 10 through BenchExitCodes), not a fail.
@@ -435,7 +459,10 @@ public sealed class CompositeEval : IEval
             : unconfirmedText is not null || qualityText is not null
                 ? string.Join("; ", new[] { unconfirmedText, qualityText }.Where(t => t is not null)) + ", so the verdict is warn, not fail."
                 : null;
-        var coverageNote = string.Join(" ", new[] { effectNote, nothingMeasuredNote ?? partialCoverageNote }.Where(n => n is not null))
+        string? decidedNote = decidedDespiteError
+            ? $"A required part produced no verdict, but a {decidedSeverity} failure the measured parts show decides it: fail."
+            : null;
+        var coverageNote = string.Join(" ", new[] { decidedNote, effectNote, nothingMeasuredNote ?? partialCoverageNote }.Where(n => n is not null))
                            is { Length: > 0 } joined ? joined : null;
 
         return new EvalResult(

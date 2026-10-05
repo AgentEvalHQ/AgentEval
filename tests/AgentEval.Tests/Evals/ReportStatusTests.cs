@@ -38,6 +38,7 @@ public class ReportStatusTests
     [InlineData("warn", 1, 0, 1, "WARN")]
     [InlineData("fail", 0, 1, 0, "FAIL")]
     [InlineData("error", 1, 0, 0, "WARN")]       // some parts measured: not a pass, not a measured failure
+    [InlineData("error", 1, 1, 0, "FAIL")]       // a measured failure under an errored root (review round 3 H2: was WARN)
     [InlineData("error", 0, 0, 0, "PENDING")]    // nothing measured: no verdict
     [InlineData("skipped", 0, 0, 0, "PENDING")]
     public void RunVerdict_IsAVerdictTheSummarySchemaAllows_AndNeverFAILForANonVerdict(
@@ -85,6 +86,58 @@ public class ReportStatusTests
         Assert.DoesNotContain(recommendations, r => r.Contains("Review failures in hate_unfairness", StringComparison.Ordinal));
         Assert.DoesNotContain(recommendations, r => r.Contains("Review failures in agentic.safety", StringComparison.Ordinal));
         Assert.Contains(recommendations, r => r.StartsWith("hate_unfairness produced no verdict", StringComparison.Ordinal));
+    }
+
+    private static EvalResult Severe(string key, string label, bool passed, string severity) => new(
+        new(key, key, "test", "1.0.0"), new EvalScore(passed ? 1.0 : 0.1, null, label, passed, null, severity, null),
+        new(null, null, null, null, null), new("atomic-llm", null, null, null, null, 0, false), DateTimeOffset.UtcNow);
+
+    private sealed class Fixed(EvalResult result) : IEval
+    {
+        public string Key => result.Metric.Key;
+        public string Name => Key;
+        public string Category => "test";
+        public string Version => "1.0.0";
+        public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default) => Task.FromResult(result);
+    }
+
+    [Fact]
+    public async Task AMeasuredCriticalFailure_DecidesTheVerdict_EvenBesideAnErroredArticle()
+    {
+        // Review round 3 H2: a GDPR-shaped run — one article's judge errored, another article failed at critical. The pillar
+        // (threshold only) cannot decide and reads error; the severity-capped preset above it can, and must read FAIL. It
+        // read ERROR, and its stored summary WARN.
+        var pillar = new CompositeEval("pillar", "Pillar", "test", "1.0.0",
+            [new EvalComponent(new Fixed(Severe("art.a", "error", false, "none")), 0.5),
+             new EvalComponent(new Fixed(Severe("art.b", "fail", false, "critical")), 0.5)],
+            WeightedSumAggregation.Instance, threshold: 0.85);
+        var preset = new CompositeEval("preset", "Preset", "test", "1.0.0",
+            [new EvalComponent(pillar, 1.0)], WeightedSumAggregation.Instance, threshold: 0.85) { SeverityCapsThreshold = true };
+        var input = new EvalInput("q", "r");
+
+        var pillarResult = await pillar.EvaluateAsync(input);
+        var result = await preset.EvaluateAsync(input);
+
+        Assert.Equal("error", pillarResult.Score.Label);         // the threshold alone cannot decide without art.a
+        Assert.Equal("fail", result.Score.Label);
+        Assert.Equal("critical", result.Score.Severity);
+        Assert.Contains("decides", result.Details.Summary);
+        Assert.Equal("FAIL", AgentEval.Compliance.Gdpr.Articles.GdprBenchmarkRunner.BuildSummary(result, "run").Verdict);
+    }
+
+    [Theory]
+    [InlineData(null, false, "critical", "fail")]   // severity rule: the critical failure decides
+    [InlineData(null, false, "medium", "error")]    // a medium failure under the severity rule is a warn at most: the error stands
+    [InlineData(0.85, false, "critical", "error")]  // threshold only: the missing part could still move the average
+    [InlineData(0.85, true, "critical", "fail")]    // threshold + SeverityCapsThreshold: decided
+    public async Task ARequiredError_GivesWayOnlyToAFailureTheSeverityRuleDecides(double? threshold, bool caps, string severity, string label)
+    {
+        var composite = new CompositeEval("c", "C", "test", "1.0.0",
+            [new EvalComponent(new Fixed(Severe("errored", "error", false, "none")), 0.5),
+             new EvalComponent(new Fixed(Severe("failed", "fail", false, severity)), 0.5)],
+            WeightedSumAggregation.Instance, threshold) { SeverityCapsThreshold = caps };
+
+        Assert.Equal(label, (await composite.EvaluateAsync(new EvalInput("q", "r"))).Score.Label);
     }
 
     [Theory]

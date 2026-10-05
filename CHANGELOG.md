@@ -80,6 +80,13 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   `skipped` with "No component produced a measurement (0 errored, 0 skipped, 0 inapplicable)", though the parts inside
   were measured — the Tool Call Accuracy preset did this whenever no tool definitions were captured. It now withholds
   too (`warn`, recorded `notMeasured`) and names the components; a breakdown counts the withheld ones.
+- **A measured critical failure beside an errored part read as "no verdict".** A composite with a required part that
+  errored reported `error` even when a high or critical failure in its measured parts already decided the verdict under
+  the severity rule (no threshold, or `SeverityCapsThreshold`): a GDPR run with one article's judge errored and another
+  article failing at critical read ERROR, and its stored summary WARN. Such a composite now reads `fail` and says so;
+  a run summary whose root has no verdict reads FAIL when a check failed (as `BenchmarkRunner` already did). And a
+  composite with no component marked required ignored every failure in the severity rule — every check failing at
+  critical read PASS; none marked required now means every component counts, as everywhere else.
 - **A judge that failed read as an agent that failed.** The agentic, GDPR and EU AI Act reports and run summaries, and
   `bench owasp`, `mitre`, `nist` and `perf`, mapped every label but pass and warn to FAIL: a check whose judge answered off
   its rubric's scale (or not at all) showed "FAIL 0%" and "Review failures in …", and a run with nothing measured read

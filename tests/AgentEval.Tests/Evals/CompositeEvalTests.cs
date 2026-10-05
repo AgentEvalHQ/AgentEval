@@ -342,13 +342,11 @@ public class CompositeEvalTests
     }
 
     [Fact]
-    public async Task EvaluateAsync_AllOptionalAllFail_VerdictLabelIsPass()
+    public async Task EvaluateAsync_AllOptionalAllFail_FailsLikeAllRequired()
     {
-        // No required components, all optional, all failing → verdict label
-        // must be "pass" (no required component dragged it down). Score.Severity
-        // still reflects the aggregation-level worst-case (for diagnostics),
-        // but the consumer-facing verdict is governed by required-component
-        // severities only.
+        // No component marked required means every component counts — as the composite reads it everywhere else (coverage,
+        // inapplicable, errors). This test used to pin the opposite: every component failing at critical read PASS
+        // (#203 review round 3, B10b — a fail-open, and the code's own comment said "every component when none is required").
         var components = new EvalComponent[]
         {
             new(new StubAtomic("opt-1", 0.10, severity: "critical", passed: false), Weight: 1.0, Required: false),
@@ -358,11 +356,24 @@ public class CompositeEvalTests
 
         var result = await sut.EvaluateAsync(Input);
 
-        // Verdict label = pass because there are no required components that
-        // failed; the optional fails' severity does not propagate into the
-        // label decision.
+        Assert.Equal("fail", result.Score.Label);
+        Assert.False(result.Score.Passed);
+        Assert.Equal("critical", result.Score.Severity);
+    }
+
+    [Fact]
+    public async Task OneOptionalFailing_BesideARequiredPass_StillDoesNotDecide()
+    {
+        // Guard: where SOME component is required, an optional one's failure still does not propagate (unchanged).
+        var components = new EvalComponent[]
+        {
+            new(new StubAtomic("req", 1.0, severity: "none", passed: true), Weight: 1.0, Required: true),
+            new(new StubAtomic("opt", 0.10, severity: "critical", passed: false), Weight: 1.0, Required: false),
+        };
+
+        var result = await MakeComposite(components).EvaluateAsync(Input);
+
         Assert.Equal("pass", result.Score.Label);
-        Assert.True(result.Score.Passed);
     }
 
     // ── Threshold validation (batch-5 surface) ───────────────────────────────
