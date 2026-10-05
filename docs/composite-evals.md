@@ -136,8 +136,10 @@ nested `warn` from a measured medium-severity failure, or from a nested composit
 like any other (the coverage bar is per level). Under the default `Averaged` effect a nested `warn` — or `fail` — is
 averaged into its parent like any other score, so the parent can still pass; set `OnFailure` to `Warn` or `Fail` on the
 component to carry its verdict up (the agentic presets do, on every component). The parent's summary names what it
-absorbed this way ("Absorbed by the average (OnFailure = Averaged): <key> (fail), <key> (warn)"), so a pass never
-hides it; the verdict does not change. An `inapplicable` component (the case cannot test the thing) never
+absorbed this way ("Absorbed by the score (OnFailure = Averaged): <key> (fail), <key> (warn)"), so a pass never
+hides it; the verdict does not change. Under the severity rule (no threshold, or `SeverityCapsThreshold`) a required
+part failing at medium or more decides the label instead, and the summary says so ("Decided by severity: <key> (fail,
+medium)"). An `inapplicable` component (the case cannot test the thing) never
 triggers row 6. Row 7: a composite whose components mostly report "not applicable" cannot pass on
 the few that remain; `MinimumMeasuredShare = 0` drops this bar, not row 6. Only a pass is withheld; a measured
 failure stays a failure. Whenever components were left out, the result's `Details.Summary` says how many were

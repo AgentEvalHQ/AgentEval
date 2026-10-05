@@ -123,7 +123,7 @@ public class CompositeEvalComponentEffectTests
 
         var nested = await averaged.EvaluateAsync(Input);
         Assert.Equal("pass", nested.Score.Label);                                   // the verdict is unchanged
-        Assert.Contains("Absorbed by the average", nested.Details.Summary);
+        Assert.Contains("Absorbed by the score", nested.Details.Summary);
         Assert.Contains("child (warn)", nested.Details.Summary);
 
         var flatResult = await flat.EvaluateAsync(Input);
@@ -132,6 +132,30 @@ public class CompositeEvalComponentEffectTests
 
         Assert.Null((await clean.EvaluateAsync(Input)).Details.Summary);              // nothing absorbed, nothing said
         Assert.DoesNotContain("Absorbed", (await withEffect.EvaluateAsync(Input)).Details.Summary ?? "");   // the effect names it
+    }
+
+    [Fact]
+    public async Task APartWhoseSeverityDecidedTheWarn_IsNamedAsTheReason_NotAsAbsorbed()
+    {
+        // Review round 6 M-1 (B10z): under the severity rule (every GDPR/EU pillar) a medium failure decides a warn, and
+        // the note called that part "absorbed by the average". It now says what decided it.
+        var pillar = new CompositeEval("pillar", "Pillar", "test", "1.0.0",
+            [new EvalComponent(new Fixed("a", "pass", 1.0), 1.0),
+             new EvalComponent(new WithSeverity("b", "fail", 0.5, "medium"), 1.0)],
+            WeightedSumAggregation.Instance, threshold: null);
+        var lowOnly = new CompositeEval("low", "Low", "test", "1.0.0",
+            [new EvalComponent(new Fixed("a", "pass", 1.0), 1.0),
+             new EvalComponent(new WithSeverity("b", "fail", 0.5, "low"), 1.0)],
+            WeightedSumAggregation.Instance, threshold: null);
+
+        var decided = await pillar.EvaluateAsync(Input);
+        var absorbed = await lowOnly.EvaluateAsync(Input);
+
+        Assert.Equal("warn", decided.Score.Label);
+        Assert.DoesNotContain("Absorbed", decided.Details.Summary ?? "");
+        Assert.Contains("Decided by severity: b (fail, medium)", decided.Details.Summary);
+        Assert.Equal("pass", absorbed.Score.Label);                                   // low severity cannot change the label
+        Assert.Contains("Absorbed by the score (OnFailure = Averaged): b (fail)", absorbed.Details.Summary);
     }
 
     [Fact]

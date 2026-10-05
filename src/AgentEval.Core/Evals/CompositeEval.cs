@@ -506,19 +506,36 @@ public sealed class CompositeEval : IEval
                 : $"{parts} produced no verdict, but the score cannot reach the threshold ({Threshold:0.##}) even if {they} " +
                   "had passed: fail."
             : null;
-        // What the default Averaged effect absorbed (the owner's decision on B10h, B10t): a component left to the score
-        // whose own verdict was warn or fail is named, so a pass never hides it. The verdict is unchanged — averaging is
-        // what the composite's author asked for; OnFailure = Warn or Fail makes it count.
-        var absorbed = Components.Zip(subs, (c, s) => (Component: c, Sub: s))
+        // What the default Averaged effect left to the score (the owner's decision on B10h, B10t): a component whose own
+        // verdict was warn or fail is named, so a pass never hides it; the verdict is unchanged — OnFailure = Warn or Fail
+        // makes it count. But under the severity rule (no threshold, or SeverityCapsThreshold — every GDPR/EU pillar and
+        // preset) a required part's severity of medium or more DECIDES the label: such a part is not "absorbed", and a warn
+        // or fail it decided names it as the reason instead (#203 review round 6, B10z — the note called the very part that
+        // made the composite warn "absorbed"; "average" was also wrong under min and cap-by-worst).
+        var averagedNonPasses = Components.Zip(subs, (c, s) => (Component: c, Sub: s))
             .Where(p => p.Component.OnFailure == ComponentFailureEffect.Averaged
                         && p.Sub.Score.CountsTowardAggregate()
                         && p.Sub.Score.Label is "fail" or "warn")
+            .ToArray();
+        bool DecidesBySeverity((EvalComponent Component, EvalResult Sub) p) =>
+            (Threshold is null || SeverityCapsThreshold)
+            && (p.Component.Required || noneRequired)
+            && SeverityLabel(p.Sub.Score.Severity) != "pass";
+        var absorbed = averagedNonPasses
+            .Where(p => !DecidesBySeverity(p))
             .Select(p => $"{p.Sub.Metric.Key} ({p.Sub.Score.Label}{(p.Component.Required ? "" : ", optional")})")
             .ToArray();
+        var decidedBy = averagedNonPasses
+            .Where(DecidesBySeverity)
+            .Select(p => $"{p.Sub.Metric.Key} ({p.Sub.Score.Label}, {p.Sub.Score.Severity})")
+            .ToArray();
         string? absorbedNote = absorbed.Length > 0 && label is "pass" or "warn"
-            ? $"Absorbed by the average (OnFailure = Averaged): {string.Join(", ", absorbed)}."
+            ? $"Absorbed by the score (OnFailure = Averaged): {string.Join(", ", absorbed)}."
             : null;
-        var coverageNote = string.Join(" ", new[] { decidedNote, effectNote, nothingMeasuredNote ?? partialCoverageNote, absorbedNote }.Where(n => n is not null))
+        string? severityNote = decidedBy.Length > 0 && label is "warn" or "fail"
+            ? $"Decided by severity: {string.Join(", ", decidedBy)}."
+            : null;
+        var coverageNote = string.Join(" ", new[] { decidedNote, effectNote, severityNote, nothingMeasuredNote ?? partialCoverageNote, absorbedNote }.Where(n => n is not null))
                            is { Length: > 0 } joined ? joined : null;
 
         return new EvalResult(
