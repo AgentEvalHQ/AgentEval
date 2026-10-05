@@ -117,11 +117,12 @@ public class CompositeEvalSkippedLeavesTests
     }
 
     [Fact]
-    public async Task OnlyOptionalLeavesErrored_RestSkipped_IsError_NotPass()
+    public async Task OnlyOptionalLeavesErrored_RestSkipped_IsSkipped_NotPass()
     {
         // Nothing was measured and one leaf errored. The required-error path does not fire (the
-        // erroring leaf is optional) and pre-fix this fell through to "pass". The honest label is
-        // "error" — an optional judge that could not speak is still the only thing that ran.
+        // erroring leaf is optional) and pre-fix this fell through to "pass". It is not a pass; and since
+        // B7 (#203 review) it is "skipped", not "error": the required leaf did not run, and an optional
+        // error is not the verdict — as "error" its parent read it as a required error (the test below).
         var sut = Composite(new EvalComponent[]
         {
             new(new SkippingEval("a"), Required: true),
@@ -130,8 +131,87 @@ public class CompositeEvalSkippedLeavesTests
 
         var result = await sut.EvaluateAsync(Input);
 
-        Assert.Equal("error", result.Score.Label);
+        Assert.Equal("skipped", result.Score.Label);
         Assert.False(result.Score.Passed);
+        Assert.Contains("1 errored", result.Details.Summary);
+        Assert.Contains("optional", result.Details.Summary);
+    }
+
+    [Fact]
+    public async Task WithNoRequiredComponent_AnErrorAmongNothingMeasured_IsStillError()
+    {
+        // Guard: the B7 fix must not widen. With no component required, every one is what the verdict rests on.
+        var sut = Composite(new EvalComponent[]
+        {
+            new(new SkippingEval("a"), Required: false),
+            new(new FixedEval("b", 0.0, passed: false, label: "error"), Required: false),
+        });
+
+        Assert.Equal("error", (await sut.EvaluateAsync(Input)).Score.Label);
+    }
+
+    public static IEnumerable<object[]> RequiredStates() =>
+        new[] { "pass", "fail", "skipped", "error", "inapplicable" }.Select(x => new object[] { x });
+
+    private static IEval Leaf(string key, string state) => state switch
+    {
+        "pass" => new FixedEval(key, 1.0, passed: true),
+        "fail" => new FixedEval(key, 0.2, passed: false, severity: "medium"),
+        "skipped" => new SkippingEval(key),
+        "error" => new FixedEval(key, 0.0, passed: false, label: "error"),
+        "inapplicable" => new FixedEval(key, 0.0, passed: false, label: "inapplicable"),
+        _ => throw new ArgumentOutOfRangeException(nameof(state)),
+    };
+
+    [Theory]
+    [MemberData(nameof(RequiredStates))]
+    public async Task AnOptionalError_ReadsExactlyLikeAnOptionalSkip_FlatAndNested(string required)
+    {
+        // B7 (#203 review, round 2 L-8): a child [required skipped, optional errored] reported "error", and its parent
+        // read that as a required error — the same leaves flat gave warn. An optional component that errored must
+        // change nothing an optional skip would not, in the composite itself and one level up.
+        async Task<(EvalResult Flat, EvalResult Nested)> Run(string optional)
+        {
+            EvalComponent[] Parts() =>
+            [
+                new(Leaf("req", required), 0.5, Required: true),
+                new(Leaf("opt", optional), 0.5, Required: false),
+            ];
+            var flat = await Composite(Parts(), threshold: 0.5).EvaluateAsync(Input);
+            var child = new CompositeEval("child", "Child", "test", "1.0.0", Parts(), WeightedSumAggregation.Instance, 0.5);
+            var nested = await Composite(
+                [new(child, 0.5), new(new FixedEval("sibling", 1.0, passed: true), 0.5)], threshold: 0.5).EvaluateAsync(Input);
+            return (flat, nested);
+        }
+
+        var withError = await Run("error");
+        var withSkip = await Run("skipped");
+
+        Assert.Equal(withSkip.Flat.Score.Label, withError.Flat.Score.Label);
+        Assert.Equal(withSkip.Flat.Score.CensusBucket(), withError.Flat.Score.CensusBucket());
+        Assert.True(withSkip.Nested.Score.Label == withError.Nested.Score.Label,
+            $"required {required}: nested with an optional error read {withError.Nested.Score.Label}, with an optional skip " +
+            $"{withSkip.Nested.Score.Label} — {withError.Nested.Details.Summary}");
+        Assert.Equal(withSkip.Nested.Score.CensusBucket(), withError.Nested.Score.CensusBucket());
+    }
+
+    [Theory]
+    [InlineData(null)]     // severity path: a medium failure is a warn
+    [InlineData(0.9)]      // threshold path: a fail
+    public async Task AVerdictThatIsAlreadyNotAPass_StillNamesTheRequiredPartsThatDidNotRun(double? threshold)
+    {
+        // B7 (#203 review, round 2 L-8): only a withheld PASS named them; a warn from severity or a fail said "Measured
+        // 1 of 2" and nothing about which check was missing.
+        var sut = Composite(new EvalComponent[]
+        {
+            new(new FixedEval("measured_check", 0.6, passed: false, severity: "medium"), Required: true),
+            new(new SkippingEval("missing_check"), Required: true),
+        }, threshold: threshold);
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal(threshold is null ? "warn" : "fail", result.Score.Label);
+        Assert.Contains("missing_check", result.Details.Summary);
     }
 
     [Fact]

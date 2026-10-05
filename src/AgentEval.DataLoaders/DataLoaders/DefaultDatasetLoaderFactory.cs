@@ -38,6 +38,9 @@ public sealed class DefaultDatasetLoaderFactory : IDatasetLoaderFactory
     // Format name → DI-registered loader, for Create(format) (see the constructor).
     private readonly Dictionary<string, Func<IDatasetLoader>> _formats = new(StringComparer.OrdinalIgnoreCase);
 
+    // Extensions set through Register, which Create(format) honours for the same name (see Create).
+    private readonly HashSet<string> _registered = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>
     /// Creates a new factory with only built-in loaders (backward compatible).
     /// </summary>
@@ -84,7 +87,24 @@ public sealed class DefaultDatasetLoaderFactory : IDatasetLoaderFactory
     }
 
     /// <inheritdoc/>
-    public IDatasetLoader Create(string format) => format.ToLowerInvariant() switch
+    /// <remarks>
+    /// An extension set through <see cref="Register"/> answers for its name too: after <c>Register(".csv", f)</c>,
+    /// <c>Create("csv")</c> returns <c>f()</c>, as <c>CreateFromExtension(".csv")</c> does. Otherwise a built-in name
+    /// resolves to the built-in loader, then a DI-registered loader is found by its <see cref="IDatasetLoader.Format"/>.
+    /// </remarks>
+    public IDatasetLoader Create(string format)
+    {
+        ArgumentNullException.ThrowIfNull(format);
+
+        // Register is the documented way to replace a built-in loader, but it reached only CreateFromExtension:
+        // Create("csv") kept returning the built-in (#203 review, B7).
+        if (_registered.Contains("." + format) && _loaders.TryGetValue("." + format, out var registered))
+            return registered();
+
+        return CreateByName(format);
+    }
+
+    private IDatasetLoader CreateByName(string format) => format.ToLowerInvariant() switch
     {
         "jsonl" or "ndjson" => new JsonlDatasetLoader(),
         "json" => new JsonDatasetLoader(),
@@ -99,5 +119,6 @@ public sealed class DefaultDatasetLoaderFactory : IDatasetLoaderFactory
     public void Register(string extension, Func<IDatasetLoader> factory)
     {
         _loaders[extension] = factory;
+        _registered.Add(extension);
     }
 }

@@ -57,6 +57,13 @@ that the old verdict hid. The entries below give the cause and the evidence for 
     data captured: run with `--trace`, which now passes the trace's tool calls — see below), Reasoning (a
     response without plan or list markers skips the plan and goal-decomposition checks), Telemetry (zero calls), Judge
     Quality (a missing input), and Tool Call Accuracy / Agentic Execution (no tool definitions captured, or definitions with no tool calls).
+- **Composite edge cases.** A composite whose required components did not run and whose only error was in an optional
+  component reported `error`, and its parent read that as a REQUIRED error: nested, the same leaves gave `error` where
+  flat they gave `warn`. Nothing measured is now `error` only when a component the verdict rests on errored (any one when
+  none is required); otherwise `skipped`, and the summary says the errored ones are optional. A verdict that is already
+  not a pass (a severity `warn`, a `fail`) now names the required components that did not run; it gave only a count.
+  `DefaultDatasetLoaderFactory.Create(format)` now honours `Register`: after `Register(".csv", f)`, `Create("csv")`
+  returned the built-in loader, and a registered `.parquet` was an unknown format.
 - **`tool_input_accuracy` (2.5.0) and the trace projection, three smaller gaps.** A case declaring no tools while the agent
   called some read inapplicable, so the judge alone decided — those calls are to undeclared tools and now fail, like a
   call to an undeclared tool beside declared ones. Parameters that are not a JSON Schema (a name→type map, an empty

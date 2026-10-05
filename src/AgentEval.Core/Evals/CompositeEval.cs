@@ -270,10 +270,16 @@ public sealed class CompositeEval : IEval
         // label: all-skipped still yields "skipped", and any errored leaf still yields "error" — except when every
         // required component is inapplicable: the composite cannot be tested at all, so an optional component that
         // errored is not its verdict (it reports "skipped", recorded NotApplicable below, and never blocks a parent).
+        // Nor is it when a required component simply did not run (#203 review, B7): only a component the verdict rests
+        // on can make it "error" — a required one (hasRequiredError), or any one when none is required. Before, a
+        // child [required skipped, optional errored] reported "error" and its parent then read that as a REQUIRED
+        // error, so nesting turned the flat composite's warn into an error; an optional error now reads exactly like
+        // an optional skip, at every level, and the note below still counts it.
+        var gatingErrored = gating.Any(s => s.Score.Label == "error");
         var label = hasRequiredError
             ? "error"
             : nothingMeasured
-                ? (erroredCount > 0 && !requiredAllInapplicable ? "error" : "skipped")
+                ? (gatingErrored && !requiredAllInapplicable ? "error" : "skipped")
                 : Threshold is { } t
                     ? (score < t ? "fail" : SeverityCapsThreshold ? SeverityLabel(verdictSeverity) : "pass")
                     : SeverityLabel(verdictSeverity);
@@ -339,7 +345,10 @@ public sealed class CompositeEval : IEval
                           $"requires — so no verdict is reported ({erroredCount} errored, {skippedCount} skipped among " +
                           "the optional ones). This is a corpus finding, not a run failure."
                         : $"No component produced a measurement ({erroredCount} errored, " +
-                          $"{skippedCount} skipped, {inapplicableCount} inapplicable); no verdict is reported.")
+                          $"{skippedCount} skipped, {inapplicableCount} inapplicable); no verdict is reported." +
+                          (erroredCount > 0 && label == "skipped"
+                              ? " The errored component(s) are optional, so they are not the verdict: the required ones did not run."
+                              : ""))
             : null;
 
         // Coverage disclosure for a PARTLY measured composite. Excluding skipped, inapplicable and
@@ -374,6 +383,13 @@ public sealed class CompositeEval : IEval
                           ? $"It also rests on only {measuredCount} of {subs.Length} component(s), below the {share} a pass needs"
                           : $"Measured {measuredCount} of {subs.Length} component(s)") +
                       $"{leftOut}."
+                    // A verdict that is already not a pass (a severity warn, a fail) still names the required parts that
+                    // did not run (#203 review, B7): before, only the count was given, so a reader could not tell
+                    // which check was missing from it.
+                    : requiredUnattested.Length > 0
+                        ? $"Required component(s) that did not run or could not attest their own pass: " +
+                          $"{string.Join(", ", requiredUnattested)}; this {label} comes from the measured part only. " +
+                          $"Measured {measuredCount} of {subs.Length} component(s){leftOut}."
                     : unmeasured.Length == 0
                         ? null
                         : underCovered

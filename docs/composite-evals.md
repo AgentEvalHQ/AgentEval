@@ -110,7 +110,7 @@ The composite verdict is determined after aggregation. `warn` is a soft fail: `P
 | # | Condition | `Label` | `Passed` |
 |---|-----------|---------|----------|
 | 1 | a `Required` component errored | `"error"` | `false` |
-| 2 | no component produced a measurement | `"error"` if any errored, else `"skipped"` | `false` |
+| 2 | no component produced a measurement | `"error"` if a component the verdict rests on errored (a `Required` one is row 1; any one when none is required), else `"skipped"` — an optional component that errored is not the verdict, so it reads like an optional skip, here and in a parent | `false` |
 | 3 | threshold set, `score >= threshold` | `"pass"` (see rows 6–7); with `SeverityCapsThreshold = true`, required-component severity still decides as in row 5 (`critical`/`high` → `"fail"`, `medium` → `"warn"`) | `true` only on pass |
 | 4 | threshold set, `score < threshold` | `"fail"` | `false` |
 | 5 | no threshold: severity `critical` or `high` → `"fail"`; `medium` → `"warn"`; `none` or `low` → `"pass"` (see rows 6–7) | as stated | |
@@ -133,7 +133,8 @@ like any other (the coverage bar is per level). An `inapplicable` component (the
 triggers row 6. Row 7: a composite whose components mostly report "not applicable" cannot pass on
 the few that remain; `MinimumMeasuredShare = 0` drops this bar, not row 6. Only a pass is withheld; a measured
 failure stays a failure. Whenever components were left out, the result's `Details.Summary` says how many were
-measured and why the others were not, and names the required components behind a row-6 `warn`. Through the CLI,
+measured and why the others were not, and names the required components that did not run — behind a row-6 `warn`,
+and under a `warn` or `fail` the measured part decided. Through the CLI,
 `warn` exits with code 10 (`GateWarning`), which CI can treat as blocking or not.
 
 Composite severity is the maximum severity across all sub-results (`none < low < medium < high < critical`), computed by `SeverityRollup.Max`.
