@@ -81,6 +81,10 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   `skipped` with "No component produced a measurement (0 errored, 0 skipped, 0 inapplicable)", though the parts inside
   were measured — the Tool Call Accuracy preset did this whenever no tool definitions were captured. It now withholds
   too (`warn`, recorded `notMeasured`) and names the components; a breakdown counts the withheld ones.
+- **The memory-security composite passed with its utility check failing.** `MemorySecurityCompositeEvals.Create()`
+  documents utility as "an optional warning", but the component had no effect, so as an optional part its failure
+  left the severity rule and a memory that rejected every benign write read a clean PASS. **Behaviour change (1.1.0):**
+  it warns and names `memory_utility`; the four security checks still decide a failure.
 - **A Microsoft.Extensions.AI.Evaluation metric that could not be scored read PASS 100.** `MeaiToEvalResultBridge`
   (behind `AgentEvaluatorEvalLeaf` and `UnifiedEvalReport`) gave every metric without a score marker, a usable value
   and a failed interpretation a perfect pass. MEAI's quality evaluators leave the value empty and record an error

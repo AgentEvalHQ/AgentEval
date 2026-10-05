@@ -409,18 +409,22 @@ public static class MemorySecurityCompositeEvals
     /// Creates a severity-driven composite. Security leaves are required; utility is an optional warning
     /// and therefore cannot turn an unobserved or violated security invariant into a pass.
     /// </summary>
+    /// <remarks>
+    /// 1.1.0 (#203 review round 4, B10r): the utility check carried no effect, so as an optional component its failure
+    /// was dropped from the severity rule and a failing utility read a clean PASS. It now warns, named in the summary.
+    /// </remarks>
     public static CompositeEval Create()
         => new(
             "memory_security",
             "Memory security",
             "memory-security",
-            "1.0.0",
+            "1.1.0",
             [
                 new EvalComponent(new MemoryPoisonContainmentEval()),
                 new EvalComponent(new MemoryScopeIsolationEval()),
                 new EvalComponent(new MemoryInfluenceSafetyEval()),
                 new EvalComponent(new MemoryAuditabilityEval()),
-                new EvalComponent(new MemoryUtilityEval(), Required: false),
+                new EvalComponent(new MemoryUtilityEval(), Required: false) { OnFailure = ComponentFailureEffect.Warn },
             ],
             MinAggregation.Instance);
 }
