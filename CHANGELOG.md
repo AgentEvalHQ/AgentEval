@@ -58,7 +58,8 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   - Agentic presets whose required components skip on common inputs now report `warn` where they passed:
     Glass Box Diagnostics (no tool executions in the trace, fewer than 2 system prompts or 3 turns), Safety (no tool
     data captured: run with `--trace`, which now passes the trace's tool calls — see below), Reasoning (a
-    response without plan or list markers skips the plan and goal-decomposition checks), Telemetry (zero calls), Judge
+    response without plan or list markers skips the plan and goal-decomposition checks, and one without reasoning-style
+    phrasing skips the reasoning-correctness check), Telemetry (zero calls), Judge
     Quality (a missing input), and Tool Call Accuracy / Agentic Execution (no tool definitions captured, or definitions with no tool calls).
 - **`bench agentic calibrate` named deliberate carve-outs as wiring gaps.** A category whose entries are all carved out
   on purpose (memory, reasoning) said its entries "had no dispatch wiring (this means a new golden key is not yet

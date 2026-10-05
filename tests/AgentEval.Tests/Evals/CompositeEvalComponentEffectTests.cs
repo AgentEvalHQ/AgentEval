@@ -57,6 +57,31 @@ public class CompositeEvalComponentEffectTests
         Assert.Equal("pass", result.Score.Label);   // 0.93: the failure is averaged out, as before
     }
 
+    [Theory]
+    [InlineData(ComponentFailureEffect.Averaged, "pass")]   // 0.8 clears 0.5: the nested failure is averaged out
+    [InlineData(ComponentFailureEffect.Warn, "warn")]
+    [InlineData(ComponentFailureEffect.Fail, "fail")]
+    public async Task AThresholdParent_WithARequiredNestedFailure_DoesWhatItsEffectSays(ComponentFailureEffect effect, string parentLabel)
+    {
+        // Round 2 L-3: a required NESTED composite that failed — measured, scoring 0.6 against its own 0.8 bar — under a
+        // parent whose threshold (0.5) the average still clears. The parent's verdict is the component's effect, not
+        // an accident of the average; Averaged (the default for your own composites) is the documented old behaviour.
+        var child = new CompositeEval("child", "Child", "test", "1.0.0",
+            [new EvalComponent(new Fixed("x", "fail", 0.6), 1.0)], WeightedSumAggregation.Instance, threshold: 0.8);
+        var parent = new CompositeEval("parent", "Parent", "test", "1.0.0",
+            [new EvalComponent(child, 0.5) { OnFailure = effect }, new EvalComponent(new Fixed("sibling", "pass", 1.0), 0.5)],
+            WeightedSumAggregation.Instance, threshold: 0.5);
+
+        var childResult = await child.EvaluateAsync(Input);
+        var result = await parent.EvaluateAsync(Input);
+
+        Assert.Equal("fail", childResult.Score.Label);
+        Assert.Equal(AgentEval.Evals.Meta.MeasurementState.Measured, childResult.Score.Measurement);   // a measured failure, not a withheld pass
+        Assert.Equal(parentLabel, result.Score.Label);
+        if (effect != ComponentFailureEffect.Averaged)
+            Assert.Contains("child", result.Details.Summary);
+    }
+
     [Fact]
     public async Task Fail_AnAccuracyDimensionFailing_FailsTheComposite_AndSaysWhich()
     {

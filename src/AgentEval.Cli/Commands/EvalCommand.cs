@@ -95,7 +95,7 @@ internal static class EvalCommand
 
         // Output
         var formatOpt = new Option<string>("--format")
-            { DefaultValueFactory = _ => DefaultFormat, Description = "Export format: json | junit | xml | markdown | md | trx | csv | directory | dir" };
+            { DefaultValueFactory = _ => DefaultFormat, Description = "Export format: json | junit (alias xml) | markdown (alias md) | trx | csv. For the structured directory, use --output-dir." };
         var outputOpt = new Option<FileInfo?>("-o", "--output") { Description = "Output file (default: stdout)" };
         var outputDirOpt = new Option<DirectoryInfo?>("--output-dir")
             { Description = "Write structured results to a directory (ADR-002 format: results.jsonl + summary.json + run.json)" };

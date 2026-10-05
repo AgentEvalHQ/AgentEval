@@ -143,8 +143,10 @@ public class ToolInputAccuracySkipTests
 
         var result = await preset.EvaluateAsync(input);
 
+        // Not merely "not a pass" (round 2 L-3): a warn that names the check whose pass was withheld.
+        Assert.Equal("warn", result.Score.Label);
         Assert.False(result.Score.Passed);
-        Assert.NotEqual("pass", result.Score.Label);
+        Assert.Contains("tool_call_accuracy", result.Details.Summary!, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -205,12 +207,42 @@ public class ToolInputAccuracySkipTests
         Assert.True(result.Score.Passed);
     }
 
+    // What each version of the schema check decides on a fixed set of inputs (round 2 L-3: the version test pinned a
+    // constant, so it could not fail when the verdicts changed). Change a verdict and this fails until the version is
+    // bumped and its row recorded; bump the version without a row and it fails too.
+    private static readonly IReadOnlyDictionary<string, string> s_verdictsByVersion = new Dictionary<string, string>
+    {
+        ["2.5.0"] = "not-captured=skipped; none-declared-no-calls=inapplicable; none-declared-with-calls=fail; " +
+                    "schema-ok=pass; required-missing=fail; undeclared-tool=fail; not-a-schema=skipped; declared-no-calls=skipped",
+    };
+
+    private static IEnumerable<(string Name, EvalInput Input)> VersionProbes()
+    {
+        var schema = new Dictionary<string, object> { ["type"] = "object", ["required"] = new List<object> { "q" } };
+        var good = new ToolCall("search", new Dictionary<string, object> { ["q"] = "x" }, null);
+        var missing = new ToolCall("search", new Dictionary<string, object>(), null);
+        yield return ("not-captured", new EvalInput("q", "r", ToolCalls: [good], ToolDefinitions: null));
+        yield return ("none-declared-no-calls", new EvalInput("q", "r", ToolCalls: [], ToolDefinitions: []));
+        yield return ("none-declared-with-calls", new EvalInput("q", "r", ToolCalls: [good], ToolDefinitions: []));
+        yield return ("schema-ok", new EvalInput("q", "r", ToolCalls: [good], ToolDefinitions: [Def("search", schema)]));
+        yield return ("required-missing", new EvalInput("q", "r", ToolCalls: [missing], ToolDefinitions: [Def("search", schema)]));
+        yield return ("undeclared-tool", new EvalInput("q", "r", ToolCalls: [good, new ToolCall("delete", null, null)], ToolDefinitions: [Def("search", schema)]));
+        yield return ("not-a-schema", new EvalInput("q", "r", ToolCalls: [good], ToolDefinitions: [Def("search", new Dictionary<string, object> { ["q"] = "string" })]));
+        yield return ("declared-no-calls", new EvalInput("q", "r", ToolCalls: [], ToolDefinitions: [Def("search", schema)]));
+    }
+
     [Fact]
-    public void Version_IsBumped_BecauseTheVerdictChanged()
+    public async Task TheVersion_NamesTheVerdictsItGives()
     {
         var eval = new ToolInputAccuracyEval(new FixedScoreEvaluator(100));
+        var verdicts = new List<string>();
+        foreach (var (name, input) in VersionProbes())
+            verdicts.Add($"{name}={SchemaLeaf(await eval.EvaluateAsync(input)).Score.Label}");
+        var observed = string.Join("; ", verdicts);
 
-        Assert.Equal("2.5.0", eval.Version);
+        Assert.True(s_verdictsByVersion.TryGetValue(eval.Version, out var recorded),
+            $"version {eval.Version} has no recorded verdicts; add them: \"{observed}\"");
+        Assert.Equal(recorded, observed);
     }
 
     // ── B5a (#203 review): a call is checked only against a schema the check can read ──────────────────────────

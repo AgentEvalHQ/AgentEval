@@ -23,7 +23,8 @@ So an exporter cannot honour "not measured is not failed": a judge outage and a 
 
 **Who calls an exporter.** Less than the docs implied. `agenteval eval --format` goes through `ExportHandler` →
 `ResultExporterFactory.Create(ExportFormat)` and accepts only the built-in names (json, junit, markdown, trx, csv,
-directory). `IExporterRegistry` — the documented DI path for a custom exporter — is registered by
+with the aliases xml for junit and md for markdown); the structured directory export is `--output-dir <path>`, and
+`--format directory` (or `dir`) is refused with that hint. `IExporterRegistry` — the documented DI path for a custom exporter — is registered by
 `AddAgentEvalDataLoaders()` and resolved by **nothing in AgentEval itself**: a custom exporter runs only when the
 caller's own code resolves it from the registry and calls it. That is a working library facility, not a CLI feature,
 and the docs now say so.

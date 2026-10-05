@@ -163,15 +163,15 @@ var dirName = DirectoryExporter.GenerateDirectoryName(report);
 await exporter.ExportToDirectoryAsync(report, $"./results/{dirName}");
 ```
 
-**CLI usage:**
-```bash
-# Run a benchmark — exporters write to .agenteval/<subject>/runs/<runId>/reports/ automatically
-export AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
-export AZURE_OPENAI_API_KEY=...
-export AZURE_OPENAI_DEPLOYMENT=gpt-4o
-agenteval bench agentic --subject MyAgent --input "..."
+**CLI usage:** `agenteval eval` writes the directory with `--output-dir` (`--format directory` is refused with that
+hint). The `bench` commands do not run exporters: each stores its run under `.agenteval/` (summary, results and its own
+Markdown and PDF report), and `agenteval render` re-renders those reports later at no LLM cost.
 
-# Re-render reports later (no LLM cost) into any export format the renderer supports:
+```bash
+# The structured directory from an evaluation run
+agenteval eval --dataset cases.yaml --endpoint http://localhost:1234/v1 --model my-model --output-dir ./results/baseline
+
+# A benchmark run is stored, not exported; re-render its report later (no LLM cost):
 agenteval render --benchmark agentic --subject MyAgent
 ```
 
