@@ -135,6 +135,22 @@ public class CompositeEvalComponentEffectTests
     }
 
     [Fact]
+    public async Task ACustomNonPassingLabel_FailsASecurityGate()
+    {
+        // Review round 6 (B10aa sweep): EvalScore.Label is a free string. A custom check's measured "needs-review" (not
+        // passed) is a FAIL by ReportStatus, but the effects read "fail"/"warn" literally, so FailUnlessPass never fired
+        // and the gate passed on its 0.95.
+        var gate = new CompositeEval("gate", "Gate", "test", "1.0.0",
+            [new EvalComponent(new Fixed("custom", "needs-review", 0.95), 1.0) { OnFailure = ComponentFailureEffect.FailUnlessPass }],
+            WeightedSumAggregation.Instance, threshold: 0.90);
+
+        var result = await gate.EvaluateAsync(Input);
+
+        Assert.Equal("fail", result.Score.Label);
+        Assert.False(result.Score.Passed);
+    }
+
+    [Fact]
     public async Task APartWhoseSeverityDecidedTheWarn_IsNamedAsTheReason_NotAsAbsorbed()
     {
         // Review round 6 M-1 (B10z): under the severity rule (every GDPR/EU pillar) a medium failure decides a warn, and

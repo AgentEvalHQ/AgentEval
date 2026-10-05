@@ -81,6 +81,10 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   `skipped` with "No component produced a measurement (0 errored, 0 skipped, 0 inapplicable)", though the parts inside
   were measured — the Tool Call Accuracy preset did this whenever no tool definitions were captured. It now withholds
   too (`warn`, recorded `notMeasured`) and names the components; a breakdown counts the withheld ones.
+- **A custom label that did not pass could read as a pass.** `EvalScore.Label` is a free string; a custom check's
+  measured `needs-review` (not passed) is a FAIL by `ReportStatus()`, but a composite's effects read "fail"/"warn"
+  literally (so a security gate's `FailUnlessPass` never fired and the gate passed), and the MEAI bridge and unified
+  report passed it too. All read labels through `ReportStatus()` now.
 - **Trace fidelity passed with nothing checked.** In `bench workflow-trace-fidelity`, an executor with no chat-boundary
   trace (`NoTruth`) scored 1.0 and counted as passed, and a run with none read PASS at 100%, exit 0 — every live MAF
   `InProcessExecution` run today. `bench trace-fidelity` did the same for a chat trace with no model responses. Now an

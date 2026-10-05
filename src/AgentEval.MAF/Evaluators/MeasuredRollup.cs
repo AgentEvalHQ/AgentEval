@@ -30,8 +30,9 @@ internal static class MeasuredRollup
         ArgumentNullException.ThrowIfNull(subs);
 
         var measured = subs.Where(s => s.Score.CountsTowardAggregate()).ToList();
-        var failing = measured.Where(s => s.Score.Label == "fail").ToList();
-        var measuredWarn = measured.Any(s => s.Score.Label == "warn");
+        // By ReportStatus (B10aa): a measured part with an unknown label that did not pass is a failure, as everywhere else.
+        var failing = measured.Where(s => s.Score.ReportStatus() == "FAIL").ToList();
+        var measuredWarn = measured.Any(s => s.Score.ReportStatus() == "WARN");
         var errored = subs.Any(s => s.Score.Label == "error");
         var withheld = subs.Any(s => s.Score.CensusBucket() == MeasurementState.NotMeasured
                                      && s.Score.Label is not ("error" or "skipped"));
@@ -53,7 +54,7 @@ internal static class MeasuredRollup
         if (measuredWarn)
         {
             // A warn reports its parts' severity capped at medium, as a composite's warn does (B6c-6).
-            var warnSeverity = SeverityRollup.Max(measured.Where(s => s.Score.Label == "warn").Select(s => s.Score.Severity));
+            var warnSeverity = SeverityRollup.Max(measured.Where(s => s.Score.ReportStatus() == "WARN").Select(s => s.Score.Severity));
             return new(value, "warn", false, warnSeverity is "high" or "critical" ? "medium" : warnSeverity,
                 MeasurementState.Measured);
         }

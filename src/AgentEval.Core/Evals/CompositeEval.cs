@@ -341,19 +341,22 @@ public sealed class CompositeEval : IEval
             .Where(p => p.Component.OnFailure != ComponentFailureEffect.Averaged
                         && p.Sub.Score.CountsTowardAggregate()
                         && !p.Sub.Score.Passed
-                        && p.Sub.Score.Label is "fail" or "warn")
+                        && p.Sub.Score.ReportStatus() is "FAIL" or "WARN")
             .ToArray();
+        // Labels are read through ReportStatus() (#203 review round 6, B10aa): EvalScore.Label is a free string, and a
+        // custom check's measured, non-passing label ("needs-review") is a FAIL there; read literally it was no failure
+        // at all, so no effect fired and a security gate passed with it.
         // A Fail component fails the composite on a measured failure; a FailUnlessPass one (a security gate's check) on
         // anything short of a pass, a needs-review warn included (B10c).
         static bool FailsIt(EvalComponent component, EvalResult sub) =>
             component.OnFailure == ComponentFailureEffect.FailUnlessPass
-            || (component.OnFailure == ComponentFailureEffect.Fail && sub.Score.Label == "fail");
+            || (component.OnFailure == ComponentFailureEffect.Fail && sub.Score.ReportStatus() == "FAIL");
         var failingAccuracy = effectsFired
             .Where(p => FailsIt(p.Component, p.Sub))
             .Select(p => p.Sub.Metric.Key)
             .ToArray();
         var gateNotPassed = effectsFired
-            .Where(p => p.Component.OnFailure == ComponentFailureEffect.FailUnlessPass && p.Sub.Score.Label == "warn")
+            .Where(p => p.Component.OnFailure == ComponentFailureEffect.FailUnlessPass && p.Sub.Score.ReportStatus() == "WARN")
             .Select(p => p.Sub.Metric.Key)
             .ToArray();
         var notOptimal = effectsFired
@@ -457,7 +460,7 @@ public sealed class CompositeEval : IEval
         // needs-review band, or a nested composite that warned — is not "usable but not optimal": it is unconfirmed, and
         // the note says so (#203 review, B9). Warn-effect dimensions keep the "not optimal" wording.
         var unconfirmedSubs = effectsFired
-            .Where(p => p.Component.OnFailure == ComponentFailureEffect.Fail && p.Sub.Score.Label == "warn")
+            .Where(p => p.Component.OnFailure == ComponentFailureEffect.Fail && p.Sub.Score.ReportStatus() == "WARN")
             .Select(p => p.Sub)
             .ToArray();
         var unconfirmed = unconfirmedSubs.Select(s => s.Metric.Key).ToArray();
@@ -515,7 +518,7 @@ public sealed class CompositeEval : IEval
         var averagedNonPasses = Components.Zip(subs, (c, s) => (Component: c, Sub: s))
             .Where(p => p.Component.OnFailure == ComponentFailureEffect.Averaged
                         && p.Sub.Score.CountsTowardAggregate()
-                        && p.Sub.Score.Label is "fail" or "warn")
+                        && p.Sub.Score.ReportStatus() is "FAIL" or "WARN")
             .ToArray();
         bool DecidesBySeverity((EvalComponent Component, EvalResult Sub) p) =>
             (Threshold is null || SeverityCapsThreshold)

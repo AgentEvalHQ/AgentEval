@@ -100,6 +100,21 @@ public class MeaiToEvalResultBridgeTests
     }
 
     [Fact]
+    public void AMetricWithACustomNonPassingLabel_DoesNotPassItsQuery()
+    {
+        // Review round 6 M-2 (B10aa): MeasuredRollup read only "fail"/"warn" as non-passing, so a measured "needs-review"
+        // (not passed; ReportStatus FAIL) passed the query, the run and the unified report.
+        var meai = ResultWith(("custom", new NumericMetric("custom", 3.0, "AgentEval score: 60/100 (needs-review, severity medium)")));
+
+        var tree = MeaiToEvalResultBridge.Build("Eval", new[] { "q1" }, Wrap(meai));
+
+        Assert.Equal("needs-review", FirstLeaf(tree).Score.Label);
+        Assert.False(FirstLeaf(tree).Score.Passed);
+        Assert.Equal("fail", tree.Details.SubResults![0].Score.Label);
+        Assert.False(tree.Score.Passed);
+    }
+
+    [Fact]
     public void ARunWhoseOnlyQueryWithheldItsPass_Withholds_NotSkipped()
     {
         // Review round 5 L-1 (B10u): the root checked "nothing measured" before the withheld state and read skipped 0.000
