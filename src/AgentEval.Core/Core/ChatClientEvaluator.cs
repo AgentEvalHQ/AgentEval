@@ -65,11 +65,18 @@ public class ChatClientEvaluator : IEvaluator, IJudgePromptSource, IRubricBindab
 
     // A judge on the same chat client that grades with `rubric` (see WithRubric).
     private ChatClientEvaluator(IChatClient chatClient, EvalRubric rubric, string? dimension)
-        : this(chatClient, rubric.Text, rubric.Id)
+        : this(chatClient, SystemPromptFor(rubric, dimension), rubric.Id)
     {
         _rubric = rubric;
         _dimension = rubric.Dimensional && !string.IsNullOrWhiteSpace(dimension) ? dimension : null;
     }
+
+    // A dimensional rubric names its dimension through a {dimension} placeholder ("Current dimension under evaluation:
+    // {dimension}"); it is filled with the leaf's dimension. It was sent literally (#203 review round 3, B10e).
+    private static string SystemPromptFor(EvalRubric rubric, string? dimension) =>
+        rubric.Dimensional && !string.IsNullOrWhiteSpace(dimension)
+            ? rubric.Text.Replace("{dimension}", dimension, StringComparison.Ordinal)
+            : rubric.Text;
 
     /// <inheritdoc/>
     /// <remarks>The rubric replaces this judge's system prompt: it is the instrument the check was written for.</remarks>

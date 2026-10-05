@@ -330,19 +330,27 @@ public class AgenticRubricCensusTests
     }
 
     [Fact]
-    public void ADimensionalRubric_HasASectionForEveryLeafThatSendsIt()
+    public void ADimensionalRubric_IsFlaggedSo_AndNamesEveryLeafThatSendsIt()
     {
+        // Review round 3 M2: groundedness grades one of four named dimensions through a {dimension} placeholder, but the
+        // manifest said it was not dimensional, so its 4 leaves sent the placeholder literally and no dimension. A rubric
+        // is dimensional exactly when its text carries the placeholder.
         var problems = new List<string>();
-        foreach (var spec in AgenticRubrics.Manifest.Where(s => s.Dimensional))
+        foreach (var spec in AgenticRubrics.Manifest)
         {
-            var id = AgenticRubrics.IdFor(spec.Path);
             var text = AgenticRubrics.TextOf(spec.Path);
+            var hasPlaceholder = text.Contains("{dimension}", StringComparison.Ordinal);
+            if (hasPlaceholder != spec.Dimensional)
+                problems.Add($"{spec.Path}: Dimensional={spec.Dimensional}, placeholder in the text={hasPlaceholder}");
+            if (!spec.Dimensional)
+                continue;
+            var id = AgenticRubrics.IdFor(spec.Path);
             var keys = DeclaredLeaves().Where(l => l.PromptId == id).Select(l => l.Key).ToList();
             Assert.NotEmpty(keys);
             foreach (var key in keys)
             {
-                if (key is null || !Regex.IsMatch(text, @"^###\s+" + Regex.Escape(key) + @"\s*$", RegexOptions.Multiline))
-                    problems.Add($"{spec.Path}: no '### {key}' section");
+                if (key is null || !text.Contains(key, StringComparison.Ordinal))
+                    problems.Add($"{spec.Path}: does not name the dimension '{key}' its leaf sends");
             }
         }
 

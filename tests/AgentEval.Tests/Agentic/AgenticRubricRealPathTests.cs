@@ -44,7 +44,11 @@ public class AgenticRubricRealPathTests : IDisposable
         {
             AgenticEvalRegistration.Register();
             var system = sent.FirstOrDefault(m => m.Role == ChatRole.System)?.Text ?? "";
-            var rubric = EvalRubrics.All.FirstOrDefault(r => r.Text == system);
+            // A dimensional rubric is sent with its {dimension} placeholder filled (B10e); no placeholder may be left.
+            var rubric = EvalRubrics.All.FirstOrDefault(r => r.Text == system
+                || (r.Dimensional && !system.Contains("{dimension}", StringComparison.Ordinal)
+                    && System.Text.RegularExpressions.Regex.IsMatch(system,
+                        "^" + System.Text.RegularExpressions.Regex.Escape(r.Text).Replace("\\{dimension}", "[a-z_]+") + "$")));
             if (rubric is null)
             {
                 Interlocked.Increment(ref OtherCalls);
@@ -103,6 +107,24 @@ public class AgenticRubricRealPathTests : IDisposable
 
         Assert.Equal(0, model.OtherCalls);
         Assert.True(model.RubricsSeen.Count >= 20, $"only {model.RubricsSeen.Count} distinct rubrics reached — the presets did not run their judges");
+    }
+
+    [Fact]
+    public async Task EachGroundednessLeaf_IsSentItsOwnDimension_AndNoPlaceholder()
+    {
+        // Review round 3 M2: the four groundedness leaves sent "{dimension}" literally, so the judge could not tell which
+        // dimension (and which scoring rule — claim_contradicted is zero-tolerance) it was grading.
+        var client = new AgentEval.Tests.Evals.RubricJudgeTests.RecordingChatClient(_ =>
+            """{"score": 0.9, "label": "pass", "reasoning": "r", "criteria_results": [], "evidence": []}""");
+        var eval = new AgentEval.Evals.Agentic.Quality.GroundednessEval(new ChatClientEvaluator(client));
+
+        await eval.EvaluateAsync(new EvalInput(Query: "q", Response: "Paris is the capital of France.", Context: "Paris is France's capital."));
+
+        var systems = client.Calls.Select(c => c.Single(m => m.Role == ChatRole.System).Text).ToList();
+        Assert.Equal(4, systems.Count);
+        Assert.All(systems, s => Assert.DoesNotContain("{dimension}", s, StringComparison.Ordinal));
+        foreach (var dimension in new[] { "claim_support", "claim_contradicted", "citation_accuracy", "evidence_coverage" })
+            Assert.Contains(systems, s => s.Contains($"measuring **{dimension}**", StringComparison.Ordinal));
     }
 
     [Fact]

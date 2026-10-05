@@ -107,8 +107,8 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   calibrate` resolve one judge with no system prompt, so every agentic LLM check ran on a six-line default and its reply
   was read as a 0–100 score, while the 46 rubric files under `Resources/Prompts/` shipped as references (and half of
   them ask for a 0.0–1.0 score: a reply of 0.85 would have read as 0.85 out of 100). **Behaviour change:** each check
-  sends the rubric its `promptId` names as the judge's system prompt (plus the dimension, for the two dimensional
-  rubrics), reads the reply on the rubric's scale — a score off it, or none, is `error`, never a grade — and takes its
+  sends the rubric its `promptId` names as the judge's system prompt (for the three dimensional rubrics —
+  groundedness, task adherence, intent resolution — with the leaf's dimension filled in), reads the reply on the rubric's scale — a score off it, or none, is `error`, never a grade — and takes its
   verdict from the rubric's band table: pass at the check's threshold, the rubric's `needs_review` / `warn` band is a
   `warn` (not passed, not a confirmed failure), below it fails. The severity is the rubric's own where it has a table. A
   preset whose accuracy check comes back `warn` reads WARN, "Not confirmed: <check>". The security gates (Safety,

@@ -67,7 +67,7 @@ internal static class AgenticRubrics
         new("process/tool-selection.v1.md", Unit, 0.70, 0.50, []),
         new("quality/coherence.v1.md", Unit, 0.60, 0.40, []),
         new("quality/fluency.v1.md", Unit, 0.60, 0.40, []),
-        new("quality/groundedness.v1.md", Unit, 0.75, 0.50, []),
+        new("quality/groundedness.v1.md", Unit, 0.75, 0.50, [], Dimensional: true),
         new("quality/relevance.v1.md", Unit, 0.70, 0.40, []),
         new("quality/response-completeness.v1.md", Unit, 0.70, 0.40, []),
         new("quality/similarity.v1.md", Unit, 0.70, 0.40, []),
