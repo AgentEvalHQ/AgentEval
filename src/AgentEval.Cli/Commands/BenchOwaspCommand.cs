@@ -216,6 +216,8 @@ public static class BenchOwaspCommand
             incompleteReasons.Add("the scan ran out of time before every probe ran");
         }
         var incomplete = incompleteReasons.Count > 0;
+        // An incomplete run is neither a pass nor a fail: its composite must not be stored or rendered as PASS (B10ak).
+        compositeEval = IncompleteRunPolicy.Withhold(compositeEval, incompleteReasons);
 
         // ── Persist through the unified output-store ─────────────────────────
         string runId;
@@ -268,7 +270,8 @@ public static class BenchOwaspCommand
         try
         {
             var reporter = new OWASPComplianceReporter();
-            await reporter.SaveReportAsync(store!, subjectIdentity, runId, redTeamResult);
+            await reporter.SaveReportAsync(store!, subjectIdentity, runId, redTeamResult,
+                new ComplianceReportOptions { IncompleteReason = incomplete ? string.Join("; ", incompleteReasons) : null });
         }
         catch (Exception ex)
         {

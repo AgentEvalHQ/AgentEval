@@ -83,4 +83,10 @@ public class ComplianceReportOptions
 
     /// <summary>Company/organization name for branding.</summary>
     public string? OrganizationName { get; init; }
+
+    /// <summary>
+    /// Set when the run that produced the result is incomplete (a judge call failed, the scan was truncated): a would-be
+    /// PASS evidence status is stored as WARN, because the run is neither a pass nor a fail (#203 review round 8, B10ak).
+    /// </summary>
+    public string? IncompleteReason { get; init; }
 }

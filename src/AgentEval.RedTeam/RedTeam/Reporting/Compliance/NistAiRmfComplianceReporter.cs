@@ -276,6 +276,7 @@ public class NistAiRmfComplianceReporter : IComplianceReporter<NistAiRmfComplian
             report.Controls.Count(c => c.RanInconclusive
                                        || (c.Status is not (ControlEvaluationStatus.NotApplicable or ControlEvaluationStatus.NotEvaluated)
                                            && c.Control.RelevantAttacks.Any(nothingNames.Contains))));
+        overallStatus = ComplianceStatusPolicy.CapForIncompleteRun(overallStatus, options);   // B10ak
 
         // T4-4: the disclaimer lives in the markdown footer, NOT as a synthetic control row. ControlsTotal == Controls.Count.
         var evidence = new AgentEval.Output.ComplianceEvidence(

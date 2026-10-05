@@ -56,6 +56,10 @@ internal static class ComplianceStatusPolicy
         : passed > 0 ? (inconclusive > 0 ? "WARN" : "PASS")
         : "NOT_EVALUATED";
 
+    /// <summary>An incomplete run's evidence is never PASS (B10ak): a would-be PASS is WARN.</summary>
+    public static string CapForIncompleteRun(string status, ComplianceReportOptions? options) =>
+        status == "PASS" && options?.IncompleteReason is not null ? "WARN" : status;
+
     public static Severity? WorstSucceededSeverity(IEnumerable<AttackResult> results)
     {
         Severity? worst = null;

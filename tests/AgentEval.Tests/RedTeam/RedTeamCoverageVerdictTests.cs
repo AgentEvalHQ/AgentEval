@@ -226,6 +226,44 @@ public class RedTeamCoverageVerdictTests
     }
 
     [Fact]
+    public async Task AnIncompleteRun_NeverStoresPassEvidence_NorAPassingComposite()
+    {
+        // Review round 8 M1 (B10ak): an incomplete run (a judge call failed, the scan was truncated) stored PASS evidence
+        // and a PASS composite (scenario, HTML, PDF) beside its WARN run summary and exit 11.
+        var scan = Result(Attack("PromptInjection", "LLM01", resisted: 10, inconclusive: 0));
+        var composite = OwaspBenchmark.Top10().BuildEvalResult(scan);
+        Assert.Equal("pass", composite.Score.Label);
+
+        var withheld = AgentEval.Cli.Commands.IncompleteRunPolicy.Withhold(composite, ["the judge failed 1 of 10 grading calls"]);
+        Assert.Equal("warn", withheld.Score.Label);
+        Assert.False(withheld.Score.Passed);
+        Assert.Equal(AgentEval.Evals.Meta.MeasurementState.NotMeasured, withheld.Score.Measurement);
+        Assert.Contains("INCOMPLETE: the judge failed 1 of 10", withheld.Details.Summary, StringComparison.Ordinal);
+        Assert.Same(composite, AgentEval.Cli.Commands.IncompleteRunPolicy.Withhold(composite, []));   // complete: unchanged
+
+        var options = new ComplianceReportOptions { IncompleteReason = "the judge failed 1 of 10 grading calls" };
+        Assert.Equal("WARN", await StoredStatusAsync((store, subject, runId) =>
+            new OWASPComplianceReporter().SaveReportAsync(store, subject, runId, scan, options)));
+        Assert.Equal("PASS", await StoredStatusAsync((store, subject, runId) =>
+            new OWASPComplianceReporter().SaveReportAsync(store, subject, runId, scan)));   // a complete run still passes
+    }
+
+    [Theory]
+    [InlineData("BenchOwaspCommand.cs")]
+    [InlineData("BenchNistCommand.cs")]
+    [InlineData("BenchMitreCommand.cs")]
+    public void EveryRedTeamComplianceCommand_WithholdsAnIncompleteRunsPass(string file)
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "AgentEval.sln")))
+            dir = dir.Parent;
+        var source = File.ReadAllText(Path.Combine(dir!.FullName, "src", "AgentEval.Cli", "Commands", file));
+
+        Assert.Contains("IncompleteRunPolicy.Withhold(compositeEval, incompleteReasons)", source, StringComparison.Ordinal);
+        Assert.Contains("IncompleteReason = incomplete ?", source, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void SystemPromptExtraction_DeclaresWhyOnlyWithoutACanary()
     {
         IAttackType without = new SystemPromptExtractionAttack();

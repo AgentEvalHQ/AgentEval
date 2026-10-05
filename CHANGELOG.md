@@ -89,6 +89,11 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   "not evaluated", the same as a control no attack exercised, so `bench nist` passed on the rest and the stored
   evidence of all three read PASS (the OWASP / MITRE rule never reached them). `ControlStatus.RanInconclusive` now
   tells them apart: the NIST run withholds its pass (warn, naming the controls) and the evidence reads WARN.
+- **An incomplete red-team run stored PASS evidence and a PASS report.** When a judge call failed or the scan ran out
+  of time, `bench owasp`, `bench nist` and `bench mitre` stored a WARN run summary and exited 11, but the composite
+  they persisted and rendered (scenario result, HTML, PDF) and the compliance evidence still read PASS. A passing
+  composite of an incomplete run now withholds its pass (warn, naming the reasons), and the evidence reads WARN
+  (`ComplianceReportOptions.IncompleteReason`); a measured failure stays one.
 - **`bench owasp` and `bench mitre` stored PASS evidence for a run that withheld its pass.** A category (technique)
   whose probes all came back inconclusive makes the run WARN (exit 10), but the stored compliance evidence counted only
   the tested categories and read PASS. It now reads WARN (`ComplianceStatusPolicy.OverallEvidenceStatus`).
