@@ -100,6 +100,20 @@ public class MeaiToEvalResultBridgeTests
     }
 
     [Fact]
+    public void ARunWhoseOnlyQueryWithheldItsPass_Withholds_NotSkipped()
+    {
+        // Review round 5 L-1 (B10u): the root checked "nothing measured" before the withheld state and read skipped 0.000
+        // though a metric passed (the B9d defect).
+        var meai = ResultWith(("coherence", new NumericMetric("coherence", 4.5)), ("note", new StringMetric("note", "informational")));
+
+        var tree = MeaiToEvalResultBridge.Build("Eval", new[] { "q1" }, Wrap(meai));
+
+        Assert.Equal("warn", tree.Details.SubResults![0].Score.Label);
+        Assert.Equal("warn", tree.Score.Label);
+        Assert.Equal(AgentEval.Evals.Meta.MeasurementState.NotMeasured, tree.Score.Measurement);
+    }
+
+    [Fact]
     public void Build_RecoversAgentEvalScore_FromReasonMarker()
     {
         // Value (5.0) deliberately disagrees with the marker (85) to prove the marker wins.

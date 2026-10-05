@@ -215,46 +215,22 @@ public static class MeaiToEvalResultBridge
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 
-    // Every metric is a required part (B10q): the score is the mean of the measured ones; a metric with no verdict is
-    // never averaged in as a 0, never lets the node pass (an error is "error" unless a measured failure decides it; one
-    // that did not run withholds a pass), and nothing measured is no verdict. Before, the mean took the placeholders
-    // and the label was pass/fail only, so an errored metric made its query FAIL.
+    // Every metric is a required part: read by measurement state (MeasuredRollup, B10q/B10u) unless an "(overall)"
+    // metric carries the item's verdict.
     private static EvalResult Composite(
         string key, string name, string category, IReadOnlyList<EvalResult> subs, EvalResult? verdictFrom = null)
     {
-        var measured = subs.Where(s => s.Score.CountsTowardAggregate()).ToList();
-        var failing = measured.Where(s => s.Score.Label is "fail").ToList();
-        var errored = subs.Any(s => s.Score.Label == "error");
-        var notRun = subs.Any(s => !s.Score.CountsTowardAggregate() && s.Score.Label != "error"
-                                   && s.Score.CensusBucket() == MeasurementState.NotMeasured);
-        var derivedLabel =
-            measured.Count == 0 ? (errored ? "error" : "skipped")
-            : failing.Count > 0 ? "fail"
-            : errored ? "error"
-            : notRun || measured.Any(s => s.Score.Label == "warn") ? "warn"
-            : "pass";
-        var label = verdictFrom?.Score.Label ?? derivedLabel;
-        var passed = verdictFrom?.Score.Passed ?? derivedLabel == "pass";
-        var avg = verdictFrom?.Score.Value ?? (measured.Count == 0 ? 0 : measured.Average(s => s.Score.Value));
-        var severity = verdictFrom?.Score.Severity ?? derivedLabel switch
-        {
-            "fail" => SeverityRollup.Max(failing.Select(s => s.Score.Severity).Append("medium")),
-            "warn" => notRun && !measured.Any(s => s.Score.Label == "warn") ? "none" : "medium",
-            _ => "none",
-        };
-        var measurement = verdictFrom is null && derivedLabel == "warn" && notRun && !measured.Any(s => s.Score.Label == "warn")
-            ? MeasurementState.NotMeasured
-            : MeasurementState.Measured;
+        var v = MeasuredRollup.Of(subs);
         return new EvalResult(
             Metric: new EvalMetadata(key, name, category, "1.0.0"),
             Score: new EvalScore(
-                Value: avg,
+                Value: verdictFrom?.Score.Value ?? v.Value,
                 Ordinal: null,
-                Label: label,
-                Passed: passed,
+                Label: verdictFrom?.Score.Label ?? v.Label,
+                Passed: verdictFrom?.Score.Passed ?? v.Passed,
                 Threshold: 0.70,
-                Severity: severity,
-                Confidence: null) { Measurement = verdictFrom?.Score.Measurement ?? measurement },
+                Severity: verdictFrom?.Score.Severity ?? v.Severity,
+                Confidence: null) { Measurement = verdictFrom?.Score.Measurement ?? v.Measurement },
             Details: new EvalDetails(
                 Dimensions: null,
                 Evidence: null,

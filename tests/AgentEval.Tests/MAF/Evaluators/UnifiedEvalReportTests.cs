@@ -4,6 +4,7 @@
 
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
+using Microsoft.Extensions.AI.Evaluation;
 using AgentEval.MAF.Evaluators;
 using Xunit;
 using static AgentEval.Tests.MAF.Evaluators.HybridEvalTestHelpers;
@@ -37,7 +38,7 @@ public class UnifiedEvalReportTests
     }
 
     [Fact]
-    public void Build_EmptyResultSet_IsNeutralErrorBranch_DoesNotSinkTheRoot()
+    public void Build_EmptyResultSet_IsAnErrorBranch_AndTheRootHasNoVerdict_NotAFail()
     {
         var items = Items(1);
         var empty = new AgentEvaluationResults(
@@ -46,9 +47,61 @@ public class UnifiedEvalReportTests
         var report = UnifiedEvalReport.Build([("agenteval-local", Pass(items, "agenteval-local")), ("foundry", empty)]);
 
         var foundryBranch = report.Details.SubResults!.Single(b => b.Metric.Name == "foundry");
-        Assert.Equal("error", foundryBranch.Score.Label);      // neutral, not a confirmed fail
+        Assert.Equal("error", foundryBranch.Score.Label);      // no verdict, not a confirmed fail
         Assert.Equal("none", foundryBranch.Score.Severity);
-        Assert.Equal("pass", report.Score.Label);              // the neutral branch must NOT sink the passing local branch
+        // The root rests on both providers: one produced no verdict, so the root has none either — "error", severity none,
+        // never a FAIL. It used to read PASS on the local branch alone (#203 review round 5, B10u: a pass resting on part
+        // of what was asked). The local branch's pass stays visible beside it.
+        Assert.Equal("error", report.Score.Label);
+        Assert.Equal("none", report.Score.Severity);
+        Assert.Equal("pass", report.Details.SubResults!.Single(b => b.Metric.Name == "agenteval-local").Score.Label);
+    }
+
+    private static AgentEvaluationResults FoundryWith(params (string Key, Microsoft.Extensions.AI.Evaluation.EvaluationMetric Metric)[][] perItem)
+    {
+        var results = perItem.Select(metrics =>
+        {
+            var r = new Microsoft.Extensions.AI.Evaluation.EvaluationResult();
+            foreach (var (key, metric) in metrics)
+                r.Metrics[key] = metric;
+            return r;
+        }).ToList();
+        return new AgentEvaluationResults("foundry", results, inputItems: Items(perItem.Length));
+    }
+
+    [Fact]
+    public void AnUnparseableMetric_BesideAPass_IsNoVerdict_NotAPass()
+    {
+        // Review round 5 H-1 (B10u): the bridge marks the metric "error", but Node() left error/skipped children out and
+        // passed on the rest, so the Foundry branch and the root read PASS.
+        var relevance = new Microsoft.Extensions.AI.Evaluation.NumericMetric("relevance", null);
+        relevance.AddDiagnostics(Microsoft.Extensions.AI.Evaluation.EvaluationDiagnostic.Error("Failed to parse numeric score for 'relevance'."));
+        var foundry = FoundryWith([("relevance", relevance), ("coherence", new Microsoft.Extensions.AI.Evaluation.NumericMetric("coherence", 4.5))]);
+
+        var report = UnifiedEvalReport.Build([("foundry", foundry)]);
+
+        var branch = Assert.Single(report.Details.SubResults!);
+        Assert.Equal("error", branch.Score.Label);
+        Assert.False(branch.Score.Passed);
+        Assert.Equal("error", report.Score.Label);
+        Assert.Equal(0.875, branch.Score.Value, 3);   // the measured metric only: (4.5 - 1) / 4
+    }
+
+    [Fact]
+    public void AQueryThatWithheldItsPass_IsAWarn_NotAFailHigh()
+    {
+        // Review round 5 H-1, the other direction: passed = All(Passed) turned any warn child into FAIL / high.
+        var foundry = FoundryWith(
+            [("coherence", new Microsoft.Extensions.AI.Evaluation.NumericMetric("coherence", 4.5))],
+            [("coherence", new Microsoft.Extensions.AI.Evaluation.NumericMetric("coherence", 4.5)),
+             ("note", new Microsoft.Extensions.AI.Evaluation.StringMetric("note", "informational"))]);
+
+        var report = UnifiedEvalReport.Build([("foundry", foundry)]);
+
+        var branch = Assert.Single(report.Details.SubResults!);
+        Assert.Equal("warn", branch.Score.Label);
+        Assert.NotEqual("high", branch.Score.Severity);
+        Assert.Equal("warn", report.Score.Label);
     }
 
     [Fact]

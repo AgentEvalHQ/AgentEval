@@ -103,23 +103,18 @@ public static class UnifiedEvalReport
         source.Contains("local", StringComparison.OrdinalIgnoreCase) ||
         source.Contains("agenteval", StringComparison.OrdinalIgnoreCase);
 
-    private static bool IsNeutral(EvalResult r) => r.Score.Label is "error" or "skipped";
-
-    // Mean-aggregated node tagged with `provenanceType`. Rolls up over NON-neutral sub-results only: a
-    // neutral "error"/"skipped" branch is visible in the tree but never drags the parent to fail/high.
-    // If EVERY sub-result is neutral, the parent is itself neutral (severity none) — nothing was evaluated.
+    // Mean-aggregated node tagged with `provenanceType`, read by measurement state (MeasuredRollup): an errored or
+    // skipped part is never averaged in as a 0 and never lets the node pass on the rest, and a warn stays a warn. It
+    // left "error"/"skipped" parts out and passed on whatever remained — an MEAI metric whose judge reply did not parse
+    // beside a passing one read PASS — and read any other non-pass, a quality WARN included, as FAIL/high (#203 review
+    // round 5, B10u). An errored part is "error" unless a measured failure decides; nothing measured is no verdict.
     private static EvalResult Node(string key, string name, string category,
         IReadOnlyList<EvalResult> subs, string provenanceType)
     {
-        var real = subs.Where(s => !IsNeutral(s)).ToList();
-        var avg = real.Count == 0 ? 0 : real.Average(s => s.Score.Value);
-        var passed = real.Count > 0 && real.All(s => s.Score.Passed);
-        var (label, severity) = real.Count == 0
-            ? (subs.Any(s => s.Score.Label == "error") ? "error" : "skipped", "none")
-            : (passed ? "pass" : "fail", passed ? "none" : "high");
+        var v = MeasuredRollup.Of(subs);
         return new EvalResult(
             Metric: new EvalMetadata(key, name, category, "1.0.0"),
-            Score: new EvalScore(avg, null, label, passed, 0.70, severity, null),
+            Score: new EvalScore(v.Value, null, v.Label, v.Passed, 0.70, v.Severity, null) { Measurement = v.Measurement },
             Details: new EvalDetails(null, null, null, subs, "mean"),
             Provenance: new EvalProvenance(provenanceType, null, null, null, null, 0, false),
             EvaluatedAt: DateTimeOffset.UtcNow);

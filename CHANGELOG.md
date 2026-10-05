@@ -92,7 +92,10 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   with an error diagnostic, an `Inconclusive` rating or no value is now `error`; one that is neither numeric nor
   boolean and has no interpretation is `skipped`; a boolean metric is its own verdict (`false` read 100). The query
   node averages only the measured metrics and reads them by state: an errored metric beside passes is `error` (it was
-  FAIL), a measured failure decides, a metric that did not run withholds the pass.
+  FAIL), a measured failure decides, a metric that did not run withholds the pass. `UnifiedEvalReport` reads its
+  branches and root the same way: it left errored and skipped parts out and passed on the rest (so the hybrid report
+  read PASS beside an unparseable metric), and showed any warn — a quality WARN included — as FAIL/high. A provider
+  branch that produced no verdict now makes the root `error`, not PASS on the other branch.
 - **The GDPR and EU AI Act evidence counted a scenario with no verdict as failed.** `scenariosFailed` (and the
   Markdown "Failed x/y" column and the PDF) counted every scenario that did not pass, so an article with one judge
   error read "Failed 1/3" beside status ERROR, and a needs-review or withheld scenario counted too. It now counts
