@@ -81,6 +81,11 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   `skipped` with "No component produced a measurement (0 errored, 0 skipped, 0 inapplicable)", though the parts inside
   were measured — the Tool Call Accuracy preset did this whenever no tool definitions were captured. It now withholds
   too (`warn`, recorded `notMeasured`) and names the components; a breakdown counts the withheld ones.
+- **`bench trace-fidelity` and `bench workflow-trace-fidelity` passed a warn.** A score of 0.80–0.99 was labelled
+  `warn` but `Passed = true`, and both commands decided from `Passed`: "Verdict: PASS", a stored PASS, exit 0 — every
+  other bench command exits 10 for a warn. `Passed` is now true only on a pass; the commands store the root's verdict
+  and exit by its label (0 / 10 / 9). The agent-boundary report's severities are lower-case and `none` on a pass (it
+  read "Low" at 1.00). The docs gave exit `2` for discrepancies; it has been `9` since the exit-code remap.
 - **The memory-security composite passed with its utility check failing.** `MemorySecurityCompositeEvals.Create()`
   documents utility as "an optional warning", but the component had no effect, so as an optional part its failure
   left the severity rule and a memory that rejected every benign write read a clean PASS. **Behaviour change (1.1.0):**

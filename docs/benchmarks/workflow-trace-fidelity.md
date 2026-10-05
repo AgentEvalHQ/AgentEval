@@ -40,4 +40,4 @@ instrumented chat client today, so per-executor chat traces come back **without*
 agenteval bench workflow-trace-fidelity --workflow-trace <file> --subject <name> [--preset standard]
 ```
 
-Exit codes: `0` clean, `2` discrepancies, `1` setup/IO error.
+Exit codes: `0` clean (score ≥ 0.99, PASS), `10` minor discrepancies (0.80–0.99, WARN), `9` discrepancies (below 0.80, FAIL), `1` setup/IO error.

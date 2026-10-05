@@ -68,8 +68,9 @@ public sealed class TraceFidelityRunner
             Metric: new EvalMetadata(Key: $"trace_fidelity.{d.ClassKey}", Name: d.ClassKey, Category: "TraceFidelity", Version: "1.0"),
             Score: new EvalScore(
                 Value: d.Score, Ordinal: null,
+                // A warn is a soft fail (#203 review round 5, B10w): Passed only on a pass.
                 Label: d.Score >= 0.99 ? "pass" : d.Score >= 0.8 ? "warn" : "fail",
-                Passed: d.Score >= 0.8, Threshold: 0.8, Severity: d.Severity, Confidence: null),
+                Passed: d.Score >= 0.99, Threshold: 0.8, Severity: d.Severity, Confidence: null),
             Details: new EvalDetails(
                 Dimensions: new Dictionary<string, double> { ["count"] = d.Count, ["score100"] = d.Score * 100 },
                 Evidence: d.Examples.Select(x => new EvalEvidence(Source: "chat-vs-agent", Reference: d.ClassKey, Message: x)).ToList(),
@@ -81,9 +82,12 @@ public sealed class TraceFidelityRunner
             Metric: new EvalMetadata(Key: "trace_fidelity", Name: "Trace Fidelity", Category: "TraceFidelity", Version: "1.0"),
             Score: new EvalScore(
                 Value: report.OverallScore, Ordinal: null,
+                // A warn is a soft fail (B10w): Passed only on a pass, which reports no severity; severities in the lower
+                // case every other result uses ("Low" read low even at 1.00).
                 Label: report.OverallScore >= 0.99 ? "pass" : report.OverallScore >= 0.8 ? "warn" : "fail",
-                Passed: report.OverallScore >= 0.8, Threshold: 0.8,
-                Severity: report.OverallScore >= 0.8 ? "Low" : report.OverallScore >= 0.5 ? "Medium" : "High", Confidence: null),
+                Passed: report.OverallScore >= 0.99, Threshold: 0.8,
+                Severity: report.OverallScore >= 0.99 ? "none" : report.OverallScore >= 0.8 ? "low" : report.OverallScore >= 0.5 ? "medium" : "high",
+                Confidence: null),
             Details: new EvalDetails(
                 Dimensions: new Dictionary<string, double> { ["score100"] = report.OverallScore * 100 },
                 Evidence: null, Recommendations: null, SubResults: subResults, AggregationStrategy: "severity-weighted"),

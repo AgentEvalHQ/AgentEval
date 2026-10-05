@@ -184,6 +184,33 @@ public class TraceFidelityTests
 
     // ── T3.3: EvalResult tree projection ──
     [Fact]
+    public void AWarnIsASoftFail_NotAPass_AndAPassCarriesNoSeverity()
+    {
+        // Review round 5 M-2 (B10w): 0.80-0.99 was labelled warn with Passed = true, so the command printed PASS and
+        // exited 0; the root's severity read "Low" even at 1.00.
+        var chat = Chat(
+            ChatResp(0, "tool_calls", new[] { ("SearchFlights", "{}") }),
+            ChatResp(1, "tool_calls", new[] { ("SearchFlights", "{}") }),
+            ChatResp(2));
+        var agent = Agent(null, AgentResp(0, new[] { ("SearchFlights", "{}") }));
+
+        var warn = new TraceFidelityRunner().ReconcileToEvalResult(agent, chat);
+
+        Assert.Equal(0.90, warn.Score.Value, 6);
+        Assert.Equal("warn", warn.Score.Label);
+        Assert.False(warn.Score.Passed);
+        Assert.Equal("low", warn.Score.Severity);
+        Assert.All(warn.Details.SubResults!, s => Assert.Equal(s.Score.Label == "pass", s.Score.Passed));
+
+        var clean = new TraceFidelityRunner().ReconcileToEvalResult(
+            Agent(new TracePerformance { TotalPromptTokens = 10, TotalCompletionTokens = 5 }, AgentResp(0, new[] { ("Book", "{\"x\":1}") })),
+            Chat(ChatResp(0, "stop", new[] { ("Book", "{\"x\":1}") }, prompt: 10, completion: 5)));   // CleanPair_ScoresPerfectFidelity's pair
+        Assert.Equal("pass", clean.Score.Label);
+        Assert.True(clean.Score.Passed);
+        Assert.Equal("none", clean.Score.Severity);
+    }
+
+    [Fact]
     public void ReconcileToEvalResult_EmitsSixSubResultsWithExpectedKeysAndDimensions()
     {
         var chat = Chat(

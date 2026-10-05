@@ -205,8 +205,9 @@ public sealed class WorkflowTraceFidelityReconciler
             Metric: new EvalMetadata(Key: $"workflow_trace_fidelity.executor.{e.ExecutorId}", Name: e.ExecutorId, Category: "TraceFidelity", Version: "1.0"),
             Score: new EvalScore(
                 Value: e.Score, Ordinal: null,
+                // A warn is a soft fail (#203 review round 5, B10w): Passed only on a pass.
                 Label: e.Score >= 0.99 ? "pass" : e.Score >= 0.8 ? "warn" : "fail",
-                Passed: e.Score >= 0.8, Threshold: 0.8,
+                Passed: e.Score >= 0.99, Threshold: 0.8,
                 Severity: e.Score >= 0.99 ? "none" : e.Score >= 0.8 ? "low" : e.Score >= 0.5 ? "medium" : "high", Confidence: null),
             Details: new EvalDetails(
                 Dimensions: BuildLeafDimensions(e),
@@ -229,7 +230,7 @@ public sealed class WorkflowTraceFidelityReconciler
             Score: new EvalScore(
                 Value: report.OverallScore, Ordinal: null,
                 Label: report.OverallScore >= 0.99 ? "pass" : report.OverallScore >= 0.8 ? "warn" : "fail",
-                Passed: report.OverallScore >= 0.8, Threshold: 0.8,
+                Passed: report.OverallScore >= 0.99, Threshold: 0.8,
                 Severity: report.OverallScore >= 0.99 ? "none" : report.OverallScore >= 0.8 ? "low" : report.OverallScore >= 0.5 ? "medium" : "high", Confidence: null),
             Details: new EvalDetails(
                 Dimensions: new Dictionary<string, double>
