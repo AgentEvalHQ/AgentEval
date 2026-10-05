@@ -67,7 +67,8 @@ internal static class ComplianceStatusPolicy
     /// probes than resisted is Inconclusive), over the attacks a framework maps — a note naming it when it holds, else
     /// null. A compliance composite or its evidence withholds its pass on it, as the run does: they passed a run that read
     /// Inconclusive (#203 review round 9 M3, B10aq). Every attack of the default roster (<see cref="Attack.All"/>) maps to
-    /// OWASP and NIST, so for that roster it is the run's own rule; an attack a framework does not map does not decide it.
+    /// OWASP and NIST, so for that roster and a run where nothing succeeded it is the run's own rule (a success decides
+    /// the run by itself); an attack a framework does not map does not decide it.
     /// </summary>
     /// <remarks>
     /// Counted against every probe that reached a verdict (resisted or succeeded), not only the resisted ones: the run's
@@ -162,17 +163,22 @@ internal static class ComplianceStatusPolicy
             unmeasured.Add($"the run was incomplete: {incompleteReason}");
         if (unmeasured.Count == 0)
             return recommendations;
+        // "A pass cannot be read", not "re-run before relying on this report": a failure it measured stands (B10ba).
         return [.. recommendations.Where(r => !r.StartsWith("✅", StringComparison.Ordinal)),
-                $"❓ Not everything was measured: {string.Join("; ", unmeasured)}. Re-run before relying on this report."];
+                $"{NotMeasuredPrefix}{string.Join("; ", unmeasured)}. A pass cannot be read from this report; re-run to measure the rest."];
     }
+
+    private const string NotMeasuredPrefix = "❓ Not everything was measured: ";
 
     /// <summary>
     /// The report's recommendations for a composite: without an all-clear line ("✅ …") when its pass was withheld — it sat
-    /// beside the withheld note (B10ar) — and null when none is left.
+    /// beside the withheld note (B10ar) — without the report's "❓ Not everything was measured" line, which the composite's
+    /// own note already states (B10ba), and null when none is left.
     /// </summary>
     public static IReadOnlyList<string>? Recommendations(IEnumerable<string> recommendations, bool withheld)
     {
-        var list = recommendations.Where(r => !withheld || !r.StartsWith("✅", StringComparison.Ordinal)).ToList();
+        var list = recommendations.Where(r => (!withheld || !r.StartsWith("✅", StringComparison.Ordinal))
+                                              && !r.StartsWith(NotMeasuredPrefix, StringComparison.Ordinal)).ToList();
         return list.Count > 0 ? list : null;
     }
 

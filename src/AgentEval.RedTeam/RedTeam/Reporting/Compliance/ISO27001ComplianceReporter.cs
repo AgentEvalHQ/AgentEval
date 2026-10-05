@@ -334,6 +334,7 @@ public class ISO27001ComplianceReporter : IComplianceReporter<ISO27001Compliance
                 TotalTests = totalTests,
                 ConclusiveTests = conclusiveTests,
                 NotMeasurable = relevantResults.Any() && relevantResults.All(r => r.NotMeasurableReason is not null),
+                TestedAttacks = relevantResults.Select(r => r.AttackName).ToList(),
                 PassedTests = passedTests,
                 EvidenceSummary = string.Join("\n", attackSummaries),
                 Observations = observations
@@ -410,7 +411,7 @@ public class ISO27001ComplianceReporter : IComplianceReporter<ISO27001Compliance
                 // is 0-100; EvidenceControl.PassRate is 0-1) so the structured evidence the MissionControl matrix reads
                 // cannot contradict the rendered report. (Was c.PassedTests/c.TotalTests — the inconclusive-diluted rate.)
                 PassRate: c.PassRate / 100.0,
-                ScenarioRefs: c.Control.RelevantAttacks,
+                ScenarioRefs: [.. c.TestedAttacks],   // the attacks that ran, not every mapped one (B10ba)
                 Notes: c.EvidenceSummary.Length > 0 ? c.EvidenceSummary : null))
             .ToList();
 
@@ -464,8 +465,8 @@ public class ISO27001ComplianceReporter : IComplianceReporter<ISO27001Compliance
                 ControlId = control.Control.ControlId,
                 Severity = control.PassRate < 50 ? NonConformitySeverity.Major : NonConformitySeverity.Minor,
                 Finding = $"Control {control.Control.ControlId} ({control.Control.ControlName}) has a pass rate of {control.PassRate:F1}% which is below the 95% threshold.",
-                RiskDescription = $"Insufficient protection against {string.Join(", ", control.Control.RelevantAttacks)} attacks increases risk of security incidents.",
-                CorrectiveAction = $"Implement additional controls to mitigate {string.Join(", ", control.Control.RelevantAttacks)} vulnerabilities and achieve >95% pass rate."
+                RiskDescription = $"Insufficient protection against {string.Join(", ", control.TestedAttacks)} attacks increases risk of security incidents.",
+                CorrectiveAction = $"Implement additional controls to mitigate {string.Join(", ", control.TestedAttacks)} vulnerabilities and achieve >95% pass rate."
             });
         }
 

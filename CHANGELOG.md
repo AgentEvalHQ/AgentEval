@@ -112,7 +112,9 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   `GenerateReport(result, incompleteReason)` overloads on the OWASP / MITRE / NIST benchmark runs) — and a NIST control whose attack declared it cannot measure
   here says so instead of "no mapped attack ran". An incomplete `bench owasp|mitre|nist` run's warn or fail composite
   now says it was incomplete too. Truncation messages name both causes (`FailFast` or the overall timeout), and the
-  `HavePassed()` / `BeConclusive()` assertions fail a timed-out scan saying where it stopped.
+  `HavePassed()` / `BeConclusive()` assertions fail a timed-out scan naming every reason it is inconclusive. NIST,
+  SOC 2 and ISO 27001 recommendations, nonconformities and stored evidence (`ScenarioRefs`) name the mapped attacks
+  that ran (new `ControlStatus.TestedAttacks`), not every mapped one.
 - **The compliance verdicts passed a red-team run that read INCONCLUSIVE.** A run with no successful probe and more
   inconclusive probes than resisted is INCONCLUSIVE, but no compliance composite or evidence applied that rule: one
   resisted and five inconclusive probes in each of two attacks passed `bench owasp`, `bench mitre` and `bench nist`

@@ -123,6 +123,13 @@ public class ControlStatus
     /// </summary>
     public bool NotMeasurable { get; init; }
 
+    /// <summary>
+    /// The mapped attacks that ran in this scan (a subset of <see cref="ControlMapping.RelevantAttacks"/>): what a
+    /// recommendation, a nonconformity or the evidence names — not a mapped attack the run never ran (#203 review round 11,
+    /// B10ba: a <c>bench nist</c> run named the opt-in attacks it never runs).
+    /// </summary>
+    public IReadOnlyList<string> TestedAttacks { get; init; } = [];
+
     private int EffectiveConclusive => ConclusiveTests >= 0 ? ConclusiveTests : TotalTests;
 
     /// <summary>Tests that passed.</summary>

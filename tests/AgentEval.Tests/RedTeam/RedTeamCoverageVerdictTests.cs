@@ -503,6 +503,68 @@ public class RedTeamCoverageVerdictTests
     }
 
     [Fact]
+    public async Task Round11Lows_NoRepeatedNote_EveryReasonNamed_OnlyAttacksThatRan()
+    {
+        // Review round 11 LOWs (B10ba).
+        var mixed = Result(Attack("PromptInjection", "LLM01", resisted: 10, inconclusive: 0, mitre: ["AML.T0051"]),
+                           Attack("Jailbreak", "LLM01", resisted: 0, inconclusive: 5, mitre: ["AML.T0054"]));
+
+        // The composite states what it left unmeasured once (its Summary), not again as the report's "❓" line; the report's
+        // line does not cast doubt on a failure ("A pass cannot be read", not "re-run before relying on this report").
+        var owasp = OwaspBenchmark.Top10().BuildEvalResult(mixed);
+        Assert.Contains("Not measured:", owasp.Details.Summary, StringComparison.Ordinal);
+        Assert.DoesNotContain(owasp.Details.Recommendations ?? [], r => r.StartsWith("❓ Not everything was measured", StringComparison.Ordinal));
+        Assert.Contains(new OWASPComplianceReporter().GenerateReport(mixed).Recommendations,
+            r => r.EndsWith("A pass cannot be read from this report; re-run to measure the rest.", StringComparison.Ordinal));
+
+        // HavePassed / BeConclusive name every reason: a truncated scan beside an attack that measured nothing named only one.
+        var both = new RedTeamResult
+        {
+            AgentName = "agent",
+            AttackResults = [Attack("PromptInjection", "LLM01", resisted: 10, inconclusive: 0), Attack("Jailbreak", "LLM01", resisted: 0, inconclusive: 3)],
+            TotalProbes = 13, ResistedProbes = 10, InconclusiveProbes = 3, SkippedProbes = 7, WasTruncated = true,
+        };
+        foreach (var message in new[]
+                 {
+                     Assert.Throws<RedTeamAssertionException>(() => both.Should().HavePassed()).Message,
+                     Assert.Throws<RedTeamAssertionException>(() => both.Should().BeConclusive(maxInconclusiveFraction: 0.5)).Message,
+                 })
+        {
+            Assert.Contains("Jailbreak measured nothing", message, StringComparison.Ordinal);
+            Assert.Contains("the scan stopped after 13 of 20 planned probes", message, StringComparison.Ordinal);
+        }
+
+        // A recommendation, a nonconformity and the evidence name the mapped attacks that ran, not the opt-in ones the
+        // run never ran (a bench nist run said "address ... Crescendo, PAIR, TAP, ToolEscalation weaknesses").
+        var failing = Result(new AttackResult
+        {
+            AttackName = "PromptInjection", OwaspId = "LLM01", MitreAtlasIds = ["AML.T0051"], ResistedCount = 1, SucceededCount = 1,
+            ProbeResults =
+            [
+                new ProbeResult { ProbeId = "r0", Prompt = "p", Response = "no", Outcome = EvaluationOutcome.Resisted, Reason = "refused" },
+                new ProbeResult { ProbeId = "s0", Prompt = "p", Response = "ok", Outcome = EvaluationOutcome.Succeeded, Reason = "complied", Severity = Severity.Critical },
+            ],
+        });
+        var said = string.Join(" | ", new NistAiRmfComplianceReporter().GenerateReport(failing).Recommendations
+            .Concat(new SOC2ComplianceReporter().GenerateReport(failing).Recommendations)
+            .Concat(new ISO27001ComplianceReporter().GenerateReport(failing).NonConformities.Select(n => n.CorrectiveAction)));
+        Assert.Contains("PromptInjection", said, StringComparison.Ordinal);
+        Assert.DoesNotContain("Crescendo", said, StringComparison.Ordinal);
+        Assert.DoesNotContain("ToolEscalation", said, StringComparison.Ordinal);
+        var store = new AgentEval.Output.InMemoryOutputStore();
+        var subject = new AgentEval.Output.SubjectIdentity(AgentEval.Output.SubjectKind.Agent, "agent");
+        await store.EnsureSubjectAsync(subject);
+        var run = await store.StartRunAsync(subject, new AgentEval.Output.RunContext("Evals", ".", "TestHarness", null, null, "benchmark"));
+        await new NistAiRmfComplianceReporter().SaveReportAsync(store, subject, run.Run.RunId, failing);
+        var refs = new List<string>();
+        await foreach (var pointer in store.ListComplianceEvidenceAsync())
+            refs.AddRange((await store.GetComplianceEvidenceAsync(pointer.Regulation, subject, pointer.Timestamp))!
+                .Controls.SelectMany(c => c.ScenarioRefs));
+        Assert.Contains("PromptInjection", refs);
+        Assert.DoesNotContain("Crescendo", refs);
+    }
+
+    [Fact]
     public void TheReports_DropTheAllClear_WhenSomethingWasNotMeasured()
     {
         // Review round 10 LOW (B10ax): report.md / report.json kept "✅ Strong security posture" / "✅ All evaluated ..." for a

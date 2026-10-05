@@ -60,7 +60,7 @@ public class RedTeamResult : IRedTeamResult
     /// </summary>
     public bool WasTruncated { get; init; }
 
-    /// <summary>Probes that were never executed because FailFast stopped the scan early (RA3-06).</summary>
+    /// <summary>Probes that were never executed because the scan stopped early — FailFast or the overall timeout (RA3-06).</summary>
     public int SkippedProbes { get; init; }
 
     /// <summary>

@@ -56,9 +56,7 @@ public sealed class RedTeamAssertions
 
             AgentEvalScope.FailWith(RedTeamAssertionException.Create(
                 _result.Verdict == Verdict.Inconclusive
-                    ? _result.WasTruncated   // B10ax: since B10ar a timed-out scan is inconclusive, not "too few probes"
-                        ? $"Expected red team scan to pass, but it was inconclusive (the scan stopped after {_result.TotalProbes} of {_result.PlannedProbes} planned probes)."
-                        : "Expected red team scan to pass, but it was inconclusive (too few probes reached a verdict)."
+                    ? $"Expected red team scan to pass, but it was inconclusive ({InconclusiveWhy()})."
                     : "Expected red team scan to pass, but vulnerabilities were found.",
                 expected: "Verdict.Pass (no successful attacks)",
                 actual: $"Verdict.{_result.Verdict} with {_result.SucceededProbes} compromised probes, {_result.InconclusiveProbes} inconclusive",
@@ -330,6 +328,23 @@ public sealed class RedTeamAssertions
         return probe.Complete(this);
     }
 
+    // Every reason the scan is inconclusive (B10ax, B10ba): an attack that measured nothing, a scan that stopped early, most
+    // probes inconclusive — a truncated scan beside an attack that measured nothing named only the truncation.
+    private string InconclusiveWhy()
+    {
+        var why = new List<string>();
+        var nothing = _result.AttackResults.Where(a => a.MeasuredNothing).Select(a => a.AttackName).ToList();
+        if (nothing.Count > 0)
+            why.Add($"{string.Join(", ", nothing)} measured nothing");
+        if (_result.WasTruncated)
+            why.Add($"the scan stopped after {_result.TotalProbes} of {_result.PlannedProbes} planned probes");
+        if (_result.TotalProbes == 0)
+            why.Add("no probe ran");
+        else if (_result.InconclusiveProbes > _result.ResistedProbes)
+            why.Add($"{_result.InconclusiveProbes}/{_result.TotalProbes} probes were inconclusive");
+        return why.Count > 0 ? string.Join("; ", why) : "too few probes reached a verdict";
+    }
+
     /// <summary>Asserts the scan was conclusive: a real verdict, not dominated by inconclusive probes (RC-6).</summary>
     /// <param name="maxInconclusiveFraction">Maximum acceptable fraction of inconclusive probes.</param>
     /// <param name="because">Optional reason for this assertion.</param>
@@ -341,8 +356,8 @@ public sealed class RedTeamAssertions
         if (_result.Verdict == Verdict.Inconclusive || inconclusiveRate > maxInconclusiveFraction)
         {
             AgentEvalScope.FailWith(RedTeamAssertionException.Create(
-                _result.WasTruncated && inconclusiveRate <= maxInconclusiveFraction   // B10ax: not "0/N inconclusive (0.0%)"
-                    ? $"Expected a conclusive scan, but it stopped after {_result.TotalProbes} of {_result.PlannedProbes} planned probes."
+                _result.Verdict == Verdict.Inconclusive && inconclusiveRate <= maxInconclusiveFraction   // not "0/N inconclusive (0.0%)"
+                    ? $"Expected a conclusive scan, but it was inconclusive ({InconclusiveWhy()})."
                     : $"Expected a conclusive scan, but {_result.InconclusiveProbes}/{_result.TotalProbes} probes were inconclusive ({inconclusiveRate:P1}).",
                 expected: $"Inconclusive fraction <= {maxInconclusiveFraction:P0} and a definitive verdict",
                 actual: $"Verdict.{_result.Verdict}, inconclusive {inconclusiveRate:P1}, coverage {_result.Coverage:F1}%",

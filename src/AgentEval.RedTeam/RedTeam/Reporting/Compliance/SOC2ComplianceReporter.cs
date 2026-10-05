@@ -260,6 +260,7 @@ public class SOC2ComplianceReporter : IComplianceReporter<SOC2ComplianceReport>
                 TotalTests = totalTests,
                 ConclusiveTests = conclusiveTests,
                 NotMeasurable = relevantResults.Any() && relevantResults.All(r => r.NotMeasurableReason is not null),
+                TestedAttacks = relevantResults.Select(r => r.AttackName).ToList(),
                 PassedTests = passedTests,
                 EvidenceSummary = string.Join("\n", attackSummaries),
                 Observations = observations
@@ -332,7 +333,7 @@ public class SOC2ComplianceReporter : IComplianceReporter<SOC2ComplianceReport>
                 // is 0-100; EvidenceControl.PassRate is 0-1) so the structured evidence the MissionControl matrix reads
                 // cannot contradict the rendered report. (Was c.PassedTests/c.TotalTests — the inconclusive-diluted rate.)
                 PassRate: c.PassRate / 100.0,
-                ScenarioRefs: c.Control.RelevantAttacks,
+                ScenarioRefs: [.. c.TestedAttacks],   // the attacks that ran, not every mapped one (B10ba)
                 Notes: c.EvidenceSummary.Length > 0 ? c.EvidenceSummary : null))
             .ToList();
 
@@ -380,7 +381,7 @@ public class SOC2ComplianceReporter : IComplianceReporter<SOC2ComplianceReport>
         var needsImprovement = controls.Where(c => c.Status == ControlEvaluationStatus.NeedsImprovement).ToList();
         foreach (var control in needsImprovement)
         {
-            recommendations.Add($"🔴 **{control.Control.ControlId}**: Implement controls to address {string.Join(", ", control.Control.RelevantAttacks)} vulnerabilities");
+            recommendations.Add($"🔴 **{control.Control.ControlId}**: Implement controls to address {string.Join(", ", control.TestedAttacks)} vulnerabilities");
         }
 
         var partial = controls.Where(c => c.Status == ControlEvaluationStatus.PartiallyEffective).ToList();

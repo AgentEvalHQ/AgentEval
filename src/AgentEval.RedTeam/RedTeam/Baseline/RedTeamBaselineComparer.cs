@@ -37,14 +37,14 @@ public class RedTeamBaselineComparer
                 "or call Compare(..., requireMatchingIntensity: false) to override (RC-6).");
         }
 
-        // RA3-06 / T5-2: a FailFast-truncated scan executed only a partial probe set, so its score/ASR
+        // RA3-06 / T5-2: a truncated scan (FailFast or the overall timeout) executed only a partial probe set, so its score/ASR
         // denominators are not comparable to a full baseline. Refuse by default; the explicit override stands.
         if (requireMatchingIntensity && current.WasTruncated)
         {
             throw new InvalidOperationException(
                 $"Cannot compare a truncated scan (FailFast or the overall timeout; {current.TotalProbes}/{current.PlannedProbes} probes " +
                 "executed) against a baseline: the truncated probe set makes score/ASR deltas non-comparable (RA3-06). " +
-                "Re-run without FailFast, or call Compare(..., requireMatchingIntensity: false) to override.");
+                "Re-run without FailFast (or with a longer overall timeout), or call Compare(..., requireMatchingIntensity: false) to override.");
         }
 
         // ADR-021 (B.1): a baseline graded under a different JudgeMode is not fidelity-comparable — judge-primary

@@ -214,6 +214,7 @@ public class NistAiRmfComplianceReporter : IComplianceReporter<NistAiRmfComplian
                 TotalTests = totalTests,
                 ConclusiveTests = conclusiveTests,
                 NotMeasurable = relevantResults.Any() && relevantResults.All(r => r.NotMeasurableReason is not null),
+                TestedAttacks = relevantResults.Select(r => r.AttackName).ToList(),
                 PassedTests = passedTests,
                 EvidenceSummary = string.Join("\n", attackSummaries),
             };
@@ -267,7 +268,7 @@ public class NistAiRmfComplianceReporter : IComplianceReporter<NistAiRmfComplian
                 Title: c.Control.ControlName,
                 Status: c.Status.ToString(),
                 PassRate: c.PassRate / 100.0,   // 0-1, conclusive-only — matches markdown (N-03)
-                ScenarioRefs: c.Control.RelevantAttacks,
+                ScenarioRefs: [.. c.TestedAttacks],   // the attacks that ran, not every mapped one (B10ba)
                 Notes: c.EvidenceSummary.Length > 0 ? c.EvidenceSummary : null))
             .ToList();
 
@@ -309,7 +310,7 @@ public class NistAiRmfComplianceReporter : IComplianceReporter<NistAiRmfComplian
     {
         var recs = new List<string>();
         foreach (var c in controls.Where(c => c.Status == ControlEvaluationStatus.NeedsImprovement))
-            recs.Add($"🔴 **{c.Control.ControlId}**: address {string.Join(", ", c.Control.RelevantAttacks)} weaknesses.");
+            recs.Add($"🔴 **{c.Control.ControlId}**: address {string.Join(", ", c.TestedAttacks)} weaknesses.");
         foreach (var c in controls.Where(c => c.Status == ControlEvaluationStatus.PartiallyEffective))
             recs.Add($"🟡 **{c.Control.ControlId}**: strengthen — current pass rate {c.PassRate:F0}%.");
         // A control that ran inconclusive is not a success to report (B10am L5): it sat beside "All evaluated ... meet".
