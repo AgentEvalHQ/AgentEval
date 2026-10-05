@@ -34,6 +34,18 @@ public static class ResultConverter
     /// </summary>
     public static void AddToEvaluationResult(MEAIEvaluationResult result, MetricResult metricResult)
     {
+        // Not measured (an input it needs was not supplied) is neither a pass nor a fail: no value, inconclusive, not
+        // failed — as a skipped leaf reads in AgentEvalCompositeEvaluator (#203 review round 15, B12i).
+        if (!metricResult.Measured)
+        {
+            var notMeasured = $"AgentEval: not measured — {metricResult.Explanation}";
+            result.Metrics[metricResult.MetricName] = new NumericMetric(metricResult.MetricName, value: null, reason: notMeasured)
+            {
+                Interpretation = new EvaluationMetricInterpretation(EvaluationRating.Inconclusive, failed: false, reason: notMeasured),
+            };
+            return;
+        }
+
         var meaiScore = ScoreNormalizer.ToOneToFive(metricResult.Score);
 
         // Build reason string preserving original 0-100 score

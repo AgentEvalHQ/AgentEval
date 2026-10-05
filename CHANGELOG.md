@@ -36,7 +36,7 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   anything short of a pass.
 - **Calibration reports only measured verdicts.** A judge outage is INFRA-FAIL; an evaluator not measured on every
   record is left out whole (INCOMPLETE).
-- **A missing reference answer is not a failure.** `similarity` and `f1_score` without `EvalInput.GroundTruth` (or with a blank one) are
+- **A missing reference answer or context is not a failure.** `similarity` and `f1_score` without `EvalInput.GroundTruth` (or with a blank one) are
   not measured (`skipped`); the QA composite withholds its pass naming them. With one, the judge now receives it.
   `bench agentic --preset rag-quality` has no option for a reference answer or retrieved context yet, so from the CLI it
   reads WARN (exit 10); pass them through the library or the MAF bridge.
@@ -50,6 +50,13 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   carried on this branch; the list above is what ships.
 
 #### Fixed
+- **The legacy metrics failed an agent for an input it was never given.** Faithfulness, context precision, context
+  recall, answer correctness, the embedding similarities and the groundedness safety metric returned a fail at score 0
+  when their retrieved context or reference answer was missing, and treated a whitespace one as present.
+  `MetricResult` gains a not-measured state (`Measured`, `MetricResult.NotMeasured`): neither a pass nor a fail. The
+  MEAI bridge reports it as inconclusive, not failed — so MAF no longer fails the item (the `Quality` preset failed
+  every item without a context) — report scores and stochastic statistics leave it out, and the console and trace
+  artifacts say "not measured". The safety-metric gate still blocks on it (fail-closed).
 - **`similarity` never sent the reference answer to its judge.** `SimilarityEval` and `ResponseCompletenessEval`
   documented that they read `EvalInput.GroundTruth`, but the judge received only the query, the response and the
   context. Similarity's judge therefore improvised a comparison — the calibration case "Paris is the capital of France"

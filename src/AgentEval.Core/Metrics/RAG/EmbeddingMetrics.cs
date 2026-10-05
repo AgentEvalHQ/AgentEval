@@ -75,9 +75,9 @@ public abstract class EmbeddingBasedMetric : IRAGMetric
     {
         var (text1, text2, validationError) = GetTextsToCompare(context);
         
-        if (validationError != null)
+        if (validationError != null)   // a missing input: not measured, never a fail (B12i)
         {
-            return MetricResult.Fail(Name, validationError);
+            return MetricResult.NotMeasured(Name, validationError);
         }
         
         try
@@ -158,8 +158,8 @@ public class AnswerSimilarityMetric : EmbeddingBasedMetric
     /// <inheritdoc />
     protected override (string? Text1, string? Text2, string? ValidationError) GetTextsToCompare(EvaluationContext context)
     {
-        if (string.IsNullOrEmpty(context.GroundTruth))
-            return (null, null, "Answer similarity requires ground truth to be provided.");
+        if (string.IsNullOrWhiteSpace(context.GroundTruth))
+            return (null, null, "Answer similarity requires a reference answer, and none was supplied: not measured.");
         
         if (string.IsNullOrEmpty(context.Output))
             return (null, null, "Answer similarity requires an output to evaluate.");
@@ -216,8 +216,8 @@ public class ResponseContextSimilarityMetric : EmbeddingBasedMetric
     /// <inheritdoc />
     protected override (string? Text1, string? Text2, string? ValidationError) GetTextsToCompare(EvaluationContext context)
     {
-        if (string.IsNullOrEmpty(context.Context))
-            return (null, null, "Response-context similarity requires context to be provided.");
+        if (string.IsNullOrWhiteSpace(context.Context))
+            return (null, null, "Response-context similarity requires a retrieved context, and none was supplied: not measured.");
         
         if (string.IsNullOrEmpty(context.Output))
             return (null, null, "Response-context similarity requires an output to evaluate.");
@@ -263,8 +263,8 @@ public class QueryContextSimilarityMetric : EmbeddingBasedMetric
     /// <inheritdoc />
     protected override (string? Text1, string? Text2, string? ValidationError) GetTextsToCompare(EvaluationContext context)
     {
-        if (string.IsNullOrEmpty(context.Context))
-            return (null, null, "Query-context similarity requires context to be provided.");
+        if (string.IsNullOrWhiteSpace(context.Context))
+            return (null, null, "Query-context similarity requires a retrieved context, and none was supplied: not measured.");
         
         return (context.Input, context.Context, null);
     }

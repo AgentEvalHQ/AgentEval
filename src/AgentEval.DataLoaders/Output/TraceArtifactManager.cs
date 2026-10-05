@@ -301,6 +301,7 @@ public class TraceArtifactManager
                 name = m.MetricName,
                 score = m.Score,
                 passed = m.Passed,
+                measured = m.Measured,   // B12i
                 explanation = m.Explanation
             }),
             failure = result.Failure is null ? null : new

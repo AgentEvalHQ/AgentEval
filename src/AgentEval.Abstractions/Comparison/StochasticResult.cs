@@ -182,6 +182,7 @@ public record StochasticResult(
     {
         var metrics = IndividualResults
             .SelectMany(r => r.MetricResults ?? Array.Empty<MetricResult>())
+            .Where(m => m.Measured)   // a not-measured placeholder 0 is not a sample (B12i)
             .GroupBy(m => m.MetricName, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(
                 g => g.Key,

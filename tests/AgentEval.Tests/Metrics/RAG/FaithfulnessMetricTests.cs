@@ -79,7 +79,7 @@ public class FaithfulnessMetricTests
     }
     
     [Fact]
-    public async Task EvaluateAsync_NoContext_ReturnsFail()
+    public async Task EvaluateAsync_NoContext_IsNotMeasured()
     {
         // Arrange
         var fakeChatClient = new FakeChatClient(); // No response needed
@@ -97,7 +97,8 @@ public class FaithfulnessMetricTests
         
         // Assert
         Assert.False(result.Passed);
-        Assert.Contains("requires context", result.Explanation, StringComparison.OrdinalIgnoreCase);
+        Assert.False(result.Measured);   // not measured, never a fail (B12i)
+        Assert.Contains("requires a retrieved context", result.Explanation, StringComparison.OrdinalIgnoreCase);
         Assert.Empty(fakeChatClient.ReceivedMessages); // Should not call LLM
     }
     
@@ -149,7 +150,7 @@ public class FaithfulnessMetricTests
     }
     
     [Fact]
-    public async Task EvaluateAsync_EmptyContext_ReturnsFail()
+    public async Task EvaluateAsync_EmptyContext_IsNotMeasured()
     {
         // Arrange
         var fakeChatClient = new FakeChatClient();
@@ -167,7 +168,8 @@ public class FaithfulnessMetricTests
         
         // Assert
         Assert.False(result.Passed);
-        Assert.Contains("requires context", result.Explanation, StringComparison.OrdinalIgnoreCase);
+        Assert.False(result.Measured);   // not measured, never a fail (B12i)
+        Assert.Contains("requires a retrieved context", result.Explanation, StringComparison.OrdinalIgnoreCase);
     }
     
     [Fact]

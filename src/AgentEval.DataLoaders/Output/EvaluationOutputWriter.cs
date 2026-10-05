@@ -268,6 +268,11 @@ public class EvaluationOutputWriter
 
         foreach (var metric in metrics)
         {
+            if (!metric.Measured)   // B12i
+            {
+                _output.WriteLine($"   – {metric.MetricName}: not measured ({metric.Explanation ?? "no explanation"})");
+                continue;
+            }
             var passIcon = metric.Passed ? "✓" : "✗";
             _output.WriteLine($"   {passIcon} {metric.MetricName}: {metric.Score:F2} ({metric.Explanation ?? "no explanation"})");
         }
@@ -318,6 +323,7 @@ public class EvaluationOutputWriter
                 name = m.MetricName,
                 score = m.Score,
                 passed = m.Passed,
+                measured = m.Measured,   // B12i
                 explanation = m.Explanation
             }),
             failure = result.Failure is null ? null : new
