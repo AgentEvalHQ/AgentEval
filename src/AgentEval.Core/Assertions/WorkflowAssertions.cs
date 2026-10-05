@@ -223,11 +223,16 @@ public class WorkflowAssertionBuilder
     /// score. When no executor can be checked (e.g. <c>null</c>), the assertion fails: nothing was checked.</param>
     /// <param name="minScore">Minimum acceptable overall fidelity score in [0, 1]. Defaults to 1.0 (exact).</param>
     /// <param name="because">Optional reason for the assertion.</param>
+    /// <param name="allowUncheckedExecutors">By default an executor that could not be checked fails the assertion, as the
+    /// <c>bench workflow-trace-fidelity</c> verdict withholds its pass (#203 review round 7, B10af). Set <c>true</c> to judge
+    /// only the checked executors — e.g. for a workflow whose router or function executors never call a model and so can
+    /// never carry a chat trace.</param>
     [StackTraceHidden]
     public WorkflowAssertionBuilder HaveTraceFidelity(
         IReadOnlyDictionary<string, AgentTrace>? chatTraces = null,
         double minScore = 1.0,
-        string? because = null)
+        string? because = null,
+        bool allowUncheckedExecutors = false)
     {
         if (minScore < 0.0 || minScore > 1.0 || double.IsNaN(minScore))
         {
@@ -244,7 +249,17 @@ public class WorkflowAssertionBuilder
                 $"Expected workflow trace fidelity >= {minScore:F2} but nothing could be checked: no executor had a " +
                 "chat-boundary trace to reconcile against (pass per-executor chat traces, e.g. WorkflowTrace.ExecutorTraces).");
         }
-        else if (result.Score.Value < minScore)
+        else if (!allowUncheckedExecutors
+                 && result.Details.SubResults?.Where(s => s.Score.Label == "skipped").Select(s => s.Metric.Name).ToList()
+                    is { Count: > 0 } uncheckedNames)
+        {
+            // A pass on part of the executors is withheld by the bench verdict; the assertion said nothing (B10af).
+            AddFailure(
+                $"Expected workflow trace fidelity >= {minScore:F2} for every executor, but {uncheckedNames.Count} could not be " +
+                $"checked (no chat-boundary trace): {string.Join(", ", uncheckedNames)}. Supply their chat traces, or pass " +
+                "allowUncheckedExecutors: true to judge only the checked ones.");
+        }
+        if (result.Score.Label != "skipped" && result.Score.Value < minScore)
         {
             // The reconciler leaves the root Evidence null and attaches per-executor evidence (executor id +
             // framework-vs-chat detail) to each sub-result; surface the DIVERGING executors' messages (checked ones only).

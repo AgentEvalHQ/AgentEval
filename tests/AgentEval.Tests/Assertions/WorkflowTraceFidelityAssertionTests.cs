@@ -68,6 +68,20 @@ public class WorkflowTraceFidelityAssertionTests
         Assert.Contains("nothing could be checked", ex.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void PartlyChecked_Fails_UnlessUncheckedExecutorsAreAllowed()
+    {
+        // Review round 7 M-B (B10af): the bench verdict withholds a pass that rests on some executors (warn, exit 10);
+        // the assertion passed it.
+        var result = Result(Step("a", 10, 5, "stop"), Step("router", 0, 0, null));
+        var traces = new Dictionary<string, AgentTrace> { ["a"] = ChatTrace(15, "stop") };
+
+        var ex = Assert.Throws<WorkflowAssertionException>(() => result.Should().HaveTraceFidelity(traces).Validate());
+        Assert.Contains("router", ex.Message, StringComparison.Ordinal);
+
+        result.Should().HaveTraceFidelity(traces, allowUncheckedExecutors: true).Validate();   // judged on "a" alone
+    }
+
     [Theory]
     [InlineData(-0.1)]
     [InlineData(1.5)]

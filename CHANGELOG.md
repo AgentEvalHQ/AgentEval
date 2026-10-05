@@ -103,8 +103,9 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   trace (`NoTruth`) scored 1.0 and counted as passed, and a run with none read PASS at 100%, exit 0 — every live MAF
   `InProcessExecution` run today. `bench trace-fidelity` did the same for a chat trace with no model responses. Now an
   unchecked executor is `skipped`; a run with nothing checked has no verdict (`skipped`, exit 11); a pass that rests
-  on some executors is withheld (`warn`, exit 10). `HaveTraceFidelity()` fails when nothing could be checked (it
-  passed).
+  on some executors is withheld (`warn`, exit 10). `HaveTraceFidelity()` agrees: it fails when nothing could be
+  checked (it passed), and when some executors could not be checked unless `allowUncheckedExecutors: true` (for a
+  workflow whose router or function executors never call a model).
 - **A composite's pass could hide a part that warned or failed under the default `Averaged` effect.** A component left to
   the score (no `OnFailure` effect, the default for your own composites) whose own verdict was warn or fail was averaged
   into a parent pass without a word. The verdict is unchanged — averaging is what the author asked for, and the GDPR /
