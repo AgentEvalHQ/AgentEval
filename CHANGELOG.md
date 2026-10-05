@@ -108,7 +108,8 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   unchanged.) The compliance composites also name what they left unmeasured when they already warn or fail (a NIST run that warned
   on MEASURE.2.5 did not mention MEASURE.2.10, all inconclusive), drop the "✅ Strong security posture" / "All
   evaluated … meet thresholds" line when their pass is withheld — so do the five frameworks' `report.md` /
-  `report.json`, which say instead what was not measured — and a NIST control whose attack declared it cannot measure
+  `report.json`, which say instead what was not measured, including a judge call that failed (new
+  `GenerateReport(result, incompleteReason)` overloads on the OWASP / MITRE / NIST benchmark runs) — and a NIST control whose attack declared it cannot measure
   here says so instead of "no mapped attack ran". An incomplete `bench owasp|mitre|nist` run's warn or fail composite
   now says it was incomplete too. Truncation messages name both causes (`FailFast` or the overall timeout), and the
   `HavePassed()` / `BeConclusive()` assertions fail a timed-out scan saying where it stopped.

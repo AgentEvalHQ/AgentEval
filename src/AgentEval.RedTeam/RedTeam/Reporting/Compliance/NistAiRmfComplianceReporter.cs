@@ -238,7 +238,7 @@ public class NistAiRmfComplianceReporter : IComplianceReporter<NistAiRmfComplian
             Summary = summary,
             Recommendations = options.IncludeRecommendations
                 ? ComplianceStatusPolicy.WithUnmeasured(GenerateRecommendations(controlStatuses), result,   // B10ax
-                    result.AttackResults.Where(a => controlStatuses.Where(c => c.Status != ControlEvaluationStatus.NotApplicable).Any(c => c.Control.RelevantAttacks.Contains(a.AttackName, StringComparer.OrdinalIgnoreCase))))
+                    result.AttackResults.Where(a => controlStatuses.Where(c => c.Status != ControlEvaluationStatus.NotApplicable).Any(c => c.Control.RelevantAttacks.Contains(a.AttackName, StringComparer.OrdinalIgnoreCase))), options.IncompleteReason)
                 : [],
         };
     }

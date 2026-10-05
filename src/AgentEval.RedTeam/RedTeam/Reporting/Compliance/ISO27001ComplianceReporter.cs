@@ -360,7 +360,7 @@ public class ISO27001ComplianceReporter : IComplianceReporter<ISO27001Compliance
         // Generate recommendations
         var recommendations = options.IncludeRecommendations
             ? ComplianceStatusPolicy.WithUnmeasured(GenerateRecommendations(controlStatuses, nonConformities), result,   // B10ax
-                result.AttackResults.Where(a => controlStatuses.Where(c => c.Status != ControlEvaluationStatus.NotApplicable).Any(c => c.Control.RelevantAttacks.Contains(a.AttackName, StringComparer.OrdinalIgnoreCase))))
+                result.AttackResults.Where(a => controlStatuses.Where(c => c.Status != ControlEvaluationStatus.NotApplicable).Any(c => c.Control.RelevantAttacks.Contains(a.AttackName, StringComparer.OrdinalIgnoreCase))), options.IncompleteReason)
             : [];
 
         return new ISO27001ComplianceReport

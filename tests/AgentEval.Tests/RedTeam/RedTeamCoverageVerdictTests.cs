@@ -269,6 +269,8 @@ public class RedTeamCoverageVerdictTests
         Assert.Contains("var indeterminate = IncompleteRunPolicy.IsIndeterminate(compositeEval, incompleteReasons);", source, StringComparison.Ordinal);
         Assert.Contains("var verdict = indeterminate ? \"WARN\"", source, StringComparison.Ordinal);
         Assert.Contains("if (indeterminate)", source, StringComparison.Ordinal);
+        // B10ay: report.md / report.json are regenerated once the incomplete reasons are known.
+        Assert.Contains("report = benchmark.GenerateReport(redTeamResult, string.Join(\"; \", incompleteReasons));", source, StringComparison.Ordinal);
         Assert.DoesNotContain("var verdict = incomplete ?", source, StringComparison.Ordinal);
     }
 
@@ -477,6 +479,27 @@ public class RedTeamCoverageVerdictTests
         Assert.Equal(measuredWarn.Score.Measurement, annotated.Score.Measurement);
         Assert.StartsWith("INCOMPLETE: the judge failed 1 of 10 grading calls", annotated.Details.Summary, StringComparison.Ordinal);
         Assert.DoesNotContain(annotated.Details.Recommendations!, r => r.StartsWith("✅", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void AnIncompleteRunsReport_SaysSo_InsteadOfAnAllClear()
+    {
+        // Review round 11 M1 (B10ay): a judge call that failed withheld the composite's pass (WARN, exit 11), but the bench
+        // commands wrote report.md / report.json before they knew it - "✅ Strong security posture", no word of it.
+        var clean = Result(Attack("PromptInjection", "LLM01", resisted: 10, inconclusive: 0, mitre: ["AML.T0051"]));
+        const string reason = "the judge failed 1 of 11 grading calls";
+
+        foreach (var (name, recs, complete) in new (string, IReadOnlyList<string>, IReadOnlyList<string>)[]
+                 {
+                     ("OWASP", OwaspBenchmark.Top10().GenerateReport(clean, reason).Recommendations, OwaspBenchmark.Top10().GenerateReport(clean).Recommendations),
+                     ("MITRE", MitreBenchmark.AtlasBaseline().GenerateReport(clean, reason).Recommendations, MitreBenchmark.AtlasBaseline().GenerateReport(clean).Recommendations),
+                     ("NIST", NistBenchmark.RmfSmoke().GenerateReport(clean, reason).Recommendations, NistBenchmark.RmfSmoke().GenerateReport(clean).Recommendations),
+                 })
+        {
+            Assert.True(complete.Any(x => x.StartsWith("✅", StringComparison.Ordinal)), $"{name}: a complete run keeps its all-clear");
+            Assert.DoesNotContain(recs, x => x.StartsWith("✅", StringComparison.Ordinal));
+            Assert.Contains(recs, x => x.Contains("the run was incomplete: the judge failed 1 of 11 grading calls", StringComparison.Ordinal));
+        }
     }
 
     [Fact]

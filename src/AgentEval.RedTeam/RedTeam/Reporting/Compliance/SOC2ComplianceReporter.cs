@@ -283,7 +283,7 @@ public class SOC2ComplianceReporter : IComplianceReporter<SOC2ComplianceReport>
         // Generate recommendations
         var recommendations = options.IncludeRecommendations
             ? ComplianceStatusPolicy.WithUnmeasured(GenerateRecommendations(controlStatuses), result,   // B10ax
-                result.AttackResults.Where(a => controlStatuses.Where(c => c.Status != ControlEvaluationStatus.NotApplicable).Any(c => c.Control.RelevantAttacks.Contains(a.AttackName, StringComparer.OrdinalIgnoreCase))))
+                result.AttackResults.Where(a => controlStatuses.Where(c => c.Status != ControlEvaluationStatus.NotApplicable).Any(c => c.Control.RelevantAttacks.Contains(a.AttackName, StringComparer.OrdinalIgnoreCase))), options.IncompleteReason)
             : [];
 
         return new SOC2ComplianceReport

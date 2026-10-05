@@ -102,10 +102,16 @@ public sealed class NistBenchmarkRun
     }
 
     /// <summary>Generates the rich <see cref="NistAiRmfComplianceReport"/> from an existing result (pure projection).</summary>
-    public NistAiRmfComplianceReport GenerateReport(RedTeamResult result)
+    public NistAiRmfComplianceReport GenerateReport(RedTeamResult result) => GenerateReport(result, incompleteReason: null);
+
+    /// <summary>
+    /// <see cref="GenerateReport(RedTeamResult)"/> for a run that was incomplete — a judge call failed, or the scan ran out
+    /// of time — so the report says so instead of an all-clear (#203 review round 11, B10ay).
+    /// </summary>
+    public NistAiRmfComplianceReport GenerateReport(RedTeamResult result, string? incompleteReason)
     {
         ArgumentNullException.ThrowIfNull(result);
-        return _reporter.GenerateReport(result);
+        return _reporter.GenerateReport(result, incompleteReason is null ? null : new ComplianceReportOptions { IncompleteReason = incompleteReason });
     }
 
     /// <summary>Adapter that lets NIST results flow through the output-store + audit-chain pipeline. Resolves the

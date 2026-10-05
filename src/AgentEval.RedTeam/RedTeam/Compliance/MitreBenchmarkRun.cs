@@ -137,12 +137,18 @@ public sealed class MitreBenchmarkRun
     /// Generates the rich <see cref="MITREATLASReport"/> from an existing
     /// <see cref="RedTeamResult"/>. Pure projection — does not re-run the scan.
     /// </summary>
-    public MITREATLASReport GenerateReport(RedTeamResult result)
+    public MITREATLASReport GenerateReport(RedTeamResult result) => GenerateReport(result, incompleteReason: null);
+
+    /// <summary>
+    /// <see cref="GenerateReport(RedTeamResult)"/> for a run that was incomplete — a judge call failed, or the scan ran out
+    /// of time — so the report says so instead of an all-clear (#203 review round 11, B10ay).
+    /// </summary>
+    public MITREATLASReport GenerateReport(RedTeamResult result, string? incompleteReason)
     {
         ArgumentNullException.ThrowIfNull(result);
         // Capture the agent's response excerpt in findings (security cert run against the
         // operator's own agent). The attack prompt + judge reason are carried regardless.
-        return _reporter.GenerateReport(result, new ComplianceReportOptions { IncludeEvidence = true });
+        return _reporter.GenerateReport(result, new ComplianceReportOptions { IncludeEvidence = true, IncompleteReason = incompleteReason });
     }
 
     /// <summary>

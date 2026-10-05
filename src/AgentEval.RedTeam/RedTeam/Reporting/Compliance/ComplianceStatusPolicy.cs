@@ -141,9 +141,11 @@ internal static class ComplianceStatusPolicy
     /// A framework report's recommendations with what the run left unmeasured applied: when an attack the framework maps
     /// measured nothing, most of its probes were inconclusive, or the scan stopped early, the all-clear line ("✅ …") gives
     /// way to one saying what was not measured — report.md / report.json said "✅ Strong security posture" beside a
-    /// withheld pass (#203 review round 10, B10ax).
+    /// withheld pass (#203 review round 10, B10ax) — and the run's own incompleteness (a judge call that failed), which the
+    /// bench commands pass as <see cref="ComplianceReportOptions.IncompleteReason"/> (round 11 M1, B10ay).
     /// </summary>
-    public static List<string> WithUnmeasured(List<string> recommendations, RedTeamResult result, IEnumerable<AttackResult> mapped)
+    public static List<string> WithUnmeasured(List<string> recommendations, RedTeamResult result, IEnumerable<AttackResult> mapped,
+        string? incompleteReason = null)
     {
         ArgumentNullException.ThrowIfNull(recommendations);
         ArgumentNullException.ThrowIfNull(result);
@@ -156,6 +158,8 @@ internal static class ComplianceStatusPolicy
             unmeasured.Add(thin);
         if (result.WasTruncated)
             unmeasured.Add($"the scan stopped after {result.TotalProbes} of {result.PlannedProbes} planned probes");
+        if (incompleteReason is not null)
+            unmeasured.Add($"the run was incomplete: {incompleteReason}");
         if (unmeasured.Count == 0)
             return recommendations;
         return [.. recommendations.Where(r => !r.StartsWith("✅", StringComparison.Ordinal)),

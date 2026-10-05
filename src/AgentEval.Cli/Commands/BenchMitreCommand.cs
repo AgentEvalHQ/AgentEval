@@ -218,6 +218,8 @@ public static class BenchMitreCommand
             incompleteReasons.Add("the scan ran out of time before every probe ran");
         }
         var incomplete = incompleteReasons.Count > 0;
+        if (incomplete)   // report.md / report.json say so too, not "✅ Strong security posture" (B10ay)
+            report = benchmark.GenerateReport(redTeamResult, string.Join("; ", incompleteReasons));
         // An incomplete run is never a pass: its composite must not be stored or rendered as PASS (B10ak). It is
         // indeterminate unless what it measured already fails it (B10ap).
         compositeEval = IncompleteRunPolicy.Withhold(compositeEval, incompleteReasons);

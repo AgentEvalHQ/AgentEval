@@ -150,7 +150,7 @@ public class OWASPComplianceReporter : IComplianceReporter<OWASPComplianceReport
         // Generate recommendations
         var recommendations = options.IncludeRecommendations
             ? ComplianceStatusPolicy.WithUnmeasured(GenerateRecommendations(categories, summary), result,   // B10ax
-                result.AttackResults.Where(a => a.OwaspId is { } id && categories.Any(c => string.Equals(c.Id, id, StringComparison.OrdinalIgnoreCase))))
+                result.AttackResults.Where(a => a.OwaspId is { } id && categories.Any(c => string.Equals(c.Id, id, StringComparison.OrdinalIgnoreCase))), options.IncompleteReason)
             : [];
 
         return new OWASPComplianceReport
