@@ -119,8 +119,9 @@ The composite verdict is determined after aggregation. `warn` is a soft fail: `P
 
 After the matrix, each component's `EvalComponent.OnFailure` applies to a component that ran and failed: `Fail`
 makes the composite `"fail"`, `Warn` turns a `"pass"` into `"warn"` and the summary names the component, and
-`Averaged` (the default) leaves it to the score. The effect only escalates, and a component that only warned
-passes a warn up, never a fail. The agentic presets set it on every component (see the agentic getting-started
+`Averaged` (the default) leaves it to the score. The effect only escalates: under `Fail` or `Warn`, a component that
+only warned passes a warn up, never a fail. `FailUnlessPass` is for a security gate's checks: the composite fails on
+anything short of a pass, a warn included (fail-closed). The agentic presets set it on every component (see the agentic getting-started
 guide, "What a preset's verdict means").
 
 Skipped, inapplicable and errored components are left out of the score, so they never count as 0. Rows 6 and 7 stop

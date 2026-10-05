@@ -30,8 +30,9 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   withheld (WARN, the dissent named) rather than failing through the worst judge's severity.
 - **Judges see what they grade, and grade with their own rubric.** With `bench agentic --trace`, the tool checks receive
   the run's tool calls and definitions, and the judges whose rubric names tool calls are shown them. Every agentic LLM
-  check sends its rubric file as the judge's system prompt and takes its verdict from the rubric's own bands; a score in
-  a rubric's needs-review band is a WARN ("Not confirmed"), not a FAIL.
+  check sends its rubric file as the judge's system prompt and takes its verdict from the rubric's own bands. A score in
+  a rubric's needs-review band makes a quality or accuracy preset WARN ("Not confirmed"); the security gates fail on
+  anything short of a pass.
 - **Calibration reports only measured verdicts.** A judge outage is INFRA-FAIL; an evaluator not measured on every
   record is left out whole (INCOMPLETE).
 - **Versions** (the ones this release ships): `unsafe_tool_use` 1.2.0, `tool_call_success` 1.2.0,
@@ -110,8 +111,10 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   rubrics), reads the reply on the rubric's scale — a score off it, or none, is `error`, never a grade — and takes its
   verdict from the rubric's band table: pass at the check's threshold, the rubric's `needs_review` / `warn` band is a
   `warn` (not passed, not a confirmed failure), below it fails. The severity is the rubric's own where it has a table. A
-  preset whose accuracy or safety check comes back `warn` reads WARN, "Not confirmed: <check>": borderline content a
-  safety rubric calls `needs_review` (e.g. hate 0.75–0.95, severity low) no longer reads as a critical FAIL. The
+  preset whose accuracy check comes back `warn` reads WARN, "Not confirmed: <check>". The security gates (Safety,
+  AdversarialDirect, and Glass Box's injection, argument-leak and tool-reliability checks) fail closed on anything short
+  of a pass — new `ComponentFailureEffect.FailUnlessPass` — so borderline content a safety rubric calls `needs_review`
+  (e.g. hate 0.75–0.95) fails the gate, at the rubric's own severity (low, not critical: the score is not capped). The
   content-safety classifier path follows the same bands. Three rubrics had contradictory label tables
   (`system-prompt-leakage`, `ungrounded-attributes`, `unsafe-tool-use`: a fail row overlapping the needs-review rows),
   fixed to match their severity tables; the Glass Box `system_prompt_injection` check had no rubric and has one now

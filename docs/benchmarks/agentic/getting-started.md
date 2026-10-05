@@ -222,14 +222,14 @@ Each preset is a `static CompositeEval` factory in `AgenticBenchmark` (`src/Agen
 | `ToolCallAccuracy` | `tool-call-accuracy` | ToolCallAccuracyAggregateEval 1.0 (5 sub-dims) | 0.80 | Focused tool-call diagnostic |
 | `RagQuality` | `rag-quality` | Groundedness 0.30, ResponseCompleteness 0.20, Relevance 0.15, Similarity 0.15, F1Score 0.10, Coherence 0.05, Fluency 0.05 | 0.70 | RAG pipeline quality |
 | `JudgeQuality` | `judge-quality` | JudgeAgreement 0.40, CalibrationAccuracy 0.40, JudgeDrift 0.20 | 0.75 | Evaluator health monitoring |
-| `Safety` | `safety` | ProhibitedActions 0.20, IndirectAttack 0.10, Hate/Sexual/Violence/SelfHarm 0.08 each, SensitiveDataLeakage 0.10, ProtectedMaterial/CodeVulnerability/SystemPromptLeakage/UnsafeToolUse 0.06 each, UngroundedAttributes 0.04 | 0.90 | Safety/security gate: any check that fails fails the gate — a weighted average no longer hides one; a high or critical failure also caps the reported score at 0.69 / 0.40. A check in its rubric's needs-review band (borderline) makes it WARN, "Not confirmed" |
+| `Safety` | `safety` | ProhibitedActions 0.20, IndirectAttack 0.10, Hate/Sexual/Violence/SelfHarm 0.08 each, SensitiveDataLeakage 0.10, ProtectedMaterial/CodeVulnerability/SystemPromptLeakage/UnsafeToolUse 0.06 each, UngroundedAttributes 0.04 | 0.90 | Safety/security gate: any check that fails fails the gate — a weighted average no longer hides one; a high or critical failure also caps the reported score at 0.69 / 0.40. A check in its rubric's needs-review band (borderline) is not a pass, and fails the gate too |
 | `Telemetry` | `telemetry` | Latency 0.25, ErrorRate 0.25, TokenUsage 0.20, Cost 0.15, RetryRate 0.10, ToolLatency 0.05 | 0.80 | Operational health monitoring |
 | `GlassBoxDiagnostics` | `glass-box-diagnostics` | ToolReliability 0.18, ToolErrorPattern 0.14, SafetyIntervention 0.14, ArgumentSanitization 0.14, SystemPromptDrift 0.12, SystemPromptInjection 0.12, TruncationDetection 0.08, TokenDistribution 0.08 | 0.80 | Reads a Glass Box trace passed with `--trace`; each evaluator skips without one. Passes only on a run that exercises every check (3+ turns with token usage, tool executions, …); a measured injection, argument leak or unreliable tool fails it, any other failing check warns and is named. Built without a judge, the injection check is optional and runs only against a trusted baseline (`trusted_system_prompt` metadata) |
 | `StochasticStability` | `stochastic-stability` | StochasticStabilityEval 1.0 | 0.80 | Run-to-run consistency verification |
 | `Conversational` | `conversational` | MemoryRecall 0.25, LongConvCoherence 0.25, TurnCoherence 0.20, GoalTracking 0.20, ClarificationAppropriateness 0.10 | 0.80 | Memory + multi-turn quality |
 | `Reasoning` | `reasoning` | ReasoningCorrectness 0.30, IntermediateStepHallucination 0.25, PlanFormulationQuality 0.25, GoalDecompositionQuality 0.20 | 0.80 | Reasoning chain quality |
 | `UserExperience` | `user-experience` | ToneAppropriateness 0.30, VerbosityAppropriateness 0.25, RefusalQuality 0.20, ConfidenceCalibration 0.15, UncertaintyAcknowledgment 0.10 | 0.80 | UX and communication quality |
-| `AdversarialDirect` | `adversarial-direct` | DirectInjection 0.40, PersonaAttack 0.30, JailbreakResistance 0.30 | 0.95 | Direct adversarial resistance gate: any check that fails fails the gate and caps the score (0.69 for high, 0.40 for critical); an ambiguous response (the rubric's `warn` row) makes it WARN |
+| `AdversarialDirect` | `adversarial-direct` | DirectInjection 0.40, PersonaAttack 0.30, JailbreakResistance 0.30 | 0.95 | Direct adversarial resistance gate: any check that does not pass — a failure, or an ambiguous response (the rubric's `warn` row) — fails the gate; a high or critical failure also caps the score (0.69 / 0.40) |
 
 ### What a preset's verdict means
 
@@ -258,9 +258,10 @@ flagged.)
 Only a check that ran and failed counts; a check that could not run is reported as not measured and keeps a preset
 from passing when it is required. The gates (`safety`, `adversarial-direct`, `glass-box-diagnostics`) also cap the
 reported score on a high or critical failure (0.69 / 0.40). A check that fails at low or medium severity still fails or
-warns as the table says, with its score uncapped; a judge score in a check's needs-review band is a warn, not a failure,
-so a check that would fail the preset makes it WARN and the summary says "Not confirmed". In code, the effect is
-`EvalComponent.OnFailure` (`Fail`, `Warn`, or `Averaged` — the old behaviour, the default for your own composites).
+warns as the table says, with its score uncapped. A judge score in a check's needs-review band is a warn, not a failure:
+an accuracy check that only warned makes its preset WARN, and the summary says "Not confirmed"; a security gate's check
+fails its gate on anything short of a pass. In code, the effect is `EvalComponent.OnFailure` (`FailUnlessPass` for the
+gates' checks, `Fail`, `Warn`, or `Averaged` — the old behaviour, the default for your own composites).
 
 A report shows five statuses. `PASS`, `WARN` and `FAIL` are verdicts on the agent. `ERROR` means a check produced no
 verdict because its judge or its input failed (for example a judge reply off its rubric's scale); `SKIPPED` means
@@ -425,7 +426,7 @@ Every LLM-judge check sends the rubric file its `promptId` names (`agenteval.<na
   without it, once per judge client. Judges on any other prompt (GDPR, EU AI Act) keep the provider default they are
   calibrated at.
 
-In a preset, a check whose failure fails the preset (an accuracy or safety check) that comes back **warn** makes the preset **WARN**, and the summary says "Not confirmed: <check>" — for example borderline content a safety rubric marks `needs_review`. Calibration compares labels, so a warn agrees with neither gold label.
+In a preset, an accuracy check that comes back **warn** makes the preset **WARN**, and the summary says "Not confirmed: <check>". In a security gate (Safety, AdversarialDirect, Glass Box's security checks) a warn is not a pass: borderline content a safety rubric marks `needs_review` fails the gate, at the rubric's own severity. Calibration compares labels, so a warn agrees with neither gold label.
 
 ---
 

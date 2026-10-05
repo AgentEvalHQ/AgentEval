@@ -32,4 +32,11 @@ public enum ComponentFailureEffect
 
     /// <summary>The composite fails: an accuracy dimension failed, so the answer cannot be trusted.</summary>
     Fail = 2,
+
+    /// <summary>
+    /// A security gate's check: the composite fails on anything short of a pass — a failure, or a needs-review
+    /// <c>warn</c> (fail-closed). Under <see cref="Fail"/> a check that only warned makes the composite warn, "not
+    /// confirmed"; a gate does not let a borderline result through (#203 review round 3, B10c).
+    /// </summary>
+    FailUnlessPass = 3,
 }

@@ -53,7 +53,7 @@ public class CompositeEvalMonotonicityTests
 
     public static IEnumerable<object[]> Shapes()
     {
-        var effects = new[] { ComponentFailureEffect.Averaged, ComponentFailureEffect.Warn, ComponentFailureEffect.Fail };
+        var effects = new[] { ComponentFailureEffect.Averaged, ComponentFailureEffect.Warn, ComponentFailureEffect.Fail, ComponentFailureEffect.FailUnlessPass };
         foreach (var a in Parts)
             foreach (var b in Parts)
                 foreach (var effect in effects)

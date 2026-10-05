@@ -335,12 +335,21 @@ public sealed class CompositeEval : IEval
                         && !p.Sub.Score.Passed
                         && p.Sub.Score.Label is "fail" or "warn")
             .ToArray();
+        // A Fail component fails the composite on a measured failure; a FailUnlessPass one (a security gate's check) on
+        // anything short of a pass, a needs-review warn included (B10c).
+        static bool FailsIt(EvalComponent component, EvalResult sub) =>
+            component.OnFailure == ComponentFailureEffect.FailUnlessPass
+            || (component.OnFailure == ComponentFailureEffect.Fail && sub.Score.Label == "fail");
         var failingAccuracy = effectsFired
-            .Where(p => p.Component.OnFailure == ComponentFailureEffect.Fail && p.Sub.Score.Label == "fail")
+            .Where(p => FailsIt(p.Component, p.Sub))
+            .Select(p => p.Sub.Metric.Key)
+            .ToArray();
+        var gateNotPassed = effectsFired
+            .Where(p => p.Component.OnFailure == ComponentFailureEffect.FailUnlessPass && p.Sub.Score.Label == "warn")
             .Select(p => p.Sub.Metric.Key)
             .ToArray();
         var notOptimal = effectsFired
-            .Where(p => !(p.Component.OnFailure == ComponentFailureEffect.Fail && p.Sub.Score.Label == "fail"))
+            .Where(p => !FailsIt(p.Component, p.Sub))
             .Select(p => p.Sub.Metric.Key)
             .ToArray();
         // A required part that errored does not change it either (B6c-10): more measurement cannot turn a measured
@@ -454,6 +463,9 @@ public sealed class CompositeEval : IEval
         string? effectNote = failingAccuracy.Length > 0
             ? $"Failed: {string.Join(", ", failingAccuracy)} — a dimension whose failure means the answer cannot be " +
               "trusted, so the verdict is fail." +
+              (gateNotPassed.Length > 0
+                  ? $" In a security gate a needs-review score is not a pass: {string.Join(", ", gateNotPassed)}."
+                  : "") +
               (unconfirmed.Length > 0 ? $" Also not confirmed: {string.Join(", ", unconfirmed)}." : "") +
               (quality.Length > 0 ? $" Also not optimal: {string.Join(", ", quality)}." : "")
             : unconfirmedText is not null || qualityText is not null

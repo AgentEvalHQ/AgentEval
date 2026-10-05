@@ -28,8 +28,10 @@ public class AgenticPresetVerdictTests
     }
 
     // A component forced to a measured verdict, keeping its key so the summary can name it.
-    private sealed class Forced(IEval inner, bool pass) : IEval
+    private sealed class Forced(IEval inner, string label) : IEval
     {
+        public Forced(IEval inner, bool pass) : this(inner, pass ? "pass" : "fail") { }
+
         public string Key => inner.Key;
         public string Name => inner.Name;
         public string Category => inner.Category;
@@ -37,7 +39,9 @@ public class AgenticPresetVerdictTests
 
         public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default) => Task.FromResult(new EvalResult(
             new(Key, Name, Category, Version),
-            new EvalScore(pass ? 1.0 : 0.3, null, pass ? "pass" : "fail", pass, null, pass ? "none" : "medium", null),
+            // A warn is a judge score in its rubric's needs-review band: 0.8, low severity, not passed.
+            new EvalScore(label switch { "pass" => 1.0, "warn" => 0.8, _ => 0.3 }, null, label, label == "pass", null,
+                label switch { "pass" => "none", "warn" => "low", _ => "medium" }, null),
             new(null, null, null, null, null),
             new("atomic-code", null, null, null, null, 0, false),
             DateTimeOffset.UtcNow));
@@ -97,6 +101,37 @@ public class AgenticPresetVerdictTests
 
     [Theory]
     [MemberData(nameof(Presets))]
+    public async Task AnyOneComponentNeedingReview_NeverReadsPass_AndASecurityGateFails(string preset)
+    {
+        // Review round 3 H3 / B10c: a needs-review score (a warn) FAILed AdversarialDirect and prohibited_actions (through a
+        // threshold or a severity cap) but WARNed on hate — and the docs promised WARN. A security gate's check now fails
+        // its gate on anything short of a pass; an accuracy check that only warned makes its preset warn, "Not confirmed".
+        var built = Build(preset);
+        var wrong = new List<string>();
+        for (var i = 0; i < built.Components.Count; i++)
+        {
+            var component = built.Components[i];
+            var result = await built.WithComponents(built.Components
+                    .Select((c, j) => c with { Eval = new Forced(c.Eval, j == i ? "warn" : "pass") }).ToList())
+                .EvaluateAsync(new EvalInput("q", "r"));
+            var key = component.Eval.Key;
+            var named = result.Details.Summary?.Contains(key, StringComparison.Ordinal) == true;
+
+            var ok = component.OnFailure switch
+            {
+                ComponentFailureEffect.FailUnlessPass => result.Score.Label == "fail" && named,
+                ComponentFailureEffect.Fail or ComponentFailureEffect.Warn => result.Score.Label is "warn" or "fail" && named,
+                _ => false,
+            };
+            if (!ok)
+                wrong.Add($"{key} ({component.OnFailure}) → {result.Score.Label} \"{result.Details.Summary}\"");
+        }
+
+        Assert.True(wrong.Count == 0, $"{preset}: " + string.Join("; ", wrong));
+    }
+
+    [Theory]
+    [MemberData(nameof(Presets))]
     public async Task AnyOneComponentFailing_NeverReadsPass_AndAnAccuracyFailureFails(string preset)
     {
         var built = Build(preset);
@@ -110,7 +145,7 @@ public class AgenticPresetVerdictTests
 
             var ok = component.OnFailure switch
             {
-                ComponentFailureEffect.Fail => result.Score.Label == "fail",
+                ComponentFailureEffect.Fail or ComponentFailureEffect.FailUnlessPass => result.Score.Label == "fail",
                 // A quality dimension warns and is named — or fails, when it weighs enough to sink the average.
                 ComponentFailureEffect.Warn => result.Score.Label == "fail"
                     || (result.Score.Label == "warn" && result.Details.Summary?.Contains(key, StringComparison.Ordinal) == true),
