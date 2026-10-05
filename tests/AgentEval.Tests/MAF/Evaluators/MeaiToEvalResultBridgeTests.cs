@@ -114,6 +114,45 @@ public class MeaiToEvalResultBridgeTests
         Assert.False(tree.Score.Passed);
     }
 
+    // What AgentEvalCompositeEvaluator emits for a passing composite with one failed (informational) leaf.
+    private static (string, Microsoft.Extensions.AI.Evaluation.EvaluationMetric)[] PassingCompositeWithAFailedLeaf(string prefix = "") =>
+    [
+        ($"{prefix}Comp (overall)", new Microsoft.Extensions.AI.Evaluation.NumericMetric("Comp (overall)", 4.2,
+            "AgentEval score: 80/100 (pass, severity none)")),
+        ($"{prefix}b", new Microsoft.Extensions.AI.Evaluation.NumericMetric("b", 3.4,
+            "AgentEval score: 60/100 (fail, severity medium)" + AgentEvalCompositeEvaluator.InformationalLeafNote)),
+    ];
+
+    [Fact]
+    public void AnOverallVerdict_DoesNotHideAnotherEvaluatorsFailedMetric()
+    {
+        // Review round 6 M-5 (B10ad): after HybridEvalInterop.Merge, the query took the "(overall)" leaf's verdict alone, so
+        // a failed Foundry metric beside a passing AgentEval composite read PASS while MAF failed the item.
+        var metrics = PassingCompositeWithAFailedLeaf("local:").Append(
+            ("foundry:relevance", (Microsoft.Extensions.AI.Evaluation.EvaluationMetric)new NumericMetric("relevance", 1.0)
+            {
+                Interpretation = new EvaluationMetricInterpretation(EvaluationRating.Unacceptable, failed: true),
+            }))
+            .Append(("local:" + AgentEvalCompositeEvaluator.FloorDeclarationMetricName,
+                new StringMetric(AgentEvalCompositeEvaluator.FloorDeclarationMetricName, "none floored")))
+            .ToArray();
+
+        var tree = MeaiToEvalResultBridge.Build("Eval", new[] { "q1" }, Wrap(ResultWith(metrics)));
+
+        var query = tree.Details.SubResults![0];
+        Assert.Equal("fail", query.Score.Label);
+        Assert.False(tree.Score.Passed);
+        Assert.DoesNotContain(query.Details.SubResults!, l => l.Metric.Key.Contains("chance-floor", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void AnOverallVerdict_StillDecidesOverItsOwnInformationalLeaves()
+    {
+        var tree = MeaiToEvalResultBridge.Build("Eval", new[] { "q1" }, Wrap(ResultWith(PassingCompositeWithAFailedLeaf())));
+
+        Assert.Equal("pass", tree.Details.SubResults![0].Score.Label);   // the failed leaf "b" is the composite's own
+    }
+
     [Fact]
     public void ARunWhoseOnlyQueryWithheldItsPass_Withholds_NotSkipped()
     {

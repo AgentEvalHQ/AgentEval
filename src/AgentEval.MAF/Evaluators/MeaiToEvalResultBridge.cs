@@ -62,21 +62,28 @@ public static class MeaiToEvalResultBridge
             // share a metric name — using it as the leaf key keeps the EvalResult tree keys unique.
             // The chance-floor declaration is a statement about the tree, not a score: rendering it as a
             // leaf used to show a "100/100 pass" node that measured nothing.
-            var leaves = meai.Metrics
-                .Where(kv => !string.Equals(kv.Key, AgentEvalCompositeEvaluator.FloorDeclarationMetricName, StringComparison.Ordinal))
-                .Select(kv => MetricToLeaf(kv.Key, kv.Value, judgeModel)).ToList();
-            // An AgentEvalCompositeEvaluator item carries its verdict on the "(overall)" metric and marks every leaf
-            // informational, so MAF passes the item on that verdict alone. The report must agree with MAF: the query
-            // node takes its verdict from "(overall)" when present, not from "every leaf passed".
-            var overall = meai.Metrics.Keys.Any(k => k.EndsWith(" (overall)", StringComparison.Ordinal))
-                ? leaves.FirstOrDefault(l => l.Metric.Key.EndsWith(" (overall)", StringComparison.Ordinal))
+            // The floor declaration may carry a "{source}:" prefix after HybridEvalInterop.Merge (B10ad): EndsWith.
+            var entries = meai.Metrics
+                .Where(kv => !kv.Key.EndsWith(AgentEvalCompositeEvaluator.FloorDeclarationMetricName, StringComparison.Ordinal))
+                .Select(kv => (kv.Key, Metric: kv.Value, Leaf: MetricToLeaf(kv.Key, kv.Value, judgeModel)))
+                .ToList();
+            var leaves = entries.Select(e => e.Leaf).ToList();
+            // An AgentEvalCompositeEvaluator item carries its verdict on the "(overall)" metric and marks every leaf of its
+            // own informational, so the report reads that verdict, not "every leaf passed". But only the composite's OWN
+            // leaves are informational: on a merged or multi-evaluator item, the other evaluators' metrics still decide.
+            // The query took the "(overall)" leaf's verdict alone, so a failed Foundry metric beside a passing AgentEval
+            // composite read PASS while MAF failed the item (#203 review round 6, B10ad).
+            var hasOverall = entries.Any(e => e.Key.EndsWith(" (overall)", StringComparison.Ordinal));
+            IReadOnlyList<EvalResult>? deciding = hasOverall
+                ? entries.Where(e => e.Key.EndsWith(" (overall)", StringComparison.Ordinal) || !IsCompositeLeaf(e.Metric))
+                         .Select(e => e.Leaf).ToList()
                 : null;
             queryNodes.Add(Composite(
                 key: $"maf.eval.query{i}",
                 name: $"Query: {Truncate(query, 80)}",
                 category: "agentic",
                 subs: leaves,
-                verdictFrom: overall));
+                decidingSubs: deciding));
         }
 
         return Composite("maf.eval", evalName, "agentic", queryNodes);
@@ -215,22 +222,26 @@ public static class MeaiToEvalResultBridge
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 
-    // Every metric is a required part: read by measurement state (MeasuredRollup, B10q/B10u) unless an "(overall)"
-    // metric carries the item's verdict.
+    // A leaf of an AgentEval composite: informational, its composite's "(overall)" metric decides.
+    private static bool IsCompositeLeaf(EvaluationMetric metric) =>
+        (metric.Interpretation?.Reason ?? metric.Reason)?.Contains(AgentEvalCompositeEvaluator.InformationalLeafNote, StringComparison.Ordinal) == true;
+
+    // Every metric is a required part, read by measurement state (MeasuredRollup, B10q/B10u) — over decidingSubs when
+    // given (an "(overall)" metric and the metrics that are not its composite's own informational leaves), else over all.
     private static EvalResult Composite(
-        string key, string name, string category, IReadOnlyList<EvalResult> subs, EvalResult? verdictFrom = null)
+        string key, string name, string category, IReadOnlyList<EvalResult> subs, IReadOnlyList<EvalResult>? decidingSubs = null)
     {
-        var v = MeasuredRollup.Of(subs);
+        var v = MeasuredRollup.Of(decidingSubs ?? subs);
         return new EvalResult(
             Metric: new EvalMetadata(key, name, category, "1.0.0"),
             Score: new EvalScore(
-                Value: verdictFrom?.Score.Value ?? v.Value,
+                Value: v.Value,
                 Ordinal: null,
-                Label: verdictFrom?.Score.Label ?? v.Label,
-                Passed: verdictFrom?.Score.Passed ?? v.Passed,
+                Label: v.Label,
+                Passed: v.Passed,
                 Threshold: 0.70,
-                Severity: verdictFrom?.Score.Severity ?? v.Severity,
-                Confidence: null) { Measurement = verdictFrom?.Score.Measurement ?? v.Measurement },
+                Severity: v.Severity,
+                Confidence: null) { Measurement = v.Measurement },
             Details: new EvalDetails(
                 Dimensions: null,
                 Evidence: null,

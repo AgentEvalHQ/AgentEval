@@ -76,11 +76,15 @@ public static class UnifiedEvalReport
                 //          └─ metric leaf …
                 var bridged = MeaiToEvalResultBridge.Build(source, queries, result, judgeModel: null);
                 var querySubs = bridged.Details.SubResults ?? [];
-                IReadOnlyList<EvalResult> hybridChildren = querySubs.Count == 1
-                    && querySubs[0].Details.SubResults is { Count: > 0 } leafSubs
-                        ? leafSubs          // single query → expose metric leaves directly
-                        : querySubs;        // multiple queries → keep per-query level
-                branch = Node($"hybrid.{Sanitize(source)}", source, "agentic", hybridChildren, source);
+                var singleQuery = querySubs.Count == 1 && querySubs[0].Details.SubResults is { Count: > 0 };
+                IReadOnlyList<EvalResult> hybridChildren = singleQuery
+                    ? querySubs[0].Details.SubResults!   // single query → expose metric leaves directly
+                    : querySubs;                         // multiple queries → keep per-query level
+                // A single query's verdict is the bridged query node's, which honours an "(overall)" metric (an AgentEval
+                // composite's own verdict); re-rolling the promoted leaves dropped it, so a passing composite read FAIL
+                // with one query and PASS with two (#203 review round 6, B10ac).
+                branch = Node($"hybrid.{Sanitize(source)}", source, "agentic", hybridChildren, source,
+                    verdictFrom: singleQuery ? querySubs[0] : null);
             }
 
             // Attach the provider's portal link (when present) as evidence on the branch. Use the actual
@@ -109,9 +113,11 @@ public static class UnifiedEvalReport
     // beside a passing one read PASS — and read any other non-pass, a quality WARN included, as FAIL/high (#203 review
     // round 5, B10u). An errored part is "error" unless a measured failure decides; nothing measured is no verdict.
     private static EvalResult Node(string key, string name, string category,
-        IReadOnlyList<EvalResult> subs, string provenanceType)
+        IReadOnlyList<EvalResult> subs, string provenanceType, EvalResult? verdictFrom = null)
     {
-        var v = MeasuredRollup.Of(subs);
+        var v = verdictFrom is { } from
+            ? new MeasuredRollup.Verdict(from.Score.Value, from.Score.Label, from.Score.Passed, from.Score.Severity, from.Score.Measurement)
+            : MeasuredRollup.Of(subs);
         return new EvalResult(
             Metric: new EvalMetadata(key, name, category, "1.0.0"),
             Score: new EvalScore(v.Value, null, v.Label, v.Passed, 0.70, v.Severity, null) { Measurement = v.Measurement },

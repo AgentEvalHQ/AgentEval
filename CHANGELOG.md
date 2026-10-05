@@ -81,6 +81,13 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   `skipped` with "No component produced a measurement (0 errored, 0 skipped, 0 inapplicable)", though the parts inside
   were measured — the Tool Call Accuracy preset did this whenever no tool definitions were captured. It now withholds
   too (`warn`, recorded `notMeasured`) and names the components; a breakdown counts the withheld ones.
+- **An AgentEval composite's "(overall)" verdict was both lost and over-trusted in the MAF reports.** With one query,
+  `UnifiedEvalReport` re-rolled the composite's promoted leaves and dropped its "(overall)" verdict, so a passing
+  composite read FAIL with one query and PASS with two. And `MeaiToEvalResultBridge` took the "(overall)" metric's
+  verdict alone for the whole item, so after `HybridEvalInterop.Merge` a failed Foundry metric beside a passing
+  composite read PASS while MAF failed the item. Now a single query keeps the query's verdict, and an item's verdict
+  is its "(overall)" metrics plus every metric that is not that composite's own informational leaf. The
+  source-prefixed chance-floor declaration no longer shows as a leaf.
 - **A custom label that did not pass could read as a pass.** `EvalScore.Label` is a free string; a custom check's
   measured `needs-review` (not passed) is a FAIL by `ReportStatus()`, but a composite's effects read "fail"/"warn"
   literally (so a security gate's `FailUnlessPass` never fired and the gate passed), and the MEAI bridge and unified

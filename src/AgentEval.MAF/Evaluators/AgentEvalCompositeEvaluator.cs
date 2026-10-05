@@ -108,6 +108,13 @@ public sealed class AgentEvalCompositeEvaluator : MEAIIEvaluator
     public const string FloorDeclarationMetricName = "AgentEval chance-floor declaration";
 
     /// <summary>
+    /// Appended to every leaf metric's reason: the leaf is informational, and the composite's "(overall)" metric decides
+    /// the item. <see cref="MeaiToEvalResultBridge"/> reads it to tell the composite's own leaves from other evaluators'
+    /// metrics on the same item.
+    /// </summary>
+    internal const string InformationalLeafNote = " — informational: the composite's (overall) verdict decides this item";
+
+    /// <summary>
     /// The root-level floor this door was constructed with, or <see langword="null"/> when nobody
     /// declared one. Recorded beside every verdict; applied to none.
     /// </summary>
@@ -226,7 +233,7 @@ public sealed class AgentEvalCompositeEvaluator : MEAIIEvaluator
         // verdict from it, so making a leaf informational below loses nothing on the way back.
         var reason = $"AgentEval score: {pct:F0}/100 ({node.Score.Label}, severity {node.Score.Severity})";
         if (!isRoot)
-            reason += " — informational: the composite's (overall) verdict decides this item";
+            reason += InformationalLeafNote;
 
         var metric = new NumericMetric(isRoot ? $"{node.Metric.Name} (overall)" : node.Metric.Name, meaiValue, reason)
         {

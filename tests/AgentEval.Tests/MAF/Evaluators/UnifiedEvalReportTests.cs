@@ -104,6 +104,29 @@ public class UnifiedEvalReportTests
         Assert.Equal("warn", report.Score.Label);
     }
 
+    // What AgentEvalCompositeEvaluator emits for a passing composite with one failed (informational) leaf.
+    private static (string, Microsoft.Extensions.AI.Evaluation.EvaluationMetric)[] PassingCompositeWithAFailedLeaf(string prefix = "") =>
+    [
+        ($"{prefix}Comp (overall)", new Microsoft.Extensions.AI.Evaluation.NumericMetric("Comp (overall)", 4.2,
+            "AgentEval score: 80/100 (pass, severity none)")),
+        ($"{prefix}b", new Microsoft.Extensions.AI.Evaluation.NumericMetric("b", 3.4,
+            "AgentEval score: 60/100 (fail, severity medium)" + AgentEvalCompositeEvaluator.InformationalLeafNote)),
+    ];
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void APassingComposite_ReadsPass_WithOneQueryOrTwo(int queries)
+    {
+        // Review round 6 M-4 (B10ac): with one query the flat branch re-rolled the promoted leaves and dropped the
+        // "(overall)" verdict, so a passing composite read FAIL with 1 query and PASS with 2.
+        var report = UnifiedEvalReport.Build([("agenteval-local",
+            FoundryWith(Enumerable.Repeat(PassingCompositeWithAFailedLeaf(), queries).ToArray()))]);
+
+        Assert.Equal("pass", report.Score.Label);
+        Assert.Equal("pass", Assert.Single(report.Details.SubResults!).Score.Label);
+    }
+
     [Fact]
     public async Task Build_WithComposite_KeepsRichLocalHierarchy()
     {
