@@ -71,6 +71,11 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   through one exclusive rule, `EvalScore.StatsBucket()` / `ToRunStats()` (not measured → Skipped; else `warn` → Warnings;
   else passed or failed), the one `BenchmarkRunner` already used. The memory baseline store computed its skip count and
   then passed it positionally as `Warnings: 0`, so Skipped always read 0; it is written now.
+- **A composite whose only part withheld its pass read "nothing measured".** When every component a composite rests on
+  was a nested composite that withheld its own pass (a required part inside did not run), the composite reported
+  `skipped` with "No component produced a measurement (0 errored, 0 skipped, 0 inapplicable)", though the parts inside
+  were measured — the Tool Call Accuracy preset did this whenever no tool definitions were captured. It now withholds
+  too (`warn`, recorded `notMeasured`) and names the components; a breakdown counts the withheld ones.
 - **A judge that failed read as an agent that failed.** The agentic, GDPR and EU AI Act reports and run summaries, and
   `bench owasp`, `mitre`, `nist` and `perf`, mapped every label but pass and warn to FAIL: a check whose judge answered off
   its rubric's scale (or not at all) showed "FAIL 0%" and "Review failures in …", and a run with nothing measured read

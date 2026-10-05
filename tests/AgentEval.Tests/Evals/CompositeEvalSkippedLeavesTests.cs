@@ -137,6 +137,48 @@ public class CompositeEvalSkippedLeavesTests
         Assert.Contains("optional", result.Details.Summary);
     }
 
+    // A composite that withholds its own pass: one part passed, a required one did not run (warn, NotMeasured).
+    private static CompositeEval Withholding(string key) =>
+        new(key, key, "test", "1.0.0", new EvalComponent[]
+        {
+            new(new FixedEval(key + "_ok", 1.0, passed: true)),
+            new(new SkippingEval(key + "_missing")),
+        }, WeightedSumAggregation.Instance, threshold: 0.5);
+
+    [Fact]
+    public async Task AParentWhoseOnlyPartWithheldItsPass_Withholds_AndNamesIt()
+    {
+        // B9d (#203 review): it read "skipped" — "No component produced a measurement (0 errored, 0 skipped, 0
+        // inapplicable)" — though the part inside had been measured.
+        var parent = Composite(new EvalComponent[] { new(Withholding("child")) }, threshold: 0.5);
+
+        var result = await parent.EvaluateAsync(Input);
+
+        Assert.Equal("warn", result.Score.Label);
+        Assert.Equal(AgentEval.Evals.Meta.MeasurementState.NotMeasured, result.Score.Measurement);
+        Assert.Contains("child", result.Details.Summary);
+        Assert.DoesNotContain("0 errored, 0 skipped, 0 inapplicable", result.Details.Summary);
+
+        // One level up, beside a passing sibling, the withheld state still blocks a pass.
+        var grand = Composite(new EvalComponent[] { new(parent), new(new FixedEval("sibling", 1.0, passed: true)) }, threshold: 0.5);
+        Assert.Equal("warn", (await grand.EvaluateAsync(Input)).Score.Label);
+    }
+
+    [Fact]
+    public async Task AnOptionalPartThatWithheld_DoesNotDecide_ButIsCounted()
+    {
+        var sut = Composite(new EvalComponent[]
+        {
+            new(new SkippingEval("required_missing"), Required: true),
+            new(Withholding("optional_child"), Required: false),
+        }, threshold: 0.5);
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("skipped", result.Score.Label);
+        Assert.Contains("1 withheld their own pass", result.Details.Summary);
+    }
+
     [Fact]
     public async Task WithNoRequiredComponent_AnErrorAmongNothingMeasured_IsStillError()
     {

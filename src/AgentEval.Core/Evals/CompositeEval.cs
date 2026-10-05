@@ -276,10 +276,18 @@ public sealed class CompositeEval : IEval
         // error, so nesting turned the flat composite's warn into an error; an optional error now reads exactly like
         // an optional skip, at every level, and the note below still counts it.
         var gatingErrored = gating.Any(s => s.Score.Label == "error");
+        // A component the verdict rests on that WITHHELD its own pass — a nested composite whose required part did not run
+        // (warn, NotMeasured) — is not "nothing measured": its measured parts are inside it (#203 review, B9d). With
+        // nothing else measured, this composite cannot pass either and withholds too (warn, NotMeasured), naming them.
+        // It read "skipped" with "No component produced a measurement (0 errored, 0 skipped, 0 inapplicable)".
+        var withheld = gating
+            .Where(s => s.Score.Measurement == MeasurementState.NotMeasured && s.Score.Label is not ("error" or "skipped"))
+            .Select(s => s.Metric.Key)
+            .ToArray();
         var label = hasRequiredError
             ? "error"
             : nothingMeasured
-                ? (gatingErrored && !requiredAllInapplicable ? "error" : "skipped")
+                ? (gatingErrored && !requiredAllInapplicable ? "error" : withheld.Length > 0 ? "warn" : "skipped")
                 : Threshold is { } t
                     ? (score < t ? "fail" : SeverityCapsThreshold ? SeverityLabel(verdictSeverity) : "pass")
                     : SeverityLabel(verdictSeverity);
@@ -324,7 +332,8 @@ public sealed class CompositeEval : IEval
         // did not run. NotApplicable: nothing was measured and the case cannot test what it requires. Otherwise the
         // default (Measured; written to JSON only when it is not), so every other result serialises as before.
         // A measured accuracy failure is a verdict in its own right, whatever else did not run.
-        var measurement = passUnattested && label != "fail"
+        var withheldOnly = nothingMeasured && label == "warn" && withheld.Length > 0;
+        var measurement = (passUnattested || withheldOnly) && label != "fail"
             ? MeasurementState.NotMeasured
             : nothingMeasured && requiredAllInapplicable && !hasRequiredError
                 ? MeasurementState.NotApplicable
@@ -334,8 +343,12 @@ public sealed class CompositeEval : IEval
         // Recommendations) so a reader of the artifact sees "nothing ran", not a bare 0.0. The three
         // states have different owners and different fixes — inapplicable is "fix the cases", skipped
         // and errored are "fix the run" — so the note counts them separately rather than pooling them.
+        var withheldCount = subs.Count(s => s.Score.Measurement == MeasurementState.NotMeasured && s.Score.Label is not ("error" or "skipped"));
         string? nothingMeasuredNote = nothingMeasured && !hasRequiredError
-            ? (skippedCount == subs.Length
+            ? withheldOnly
+                ? $"Component(s) that withheld their own pass: {string.Join(", ", withheld)} — a required part did not run " +
+                  "inside them, and nothing else here was measured, so this verdict is withheld too (warn)."
+            : (skippedCount == subs.Length
                 ? $"All {subs.Length} component(s) were skipped; nothing was measured, so no verdict is reported."
                 : inapplicableCount == subs.Length
                     ? $"All {subs.Length} component(s) were inapplicable — no case could test the thing, " +
@@ -345,7 +358,8 @@ public sealed class CompositeEval : IEval
                           $"requires — so no verdict is reported ({erroredCount} errored, {skippedCount} skipped among " +
                           "the optional ones). This is a corpus finding, not a run failure."
                         : $"No component produced a measurement ({erroredCount} errored, " +
-                          $"{skippedCount} skipped, {inapplicableCount} inapplicable); no verdict is reported." +
+                          $"{skippedCount} skipped, {inapplicableCount} inapplicable" +
+                          (withheldCount > 0 ? $", {withheldCount} withheld their own pass" : "") + "); no verdict is reported." +
                           (erroredCount > 0 && label == "skipped"
                               ? " The errored component(s) are optional, so they are not the verdict: the required ones did not run."
                               : ""))
