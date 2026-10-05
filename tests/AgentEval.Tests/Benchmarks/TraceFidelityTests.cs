@@ -208,6 +208,7 @@ public class TraceFidelityTests
         Assert.Equal("pass", clean.Score.Label);
         Assert.True(clean.Score.Passed);
         Assert.Equal("none", clean.Score.Severity);
+        Assert.All(clean.Details.SubResults!, s => Assert.Equal("none", s.Score.Severity));   // a clean class read "Critical" (B10ab)
     }
 
     [Fact]

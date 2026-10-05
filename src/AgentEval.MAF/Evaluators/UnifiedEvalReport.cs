@@ -37,9 +37,9 @@ public static class UnifiedEvalReport
             EvalResult branch;
             if (!string.IsNullOrEmpty(result.Error) || result.Items.Count == 0)
             {
-                // Neutral infra branch (timeout / exception / breaker-open / empty result set). Do NOT bridge:
-                // the bridge yields a fail/high composite (an empty composite is "not passed") that would
-                // sink the whole report. Render it neutral instead.
+                // Infra branch (timeout / exception / breaker-open / empty result set). Do NOT bridge it: render it as
+                // what it is, "error" or "skipped" with no severity — no verdict, never a confirmed failure. The root
+                // reads it as such (MeasuredRollup): no verdict beside a pass is "error", a skipped branch withholds.
                 var reason = !string.IsNullOrEmpty(result.Error) ? result.Error : "no results returned";
                 // Use result.Status as the primary discriminant (reliable, set by both TracingAgentEvaluator
                 // and HybridEvalInterop.SkippedResults). Fall back to the ProviderName suffix for results

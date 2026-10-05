@@ -11,7 +11,7 @@ namespace AgentEval.Tests.Cli;
 
 /// <summary>
 /// Glass Box Phase 3 (P3.2b) — <c>agenteval bench workflow-trace-fidelity</c>. Pure-code (no Azure):
-/// exercises the load → replay → reconcile → persist path and the 0/2/1 exit-code contract.
+/// exercises the load → replay → reconcile → persist path and the 0/10/9/11/1 exit-code contract.
 /// </summary>
 public class BenchWorkflowTraceFidelityCommandTests : IDisposable
 {

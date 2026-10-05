@@ -108,8 +108,8 @@ that the old verdict hid. The entries below give the cause and the evidence for 
 - **`bench trace-fidelity` and `bench workflow-trace-fidelity` passed a warn.** A score of 0.80–0.99 was labelled
   `warn` but `Passed = true`, and both commands decided from `Passed`: "Verdict: PASS", a stored PASS, exit 0 — every
   other bench command exits 10 for a warn. `Passed` is now true only on a pass; the commands store the root's verdict
-  and exit by its label (0 / 10 / 9). The agent-boundary report's severities are lower-case and `none` on a pass (it
-  read "Low" at 1.00). The docs gave exit `2` for discrepancies; it has been `9` since the exit-code remap.
+  and exit by its label (0 / 10 / 9). The agent-boundary report's severities, root and classes, are lower-case and
+  `none` on a pass (it read "Low" at 1.00, and a clean class "Critical"). The docs gave exit `2` for discrepancies; it has been `9` since the exit-code remap.
 - **The memory-security composite passed with its utility check failing.** `MemorySecurityCompositeEvals.Create()`
   documents utility as "an optional warning", but the component had no effect, so as an optional part its failure
   left the severity rule and a memory that rejected every benign write read a clean PASS. **Behaviour change (1.1.0):**
@@ -124,7 +124,8 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   FAIL), a measured failure decides, a metric that did not run withholds the pass. `UnifiedEvalReport` reads its
   branches and root the same way: it left errored and skipped parts out and passed on the rest (so the hybrid report
   read PASS beside an unparseable metric), and showed any warn — a quality WARN included — as FAIL/high. A provider
-  branch that produced no verdict now makes the root `error`, not PASS on the other branch.
+  branch that produced no verdict now makes the root `error` (or a withheld `warn` when the branch was skipped, e.g.
+  by an open circuit breaker), not PASS on the other branch.
 - **The GDPR and EU AI Act evidence counted a scenario with no verdict as failed.** `scenariosFailed` (and the
   Markdown "Failed x/y" column and the PDF) counted every scenario that did not pass, so an article with one judge
   error read "Failed 1/3" beside status ERROR, and a needs-review or withheld scenario counted too. It now counts

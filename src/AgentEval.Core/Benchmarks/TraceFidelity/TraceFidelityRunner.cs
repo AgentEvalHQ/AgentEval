@@ -75,7 +75,9 @@ public sealed class TraceFidelityRunner
                 Value: d.Score, Ordinal: null,
                 // A warn is a soft fail (#203 review round 5, B10w): Passed only on a pass.
                 Label: d.Score >= 0.99 ? "pass" : d.Score >= 0.8 ? "warn" : "fail",
-                Passed: d.Score >= 0.99, Threshold: 0.8, Severity: d.Severity, Confidence: null),
+                Passed: d.Score >= 0.99, Threshold: 0.8,
+                    // A passing class carries no severity, and severities are lower-case (B10ab: a clean leaf read "Critical").
+                    Severity: d.Score >= 0.99 ? "none" : d.Severity.ToLowerInvariant(), Confidence: null),
             Details: new EvalDetails(
                 Dimensions: new Dictionary<string, double> { ["count"] = d.Count, ["score100"] = d.Score * 100 },
                 Evidence: d.Examples.Select(x => new EvalEvidence(Source: "chat-vs-agent", Reference: d.ClassKey, Message: x)).ToList(),

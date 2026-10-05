@@ -66,7 +66,8 @@ public class StochasticStabilityEvalTests
     [Theory]
     [InlineData("""{"value":0.0}""")]                                                              // no "passed": no verdict
     [InlineData("""{"score":{"value":0.0,"passed":false,"label":"warn","measurement":"notMeasured"}}""")]
-    [InlineData("""{"score":{"value":0.0,"passed":false,"label":"warn","measurement":1}}""")]       // the enum as a number (B10v)
+    [InlineData("""{"score":{"value":0.0,"passed":false,"label":"warn","measurement":1}}""")]       // NotApplicable as a number (B10v)
+    [InlineData("""{"score":{"value":0.0,"passed":false,"label":"warn","measurement":2}}""")]       // NotMeasured as a number
     [InlineData("""{"score":{"value":0.0,"passed":false,"label":"error"}}""")]
     public async Task AJsonRunWithNoVerdict_IsNotAFailedRun(string unmeasured)
     {

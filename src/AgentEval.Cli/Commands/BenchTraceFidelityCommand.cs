@@ -21,7 +21,8 @@ namespace AgentEval.Cli.Commands;
 /// </summary>
 public static class BenchTraceFidelityCommand
 {
-    /// <summary>Runs the reconciliation. Returns 0 (clean), 2 (discrepancies), or 1 (setup/IO error).</summary>
+    /// <summary>Runs the reconciliation. Returns 0 (clean, PASS), 10 (minor discrepancies or partly checked, WARN), 9
+    /// (discrepancies, FAIL), 11 (nothing checked, SKIPPED) or 1 (setup/IO error).</summary>
     public static async Task<int> RunAsync(
         string agentTraceFile, string chatTraceFile, string preset, string subject, string? rootOverride, CancellationToken ct = default)
     {
