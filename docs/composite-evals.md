@@ -130,7 +130,9 @@ that from turning into a pass on whatever is left. Row 6: a pass cannot rest on 
 A nested composite tells its parent through its **measurement state**, not its label: one that withheld its pass
 this way records `notMeasured`, and one whose required components are all inapplicable records `notApplicable`. A
 nested `warn` from a measured medium-severity failure, or from a nested composite's own coverage bar, is a measurement
-like any other (the coverage bar is per level). An `inapplicable` component (the case cannot test the thing) never
+like any other (the coverage bar is per level). Under the default `Averaged` effect a nested `warn` — or `fail` — is
+averaged into its parent like any other score, so the parent can still pass; set `OnFailure` to `Warn` or `Fail` on the
+component to carry its verdict up (the agentic presets do, on every component). An `inapplicable` component (the case cannot test the thing) never
 triggers row 6. Row 7: a composite whose components mostly report "not applicable" cannot pass on
 the few that remain; `MinimumMeasuredShare = 0` drops this bar, not row 6. Only a pass is withheld; a measured
 failure stays a failure. Whenever components were left out, the result's `Details.Summary` says how many were

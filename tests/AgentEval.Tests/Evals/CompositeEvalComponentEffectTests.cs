@@ -82,6 +82,26 @@ public class CompositeEvalComponentEffectTests
             Assert.Contains("child", result.Details.Summary);
     }
 
+    [Theory]
+    [InlineData(ComponentFailureEffect.Averaged, "pass")]   // documented: averaged like any score (review round 3 M5)
+    [InlineData(ComponentFailureEffect.Warn, "warn")]
+    [InlineData(ComponentFailureEffect.Fail, "warn")]       // a component that only warned passes a warn up, never a fail
+    public async Task ANestedWarn_UnderASeverityPathParent_DoesWhatItsEffectSays(ComponentFailureEffect effect, string parentLabel)
+    {
+        // The child warns: a Warn-effect dimension failed at low severity. Under the default Averaged effect the parent
+        // (no threshold: the severity rule) averages it like any score and passes; an effect carries the warn up. Pinned
+        // so a change to Averaged's meaning is a decision, not an accident.
+        var child = new CompositeEval("child", "Child", "test", "1.0.0",
+            [new EvalComponent(new Fixed("ok", "pass", 1.0), 0.5),
+             new EvalComponent(new WithSeverity("style", "fail", 0.6, "low"), 0.5) { OnFailure = ComponentFailureEffect.Warn }],
+            WeightedSumAggregation.Instance, threshold: null);
+        var parent = new CompositeEval("parent", "Parent", "test", "1.0.0",
+            [new EvalComponent(child, 1.0) { OnFailure = effect }], WeightedSumAggregation.Instance, threshold: null);
+
+        Assert.Equal("warn", (await child.EvaluateAsync(Input)).Score.Label);
+        Assert.Equal(parentLabel, (await parent.EvaluateAsync(Input)).Score.Label);
+    }
+
     [Fact]
     public async Task TheSummary_NeverStatesAVerdictTheLabelContradicts()
     {
