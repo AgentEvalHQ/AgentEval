@@ -55,7 +55,7 @@ public sealed class StochasticStabilityEval : IEval
     private const string KeyValue      = "stochastic_stability";
     private const string NameValue     = "Stochastic Stability";
     private const string CategoryValue = "operational";
-    private const string VersionValue  = "1.0.0";
+    private const string VersionValue  = "1.1.0";
 
     /// <summary>
     /// Conventional metadata key for supplying run results via <see cref="EvalInput.Metadata"/>.
@@ -98,12 +98,18 @@ public sealed class StochasticStabilityEval : IEval
     {
         ArgumentNullException.ThrowIfNull(input);
 
-        var runResults = ExtractRunResults(input);
+        // A run that produced no verdict (errored, skipped, inapplicable) is not an unstable run: it entered the success
+        // rate as a failure and the variance as a 0 (#203 review round 3, B10i — the B9b class). It is left out, and a
+        // pass that rests on part of the runs is a warn.
+        var allRuns = ExtractRunResults(input);
+        var unmeasured = allRuns.Count(r => r.Label is "error" or "skipped" or "inapplicable");
+        var runResults = allRuns.Where(r => r.Label is not ("error" or "skipped" or "inapplicable")).ToList();
         if (runResults.Count < 2)
         {
             return Task.FromResult(EvalResult.Skipped(this,
-                $"StochasticStabilityEval requires at least 2 run results in " +
-                $"EvalInput.Metadata[\"{MetadataRunResultsKey}\"]. Got {runResults.Count}."));
+                $"StochasticStabilityEval requires at least 2 run results with a verdict in " +
+                $"EvalInput.Metadata[\"{MetadataRunResultsKey}\"]. Got {runResults.Count}" +
+                (unmeasured > 0 ? $" ({unmeasured} more produced no verdict)." : ".")));
         }
 
         // ── Compute the three sub-dimensions ─────────────────────────────────────
@@ -148,10 +154,17 @@ public sealed class StochasticStabilityEval : IEval
         var finalScore = Math.Clamp(compositeScore, 0.0, 1.0);
         var passed = finalScore >= _passThreshold;
         var severity = passed ? "none" : "medium";
+        var label = passed ? "pass" : "fail";
+        if (passed && unmeasured > 0)
+        {
+            label = "warn";
+            passed = false;
+            severity = "none";
+        }
 
         return Task.FromResult(new EvalResult(
             Metric: new(KeyValue, NameValue, CategoryValue, VersionValue),
-            Score: new(finalScore, null, passed ? "pass" : "fail", passed, _passThreshold, severity, null),
+            Score: new(finalScore, null, label, passed, _passThreshold, severity, null),
             Details: new(
                 Dimensions: new Dictionary<string, double>
                 {
@@ -162,6 +175,7 @@ public sealed class StochasticStabilityEval : IEval
                     ["score_variance_inverse_norm"]  = normalizedVarianceInverse,
                     ["failure_mode_consistency"]     = failureModeConsistency,
                     ["failed_run_count"]             = failedLabels.Count,
+                    ["runs_without_verdict"]         = unmeasured,
                 },
                 Evidence:
                 [
@@ -171,7 +185,10 @@ public sealed class StochasticStabilityEval : IEval
                         Message: $"{runResults.Count} runs: success_rate={successRate:P0}, " +
                                  $"score_variance={variance:F4} (normalized_inv={normalizedVarianceInverse:F3}), " +
                                  $"failure_mode_consistency={failureModeConsistency:P0}. " +
-                                 $"Composite={finalScore:F3}."),
+                                 $"Composite={finalScore:F3}." +
+                                 (unmeasured > 0
+                                     ? $" {unmeasured} more run(s) produced no verdict and are left out; a pass on the rest is a warn."
+                                     : "")),
                 ],
                 Recommendations: passed ? null : BuildRecommendations(successRate, normalizedVarianceInverse, failureModeConsistency),
                 SubResults: null,

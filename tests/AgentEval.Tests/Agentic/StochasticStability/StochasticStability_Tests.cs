@@ -18,7 +18,7 @@ public class StochasticStabilityEvalTests
     private static EvalResult MakeResult(bool passed, double score, string label = "pass") =>
         new(
             Metric: new("stub", "Stub", "test", "1.0.0"),
-            Score: new(score, null, passed ? "pass" : "fail", passed, 0.70, "none", null),
+            Score: new(score, null, label != "pass" ? label : passed ? "pass" : "fail", passed, 0.70, "none", null),   // the label was ignored
             Details: new(null, null, null, null, null),
             Provenance: new("stub", null, null, null, null, 0, false),
             EvaluatedAt: DateTimeOffset.UtcNow);
@@ -29,6 +29,32 @@ public class StochasticStabilityEvalTests
             {
                 [StochasticStabilityEval.MetadataRunResultsKey] = runResults
             });
+
+    [Fact]
+    public async Task ARunThatProducedNoVerdict_IsNotAnUnstableRun()
+    {
+        // Review round 3 (the B9b class, swept in B10i): an errored or skipped run entered the success rate as a failure
+        // and the variance as a 0, so a judge outage read as agent instability.
+        var stable = new[] { MakeResult(true, 0.95), MakeResult(true, 0.95), MakeResult(true, 0.95), MakeResult(true, 0.95) };
+        var withOutages = stable.Concat([MakeResult(false, 0.0, "error"), MakeResult(false, 0.0, "skipped")]);
+
+        var clean = await new StochasticStabilityEval().EvaluateAsync(MakeInput(stable));
+        var result = await new StochasticStabilityEval().EvaluateAsync(MakeInput(withOutages));
+
+        Assert.Equal("pass", clean.Score.Label);
+        Assert.Equal(clean.Score.Value, result.Score.Value, 6);       // the outages do not move the measurement
+        Assert.Equal("warn", result.Score.Label);                     // but a pass on part of the runs is not a clean pass
+        Assert.Equal(2, result.Details.Dimensions!["runs_without_verdict"]);
+    }
+
+    [Fact]
+    public async Task FewerThanTwoRunsWithAVerdict_IsSkipped()
+    {
+        var result = await new StochasticStabilityEval().EvaluateAsync(
+            MakeInput([MakeResult(true, 0.9), MakeResult(false, 0.0, "error"), MakeResult(false, 0.0, "error")]));
+
+        Assert.Equal("skipped", result.Score.Label);
+    }
 
     [Fact]
     public void Build_HasExpectedShape()
