@@ -156,7 +156,7 @@ public class CompositeEvalComponentEffectTests
         var composite = new CompositeEval("c", "C", "test", "1.0.0",
             [new EvalComponent(new Fixed("ok", "pass", 1.0), 1.0),
              new EvalComponent(new Fixed("other", label, 0.0), 1.0)],
-            WeightedSumAggregation.Instance, threshold: null);
+            WeightedSumAggregation.Instance, threshold: 0.4);   // counted as a measured 0, the mean 0.5 cleared the bar
 
         Assert.Equal(expected, (await composite.EvaluateAsync(Input)).Score.Label);   // it read pass, saying nothing
     }
