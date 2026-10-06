@@ -15,8 +15,12 @@ internal static class ReferenceText
 {
     private static readonly char[] s_punctuation = ['.', ',', '!', '?', ';', ':', '"', '\'', '(', ')', '[', ']'];
 
-    /// <summary>Whether <paramref name="text"/> has at least one word to compare against.</summary>
-    public static bool HasWords([NotNullWhen(true)] string? text) => Tokenize(text).Count > 0;
+    /// <summary>
+    /// Whether <paramref name="text"/> has at least one word — a token with a letter or a digit — to compare against.
+    /// Punctuation the trim does not strip ("…", "—", "{}") is no word either (#279 review).
+    /// </summary>
+    public static bool HasWords([NotNullWhen(true)] string? text) =>
+        Tokenize(text).Any(t => t.Any(char.IsLetterOrDigit));
 
     /// <summary>Whitespace-split, lowercased tokens with attached punctuation stripped; a multiset (duplicates kept).</summary>
     public static IReadOnlyList<string> Tokenize(string? text)

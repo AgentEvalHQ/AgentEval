@@ -225,8 +225,9 @@ public class MetricResult
     /// <summary>
     /// False when the metric could not be measured because an input it needs — a reference answer, a retrieved
     /// context — was not supplied. Such a result is neither a pass nor a fail: <see cref="Passed"/> is false, the
-    /// <see cref="Score"/> is a placeholder 0 that no aggregate counts, and the MEAI bridge reports it as inconclusive,
-    /// not failed (#203 review round 15, B12i: a missing input failed the metric at 0).
+    /// <see cref="Score"/> is a placeholder 0 that no aggregate counts. MAF has no item state between pass and fail, so
+    /// the MEAI bridge reports it with no value, rated inconclusive and failed (fail-closed), its reason saying "not
+    /// measured" (#203 review round 15, B12i: a missing input failed the metric at 0; round 16, B12k).
     /// </summary>
     public bool Measured { get; init; } = true;
 

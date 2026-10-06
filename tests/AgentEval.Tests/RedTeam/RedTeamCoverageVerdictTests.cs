@@ -830,4 +830,18 @@ public class RedTeamCoverageVerdictTests
         Assert.Contains("canary", without.NotMeasurableReason!, StringComparison.Ordinal);
         Assert.Null(with.NotMeasurableReason);
     }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void SystemPromptExtraction_ABlankCanaryIsNoCanary(string blank)
+    {
+        // PR #279 review: the evaluator ignores a blank canary, so every probe came back inconclusive while the attack
+        // declared itself measurable, and the scan was blocked as unexpectedly unmeasured.
+        IAttackType attack = new SystemPromptExtractionAttack(blank);
+
+        Assert.Contains("canary", attack.NotMeasurableReason!, StringComparison.Ordinal);
+        Assert.All(attack.GetProbes(Intensity.Comprehensive),
+            p => Assert.False(p.Metadata?.ContainsKey("system_prompt_canary") ?? false));
+    }
 }

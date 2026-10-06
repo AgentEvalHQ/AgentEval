@@ -79,12 +79,12 @@ public sealed class F1ScoreEval : AtomicCodeEval
             return EvalResult.Skipped(this,
                 "F1 compares the response with a reference answer, and none was supplied (EvalInput.GroundTruth or the constructor): not measured.");
 
-        var responseTokens = ReferenceText.Tokenize(response);
-        var truthTokens = ReferenceText.Tokenize(groundTruth);
-
-        if (truthTokens.Count == 0)
+        if (!ReferenceText.HasWords(groundTruth))
             return EvalResult.Skipped(this,
                 "F1 compares the response with a reference answer, and the one supplied has no words to compare: not measured.");
+
+        var responseTokens = ReferenceText.Tokenize(response);
+        var truthTokens = ReferenceText.Tokenize(groundTruth);
 
         // Phase-7 Task 7.8: empty-input branches compute `passed = f1 >= threshold`
         // uniformly with the non-empty branch. A threshold of 0.0 makes f1=0.0 a pass

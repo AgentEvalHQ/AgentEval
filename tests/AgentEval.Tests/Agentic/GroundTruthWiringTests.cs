@@ -131,6 +131,8 @@ public sealed class GroundTruthWiringTests
     [Theory]
     [InlineData("?", "")]
     [InlineData("...", "Paris.")]
+    [InlineData("…", "…")]       // PR #279 review: punctuation the trim does not strip passed F1 at 1.0
+    [InlineData("— {}", "— {}")]
     public async Task AReferenceWithNoWords_IsNoReference(string reference, string response)
     {
         // Review round 15 L2 (B12j): a punctuation-only reference passed at 1.0 beside an empty response and failed at 0
@@ -148,6 +150,7 @@ public sealed class GroundTruthWiringTests
         var input = new EvalInput(Query: "What is the capital of France?", Response: "Paris.", GroundTruth: "?");
 
         Assert.Equal("skipped", (await new SimilarityEval(judge).EvaluateAsync(input)).Score.Label);
+        Assert.Equal("skipped", (await new SimilarityEval(judge).EvaluateAsync(input with { GroundTruth = "…" })).Score.Label);
         await new ConfidenceCalibrationEval(judge).EvaluateAsync(input);
         Assert.DoesNotContain(judge.Inputs, i => i.Contains("Ground truth reference", StringComparison.Ordinal));
     }

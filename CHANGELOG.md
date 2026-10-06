@@ -99,7 +99,7 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   preset failed every item; it forwards both now, also as the evaluator contexts Microsoft.Extensions.AI's own
   Groundedness / Equivalence / Completeness evaluators read. A blank carrier — or an empty expected-tools list — no
   longer hides a real one. One test now decides "a reference answer was supplied": a reference with no word in it
-  (blank, "?", "...") is none — for F1, similarity, confidence calibration, the decision judge, context recall, answer
+  (blank, "?", "...", "—") is none — for F1, similarity, confidence calibration, the decision judge, context recall, answer
   correctness, answer similarity, the Microsoft.Extensions.AI adapters and the MAF carriers alike — and F1 falls back to
   its constructor reference for it as it does for a blank one. The decision judge no longer receives a blank context.
   Found by the release's own recalibration round.
@@ -390,7 +390,8 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   when another attack in the same category, technique or control did measure (`AttackResult.MeasuredNothing`; the
   evidence of all five compliance reporters reads WARN). An attack can declare it is not
   measurable in the current setup (new `IAttackType.NotMeasurableReason`, carried on `AttackResult`): System Prompt
-  Extraction does so when no canary is planted, and stays "not tested" with that reason, without blocking.
+  Extraction does so when no canary is planted (a blank one counts as none), and stays "not tested" with that reason,
+  without blocking.
 - **The agentic calibration scored a sample its evaluators' own verdicts selected.** Excluding unmeasured records
   (the B3a fix above) left `tool_input_accuracy` and `tool_call_accuracy` measured only when they predicted fail —
   on the text-only golden cases their schema check cannot run, so every pass is withheld — and their false negatives
