@@ -104,6 +104,16 @@ public class PackTests
     }
 
     [Fact]
+    public void The_packs_judge_scores_the_criteria_not_the_outputs_quality()
+    {
+        var judge = HealthcareSafetyPackFactory.CreateJudge(new ScriptedModel(ScriptedModel.Says("unused")));
+
+        Assert.Equal(HealthcareSafetyPackFactory.JudgeSystemPromptId, judge.SystemPromptId);
+        Assert.Contains("how fully the output meets the listed criteria", judge.PromptMaterial);
+        Assert.Contains("Judge only what the criteria ask", judge.PromptMaterial);
+    }
+
+    [Fact]
     public async Task Each_check_keeps_the_contributors_severity()
     {
         var judge = new ScriptedJudge(_ => ScriptedJudge.Fail);

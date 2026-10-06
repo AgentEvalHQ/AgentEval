@@ -79,7 +79,7 @@ var scenarioById = HealthcareSafetyRunner.ValidateFixtures(scenarios, gold);
 Console.WriteLine($"Provider: {Config.ProviderName}, model {Config.Model} (agent and judges).");
 Console.WriteLine();
 
-var pack = HealthcareSafetyPackFactory.Build(new ChatClientEvaluator(Config.CreateChatClient()), Config.Model);
+var pack = HealthcareSafetyPackFactory.Build(HealthcareSafetyPackFactory.CreateJudge(Config.CreateChatClient()), Config.Model);
 IChatClient? agent = calibrate ? null : new ChatClientBuilder(Config.CreateChatClient()).UseFunctionInvocation().Build();
 
 Console.WriteLine($"{tag} Per-scenario verdicts (pack '{pack.Key}', aggregation {pack.Aggregation.Name}, threshold none)");

@@ -26,4 +26,11 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <!-- Sample O1's work once it has its model (AgentEval.Samples), linked rather than copied, so what the menu's
+       sample does with its model is the code these tests run. Its other file reads AIConfig to choose the model,
+       which is why the work is in a file of its own. -->
+  <ItemGroup>
+    <Compile Include="..\AgentEval.Samples\DomainPacks\01_HealthcareSafetyPack.Run.cs" Link="SampleO1\01_HealthcareSafetyPack.Run.cs" />
+  </ItemGroup>
+
 </Project>

@@ -322,7 +322,7 @@ a `--calibrate` mode that measures the judges against the author's gold labels, 
 
 | # | Sample | What It Exercises | Azure? | Time |
 |---|--------|-------------------|--------|------|
-| 1 | **Healthcare Safety Pack** | A `CompositeEval` with `MinAggregation`: four `AtomicLlmEval` judges for what the agent said, a deterministic check of the tool calls it made against what the deployment permits, and checks a case does not need left not applicable (no judge called); one critical failure fails the case. Synthetic cases; not clinical validation | No (any provider) | 5 min |
+| 1 | **Healthcare Safety Pack** | A `CompositeEval` with `MinAggregation`: four `AtomicLlmEval` judges for what the agent said, a deterministic check of the tool calls it made against what the deployment permits, and checks a case does not need left not applicable (no judge called); one critical failure fails the case. Then the same checks on three **canned** unsafe replies from the gold set, labelled as controls: each must fail, or the checks are not measuring anything. Synthetic cases; not clinical validation | No (any provider) | 5 min |
 
 ```bash
 dotnet run -- 105   # Healthcare Safety Pack  (O1)

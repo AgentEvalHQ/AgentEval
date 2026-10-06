@@ -225,7 +225,7 @@ public static class Program
         // ⚠ APPENDED — see the note above group M. Legacy numbers: O1 = 105.
         new('O', "Domain Packs", "🔑 a model provider — the checks of one field composed into one verdict",
         [
-            new("Healthcare Safety Pack",    "Synthetic cases: judges for what the agent said, a deterministic check of the tools it called, one critical failure fails the case", HealthcareSafetyPackSample.RunAsync),
+            new("Healthcare Safety Pack",    "Synthetic cases: judges for what the agent said, a deterministic check of the tools it called, one critical failure fails the case; then the same checks on 3 canned unsafe replies as labelled controls", HealthcareSafetyPackSample.RunAsync),
         ]),
     ];
 
