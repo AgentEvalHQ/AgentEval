@@ -88,8 +88,21 @@ public static class BenchEuAiActCalibrateCommand
         string? outPathOverride,
         IEvaluator? evaluatorOverride,
         CancellationToken ct = default,
-        CalibrationJudgeIdentity? evaluatorOverrideIdentity = null)
+        CalibrationJudgeIdentity? evaluatorOverrideIdentity = null,
+        int? limitPerPillar = null)
     {
+        if (limitPerPillar is < 1)
+        {
+            Console.Error.WriteLine("--limit must be at least 1.");
+            return ExitCodes.UsageError;
+        }
+        if (limitPerPillar is not null && outPathOverride is null)
+        {
+            // A limited run must never land on the default dated baseline path and overwrite that day's full run.
+            Console.Error.WriteLine("--limit requires --out: a limited run is a wiring check, not a baseline, and must not overwrite the day's report.");
+            return ExitCodes.UsageError;
+        }
+
         // ── Judge / evaluator ────────────────────────────────────────────────
         // Calibration measures a judge, so it needs a real one: there is no stand-in judge.
         // Workspace root canonicalisation (defense-in-depth against --root traversal).
@@ -167,7 +180,7 @@ public static class BenchEuAiActCalibrateCommand
         try
         {
             var runner = new CalibrationRunner(articles, judge);
-            report = await runner.RunAsync(datasets, ct);
+            report = await runner.RunAsync(datasets, limitPerPillar, ct);
         }
         catch (Exception ex)
         {
@@ -186,6 +199,9 @@ public static class BenchEuAiActCalibrateCommand
         {
             Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
             var md = BuildMarkdownReport(report, judgeIdentity);
+            if (limitPerPillar is int lim)
+                md = $"> ⚠️ **LIMITED RUN — at most {lim} entr{(lim == 1 ? "y" : "ies")} per pillar.** A wiring check, not a baseline: " +
+                     "accuracy and kappa on this few cases mean nothing, and the calibration gate is not applied." + Environment.NewLine + Environment.NewLine + md;
             await File.WriteAllTextAsync(outPath, md);
             Console.WriteLine($"Calibration report: {outPath}");
         }
@@ -208,23 +224,31 @@ public static class BenchEuAiActCalibrateCommand
                 : (AccuracyThreshold, KappaThreshold);
             var accOk = pillarReport.Accuracy >= accThr;
             var kappaOk = pillarReport.CohensKappa >= kapThr;
-            var noInfraFail = pillarReport.EvaluationFailures == 0;
-            var status = !noInfraFail
-                ? "INFRA-FAIL"
-                : (accOk && kappaOk ? "PASS" : "FAIL");
+            var status = BenchCalibrateCommand.PillarGateStatus(pillarReport.EvaluationFailures, pillarReport.NotMeasured, accOk, kappaOk);
             var thrSuffix = s_pillarOverrides.ContainsKey(pillar)
                 ? $" [override: acc>={accThr:P0} kappa>={kapThr:F2}]"
                 : string.Empty;
             Console.WriteLine(
                 $"  [{status}] {pillar}: accuracy={pillarReport.Accuracy:P1}, " +
                 $"kappa={FormatKappa(pillarReport.CohensKappa)}, entries={pillarReport.EntryCount}, " +
-                $"failures={pillarReport.EvaluationFailures}{thrSuffix}");
-            if (!accOk || !kappaOk || !noInfraFail) allPass = false;
+                $"failures={pillarReport.EvaluationFailures}, not_measured={pillarReport.NotMeasured}, " +
+                $"inapplicable={pillarReport.NotApplicable}{thrSuffix}");
+            if (status != "PASS") allPass = false;
         }
 
         Console.WriteLine(allPass
             ? "EU AI Act calibration gate PASSED — all pillars meet thresholds with zero evaluation failures."
-            : $"EU AI Act calibration gate FAILED — one or more pillars below accuracy>={AccuracyThreshold:P0} or kappa>={KappaThreshold:F2}, or had non-zero evaluation_failures.");
+            : $"EU AI Act calibration gate FAILED — one or more pillars below accuracy>={AccuracyThreshold:P0} or kappa>={KappaThreshold:F2}, had non-zero evaluation_failures, or was INCOMPLETE (a record not measured).");
+
+        if (limitPerPillar is not null)
+        {
+            // At one entry per pillar kappa is undefined, so the gate would fail every pillar by construction. A limited
+            // run checks the wiring; it passes when nothing errored, and says the gate was not applied.
+            var anyFailures = report.PerPillar.Values.Any(p => p.EvaluationFailures > 0);
+            Console.WriteLine($"Limited run (--limit {limitPerPillar}): the calibration gate is NOT applied. " +
+                              (anyFailures ? "Evaluation failures occurred — the wiring is not clean." : "No evaluation failures — the wiring is clean."));
+            return anyFailures ? ExitCodes.GateFailed : ExitCodes.Success;
+        }
 
         return allPass ? ExitCodes.Success : ExitCodes.GateFailed;
     }
@@ -236,7 +260,7 @@ public static class BenchEuAiActCalibrateCommand
         => double.IsNaN(kappa) ? "UNDEFINED" : kappa.ToString("F3", System.Globalization.CultureInfo.InvariantCulture);
 
 
-    private static string BuildMarkdownReport(CalibrationReport report, CalibrationJudgeIdentity judge)
+    internal static string BuildMarkdownReport(CalibrationReport report, CalibrationJudgeIdentity judge)
     {
         var sb = new StringBuilder();
         sb.AppendLine("# EU AI Act Calibration Report");
@@ -255,9 +279,9 @@ public static class BenchEuAiActCalibrateCommand
             var accOk = pr.Accuracy >= accThr;
             var kappaOk = pr.CohensKappa >= kapThr;
             var noInfraFail = pr.EvaluationFailures == 0;
-            var badge = !noInfraFail
-                ? "INFRA-FAIL"
-                : (accOk && kappaOk ? "PASS" : "FAIL");
+            // The gate's own status (B10o): the report read INFRA-FAIL / PASS / FAIL and showed [PASS] for a pillar the
+            // gate calls INCOMPLETE.
+            var badge = BenchCalibrateCommand.PillarGateStatus(pr.EvaluationFailures, pr.NotMeasured, accOk, kappaOk);
             var thrTag = s_pillarOverrides.ContainsKey(pillar) ? " (relaxed per-pillar override)" : string.Empty;
 
             sb.AppendLine($"## {pillar} [{badge}]{thrTag}");
@@ -266,6 +290,9 @@ public static class BenchEuAiActCalibrateCommand
             sb.AppendLine($"|--------|-------|-----------|--------|");
             sb.AppendLine($"| Entries evaluated | {pr.EntryCount} | — | — |");
             sb.AppendLine($"| Evaluation failures | {pr.EvaluationFailures} | == 0 | {(noInfraFail ? "OK" : "INFRA-FAIL")} |");
+            // Not scored (B3a): no verdict to compare with gold — reported, never counted as agreement or disagreement.
+            sb.AppendLine($"| Not measured (not scored) | {pr.NotMeasured} | == 0 | {(pr.NotMeasured == 0 ? "OK" : "INCOMPLETE")} |");
+            sb.AppendLine($"| Inapplicable (not scored) | {pr.NotApplicable} | — | info |");
             sb.AppendLine($"| Accuracy | {pr.Accuracy:P1} | >= {accThr:P0} | {(accOk ? "OK" : "BELOW")} |");
             sb.AppendLine($"| Cohen's kappa | {FormatKappa(pr.CohensKappa)} | >= {kapThr:F2} | {(kappaOk ? "OK" : "BELOW")} |");
             sb.AppendLine($"| Within score range | {pr.WithinScoreRange} / {pr.EntryCount} | — | — |");

@@ -71,7 +71,12 @@ public static class AgenticEvalRegistration
 #pragma warning disable CA2255
     [ModuleInitializer]
 #pragma warning restore CA2255
-    public static void Register() => RegisterInto(EvalRegistry.Shared);
+    public static void Register()
+    {
+        // The rubrics first: an evaluator built from the registry binds its rubric in its constructor (B9).
+        AgenticRubrics.Register();
+        RegisterInto(EvalRegistry.Shared);
+    }
 
     /// <summary>
     /// Registers the 40 entries into <paramref name="registry"/>. Exposed separately from

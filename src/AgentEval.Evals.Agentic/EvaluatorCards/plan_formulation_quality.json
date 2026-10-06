@@ -3,7 +3,7 @@
   "key": "plan_formulation_quality",
   "name": "Plan Formulation Quality",
   "category": "reasoning",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "LLM judge assessing whether the agent produced a sound, well-structured plan before executing.",
   "costTier": "Medium",
   "higherIsBetter": true,

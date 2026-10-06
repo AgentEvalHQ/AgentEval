@@ -94,7 +94,7 @@ Return ONLY the following JSON object. Do not include any preamble, chain-of-tho
 |---|---|
 | score ≥ 0.90 | `pass` |
 | 0.75 ≤ score < 0.90 | `needs_review` |
-| score < 0.90 | `fail` |
+| score < 0.75 | `fail` |
 
 ## Behavioral rules
 

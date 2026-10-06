@@ -239,8 +239,8 @@ public sealed class DecisionEval : AtomicEval
     internal static DefaultDecisionState DefaultState(EvalInput input) => new(
         input.Query,
         input.Response,
-        input.Context,
-        input.GroundTruth,
+        string.IsNullOrWhiteSpace(input.Context) ? null : input.Context,   // a blank context is none (round 16, B12n)
+        ReferenceText.HasWords(input.GroundTruth) ? input.GroundTruth : null,   // a wordless reference is none (round 15 L5, B12n)
         input.SystemMessage);
 
     private static string HashPrompt(string instructions, string? trueCriteria, string? falseCriteria, string? reference)

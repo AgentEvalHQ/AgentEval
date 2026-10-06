@@ -78,7 +78,7 @@ public class GroundednessMetricTests
     }
     
     [Fact]
-    public async Task EvaluateAsync_WhenNoContextProvided_ReturnsFail()
+    public async Task EvaluateAsync_WhenNoContextProvided_IsNotMeasured()
     {
         // Arrange
         var fakeClient = new FakeChatClient("{}");
@@ -96,7 +96,8 @@ public class GroundednessMetricTests
         
         // Assert
         Assert.False(result.Passed);
-        Assert.Contains("requires context", result.Explanation);
+        Assert.False(result.Measured);   // not measured, never a fail (B12i)
+        Assert.Contains("requires a retrieved context", result.Explanation);
     }
     
     [Fact]

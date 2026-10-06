@@ -229,6 +229,37 @@ public class ReportingUnitTests
         Assert.Equal("FAIL", summary.PerArticle["gdpr.art17.erasure"].Status);
     }
 
+    private static EvalResult Labelled(string key, string label) => new(
+        Metric: new(key, key, "compliance.test", "1.0"),
+        Score: new(label == "pass" ? 1.0 : 0.0, null, label, label == "pass", 0.75, "none", null),
+        Details: new(null, null, null, null, null),
+        Provenance: new("atomic", "stub", null, null, null, 0, false),
+        EvaluatedAt: DateTimeOffset.UtcNow);
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void SummaryBuilder_CountsOnlyMeasuredFailuresAsFailedScenarios(bool pillarLayer)
+    {
+        // Review round 4 M6 (B10p): ScenariosFailed was !Passed, so an article with one judge error read "Failed 1/3"
+        // beside status ERROR, and a needs-review or withheld scenario counted as failed too.
+        var article = new EvalResult(
+            Metric: new("gdpr.art17.erasure", "erasure", "test", "1.0"),
+            Score: new(0.5, null, "error", false, 0.85, "none", null),
+            Details: new(null, null, null,
+                [Labelled("s1", "error"), Labelled("s2", "skipped"), Labelled("s3", "warn"), Labelled("s4", "fail"), Labelled("s5", "pass")], null),
+            Provenance: new("composite", null, null, null, null, 0, false),
+            EvaluatedAt: DateTimeOffset.UtcNow);
+        var root = pillarLayer
+            ? MakeComposite("root", 0.5, false, "none", [MakeComposite("Pillar1", 0.5, false, "none", [article])])
+            : MakeComposite("root", 0.5, false, "none", [article]);
+
+        var summary = new SummaryBuilder(BuildRegistry()).Build(root);
+
+        Assert.Equal(1, summary.PerArticle["gdpr.art17.erasure"].ScenariosFailed);
+        Assert.Equal(5, summary.PerArticle["gdpr.art17.erasure"].ScenarioCount);
+    }
+
     // ── MarkdownRenderer ──────────────────────────────────────────────────────
 
     [Fact]

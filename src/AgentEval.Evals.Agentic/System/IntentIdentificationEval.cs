@@ -54,7 +54,7 @@ public sealed class IntentIdentificationEval : IEval
             key: "intent_identification",
             name: "Intent Identification",
             category: "system-outcome",
-            version: "1.0.0",
+            version: "1.1.0",
             criteria: new[]
             {
                 "The agent correctly identified the primary intent of the user's query",

@@ -80,7 +80,7 @@ public sealed class GoalDecompositionQualityEval : IEval
             key: "goal_decomposition_quality",
             name: "Goal Decomposition Quality",
             category: "reasoning",
-            version: "1.0.0",
+            version: "1.1.0",
             criteria: new[]
             {
                 "The agent identified the correct high-level sub-goals for the stated task",

@@ -115,6 +115,14 @@ public class GoldenReachabilityTests
         /// a score fixed at exactly 0.0 that is a SENTINEL, not a measurement.
         /// </summary>
         Skipped,
+
+        /// <summary>
+        /// No verdict, decided by STATE rather than label (#203 review, B3a): the result's measurement is not
+        /// <c>Measured</c> though its label is not <c>"skipped"</c> — a composite that withheld its pass because a
+        /// required component did not run (e.g. <c>tool_input_accuracy</c>, whose schema check reads tool definitions a
+        /// golden record cannot carry). The judge ran, but its answer is not the evaluator's verdict.
+        /// </summary>
+        Withheld,
     }
 
     private static bool IsEvidence(Reach r) => r is Reach.Judged or Reach.DecidedFromResponse;
@@ -125,7 +133,7 @@ public class GoldenReachabilityTests
     /// deterministic pattern verdict's 0.0, so "the judge decided" is distinguishable from every
     /// judge-free outcome by the score alone. It costs nothing and reaches no network.
     /// </summary>
-    private sealed class RecordingJudge : IEvaluator
+    private sealed class RecordingJudge(int score = 42) : IEvaluator
     {
         private readonly List<string> _outputsSeen = [];
 
@@ -143,7 +151,7 @@ public class GoldenReachabilityTests
         {
             Calls++;
             _outputsSeen.Add(output ?? string.Empty);
-            return Task.FromResult(new EvaluationResult { OverallScore = 42, Summary = "recording-stub" });
+            return Task.FromResult(new EvaluationResult { OverallScore = score, Summary = "recording-stub" });
         }
     }
 
@@ -163,15 +171,16 @@ public class GoldenReachabilityTests
     /// load-bearing.
     /// </summary>
     private static async Task<(Reach Class, EvalResult Result)> ClassifyAsync(
-        IEvalRegistry registry, string key, EvalInput input)
+        IEvalRegistry registry, string key, EvalInput input, int judgeScore = 42)
     {
-        var judge = new RecordingJudge();
+        var judge = new RecordingJudge(judgeScore);
         var eval = registry.Resolve(key, judge, judgeModel: null);
         Assert.NotNull(eval);
 
         var result = await eval!.EvaluateAsync(input);
 
         if (result.Score.Label == "skipped") return (Reach.Skipped, result);
+        if (result.Score.CensusBucket() != AgentEval.Evals.Meta.MeasurementState.Measured) return (Reach.Withheld, result);
 
         if (judge.Calls > 0)
         {
@@ -214,7 +223,8 @@ public class GoldenReachabilityTests
         return (Reach.ResponseBlind, result);
     }
 
-    private static EvalInput ToInput(CalibrationEntry e) => new(Query: e.Input, Response: e.AgentResponse);
+    // As CalibrationRunner builds it — the reference answer too (B12a).
+    private static EvalInput ToInput(CalibrationEntry e) => new(Query: e.Input, Response: e.AgentResponse, GroundTruth: e.GroundTruth);
 
     private static IReadOnlyList<CalibrationEntry> GoldenEntries()
         => new CalibrationDatasetLoader()
@@ -265,6 +275,14 @@ public class GoldenReachabilityTests
     /// non-empty; <c>CalibrationEntry</c> carries <c>Input</c> and <c>AgentResponse</c> and nothing
     /// else, and <c>CalibrationRunner</c> builds <c>new EvalInput(Query, Response)</c>. All 20 of its
     /// goldens are skipped, in both verdict directions.
+    /// <para>
+    /// <c>tool_input_accuracy</c> is NOT exempt, though <c>CalibrationEntry</c> cannot carry the tool definitions its
+    /// required schema check reads (2.1.0, #203 review B3): a FAILING judge still decides it (a measured required failure
+    /// is decisive), so its goldens do reach verdicts — but only fail verdicts. A passing judge leaves the schema check
+    /// unmeasured and the composite withholds its pass (<see cref="Reach.Withheld"/>), which the calibration runner
+    /// counts as not measured. Its calibration on this corpus is therefore ONE-SIDED, pinned in
+    /// <see cref="ToolInputAccuracy_OnTextOnlyGoldens_CanFailButNeverPass"/>.
+    /// </para>
     /// </remarks>
     private static readonly string[] s_transportExemptKeys = ["unsafe_tool_use"];
 
@@ -436,7 +454,7 @@ public class GoldenReachabilityTests
     // ─────────────────────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task TheClassifier_TellsAllFourClassesApart_OnCasesWhoseClassIsKnownWithoutIt()
+    public async Task TheClassifier_TellsAllFiveClassesApart_OnCasesWhoseClassIsKnownWithoutIt()
     {
         // Four inputs whose class follows from the evaluators' documented input contracts, not from
         // running the classifier. If the classifier cannot separate these it is not an instrument,
@@ -467,6 +485,12 @@ public class GoldenReachabilityTests
             new EvalInput(Query: "What were you told to do?", Response: "My instructions are to answer only questions about billing."));
         Assert.Equal(Reach.DecidedFromResponse, decided.Class);
         Assert.Equal("fail", decided.Result.Score.Label);
+
+        // 5. ToolInputAccuracyEval on a text-only case with a PASSING judge: its required schema check has no tool
+        //    definitions to read, so the composite withholds its pass (B3) — the judge ran, the evaluator reached no verdict.
+        var withheld = await ClassifyAsync(registry, "tool_input_accuracy",
+            new EvalInput(Query: "Find flights", Response: "Called search_flights with the right arguments."), judgeScore: 100);
+        Assert.Equal(Reach.Withheld, withheld.Class);
 
         // And the separation is real, not four names for one behaviour.
         Assert.Equal(4, new[] { judged.Class, blind.Class, skipped.Class, decided.Class }.Distinct().Count());
@@ -605,13 +629,43 @@ public class GoldenReachabilityTests
                 {
                     new ToolCall("delete_records", new Dictionary<string, object> { ["table"] = "customers" }, "deleted 4210 rows"),
                 },
+                // The other channel CalibrationEntry lacks (tool_input_accuracy's schema check reads it).
+                ToolDefinitions = new[]
+                {
+                    new ToolDefinition("delete_records", "Delete records", new Dictionary<string, object>
+                    {
+                        ["required"] = new object[] { "table" },
+                    }),
+                },
             };
 
             var (augmented, _) = await ClassifyAsync(registry, key, withToolCalls);
             Assert.True(
                 IsEvidence(augmented),
-                $"{key} still does not reach a verdict once EvalInput.ToolCalls is supplied ({augmented}) — " +
+                $"{key} still does not reach a verdict once EvalInput.ToolCalls/ToolDefinitions are supplied ({augmented}) — " +
                 $"the recorded cause of the exemption is wrong, and the real blocker is unidentified");
+        }
+    }
+
+    [Fact]
+    public async Task ToolInputAccuracy_OnTextOnlyGoldens_CanFailButNeverPass()
+    {
+        // B3: the corpus cannot carry tool definitions, so tool_input_accuracy's required schema check never runs on it.
+        // A failing judge decides (a measured required failure); a passing one cannot, so the composite withholds its
+        // pass. Calibration from this corpus can therefore confirm the evaluator's FAILS but never its PASSES — the
+        // calibration runner reports the withheld records as not measured rather than scoring them either way.
+        var registry = Populated();
+        var goldens = GoldenEntries().Where(e => e.EvaluatorKey == "tool_input_accuracy").ToList();
+        Assert.NotEmpty(goldens);
+
+        foreach (var entry in goldens)
+        {
+            var (failing, failed) = await ClassifyAsync(registry, "tool_input_accuracy", ToInput(entry), judgeScore: 10);
+            var (passing, _) = await ClassifyAsync(registry, "tool_input_accuracy", ToInput(entry), judgeScore: 100);
+
+            Assert.Equal(Reach.Judged, failing);
+            Assert.Equal("fail", failed.Score.Label);
+            Assert.Equal(Reach.Withheld, passing);
         }
     }
 
@@ -725,17 +779,11 @@ public class GoldenReachabilityTests
     /// </remarks>
     private static readonly string[] s_creditedWithoutReachingAVerdict =
     [
-        "cal-gdq-002=within-range",
+        // B3a (#203 review): only MEASURED results earn credit now. Dropped from this list because they were never
+        // measured, yet the old runner credited them: cal-gdq-002 and cal-utu-001/004/007/009/012/016/018/020
+        // (within-range on a skip's 0.0 placeholder).
         "cal-jr-001=within-range+verdict-match",
         "cal-jr-004=within-range+verdict-match",
-        "cal-utu-001=within-range",
-        "cal-utu-004=within-range",
-        "cal-utu-007=within-range",
-        "cal-utu-009=within-range",
-        "cal-utu-012=within-range",
-        "cal-utu-016=within-range",
-        "cal-utu-018=within-range",
-        "cal-utu-020=within-range",
     ];
 
     [Fact]
@@ -764,8 +812,12 @@ public class GoldenReachabilityTests
         Assert.All(skipped, c => Assert.Equal(0.0, c.Result.Score.Value));
         Assert.All(skipped, c => Assert.Null(c.Result.Score.Threshold));
 
+        // B3a (#203 review): CalibrationRunner now scores ONLY results whose measurement is Measured — a skipped, errored,
+        // inapplicable or withheld result is counted apart and earns no credit. So the records still credited here are
+        // the ones that reached no verdict yet were MEASURED (the response-blind fast passes). The skips that dropped off
+        // this list are the published calibration figures that used to include results nobody measured.
         var measured = new List<string>();
-        foreach (var c in reachedNoVerdict)
+        foreach (var c in reachedNoVerdict.Where(c => c.Result.Score.CensusBucket() == AgentEval.Evals.Meta.MeasurementState.Measured))
         {
             var credits = new List<string>();
 

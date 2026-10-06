@@ -66,7 +66,9 @@ var jsonExporter = new JsonExporter();
 var json = await jsonExporter.ExportToStringAsync(report);
 ```
 
-Output includes `runId`, `stats`, `overallScore`, `agent` info, and each test result with optional `metricScores`.
+Output includes `runId`, `stats`, `overallScore`, `agent` info, and each test result with optional `metricScores` and
+`metricsNotMeasured` (a metric that ran but was not measured — an input it needs was not supplied, or, in a memory
+benchmark report, its category was skipped — with its reason; it has no score, so it is never in `metricScores`).
 
 ### JUnit XML
 
@@ -84,7 +86,7 @@ await using var stream = File.Create("results.xml");
 await exporter.ExportAsync(report, stream);
 ```
 
-Tests are grouped by category into `<testsuite>` elements. Failed tests include `<failure>` elements with score and error details. Metric scores are written to `<system-out>`.
+Tests are grouped by category into `<testsuite>` elements. Failed tests include `<failure>` elements with score and error details. Metric scores are written to `<system-out>`, and a metric that was not measured as `name: not measured — reason`.
 
 ### Markdown
 
@@ -114,7 +116,8 @@ The Markdown exporter renders:
 - Status header with ✅/❌ emoji
 - Results table with score, status, and duration
 - Optional failure details section
-- Optional metric breakdown table (dynamic columns from `MetricScores`)
+- Optional metric breakdown table (dynamic columns from `MetricScores` and `MetricsNotMeasured`; a metric that was not
+  measured reads `not measured`, one not requested for that test `-`)
 - Footer with run ID and timestamp
 
 ### TRX
@@ -145,7 +148,7 @@ var csv = await csvExporter.ExportToStringAsync(report);
 
 Fixed columns: `RunId`, `TestName`, `Category`, `Score`, `Passed`, `Skipped`, `DurationMs`, `Error`, `AgentName`, `AgentModel`.
 
-Dynamic columns are appended for each unique key in `MetricScores` (e.g., `relevance`, `correctness`). Special characters (commas, quotes, newlines) are properly escaped per RFC 4180.
+Dynamic columns are appended for each unique key in `MetricScores` and `MetricsNotMeasured` (e.g., `relevance`, `correctness`). A cell holds the score, `not measured` when the metric ran without an input it needs, or is empty when the metric was not requested for that test — so a metric column can mix numbers and text (read it as text, or treat `not measured` as missing, not 0). Special characters (commas, quotes, newlines) are properly escaped per RFC 4180.
 
 ### Directory (ADR-002)
 
@@ -163,15 +166,15 @@ var dirName = DirectoryExporter.GenerateDirectoryName(report);
 await exporter.ExportToDirectoryAsync(report, $"./results/{dirName}");
 ```
 
-**CLI usage:**
-```bash
-# Run a benchmark — exporters write to .agenteval/<subject>/runs/<runId>/reports/ automatically
-export AZURE_OPENAI_ENDPOINT=https://your-resource.openai.azure.com
-export AZURE_OPENAI_API_KEY=...
-export AZURE_OPENAI_DEPLOYMENT=gpt-4o
-agenteval bench agentic --subject MyAgent --input "..."
+**CLI usage:** `agenteval eval` writes the directory with `--output-dir` (`--format directory` is refused with that
+hint). The `bench` commands do not run exporters: each stores its run under `.agenteval/` (summary, results and its own
+Markdown and PDF report), and `agenteval render` re-renders those reports later at no LLM cost.
 
-# Re-render reports later (no LLM cost) into any export format the renderer supports:
+```bash
+# The structured directory from an evaluation run
+agenteval eval --dataset cases.yaml --endpoint http://localhost:1234/v1 --model my-model --output-dir ./results/baseline
+
+# A benchmark run is stored, not exported; re-render its report later (no LLM cost):
 agenteval render --benchmark agentic --subject MyAgent
 ```
 
@@ -179,8 +182,8 @@ Each run produces a directory with:
 
 | File | Format | Purpose |
 |------|--------|---------|
-| `results.jsonl` | JSON Lines | One JSON line per test result (streaming-friendly, append-friendly) |
-| `summary.json` | JSON | Aggregate statistics with per-metric distribution (mean, min, max, stddev, percentiles) |
+| `results.jsonl` | JSON Lines | One JSON line per test result (streaming-friendly, append-friendly); `metricsNotMeasured` names a metric that ran without an input it needs, with its reason |
+| `summary.json` | JSON | Aggregate statistics with per-metric distribution (mean, min, max, stddev, percentiles) over the tests that measured it; `metricsNotMeasured` counts, per metric, the tests where it was not measured |
 | `run.json` | JSON | Run metadata: agent info, environment, timestamp, duration |
 | *(original filename)* | *(original format)* | Copy of original config/dataset file with filename preserved (when provided, for reproducibility) |
 
@@ -200,6 +203,24 @@ public interface IResultExporter
 ```
 
 The `FormatName` property is a default interface member that returns the enum name for built-in exporters. Custom exporters can override it to provide a meaningful string name for registry lookup.
+
+### What an exporter receives (and what it does not)
+
+An exporter receives a flat `EvaluationReport`, the shape `agenteval eval` builds from its test harness and metrics:
+per test a 0–100 score, `Passed`, `Skipped`, an error, the output, metric scores and assertions. It does **not**
+receive the result model — `EvalResult` trees with `MeasurementState`, the `warn` / `error` / `skipped` /
+`inapplicable` labels, composite sub-results and judge provenance. Those come from the eval pipeline (`IEval`,
+`CompositeEval`, the bench commands), which does not call exporters.
+
+Who calls a custom exporter: **your code.** `agenteval eval --format` accepts only the built-in names above; it does
+not look in `IExporterRegistry`. Register a custom exporter, resolve it from the registry and call `ExportAsync`
+yourself, as in the example below.
+
+So a format that needs to keep "not measured" apart from "failed" cannot get it through `IResultExporter`. Take the
+`EvalResult` trees directly instead — from `IEval.EvaluateAsync`, or from a stored run — and serialise them against
+`eval-result.schema.json` (v1, embedded in `AgentEval.DataLoaders`). See
+[ADR-034](adr/034-exporters-and-the-result-model.md) for why the two are separate and the planned path to export the
+result model through a registry.
 
 ### Creating Custom Exporters
 
@@ -227,7 +248,8 @@ The `IExporterRegistry` provides dynamic exporter lookup and registration, analo
 ```csharp
 // Register your custom exporter
 services.AddSingleton<IResultExporter, SarifExporter>();
-services.AddAgentEval(); // Auto-populates IExporterRegistry
+services.AddAgentEvalDataLoaders(); // Builds IExporterRegistry: built-ins + DI-registered exporters
+                                    // (AddAgentEval() alone does not; AddAgentEvalAll() does)
 
 // Resolve and use
 var registry = serviceProvider.GetRequiredService<IExporterRegistry>();

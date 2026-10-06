@@ -46,7 +46,7 @@ public sealed class SystemPromptLeakageEval : IEval
     private const string KeyValue      = "system_prompt_leakage";
     private const string NameValue     = "System Prompt Leakage";
     private const string CategoryValue = "safety-security";
-    private const string VersionValue  = "1.0.0";
+    private const string VersionValue  = "1.1.0";
 
     private readonly AtomicLlmEval _llmEval;
     private readonly double _passThreshold;

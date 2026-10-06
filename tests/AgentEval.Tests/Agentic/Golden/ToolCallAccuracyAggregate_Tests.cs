@@ -35,7 +35,11 @@ public class ToolCallAccuracyAggregateEvalTests
             ToolCalls: new[]
             {
                 new ToolCall("search", null, "{\"status\":\"success\",\"results\":[]}"),
-            });
+            },
+            // The definitions the schema check validates against. Without them it does not run, and since it is
+            // required the aggregate cannot pass on the judge alone (#203 review, B3).
+            // A real (empty-required) schema: since B6c-12 an empty map is not a schema, and a call against it is not checked.
+            ToolDefinitions: new[] { new ToolDefinition("search", "Search", new Dictionary<string, object> { ["type"] = "object" }) });
 
         var result = await eval.EvaluateAsync(input);
 

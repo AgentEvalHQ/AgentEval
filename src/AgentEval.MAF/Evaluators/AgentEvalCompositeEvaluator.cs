@@ -29,7 +29,10 @@ namespace AgentEval.MAF.Evaluators;
 /// <para>
 /// The composite's sub-evaluators (e.g. the AgenticBenchmark tool sub-evals) are LLM-judged: they
 /// grade the query + response text, so they work over MAF's evaluation feature even when only the
-/// final response is forwarded. (To also let <i>code-based</i> tool metrics see the calls, run this
+/// final response is forwarded. A reference answer and retrieved context reach the composite as
+/// <c>EvalInput.GroundTruth</c> / <c>EvalInput.Context</c> — from <see cref="AgentEvalGroundTruthContext"/> /
+/// <see cref="AgentEvalRAGContext"/> on a direct MEAI call, and from <c>EvalItem.ExpectedOutput</c> /
+/// <c>EvalItem.Context</c> when run through <see cref="AgentEvalAgentEvaluator"/> (MAF's own adapter forwards neither). (To also let <i>code-based</i> tool metrics see the calls, run this
 /// through <see cref="AgentEvalAgentEvaluator"/>, which forwards the full conversation.)
 /// </para>
 /// <para>
@@ -108,6 +111,13 @@ public sealed class AgentEvalCompositeEvaluator : MEAIIEvaluator
     public const string FloorDeclarationMetricName = "AgentEval chance-floor declaration";
 
     /// <summary>
+    /// Appended to every leaf metric's reason: the leaf is informational, and the composite's "(overall)" metric decides
+    /// the item. <see cref="MeaiToEvalResultBridge"/> reads it to tell the composite's own leaves from other evaluators'
+    /// metrics on the same item.
+    /// </summary>
+    internal const string InformationalLeafNote = " — informational: the composite's (overall) verdict decides this item";
+
+    /// <summary>
     /// The root-level floor this door was constructed with, or <see langword="null"/> when nobody
     /// declared one. Recorded beside every verdict; applied to none.
     /// </summary>
@@ -155,7 +165,15 @@ public sealed class AgentEvalCompositeEvaluator : MEAIIEvaluator
         var query = ConversationExtractor.ExtractLastUserMessage(messages);
         var output = response.Text ?? string.Empty;
 
-        var input = new EvalInput(Query: query, Response: output);
+        // The reference answer and the retrieved context the caller passes as MEAI additional context
+        // (AgentEvalGroundTruthContext / AgentEvalRAGContext), as AgentEvalEvaluator reads them: they were dropped, so
+        // through MAF similarity and F1 read "none was supplied" and groundedness was graded without its context (#203
+        // review round 14, B12e).
+        var input = new EvalInput(
+            Query: query,
+            Response: output,
+            Context: AdditionalContextHelper.ExtractRAGContext(additionalContext),
+            GroundTruth: AdditionalContextHelper.ExtractGroundTruth(additionalContext));
         EvalResult tree = await _composite.EvaluateAsync(input, cancellationToken).ConfigureAwait(false);
         _captured.Add(tree);
 
@@ -226,7 +244,7 @@ public sealed class AgentEvalCompositeEvaluator : MEAIIEvaluator
         // verdict from it, so making a leaf informational below loses nothing on the way back.
         var reason = $"AgentEval score: {pct:F0}/100 ({node.Score.Label}, severity {node.Score.Severity})";
         if (!isRoot)
-            reason += " — informational: the composite's (overall) verdict decides this item";
+            reason += InformationalLeafNote;
 
         var metric = new NumericMetric(isRoot ? $"{node.Metric.Name} (overall)" : node.Metric.Name, meaiValue, reason)
         {

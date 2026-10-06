@@ -66,33 +66,20 @@ public static class CompositeExtensions
             // Renormalise so the weights still sum to 1.0.
             var totalWeight = combined.Sum(c => c.Weight);
             var normalised = totalWeight > 0
-                ? combined.Select(c => new EvalComponent(c.Eval, c.Weight / totalWeight, c.Required)).ToList()
+                ? combined.Select(c => c with { Weight = c.Weight / totalWeight }).ToList()
                 : combined;
 
-            return new CompositeEval(
-                key: node.Key,
-                name: node.Name,
-                category: node.Category,
-                version: node.Version,
-                components: normalised,
-                aggregation: node.Aggregation,
-                threshold: node.Threshold);
+            // A copy keeps the node's verdict settings; it used to drop them (#203 review, B4).
+            return node.WithComponents(normalised);
         }
 
         // Otherwise, recurse into child composites (children of this node that ARE composites).
         var newComponents = node.Components
             .Select(c => c.Eval is CompositeEval child
-                ? new EvalComponent(TransformTree(child, additions), c.Weight, c.Required)
+                ? c with { Eval = TransformTree(child, additions) }
                 : c)
             .ToList();
 
-        return new CompositeEval(
-            key: node.Key,
-            name: node.Name,
-            category: node.Category,
-            version: node.Version,
-            components: newComponents,
-            aggregation: node.Aggregation,
-            threshold: node.Threshold);
+        return node.WithComponents(newComponents);
     }
 }

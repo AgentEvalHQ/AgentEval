@@ -260,7 +260,8 @@ public sealed class DirectoryExporter : IResultExporter
                 Score = result.Score,
                 DurationMs = result.DurationMs,
                 Error = result.Error,
-                Metrics = result.MetricScores.Count > 0 ? result.MetricScores : null
+                Metrics = result.MetricScores.Count > 0 ? result.MetricScores : null,
+                MetricsNotMeasured = result.MetricsNotMeasured.Count > 0 ? result.MetricsNotMeasured : null
             };
 
             sb.AppendLine(JsonSerializer.Serialize(line, s_jsonlOptions));
@@ -361,6 +362,13 @@ public sealed class DirectoryExporter : IResultExporter
                 SampleSize = values.Count
             };
         }
+
+        var notMeasured = report.TestResults
+            .SelectMany(t => t.MetricsNotMeasured.Keys)
+            .GroupBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+        if (notMeasured.Count > 0)
+            summary.MetricsNotMeasured = notMeasured;
 
         return summary;
     }

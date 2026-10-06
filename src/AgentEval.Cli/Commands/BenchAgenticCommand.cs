@@ -299,15 +299,15 @@ public static class BenchAgenticCommand
 
         // ── All-skipped diagnostic ────────────────────────────────────────────
         // A trace-only preset (e.g. glass-box-diagnostics) run without a trace yields an all-skipped
-        // composite (weighted score 0 → "FAIL"). That is a "nothing ran" state, not a genuine regression —
-        // print a clear reason so the FAIL is not mistaken for a 0% score. (Exit stays FAIL-strict for CI.)
+        // composite. That is a "nothing ran" state, not a genuine regression: the status is SKIPPED (B9b; it
+        // used to read FAIL) and the exit is indeterminate (11) — print why.
         var subResults = compositeResult.Details.SubResults;
         if (subResults is { Count: > 0 } && subResults.All(s => s.Score.Label == "skipped"))
         {
             var isGlassBox = string.Equals(preset, "glass-box-diagnostics", StringComparison.OrdinalIgnoreCase);
             Console.Error.WriteLine(
                 $"[bench agentic] NOTE: all {subResults.Count} evaluator(s) in preset '{preset}' were SKIPPED — "
-                + "no score was produced (the FAIL below reflects 'nothing ran', not a 0% result). "
+                + "no score was produced (SKIPPED below means 'nothing ran', not a 0% result). "
                 + (isGlassBox
                     ? (traceFile is null
                         ? "This preset reads a Glass Box trace; pass --trace <file> to activate it."
@@ -317,7 +317,16 @@ public static class BenchAgenticCommand
 
         // ── Exit code ─────────────────────────────────────────────────────────
         var overall = result.Summary.OverallStatus;
-        Console.WriteLine($"Overall result: {overall} (score {result.Summary.OverallScore:P0})");
+        // ERROR / SKIPPED are not verdicts on the agent (B9b): the score covers only what was measured, and the exit is
+        // indeterminate (11), not "gate failed" (9).
+        var errored = result.Summary.PerEvaluator.Where(kv => kv.Value.Status == "ERROR").Select(kv => kv.Key).ToList();
+        var scoreText = overall is "ERROR" or "SKIPPED"
+            ? $"score {result.Summary.OverallScore:P0} of the measured part only"
+            : $"score {result.Summary.OverallScore:P0}";
+        Console.WriteLine($"Overall result: {overall} ({scoreText})");
+        if (errored.Count > 0)
+            Console.WriteLine($"  {errored.Count} check(s) produced no verdict — the judge or its input failed, not the agent: " +
+                              string.Join(", ", errored));
 
         // Reuse fix: was an inlined duplicate of BenchExitCodes.FromLabel (identical PASS=>0/else=>2 mapping);
         // the shared helper exists specifically so a future policy change lands in one place.

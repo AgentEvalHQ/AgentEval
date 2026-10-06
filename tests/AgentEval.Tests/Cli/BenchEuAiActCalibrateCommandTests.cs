@@ -122,4 +122,38 @@ public class BenchEuAiActCalibrateCommandTests : IDisposable
             content.IndexOf("Judge model:", StringComparison.Ordinal) < content.IndexOf("## ", StringComparison.Ordinal),
             "The judge lines must be in the report header, before the first pillar section.");
     }
+
+    // ── --limit (B12): the one-item stage before a full paid run ───────────────────────────────────────────────
+
+    [Fact]
+    public async Task BenchEuAiActCalibrate_Limit_RequiresOut_SoItCannotOverwriteTheDaysBaseline()
+    {
+        var exit = await BenchEuAiActCalibrateCommand.RunCoreAsync(
+            rootOverride: _root, outPathOverride: null, evaluatorOverride: new AlwaysPassEvaluator(), limitPerPillar: 1);
+
+        Assert.Equal(AgentEval.Cli.ExitCodes.UsageError, exit);
+    }
+
+    [Fact]
+    public async Task BenchEuAiActCalibrate_LimitZero_IsAUsageError()
+    {
+        var exit = await BenchEuAiActCalibrateCommand.RunCoreAsync(
+            rootOverride: _root, outPathOverride: Path.Combine(_root, "limited.md"), evaluatorOverride: new AlwaysPassEvaluator(),
+            limitPerPillar: 0);
+
+        Assert.Equal(AgentEval.Cli.ExitCodes.UsageError, exit);
+    }
+
+    [Fact]
+    public async Task BenchEuAiActCalibrate_ALimitedRun_IsBannered_AndTheGateIsNotApplied()
+    {
+        var outPath = Path.Combine(_root, "limited.md");
+
+        var exit = await BenchEuAiActCalibrateCommand.RunCoreAsync(
+            rootOverride: _root, outPathOverride: outPath, evaluatorOverride: new AlwaysPassEvaluator(), limitPerPillar: 1);
+
+        // One entry per pillar: kappa is undefined, so the gate would fail by construction. Clean wiring passes.
+        Assert.Equal(AgentEval.Cli.ExitCodes.Success, exit);
+        Assert.StartsWith("> ⚠️ **LIMITED RUN — at most 1 entry per pillar.**", await File.ReadAllTextAsync(outPath));
+    }
 }

@@ -80,7 +80,7 @@ public class ContextRecallMetricTests
     }
     
     [Fact]
-    public async Task EvaluateAsync_NoContext_ReturnsFail()
+    public async Task EvaluateAsync_NoContext_IsNotMeasured()
     {
         // Arrange
         var fakeChatClient = new FakeChatClient();
@@ -99,12 +99,13 @@ public class ContextRecallMetricTests
         
         // Assert
         Assert.False(result.Passed);
-        Assert.Contains("requires context", result.Explanation, StringComparison.OrdinalIgnoreCase);
+        Assert.False(result.Measured);   // not measured, never a fail (B12i)
+        Assert.Contains("requires a retrieved context", result.Explanation, StringComparison.OrdinalIgnoreCase);
         Assert.Empty(fakeChatClient.ReceivedMessages);
     }
     
     [Fact]
-    public async Task EvaluateAsync_NoGroundTruth_ReturnsFail()
+    public async Task EvaluateAsync_NoGroundTruth_IsNotMeasured()
     {
         // Arrange
         var fakeChatClient = new FakeChatClient();
@@ -123,7 +124,8 @@ public class ContextRecallMetricTests
         
         // Assert
         Assert.False(result.Passed);
-        Assert.Contains("requires ground truth", result.Explanation, StringComparison.OrdinalIgnoreCase);
+        Assert.False(result.Measured);   // not measured, never a fail (B12i)
+        Assert.Contains("requires a reference answer", result.Explanation, StringComparison.OrdinalIgnoreCase);
         Assert.Empty(fakeChatClient.ReceivedMessages);
     }
     

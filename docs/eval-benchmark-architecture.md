@@ -116,6 +116,7 @@ Two details worth surfacing:
 
 - **`failureSeverity`** propagates article-level severity from YAML metadata into the eval result. This is what enables `CapByWorstAggregation` to identify *critical* failures (e.g., a GDPR Art 9 special-category-data failure) at rollup time. Without this propagation, severity-aware aggregation can't distinguish a critical-article failure from a low-severity one.
 - **`rateResolver`** lets a tenant override cost computation per-eval — useful when negotiated rates differ from list price, or for testing fixtures.
+- **What the judge is sent.** The query, then (each in a labelled section) the context the response must be faithful to, any evaluator notes, and — only when the leaf sets the `JudgeSeesToolData` init property (`ToolCalls`, `ToolDefinitions`) — the run's tool calls (name, arguments, result, recorded outcome, in order) and the tools the agent was offered. Tool data is labelled as recorded data, not instructions; an empty tool-call list says "none were made", a null one adds nothing; long values and long sections are cut with the cut stated. The 13 agentic evaluators whose rubric names tool data set it; `PromptHash` moves only for those leaves.
 
 ### 2.3 Atomic code eval
 
@@ -222,7 +223,7 @@ All three follow the same architectural pattern. They differ in subject matter (
 | **Smoke preset cost** | < $0.10 | < $0.10 | < $0.05 |
 | **Audit-grade preset cost** | $5–10 (multi-judge × stochastic) | $5–10 | Varies |
 
-> **Calibration status, precisely.** The compliance figures this table used to show (GDPR "5/5", EU AI Act "4/6") come from runs in May 2026 on the maintainer's Azure OpenAI deployments. Those runs graded with the generic default judge prompt — before 0.42.0-beta, `calibrate` did not send the regulation prompt that `bench` sends — the reports are not in the repository and do not record the judge model, and results moved with the judge model (with gpt-4o-mini as judge, EU AI Act pillars 3–5 failed). GDPR's sixth pillar cleared only a relaxed κ ≥ 0.60 gate. Treat these judges as uncalibrated for your deployment until you re-run `calibrate`, which sends the benchmark prompt from 0.42.0-beta, and its reports are published.
+> **Calibration status, precisely.** The compliance figures this table used to show (GDPR "5/5", EU AI Act "4/6") come from runs in May 2026 on the maintainer's Azure OpenAI deployments. Those runs graded with the generic default judge prompt — before 0.42.0-beta, `calibrate` did not send the regulation prompt that `bench` sends — the reports are not in the repository and do not record the judge model, and results moved with the judge model (with gpt-4o-mini as judge, EU AI Act pillars 3–5 failed). GDPR's sixth pillar cleared only a relaxed κ ≥ 0.60 gate. Treat these judges as uncalibrated for your deployment until you re-run `calibrate`, which sends the benchmark prompt from 0.42.0-beta. The figures measured on 2026-10-05 for one judge model are in [Calibration results](benchmarks/calibration-results.md).
 
 The headline takeaway: **same primitive, same composition pattern, different content and weighting.** Adding a new regulation (NIST AI RMF, ISO 42001, future Colorado AI Act) is largely a content addition — new YAML scenarios + new judge prompt + a preset factory method that wires them together. No new framework code needed.
 

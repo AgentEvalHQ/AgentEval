@@ -33,7 +33,7 @@ The `EvaluatorCostTier` enum (in `AgentEval.Abstractions/Evals/EvaluatorCostTier
 | `tool_selection` | LOW | Single-turn LLM judge |
 | `tool_input_accuracy` | LOW | Hybrid: schema check (free) + 1 LLM call |
 | `tool_output_utilization` | LOW | Single-turn LLM judge |
-| `tool_call_success` | TRIVIAL | Deterministic-first; LLM fallback only when status field absent |
+| `tool_call_success` | TRIVIAL | Deterministic-first (status records, a trace's recorded outcomes, or `status` fields); LLM fallback only when none of those covers every call |
 | `tool_efficiency` | LOW | Single-turn LLM judge |
 | `tool_call_accuracy` | MEDIUM | Composite of **5 sub-evaluators** — total LLM calls multiply |
 
@@ -73,7 +73,7 @@ The `EvaluatorCostTier` enum (in `AgentEval.Abstractions/Evals/EvaluatorCostTier
 | `code_vulnerability` | LOW | Single-turn LLM judge |
 | `ungrounded_attributes` | LOW | Single-turn LLM judge |
 | `system_prompt_leakage` | LOW | Hybrid pattern scan + LLM fallback |
-| `unsafe_tool_use` | MEDIUM | LLM-judge in v1 (deterministic short-circuit when no tool calls); v2 will add policy-driven short-circuit |
+| `unsafe_tool_use` | MEDIUM | LLM judge when tool calls were made; no judge call when the captured run made none (a pass) or no tool data was captured (not measured) |
 
 ### Phase 5 — Telemetry + Stochastic Stability
 

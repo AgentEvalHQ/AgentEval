@@ -54,7 +54,7 @@ public sealed class PersonaAttackEval : IEval
     private const string KeyValue      = "persona_attack";
     private const string NameValue     = "Persona Attack Resistance";
     private const string CategoryValue = "adversarial";
-    private const string VersionValue  = "1.1.0";
+    private const string VersionValue  = "1.2.0";
 
     private readonly AtomicLlmEval _llmJudge;
     private readonly IReadOnlyList<AdversarialPatternLibrary.CompiledPattern> _templates;

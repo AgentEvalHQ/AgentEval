@@ -37,9 +37,9 @@ public static class UnifiedEvalReport
             EvalResult branch;
             if (!string.IsNullOrEmpty(result.Error) || result.Items.Count == 0)
             {
-                // Neutral infra branch (timeout / exception / breaker-open / empty result set). Do NOT bridge:
-                // the bridge yields a fail/high composite (an empty composite is "not passed") that would
-                // sink the whole report. Render it neutral instead.
+                // Infra branch (timeout / exception / breaker-open / empty result set). Do NOT bridge it: render it as
+                // what it is, "error" or "skipped" with no severity — no verdict, never a confirmed failure. The root
+                // reads it as such (MeasuredRollup): no verdict beside a pass is "error", a skipped branch withholds.
                 var reason = !string.IsNullOrEmpty(result.Error) ? result.Error : "no results returned";
                 // Use result.Status as the primary discriminant (reliable, set by both TracingAgentEvaluator
                 // and HybridEvalInterop.SkippedResults). Fall back to the ProviderName suffix for results
@@ -76,11 +76,15 @@ public static class UnifiedEvalReport
                 //          └─ metric leaf …
                 var bridged = MeaiToEvalResultBridge.Build(source, queries, result, judgeModel: null);
                 var querySubs = bridged.Details.SubResults ?? [];
-                IReadOnlyList<EvalResult> hybridChildren = querySubs.Count == 1
-                    && querySubs[0].Details.SubResults is { Count: > 0 } leafSubs
-                        ? leafSubs          // single query → expose metric leaves directly
-                        : querySubs;        // multiple queries → keep per-query level
-                branch = Node($"hybrid.{Sanitize(source)}", source, "agentic", hybridChildren, source);
+                var singleQuery = querySubs.Count == 1 && querySubs[0].Details.SubResults is { Count: > 0 };
+                IReadOnlyList<EvalResult> hybridChildren = singleQuery
+                    ? querySubs[0].Details.SubResults!   // single query → expose metric leaves directly
+                    : querySubs;                         // multiple queries → keep per-query level
+                // A single query's verdict is the bridged query node's, which honours an "(overall)" metric (an AgentEval
+                // composite's own verdict); re-rolling the promoted leaves dropped it, so a passing composite read FAIL
+                // with one query and PASS with two (#203 review round 6, B10ac).
+                branch = Node($"hybrid.{Sanitize(source)}", source, "agentic", hybridChildren, source,
+                    verdictFrom: singleQuery ? querySubs[0] : null);
             }
 
             // Attach the provider's portal link (when present) as evidence on the branch. Use the actual
@@ -103,23 +107,20 @@ public static class UnifiedEvalReport
         source.Contains("local", StringComparison.OrdinalIgnoreCase) ||
         source.Contains("agenteval", StringComparison.OrdinalIgnoreCase);
 
-    private static bool IsNeutral(EvalResult r) => r.Score.Label is "error" or "skipped";
-
-    // Mean-aggregated node tagged with `provenanceType`. Rolls up over NON-neutral sub-results only: a
-    // neutral "error"/"skipped" branch is visible in the tree but never drags the parent to fail/high.
-    // If EVERY sub-result is neutral, the parent is itself neutral (severity none) — nothing was evaluated.
+    // Mean-aggregated node tagged with `provenanceType`, read by measurement state (MeasuredRollup): an errored or
+    // skipped part is never averaged in as a 0 and never lets the node pass on the rest, and a warn stays a warn. It
+    // left "error"/"skipped" parts out and passed on whatever remained — an MEAI metric whose judge reply did not parse
+    // beside a passing one read PASS — and read any other non-pass, a quality WARN included, as FAIL/high (#203 review
+    // round 5, B10u). An errored part is "error" unless a measured failure decides; nothing measured is no verdict.
     private static EvalResult Node(string key, string name, string category,
-        IReadOnlyList<EvalResult> subs, string provenanceType)
+        IReadOnlyList<EvalResult> subs, string provenanceType, EvalResult? verdictFrom = null)
     {
-        var real = subs.Where(s => !IsNeutral(s)).ToList();
-        var avg = real.Count == 0 ? 0 : real.Average(s => s.Score.Value);
-        var passed = real.Count > 0 && real.All(s => s.Score.Passed);
-        var (label, severity) = real.Count == 0
-            ? (subs.Any(s => s.Score.Label == "error") ? "error" : "skipped", "none")
-            : (passed ? "pass" : "fail", passed ? "none" : "high");
+        var v = verdictFrom is { } from
+            ? new MeasuredRollup.Verdict(from.Score.Value, from.Score.Label, from.Score.Passed, from.Score.Severity, from.Score.Measurement)
+            : MeasuredRollup.Of(subs);
         return new EvalResult(
             Metric: new EvalMetadata(key, name, category, "1.0.0"),
-            Score: new EvalScore(avg, null, label, passed, 0.70, severity, null),
+            Score: new EvalScore(v.Value, null, v.Label, v.Passed, 0.70, v.Severity, null) { Measurement = v.Measurement },
             Details: new EvalDetails(null, null, null, subs, "mean"),
             Provenance: new EvalProvenance(provenanceType, null, null, null, null, 0, false),
             EvaluatedAt: DateTimeOffset.UtcNow);

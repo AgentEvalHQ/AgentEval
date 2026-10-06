@@ -70,7 +70,7 @@ public static class LightPathMAFIntegration
                 if (metric is NumericMetric num)
                 {
                     var icon = num.Interpretation?.Failed != true ? "✅" : "❌";
-                    Console.WriteLine($"      {icon} {name}: {num.Value:F1}/5.0{AIConfig.MockLabel}");
+                    Console.WriteLine($"      {icon} {name}: {FormatScore(num)}{AIConfig.MockLabel}");
                 }
             }
         }
@@ -116,7 +116,7 @@ public static class LightPathMAFIntegration
                     if (metric is NumericMetric num)
                     {
                         var icon = num.Interpretation?.Failed != true ? "✅" : "❌";
-                        Console.WriteLine($"      {icon} {name}: {num.Value:F1}/5.0{AIConfig.MockLabel}");
+                        Console.WriteLine($"      {icon} {name}: {FormatScore(num)}{AIConfig.MockLabel}");
                     }
                 }
             }
@@ -140,7 +140,7 @@ public static class LightPathMAFIntegration
             Console.ResetColor();
             Console.WriteLine();
 
-            Console.WriteLine("   🔄 Running Quality evaluation (4 LLM-as-judge metrics)...\n");
+            Console.WriteLine("   🔄 Running Quality evaluation (3 LLM-as-judge metrics)...\n");
             var agent3 = CreateTravelAgent();
             var qualityResults = await agent3.EvaluateAsync(
                 queries,
@@ -159,7 +159,7 @@ public static class LightPathMAFIntegration
                         var endIdx = reason.IndexOf(')');
                         var scoreInfo = scoreIdx >= 0 && endIdx > scoreIdx
                             ? reason.Substring(scoreIdx, endIdx - scoreIdx + 1) : "";
-                        Console.WriteLine($"      {icon} {name}: {num.Value:F1}/5.0 — {scoreInfo}");
+                        Console.WriteLine($"      {icon} {name}: {FormatScore(num)} — {scoreInfo}");
                     }
                 }
             }
@@ -184,7 +184,7 @@ public static class LightPathMAFIntegration
                     if (metric is NumericMetric num)
                     {
                         var icon = num.Interpretation?.Failed != true ? "✅" : "❌";
-                        Console.WriteLine($"      {icon} {name}: {num.Value:F1}/5.0{AIConfig.MockLabel}");
+                        Console.WriteLine($"      {icon} {name}: {FormatScore(num)}{AIConfig.MockLabel}");
                     }
                 }
             }
@@ -198,10 +198,11 @@ public static class LightPathMAFIntegration
             Console.ForegroundColor = ConsoleColor.Yellow;
             Console.WriteLine("   ⚠️  Mock mode: the LLM-judged bundles need a real model. They are:\n");
             Console.ResetColor();
-            Console.WriteLine("   AgentEvalEvaluators.Quality(judgeClient)   → faithfulness, relevance, coherence, fluency");
-            Console.WriteLine("   AgentEvalEvaluators.RAG(judgeClient)       → + context precision/recall, answer correctness");
+            Console.WriteLine("   AgentEvalEvaluators.Quality(judgeClient)   → relevance, coherence, fluency");
+            Console.WriteLine("   AgentEvalEvaluators.RAG(judgeClient)       → faithfulness, relevance, context precision/recall, answer correctness");
+            Console.WriteLine("                                                (needs each EvalItem's Context; agent.EvaluateAsync cannot set it)");
             Console.WriteLine("   AgentEvalEvaluators.Safety(judgeClient)    → toxicity, bias, misinformation");
-            Console.WriteLine("   AgentEvalEvaluators.Advanced(judgeClient)  → all 10 metrics combined\n");
+            Console.WriteLine("   AgentEvalEvaluators.Advanced(judgeClient)  → all 8 metrics that need no retrieved context\n");
             Console.ForegroundColor = ConsoleColor.DarkGray;
             Console.WriteLine("   Set a provider (AZURE_OPENAI_* / BITDEER_API_KEY / OPENAI_COMPATIBLE_*) to run live");
             Console.ResetColor();
@@ -216,14 +217,18 @@ public static class LightPathMAFIntegration
         PrintBundle("Agentic()", AgentEvalEvaluators.Agentic());
         PrintBundle("Agentic([\"SearchFlights\", \"BookHotel\"])",
             AgentEvalEvaluators.Agentic(["SearchFlights", "BookHotel"]));
-        Console.WriteLine("   AgentEvalEvaluators.Quality(judgeClient)   → 4 metrics");
+        Console.WriteLine("   AgentEvalEvaluators.Quality(judgeClient)   → 3 metrics");
         Console.WriteLine("   AgentEvalEvaluators.RAG(judgeClient)       → 5 metrics");
         Console.WriteLine("   AgentEvalEvaluators.Safety(judgeClient)    → 3 metrics");
-        Console.WriteLine("   AgentEvalEvaluators.Advanced(judgeClient)  → 10 metrics");
+        Console.WriteLine("   AgentEvalEvaluators.Advanced(judgeClient)  → 8 metrics");
         Console.WriteLine("   AgentEvalEvaluators.Custom(metric1, ...)   → your choice");
 
         PrintKeyTakeaways();
     }
+
+    // A metric that was not measured carries no value (its reason says why), so there is no score to print.
+    private static string FormatScore(NumericMetric num) =>
+        num.Value is { } v ? $"{v:F1}/5.0" : "no value";
 
     // ════════════════════════════════════════════════════════════════════
     // AGENT & TOOLS

@@ -55,7 +55,7 @@ public sealed class StochasticStabilityEval : IEval
     private const string KeyValue      = "stochastic_stability";
     private const string NameValue     = "Stochastic Stability";
     private const string CategoryValue = "operational";
-    private const string VersionValue  = "1.0.0";
+    private const string VersionValue  = "1.1.0";
 
     /// <summary>
     /// Conventional metadata key for supplying run results via <see cref="EvalInput.Metadata"/>.
@@ -98,12 +98,20 @@ public sealed class StochasticStabilityEval : IEval
     {
         ArgumentNullException.ThrowIfNull(input);
 
-        var runResults = ExtractRunResults(input);
+        // A run that produced no verdict (errored, skipped, inapplicable) is not an unstable run: it entered the success
+        // rate as a failure and the variance as a 0 (#203 review round 3, B10i — the B9b class). It is left out, and a
+        // pass that rests on part of the runs is a warn.
+        var allRuns = ExtractRunResults(input);
+        // By measurement state, not label strings (review round 4, B10s): a run that withheld its pass (warn, not
+        // measured) and a JSON run with no label counted as failed runs.
+        var unmeasured = allRuns.Count(r => !r.Measured);
+        var runResults = allRuns.Where(r => r.Measured).ToList();
         if (runResults.Count < 2)
         {
             return Task.FromResult(EvalResult.Skipped(this,
-                $"StochasticStabilityEval requires at least 2 run results in " +
-                $"EvalInput.Metadata[\"{MetadataRunResultsKey}\"]. Got {runResults.Count}."));
+                $"StochasticStabilityEval requires at least 2 run results with a verdict in " +
+                $"EvalInput.Metadata[\"{MetadataRunResultsKey}\"]. Got {runResults.Count}" +
+                (unmeasured > 0 ? $" ({unmeasured} more produced no verdict)." : ".")));
         }
 
         // ── Compute the three sub-dimensions ─────────────────────────────────────
@@ -148,10 +156,17 @@ public sealed class StochasticStabilityEval : IEval
         var finalScore = Math.Clamp(compositeScore, 0.0, 1.0);
         var passed = finalScore >= _passThreshold;
         var severity = passed ? "none" : "medium";
+        var label = passed ? "pass" : "fail";
+        if (passed && unmeasured > 0)
+        {
+            label = "warn";
+            passed = false;
+            severity = "none";
+        }
 
         return Task.FromResult(new EvalResult(
             Metric: new(KeyValue, NameValue, CategoryValue, VersionValue),
-            Score: new(finalScore, null, passed ? "pass" : "fail", passed, _passThreshold, severity, null),
+            Score: new(finalScore, null, label, passed, _passThreshold, severity, null),
             Details: new(
                 Dimensions: new Dictionary<string, double>
                 {
@@ -162,6 +177,7 @@ public sealed class StochasticStabilityEval : IEval
                     ["score_variance_inverse_norm"]  = normalizedVarianceInverse,
                     ["failure_mode_consistency"]     = failureModeConsistency,
                     ["failed_run_count"]             = failedLabels.Count,
+                    ["runs_without_verdict"]         = unmeasured,
                 },
                 Evidence:
                 [
@@ -171,7 +187,10 @@ public sealed class StochasticStabilityEval : IEval
                         Message: $"{runResults.Count} runs: success_rate={successRate:P0}, " +
                                  $"score_variance={variance:F4} (normalized_inv={normalizedVarianceInverse:F3}), " +
                                  $"failure_mode_consistency={failureModeConsistency:P0}. " +
-                                 $"Composite={finalScore:F3}."),
+                                 $"Composite={finalScore:F3}." +
+                                 (unmeasured > 0
+                                     ? $" {unmeasured} more run(s) produced no verdict and are left out; a pass on the rest is a warn."
+                                     : "")),
                 ],
                 Recommendations: passed ? null : BuildRecommendations(successRate, normalizedVarianceInverse, failureModeConsistency),
                 SubResults: null,
@@ -182,7 +201,8 @@ public sealed class StochasticStabilityEval : IEval
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private sealed record RunSummary(double Score, bool Passed, string Label);
+    // Measured: the run has a verdict to compare (EvalScore.CountsTowardAggregate, or its JSON equivalent).
+    private sealed record RunSummary(double Score, bool Passed, string Label, bool Measured = true);
 
     private static IReadOnlyList<RunSummary> ExtractRunResults(EvalInput input)
     {
@@ -191,7 +211,7 @@ public sealed class StochasticStabilityEval : IEval
 
         return raw switch
         {
-            IEnumerable<EvalResult> results  => results.Select(r => new RunSummary(r.Score.Value, r.Score.Passed, r.Score.Label)).ToList(),
+            IEnumerable<EvalResult> results  => results.Select(Summarise).ToList(),
             IEnumerable<RunSummary> summaries => summaries.ToList(),
             string json                       => ParseJsonRunResults(json),
             _                                 => TryConvertEnumerable(raw),
@@ -210,24 +230,34 @@ public sealed class StochasticStabilityEval : IEval
             foreach (var el in doc.RootElement.EnumerateArray())
             {
                 double scoreValue = 0;
-                bool passed = false;
-                string label = "unknown";
+                bool? passed = null;
+                string? label = null;
+                var measurementRecorded = true;
 
                 // Support both flat {"value":..., "passed":...} and nested {"score":{"value":...}}
-                if (el.TryGetProperty("score", out var scoreEl))
+                var src = el.TryGetProperty("score", out var scoreEl) ? scoreEl : el;
+                if (src.TryGetProperty("value",  out var v))  scoreValue = v.GetDouble();
+                if (src.TryGetProperty("passed", out var p))  passed     = p.GetBoolean();
+                if (src.TryGetProperty("label",  out var l))  label      = l.GetString();
+                if (src.TryGetProperty("measurement", out var m))
                 {
-                    if (scoreEl.TryGetProperty("value",  out var v))  scoreValue = v.GetDouble();
-                    if (scoreEl.TryGetProperty("passed", out var p))  passed     = p.GetBoolean();
-                    if (scoreEl.TryGetProperty("label",  out var l))  label      = l.GetString() ?? "unknown";
-                }
-                else
-                {
-                    if (el.TryGetProperty("value",  out var v))  scoreValue = v.GetDouble();
-                    if (el.TryGetProperty("passed", out var p))  passed     = p.GetBoolean();
-                    if (el.TryGetProperty("label",  out var l))  label      = l.GetString() ?? "unknown";
+                    // Written as a name ("notMeasured") by the result store, as a number by default System.Text.Json (B10v):
+                    // anything but Measured (0) is a run with no verdict to compare.
+                    measurementRecorded = m.ValueKind switch
+                    {
+                        JsonValueKind.String => string.Equals(m.GetString(), nameof(AgentEval.Evals.Meta.MeasurementState.Measured), StringComparison.OrdinalIgnoreCase),
+                        JsonValueKind.Number => m.TryGetInt32(out var n) && n == (int)AgentEval.Evals.Meta.MeasurementState.Measured,
+                        _ => true,
+                    };
                 }
 
-                results.Add(new RunSummary(scoreValue, passed, label));
+                // The documented minimum is value + passed: that is a verdict (#203 review round 5, B10v — B10s treated a run
+                // with no label as having none, so a run saying "passed": false was dropped and a failed run disappeared). No
+                // verdict is a run without "passed", one labelled error/skipped/inapplicable, or one recorded as not measured.
+                var measured = passed is not null
+                               && label is not ("error" or "skipped" or "inapplicable")
+                               && measurementRecorded;
+                results.Add(new RunSummary(scoreValue, passed ?? false, label ?? (passed == true ? "pass" : "fail"), measured));
             }
             return results;
         }
@@ -237,6 +267,9 @@ public sealed class StochasticStabilityEval : IEval
         }
     }
 
+    private static RunSummary Summarise(EvalResult r) =>
+        new(r.Score.Value, r.Score.Passed, r.Score.Label, r.Score.CountsTowardAggregate());
+
     private static IReadOnlyList<RunSummary> TryConvertEnumerable(object raw)
     {
         if (raw is global::System.Collections.IEnumerable enumerable)
@@ -245,7 +278,7 @@ public sealed class StochasticStabilityEval : IEval
             foreach (var item in enumerable)
             {
                 if (item is EvalResult er)
-                    result.Add(new RunSummary(er.Score.Value, er.Score.Passed, er.Score.Label));
+                    result.Add(Summarise(er));
             }
             return result;
         }

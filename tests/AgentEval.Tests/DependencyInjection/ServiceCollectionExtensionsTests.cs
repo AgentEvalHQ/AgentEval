@@ -703,6 +703,72 @@ public class ServiceCollectionExtensionsTests
         Assert.Same(customEmbeddings, embeddings);
     }
 
+    // ── The registration contract docs/extensibility.md states ───────────────────────────────────
+    // The docs and the Extensibility sample used to say AddAgentEval() builds the exporter, loader and
+    // attack registries. It builds only IMetricRegistry; the sample stopped at its exporter step with
+    // "No service for type IExporterRegistry". These two tests pin the table the docs now print.
+
+    [Fact]
+    public void AddAgentEval_Alone_BuildsOnlyTheMetricRegistry()
+    {
+        var services = new ServiceCollection();
+        services.AddAgentEval();
+        var provider = services.BuildServiceProvider();
+
+        Assert.NotNull(provider.GetService<IMetricRegistry>());
+        Assert.Null(provider.GetService<IExporterRegistry>());
+        Assert.Null(provider.GetService<IDatasetLoaderFactory>());
+        Assert.Null(provider.GetService<IAttackTypeRegistry>());
+    }
+
+    [Fact]
+    public void DocumentedSetup_EveryRegistryResolves_WithTheCustomExtensionsRegisteredBeforeIt()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IMetric>(new FakeMetric("custom_metric"));
+        services.AddSingleton<IResultExporter>(new FakeExporter("custom_format", ".custom"));
+        services.AddSingleton<IDatasetLoader>(new FakeDatasetLoader("custom_loader", [".customdata"]));
+        services.AddSingleton<IAttackType>(new FakeAttackType("CustomAttack", "LLM01"));
+
+        // The calls docs/extensibility.md and the Extensibility sample now make.
+        services.AddAgentEval();
+        services.AddAgentEvalDataLoaders();
+        services.AddAgentEvalRedTeam();
+        var provider = services.BuildServiceProvider();
+
+        Assert.NotNull(provider.GetRequiredService<IMetricRegistry>().Get("custom_metric"));
+        Assert.True(provider.GetRequiredService<IExporterRegistry>().Contains("custom_format"));
+        Assert.Equal("custom_loader", provider.GetRequiredService<IDatasetLoaderFactory>().CreateFromExtension(".customdata").Format);
+        Assert.True(provider.GetRequiredService<IAttackTypeRegistry>().Contains("CustomAttack"));
+    }
+
+    // A DI-registered loader declares a Format, but Create(format) used to know only the built-in names, so it
+    // threw "Unknown format" for every custom loader (the Extensibility sample printed a ⚠️ about it).
+
+    [Fact]
+    public void DiRegisteredLoader_IsReachableByItsFormatName()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IDatasetLoader>(new FakeDatasetLoader("custom_loader", [".customdata"]));
+        services.AddAgentEvalDataLoaders();
+        var factory = services.BuildServiceProvider().GetRequiredService<IDatasetLoaderFactory>();
+
+        Assert.Equal("custom_loader", factory.Create("custom_loader").Format);
+        Assert.Equal("custom_loader", factory.Create("CUSTOM_LOADER").Format); // case-insensitive, like the built-ins
+        Assert.Throws<ArgumentException>(() => factory.Create("not_registered"));
+    }
+
+    [Fact]
+    public void DiRegisteredLoader_ReusingABuiltInFormatName_DoesNotReplaceTheBuiltIn()
+    {
+        var services = new ServiceCollection();
+        services.AddSingleton<IDatasetLoader>(new FakeDatasetLoader("csv", [".customcsv"]));
+        services.AddAgentEvalDataLoaders();
+        var factory = services.BuildServiceProvider().GetRequiredService<IDatasetLoaderFactory>();
+
+        Assert.IsType<CsvDatasetLoader>(factory.Create("csv"));
+    }
+
     // Fake test harness for testing
     private class FakeTestHarness : IEvaluationHarness
     {

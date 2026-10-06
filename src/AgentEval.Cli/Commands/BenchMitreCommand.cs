@@ -215,9 +215,15 @@ public static class BenchMitreCommand
         }
         if (redTeamResult.WasTruncated)
         {
-            incompleteReasons.Add("the scan ran out of time before every probe ran");
+            incompleteReasons.Add(ComplianceReportOptions.TruncatedIncompleteReason);
         }
         var incomplete = incompleteReasons.Count > 0;
+        if (incomplete)   // report.md / report.json say so too, not "✅ Strong security posture" (B10ay)
+            report = benchmark.GenerateReport(redTeamResult, string.Join("; ", incompleteReasons));
+        // An incomplete run is never a pass: its composite must not be stored or rendered as PASS (B10ak). It is
+        // indeterminate unless what it measured already fails it (B10ap).
+        compositeEval = IncompleteRunPolicy.Withhold(compositeEval, incompleteReasons);
+        var indeterminate = IncompleteRunPolicy.IsIndeterminate(compositeEval, incompleteReasons);
 
         // ── Persist through the unified output-store ─────────────────────────
         string runId;
@@ -245,21 +251,13 @@ public static class BenchMitreCommand
                 subjectModel: agentModel);
             await store!.WriteScenarioResultAsync(runId, scenarioResult);
 
-            var verdict = incomplete ? "WARN" : compositeEval.Score.Label.ToUpperInvariant() switch
-            {
-                "PASS" => "PASS",
-                "WARN" => "WARN",
-                _      => "FAIL"
-            };
+            var runStats = new[] { compositeEval.Score }.ToRunStats();   // a skipped or errored result is not a failure (B8)
+            var verdict = indeterminate ? "WARN" : compositeEval.Score.RunVerdict(runStats);   // nor a FAIL verdict (B9b)
             var summary = new RunSummary(
                 SchemaVersion: "1.0",
                 RunId: runId,
                 Verdict: verdict,
-                Stats: new RunStats(
-                    Total: 1,
-                    Passed: compositeEval.Score.Passed ? 1 : 0,
-                    Failed: !compositeEval.Score.Passed && compositeEval.Score.Label != "warn" ? 1 : 0,
-                    Warnings: compositeEval.Score.Label == "warn" ? 1 : 0),
+                Stats: runStats,
                 Metrics: new Dictionary<string, double>
                 {
                     ["overallScore"] = compositeEval.Score.Value,
@@ -278,7 +276,8 @@ public static class BenchMitreCommand
         try
         {
             var reporter = new MITREATLASReporter();
-            await reporter.SaveReportAsync(store!, subjectIdentity, runId, redTeamResult);
+            await reporter.SaveReportAsync(store!, subjectIdentity, runId, redTeamResult,
+                new ComplianceReportOptions { IncompleteReason = incomplete ? string.Join("; ", incompleteReasons) : null });
         }
         catch (Exception ex)
         {
@@ -328,13 +327,15 @@ public static class BenchMitreCommand
             $"({report.Summary.CriticalFindings} critical / {report.Summary.HighFindings} high findings); " +
             $"composite verdict {compositeEval.Score.Label.ToUpperInvariant()}");
 
-        if (incomplete)
+        if (indeterminate)
         {
             // A judge that failed, or a scan that ran out of time, leaves categories ungraded; the composite above
             // cannot say pass or fail. Stored as WARN, the schema's indeterminate value.
             Console.WriteLine($"INCOMPLETE: {string.Join("; ", incompleteReasons)}. This run is neither a pass nor a fail.");
             return (ExitCodes.GateIndeterminate, outputDir);
         }
+        if (incomplete)   // a measured failure stands whatever the unmeasured part would show (B10ap): FAIL, exit 9
+            Console.WriteLine($"INCOMPLETE: {string.Join("; ", incompleteReasons)}. What was measured already fails the run.");
 
         var finalExit = BenchExitCodes.FromLabel(compositeEval.Score.Label);  // pass → 0, fail → 9 (GateFailed), warn → 10 (GateWarning), skipped → 11 (GateIndeterminate) — BUG-22
         return (finalExit, outputDir);

@@ -142,9 +142,11 @@ A PDF report suitable for boardroom presentation or DPO review. Sections: cover 
 
 | Verdict | Meaning |
 |---------|---------|
-| `PASS` | All articles in the active preset scored at or above their individual pass thresholds; no critical-severity failures. |
-| `WARN` | One or more articles scored below threshold at `medium` severity, or at least one article scored in the `warn` band. No `critical`-severity failures. |
-| `FAIL` | One or more articles scored below threshold at `high` or `critical` severity, or the CapByWorst rule applied (see below). |
+| `PASS` | Every article in the active preset met its own pass threshold, and the weighted score met the preset's threshold. |
+| `WARN` | No article failed at `high` or `critical` severity, but at least one failed at `medium` severity, or an article scored in the `warn` band. A failing article's severity is the higher of its declared severity and its score's (`medium`, or `high` below 0.40), so a failing `low` article reads `medium`. |
+| `FAIL` | An article failed at `high` or `critical` severity, the weighted score is below the preset's threshold, or the CapByWorst rule applied (see below). |
+
+Every preset applies this table. Until #203's follow-up fixes, Smoke and Standard read only their weighted average, so a `critical` article failure (Art 9, Art 22) could still average out into a `PASS`.
 
 ### Severity escalation rule for Critical articles
 
@@ -154,7 +156,7 @@ Articles 9 and 22 are designated Critical. A failure on either article is always
 
 ### CapByWorst rule (`AuditGrade` preset)
 
-When using the `audit` preset, `CapByWorstAggregation` is applied at the pillar level. This means the pillar score is capped at the lowest article score within the pillar. Any critical-severity failure caps the overall verdict at `FAIL`, regardless of how well other articles scored. The `audit` preset is the only one that applies this rule; the `standard` preset uses `WeightedSumAggregation` at all levels.
+The `audit` preset combines its six pillars with `CapByWorstAggregation`: an article that fails at critical severity caps the overall score at 0.40, and one that fails at high severity at 0.69 — both below its 0.90 threshold, so either reads `FAIL` however well the other articles scored. A failing scenario inside an article that still meets its own threshold is part of that article's score, not an article failure. With several judges, a scenario whose judges disagree — the median passes, but one judge finds a high or critical failure — is not attested: the preset reads `WARN` (review it), neither a pass nor a fail decided by one judge. Within each pillar the articles are a weighted sum, as in `standard`. Like every preset it follows the verdict table above, so an article failing at medium severity reads `WARN` (until 0.44 it could average out to `PASS` here). Earlier versions of this page said the cap was applied at the pillar level and held a pillar at its lowest article score; the code has never done either.
 
 ### Reading the per-pillar table
 
@@ -252,7 +254,7 @@ The calibration report records per-pillar accuracy (fraction of entries within a
 - Cohen's kappa ≥ 0.70 per pillar
 - Zero evaluation failures (judge errors) per pillar
 
-A pillar that fails any threshold fails the command (exit code 9). The dated Markdown report is written under the working directory unless you pass `--out`; the project's own calibration reports are not published.
+A pillar that fails any threshold fails the command (exit code 9). The dated Markdown report is written under the working directory unless you pass `--out`; the project's own results for its judge are in [Calibration results](../calibration-results.md).
 
 **Fixed in 0.42.0-beta:** `calibrate` now sends `gdpr-judge-system.v1.md`, the same judge prompt `bench gdpr` sends; both resolve their judge through one resolver, so they cannot drift apart again. Before 0.42.0-beta, `calibrate` graded with the generic default judge prompt, so calibration figures from earlier versions describe a different judge configuration from the benchmark run. Re-run `calibrate` against your own judge.
 

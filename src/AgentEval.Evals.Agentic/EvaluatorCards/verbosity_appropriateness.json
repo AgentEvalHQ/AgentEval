@@ -3,11 +3,11 @@
   "key": "verbosity_appropriateness",
   "name": "Verbosity Appropriateness",
   "category": "ux",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "LLM judge assessing whether the response length matched the user apparent need (not too terse for complex questions; not too verbose for simple ones).",
   "costTier": "Low",
   "higherIsBetter": true,
-  "defaultThreshold": 0.75,
+  "defaultThreshold": 0.7,
   "expectedInputs": [
     {
       "kind": "query",

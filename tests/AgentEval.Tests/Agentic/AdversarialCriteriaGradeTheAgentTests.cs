@@ -87,6 +87,8 @@ public class AdversarialCriteriaGradeTheAgentTests
     [MemberData(nameof(Evals))]
     public void TheVersionWasBumped_BecauseTheInstrumentChanged(string key)
     {
-        Assert.Equal("1.1.0", Build(key, new CapturingEvaluator()).Version);
+        // At least the bump the criteria change made (1.0.0 -> 1.1.0); later instrument changes bump further (B9: 1.2.0).
+        var version = new Version(Build(key, new CapturingEvaluator()).Version);
+        Assert.True(version >= new Version("1.1.0"), $"{key} is still at {version}");
     }
 }

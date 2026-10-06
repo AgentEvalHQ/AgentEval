@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using AgentEval.Evals;
+using AgentEval.Evals.Meta;
 
 namespace AgentEval.Evals.Agentic.Calibration;
 
@@ -94,11 +95,13 @@ public sealed class CalibrationRunner
         {
             ct.ThrowIfCancellationRequested();
 
-            var pairs = new List<(string Expected, string Actual)>();
-            var scoreDeltas = new List<double>();
-            int withinScoreRange = 0;
+            var measured = new List<(string Key, CalibrationEntry Entry, EvalResult Result)>();
+            var keysNotMeasured = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             int evaluationFailures = 0;
             int skippedUnknownKey = 0;
+            var skippedKeys = new SortedDictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            int notMeasured = 0;
+            int notApplicable = 0;
 
             var entries = limitPerCategory is int limit ? ds.Entries.Take(limit) : ds.Entries;
             foreach (var entry in entries)
@@ -108,8 +111,9 @@ public sealed class CalibrationRunner
                 {
                     Console.Error.WriteLine(
                         $"[calibration] {ds.CategoryKey} entry {entry.ScenarioId}: " +
-                        $"unknown evaluator key '{entry.EvaluatorKey}' — skipping.");
+                        $"no evaluator dispatched for key '{entry.EvaluatorKey}' (unknown, or carved out) — skipping.");
                     skippedUnknownKey++;
+                    skippedKeys[entry.EvaluatorKey] = skippedKeys.GetValueOrDefault(entry.EvaluatorKey) + 1;
                     continue;
                 }
 
@@ -117,7 +121,7 @@ public sealed class CalibrationRunner
                 try
                 {
                     result = await eval.EvaluateAsync(
-                        new EvalInput(Query: entry.Input, Response: entry.AgentResponse), ct);
+                        new EvalInput(Query: entry.Input, Response: entry.AgentResponse, GroundTruth: entry.GroundTruth), ct);
                 }
                 catch (OperationCanceledException)
                 {
@@ -140,15 +144,41 @@ public sealed class CalibrationRunner
                 if (caseSink is not null)
                     await caseSink(CalibrationCaseRecord.From(ds.CategoryKey, entry, result), ct).ConfigureAwait(false);
 
-                pairs.Add((entry.ExpectedVerdict, result.Score.Label));
+                // Only a MEASURED verdict is calibration evidence (ADR-030; #203 review, B3a). A result that reached no
+                // verdict never equals a gold label and its 0.0 is a placeholder, so counting it made a judge outage read
+                // as disagreement and a placeholder as an in-band score. A judge that answered with no usable verdict
+                // ("error") IS an evaluation failure — counted with the thrown ones, so an outage cannot raise accuracy by
+                // dropping out; anything else not measured (skipped, a composite that withheld its pass) or inapplicable
+                // is reported in its own count, never scored.
+                switch (result.Score.CensusBucket())
+                {
+                    case MeasurementState.NotMeasured when result.Score.Label == "error":
+                        evaluationFailures++;
+                        continue;
+                    case MeasurementState.NotMeasured:
+                        notMeasured++;
+                        keysNotMeasured.Add(entry.EvaluatorKey);
+                        continue;
+                    case MeasurementState.NotApplicable:
+                        notApplicable++;
+                        continue;
+                }
 
-                if (result.Score.Value >= entry.ExpectedScoreMin &&
-                    result.Score.Value <= entry.ExpectedScoreMax)
-                    withinScoreRange++;
-
-                var midpoint = (entry.ExpectedScoreMin + entry.ExpectedScoreMax) / 2.0;
-                scoreDeltas.Add(result.Score.Value - midpoint);
+                measured.Add((entry.EvaluatorKey, entry, result));
             }
+
+            // Exclusion is by KEY, never by outcome (#203 review, B6c-7). Excluding only the unmeasured records scored a
+            // sample selected on the evaluator's own verdict: a composite that withholds its pass on these goldens (its
+            // tool-data leaf cannot run) was measured only when it predicted fail, so its false negatives vanished from
+            // accuracy and kappa. A key with ANY unmeasured record is left out whole, and named.
+            var excludedKeys = keysNotMeasured.OrderBy(k => k, StringComparer.Ordinal).ToList();
+            var scored = measured.Where(m => !keysNotMeasured.Contains(m.Key)).ToList();
+            var pairs = scored.Select(m => (m.Entry.ExpectedVerdict, m.Result.Score.Label)).ToList();
+            var withinScoreRange = scored.Count(m =>
+                m.Result.Score.Value >= m.Entry.ExpectedScoreMin && m.Result.Score.Value <= m.Entry.ExpectedScoreMax);
+            var scoreDeltas = scored
+                .Select(m => m.Result.Score.Value - (m.Entry.ExpectedScoreMin + m.Entry.ExpectedScoreMax) / 2.0)
+                .ToList();
 
             perCategory[ds.CategoryKey] = new CalibrationCategoryReport(
                 Category: ds.CategoryKey,
@@ -158,7 +188,14 @@ public sealed class CalibrationRunner
                 WithinScoreRange: withinScoreRange,
                 MeanScoreDelta: scoreDeltas.Count > 0 ? scoreDeltas.Average() : 0.0,
                 EvaluationFailures: evaluationFailures,
-                SkippedUnknownKey: skippedUnknownKey);
+                SkippedUnknownKey: skippedUnknownKey,
+                NotMeasured: notMeasured,
+                NotApplicable: notApplicable)
+            {
+                ExcludedKeys = excludedKeys,
+                SkippedKeys = skippedKeys,
+                ExcludedMeasuredRecords = measured.Count - scored.Count,
+            };
         }
 
         return new CalibrationReport(DateTimeOffset.UtcNow, perCategory);
@@ -179,7 +216,26 @@ public sealed record CalibrationCategoryReport(
     int WithinScoreRange,
     double MeanScoreDelta,
     int EvaluationFailures = 0,
-    int SkippedUnknownKey = 0);
+    int SkippedUnknownKey = 0,
+    int NotMeasured = 0,
+    int NotApplicable = 0)
+{
+    /// <summary>
+    /// Keys left out of this category's scoring because at least one of their records was not measured (B6c-7):
+    /// scoring the rest would score a sample selected on the evaluator's own verdict. A category with any is INCOMPLETE.
+    /// </summary>
+    public IReadOnlyList<string> ExcludedKeys { get; init; } = [];
+
+    /// <summary>Measured records dropped with their key (in addition to <see cref="NotMeasured"/>).</summary>
+    public int ExcludedMeasuredRecords { get; init; }
+
+    /// <summary>
+    /// The keys behind <see cref="SkippedUnknownKey"/>, with their entry counts: the resolver dispatched nothing for them.
+    /// The caller knows which of these are carved out on purpose and which are not routed (B6c-15); the count alone
+    /// could not say, and the report called every one of them "not yet routed".
+    /// </summary>
+    public IReadOnlyDictionary<string, int> SkippedKeys { get; init; } = new Dictionary<string, int>();
+}
 
 /// <summary>
 /// One evaluated calibration case, as a record that can be written to JSONL and analysed offline.
@@ -235,7 +291,7 @@ public sealed record CalibrationCaseRecord(
 /// <param name="PromptId">The prompt the judge was sent.</param>
 /// <param name="PromptHash">The fingerprint of that prompt.</param>
 /// <param name="AggregationStrategy">
-/// Null for an atomic leaf. Otherwise the evaluator's aggregation (for example <c>mean-of-3-pattern-scores</c>),
+/// Null for an atomic leaf. Otherwise the evaluator's aggregation (for example <c>min-of-3-pattern-scores</c>),
 /// which says that <paramref name="Criteria"/> holds aggregate dimensions rather than criterion verdicts.
 /// </param>
 public sealed record CalibrationLeafRecord(

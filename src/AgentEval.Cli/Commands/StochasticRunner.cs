@@ -6,6 +6,8 @@ using AgentEval.Evals;
 using AgentEval.Compliance.Gdpr.Articles;
 using AgentEval.Output;
 
+using AgentEval.Evals.Meta;
+
 namespace AgentEval.Cli.Commands;
 
 /// <summary>
@@ -57,17 +59,46 @@ internal static class StochasticBenchRunner
         }
 
         var (score, severity) = MajorityVoteAggregation.Instance.Aggregate(results, components);
-        var label = severity switch
+
+        // The verdict is the vote's winning LABEL, over the runs that produced one (#203 review, B6c-1). It was mapped
+        // back from the vote's severity: with no counting run (every run errored, or withheld its pass) the vote's
+        // (0, "none") read PASS and exited 0, and a majority of medium-severity fails read WARN.
+        var counted = results.Where(r => r.Score.CountsTowardAggregate()).ToList();
+        string label;
+        string? note = null;
+        var measurement = MeasurementState.Measured;
+        if (counted.Count == 0)
         {
-            "critical" or "high" => "fail",
-            "medium" => "warn",
-            _ => "pass"
-        };
+            var errored = results.Count(r => r.Score.Label == "error");
+            label = errored > 0 ? "error" : "skipped";
+            measurement = results.All(r => r.Score.CensusBucket() == MeasurementState.NotApplicable)
+                ? MeasurementState.NotApplicable
+                : MeasurementState.NotMeasured;
+            note = $"None of the {runs} runs produced a verdict ({errored} errored, {runs - errored} skipped or withheld), " +
+                   "so no verdict is reported.";
+        }
+        else
+        {
+            label = MajorityVoteAggregation.WinningLabel(counted);
+            if (counted.Count < runs)
+            {
+                note = $"{runs - counted.Count} of {runs} runs produced no verdict; the vote rests on {counted.Count}.";
+                if (label == "pass")
+                {
+                    // A pass on part of the runs is not the N-run pass the caller asked for.
+                    label = "warn";
+                    note += " A pass on part of the runs is a warn.";
+                }
+            }
+        }
 
         return new EvalResult(
             Metric: new($"{benchmark.Key}.runs{runs}", $"{benchmark.Name} (×{runs} stochastic)", benchmark.Category, benchmark.Version),
-            Score: new(score, null, label, label == "pass", benchmark.Threshold, severity, null),
-            Details: new(null, null, null, results.AsReadOnly(), MajorityVoteAggregation.Instance.Name),
+            Score: new(score, null, label, label == "pass", benchmark.Threshold, severity, null) { Measurement = measurement },
+            Details: new(null, null, note is null ? null : [note], results.AsReadOnly(), MajorityVoteAggregation.Instance.Name)
+            {
+                Summary = note,
+            },
             Provenance: new("composite", null, null, null, null, results.Sum(r => r.Provenance.EstimatedCost), false),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }

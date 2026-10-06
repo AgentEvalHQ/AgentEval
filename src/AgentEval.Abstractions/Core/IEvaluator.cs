@@ -89,6 +89,22 @@ public class EvaluationResult
     /// <c>null</c> when the evaluator did not invoke a chat model or the model did not report usage.
     /// </summary>
     public long? OutputTokenCount { get; init; }
+
+    /// <summary>
+    /// The exact score (0..1) when the judge graded with a <see cref="EvalRubric"/>; <see langword="null"/> otherwise.
+    /// <see cref="OverallScore"/> holds it rounded to 0–100, which can cross a band boundary, so a reader of a rubric
+    /// verdict uses this.
+    /// </summary>
+    public double? RubricScore { get; init; }
+
+    /// <summary>The severity the rubric's own table gives <see cref="RubricScore"/>, when the rubric has one.</summary>
+    public string? RubricSeverity { get; init; }
+
+    /// <summary>The label the judge wrote, when it wrote one. Kept as evidence: the verdict is the band of the score.</summary>
+    public string? JudgeLabel { get; init; }
+
+    /// <summary>The evidence the judge cited, when its reply had any.</summary>
+    public IReadOnlyList<JudgeEvidence> Evidence { get; init; } = [];
 }
 
 /// <summary>

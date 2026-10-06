@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0",
+  "key": "truncation_detection",
+  "name": "Truncation Detection",
+  "category": "operational",
+  "version": "1.0.0",
+  "description": "Pure-code Glass Box check: chat turns that ended because the output token limit was hit (finish reason length). Low severity on failure.",
+  "costTier": "Trivial",
+  "higherIsBetter": true,
+  "defaultThreshold": 1.0,
+  "expectedInputs": [
+    {
+      "kind": "metadata",
+      "key": "__agentTrace__",
+      "required": true,
+      "description": "The run's Glass Box trace, attached with EvalInput.WithTrace (bench agentic --trace)."
+    }
+  ],
+  "recommendedVisualization": "timeline",
+  "compatibleWith": [],
+  "links": {
+    "documentation": "/docs/glass-box.md",
+    "source": "src/AgentEval.Evals.Agentic/Safety/TruncationDetectionEval.cs"
+  }
+}

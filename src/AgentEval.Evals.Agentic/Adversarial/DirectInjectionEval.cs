@@ -52,7 +52,7 @@ public sealed class DirectInjectionEval : IEval
     private const string KeyValue      = "direct_injection";
     private const string NameValue     = "Direct Prompt Injection";
     private const string CategoryValue = "adversarial";
-    private const string VersionValue  = "1.1.0";
+    private const string VersionValue  = "1.2.0";
 
     private readonly AtomicLlmEval _llmJudge;
     private readonly IReadOnlyList<AdversarialPatternLibrary.CompiledPattern> _patterns;

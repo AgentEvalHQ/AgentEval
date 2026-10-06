@@ -45,7 +45,7 @@ The trace is what the evaluators look at. Some evaluators read the response only
 
 Each atomic evaluator answers one focused question. There are three kinds:
 
-- **LLM-judge evaluators** — a second AI grades the agent's output against a short list of criteria defined in each evaluator (e.g., *Task Completion*, *Groundedness*, *Coherence*), under a generic judge system prompt. Each also has a longer rubric file under `src/AgentEval.Evals.Agentic/Resources/Prompts/<category>/*.v1.md`, written by AgentEval. About half of those files are modelled on the concept of an Azure AI Evaluation SDK evaluator — its name, inputs and scoring dimensions, not its wording — and the rest have no upstream prompt to be modelled on (see [Prompt Provenance](getting-started.md#prompt-provenance)). They ship as references and are **not yet sent to the judge**.
+- **LLM-judge evaluators** — a second AI grades the agent's output against a short list of criteria defined in each evaluator (e.g., *Task Completion*, *Groundedness*, *Coherence*), with the evaluator's rubric file under `src/AgentEval.Evals.Agentic/Resources/Prompts/<category>/*.v1.md`, written by AgentEval, as its system prompt. About half of those files are modelled on the concept of an Azure AI Evaluation SDK evaluator — its name, inputs and scoring dimensions, not its wording — and the rest have no upstream prompt to be modelled on (see [Prompt Provenance](getting-started.md#prompt-provenance)). The verdict is the band of the judge's score in the rubric's own table, and a reply off the rubric's scale is an error — see [What the judge is sent](getting-started.md#what-the-judge-is-sent).
 - **Code-only evaluators** — pure C# code reads the trace and computes a score (e.g., *Latency*, *Cost*, *Token Usage*, *Error Rate*, *F1 Score*). No LLM call, no LLM cost.
 - **Hybrid evaluators** — deterministic check first, LLM fallback only when needed (e.g., *Tool Call Success* reads structured status fields if present, falls back to LLM only on free-text result strings).
 
@@ -113,7 +113,7 @@ The `--budget-tier low` flag filters the preset to keep only LOW and TRIVIAL tie
 
 ## How we know the judges can be trusted — **calibration**
 
-The agentic benchmark uses many judges (one per LLM-graded dimension), each with its own criteria list; all of them share the generic judge system prompt. Each evaluator dispatched for calibration has its own golden dataset; some are carved out (see below).
+The agentic benchmark uses many judges (one per LLM-graded dimension), each with its own criteria list and its own rubric as the system prompt (since 0.44; through 0.43 they shared a generic judge system prompt). A judge's `needs_review` verdict is a warn, which agrees with neither gold label. Each evaluator dispatched for calibration has its own golden dataset; some are carved out (see below).
 
 ### The golden datasets — reference truth per evaluator
 
@@ -152,19 +152,19 @@ Calibration coverage is reported **per evaluator category**, and it is partial. 
 - **Dispatched** — the evaluator has hand-labelled golden entries, and `bench agentic calibrate` runs them through the judge and gates the category on the result.
 - **Carved out** — the evaluator exists, is wired, and produces a verdict at runtime, but `calibrate` skips it: it is pure code, a meta-evaluator, or it needs conversation history or a reasoning trace that a single-turn golden entry cannot carry. The verdict at runtime is still real (its criteria are still graded); there is just no measurement of how often its judge matches a human.
 
-The dispatched evaluators are registered in `src/AgentEval.Evals.Agentic/AgenticEvalRegistration.cs`; the carved-out ones, each with its reason, are in `s_carveOutKeys` in `src/AgentEval.Cli/Commands/BenchAgenticCalibrateCommand.cs`. The table below summarises both by category.
+The dispatched evaluators are registered in `src/AgentEval.Evals.Agentic/AgenticEvalRegistration.cs`; the carved-out ones, each with its reason, are in `s_carveOutKeys` and `s_notCalibratableOnTheseGoldens` in `src/AgentEval.Cli/Commands/BenchAgenticCalibrateCommand.cs`. The table below summarises both by category.
 
 ### Calibration quality today
 
-The project's calibration reports are not published. The qualitative picture by category, with the gate each category is held to (`s_categoryOverrides` in `src/AgentEval.Cli/Commands/BenchAgenticCalibrateCommand.cs`; the default is 0.85 / 0.70):
+The project's latest figures, for one judge model on one day, are in [Calibration results](../calibration-results.md). The qualitative picture by category, with the gate each category is held to (`s_categoryOverrides` in `src/AgentEval.Cli/Commands/BenchAgenticCalibrateCommand.cs`; the default is 0.85 / 0.70):
 
 | Category | Calibration status | Notes |
 |---|---|---|
-| System and Process | **Dispatched, relaxed gates** | All five system and all six process evaluators run in `calibrate`; process is gated at 0.85 / 0.65 and system at 0.70 / 0.45 |
+| System and Process | **Dispatched, relaxed gates** | All five system evaluators and four of the six process evaluators run in `calibrate`; Tool Input Accuracy and Tool Call Accuracy are left out by key, because the golden cases carry no tool definitions — their schema check cannot run, so they withhold every pass and only their fail predictions could be scored. Process is gated at 0.85 / 0.65 and system at 0.70 / 0.45 |
 | RAG Quality | **Dispatched, relaxed gate** | Six of the seven run in `calibrate`; F1 Score is pure code and is carved out. Gated at 0.65 / 0.40 |
 | Judge Quality | **N/A — meta** | Meta-evaluators have no separate judge to calibrate |
 | Operational / Telemetry | **N/A — code-only** | No LLM judge to calibrate; deterministic from trace metadata |
-| Safety | **Dispatched, relaxed gate** | Eleven of the twelve run in `calibrate`; Prohibited Actions needs a policy resolver and a subject id, so it is not dispatched. Gated at 0.80 / 0.60. See the content-filter note below |
+| Safety | **Dispatched, relaxed gate** | Ten of the twelve run in `calibrate`; Prohibited Actions needs a policy resolver and a subject id, and Unsafe Tool Use needs tool calls the golden cases do not carry, so neither is dispatched. Gated at 0.80 / 0.60. See the content-filter note below |
 | Memory | **Not calibrated (carved out)** | Memory Recall Accuracy and Long Conversation Coherence grade recall of earlier turns; a golden entry is single-turn, so `calibrate` skips them and reports the category as SKIP |
 | Multi-turn | **Not calibrated (carved out)** | Same reason as Memory; `calibrate` files these three under its `memory` category |
 | Reasoning | **Partly dispatched, relaxed gate** | Reasoning Correctness and Goal Decomposition run in `calibrate`; Plan Formulation and Intermediate-Step Hallucination need the agent's reasoning trace and are carved out. Gated at 0.70 / 0.40 |
@@ -173,7 +173,7 @@ The project's calibration reports are not published. The qualitative picture by 
 | Adversarial | **Dispatched, default gate** | All three run in `calibrate`, plus two calibration-only keys (`prompt_leak`, graded by System Prompt Leakage, and `escalation_resistance`, graded by Jailbreak Resistance); default 0.85 / 0.70. See the content-filter note below |
 | Efficiency | **N/A — code-only** | Deterministic from cost and score |
 
-Every category in this table runs at runtime and produces verdicts, whether or not `calibrate` covers it. Six of the eight categories `calibrate` scores are held to relaxed gates rather than the 0.85 / 0.70 default. Before the memory and multi-turn evaluators were carved out, the judge scored 14.3% accuracy on their 21 single-turn entries — below chance — which is why they are skipped rather than gated (the measurement is recorded in the `s_carveOutKeys` remarks).
+Every category in this table runs at runtime and produces verdicts, whether or not `calibrate` covers it. A category reads **INCOMPLETE** (and fails the gate) when one of its dispatched evaluators was not measured on every record: that evaluator is left out of the scoring whole — scoring only its measured records would score a sample selected by its own verdicts. Six of the eight categories `calibrate` scores are held to relaxed gates rather than the 0.85 / 0.70 default. Before the memory and multi-turn evaluators were carved out, the judge scored 14.3% accuracy on their 21 single-turn entries — below chance — which is why they are skipped rather than gated (the measurement is recorded in the `s_carveOutKeys` remarks).
 
 **Content-filter note.** An evaluation that throws (for example, a judge call the provider rejects) counts as an evaluation failure, which makes its category report INFRA-FAIL and fails the command. The calibrate command's own notes record that on Azure OpenAI the provider's content filter has blocked judge calls on the harmful-content goldens in the Safety and Adversarial categories.
 
@@ -184,7 +184,7 @@ Every category in this table runs at runtime and produces verdicts, whether or n
 1. **Coverage.** No single number tells you whether an agent is good. The benchmark gives you many orthogonal angles — task completion, tool accuracy, RAG quality, reasoning, memory, safety — and shows where the agent succeeds and where it breaks.
 2. **Diagnosability.** Composite evaluators surface sub-scores. A 0.4 on Tool Call Accuracy tells you something failed; the sub-scores tell you *which dimension* — selection, inputs, outputs, execution, or efficiency.
 3. **Cost-tiered.** The `--budget-tier low` flag keeps inner-loop runs cheap. Operational evaluators run free (pure-code). Safety and RAG runs reserved for releases.
-4. **Familiar evaluator concepts.** More than a third of the evaluator cards name a corresponding Azure AI Foundry evaluator, and about half of the reference prompt files under `Resources/Prompts/` are modelled on one. The prompt text is AgentEval's own, with its differences from the upstream evaluator listed in each file's header. The judge does not receive that text yet — it grades each evaluator's own criteria. Deterministic-first tool-call success and the sub-dimension splits are implemented in code.
+4. **Familiar evaluator concepts.** More than a third of the evaluator cards name a corresponding Azure AI Foundry evaluator, and about half of the rubric files under `Resources/Prompts/` are modelled on one. The rubric text is AgentEval's own, with its differences from the upstream evaluator listed in each file's header, and it is what the judge is sent, beside each evaluator's own criteria. Deterministic-first tool-call success and the sub-dimension splits are implemented in code.
 5. **Calibration built in.** Golden datasets ship for the dispatched evaluators and `calibrate` measures the judge against them; six of the eight categories it scores are held to relaxed per-category gates (see the table above).
 6. **Open.** Every evaluator card, prompt file, and golden entry is in the repo.
 

@@ -315,8 +315,9 @@ public sealed class EuAiActPdfRenderer
                 });
 
                 // Render top criteria failures (up to 5, failed scenarios prioritised)
+                // Measured failures only (B10p): an errored, skipped or needs-review scenario is not a criteria failure.
                 var topFailures = scenarios
-                    .Where(s => !s.Score.Passed)
+                    .Where(s => s.Score.ReportStatus() == "FAIL")
                     .Take(5)
                     .ToList();
 
@@ -490,7 +491,8 @@ public sealed class EuAiActPdfRenderer
     {
         "PASS" => Colors.Green.Medium,
         "WARN" => Colors.Orange.Medium,
-        _ => Colors.Red.Medium
+        "FAIL" => Colors.Red.Medium,
+        _ => Colors.Grey.Medium   // ERROR, SKIPPED: no verdict (B9b)
     };
 
     private static string Capitalize(string s) => EvalReportHelpers.Capitalize(s); // ARC-02: shared

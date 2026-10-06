@@ -193,21 +193,13 @@ public static class BenchPerfCommand
                 scenarioName: $"Performance — {preset}");
             await store.WriteScenarioResultAsync(runId, scenarioResult);
 
-            var verdict = result.Score.Label.ToUpperInvariant() switch
-            {
-                "PASS" => "PASS",
-                "WARN" => "WARN",
-                _      => "FAIL"
-            };
+            var runStats = new[] { result.Score }.ToRunStats();   // a skipped or errored result is not a failure (B8)
+            var verdict = result.Score.RunVerdict(runStats);   // nor a FAIL verdict (B9b)
             var summary = new RunSummary(
                 SchemaVersion: "1.0",
                 RunId: runId,
                 Verdict: verdict,
-                Stats: new RunStats(
-                    Total: 1,
-                    Passed: result.Score.Passed ? 1 : 0,
-                    Failed: !result.Score.Passed && result.Score.Label != "warn" ? 1 : 0,
-                    Warnings: result.Score.Label == "warn" ? 1 : 0),
+                Stats: runStats,
                 Metrics: new Dictionary<string, double>
                 {
                     ["overallScore"] = result.Score.Value,

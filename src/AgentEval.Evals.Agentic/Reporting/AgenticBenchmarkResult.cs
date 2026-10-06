@@ -83,9 +83,9 @@ public sealed record AgenticEvaluatorSummary(
 /// evaluators are all computed in code and call no judge.
 /// </param>
 /// <param name="PromptVersions">
-/// Map of prompt key to the version actually sent to the judge. The default is
-/// <c>{ "judge-system": "agenteval.judge.default-system.v1" }</c>: the agentic judges use the built-in
-/// default system prompt, and the per-evaluator files under <c>Resources/Prompts/</c> are not sent.
+/// Map of check key to the prompt actually sent to its judge: the rubric under <c>Resources/Prompts/</c> its
+/// <c>promptId</c> names (since 0.44, #203 review B9), as each check's provenance records it. Empty for a preset whose
+/// checks call no judge.
 /// </param>
 public sealed record AgenticAttestation(
     string AgentEvalVersion,

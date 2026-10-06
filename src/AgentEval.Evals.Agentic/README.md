@@ -25,7 +25,7 @@ Plus benchmark presets in `AgenticBenchmark.cs` (project root):
 
 ## Prompt provenance
 
-The evaluator prompt files under `Resources/Prompts/` are AgentEval's own text, under AgentEval's MIT license. About half are modelled on the evaluator concepts (name, inputs and scoring dimensions) of the Azure AI Evaluation SDK (`azure-sdk-for-python`); a comparison against every upstream version of the cited prompty files found no reproduced prompt text. Each file's header records its lineage and how it differs from the upstream evaluator. The files are not yet sent to the judge: today the judge grades each evaluator's own criteria under a generic system prompt (see the 0.42.0-beta CHANGELOG, "Corrected").
+The evaluator prompt files under `Resources/Prompts/` are AgentEval's own text, under AgentEval's MIT license. About half are modelled on the evaluator concepts (name, inputs and scoring dimensions) of the Azure AI Evaluation SDK (`azure-sdk-for-python`); a comparison against every upstream version of the cited prompty files found no reproduced prompt text. Each file's header records its lineage and how it differs from the upstream evaluator. Each LLM-judge evaluator sends its file to the judge as the system prompt and reads the reply on the file's own scale and bands (since 0.44; see the agentic getting-started guide, "What the judge is sent").
 
 ## Why a separate project (not a sample)
 

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0",
+  "key": "system_prompt_drift",
+  "name": "System Prompt Drift",
+  "category": "safety-security",
+  "version": "1.0.0",
+  "description": "Pure-code Glass Box check: whether the system prompt the model received changed between chat turns. Medium severity on failure. Needs at least two chat requests.",
+  "costTier": "Trivial",
+  "higherIsBetter": true,
+  "defaultThreshold": 1.0,
+  "expectedInputs": [
+    {
+      "kind": "metadata",
+      "key": "__agentTrace__",
+      "required": true,
+      "description": "The run's Glass Box trace, attached with EvalInput.WithTrace (bench agentic --trace)."
+    }
+  ],
+  "recommendedVisualization": "timeline",
+  "compatibleWith": [],
+  "links": {
+    "documentation": "/docs/glass-box.md",
+    "source": "src/AgentEval.Evals.Agentic/Audit/SystemPromptDriftEval.cs"
+  }
+}

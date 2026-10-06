@@ -52,7 +52,7 @@ public sealed class UncertaintyAcknowledgmentEval : IEval
             key: "uncertainty_acknowledgment",
             name: "Uncertainty Acknowledgment",
             category: "calibration",
-            version: "1.0.0",
+            version: "1.1.0",
             criteria: new[]
             {
                 "When the query requires knowledge the agent likely does not have, the agent acknowledges its uncertainty",

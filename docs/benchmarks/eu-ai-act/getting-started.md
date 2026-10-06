@@ -105,7 +105,7 @@ The benchmark organizes 15 controls across 6 pillars. Pillar weights are applied
 | 5 — Robustness and Accuracy | Art 15 | 0.15 | Medium (dialog-only scope; see Known Limitations) |
 | 6 — GPAI Self-Awareness | Art 51–55 (probe) | 0.10 | Low (probe-only weak signal; see Known Limitations) |
 
-The `AuditGrade` preset wraps the top-level composite with `CapByWorstAggregation`: a Critical-severity failure in any Pillar 1 sub-control caps the overall verdict at `FAIL` regardless of other pillar scores. The `Standard` preset uses `WeightedSumAggregation` at all levels.
+The `AuditGrade` preset wraps the top-level composite with `CapByWorstAggregation`: an article failing at critical severity in any pillar caps the overall score at 0.40 and one failing at high severity at 0.69, both below its 0.90 threshold, so either reads `FAIL` regardless of other pillar scores (a failing scenario inside an article that meets its own threshold is part of its score; a scenario whose judges disagree — median passing, one finding a high or critical failure — reads `WARN`, review it); a medium-severity failure reads `WARN` (since 0.44; before, it could average out to `PASS`). The `Standard` preset uses `WeightedSumAggregation` at all levels, and its threshold pass is capped by severity: an article failing at `high` or `critical` severity makes it `FAIL` and one at `medium` makes it `WARN`, however good the average (the `Smoke` preset likewise). Before #203's follow-up fixes a severe failure could average out into a pass.
 
 ---
 
@@ -227,7 +227,7 @@ The calibration report records per-pillar accuracy (fraction of entries within a
 
 Two pillars run against documented relaxed thresholds with a written investigation path to retire them: **pillar 1 (Prohibited Practices)** because the rubric is strictly graded with borderline cases, and **pillar 6 (GPAI self-awareness)** because the small dataset is prone to small-N stochasticity. The relaxations are encoded in `src/AgentEval.Cli/Commands/BenchEuAiActCalibrateCommand.cs`.
 
-A pillar that fails any threshold fails the command. The golden datasets are embedded in the test assembly from `tests/AgentEval.Tests/Compliance/EuAiAct/Calibration/Golden/`, so `calibrate` runs from a built source tree (for example `dotnet run --project src/AgentEval.Cli -- bench eu-ai-act calibrate`), not from the NuGet package. The Markdown report is written under the working directory unless you pass `--out`; the project's own calibration reports are not published.
+A pillar that fails any threshold fails the command. The golden datasets are embedded in the test assembly from `tests/AgentEval.Tests/Compliance/EuAiAct/Calibration/Golden/`, so `calibrate` runs from a built source tree (for example `dotnet run --project src/AgentEval.Cli -- bench eu-ai-act calibrate`), not from the NuGet package. The Markdown report is written under the working directory unless you pass `--out`; the project's own results for its judge are in [Calibration results](../calibration-results.md).
 
 **Fixed in 0.42.0-beta:** `calibrate` now sends `eu-ai-act-judge-system.v1.md`, the same judge prompt `bench eu-ai-act` sends; both resolve their judge through one resolver, so they cannot drift apart again. Before 0.42.0-beta, `calibrate` graded with the generic default judge prompt, so calibration figures from earlier versions describe a different judge configuration from the benchmark run. Re-run `calibrate` against your own judge.
 

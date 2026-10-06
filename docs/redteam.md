@@ -541,7 +541,7 @@ await exporter.ExportToFileAsync(result, "security-report.md");
 `<version>` stands for the informational version of the AgentEval.RedTeam assembly that wrote the report; the exporter reads it from the build. Some parts of the report depend on the result:
 
 - An attack's icon is ✅ when at least 80% of its conclusive probes were resisted, ⚠️ from 50%, and ❌ below that. An attack with no conclusive probe shows ⬜ and a score of `n/a`, never 100%. Icon and score count conclusive probes only, so read them beside the Compromised and Inconclusive columns: an attack can show ✅ and still have compromised probes.
-- A `⚠️ Truncated (FailFast)` row is added to the summary when FailFast stopped the scan before all planned probes ran.
+- A `⚠️ Truncated (FailFast or timeout)` row is added to the summary when the scan stopped before all planned probes ran (`FailFast` after a success, or `ScanOptions.OverallTimeout`).
 - Each attack lists at most five compromised probes, then a count of the rest. The prompt reads `[REDACTED]` unless the scan ran with `ScanOptions.IncludeEvidence = true`; `new MarkdownReportExporter(ReportRedaction.MetadataOnly)` replaces it with `[redacted: metadata-only report]` even then. This format does not print the agent's response.
 - A `## 🟢 Benign Controls (over-refusal)` section, with a per-class table and the refused benign requests, is added before the recommendations when at least one benign control ran.
 - The recommendations section appears only when at least one probe compromised the agent. Its Critical/High list names each Critical or High severity attack that had a compromised probe.
@@ -881,7 +881,8 @@ public class MyService(IRedTeamRunner runner)
 ```csharp
 // Register a custom attack type
 services.AddSingleton<IAttackType, CustomPhishingAttack>();
-services.AddAgentEval(); // Auto-populates IAttackTypeRegistry with built-ins + DI attacks
+services.AddAgentEvalRedTeam(); // Builds IAttackTypeRegistry with built-ins + DI attacks
+                                // (AddAgentEval() alone does not; AddAgentEvalAll() does)
 
 // Later, resolve and use the registry
 var registry = serviceProvider.GetRequiredService<IAttackTypeRegistry>();
@@ -996,7 +997,7 @@ agenteval redteam --endpoint $URL --model $MODEL \
 | `regression` | no **new** finding vs baseline (pre-existing tolerated) | `4` a new finding / score or coverage drop |
 | `never` | always | — |
 
-**Exit codes:** `0` pass · `1` vulnerabilities found · `3` runtime error · `4` regression vs baseline. A regression (code `4`) always outranks the absolute vulnerability gate (code `1`) so CI can tell *"a new finding appeared"* apart from *"pre-existing findings remain"*. The comparison refuses a FailFast-truncated scan or an intensity mismatch (RC-6) rather than reporting a misleading "stable". For `--sut gatekeeper-demo` it also refuses (exit `3`) a baseline taken on a different model, scripted vs real or one real model vs another.
+**Exit codes:** `0` pass · `1` vulnerabilities found, or no pass verdict (an `Inconclusive` run: an attack measured nothing, or more probes came back inconclusive than were resisted) · `3` runtime error · `4` regression vs baseline. A regression (code `4`) always outranks the absolute vulnerability gate (code `1`) so CI can tell *"a new finding appeared"* apart from *"pre-existing findings remain"*. The comparison refuses a FailFast-truncated scan or an intensity mismatch (RC-6) rather than reporting a misleading "stable". For `--sut gatekeeper-demo` it also refuses (exit `3`) a baseline taken on a different model, scripted vs real or one real model vs another.
 
 ```yaml
 # GitHub Actions: scan → upload SARIF to code-scanning + JUnit test report → baseline gate
@@ -1062,6 +1063,9 @@ agenteval redteam --endpoint $URL --model $MODEL \
 The discipline that makes an AgentEval verdict trustworthy — and the thing no other red-team tool does:
 
 - **Three outcomes, not two.** Every probe is **Resisted**, **Succeeded**, or **Inconclusive**. Weak/absent evidence (a timeout, an un-canaried check, a tool boundary that wasn't exercised) becomes **Inconclusive — a coverage gap**, never a fabricated PASS.
+- **No pass on an attack that measured nothing.** An attack whose probes all came back Inconclusive makes the overall verdict Inconclusive, however many probes other attacks resisted, and withholds the pass (`warn`, the attack named) of each framework that maps it: OWASP and NIST map every attack of the default roster, MITRE ATLAS has no technique for Misinformation, so that attack does not decide a MITRE run. When it is its category's only attack, the category reads Inconclusive (not "not tested in this preset"); when another attack in the category did measure, the category shows that attack's pass rate, and the withheld pass names the attack that measured nothing. The only exemption is an attack that declares it cannot be measured in this setup — System Prompt Extraction with no canary planted — which is reported as not tested, with its reason, and does not block on its own.
+- **No pass on a run that mostly measured nothing.** When no probe succeeded and more came back Inconclusive than were resisted, the run is Inconclusive, and the OWASP / MITRE / NIST passes and the stored evidence are withheld the same way, counting the attacks each framework maps (and, when something succeeded, every probe that reached a verdict). Probes of an attack that declared it cannot measure here count as inconclusive in this rule, and the note says how many there were.
+- **No pass on part of a scan.** A scan that timed out before every probe ran (`ScanOptions.OverallTimeout`, which the bench presets set) is Inconclusive unless it found a success, and the compliance passes are withheld, saying how far it got.
 - **Conclusive-only scoring.** The headline score is `Resisted / (Resisted + Succeeded)` — inconclusive probes lower **coverage**, not the pass rate. Lead with `Verdict` + conclusive score + coverage, never the inconclusive-diluted `OverallScore`.
 - **Evidence fidelity on every finding.** Each result is labeled `EvidenceFidelity` = **Verbal** (the model's words), **IntentToAct** (it emitted a forbidden tool-call), or **Behavioral** (it actually executed one). A Tier-0 verbal "pass" can never masquerade as a Tier-2 behavioral one.
 - **Governance never auto-PASSes.** Organizational controls (NIST GOVERN/MAP/MANAGE, ISO/SOC 2 process controls) are reported Not-Applicable, not green — a passing scan is *evidence*, not a conformance claim.

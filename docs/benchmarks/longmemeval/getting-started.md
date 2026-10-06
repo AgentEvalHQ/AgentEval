@@ -58,7 +58,7 @@ overall accuracy = correct questions / scored questions * 100
 The result separately reports selected, agent-completed, scored, correct,
 incorrect, inconclusive, and agent-failure counts. A run with zero scored
 questions has `OverallAccuracy == null`; it is inconclusive, not a 0% failure.
-The CLI returns `GateInconclusive` for that case.
+The CLI returns `GateInconclusive` for that case. A run with accuracy of at least 50% passes (exit 0) only when every question was scored; when some were not (inconclusive judgments, agent failures), its accuracy covers only the scored ones, so the verdict is `WARN` (exit 10) and the CLI says how many were not scored. Below 50% is `FAIL` (exit 9).
 
 Do not use the `.NET` `P1` formatter on these properties: `57.7` is already
 57.7%, and `57.7:P1` would incorrectly render as 5,770.0%.

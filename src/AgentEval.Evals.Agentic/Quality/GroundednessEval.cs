@@ -36,8 +36,8 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// inputs and scoring dimensions) of Azure/azure-sdk-for-python
 /// <c>sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_groundedness/</c>
 /// (<c>groundedness_with_query.prompty</c> and <c>groundedness_without_query.prompty</c>).
-/// A 2026-10-02 check found no upstream prompt text in the reference prompt file under
-/// <c>Resources/Prompts/</c>, which is not yet sent to the judge.
+/// A 2026-10-02 check found no upstream prompt text in the rubric file under
+/// <c>Resources/Prompts/</c>, which the judge is sent as its system prompt.
 /// </para>
 /// </summary>
 public sealed class GroundednessEval : IEval
@@ -87,7 +87,7 @@ public sealed class GroundednessEval : IEval
                     judgeModel: judgeModel,
                     promptId: "agenteval.groundedness.v1",
                     failureSeverity: "medium"),
-                Weight: 0.30),
+                Weight: 0.30) { OnFailure = ComponentFailureEffect.Fail },
 
             new EvalComponent(
                 Eval: new AtomicLlmEval(
@@ -106,7 +106,7 @@ public sealed class GroundednessEval : IEval
                     promptId: "agenteval.groundedness.v1",
                     // Contradictions are more severe — escalate to high
                     failureSeverity: "high"),
-                Weight: 0.25),
+                Weight: 0.25) { OnFailure = ComponentFailureEffect.Fail },
 
             new EvalComponent(
                 Eval: new AtomicLlmEval(
@@ -124,7 +124,7 @@ public sealed class GroundednessEval : IEval
                     judgeModel: judgeModel,
                     promptId: "agenteval.groundedness.v1",
                     failureSeverity: "medium"),
-                Weight: 0.20),
+                Weight: 0.20) { OnFailure = ComponentFailureEffect.Fail },
 
             new EvalComponent(
                 Eval: new AtomicLlmEval(
@@ -142,14 +142,14 @@ public sealed class GroundednessEval : IEval
                     judgeModel: judgeModel,
                     promptId: "agenteval.groundedness.v1",
                     failureSeverity: "medium"),
-                Weight: 0.25),
+                Weight: 0.25) { OnFailure = ComponentFailureEffect.Warn },
         };
 
         _inner = new CompositeEval(
             key: "groundedness",
             name: "Groundedness",
             category: "rag",
-            version: "1.0.0",
+            version: "1.1.0",
             components: components,
             aggregation: WeightedSumAggregation.Instance,
             threshold: passThreshold);

@@ -109,7 +109,7 @@ public class AnswerCorrectnessMetricTests
     }
     
     [Fact]
-    public async Task EvaluateAsync_NoGroundTruth_ReturnsFail()
+    public async Task EvaluateAsync_NoGroundTruth_IsNotMeasured()
     {
         // Arrange
         var fakeChatClient = new FakeChatClient();
@@ -127,7 +127,8 @@ public class AnswerCorrectnessMetricTests
         
         // Assert
         Assert.False(result.Passed);
-        Assert.Contains("requires ground truth", result.Explanation, StringComparison.OrdinalIgnoreCase);
+        Assert.False(result.Measured);   // not measured, never a fail (B12i)
+        Assert.Contains("requires a reference answer", result.Explanation, StringComparison.OrdinalIgnoreCase);
         Assert.Empty(fakeChatClient.ReceivedMessages);
     }
     

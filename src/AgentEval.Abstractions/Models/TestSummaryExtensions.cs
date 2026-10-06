@@ -85,8 +85,14 @@ public static class TestSummaryExtensions
             StackTrace = result.Error?.StackTrace,
             Output = result.ActualOutput,
             MetricScores = result.MetricResults?
+                .Where(m => m.Measured)   // a not-measured placeholder 0 is not a score (B12i)
                 .ToDictionary(m => m.MetricName, m => m.Score)
-                ?? new Dictionary<string, double>()
+                ?? new Dictionary<string, double>(),
+            // Without it every exporter dropped a not-measured metric silently: indistinguishable from one not requested (B12m).
+            MetricsNotMeasured = result.MetricResults?
+                .Where(m => !m.Measured)
+                .ToDictionary(m => m.MetricName, m => m.Explanation ?? "not measured")
+                ?? new Dictionary<string, string>()
         };
     }
 

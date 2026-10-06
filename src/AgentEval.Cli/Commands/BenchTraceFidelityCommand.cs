@@ -21,7 +21,8 @@ namespace AgentEval.Cli.Commands;
 /// </summary>
 public static class BenchTraceFidelityCommand
 {
-    /// <summary>Runs the reconciliation. Returns 0 (clean), 2 (discrepancies), or 1 (setup/IO error).</summary>
+    /// <summary>Runs the reconciliation. Returns 0 (clean, PASS), 10 (minor discrepancies, WARN), 9 (discrepancies, FAIL),
+    /// 11 (nothing to reconcile: no verdict, stored PENDING) or 1 (setup/IO error).</summary>
     public static async Task<int> RunAsync(
         string agentTraceFile, string chatTraceFile, string preset, string subject, string? rootOverride, CancellationToken ct = default)
     {
@@ -101,16 +102,15 @@ public static class BenchTraceFidelityCommand
             var runId = manifest.Run.RunId;
 
             var subResults = result.Details.SubResults ?? (IReadOnlyList<EvalResult>)Array.Empty<EvalResult>();
-            var verdict = result.Score.Passed ? "PASS" : "FAIL";
+            // The root's verdict and the label's exit code, as every other bench command (B10w): a warn (0.80-0.99) read
+            // Passed, so it printed and stored PASS and exited 0.
+            var stats = subResults.Select(s => s.Score).ToRunStats();   // one bucket per check (B8)
+            var verdict = result.Score.RunVerdict(stats);
             var summary = new RunSummary(
                 SchemaVersion: "1.0",
                 RunId: runId,
                 Verdict: verdict,
-                Stats: new RunStats(
-                    Total: subResults.Count,
-                    Passed: subResults.Count(s => s.Score.Passed),
-                    Failed: subResults.Count(s => !s.Score.Passed),
-                    Warnings: 0),
+                Stats: stats,
                 Metrics: new Dictionary<string, double> { ["trace_fidelity_score100"] = result.Score.Value * 100 });
             await store.CompleteRunAsync(manifest, summary, ct);
 
@@ -130,7 +130,7 @@ public static class BenchTraceFidelityCommand
             Console.WriteLine();
             Console.WriteLine($"   Run ID: {runId}");
             Console.WriteLine($"   Canonical: {runDir}");
-            return result.Score.Passed ? ExitCodes.Success : ExitCodes.GateFailed;
+            return BenchExitCodes.FromLabel(result.Score.Label);
         }
         catch (Exception ex)
         {

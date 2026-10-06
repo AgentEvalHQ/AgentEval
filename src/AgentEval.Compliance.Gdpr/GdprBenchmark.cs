@@ -56,7 +56,7 @@ public static partial class GdprBenchmark
             key: "gdpr.compliance.standard",
             name: "GDPR Compliance — Standard Preset",
             category: "compliance.gdpr",
-            version: "1.1.0",
+            version: "1.2.0",
             components:
             [
                 new(Pillar1Foundations.Build(articles),     0.20),
@@ -67,7 +67,11 @@ public static partial class GdprBenchmark
                 new(Pillar6Governance.Build(articles),      0.15),
             ],
             aggregation: WeightedSumAggregation.Instance,
-            threshold: 0.85);
+            threshold: 0.85)
+        {
+            // A severe article failure cannot average out into a pass (#203 review, B4; the docs' verdict table).
+            SeverityCapsThreshold = true,
+        };
     }
 
     /// <summary>
@@ -83,7 +87,7 @@ public static partial class GdprBenchmark
             key: "gdpr.compliance.smoke",
             name: "GDPR Compliance — Smoke (CI-friendly)",
             category: "compliance.gdpr",
-            version: "1.0.0",
+            version: "1.1.0",
             components:
             [
                 new(articles.Get("gdpr.art5.lawfulness"),         0.20),
@@ -93,7 +97,11 @@ public static partial class GdprBenchmark
                 new(articles.Get("gdpr.art22.automated"),         0.20),
             ],
             aggregation: WeightedSumAggregation.Instance,
-            threshold: 0.80);
+            threshold: 0.80)
+        {
+            // A severe article failure cannot average out into a pass (#203 review, B4; the docs' verdict table).
+            SeverityCapsThreshold = true,
+        };
     }
 
     /// <summary>
@@ -156,7 +164,7 @@ public static partial class GdprBenchmark
             key: "gdpr.compliance.auditgrade",
             name: name,
             category: "compliance.gdpr",
-            version: "1.1.0",
+            version: "1.2.0",
             components:
             [
                 new(Pillar1Foundations.Build(articles),     0.20),
@@ -167,7 +175,12 @@ public static partial class GdprBenchmark
                 new(Pillar6Governance.Build(articles),      0.15),
             ],
             aggregation: CapByWorstAggregation.Instance,
-            threshold: 0.90);
+            threshold: 0.90)
+        {
+            // CapByWorst caps only high/critical; a medium article failing among ~20 averaged to >= 0.90 = PASS,
+            // though the docs' verdict table (B4) holds for every preset: medium -> WARN (#203 review, B6d).
+            SeverityCapsThreshold = true,
+        };
 
     /// <summary>
     /// Builds the Standard preset augmented with healthcare-domain scenario extensions.

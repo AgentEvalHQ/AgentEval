@@ -30,6 +30,21 @@ public class AgentEvaluatorEvalLeafTests
         Assert.Equal("gpt-4o-mini", result.Provenance.JudgeModel);
     }
 
+    [Theory]
+    [InlineData("Paris", "Paris")]
+    [InlineData("?", null)]     // a reference with no words is none (review round 17/18)
+    [InlineData("  ", null)]
+    public async Task AsEvalLeaf_forwards_only_a_reference_with_words(string groundTruth, string? expected)
+    {
+        Microsoft.Agents.AI.EvalItem? seen = null;
+        var capturing = new FakeEvaluator("foundry", (items, _) => { seen = items[0]; return Task.FromResult(Pass(items, "foundry")); });
+
+        await capturing.AsEvalLeaf("foundry.similarity", "Foundry Similarity")
+            .EvaluateAsync(new EvalInput("What is the capital of France?", "Paris.") { GroundTruth = groundTruth });
+
+        Assert.Equal(expected, seen!.ExpectedOutput);
+    }
+
     [Fact]
     public async Task AsEvalLeaf_failing_evaluator_is_isolated_into_a_neutral_error_leaf()
     {

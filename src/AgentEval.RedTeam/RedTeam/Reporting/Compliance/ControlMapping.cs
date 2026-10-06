@@ -109,6 +109,27 @@ public class ControlStatus
     /// </summary>
     public int ConclusiveTests { get; init; } = -1;
 
+    /// <summary>
+    /// Probes for this control ran but none reached a conclusive verdict. Its status is <see cref="ControlEvaluationStatus.NotEvaluated"/>,
+    /// the same as a control no mapped attack exercised, but unlike that one it keeps a run from passing — the OWASP /
+    /// MITRE <c>Inconclusive</c> rule (#203 review, B6c-8), swept to NIST, ISO 27001 and SOC 2 (round 7, B10ai).
+    /// </summary>
+    public bool RanInconclusive => Status == ControlEvaluationStatus.NotEvaluated && TotalTests > 0 && ConclusiveTests == 0
+                                   && !NotMeasurable;
+
+    /// <summary>
+    /// Every attack mapped to this control declared it cannot measure in this setup (<c>NotMeasurableReason</c>, e.g. no
+    /// canary planted): stated, not hidden, and it does not block — the OWASP / MITRE exemption (review round 8 L4, B10am).
+    /// </summary>
+    public bool NotMeasurable { get; init; }
+
+    /// <summary>
+    /// The mapped attacks that ran in this scan (a subset of <see cref="ControlMapping.RelevantAttacks"/>): what a
+    /// recommendation, a nonconformity or the evidence names — not a mapped attack the run never ran (#203 review round 11,
+    /// B10ba: a <c>bench nist</c> run named the opt-in attacks it never runs).
+    /// </summary>
+    public IReadOnlyList<string> TestedAttacks { get; init; } = [];
+
     private int EffectiveConclusive => ConclusiveTests >= 0 ? ConclusiveTests : TotalTests;
 
     /// <summary>Tests that passed.</summary>
@@ -178,7 +199,7 @@ public static class SOC2Controls
             ControlName = "Access Restrictions",
             Description = "Prior to issuing system credentials and granting system access, the entity registers and authorizes new internal and external users.",
             Framework = "SOC2",
-            RelevantAttacks = ["ExcessiveAgency"]
+            RelevantAttacks = ["ExcessiveAgency", "ToolEscalation"]
             // OwaspCategories derived → ["LLM06"] (was hand-authored "LLM08"). RC-5.
         },
         new()
@@ -187,7 +208,7 @@ public static class SOC2Controls
             ControlName = "Unauthorized Access Prevention",
             Description = "The entity authorizes, modifies, or removes access to data, software, functions, and other protected information assets based on roles, responsibilities, or the system design and changes.",
             Framework = "SOC2",
-            RelevantAttacks = ["PromptInjection", "Jailbreak"]
+            RelevantAttacks = ["PromptInjection", "Jailbreak", "Crescendo", "PAIR", "TAP"]
             // OwaspCategories derived → ["LLM01"]
         },
         new()
@@ -196,7 +217,7 @@ public static class SOC2Controls
             ControlName = "System Boundaries",
             Description = "The entity implements logical access security measures to protect against threats from sources outside its system boundaries.",
             Framework = "SOC2",
-            RelevantAttacks = ["IndirectInjection", "EncodingEvasion"]
+            RelevantAttacks = ["IndirectInjection", "EncodingEvasion", "SkillInjection"]   // + SkillInjection, an indirect channel (B10an)
             // OwaspCategories derived → ["LLM01"]
         },
         new()
@@ -246,7 +267,7 @@ public static class ISO27001Controls
             ControlName = "Policies for Information Security",
             Description = "Information security policy and topic-specific policies shall be defined, approved by management, published, communicated to and acknowledged by relevant personnel and relevant interested parties.",
             Framework = "ISO27001",
-            RelevantAttacks = ["PromptInjection", "Jailbreak", "PIILeakage"]
+            RelevantAttacks = ["PromptInjection", "Jailbreak", "PIILeakage", "Crescendo", "PAIR", "TAP"]
             // OwaspCategories derived → ["LLM01", "LLM02"]
         },
         new()
@@ -255,7 +276,7 @@ public static class ISO27001Controls
             ControlName = "Access Control",
             Description = "Rules to control physical and logical access to information and other associated assets shall be established and implemented based on business and information security requirements.",
             Framework = "ISO27001",
-            RelevantAttacks = ["ExcessiveAgency", "SystemPromptExtraction"]
+            RelevantAttacks = ["ExcessiveAgency", "SystemPromptExtraction", "ToolEscalation"]
             // OwaspCategories derived → ["LLM06", "LLM07"] (was hand-authored incl. "LLM08"). RC-5.
         },
         new()
@@ -273,7 +294,7 @@ public static class ISO27001Controls
             ControlName = "Information Access Restriction",
             Description = "Access to information and other associated assets shall be restricted in accordance with the established topic-specific policy on access control.",
             Framework = "ISO27001",
-            RelevantAttacks = ["PromptInjection", "Jailbreak"]
+            RelevantAttacks = ["PromptInjection", "Jailbreak", "SkillInjection", "IndirectInjection", "Crescendo", "PAIR", "TAP"]
             // OwaspCategories derived → ["LLM01"]
         },
         new()

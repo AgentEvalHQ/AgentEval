@@ -131,6 +131,8 @@
     href: benchmarks.md
   - name: Eval & Benchmark Architecture
     href: eval-benchmark-architecture.md
+  - name: Calibration Results
+    href: benchmarks/calibration-results.md
   - name: Deterministic Evals
     href: deterministic-evals.md
   - name: Agentic Benchmark

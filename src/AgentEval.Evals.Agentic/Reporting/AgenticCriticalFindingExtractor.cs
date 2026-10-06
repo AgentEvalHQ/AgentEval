@@ -76,20 +76,31 @@ public static class AgenticRecommendationExtractor
     {
         ArgumentNullException.ThrowIfNull(root);
         var failed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        WalkEvaluators(root, failed);
+        var noVerdict = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        WalkEvaluators(root, failed, noVerdict);
         return failed
             .OrderBy(k => k, StringComparer.OrdinalIgnoreCase)
             .Select(k => s_recommendations.TryGetValue(k, out var rec) ? rec : $"Review failures in {k}.")
+            // A check that produced no verdict is not a failure to review (B9b): the judge or its input failed.
+            .Concat(noVerdict.OrderBy(k => k, StringComparer.OrdinalIgnoreCase)
+                .Select(k => $"{k} produced no verdict — the judge or its input failed, not the agent; check the judge and rerun."))
             .ToList();
     }
 
-    private static void WalkEvaluators(EvalResult node, HashSet<string> sink)
+    private static void WalkEvaluators(EvalResult node, HashSet<string> failed, HashSet<string> noVerdict)
     {
-        if (!node.Score.Passed && !string.IsNullOrEmpty(node.Metric.Key))
-            sink.Add(node.Metric.Key);
+        if (!string.IsNullOrEmpty(node.Metric.Key))
+        {
+            // Only a measured failure or warning is something to review in the agent.
+            var status = node.Score.ReportStatus();
+            if (status is "FAIL" or "WARN")
+                failed.Add(node.Metric.Key);
+            else if (status == "ERROR" && node.Details.SubResults is not { Count: > 0 })
+                noVerdict.Add(node.Metric.Key);
+        }
 
         var subs = node.Details.SubResults;
         if (subs is null) return;
-        foreach (var s in subs) WalkEvaluators(s, sink);
+        foreach (var s in subs) WalkEvaluators(s, failed, noVerdict);
     }
 }

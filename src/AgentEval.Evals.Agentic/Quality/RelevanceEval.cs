@@ -16,8 +16,8 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// <b>Secondary metric caveat</b>: Relevance is a necessary but insufficient quality signal.
 /// A response can score high on relevance while being factually wrong. Always interpret
 /// relevance alongside <see cref="GroundednessEval"/> for a complete quality picture.
-/// This caveat is written into the reference prompt file, which is not yet sent to the judge;
-/// the judge sees only the three criteria in the constructor.
+/// This caveat is written into the rubric the judge is sent, beside the three criteria in the
+/// constructor.
 /// </para>
 /// <para>
 /// <b>Input contract</b>: requires <see cref="EvalInput.Query"/> and
@@ -29,8 +29,8 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// Lineage: AgentEval's own criteria and reference prompt, modelled on the evaluator concept (name,
 /// inputs and scoring dimensions) of Azure/azure-sdk-for-python
 /// <c>sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_relevance/relevance.prompty</c>.
-/// A 2026-10-02 check found no upstream prompt text in the reference prompt file under
-/// <c>Resources/Prompts/</c>, which is not yet sent to the judge.
+/// A 2026-10-02 check found no upstream prompt text in the rubric file under
+/// <c>Resources/Prompts/</c>, which the judge is sent as its system prompt.
 /// </para>
 /// </summary>
 public sealed class RelevanceEval : IEval
@@ -63,7 +63,7 @@ public sealed class RelevanceEval : IEval
             key: "relevance",
             name: "Relevance",
             category: "rag",
-            version: "1.0.0",
+            version: "1.1.0",
             criteria: new[]
             {
                 "Response directly addresses the user's query without significant off-topic content",

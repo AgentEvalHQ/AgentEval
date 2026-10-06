@@ -81,7 +81,7 @@ public sealed class AgenticPdfRenderer
 
             // L2 Evaluator pages — one per failed or warned evaluator
             var failedOrWarnedEvaluators = result.Summary.PerEvaluator
-                .Where(kv => kv.Value.Status is "FAIL" or "WARN")
+                .Where(kv => kv.Value.Status is "FAIL" or "WARN" or "ERROR")
                 .OrderBy(kv => kv.Key, StringComparer.Ordinal)
                 .ToList();
 
@@ -280,8 +280,9 @@ public sealed class AgenticPdfRenderer
             col.Item().PaddingTop(10);
 
             // Top criteria failures — up to 5 failed sub-results
+            // Measured failures only (B10p): an errored, skipped or needs-review check is not a criteria failure.
             var topFailures = subResults
-                .Where(s => !s.Score.Passed)
+                .Where(s => s.Score.ReportStatus() == "FAIL")
                 .Take(5)
                 .ToList();
 
@@ -376,9 +377,9 @@ public sealed class AgenticPdfRenderer
                 "Evaluator prompt files are AgentEval's own text, under AgentEval's MIT license. About half " +
                 "are modelled on the evaluator concepts (name, inputs and scoring dimensions) of the Azure AI " +
                 "Evaluation SDK (azure-sdk-for-python); none reproduces upstream prompt text. Each prompt " +
-                "file's header records its lineage and how it differs from the upstream evaluator. The files " +
-                "are not yet sent to the judge: it grades each evaluator's own criteria under a generic " +
-                "system prompt.").FontSize(11);
+                "file's header records its lineage and how it differs from the upstream evaluator. Each " +
+                "judge-backed check sends its file as the judge's system prompt and reads the reply on the " +
+                "file's own scale and bands; the versions below are the files each check sent.").FontSize(11);
 
             col.Item().PaddingTop(15).Text("Prompt Versions").FontSize(14).Bold();
             col.Item().PaddingTop(5);
@@ -396,7 +397,8 @@ public sealed class AgenticPdfRenderer
     {
         "PASS" => Colors.Green.Medium,
         "WARN" => Colors.Orange.Medium,
-        _ => Colors.Red.Medium
+        "FAIL" => Colors.Red.Medium,
+        _ => Colors.Grey.Medium   // ERROR, SKIPPED: no verdict on the agent (B9b)
     };
 
     private static string FormatPresetTitle(string preset)

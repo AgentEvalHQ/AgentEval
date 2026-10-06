@@ -3,11 +3,11 @@
   "key": "turn_coherence",
   "name": "Turn Coherence",
   "category": "multi-turn",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "LLM judge assessing whether the current turn response is coherent with the immediately preceding turn (response logically follows the previous user message + agent reply).",
   "costTier": "Medium",
   "higherIsBetter": true,
-  "defaultThreshold": 0.8,
+  "defaultThreshold": 0.85,
   "expectedInputs": [
     {
       "kind": "query",

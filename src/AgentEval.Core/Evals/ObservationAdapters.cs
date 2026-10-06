@@ -66,14 +66,15 @@ public static class ObservationAdapters
     /// <c>EvalScore.Value</c> is 0 to 1, and the meta lane compares them side by side. The division
     /// happens here, once, rather than at each call site — a comparison of a 0..100 arm against a
     /// 0..1 arm is a wins/losses table that means nothing, and it would look entirely plausible.
-    /// A non-finite score becomes <see cref="MeasurementState.NotMeasured"/>: a metric that could
+    /// A non-finite score, or a result that is not <see cref="MetricResult.Measured"/> (an input it needs was not
+    /// supplied; its score is a placeholder 0), becomes <see cref="MeasurementState.NotMeasured"/>: a metric that could
     /// not produce a number did not measure the case.
     /// </remarks>
     public static Observation ToObservation(this MetricResult result, string caseId, string armId)
     {
         ArgumentNullException.ThrowIfNull(result);
 
-        return double.IsFinite(result.Score)
+        return result.Measured && double.IsFinite(result.Score)
             ? Observation.Measured(caseId, armId, result.Score / 100.0)
             : Observation.NotMeasured(caseId, armId);
     }

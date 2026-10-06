@@ -4,10 +4,10 @@
   "name": "Telemetry: Tool Latency",
   "category": "operational",
   "version": "1.0.0",
-  "description": "Pure-code telemetry evaluator surfacing per-tool latency percentiles from AgenticTelemetry.ToolLatencyMs. Lower is better.",
+  "description": "Pure-code telemetry evaluator surfacing per-tool latency percentiles from AgenticTelemetry.ToolLatencyMs. The rate is better lower; the score is its inverse, so a higher score is better.",
   "costTier": "Trivial",
-  "higherIsBetter": false,
-  "defaultThreshold": 1.0,
+  "higherIsBetter": true,
+  "defaultThreshold": 0.8,
   "expectedInputs": [
     {
       "kind": "metadata",

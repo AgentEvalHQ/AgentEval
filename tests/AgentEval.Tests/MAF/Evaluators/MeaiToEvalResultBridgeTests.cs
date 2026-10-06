@@ -32,6 +32,141 @@ public class MeaiToEvalResultBridgeTests
         tree.Details.SubResults![0]      // query node
             .Details.SubResults![0];     // first metric leaf
 
+    // ── B10q (review round 4 M7): a metric MEAI could not score is no verdict, never PASS 100 ──────────────────────
+
+    public static TheoryData<string, EvaluationMetric, string> MetricsWithoutAVerdict()
+    {
+        var withDiagnostic = new NumericMetric("relevance", 4.0, "scored");
+        withDiagnostic.AddDiagnostics(EvaluationDiagnostic.Error("Failed to parse numeric score for 'relevance'."));
+        return new()
+        {
+            { "no value", new NumericMetric("groundedness", null, "no score"), "error" },
+            { "no value, inconclusive", new NumericMetric("groundedness", null)
+                { Interpretation = new EvaluationMetricInterpretation(EvaluationRating.Inconclusive) }, "error" },
+            { "error diagnostic", withDiagnostic, "error" },
+            { "off scale, inconclusive", new NumericMetric("coherence", 6.0)
+                { Interpretation = new EvaluationMetricInterpretation(EvaluationRating.Inconclusive) }, "error" },
+            { "boolean with no value", new BooleanMetric("equivalent", null), "error" },
+            { "a string with no interpretation", new StringMetric("note", "informational"), "skipped" },
+        };
+    }
+
+    [Theory]
+    [MemberData(nameof(MetricsWithoutAVerdict))]
+    public void AMetricWithoutAVerdict_IsNotAPass(string because, EvaluationMetric metric, string label)
+    {
+        // MEAI's quality evaluators leave the value empty and record an error diagnostic when they cannot parse the
+        // judge's reply or lack their context; every such metric fell to the last branch and read PASS 100.
+        var tree = MeaiToEvalResultBridge.Build("Eval", new[] { "q1" }, Wrap(ResultWith((metric.Name, metric))));
+
+        var leaf = FirstLeaf(tree);
+        Assert.True(label == leaf.Score.Label, because);
+        Assert.False(leaf.Score.Passed);
+        Assert.Equal(0.0, leaf.Score.Value);
+        Assert.False(tree.Details.SubResults![0].Score.Passed, because);   // nor does its query pass on it
+    }
+
+    [Theory]
+    [InlineData(true, "pass", 1.0)]
+    [InlineData(false, "fail", 0.0)]   // read 100 with no interpretation
+    public void ABooleanMetric_IsItsOwnVerdict(bool value, string label, double score)
+    {
+        var tree = MeaiToEvalResultBridge.Build("Eval", new[] { "q1" }, Wrap(ResultWith(("equivalent", new BooleanMetric("equivalent", value)))));
+
+        Assert.Equal(label, FirstLeaf(tree).Score.Label);
+        Assert.Equal(score, FirstLeaf(tree).Score.Value);
+    }
+
+    [Theory]
+    [InlineData("error", "error")]     // a metric with no verdict beside a pass: no verdict for the query (was FAIL)
+    [InlineData("fail", "fail")]       // a measured failure decides
+    [InlineData("skipped", "warn")]    // a metric that did not run withholds the pass
+    public void AQuery_ReadsItsMetricsByMeasurement(string second, string queryLabel)
+    {
+        EvaluationMetric other = second switch
+        {
+            "error" => new NumericMetric("groundedness", null),
+            "fail" => new NumericMetric("groundedness", 1.0) { Interpretation = new EvaluationMetricInterpretation(EvaluationRating.Unacceptable, failed: true) },
+            _ => new StringMetric("note", "informational"),
+        };
+        var meai = ResultWith(("relevance", new NumericMetric("relevance", 5.0)), (other.Name, other));
+
+        var query = MeaiToEvalResultBridge.Build("Eval", new[] { "q1" }, Wrap(meai)).Details.SubResults![0];
+
+        Assert.Equal(queryLabel, query.Score.Label);
+        Assert.False(query.Score.Passed);
+        if (second == "error")
+            Assert.Equal(1.0, query.Score.Value, 6);   // the mean of the measured metric, not (1.0 + 0) / 2
+    }
+
+    [Fact]
+    public void AMetricWithACustomNonPassingLabel_DoesNotPassItsQuery()
+    {
+        // Review round 6 M-2 (B10aa): MeasuredRollup read only "fail"/"warn" as non-passing, so a measured "needs-review"
+        // (not passed; ReportStatus FAIL) passed the query, the run and the unified report.
+        var meai = ResultWith(("custom", new NumericMetric("custom", 3.0, "AgentEval score: 60/100 (needs-review, severity medium)")));
+
+        var tree = MeaiToEvalResultBridge.Build("Eval", new[] { "q1" }, Wrap(meai));
+
+        Assert.Equal("needs-review", FirstLeaf(tree).Score.Label);
+        Assert.False(FirstLeaf(tree).Score.Passed);
+        Assert.Equal("fail", tree.Details.SubResults![0].Score.Label);
+        Assert.False(tree.Score.Passed);
+    }
+
+    // What AgentEvalCompositeEvaluator emits for a passing composite with one failed (informational) leaf.
+    private static (string, Microsoft.Extensions.AI.Evaluation.EvaluationMetric)[] PassingCompositeWithAFailedLeaf(string prefix = "") =>
+    [
+        ($"{prefix}Comp (overall)", new Microsoft.Extensions.AI.Evaluation.NumericMetric("Comp (overall)", 4.2,
+            "AgentEval score: 80/100 (pass, severity none)")),
+        ($"{prefix}b", new Microsoft.Extensions.AI.Evaluation.NumericMetric("b", 3.4,
+            "AgentEval score: 60/100 (fail, severity medium)" + AgentEvalCompositeEvaluator.InformationalLeafNote)),
+    ];
+
+    [Fact]
+    public void AnOverallVerdict_DoesNotHideAnotherEvaluatorsFailedMetric()
+    {
+        // Review round 6 M-5 (B10ad): after HybridEvalInterop.Merge, the query took the "(overall)" leaf's verdict alone, so
+        // a failed Foundry metric beside a passing AgentEval composite read PASS while MAF failed the item.
+        var metrics = PassingCompositeWithAFailedLeaf("local:").Append(
+            ("foundry:relevance", (Microsoft.Extensions.AI.Evaluation.EvaluationMetric)new NumericMetric("relevance", 1.0)
+            {
+                Interpretation = new EvaluationMetricInterpretation(EvaluationRating.Unacceptable, failed: true),
+            }))
+            .Append(("local:" + AgentEvalCompositeEvaluator.FloorDeclarationMetricName,
+                new StringMetric(AgentEvalCompositeEvaluator.FloorDeclarationMetricName, "none floored")))
+            .ToArray();
+
+        var tree = MeaiToEvalResultBridge.Build("Eval", new[] { "q1" }, Wrap(ResultWith(metrics)));
+
+        var query = tree.Details.SubResults![0];
+        Assert.Equal("fail", query.Score.Label);
+        Assert.False(tree.Score.Passed);
+        Assert.DoesNotContain(query.Details.SubResults!, l => l.Metric.Key.Contains("chance-floor", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void AnOverallVerdict_StillDecidesOverItsOwnInformationalLeaves()
+    {
+        var tree = MeaiToEvalResultBridge.Build("Eval", new[] { "q1" }, Wrap(ResultWith(PassingCompositeWithAFailedLeaf())));
+
+        Assert.Equal("pass", tree.Details.SubResults![0].Score.Label);   // the failed leaf "b" is the composite's own
+    }
+
+    [Fact]
+    public void ARunWhoseOnlyQueryWithheldItsPass_Withholds_NotSkipped()
+    {
+        // Review round 5 L-1 (B10u): the root checked "nothing measured" before the withheld state and read skipped 0.000
+        // though a metric passed (the B9d defect).
+        var meai = ResultWith(("coherence", new NumericMetric("coherence", 4.5)), ("note", new StringMetric("note", "informational")));
+
+        var tree = MeaiToEvalResultBridge.Build("Eval", new[] { "q1" }, Wrap(meai));
+
+        Assert.Equal("warn", tree.Details.SubResults![0].Score.Label);
+        Assert.Equal("warn", tree.Score.Label);
+        Assert.Equal(AgentEval.Evals.Meta.MeasurementState.NotMeasured, tree.Score.Measurement);
+    }
+
     [Fact]
     public void Build_RecoversAgentEvalScore_FromReasonMarker()
     {

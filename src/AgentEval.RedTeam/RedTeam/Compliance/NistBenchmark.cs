@@ -10,8 +10,8 @@ namespace AgentEval.Benchmarks;
 
 /// <summary>
 /// Top-level factory for NIST AI RMF (AI 100-1) benchmark presets — parity with <see cref="OwaspBenchmark"/> /
-/// <see cref="MitreBenchmark"/>. A thin façade over <see cref="AttackPipeline"/>; each preset wires the 13 built-in
-/// attacks and returns a <see cref="NistBenchmarkRun"/> exposing <c>ScanAsync</c> / <c>EvaluateAsync</c> /
+/// <see cref="MitreBenchmark"/>. A thin façade over <see cref="AttackPipeline"/>; each preset wires the 14 attacks of
+/// the default roster (<see cref="Attack.All"/>) and returns a <see cref="NistBenchmarkRun"/> exposing <c>ScanAsync</c> / <c>EvaluateAsync</c> /
 /// <c>BuildEvalResult</c> / <c>GenerateReport</c>.
 /// </summary>
 /// <remarks>

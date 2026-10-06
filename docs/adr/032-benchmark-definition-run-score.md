@@ -16,6 +16,11 @@
   §6's answer table for what each answer refused, **in code and not only in prose**.
   <br/>⚠ Accepted describes the contract, not the stop rule: Q6 is *yes on the principle, staged in
   execution*, so `BenchmarkRunner` still applies **no** floor to any verdict.
+  <br/>**Amended 2026-10-04 (#203 review):** the run verdict below read "WARN if warnings > 0 · else PASS", so a
+  row whose check did not run (`NotMeasured`: skipped or errored) was ignored and the run passed without it. The
+  verdict is now WARN when any row is `NotMeasured` and at least one row was measured (a run in which no row was
+  measured is PENDING), as a composite treats a required component that did not run. `skipped` stays one bucket
+  for both states; only `NotApplicable` rows (a corpus finding) stay out of the verdict.
   <br/>_Superseded status, kept because the reasoning still holds: **Proposed.** Proposed is a gate,
   not a placeholder (the ADR-026 / ADR-030 precedent). Accepting this document funds Waves 0 and 1 of
   §3.3 … Wave 2, the benchmark contract itself, is gated on one question only the owner can answer

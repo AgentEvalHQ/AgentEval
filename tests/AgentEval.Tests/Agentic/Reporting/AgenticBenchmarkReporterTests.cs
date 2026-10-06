@@ -104,6 +104,8 @@ public class AgenticBenchmarkReporterTests
     {
         var (_, _, report) = await RunAndReportAsync(stubScore: 100, "ReporterTestAgent4");
 
-        Assert.Contains(report.Summary.OverallStatus, new[] { "PASS", "WARN", "FAIL" });
+        // This fixture's one check withholds its pass (its schema leaf has no tool definitions): WARN. It read FAIL until
+        // B9b and SKIPPED until B9d.
+        Assert.True(report.Summary.OverallStatus == "WARN", $"status {report.Summary.OverallStatus}; root {report.CompositeTree.Score.Label}: {report.CompositeTree.Details.Summary}");
     }
 }

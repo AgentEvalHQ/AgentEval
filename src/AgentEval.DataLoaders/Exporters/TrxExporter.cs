@@ -156,7 +156,7 @@ public class TrxExporter : IResultExporter
             await writer.WriteStartElementAsync(null, "Output", null);
             
             // StdOut
-            if (!string.IsNullOrEmpty(test.Output) || test.MetricScores.Count > 0)
+            if (!string.IsNullOrEmpty(test.Output) || test.MetricScores.Count > 0 || test.MetricsNotMeasured.Count > 0)
             {
                 await writer.WriteStartElementAsync(null, "StdOut", null);
                 var stdout = new StringBuilder();
@@ -164,6 +164,10 @@ public class TrxExporter : IResultExporter
                 foreach (var (metric, score) in test.MetricScores)
                 {
                     stdout.AppendLine($"{metric}: {score:F1}");
+                }
+                foreach (var (metric, reason) in test.MetricsNotMeasured)
+                {
+                    stdout.AppendLine($"{metric}: not measured — {reason}");
                 }
                 if (!string.IsNullOrEmpty(test.Output))
                 {

@@ -489,7 +489,9 @@ public partial class JsonFileBaselineStore : IBaselineStore
         var passed = b.CategoryResults.Values.Count(c => !c.Skipped && c.Score >= 70.0);
         var skipped = b.CategoryResults.Values.Count(c => c.Skipped);
         var failed = total - passed - skipped;
-        return new RunStats(total, passed, failed < 0 ? 0 : failed, 0);
+        // Named, not positional (#203 review, B8): the fourth positional argument is Warnings, so the skip count computed
+        // above was never written — Skipped read 0 and the buckets added up to less than Total.
+        return new RunStats(Total: total, Passed: passed, Failed: failed, Warnings: 0, Skipped: skipped);
     }
 
     private static IReadOnlyDictionary<string, double> BuildMetrics(MemoryBaseline b)

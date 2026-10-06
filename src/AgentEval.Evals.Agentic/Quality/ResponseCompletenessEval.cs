@@ -14,8 +14,8 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// Wraps an <see cref="AtomicLlmEval"/> configured with three response-completeness criteria;
 /// each criterion's verdict and explanation is surfaced via <see cref="EvalDetails"/> evidence.
 /// The critical/optional fact classification, its 0.80 / 0.20 weighting and the
-/// <c>missing_facts[]</c> array are specified in the reference prompt file and are not yet
-/// produced: the judge does not receive that file yet.
+/// <c>missing_facts[]</c> array are specified in the rubric the judge is sent; the result keeps the score,
+/// criteria and evidence, not the <c>missing_facts[]</c> array.
 /// </para>
 /// <para>
 /// <b>Input contract</b>: requires <see cref="EvalInput.Query"/> and
@@ -28,8 +28,8 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// Lineage: AgentEval's own criteria and reference prompt, modelled on the evaluator concept (name,
 /// inputs and scoring dimensions) of Azure/azure-sdk-for-python
 /// <c>sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_response_completeness/response_completeness.prompty</c>.
-/// A 2026-10-02 check found no upstream prompt text in the reference prompt file under
-/// <c>Resources/Prompts/</c>, which is not yet sent to the judge.
+/// A 2026-10-02 check found no upstream prompt text in the rubric file under
+/// <c>Resources/Prompts/</c>, which the judge is sent as its system prompt.
 /// </para>
 /// </summary>
 public sealed class ResponseCompletenessEval : IEval
@@ -62,7 +62,7 @@ public sealed class ResponseCompletenessEval : IEval
             key: "response_completeness",
             name: "Response Completeness",
             category: "rag",
-            version: "1.0.0",
+            version: "1.2.0",   // 1.2.0: a supplied reference answer reaches the judge (B12a)
             criteria: new[]
             {
                 "All critical facts expected from the query are covered in the response",
@@ -76,6 +76,10 @@ public sealed class ResponseCompletenessEval : IEval
     }
 
     /// <inheritdoc/>
-    public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default) =>
-        _inner.EvaluateAsync(input, ct);
+    public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        // The reference answer derives the expected facts when supplied; it was never sent (#203, B12a).
+        return _inner.EvaluateAsync(GroundTruthInput.Fold(input), ct);
+    }
 }

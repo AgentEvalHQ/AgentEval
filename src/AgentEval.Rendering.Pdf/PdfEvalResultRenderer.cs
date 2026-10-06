@@ -89,6 +89,9 @@ public sealed class PdfEvalResultRenderer : IEvalResultRenderer
         }, ct);
     }
 
+    // The root's recommendations shown on the cover (B10bd); the rest are counted.
+    private const int MaxCoverRecommendations = 5;
+
     // ── Cover page ───────────────────────────────────────────────────────────
 
     private static void RenderCover(PageDescriptor page, EvalResult root, EvalResultRenderOptions opts)
@@ -131,6 +134,29 @@ public sealed class PdfEvalResultRenderer : IEvalResultRenderer
             col.Item().Background(sevColor).Padding(12)
                 .Text($"OVERALL: {label} ({root.Score.Value:P0})")
                 .FontColor(Colors.White).FontSize(20).Bold();
+
+            // Why the overall verdict is what it is: the root's own summary and recommendations were rendered nowhere, so a
+            // withheld WARN read only "OVERALL: WARN" (#203 review round 13 L4, B10bd). Leaves keep theirs on their pages.
+            if (!string.IsNullOrWhiteSpace(root.Details.Summary))
+                col.Item().PaddingTop(8).Text(root.Details.Summary!).FontSize(11);
+            // A recommendation the summary already states is not printed again: the summary is usually the first
+            // recommendation (a withheld pass, a coverage note, a skipped result) — it read twice (B12f).
+            var summary = root.Details.Summary ?? "";
+            // Only a sentence-length one (20+ characters) inside the summary: a short bullet ("warn", "Be concise") can sit
+            // inside an unrelated summary sentence and must still be printed (review round 15 L1) — unless it IS the summary.
+            // A blank one is no bullet (round 16, B12n).
+            if (root.Details.Recommendations?
+                    .Where(r => !string.IsNullOrWhiteSpace(r)
+                                && !string.Equals(r.Trim(), summary.Trim(), StringComparison.Ordinal)
+                                && (r.Length < 20 || !summary.Contains(r, StringComparison.Ordinal)))
+                    .ToList()
+                is { Count: > 0 } rootRecs)
+            {
+                foreach (var r in rootRecs.Take(MaxCoverRecommendations))
+                    col.Item().Text($"• {r}").FontSize(10);
+                if (rootRecs.Count > MaxCoverRecommendations)
+                    col.Item().Text($"… and {rootRecs.Count - MaxCoverRecommendations} more").FontSize(9).Italic().FontColor(Colors.Grey.Darken1);
+            }
 
             if (!string.IsNullOrEmpty(opts.AgentEvalVersion))
                 col.Item().PaddingTop(20).Text($"AgentEval version: {opts.AgentEvalVersion}").FontSize(9).Italic();

@@ -63,15 +63,26 @@ public sealed class TraceFidelityRunner
     public EvalResult ReconcileToEvalResult(AgentTrace agentTrace, AgentTrace chatTrace)
     {
         var report = Reconcile(agentTrace, chatTrace);
+        // A chat trace with no model responses (a failed or empty capture) holds no truth to reconcile against: nothing was
+        // measured (#203 review round 6, B10y). Every class scored 1.0 and the run read PASS.
+        var noTruth = !chatTrace.Entries.Any(e => e.EffectiveScope == TraceEntryScope.ChatTurn && e.Type == TraceEntryType.Response);
 
         var subResults = report.Discrepancies.Select(d => new EvalResult(
             Metric: new EvalMetadata(Key: $"trace_fidelity.{d.ClassKey}", Name: d.ClassKey, Category: "TraceFidelity", Version: "1.0"),
-            Score: new EvalScore(
+            Score: noTruth
+                ? new EvalScore(Value: 0.0, Ordinal: null, Label: "skipped", Passed: false, Threshold: 0.8, Severity: "none", Confidence: null)
+                : new EvalScore(
                 Value: d.Score, Ordinal: null,
+                // A warn is a soft fail (#203 review round 5, B10w): Passed only on a pass.
                 Label: d.Score >= 0.99 ? "pass" : d.Score >= 0.8 ? "warn" : "fail",
-                Passed: d.Score >= 0.8, Threshold: 0.8, Severity: d.Severity, Confidence: null),
+                Passed: d.Score >= 0.99, Threshold: 0.8,
+                    // A passing class carries no severity, and severities are lower-case (B10ab: a clean leaf read "Critical").
+                    Severity: d.Score >= 0.99 ? "none" : d.Severity.ToLowerInvariant(), Confidence: null),
             Details: new EvalDetails(
-                Dimensions: new Dictionary<string, double> { ["count"] = d.Count, ["score100"] = d.Score * 100 },
+                // A class with nothing to reconcile carries no 0-100 figure (B10ah: it read 100 beside a skipped label).
+                Dimensions: noTruth
+                    ? new Dictionary<string, double> { ["count"] = d.Count }
+                    : new Dictionary<string, double> { ["count"] = d.Count, ["score100"] = d.Score * 100 },
                 Evidence: d.Examples.Select(x => new EvalEvidence(Source: "chat-vs-agent", Reference: d.ClassKey, Message: x)).ToList(),
                 Recommendations: null, SubResults: null, AggregationStrategy: null),
             Provenance: new EvalProvenance(Type: "code", JudgeModel: null, PromptId: null, PromptHash: null, TokensUsed: null, EstimatedCost: 0.0, CacheHit: false),
@@ -79,14 +90,24 @@ public sealed class TraceFidelityRunner
 
         return new EvalResult(
             Metric: new EvalMetadata(Key: "trace_fidelity", Name: "Trace Fidelity", Category: "TraceFidelity", Version: "1.0"),
-            Score: new EvalScore(
-                Value: report.OverallScore, Ordinal: null,
-                Label: report.OverallScore >= 0.99 ? "pass" : report.OverallScore >= 0.8 ? "warn" : "fail",
-                Passed: report.OverallScore >= 0.8, Threshold: 0.8,
-                Severity: report.OverallScore >= 0.8 ? "Low" : report.OverallScore >= 0.5 ? "Medium" : "High", Confidence: null),
+            Score: noTruth
+                ? new EvalScore(Value: 0.0, Ordinal: null, Label: "skipped", Passed: false, Threshold: 0.8, Severity: "none", Confidence: null)
+                : new EvalScore(
+                    Value: report.OverallScore, Ordinal: null,
+                    // A warn is a soft fail (B10w): Passed only on a pass, which reports no severity; severities in the lower
+                    // case every other result uses ("Low" read low even at 1.00).
+                    Label: report.OverallScore >= 0.99 ? "pass" : report.OverallScore >= 0.8 ? "warn" : "fail",
+                    Passed: report.OverallScore >= 0.99, Threshold: 0.8,
+                    Severity: report.OverallScore >= 0.99 ? "none" : report.OverallScore >= 0.8 ? "low" : report.OverallScore >= 0.5 ? "medium" : "high",
+                    Confidence: null),
             Details: new EvalDetails(
-                Dimensions: new Dictionary<string, double> { ["score100"] = report.OverallScore * 100 },
-                Evidence: null, Recommendations: null, SubResults: subResults, AggregationStrategy: "severity-weighted"),
+                Dimensions: noTruth ? null : new Dictionary<string, double> { ["score100"] = report.OverallScore * 100 },
+                Evidence: null,
+                Recommendations: noTruth ? ["The chat-boundary trace has no model responses, so there is nothing to reconcile against: no verdict."] : null,
+                SubResults: subResults, AggregationStrategy: "severity-weighted")
+            {
+                Summary = noTruth ? "The chat-boundary trace has no model responses, so there is nothing to reconcile against: no verdict." : null,
+            },
             Provenance: new EvalProvenance(Type: "code", JudgeModel: null, PromptId: null, PromptHash: null, TokensUsed: null, EstimatedCost: 0.0, CacheHit: false),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }

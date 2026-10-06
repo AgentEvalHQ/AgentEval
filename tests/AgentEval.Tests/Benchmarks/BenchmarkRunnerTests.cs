@@ -220,6 +220,36 @@ public class BenchmarkRunnerTests
             summary.Stats.Passed + summary.Stats.Failed + summary.Stats.Warnings + summary.Stats.Skipped);
     }
 
+    private sealed class AlwaysSkippedEval()
+        : AtomicEval("always_skipped", "Always skipped", "test", "1.0.0")
+    {
+        public override Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default) =>
+            Task.FromResult(EvalResult.Skipped(this, "a required input was not captured; this check did not run."));
+    }
+
+    [Fact]
+    public async Task ARowWhoseCheckDidNotRun_KeepsTheRunFromPassing()
+    {
+        // A check that did not run is not a pass: the run is WARN, not PASS. It used to be ignored (#203 review, B1a).
+        using var temp = TempWorkspace.Create("BenchNotMeasured");
+        var definition = Definition(
+            checks:
+            [
+                new AdmittedCheck(new ContainsEval("k1", "yes"), Floor),
+                new AdmittedCheck(new AlwaysSkippedEval(), Floor),
+            ]);
+
+        var run = await RunnerIn(temp).RunAsync(definition, Answering("live", "yes"));
+
+        var store = new FileSystemOutputStore(temp.Path);
+        var summary = await store.GetRunSummaryAsync(run.RunId);
+
+        Assert.Equal("WARN", summary!.Verdict);
+        Assert.Equal(2, summary.Stats.Passed);
+        Assert.Equal(0, summary.Stats.Failed);
+        Assert.Equal(2, summary.Stats.Skipped);
+    }
+
     [Fact]
     public async Task ARunWhereNothingWasMeasured_IsPENDING_NotPASS()
     {

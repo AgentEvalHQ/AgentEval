@@ -145,6 +145,38 @@ public class AgentEvalLoggerTests
     }
 
     [Fact]
+    public void ConsoleLogger_LogMetricResult_NotMeasured_PrintsNoScore()
+    {
+        // #203 review round 16 (B12n): a not-measured metric was logged as a failure at its placeholder 0 ("✗ 0.00").
+        var output = CaptureConsoleOutput(logger =>
+            logger.LogMetricResult(MetricResult.NotMeasured("llm_faithfulness", "no context")));
+
+        Assert.Contains("llm_faithfulness: not measured", output);
+        Assert.DoesNotContain("0.00", output);
+        Assert.DoesNotContain("✗", output);
+    }
+
+    [Fact]
+    public void MicrosoftLoggingAdapter_LogMetricResult_NotMeasured_LogsNoScore()
+    {
+        var sink = new CapturingMeLogger();
+        new MicrosoftLoggingAdapter(sink).LogMetricResult(MetricResult.NotMeasured("llm_faithfulness", "no context"));
+
+        var line = Assert.Single(sink.Lines);
+        Assert.Contains("not measured", line);
+        Assert.DoesNotContain("Score", line);
+    }
+
+    private sealed class CapturingMeLogger : Microsoft.Extensions.Logging.ILogger
+    {
+        public List<string> Lines { get; } = [];
+        public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+        public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) => true;
+        public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId,
+            TState state, Exception? exception, Func<TState, Exception?, string> formatter) => Lines.Add(formatter(state, exception));
+    }
+
+    [Fact]
     public void ConsoleLogger_BeginScope_ReturnsDisposable()
     {
         var output = CaptureConsoleOutput(logger =>

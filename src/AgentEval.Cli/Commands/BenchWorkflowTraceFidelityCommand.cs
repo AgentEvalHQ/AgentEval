@@ -21,7 +21,8 @@ namespace AgentEval.Cli.Commands;
 /// </summary>
 public static class BenchWorkflowTraceFidelityCommand
 {
-    /// <summary>Runs the reconciliation. Returns 0 (clean), 2 (discrepancies), or 1 (setup/IO error).</summary>
+    /// <summary>Runs the reconciliation. Returns 0 (clean, PASS), 10 (minor discrepancies or partly checked, WARN), 9
+    /// (discrepancies, FAIL), 11 (nothing checked: no verdict, stored PENDING) or 1 (setup/IO error).</summary>
     public static async Task<int> RunAsync(
         string workflowTraceFile, string preset, string subject, string? rootOverride, CancellationToken ct = default)
     {
@@ -73,14 +74,14 @@ public static class BenchWorkflowTraceFidelityCommand
         }
 
         // Per-executor chat truth comes from the trace's ExecutorTraces (populated MAF-side before persistence).
-        // When absent, the reconciler reports every executor as NoTruth (score 1.0) — a legitimate but trivial result.
+        // When absent, every executor is NoTruth: nothing can be checked, so the run has no verdict (B10y).
         IReadOnlyDictionary<string, AgentTrace>? chatTraces = wfTrace.ExecutorTraces;
         if (chatTraces is null || chatTraces.Count == 0)
         {
             Console.Error.WriteLine(
                 "[bench workflow-trace-fidelity] NOTE: the workflow trace carries no per-executor ExecutorTraces; "
-                + "every executor will be reported as NoTruth (score 100%). Capture per-executor chat traces to get "
-                + "real reconciliation.");
+                + "no executor can be checked, so the run has no verdict (stored PENDING, exit 11). Capture per-executor chat "
+                + "traces to get real reconciliation.");
         }
 
         var result = new WorkflowTraceFidelityReconciler(ParsePreset(preset)).ReconcileToEvalResult(wfResult, chatTraces);
@@ -107,16 +108,15 @@ public static class BenchWorkflowTraceFidelityCommand
             var runId = manifest.Run.RunId;
 
             var subResults = result.Details.SubResults ?? (IReadOnlyList<EvalResult>)Array.Empty<EvalResult>();
-            var verdict = result.Score.Passed ? "PASS" : "FAIL";
+            // The root's verdict and the label's exit code, as every other bench command (B10w): a warn (0.80-0.99) read
+            // Passed, so it printed and stored PASS and exited 0.
+            var stats = subResults.Select(s => s.Score).ToRunStats();   // one bucket per check (B8)
+            var verdict = result.Score.RunVerdict(stats);
             var summary = new RunSummary(
                 SchemaVersion: "1.0",
                 RunId: runId,
                 Verdict: verdict,
-                Stats: new RunStats(
-                    Total: subResults.Count,
-                    Passed: subResults.Count(s => s.Score.Passed),
-                    Failed: subResults.Count(s => !s.Score.Passed),
-                    Warnings: 0),
+                Stats: stats,
                 Metrics: new Dictionary<string, double> { ["workflow_trace_fidelity_score100"] = result.Score.Value * 100 });
             await store.CompleteRunAsync(manifest, summary, ct);
 
@@ -127,16 +127,22 @@ public static class BenchWorkflowTraceFidelityCommand
                 ct);
 
             Console.WriteLine();
-            Console.WriteLine($"   Fidelity score: {result.Score.Value * 100:F1}%   Verdict: {verdict}");
+            // Nothing checked has no score to print (B10am L6: it read "0.0%"); the stored metric keeps its placeholder so
+            // a baseline comparison still reads the run as worse than a PASS (fail-closed).
+            Console.WriteLine(result.Score.Label == "skipped"
+                ? $"   Fidelity score: — (nothing checked)   Verdict: {verdict}"
+                : $"   Fidelity score: {result.Score.Value * 100:F1}%   Verdict: {verdict}");
             foreach (var sub in subResults)
             {
-                Console.WriteLine($"   {sub.Metric.Name,-28} {sub.Score.Value * 100,5:F0}%  ({sub.Score.Severity})");
+                Console.WriteLine(sub.Score.Label == "skipped"
+                    ? $"   {sub.Metric.Name,-28}   —    (not checked: no chat-boundary trace)"
+                    : $"   {sub.Metric.Name,-28} {sub.Score.Value * 100,5:F0}%  ({sub.Score.Severity})");
             }
 
             Console.WriteLine();
             Console.WriteLine($"   Run ID: {runId}");
             Console.WriteLine($"   Canonical: {runDir}");
-            return result.Score.Passed ? ExitCodes.Success : ExitCodes.GateFailed;
+            return BenchExitCodes.FromLabel(result.Score.Label);
         }
         catch (Exception ex)
         {

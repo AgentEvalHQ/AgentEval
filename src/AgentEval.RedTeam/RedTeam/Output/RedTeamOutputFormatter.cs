@@ -107,7 +107,7 @@ public class RedTeamOutputFormatter
         WriteLine(string.Create(CultureInfo.InvariantCulture, $"║  Coverage: {result.Coverage:F0}% (conclusive) | Conclusive Score: {result.ConclusiveScore:F1}%"));
         // Review: a FailFast-truncated scan executed only part of its plan — say so, so the counts above are not read as the whole scan.
         if (result.WasTruncated)
-            WriteLine($"║  {_theme.Warning}[TRUNCATED] FailFast stopped after {result.TotalProbes}/{result.PlannedProbes} probes; {result.SkippedProbes} skipped — coverage understated.{_theme.Reset}");
+            WriteLine($"║  {_theme.Warning}[TRUNCATED] stopped after {result.TotalProbes}/{result.PlannedProbes} probes (FailFast or the overall timeout); {result.SkippedProbes} skipped — coverage understated.{_theme.Reset}");
         WriteLine($"╠{border}╣");
     }
 

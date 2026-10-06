@@ -470,7 +470,8 @@ public sealed class GDPRPdfRenderer
     {
         "PASS" => Colors.Green.Medium,
         "WARN" => Colors.Orange.Medium,
-        _ => Colors.Red.Medium
+        "FAIL" => Colors.Red.Medium,
+        _ => Colors.Grey.Medium   // ERROR, SKIPPED: no verdict (B9b)
     };
 
     private static string Capitalize(string s) => EvalReportHelpers.Capitalize(s); // ARC-02: shared

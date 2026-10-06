@@ -46,6 +46,24 @@ public class EuAiActComplianceReporterTests
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    [Fact]
+    public void TheSummary_CountsOnlyMeasuredFailuresAsFailedScenarios()
+    {
+        // Review round 4 M6 (B10p), the EU copy of the GDPR summary.
+        static EvalResult Leaf(string key, string label) => new(
+            new(key, key, "test", "1.0"), new(label == "pass" ? 1.0 : 0.0, null, label, label == "pass", 0.75, "none", null),
+            new(null, null, null, null, null), new("atomic", null, null, null, null, 0, false), DateTimeOffset.UtcNow);
+        static EvalResult Node(string key, string label, params EvalResult[] children) => new(
+            new(key, key, "test", "1.0"), new(0.5, null, label, false, 0.85, "none", null),
+            new(null, null, null, children, null), new("composite", null, null, null, null, 0, false), DateTimeOffset.UtcNow);
+        var article = Node("euaiact.art5", "error", Leaf("s1", "error"), Leaf("s2", "warn"), Leaf("s3", "fail"), Leaf("s4", "pass"));
+        var root = Node("root", "error", Node("Pillar1", "error", article));
+
+        var summary = new AgentEval.Compliance.EuAiAct.Reporting.SummaryBuilder(BuildRegistry(100)).Build(root);
+
+        Assert.Equal(1, summary.PerArticle["euaiact.art5"].ScenariosFailed);
+    }
+
     private static EuAiActArticlesRegistry BuildRegistry(int stubScore)
     {
         var loader = new ArticleScenarioYamlLoader();

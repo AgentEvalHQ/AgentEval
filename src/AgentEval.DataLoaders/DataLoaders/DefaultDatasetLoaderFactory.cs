@@ -9,7 +9,7 @@ namespace AgentEval.DataLoaders;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Registered as a singleton in DI via <c>services.AddAgentEval()</c>.
+/// Registered as a singleton in DI via <c>services.AddAgentEvalDataLoaders()</c> (or <c>AddAgentEvalAll()</c>).
 /// The static <see cref="DatasetLoaderFactory"/> class delegates to a
 /// shared instance of this class for backwards compatibility.
 /// </para>
@@ -35,6 +35,12 @@ public sealed class DefaultDatasetLoaderFactory : IDatasetLoaderFactory
         [".yml"] = () => new YamlDatasetLoader(),
     };
 
+    // Format name → DI-registered loader, for Create(format) (see the constructor).
+    private readonly Dictionary<string, Func<IDatasetLoader>> _formats = new(StringComparer.OrdinalIgnoreCase);
+
+    // Extensions set through Register, which Create(format) honours for the same name (see Create).
+    private readonly HashSet<string> _registered = new(StringComparer.OrdinalIgnoreCase);
+
     /// <summary>
     /// Creates a new factory with only built-in loaders (backward compatible).
     /// </summary>
@@ -46,7 +52,8 @@ public sealed class DefaultDatasetLoaderFactory : IDatasetLoaderFactory
     /// </summary>
     /// <param name="additionalLoaders">
     /// DI-registered loaders. Each loader's <see cref="IDatasetLoader.SupportedExtensions"/>
-    /// are used as keys. Built-in defaults are not overridden; use <see cref="Register"/>
+    /// are used as keys for <see cref="CreateFromExtension"/>, and its <see cref="IDatasetLoader.Format"/>
+    /// for <see cref="Create"/>. Built-in defaults are not overridden; use <see cref="Register"/>
     /// to explicitly replace a built-in loader.
     /// </param>
     public DefaultDatasetLoaderFactory(IEnumerable<IDatasetLoader> additionalLoaders) : this()
@@ -60,6 +67,11 @@ public sealed class DefaultDatasetLoaderFactory : IDatasetLoaderFactory
                 // DI-registered loaders don't override built-in defaults
                 _loaders.TryAdd(ext, () => loader);
             }
+
+            // ...and are reachable by their own Format name too. Create() checks the built-in names first, so a
+            // DI loader that reuses one ("csv") cannot replace the built-in; the first loader with a name wins.
+            if (!string.IsNullOrWhiteSpace(loader.Format))
+                _formats.TryAdd(loader.Format, () => loader);
         }
     }
 
@@ -75,13 +87,31 @@ public sealed class DefaultDatasetLoaderFactory : IDatasetLoaderFactory
     }
 
     /// <inheritdoc/>
-    public IDatasetLoader Create(string format) => format.ToLowerInvariant() switch
+    /// <remarks>
+    /// An extension set through <see cref="Register"/> answers for its name too: after <c>Register(".csv", f)</c>,
+    /// <c>Create("csv")</c> returns <c>f()</c>, as <c>CreateFromExtension(".csv")</c> does. Otherwise a built-in name
+    /// resolves to the built-in loader, then a DI-registered loader is found by its <see cref="IDatasetLoader.Format"/>.
+    /// </remarks>
+    public IDatasetLoader Create(string format)
+    {
+        ArgumentNullException.ThrowIfNull(format);
+
+        // Register is the documented way to replace a built-in loader, but it reached only CreateFromExtension:
+        // Create("csv") kept returning the built-in (#203 review, B7).
+        if (_registered.Contains("." + format) && _loaders.TryGetValue("." + format, out var registered))
+            return registered();
+
+        return CreateByName(format);
+    }
+
+    private IDatasetLoader CreateByName(string format) => format.ToLowerInvariant() switch
     {
         "jsonl" or "ndjson" => new JsonlDatasetLoader(),
         "json" => new JsonDatasetLoader(),
         "csv" => new CsvDatasetLoader(),
         "tsv" => new CsvDatasetLoader('\t'),
         "yaml" or "yml" => new YamlDatasetLoader(),
+        _ when _formats.TryGetValue(format, out var factory) => factory(),
         _ => throw new ArgumentException($"Unknown format: {format}", nameof(format))
     };
 
@@ -89,5 +119,6 @@ public sealed class DefaultDatasetLoaderFactory : IDatasetLoaderFactory
     public void Register(string extension, Func<IDatasetLoader> factory)
     {
         _loaders[extension] = factory;
+        _registered.Add(extension);
     }
 }

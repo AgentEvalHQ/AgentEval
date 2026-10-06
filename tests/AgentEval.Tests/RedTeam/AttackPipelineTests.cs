@@ -177,8 +177,7 @@ public class AttackPipelineTests
     public async Task Create_WithProgress_ReportsProgress()
     {
         var agent = new FakeResistantAgent();
-        var progressReports = new List<ScanProgress>();
-        var progress = new Progress<ScanProgress>(p => progressReports.Add(p));
+        var progress = new CollectingProgress<ScanProgress>();
 
         var result = await AttackPipeline
             .Create()
@@ -187,16 +186,8 @@ public class AttackPipelineTests
             .WithProgress(progress)
             .ScanAsync(agent);
 
-        // Progress<T> marshals its callbacks through the captured SynchronizationContext (here the
-        // thread pool), so they can lag the awaited scan. A fixed sleep races that scheduling and can
-        // flake under CI load; poll until the first report lands with a generous ceiling instead.
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-        while (progressReports.Count == 0 && sw.Elapsed < TimeSpan.FromSeconds(30))
-        {
-            await Task.Delay(25);
-        }
-
-        Assert.NotEmpty(progressReports);
+        // A synchronous collector: every report has landed when the scan returns (see CollectingProgress).
+        Assert.NotEmpty(progress.Reports);
     }
 
     [Fact]

@@ -34,7 +34,9 @@ namespace AgentEval.Evals.Performance;
 /// ⚠ <b>Absent is not fast, and absent is not free.</b> <see cref="EvalInput.Performance"/> is
 /// <see langword="null"/> whenever the harness ran without
 /// <c>EvaluationOptions.TrackPerformance</c>, and every check below returns
-/// <c>NotApplicable</c> for it. Reading a missing measurement as a zero duration or a zero token
+/// <c>skipped</c> (not measured, ADR-030) for it — so a run that measured nothing cannot pass a benchmark either
+/// (B1a). Only a run that WAS measured but not streamed is <c>NotApplicable</c> for time to first token: that is
+/// how the agent was called, not a measurement that failed. Reading a missing measurement as a zero duration or a zero token
 /// count would turn an unmeasured run into the best possible one — the flattering direction, and the
 /// same <c>?? 0</c> shape this lane exists to remove.
 /// </para>
@@ -100,7 +102,7 @@ public sealed class WithinLatencyBudgetEval(TimeSpan budget)
                 "nothing measured this run's duration, so nothing here can say whether it met its budget. "
                 + "The harness records timings only under EvaluationOptions.TrackPerformance, and an "
                 + "unmeasured run is not a fast one.";
-            return NotApplicable(reason, new EvalEvidence("performance", "duration", reason));
+            return EvalResult.Skipped(this, reason); // not measured (ADR-030), not inapplicable: nothing timed it
         }
 
         var duration = performance.TotalDuration;
@@ -141,13 +143,14 @@ public sealed class WithinTokenBudgetEval(int maxTotalTokens)
 
         // ⚠ TWO separate absences, and collapsing them is the defect. Performance may be null (nobody
         // measured anything) or present with a null TotalTokens (timings were taken but the provider
-        // reported no usage). Both decline; neither is a zero-token run.
+        // reported no usage). Both are NOT MEASURED (ADR-030: the instrument did not produce the number), never
+        // inapplicable — the case could have been measured — and neither is a zero-token run.
         if (input.Performance is not { } performance)
         {
             var reason =
                 "nothing measured this run, so nothing here can say how many tokens it used. An "
                 + "unmeasured run is not a free one.";
-            return NotApplicable(reason, new EvalEvidence("performance", "tokens", reason));
+            return EvalResult.Skipped(this, reason);
         }
 
         if (performance.TotalTokens is not { } total)
@@ -156,7 +159,7 @@ public sealed class WithinTokenBudgetEval(int maxTotalTokens)
                 "this run was timed but reported NO token usage, so the budget cannot be checked. A "
                 + "provider that returns no usage is not a provider that used none — the two are "
                 + "indistinguishable here and scoring the second would be a fabricated zero.";
-            return NotApplicable(reason, new EvalEvidence("performance", "tokens", reason));
+            return EvalResult.Skipped(this, reason);
         }
 
         var within = total <= _max;
@@ -192,10 +195,15 @@ public sealed class WithinFirstTokenBudgetEval(TimeSpan budget)
         // TimeToFirstToken is null on a non-streaming run. That is a property of HOW the agent was
         // called, not of how fast it was, and it is the case this check most has to get right: a
         // non-streaming run has no first-token time and must not be scored as an instant one.
-        if (input.Performance?.TimeToFirstToken is not { } ttft)
+        if (input.Performance is null)
+            return EvalResult.Skipped(this,
+                "nothing measured this run, so nothing here can say when its first token arrived. An unmeasured run "
+                + "is not a fast one.");
+
+        if (input.Performance.TimeToFirstToken is not { } ttft)
         {
             var reason =
-                "this run recorded no time to first token — it was not streamed, or nothing measured it. "
+                "this run was measured but recorded no time to first token — it was not streamed. "
                 + "A run with no first-token time is not a run whose first token arrived instantly.";
             return NotApplicable(reason, new EvalEvidence("performance", "ttft", reason));
         }

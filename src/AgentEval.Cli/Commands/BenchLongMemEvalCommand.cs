@@ -200,12 +200,10 @@ public static class BenchLongMemEvalCommand
             // the manifest below. The summary still captures pass/fail totals.
 
             const double passThresholdPercent = 50.0;
-            var verdict = result.OverallAccuracy switch
-            {
-                null => "INCONCLUSIVE",
-                >= passThresholdPercent => "PASS",
-                _ => "FAIL"
-            };
+            // A pass on part of the questions is a warn (#203 review, B6c-9): accuracy is over the SCORED questions only,
+            // and the default RetryThenInconclusive policy leaves judge failures and agent errors unscored, so 1 scored
+            // question and 499 inconclusive passed. A fail stays a fail.
+            var verdict = LongMemEvalVerdict(result.OverallAccuracy, unscored: result.QuestionResults.Count - result.ScoredQuestions);
             var metrics = new Dictionary<string, double>();
             // The canonical RunSummary schema uses WARN for indeterminate runs.
             // Keep the more precise INCONCLUSIVE label in LongMemEval's console/native surfaces.
@@ -246,7 +244,8 @@ public static class BenchLongMemEvalCommand
             Console.WriteLine($"   Task-averaged accuracy:  {FormatPercent(result.TaskAveragedAccuracy)}  ({result.ScoredTypeCount} scored types)");
             Console.WriteLine($"   Inconclusive judgments:  {result.InconclusiveQuestions}");
             Console.WriteLine($"   Agent failures:          {result.AgentFailureQuestions}");
-            Console.WriteLine($"   Verdict:                 {verdict}");
+            Console.WriteLine($"   Verdict:                 {verdict}" +
+                (verdict == "WARN" ? $" — {result.QuestionResults.Count - result.ScoredQuestions} of {result.QuestionResults.Count} questions were not scored, so the pass is a warn" : ""));
             Console.WriteLine();
             Console.WriteLine($"   Run ID: {runId}");
             Console.WriteLine($"   Canonical: {runDir}");
@@ -258,13 +257,26 @@ public static class BenchLongMemEvalCommand
             return 1;
         }
 
-        return result.OverallAccuracy switch
+        return LongMemEvalVerdict(result.OverallAccuracy, result.QuestionResults.Count - result.ScoredQuestions) switch
         {
-            null => ExitCodes.GateInconclusive,
-            >= 50.0 => ExitCodes.Success,
-            _ => ExitCodes.GateFailed
+            "INCONCLUSIVE" => ExitCodes.GateInconclusive,
+            "WARN" => ExitCodes.GateWarning,
+            "PASS" => ExitCodes.Success,
+            _ => ExitCodes.GateFailed,
         };
     }
+
+    /// <summary>
+    /// The run's verdict: INCONCLUSIVE when nothing was scored; PASS only when accuracy over the scored questions meets 50%
+    /// AND every question was scored — otherwise that pass is a WARN (B6c-9); FAIL below 50%.
+    /// </summary>
+    internal static string LongMemEvalVerdict(double? overallAccuracy, int unscored) => overallAccuracy switch
+    {
+        null => "INCONCLUSIVE",
+        >= 50.0 when unscored > 0 => "WARN",
+        >= 50.0 => "PASS",
+        _ => "FAIL",
+    };
 
     private static string FormatPercent(double? value) => value is { } score ? $"{score:F1}%" : "n/a";
 }

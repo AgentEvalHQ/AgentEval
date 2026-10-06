@@ -77,8 +77,37 @@ public class MicrosoftEvaluatorAdapterContextTests
     }
 
     [Fact]
-    public void NothingToCompareAgainst_PassesNoContext_SoTheErrorStaysHonest()
+    public void NothingToCompareAgainst_PassesNoContext()
     {
         Assert.Empty(MicrosoftEvaluatorAdapter.BuildAdditionalContext(null, "  "));
+    }
+
+    public static TheoryData<string, MeaiIEvaluator, string?, string?> ReferenceEvaluatorsWithoutTheirInput() => new()
+    {
+        { "groundedness, no context", new GroundednessEvaluator(), null, "3 May 2026" },
+        { "equivalence, no reference", new EquivalenceEvaluator(), "the ledger", "  " },
+        { "completeness, no reference", new CompletenessEvaluator(), "the ledger", null },
+        { "equivalence, a reference with no words", new EquivalenceEvaluator(), "the ledger", "?" },   // round 17 L1
+    };
+
+    [Theory]
+    [MemberData(nameof(ReferenceEvaluatorsWithoutTheirInput))]
+    public async Task AReferenceEvaluatorWithoutItsInput_IsNotMeasured_OnBothPaths(
+        string because, MeaiIEvaluator evaluator, string? context, string? groundTruth)
+    {
+        // #203 review round 16 (B12n): it failed at 0 (IMetric) or read "error" (IEval) for an input the caller did not give.
+        var judge = new FakeChatClient();
+        var adapter = new MicrosoftEvaluatorAdapter(evaluator, judge);
+
+        var eval = await adapter.EvaluateAsync(new EvalInput(Query: "q", Response: "a", Context: context, GroundTruth: groundTruth));
+        var metric = await adapter.EvaluateAsync(new AgentEval.Core.EvaluationContext
+        {
+            Input = "q", Output = "a", Context = context, GroundTruth = groundTruth,
+        });
+
+        Assert.Equal("skipped", eval.Score.Label);
+        Assert.False(metric.Measured, because);
+        Assert.False(metric.Passed, because);
+        Assert.Empty(judge.ReceivedMessages);
     }
 }

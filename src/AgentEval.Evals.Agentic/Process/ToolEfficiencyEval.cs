@@ -16,16 +16,16 @@ namespace AgentEval.Evals.Agentic.Process;
 /// <para>
 /// Implemented as an <see cref="AtomicLlmEval"/> with three criteria (no redundant calls, no
 /// wasted results, exploratory calls not penalised); the score is the judge's overall score. The
-/// <c>1.0 − (bad_calls / total_calls)</c> formula is in the reference prompt file and is not yet
-/// applied. Severity is intentionally lower than other
+/// <c>1.0 − (bad_calls / total_calls)</c> formula is in the rubric the judge is sent; the code does not
+/// recompute it. Severity is intentionally lower than other
 /// process evaluators: efficiency failures are optimization concerns, not correctness failures.
 /// </para>
 /// <para>
 /// Lineage: AgentEval's own criteria and reference prompt, modelled on the evaluator concept (name,
 /// inputs and scoring dimensions) of Azure/azure-sdk-for-python
 /// <c>sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_tool_call_accuracy/tool_call_accuracy.prompty</c>.
-/// A 2026-10-02 check found no upstream prompt text in the reference prompt file
-/// <c>Resources/Prompts/process/tool-efficiency.v1.md</c>, which is not yet sent to the judge.
+/// A 2026-10-02 check found no upstream prompt text in the rubric file
+/// <c>Resources/Prompts/process/tool-efficiency.v1.md</c>, which the judge is sent as its system prompt.
 /// </para>
 /// <para>
 /// Foundry reference: <c>azureai://built-in/evaluators/tool_call_accuracy</c> (efficiency sub-dimension)
@@ -61,7 +61,7 @@ public sealed class ToolEfficiencyEval : IEval
             key: "tool_efficiency",
             name: "Tool Efficiency",
             category: "agentic-process",
-            version: "1.0.0",
+            version: "1.1.0",
             criteria: new[]
             {
                 "No tool is called twice with functionally identical arguments (no redundant calls)",
@@ -71,7 +71,7 @@ public sealed class ToolEfficiencyEval : IEval
             passThreshold: passThreshold,
             judgeModel: judgeModel,
             promptId: "agenteval.tool_efficiency.v1",
-            failureSeverity: "low");
+            failureSeverity: "low") { JudgeSeesToolData = JudgeToolData.ToolCalls };
     }
 
     /// <inheritdoc/>

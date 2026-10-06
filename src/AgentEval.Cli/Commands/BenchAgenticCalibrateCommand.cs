@@ -177,6 +177,57 @@ public static class BenchAgenticCalibrateCommand
     };
 
     /// <summary>
+    /// The entries the resolver dispatched nothing for, split by why (B6c-15): carved out on purpose (<see cref="s_carveOutKeys"/>,
+    /// <see cref="s_notCalibratableOnTheseGoldens"/>) or not routed at all — a golden key nothing knows. The report used to
+    /// call every one of them "not yet routed", so a category emptied by deliberate carve-outs read as a wiring gap.
+    /// </summary>
+    internal static (int CarvedOut, string CarvedKeys, int NotRouted, string NotRoutedKeys) SplitUndispatched(CalibrationCategoryReport report)
+    {
+        static bool Carved(string key) => s_carveOutKeys.Contains(key) || s_notCalibratableOnTheseGoldens.Contains(key);
+        var carved = report.SkippedKeys.Where(kv => Carved(kv.Key)).ToList();
+        var notRouted = report.SkippedKeys.Where(kv => !Carved(kv.Key)).ToList();
+        return (carved.Sum(kv => kv.Value), string.Join(", ", carved.Select(kv => kv.Key)),
+                notRouted.Sum(kv => kv.Value), string.Join(", ", notRouted.Select(kv => kv.Key)));
+    }
+
+    // One sentence for a category none of whose entries was dispatched.
+    private static string UndispatchedSentence(CalibrationCategoryReport report)
+    {
+        var (carved, carvedKeys, notRouted, notRoutedKeys) = SplitUndispatched(report);
+        var parts = new List<string>();
+        if (carved > 0)
+            parts.Add($"{carved} entries carved out by key, not calibratable on these goldens ({carvedKeys})");
+        if (notRouted > 0)
+            parts.Add($"{notRouted} entries have a key nothing dispatches ({notRoutedKeys}) — a new golden key not yet routed in " +
+                      "CalibrationDataset.DeriveCategory");
+        return parts.Count == 0 ? "no entries" : string.Join("; ", parts);
+    }
+
+    /// <summary>
+    /// A category's gate status. INFRA-FAIL: an evaluation failed. INCOMPLETE: a key was left out of the scoring because
+    /// it was not measured on every record (#203 review, B6c-7) — scoring the rest would score a sample selected on the
+    /// evaluator's own verdict, so the category is not a measured PASS. Otherwise PASS or FAIL on accuracy and kappa.
+    /// </summary>
+    internal static string CategoryStatus(CalibrationCategoryReport report, double accuracyThreshold, double kappaThreshold) =>
+        report.EvaluationFailures > 0 ? "INFRA-FAIL"
+        : report.ExcludedKeys.Count > 0 ? "INCOMPLETE"
+        : report.Accuracy >= accuracyThreshold && report.CohensKappa >= kappaThreshold ? "PASS"
+        : "FAIL";
+
+    /// <summary>
+    /// Registered evaluators the golden cases cannot calibrate, left out by KEY (#203 review, B6c-7). The goldens carry no
+    /// tool calls or tool definitions: <c>unsafe_tool_use</c> measures nothing on them (20 of 20 not measured), and
+    /// <c>tool_input_accuracy</c> / <c>tool_call_accuracy</c> withhold every PASS (their schema leaf cannot run), so only
+    /// their FAIL predictions were measured — a sample selected on their own verdict, in which their false negatives
+    /// vanished. They stay registered for every other use; only this command does not dispatch them, until the golden
+    /// schema carries tool data.
+    /// </summary>
+    internal static readonly IReadOnlySet<string> s_notCalibratableOnTheseGoldens = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "unsafe_tool_use", "tool_input_accuracy", "tool_call_accuracy",
+    };
+
+    /// <summary>
     /// Categories that represent dispatch-coverage skips (not real measurement).
     /// Filtered from the gate evaluation so an empty bucket doesn't fail the run.
     /// <para>
@@ -193,9 +244,17 @@ public static class BenchAgenticCalibrateCommand
     /// </list>
     /// </para>
     /// </summary>
-    private static bool IsAgentInfraSkipCategory(string category, int entryCount, int skippedUnknownKey = 0) =>
-        (category == "unknown" && entryCount == 0)
-        || (entryCount == 0 && skippedUnknownKey > 0);
+    internal static bool IsAgentInfraSkipCategory(string category, CalibrationCategoryReport report) =>
+        DispatchedCount(report) == 0 && (category == "unknown" || report.SkippedUnknownKey > 0);
+
+    /// <summary>
+    /// Entries the resolver DID dispatch: scored, errored, not measured, inapplicable, or dropped with an excluded key.
+    /// <see cref="CalibrationCategoryReport.EntryCount"/> counts only the scored ones, so a category whose dispatched
+    /// entries were all excluded (INCOMPLETE) or all errored (INFRA-FAIL) used to read as "nothing dispatched" — SKIP — and
+    /// pass the gate (#203 review round 3, B10a).
+    /// </summary>
+    internal static int DispatchedCount(CalibrationCategoryReport report) =>
+        report.EntryCount + report.EvaluationFailures + report.NotMeasured + report.NotApplicable + report.ExcludedMeasuredRecords;
 
     /// <summary>Runs the agentic calibrate subcommand.</summary>
     /// <param name="rootOverride">Optional workspace root override (used by tests).</param>
@@ -285,7 +344,8 @@ public static class BenchAgenticCalibrateCommand
         {
             if (!resolved.TryGetValue(key, out var eval))
             {
-                eval = EvalRegistry.Shared.Resolve(key, judge, judgeModelName);
+                // Not dispatched on these goldens (B6c-7): left out by key, counted as carved_out in the report.
+                eval = s_notCalibratableOnTheseGoldens.Contains(key) ? null : EvalRegistry.Shared.Resolve(key, judge, judgeModelName);
                 resolved[key] = eval;
             }
             return eval;
@@ -397,45 +457,41 @@ public static class BenchAgenticCalibrateCommand
         bool allPass = true;
         foreach (var (category, categoryReport) in report.PerCategory.OrderBy(kv => kv.Key))
         {
-            if (IsAgentInfraSkipCategory(category, categoryReport.EntryCount, categoryReport.SkippedUnknownKey))
+            if (IsAgentInfraSkipCategory(category, categoryReport))
             {
                 // Path A' (v1.1) carved out 9 more evaluators (5 multi-turn memory +
                 // 3 trace-dependent reasoning + f1_score), trimming dispatch from
                 // 49 → 40 of 60. The carved-key entries route into memory / reasoning
-                // categories where every entry skips — surfaced as SKIP with the
-                // SkippedUnknownKey count. An "unknown" SKIP indicates a future
-                // golden added a brand-new key without extending DeriveCategory.
-                Console.WriteLine(
-                    $"  [SKIP] {category}: {categoryReport.SkippedUnknownKey} entries had no dispatch wiring " +
-                    $"(this means a new golden key is not yet routed in CalibrationDataset.DeriveCategory). " +
-                    $"The 20 evaluators carved out from dispatch (6 pure-code telemetry + StochasticStability + " +
-                    $"CostQualityEfficiency + 3 judge-quality meta + 5 multi-turn memory + 3 trace-dependent " +
-                    $"reasoning + f1_score) do NOT route through this path.");
+                // categories where every entry skips — surfaced as SKIP, naming the
+                // carved-out keys apart from any not routed at all (B6c-15): only the
+                // latter means a golden added a brand-new key without extending DeriveCategory.
+                Console.WriteLine($"  [SKIP] {category}: nothing dispatched — {UndispatchedSentence(categoryReport)}.");
                 continue;
             }
             var (accThr, kapThr) = s_categoryOverrides.TryGetValue(category, out var ov)
                 ? ov
                 : (AccuracyThreshold, KappaThreshold);
-            var accOk = categoryReport.Accuracy >= accThr;
-            var kappaOk = categoryReport.CohensKappa >= kapThr;
-            var noInfraFail = categoryReport.EvaluationFailures == 0;
-            var status = !noInfraFail
-                ? "INFRA-FAIL"
-                : (accOk && kappaOk ? "PASS" : "FAIL");
+            var complete = categoryReport.ExcludedKeys.Count == 0;
+            var status = CategoryStatus(categoryReport, accThr, kapThr);
+            var (carvedOut, _, notRouted, notRoutedKeys) = SplitUndispatched(categoryReport);
             var thrSuffix = s_categoryOverrides.ContainsKey(category)
                 ? $" [override: acc>={accThr:P0} kappa>={kapThr:F2}]"
                 : string.Empty;
             Console.WriteLine(
                 $"  [{status}] {category}: accuracy={categoryReport.Accuracy:P1}, " +
                 $"kappa={FormatKappa(categoryReport.CohensKappa)}, entries={categoryReport.EntryCount}, " +
-                $"failures={categoryReport.EvaluationFailures}{thrSuffix}");
-            if (!accOk || !kappaOk || !noInfraFail) allPass = false;
+                $"failures={categoryReport.EvaluationFailures}, not_measured={categoryReport.NotMeasured}, " +
+                $"inapplicable={categoryReport.NotApplicable}, carved_out={carvedOut}" +
+                (notRouted > 0 ? $", not_routed={notRouted} ({notRoutedKeys})" : "") + thrSuffix +
+                (complete ? "" : $" — excluded keys (not measured on every record): {string.Join(", ", categoryReport.ExcludedKeys)}"));
+            if (status != "PASS") allPass = false;
         }
 
         Console.WriteLine(allPass
             ? "Agentic calibration gate PASSED — all categories meet thresholds with zero evaluation failures."
             : $"Agentic calibration gate FAILED — one or more categories below " +
-              $"accuracy>={AccuracyThreshold:P0} or kappa>={KappaThreshold:F2}, or had non-zero evaluation_failures.");
+              $"accuracy>={AccuracyThreshold:P0} or kappa>={KappaThreshold:F2}, had non-zero evaluation_failures, " +
+              "or was INCOMPLETE (a key not measured on every record).");
 
         if (limitPerCategory is not null)
         {
@@ -472,16 +528,11 @@ public static class BenchAgenticCalibrateCommand
 
         foreach (var (category, cr) in report.PerCategory.OrderBy(kv => kv.Key))
         {
-            if (IsAgentInfraSkipCategory(category, cr.EntryCount, cr.SkippedUnknownKey))
+            if (IsAgentInfraSkipCategory(category, cr))
             {
                 sb.AppendLine($"## {category} [SKIP]");
                 sb.AppendLine();
-                sb.AppendLine(
-                    $"> {cr.SkippedUnknownKey} entries had no dispatch wiring. Post-Path A' (40 of 60 dispatched), " +
-                    "this means a new golden key is not yet routed in `CalibrationDataset.DeriveCategory`. " +
-                    "The 20 carve-outs (6 pure-code telemetry + StochasticStability + CostQualityEfficiency + " +
-                    "3 judge-quality meta + 5 multi-turn memory + 3 trace-dependent reasoning + f1_score) are " +
-                    "deliberately omitted from the dispatch table and do not surface here.");
+                sb.AppendLine($"> Nothing dispatched: {UndispatchedSentence(cr)}.");
                 sb.AppendLine();
                 continue;
             }
@@ -491,9 +542,7 @@ public static class BenchAgenticCalibrateCommand
             var accOk = cr.Accuracy >= accThr;
             var kappaOk = cr.CohensKappa >= kapThr;
             var noInfraFail = cr.EvaluationFailures == 0;
-            var badge = !noInfraFail
-                ? "INFRA-FAIL"
-                : (accOk && kappaOk ? "PASS" : "FAIL");
+            var badge = CategoryStatus(cr, accThr, kapThr);   // the gate's own function: the report cannot disagree with it
             var thrTag = s_categoryOverrides.ContainsKey(category) ? " (relaxed per-category override)" : string.Empty;
 
             sb.AppendLine($"## {category} [{badge}]{thrTag}");
@@ -502,12 +551,18 @@ public static class BenchAgenticCalibrateCommand
             sb.AppendLine($"|--------|-------|-----------|--------|");
             sb.AppendLine($"| Entries evaluated | {cr.EntryCount} | — | — |");
             sb.AppendLine($"| Evaluation failures | {cr.EvaluationFailures} | == 0 | {(noInfraFail ? "OK" : "INFRA-FAIL")} |");
+            // Not scored (B3a): no verdict to compare with gold — reported, never counted as agreement or disagreement.
+            sb.AppendLine($"| Not measured (not scored) | {cr.NotMeasured} | — | info |");
+            sb.AppendLine($"| Inapplicable (not scored) | {cr.NotApplicable} | — | info |");
+            var (carved, carvedKeys, unrouted, unroutedKeys) = SplitUndispatched(cr);
+            sb.AppendLine($"| Carved out by key (not dispatched) | {carved}{(carved > 0 ? $" ({carvedKeys})" : "")} | — | info |");
+            if (unrouted > 0)
+                sb.AppendLine($"| Not routed (a golden key nothing dispatches) | {unrouted} ({unroutedKeys}) | — | info |");
+            sb.AppendLine($"| Keys excluded (not measured on every record) | {(cr.ExcludedKeys.Count == 0 ? "none" : string.Join(", ", cr.ExcludedKeys))} | none | {(cr.ExcludedKeys.Count == 0 ? "OK" : "INCOMPLETE")} |");
             sb.AppendLine($"| Accuracy | {cr.Accuracy:P1} | >= {accThr:P0} | {(accOk ? "OK" : "BELOW")} |");
             sb.AppendLine($"| Cohen's kappa | {FormatKappa(cr.CohensKappa)} | >= {kapThr:F2} | {(kappaOk ? "OK" : "BELOW")} |");
             sb.AppendLine($"| Within score range | {cr.WithinScoreRange} / {cr.EntryCount} | — | — |");
             sb.AppendLine($"| Mean score delta | {cr.MeanScoreDelta:+0.000;-0.000;0.000} | — | — |");
-            if (cr.SkippedUnknownKey > 0)
-                sb.AppendLine($"| Skipped (unknown key) | {cr.SkippedUnknownKey} | — | — |");
             sb.AppendLine();
         }
 

@@ -13,12 +13,10 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// Wraps an <see cref="AtomicLlmEval"/> configured with three similarity criteria.
 /// </para>
 /// <para>
-/// <b>Ground-truth resolution</b>: ground truth is read from <see cref="EvalInput.GroundTruth"/>
-/// (the dedicated field in <see cref="EvalInput"/>). If that field is null or empty,
-/// the evaluator will score 0.0 with a <c>fail</c> label and an evidence note explaining
-/// that similarity cannot be computed without a reference answer. Ground truth can also
-/// be provided via the constructor for batch scenarios where all inputs share the same
-/// reference — though per-input <see cref="EvalInput.GroundTruth"/> takes precedence.
+/// <b>Ground truth</b>: the reference answer is read from <see cref="EvalInput.GroundTruth"/> and sent to the judge after
+/// the query. Without one, similarity cannot be measured: the result is <c>skipped</c> (not measured, the reason given)
+/// and the judge is not called — never a <c>fail</c>, which would score the agent for a missing input (#203, B12a: the
+/// reference was never sent, so the judge improvised a comparison, and since 1.1.0 failed every input).
 /// </para>
 /// <para>
 /// <b>Input contract</b>: requires <see cref="EvalInput.Query"/>,
@@ -28,8 +26,8 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// Lineage: AgentEval's own criteria and reference prompt, modelled on the evaluator concept (name,
 /// inputs and scoring dimensions) of Azure/azure-sdk-for-python
 /// <c>sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_similarity/similarity.prompty</c>.
-/// A 2026-10-02 check found no upstream prompt text in the reference prompt file under
-/// <c>Resources/Prompts/</c>, which is not yet sent to the judge.
+/// A 2026-10-02 check found no upstream prompt text in the rubric file under
+/// <c>Resources/Prompts/</c>, which the judge is sent as its system prompt.
 /// </para>
 /// </summary>
 public sealed class SimilarityEval : IEval
@@ -62,7 +60,7 @@ public sealed class SimilarityEval : IEval
             key: "similarity",
             name: "Similarity",
             category: "rag",
-            version: "1.0.0",
+            version: "1.2.0",   // 1.2.0: the reference answer reaches the judge; none → not measured (B12a)
             criteria: new[]
             {
                 "Response conveys the same key facts and meaning as the ground-truth reference answer",
@@ -76,6 +74,12 @@ public sealed class SimilarityEval : IEval
     }
 
     /// <inheritdoc/>
-    public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default) =>
-        _inner.EvaluateAsync(input, ct);
+    public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        if (!GroundTruthInput.Has(input))
+            return Task.FromResult(EvalResult.Skipped(this,
+                "Similarity compares the response with a reference answer, and none was supplied (EvalInput.GroundTruth): not measured."));
+        return _inner.EvaluateAsync(GroundTruthInput.Fold(input), ct);
+    }
 }

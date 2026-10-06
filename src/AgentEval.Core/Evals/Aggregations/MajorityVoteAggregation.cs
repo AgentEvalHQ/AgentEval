@@ -63,10 +63,6 @@ public sealed class MajorityVoteAggregation : IAggregationStrategy
         var voting = results.Where(r => r.Score.CountsTowardAggregate()).ToList();
         if (voting.Count == 0) return (0, "none");
 
-        var passCount = voting.Count(r => r.Score.Label == "pass");
-        var warnCount = voting.Count(r => r.Score.Label == "warn");
-        var failCount = voting.Count(r => r.Score.Label == "fail");
-
         var meanScore = voting.Average(r => r.Score.Value);
 
         // Determine the WINNING label by majority, with most-severe tie-break.
@@ -74,13 +70,7 @@ public sealed class MajorityVoteAggregation : IAggregationStrategy
         // verdict matrix actually reflects the majority vote (previously
         // every branch returned the rolled-up max severity, which collapsed
         // the vote into "worst result wins" regardless of the count).
-        string winningLabel;
-        if (failCount > passCount && failCount > warnCount)            winningLabel = "fail";
-        else if (warnCount > passCount && warnCount > failCount)       winningLabel = "warn";
-        else if (passCount > failCount && passCount > warnCount)       winningLabel = "pass";
-        else if (failCount > 0 && failCount >= warnCount && failCount >= passCount) winningLabel = "fail";  // tie → fail wins
-        else if (warnCount > 0 && warnCount >= passCount)              winningLabel = "warn";              // tie → warn beats pass
-        else                                                            winningLabel = "pass";
+        var winningLabel = WinningLabel(voting);
 
         // Phase-7 Task 7.6: roll up severity from voters that actually carried
         // the winning label, instead of hard-coding "medium" / "none". A "warn"
@@ -101,5 +91,29 @@ public sealed class MajorityVoteAggregation : IAggregationStrategy
         };
 
         return (meanScore, severity);
+    }
+
+    /// <summary>
+    /// The label the majority of <paramref name="voting"/> carries — fail beats warn beats pass on a tie. The caller
+    /// passes only results that count (<c>CountsTowardAggregate</c>) and at least one. A caller that needs the vote's
+    /// VERDICT reads it here: mapping <see cref="Aggregate"/>'s severity back to a label lifted a majority of
+    /// medium-severity fails to warn, and read "no voter at all" (severity <c>none</c>) as a pass (#203 review, B6c-1).
+    /// </summary>
+    public static string WinningLabel(IReadOnlyList<EvalResult> voting)
+    {
+        ArgumentNullException.ThrowIfNull(voting);
+        if (voting.Count == 0)
+            throw new ArgumentException("No result counts toward the vote; there is no winning label.", nameof(voting));
+
+        var passCount = voting.Count(r => r.Score.Label == "pass");
+        var warnCount = voting.Count(r => r.Score.Label == "warn");
+        var failCount = voting.Count(r => r.Score.Label == "fail");
+
+        if (failCount > passCount && failCount > warnCount) return "fail";
+        if (warnCount > passCount && warnCount > failCount) return "warn";
+        if (passCount > failCount && passCount > warnCount) return "pass";
+        if (failCount > 0 && failCount >= warnCount && failCount >= passCount) return "fail";  // tie → fail wins
+        if (warnCount > 0 && warnCount >= passCount) return "warn";                            // tie → warn beats pass
+        return "pass";
     }
 }

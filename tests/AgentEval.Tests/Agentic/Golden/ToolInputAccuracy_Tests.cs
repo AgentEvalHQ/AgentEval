@@ -37,6 +37,14 @@ public class ToolInputAccuracyEvalTests
                 new ToolCall("search_flights",
                     new Dictionary<string, object> { ["origin"] = "NYC", ["destination"] = "London" },
                     null),
+            },
+            // Without definitions the schema check is not measured, and the composite cannot pass (#203 review, B3).
+            ToolDefinitions: new[]
+            {
+                new ToolDefinition("search_flights", "Search", new Dictionary<string, object>
+                {
+                    ["required"] = new object[] { "origin", "destination" },
+                }),
             });
 
         var result = await eval.EvaluateAsync(input);

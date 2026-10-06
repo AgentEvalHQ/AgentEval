@@ -88,16 +88,16 @@ public sealed class QaCompositeEval : IEval
             key: "qa_composite",
             name: "QA Composite",
             category: "rag",
-            version: "1.0.0",
+            version: "1.2.0",   // 1.2.0: similarity / F1 without a reference are not measured, so the composite withholds its pass naming them (B12a)
             components: new[]
             {
-                new EvalComponent(groundedness,         Weight: 0.30),
-                new EvalComponent(responseCompleteness, Weight: 0.20),
-                new EvalComponent(relevance,            Weight: 0.15),
-                new EvalComponent(similarity,           Weight: 0.15),
-                new EvalComponent(f1Score,              Weight: 0.10),
-                new EvalComponent(coherence,            Weight: 0.05),
-                new EvalComponent(fluency,              Weight: 0.05),
+                new EvalComponent(groundedness,         Weight: 0.30) { OnFailure = ComponentFailureEffect.Fail },
+                new EvalComponent(responseCompleteness, Weight: 0.20) { OnFailure = ComponentFailureEffect.Fail },
+                new EvalComponent(relevance,            Weight: 0.15) { OnFailure = ComponentFailureEffect.Fail },
+                new EvalComponent(similarity,           Weight: 0.15) { OnFailure = ComponentFailureEffect.Warn },
+                new EvalComponent(f1Score,              Weight: 0.10) { OnFailure = ComponentFailureEffect.Warn },
+                new EvalComponent(coherence,            Weight: 0.05) { OnFailure = ComponentFailureEffect.Warn },
+                new EvalComponent(fluency,              Weight: 0.05) { OnFailure = ComponentFailureEffect.Warn },
             },
             aggregation: WeightedSumAggregation.Instance,
             threshold: passThreshold);

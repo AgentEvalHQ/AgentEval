@@ -399,11 +399,11 @@ public class AgenticGoldenCoverageTests
             if (judge.Calls != predicted.Length)
                 problems.Add($"{entry.ScenarioId}: predicted {predicted.Length} judge call(s), one per matched pattern; observed {judge.Calls}");
 
-            // The aggregate is the mean of the per-pattern scores, and the strategy string names how
-            // many went into it. Asserted because it was predicted: a record that reaches the judge
+            // The aggregate is the weakest per-pattern score (B10l; the mean before), and the strategy string
+            // names how many went into it. Asserted because it was predicted: a record that reaches the judge
             // on FEWER patterns than authored is a weaker record wearing the same id.
-            if (result.Details.AggregationStrategy != $"mean-of-{predicted.Length}-pattern-scores")
-                problems.Add($"{entry.ScenarioId}: predicted aggregation 'mean-of-{predicted.Length}-pattern-scores', " +
+            if (result.Details.AggregationStrategy != $"min-of-{predicted.Length}-pattern-scores")
+                problems.Add($"{entry.ScenarioId}: predicted aggregation 'min-of-{predicted.Length}-pattern-scores', " +
                              $"observed '{result.Details.AggregationStrategy}'");
 
             // The threshold is a declared constant on the evaluator, read back off a result. Nothing

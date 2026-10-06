@@ -11,7 +11,7 @@ namespace AgentEval.Tests.Cli;
 
 /// <summary>
 /// Glass Box Phase 3 (P3.2b) — <c>agenteval bench workflow-trace-fidelity</c>. Pure-code (no Azure):
-/// exercises the load → replay → reconcile → persist path and the 0/2/1 exit-code contract.
+/// exercises the load → replay → reconcile → persist path and the 0/10/9/11/1 exit-code contract.
 /// </summary>
 public class BenchWorkflowTraceFidelityCommandTests : IDisposable
 {
@@ -69,7 +69,7 @@ public class BenchWorkflowTraceFidelityCommandTests : IDisposable
     }
 
     [Fact]
-    public async Task NoExecutorTraces_AllNoTruth_ReturnsExitCode0()
+    public async Task NoExecutorTraces_AllNoTruth_HasNoVerdict_ExitsEleven()
     {
         var trace = new WorkflowTrace
         {
@@ -80,7 +80,45 @@ public class BenchWorkflowTraceFidelityCommandTests : IDisposable
 
         var code = await BenchWorkflowTraceFidelityCommand.RunAsync(path, "standard", "wf", _root);
 
-        Assert.Equal(0, code);
+        // Nothing was checked: no verdict (skipped → exit 11). It exited 0 as a PASS (review round 6, B10y) — the default
+        // live MAF path today, where executor traces carry no responses.
+        Assert.Equal(11, code);
+    }
+
+    [Fact]
+    public async Task APassOnPartOfTheExecutors_IsWithheld_ExitsTen()
+    {
+        var trace = new WorkflowTrace
+        {
+            TraceName = "wtf", OriginalPrompt = "go", FinalOutput = "done",
+            Steps = { Step("a", 10, 5, "stop"), Step("b", 10, 5, "stop") },
+            ExecutorTraces = new Dictionary<string, AgentTrace> { ["a"] = ChatTrace(15, "stop") },   // b has no chat truth
+        };
+        var path = await WriteTraceAsync(trace);
+
+        var code = await BenchWorkflowTraceFidelityCommand.RunAsync(path, "standard", "wf", _root);
+
+        Assert.Equal(10, code);   // the verified executor agrees, but b was never checked: a warn, not a clean pass
+    }
+
+    [Fact]
+    public async Task AWarnScore_ExitsTen_NotZero()
+    {
+        // Review round 5 M-2 (B10w): five executors agree, one's tokens differ: (5 + 0.5) / 6 = 0.917, labelled warn. The
+        // command decided from Passed (true at >= 0.80), printed and stored PASS and exited 0; every other bench exits 10.
+        var trace = new WorkflowTrace { TraceName = "wtf", OriginalPrompt = "go", FinalOutput = "done" };
+        var executors = new Dictionary<string, AgentTrace>();
+        foreach (var id in new[] { "a", "b", "c", "d", "e", "f" })
+        {
+            trace.Steps.Add(Step(id, 10, 5, "stop"));                         // framework: 15 tokens
+            executors[id] = ChatTrace(id == "f" ? 99 : 15, "stop");           // chat truth: 15, except f
+        }
+        trace.ExecutorTraces = executors;
+        var path = await WriteTraceAsync(trace);
+
+        var code = await BenchWorkflowTraceFidelityCommand.RunAsync(path, "standard", "wf", _root);
+
+        Assert.Equal(10, code);   // GateWarning, as BenchExitCodes.FromLabel("warn")
     }
 
     [Fact]

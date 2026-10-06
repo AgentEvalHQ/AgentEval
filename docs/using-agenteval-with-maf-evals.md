@@ -86,10 +86,22 @@ Build any AgentEval evaluator, call `.AsAgentEvaluator(chatConfig)`, pass to `ag
 ### 3a. A single metric / a preset bundle
 
 ```csharp
-var metrics = AgentEvalEvaluators.Quality(judge);     // or Relevance(judge), RAG(judge), Safety(judge),
+var metrics = AgentEvalEvaluators.Quality(judge);     // or Relevance(judge), Safety(judge),
                                                       //    Agentic(["SearchFlights"]), Advanced(judge)
 var results = await agent.EvaluateAsync([query], metrics.AsAgentEvaluator(chatConfig));
 ```
+
+`agent.EvaluateAsync` passes the reference answer (`expectedOutput:`) but no retrieved context, so the presets above
+use only metrics that need none. `RAG(judge)` — faithfulness, context precision and recall, answer correctness — needs
+the retrieved context of each item: build the `EvalItem`s yourself and call the evaluator directly.
+
+```csharp
+var item = new EvalItem(query, response) { Context = retrievedText, ExpectedOutput = referenceAnswer };
+var results = await AgentEvalEvaluators.RAG(judge).AsAgentEvaluator(chatConfig).EvaluateAsync([item]);
+```
+
+A metric whose input is missing is **not measured**. MAF has no item state between pass and fail, so it fails the
+item, and its reason says `not measured` and which input was missing; the report bridge reads it back as `skipped`.
 
 ### 3b. A custom flat composite
 

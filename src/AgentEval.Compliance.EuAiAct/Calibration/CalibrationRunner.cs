@@ -4,6 +4,7 @@
 
 using AgentEval.Core;
 using AgentEval.Evals;
+using AgentEval.Evals.Meta;
 using AgentEval.Compliance.EuAiAct.Articles;
 using AgentEval.Compliance.EuAiAct.Articles.Building;
 using AgentEval.Compliance.EuAiAct.Articles.Models;
@@ -38,10 +39,23 @@ public sealed class CalibrationRunner
     /// <param name="datasets">One dataset per pillar to evaluate.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>A report containing per-pillar accuracy, kappa, and score delta statistics.</returns>
-    public async Task<CalibrationReport> RunAsync(
+    public Task<CalibrationReport> RunAsync(
         IReadOnlyList<CalibrationDataset> datasets, CancellationToken ct = default)
+        => RunAsync(datasets, limitPerPillar: null, ct);
+
+    /// <summary>
+    /// Runs calibration, evaluating at most <paramref name="limitPerPillar"/> entries per pillar when it is set — the
+    /// one-item stage before a full paid run (the three-stage protocol: dry run, one item, full run).
+    /// </summary>
+    /// <param name="datasets">One dataset per pillar to evaluate.</param>
+    /// <param name="limitPerPillar">At most this many entries per pillar; <see langword="null"/> for all.</param>
+    /// <param name="ct">Cancellation token.</param>
+    public async Task<CalibrationReport> RunAsync(
+        IReadOnlyList<CalibrationDataset> datasets, int? limitPerPillar, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(datasets);
+        if (limitPerPillar is < 1)
+            throw new ArgumentOutOfRangeException(nameof(limitPerPillar), limitPerPillar, "must be at least 1.");
 
         var perPillar = new Dictionary<string, CalibrationPillarReport>();
 
@@ -53,8 +67,10 @@ public sealed class CalibrationRunner
             var scoreDeltas = new List<double>();
             int withinScoreRange = 0;
             int evaluationFailures = 0;
+            int notMeasured = 0;
+            int notApplicable = 0;
 
-            foreach (var entry in ds.Entries)
+            foreach (var entry in limitPerPillar is int limit ? ds.Entries.Take(limit) : ds.Entries)
             {
                 // Defensive skip: calibration data may contain synthetic IDs not in the registry.
                 if (!_articles.All.TryGetValue(entry.ArticleControlId, out _))
@@ -140,6 +156,24 @@ public sealed class CalibrationRunner
                     continue;
                 }
 
+                // Only a MEASURED verdict is calibration evidence (ADR-030; #203 review, B3a). A result that reached no
+                // verdict never equals a gold label and its 0.0 is a placeholder, so counting it made a judge outage read
+                // as disagreement and a placeholder as an in-band score. A judge that answered with no usable verdict
+                // ("error") IS an evaluation failure — counted with the thrown ones, so an outage cannot raise accuracy by
+                // dropping out; anything else not measured or inapplicable is reported in its own count, never scored.
+                switch (result.Score.CensusBucket())
+                {
+                    case MeasurementState.NotMeasured when result.Score.Label == "error":
+                        evaluationFailures++;
+                        continue;
+                    case MeasurementState.NotMeasured:
+                        notMeasured++;
+                        continue;
+                    case MeasurementState.NotApplicable:
+                        notApplicable++;
+                        continue;
+                }
+
                 pairs.Add((entry.ExpectedVerdict, result.Score.Label));
 
                 if (result.Score.Value >= entry.ExpectedScoreMin &&
@@ -157,7 +191,9 @@ public sealed class CalibrationRunner
                 CohensKappa: CalibrationMetrics.CohensKappa(pairs),
                 WithinScoreRange: withinScoreRange,
                 MeanScoreDelta: scoreDeltas.Count > 0 ? scoreDeltas.Average() : 0.0,
-                EvaluationFailures: evaluationFailures);
+                EvaluationFailures: evaluationFailures,
+                NotMeasured: notMeasured,
+                NotApplicable: notApplicable);
         }
 
         return new CalibrationReport(DateTimeOffset.UtcNow, perPillar);
@@ -177,4 +213,6 @@ public sealed record CalibrationPillarReport(
     double CohensKappa,
     int WithinScoreRange,
     double MeanScoreDelta,
-    int EvaluationFailures = 0);
+    int EvaluationFailures = 0,
+    int NotMeasured = 0,
+    int NotApplicable = 0);

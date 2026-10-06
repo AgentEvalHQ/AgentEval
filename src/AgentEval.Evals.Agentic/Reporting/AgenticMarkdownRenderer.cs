@@ -47,7 +47,9 @@ public sealed class AgenticMarkdownRenderer
         sb.AppendLine($"**Subject**: `{result.Subject.Name}` ({result.Subject.Kind})");
         sb.AppendLine($"**Run**: `{result.SourceRunId}`");
         sb.AppendLine($"**Generated**: {result.GeneratedAt:O}");
-        sb.AppendLine($"**Overall**: **{result.Summary.OverallStatus}** (score {result.Summary.OverallScore:P0})");
+        sb.AppendLine($"**Overall**: **{result.Summary.OverallStatus}** (score {result.Summary.OverallScore:P0}" +
+            // ERROR / SKIPPED are not verdicts on the agent: the score covers only the measured part (B9b).
+            (result.Summary.OverallStatus is "ERROR" or "SKIPPED" ? " of the measured part only)" : ")"));
         sb.AppendLine();
 
         // Per-category table — suppress when empty (e.g. very flat presets)

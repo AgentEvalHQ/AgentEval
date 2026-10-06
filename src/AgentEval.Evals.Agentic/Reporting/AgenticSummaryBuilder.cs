@@ -53,7 +53,7 @@ public sealed class AgenticSummaryBuilder
         {
             return new AgenticSummary(
                 OverallScore: root.Score.Value,
-                OverallStatus: MapLabelToStatus(root.Score.Label),
+                OverallStatus: root.Score.ReportStatus(),
                 PerCategory: perCategory,
                 PerEvaluator: perEvaluator);
         }
@@ -79,7 +79,7 @@ public sealed class AgenticSummaryBuilder
                     foreach (var evaluator in evaluators)
                     {
                         var evalKey = evaluator.Metric.Key;
-                        var status = MapLabelToStatus(evaluator.Score.Label);
+                        var status = evaluator.Score.ReportStatus();
 
                         if (evaluator.Score.Severity == "critical" && status == "FAIL")
                             criticalFails.Add(evalKey);
@@ -97,7 +97,7 @@ public sealed class AgenticSummaryBuilder
 
                 perCategory[categoryKey] = new AgenticCategorySummary(
                     Score: categoryNode.Score.Value,
-                    Status: MapLabelToStatus(categoryNode.Score.Label),
+                    Status: categoryNode.Score.ReportStatus(),
                     CriticalFails: criticalFails);
             }
         }
@@ -115,7 +115,7 @@ public sealed class AgenticSummaryBuilder
             foreach (var evaluator in l1Children)
             {
                 var evalKey = evaluator.Metric.Key;
-                var status = MapLabelToStatus(evaluator.Score.Label);
+                var status = evaluator.Score.ReportStatus();
                 var categoryKey = ResolveCategoryFromEvaluator(evaluator);
                 var confidence = ExtractConfidence(evaluator);
 
@@ -128,7 +128,7 @@ public sealed class AgenticSummaryBuilder
                 catScoreSum[categoryKey] = catScoreSum.GetValueOrDefault(categoryKey) + evaluator.Score.Value;
                 catCount[categoryKey] = catCount.GetValueOrDefault(categoryKey) + 1;
                 catStatus[categoryKey] = catStatus.TryGetValue(categoryKey, out var prior)
-                    ? CombineStatus(prior, status)
+                    ? EvalScoreExtensions.CombineReportStatus(prior, status)
                     : status;
 
                 if (evaluator.Score.Severity == "critical" && status == "FAIL")
@@ -152,7 +152,7 @@ public sealed class AgenticSummaryBuilder
 
         return new AgenticSummary(
             OverallScore: root.Score.Value,
-            OverallStatus: MapLabelToStatus(root.Score.Label),
+            OverallStatus: root.Score.ReportStatus(),
             PerCategory: perCategory,
             PerEvaluator: perEvaluator);
     }
@@ -191,12 +191,6 @@ public sealed class AgenticSummaryBuilder
         return AgenticCategoryResolver.InferCategoryFromKey(node.Metric.Key);
     }
 
-    private static string CombineStatus(string a, string b)
-    {
-        if (a == "FAIL" || b == "FAIL") return "FAIL";
-        if (a == "WARN" || b == "WARN") return "WARN";
-        return "PASS";
-    }
 
     /// <summary>
     /// Attempts to extract a confidence value from the evaluator result.
@@ -210,10 +204,4 @@ public sealed class AgenticSummaryBuilder
         return evaluator.Score.Confidence;
     }
 
-    private static string MapLabelToStatus(string label) => label.ToUpperInvariant() switch
-    {
-        "PASS" => "PASS",
-        "WARN" => "WARN",
-        _ => "FAIL"
-    };
 }
