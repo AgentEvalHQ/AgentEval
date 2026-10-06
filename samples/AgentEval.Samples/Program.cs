@@ -221,6 +221,12 @@ public static class Program
             new("Memory Judge vs Judge",     "Can a decision model do the memory judge's job? LongMemEval's labelled questions, gold answer vs same-type distractor, chance floor 50% — --dry-run, --limit N, --types a,b", MemoryJudgeVsJudgeDemo.RunAsync),
             new("Judge Reference Experiment", "Does a reference stop a decision model over-flagging? One golden category, five arms, only the PROMPT moves; floor is the majority class, not 50% — --dry-run, --file KEY, --arms A0,B1,B2", JudgeReferenceExperimentDemo.RunAsync),
         ]),
+
+        // ⚠ APPENDED — see the note above group M. Legacy numbers: O1 = 105.
+        new('O', "Domain Packs", "🔑 a model provider — the checks of one field composed into one verdict",
+        [
+            new("Healthcare Safety Pack",    "Synthetic cases: judges for what the agent said, a deterministic check of the tools it called, one critical failure fails the case; then the same checks on 3 canned unsafe replies as labelled controls", HealthcareSafetyPackSample.RunAsync),
+        ]),
     ];
 
     // ──────────────────────────────────────────────────────────
