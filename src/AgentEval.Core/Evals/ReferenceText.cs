@@ -2,6 +2,8 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Diagnostics.CodeAnalysis;
+
 namespace AgentEval.Evals;
 
 /// <summary>
@@ -14,7 +16,7 @@ internal static class ReferenceText
     private static readonly char[] s_punctuation = ['.', ',', '!', '?', ';', ':', '"', '\'', '(', ')', '[', ']'];
 
     /// <summary>Whether <paramref name="text"/> has at least one word to compare against.</summary>
-    public static bool HasWords(string? text) => Tokenize(text).Count > 0;
+    public static bool HasWords([NotNullWhen(true)] string? text) => Tokenize(text).Count > 0;
 
     /// <summary>Whitespace-split, lowercased tokens with attached punctuation stripped; a multiset (duplicates kept).</summary>
     public static IReadOnlyList<string> Tokenize(string? text)

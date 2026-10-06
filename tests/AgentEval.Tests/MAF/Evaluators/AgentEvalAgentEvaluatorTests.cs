@@ -74,4 +74,44 @@ public class AgentEvalAgentEvaluatorTests
         Assert.Contains(capturing.Contexts, c => c is AgentEvalGroundTruthContext);
         Assert.Contains(capturing.Contexts, c => c is AgentEvalRAGContext);
     }
+
+    [Fact]
+    public async Task EvaluateAsync_AWordlessExpectedOutput_IsNoReference()
+    {
+        // Review round 18 (L8): "?" is no reference on this path either.
+        var capturing = new CapturingEvaluator();
+        var adapter = new AgentEvalAgentEvaluator(capturing, new ChatConfiguration(new FakeChatClient("judge")));
+
+        await adapter.EvaluateAsync([new EvalItem("q", "a") { ExpectedOutput = "?" }]);
+
+        Assert.Empty(capturing.Contexts);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_AMetricWithNoValueAndNoVerdict_FailsTheItem()
+    {
+        // Review round 18 (M1): MAF fails an item only on Interpretation.Failed or a false BooleanMetric, so M.E.AI's own
+        // Equivalence evaluator without its reference — no value, an error diagnostic, no interpretation — passed it.
+        var adapter = new AgentEvalAgentEvaluator(new Microsoft.Extensions.AI.Evaluation.Quality.EquivalenceEvaluator(),
+            new ChatConfiguration(new FakeChatClient()));
+
+        var results = await adapter.EvaluateAsync([new EvalItem("What is the capital of France?", "Paris.") { ExpectedOutput = "?" }]);
+
+        Assert.False(results.AllPassed);
+        var metric = Assert.Single(results.Items[0].Metrics.Values);
+        Assert.True(metric.Interpretation!.Failed);
+        Assert.StartsWith("No value, so no verdict", metric.Interpretation.Reason, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_LeavesAScoredMetric_AndAgentEvalsNotMeasured_AsTheyAre()
+    {
+        var capturing = new CapturingEvaluator();   // scores 5.0 with no interpretation
+        var adapter = new AgentEvalAgentEvaluator(capturing, new ChatConfiguration(new FakeChatClient("judge")));
+
+        var results = await adapter.EvaluateAsync([new EvalItem("q", "a")]);
+
+        Assert.Null(results.Items[0].Metrics["captured"].Interpretation);
+        Assert.True(results.AllPassed);
+    }
 }

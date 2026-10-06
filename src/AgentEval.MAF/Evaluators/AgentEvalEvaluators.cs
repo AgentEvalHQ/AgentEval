@@ -79,7 +79,8 @@ public static class AgentEvalEvaluators
     /// <summary>
     /// Every metric that needs no retrieved context (quality + agentic + safety + task completion): the most
     /// comprehensive single-call evaluation for <c>agent.EvaluateAsync</c>, which cannot pass a context. Faithfulness and
-    /// groundedness need one; they are in <see cref="RAG"/>, <see cref="Faithfulness"/> and <see cref="Groundedness"/>.
+    /// groundedness need one; faithfulness is in <see cref="RAG"/> and <see cref="Faithfulness"/>, groundedness in
+    /// <see cref="Groundedness"/>.
     /// </summary>
     public static AgentEvalEvaluator Advanced(IChatClient judgeClient) => new([
         new RelevanceMetric(judgeClient),

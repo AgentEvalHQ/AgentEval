@@ -70,7 +70,7 @@ public static class LightPathMAFIntegration
                 if (metric is NumericMetric num)
                 {
                     var icon = num.Interpretation?.Failed != true ? "✅" : "❌";
-                    Console.WriteLine($"      {icon} {name}: {num.Value:F1}/5.0{AIConfig.MockLabel}");
+                    Console.WriteLine($"      {icon} {name}: {FormatScore(num)}{AIConfig.MockLabel}");
                 }
             }
         }
@@ -116,7 +116,7 @@ public static class LightPathMAFIntegration
                     if (metric is NumericMetric num)
                     {
                         var icon = num.Interpretation?.Failed != true ? "✅" : "❌";
-                        Console.WriteLine($"      {icon} {name}: {num.Value:F1}/5.0{AIConfig.MockLabel}");
+                        Console.WriteLine($"      {icon} {name}: {FormatScore(num)}{AIConfig.MockLabel}");
                     }
                 }
             }
@@ -159,7 +159,7 @@ public static class LightPathMAFIntegration
                         var endIdx = reason.IndexOf(')');
                         var scoreInfo = scoreIdx >= 0 && endIdx > scoreIdx
                             ? reason.Substring(scoreIdx, endIdx - scoreIdx + 1) : "";
-                        Console.WriteLine($"      {icon} {name}: {num.Value:F1}/5.0 — {scoreInfo}");
+                        Console.WriteLine($"      {icon} {name}: {FormatScore(num)} — {scoreInfo}");
                     }
                 }
             }
@@ -184,7 +184,7 @@ public static class LightPathMAFIntegration
                     if (metric is NumericMetric num)
                     {
                         var icon = num.Interpretation?.Failed != true ? "✅" : "❌";
-                        Console.WriteLine($"      {icon} {name}: {num.Value:F1}/5.0{AIConfig.MockLabel}");
+                        Console.WriteLine($"      {icon} {name}: {FormatScore(num)}{AIConfig.MockLabel}");
                     }
                 }
             }
@@ -225,6 +225,10 @@ public static class LightPathMAFIntegration
 
         PrintKeyTakeaways();
     }
+
+    // A metric that was not measured carries no value (its reason says why), so there is no score to print.
+    private static string FormatScore(NumericMetric num) =>
+        num.Value is { } v ? $"{v:F1}/5.0" : "no value";
 
     // ════════════════════════════════════════════════════════════════════
     // AGENT & TOOLS

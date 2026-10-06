@@ -105,7 +105,7 @@ public sealed class MetricNotMeasuredTests
     {
         // The MAF doc's headline example: AgentEvalEvaluators.Quality(judge).AsAgentEvaluator(chatConfig). Its faithfulness
         // needs a retrieved context that agent.EvaluateAsync's text path cannot pass, so it failed (or, under B12i,
-        // passed unmeasured) every item. It stays in RAG / Advanced / Faithfulness().
+        // passed unmeasured) every item. It stays in RAG / Faithfulness().
         var judge = new FakeChatClient();
         var evaluator = AgentEvalEvaluators.Quality(judge).AsAgentEvaluator(new ChatConfiguration(judge));
 

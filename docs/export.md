@@ -67,8 +67,8 @@ var json = await jsonExporter.ExportToStringAsync(report);
 ```
 
 Output includes `runId`, `stats`, `overallScore`, `agent` info, and each test result with optional `metricScores` and
-`metricsNotMeasured` (a metric that ran but was not measured — an input it needs was not supplied — with its reason; it
-has no score, so it is never in `metricScores`).
+`metricsNotMeasured` (a metric that ran but was not measured — an input it needs was not supplied, or, in a memory
+benchmark report, its category was skipped — with its reason; it has no score, so it is never in `metricScores`).
 
 ### JUnit XML
 

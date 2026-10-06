@@ -66,14 +66,17 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   as `skipped`, not as an error. **Behaviour change:** `agent.EvaluateAsync` passes no retrieved context, so the presets
   for it carry no metric that needs one: `AgentEvalEvaluators.Quality` is now relevance, coherence and fluency, and
   `Advanced` the eight metrics that need no context — both included faithfulness (`Advanced` also groundedness), which
-  could never be measured there, so they failed every item. Faithfulness and groundedness stay in `RAG`,
-  `Faithfulness()` and `Groundedness()`; for those, build the `EvalItem`s with `Context` set and call the evaluator
-  directly (the MAF guide shows how). Report scores, stochastic
+  could never be measured there, so they failed every item. Faithfulness stays in `RAG` and `Faithfulness()`,
+  groundedness in `Groundedness()`; for those, build the `EvalItem`s with `Context` set and call the evaluator
+  directly (the MAF guide shows how). Through `AsAgentEvaluator`, a metric that comes back with no value and no
+  failing verdict — an M.E.AI evaluator that could not score, its context or reference missing or its judge's reply
+  unparseable — now fails the item (MAF fails an item only on a failed interpretation, so it passed). Report scores, stochastic
   statistics and the meta lane's observations leave a not-measured metric out; the console, the loggers and the trace
   artifacts say "not measured", with no score. `agenteval eval --metrics` exports name it instead of dropping it — a
   "not measured" CSV or Markdown cell, a JUnit / TRX output line, a `metricsNotMeasured` field in the JSON and
   directory exports (`TestResultSummary.MetricsNotMeasured`) — so "not measured" is no longer indistinguishable from
-  "not requested". The safety-metric gate still blocks on it (fail-closed).
+  "not requested". The memory benchmark's report lists a skipped category there too, with its reason, instead of its
+  placeholder 0 under `metricScores`. The safety-metric gate still blocks on it (fail-closed).
 - **`similarity` never sent the reference answer to its judge.** `SimilarityEval` and `ResponseCompletenessEval`
   documented that they read `EvalInput.GroundTruth`, but the judge received only the query, the response and the
   context. Similarity's judge therefore improvised a comparison — the calibration case "Paris is the capital of France"

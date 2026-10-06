@@ -98,6 +98,7 @@ public sealed class AgentEvalAgentEvaluator : IAgentEvaluator
                 additionalContext.Count > 0 ? additionalContext : null,
                 cancellationToken).ConfigureAwait(false);
 
+            FailWhatWasNotScored(result);
             results.Add(result);
         }
 
@@ -105,5 +106,35 @@ public sealed class AgentEvalAgentEvaluator : IAgentEvaluator
         // own identity is still available via Name. Ignoring evalName would silently drop a name the
         // caller set on agent.EvaluateAsync(...).
         return new AgentEvaluationResults(evalName, results, inputItems: items);
+    }
+
+    /// <summary>
+    /// Fails a metric that produced no value and no failing verdict. MAF fails an item only on
+    /// <c>Interpretation.Failed</c> or a false <see cref="BooleanMetric"/>, so an M.E.AI evaluator that could not score
+    /// (its context or reference missing, its judge's reply unparseable) — no value, an error diagnostic, no
+    /// interpretation — passed the item (#203 review round 18). Its reason is kept; MeaiToEvalResultBridge reads it as
+    /// <c>error</c>, as before.
+    /// </summary>
+    private static void FailWhatWasNotScored(MEAIEvaluationResult result)
+    {
+        foreach (var metric in result.Metrics.Values)
+        {
+            var noValue = metric switch
+            {
+                NumericMetric n => n.Value is null,
+                BooleanMetric b => b.Value is null,
+                _ => false,
+            };
+            if (!noValue || metric.Interpretation?.Failed == true)
+                continue;
+
+            var why = metric.Diagnostics?
+                          .Where(d => d.Severity == EvaluationDiagnosticSeverity.Error)
+                          .Select(d => d.Message)
+                          .FirstOrDefault()
+                      ?? metric.Interpretation?.Reason ?? metric.Reason ?? "the evaluator produced no value";
+            metric.Interpretation = new EvaluationMetricInterpretation(
+                EvaluationRating.Inconclusive, failed: true, reason: $"No value, so no verdict: {why}");
+        }
     }
 }
