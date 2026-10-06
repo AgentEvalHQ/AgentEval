@@ -11,11 +11,21 @@
   </PropertyGroup>
 
   <!-- Consumes AgentEval; does NOT modify it. Versions come from Directory.Packages.props (CPM).
-       Only the public eval primitives are used: AtomicCodeEval / CompositeEval / MinAggregation
-       (AgentEval.Core) and AgentEval.Calibration.AgreementMetrics. -->
+       Only public eval primitives are used: AtomicLlmEval / AtomicCodeEval / CompositeEval / MinAggregation and
+       ChatClientEvaluator (AgentEval.Core), InferenceProviderEnvironment for the provider, and
+       AgentEval.Calibration.AgreementMetrics. -->
   <ItemGroup>
     <ProjectReference Include="..\..\src\AgentEval.Abstractions\AgentEval.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Core\AgentEval.Core.csproj" />
+  </ItemGroup>
+
+  <!-- The configured model answers the cases and judges them: the Azure protocol for Azure OpenAI and Foundry, the
+       OpenAI protocol for the other providers. System.Memory.Data is the floor Azure.Core needs. -->
+  <ItemGroup>
+    <PackageReference Include="Azure.AI.OpenAI" />
+    <PackageReference Include="Microsoft.Extensions.AI" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
+    <PackageReference Include="System.Memory.Data" />
   </ItemGroup>
 
   <!-- Synthetic fixtures ship next to the binary so `dotnet run` works from any working directory. -->
