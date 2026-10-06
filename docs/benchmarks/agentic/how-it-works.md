@@ -113,7 +113,7 @@ The `--budget-tier low` flag filters the preset to keep only LOW and TRIVIAL tie
 
 ## How we know the judges can be trusted — **calibration**
 
-The agentic benchmark uses many judges (one per LLM-graded dimension), each with its own criteria list and its own rubric as the system prompt (since 0.44; through 0.43 they shared a generic judge system prompt). A judge's `needs_review` verdict is a warn, which agrees with neither gold label. Each evaluator dispatched for calibration has its own golden dataset; some are carved out (see below).
+The agentic benchmark uses many judges (one per LLM-graded dimension), each with its own criteria list and its own rubric as the system prompt (since 0.43; through 0.42 they shared a generic judge system prompt). A judge's `needs_review` verdict is a warn, which agrees with neither gold label. Each evaluator dispatched for calibration has its own golden dataset; some are carved out (see below).
 
 ### The golden datasets — reference truth per evaluator
 

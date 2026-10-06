@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://agenteval.dev/schemas/v1/gdpr-evidence.schema.json",
   "title": "AgentEval GDPR Compliance Evidence (wrapper)",
-  "$comment": "v1 revisions. 0.44: the status enums gained ERROR (a check the verdict rests on produced no verdict) and SKIPPED (nothing measured). Widening only: every document written before still validates, so the $id keeps v1; a consumer that handles only PASS/WARN/FAIL must handle the two new values.",
+  "$comment": "v1 revisions. 0.43: the status enums gained ERROR (a check the verdict rests on produced no verdict) and SKIPPED (nothing measured). Widening only: every document written before still validates, so the $id keeps v1; a consumer that handles only PASS/WARN/FAIL must handle the two new values.",
   "type": "object",
   "additionalProperties": false,
   "required": ["base", "preset", "domainPacks", "compositeTree", "summary", "criticalFindings", "recommendations", "disclaimer", "gdprAttestation"],

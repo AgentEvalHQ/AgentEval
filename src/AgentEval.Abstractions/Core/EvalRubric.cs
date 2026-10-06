@@ -25,7 +25,7 @@ public sealed record RubricSeverityBand(double AtLeast, string Severity);
 /// <remarks>
 /// <para>
 /// A rubric file states the reply it wants (<c>score</c>, <c>label</c>, <c>criteria_results</c>, <c>evidence</c>), the
-/// scale of the score, and the bands that turn a score into a verdict. Before 0.44 the agentic checks never sent theirs:
+/// scale of the score, and the bands that turn a score into a verdict. Before 0.43 the agentic checks never sent theirs:
 /// every judge ran on a generic default prompt whose reply was read as a 0–100 score (#203 review, B9). This record
 /// carries what the reader needs; the text itself is what the judge is sent.
 /// </para>

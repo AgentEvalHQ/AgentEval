@@ -9,7 +9,7 @@ relying on a verdict.
 |---|---|
 | **Date** | 2026-10-05 (GDPR, EU AI Act); 2026-10-06 (agentic) |
 | **Judge** | Bitdeer AI Model Studio, `zai-org/GLM-5.3-Flash` (`AI_INFERENCE_PROVIDER=bitdeer`) |
-| **Version** | the code released as 0.44.0-beta |
+| **Version** | the code released as 0.43.0-beta |
 | **Golden sets** | the ones shipped with the release (agentic: `tests/AgentEval.Tests/Agentic/Calibration/Golden/`) |
 | **Gate** | accuracy ≥ 85% and κ ≥ 0.70 per pillar or category, with zero evaluation failures, unless a row names its own gate |
 

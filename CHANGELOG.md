@@ -6,6 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [0.43.0-beta] - 2026-10-06
+
+One release with three parts, newest first below:
+- no verdict reads PASS when something failed or was not measured (reported in #203);
+- no real target, no measurement: the `bench` commands, `redteam`, `eval`, the samples and the judges stop standing in
+  for a model, and a check that could not run stops reading as a pass;
+- over-refusal graded by a judge, grader test sets that agree with their thresholds, and calibration reports in the
+  workspace folder.
+
+**Upgrading from 0.42.** Runs that passed before can now read WARN (exit 10), FAIL (exit 9) or INCONCLUSIVE, each
+because something failed or was not measured that the old verdict hid; decide how your CI treats exit 10. `bench`,
+`redteam` and `eval` need a real target, `AGENTEVAL_ALLOW_STUB_JUDGE` is ignored, and a command line that does not
+parse exits 2.
+
 ### A required component that did not run no longer lets a composite pass
 
 Reported in [#203](https://github.com/AgentEvalHQ/AgentEval/issues/203), by an independent contributor building a
@@ -7971,7 +7986,8 @@ This release marks the transition from alpha to beta. The framework is now featu
 - `AgentEval.Tracing` (OTel + run artifacts) - planned
 - `AgentEval.Studio` (workflow visualizer / time-travel UI) - future
 
-[Unreleased]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.42.0-beta...HEAD
+[Unreleased]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.43.0-beta...HEAD
+[0.43.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.42.0-beta...v0.43.0-beta
 [0.42.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.41.0-beta...v0.42.0-beta
 [0.41.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.40.0-beta...v0.41.0-beta
 [0.40.0-beta]: https://github.com/AgentEvalHQ/AgentEval/compare/v0.39.0-beta...v0.40.0-beta

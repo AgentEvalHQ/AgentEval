@@ -37,7 +37,7 @@ Covers the agent's end-to-end task execution and tool-use behavior:
 - **Tool Efficiency** — whether the agent avoided redundant or wasteful tool calls.
 - **Tool Call Accuracy Aggregate** — a composite of the five tool sub-evaluators with canonical weights.
 
-Every evaluator above except the aggregate also has a reference prompt file (`Resources/Prompts/<category>/*.v1.md`) written by AgentEval. Eight of those ten are modelled on the concept (name, inputs and scoring dimensions) of an Azure AI Evaluation SDK evaluator, and their header names that evaluator's `.prompty` file in `azure-sdk-for-python`; they do not reproduce its text (see [Prompt Provenance](#prompt-provenance)). Intent Identification and Task Navigation Efficiency have no upstream prompt to be modelled on. Since 0.44 each LLM-judge evaluator sends its file to the judge as the system prompt and reads the reply on the file's own scale and bands — see [What the judge is sent](#what-the-judge-is-sent).
+Every evaluator above except the aggregate also has a reference prompt file (`Resources/Prompts/<category>/*.v1.md`) written by AgentEval. Eight of those ten are modelled on the concept (name, inputs and scoring dimensions) of an Azure AI Evaluation SDK evaluator, and their header names that evaluator's `.prompty` file in `azure-sdk-for-python`; they do not reproduce its text (see [Prompt Provenance](#prompt-provenance)). Intent Identification and Task Navigation Efficiency have no upstream prompt to be modelled on. Since 0.43 each LLM-judge evaluator sends its file to the judge as the system prompt and reads the reply on the file's own scale and bands — see [What the judge is sent](#what-the-judge-is-sent).
 
 ### RAG Quality (Phase 2)
 
@@ -242,7 +242,7 @@ Each preset is a `static CompositeEval` factory in `AgenticBenchmark` (`src/Agen
 A preset's score is a weighted average, but the average alone never decides the verdict: each check says what its own
 failure does. A check whose failure means **the answer cannot be trusted** (it is wrong, the task was not done, it was
 unsafe) fails the preset. A check whose failure means the answer is **usable but not optimal** makes it `WARN`, and the
-summary names the check. A failing check never leaves a clean `PASS`. (Before 0.44 every check was only averaged:
+summary names the check. A failing check never leaves a clean `PASS`. (Before 0.43 every check was only averaged:
 fluency at 0.30 with the rest perfect read RAG Quality 0.965 = `PASS`; the Safety gate passed with self-harm content
 flagged.)
 
@@ -277,7 +277,7 @@ errored check is listed as "produced no verdict", not as a failure to review, an
 of the run was measured and `PENDING` when none was.
 
 The same rule holds one level down, inside the seven evaluators built from sub-dimensions — so a failure cannot
-hide inside an evaluator either (before 0.44, an unauthorized action averaged out inside `task_adherence`, and the
+hide inside an evaluator either (before 0.43, an unauthorized action averaged out inside `task_adherence`, and the
 preset above it never saw a failure):
 
 | Evaluator | Fails it | Warns, naming the sub-dimension |
@@ -416,7 +416,7 @@ The evaluator prompt files under `src/AgentEval.Evals.Agentic/Resources/Prompts/
 
 The header of each of those 22 files records that lineage and names the upstream `.prompty` file or hosted evaluator; the fourteen list how the AgentEval prompt differs from the upstream evaluator, and the eight list their design notes.
 
-The files also describe an output envelope of their own: structured `evidence[]` output instead of chain-of-thought, a severity rubric, and sub-dimensions where applicable. Since 0.44 they are sent to the judge (through 0.43 the judge received each evaluator's criteria under a generic system prompt — the 0.42.0-beta CHANGELOG entry "The agentic judges never receive their rubric files"). Sub-dimension splits and deterministic-first paths for hybrid evaluators are implemented in code.
+The files also describe an output envelope of their own: structured `evidence[]` output instead of chain-of-thought, a severity rubric, and sub-dimensions where applicable. Since 0.43 they are sent to the judge (through 0.42 the judge received each evaluator's criteria under a generic system prompt — the 0.42.0-beta CHANGELOG entry "The agentic judges never receive their rubric files"). Sub-dimension splits and deterministic-first paths for hybrid evaluators are implemented in code.
 
 ### What the judge is sent
 
