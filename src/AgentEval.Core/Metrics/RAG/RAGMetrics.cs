@@ -4,6 +4,7 @@
 
 using Microsoft.Extensions.AI;
 using AgentEval.Core;
+using AgentEval.Evals;
 
 namespace AgentEval.Metrics.RAG;
 
@@ -323,7 +324,7 @@ public class ContextRecallMetric : IRAGMetric
             return MetricResult.NotMeasured(Name, "Context recall requires a retrieved context, and none was supplied: not measured.");
         }
         
-        if (string.IsNullOrWhiteSpace(context.GroundTruth))
+        if (!ReferenceText.HasWords(context.GroundTruth))   // a wordless reference ("?") is none (round 17)
         {
             return MetricResult.NotMeasured(Name, "Context recall requires a reference answer, and none was supplied: not measured.");
         }
@@ -421,7 +422,7 @@ public class AnswerCorrectnessMetric : IRAGMetric
     
     public async Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(context.GroundTruth))   // not measured, never a fail (B12i)
+        if (!ReferenceText.HasWords(context.GroundTruth))   // not measured, never a fail (B12i); "?" is none (round 17)
         {
             return MetricResult.NotMeasured(Name, "Answer correctness requires a reference answer, and none was supplied: not measured.");
         }

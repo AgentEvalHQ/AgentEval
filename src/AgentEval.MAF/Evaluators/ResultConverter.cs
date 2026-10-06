@@ -37,10 +37,11 @@ public static class ResultConverter
         // MAF has no item state between pass and fail, so not measured fails the item (fail-closed), as a skipped
         // composite root does in AgentEvalCompositeEvaluator; the marker's "skipped" label lets MeaiToEvalResultBridge read
         // it back as not measured. As failed:false it passed an item where nothing was measured (#203 review round 16, B12k).
+        // No value: 1.0 is the lowest score on MEAI's 1–5 scale, and a reader of Value would count it (round 17, M1).
         if (!metricResult.Measured)
         {
             var notMeasured = $"AgentEval score: 0/100 (skipped, severity none) — not measured: {metricResult.Explanation}";
-            result.Metrics[metricResult.MetricName] = new NumericMetric(metricResult.MetricName, value: 1.0, reason: notMeasured)
+            result.Metrics[metricResult.MetricName] = new NumericMetric(metricResult.MetricName, value: null, reason: notMeasured)
             {
                 Interpretation = new EvaluationMetricInterpretation(EvaluationRating.Inconclusive, failed: true, reason: notMeasured),
             };

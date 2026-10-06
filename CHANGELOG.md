@@ -56,14 +56,19 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   recall, answer correctness, the embedding similarities, MRR, Recall@K, the groundedness safety metric and the
   Microsoft.Extensions.AI Groundedness / Equivalence / Completeness adapters (`MicrosoftEvaluatorAdapter`, `IMetric`
   and `IEval` paths; result version 1.1.0) returned a fail at score 0 — or an `error` — when their retrieved context,
-  reference answer or relevant document IDs were missing, and treated a whitespace one as present. The agent's own
-  output is still measured: an empty answer, or an empty retrieved-document list, fails at 0 as before.
+  reference answer, or retrieved or relevant document IDs were missing, and treated a whitespace one as present. The
+  agent's own output is still measured: an empty answer, or an empty retrieved-document list, fails at 0 as before. A
+  custom `EmbeddingBasedMetric` is not measured when its validation error ends with `NotSuppliedSuffix`; any other
+  validation error is a fail.
   `MetricResult` gains a not-measured state (`Measured`, `MetricResult.NotMeasured`): neither a pass nor a fail. MAF
   has no item state between the two, so through the MEAI bridge a not-measured metric fails its item (fail-closed),
-  its reason saying "not measured" and which input was missing, and the reverse bridge reads it back as `skipped`, not
-  as an error. **Behaviour change:** the text-only `AgentEvalEvaluators.Quality` preset is now relevance, coherence and
-  fluency — it included faithfulness, which needs a retrieved context the `agent.EvaluateAsync` text path cannot pass,
-  so it failed every item; faithfulness stays in `RAG`, `Advanced` and `Faithfulness()`. Report scores, stochastic
+  with no value and its reason saying "not measured" and which input was missing, and the reverse bridge reads it back
+  as `skipped`, not as an error. **Behaviour change:** `agent.EvaluateAsync` passes no retrieved context, so the presets
+  for it carry no metric that needs one: `AgentEvalEvaluators.Quality` is now relevance, coherence and fluency, and
+  `Advanced` the eight metrics that need no context — both included faithfulness (`Advanced` also groundedness), which
+  could never be measured there, so they failed every item. Faithfulness and groundedness stay in `RAG`,
+  `Faithfulness()` and `Groundedness()`; for those, build the `EvalItem`s with `Context` set and call the evaluator
+  directly (the MAF guide shows how). Report scores, stochastic
   statistics and the meta lane's observations leave a not-measured metric out; the console, the loggers and the trace
   artifacts say "not measured", with no score. `agenteval eval --metrics` exports name it instead of dropping it — a
   "not measured" CSV or Markdown cell, a JUnit / TRX output line, a `metricsNotMeasured` field in the JSON and
@@ -86,9 +91,11 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   (MAF's own adapter forwards no additional context), so faithfulness never had its context and the `Quality`
   preset failed every item; it forwards both now, also as the evaluator contexts Microsoft.Extensions.AI's own
   Groundedness / Equivalence / Completeness evaluators read. A blank carrier — or an empty expected-tools list — no
-  longer hides a real one. One test now decides "a reference was supplied" everywhere: a reference with no word in it
-  (blank, "?", "...") is none, for similarity, confidence calibration and the decision judge as for F1, and F1 falls
-  back to its constructor reference for it as it does for a blank one. Found by the release's own recalibration round.
+  longer hides a real one. One test now decides "a reference answer was supplied": a reference with no word in it
+  (blank, "?", "...") is none — for F1, similarity, confidence calibration, the decision judge, context recall, answer
+  correctness, answer similarity, the Microsoft.Extensions.AI adapters and the MAF carriers alike — and F1 falls back to
+  its constructor reference for it as it does for a blank one. The decision judge no longer receives a blank context.
+  Found by the release's own recalibration round.
 - **The PDF report's cover gave a verdict and no reason.** The cover showed "OVERALL: WARN" and nothing else; the
   overall result's summary and recommendations — for a withheld pass, what was not measured — were rendered on no
   page. They now follow the verdict on the cover (the first five recommendations, the rest counted; one that repeats

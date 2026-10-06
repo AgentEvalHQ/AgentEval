@@ -66,7 +66,9 @@ var jsonExporter = new JsonExporter();
 var json = await jsonExporter.ExportToStringAsync(report);
 ```
 
-Output includes `runId`, `stats`, `overallScore`, `agent` info, and each test result with optional `metricScores`.
+Output includes `runId`, `stats`, `overallScore`, `agent` info, and each test result with optional `metricScores` and
+`metricsNotMeasured` (a metric that ran but was not measured — an input it needs was not supplied — with its reason; it
+has no score, so it is never in `metricScores`).
 
 ### JUnit XML
 
@@ -84,7 +86,7 @@ await using var stream = File.Create("results.xml");
 await exporter.ExportAsync(report, stream);
 ```
 
-Tests are grouped by category into `<testsuite>` elements. Failed tests include `<failure>` elements with score and error details. Metric scores are written to `<system-out>`.
+Tests are grouped by category into `<testsuite>` elements. Failed tests include `<failure>` elements with score and error details. Metric scores are written to `<system-out>`, and a metric that was not measured as `name: not measured — reason`.
 
 ### Markdown
 
@@ -114,7 +116,8 @@ The Markdown exporter renders:
 - Status header with ✅/❌ emoji
 - Results table with score, status, and duration
 - Optional failure details section
-- Optional metric breakdown table (dynamic columns from `MetricScores`)
+- Optional metric breakdown table (dynamic columns from `MetricScores` and `MetricsNotMeasured`; a metric that was not
+  measured reads `not measured`, one not requested for that test `-`)
 - Footer with run ID and timestamp
 
 ### TRX
@@ -145,7 +148,7 @@ var csv = await csvExporter.ExportToStringAsync(report);
 
 Fixed columns: `RunId`, `TestName`, `Category`, `Score`, `Passed`, `Skipped`, `DurationMs`, `Error`, `AgentName`, `AgentModel`.
 
-Dynamic columns are appended for each unique key in `MetricScores` (e.g., `relevance`, `correctness`). Special characters (commas, quotes, newlines) are properly escaped per RFC 4180.
+Dynamic columns are appended for each unique key in `MetricScores` and `MetricsNotMeasured` (e.g., `relevance`, `correctness`). A cell holds the score, `not measured` when the metric ran without an input it needs, or is empty when the metric was not requested for that test — so a metric column can mix numbers and text (read it as text, or treat `not measured` as missing, not 0). Special characters (commas, quotes, newlines) are properly escaped per RFC 4180.
 
 ### Directory (ADR-002)
 
@@ -179,8 +182,8 @@ Each run produces a directory with:
 
 | File | Format | Purpose |
 |------|--------|---------|
-| `results.jsonl` | JSON Lines | One JSON line per test result (streaming-friendly, append-friendly) |
-| `summary.json` | JSON | Aggregate statistics with per-metric distribution (mean, min, max, stddev, percentiles) |
+| `results.jsonl` | JSON Lines | One JSON line per test result (streaming-friendly, append-friendly); `metricsNotMeasured` names a metric that ran without an input it needs, with its reason |
+| `summary.json` | JSON | Aggregate statistics with per-metric distribution (mean, min, max, stddev, percentiles) over the tests that measured it; `metricsNotMeasured` counts, per metric, the tests where it was not measured |
 | `run.json` | JSON | Run metadata: agent info, environment, timestamp, duration |
 | *(original filename)* | *(original format)* | Copy of original config/dataset file with filename preserved (when provided, for reproducibility) |
 

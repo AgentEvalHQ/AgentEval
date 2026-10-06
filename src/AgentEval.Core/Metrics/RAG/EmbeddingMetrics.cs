@@ -4,6 +4,7 @@
 
 using AgentEval.Core;
 using AgentEval.Embeddings;
+using AgentEval.Evals;
 
 namespace AgentEval.Metrics.RAG;
 
@@ -169,7 +170,7 @@ public class AnswerSimilarityMetric : EmbeddingBasedMetric
     /// <inheritdoc />
     protected override (string? Text1, string? Text2, string? ValidationError) GetTextsToCompare(EvaluationContext context)
     {
-        if (string.IsNullOrWhiteSpace(context.GroundTruth))
+        if (!ReferenceText.HasWords(context.GroundTruth))   // a wordless reference ("?") is none (round 17)
             return (null, null, $"Answer similarity requires a reference answer, {NotSuppliedSuffix}");
 
         if (string.IsNullOrWhiteSpace(context.Output))

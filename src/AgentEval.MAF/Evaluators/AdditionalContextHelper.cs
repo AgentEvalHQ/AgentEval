@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using MEAIEvaluationContext = Microsoft.Extensions.AI.Evaluation.EvaluationContext;
+using AgentEval.Evals;
 
 namespace AgentEval.MAF.Evaluators;
 
@@ -35,7 +36,7 @@ public static class AdditionalContextHelper
 
         foreach (var ctx in additionalContext)
         {
-            if (ctx is AgentEvalGroundTruthContext gtCtx && !string.IsNullOrWhiteSpace(gtCtx.GroundTruth))   // a blank one is none (B12j)
+            if (ctx is AgentEvalGroundTruthContext gtCtx && ReferenceText.HasWords(gtCtx.GroundTruth))   // a blank or wordless one is none (B12j, round 17)
                 return gtCtx.GroundTruth;
         }
         return null;

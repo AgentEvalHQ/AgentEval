@@ -96,6 +96,15 @@ public class AdditionalContextHelperTests
     }
 
     [Fact]
+    public void ExtractGroundTruth_AWordlessCarrier_DoesNotHideARealOne()
+    {
+        // #203 review round 17 (L1): "?" is no reference, as for F1 and similarity.
+        var contexts = new MEAIEvaluationContext[] { new AgentEvalGroundTruthContext("?"), new AgentEvalGroundTruthContext("Paris") };
+
+        Assert.Equal("Paris", AdditionalContextHelper.ExtractGroundTruth(contexts));
+    }
+
+    [Fact]
     public void ExtractFromMixedContexts_ReturnsCorrectTypes()
     {
         var contexts = new MEAIEvaluationContext[]

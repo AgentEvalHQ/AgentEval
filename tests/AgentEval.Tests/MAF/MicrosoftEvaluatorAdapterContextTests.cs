@@ -87,6 +87,7 @@ public class MicrosoftEvaluatorAdapterContextTests
         { "groundedness, no context", new GroundednessEvaluator(), null, "3 May 2026" },
         { "equivalence, no reference", new EquivalenceEvaluator(), "the ledger", "  " },
         { "completeness, no reference", new CompletenessEvaluator(), "the ledger", null },
+        { "equivalence, a reference with no words", new EquivalenceEvaluator(), "the ledger", "?" },   // round 17 L1
     };
 
     [Theory]

@@ -46,6 +46,22 @@ public sealed class MetricNotMeasuredTests
     }
 
     [Fact]
+    public async Task AWordlessReference_IsNoReference_ForTheLegacyMetricsToo()
+    {
+        // Review round 17 (L1): F1 and similarity read "?" as no reference, these sent it to the judge as one.
+        var judge = new FakeChatClient();
+        var context = new AgentEval.Core.EvaluationContext { Input = "q", Output = "a", Context = "ctx", GroundTruth = "?" };
+
+        foreach (var metric in new IMetric[]
+                 {
+                     new ContextRecallMetric(judge), new AnswerCorrectnessMetric(judge),
+                     new AnswerSimilarityMetric(new FakeEmbeddings(dimensions: 16)),
+                 })
+            Assert.False((await metric.EvaluateAsync(context)).Measured, metric.Name);
+        Assert.Empty(judge.ReceivedMessages);
+    }
+
+    [Fact]
     public void TheMeaiBridge_FailsNotMeasured_AndTheReportReadsItAsSkipped()
     {
         // #203 review round 16 (B12k): MAF has no item state between pass and fail. As failed:false, a not-measured metric
@@ -57,6 +73,9 @@ public sealed class MetricNotMeasuredTests
         Assert.True(metric.Interpretation!.Failed);
         Assert.Equal(EvaluationRating.Inconclusive, metric.Interpretation.Rating);
         Assert.Contains("not measured", metric.Interpretation.Reason, StringComparison.Ordinal);
+        // No value (round 17 M1): 1.0 is MEAI's lowest score, and the meta lane counted it as a measured 0.
+        Assert.Null(metric.Value);
+        Assert.Equal(MeasurementState.NotMeasured, meai.ToObservation("c1", "arm").State);
 
         var report = MeaiToEvalResultBridge.Build("run", ["q"], new AgentEvaluationResults("agenteval", [meai]));
         var leaf = report.Details.SubResults![0].Details.SubResults![0];
@@ -93,6 +112,19 @@ public sealed class MetricNotMeasuredTests
         var results = await evaluator.EvaluateAsync([new EvalItem("What is the capital of France?", "Paris.")]);
 
         Assert.Equal(["llm_coherence", "llm_fluency", "llm_relevance"], results.Items[0].Metrics.Keys.Order());
+    }
+
+    [Fact]
+    public void TheSingleCallPresets_CarryNoMetricThatNeedsARetrievedContext()
+    {
+        // Review round 17 (M2): agent.EvaluateAsync passes no context, so Advanced's faithfulness and groundedness were
+        // never measured and, failing closed, failed every item of "the most comprehensive single-call evaluation".
+        var judge = new FakeChatClient();
+        string[] needContext = ["llm_faithfulness", "llm_groundedness", "llm_context_precision", "llm_context_recall"];
+
+        foreach (var preset in new[] { AgentEvalEvaluators.Quality(judge), AgentEvalEvaluators.Advanced(judge), AgentEvalEvaluators.Safety(judge) })
+            Assert.DoesNotContain(preset.EvaluationMetricNames, n => needContext.Contains(n));
+        Assert.Equal(8, AgentEvalEvaluators.Advanced(judge).EvaluationMetricNames.Count);
     }
 
     [Fact]

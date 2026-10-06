@@ -493,7 +493,7 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
         var contexts = new List<MicrosoftEvaluationContext>();
         if (!string.IsNullOrWhiteSpace(groundingContext))
             contexts.Add(new GroundednessEvaluatorContext(groundingContext));
-        if (!string.IsNullOrWhiteSpace(groundTruth))
+        if (ReferenceText.HasWords(groundTruth))   // a wordless reference ("?") is none, as for F1 (round 17)
         {
             contexts.Add(new EquivalenceEvaluatorContext(groundTruth));
             contexts.Add(new CompletenessEvaluatorContext(groundTruth));
@@ -510,7 +510,7 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
     {
         GroundednessEvaluator when string.IsNullOrWhiteSpace(groundingContext) =>
             $"{Name} requires a grounding context (EvalInput.Context), and none was supplied: not measured.",
-        EquivalenceEvaluator or CompletenessEvaluator when string.IsNullOrWhiteSpace(groundTruth) =>
+        EquivalenceEvaluator or CompletenessEvaluator when !ReferenceText.HasWords(groundTruth) =>
             $"{Name} requires a reference answer (EvalInput.GroundTruth), and none was supplied: not measured.",
         _ => null,
     };

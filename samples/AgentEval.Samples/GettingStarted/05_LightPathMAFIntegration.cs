@@ -200,8 +200,9 @@ public static class LightPathMAFIntegration
             Console.ResetColor();
             Console.WriteLine("   AgentEvalEvaluators.Quality(judgeClient)   → relevance, coherence, fluency");
             Console.WriteLine("   AgentEvalEvaluators.RAG(judgeClient)       → faithfulness, relevance, context precision/recall, answer correctness");
+            Console.WriteLine("                                                (needs each EvalItem's Context; agent.EvaluateAsync cannot set it)");
             Console.WriteLine("   AgentEvalEvaluators.Safety(judgeClient)    → toxicity, bias, misinformation");
-            Console.WriteLine("   AgentEvalEvaluators.Advanced(judgeClient)  → all 10 metrics combined\n");
+            Console.WriteLine("   AgentEvalEvaluators.Advanced(judgeClient)  → all 8 metrics that need no retrieved context\n");
             Console.ForegroundColor = ConsoleColor.DarkGray;
             Console.WriteLine("   Set a provider (AZURE_OPENAI_* / BITDEER_API_KEY / OPENAI_COMPATIBLE_*) to run live");
             Console.ResetColor();
@@ -219,7 +220,7 @@ public static class LightPathMAFIntegration
         Console.WriteLine("   AgentEvalEvaluators.Quality(judgeClient)   → 3 metrics");
         Console.WriteLine("   AgentEvalEvaluators.RAG(judgeClient)       → 5 metrics");
         Console.WriteLine("   AgentEvalEvaluators.Safety(judgeClient)    → 3 metrics");
-        Console.WriteLine("   AgentEvalEvaluators.Advanced(judgeClient)  → 10 metrics");
+        Console.WriteLine("   AgentEvalEvaluators.Advanced(judgeClient)  → 8 metrics");
         Console.WriteLine("   AgentEvalEvaluators.Custom(metric1, ...)   → your choice");
 
         PrintKeyTakeaways();

@@ -62,11 +62,16 @@ public static class MemoryBenchmarkReportExtensions
                 Skipped = c.Skipped,
                 DurationMs = (long)c.Duration.TotalMilliseconds,
                 Error = c.SkipReason,
-                MetricScores = new Dictionary<string, double>
-                {
-                    [$"memory_{c.ScenarioType.ToString().ToLowerInvariant()}"] = c.Score
-                }
+                // A skipped category's 0 is a placeholder, not a score: it goes under MetricsNotMeasured (#203 round 17).
+                MetricScores = c.Skipped
+                    ? new Dictionary<string, double>()
+                    : new Dictionary<string, double> { [MetricName(c)] = c.Score },
+                MetricsNotMeasured = c.Skipped
+                    ? new Dictionary<string, string> { [MetricName(c)] = c.SkipReason ?? "skipped" }
+                    : new Dictionary<string, string>()
             }).ToList()
         };
     }
+
+    private static string MetricName(BenchmarkCategoryResult c) => $"memory_{c.ScenarioType.ToString().ToLowerInvariant()}";
 }

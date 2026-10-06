@@ -10,6 +10,7 @@ using Microsoft.Extensions.AI.Evaluation;
 using MEAIIEvaluator = Microsoft.Extensions.AI.Evaluation.IEvaluator;
 using MEAIEvaluationResult = Microsoft.Extensions.AI.Evaluation.EvaluationResult;
 using MEAIEvaluationContext = Microsoft.Extensions.AI.Evaluation.EvaluationContext;
+using AgentEval.Evals;
 
 namespace AgentEval.MAF.Evaluators;
 
@@ -84,7 +85,7 @@ public sealed class AgentEvalAgentEvaluator : IAgentEvaluator
             // review round 15, B12g). They travel as the carriers AgentEval's MEAI evaluators read, and as the contexts
             // M.E.AI's own Groundedness / Equivalence / Completeness evaluators read, which got none (round 16, B12n).
             var additionalContext = new List<MEAIEvaluationContext>();
-            if (!string.IsNullOrWhiteSpace(item.ExpectedOutput))
+            if (ReferenceText.HasWords(item.ExpectedOutput))   // a wordless reference ("?") is none (round 17)
                 additionalContext.Add(new AgentEvalGroundTruthContext(item.ExpectedOutput!));
             if (!string.IsNullOrWhiteSpace(item.Context))
                 additionalContext.Add(new AgentEvalRAGContext(item.Context!));

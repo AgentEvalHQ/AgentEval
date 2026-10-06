@@ -39,27 +39,26 @@ public sealed class MetricNotMeasuredExportTests
         Assert.Contains("retrieved context", test.MetricsNotMeasured["llm_faithfulness"], StringComparison.Ordinal);
     }
 
-    public static TheoryData<string, IResultExporter> StreamExporters() => new()
+    public static TheoryData<string, IResultExporter, string> StreamExporters() => new()
     {
-        { "json", new JsonExporter() },
-        { "csv", new CsvExporter() },
-        { "markdown", new MarkdownExporter() },
-        { "junit", new JUnitXmlExporter() },
-        { "trx", new TrxExporter() },
-        { "directory summary", new DirectoryExporter() },
+        { "json", new JsonExporter(), "\"metricsNotMeasured\": {" },
+        { "csv", new CsvExporter(), ",not measured" },
+        { "markdown", new MarkdownExporter(), "| not measured |" },
+        { "junit", new JUnitXmlExporter(), "llm_faithfulness: not measured — " },
+        { "trx", new TrxExporter(), "llm_faithfulness: not measured — " },
+        { "directory summary", new DirectoryExporter(), "\"metricsNotMeasured\": {" },
     };
 
     [Theory]
     [MemberData(nameof(StreamExporters))]
-    public async Task EveryExporter_SaysTheMetricWasNotMeasured(string because, IResultExporter exporter)
+    public async Task EveryExporter_SaysTheMetricWasNotMeasured(string because, IResultExporter exporter, string marker)
     {
         using var stream = new MemoryStream();
         await exporter.ExportAsync(Report(), stream);
         var text = Encoding.UTF8.GetString(stream.ToArray());
 
         Assert.Contains("llm_faithfulness", text, StringComparison.Ordinal);
-        Assert.True(text.Contains("not measured", StringComparison.Ordinal) || text.Contains("metricsNotMeasured", StringComparison.Ordinal),
-            because);
+        Assert.True(text.Contains(marker, StringComparison.Ordinal), $"{because}: no '{marker}' in{Environment.NewLine}{text}");
     }
 
     [Fact]
