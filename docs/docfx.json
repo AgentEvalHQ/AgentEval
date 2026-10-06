@@ -4,7 +4,8 @@
       "src": [
         {
           "src": "../src",
-          "files": ["**/*.csproj"]
+          "files": ["**/*.csproj"],
+          "exclude": ["AgentEval.MAF.AgentHooks/**"]
         }
       ],
       "dest": "api",

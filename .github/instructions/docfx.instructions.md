@@ -22,7 +22,7 @@ docs/
 ```json
 {
   "metadata": [{
-    "src": [{ "src": "../src", "files": ["**/*.csproj"] }],
+    "src": [{ "src": "../src", "files": ["**/*.csproj"], "exclude": ["AgentEval.MAF.AgentHooks/**"] }],
     "dest": "api",
     "properties": { "TargetFramework": "net10.0" }
   }],
@@ -75,6 +75,11 @@ start _site\index.html
 ### Issue: docfx metadata fails
 **Cause:** Build errors in source code
 **Fix:** Run `dotnet build` first and fix any compilation errors
+
+**Cause:** A project that does not target `net10.0`. `docfx metadata` builds every project at the `TargetFramework`
+set in docfx.json, so a project without that target has no restored references and fails with CS0246.
+`AgentEval.MAF.AgentHooks` (net8.0 only, experimental, not packaged) is excluded for this reason.
+**Fix:** Exclude the project in `metadata.src.exclude`, or add the `net10.0` target to it.
 
 ### Issue: Changes not appearing
 **Cause:** Browser cache or stale `_site` folder
