@@ -4,7 +4,7 @@
 //
 // Test path discovery for the legacy AgentEval.Cli test suite ported from
 // AgentEvalHQ/AgentEval.Cli. The original tests walked up from AppContext.BaseDirectory
-// looking for AgentEval.Cli.slnx / .sln; in the joslat/AgentEval monorepo the
+// looking for AgentEval.Cli.slnx / .sln; in the AgentEvalHQ/AgentEval monorepo the
 // marker is AgentEval.sln. This helper accepts either so the tests are repo-portable.
 
 namespace AgentEval.Tests.Cli.Classic;

@@ -3,7 +3,7 @@
   "key": "stochastic_stability",
   "name": "Stochastic Stability",
   "category": "operational",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Pure-code evaluator: across N stochastic re-runs of the same scenario, what fraction of verdicts agree? Surfaces sampling-noise issues in the agent or the judge.",
   "costTier": "Trivial",
   "higherIsBetter": true,

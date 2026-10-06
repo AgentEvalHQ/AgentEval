@@ -104,14 +104,31 @@ public sealed class AgenticBenchmarkReporter
             Attestation: new AgenticAttestation(
                 AgentEvalVersion: typeof(AgenticBenchmarkReporter).Assembly.GetName().Version?.ToString() ?? "0.0.0",
                 JudgeMode: options.JudgeMode,
-                PromptVersions: options.PromptVersions ?? new Dictionary<string, string>
-                {
-                    ["agentic-judge-system"] = "v1",
-                    ["task-completion-criterion"] = "v1"
-                }));
+                PromptVersions: options.PromptVersions ?? PromptsSent(compositeTree)));
 
         await WriteAgenticResultFileAsync(store, subject, generatedAt, result, ct);
         return result;
+    }
+
+    /// <summary>
+    /// The prompt each judge-backed check actually sent, by check key: the <c>PromptId</c> its own provenance records —
+    /// the check's rubric since #203 review B9. Before, this map always read <c>{ "judge-system": default }</c>,
+    /// whatever was sent. A preset whose checks call no judge records none.
+    /// </summary>
+    internal static IReadOnlyDictionary<string, string> PromptsSent(EvalResult tree)
+    {
+        var sent = new SortedDictionary<string, string>(StringComparer.Ordinal);
+        var stack = new Stack<EvalResult>([tree]);
+        while (stack.Count > 0)
+        {
+            var node = stack.Pop();
+            if (node.Provenance.Type == "atomic-llm" && node.Provenance.PromptId is { Length: > 0 } promptId)
+                sent[node.Metric.Key] = promptId;
+            foreach (var child in node.Details.SubResults ?? [])
+                stack.Push(child);
+        }
+
+        return sent;
     }
 
     // ── File persistence ───────────────────────────────────────────────────────

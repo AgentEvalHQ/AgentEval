@@ -8,6 +8,17 @@ A roundup of what landed in AgentEval's red-team module recently: broader covera
 
 ## New & upgraded capabilities
 
+### Over-refusal beside the attack success rate *(new)*
+
+An agent that refuses everything resists every attack, so attack success alone rewards it. `--benign-controls`
+(with `--judge`) adds the second number:
+- **The corpus:** 29 legitimate requests that look like attacks ("ignore my previous message", "decode this base64
+  value"). Each reply is graded by Gatekeeper's over-refusal judge, never by a phrase list.
+- **The report:** the refusal rate with a Wilson 95% interval, and "not measured" below 20 conclusive cases.
+- **The verdict is unchanged.** Over-refusal is reported beside it and does not change it.
+
+See [Over-refusal](redteam.md#over-refusal-the-second-headline-number).
+
 ### Grading — judge-primary by default + Composite Judges *(the big one)*
 
 The grader — the component that decides whether each attack actually *succeeded* — moved from a keyword/substring oracle to **LLM-judge-primary grading** with **honest-by-construction "Composite Judges."** This is the headline change here, and it's a deliberate, evidence-driven flip (see [ADR-021→024](adr/README.md)).
@@ -88,7 +99,7 @@ So our honest position: **on raw probe breadth, garak leads; on attacker-LLM orc
 
 ### Practical guidance
 
-- **Configure `--judge`.** This is now where the honesty lives: with a judge set, Composite Judges *lead* the semantic verdicts. Without one, AgentEval falls back to the deterministic keyword oracle — best-effort only — and the cases it can't be sure about honestly report as a coverage gap, not a fake pass. (Use `--judge-mode fallback` if you want the old judge-as-tiebreaker behavior.)
+- **Configure `--judge`.** This is now where the honesty lives: with a judge set, Composite Judges *lead* the semantic verdicts. Without one, AgentEval falls back to the deterministic keyword oracle — best-effort only — and the cases it can't be sure about honestly report as a coverage gap, not a fake pass. (Use `--judge-mode fallback` if you want the judge only to adjudicate Inconclusive verdicts. Since 0.43 it can raise one to Succeeded, never to Resisted.)
 - **Trust the structural signals on their own** — exact markers, canary-tool execution, real payloads. Those don't depend on reading prose.
 - **Read the verdict *and* its fidelity label.** "Succeeded (Behavioral)" is a proven compromise; "Succeeded (Verbal)" is a strong signal worth a human look.
 

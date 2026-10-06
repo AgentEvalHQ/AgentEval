@@ -12,7 +12,8 @@ namespace AgentEval.Memory.Reporting;
 
 /// <summary>
 /// File-system-based baseline store that persists baselines as individual JSON files.
-/// On each save: writes baseline JSON, rebuilds manifest.json, copies report template if missing.
+/// On each save: writes baseline JSON, rebuilds manifest.json, copies report template if missing,
+/// and copies archetypes.json only when <see cref="MemoryReportingOptions.IncludeArchetypes"/> is set.
 /// </summary>
 public partial class JsonFileBaselineStore : IBaselineStore
 {
@@ -294,7 +295,9 @@ public partial class JsonFileBaselineStore : IBaselineStore
             GeneratedBy = $"AgentEval.Memory v{typeof(JsonFileBaselineStore).Assembly.GetName().Version}",
             Agent = new ManifestAgentInfo { Name = agentConfig.AgentName },
             Benchmarks = groups,
-            Archetypes = "archetypes.json"
+            // Name the file only when this store copies it, so the manifest never points at a file
+            // that is not there. Nothing in the shipped report reads it (see IncludeArchetypes).
+            Archetypes = _options.IncludeArchetypes ? "archetypes.json" : null
         };
 
         var manifestJson = JsonSerializer.Serialize(manifest, JsonOptions);
@@ -486,7 +489,9 @@ public partial class JsonFileBaselineStore : IBaselineStore
         var passed = b.CategoryResults.Values.Count(c => !c.Skipped && c.Score >= 70.0);
         var skipped = b.CategoryResults.Values.Count(c => c.Skipped);
         var failed = total - passed - skipped;
-        return new RunStats(total, passed, failed < 0 ? 0 : failed, 0);
+        // Named, not positional (#203 review, B8): the fourth positional argument is Warnings, so the skip count computed
+        // above was never written — Skipped read 0 and the buckets added up to less than Total.
+        return new RunStats(Total: total, Passed: passed, Failed: failed, Warnings: 0, Skipped: skipped);
     }
 
     private static IReadOnlyDictionary<string, double> BuildMetrics(MemoryBaseline b)

@@ -16,7 +16,7 @@ namespace AgentEval.Evals.Agentic.System;
 /// then resolved successfully. They can fail independently.
 /// </para>
 /// <para>
-/// Wraps an <see cref="AtomicLlmEval"/> with the intent-identification rubric.
+/// Wraps an <see cref="AtomicLlmEval"/> with three intent-identification criteria.
 /// </para>
 /// <para>
 /// Source: split from the Foundry _intent_resolution evaluator per plan-05 §8 and
@@ -54,7 +54,7 @@ public sealed class IntentIdentificationEval : IEval
             key: "intent_identification",
             name: "Intent Identification",
             category: "system-outcome",
-            version: "1.0.0",
+            version: "1.1.0",
             criteria: new[]
             {
                 "The agent correctly identified the primary intent of the user's query",

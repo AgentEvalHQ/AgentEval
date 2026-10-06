@@ -3,7 +3,7 @@
   "key": "intermediate_step_hallucination",
   "name": "Intermediate Step Hallucination",
   "category": "reasoning",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "LLM judge cross-checking each intermediate factual claim in the agent reasoning against the actual tool-call results \u2014 catches hallucinations between tool calls.",
   "costTier": "Medium",
   "higherIsBetter": true,

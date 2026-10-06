@@ -3,9 +3,9 @@
 
 `typedmemeval_dense_retrieval.py` already argues that K_ref=5 is one point and that headroom is a
 statement about the retrieval BUDGET first. The same argument applies one level up. Its "dense" arm
-is not dense retrieval; it is `text-embedding-ada-002`, a 2022 model, and until 2026-09-14 the
-sidecar did not say so -- it said "azure-openai-embeddings", which every embedding model Azure has
-ever served satisfies.
+is not dense retrieval; it is ONE embedding model -- published as `text-embedding-ada-002`, a 2022
+model, and until 2026-09-14 the sidecar did not say so: it said "azure-openai-embeddings", which every
+embedding model Azure has ever served satisfies.
 
 So a published line like "dense retrieval closes 21% of the headroom BM25 leaves open" is a
 statement about ONE retriever. This tool turns that point into a comparison, and it does so for
@@ -23,6 +23,12 @@ vertical is skipped and named. Two retrievers scored over different question set
 comparison; it is not a comparison.
 
     python tools/typedmemeval_retriever_compare.py --models text-embedding-ada-002,text-embedding-3-small
+    python tools/typedmemeval_retriever_compare.py --models bitdeer:BAAI/bge-m3,azure:text-embedding-ada-002
+
+A `--models` entry is either an azure DEPLOYMENT alias, resolved to its model through the deployments
+listing (one network call, no spend), or a `provider:model` identity, which is used as written and
+needs no network at all -- the only way to name an azure model whose deployment no longer exists, or
+any other provider's. Either way the shards must be stamped with that provider and model.
 """
 from __future__ import annotations
 
@@ -39,10 +45,43 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 
 import typedmemeval_common as tmc          # noqa: E402
+import inference_provider as ip            # noqa: E402
 import typedmemeval_dense_retrieval as dr  # noqa: E402
 
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+
+
+def split_identity(identity: str):
+    """`provider:model` -> (provider, model). Split on the FIRST colon: the provider never has one."""
+    tag, _, model = identity.partition(':')
+    return tag, model
+
+
+def retriever_id(identity: str) -> str:
+    tag, model = split_identity(identity)
+    return dr.dense_retriever_id(model, dims_of(identity), tag)
+
+
+def resolve_models(entries):
+    """Each `--models` entry -> its `provider:model` identity.
+
+    `provider:model` is taken as written (the provider name canonicalised, nothing looked up); a bare
+    name is an azure deployment alias and goes through the listing, exactly as before.
+    """
+    out, aliases = {}, []
+    for entry in entries:
+        if ':' not in entry:
+            aliases.append(entry)
+            continue
+        tag, model = split_identity(entry)
+        canonical = ip.canonical_tag(tag)
+        if canonical is None or not model:
+            raise SystemExit('%r is not provider:model (providers: %s).' % (entry, ', '.join(ip.ORDER)))
+        out[entry] = '%s:%s' % (canonical, model)
+    if aliases:
+        out.update({a: 'azure:%s' % m for a, m in resolve_aliases(aliases).items()})
+    return out
 
 
 def resolve_aliases(aliases):
@@ -73,7 +112,7 @@ def resolve_aliases(aliases):
     return out
 
 
-#: Vector width per model, read from the shards as they load. NOT assumed.
+#: Vector width per `provider:model` identity, read from the shards as they load. NOT assumed.
 _dims_by_model: dict = {}
 
 
@@ -93,15 +132,16 @@ def dims_of(model: str) -> int:
     return dims
 
 
-def load_model_cache(model: str, vertical: str) -> dict:
-    """Every vector this model has for this vertical, from ITS OWN directory.
+def load_model_cache(identity: str, vertical: str) -> dict:
+    """Every vector this `provider:model` has for this vertical, from ITS OWN directory.
 
     The per-model directory is the whole reason this comparison is safe to make: before 2026-09-14
     the cache was flat, and a second model either had its shards refused or -- through the
     merge-on-save path -- silently blended into the first model's file.
     """
     cache: dict = {}
-    root = os.path.join(dr.CACHE_DIR, model)
+    tag, model = split_identity(identity)
+    root = dr.cache_root_for(tag, model)
     for name in (vertical, '_migrated'):
         path = os.path.join(root, '%s.json' % name)
         if not os.path.exists(path):
@@ -115,11 +155,11 @@ def load_model_cache(model: str, vertical: str) -> dict:
             raise SystemExit('%s records no usable __embedding_dims__ (%r). Its vectors have an '
                              'unestablished width, so no identity can honestly cover them. '
                              'Re-embed it.' % (path, width))
-        seen = _dims_by_model.setdefault(model, width)
+        seen = _dims_by_model.setdefault(identity, width)
         if seen != width:
             raise SystemExit('%s: shards of %r disagree on vector width (%d vs %d). One of '
                              'them was not produced by that model.'
-                             % (path, model, seen, width))
+                             % (path, identity, seen, width))
         # THE STATED WIDTH IS CHECKED AGAINST THE BYTES. `_save_shard` derives __embedding_dims__
         # from ONE sample, and `cosine_rank` zips the two vectors -- so a short or corrupted payload
         # is silently TRUNCATED during ranking and still published under the stated width. float16,
@@ -155,6 +195,12 @@ def load_model_cache(model: str, vertical: str) -> dict:
                 '%s carries model %r, not %r. A comparison must not include vectors whose '
                 'producer is unproven -- re-embed that shard or drop the model from --models.'
                 % (path, stamped, model))
+        # AND THE PROVIDER. One weight file served by two providers is two retrievers. Absent means
+        # azure: every shard banked before the key existed came from there, and nothing else did.
+        stamped_provider = shard.get(dr._PROVIDER_KEY) or 'azure'
+        if stamped_provider != tag:
+            raise SystemExit('%s was embedded on %r, not %r. Same refusal, provider operand.'
+                             % (path, stamped_provider, tag))
         cache.update({k: v for k, v in shard.items() if not k.startswith('__')})
     return cache
 
@@ -235,8 +281,8 @@ def stamp_second_column(by_shape, models, budget: int) -> int:
     compared, and a mismatch stops the publication rather than overwriting the older one. If they
     disagree, one of the two is wrong and neither should ship.
     """
-    first_id = dr.dense_retriever_id(models[0], dims_of(models[0]))
-    second_id = dr.dense_retriever_id(models[1], dims_of(models[1]))
+    first_id = retriever_id(models[0])
+    second_id = retriever_id(models[1])
     if not (first_id and second_id):
         raise SystemExit('a retriever without an id cannot be published as a column')
 
@@ -394,7 +440,8 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument('--models', required=True,
-                    help='two or more DEPLOYMENT aliases, comma separated')
+                    help='two or more retrievers, comma separated: azure DEPLOYMENT aliases, or '
+                         'provider:model identities (bitdeer:BAAI/bge-m3, azure:text-embedding-ada-002)')
     ap.add_argument('--budget', type=int, default=tmc.K_REF)
     ap.add_argument('--vertical')
     ap.add_argument('--stamp', action='store_true',
@@ -403,10 +450,12 @@ def main() -> int:
                          'self-check for each one first.')
     args = ap.parse_args()
 
-    aliases = [a for a in args.models.split(',') if a]
+    aliases = [a.strip() for a in args.models.split(',') if a.strip()]
     if len(aliases) < 2:
-        raise SystemExit('a comparison needs at least two deployments')
-    resolved = resolve_aliases(aliases)
+        raise SystemExit('a comparison needs at least two retrievers')
+    resolved = resolve_models(aliases)
+    # `provider:model` identities from here on: the directory, the stamp check and the published id
+    # all need the provider, and a bare model name would let two providers' bge-m3 read as one.
     models = list(dict.fromkeys(resolved[a] for a in aliases))
 
     if args.stamp:

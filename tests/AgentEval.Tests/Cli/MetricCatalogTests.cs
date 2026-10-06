@@ -10,8 +10,8 @@ using Xunit;
 namespace AgentEval.Tests.Cli;
 
 /// <summary>
-/// Item 4 (<c>strategy/CLI-Custom-Benchmarks-CopilotStudio-OpenAI-and-Metrics-Remediation-Design.md</c> §2 D,
-/// candidate D1): <c>MetricCatalog</c> — the genuinely new bare-name -> <see cref="IMetric"/> resolver.
+/// Item 4 of the CLI metrics remediation (candidate D1): <c>MetricCatalog</c> — the genuinely new
+/// bare-name -> <see cref="IMetric"/> resolver.
 /// </summary>
 public class MetricCatalogTests
 {

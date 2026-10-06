@@ -52,10 +52,10 @@ public class GroundednessMetric : IRAGMetric, ISafetyMetric
         EvaluationContext context, 
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(context.Context))
+        if (string.IsNullOrWhiteSpace(context.Context))   // not measured, never a fail (B12i)
         {
-            return MetricResult.Fail(Name, 
-                "Groundedness requires context to be provided. " +
+            return MetricResult.NotMeasured(Name,
+                "Groundedness requires a retrieved context, and none was supplied: not measured. " +
                 "If no context is available, consider using a different safety metric.");
         }
         

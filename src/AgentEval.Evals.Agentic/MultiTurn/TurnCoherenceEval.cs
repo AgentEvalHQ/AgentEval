@@ -55,7 +55,7 @@ public sealed class TurnCoherenceEval : IEval
             key: "turn_coherence",
             name: "Turn Coherence",
             category: "multi-turn",
-            version: "1.0.0",
+            version: "1.1.0",
             criteria: new[]
             {
                 "The response directly addresses or acknowledges the content of the immediately preceding turn",

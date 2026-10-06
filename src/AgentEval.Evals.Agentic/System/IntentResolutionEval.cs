@@ -20,9 +20,11 @@ namespace AgentEval.Evals.Agentic.System;
 /// fix from an intent that was never correctly understood.
 /// </para>
 /// <para>
-/// Source: forked from Azure/azure-sdk-for-python
-/// sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_intent_resolution/intent_resolution.prompty
-/// License: MIT. Modifications: split into two independent sub-dimensions; structured evidence output.
+/// Lineage: AgentEval's own criteria and reference prompt, modelled on the evaluator concept (name,
+/// inputs and scoring dimensions) of Azure/azure-sdk-for-python
+/// <c>sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_intent_resolution/intent_resolution.prompty</c>.
+/// A 2026-10-02 check found no upstream prompt text in the rubric file
+/// <c>Resources/Prompts/system/intent-resolution.v1.md</c>, which the judge is sent as its system prompt.
 /// </para>
 /// </summary>
 public sealed class IntentResolutionEval : IEval
@@ -59,7 +61,7 @@ public sealed class IntentResolutionEval : IEval
                     key: "intent_identified",
                     name: "Intent Identified",
                     category: "system-outcome",
-                    version: "1.0.0",
+                    version: "1.1.0",
                     criteria: new[]
                     {
                         "The agent's response demonstrates that it correctly understood the user's primary intent",
@@ -68,8 +70,8 @@ public sealed class IntentResolutionEval : IEval
                     passThreshold: passThreshold,
                     judgeModel: judgeModel,
                     promptId: "agenteval.intent_resolution.v1",
-                    failureSeverity: "medium"),
-                Weight: 0.50),
+                    failureSeverity: "medium") { JudgeSeesToolData = JudgeToolData.ToolCalls },
+                Weight: 0.50) { OnFailure = ComponentFailureEffect.Fail },
 
             new EvalComponent(
                 Eval: new AtomicLlmEval(
@@ -77,7 +79,7 @@ public sealed class IntentResolutionEval : IEval
                     key: "intent_resolved",
                     name: "Intent Resolved",
                     category: "system-outcome",
-                    version: "1.0.0",
+                    version: "1.1.0",
                     criteria: new[]
                     {
                         "The agent's response fully resolves the identified intent",
@@ -87,15 +89,15 @@ public sealed class IntentResolutionEval : IEval
                     passThreshold: passThreshold,
                     judgeModel: judgeModel,
                     promptId: "agenteval.intent_resolution.v1",
-                    failureSeverity: "medium"),
-                Weight: 0.50),
+                    failureSeverity: "medium") { JudgeSeesToolData = JudgeToolData.ToolCalls },
+                Weight: 0.50) { OnFailure = ComponentFailureEffect.Fail },
         };
 
         _inner = new CompositeEval(
             key: "intent_resolution",
             name: "Intent Resolution",
             category: "system-outcome",
-            version: "1.0.0",
+            version: "1.2.0",
             components: components,
             aggregation: WeightedSumAggregation.Instance,
             threshold: passThreshold);

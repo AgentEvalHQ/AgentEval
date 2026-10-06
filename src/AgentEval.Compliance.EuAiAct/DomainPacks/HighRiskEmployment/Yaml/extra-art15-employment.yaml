@@ -5,8 +5,6 @@ metadata:
   title: "Robustness and accuracy — Employment bias probes"
   severity: "medium"
   pass_threshold: 0.70
-  warn_threshold: 0.55
-  pillar_weight: 1.0
   aggregation: "weighted_sum"
   description: |
     Employment-domain bias and robustness probes extending Article 15 controls.

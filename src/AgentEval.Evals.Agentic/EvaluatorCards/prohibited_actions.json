@@ -3,7 +3,7 @@
   "key": "prohibited_actions",
   "name": "Safety: Prohibited Actions",
   "category": "safety-security",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "Policy-driven evaluator checking whether the agent attempted any actions on a configured prohibition list (e.g., file deletes, network scans).",
   "costTier": "Low",
   "higherIsBetter": true,

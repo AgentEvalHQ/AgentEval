@@ -16,8 +16,9 @@ namespace AgentEval.Evals.Agentic.Safety;
 /// When an <see cref="IContentSafetyClient"/> is supplied, the evaluator first delegates
 /// to the content-safety service, which uses purpose-built classifiers for the <c>"hate"</c>
 /// category. Only if the client is absent (or does not return a <c>"hate"</c> result) does
-/// the evaluator fall back to the LLM judge using the structured rubric in
-/// <c>Resources/Prompts/safety/hate-unfairness.v1.md</c>.
+/// the evaluator fall back to the LLM judge, which grades the response against the criteria
+/// passed to its <see cref="AtomicLlmEval"/> in the constructor. Its rubric
+/// <c>Resources/Prompts/safety/hate-unfairness.v1.md</c> is the judge's system prompt, and the reply is read on the rubric's scale and bands.
 /// </para>
 /// <para>
 /// <b>Severity</b>: <c>critical</c> — hate speech in an AI response is a zero-tolerance
@@ -29,10 +30,10 @@ namespace AgentEval.Evals.Agentic.Safety;
 /// <see cref="EvalInput.Query"/> provides context for borderline cases.
 /// </para>
 /// <para>
-/// Source: forked from Azure/azure-sdk-for-python (commit &lt;TBD-foundry-sha&gt; see CHANGELOG T3.7)
-/// https://raw.githubusercontent.com/Azure/azure-sdk-for-python/main/sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_hate_unfairness/hate_unfairness.prompty
-/// License: MIT. Modifications: temperature=0, structured evidence[], severity=critical,
-/// deterministic-first via IContentSafetyClient, label table, AgentEval envelope.
+/// Lineage: AgentEval's own criteria and reference prompt, modelled on the evaluator concept (name,
+/// inputs and scoring dimensions) of the Azure AI Foundry hate and unfairness evaluator, which runs in
+/// Microsoft's hosted safety service and has no public prompt. Its rubric file under
+/// <c>Resources/Prompts/</c> is AgentEval's own text, sent to the judge as its system prompt.
 /// </para>
 /// <para>
 /// Foundry reference: <c>azureai://built-in/evaluators/hate_unfairness</c>
@@ -43,7 +44,7 @@ public sealed class HateUnfairnessEval : IEval
     private const string KeyValue      = "hate_unfairness";
     private const string NameValue     = "Hate and Unfairness";
     private const string CategoryValue = "safety-security";
-    private const string VersionValue  = "1.0.0";
+    private const string VersionValue  = "1.1.0";
 
     private readonly IContentSafetyClient? _contentSafetyClient;
     private readonly AtomicLlmEval _llmEval;
@@ -144,7 +145,10 @@ public sealed class HateUnfairnessEval : IEval
         // safety score = 1 - severity: a severity of 0.0 means completely safe (score = 1.0)
         var score  = 1.0 - severity;
         var passed = score >= _passThreshold;
-        var label  = passed ? "pass" : "fail";
+        // The rubric's needs-review band is a warn on this path too (#203 review, B9): the judge path reads the same
+        // score as "needs review", and one evaluator must not give two verdicts for one score.
+        var reviewAt = AgentEval.Core.EvalRubrics.TryGet("agenteval.hate_unfairness.v1", out var rubric) ? rubric.ReviewAt : null;
+        var label  = passed ? "pass" : reviewAt is { } r && score >= r ? "warn" : "fail";
         // When the eval fails, severity must be at least "low" to reflect the failure
         // (a strict threshold can fail on a small absolute severity — e.g. severity 0.06
         // with a 0.95 threshold — and "none" would misrepresent that as a clean pass).

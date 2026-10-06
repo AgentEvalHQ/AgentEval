@@ -85,7 +85,7 @@ public sealed class PlanFormulationQualityEval : IEval
             key: "plan_formulation_quality",
             name: "Plan Formulation Quality",
             category: "reasoning",
-            version: "1.0.0",
+            version: "1.1.0",
             criteria: new[]
             {
                 "Plan is well-structured and internally consistent",

@@ -50,14 +50,17 @@ public sealed class JUnitReportExporter : IReportExporter
             new XAttribute("name", "AgentEval RedTeam"),
             // L27: include FailFast-skipped probes so tests == failures+errors+skipped+passed and a CI parser summing
             // `tests` counts the full planned scope (SkippedProbes is 0 on a complete scan, so this is unchanged there).
-            new XAttribute("tests", result.TotalProbes + result.SkippedProbes),
-            new XAttribute("failures", result.SucceededProbes), // Succeeded attacks = failures in security
+            // The root totals sum every child suite, the benign-control suite included, so a CI reader that trusts the
+            // root sees refused benign requests too.
+            new XAttribute("tests", result.TotalProbes + result.SkippedProbes + BenignCount(result)),
+            new XAttribute("failures", result.SucceededProbes + BenignRefused(result)), // Succeeded attacks = failures in security
             new XAttribute("errors", result.InconclusiveProbes),
             // 5d: surface FailFast-skipped probes so a truncated scan does not render as a complete green run in CI.
-            new XAttribute("skipped", result.SkippedProbes),
+            new XAttribute("skipped", result.SkippedProbes + BenignInconclusive(result)),
             new XAttribute("time", result.Duration.TotalSeconds.ToString("F3", CultureInfo.InvariantCulture)),
             new XAttribute("timestamp", result.StartedAt.ToString("yyyy-MM-ddTHH:mm:ss")),
             GetTestSuites(result),
+            BenignControlSuite(result),
             TruncationNotice(result)   // null when not truncated → ignored by XElement
         );
 
@@ -92,7 +95,7 @@ public sealed class JUnitReportExporter : IReportExporter
     private static XElement? TruncationNotice(RedTeamResult result)
     {
         if (!result.WasTruncated) return null;
-        var msg = $"FailFast truncated scan: {result.TotalProbes}/{result.PlannedProbes} probes executed, " +
+        var msg = $"Truncated scan (FailFast or the overall timeout): {result.TotalProbes}/{result.PlannedProbes} probes executed, " +
                   $"{result.SkippedProbes} skipped — coverage and scores are not comparable to a full scan.";
         return new XElement("testsuite",
             new XAttribute("name", "RedTeam.TruncationNotice"),
@@ -104,6 +107,56 @@ public sealed class JUnitReportExporter : IReportExporter
                 new XAttribute("name", "ScanTruncated"),
                 new XAttribute("classname", "RedTeam.TruncationNotice"),
                 new XElement("skipped", new XAttribute("message", SanitizeForXml(msg)))));
+    }
+
+    private static int BenignCount(RedTeamResult result) => result.BenignControlResults?.Count ?? 0;
+
+    private static int BenignRefused(RedTeamResult result) =>
+        result.BenignControlResults?.Count(p => BenignControls.BenignControlCorpus.IsFalsePositive(p.Outcome)) ?? 0;
+
+    private static int BenignInconclusive(RedTeamResult result) =>
+        result.BenignControlResults?.Count(p => p.Outcome == EvaluationOutcome.Inconclusive) ?? 0;
+
+    // The benign-control arm as its own suite. A refused benign request is a failed case (the agent failed to
+    // serve a legitimate request); a case with no verdict is skipped. The scan verdict and exit code do not change.
+    // The suite is always present: when the arm was not requested it has no cases, and its over_refusal property
+    // says "not measured", so a JUnit reader can tell an attack-only scan from one that measured zero over-refusal.
+    private static XElement BenignControlSuite(RedTeamResult result)
+    {
+        var benign = result.BenignControlResults ?? [];
+
+        const string suite = "RedTeam.BenignControls";
+        return new XElement("testsuite",
+            new XAttribute("name", suite),
+            new XAttribute("tests", benign.Count),
+            new XAttribute("failures", benign.Count(p => BenignControls.BenignControlCorpus.IsFalsePositive(p.Outcome))),
+            new XAttribute("errors", 0),
+            new XAttribute("skipped", benign.Count(p => p.Outcome == EvaluationOutcome.Inconclusive)),
+            new XElement("properties",
+                new XElement("property",
+                    new XAttribute("name", "over_refusal"),
+                    new XAttribute("value", SanitizeForXml(result.OverRefusalSummary))),
+                new XElement("property",
+                    new XAttribute("name", "over_refusal_measured"),
+                    new XAttribute("value", result.IsOverRefusalMeasured ? "true" : "false"))),
+            benign.Select(p =>
+            {
+                var testCase = new XElement("testcase",
+                    new XAttribute("name", $"BenignControl.{SanitizeForXml(p.ProbeId)}"),
+                    new XAttribute("classname", suite),
+                    new XAttribute("time", p.Duration?.TotalSeconds.ToString("F3", CultureInfo.InvariantCulture) ?? "0.000"));
+                if (BenignControls.BenignControlCorpus.IsFalsePositive(p.Outcome))
+                {
+                    testCase.Add(new XElement("failure",
+                        new XAttribute("message", $"Over-refusal: {SanitizeForXml(p.Reason)}"),
+                        new XAttribute("type", "OverRefusal")));
+                }
+                else if (p.Outcome == EvaluationOutcome.Inconclusive)
+                {
+                    testCase.Add(new XElement("skipped", new XAttribute("message", SanitizeForXml(p.Reason))));
+                }
+                return testCase;
+            }));
     }
 
     private IEnumerable<XElement> GetTestSuites(RedTeamResult result)

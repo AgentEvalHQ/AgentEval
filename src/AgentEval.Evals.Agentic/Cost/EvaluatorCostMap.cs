@@ -87,6 +87,17 @@ public static class EvaluatorCostMap
         ["retry_rate"]                      = EvaluatorCostTier.Trivial,
         ["tool_latency"]                    = EvaluatorCostTier.Trivial,
 
+        // ── Glass Box diagnostics (8) — were unmapped, so silently Medium: `--max-cost-tier low` dropped all eight and
+        //    the run failed with "no evaluators remain" (#203 review, B6b sweep) ──
+        ["tool_reliability"]                = EvaluatorCostTier.Trivial,   // pure code over the trace
+        ["tool_error_pattern"]              = EvaluatorCostTier.Trivial,
+        ["safety_intervention"]             = EvaluatorCostTier.Trivial,
+        ["argument_sanitization"]           = EvaluatorCostTier.Trivial,
+        ["system_prompt_drift"]             = EvaluatorCostTier.Trivial,
+        ["truncation_detection"]            = EvaluatorCostTier.Trivial,
+        ["token_distribution"]              = EvaluatorCostTier.Trivial,
+        ["system_prompt_injection"]         = EvaluatorCostTier.Low,       // baseline-first; LLM only without a baseline
+
         // ── Plan 05 — Stability (1) ────────────────────────────────────────
         ["stochastic_stability"]            = EvaluatorCostTier.Trivial,   // pure code
 

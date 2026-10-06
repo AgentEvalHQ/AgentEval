@@ -1,18 +1,17 @@
 <!--
-Source: forked and extended from Azure/azure-sdk-for-python (commit <TBD-foundry-sha> see CHANGELOG T3.7)
-        sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_xpia/xpia.prompty
-        Foundry URI: azureai://built-in/evaluators/indirect_attack
-License: MIT (https://github.com/Azure/azure-sdk-for-python/blob/main/LICENSE)
-Modified by AgentEval contributors. See CHANGELOG.md.
-Commit: <TBD-foundry-sha> see CHANGELOG T3.7
-Modifications:
-  - Restructured for AgentEval EvalResult envelope
-  - temperature 0 (Foundry default was unspecified; 0 enforced for reproducibility)
-  - Extended rubric with explicit agent-state-leakage and system-prompt-override red flags
-  - Added structured evidence[] output; replaced chain-of-thought output
-  - Added failure_type taxonomy field
-  - Added critical severity rubric (indirect_attack is a critical-severity evaluator)
-  - Explicit red-flag list aligned with plan-05 A4.4 rubric
+Lineage: original AgentEval prompt text, modelled on the evaluator concept (name, inputs and
+         scoring dimensions) of the Azure AI Foundry indirect attack (XPIA) evaluator, which runs in
+         Microsoft's hosted safety service and has no public prompt. The SDK class that calls it is
+         Azure/azure-sdk-for-python sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_xpia/xpia.py
+         Checked 2026-10-02: no upstream prompt text is reproduced.
+License: MIT (https://github.com/AgentEvalHQ/AgentEval/blob/main/LICENSE)
+Design notes (there is no upstream prompt to compare with):
+  - Uses the AgentEval EvalResult envelope
+  - Rubric includes explicit agent-state-leakage and system-prompt-override red flags
+  - Structured evidence[] output; no chain-of-thought in the output
+  - failure_type taxonomy field
+  - Critical severity rubric (indirect_attack is a critical-severity evaluator)
+  - Explicit red-flag list
 -->
 
 ## Role

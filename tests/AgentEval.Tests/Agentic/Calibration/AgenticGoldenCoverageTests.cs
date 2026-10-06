@@ -31,6 +31,9 @@ using AgentEval.Evals;
 using AgentEval.Evals.Agentic;
 using AgentEval.Evals.Agentic.Adversarial;
 using AgentEval.Evals.Agentic.Calibration;
+using AgentEval.Evals.Agentic.Safety;
+using AgentEval.Evals.Meta;
+using System.Text.RegularExpressions;
 using Xunit;
 
 namespace AgentEval.Tests.Agentic.Calibration;
@@ -68,6 +71,28 @@ public class AgenticGoldenCoverageTests
         AgenticEvalRegistration.RegisterInto(registry);
         return registry;
     }
+
+    // The pattern regexes carry a wall-clock timeout (a ReDoS guard). On a loaded parallel test host it can fire
+    // on ordinary input, and the evaluators now report that as "could not check" instead of a pass. The tests
+    // below are about what the deterministic path DECIDES, so they run the same patterns with no time limit;
+    // the timeout path itself is covered deterministically by RegexTimeoutIsNotAPassTests.
+    private static readonly Func<Regex, string, Match> s_untimedMatch = static (regex, input) =>
+        Regex.Match(input, regex.ToString(), regex.Options & ~RegexOptions.Compiled, Regex.InfiniteMatchTimeout);
+
+    /// <summary>
+    /// Resolves <paramref name="key"/> as the registry does, then swaps in an untimed pattern matcher for the
+    /// evaluators whose deterministic path scans with regexes. The registry builds each of these with the judge
+    /// and default options only (see <c>AgenticEvalRegistration</c>), so the rebuilt instance is equivalent.
+    /// </summary>
+    private static IEval? ResolveUntimed(EvalRegistry registry, string key, IEvaluator judge) =>
+        registry.Resolve(key, judge, judgeModel: null) switch
+        {
+            JailbreakResistanceEval  => new JailbreakResistanceEval(judge)  { RegexMatch = s_untimedMatch },
+            DirectInjectionEval      => new DirectInjectionEval(judge)      { RegexMatch = s_untimedMatch },
+            PersonaAttackEval        => new PersonaAttackEval(judge)        { RegexMatch = s_untimedMatch },
+            SensitiveDataLeakageEval => new SensitiveDataLeakageEval(judge) { RegexMatch = s_untimedMatch },
+            var other                => other,
+        };
 
     // ── The census, both directions ──────────────────────────────────────────
 
@@ -278,7 +303,7 @@ public class AgenticGoldenCoverageTests
             foreach (var entry in entries)
             {
                 var judge = new RecordingJudge();
-                var eval = registry.Resolve(key, judge, judgeModel: null);
+                var eval = ResolveUntimed(registry, key, judge);
                 Assert.NotNull(eval);
 
                 var result = await eval!.EvaluateAsync(new EvalInput(Query: entry.Input, Response: entry.AgentResponse));
@@ -374,11 +399,11 @@ public class AgenticGoldenCoverageTests
             if (judge.Calls != predicted.Length)
                 problems.Add($"{entry.ScenarioId}: predicted {predicted.Length} judge call(s), one per matched pattern; observed {judge.Calls}");
 
-            // The aggregate is the mean of the per-pattern scores, and the strategy string names how
-            // many went into it. Asserted because it was predicted: a record that reaches the judge
+            // The aggregate is the weakest per-pattern score (B10l; the mean before), and the strategy string
+            // names how many went into it. Asserted because it was predicted: a record that reaches the judge
             // on FEWER patterns than authored is a weaker record wearing the same id.
-            if (result.Details.AggregationStrategy != $"mean-of-{predicted.Length}-pattern-scores")
-                problems.Add($"{entry.ScenarioId}: predicted aggregation 'mean-of-{predicted.Length}-pattern-scores', " +
+            if (result.Details.AggregationStrategy != $"min-of-{predicted.Length}-pattern-scores")
+                problems.Add($"{entry.ScenarioId}: predicted aggregation 'min-of-{predicted.Length}-pattern-scores', " +
                              $"observed '{result.Details.AggregationStrategy}'");
 
             // The threshold is a declared constant on the evaluator, read back off a result. Nothing
@@ -888,7 +913,7 @@ public class AgenticGoldenCoverageTests
         foreach (var entry in entries.Where(e => dispatched.Contains(e.EvaluatorKey)))
         {
             var judge = new RecordingJudge();
-            var eval = registry.Resolve(entry.EvaluatorKey, judge, judgeModel: null);
+            var eval = ResolveUntimed(registry, entry.EvaluatorKey, judge);
             Assert.NotNull(eval);
 
             var result = await eval!.EvaluateAsync(new EvalInput(Query: entry.Input, Response: entry.AgentResponse));
@@ -897,7 +922,8 @@ public class AgenticGoldenCoverageTests
             // s_knownUnreachableReasoningGoldens) and a different signature: null threshold, and a
             // 0.0 that is a sentinel rather than a verdict. This test is about records the
             // deterministic path DECIDED.
-            if (judge.Calls != 0 || result.Score.Label == "skipped") continue;
+            // "could not check" (an error label) measured nothing either, so it is not a decision.
+            if (judge.Calls != 0 || result.Score.Label == "skipped" || result.Score.CensusBucket() != MeasurementState.Measured) continue;
 
             judgeFree.Add(entry.ScenarioId);
 

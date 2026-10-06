@@ -1,6 +1,8 @@
 # Trace Fidelity
 
-**Does what the agent framework *reports* it did match what the model *actually saw*?** Trace Fidelity (Glass Box) reconciles two traces — the **agent-boundary** trace (the framework's self-report, from `TraceRecordingAgent`) and the **chat-boundary** trace (ground truth at the model interface, from [`TraceRecordingChatClient`](../tracing.md)) — and flags where they diverge. It is the only .NET capability that audits the *framework's honesty*, not just the agent.
+**Does what the agent framework *reports* it did match what the model *actually saw*?** Trace Fidelity (Glass Box) reconciles two traces — the **agent-boundary** trace (the framework's self-report, built with `AgentBoundaryTraceBuilder.FromAgentResponse` from the run's final messages, aggregate usage and finish reason) and the **chat-boundary** trace (ground truth at the model interface, from [`TraceRecordingChatClient`](../tracing.md)) — and flags where they diverge. What it checks is the framework's account of the run, not the agent's answer: tool calls the framework omitted or reported without the model requesting them, tool arguments that differ between the two layers, retries it did not report, token totals it under-reports, and `content_filter`/`length` finish reasons it did not pass on.
+
+> A trace recorded by `TraceRecordingAgent` can stand as the agent-boundary account, with one gap. On the non-streaming path it records the agent's finish reason and the tool calls the response carries in its messages (arguments included; approval-gated calls are not recorded as calls). On the streaming path it records tool calls with their arguments but **no finish reason**, because a streamed chunk carries none, so reconciling a streaming trace reports every `content_filter`/`length` chat turn as `suppressed_finish_reason`. That finding then says nothing about the framework.
 
 It is a **Shape-B benchmark family** (`trace-fidelity`, `CostTier.Free` — pure code, no LLM tokens).
 
@@ -15,10 +17,12 @@ It is a **Shape-B benchmark family** (`trace-fidelity`, `CostTier.Free` — pure
 | `phantom_tool_calls` | the agent reports a call the model never requested | High |
 | `argument_drift` | the same tool was called with genuinely different args on the two layers | Medium |
 | `hidden_retries` | the chat boundary saw more invocations of a tool than the agent reported (silent retries) | High |
-| `token_under_reporting` | per-turn token sums disagree with the agent-layer totals beyond 2% | Low |
-| `suppressed_finish_reason` | the chat boundary saw `content_filter`/`length` but the agent boundary reported `stop`/none | Critical |
+| `token_under_reporting` | the agent-layer total is lower than the per-turn chat-boundary sum by more than 2% of that sum (over-reporting is not flagged) | Low |
+| `suppressed_finish_reason` | a chat turn ended with `content_filter`/`length` and the agent boundary did not report that reason (it reported `stop`, another reason, or none) | Critical |
 
 > Reconciliation compares tool **calls**, finish reasons, and token usage — never tool *definition schemas* — so tool-definition de-dup (Smoke/Standard presets) never affects the result. Argument comparison is by serialized-string set equality (a documented v1 heuristic, so a retry of the same args is counted by `hidden_retries`, not `argument_drift`).
+
+> **Finish reasons.** The two layers cannot be paired turn by turn (the agent boundary usually has one entry per invocation, the chat boundary one per model round-trip), so `suppressed_finish_reason` is counted per reason: the number of chat turns that ended with `content_filter` (or `length`) minus the number of agent-boundary response entries that report it, floored at zero. A faithful report, where the agent boundary passes the same reason through, is not flagged. Reasons are compared as reported strings, case-insensitively, so a framework that reports the same reason under another label (for example `MaxTokens` for `length`) is counted as not reporting it. An agent boundary that reports a reason the chat boundary never saw is not counted by this class.
 
 ## Scoring rubric (pinned)
 
@@ -38,7 +42,7 @@ agenteval bench trace-fidelity \
   --subject MyAgent
 ```
 
-Writes a run manifest + `report-native.json` under `.agenteval/`. Exit code `0` = clean, `2` = discrepancies, `1` = setup/IO error.
+Writes a run manifest + `report-native.json` under `.agenteval/`. Exit code `0` = clean (score ≥ 0.99, PASS), `10` = minor discrepancies (0.80–0.99, WARN), `9` = discrepancies (below 0.80, FAIL), `11` = nothing to reconcile (the chat trace has no model responses: no verdict, stored PENDING), `1` = setup/IO error.
 
 ## The upstream loop with Microsoft Agent Framework
 

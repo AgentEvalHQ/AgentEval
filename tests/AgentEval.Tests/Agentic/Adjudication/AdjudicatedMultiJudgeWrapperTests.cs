@@ -17,7 +17,7 @@ public class AdjudicatedMultiJudgeWrapperTests
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     /// <summary>Stub IEval that always returns the given label/score.</summary>
-    private sealed class StubEval(string label, double score = 1.0) : IEval
+    private sealed class StubEval(string label, double score = 1.0, string severity = "none") : IEval
     {
         public string Key => $"stub_{label}";
         public string Name => $"Stub {label}";
@@ -27,10 +27,49 @@ public class AdjudicatedMultiJudgeWrapperTests
         public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default) =>
             Task.FromResult(new EvalResult(
                 Metric: new(Key, Name, Category, Version),
-                Score: new(score, null, label, label == "pass", 0.70, "none", null),
+                Score: new(score, null, label, label == "pass", 0.70, severity, null),
                 Details: new(null, null, null, null, null),
                 Provenance: new("stub", null, null, null, null, 0, false),
                 EvaluatedAt: DateTimeOffset.UtcNow));
+    }
+
+    /// <summary>Adjudicator stub that passes, and counts its calls.</summary>
+    private sealed class PassingAdjudicator : IEval
+    {
+        public int InvocationCount { get; private set; }
+
+        public string Key => "passing_adjudicator";
+        public string Name => "Passing Adjudicator";
+        public string Category => "test";
+        public string Version => "1.0.0";
+
+        public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)
+        {
+            InvocationCount++;
+            return Task.FromResult(new EvalResult(
+                Metric: new(Key, Name, Category, Version),
+                Score: new(1.0, null, "pass", true, 0.70, "none", null),
+                Details: new(null, null, null, null, null),
+                Provenance: new("stub", null, null, null, null, 0, false),
+                EvaluatedAt: DateTimeOffset.UtcNow));
+        }
+    }
+
+    [Fact]
+    public async Task ARequiredJudgeThatErrored_IsNoVerdict_EvenWhenTheAdjudicatorWouldPass()
+    {
+        // Review round 4 M4 (B10n): [required errored, pass, critical fail] skipped the required-judge rule because the
+        // aggregate was critical, went to the adjudicator, and its pass stood over the missing judge.
+        var adjudicator = new PassingAdjudicator();
+        var sut = BuildWrapper(
+            [new(new StubEval("error", 0.0), 1.0), new(new StubEval("pass"), 1.0), new(new StubEval("fail", 0.1, "critical"), 1.0)],
+            adjudicator);
+
+        var result = await sut.EvaluateAsync(new EvalInput("q", "r"));
+
+        Assert.Equal("error", result.Score.Label);
+        Assert.False(result.Score.Passed);
+        Assert.Equal(0, adjudicator.InvocationCount);
     }
 
     /// <summary>Adjudicator stub that throws if invoked.</summary>
@@ -146,5 +185,78 @@ public class AdjudicatedMultiJudgeWrapperTests
         Assert.Equal("Adjudicated", result.Details.AggregationStrategy);
         // SubResults should include panel (3) + adjudicator (1) = 4
         Assert.Equal(4, result.Details.SubResults!.Count);
+    }
+
+    // ── Nothing measured is no verdict (#203 review, round 2 M-1) ─────────────────────────────────
+    // Every judge errored: their labels all agree ("error"), the panel read as undisputed, the aggregation returned
+    // (0, "none") and the severity switch made it a PASS.
+
+    [Fact]
+    public async Task EveryPanelJudgeErrored_IsError_AndTheAdjudicatorIsNotAsked()
+    {
+        var judges = new EvalComponent[]
+        {
+            new(new StubEval("error", 0.0), 1.0),
+            new(new StubEval("error", 0.0), 1.0),
+            new(new StubEval("error", 0.0), 1.0),
+        };
+        var wrapper = BuildWrapper(judges, new ThrowingAdjudicator());
+
+        var result = await wrapper.EvaluateAsync(new EvalInput(Query: "q", Response: "r"));
+
+        Assert.Equal("error", result.Score.Label);
+        Assert.False(result.Score.Passed);
+    }
+
+    [Fact]
+    public async Task ARequiredJudgeThatErrored_LeavesNoVerdict_AndTheAdjudicatorIsNotAsked()
+    {
+        // B10g (review round 3 M4, swept): three passes and one errored judge cleared the 0.70 agreement bar and passed.
+        var judges = new EvalComponent[]
+        {
+            new(new StubEval("pass", 1.0), 1.0),
+            new(new StubEval("pass", 1.0), 1.0),
+            new(new StubEval("pass", 1.0), 1.0),
+            new(new StubEval("error", 0.0), 1.0),
+        };
+        var wrapper = BuildWrapper(judges, new ThrowingAdjudicator());
+
+        var result = await wrapper.EvaluateAsync(new EvalInput(Query: "q", Response: "r"));
+
+        Assert.Equal("error", result.Score.Label);
+        Assert.False(result.Score.Passed);
+    }
+
+    [Fact]
+    public async Task AnOptionalJudgeThatErrored_DoesNotBlock()
+    {
+        var judges = new EvalComponent[]
+        {
+            new(new StubEval("pass", 1.0), 1.0),
+            new(new StubEval("pass", 1.0), 1.0),
+            new(new StubEval("pass", 1.0), 1.0),
+            new(new StubEval("error", 0.0), 1.0, Required: false),
+        };
+        var wrapper = BuildWrapper(judges, new ThrowingAdjudicator());
+
+        var result = await wrapper.EvaluateAsync(new EvalInput(Query: "q", Response: "r"));
+
+        Assert.NotEqual("error", result.Score.Label);
+    }
+
+    [Fact]
+    public async Task EveryPanelJudgeSkipped_IsSkipped_NotPass()
+    {
+        var judges = new EvalComponent[]
+        {
+            new(new StubEval("skipped", 0.0), 1.0),
+            new(new StubEval("skipped", 0.0), 1.0),
+        };
+        var wrapper = BuildWrapper(judges, new ThrowingAdjudicator());
+
+        var result = await wrapper.EvaluateAsync(new EvalInput(Query: "q", Response: "r"));
+
+        Assert.Equal("skipped", result.Score.Label);
+        Assert.False(result.Score.Passed);
     }
 }

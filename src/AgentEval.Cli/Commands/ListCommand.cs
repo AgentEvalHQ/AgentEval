@@ -75,53 +75,58 @@ internal static class ListCommand
         }
     }
 
+    /// <summary>
+    /// The metric listing: (group, name, description). Whether a row can be passed to <c>--metrics</c> is NOT
+    /// written here — it is read from <see cref="MetricCatalog"/> when printing, so the listing cannot advertise a
+    /// name the CLI then refuses. It used to print eight such names as if they were selectable.
+    /// </summary>
+    internal static readonly IReadOnlyList<(string Group, string Name, string Description)> MetricListing =
+    [
+        ("RAG (LLM-evaluated)", "llm_faithfulness", "Faithfulness to provided context"),
+        ("RAG (LLM-evaluated)", "llm_relevance", "Response relevance to input query"),
+        ("RAG (LLM-evaluated)", "llm_context_precision", "Precision of retrieved context"),
+        ("RAG (LLM-evaluated)", "llm_context_recall", "Recall of retrieved context"),
+        ("RAG (LLM-evaluated)", "llm_answer_correctness", "Correctness of the response"),
+        ("RAG (Embedding-based)", "embed_answer_similarity", "Semantic similarity to expected answer"),
+        ("RAG (Embedding-based)", "embed_response_context", "Semantic similarity: response vs context"),
+        ("RAG (Embedding-based)", "embed_query_context", "Semantic similarity: query vs context"),
+        ("Agentic", "code_tool_selection", "Correct tool was selected"),
+        ("Agentic", "code_tool_arguments", "Tool arguments match expected values"),
+        ("Agentic", "code_tool_success", "Tool calls completed without errors"),
+        ("Agentic", "code_tool_efficiency", "Optimal tool usage (minimum calls)"),
+        ("Agentic", "code_skill_disclosure_efficiency", "Skills disclosed progressively rather than all at once"),
+        ("Agentic", "llm_task_completion", "LLM-judged task completion quality"),
+        ("Safety", "llm_groundedness", "Response is grounded in provided facts"),
+        ("Safety", "llm_coherence", "Logical coherence of the response"),
+        ("Safety", "llm_fluency", "Linguistic fluency and naturalness"),
+        ("Responsible AI", "llm_bias", "Detects bias in agent responses"),
+        ("Responsible AI", "llm_misinformation", "Detects misinformation in responses"),
+        ("Responsible AI", "code_toxicity", "Code-based toxicity detection"),
+        ("Retrieval", "code_recall_at_k", "Recall@K for retrieval evaluation"),
+        ("Retrieval", "code_mrr", "Mean Reciprocal Rank"),
+        ("Conversation", "ConversationCompleteness", "Multi-turn conversation completeness"),
+    ];
+
+    internal const string LibraryOnlyMarker = "[library only: not available via --metrics]";
+
     internal static void PrintMetrics()
     {
         Console.WriteLine("  Metrics");
         Console.WriteLine("  ─────────────────────────────────────────────────────────");
 
-        // RAG metrics (LLM-evaluated)
-        Console.WriteLine("  RAG (LLM-evaluated):");
-        Console.WriteLine("    llm_faithfulness          Faithfulness to provided context");
-        Console.WriteLine("    llm_relevance             Response relevance to input query");
-        Console.WriteLine("    llm_context_precision     Precision of retrieved context");
-        Console.WriteLine("    llm_context_recall        Recall of retrieved context");
-        Console.WriteLine("    llm_answer_correctness    Correctness of the response");
+        foreach (var group in MetricListing.GroupBy(m => m.Group))
+        {
+            Console.WriteLine($"  {group.Key}:");
+            foreach (var (_, name, description) in group)
+            {
+                var marker = MetricCatalog.IsKnown(name) ? "" : $"  {LibraryOnlyMarker}";
+                Console.WriteLine($"    {name,-32} {description}{marker}");
+            }
+        }
 
-        // RAG metrics (Embedding-based)
-        Console.WriteLine("  RAG (Embedding-based):");
-        Console.WriteLine("    embed_answer_similarity   Semantic similarity to expected answer");
-        Console.WriteLine("    embed_response_context    Semantic similarity: response vs context");
-        Console.WriteLine("    embed_query_context       Semantic similarity: query vs context");
-
-        // Agentic metrics
-        Console.WriteLine("  Agentic:");
-        Console.WriteLine("    code_tool_selection       Correct tool was selected");
-        Console.WriteLine("    code_tool_arguments       Tool arguments match expected values");
-        Console.WriteLine("    code_tool_success         Tool calls completed without errors");
-        Console.WriteLine("    code_tool_efficiency      Optimal tool usage (minimum calls)");
-        Console.WriteLine("    llm_task_completion       LLM-judged task completion quality");
-
-        // Safety metrics
-        Console.WriteLine("  Safety:");
-        Console.WriteLine("    llm_groundedness          Response is grounded in provided facts");
-        Console.WriteLine("    llm_coherence             Logical coherence of the response");
-        Console.WriteLine("    llm_fluency               Linguistic fluency and naturalness");
-
-        // Responsible AI metrics
-        Console.WriteLine("  Responsible AI:");
-        Console.WriteLine("    llm_bias                  Detects bias in agent responses");
-        Console.WriteLine("    llm_misinformation        Detects misinformation in responses");
-        Console.WriteLine("    code_toxicity             Code-based toxicity detection");
-
-        // Retrieval metrics
-        Console.WriteLine("  Retrieval:");
-        Console.WriteLine("    code_recall_at_k          Recall@K for retrieval evaluation");
-        Console.WriteLine("    code_mrr                  Mean Reciprocal Rank");
-
-        // Conversation metrics
-        Console.WriteLine("  Conversation:");
-        Console.WriteLine("    ConversationCompleteness  Multi-turn conversation completeness");
+        Console.WriteLine();
+        Console.WriteLine("  Names marked library-only need per-case configuration (expected tools, an embedding");
+        Console.WriteLine("  generator, a K) that --metrics has no source for; construct them in code instead.");
     }
 
     internal static void PrintAttacks()

@@ -15,8 +15,7 @@ using Xunit;
 namespace AgentEval.Tests.Cli;
 
 /// <summary>
-/// Track 2 PR3 + Part C (<c>strategy/CLI-Custom-Benchmarks-CopilotStudio-OpenAI-and-Metrics-Remediation-Design.md</c>
-/// §2 parts B/C): <c>BenchTier1SutResolver</c> — the pure resolution logic behind <c>bench owasp</c>/<c>mitre</c>/
+/// Track 2 PR3 + Part C: <c>BenchTier1SutResolver</c> — the pure resolution logic behind <c>bench owasp</c>/<c>mitre</c>/
 /// <c>nist</c>'s new <c>--sut</c> and <c>--endpoint</c>/<c>--model</c>/<c>--api-key</c> options. Tested directly
 /// rather than through <c>Program.cs</c> (top-level statements aren't a unit-testable surface).
 /// </summary>

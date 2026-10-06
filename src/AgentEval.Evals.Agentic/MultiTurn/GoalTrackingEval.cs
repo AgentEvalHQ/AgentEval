@@ -56,7 +56,7 @@ public sealed class GoalTrackingEval : IEval
             key: "goal_tracking",
             name: "Goal Tracking",
             category: "multi-turn",
-            version: "1.0.0",
+            version: "1.1.0",
             criteria: new[]
             {
                 "The agent's response remains aligned with the original goal established in the first user turn",

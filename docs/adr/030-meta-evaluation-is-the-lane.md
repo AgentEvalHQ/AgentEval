@@ -231,11 +231,10 @@ Surveyed: OpenAI Evals, DeepEval, Ragas, promptfoo, LangSmith, Braintrust, Inspe
   *variance* (bootstrap stderr, Wilson CIs, clustered stderr) and still answers only "how much does
   the score move", never "could this eval have produced a bad score at all".
 
-**The evidence, folded in-repo on 2026-09-05.** This table previously lived in
-`strategy/Galaxus/Ecosystem_ChanceFloor_Comparison.md`, which is gitignored and therefore was not
-readable from this repository — a citation nobody could check. That file is deleted; its evidence is
-here. ⚠️ **The sweep itself is still the one performed on 2026-09-04 and was not re-run** (Q8): treat
-every row as of that date, not as of today.
+**The evidence, folded in-repo on 2026-09-05.** This table previously lived in a local, gitignored
+document, which therefore was not readable from this repository — a citation nobody could check.
+That file is deleted; its evidence is here. ⚠️ **The sweep itself is still the one performed on
+2026-09-04 and was not re-run** (Q8): treat every row as of that date, not as of today.
 
 | Framework | Evidence for "no chance-floor / negative-control machinery" |
 |---|---|
@@ -298,7 +297,7 @@ direction:
 
 ### 2.6 One qualification this ADR owes its own claim — we are not quite at zero
 
-*Added 2026-09-05, folded from `strategy/Galaxus/AgentEval_NonLlm_Inventory.md` before that file was
+*Added 2026-09-05, folded from a local, gitignored inventory document before that file was
 deleted. §2.4 says meta-evaluation is shipped by nobody. Inside this repository that is very nearly
 true, and the exception has to be named or §3 is arguing against a strawman of our own making.*
 
@@ -1938,7 +1937,7 @@ exclude the document that quotes it, or be scoped narrowly enough that quoting i
 possible, state the expected value as *"0 live references; N prose"* rather than as *"0"*.
 
 **Q7 — Does the exclusion list (§3.1) go into `docs/adr/030-*.md` as normative text**, so a PR adding
-`contains` can be closed with a link, or does it stay advisory in `strategy/`? Recommend normative.
+`contains` can be closed with a link, or does it stay advisory in local planning notes? Recommend normative.
 
 **Q8 — Unverified items to check before executing**, not decisions but they gate execution:
 - the ecosystem sweep (§2.4) was **not re-run this session** — its per-framework evidence was folded
@@ -2070,7 +2069,7 @@ sharpens their evidence.
 |---|---|---|
 | **Q4(ii)** — write `measurement` unconditionally and bump `$id` | The writer half of Slice 1.4; any typed definition identity or rep index on the run manifest (`manifest.schema.json` is `additionalProperties:false` at 7 sites — `:6,:12,:22,:36,:54,:64,:73`); a finer `RunStats` bucket than `skipped` (`summary.schema.json:13-22` closes `stats` to `total/passed/failed/warnings/skipped`); on-disk visibility of `NotApplicable` rows without reading `label` | The door changes no historical byte: `NotApplicable` writes `measurement` only when non-default (`EvalScore.cs:163-164`), exactly as the two shipped consumers do (`NamedSkuNotPresentedEval.cs:184`). External consumers hold zero run files under the post-0.28 schema, because none of it has shipped in a package (§11.5). |
 | **Q5** — negative controls | A `Controls` slot on any definition (ADR-032 deliberately gives it none); the `VOID` verdict, `controlLedger`, exit 12 (`src/AgentEval.Cli/ExitCodes.cs:153-154` reserves 12 and names S4/Q5 as the reason); whether the join wave's local ablations become durable controls | The join's ablations were run and reverted locally, not kept. `grep -rn controlLedger src` → 1 hit, the reservation comment. |
-| **Q6** — the stop rule | Whether `FloorComparison` binds any verdict (the door records, `CompareCommand.cs:245` warns, nothing gates); Slice 2.6's acceptance; ADR-032's Wave 2 gate — whether iterating 6.1+6.2 over a definition's cases is inside the local plan's "AE-04 before AE-06" rule (`strategy/Galaxus/MASTER_PLAN.md:1048` — gitignored, not readable from this repository, and not in this ADR: `grep -c 'AE-04' docs/adr/030-*.md` → 0 before this amendment); `AgentEvalCompositeEvaluator` (`src/AgentEval.MAF/Evaluators/AgentEvalCompositeEvaluator.cs:38`, ctor `(IEval composite)` at `:44`, its own two-field `EvalInput` at `:74`, 9 referencing files) — a pre-existing floorless MAF entry for any `IEval`, which takes a floor only if Q6 says a recorded-and-unapplied floor at that door is wanted | Row 11: `SignTestAtEqualK` live at 11 sites, so 2.6's precondition is *two* deletions, not one. `IsUsableAsABar && Passed` with no comparison is now a countable quantity and, on this tree, is every admitted pass. |
+| **Q6** — the stop rule | Whether `FloorComparison` binds any verdict (the door records, `CompareCommand.cs:245` warns, nothing gates); Slice 2.6's acceptance; ADR-032's Wave 2 gate — whether iterating 6.1+6.2 over a definition's cases is inside the local plan's "AE-04 before AE-06" rule (its line 1048 — gitignored, not readable from this repository, and not in this ADR: `grep -c 'AE-04' docs/adr/030-*.md` → 0 before this amendment); `AgentEvalCompositeEvaluator` (`src/AgentEval.MAF/Evaluators/AgentEvalCompositeEvaluator.cs:38`, ctor `(IEval composite)` at `:44`, its own two-field `EvalInput` at `:74`, 9 referencing files) — a pre-existing floorless MAF entry for any `IEval`, which takes a floor only if Q6 says a recorded-and-unapplied floor at that door is wanted | Row 11: `SignTestAtEqualK` live at 11 sites, so 2.6's precondition is *two* deletions, not one. `IsUsableAsABar && Passed` with no comparison is now a countable quantity and, on this tree, is every admitted pass. |
 | **Q8** | Quotation, not execution (`:1800-1802`) | Unchanged. |
 
 ### 11.5 Why none of this is testable from outside yet

@@ -16,7 +16,7 @@ using Xunit;
 namespace AgentEval.Tests.Cli.CopilotStudio;
 
 /// <summary>
-/// Track 2 PR2 (<c>strategy/CopilotStudio/Bench-Eval-Integration-and-Live-Connector-Plan.md</c> §3.4 "eval"):
+/// Track 2 PR2 ("eval"):
 /// <c>eval --sut copilot-studio</c> — the shared <c>ISutTarget</c> seam reused by a SECOND verb, without
 /// touching <c>RedTeamCommand</c>/<c>RedTeamOptions</c>. Mirrors <c>CopilotStudioRedTeamTargetTests</c>'
 /// coverage shape (safety-gate validation, then a full credential-free scan via <c>sutOverride</c>).

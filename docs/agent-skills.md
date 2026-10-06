@@ -51,11 +51,22 @@ packages you already use, plus one new package-free namespace, `AgentEval.Skills
 |---|---|---|
 | 1 | Assertions + progressive-disclosure metric | Inline-ready |
 | 2 | Compliance scanner (`SKILL.md` authoring + governance rules) | Inline-ready |
-| 3 | Skill-injection red-team attack | **Shadow-only** (judge did not clear calibration on this surface — see below) |
-| 3 | `run_skill_script` governance gates | Inline-ready (deterministic, no calibration debt) |
+| 3 | Skill-injection red-team attack | Runs; pass/fail is keyed on tool-call evidence. Its LLM judge is **shadow-only** (advisory) — the judge did not clear calibration on this surface, see below |
+| 3 | `run_skill_script` governance gates | Inline-ready (deterministic, no judge, so no calibration needed) |
 | 3b | SkillGate — construction-time drift enforcement | Inline-ready (deterministic, Tier 1) |
 | 4a/4b | Skill Health & Security Index + hash-pin drift detection | Inline-ready (both deterministic) |
-| 4c | Skill fuzzing, canary-skill honeypot, typosquat detection | **Not built** — deprioritized, see `strategy/TODO.md` |
+| 4c | Skill fuzzing, canary-skill honeypot, typosquat detection | **Not built** |
+
+**API stability.** The Gatekeeper-side skill types are part of the frozen Gatekeeper v1 public API — the
+snapshot in `tests/AgentEval.Tests/Snapshots/GatekeeperPublicApiSnapshotTests.ThePublicSurface_MatchesTheApprovedSnapshot.verified.txt`
+lists them, none marked `[Experimental]`: `GatekeeperOptions.WithSkillGate`, `GatekeeperOptions.Skills`,
+`GatekeeperOptions.SkillBaselinePath`, `GatekeeperOptions.SkillGateMode`, `SkillGateMode`,
+`SkillGateConstructionCheck`, `SkillDriftException`, `SkillScriptExecutionGate`, `SkillScriptApprovalGate`
+(all in `AgentEval.MAF.Gatekeeper`) and `AgentEval.Guardrails.Judges.Rubrics.SkillInjectionGoldSet`. The
+snapshot covers only the `AgentEval.MAF.Gatekeeper`, `AgentEval.Guardrails` and `AgentEval.MAF.AgentHooks`
+namespaces, so the rest of this page's API is outside it: the `AgentEval.Skills` namespace, `MafSkillScanner`
+and `ScannedSkillInfo` (`AgentEval.MAF.Skills` — even though `WithSkillGate` takes `ScannedSkillInfo`),
+`SkillUsageAssertions` and `SkillInjectionAttack`.
 
 ## 1 — Assertions and the disclosure-efficiency metric
 
@@ -203,16 +214,17 @@ attack types / **264** probes) red-teams two surfaces:
 
 It reuses the shipped `IndirectInjectionRubric` judge rather than inventing a new mega-judge — but a **live
 calibration found the reused rubric does not clear the promotion bar on this new surface**: 4 missed attacks
-out of a 52-case, both-directions gold set
-(`AgentEval.Guardrails.Judges.Rubrics.SkillInjectionGoldSet`), `IsInlineReady == false`. It ships
-**shadow-only** for skills — the judge's verdict is advisory, printed for visibility, but the actual
-pass/fail is keyed on real tool-call evidence (did the agent call the forbidden tool?), never on an
+and 2 false alarms on a 52-case, both-directions gold set
+(`AgentEval.Guardrails.Judges.Rubrics.SkillInjectionGoldSet`), `IsInlineReady == false`. The check is
+`SkillInjectionGoldSetCalibrationLiveCheck`, which only calls the model when `AGENTEVAL_RUN_SKILLCAL=1`. So
+on the skill surface the **judge is shadow-only**: its verdict is advisory, printed for visibility, and the
+attack's pass/fail is keyed on real tool-call evidence (did the agent call the forbidden tool?), never on an
 uncalibrated judge's opinion. This is documented explicitly, not silently promoted; see
 [Gatekeeper — gate reference](gatekeeper/gate-reference.md) for the general calibration bar every judge is
 held to.
 
-Governance for the *other* half of the surface — actually executing `run_skill_script` code — is deterministic
-and has no calibration debt:
+Governance for the *other* half of the surface — actually executing `run_skill_script` code — is deterministic,
+involves no judge, and is inline-ready:
 
 - **`SkillScriptExecutionGate`** (`IToolGate`) — an allowlist gate at the function-invocation seam. Matches by
   argument **value** (every string argument, plus pairwise `"/"`-joins), not by a specific key name, so it
@@ -266,7 +278,7 @@ var agent = baseAgent.AsBuilder()
 - **Construction-time-only, deliberately — not a per-turn runtime seam.** An `AgentSkillsSource` is wired once
   at agent construction and doesn't change mid-run, so a per-turn check would be pure waste. A long-running
   server whose skill folder is modified on disk *while already constructed* is a narrower threat this check
-  cannot catch — a future, opt-in, per-call Tier 2 gate, not built here.
+  cannot catch, and there is no per-call skill gate that would.
 
 **Recovering from a `SkillDriftException`** — after you've reviewed a legitimate skill update and want to
 re-trust it, re-pin it from the CLI rather than hand-editing the baseline JSON:
@@ -361,15 +373,16 @@ not merely non-compliant. `SkillComplianceReport.Coverage.SilentlyExcludedCount`
 in every renderer. A `compatibility` field over 500 characters, which otherwise makes `GetSkillsAsync()` throw
 and would crash the whole scan, is caught and reported as one clean finding instead.
 
-## What's not built yet
+## What's not built
 
-Phase 4c (skill fuzzing via the transform/codec pipeline, a canary-skill honeypot, skill-name typosquatting,
-load-storm-as-denial-of-wallet) was deprioritized this session in favor of shipping 4a/4b and the exclusion-
-detection fix (§5) with full rigor. Wave 3a (filesystem multi-repo scan, `scan-workspace`) shipped — see §2
-above. **Wave 3b** (a live, API-driven org-wide scan reaching repos you haven't cloned — `scan-org` — plus live
-upstream verification against a skill's declared source URL) is still gated on a security/credential-scope
-review not yet held, since it needs a real GitHub/GitLab API client and token handling that `scan-workspace`
-deliberately avoids — see `strategy/TODO.md` (local-only) for the up-to-date backlog.
+- **Phase 4c** — skill fuzzing via the transform/codec pipeline, a canary-skill honeypot, skill-name
+  typosquatting detection, and load-storm-as-denial-of-wallet detection. None of these exists.
+- **An org-wide, API-driven scan (`scan-org`)** that reaches repos you haven't cloned, and live verification of
+  a skill against its declared upstream source URL. Neither exists: both would need a GitHub/GitLab API client
+  and token handling, which `scan-workspace` (§2) deliberately avoids by scanning only folders you have
+  already cloned.
+- **A per-call skill drift gate** for a server whose skill folder changes on disk after the agent was
+  constructed (see §3b).
 
 ## Related
 
@@ -381,4 +394,4 @@ deliberately avoids — see `strategy/TODO.md` (local-only) for the up-to-date b
 - [Gatekeeper — examples](gatekeeper/examples.md) — the general `UseGatekeeper(enforcement, configure)` wiring
   pattern §3b's `WithSkillGate` plugs into.
 - [Architecture](architecture.md#maf-agent-skills-assertions) — implementation-level detail (file layout, MAF
-  API constraints discovered this session).
+  API constraints).

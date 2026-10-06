@@ -28,6 +28,9 @@ public static class PerformanceMetrics
     {
         PrintHeader();
 
+        if (!AIConfig.StartModelSample())
+            return;
+
         var agent = CreateAgent();
         Console.WriteLine($"\ud83d\udcdd Step 1: Agent '{agent.Name}' created\n");
 
@@ -69,7 +72,7 @@ public static class PerformanceMetrics
 
     private static void PrintPerformanceMetrics(TestResult result)
     {
-        Console.WriteLine("\ud83d\udcca PERFORMANCE METRICS:");
+        Console.WriteLine($"\ud83d\udcca PERFORMANCE METRICS:{AIConfig.MockLabel}");
         Console.WriteLine(new string('\u2500', 60));
         
         if (result.Performance != null)
@@ -111,13 +114,13 @@ public static class PerformanceMetrics
                     .HaveTokenCountUnder(5000);
 
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("   \u2705 Performance assertions passed!");
+                Console.WriteLine($"   \u2705 Performance assertions passed!{AIConfig.MockLabel}");
                 Console.ResetColor();
             }
             catch (PerformanceAssertionException ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"   \u274c Assertion failed: {ex.Message}");
+                Console.WriteLine($"   \u274c Assertion failed: {ex.Message}{AIConfig.MockLabel}");
                 Console.ResetColor();
             }
         }
@@ -175,7 +178,7 @@ public static class PerformanceMetrics
 
     private static AIAgent CreateAgent()
     {
-        if (!AIConfig.IsConfigured)
+        if (AIConfig.UseMock)
         {
             return CreateMockAgent();
         }

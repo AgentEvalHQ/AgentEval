@@ -64,8 +64,182 @@ public class BenchOwaspCommandTests : IDisposable
 
     // ── Env-gate parity with the other bench commands ─────────────────────────
 
+    private string[] WorkspaceFiles() =>
+        Directory.GetFileSystemEntries(Path.Combine(_root, ".agenteval"), "*", SearchOption.AllDirectories)
+            .Select(f => Path.GetRelativePath(_root, f))
+            .OrderBy(f => f, StringComparer.Ordinal)
+            .ToArray();
+
+    private sealed class CountingJudge : Microsoft.Extensions.AI.IChatClient
+    {
+        private int _calls;
+        public int Calls => _calls;
+
+        public Task<Microsoft.Extensions.AI.ChatResponse> GetResponseAsync(
+            IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages, Microsoft.Extensions.AI.ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            Interlocked.Increment(ref _calls);
+            return Task.FromResult(new Microsoft.Extensions.AI.ChatResponse(new Microsoft.Extensions.AI.ChatMessage(
+                Microsoft.Extensions.AI.ChatRole.Assistant, "VERDICT: INCONCLUSIVE\nCONFIDENCE: 0.5\nREASON: test")));
+        }
+
+        public IAsyncEnumerable<Microsoft.Extensions.AI.ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages, Microsoft.Extensions.AI.ChatOptions? options = null,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+        public void Dispose() { }
+    }
+
+    /// <summary>Answers the preflight call, then fails every grading call, as an expired key or a quota would.</summary>
+    private sealed class FailsAfterPreflightJudge : Microsoft.Extensions.AI.IChatClient
+    {
+        private int _calls;
+
+        public Task<Microsoft.Extensions.AI.ChatResponse> GetResponseAsync(
+            IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages, Microsoft.Extensions.AI.ChatOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            if (Interlocked.Increment(ref _calls) == 1)
+                return Task.FromResult(new Microsoft.Extensions.AI.ChatResponse(new Microsoft.Extensions.AI.ChatMessage(
+                    Microsoft.Extensions.AI.ChatRole.Assistant, "OK")));
+            throw new HttpRequestException("429 quota exceeded");
+        }
+
+        public IAsyncEnumerable<Microsoft.Extensions.AI.ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages, Microsoft.Extensions.AI.ChatOptions? options = null,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+        public void Dispose() { }
+    }
+
+    private sealed class DeadJudge : Microsoft.Extensions.AI.IChatClient
+    {
+        public Task<Microsoft.Extensions.AI.ChatResponse> GetResponseAsync(
+            IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages, Microsoft.Extensions.AI.ChatOptions? options = null,
+            CancellationToken cancellationToken = default) => throw new HttpRequestException("401 invalid api key");
+
+        public IAsyncEnumerable<Microsoft.Extensions.AI.ChatResponseUpdate> GetStreamingResponseAsync(
+            IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages, Microsoft.Extensions.AI.ChatOptions? options = null,
+            CancellationToken cancellationToken = default) => throw new NotSupportedException();
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+        public void Dispose() { }
+    }
+
     [Fact]
-    public async Task BenchOwasp_NoEnvVars_NoStubOptIn_ReturnsExitCode3()
+    public async Task BenchOwasp_AJudgeThatCannotAnswer_StopsTheRunBeforeTheScan()
+    {
+        InitWorkspace();
+        var before = WorkspaceFiles();
+
+        var result = await BenchOwaspCommand.RunAsync(
+            preset: "top10", subject: "OwaspDeadJudgeAgent", rootOverride: _root, inputText: null,
+            evaluatorOverride: null, agentOverride: new SafeRefusalAgent("OwaspDeadJudgeAgent"), judgeClientOverride: new DeadJudge());
+
+        Assert.Equal(AgentEval.Cli.ExitCodes.RuntimeError, result.ExitCode);
+        Assert.Equal(before, WorkspaceFiles());
+    }
+
+    [Fact]
+    public async Task BenchOwasp_AJudgeThatFailsMidScan_IsIncomplete_NotAPass()
+    {
+        // Through 0.42 a failing judge turned the semantic categories into skipped leaves and the composite read PASS.
+        InitWorkspace();
+
+        var result = await BenchOwaspCommand.RunAsync(
+            preset: "top10", subject: "OwaspFlakyJudgeAgent", rootOverride: _root, inputText: null,
+            evaluatorOverride: null, agentOverride: new SafeRefusalAgent("OwaspFlakyJudgeAgent"),
+            judgeClientOverride: new FailsAfterPreflightJudge());
+
+        Assert.Equal(AgentEval.Cli.ExitCodes.GateIndeterminate, result.ExitCode);
+        var summary = Directory.GetFiles(Path.Combine(_root, ".agenteval"), "summary.json", SearchOption.AllDirectories).Single();
+        Assert.Contains("\"WARN\"", File.ReadAllText(summary));
+    }
+
+    [Fact]
+    public async Task BenchOwasp_GradesTheAttacksWithTheJudge()
+    {
+        // Through 0.42 bench owasp resolved a judge and never called it.
+        InitWorkspace();
+        var judge = new CountingJudge();
+
+        var result = await BenchOwaspCommand.RunAsync(
+            preset: "top10", subject: "OwaspJudgedAgent", rootOverride: _root, inputText: null,
+            evaluatorOverride: null, agentOverride: new SafeRefusalAgent("OwaspJudgedAgent"), judgeClientOverride: judge);
+
+        Assert.True(result.ExitCode is 0 or 9 or 10 or 11, $"Expected a gate verdict; got {result.ExitCode}.");
+        Assert.True(judge.Calls > 0, "The judge was never called.");
+    }
+
+    [Fact]
+    public async Task BenchOwasp_NoTarget_Refuses_AndStoresNothing()
+    {
+        // Through 0.42 a run with no target scanned a built-in agent that refuses everything (a red-team PASS)
+        // and stored it as the subject's result.
+        InitWorkspace();
+        var before = WorkspaceFiles();
+
+        var result = await BenchOwaspCommand.RunAsync(
+            preset: "smoke", subject: "OwaspNoTargetAgent", rootOverride: _root, inputText: null,
+            evaluatorOverride: new PassingStubEvaluator(), agentOverride: null);
+
+        Assert.Equal(AgentEval.Cli.ExitCodes.UsageError, result.ExitCode);
+        Assert.Null(result.ReportDir);
+        Assert.Equal(before, WorkspaceFiles());
+    }
+
+    [Fact]
+    public async Task BenchOwasp_Mock_NeedsNoJudgeOrProvider()
+    {
+        // A selector naming a provider with no variables makes any real judge resolution fail closed (exit 3).
+        // A mock run must not reach it.
+        InitWorkspace();
+        using var env = new ProviderEnvironmentScope(("AI_INFERENCE_PROVIDER", "foundry"));
+
+        var result = await BenchOwaspCommand.RunAsync(
+            preset: "smoke", subject: "OwaspMockNoProviderAgent", rootOverride: _root, inputText: null,
+            evaluatorOverride: null, agentOverride: null, mock: true);
+
+        Assert.Equal(AgentEval.Cli.ExitCodes.GateIndeterminate, result.ExitCode);
+    }
+
+    [Fact]
+    public async Task BenchOwasp_MockWithARealTarget_IsRefusedByTheCommandItself()
+    {
+        InitWorkspace();
+        var before = WorkspaceFiles();
+
+        var result = await BenchOwaspCommand.RunAsync(
+            preset: "smoke", subject: "OwaspMockPlusTargetAgent", rootOverride: _root, inputText: null,
+            evaluatorOverride: new PassingStubEvaluator(), agentOverride: new SafeRefusalAgent("OwaspReal"), mock: true);
+
+        Assert.Equal(AgentEval.Cli.ExitCodes.UsageError, result.ExitCode);
+        Assert.Equal(before, WorkspaceFiles());
+    }
+
+    [Fact]
+    public async Task BenchOwasp_Mock_ExitsIndeterminate_AndStoresNothing()
+    {
+        InitWorkspace();
+        var before = WorkspaceFiles();
+
+        var result = await BenchOwaspCommand.RunAsync(
+            preset: "smoke", subject: "OwaspMockAgent", rootOverride: _root, inputText: null,
+            evaluatorOverride: new PassingStubEvaluator(), agentOverride: null, mock: true);
+
+        Assert.Equal(AgentEval.Cli.ExitCodes.GateIndeterminate, result.ExitCode);
+        Assert.Null(result.ReportDir);
+        Assert.Equal(before, WorkspaceFiles());
+    }
+
+    [Fact]
+    public async Task BenchOwasp_NoProvider_ReturnsExitCode3()
     {
         InitWorkspace();
         var result = await BenchOwaspCommand.RunAsync(
@@ -74,7 +248,7 @@ public class BenchOwaspCommandTests : IDisposable
             rootOverride: _root,
             inputText: null,
             evaluatorOverride: null,
-            agentOverride: null);
+            agentOverride: new SafeRefusalAgent("OwaspTargetAgent"));
         Assert.Equal(3, result.ExitCode);
     }
 
@@ -91,7 +265,7 @@ public class BenchOwaspCommandTests : IDisposable
             rootOverride: _root,
             inputText: null,
             evaluatorOverride: null,
-            agentOverride: null);
+            agentOverride: new SafeRefusalAgent("OwaspTargetAgent"));
         Assert.Equal(3, result.ExitCode);
     }
 
@@ -107,7 +281,7 @@ public class BenchOwaspCommandTests : IDisposable
             rootOverride: noWorkspaceRoot,
             inputText: null,
             evaluatorOverride: new PassingStubEvaluator(),
-            agentOverride: null);
+            agentOverride: new SafeRefusalAgent("OwaspTargetAgent"));
 
         Assert.Equal(1, result.ExitCode);
     }

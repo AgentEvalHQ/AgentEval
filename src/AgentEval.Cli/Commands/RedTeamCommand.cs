@@ -60,7 +60,7 @@ internal static class RedTeamCommand
         var systemPromptCanaryOpt = new Option<string?>("--system-prompt-canary")
             { Description = "Secret token embedded in the SUT system prompt; SystemPromptExtraction then proves a leak only when this exact token appears in a response (otherwise Inconclusive)." };
         var sutOpt = new Option<string?>("--sut")
-            { Description = "Built-in system-under-test. 'gatekeeper-demo' runs a credential-free, deterministic Gatekeeper-gated agent (no --endpoint needed) to demonstrate the attack-the-gate closed loop. 'copilot-studio' red-teams a LIVE Microsoft Copilot Studio agent (text-only/Verbal fidelity; requires --copilotstudio-config and --i-understand-live-side-effects)." };
+            { Description = "Built-in system-under-test. 'gatekeeper-demo' runs a Gatekeeper-gated agent on the configured provider's model (no --endpoint needed) to demonstrate the attack-the-gate closed loop; with no provider configured it falls back to a scripted, fully compromised model and says so. 'copilot-studio' red-teams a LIVE Microsoft Copilot Studio agent (text-only/Verbal fidelity; requires --copilotstudio-config and --i-understand-live-side-effects)." };
 
         // Built-in SUT targets (--sut <id>): each owns its own options + validation + construction (SRP; see
         // IRedTeamBuiltInTarget). The endpoint/--azure path is NOT a target — it stays as the red-team-core default.
@@ -92,6 +92,8 @@ internal static class RedTeamCommand
         // Options
         var failFastFlag = new Option<bool>("--fail-fast")
             { Description = "Stop scanning on first successful attack" };
+        var benignControlsFlag = new Option<bool>("--benign-controls")
+            { Description = "Also run benign look-alike requests and report over-refusal beside the attack success rate, graded by the over-refusal judge (needs --judge; does not change the verdict)" };
         var maxProbesOpt = new Option<int>("--max-probes")
             { DefaultValueFactory = _ => 0, Description = "Maximum probes per attack (0 = unlimited)" };
 
@@ -179,6 +181,7 @@ internal static class RedTeamCommand
         command.Options.Add(acceptLicenseOpt);
         command.Options.Add(intensityOpt);
         command.Options.Add(failFastFlag);
+        command.Options.Add(benignControlsFlag);
         command.Options.Add(maxProbesOpt);
         command.Options.Add(delayOpt);
         command.Options.Add(parallelismOpt);
@@ -230,6 +233,7 @@ internal static class RedTeamCommand
                 AcceptLicense = parseResult.GetValue(acceptLicenseOpt),
                 Intensity = parseResult.GetValue(intensityOpt)!,
                 FailFast = parseResult.GetValue(failFastFlag),
+                BenignControls = parseResult.GetValue(benignControlsFlag),
                 MaxProbes = parseResult.GetValue(maxProbesOpt),
                 DelaySeconds = parseResult.GetValue(delayOpt),
                 Parallelism = parseResult.GetValue(parallelismOpt),
@@ -257,6 +261,16 @@ internal static class RedTeamCommand
                 Quiet = parseResult.GetValue(quietFlag),
             };
 
+            // No target at all is a usage error (exit 2), as for every command that evaluates an agent: there is
+            // nothing to evaluate. ExecuteAsync still throws for it, for its direct callers; through 0.42 the
+            // command line reported that throw as a runtime error (exit 3). `--pack list` evaluates nothing and needs
+            // no target: ExecuteAsync prints the catalog before anything else.
+            if (opts.Sut is null && opts.Endpoint is null && !opts.Azure && !IsPackList(opts))
+            {
+                Console.Error.WriteLine("  Error: Specify --endpoint <url> or --azure, or --sut <target>.");
+                return ExitCodes.UsageError;
+            }
+
             try
             {
                 return await ExecuteAsync(opts, ct);
@@ -283,10 +297,13 @@ internal static class RedTeamCommand
     /// non-null, is used as the system-under-test instead of constructing one — the credential-free test seam that
     /// lets a fake agent drive a full built-in-target scan offline.
     /// </summary>
+    private static bool IsPackList(RedTeamOptions opts) =>
+        string.Equals(opts.Pack?.Trim(), "list", StringComparison.OrdinalIgnoreCase);
+
     internal static async Task<int> ExecuteAsync(RedTeamOptions opts, CancellationToken ct, IEvaluableAgent? sutOverride = null)
     {
         // 0. `--pack list`: print the benchmark-pack catalog and exit (no scan, no endpoint required).
-        if (string.Equals(opts.Pack?.Trim(), "list", StringComparison.OrdinalIgnoreCase))
+        if (IsPackList(opts))
         {
             Console.WriteLine("Available benchmark packs (run with --pack <name> --accept-license to download + scan):");
             foreach (var p in PackCatalog.All)
@@ -308,7 +325,7 @@ internal static class RedTeamCommand
         if (selectedTarget is null)
         {
             if (opts.Endpoint is null && !opts.Azure)
-                throw new InvalidOperationException("Specify --endpoint <url> or --azure (or --sut gatekeeper-demo for a credential-free demo).");
+                throw new InvalidOperationException("Specify --endpoint <url> or --azure (or --sut gatekeeper-demo for the Gatekeeper demo).");
             if (opts.Azure && opts.Endpoint is null)
                 throw new InvalidOperationException(
                     "--azure requires --endpoint <url> (your Azure OpenAI resource endpoint, e.g. https://myresource.openai.azure.com/).");
@@ -582,6 +599,8 @@ internal static class RedTeamCommand
             Console.Error.WriteLine($"  Verdict: {result.Verdict}  (score {result.ConclusiveScore:F1}/100 over {result.Coverage:F0}% conclusive coverage)");
             if (result.InconclusiveProbes > 0)
                 Console.Error.WriteLine($"  Note: {result.InconclusiveProbes}/{result.TotalProbes} probes were inconclusive — that lowers coverage, not the pass rate.");
+            // The second headline number, always: an agent that refuses everything passes on attacks alone.
+            Console.Error.WriteLine($"  Over-refusal: {result.OverRefusalSummary}");
 
             // Built-in target post-scan summary (e.g. the gatekeeper-demo gate-block count — the closed loop).
             if (selectedTarget is not null && gateTrace is not null)
@@ -624,6 +643,22 @@ internal static class RedTeamCommand
         if (opts.Baseline is not null)
         {
             var baseline = await RedTeamBaseline.LoadAsync(opts.Baseline.FullName, ct);
+            if (!string.Equals(baseline.AgentName, result.AgentName, StringComparison.Ordinal))
+            {
+                // The demo's name says which model it ran on. A scripted baseline against a real-model run (or one
+                // model against another) compares two different instruments, so it is refused, like an intensity
+                // mismatch. Any other agent may have been renamed, so it only gets a note.
+                if (baseline.AgentName.StartsWith("gatekeeper-demo (", StringComparison.Ordinal)
+                    && result.AgentName.StartsWith("gatekeeper-demo (", StringComparison.Ordinal))
+                {
+                    throw new InvalidOperationException(
+                        $"The baseline was taken on '{baseline.AgentName}'; this run is '{result.AgentName}'. They are " +
+                        "different instruments: take the baseline on the same model, or pass --scripted for both.");
+                }
+                if (!opts.Quiet)
+                    Console.Error.WriteLine(
+                        $"  Note: the baseline was taken on '{baseline.AgentName}'; this run is '{result.AgentName}'.");
+            }
             var comparison = new RedTeamBaselineComparer().Compare(result, baseline);
             regression = comparison.Status;
             if (!opts.Quiet)
@@ -732,6 +767,10 @@ internal static class RedTeamCommand
         const double MaxTimeoutSeconds = 86_400;
         if (opts.TimeoutPerProbeSeconds > MaxTimeoutSeconds || opts.TimeoutPerTurnSeconds > MaxTimeoutSeconds)
             throw new ArgumentException($"--timeout-per-probe / --max-turn-timeout must be <= {MaxTimeoutSeconds:F0} seconds (1 day).");
+        // A benign control is graded by the over-refusal judge. Without --judge the arm cannot run; say so before any
+        // I/O rather than scanning and then reporting "not measured".
+        if (opts.BenignControls && string.IsNullOrWhiteSpace(opts.JudgeEndpoint))
+            throw new ArgumentException("--benign-controls needs --judge: each benign control is graded by the over-refusal judge.");
     }
 
     internal static ScanOptions BuildScanOptions(
@@ -757,6 +796,7 @@ internal static class RedTeamCommand
             AttackTypes = attacks,
             Intensity = intensity,
             FailFast = opts.FailFast,
+            RunBenignControls = opts.BenignControls,
             MaxProbesPerAttack = opts.MaxProbes,
             JudgeClient = judgeClient, // GAP-19: the runner re-evaluates Inconclusive probes with this judge (capped at IntentToAct)
             // ADR-021 (B.1): judge grading mode/rubric/timeout. Mode is orthogonal to --judge: 'primary' with no
@@ -797,7 +837,7 @@ internal static class RedTeamCommand
     };
 
     /// <summary>
-    /// The built-in <c>--sut</c> targets (gatekeeper-demo — the credential-free demo — first, then copilot-studio; no
+    /// The built-in <c>--sut</c> targets (gatekeeper-demo — the Gatekeeper demo — first, then copilot-studio; no
     /// ordering is relied upon). A fresh list per call so the option-holding targets aren't shared across command
     /// builds; the dispatch (Validate/Build) reads only <see cref="RedTeamOptions"/>.
     /// </summary>
@@ -916,6 +956,7 @@ internal sealed class RedTeamOptions
     public bool AcceptLicense { get; init; }
     public required string Intensity { get; init; }
     public bool FailFast { get; init; }
+    public bool BenignControls { get; init; }
     public int MaxProbes { get; init; }
     public string? JudgeEndpoint { get; init; }
     public string? JudgeModel { get; init; }

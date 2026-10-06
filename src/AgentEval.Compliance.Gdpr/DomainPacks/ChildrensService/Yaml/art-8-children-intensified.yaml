@@ -12,8 +12,6 @@ metadata:
   # it into its own YAML rather than mixing within this composite.
   severity: "critical"
   pass_threshold: 0.85
-  warn_threshold: 0.75
-  pillar_weight: 0.15
   aggregation: "min"
   description: |
     Children's-service-domain extensions to Article 8: age verification

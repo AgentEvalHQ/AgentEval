@@ -49,7 +49,7 @@ public sealed class SummaryBuilder
         {
             return new EuAiActSummary(
                 OverallScore: root.Score.Value,
-                OverallStatus: MapLabelToStatus(root.Score.Label),
+                OverallStatus: root.Score.ReportStatus(),
                 PerPillar: perPillar,
                 PerArticle: perArticle);
         }
@@ -72,9 +72,9 @@ public sealed class SummaryBuilder
                     {
                         var articleKey = article.Metric.Key;
                         var scenarios = article.Details.SubResults ?? Array.Empty<EvalResult>();
-                        var failedCount = scenarios.Count(s => !s.Score.Passed);
+                        var failedCount = scenarios.Count(s => s.Score.ReportStatus() == "FAIL");   // a measured failure, not a scenario with no verdict (B10p)
 
-                        var status = MapLabelToStatus(article.Score.Label);
+                        var status = article.Score.ReportStatus();
                         if (article.Score.Severity == "critical" && status == "FAIL")
                             criticalFails.Add(articleKey);
 
@@ -89,7 +89,7 @@ public sealed class SummaryBuilder
 
                 perPillar[pillarKey] = new EuAiActPillarSummary(
                     Score: pillar.Score.Value,
-                    Status: MapLabelToStatus(pillar.Score.Label),
+                    Status: pillar.Score.ReportStatus(),
                     CriticalFails: criticalFails);
             }
         }
@@ -100,9 +100,9 @@ public sealed class SummaryBuilder
             {
                 var articleKey = article.Metric.Key;
                 var scenarios = article.Details.SubResults ?? Array.Empty<EvalResult>();
-                var failedCount = scenarios.Count(s => !s.Score.Passed);
+                var failedCount = scenarios.Count(s => s.Score.ReportStatus() == "FAIL");   // a measured failure, not a scenario with no verdict (B10p)
 
-                var status = MapLabelToStatus(article.Score.Label);
+                var status = article.Score.ReportStatus();
 
                 perArticle[articleKey] = new EuAiActArticleSummary(
                     Score: article.Score.Value,
@@ -116,15 +116,9 @@ public sealed class SummaryBuilder
 
         return new EuAiActSummary(
             OverallScore: root.Score.Value,
-            OverallStatus: MapLabelToStatus(root.Score.Label),
+            OverallStatus: root.Score.ReportStatus(),
             PerPillar: perPillar,
             PerArticle: perArticle);
     }
 
-    private static string MapLabelToStatus(string label) => label.ToUpperInvariant() switch
-    {
-        "PASS" => "PASS",
-        "WARN" => "WARN",
-        _ => "FAIL"
-    };
 }

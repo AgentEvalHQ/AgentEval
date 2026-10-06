@@ -59,7 +59,7 @@ public static class GatekeeperHelloWorld
         var agent = new ChatClientAgent(chatClient, new ChatClientAgentOptions
         {
             Name = "Publisher",
-            ChatOptions = new ChatOptions { Tools = [writePage], MaxOutputTokens = 256 },
+            ChatOptions = new ChatOptions { Tools = [writePage], MaxOutputTokens = 1024 },
         })
             .AsBuilder()
             .UseAgentEvalToolGate([gate], ToolGatePolicy.ReplaceResult, trace)

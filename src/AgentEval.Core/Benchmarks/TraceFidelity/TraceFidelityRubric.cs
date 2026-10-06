@@ -22,10 +22,10 @@ public static class TraceFidelityRubric
     /// <summary>Chat boundary saw more round-trips for a tool than the agent reported (silent retries).</summary>
     public const string HiddenRetries = "hidden_retries";
 
-    /// <summary>Per-turn token sums disagree with the agent-layer totals.</summary>
+    /// <summary>Agent-layer token total falls short of the per-turn chat-boundary sum by more than <see cref="TokenToleranceFraction"/> of that sum; over-reporting is not flagged.</summary>
     public const string TokenUnderReporting = "token_under_reporting";
 
-    /// <summary>Chat boundary saw content_filter/length; agent boundary reported stop/none.</summary>
+    /// <summary>Chat boundary saw content_filter/length; agent boundary did not report that reason.</summary>
     public const string SuppressedFinishReason = "suppressed_finish_reason";
 
     /// <summary>All six discrepancy classes, in canonical order.</summary>

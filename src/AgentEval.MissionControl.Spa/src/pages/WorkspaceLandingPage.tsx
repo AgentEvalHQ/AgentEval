@@ -25,7 +25,7 @@ export function WorkspaceLandingPage({ root, agentEvalVersion }: Props) {
         <p className="text-base text-slate-600">
           This workspace hasn't been initialised yet. Run{" "}
           <code className="font-mono bg-slate-100 px-1.5 py-0.5 rounded text-slate-800">
-            agenteval init
+            agenteval init-workspace
           </code>{" "}
           to start tracking eval runs, then refresh this page.
         </p>
@@ -40,14 +40,14 @@ export function WorkspaceLandingPage({ root, agentEvalVersion }: Props) {
           <Step
             n={1}
             title="Initialise the workspace"
-            command="agenteval init"
+            command="agenteval init-workspace"
             description="Creates .agenteval/ + solution.json in the current directory."
           />
           <Step
             n={2}
             title="Run an evaluation"
-            command={`agenteval bench agentic --subject MyAgent`}
-            description="Or any other bench / scenario you have. Results land in .agenteval/."
+            command={`agenteval bench owasp --preset smoke --subject MyAgent --azure-from-env`}
+            description="Points a benchmark at your agent (the provider AI_INFERENCE_PROVIDER selects), or use any other bench command with a target. Results land in .agenteval/."
           />
           <Step
             n={3}

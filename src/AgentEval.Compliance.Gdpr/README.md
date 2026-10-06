@@ -15,12 +15,11 @@ with the canonical `IOutputStore` audit chain.
 ## Quick Start
 
 ```
-dotnet run --project src/AgentEval.Cli --framework net10.0 -- bench gdpr --preset smoke --subject TravelAgent
+dotnet run --project src/AgentEval.Cli --framework net10.0 -- bench gdpr --preset smoke --subject TravelAgent --azure-from-env
 ```
 
-Without `AZURE_OPENAI_*` environment variables set, the CLI uses a stub judge
-and prints a warning. Results from the stub are not meaningful for compliance
-purposes.
+The run needs a target (`--azure-from-env` drives the model the configured provider serves; see the CLI reference
+for the others) and a judge from a configured provider (`AI_INFERENCE_PROVIDER`). Without a judge the CLI exits 3.
 
 ## Project Layout
 

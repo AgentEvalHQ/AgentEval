@@ -10,7 +10,7 @@ using Xunit;
 namespace AgentEval.Tests.Cli.CopilotStudio;
 
 /// <summary>
-/// P6 item A (<c>strategy/CopilotStudio/Copilot-Studio-P6-Connector-Health-and-Resilience-Design.md</c> §1A):
+/// P6 item A (Copilot Studio connector health and resilience):
 /// <c>CopilotStudioConfigFingerprint</c>/<c>CopilotStudioConfigBaseline</c> — pure composition over the
 /// already-tested <see cref="ManifestFingerprint"/>/<see cref="ManifestDriftDetector"/> primitive (Skills
 /// Phase 4b), applied to a Copilot Studio config instead of a skill manifest. A composition test, not

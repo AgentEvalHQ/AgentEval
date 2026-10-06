@@ -329,4 +329,201 @@ public class MultiJudgeWrapperTests
 
         Assert.False(result.Provenance.CacheHit);
     }
+
+    // ── Nothing measured is no verdict (#203 review, round 2 M-1) ─────────────────────────────────
+    // Every judge errored or skipped: the aggregation returned (0, "none") and both verdict paths read it as a pass,
+    // so a panel none of whose judges answered passed its parent.
+
+    [Fact]
+    public async Task EveryJudgeErrored_IsError_NotPass()
+    {
+        var sut = MakeWrapper([JudgeComp("a", 0, label: "error"), JudgeComp("b", 0, label: "error")]);
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("error", result.Score.Label);
+        Assert.False(result.Score.Passed);
+        Assert.Contains("No judge produced a measurement", result.Details.Summary!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task EveryJudgeSkipped_WithAThreshold_IsSkipped_NotPass()
+    {
+        var sut = new MultiJudgeWrapper("k", "n", "c", "1.0.0",
+            [JudgeComp("a", 0, label: "skipped"), JudgeComp("b", 0, label: "skipped")],
+            WeightedMedianAggregation.Instance, threshold: 0.0);
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("skipped", result.Score.Label);
+        Assert.False(result.Score.Passed);
+        Assert.Equal(AgentEval.Evals.Meta.MeasurementState.NotMeasured, result.Score.CensusBucket());
+    }
+
+    [Fact]
+    public async Task EveryJudgeInapplicable_IsNotApplicable_AndDoesNotBlockAParent()
+    {
+        var panel = MakeWrapper([JudgeComp("a", 0, label: "inapplicable"), JudgeComp("b", 0, label: "inapplicable")]);
+        var parent = new CompositeEval("p", "P", "test", "1.0.0", new EvalComponent[]
+        {
+            new(new FixedResultEval("x", MakeResult("x", 1.0))),
+            new(panel),
+        }, WeightedSumAggregation.Instance);
+
+        var panelResult = await panel.EvaluateAsync(Input);
+        var parentResult = await parent.EvaluateAsync(Input);
+
+        Assert.Equal(AgentEval.Evals.Meta.MeasurementState.NotApplicable, panelResult.Score.Measurement);
+        Assert.Equal("pass", parentResult.Score.Label);
+    }
+
+    [Fact]
+    public async Task APanelThatDidNotAnswer_KeepsARequiringParentFromPassing()
+    {
+        var panel = MakeWrapper([JudgeComp("a", 0, label: "skipped"), JudgeComp("b", 0, label: "skipped")]);
+        var parent = new CompositeEval("p", "P", "test", "1.0.0", new EvalComponent[]
+        {
+            new(new FixedResultEval("x", MakeResult("x", 1.0))),
+            new(panel),
+        }, WeightedSumAggregation.Instance);
+
+        var result = await parent.EvaluateAsync(Input);
+
+        Assert.Equal("warn", result.Score.Label);
+        Assert.False(result.Score.Passed);
+    }
+
+    [Fact]
+    public async Task APartlyMeasuredPanel_WithOnlyOptionalJudgesMissing_IsDecidedByTheJudgesThatAnswered()
+    {
+        var sut = MakeWrapper([JudgeComp("a", 0.9), JudgeComp("b", 0, label: "error") with { Required = false }]);
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("pass", result.Score.Label);
+    }
+
+    // ── B10g (review round 3 M4): a panel honours each judge's Required ──────────────────────────────────────────
+
+    [Fact]
+    public async Task ARequiredJudgeThatErrored_LeavesNoVerdict_NotAPassOnTheOthers()
+    {
+        // The GDPR/EU AuditGrade panel declares every judge required; with two of three errored it passed on one judge.
+        var sut = ThresholdPanel(JudgeComp("j1", 0.95), JudgeComp("j2", 0, label: "error"), JudgeComp("j3", 0, label: "error"));
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("error", result.Score.Label);
+        Assert.False(result.Score.Passed);
+        Assert.Contains("j2", result.Details.Summary);
+    }
+
+    [Fact]
+    public async Task ARequiredJudgeThatDidNotRun_WithholdsThePass()
+    {
+        var sut = ThresholdPanel(JudgeComp("j1", 0.95), JudgeComp("j2", 0.9), JudgeComp("j3", 0, label: "skipped"));
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("warn", result.Score.Label);
+        Assert.Equal(AgentEval.Evals.Meta.MeasurementState.NotMeasured, result.Score.Measurement);
+        Assert.Contains("j3", result.Details.Summary);
+    }
+
+    [Fact]
+    public async Task WithoutAThreshold_ACriticalDissentTheVoteOutweighs_WithholdsThePass()
+    {
+        // The comment claimed "without a threshold the severity path already fails on high"; a majority vote of two
+        // passes outweighed a critical failure and read pass.
+        var sut = MakeWrapper(
+            [JudgeComp("j1", 1.0), JudgeComp("j2", 1.0), JudgeComp("j3", 0.1, severity: "critical", label: "fail")],
+            MajorityVoteAggregation.Instance);
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("warn", result.Score.Label);
+        Assert.Contains("critical", result.Details.Summary);
+    }
+
+    // ── B10n (review round 4 M4 + L11): decided = fails even with every errored required judge at its best ─────────
+
+    [Fact]
+    public async Task UnderMajorityVote_AFailureTheMissingJudgesCouldOutvote_IsNotDecided()
+    {
+        // Two required judges errored; the three that answered vote 2 fail : 1 pass at critical, which the old heuristic
+        // (fail, no threshold, high/critical) took as decided. With the two at their best the vote is 3 pass : 2 fail.
+        var sut = MakeWrapper(
+            [JudgeComp("e1", 0, label: "error"), JudgeComp("e2", 0, label: "error"), JudgeComp("p", 1.0),
+             JudgeComp("f1", 0.1, "critical", "fail"), JudgeComp("f2", 0.1, "critical", "fail")],
+            MajorityVoteAggregation.Instance);
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("error", result.Score.Label);
+        Assert.Contains("e1", result.Details.Summary);
+    }
+
+    [Theory]
+    [InlineData(0.10, "fail")]    // (1.0 + 0.1 + 0.1) / 3 = 0.40 < 0.70: decided, whatever the missing judge said
+    [InlineData(0.60, "error")]   // (1.0 + 0.6 + 0.6) / 3 = 0.73: the missing judge could have passed it
+    public async Task WithAThreshold_TheJudgesThatAnsweredDecideOnlyWhatTheMissingOneCouldNotLift(double value, string label)
+    {
+        var sut = new MultiJudgeWrapper("panel", "Panel", "test", "1.0.0",
+            [JudgeComp("missing", 0, label: "error"), JudgeComp("a", value, label: "fail"), JudgeComp("b", value, label: "fail")],
+            WeightedSumAggregation.Instance, threshold: 0.70);
+
+        Assert.Equal(label, (await sut.EvaluateAsync(Input)).Score.Label);
+    }
+
+    [Fact]
+    public async Task ADecidedFailure_StillNamesTheRequiredJudgeThatProducedNoVerdict()
+    {
+        // Review round 5 L-5 (B10x): the panel failed and said nothing about the missing judge.
+        var sut = new MultiJudgeWrapper("panel", "Panel", "test", "1.0.0",
+            [JudgeComp("missing", 0, label: "error"), JudgeComp("a", 0.10, label: "fail"), JudgeComp("b", 0.10, label: "fail")],
+            WeightedSumAggregation.Instance, threshold: 0.70);
+
+        var result = await sut.EvaluateAsync(Input);
+
+        Assert.Equal("fail", result.Score.Label);
+        Assert.Contains("missing", result.Details.Summary);
+        Assert.Contains("even if it had passed", result.Details.Summary);
+    }
+
+    // ── B6c-3 (mid-branch review): a pass the panel cannot agree on is withheld ────────────────────────────────────
+
+    private static MultiJudgeWrapper ThresholdPanel(params EvalComponent[] judges) =>
+        new("panel", "Panel", "test", "1.0.0", judges, WeightedMedianAggregation.Instance, threshold: 0.80);
+
+    [Fact]
+    public async Task ASevereDissentBelowThePanelsBar_WithholdsThePass_AndNamesIt()
+    {
+        var result = await ThresholdPanel(
+            JudgeComp("j1", 0.95), JudgeComp("j2", 0.95), JudgeComp("j3", 0.20, "critical", "fail")).EvaluateAsync(Input);
+
+        Assert.Equal("warn", result.Score.Label);
+        Assert.False(result.Score.Passed);
+        Assert.Equal(AgentEval.Evals.Meta.MeasurementState.NotMeasured, result.Score.CensusBucket());
+        Assert.Equal("medium", result.Score.Severity);   // a warn means medium; the dissent's severity is named
+        Assert.Contains("1 of 3 judges found a critical failure", result.Details.Summary!, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task AMildDissent_IsAbsorbedByTheMedian_AndThePassReportsNoSeverity()
+    {
+        var result = await ThresholdPanel(
+            JudgeComp("j1", 0.95), JudgeComp("j2", 0.95), JudgeComp("j3", 0.50, "medium", "fail")).EvaluateAsync(Input);
+
+        Assert.Equal("pass", result.Score.Label);
+        Assert.Equal("none", result.Score.Severity);   // the absorbed dissent does not ride along on the pass
+    }
+
+    [Fact]
+    public async Task AJudgeFailingOnlyItsOwnStricterBar_IsNotADissent()
+    {
+        // Above the panel's 0.80 bar, below the judge's own: the panel's bar is the configured rule.
+        var result = await ThresholdPanel(JudgeComp("j1", 0.85, "high", "fail")).EvaluateAsync(Input);
+
+        Assert.Equal("pass", result.Score.Label);
+    }
 }

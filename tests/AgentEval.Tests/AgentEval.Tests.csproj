@@ -7,8 +7,10 @@
     <!-- Tests deliberately exercise [Experimental("AGENTEVAL_GATEKEEPER_PREVIEW001")]-marked Gatekeeper
          next-wave types (GatekeeperFleetHealthIndex, ICalibrationReportStore, JsonFileCalibrationReportStore,
          ToolResultSizeAnomalyGate) — the diagnostic is error-severity by design, so this suppression is a
-         deliberate acknowledgment, not a blanket warning bypass. -->
-    <NoWarn>$(NoWarn);AGENTEVAL_GATEKEEPER_PREVIEW001</NoWarn>
+         deliberate acknowledgment, not a blanket warning bypass. The same holds for the AgentHooks adapter, which is
+         experimental as a whole assembly (AGENTEVAL_AGENTHOOKS_PREVIEW001). -->
+    <!-- AgentEval's own use of its preview decision abstraction (DecisionsPreview): acknowledged here; consumers still see it. -->
+    <NoWarn>$(NoWarn);AGENTEVAL_GATEKEEPER_PREVIEW001;AGENTEVAL_AGENTHOOKS_PREVIEW001;AGENTEVAL_DECISIONS_PREVIEW001</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -17,6 +19,8 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.Agents.AI.A2A" PrivateAssets="all" />
+    <!-- MAF's own AgentHooks HOST (alpha): proves GatekeeperInterceptor enforces inside it. Tests only. -->
+    <PackageReference Include="Microsoft.Agents.AI.AgentHooks" PrivateAssets="all" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" />
     <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
@@ -46,8 +50,14 @@
     <ProjectReference Include="..\..\src\AgentEval.DataLoaders\AgentEval.DataLoaders.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.MAF\AgentEval.MAF.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.MAF.CopilotStudio\AgentEval.MAF.CopilotStudio.csproj" />
+    <!-- S1: the AGENT-HOOKS-0.1 interceptor adapter. Targets net8.0 only (the SDK ships lib/net8.0
+         exclusively); net9.0/net10.0 test runs consume it through normal framework compatibility. -->
+    <ProjectReference Include="..\..\src\AgentEval.MAF.AgentHooks\AgentEval.MAF.AgentHooks.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.RedTeam\AgentEval.RedTeam.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.RedTeam.Gatekeeper\AgentEval.RedTeam.Gatekeeper.csproj" />
+
+    <!-- The memory-security test doubles live with the validation sample, out of the shipped package. -->
+    <Compile Include="..\..\samples\AgentEval.Gatekeeper.Validation\MemorySecurityMockComponents.cs" Link="MAF\Gatekeeper\MemorySecurityMockComponents.cs" />
     <ProjectReference Include="..\..\src\AgentEval\AgentEval.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Cli\AgentEval.Cli.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Compliance.Gdpr\AgentEval.Compliance.Gdpr.csproj" />

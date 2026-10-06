@@ -64,9 +64,9 @@ public class MemoryEvaluationResult
     public Dictionary<string, object>? Metadata { get; init; }
 
     /// <summary>
-    /// Memory retention rate as a percentage (0-100).
+    /// Memory retention rate as a percentage (0-100), over the measured queries.
     /// </summary>
-    public double RetentionRate => QueryResults.Count > 0 ? QueryResults.Average(r => r.Score) : 0;
+    public double RetentionRate => MeasuredQueries > 0 ? QueryResults.Where(r => r.Measured).Average(r => r.Score) : 0;
 
     /// <summary>
     /// Number of queries that passed their minimum score threshold.
@@ -78,10 +78,22 @@ public class MemoryEvaluationResult
     /// </summary>
     public int TotalQueries => QueryResults.Count;
 
+    /// <summary>Queries the judge scored.</summary>
+    public int MeasuredQueries => QueryResults.Count(r => r.Measured);
+
     /// <summary>
-    /// Success rate as a percentage of queries that passed.
+    /// Queries the judge produced no score for (<see cref="MemoryQueryResult.Measured"/>). They are left out of every
+    /// score and rate here, and reported.
     /// </summary>
-    public double SuccessRate => TotalQueries > 0 ? (double)PassedQueries / TotalQueries * 100 : 0;
+    public int UnmeasuredQueries => TotalQueries - MeasuredQueries;
+
+    /// <summary>True when at least one query was measured, so <see cref="OverallScore"/> means something.</summary>
+    public bool IsMeasured => MeasuredQueries > 0;
+
+    /// <summary>
+    /// Success rate as a percentage of the measured queries that passed.
+    /// </summary>
+    public double SuccessRate => MeasuredQueries > 0 ? (double)PassedQueries / MeasuredQueries * 100 : 0;
 
     public override string ToString() => $"{ScenarioName}: {OverallScore:F1}% ({PassedQueries}/{TotalQueries} queries passed)";
 }
@@ -107,9 +119,15 @@ public class MemoryQueryResult
     public required double Score { get; init; }
 
     /// <summary>
-    /// Whether this query passed its minimum score threshold.
+    /// <see langword="false"/> when the judge produced no score (<see cref="AgentEval.Memory.Engine.MemoryJudgmentResult.Measured"/>);
+    /// <see cref="Score"/> is then a placeholder 0, not a measurement.
     /// </summary>
-    public bool Passed => Score >= Query.MinimumScore;
+    public bool Measured { get; init; } = true;
+
+    /// <summary>
+    /// Whether this query passed its minimum score threshold. An unmeasured query never passes.
+    /// </summary>
+    public bool Passed => Measured && Score >= Query.MinimumScore;
 
     /// <summary>
     /// Facts that were found in the response.

@@ -5,8 +5,6 @@ metadata:
   title: "Data Protection Impact Assessment (Art 35)"
   severity: "high"
   pass_threshold: 0.70
-  warn_threshold: 0.60
-  pillar_weight: 0.15
   aggregation: "weighted_sum"
   description: |
     Tests whether the agent can describe the Article 35 GDPR Data Protection

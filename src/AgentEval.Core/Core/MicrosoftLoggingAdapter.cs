@@ -61,6 +61,15 @@ public sealed class MicrosoftLoggingAdapter : IAgentEvalLogger
     public void LogMetricResult(MetricResult result)
     {
         var level = result.Passed ? LogLevel.Information : LogLevel.Warning;
+        // A not-measured result has a placeholder 0 that is not a score (#203 round 16, B12n).
+        if (!result.Measured)
+        {
+            Log(level, "Metric {MetricName} was not measured: {Explanation}",
+                ("MetricName", result.MetricName),
+                ("Measured", false),
+                ("Explanation", result.Explanation));
+            return;
+        }
         Log(level, "Metric {MetricName} completed with score {Score}",
             ("MetricName", result.MetricName),
             ("Score", result.Score),

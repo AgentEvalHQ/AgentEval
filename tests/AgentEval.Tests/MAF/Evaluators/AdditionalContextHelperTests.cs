@@ -82,6 +82,29 @@ public class AdditionalContextHelperTests
     }
 
     [Fact]
+    public void ExtractExpectedTools_AnEmptyCarrier_DoesNotHideOneThatNamesTools()
+    {
+        // #203 review round 16 (B12n): the first carrier won even when it named no tool, as blank references did (B12j).
+        var contexts = new MEAIEvaluationContext[]
+        {
+            new AgentEvalExpectedToolsContext([]),
+            new AgentEvalExpectedToolsContext(["SearchFlights"]),
+        };
+
+        Assert.Equal(["SearchFlights"], AdditionalContextHelper.ExtractExpectedTools(contexts));
+        Assert.Empty(AdditionalContextHelper.ExtractExpectedTools([new AgentEvalExpectedToolsContext([])])!);   // still "none expected"
+    }
+
+    [Fact]
+    public void ExtractGroundTruth_AWordlessCarrier_DoesNotHideARealOne()
+    {
+        // #203 review round 17 (L1): "?" is no reference, as for F1 and similarity.
+        var contexts = new MEAIEvaluationContext[] { new AgentEvalGroundTruthContext("?"), new AgentEvalGroundTruthContext("Paris") };
+
+        Assert.Equal("Paris", AdditionalContextHelper.ExtractGroundTruth(contexts));
+    }
+
+    [Fact]
     public void ExtractFromMixedContexts_ReturnsCorrectTypes()
     {
         var contexts = new MEAIEvaluationContext[]

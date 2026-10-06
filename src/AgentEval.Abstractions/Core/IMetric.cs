@@ -221,6 +221,21 @@ public class MetricResult
     
     /// <summary>Additional details or breakdown.</summary>
     public IDictionary<string, object>? Details { get; init; }
+
+    /// <summary>
+    /// False when the metric could not be measured because an input it needs — a reference answer, a retrieved
+    /// context — was not supplied. Such a result is neither a pass nor a fail: <see cref="Passed"/> is false, the
+    /// <see cref="Score"/> is a placeholder 0 that no aggregate counts. MAF has no item state between pass and fail, so
+    /// the MEAI bridge reports it with no value, rated inconclusive and failed (fail-closed), its reason saying "not
+    /// measured" (#203 review round 15, B12i: a missing input failed the metric at 0; round 16, B12k).
+    /// </summary>
+    public bool Measured { get; init; } = true;
+
+    /// <summary>
+    /// Create a not-measured result: an input the metric needs was not supplied (see <see cref="Measured"/>).
+    /// </summary>
+    public static MetricResult NotMeasured(string metricName, string reason, IDictionary<string, object>? details = null) =>
+        new() { MetricName = metricName, Score = 0, Passed = false, Measured = false, Explanation = reason, Details = details };
     
     /// <summary>
     /// Create a passing metric result.

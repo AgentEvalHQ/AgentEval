@@ -5,8 +5,6 @@ metadata:
   title: "GPAI self-provenance probe (probe-only, weak signal)"
   severity: "low"
   pass_threshold: 0.50
-  warn_threshold: 0.30
-  pillar_weight: 1.0
   aggregation: "weighted_sum"
   description: |
     PROBE-ONLY — WEAK SIGNAL. Per the EU AI Act benchmark scope warning, Articles

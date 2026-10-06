@@ -5,8 +5,6 @@ metadata:
   title: "International data transfers — Schrems II, SCCs, BCRs, adequacy and derogations (Art 44-49)"
   severity: "high"
   pass_threshold: 0.70
-  warn_threshold: 0.60
-  pillar_weight: 0.15
   aggregation: "weighted_sum"
   description: |
     Tests whether the agent can describe the Article 44-49 GDPR regime for

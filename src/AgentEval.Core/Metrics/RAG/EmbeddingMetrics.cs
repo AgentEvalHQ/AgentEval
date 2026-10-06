@@ -4,6 +4,7 @@
 
 using AgentEval.Core;
 using AgentEval.Embeddings;
+using AgentEval.Evals;
 
 namespace AgentEval.Metrics.RAG;
 
@@ -40,10 +41,17 @@ public abstract class EmbeddingBasedMetric : IRAGMetric
     }
     
     /// <summary>
+    /// The ending of a validation error for an input the caller did not supply (a retrieved context, a reference answer):
+    /// such an error makes the result not measured. Every other validation error is a fail.
+    /// </summary>
+    protected const string NotSuppliedSuffix = "and none was supplied: not measured.";
+
+    /// <summary>
     /// Get the two texts to compare for similarity.
     /// </summary>
     /// <param name="context">The evaluation context.</param>
-    /// <returns>A tuple of (text1, text2) to compare, or (null, error message) if validation fails.</returns>
+    /// <returns>A tuple of (text1, text2) to compare, or (null, error message) if validation fails. An error ending in
+    /// <see cref="NotSuppliedSuffix"/> is not measured; any other is a fail.</returns>
     protected abstract (string? Text1, string? Text2, string? ValidationError) GetTextsToCompare(EvaluationContext context);
     
     /// <summary>
@@ -74,10 +82,14 @@ public abstract class EmbeddingBasedMetric : IRAGMetric
         CancellationToken cancellationToken = default)
     {
         var (text1, text2, validationError) = GetTextsToCompare(context);
-        
+
+        // Only a missing context or reference is not measured; any other error — the agent's own empty answer, a custom
+        // subclass's check — is a measured fail, as before B12i turned every error into "not measured" (#203 round 16, B12l).
         if (validationError != null)
         {
-            return MetricResult.Fail(Name, validationError);
+            return validationError.EndsWith(NotSuppliedSuffix, StringComparison.Ordinal)
+                ? MetricResult.NotMeasured(Name, validationError)
+                : MetricResult.Fail(Name, validationError);
         }
         
         try
@@ -158,10 +170,10 @@ public class AnswerSimilarityMetric : EmbeddingBasedMetric
     /// <inheritdoc />
     protected override (string? Text1, string? Text2, string? ValidationError) GetTextsToCompare(EvaluationContext context)
     {
-        if (string.IsNullOrEmpty(context.GroundTruth))
-            return (null, null, "Answer similarity requires ground truth to be provided.");
-        
-        if (string.IsNullOrEmpty(context.Output))
+        if (!ReferenceText.HasWords(context.GroundTruth))   // a wordless reference ("?") is none (round 17)
+            return (null, null, $"Answer similarity requires a reference answer, {NotSuppliedSuffix}");
+
+        if (string.IsNullOrWhiteSpace(context.Output))
             return (null, null, "Answer similarity requires an output to evaluate.");
         
         return (context.GroundTruth, context.Output, null);
@@ -216,10 +228,10 @@ public class ResponseContextSimilarityMetric : EmbeddingBasedMetric
     /// <inheritdoc />
     protected override (string? Text1, string? Text2, string? ValidationError) GetTextsToCompare(EvaluationContext context)
     {
-        if (string.IsNullOrEmpty(context.Context))
-            return (null, null, "Response-context similarity requires context to be provided.");
-        
-        if (string.IsNullOrEmpty(context.Output))
+        if (string.IsNullOrWhiteSpace(context.Context))
+            return (null, null, $"Response-context similarity requires a retrieved context, {NotSuppliedSuffix}");
+
+        if (string.IsNullOrWhiteSpace(context.Output))
             return (null, null, "Response-context similarity requires an output to evaluate.");
         
         return (context.Context, context.Output, null);
@@ -263,8 +275,8 @@ public class QueryContextSimilarityMetric : EmbeddingBasedMetric
     /// <inheritdoc />
     protected override (string? Text1, string? Text2, string? ValidationError) GetTextsToCompare(EvaluationContext context)
     {
-        if (string.IsNullOrEmpty(context.Context))
-            return (null, null, "Query-context similarity requires context to be provided.");
+        if (string.IsNullOrWhiteSpace(context.Context))
+            return (null, null, $"Query-context similarity requires a retrieved context, {NotSuppliedSuffix}");
         
         return (context.Input, context.Context, null);
     }

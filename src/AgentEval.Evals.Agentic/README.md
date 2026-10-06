@@ -1,6 +1,6 @@
 # AgentEval.Evals.Agentic
 
-Agent-focused evaluator suite. Framework-neutral, prompts forked from public MIT-licensed sources and improved.
+Agent-focused evaluator suite. Framework-neutral. The evaluator prompt files are AgentEval's own text.
 
 ## What this package ships
 
@@ -25,14 +25,8 @@ Plus benchmark presets in `AgenticBenchmark.cs` (project root):
 
 ## Prompt provenance
 
-Evaluator prompts are forked from public MIT-licensed sources (`azure-sdk-for-python` evaluator prompty files) and improved per the AgentEval envelope (`temperature: 0`, structured `evidence[]` instead of chain-of-thought, severity rubric, sub-dimensions where applicable, deterministic-first paths for hybrid evaluators). Each prompt file's header carries the source URL, pinned commit SHA, and the list of modifications applied — that's the credit-where-credit-is-due story per the MIT license.
-
-The upstream-feedback summary documenting the improvements lives at [`strategy/FutureFeatures/todo/findings-and-suggestions.md`](../../strategy/FutureFeatures/todo/findings-and-suggestions.md). It's positioned as friendly contribution back to the upstream maintainers, not as a coupling layer in this codebase.
+The evaluator prompt files under `Resources/Prompts/` are AgentEval's own text, under AgentEval's MIT license. About half are modelled on the evaluator concepts (name, inputs and scoring dimensions) of the Azure AI Evaluation SDK (`azure-sdk-for-python`); a comparison against every upstream version of the cited prompty files found no reproduced prompt text. Each file's header records its lineage and how it differs from the upstream evaluator. Each LLM-judge evaluator sends its file to the judge as the system prompt and reads the reply on the file's own scale and bands (since 0.44; see the agentic getting-started guide, "What the judge is sent").
 
 ## Why a separate project (not a sample)
 
 Agentic evaluators are **building blocks** — every consumer assembles their own benchmark from these primitives. Compliance benchmarks (`samples/AgentEval.GdprBenchmark`, `samples/AgentEval.EuAiActBenchmark`) live in `samples/` because their scenario *content* is regulation-specific. Agentic evaluators live in `src/` because they are reusable infrastructure.
-
-## Implementation plan
-
-[`strategy/FutureFeatures/todo/05-AgentEval-Foundry-Evals-Local.md`](../../strategy/FutureFeatures/todo/05-AgentEval-Foundry-Evals-Local.md)

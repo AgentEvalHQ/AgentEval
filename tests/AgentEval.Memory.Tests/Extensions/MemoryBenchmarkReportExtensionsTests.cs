@@ -105,6 +105,9 @@ public class MemoryBenchmarkReportExtensionsTests
 
         Assert.True(tr.Skipped);
         Assert.Equal("Agent does not implement ISessionResettableAgent", tr.Error);
+        // #203 review round 17: its placeholder 0 was exported as the category's score.
+        Assert.Empty(tr.MetricScores);
+        Assert.Equal("Agent does not implement ISessionResettableAgent", tr.MetricsNotMeasured["memory_crosssession"]);
     }
 
     [Fact]

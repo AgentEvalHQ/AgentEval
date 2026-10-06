@@ -49,7 +49,7 @@ public static class ToolFindingsCitedSelfTest
             "I found several good flights to Paris and a lovely hotel a short walk from the Eiffel Tower. "
             + "Prices look reasonable for next Friday and I would book early.");
 
-        // 3 · empty ⇒ UNDECIDABLE. The door collapses a missing response into "" (:74), so this is
+        // 3 · empty ⇒ UNDECIDABLE. The door collapses a missing response into "", so this is
         //     ambiguous by construction and must not be scored as a failure.
         var empty = await RunAsync("");
 

@@ -83,7 +83,9 @@ public class PerformanceChecksTests
         var result = await RunAsync(PerformanceChecks.WithinLatencyBudget(TimeSpan.FromSeconds(1)), With(null));
 
         Assert.False(result.Score.Passed);
-        Assert.Equal(MeasurementState.NotApplicable, result.Score.CensusBucket());
+        // NOT MEASURED, not inapplicable (#203 review, B2): nothing timed the run, which is the harness's gap, not
+        // something the case could not test — so a benchmark run with it cannot pass either.
+        Assert.Equal(MeasurementState.NotMeasured, result.Score.CensusBucket());
         Assert.Contains("not a fast one", result.Details.Summary!, StringComparison.Ordinal);
     }
 
@@ -102,8 +104,9 @@ public class PerformanceChecksTests
         var timedButNoUsage = await RunAsync(check, With(Metrics(100)));
         var real = await RunAsync(check, With(Metrics(100, promptTokens: 10, completionTokens: 5)));
 
-        Assert.Equal(MeasurementState.NotApplicable, nothingMeasured.Score.CensusBucket());
-        Assert.Equal(MeasurementState.NotApplicable, timedButNoUsage.Score.CensusBucket());
+        // Both are NOT MEASURED (the instrument or the provider produced no number), never inapplicable (B2).
+        Assert.Equal(MeasurementState.NotMeasured, nothingMeasured.Score.CensusBucket());
+        Assert.Equal(MeasurementState.NotMeasured, timedButNoUsage.Score.CensusBucket());
         Assert.NotEqual(nothingMeasured.Details.Summary, timedButNoUsage.Details.Summary);
 
         Assert.True(real.Score.Passed);

@@ -86,10 +86,22 @@ Build any AgentEval evaluator, call `.AsAgentEvaluator(chatConfig)`, pass to `ag
 ### 3a. A single metric / a preset bundle
 
 ```csharp
-var metrics = AgentEvalEvaluators.Quality(judge);     // or Relevance(judge), RAG(judge), Safety(judge),
+var metrics = AgentEvalEvaluators.Quality(judge);     // or Relevance(judge), Safety(judge),
                                                       //    Agentic(["SearchFlights"]), Advanced(judge)
 var results = await agent.EvaluateAsync([query], metrics.AsAgentEvaluator(chatConfig));
 ```
+
+`agent.EvaluateAsync` passes the reference answer (`expectedOutput:`) but no retrieved context, so the presets above
+use only metrics that need none. `RAG(judge)` — faithfulness, context precision and recall, answer correctness — needs
+the retrieved context of each item: build the `EvalItem`s yourself and call the evaluator directly.
+
+```csharp
+var item = new EvalItem(query, response) { Context = retrievedText, ExpectedOutput = referenceAnswer };
+var results = await AgentEvalEvaluators.RAG(judge).AsAgentEvaluator(chatConfig).EvaluateAsync([item]);
+```
+
+A metric whose input is missing is **not measured**. MAF has no item state between pass and fail, so it fails the
+item, and its reason says `not measured` and which input was missing; the report bridge reads it back as `skipped`.
 
 ### 3b. A custom flat composite
 
@@ -335,9 +347,9 @@ public sealed class AgentEvalCompositeEvaluator : IEvaluator {        // (Micros
 `tool_selection`, `tool_input_accuracy`, `tool_output_utilization`, `tool_call_success`; Quality:
 `coherence`, `fluency`, `relevance`, `groundedness`, `response_completeness`, `similarity`; Safety).
 **AgentEval re-implements the same universe locally** (`AgentEval.Evals.Agentic` + `AgentEval.Metrics.*`,
-same names, same rubrics) as LLM-as-judge over any `IChatClient` — **no Azure AI Foundry project
-required**. Net: pick `FoundryEvals` for the managed cloud service + portal; pick AgentEval for the same
-metrics offline/self-hosted, with weighted composites, thresholds, and the HTML/PDF/audit-chain reports.
+same names; AgentEval's judges grade their own short criteria lists, not Foundry's rubric text) as
+LLM-as-judge over any `IChatClient` — **no Azure AI Foundry project required**. Net: pick `FoundryEvals`
+for the managed cloud service + portal; pick AgentEval for equivalently-named metrics offline/self-hosted, with weighted composites, thresholds, and the HTML/PDF/audit-chain reports.
 
 ### 8.5 Workflow evaluation — complementary, not competing
 

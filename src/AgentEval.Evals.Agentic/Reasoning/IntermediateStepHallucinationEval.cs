@@ -86,7 +86,7 @@ public sealed class IntermediateStepHallucinationEval : IEval
             key: "intermediate_step_hallucination",
             name: "Intermediate Step Hallucination",
             category: "reasoning",
-            version: "1.0.0",
+            version: "1.1.0",
             criteria: new[]
             {
                 "No tool result values are referenced in the response unless they appear in tool_calls",

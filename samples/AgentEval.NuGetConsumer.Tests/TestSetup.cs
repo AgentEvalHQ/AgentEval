@@ -5,7 +5,7 @@ namespace AgentEval.NuGetConsumer.Tests;
 
 /// <summary>
 /// Shared setup for all integration tests.
-/// All tests in this project require Azure OpenAI credentials.
+/// The live tests in this project need a configured inference provider (AI_INFERENCE_PROVIDER, e.g. Bitdeer).
 /// Use <see cref="SkipIfNotConfiguredFact"/> instead of <c>[Fact]</c>
 /// to auto-skip tests when credentials are absent.
 /// </summary>

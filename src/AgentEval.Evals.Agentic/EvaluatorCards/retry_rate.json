@@ -4,10 +4,10 @@
   "name": "Telemetry: Retry Rate",
   "category": "operational",
   "version": "1.0.0",
-  "description": "Pure-code telemetry evaluator computing the fraction of agent calls that required at least one retry. Lower is better.",
+  "description": "Pure-code telemetry evaluator computing the fraction of agent calls that required at least one retry. The rate is better lower; the score is its inverse, so a higher score is better.",
   "costTier": "Trivial",
-  "higherIsBetter": false,
-  "defaultThreshold": 0.1,
+  "higherIsBetter": true,
+  "defaultThreshold": 0.9,
   "expectedInputs": [
     {
       "kind": "metadata",

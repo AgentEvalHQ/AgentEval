@@ -6,6 +6,7 @@ using System.CommandLine;
 using System.Text.Json;
 using AgentEval.Cli.Infrastructure;
 using AgentEval.Core;
+using AgentEval.Providers;
 using AgentEval.Testing;
 using Microsoft.Extensions.AI;
 
@@ -112,7 +113,7 @@ internal static class LogFileCommand
         var modelOpt = new Option<string?>("--model") { Description = "Model/deployment name (required with --endpoint)." };
         var apiKeyOpt = new Option<string?>("--api-key") { Description = "API key for --endpoint. Falls back to OPENAI_API_KEY." };
         var azureFromEnvOpt = new Option<bool>("--azure-from-env")
-            { Description = "Replay against Azure OpenAI, configured via AZURE_OPENAI_ENDPOINT / AZURE_OPENAI_API_KEY / AZURE_OPENAI_DEPLOYMENT." };
+            { Description = "Replay against a chat client built from the environment: the provider AI_INFERENCE_PROVIDER selects (azure, bitdeer, openai, foundry or openai-compatible; auto-detected when unset). Despite the name, not only Azure OpenAI. Requires a configured provider; run with none set to see what is missing." };
         var strictTextOpt = new Option<bool>("--strict-text")
             { Description = "Also compare exact response text (in addition to the structural comparison). Off by default — LLM output isn't reproducible even against the literal same model/config at temperature > 0." };
 
@@ -181,15 +182,17 @@ internal static class LogFileCommand
         return report.FailCount > 0 ? ExitCodes.TestFailure : ExitCodes.Success;
     }
 
-    private static (IChatClient? Client, string Label, string? Error) ResolveAgainst(
+    internal static (IChatClient? Client, string Label, string? Error) ResolveAgainst(
         string? endpoint, string? model, string? apiKey, bool azureFromEnv)
     {
         if (azureFromEnv)
         {
-            var (chatClient, deployment, exitCode) = AzureChatAgentFactory.TryBuildChatClientFromEnv();
+            var (chatClient, resolvedModel, exitCode) = AzureChatAgentFactory.TryBuildChatClientFromEnv();
             return exitCode == ExitCodes.Success
-                ? (chatClient, $"azure:{deployment}", null)
-                : (null, string.Empty, "Azure OpenAI env vars not configured — see the message above for what's missing.");
+                ? (chatClient, EnvironmentTargetLabel(resolvedModel, ProviderChatClientFactory.Settings), null)
+                : (null, string.Empty,
+                    $"--azure-from-env found no usable inference provider ({InferenceProviderEnvironment.SelectorVariable} " +
+                    "selects one; with it unset, the first fully configured provider is used) — see the message above for why.");
         }
 
         if (!string.IsNullOrWhiteSpace(endpoint))
@@ -211,6 +214,29 @@ internal static class LogFileCommand
         }
 
         return (null, string.Empty, "log-file replay needs a target: pass --azure-from-env, or --endpoint/--model.");
+    }
+
+    /// <summary>
+    /// The report's target label for <c>--azure-from-env</c>: the provider tag and the model, for example
+    /// <c>bitdeer:zai-org/GLM-5.3-Flash</c>.
+    /// </summary>
+    /// <param name="model">The model the factory built the client for.</param>
+    /// <param name="settings">The provider settings the environment resolves to.</param>
+    /// <remarks>
+    /// The factory returns the model but not the provider, so the provider is read back from
+    /// <paramref name="settings"/> and named only when they still resolve to the same model; otherwise the
+    /// label says the provider is unknown rather than guessing one. This label used to read <c>azure:</c>
+    /// whichever provider served the replay.
+    /// </remarks>
+    internal static string EnvironmentTargetLabel(string? model, InferenceProviderSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+
+        var provider = settings.IsConfigured && string.Equals(settings.Model, model, StringComparison.Ordinal)
+            ? settings.ProviderTag
+            : "unknown-provider";
+        var shownModel = string.IsNullOrWhiteSpace(model) ? "unknown-model" : model;
+        return $"{provider}:{shownModel}";
     }
 
     private static async Task<IReadOnlyList<FixtureCaptureEntry>> LoadCapturedEntriesAsync(string path, CancellationToken ct)

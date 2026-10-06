@@ -99,23 +99,14 @@ public sealed class AgenticBenchmarkRunner
     internal static RunSummary BuildSummary(EvalResult root, string runId)
     {
         var leaves = EnumerateAtomicLeaves(root).ToList();
-        var passed   = leaves.Count(l => l.Result.Score.Passed);
-        var warnings = leaves.Count(l => l.Result.Score.Label == "warn");
-        var skipped  = leaves.Count(l => l.Result.Score.Label == "skipped");
-        // Skipped leaves (Label "skipped") are NOT failures — WeightedSumAggregation already
-        // ignores them, so counting them as failed made RunStats disagree with the composite
-        // verdict and inflated the failure tally (BUG-04). Give them their own bucket so the
-        // counts reconcile against Total.
-        var failed   = leaves.Count(l => !l.Result.Score.Passed
-                                         && l.Result.Score.Label is not ("warn" or "skipped"));
-        var stats = new RunStats(leaves.Count, passed, failed, warnings, skipped);
+        // One bucket per leaf, by the shared exclusive chain (#203 review, B8): not measured (skipped, errored,
+        // inapplicable — ADR-030 keeps the schema's single bucket for NotApplicable and NotMeasured) → Skipped, else warn →
+        // Warnings, else Passed decides. Four independent counts let a leaf land in two buckets (a warn that was not
+        // measured, a passed one that was skipped), so the buckets could add up to more than Total.
+        var stats = leaves.Select(l => l.Result.Score).ToRunStats();
 
-        var verdict = root.Score.Label.ToUpperInvariant() switch
-        {
-            "PASS" => "PASS",
-            "WARN" => "WARN",
-            _      => "FAIL"
-        };
+        // A root that errored or measured nothing is not a FAIL (B9b): PENDING when nothing was measured, else WARN.
+        var verdict = root.Score.RunVerdict(stats);
 
         return new RunSummary(
             SchemaVersion: "1.0",

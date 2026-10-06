@@ -164,9 +164,12 @@ public static partial class InterAgentBoundaryInjectionGate
     private sealed class OutboundTrustedGoalGate(
         Func<CancellationToken, ValueTask<string?>> trustedGoalResolver,
         IChatGate inner,
-        int maxFormattedChars) : IChatGate
+        int maxFormattedChars) : IChatGate, IDelegatingGate
     {
         public string PolicyName => inner.PolicyName;
+
+        // The goal-drift judge decides every formatted case, so the inline-judge calibration check must see it.
+        IEnumerable<object> IDelegatingGate.InnerGates => new object[] { inner };
 
         public async ValueTask<GateVerdict> InspectAsync(
             string text,

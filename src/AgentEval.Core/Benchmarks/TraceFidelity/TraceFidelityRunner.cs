@@ -15,10 +15,15 @@ namespace AgentEval.Benchmarks;
 /// <remarks>
 /// Reconciliation reads tool <em>calls</em> (<see cref="TraceEntry.ToolCalls"/>), per-turn finish reasons,
 /// and token usage — never tool <em>definition schemas</em>, so tool-definition de-dup never affects fidelity.
-/// Argument comparison is by serialized-string equality (a documented v1 heuristic).
+/// Argument comparison is by serialized-string equality (a documented v1 heuristic). Finish reasons are compared
+/// as reported strings, case-insensitively, so a framework that reports the same reason under another label is
+/// counted as not reporting it.
 /// </remarks>
 public sealed class TraceFidelityRunner
 {
+    // Provider-side interventions on a model turn (filtered / cut off) that suppressed_finish_reason checks for.
+    private static readonly string[] InterventionFinishReasons = { "content_filter", "length" };
+
     private readonly SamplePreset _preset;
 
     /// <summary>Creates a runner. The preset is informational for reconciliation (it does not change scoring).</summary>
@@ -45,7 +50,7 @@ public sealed class TraceFidelityRunner
         discrepancies.Add(ArgumentDrift(chatByName, agentByName));
         discrepancies.Add(HiddenRetries(chatByName, agentByName));
         discrepancies.Add(TokenUnderReporting(agentTrace, chatTrace));
-        discrepancies.Add(SuppressedFinishReason(chatTrace));
+        discrepancies.Add(SuppressedFinishReason(agentTrace, chatTrace));
 
         var root = 1.0 - discrepancies.Sum(d => TraceFidelityRubric.Weight(d.ClassKey) * (1.0 - d.Score));
         return new TraceFidelityReport(discrepancies, Math.Clamp(root, 0.0, 1.0));
@@ -58,15 +63,26 @@ public sealed class TraceFidelityRunner
     public EvalResult ReconcileToEvalResult(AgentTrace agentTrace, AgentTrace chatTrace)
     {
         var report = Reconcile(agentTrace, chatTrace);
+        // A chat trace with no model responses (a failed or empty capture) holds no truth to reconcile against: nothing was
+        // measured (#203 review round 6, B10y). Every class scored 1.0 and the run read PASS.
+        var noTruth = !chatTrace.Entries.Any(e => e.EffectiveScope == TraceEntryScope.ChatTurn && e.Type == TraceEntryType.Response);
 
         var subResults = report.Discrepancies.Select(d => new EvalResult(
             Metric: new EvalMetadata(Key: $"trace_fidelity.{d.ClassKey}", Name: d.ClassKey, Category: "TraceFidelity", Version: "1.0"),
-            Score: new EvalScore(
+            Score: noTruth
+                ? new EvalScore(Value: 0.0, Ordinal: null, Label: "skipped", Passed: false, Threshold: 0.8, Severity: "none", Confidence: null)
+                : new EvalScore(
                 Value: d.Score, Ordinal: null,
+                // A warn is a soft fail (#203 review round 5, B10w): Passed only on a pass.
                 Label: d.Score >= 0.99 ? "pass" : d.Score >= 0.8 ? "warn" : "fail",
-                Passed: d.Score >= 0.8, Threshold: 0.8, Severity: d.Severity, Confidence: null),
+                Passed: d.Score >= 0.99, Threshold: 0.8,
+                    // A passing class carries no severity, and severities are lower-case (B10ab: a clean leaf read "Critical").
+                    Severity: d.Score >= 0.99 ? "none" : d.Severity.ToLowerInvariant(), Confidence: null),
             Details: new EvalDetails(
-                Dimensions: new Dictionary<string, double> { ["count"] = d.Count, ["score100"] = d.Score * 100 },
+                // A class with nothing to reconcile carries no 0-100 figure (B10ah: it read 100 beside a skipped label).
+                Dimensions: noTruth
+                    ? new Dictionary<string, double> { ["count"] = d.Count }
+                    : new Dictionary<string, double> { ["count"] = d.Count, ["score100"] = d.Score * 100 },
                 Evidence: d.Examples.Select(x => new EvalEvidence(Source: "chat-vs-agent", Reference: d.ClassKey, Message: x)).ToList(),
                 Recommendations: null, SubResults: null, AggregationStrategy: null),
             Provenance: new EvalProvenance(Type: "code", JudgeModel: null, PromptId: null, PromptHash: null, TokensUsed: null, EstimatedCost: 0.0, CacheHit: false),
@@ -74,14 +90,24 @@ public sealed class TraceFidelityRunner
 
         return new EvalResult(
             Metric: new EvalMetadata(Key: "trace_fidelity", Name: "Trace Fidelity", Category: "TraceFidelity", Version: "1.0"),
-            Score: new EvalScore(
-                Value: report.OverallScore, Ordinal: null,
-                Label: report.OverallScore >= 0.99 ? "pass" : report.OverallScore >= 0.8 ? "warn" : "fail",
-                Passed: report.OverallScore >= 0.8, Threshold: 0.8,
-                Severity: report.OverallScore >= 0.8 ? "Low" : report.OverallScore >= 0.5 ? "Medium" : "High", Confidence: null),
+            Score: noTruth
+                ? new EvalScore(Value: 0.0, Ordinal: null, Label: "skipped", Passed: false, Threshold: 0.8, Severity: "none", Confidence: null)
+                : new EvalScore(
+                    Value: report.OverallScore, Ordinal: null,
+                    // A warn is a soft fail (B10w): Passed only on a pass, which reports no severity; severities in the lower
+                    // case every other result uses ("Low" read low even at 1.00).
+                    Label: report.OverallScore >= 0.99 ? "pass" : report.OverallScore >= 0.8 ? "warn" : "fail",
+                    Passed: report.OverallScore >= 0.99, Threshold: 0.8,
+                    Severity: report.OverallScore >= 0.99 ? "none" : report.OverallScore >= 0.8 ? "low" : report.OverallScore >= 0.5 ? "medium" : "high",
+                    Confidence: null),
             Details: new EvalDetails(
-                Dimensions: new Dictionary<string, double> { ["score100"] = report.OverallScore * 100 },
-                Evidence: null, Recommendations: null, SubResults: subResults, AggregationStrategy: "severity-weighted"),
+                Dimensions: noTruth ? null : new Dictionary<string, double> { ["score100"] = report.OverallScore * 100 },
+                Evidence: null,
+                Recommendations: noTruth ? ["The chat-boundary trace has no model responses, so there is nothing to reconcile against: no verdict."] : null,
+                SubResults: subResults, AggregationStrategy: "severity-weighted")
+            {
+                Summary = noTruth ? "The chat-boundary trace has no model responses, so there is nothing to reconcile against: no verdict." : null,
+            },
             Provenance: new EvalProvenance(Type: "code", JudgeModel: null, PromptId: null, PromptHash: null, TokensUsed: null, EstimatedCost: 0.0, CacheHit: false),
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
@@ -165,16 +191,50 @@ public sealed class TraceFidelityRunner
         return Build(TraceFidelityRubric.TokenUnderReporting, count, examples);
     }
 
-    private static TraceFidelityDiscrepancy SuppressedFinishReason(AgentTrace chatTrace)
+    private static TraceFidelityDiscrepancy SuppressedFinishReason(AgentTrace agentTrace, AgentTrace chatTrace)
     {
-        var suppressed = chatTrace.Entries
+        var chatTurns = chatTrace.Entries
             .Where(e => e.EffectiveScope == TraceEntryScope.ChatTurn && e.Type == TraceEntryType.Response)
-            .Where(e => string.Equals(e.FinishReason, "content_filter", StringComparison.OrdinalIgnoreCase)
-                     || string.Equals(e.FinishReason, "length", StringComparison.OrdinalIgnoreCase))
-            .Select(e => $"turn {e.Index} finished with '{e.FinishReason}' (not reflected at the agent boundary)")
             .ToList();
-        return Build(TraceFidelityRubric.SuppressedFinishReason, suppressed.Count, suppressed);
+
+        // Agent boundary: the finish reason(s) the framework reported, read from any Response entry (the same
+        // entries the agent-side tool calls are read from). A missing reason stays null — it reported none.
+        var agentReasons = agentTrace.Entries
+            .Where(e => e.Type == TraceEntryType.Response)
+            .Select(e => e.FinishReason)
+            .ToList();
+
+        // A chat turn that ended in content_filter/length is suppressed only when the agent boundary did NOT report
+        // that same reason (it reported stop, another reason, or none). Turns cannot be paired across the layers by
+        // index (agent entries are per invocation, chat entries per model round-trip), so reconcile by count per
+        // reason: each agent-boundary report of a reason accounts for one chat turn that ended with it. Directional,
+        // like token_under_reporting — the agent reporting a reason the chat boundary never saw is not counted here.
+        var count = 0;
+        var examples = new List<string>();
+        foreach (var reason in InterventionFinishReasons)
+        {
+            var turns = chatTurns
+                .Where(e => string.Equals(e.FinishReason, reason, StringComparison.OrdinalIgnoreCase))
+                .Select(e => e.Index)
+                .ToList();
+            var reported = agentReasons.Count(r => string.Equals(r, reason, StringComparison.OrdinalIgnoreCase));
+            var unreflected = turns.Count - reported;
+            if (unreflected > 0)
+            {
+                count += unreflected;
+                examples.Add($"'{reason}' ended {turns.Count} chat turn(s) (turn {string.Join(", ", turns)}) but the agent boundary reported it {reported}× (agent reported: {AgentFinishLabel(agentReasons)})");
+            }
+        }
+
+        return Build(TraceFidelityRubric.SuppressedFinishReason, count, examples);
     }
+
+    // Renders the agent boundary's reported finish reasons for evidence. A missing reason is shown as <null>, not
+    // an empty string, because "reported none" is itself the suppression signal.
+    private static string AgentFinishLabel(IReadOnlyList<string?> agentReasons)
+        => agentReasons.Count == 0
+            ? "no response entries"
+            : string.Join(", ", agentReasons.Select(r => r is null ? "<null>" : $"'{r}'").Distinct(StringComparer.Ordinal));
 
     private static TraceFidelityDiscrepancy Build(string classKey, int count, IEnumerable<string> examples)
         => new(classKey, TraceFidelityRubric.Severity(classKey), count, TraceFidelityRubric.ChildValue(classKey, count), examples.ToList());

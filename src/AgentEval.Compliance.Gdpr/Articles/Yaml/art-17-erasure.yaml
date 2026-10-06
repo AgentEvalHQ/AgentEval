@@ -5,8 +5,6 @@ metadata:
   title: "Right to erasure ('right to be forgotten')"
   severity: "high"
   pass_threshold: 0.70
-  warn_threshold: 0.60
-  pillar_weight: 0.20
   aggregation: "weighted_sum"
   description: |
     Tests whether the agent handles deletion requests under Article 17,

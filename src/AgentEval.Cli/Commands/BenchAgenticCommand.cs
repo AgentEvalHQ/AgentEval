@@ -18,7 +18,7 @@ namespace AgentEval.Cli.Commands;
 /// <summary>
 /// Implements the <c>agenteval bench agentic</c> subcommand.
 /// Runs an agentic benchmark against an agent response, persists the full evidence chain,
-/// and writes a Markdown report. PDF rendering is deferred to a follow-up batch (plan-05 §G/A1.26).
+/// and writes a Markdown report and a PDF report (<c>report.pdf</c>).
 /// </summary>
 public static class BenchAgenticCommand
 {
@@ -32,7 +32,7 @@ public static class BenchAgenticCommand
         string? budgetTier = null,
         string? traceFile = null,
         CancellationToken ct = default) =>
-        RunAsync(preset, subject, rootOverride, inputText, responseText, evaluatorOverride: null, budgetTier, traceFile, ct);
+        RunAsync(preset, subject, rootOverride, inputText, responseText, evaluatorOverride: null, budgetTier, traceFile, mock: false, ct);
 
     /// <summary>Runs the bench agentic command with optional overrides (used in tests).</summary>
     internal static async Task<int> RunAsync(
@@ -44,8 +44,32 @@ public static class BenchAgenticCommand
         IEvaluator? evaluatorOverride,
         string? budgetTier = null,
         string? traceFile = null,
+        bool mock = false,
         CancellationToken ct = default)
     {
+        // Treat an empty/whitespace --trace the same as omitted (so the load below and the all-skipped hint further
+        // down use one consistent notion of "no trace supplied").
+        if (string.IsNullOrWhiteSpace(traceFile))
+        {
+            traceFile = null;
+        }
+        var gradesSuppliedResponse = !string.IsNullOrWhiteSpace(responseText);
+        if (mock && (gradesSuppliedResponse || traceFile is not null))
+        {
+            return MockTarget.RefuseMockWithRealTarget();
+        }
+        if (!gradesSuppliedResponse && traceFile is null && !mock)
+        {
+            return MockTarget.RefuseWithoutTarget("bench agentic",
+                "the agent's real answer with --response/--response-file, or its captured run with --trace");
+        }
+        if (gradesSuppliedResponse && string.IsNullOrWhiteSpace(inputText))
+        {
+            // A supplied answer is graded against the question it answered, never a built-in one.
+            Console.Error.WriteLine("Error: --input is required with --response/--response-file: the question the response answers.");
+            return ExitCodes.UsageError;
+        }
+
         // ── Workspace setup ──────────────────────────────────────────────────
         if (rootOverride is not null)
         {
@@ -64,7 +88,7 @@ public static class BenchAgenticCommand
         var agentEvalDir = Path.Combine(workspaceRoot, ".agenteval");
         if (!Directory.Exists(agentEvalDir))
         {
-            Console.Error.WriteLine($".agenteval/ not found at {agentEvalDir}. Run `agenteval init` first.");
+            Console.Error.WriteLine($".agenteval/ not found at {agentEvalDir}. Run `agenteval init-workspace` first.");
             return 1;
         }
 
@@ -77,7 +101,12 @@ public static class BenchAgenticCommand
         // honest for the bench-agentic path; calibration paths and the
         // remaining bench commands (perf / red-team) inherit the same
         // wiring through ResolvePreset.
-        var (resolvedJudge, judgeModelName, exitCode) = JudgeFactory.Resolve(evaluatorOverride, "agentic benchmark");
+        // The pure-code presets never call a judge, so they need no provider; every other preset does.
+        var (resolvedJudge, judgeModelName, exitCode) = mock && evaluatorOverride is null
+            ? MockTarget.JudgeResolution
+            : evaluatorOverride is null && PresetNeedsNoJudge(preset)
+                ? (NoJudge.Instance, "none", 0)
+                : JudgeFactory.Resolve(evaluatorOverride, "agentic benchmark");
         if (resolvedJudge is null) return exitCode;
         IEvaluator judge = resolvedJudge;
 
@@ -86,6 +115,12 @@ public static class BenchAgenticCommand
         try
         {
             benchmark = ResolvePreset(preset, judge, subject, judgeModelName);
+        }
+        catch (ArgumentException ex)
+        {
+            // An unknown preset or domain pack is a rejected argument: a usage error, not a failed run.
+            Console.Error.WriteLine($"Failed to build agentic preset '{preset}': {ex.Message}");
+            return ExitCodes.UsageError;
         }
         catch (Exception ex)
         {
@@ -99,7 +134,7 @@ public static class BenchAgenticCommand
             if (!TryParseBudgetTier(budgetTier, out var tier))
             {
                 Console.Error.WriteLine($"Invalid --budget-tier '{budgetTier}'. Allowed values: trivial | low | medium | high | all.");
-                return 1;
+                return ExitCodes.UsageError;
             }
             try
             {
@@ -119,44 +154,12 @@ public static class BenchAgenticCommand
         }
 
         // ── Build input ──────────────────────────────────────────────────────
-        var query = inputText ??
-            "Search for the latest quarterly earnings report for ACME Corp and summarize the key financial metrics.";
-        string agentResponse;
-        if (!string.IsNullOrWhiteSpace(responseText))
-        {
-            agentResponse = responseText;
-        }
-        else
-        {
-            // No real response supplied: grade a built-in FIXTURE. Warn loudly — the
-            // produced evidence does NOT reflect the named subject agent. Mirrors the
-            // gdpr / eu-ai-act fixture-warning behaviour so agentic can grade a real
-            // agent's answer via --response / --response-file (was previously hardcoded).
-            agentResponse =
-                "I'll help you find the quarterly earnings report for ACME Corp. " +
-                "Based on the retrieved data, here are the key financial metrics: " +
-                "Revenue grew 12% year-over-year to $4.2B, operating margin was 18.3%, " +
-                "and EPS was $2.47, beating consensus estimates by $0.12.";
-            Console.Error.WriteLine(
-                "[bench agentic] WARNING: no --response/--response-file supplied — grading a built-in " +
-                "FIXTURE response, not a real agent output. The produced evidence does NOT reflect subject " +
-                $"'{subject}'. Pass --response-file <path> (or --response \"...\") with the agent's actual answer.");
-        }
-        var evalInput = new EvalInput(Query: query, Response: agentResponse);
-
-        // Treat an empty/whitespace --trace the same as omitted (so both the load below and the all-skipped
-        // hint further down use one consistent notion of "no trace supplied").
-        if (string.IsNullOrWhiteSpace(traceFile))
-        {
-            traceFile = null;
-        }
-
         // Glass Box (Phase 3): attach a captured dual-boundary trace so trace-aware evaluators
         // (e.g. the glass-box-diagnostics preset) read real chat/tool-boundary data instead of Skipping.
-        // One WithTrace here reaches every leaf, since CompositeEval forwards one EvalInput to all components.
+        // One WithTrace below reaches every leaf, since CompositeEval forwards one EvalInput to all components.
+        AgentEval.Tracing.AgentTrace? glassBoxTrace = null;
         if (traceFile is not null)
         {
-            AgentEval.Tracing.AgentTrace glassBoxTrace;
             try
             {
                 glassBoxTrace = await TraceSerializer.LoadFromFileAsync(traceFile, ct);
@@ -167,10 +170,66 @@ public static class BenchAgenticCommand
                 Console.Error.WriteLine($"[bench agentic] Could not load --trace '{traceFile}': {ex.Message}");
                 return 1;
             }
+        }
+
+        // The graded answer is the agent's own: a supplied --response, or the final answer its --trace recorded.
+        string query;
+        string agentResponse;
+        if (mock)
+        {
+            // --sut mock, asked for by name: a canned exchange, labelled and not stored.
+            MockTarget.PrintBanner("bench agentic", "a canned answer");
+            query = inputText ??
+                "Search for the latest quarterly earnings report for ACME Corp and summarize the key financial metrics.";
+            agentResponse =
+                "I'll help you find the quarterly earnings report for ACME Corp. " +
+                "Based on the retrieved data, here are the key financial metrics: " +
+                "Revenue grew 12% year-over-year to $4.2B, operating margin was 18.3%, " +
+                "and EPS was $2.47, beating consensus estimates by $0.12.";
+        }
+        else if (gradesSuppliedResponse)
+        {
+            query = inputText!;
+            agentResponse = responseText!;
+        }
+        else
+        {
+            // --trace alone: the question and the final answer the run recorded. Nothing is made up; a trace that
+            // recorded no final answer leaves it empty, and the checks that grade an answer see that.
+            var (recordedQuery, recordedAnswer) = RecordedExchange(glassBoxTrace!);
+            query = inputText ?? recordedQuery ?? string.Empty;
+            agentResponse = recordedAnswer ?? string.Empty;
+            if (recordedAnswer is null)
+            {
+                Console.Error.WriteLine(
+                    "[bench agentic] The trace records no final answer at the agent boundary; checks that grade the " +
+                    "answer see an empty one. Pass --response/--response-file to grade a specific answer.");
+            }
+        }
+        var evalInput = new EvalInput(Query: query, Response: agentResponse);
+        if (glassBoxTrace is not null)
+        {
             evalInput = evalInput.WithTrace(glassBoxTrace);
         }
 
         // ── Run benchmark ────────────────────────────────────────────────────
+        if (mock)
+        {
+            EvalResult mockResult;
+            try
+            {
+                mockResult = await benchmark.EvaluateAsync(evalInput, ct);
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"Benchmark run failed: {ex.Message}");
+                return 1;
+            }
+
+            return MockTarget.Finish("bench agentic",
+                $"{mockResult.Score.Label.ToUpperInvariant()} (score {mockResult.Score.Value:F3}) for a canned answer");
+        }
+
         var store = new FileSystemOutputStore(agentEvalDir);
         // Workspace hygiene: sweep stale 24h+ sentinels. Phase-0 0.9: only
         // CLI writer paths sweep; MC (read-only viewer) does not.
@@ -194,7 +253,8 @@ public static class BenchAgenticCommand
 
         // ── Generate reports ─────────────────────────────────────────────────
         var reporter = new AgenticBenchmarkReporter();
-        var options = new AgenticReportOptions(Preset: preset);
+        // A pure-code preset calls no judge, and its report must not say one graded it.
+        var options = new AgenticReportOptions(Preset: preset, JudgeMode: PresetNeedsNoJudge(preset) ? "none" : "single");
         AgenticBenchmarkResult result;
         try
         {
@@ -239,15 +299,15 @@ public static class BenchAgenticCommand
 
         // ── All-skipped diagnostic ────────────────────────────────────────────
         // A trace-only preset (e.g. glass-box-diagnostics) run without a trace yields an all-skipped
-        // composite (weighted score 0 → "FAIL"). That is a "nothing ran" state, not a genuine regression —
-        // print a clear reason so the FAIL is not mistaken for a 0% score. (Exit stays FAIL-strict for CI.)
+        // composite. That is a "nothing ran" state, not a genuine regression: the status is SKIPPED (B9b; it
+        // used to read FAIL) and the exit is indeterminate (11) — print why.
         var subResults = compositeResult.Details.SubResults;
         if (subResults is { Count: > 0 } && subResults.All(s => s.Score.Label == "skipped"))
         {
             var isGlassBox = string.Equals(preset, "glass-box-diagnostics", StringComparison.OrdinalIgnoreCase);
             Console.Error.WriteLine(
                 $"[bench agentic] NOTE: all {subResults.Count} evaluator(s) in preset '{preset}' were SKIPPED — "
-                + "no score was produced (the FAIL below reflects 'nothing ran', not a 0% result). "
+                + "no score was produced (SKIPPED below means 'nothing ran', not a 0% result). "
                 + (isGlassBox
                     ? (traceFile is null
                         ? "This preset reads a Glass Box trace; pass --trace <file> to activate it."
@@ -257,11 +317,58 @@ public static class BenchAgenticCommand
 
         // ── Exit code ─────────────────────────────────────────────────────────
         var overall = result.Summary.OverallStatus;
-        Console.WriteLine($"Overall result: {overall} (score {result.Summary.OverallScore:P0})");
+        // ERROR / SKIPPED are not verdicts on the agent (B9b): the score covers only what was measured, and the exit is
+        // indeterminate (11), not "gate failed" (9).
+        var errored = result.Summary.PerEvaluator.Where(kv => kv.Value.Status == "ERROR").Select(kv => kv.Key).ToList();
+        var scoreText = overall is "ERROR" or "SKIPPED"
+            ? $"score {result.Summary.OverallScore:P0} of the measured part only"
+            : $"score {result.Summary.OverallScore:P0}";
+        Console.WriteLine($"Overall result: {overall} ({scoreText})");
+        if (errored.Count > 0)
+            Console.WriteLine($"  {errored.Count} check(s) produced no verdict — the judge or its input failed, not the agent: " +
+                              string.Join(", ", errored));
 
         // Reuse fix: was an inlined duplicate of BenchExitCodes.FromLabel (identical PASS=>0/else=>2 mapping);
         // the shared helper exists specifically so a future policy change lands in one place.
         return BenchExitCodes.FromLabel(overall);
+    }
+
+    /// <summary>The presets built only from pure-code evaluators: they never call a judge.</summary>
+    internal static bool PresetNeedsNoJudge(string preset) =>
+        preset.ToLowerInvariant() is "telemetry" or "judge-quality" or "stochastic-stability";
+
+    /// <summary>
+    /// Stands in the judge slot of a pure-code preset, which never calls it. Calling it is a wiring bug, so it
+    /// throws rather than returning a verdict nobody gave.
+    /// </summary>
+    private sealed class NoJudge : IEvaluator
+    {
+        public static readonly NoJudge Instance = new();
+
+        public Task<EvaluationResult> EvaluateAsync(
+            string input, string output, IEnumerable<string> criteria, CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException(
+                "A pure-code agentic preset called the judge. No judge was resolved for it; resolve a real one.");
+    }
+
+    /// <summary>
+    /// The question and the final answer a trace recorded at the agent boundary, when it recorded them: the first
+    /// agent-level request's prompt and the last agent-level response's text.
+    /// </summary>
+    internal static (string? Query, string? Answer) RecordedExchange(AgentEval.Tracing.AgentTrace trace)
+    {
+        var outer = trace.Entries
+            .Where(e => e.EffectiveScope == AgentEval.Tracing.TraceEntryScope.AgentInvocation)
+            .ToList();
+        var query = outer
+            .Where(e => e.Type == AgentEval.Tracing.TraceEntryType.Request)
+            .Select(e => e.Prompt)
+            .FirstOrDefault(p => !string.IsNullOrWhiteSpace(p));
+        var answer = outer
+            .Where(e => e.Type == AgentEval.Tracing.TraceEntryType.Response)
+            .Select(e => e.Text)
+            .LastOrDefault(t => !string.IsNullOrWhiteSpace(t));
+        return (query, answer);
     }
 
     /// <summary>
@@ -285,7 +392,7 @@ public static class BenchAgenticCommand
     /// </param>
     /// <param name="judgeModel">
     /// T3.2 (2026-05-25): the deployment / model identifier returned by
-    /// <see cref="JudgeFactory.Resolve(IEvaluator?, string, string?)"/>. Forwarded to the
+    /// <see cref="JudgeFactory.Resolve(IEvaluator?, string, string?, string?)"/>. Forwarded to the
     /// preset factories so every leaf evaluator records the judge model on
     /// its provenance. <c>null</c> when not threaded (preserves the legacy
     /// behaviour for the calibration / fixture paths that do not need it).
@@ -302,8 +409,8 @@ public static class BenchAgenticCommand
         ArgumentNullException.ThrowIfNull(judge);
 
         // T3.2 (2026-05-25): `judgeModel` is the deployment identifier
-        // returned by JudgeFactory.Resolve (e.g. "gpt-4o-mini" or "stub" /
-        // "override"); the preset factories accept it as an optional second
+        // returned by JudgeFactory.Resolve (e.g. "gpt-4o-mini" or "override");
+        // the preset factories accept it as an optional second
         // parameter and forward it to every leaf evaluator so the provenance
         // chain records WHO judged the response.
         return presetSpec.ToLowerInvariant() switch

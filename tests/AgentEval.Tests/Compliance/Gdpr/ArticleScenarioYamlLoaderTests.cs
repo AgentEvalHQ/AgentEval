@@ -91,8 +91,8 @@ public class ArticleScenarioYamlLoaderTests : IDisposable
         Assert.Equal("Test fixture (not a real GDPR article)", spec.Metadata.Title);
         Assert.Equal("low", spec.Metadata.Severity);
         Assert.Equal(0.70, spec.Metadata.PassThreshold, precision: 5);
-        Assert.Equal(0.50, spec.Metadata.WarnThreshold, precision: 5);
-        Assert.Equal(0.10, spec.Metadata.PillarWeight, precision: 5);
+        // The fixture still carries warn_threshold and pillar_weight. They left the schema because nothing read them,
+        // and the loader ignores them, so an article file written for an older release still loads.
         Assert.Equal("weighted_sum", spec.Metadata.Aggregation);
         Assert.NotNull(spec.Metadata.Description);
 

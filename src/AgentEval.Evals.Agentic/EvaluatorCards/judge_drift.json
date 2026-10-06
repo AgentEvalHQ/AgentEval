@@ -6,8 +6,8 @@
   "version": "1.0.0",
   "description": "Pure-code meta-evaluator: detects when a judge verdicts have shifted distribution over time vs a reference window. Lower is better (low drift).",
   "costTier": "Trivial",
-  "higherIsBetter": false,
-  "defaultThreshold": 0.1,
+  "higherIsBetter": true,
+  "defaultThreshold": 0.95,
   "expectedInputs": [
     {
       "kind": "metadata",

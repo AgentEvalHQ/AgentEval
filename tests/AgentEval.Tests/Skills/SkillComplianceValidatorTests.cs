@@ -215,10 +215,9 @@ public class SkillComplianceValidatorTests
     }
 
     // ── ValidateSingle: the shared entry point Item 5's raw-frontmatter reconciliation reuses ──
-    // (strategy/FutureFeatures/Skills/Skill-Discovery-Exclusion-Detection-Design.md — "one rule set, two
-    // callers, never duplicate it"). These lock in that ValidateSingle produces EXACTLY the same findings
-    // Validate([skill]) would for the same manifest — a regression here would silently desync the two
-    // callers' explanations.
+    // ("one rule set, two callers, never duplicate it"). These lock in that ValidateSingle produces
+    // EXACTLY the same findings Validate([skill]) would for the same manifest — a regression here would
+    // silently desync the two callers' explanations.
 
     [Fact]
     public void ValidateSingle_CleanSkill_MatchesValidate()

@@ -95,7 +95,7 @@ public class MicrosoftEvaluatorAdapterEvalTests
         Assert.Equal("meai_coherence", eval.Key);
         Assert.Equal("Coherence", eval.Name);
         Assert.Equal("quality.meai", eval.Category);
-        Assert.Equal("1.0.0", eval.Version);
+        Assert.Equal("1.1.0", eval.Version);
         await Task.CompletedTask;
     }
 

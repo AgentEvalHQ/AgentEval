@@ -6,7 +6,9 @@
 // during the v1.1 CLI consolidation. The only edits are (a) the namespace, (b) the
 // dataset-path finder (uses TestPathHelpers so it works in both the joslat monorepo
 // and the original AgentEvalHQ repo), and (c) suppression of an obsolete-API warning
-// inside ProgramTests (ExitCodes is now public, not internal).
+// inside ProgramTests (ExitCodes is now public, not internal). The two temperature tests that
+// re-implemented the old "0 means not given" condition were later replaced when --temperature became
+// nullable.
 
 using AgentEval.Cli.Commands;
 using AgentEval.Cli.Infrastructure;
@@ -113,7 +115,8 @@ public class EvalCommandTests
         Assert.Equal(0.8, opts.SuccessThreshold);
         Assert.Null(opts.SystemPrompt);
         Assert.Null(opts.SystemPromptFile);
-        Assert.Equal(0f, opts.Temperature);
+        Assert.Null(opts.Temperature);   // not given = not sent; the provider's default applies
+        Assert.False(opts.FormatGiven);
         Assert.Null(opts.MaxTokens);
         Assert.Null(opts.JudgeEndpoint);
         Assert.Null(opts.JudgeModel);
@@ -775,37 +778,38 @@ public class EvalCommandTests
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    //  TEMPERATURE DEFAULT BEHAVIOR
+    //  TEMPERATURE: OMITTED = NOT SENT, GIVEN (INCLUDING 0) = SENT
     // ═══════════════════════════════════════════════════════════════════════════
+    //
+    // These call the method ExecuteAsync itself uses (EvalCommand.BuildAgentChatOptions), not a copy of its
+    // logic. The two tests they replace re-implemented the old `if (opts.Temperature != 0f)` condition inline,
+    // so they could only ever agree with themselves. The end-to-end proof that the value reaches the model
+    // client is in EvalCommandTemperatureAndRunsTests.
 
     [Fact]
-    public void EvalOptions_TemperatureDefault_IsZero()
+    public void BuildAgentChatOptions_TemperatureOmitted_IsNotSent()
     {
-        // Temperature defaults to 0f, described as "deterministic".
-        // NOTE: EvalCommand only sets ChatOptions.Temperature when != 0f,
-        // meaning the default (0) is never explicitly set on the ChatOptions
-        // object. If the LLM API defaults to a non-zero temperature, users
-        // may not get deterministic output despite the CLI description.
-        // This test documents the current behavior.
-        var opts = new EvalOptions
-        {
-            Dataset = new FileInfo("test.yaml"),
-            Model = "gpt-4o",
-            Format = "json",
-        };
+        var opts = new EvalOptions { Dataset = new FileInfo("test.yaml"), Model = "gpt-4o", Format = "json" };
 
-        Assert.Equal(0f, opts.Temperature);
+        var chatOptions = EvalCommand.BuildAgentChatOptions(opts);
 
-        // Verify the conditional logic: temperature=0 does NOT get set on ChatOptions
-        var chatOptions = new Microsoft.Extensions.AI.ChatOptions();
-        if (opts.Temperature != 0f)
-            chatOptions.Temperature = opts.Temperature;
-
-        Assert.Null(chatOptions.Temperature); // Not explicitly set — API default applies
+        Assert.Null(chatOptions.Temperature);   // the provider's default applies
     }
 
     [Fact]
-    public void EvalOptions_NonZeroTemperature_GetsSet()
+    public void BuildAgentChatOptions_TemperatureZero_IsSentAsZero()
+    {
+        // The old code used 0 as both the default and the "not given" value, so an explicit
+        // --temperature 0 was dropped and the provider's default applied instead.
+        var opts = new EvalOptions { Dataset = new FileInfo("test.yaml"), Model = "gpt-4o", Format = "json", Temperature = 0f };
+
+        var chatOptions = EvalCommand.BuildAgentChatOptions(opts);
+
+        Assert.Equal(0f, chatOptions.Temperature);
+    }
+
+    [Fact]
+    public void BuildAgentChatOptions_NonZeroTemperatureAndMaxTokens_AreSent()
     {
         var opts = new EvalOptions
         {
@@ -813,13 +817,53 @@ public class EvalCommandTests
             Model = "gpt-4o",
             Format = "json",
             Temperature = 0.7f,
+            MaxTokens = 256,
         };
 
-        var chatOptions = new Microsoft.Extensions.AI.ChatOptions();
-        if (opts.Temperature != 0f)
-            chatOptions.Temperature = opts.Temperature;
+        var chatOptions = EvalCommand.BuildAgentChatOptions(opts);
 
         Assert.Equal(0.7f, chatOptions.Temperature);
+        Assert.Equal(256, chatOptions.MaxOutputTokens);
+    }
+
+    [Fact]
+    public void TemperatureOption_IsNullable_AbsentWhenOmitted_ZeroWhenGivenAsZero()
+    {
+        // Through the real parser: omitted must parse to null (not 0f), and "--temperature 0" to 0f. Against the
+        // old Option<float> with a default of 0f, both parsed to 0f and could not be told apart.
+        var command = EvalCommand.Create();
+        var option = command.Options.Single(o => o.Name == "--temperature");
+        Assert.Equal(typeof(float?), option.ValueType);
+        var temperature = (System.CommandLine.Option<float?>)option;
+
+        var omitted = command.Parse(new[] { "--dataset", "d.yaml" });
+        var zero = command.Parse(new[] { "--dataset", "d.yaml", "--temperature", "0" });
+
+        Assert.Empty(omitted.Errors);
+        Assert.Empty(zero.Errors);
+        Assert.Null(omitted.GetValue(temperature));
+        Assert.Equal(0f, zero.GetValue(temperature));
+    }
+
+    [Fact]
+    public void TemperatureOption_HelpText_DoesNotPromiseDeterminism()
+    {
+        var option = EvalCommand.Create().Options.Single(o => o.Name == "--temperature");
+
+        Assert.DoesNotContain("= deterministic", option.Description, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("provider's default", option.Description, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void WasGiven_DistinguishesAnExplicitFormatFromTheDefault()
+    {
+        // FormatGiven relies on System.CommandLine marking a defaulted option result as Implicit. Pin that
+        // here, through the real command, so a parser upgrade that changed it would fail loudly.
+        var command = EvalCommand.Create();
+        var format = command.Options.Single(o => o.Name == "--format");
+
+        Assert.False(EvalCommand.WasGiven(command.Parse(new[] { "--dataset", "d.yaml" }), format));
+        Assert.True(EvalCommand.WasGiven(command.Parse(new[] { "--dataset", "d.yaml", "--format", "json" }), format));
     }
 
     [Fact]

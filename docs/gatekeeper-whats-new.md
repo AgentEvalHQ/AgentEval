@@ -7,7 +7,16 @@ Gatekeeper evolved from individual runtime gates into a coordinated protection a
 should start with the [introduction](gatekeeper/introduction.md), [recipes](gatekeeper/examples.md), and
 [gate reference](gatekeeper/gate-reference.md).
 
-## Current baseline — 2026-08-07
+## Gatekeeper v1 — 2026-10-01
+
+- **Frozen public surface.** It is snapshot-tested, stable-labelled inside the `AgentEval` package, and eight newer types stay preview (`[Experimental]`). See [Implementation status](gatekeeper/implementation-status.md) → Gatekeeper v1.
+- **Runs inside Microsoft Agent Framework's own AgentHooks host** (MAF 1.19+). The experimental `AgentEval.MAF.AgentHooks` adapter exposes the gate pipeline as an `AgentHooks.IInterceptor`.
+- **Microsoft Agent Framework 1.23,** with tool-approval binding re-verified live.
+- **AEVP 0.1,** a draft evidence profile for interceptor verdicts.
+- **CLI:** the never-implemented `gatekeeper serve` stub is gone.
+- **One known-limitations list** on the status page: no OpenTelemetry yet, A2A not promoted, streamed-output limits, and Workflows blocked upstream.
+
+## Previous baseline — 2026-08-07
 
 ### Coordinated composition
 

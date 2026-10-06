@@ -78,8 +78,8 @@ public sealed class RecommendationExtractor
         // stays "none" when EVERY leaf under a control errored. The recommendations schema's
         // severity enum only accepts low/medium/high/critical, never "none", so this control
         // would otherwise crash the whole report's schema validation. Checking severity here
-        // (rather than this node's own Label, which is "fail"/"pass" — composites never carry
-        // "error") catches this at any level, not just direct leaves.
+        // (rather than this node's own Label) catches this at any level, not just direct leaves; an
+        // errored article — a composite can carry "error" — reports severity "none" (B10k), so it is never a finding.
         if (node.Metric.Key.StartsWith("gdpr.art", StringComparison.Ordinal)
             && !node.Score.Passed
             && !string.Equals(node.Score.Severity, "none", StringComparison.OrdinalIgnoreCase))

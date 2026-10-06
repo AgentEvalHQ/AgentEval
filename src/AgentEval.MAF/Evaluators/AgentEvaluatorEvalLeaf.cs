@@ -76,8 +76,8 @@ public sealed class AgentEvaluatorEvalLeaf : IEval
         ArgumentNullException.ThrowIfNull(input);
 
         var item = new EvalItem(input.Query, input.Response ?? string.Empty);
-        if (input.Context is not null) item.Context = input.Context;
-        if (input.GroundTruth is not null) item.ExpectedOutput = input.GroundTruth;
+        if (!string.IsNullOrWhiteSpace(input.Context)) item.Context = input.Context;              // a blank one is none (B12j)
+        if (ReferenceText.HasWords(input.GroundTruth)) item.ExpectedOutput = input.GroundTruth;
 
         AgentEvaluationResults results;
         try
@@ -117,9 +117,11 @@ public sealed class AgentEvaluatorEvalLeaf : IEval
 
         return new EvalResult(
             Metric: new EvalMetadata(Key, Name, Category, Version),
+            // The bridged state comes along with the label (B10q): a node that withheld its pass is a warn the parent
+            // must read as not measured, not as a measured warn.
             Score: new EvalScore(
                 Value: agg.Value, Ordinal: null, Label: agg.Label, Passed: agg.Passed,
-                Threshold: _threshold, Severity: agg.Severity, Confidence: null),
+                Threshold: _threshold, Severity: agg.Severity, Confidence: null) { Measurement = agg.Measurement },
             Details: new EvalDetails(
                 Dimensions: null,
                 Evidence: evidence.ToArray(),

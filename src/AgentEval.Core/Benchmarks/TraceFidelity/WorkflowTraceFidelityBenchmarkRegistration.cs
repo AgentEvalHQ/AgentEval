@@ -37,6 +37,6 @@ internal static class WorkflowTraceFidelityBenchmarkRegistration
             _ => throw new ArgumentException($"Unknown workflow-trace-fidelity preset '{preset}'. Known: smoke, standard, audit-grade."),
         },
         evaluateAsync: null,   // Shape B — WorkflowExecutionResult + per-executor traces don't map onto a single EvalInput
-        docLinkUrl: "https://github.com/joslat/AgentEval/blob/main/docs/benchmarks/workflow-trace-fidelity.md",
+        docLinkUrl: "https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/workflow-trace-fidelity.md",
         owningAssemblyName: typeof(WorkflowTraceFidelityBenchmark).Assembly.GetName().Name));
 }

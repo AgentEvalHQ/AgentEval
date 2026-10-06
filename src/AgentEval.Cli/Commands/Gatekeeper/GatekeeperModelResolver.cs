@@ -5,6 +5,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using AgentEval.Cli.Infrastructure;
+using AgentEval.Providers;
 using Microsoft.Extensions.AI;
 
 namespace AgentEval.Cli.Commands.Gatekeeper;
@@ -14,7 +15,8 @@ internal sealed record ModelResolution(IChatClient? Client, string? Fingerprint,
 
 /// <summary>
 /// Builds the judge <see cref="IChatClient"/> from CLI flags, mirroring <c>eval</c>'s branching: explicit Azure,
-/// explicit OpenAI-compatible endpoint, or the <c>AZURE_OPENAI_*</c> env trio. Also computes a model
+/// explicit OpenAI-compatible endpoint, or the provider <c>AI_INFERENCE_PROVIDER</c> selects (resolved by
+/// <see cref="InferenceProviderEnvironment"/>, exactly as the bench judges and the samples resolve it). Also computes a model
 /// <b>fingerprint</b> (provider + host + model/deployment, hashed) so a calibration certificate is tied to the exact
 /// model it certifies — inline readiness is model-specific.
 /// </summary>
@@ -57,21 +59,27 @@ internal static class GatekeeperModelResolver
                 return new(c, Fingerprint("openai", endpoint, model!), ExitCodes.Success);
             }
 
-            // Env fallback — build it the same way as the explicit --azure branch (EndpointFactory.CreateAzure) rather
-            // than AzureChatAgentFactory, whose missing-config path writes benchmark-worded errors straight to
-            // Console.Error (duplicating gatekeeper's own message + bypassing the injected stderr). CreateAzure resolves
-            // the key itself (apiKey ?? AZURE_OPENAI_API_KEY), so an explicit --api-key overrides the env var — consistent
-            // with the other branches. We gate only on endpoint+deployment; a missing key surfaces via the outer catch.
-            var envEndpoint   = Env("AZURE_OPENAI_ENDPOINT");
-            var envDeployment = Env("AZURE_OPENAI_DEPLOYMENT");
-            if (!string.IsNullOrWhiteSpace(envEndpoint) && !string.IsNullOrWhiteSpace(envDeployment))
+            // Env fallback: the provider AI_INFERENCE_PROVIDER selects (Bitdeer, OpenAI, Foundry, Azure, any
+            // OpenAI-compatible host), resolved like the bench judges and the samples. An explicit selector wins; unset,
+            // the first provider with complete credentials is used. Built with the same EndpointFactory methods as the
+            // explicit branches, and an explicit --api-key still overrides the provider's key. The fingerprint uses the
+            // provider tag, so an Azure setup fingerprints exactly as before ("azure" + endpoint + deployment) and its
+            // existing calibration certificates stay valid.
+            var provider = InferenceProviderEnvironment.Resolve();
+            if (provider.IsConfigured && provider.Endpoint is not null && !string.IsNullOrWhiteSpace(provider.Model))
             {
-                var c = CliChatClientDiagnostics.Wrap(EndpointFactory.CreateAzure(envEndpoint!, envDeployment!, apiKey), "judge");   // apiKey ?? env key, resolved inside
-                return new(c, Fingerprint("azure", envEndpoint, envDeployment!), ExitCodes.Success);
+                var providerEndpoint = provider.Endpoint.ToString();
+                var key = apiKey ?? provider.ApiKey;
+                var client = provider.UsesAzureProtocol
+                    ? EndpointFactory.CreateAzure(providerEndpoint, provider.Model!, key)
+                    : EndpointFactory.CreateOpenAICompatible(providerEndpoint, provider.Model!, key);
+                return new(CliChatClientDiagnostics.Wrap(client, "judge"),
+                    Fingerprint(provider.ProviderTag, providerEndpoint, provider.Model!), ExitCodes.Success);
             }
 
             stderr.WriteLine("  Error: no model backing. Pass --azure --deployment-name <d>, or --endpoint <url> --model <m>, " +
-                             "or set AZURE_OPENAI_ENDPOINT / _API_KEY / _DEPLOYMENT.");
+                             "or configure a provider (AI_INFERENCE_PROVIDER, e.g. bitdeer + BITDEER_API_KEY; see docs/cli.md)." +
+                             (provider.Diagnostic is null ? "" : " " + provider.Diagnostic));
             return new(null, null, ExitCodes.UsageError);
         }
         catch (Exception ex) when (ex is InvalidOperationException or FormatException or ArgumentException)

@@ -119,8 +119,6 @@ public class ArticleCompositeBuilderTests
             Title: "Unknown aggregation test",
             Severity: "low",
             PassThreshold: 0.70,
-            WarnThreshold: 0.50,
-            PillarWeight: 0.10,
             Aggregation: "exotic");
         var scenario = new AgentEval.Compliance.Gdpr.Articles.Models.ScenarioSpec(
             Id: "test-unknown-001",

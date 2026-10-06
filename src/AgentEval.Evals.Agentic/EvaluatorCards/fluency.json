@@ -3,11 +3,11 @@
   "key": "fluency",
   "name": "Fluency",
   "category": "rag",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "LLM judge assessing grammatical correctness, natural phrasing, and overall language quality of the response.",
   "costTier": "Low",
   "higherIsBetter": true,
-  "defaultThreshold": 0.8,
+  "defaultThreshold": 0.6,
   "expectedInputs": [
     {
       "kind": "response",

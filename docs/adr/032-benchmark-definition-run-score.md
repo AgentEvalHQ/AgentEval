@@ -16,6 +16,11 @@
   §6's answer table for what each answer refused, **in code and not only in prose**.
   <br/>⚠ Accepted describes the contract, not the stop rule: Q6 is *yes on the principle, staged in
   execution*, so `BenchmarkRunner` still applies **no** floor to any verdict.
+  <br/>**Amended 2026-10-04 (#203 review):** the run verdict below read "WARN if warnings > 0 · else PASS", so a
+  row whose check did not run (`NotMeasured`: skipped or errored) was ignored and the run passed without it. The
+  verdict is now WARN when any row is `NotMeasured` and at least one row was measured (a run in which no row was
+  measured is PENDING), as a composite treats a required component that did not run. `skipped` stays one bucket
+  for both states; only `NotApplicable` rows (a corpus finding) stay out of the verdict.
   <br/>_Superseded status, kept because the reasoning still holds: **Proposed.** Proposed is a gate,
   not a placeholder (the ADR-026 / ADR-030 precedent). Accepting this document funds Waves 0 and 1 of
   §3.3 … Wave 2, the benchmark contract itself, is gated on one question only the owner can answer
@@ -209,7 +214,7 @@ CLI red-team row on disk reads as *judged*. Three files under `.agenteval/` carr
 ### 1.5 The rule this design must not cross, and where it lives
 
 *"The one thing that must not happen: AE-04 before AE-06"* is the owner's local plan's §2.4
-(`strategy/Galaxus/MASTER_PLAN.md:1048` — gitignored, **not readable from this repository**; recorded
+(its line 1048 — gitignored, **not readable from this repository**; recorded
 here by quotation because `grep -c 'AE-04' docs/adr/030-*.md` → 0 before ADR-030 §11). Its Phase 6
 rows (`:1697-1707`) list 6.1 (`AddEval`) and 6.2 (the projection) — the two that shipped as AE-04 —
 and 6.3 (*the harness runs an `IEval`*), which did not; `:688` places **all** of Phase 6 under the

@@ -9,7 +9,10 @@ using AgentEval.RedTeam.MemorySecurity;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 
-namespace AgentEval.MAF.Gatekeeper.MemorySecurity;
+// Hermetic test doubles for the memory-security validation and its tests. Through 0.42 they shipped as public
+// types in the AgentEval package; they are fakes (an in-memory SQL-style store, a scripted MCP endpoint) and have
+// no place beside the real Gatekeeper, which uses real stores and models only. The test project links this file.
+namespace AgentEval.Gatekeeper.Validation.Fixtures;
 
 /// <summary>Scope key used by the hermetic SQL-style memory store.</summary>
 public sealed record MockMemoryScope

@@ -28,19 +28,23 @@ public static class AgentEvalEvaluators
     // ═══════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Quality metrics: faithfulness, relevance, coherence, fluency.
-    /// All work fully through the light path (text-only evaluation).
+    /// Quality metrics: relevance, coherence, fluency — all three grade the text alone, so they work on every MAF path.
+    /// Faithfulness needs a retrieved context, which <c>agent.EvaluateAsync</c> cannot pass; it is in <see cref="RAG"/>
+    /// and <see cref="Faithfulness"/>.
     /// </summary>
     public static AgentEvalEvaluator Quality(IChatClient judgeClient) => new([
-        new FaithfulnessMetric(judgeClient),
         new RelevanceMetric(judgeClient),
         new CoherenceMetric(judgeClient),
         new FluencyMetric(judgeClient)]);
 
     /// <summary>
     /// RAG metrics: faithfulness, relevance, context precision, context recall, answer correctness.
-    /// Requires <see cref="AgentEvalRAGContext"/> and/or <see cref="AgentEvalGroundTruthContext"/>
-    /// via <c>additionalContext</c>.
+    /// Requires the retrieved context and the reference answer — <c>EvalItem.Context</c> / <c>EvalItem.ExpectedOutput</c>
+    /// on the native MAF path, <see cref="AgentEvalRAGContext"/> / <see cref="AgentEvalGroundTruthContext"/> via
+    /// <c>additionalContext</c> on a direct MEAI call. <c>agent.EvaluateAsync</c> takes an expected output but no context,
+    /// so build the <c>EvalItem</c>s with <c>Context</c> set and call the evaluator's <c>EvaluateAsync(items)</c>. A metric
+    /// whose input is missing is not measured, which fails the MAF item (MAF has no state between pass and fail), its
+    /// reason saying what was not supplied.
     /// </summary>
     public static AgentEvalEvaluator RAG(IChatClient judgeClient) => new([
         new FaithfulnessMetric(judgeClient),
@@ -73,15 +77,15 @@ public static class AgentEvalEvaluators
         new MisinformationMetric(judgeClient)]);
 
     /// <summary>
-    /// All available metrics (quality + agentic + safety + task completion).
-    /// The most comprehensive single-call evaluation.
+    /// Every metric that needs no retrieved context (quality + agentic + safety + task completion): the most
+    /// comprehensive single-call evaluation for <c>agent.EvaluateAsync</c>, which cannot pass a context. Faithfulness and
+    /// groundedness need one; faithfulness is in <see cref="RAG"/> and <see cref="Faithfulness"/>, groundedness in
+    /// <see cref="Groundedness"/>.
     /// </summary>
     public static AgentEvalEvaluator Advanced(IChatClient judgeClient) => new([
-        new FaithfulnessMetric(judgeClient),
         new RelevanceMetric(judgeClient),
         new CoherenceMetric(judgeClient),
         new FluencyMetric(judgeClient),
-        new GroundednessMetric(judgeClient),
         new ToolSuccessMetric(),
         new TaskCompletionMetric(judgeClient),
         new ToxicityMetric(judgeClient),

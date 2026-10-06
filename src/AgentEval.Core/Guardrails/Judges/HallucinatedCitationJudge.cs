@@ -46,13 +46,20 @@ public sealed class HallucinatedCitationJudge : IChatGate
     // spanning multiple lines is captured in FULL without bleeding into the next field.
     private static readonly Regex SourceLine = new(
         @"^\[(?<id>[^\]]+)\]\s*(?<content>.*?)(?=\r?\n\[[^\]]+\]|\r?\nCITED SOURCE:|\z)",
-        RegexOptions.Compiled | RegexOptions.Multiline | RegexOptions.Singleline, TimeSpan.FromMilliseconds(100));
-    private static readonly Regex CitedSourceLine = new(@"^CITED SOURCE:\s*(?<id>.+)$", RegexOptions.Compiled | RegexOptions.Multiline, TimeSpan.FromMilliseconds(100));
-    private static readonly Regex ClaimLine = new(@"^CLAIM:\s*(?<claim>.+)$", RegexOptions.Compiled | RegexOptions.Multiline | RegexOptions.Singleline, TimeSpan.FromMilliseconds(100));
-    private static readonly Regex TripleQuote = new("\"{3,}", RegexOptions.Compiled, TimeSpan.FromMilliseconds(50));
+        RegexOptions.Compiled | RegexOptions.Multiline | RegexOptions.Singleline, GateRegexTimeouts.Standard);
+    private static readonly Regex CitedSourceLine = new(@"^CITED SOURCE:\s*(?<id>.+)$", RegexOptions.Compiled | RegexOptions.Multiline, GateRegexTimeouts.Standard);
+    private static readonly Regex ClaimLine = new(@"^CLAIM:\s*(?<claim>.+)$", RegexOptions.Compiled | RegexOptions.Multiline | RegexOptions.Singleline, GateRegexTimeouts.Standard);
+    private static readonly Regex TripleQuote = new("\"{3,}", RegexOptions.Compiled, GateRegexTimeouts.Trivial);
 
     private readonly IChatClient _fastModel;
     private readonly JudgeGateOptions _options;
+
+    /// <summary>
+    /// How the parse regexes are run. Test seam only: a test substitutes a matcher that throws
+    /// <see cref="RegexMatchTimeoutException"/>, so the timeout path is exercised deterministically instead of
+    /// depending on machine load. Production code never sets it.
+    /// </summary>
+    internal Func<Regex, string, Match> RegexMatch { get; init; } = static (regex, input) => regex.Match(input);
 
     /// <inheritdoc/>
     public string PolicyName => "judge:hallucinated-citation";
@@ -74,7 +81,19 @@ public sealed class HallucinatedCitationJudge : IChatGate
             return GateVerdict.Allow(PolicyName);
         }
 
-        var (sources, citedId, claim) = Parse(text);
+        var (sources, citedId, claim, parseTimedOut) = Parse(text);
+
+        if (parseTimedOut)
+        {
+            // A parse that timed out is "could not check", not "nothing to check". It used to come back as
+            // (sources, null, null) and fall into the no-citation-shape Allow below, so a real hallucinated
+            // citation was allowed whenever the regexes ran slow (a busy test host or CI runner). It is now an
+            // inconclusive inspection, decided like the judge-half's own inconclusive outcomes.
+            return _options.FailClosedOnInconclusive
+                ? GateVerdict.Block(PolicyName,
+                    "hallucinated-citation parse timed out (regex match timeout): the citation could not be checked (fail-closed)")
+                : GateVerdict.Allow(PolicyName);
+        }
 
         if (citedId is null || claim is null)
         {
@@ -145,25 +164,28 @@ public sealed class HallucinatedCitationJudge : IChatGate
         return sb.ToString();
     }
 
-    private static (IReadOnlyDictionary<string, string> Sources, string? CitedId, string? Claim) Parse(string text)
+    private (IReadOnlyDictionary<string, string> Sources, string? CitedId, string? Claim, bool TimedOut) Parse(string text)
     {
         var sources = new Dictionary<string, string>(StringComparer.Ordinal);
         try
         {
-            foreach (Match m in SourceLine.Matches(text))
+            // Match/NextMatch walks the same successive matches Regex.Matches enumerates.
+            for (var m = RegexMatch(SourceLine, text); m.Success; m = m.NextMatch())
             {
                 sources[m.Groups["id"].Value.Trim()] = m.Groups["content"].Value.Trim();
             }
 
-            var citedMatch = CitedSourceLine.Match(text);
-            var claimMatch = ClaimLine.Match(text);
+            var citedMatch = RegexMatch(CitedSourceLine, text);
+            var claimMatch = RegexMatch(ClaimLine, text);
             var citedId = citedMatch.Success ? citedMatch.Groups["id"].Value.Trim() : null;
             var claim = claimMatch.Success ? claimMatch.Groups["claim"].Value.Trim() : null;
-            return (sources, citedId, claim);
+            return (sources, citedId, claim, false);
         }
         catch (RegexMatchTimeoutException)
         {
-            return (sources, null, null);
+            // Reported as its own outcome so the caller can tell "could not parse in time" from "not in the
+            // citation shape"; the partial sources are not used.
+            return (sources, null, null, true);
         }
     }
 

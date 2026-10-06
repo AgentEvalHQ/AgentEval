@@ -47,9 +47,9 @@ public static class BenchAgenticCalibrateCommand
     /// <para><b>calibration</b> (T1.3 NEW) — meta-calibration evaluators
     /// (confidence_calibration, uncertainty_acknowledgment) are a calibration-of-
     /// calibration meta loop: a judge that grades how well-calibrated the agent's
-    /// confidence is. Per playbook (Part 4 §"likely-too-noisy candidates"), these
-    /// rank among the noisiest evaluators because the judge must reason about the
-    /// agent's epistemic stance rather than a factual claim. Override 0.75 / 0.55
+    /// confidence is. They were expected (in a local calibration playbook, not in
+    /// this repository) to rank among the noisiest evaluators because the judge
+    /// must reason about the agent's epistemic stance rather than a factual claim. Override 0.75 / 0.55
     /// reflects expected n=~20 stochasticity on first real-LLM measurement; T1.4
     /// will tighten if real data clears the higher gate.</para>
     /// <para><b>safety</b> (T1.3 NEW) — content-classifier evaluators
@@ -60,8 +60,8 @@ public static class BenchAgenticCalibrateCommand
     /// one category report multiplies the at-bat count for borderline labels.
     /// Refresh after T1.4 real-LLM sweep — if accuracy clears 0.90 this override
     /// retires. NOTE: safety + adversarial currently INFRA-FAIL on Azure due to
-    /// content-filter blocking the judge call on harmful-content goldens — see
-    /// follow-up R1 (T0.10) in strategy/futurefeatures/todo/13-pending-issues-tasks.md.</para>
+    /// content-filter blocking the judge call on harmful-content goldens (an open
+    /// follow-up, R1 / T0.10, tracked outside this repository).</para>
     /// <para><b>reasoning</b> (Path A' v1.1) — after carving out the 3 trace-
     /// dependent reasoning evaluators (R4: intermediate_step_hallucination,
     /// plan_formulation_quality, self_correction_quality) the remaining 2 evaluators
@@ -76,8 +76,8 @@ public static class BenchAgenticCalibrateCommand
     /// semantics (per R3). Override 0.65 / 0.40 reflects honest measured floor;
     /// the proper fix is per-evaluator overrides (R3 follow-up T3.14).</para>
     /// <para><b>Override ceiling</b> — total of 6 overrides (process + system +
-    /// calibration + safety + reasoning + quality) exceeds the original Part 4
-    /// §"Cross-family takeaways" #6 ceiling of ≤4. Justified by Path A' analysis:
+    /// calibration + safety + reasoning + quality) exceeds the original design
+    /// ceiling of ≤4 overrides. Justified by Path A' analysis:
     /// the category bucket itself is the wrong granularity (R3); per-evaluator
     /// overrides will reduce the count once T3.14 lands. ux / adversarial run
     /// against the default 0.85 / 0.70 gate.</para>
@@ -177,6 +177,57 @@ public static class BenchAgenticCalibrateCommand
     };
 
     /// <summary>
+    /// The entries the resolver dispatched nothing for, split by why (B6c-15): carved out on purpose (<see cref="s_carveOutKeys"/>,
+    /// <see cref="s_notCalibratableOnTheseGoldens"/>) or not routed at all — a golden key nothing knows. The report used to
+    /// call every one of them "not yet routed", so a category emptied by deliberate carve-outs read as a wiring gap.
+    /// </summary>
+    internal static (int CarvedOut, string CarvedKeys, int NotRouted, string NotRoutedKeys) SplitUndispatched(CalibrationCategoryReport report)
+    {
+        static bool Carved(string key) => s_carveOutKeys.Contains(key) || s_notCalibratableOnTheseGoldens.Contains(key);
+        var carved = report.SkippedKeys.Where(kv => Carved(kv.Key)).ToList();
+        var notRouted = report.SkippedKeys.Where(kv => !Carved(kv.Key)).ToList();
+        return (carved.Sum(kv => kv.Value), string.Join(", ", carved.Select(kv => kv.Key)),
+                notRouted.Sum(kv => kv.Value), string.Join(", ", notRouted.Select(kv => kv.Key)));
+    }
+
+    // One sentence for a category none of whose entries was dispatched.
+    private static string UndispatchedSentence(CalibrationCategoryReport report)
+    {
+        var (carved, carvedKeys, notRouted, notRoutedKeys) = SplitUndispatched(report);
+        var parts = new List<string>();
+        if (carved > 0)
+            parts.Add($"{carved} entries carved out by key, not calibratable on these goldens ({carvedKeys})");
+        if (notRouted > 0)
+            parts.Add($"{notRouted} entries have a key nothing dispatches ({notRoutedKeys}) — a new golden key not yet routed in " +
+                      "CalibrationDataset.DeriveCategory");
+        return parts.Count == 0 ? "no entries" : string.Join("; ", parts);
+    }
+
+    /// <summary>
+    /// A category's gate status. INFRA-FAIL: an evaluation failed. INCOMPLETE: a key was left out of the scoring because
+    /// it was not measured on every record (#203 review, B6c-7) — scoring the rest would score a sample selected on the
+    /// evaluator's own verdict, so the category is not a measured PASS. Otherwise PASS or FAIL on accuracy and kappa.
+    /// </summary>
+    internal static string CategoryStatus(CalibrationCategoryReport report, double accuracyThreshold, double kappaThreshold) =>
+        report.EvaluationFailures > 0 ? "INFRA-FAIL"
+        : report.ExcludedKeys.Count > 0 ? "INCOMPLETE"
+        : report.Accuracy >= accuracyThreshold && report.CohensKappa >= kappaThreshold ? "PASS"
+        : "FAIL";
+
+    /// <summary>
+    /// Registered evaluators the golden cases cannot calibrate, left out by KEY (#203 review, B6c-7). The goldens carry no
+    /// tool calls or tool definitions: <c>unsafe_tool_use</c> measures nothing on them (20 of 20 not measured), and
+    /// <c>tool_input_accuracy</c> / <c>tool_call_accuracy</c> withhold every PASS (their schema leaf cannot run), so only
+    /// their FAIL predictions were measured — a sample selected on their own verdict, in which their false negatives
+    /// vanished. They stay registered for every other use; only this command does not dispatch them, until the golden
+    /// schema carries tool data.
+    /// </summary>
+    internal static readonly IReadOnlySet<string> s_notCalibratableOnTheseGoldens = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "unsafe_tool_use", "tool_input_accuracy", "tool_call_accuracy",
+    };
+
+    /// <summary>
     /// Categories that represent dispatch-coverage skips (not real measurement).
     /// Filtered from the gate evaluation so an empty bucket doesn't fail the run.
     /// <para>
@@ -193,29 +244,59 @@ public static class BenchAgenticCalibrateCommand
     /// </list>
     /// </para>
     /// </summary>
-    private static bool IsAgentInfraSkipCategory(string category, int entryCount, int skippedUnknownKey = 0) =>
-        (category == "unknown" && entryCount == 0)
-        || (entryCount == 0 && skippedUnknownKey > 0);
+    internal static bool IsAgentInfraSkipCategory(string category, CalibrationCategoryReport report) =>
+        DispatchedCount(report) == 0 && (category == "unknown" || report.SkippedUnknownKey > 0);
+
+    /// <summary>
+    /// Entries the resolver DID dispatch: scored, errored, not measured, inapplicable, or dropped with an excluded key.
+    /// <see cref="CalibrationCategoryReport.EntryCount"/> counts only the scored ones, so a category whose dispatched
+    /// entries were all excluded (INCOMPLETE) or all errored (INFRA-FAIL) used to read as "nothing dispatched" — SKIP — and
+    /// pass the gate (#203 review round 3, B10a).
+    /// </summary>
+    internal static int DispatchedCount(CalibrationCategoryReport report) =>
+        report.EntryCount + report.EvaluationFailures + report.NotMeasured + report.NotApplicable + report.ExcludedMeasuredRecords;
 
     /// <summary>Runs the agentic calibrate subcommand.</summary>
     /// <param name="rootOverride">Optional workspace root override (used by tests).</param>
     /// <param name="outPathOverride">Optional output path override (used by tests).</param>
     /// <param name="evaluatorOverride">Optional evaluator override (used by tests).</param>
     /// <param name="ct">Cancellation token.</param>
+    /// <param name="recordsPath">When set, one JSON line per evaluated case is written here (<c>--records</c>).</param>
+    /// <param name="limitPerCategory">When set, at most this many entries per category are evaluated (<c>--limit</c>).</param>
     /// <returns>0 on success, 2 if thresholds not met, 1 on internal error.</returns>
     public static Task<int> RunAsync(
         string? rootOverride = null,
         string? outPathOverride = null,
         IEvaluator? evaluatorOverride = null,
-        CancellationToken ct = default)
-        => RunCoreAsync(rootOverride, outPathOverride, evaluatorOverride, ct);
+        CancellationToken ct = default,
+        string? recordsPath = null,
+        int? limitPerCategory = null)
+        => RunCoreAsync(rootOverride, outPathOverride, evaluatorOverride, ct, recordsPath, limitPerCategory);
 
+    // evaluatorOverrideIdentity: the provider and model behind evaluatorOverride, for the report header and the
+    // per-case records. Without it a supplied evaluator is reported as unknown; it is ignored when evaluatorOverride
+    // is null.
     internal static async Task<int> RunCoreAsync(
         string? rootOverride,
         string? outPathOverride,
         IEvaluator? evaluatorOverride,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        string? recordsPath = null,
+        int? limitPerCategory = null,
+        CalibrationJudgeIdentity? evaluatorOverrideIdentity = null)
     {
+        if (limitPerCategory is < 1)
+        {
+            Console.Error.WriteLine("--limit must be at least 1.");
+            return ExitCodes.UsageError;
+        }
+        if (limitPerCategory is not null && outPathOverride is null)
+        {
+            // A limited run must never land on the default dated baseline path and overwrite that day's full run.
+            Console.Error.WriteLine("--limit requires --out: a limited run is a wiring check, not a baseline, and must not overwrite the day's report.");
+            return ExitCodes.UsageError;
+        }
+
         // ── Workspace root canonicalisation ──────────────────────────────────
         if (rootOverride is not null)
         {
@@ -225,11 +306,12 @@ public static class BenchAgenticCalibrateCommand
         }
 
         // ── Judge / evaluator ────────────────────────────────────────────────
-        // Calibration requires AGENTEVAL_ALLOW_STUB_JUDGE=1 to use stub mode —
-        // stub-graded calibration gates the wrong thing.
+        // Calibration measures a judge, so it needs a real one: there is no stand-in judge.
         var (resolvedJudge, judgeModelName, exitCode) = JudgeFactory.Resolve(evaluatorOverride, "agentic calibration");
         if (resolvedJudge is null) return exitCode;
         IEvaluator judge = resolvedJudge;
+        // Which judge produced this run goes into the report header and every per-case record.
+        var judgeIdentity = CalibrationJudgeIdentity.Of(evaluatorOverride, evaluatorOverrideIdentity, judge, judgeModelName);
 
         // ── Resolve the evaluator dispatch table from IEvalRegistry ──────────
         // ADR-031 C1. The 40-entry hand-authored `Dictionary<string, IEval>`
@@ -262,7 +344,8 @@ public static class BenchAgenticCalibrateCommand
         {
             if (!resolved.TryGetValue(key, out var eval))
             {
-                eval = EvalRegistry.Shared.Resolve(key, judge, judgeModelName);
+                // Not dispatched on these goldens (B6c-7): left out by key, counted as carved_out in the report.
+                eval = s_notCalibratableOnTheseGoldens.Contains(key) ? null : EvalRegistry.Shared.Resolve(key, judge, judgeModelName);
                 resolved[key] = eval;
             }
             return eval;
@@ -311,7 +394,32 @@ public static class BenchAgenticCalibrateCommand
         try
         {
             var runner = new AgentEval.Evals.Agentic.Calibration.CalibrationRunner(Resolver);
-            report = await runner.RunAsync(datasets, ct);
+            if (recordsPath is null)
+            {
+                report = await runner.RunAsync(datasets, caseSink: null, limitPerCategory, ct);
+            }
+            else
+            {
+                var dir = Path.GetDirectoryName(Path.GetFullPath(recordsPath));
+                if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
+                await using var writer = new StreamWriter(recordsPath, append: false);
+                var jsonOptions = new System.Text.Json.JsonSerializerOptions(System.Text.Json.JsonSerializerDefaults.Web);
+                report = await runner.RunAsync(
+                    datasets,
+                    async (record, token) =>
+                    {
+                        // The record type belongs to the runner and knows nothing of providers, so the judge is
+                        // added here, on every line: a records file must say which judge produced it on its own.
+                        var line = System.Text.Json.JsonSerializer.SerializeToNode(record, jsonOptions)!.AsObject();
+                        line["judgeProvider"] = judgeIdentity.Provider;
+                        line["judgeModel"] = judgeIdentity.Model;
+                        await writer.WriteLineAsync(line.ToJsonString(jsonOptions).AsMemory(), token);
+                        await writer.FlushAsync(token);
+                    },
+                    limitPerCategory,
+                    ct);
+                Console.WriteLine($"Per-case records written: {recordsPath}");
+            }
         }
         catch (Exception ex)
         {
@@ -323,13 +431,16 @@ public static class BenchAgenticCalibrateCommand
         var dateStr = report.GeneratedAt.ToString("yyyy-MM-dd");
         var defaultOut = Path.Combine(
             rootOverride ?? Directory.GetCurrentDirectory(),
-            "strategy", "FutureFeatures", "calibration-baselines", $"agentic-calibration-{dateStr}.md");
+            ".agenteval", "calibration", $"agentic-calibration-{dateStr}.md");   // the workspace folder every bench command writes to
         var outPath = outPathOverride ?? defaultOut;
 
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
-            var md = BuildMarkdownReport(report);
+            var md = BuildMarkdownReport(report, judgeIdentity);
+            if (limitPerCategory is int lim)
+                md = $"> ⚠️ **LIMITED RUN — at most {lim} entr{(lim == 1 ? "y" : "ies")} per category.** A wiring check, not a baseline: " +
+                     "accuracy and kappa on this few cases mean nothing, and the calibration gate is not applied." + Environment.NewLine + Environment.NewLine + md;
             await File.WriteAllTextAsync(outPath, md);
             Console.WriteLine($"Agentic calibration report: {outPath}");
         }
@@ -346,45 +457,51 @@ public static class BenchAgenticCalibrateCommand
         bool allPass = true;
         foreach (var (category, categoryReport) in report.PerCategory.OrderBy(kv => kv.Key))
         {
-            if (IsAgentInfraSkipCategory(category, categoryReport.EntryCount, categoryReport.SkippedUnknownKey))
+            if (IsAgentInfraSkipCategory(category, categoryReport))
             {
                 // Path A' (v1.1) carved out 9 more evaluators (5 multi-turn memory +
                 // 3 trace-dependent reasoning + f1_score), trimming dispatch from
                 // 49 → 40 of 60. The carved-key entries route into memory / reasoning
-                // categories where every entry skips — surfaced as SKIP with the
-                // SkippedUnknownKey count. An "unknown" SKIP indicates a future
-                // golden added a brand-new key without extending DeriveCategory.
-                Console.WriteLine(
-                    $"  [SKIP] {category}: {categoryReport.SkippedUnknownKey} entries had no dispatch wiring " +
-                    $"(this means a new golden key is not yet routed in CalibrationDataset.DeriveCategory). " +
-                    $"The 20 evaluators carved out from dispatch (6 pure-code telemetry + StochasticStability + " +
-                    $"CostQualityEfficiency + 3 judge-quality meta + 5 multi-turn memory + 3 trace-dependent " +
-                    $"reasoning + f1_score) do NOT route through this path.");
+                // categories where every entry skips — surfaced as SKIP, naming the
+                // carved-out keys apart from any not routed at all (B6c-15): only the
+                // latter means a golden added a brand-new key without extending DeriveCategory.
+                Console.WriteLine($"  [SKIP] {category}: nothing dispatched — {UndispatchedSentence(categoryReport)}.");
                 continue;
             }
             var (accThr, kapThr) = s_categoryOverrides.TryGetValue(category, out var ov)
                 ? ov
                 : (AccuracyThreshold, KappaThreshold);
-            var accOk = categoryReport.Accuracy >= accThr;
-            var kappaOk = categoryReport.CohensKappa >= kapThr;
-            var noInfraFail = categoryReport.EvaluationFailures == 0;
-            var status = !noInfraFail
-                ? "INFRA-FAIL"
-                : (accOk && kappaOk ? "PASS" : "FAIL");
+            var complete = categoryReport.ExcludedKeys.Count == 0;
+            var status = CategoryStatus(categoryReport, accThr, kapThr);
+            var (carvedOut, _, notRouted, notRoutedKeys) = SplitUndispatched(categoryReport);
             var thrSuffix = s_categoryOverrides.ContainsKey(category)
                 ? $" [override: acc>={accThr:P0} kappa>={kapThr:F2}]"
                 : string.Empty;
             Console.WriteLine(
                 $"  [{status}] {category}: accuracy={categoryReport.Accuracy:P1}, " +
                 $"kappa={FormatKappa(categoryReport.CohensKappa)}, entries={categoryReport.EntryCount}, " +
-                $"failures={categoryReport.EvaluationFailures}{thrSuffix}");
-            if (!accOk || !kappaOk || !noInfraFail) allPass = false;
+                $"failures={categoryReport.EvaluationFailures}, not_measured={categoryReport.NotMeasured}, " +
+                $"inapplicable={categoryReport.NotApplicable}, carved_out={carvedOut}" +
+                (notRouted > 0 ? $", not_routed={notRouted} ({notRoutedKeys})" : "") + thrSuffix +
+                (complete ? "" : $" — excluded keys (not measured on every record): {string.Join(", ", categoryReport.ExcludedKeys)}"));
+            if (status != "PASS") allPass = false;
         }
 
         Console.WriteLine(allPass
             ? "Agentic calibration gate PASSED — all categories meet thresholds with zero evaluation failures."
             : $"Agentic calibration gate FAILED — one or more categories below " +
-              $"accuracy>={AccuracyThreshold:P0} or kappa>={KappaThreshold:F2}, or had non-zero evaluation_failures.");
+              $"accuracy>={AccuracyThreshold:P0} or kappa>={KappaThreshold:F2}, had non-zero evaluation_failures, " +
+              "or was INCOMPLETE (a key not measured on every record).");
+
+        if (limitPerCategory is not null)
+        {
+            // At one entry per category kappa is undefined, so the gate would fail every category by construction.
+            // A limited run checks the wiring; it passes when nothing errored, and says the gate was not applied.
+            var anyFailures = report.PerCategory.Values.Any(c => c.EvaluationFailures > 0);
+            Console.WriteLine($"Limited run (--limit {limitPerCategory}): the calibration gate is NOT applied. " +
+                              (anyFailures ? "Evaluation failures occurred — the wiring is not clean." : "No evaluation failures — the wiring is clean."));
+            return anyFailures ? ExitCodes.GateFailed : ExitCodes.Success;
+        }
 
         return allPass ? ExitCodes.Success : ExitCodes.GateFailed;
     }
@@ -397,28 +514,25 @@ public static class BenchAgenticCalibrateCommand
 
 
     private static string BuildMarkdownReport(
-        AgentEval.Evals.Agentic.Calibration.CalibrationReport report)
+        AgentEval.Evals.Agentic.Calibration.CalibrationReport report,
+        CalibrationJudgeIdentity judge)
     {
         var sb = new StringBuilder();
         sb.AppendLine("# Agentic Evaluator Calibration Report");
         sb.AppendLine();
         sb.AppendLine($"Generated: {report.GeneratedAt:yyyy-MM-dd HH:mm:ss} UTC");
         sb.AppendLine();
+        judge.AppendMarkdownHeader(sb);
         sb.AppendLine($"Thresholds: accuracy >= {AccuracyThreshold:P0}, Cohen's kappa >= {KappaThreshold:F2}");
         sb.AppendLine();
 
         foreach (var (category, cr) in report.PerCategory.OrderBy(kv => kv.Key))
         {
-            if (IsAgentInfraSkipCategory(category, cr.EntryCount, cr.SkippedUnknownKey))
+            if (IsAgentInfraSkipCategory(category, cr))
             {
                 sb.AppendLine($"## {category} [SKIP]");
                 sb.AppendLine();
-                sb.AppendLine(
-                    $"> {cr.SkippedUnknownKey} entries had no dispatch wiring. Post-Path A' (40 of 60 dispatched), " +
-                    "this means a new golden key is not yet routed in `CalibrationDataset.DeriveCategory`. " +
-                    "The 20 carve-outs (6 pure-code telemetry + StochasticStability + CostQualityEfficiency + " +
-                    "3 judge-quality meta + 5 multi-turn memory + 3 trace-dependent reasoning + f1_score) are " +
-                    "deliberately omitted from the dispatch table and do not surface here.");
+                sb.AppendLine($"> Nothing dispatched: {UndispatchedSentence(cr)}.");
                 sb.AppendLine();
                 continue;
             }
@@ -428,9 +542,7 @@ public static class BenchAgenticCalibrateCommand
             var accOk = cr.Accuracy >= accThr;
             var kappaOk = cr.CohensKappa >= kapThr;
             var noInfraFail = cr.EvaluationFailures == 0;
-            var badge = !noInfraFail
-                ? "INFRA-FAIL"
-                : (accOk && kappaOk ? "PASS" : "FAIL");
+            var badge = CategoryStatus(cr, accThr, kapThr);   // the gate's own function: the report cannot disagree with it
             var thrTag = s_categoryOverrides.ContainsKey(category) ? " (relaxed per-category override)" : string.Empty;
 
             sb.AppendLine($"## {category} [{badge}]{thrTag}");
@@ -439,12 +551,18 @@ public static class BenchAgenticCalibrateCommand
             sb.AppendLine($"|--------|-------|-----------|--------|");
             sb.AppendLine($"| Entries evaluated | {cr.EntryCount} | — | — |");
             sb.AppendLine($"| Evaluation failures | {cr.EvaluationFailures} | == 0 | {(noInfraFail ? "OK" : "INFRA-FAIL")} |");
+            // Not scored (B3a): no verdict to compare with gold — reported, never counted as agreement or disagreement.
+            sb.AppendLine($"| Not measured (not scored) | {cr.NotMeasured} | — | info |");
+            sb.AppendLine($"| Inapplicable (not scored) | {cr.NotApplicable} | — | info |");
+            var (carved, carvedKeys, unrouted, unroutedKeys) = SplitUndispatched(cr);
+            sb.AppendLine($"| Carved out by key (not dispatched) | {carved}{(carved > 0 ? $" ({carvedKeys})" : "")} | — | info |");
+            if (unrouted > 0)
+                sb.AppendLine($"| Not routed (a golden key nothing dispatches) | {unrouted} ({unroutedKeys}) | — | info |");
+            sb.AppendLine($"| Keys excluded (not measured on every record) | {(cr.ExcludedKeys.Count == 0 ? "none" : string.Join(", ", cr.ExcludedKeys))} | none | {(cr.ExcludedKeys.Count == 0 ? "OK" : "INCOMPLETE")} |");
             sb.AppendLine($"| Accuracy | {cr.Accuracy:P1} | >= {accThr:P0} | {(accOk ? "OK" : "BELOW")} |");
             sb.AppendLine($"| Cohen's kappa | {FormatKappa(cr.CohensKappa)} | >= {kapThr:F2} | {(kappaOk ? "OK" : "BELOW")} |");
             sb.AppendLine($"| Within score range | {cr.WithinScoreRange} / {cr.EntryCount} | — | — |");
             sb.AppendLine($"| Mean score delta | {cr.MeanScoreDelta:+0.000;-0.000;0.000} | — | — |");
-            if (cr.SkippedUnknownKey > 0)
-                sb.AppendLine($"| Skipped (unknown key) | {cr.SkippedUnknownKey} | — | — |");
             sb.AppendLine();
         }
 

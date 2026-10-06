@@ -1,8 +1,7 @@
 # AgentEval.AgentSkillsEval
 
-A live sample for evaluating **MAF Agent Skills** (GA'd 2026-07-07) with AgentEval — Phase 1 of
-[`strategy/FutureFeatures/Skills/AgentEval-AgentSkills-Evals-Design-and-Plan.md`](../../strategy/FutureFeatures/Skills/AgentEval-AgentSkills-Evals-Design-and-Plan.md)
-(local-only strategy doc; see `CHANGELOG.md` for the public-facing summary).
+A live sample for evaluating **MAF Agent Skills** (GA'd 2026-07-07) with AgentEval — Phase 1 of the
+Agent Skills evaluation work described in [`docs/agent-skills.md`](../../docs/agent-skills.md).
 
 Runs a **real** `ChatClientAgent` against Azure OpenAI, wrapped with a **real**
 `Microsoft.Agents.AI.AgentSkillsProvider` over a real file-based skill fixture

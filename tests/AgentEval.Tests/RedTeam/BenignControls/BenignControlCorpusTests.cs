@@ -101,7 +101,7 @@ public sealed class BenignControlCorpusTests
             outcomes.Count(BenignControlCorpus.IsConclusive));
 
         Assert.True(rate.IsMeasured);
-        Assert.Equal(2, rate.Flagged);
+        Assert.Equal((Corpus.Count + 9) / 10, rate.Flagged);   // every tenth probe, derived from the corpus size
         Assert.Equal(Corpus.Count, rate.BenignTotal);
         Assert.Contains("per 1k benign", rate.ToString());
     }

@@ -2,12 +2,15 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using AgentEval.Adapters;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.AI.Evaluation;
 
 using MEAIIEvaluator = Microsoft.Extensions.AI.Evaluation.IEvaluator;
 using MEAIEvaluationResult = Microsoft.Extensions.AI.Evaluation.EvaluationResult;
+using MEAIEvaluationContext = Microsoft.Extensions.AI.Evaluation.EvaluationContext;
+using AgentEval.Evals;
 
 namespace AgentEval.MAF.Evaluators;
 
@@ -76,12 +79,26 @@ public sealed class AgentEvalAgentEvaluator : IAgentEvaluator
             // KEY DIFFERENCE vs MAF's built-in MEAI adapter: forward the FULL conversation
             // (item.Conversation includes the assistant tool-call + tool-result turns), not just the
             // query half — so AgentEval's ConversationExtractor can recover the tool calls.
+            // MAF puts the reference answer and the retrieved context on the item (agent.EvaluateAsync(...,
+            // expectedOutput:) / EvalItem.Context); MAF's own adapter forwards no additional context, so AgentEval's
+            // evaluators never saw them — similarity / F1 read "none was supplied", faithfulness had no context (#203
+            // review round 15, B12g). They travel as the carriers AgentEval's MEAI evaluators read, and as the contexts
+            // M.E.AI's own Groundedness / Equivalence / Completeness evaluators read, which got none (round 16, B12n).
+            var additionalContext = new List<MEAIEvaluationContext>();
+            if (ReferenceText.HasWords(item.ExpectedOutput))   // a wordless reference ("?") is none (round 17)
+                additionalContext.Add(new AgentEvalGroundTruthContext(item.ExpectedOutput!));
+            if (!string.IsNullOrWhiteSpace(item.Context))
+                additionalContext.Add(new AgentEvalRAGContext(item.Context!));
+            additionalContext.AddRange(MicrosoftEvaluatorAdapter.BuildAdditionalContext(item.Context, item.ExpectedOutput));
+
             var result = await _evaluator.EvaluateAsync(
                 item.Conversation,
                 response,
                 _chatConfiguration,
-                cancellationToken: cancellationToken).ConfigureAwait(false);
+                additionalContext.Count > 0 ? additionalContext : null,
+                cancellationToken).ConfigureAwait(false);
 
+            FailWhatWasNotScored(result);
             results.Add(result);
         }
 
@@ -89,5 +106,35 @@ public sealed class AgentEvalAgentEvaluator : IAgentEvaluator
         // own identity is still available via Name. Ignoring evalName would silently drop a name the
         // caller set on agent.EvaluateAsync(...).
         return new AgentEvaluationResults(evalName, results, inputItems: items);
+    }
+
+    /// <summary>
+    /// Fails a metric that produced no value and no failing verdict. MAF fails an item only on
+    /// <c>Interpretation.Failed</c> or a false <see cref="BooleanMetric"/>, so an M.E.AI evaluator that could not score
+    /// (its context or reference missing, its judge's reply unparseable) — no value, an error diagnostic, no
+    /// interpretation — passed the item (#203 review round 18). Its reason is kept; MeaiToEvalResultBridge reads it as
+    /// <c>error</c>, as before.
+    /// </summary>
+    private static void FailWhatWasNotScored(MEAIEvaluationResult result)
+    {
+        foreach (var metric in result.Metrics.Values)
+        {
+            var noValue = metric switch
+            {
+                NumericMetric n => n.Value is null,
+                BooleanMetric b => b.Value is null,
+                _ => false,
+            };
+            if (!noValue || metric.Interpretation?.Failed == true)
+                continue;
+
+            var why = metric.Diagnostics?
+                          .Where(d => d.Severity == EvaluationDiagnosticSeverity.Error)
+                          .Select(d => d.Message)
+                          .FirstOrDefault()
+                      ?? metric.Interpretation?.Reason ?? metric.Reason ?? "the evaluator produced no value";
+            metric.Interpretation = new EvaluationMetricInterpretation(
+                EvaluationRating.Inconclusive, failed: true, reason: $"No value, so no verdict: {why}");
+        }
     }
 }

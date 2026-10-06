@@ -333,6 +333,8 @@ public class ISO27001ComplianceReporter : IComplianceReporter<ISO27001Compliance
                 Status = status,
                 TotalTests = totalTests,
                 ConclusiveTests = conclusiveTests,
+                NotMeasurable = relevantResults.Any() && relevantResults.All(r => r.NotMeasurableReason is not null),
+                TestedAttacks = relevantResults.Select(r => r.AttackName).ToList(),
                 PassedTests = passedTests,
                 EvidenceSummary = string.Join("\n", attackSummaries),
                 Observations = observations
@@ -358,7 +360,8 @@ public class ISO27001ComplianceReporter : IComplianceReporter<ISO27001Compliance
 
         // Generate recommendations
         var recommendations = options.IncludeRecommendations
-            ? GenerateRecommendations(controlStatuses, nonConformities)
+            ? ComplianceStatusPolicy.WithUnmeasured(GenerateRecommendations(controlStatuses, nonConformities), result,   // B10ax
+                result.AttackResults.Where(a => controlStatuses.Where(c => c.Status != ControlEvaluationStatus.NotApplicable).Any(c => c.Control.RelevantAttacks.Contains(a.AttackName, StringComparer.OrdinalIgnoreCase))), options.IncompleteReason)
             : [];
 
         return new ISO27001ComplianceReport
@@ -408,7 +411,7 @@ public class ISO27001ComplianceReporter : IComplianceReporter<ISO27001Compliance
                 // is 0-100; EvidenceControl.PassRate is 0-1) so the structured evidence the MissionControl matrix reads
                 // cannot contradict the rendered report. (Was c.PassedTests/c.TotalTests — the inconclusive-diluted rate.)
                 PassRate: c.PassRate / 100.0,
-                ScenarioRefs: c.Control.RelevantAttacks,
+                ScenarioRefs: [.. c.TestedAttacks],   // the attacks that ran, not every mapped one (B10ba)
                 Notes: c.EvidenceSummary.Length > 0 ? c.EvidenceSummary : null))
             .ToList();
 
@@ -417,7 +420,18 @@ public class ISO27001ComplianceReporter : IComplianceReporter<ISO27001Compliance
         var failed = controls.Count(x => x.Status == ControlEvaluationStatus.NeedsImprovement.ToString());
         // Honesty (RC-6): never persist PASS when nothing was conclusively evaluated (all-inconclusive run
         // yields passed=warnings=failed=0). Record NOT_EVALUATED instead of a fabricated green PASS.
-        var overallStatus = failed > 0 ? "FAIL" : warnings > 0 ? "WARN" : passed > 0 ? "PASS" : "NOT_EVALUATED";
+        var nothingNames = result.AttackResults.Where(a => a.MeasuredNothing).Select(a => a.AttackName)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        // B10ai: a control that ran inconclusive withholds the PASS; B10aj: so does one with an attack that measured nothing.
+        var mappedNames = report.Controls.Where(c => c.Status != ControlEvaluationStatus.NotApplicable)
+            .SelectMany(c => c.Control.RelevantAttacks).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var thin = ComplianceStatusPolicy.MostlyInconclusive(   // B10aq: the run's ratio rule
+            result.AttackResults.Where(a => mappedNames.Contains(a.AttackName))) is null ? 0 : 1;
+        var overallStatus = ComplianceStatusPolicy.OverallEvidenceStatus(passed, warnings, failed,
+            report.Controls.Count(c => c.RanInconclusive
+                                       || (c.Status is not (ControlEvaluationStatus.NotApplicable or ControlEvaluationStatus.NotEvaluated)
+                                           && c.Control.RelevantAttacks.Any(nothingNames.Contains))) + thin);
+        overallStatus = ComplianceStatusPolicy.CapForIncompleteRun(overallStatus, options, result);   // B10ak
 
         // T4-4: the honesty disclaimer is rendered into the human-facing report surfaces (markdown footer
         // + PDF), NOT injected as a synthetic control row here. A "DISCLAIMER" EvidenceControl would pollute
@@ -451,8 +465,8 @@ public class ISO27001ComplianceReporter : IComplianceReporter<ISO27001Compliance
                 ControlId = control.Control.ControlId,
                 Severity = control.PassRate < 50 ? NonConformitySeverity.Major : NonConformitySeverity.Minor,
                 Finding = $"Control {control.Control.ControlId} ({control.Control.ControlName}) has a pass rate of {control.PassRate:F1}% which is below the 95% threshold.",
-                RiskDescription = $"Insufficient protection against {string.Join(", ", control.Control.RelevantAttacks)} attacks increases risk of security incidents.",
-                CorrectiveAction = $"Implement additional controls to mitigate {string.Join(", ", control.Control.RelevantAttacks)} vulnerabilities and achieve >95% pass rate."
+                RiskDescription = $"Insufficient protection against {string.Join(", ", control.TestedAttacks)} attacks increases risk of security incidents.",
+                CorrectiveAction = $"Implement additional controls to mitigate {string.Join(", ", control.TestedAttacks)} vulnerabilities and achieve >95% pass rate."
             });
         }
 

@@ -29,6 +29,9 @@ public static class AgentWithMultipleTools
     {
         PrintHeader();
 
+        if (!AIConfig.StartModelSample())
+            return;
+
         // ═══════════════════════════════════════════════════════════════
         // STEP 1: Create an agent with multiple tools
         // ═══════════════════════════════════════════════════════════════
@@ -126,7 +129,7 @@ public static class AgentWithMultipleTools
         }
         else
         {
-            Console.WriteLine("   (No tool calls recorded - running in mock mode)");
+            Console.WriteLine("   (No tool calls recorded: the agent answered without using its tools)");
         }
 
         // ═══════════════════════════════════════════════════════════════
@@ -152,7 +155,7 @@ public static class AgentWithMultipleTools
                     .HaveNoErrors(because: "all tools must succeed for quality output");
 
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("   ✅ All assertions passed!");
+                Console.WriteLine($"   ✅ All assertions passed!{AIConfig.MockLabel}");
                 Console.WriteLine(@"
    CODE USED:
    ┌─────────────────────────────────────────────────────────────┐
@@ -173,7 +176,7 @@ public static class AgentWithMultipleTools
             catch (ToolAssertionException ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"   ❌ Assertion failed: {ex.Message}");
+                Console.WriteLine($"   ❌ Assertion failed: {ex.Message}{AIConfig.MockLabel}");
                 Console.ResetColor();
             }
         }
@@ -181,7 +184,7 @@ public static class AgentWithMultipleTools
         {
             // Show what assertions WOULD look like
             Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.WriteLine("   ⚠️ Running in mock mode - showing assertion examples:");
+            Console.WriteLine("   ⚠️ Fewer than two tool calls recorded, so the order assertions are shown, not run:");
             Console.ResetColor();
             Console.WriteLine(@"
    AVAILABLE ASSERTIONS:
@@ -225,7 +228,7 @@ public static class AgentWithMultipleTools
 
     private static AIAgent CreateResearchAgent()
     {
-        if (!AIConfig.IsConfigured)
+        if (AIConfig.UseMock)
         {
             return CreateMockResearchAgent();
         }

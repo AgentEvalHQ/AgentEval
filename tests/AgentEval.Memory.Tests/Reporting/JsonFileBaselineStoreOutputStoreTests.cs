@@ -46,6 +46,24 @@ public class JsonFileBaselineStoreOutputStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task SaveAsync_WithOutputStore_TheStatsCountASkippedCategory_AndAddUpToTotal()
+    {
+        // B8 (#203 review): the skip count was computed and then passed positionally as Warnings: 0, so Skipped read 0.
+        var store = new InMemoryOutputStore();
+        var subject = new SubjectIdentity(SubjectKind.Agent, "TestAgent");
+        var baselineStore = new JsonFileBaselineStore(
+            new MemoryReportingOptions { OutputPath = Path.Combine(_tempDir, "{AgentName}") }, store, subject);
+        var baseline = CreateBaseline("V1", agentName: "TestAgent");
+        baseline.CategoryResults["Cross Session"] = new() { Score = 40, Grade = "F", Skipped = false };   // Basic Retention: 90
+        baseline.CategoryResults["Temporal"] = new() { Score = 0, Grade = "-", Skipped = true };
+
+        await baselineStore.SaveAsync(baseline);
+
+        var stats = (await store.LoadBaselineAsync(subject))!.Stats;
+        Assert.Equal(new RunStats(Total: 3, Passed: 1, Failed: 1, Warnings: 0, Skipped: 1), stats);
+    }
+
+    [Fact]
     public async Task SaveAsync_WithNullOutputStore_DoesNotThrow()
     {
         var nullStore = new NullOutputStore();

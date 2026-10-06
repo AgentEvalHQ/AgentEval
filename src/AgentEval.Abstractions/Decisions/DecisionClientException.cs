@@ -2,9 +2,12 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Diagnostics.CodeAnalysis;
+
 namespace AgentEval.Decisions;
 
 /// <summary>Why a decision call failed, classified so a caller can decide whether a retry is honest.</summary>
+[Experimental(DecisionsPreview.DiagnosticId)]
 public enum DecisionFailureKind
 {
     /// <summary>The provider could not classify the failure, or the failure is local (network, cancellation wrapper).</summary>
@@ -34,6 +37,7 @@ public enum DecisionFailureKind
 /// classification and the HTTP status so the caller can tell a retryable condition from a permanent
 /// one; the message never contains the API key.
 /// </summary>
+[Experimental(DecisionsPreview.DiagnosticId)]
 public sealed class DecisionClientException : Exception
 {
     /// <summary>Initialises the exception.</summary>

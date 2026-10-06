@@ -12,7 +12,18 @@ namespace AgentEval.Evals;
 /// <i>is</i> the time order. See the ordering contract on <see cref="EvalInput.ToolCalls"/>.
 /// </para>
 /// </summary>
-public sealed record ToolCall(string Name, IReadOnlyDictionary<string, object>? Arguments, string? Result);
+public sealed record ToolCall(string Name, IReadOnlyDictionary<string, object>? Arguments, string? Result)
+{
+    /// <summary>
+    /// Whether the call ran without error, as RECORDED by whatever observed it run (e.g. a Glass Box trace's
+    /// tool-execution layer). <see langword="null"/> = not recorded: a hand-built call, or a call the model requested
+    /// that nothing observed run. Never inferred from <see cref="Result"/>.
+    /// </summary>
+    public bool? Succeeded { get; init; }
+
+    /// <summary>The error the call raised, when it failed and the capture recorded one.</summary>
+    public string? Error { get; init; }
+}
 
 /// <summary>Definition of a tool that was available to the agent during the evaluated interaction.</summary>
 public sealed record ToolDefinition(string Name, string? Description, IReadOnlyDictionary<string, object>? Parameters);

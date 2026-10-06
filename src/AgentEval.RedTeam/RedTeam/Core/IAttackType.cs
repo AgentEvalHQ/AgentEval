@@ -58,6 +58,14 @@ public interface IAttackType
     /// </summary>
     /// <returns>The probe evaluator for this attack type.</returns>
     IProbeEvaluator GetEvaluator();
+    /// <summary>
+    /// Why this attack cannot reach a verdict in the current setup, or <see langword="null"/> when it can (#203 review,
+    /// B6c-8). An attack whose probes all come back inconclusive BECAUSE of a missing configuration (no system-prompt
+    /// canary planted) is not measurable by construction: it is reported as not tested, with this reason, and does not
+    /// block the run's verdict. One that ran and measured nothing for any other reason keeps the run from passing.
+    /// </summary>
+    string? NotMeasurableReason => null;
+
 }
 
 /// <summary>

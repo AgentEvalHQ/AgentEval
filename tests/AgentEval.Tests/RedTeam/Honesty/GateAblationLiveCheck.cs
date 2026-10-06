@@ -10,7 +10,7 @@
 // structure with fewer and flags any mismatch with what currently ships. Adding an oracle's experiment = one registry
 // line. Env-gated on AGENTEVAL_RUN_5B=1 (live LLM cost); informational — asserts only that the run completed (like 5b).
 //
-//   AZURE_OPENAI_DEPLOYMENT=gpt-4o-mini AGENTEVAL_RUN_5B=1 AGENTEVAL_GATE_AB_REPS=3 \
+//   AI_INFERENCE_PROVIDER=bitdeer AGENTEVAL_RUN_5B=1 AGENTEVAL_GATE_AB_REPS=3 \
 //     dotnet test --filter "FullyQualifiedName~GateAblation_PerOracle_FlatVsGated"
 //
 // Use REPS≥3 for InferenceAbuse: its Grok-floor miss is nondeterministic (flips 0↔1), so a single rep can read 0 for the
@@ -45,7 +45,7 @@ public class GateAblationLiveCheck(ITestOutputHelper output)
             return;   // inert unless explicitly opted in (live LLM cost)
 
         var (judge, _, exit) = AzureChatAgentFactory.TryBuildChatClientFromEnv();
-        Assert.True(judge is not null, $"no judge client from env (exit {exit}); set AZURE_OPENAI_* env vars");
+        Assert.True(judge is not null, $"no judge client from env (exit {exit}); configure a provider (AI_INFERENCE_PROVIDER, e.g. bitdeer + BITDEER_API_KEY)");
 
         int reps = int.TryParse(Environment.GetEnvironmentVariable("AGENTEVAL_GATE_AB_REPS"), out var r) && r > 0 ? r : 1;
 

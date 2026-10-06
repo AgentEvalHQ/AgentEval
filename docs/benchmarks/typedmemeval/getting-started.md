@@ -1,9 +1,11 @@
 # TypedMemEval
 
-TypedMemEval is an AgentEval-authored benchmark family that measures five memory mechanisms in
-isolation: **prospective memory**, **episodic structure**, **arithmetic over memory**,
-**working-memory distance**, and **forgetting**. Each vertical is its own corpus, its own
-question types, and its own validity rules.
+TypedMemEval is an AgentEval-authored benchmark family that measures memory mechanisms in
+isolation, one vertical per mechanism. It started with five — **prospective memory**, **episodic
+structure**, **arithmetic over memory**, **working-memory distance**, and **forgetting** — and now
+ships ten, adding **bitemporal**, **temporal**, **semantic**, **conjunction** and **procedural**
+(see [The ten verticals](#the-ten-verticals)). Each vertical is its own corpus, its own question
+types, and its own validity rules.
 
 > **Citation rule.** Cite results as **"TypedMemEval-\<Vertical\> v5 (AgentEval)"**. TypedMemEval
 > results are **not** LongMemEval results and must never be presented as, summed with, or averaged
@@ -61,10 +63,19 @@ agenteval bench typedmemeval --vertical forgetting --subject MyAgent
 ```
 
 `--vertical` and `--subject` are both required: the verticals measure different mechanisms, so
-there is no default to fall back to. The CLI binding requires `AZURE_OPENAI_ENDPOINT`,
-`AZURE_OPENAI_API_KEY`, and `AZURE_OPENAI_DEPLOYMENT` and has no stub fallback, because the judge
-round-trip is the correctness signal. Programmatic callers can use any `IChatClient` and any
-`IEvaluableAgent`.
+there is no default to fall back to. The CLI binding needs a real model and has no stub fallback,
+because the judge round-trip is the correctness signal. It uses whichever provider
+`AI_INFERENCE_PROVIDER` selects — Azure OpenAI, Bitdeer, OpenAI, Azure AI Foundry, or any
+OpenAI-compatible endpoint — and auto-detects when the selector is unset, so the
+`AZURE_OPENAI_ENDPOINT` + `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_DEPLOYMENT` trio alone still works.
+Each provider's variables are listed in
+[CLI Reference — `AI_INFERENCE_PROVIDER`](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to).
+When no provider resolves, the command prints why (for example, which variables are missing) and
+exits 3 (`RuntimeError`).
+
+One client plays both roles: the same model answers the questions and judges the answers, and the
+`AZURE_OPENAI_JUDGE_*` override in the CLI reference is not read by this command. Programmatic
+callers can use any `IChatClient` for the judge and any `IEvaluableAgent` for the system under test.
 
 It prints the typed vector with every denominator — the run totals, the per-shape strata, coverage
 against the corpus's calibrated floor, and the attribution counts — plus the vertical's own extras
@@ -86,15 +97,16 @@ as sensitive data: restrict access, retention, and publication.
 >
 > | vertical | shapes under 15 questions |
 > |---|---|
-> | `prospective` | `expiring-validity` (6), `not-yet-true` (6), `due-later-reminder` (8), `seed-carry-over` (12) |
+> | `prospective` | `seed-carry-over` (12), `due-later-reminder` (14), `expiring-validity` (14), `not-yet-true` (14) |
 > | `workingmemory` | all five distance rungs (12 each) |
 > | `arithmetic` | `delta` (10), `duration` (12), `count` (14), `sum` (14) |
 >
-> On a six-question shape one question is 0.167 of the rate. `not-yet-true` illustrates both
-> directions: its headroom was **0.1667 — one question** while the shape was saturated, and is
-> **0.50** now that its distractors compete. Quote these shapes to diagnose where a system
-> struggles; do not quote them as a measured capability, and do not rank two systems on a
-> difference of one or two items.
+> On the smallest shape, `arithmetic/delta`, one question is 0.10 of the rate; on a 14-question shape
+> it is 0.071. `not-yet-true` and `expiring-validity` show how little separates a verdict: each
+> publishes a headroom of **0.1429 — two questions** — and both sit just under the 0.15 floor at
+> which the probe runner counts a shape as able to rank two systems. Quote these shapes to diagnose
+> where a system struggles; do not quote them as a measured capability, and do not rank two systems
+> on a difference of one or two items.
 
 Every result reports a vector, per vertical and per shape, always with its `n`:
 
@@ -131,7 +143,7 @@ a fact, because a compression loss inside the store looks identical from here.
 
 ## The ten verticals
 
-### Prospective (50 questions)
+### Prospective (72 questions)
 
 Due-later reminders, expiring validity, not-yet-true assertions, **due-windows** — plus the twelve
 time-grounded probe questions carried in as its seed. Runs under `TimestampsOnly` grounding: the
@@ -146,7 +158,7 @@ due-window names nothing: several reminders whose only distinguishing property i
 due, and an answer that is a **set** whose membership changes with the as-of instant. It gave the
 family its first real interference cost (0.00 → 0.28).
 
-Thirty-eight of the fifty are **19 before/after pairs**: one haystack asked twice, differing only in
+Sixty of the seventy-two are **30 before/after pairs**: one haystack asked twice, differing only in
 when it was asked, with gold flipping between the arms. Pairs are the vertical's teeth — a system
 that answers the after-arm correctly but also fires on the before-arm is *premature*, which no
 single question can show.
@@ -168,36 +180,34 @@ var control = await runner.RunAsync(agent, TypedMemEvalVertical.Prospective,
 Equal scores mean the system honours the timestamps it was given. A drop under the probe is the
 share of its temporal score that was coming from dates printed in the prompt.
 
-Watch `PairConsistency.BothArmsSameOutcome`: gold flips between arms by construction, so identical
-outcomes on both arms is the signature of a system that never received the query time — or ignored
-it and read a wall clock instead.
+Watch `PairConsistency.TimeBlindPattern`. It counts the pairs whose two arms are consistent with one
+fixed answer given to both: correct-then-missed (always "not yet") or premature-then-correct (always
+"it happened"). Gold flips between the arms by construction, so one unchanging answer earns two
+different labels rather than the same outcome twice. That pattern is the signature of a
+system that never received the query time — or ignored it and read a wall clock instead. It is a
+count over pairs, not a verdict: one pair can show the pattern by chance.
 
 ### Episodic (50 questions)
 
 Memory of the conversation *as an event*: 20 assistant-stated answers (the user never states them),
 15 list-order questions, 15 speaker-attribution questions.
 
-**Addressed in v4; read the numbers with one caveat.** The attribution shape's statements are emitted
-from matched templates so that either speaker could plausibly have said them — that is what stops the
-answer being inferable from content. Through v3 the surrounding wording was also *fixed*, so a system
-storing no speaker label could recover the answer from the template rather than from memory. v4 draws
-the framing from a bank of five, selected per question and **independently of which speaker holds the
-answer**, so the wording no longer carries it. The shape got harder in exactly the way that predicts:
-its oracle pass rate moved 13/15 → 12/15, and V2 non-inferability reads 50/50 on a corpus where the
-turn-role sequence also carries nothing (see ADR-026 §18).
+**Speaker attribution, as shipped.** The shape has three arms — `me`, `you` and `both of us`, five
+questions each — so its chance floor is 1/3. A question does not quote the claim it asks about. It
+names an event the claim led to ("the afternoon I gave up on the website and walked down there in
+person"), so a system has to find the session describing that event, connect it to the session where
+the claim was made, and read which role made it. Gold is two sessions per question, three on the
+`both of us` arm. All fifteen questions close with the same words ("whose earlier point were we
+going on? Me or you or both of us?"); that frame carries nothing, because the three answers are
+balanced across it.
 
-**Superseded as of the current corpus.** The shape now has three arms — `me`, `you`, and
-`both of us` — which drops the chance floor from 1/2 to 1/3, and its calibration echo no longer
-scatters the quoted statement across both speaker roles. That echo was the shape's only source of
-retrieval difficulty AND an answer leak, so removing it took V9 from 12/15 to 15/15 and headroom
-from 0.20 to −0.0667. The shape is now scored on the READER rather than on retrieval: the probe
-harness labels every turn with its role, so provenance is free for our reference stack and it
-cannot fail this shape for the reason the shape exists to test. What it discriminates is a memory
-layer that flattens conversations and drops the speaker. See ADR-028 §18.
+Shipped probe records: V1 14/15, V8 13/15, V9 4/15 — a published headroom of 0.67, of which 0.60 is
+reachable. V9 sits below the 1/3 chance floor (`v9_above_chance` −0.07), so compare systems on how
+far they clear 1/3, not on the raw rate.
 
-The caveat: the frame is fixed *within* a question and there are five of them across fifteen
-questions, so each recurs about three times. That bounds how much framing variety the shape
-demonstrates, not whether the framing leaks the speaker — the selection is independent of it.
+Earlier revisions quoted the claim in the question, which handed a lexical retriever the gold
+session; at 0.34.0-beta BM25 top-5 answered 15/15, the headroom was −0.0667, and the shape could not
+rank two systems. ADR-026 §18 and ADR-028 §18 record that history.
 
 List-order is scored **conditionally on coverage**: pairwise-order accuracy over the items the
 answer actually mentions, because a budget-limited system may only have seen some of them and
@@ -276,8 +286,9 @@ conversations carry **no absolute date and no four-digit year**.
 answer one transitive step over two sessions that named those events outright — and it scored
 **15/15 at V1, V8 and V9**, the only shape in the family on which no two systems could be told
 apart. It now asks about events **spanning** the chain, so every link between them has to be
-followed. V9 on `recency` is **7/15** where it was 15/15, and the vertical's headroom rose from
-0.16 to **0.34**.
+followed. V9 on `recency` was 15/15 before the reshape and is **8/15** in the shipped corpus; the
+vertical's headroom was 0.16 before the reshape and is **0.62** in the shipped corpus, which has
+changed in other ways since.
 
 Milestone names are **verified non-referential** (`tools/audit_name_collisions.py`). An earlier bank
 was built from real British place-names, and the reference model answered *"which came first"* from
@@ -295,14 +306,21 @@ snapshot cannot recover even when it holds the right value.
 
 ### Conjunction (65 questions)
 
-Twenty value-then-count, fifteen alias-then-count, fifteen order-then-value. Each question needs a
-fact of one memory type resolved **and** an operation of another type applied to it. Retrieving
-either half is necessary and neither is sufficient, so **a stack strong on one type and weak on the
-other scores like a stack weak on both** — which is exactly what a per-type score cannot show.
+Twenty value-then-count, fifteen alias-then-count, fifteen order-then-value, fifteen
+conditional-branch. Each question needs a fact of one memory type resolved **and** an operation of
+another type applied to it. Retrieving either half is necessary and neither is sufficient, so **a
+stack strong on one type and weak on the other scores like a stack weak on both** — which is exactly
+what a per-type score cannot show.
 
-**Read the shapes, not the mean.** `order-then-value` is **saturated under BM25** (V9 15/15,
-headroom 0.00) and cannot discriminate retrievers at all; the vertical's headroom is carried
-entirely by the other two. That is declared here rather than left inside an average.
+`conditional-branch` joins a standing rule to a specific state: one session states a rule with three
+outcomes, another records the state that selects one of them, and both are required. The rule
+session names all three outcomes, so a reader that finds the rule and misses the state still reaches
+gold one time in three.
+
+**Read the shapes, not the mean.** In the shipped probe records the four shapes publish headroom from
+0.47 (`order-then-value`, of which only 0.27 is reachable, because a reader holding the whole
+haystack misses 3 of 15) to 1.00 (`conditional-branch`, whose BM25 arm scores 0 of 15 against that
+1/3 floor). A vertical mean of 0.77 hides both.
 
 ### Procedural (80 questions)
 
@@ -348,10 +366,10 @@ family is precise about which applies where.
 
 **Structural dispersion.** Gold spread across `G` sessions caps coverage at `min(1, K/G)` for a
 budget of `K`. With the declared reference budget `K_ref = 5`, a structural ceiling below 1.0 exists
-**only where `G > 5`** — Arithmetic's high-dispersion questions and Episodic's longest list-order
-questions. For every `G ≤ 5` question — all of Prospective, Forgetting, and WorkingMemory, where the
-mechanism under test fixes `G` at 1 or 2 — the ceiling is exactly 1.0, and presenting that as a band
-would be numerology.
+**only where `G > 5`** — Arithmetic's high-dispersion questions, Episodic's longest list-order
+questions and Conjunction's widest joins. For every `G ≤ 5` question — which is every question in
+the other seven verticals — the ceiling is exactly 1.0, and presenting that as a band would be
+numerology.
 
 **Calibrated competition.** Everywhere, the haystack must make gold *hard to find*, not merely legal
 to miss. No ceiling formula shows that; only a measurement does. So each corpus passes a
@@ -388,39 +406,40 @@ floor inflated by vacuous ones would flatter every system by the share of no-gol
 
 ## Difficulty bands
 
-Every question carries `difficulty` (1–5) and `difficulty_dial` in its `typedmemeval` block. The
-band is derived from **memory dials only** — dispersion, distance, interference, discrimination —
-never from answer-step trickiness, which would confound the answer model with the memory system.
+A question whose shape has a difficulty dial carries `difficulty` and `difficulty_dial` in its
+`typedmemeval` block. The band is derived from **memory dials only** — dispersion, distance,
+interference, discrimination — never from answer-step trickiness, which would confound the answer
+model with the memory system. The table is read from the shipped corpus files:
 
-| Vertical | dial | what varies | banded | validated? |
-|---|---|---|---|---|
-| WorkingMemory | distance | 8 / 15 / 25 / 40 / 60 intervening sessions | 60/60 | **yes** |
-| Arithmetic | dispersion | 2–6 derivation inputs | 50/50 | **yes** |
-| Episodic | dispersion | list length 4–7 | 15/50 | **yes** |
-| Prospective | distance | 15–142 days from evidence to question | 38/50 | no |
-| Forgetting | discrimination | 4–15 sessions between statement and invalidation | 20/50 | no |
+| Vertical | dial | what varies | bands | banded | validated? |
+|---|---|---|---|---|---|
+| WorkingMemory | `distance` | 8 / 15 / 25 / 40 / 60 intervening sessions | 1–5 | 60/60 | no |
+| Arithmetic | `dispersion` | 3–6 gold sessions (`G`) | 2–5 | 50/50 | no |
+| Episodic | `dispersion` | list length 4–7 | 2–5 | 15/50 | no |
+| Prospective | `distance` | 12.5–132 days (`displacement_days`) | 1–5 | 60/72 | no |
+| Forgetting | `discrimination` | 4–15 sessions between statement and invalidation | 1–5 | 20/50 | no |
+| Bitemporal | `correction-latency` | 1–12 sessions (`latency_sessions`) | 1–5 | 60/60 | no |
+| Temporal | `narration-disorder` | 1–13 narration inversions | 1–5 | 50/50 | no |
+| Conjunction | `branch` | which of three branches the state selects | 1–3 | 15/65 | no |
 
 **Not every question carries a band.** A dial only exists where the shape has one: Episodic's
-list length lives in its 15 list-order questions, Forgetting's gap in its 20 invalidated ones, and
-Prospective's displacement in its 38 paired arms. The unbanded remainder is not "difficulty 3" — it
-is unbanded, and it is the flat majority the family's own profile identified. Only WorkingMemory
-and Arithmetic band every question they contain.
+list length lives in its 15 list-order questions, Forgetting's gap in its 20 invalidated ones,
+Prospective's displacement in its 60 paired arms, and Conjunction's branch in its 15
+conditional-branch questions. Semantic and Procedural carry no band. The unbanded remainder is not
+"difficulty 3" — it is unbanded.
 
-**"Validated" means the reference retriever's coverage slopes down across the bands.** That test
-matters more than the labels: a band nothing can fail is a label, not a band. Three verticals pass
-it. Two do not, and the reason is structural rather than a tuning problem — **BM25 has no time
-component**, so a dial measured in days cannot move it, and Forgetting's gap is a *position*
-rather than a count. The dials that do slope are exactly those that change lexical competition:
-list length and input count *are* the gold-session count, and WorkingMemory's distance *is* the
-distractor count.
+**No band is validated.** Every banded question in the shipped corpora carries
+`difficulty_validated: false`. "Validated" would mean the reference retriever's coverage slopes down
+across the bands once the calibration scaffolding is stripped and the structural ceiling
+`min(1, K/G)` is accounted for; the note under [Validity rules](#validity-rules) and ADR-026 §20
+explain why no vertical passes that test. An earlier version of this table marked WorkingMemory,
+Arithmetic and Episodic as validated under a rule that did not apply those two corrections.
 
-Read an unvalidated band as a description of how the corpus was built, not as evidence that those
-questions are harder. They are kept rather than dropped because dropping them would leave the
-family implying that memory difficulty is only ever lexical, which is the opposite of what it
-exists to measure — but the corpus marks them `difficulty_validated: false` so you cannot mistake
-one for the other.
+Read a band as a description of how the corpus was built, not as evidence that those questions are
+harder. The bands are kept rather than dropped because dropping them would leave the family implying
+that memory difficulty is only ever lexical, which is the opposite of what it exists to measure.
 
-**Per-band `n` is 4–17.** These are diagnostics, never claims: the family's n ≥ 30 floor for a
+**Per-band `n` is 2–17.** These are diagnostics, never claims: the family's n ≥ 30 floor for a
 citable figure is per *vertical*, and no band comes close to it. Report bands to locate where a
 system degrades, and report the vertical when you quote a number.
 
@@ -443,12 +462,17 @@ means those four were measured against *this* corpus, not that they were measure
 
 Shipped probe records (reference deployment `gpt-5.5`, per-question outcomes in each corpus's
 `.meta.json`). Dashes are not-applicable rather than skipped, but for different reasons per column, and the
-difference matters. Pair-flip needs pairs, which only Prospective and Forgetting have. V6 is
-scoped by design to Arithmetic and Forgetting (ADR §12) — not because the other verticals lack
-multi-component gold, since Episodic list-order has G = 4–7 and some Prospective questions have
-G = 2, but because those are the two verticals whose per-component coverage echo depends on every
-component being individually load-bearing. V1 and V2 do not apply to a never-known probe, whose
-gold is itself an abstention.
+difference matters. Pair-flip needs pairs, which only Prospective, Forgetting and Bitemporal have.
+V6 runs only where a corpus declares gold components load-bearing — Arithmetic, Forgetting,
+Temporal, Semantic, Conjunction and Procedural in the shipped corpora — not wherever gold has more
+than one component: Episodic list-order has G = 4–7 and carries no such declaration. V1 and V2 do
+not apply to a never-known probe, whose gold is itself an abstention.
+
+> **These records will not be re-measured.** As of 2026-10-02 TypedMemEval is frozen at its current
+> corpus: the reference deployment the V1, V2, V3, V6, V8 and V9 arms ran against has been retired,
+> and no corpus change is planned until a new reference model is chosen. The generators and the
+> probe runner stay in the repository, but re-running the probes against a different model would
+> produce records for that model, not a refresh of these.
 
 | Vertical | V1 oracle | V1 pair-flip | V2 non-inferability | V3 gold-ablated | V6 leave-one-out | V8 full-haystack | V9 BM25 top-K | Retrieval headroom |
 |---|---|---|---|---|---|---|---|---|
@@ -478,41 +502,51 @@ gold is itself an abstention.
 > reader who already has everything. Reading `V1 − V8 ≈ 0` as "retrieval quality cannot matter here"
 > was a mistake — a real system does not dump the haystack into context, it *selects*, and selecting
 > badly is far worse than either arm above. Measured against a lexical baseline, **every vertical has
-> substantial headroom, from 0.12 to 0.62.**
+> substantial headroom, from 0.34 (Forgetting) to 0.80 (Procedural)** in the shipped records.
 >
 > **But `V1 − V9` is NOT "the headroom a better retriever can capture", which is what this passage
 > used to say.** A real retriever returns gold *plus* whatever else it ranks highly, so it can never
 > beat having everything: **its ceiling is V8, not V1.** Where the two diverge, most of the published
-> headroom is unbuyable. `V9 − V8` is the reachable half, and it is published per shape as
-> `headroom_reachable` alongside `limited_by`, which says whether a shape is retrieval-limited or
-> reasoning-limited (ADR-028 §3e).
+> headroom is unbuyable. `V8 − V9` is the reachable half, and it is published per shape as
+> `headroom_reachable` (ADR-028 §3e).
 >
-> | shape | `V1 − V9` published | `V8 − V9` reachable | limited by | chance floor |
-> |---|---|---|---|---|
-> | `prospective/due-window` | 0.8889 | 0.7778 | retrieval | — |
-> | `episodic/participant-attribution` | −0.0667 | 0.00 | — | 0.333 |
-> | `bitemporal/belief-at-instant` | 0.3056 | 0.2222 | retrieval | — |
-> | `temporal/occurrence-order` | **0.75** | **0.75** | retrieval | **0.500** |
+> **`limited_by` does not currently discriminate.** Each shape's sidecar entry also carries
+> `limited_by`, meant to say whether the shape is retrieval-limited or reasoning-limited. The probe
+> runner sets it to `reasoning` when the whole-haystack arm (V8) recovers less than half of the gap
+> between the BM25 arm (V9) and the gold-only arm (V1), and to `retrieval` otherwise. On the shipped
+> reference records it reads `retrieval` for all 35 shapes that carry it — `forgetting/never-known`,
+> which has no gold, carries none — so it tells no shape apart from any other. Read
+> `headroom_reachable` beside the published headroom instead; where the two diverge, that gap is the
+> unbuyable part.
 >
-> **Read the reachable column before buying retrieval work** — and now the chance floor beside it.
+> Four shapes, exactly as the shipped sidecars record them:
+>
+> | shape | V1 | V8 | V9 | `V1 − V9` published | `V8 − V9` reachable | `limited_by` | chance floor |
+> |---|---|---|---|---|---|---|---|
+> | `prospective/due-window` | 18/18 | 16/18 | 1/18 | 0.9444 | 0.8333 | retrieval | — |
+> | `episodic/participant-attribution` | 14/15 | 13/15 | 4/15 | 0.6667 | 0.6 | retrieval | 0.3333 |
+> | `bitemporal/belief-at-instant` | 36/36 | 34/36 | 23/36 | 0.3611 | 0.3056 | retrieval | — |
+> | `temporal/occurrence-order` | 20/20 | 20/20 | 5/20 | **0.75** | **0.75** | retrieval | **0.5** |
+>
+> **Read the reachable column before buying retrieval work** — and the chance floor beside it.
 >
 > `due-window` used to be the cautionary case here at 0.94 published against 0.17 reachable, because
 > a reader holding the entire haystack failed 78% of the time. Its answer key was wrong; V8 is now
 > 16/18 and the two columns nearly agree.
 >
-> `occurrence-order` replaces it as the number to read carefully, for a different reason. Its two
-> columns agree, so retrieval work does pay — but the question names its own two candidates, so a
-> reader with no evidence still reaches gold half the time. **Its 0.75 contains 0.50 that a coin
-> captures**, and its `v9_above_chance` is **−0.25**: our baseline scores *below* chance because it
-> declines rather than guessing. Compare systems on the distance above the floor, not on 0.75.
+> `occurrence-order` is the number to read carefully, for a different reason. Its two columns agree,
+> so retrieval work does pay — but the question names its own two candidates, so a reader with no
+> evidence still reaches gold half the time. **Its 0.75 contains 0.50 that a coin captures**, and its
+> `v9_above_chance` is **−0.25**: our baseline scores *below* chance because it declines rather than
+> guessing. Compare systems on the distance above the floor, not on 0.75.
 >
-> `participant-attribution` is no longer a retrieval shape at all — see the note in its section
-> above and ADR-028 §18.
+> `participant-attribution` is a retrieval shape again in the shipped corpus — see its section above.
+> Its V9 of 4/15 sits below its 1/3 chance floor (`v9_above_chance` −0.07).
 >
-> Episodic's interference cost of **−0.04** is real rather than rounding: two `participant-attribution`
-> questions fail on gold alone and succeed on the whole haystack, because gold-only strips the
-> conversational context that identifies a speaker. **V1 is therefore not a strict ceiling for
-> attribution shapes.**
+> Episodic's interference cost is **0.02** (V1 49/50, V8 48/50), and both of the questions that
+> regress on the whole haystack are `participant-attribution` ones. The shape also holds one question
+> that fails on gold alone and passes on the whole haystack — gold-only strips conversational context
+> that can help identify a speaker — so **V1 is not a strict ceiling for attribution shapes.**
 >
 > **`V1 − V9` is an upper bound, not an estimate, and here is why.** The calibration gate drags BM25
 > coverage into band by injecting the question's own vocabulary into distractors as a bracketed,
@@ -520,14 +554,19 @@ gold is itself an abstention.
 > jumps by **+0.10 to +0.34**, to 0.87–1.00; strip it from gold instead and almost nothing moves. So
 > **the entire retrieval difficulty of these corpora, for a lexical retriever, is one parenthetical
 > keyword list**, and any retriever that discounts formulaic scaffolding sees a far easier corpus.
-> V9's baseline is depressed by roughly `scaffolding_dependence` (stamped per corpus in
-> `structure`), and the headroom above is inflated by the same amount. Difficulty that a one-line
-> regex defeats is not difficulty; earning it from naturalistic same-domain competition instead is a
-> generation change and is the family's next corpus revision.
+> V9's baseline is depressed and the headroom above it inflated by that amount. Those figures were
+> measured on an earlier revision of the corpora (`tools/measure_scaffolding_dependence.py`); the
+> clause is still present in every shipped corpus, but the shipped sidecars do not carry the
+> `structure.scaffolding_dependence` field that recorded the measurement, so the size of the effect
+> on the shipped bytes is not recorded with them. Difficulty that a one-line regex defeats is not
+> difficulty; earning it from naturalistic same-domain competition instead would be a generation
+> change, and with the family frozen none is scheduled.
 > **And `V1 − V9` contains a component no ranker can reach.** Having found that the scaffolding
 > depresses BM25, we told a consuming project to expect a scaffolding-robust retriever near `V8`.
 > That was an extrapolation from a *coverage* figure presented as an expectation about *accuracy*,
-> and measuring it refuted it:
+> and measuring it refuted it. The table below is that measurement, taken on an earlier revision of
+> the corpora; the shipped records differ (Arithmetic's V1 is now 50/50 and its V9 21/50, for
+> example) and it has not been repeated on them:
 >
 > | Vertical | V9 as published | **V9 scaffolding-robust** | V8 whole haystack | V1 gold-only | questions needing > `K_ref` |
 > |---|---|---|---|---|---|
@@ -545,7 +584,10 @@ gold is itself an abstention.
 > larger `K` buys it more cheaply than a better ranker.** Where it is zero, a scaffolding-robust
 > retriever comes close to `V8`, which is the control that isolates the mechanism.
 >
-> Stamped per corpus as `structure.retrieval_ceiling`.
+> The last column is structural, so it can be read straight off the shipped `G` distributions: with
+> `K_ref` = 5, Arithmetic has 14 such questions, Conjunction 13 and Episodic 7, and every other
+> vertical has none. The shipped sidecars do not carry the `structure.retrieval_ceiling` field that
+> recorded the rest of the table.
 >
 > **And no vertical in this family has a validated difficulty ladder.** Every corpus carries
 > `difficulty_validated: false`. The bands describe **how the corpus was built** and nothing more —
@@ -596,36 +638,35 @@ that is there — the distractor collision fixed in 0.22.0-beta was caught by on
 easily have been missed by it. Unlike V2 there is no hit threshold: one sample that rebuilds the
 answer from distractors alone condemns the question.
 
-These are reported as measured. The remaining V1 shortfalls sit where the *answer model*, not the
-memory system, is the limit: the Arithmetic misses are duration questions whose gold requires
-summing several timestamp-derived intervals, and whose arithmetic was verified correct independently
-of the model. One Prospective question and one of its pairs sit in the same place.
-A question the ceiling cannot answer measures the ceiling, so treat those as the noise floor of the
-vertical rather than as headroom in the system under test — the per-question records name exactly
-which ones they are.
+These are reported as measured. The remaining V1 shortfalls are single questions — one each in
+Prospective (`not-yet-true`), Episodic (`participant-attribution`) and Forgetting (`still-valid`) —
+plus one failed pair-flip each in Prospective and Forgetting. A question the ceiling cannot answer
+measures the ceiling, so treat those as the noise floor of the vertical rather than as headroom in
+the system under test — the per-question records name exactly which ones they are.
 
 Three of the rules do not apply to every question, and saying so matters more than a full column.
 V1 and V2 are not applicable to a never-known probe: its gold *is* an abstention, so "I have no way
 of knowing" is both the correct answer and what any model with no context says, and scoring it would
 reject all fifteen for being guessable when what was measured is that the corpus asked for a
 negative and got one. V3 and V6 require the ablated model to reproduce the *specific* value rather
-than merely a negative, for the same reason. Where a gold answer carries no specific value at all —
-Prospective's "not yet", whose content is a date the question already supplies — V3 abstains rather
-than scores, because it cannot tell "reached the evidence" from "said what any model with no
-evidence says". Those abstentions are why Prospective's V3 denominator is 39 and not 50.
+than merely a negative, for the same reason. Where a gold answer carries no content the question did
+not already supply — Prospective's "not yet", for example, whose content is a date the question
+already gives — V3 abstains rather than scores, because it cannot tell "reached the evidence" from
+"said what any model with no evidence says". Those abstentions are why Prospective's V3 denominator
+is 35 and not 72: 37 questions are recorded as not decidable.
 
-**Read Episodic's V3 with the same caution.** Its one failure is a `participant-attribution`
-question, and that shape's answer is one of *two* — "you said it" or "I said it". An ablation probe
-cannot distinguish a model that reached the evidence from one that guessed a coin flip, so V3 is
-weak by construction on that shape. What bounds guessability there is V2, which samples ten times
-with no context at all and passes 50/50. The two Episodic V1 shortfalls are in the same shape, for
-the same reason it is already flagged as a known limitation above.
+**Read Episodic's V3 with the same caution.** It passes 50/50, but `participant-attribution`'s
+answer is one of *three* — "me", "you" or "both of us". An ablation probe cannot fully distinguish a
+model that reached the evidence from one that guessed, so V3 is weak by construction on that shape.
+What bounds guessability there is V2, which samples ten times with no context at all and passes
+50/50. Episodic's one V1 shortfall is in the same shape.
 
 V1, V2, V3 and V6 need a reference model, so they run at authoring time and their per-question
 records are stamped into the corpus metadata. The generators
 (`tools/gen_typedmemeval_<vertical>.py`) and the probe runner
-(`tools/run_typedmemeval_probes.py`) are in the repository: the corpora are reproducible, and that
-is what makes them criticizable.
+(`tools/run_typedmemeval_probes.py`) are in the repository: the corpora are reproducible from them,
+and that is what makes them criticizable. The probe records are tied to the retired reference
+deployment and will not be refreshed; see the note above the probe table.
 
 ## V7 — can a cheap classifier find the gold without reading it?
 
@@ -689,7 +730,8 @@ separates gold perfectly and is meant to.
 found gold at AUC 0.990 in Forgetting and session length at 0.992 in WorkingMemory — gold states an
 arbitrary *named* fact, so it carried proper nouns and extra text that filler did not, and counting
 capital letters found the evidence without reading it. The v2 corpora pad every session to a common
-shape; the worst refused feature across the family is now 0.713.
+shape; in the shipped sidecars the worst refused feature across the family is 0.663 (Arithmetic's
+`gold_marker_ngram`).
 
 ## Bands, not points
 
@@ -719,11 +761,11 @@ Pin `AnswerSeed` to measure the memory system's own variance; vary it to measure
 
 - **No cross-family composite score.** The verticals measure different mechanisms; a blend would
   rebuild the one percentage the family exists to replace.
-- **No leaderboard claims.** With 50–60 questions per vertical, TypedMemEval is an instrument for comparing
+- **No leaderboard claims.** With 50–80 questions per vertical, TypedMemEval is an instrument for comparing
   configurations of one system and for regression-testing memory mechanisms. Cross-system ranking
   needs the bands above and honest `n` reporting.
 - **No claim beyond the vertical.** The shapes inside a vertical (and WorkingMemory's distance
-  rungs, and the pair sets) hold 5–20 questions each. Their `n` is published next to every number
+  rungs, and the pair sets) hold 10–36 questions each. Their `n` is published next to every number
   because at those sizes they support diagnosis, not claims.
 - **No endorsed MemoryBaseline pentagon.** `ToBaseline` accepts a family result mechanically,
   because it keys on `BenchmarkId` and the compatibility accuracy field. That is not an

@@ -15,16 +15,18 @@ namespace AgentEval.Evals.Agentic.Process;
 /// alternatives used in place of required tools?
 /// </para>
 /// <para>
-/// Wraps an <see cref="AtomicLlmEval"/> with a weighted rubric:
-/// required-tool coverage (0.60 weight) − redundancy penalty (0.25) + acceptable-alternative
-/// bonus (0.15). Emits <c>score</c> in <c>[0,1]</c> plus structured <c>evidence[]</c>
-/// and <c>failure_type</c> via the judge's criteria results.
+/// Wraps an <see cref="AtomicLlmEval"/> with four criteria: required-tool coverage, no redundant
+/// calls, alignment with the query intent, and credit for acceptable alternatives. The score is the
+/// judge's overall score in <c>[0,1]</c>, with one evidence entry per criterion. The weighted formula
+/// (0.60 / 0.25 / 0.15) and the <c>failure_type</c> field are in the rubric the judge is sent; the judge
+/// applies the formula, and the result does not keep <c>failure_type</c>.
 /// </para>
 /// <para>
-/// Source: forked from Azure/azure-sdk-for-python
-/// sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_tool_selection/tool_selection.prompty
-/// License: MIT. Modifications listed in the corresponding prompt file at
-/// Resources/Prompts/process/tool-selection.v1.md.
+/// Lineage: AgentEval's own criteria and reference prompt, modelled on the evaluator concept (name,
+/// inputs and scoring dimensions) of Azure/azure-sdk-for-python
+/// <c>sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_tool_selection/tool_selection.prompty</c>.
+/// A 2026-10-02 check found no upstream prompt text in the rubric file
+/// <c>Resources/Prompts/process/tool-selection.v1.md</c>, which the judge is sent as its system prompt.
 /// </para>
 /// <para>
 /// Foundry reference: <c>azureai://built-in/evaluators/tool_selection</c>
@@ -60,7 +62,7 @@ public sealed class ToolSelectionEval : IEval
             key: "tool_selection",
             name: "Tool Selection",
             category: "agentic-process",
-            version: "1.0.0",
+            version: "1.1.0",
             criteria: new[]
             {
                 "All required tools (per expected_actions.required_tools) were called",
@@ -71,7 +73,7 @@ public sealed class ToolSelectionEval : IEval
             passThreshold: passThreshold,
             judgeModel: judgeModel,
             promptId: "agenteval.tool_selection.v1",
-            failureSeverity: "medium");
+            failureSeverity: "medium") { JudgeSeesToolData = JudgeToolData.ToolCalls | JudgeToolData.ToolDefinitions };
     }
 
     /// <inheritdoc/>

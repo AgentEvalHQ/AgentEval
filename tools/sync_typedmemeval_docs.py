@@ -74,9 +74,12 @@ def _headroom_cell(record: dict | None) -> str:
 def _interference_cell(record: dict | None) -> str:
     """V1 - V8, rendered WITH its sign, because a negative value is a real result here.
 
-    Episodic reads -0.04: two questions fail on gold alone and succeed on the whole haystack, so V1
-    is not the strict ceiling ADR-026 calls it. Printing that unsigned, or rounding it to 0.00, would
-    hide the one number in this table that contradicts a claim made elsewhere in these docs.
+    In the shipped v5 sidecars Episodic reads +0.02 (49/50 on gold alone, 48/50 on the whole
+    haystack). The one negative value is Forgetting, -0.03: one question fails on gold alone and
+    succeeds on the whole haystack (34/35 against 35/35), so V1 is not the strict ceiling ADR-026
+    calls it. Printing that unsigned, or rounding it to 0.00, would hide the one number that
+    contradicts a claim made elsewhere in these docs. The published table no longer calls this; it
+    shows retrieval headroom instead (see `_headroom_cell`).
     """
     if not record or record.get("interference_cost") is None:
         return "—"

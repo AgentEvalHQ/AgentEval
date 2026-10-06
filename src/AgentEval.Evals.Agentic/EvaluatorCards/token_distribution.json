@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0",
+  "key": "token_distribution",
+  "name": "Token Distribution Skew",
+  "category": "operational",
+  "version": "1.0.0",
+  "description": "Pure-code Glass Box check: whether one chat turn consumed a disproportionate share of the run's completion tokens (1 - max/sum). Low severity on failure. Needs at least three turns with token usage.",
+  "costTier": "Trivial",
+  "higherIsBetter": true,
+  "defaultThreshold": 0.5,
+  "expectedInputs": [
+    {
+      "kind": "metadata",
+      "key": "__agentTrace__",
+      "required": true,
+      "description": "The run's Glass Box trace, attached with EvalInput.WithTrace (bench agentic --trace)."
+    }
+  ],
+  "recommendedVisualization": "histogram",
+  "compatibleWith": [],
+  "links": {
+    "documentation": "/docs/glass-box.md",
+    "source": "src/AgentEval.Evals.Agentic/Performance/TokenDistributionEval.cs"
+  }
+}

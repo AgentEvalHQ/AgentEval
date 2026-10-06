@@ -16,7 +16,15 @@ public sealed record CalibrationEntry(
     string ExpectedVerdict,
     double ExpectedScoreMin,
     double ExpectedScoreMax,
-    string Rationale);
+    string Rationale)
+{
+    /// <summary>
+    /// The reference answer, for an evaluator that compares the response with one (<c>similarity</c>,
+    /// <c>response_completeness</c>); passed as <see cref="EvalInput.GroundTruth"/>. The goldens carried none, so
+    /// similarity was calibrated on a judge that improvised a reference (#203, B12a).
+    /// </summary>
+    public string? GroundTruth { get; init; }
+}
 
 /// <summary>A named collection of calibration entries for a single agentic category.</summary>
 public sealed record CalibrationDataset(string CategoryKey, IReadOnlyList<CalibrationEntry> Entries);

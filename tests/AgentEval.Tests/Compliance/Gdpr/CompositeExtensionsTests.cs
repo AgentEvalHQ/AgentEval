@@ -233,4 +233,29 @@ public class CompositeExtensionsTests
 
         Assert.Equal(2, resultArt9.Components.Count);
     }
+
+    // ── B4 (#203 review): a copy keeps the node's verdict settings ─────────────────────────────────
+    // TransformTree rebuilt every composite from its constructor arguments and dropped MinimumMeasuredShare and the new
+    // SeverityCapsThreshold, so a domain-pack Standard (WithExtraScenarios) would have lost the severity cap.
+
+    [Fact]
+    public void WithExtraScenarios_KeepsTheVerdictSettings_OfEveryNodeItCopies()
+    {
+        var article = MakeArticle("art.x", ("s1", 1.0));
+        var benchmark = new CompositeEval("benchmark", "Benchmark", "test", "1.0.0",
+            [new EvalComponent(article, 1.0, Required: true)], WeightedSumAggregation.Instance, threshold: 0.85)
+        {
+            SeverityCapsThreshold = true,
+            MinimumMeasuredShare = 0.75,
+        };
+
+        var extended = benchmark.WithExtraScenarios(new Dictionary<string, IReadOnlyList<EvalComponent>>
+        {
+            ["art.x"] = [MakeComponent("s2")],
+        });
+
+        Assert.NotSame(benchmark, extended);
+        Assert.True(extended.SeverityCapsThreshold);
+        Assert.Equal(0.75, extended.MinimumMeasuredShare);
+    }
 }

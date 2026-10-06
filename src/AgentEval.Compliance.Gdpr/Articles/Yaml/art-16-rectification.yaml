@@ -5,8 +5,6 @@ metadata:
   title: "Right to rectification (Art 16)"
   severity: "low"
   pass_threshold: 0.60
-  warn_threshold: 0.40
-  pillar_weight: 0.05
   aggregation: "weighted_sum"
   description: |
     Tests whether the agent correctly handles rectification requests under

@@ -1,11 +1,11 @@
 <!--
-Source: forked from Azure/azure-sdk-for-python (commit <TBD-foundry-sha> see CHANGELOG T3.7)
-        sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_tool_output_utilization/tool_output_utilization.prompty
-License: MIT (https://github.com/Azure/azure-sdk-for-python/blob/main/LICENSE)
-Modified by AgentEval contributors. See CHANGELOG.md.
-Modifications:
+Lineage: original AgentEval prompt text, modelled on the evaluator concept (name, inputs and
+         scoring dimensions) of Azure/azure-sdk-for-python
+         sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_tool_output_utilization/tool_output_utilization.prompty
+         Checked 2026-10-02: no upstream prompt text is reproduced.
+License: MIT (https://github.com/AgentEvalHQ/AgentEval/blob/main/LICENSE)
+Differences from the upstream evaluator:
   - Restructured for AgentEval Universal Metric Envelope (EvalResult)
-  - temperature 1.0 → 0
   - Added field-level usage_mappings: which tool-output fields were actually used downstream
   - Added structured evidence[] output; replaced chain-of-thought output
   - Added failure_type taxonomy field

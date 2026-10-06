@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://agenteval.dev/schemas/v1/agentic-result.schema.json",
   "title": "AgentEval Agentic Benchmark Result",
+  "$comment": "v1 revisions. 0.44: the status enums gained ERROR (a check the verdict rests on produced no verdict) and SKIPPED (nothing measured). Widening only: every document written before still validates, so the $id keeps v1; a consumer that handles only PASS/WARN/FAIL must handle the two new values.",
   "type": "object",
   "required": [
     "preset",
@@ -75,8 +76,8 @@
           "description": "Composite score across all evaluators."
         },
         "overallStatus": {
-          "enum": ["PASS", "FAIL", "WARN"],
-          "description": "Overall verdict."
+          "enum": ["PASS", "FAIL", "WARN", "ERROR", "SKIPPED"],
+          "description": "Overall verdict: a measured PASS, WARN or FAIL; ERROR when a check the verdict rests on produced no verdict; SKIPPED when nothing was measured."
         },
         "perCategory": {
           "type": "object",
@@ -118,7 +119,7 @@
           "description": "AgentEval assembly version that generated this result."
         },
         "judgeMode": {
-          "enum": ["single", "panel", "adjudicated"],
+          "enum": ["single", "panel", "adjudicated", "none"],
           "description": "Judge mode used during evaluation."
         },
         "promptVersions": {
@@ -135,7 +136,7 @@
       "required": ["score", "status"],
       "properties": {
         "score":          { "type": "number", "minimum": 0, "maximum": 1 },
-        "status":         { "enum": ["PASS", "FAIL", "WARN"] },
+        "status":         { "enum": ["PASS", "FAIL", "WARN", "ERROR", "SKIPPED"] },
         "criticalFails":  { "type": "array", "items": { "type": "string" } }
       }
     },
@@ -144,7 +145,7 @@
       "required": ["score", "status", "severity"],
       "properties": {
         "score":       { "type": "number", "minimum": 0, "maximum": 1 },
-        "status":      { "enum": ["PASS", "FAIL", "WARN"] },
+        "status":      { "enum": ["PASS", "FAIL", "WARN", "ERROR", "SKIPPED"] },
         "severity":    { "enum": ["none", "low", "medium", "high", "critical"] },
         "confidence":  { "type": ["number", "null"], "minimum": 0, "maximum": 1 }
       }

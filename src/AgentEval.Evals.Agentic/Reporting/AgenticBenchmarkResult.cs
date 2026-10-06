@@ -79,11 +79,13 @@ public sealed record AgenticEvaluatorSummary(
 /// </summary>
 /// <param name="AgentEvalVersion">The AgentEval assembly version that generated this result.</param>
 /// <param name="JudgeMode">
-/// The judge mode used: <c>single</c>, <c>panel</c>, or <c>adjudicated</c>.
+/// The judge mode used: <c>single</c>, <c>panel</c>, <c>adjudicated</c>, or <c>none</c> for a preset whose
+/// evaluators are all computed in code and call no judge.
 /// </param>
 /// <param name="PromptVersions">
-/// Map of prompt template key to version string, e.g.
-/// <c>{ "agentic-judge-system": "v1", "task-completion-criterion": "v1" }</c>.
+/// Map of check key to the prompt actually sent to its judge: the rubric under <c>Resources/Prompts/</c> its
+/// <c>promptId</c> names (since 0.44, #203 review B9), as each check's provenance records it. Empty for a preset whose
+/// checks call no judge.
 /// </param>
 public sealed record AgenticAttestation(
     string AgentEvalVersion,

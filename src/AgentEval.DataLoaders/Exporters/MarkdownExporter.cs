@@ -100,7 +100,7 @@ public class MarkdownExporter : IResultExporter
         }
         
         // Metric breakdown (if available)
-        var testsWithMetrics = report.TestResults.Where(t => t.MetricScores.Count > 0).ToList();
+        var testsWithMetrics = report.TestResults.Where(t => t.MetricScores.Count > 0 || t.MetricsNotMeasured.Count > 0).ToList();
         if (testsWithMetrics.Count > 0 && Options.IncludeMetricBreakdown)
         {
             sb.AppendLine("### 📊 Metric Breakdown");
@@ -108,7 +108,7 @@ public class MarkdownExporter : IResultExporter
             
             // Get all unique metric names
             var metricNames = testsWithMetrics
-                .SelectMany(t => t.MetricScores.Keys)
+                .SelectMany(t => t.MetricScores.Keys.Concat(t.MetricsNotMeasured.Keys))
                 .Distinct()
                 .OrderBy(m => m)
                 .ToList();
@@ -132,7 +132,9 @@ public class MarkdownExporter : IResultExporter
                 sb.Append($"| {EscapeMarkdown(test.Name)} |");
                 foreach (var metric in metricNames)
                 {
-                    var score = test.MetricScores.TryGetValue(metric, out var s) ? s.ToString("F1", CultureInfo.InvariantCulture) : "-";
+                    var score = test.MetricScores.TryGetValue(metric, out var s) ? s.ToString("F1", CultureInfo.InvariantCulture)
+                        : test.MetricsNotMeasured.ContainsKey(metric) ? "not measured"
+                        : "-";
                     sb.Append($" {score} |");
                 }
                 sb.AppendLine();

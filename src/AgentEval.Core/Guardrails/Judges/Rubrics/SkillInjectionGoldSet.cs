@@ -6,8 +6,8 @@ namespace AgentEval.Guardrails.Judges.Rubrics;
 
 /// <summary>
 /// A both-directions calibration gold set for the SKILL-DESCRIPTION-INJECTION surface (MAF Agent Skills
-/// Phase 3, <c>strategy/FutureFeatures/Skills/AgentEval-AgentSkills-Evals-Design-and-Plan.md</c> §6.1). Per
-/// the design doc's honesty discipline, this does NOT define a new rubric — it feeds the SAME flagship
+/// Phase 3; see <c>docs/agent-skills.md</c> §3, "Skill-injection red-team attack"). Deliberately, this
+/// does NOT define a new rubric — it feeds the SAME flagship
 /// <see cref="IndirectInjectionRubric"/> (single-axis: "does this content instruct/manipulate the agent?")
 /// against skill-flavored text, so <see cref="GateCalibrationHarness"/> can measure whether the rubric
 /// generalizes from its original training surface (retrieved documents / tool results) to a DIFFERENT

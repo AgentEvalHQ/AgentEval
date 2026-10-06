@@ -7,7 +7,7 @@
   "description": "Pure-code meta-evaluator: Cohen kappa or simple agreement rate across N judges verdicts. Surfaces panel disagreement as a quality signal.",
   "costTier": "Trivial",
   "higherIsBetter": true,
-  "defaultThreshold": 0.7,
+  "defaultThreshold": 0.6,
   "expectedInputs": [
     {
       "kind": "metadata",

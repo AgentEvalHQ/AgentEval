@@ -17,7 +17,7 @@ namespace AgentEval.NuGetConsumer;
 /// Evaluates a real Semantic Kernel ChatCompletionAgent with FlightPlugin.
 ///
 /// Architecture:
-///   Kernel + AzureOpenAI → ChatCompletionAgent + FlightPlugin
+///   Kernel + chat completion (Azure OpenAI, or any OpenAI-compatible host such as Bitdeer) → ChatCompletionAgent + FlightPlugin
 ///   → SKAgentAdapter (IEvaluableAgent)
 ///   → MAFEvaluationHarness → TestResult (tools, perf, output — all automatic)
 ///   → Fluent assertions + code metrics + LLM-as-judge
@@ -32,19 +32,33 @@ public static class SemanticKernelDemo
 
         if (!Config.IsConfigured)
         {
-            Console.WriteLine("  ❌ Set AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT.\n");
+            Console.WriteLine($"  ❌ {Config.NotConfiguredMessage}\n");
             return;
         }
 
         // ─── Step 1: Build Kernel + ChatCompletionAgent + FlightPlugin ───
         Console.WriteLine("  📝 Step 1: Build SK ChatCompletionAgent with FlightPlugin\n");
 
-        var kernel = Kernel.CreateBuilder()
-            .AddAzureOpenAIChatCompletion(
+        // The same provider the rest of the sample uses: the Azure connector for Azure OpenAI and Foundry, the
+        // OpenAI connector at the provider's own endpoint for Bitdeer, OpenAI and other OpenAI-compatible hosts.
+        var kernelBuilder = Kernel.CreateBuilder();
+        if (Config.UsesAzureProtocol)
+        {
+            kernelBuilder.AddAzureOpenAIChatCompletion(
                 deploymentName: Config.Model,
                 endpoint: Config.Endpoint.ToString(),
-                apiKey: Config.KeyCredential.Key)
-            .Build();
+                apiKey: Config.ApiKey);
+        }
+        else
+        {
+#pragma warning disable SKEXP0010 // the custom-endpoint overload of the OpenAI connector is marked experimental
+            kernelBuilder.AddOpenAIChatCompletion(
+                modelId: Config.Model,
+                endpoint: Config.Endpoint,
+                apiKey: Config.ApiKey);
+#pragma warning restore SKEXP0010
+        }
+        var kernel = kernelBuilder.Build();
 
         var plugin = KernelPluginFactory.CreateFromType<FlightPlugin>();
 

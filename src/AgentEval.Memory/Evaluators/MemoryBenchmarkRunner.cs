@@ -203,6 +203,58 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
         return result;
     }
 
+    // ── What each category actually measured ─────────────────────────────────────────────────────────────
+    // A scenario the judge produced no score for, or that failed, is not a 0: it is left out of the category score
+    // and counted. Each category run tallies both; one with nothing measured is reported like a crash.
+
+    private sealed class MeasurementTally
+    {
+        public int MeasuredScenarios;
+        public int UnmeasuredQueries;
+    }
+
+    private static readonly AsyncLocal<MeasurementTally?> s_tally = new();
+
+    private static void Record(List<double> scores, MemoryEvaluationResult result) =>
+        Record(scores, result.IsMeasured, result.OverallScore, result.UnmeasuredQueries);
+
+    private static void Record(List<double> scores, CrossSessionResult result) =>
+        Record(scores, result.IsMeasured, result.OverallScore,
+            result.UnmeasuredFacts + (result.ErrorMessage is null ? 0 : Math.Max(1, result.FactResults.Count)));
+
+    private static void Record(List<double> scores, ReachBackResult result) =>
+        Record(scores, result.IsMeasured, result.OverallScore, result.UnmeasuredDepths);
+
+    /// <summary>The reducer is judged too (it runs its questions through the same runner), so it is no exception.</summary>
+    private static void Record(List<double> scores, ReducerEvaluationResult result) =>
+        Record(scores, result.IsMeasured, result.FidelityScore, result.UnmeasuredFacts);
+
+    private static void Record(List<double> scores, bool measured, double score, int unmeasured)
+    {
+        var tally = s_tally.Value;
+        if (tally is not null) tally.UnmeasuredQueries += unmeasured;
+        if (!measured) return;
+        scores.Add(score);
+        if (tally is not null) tally.MeasuredScenarios++;
+    }
+
+    private static (double Score, bool Skipped, string? SkipReason) Mean(List<double> scores) =>
+        (scores.Count > 0 ? scores.Average() : 0, false, null);
+
+    private static (double Score, bool Skipped, string? SkipReason) Single(MemoryEvaluationResult result)
+    {
+        var scores = new List<double>();
+        Record(scores, result);
+        return Mean(scores);
+    }
+
+    private static (double Score, bool Skipped, string? SkipReason) Single(ReachBackResult result)
+    {
+        var scores = new List<double>();
+        Record(scores, result);
+        return Mean(scores);
+    }
+
     private async Task<BenchmarkCategoryResult> RunCategoryAsync(
         IEvaluableAgent agent,
         MemoryBenchmarkCategory category,
@@ -211,6 +263,8 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
         CancellationToken cancellationToken)
     {
         var catStopwatch = Stopwatch.StartNew();
+        var tally = new MeasurementTally();
+        s_tally.Value = tally;
 
         try
         {
@@ -228,20 +282,28 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
                 BenchmarkScenarioType.ConflictResolution => await RunConflictResolutionAsync(agent, presetName, overrides, cancellationToken),
                 BenchmarkScenarioType.MultiSessionReasoning => await RunMultiSessionReasoningAsync(agent, presetName, cancellationToken),
                 BenchmarkScenarioType.PreferenceExtraction => await RunPreferenceExtractionAsync(agent, presetName, overrides, cancellationToken),
-                _ => (Score: 0.0, Skipped: true, SkipReason: $"Unknown scenario type: {category.ScenarioType}")
+                // A preset naming a type this runner does not know is a broken configuration, not a skip (B6c-9).
+                _ => throw new InvalidOperationException($"Unknown scenario type: {category.ScenarioType}")
             };
 
             catStopwatch.Stop();
 
+            // A category that ran but measured nothing (the judge produced no score anywhere) is reported like a crash:
+            // it never scores, and the run is incomplete.
+            var nothingMeasured = !score.Skipped && tally.MeasuredScenarios == 0;
             return new BenchmarkCategoryResult
             {
                 CategoryName = category.Name,
-                Score = score.Score,
+                Score = nothingMeasured ? 0 : score.Score,
                 Weight = category.Weight,
                 ScenarioType = category.ScenarioType,
                 Duration = catStopwatch.Elapsed,
-                Skipped = score.Skipped,
-                SkipReason = score.SkipReason
+                Skipped = score.Skipped || nothingMeasured,
+                Errored = nothingMeasured,
+                SkipReason = nothingMeasured
+                    ? $"Not measured: no question in this category produced a score ({tally.UnmeasuredQueries} unscored)."
+                    : score.SkipReason,
+                UnmeasuredQueries = tally.UnmeasuredQueries,
             };
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -257,6 +319,8 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
                 ScenarioType = category.ScenarioType,
                 Duration = catStopwatch.Elapsed,
                 Skipped = true,
+                // A crash is not "not supported": it counts as 0 in OverallScore instead of leaving the weights.
+                Errored = true,
                 SkipReason = $"Error: {ex.Message}"
             };
         }
@@ -409,7 +473,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
             };
 
             var result = await _runner.RunAsync(agent, scenario, ct);
-            return (result.OverallScore, false, null);
+            return Single(result);
         }
         catch (FileNotFoundException)
         {
@@ -498,8 +562,9 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
         var jsonResult = await TryRunFromJsonAsync(agent, "preference-extraction", presetName, overrides, ct);
         if (jsonResult.HasValue) return jsonResult.Value;
 
-        // No hardcoded fallback — preference extraction is JSON-only
-        return (0, true, "Preference extraction scenario JSON not found");
+        // No hardcoded fallback — preference extraction is JSON-only.
+        // A missing data file is a broken install, not a designed skip (#203 review, B6c-9): it errors the category, which counts as 0 and makes the run incomplete. As a skip it left the weights and the run could PASS.
+        throw new FileNotFoundException("Preference extraction scenario JSON not found");
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -544,7 +609,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
         var scenario = _memoryScenarios.CreateBasicMemoryTest(facts, queries);
         scenario.ContextTextBlob = contextBlob;
         var result = await _runner.RunAsync(agent, scenario, ct);
-        scores.Add(result.OverallScore);
+        Record(scores, result);
 
         // Standard+: Long-term memory (facts + 10 conversation turns, then query)
         if (presetName is "Standard" or "Full")
@@ -553,7 +618,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
             var longTermScenario = _memoryScenarios.CreateLongTermMemoryTest(facts, conversationTurns: 10);
             longTermScenario.ContextTextBlob = contextBlob;
             var longTermResult = await _runner.RunAsync(agent, longTermScenario, ct);
-            scores.Add(longTermResult.OverallScore);
+            Record(scores, longTermResult);
         }
 
         // Full: Priority memory (high vs low importance)
@@ -565,10 +630,10 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
             var priorityScenario = _memoryScenarios.CreatePriorityMemoryTest(highPriority, lowPriority);
             priorityScenario.ContextTextBlob = contextBlob;
             var priorityResult = await _runner.RunAsync(agent, priorityScenario, ct);
-            scores.Add(priorityResult.OverallScore);
+            Record(scores, priorityResult);
         }
 
-        return (scores.Average(), false, null);
+        return Mean(scores);
     }
 
     private async Task<(double Score, bool Skipped, string? SkipReason)> RunTemporalReasoningAsync(
@@ -593,7 +658,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
         ]);
         sequenceScenario.ContextTextBlob = contextBlob;
         var seqResult = await _runner.RunAsync(agent, sequenceScenario, ct);
-        scores.Add(seqResult.OverallScore);
+        Record(scores, seqResult);
 
         // Standard+: Time-point memory
         if (presetName is "Standard" or "Full")
@@ -607,7 +672,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
             ], eventsPerTimepoint: 2);
             timePointScenario.ContextTextBlob = contextBlob;
             var tpResult = await _runner.RunAsync(agent, timePointScenario, ct);
-            scores.Add(tpResult.OverallScore);
+            Record(scores, tpResult);
         }
 
         // Full: Causal reasoning
@@ -625,10 +690,10 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
             ]);
             causalScenario.ContextTextBlob = contextBlob;
             var causalResult = await _runner.RunAsync(agent, causalScenario, ct);
-            scores.Add(causalResult.OverallScore);
+            Record(scores, causalResult);
         }
 
-        return (scores.Average(), false, null);
+        return Mean(scores);
     }
 
     private async Task<(double Score, bool Skipped, string? SkipReason)> RunNoiseResilienceAsync(
@@ -652,7 +717,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
         var buriedScenario = _chattyScenarios.CreateBuriedFactsScenario(facts, noiseRatio: 5);
         buriedScenario.ContextTextBlob = contextBlob;
         var buriedResult = await _runner.RunAsync(agent, buriedScenario, ct);
-        scores.Add(buriedResult.OverallScore);
+        Record(scores, buriedResult);
 
         // Standard+: Topic switching with the same 4 facts
         if (presetName is "Standard" or "Full")
@@ -661,7 +726,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
             var topicScenario = _chattyScenarios.CreateTopicSwitchingScenario(facts, topicChanges: 8);
             topicScenario.ContextTextBlob = contextBlob;
             var topicResult = await _runner.RunAsync(agent, topicScenario, ct);
-            scores.Add(topicResult.OverallScore);
+            Record(scores, topicResult);
         }
 
         // Full: Emotional distractors + false information with confusing contradictions
@@ -671,7 +736,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
             var emotionalScenario = _chattyScenarios.CreateEmotionalDistractorScenario(facts);
             emotionalScenario.ContextTextBlob = contextBlob;
             var emotionalResult = await _runner.RunAsync(agent, emotionalScenario, ct);
-            scores.Add(emotionalResult.OverallScore);
+            Record(scores, emotionalResult);
 
             await ResetBetweenScenarios(agent, ct);
             MemoryFact[] falseFacts =
@@ -683,10 +748,10 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
             var falseInfoScenario = _chattyScenarios.CreateFalseInformationScenario(facts, falseFacts);
             falseInfoScenario.ContextTextBlob = contextBlob;
             var falseResult = await _runner.RunAsync(agent, falseInfoScenario, ct);
-            scores.Add(falseResult.OverallScore);
+            Record(scores, falseResult);
         }
 
-        return (scores.Average(), false, null);
+        return Mean(scores);
     }
 
     private async Task<(double Score, bool Skipped, string? SkipReason)> RunReachBackAsync(
@@ -704,7 +769,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
         };
 
         var result = await _reachBackEvaluator.EvaluateAsync(agent, fact, query, depths, ct);
-        return (result.OverallScore, false, null);
+        return Single(result);
     }
 
     private async Task<(double Score, bool Skipped, string? SkipReason)> RunFactUpdateAsync(
@@ -726,7 +791,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
             MemoryFact.Create("I sold the Honda and bought a Tesla")
         ]);
         var updateResult = await _runner.RunAsync(agent, updateScenario, ct);
-        scores.Add(updateResult.OverallScore);
+        Record(scores, updateResult);
 
         // Standard+: Verify corrections stick after conversation
         if (presetName is "Standard" or "Full")
@@ -739,10 +804,10 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
             ];
             var delayScenario = _memoryScenarios.CreateLongTermMemoryTest(delayFacts, conversationTurns: 5);
             var delayResult = await _runner.RunAsync(agent, delayScenario, ct);
-            scores.Add(delayResult.OverallScore);
+            Record(scores, delayResult);
         }
 
-        return (scores.Average(), false, null);
+        return Mean(scores);
     }
 
     private async Task<(double Score, bool Skipped, string? SkipReason)> RunMultiTopicAsync(
@@ -773,7 +838,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
 
         var scenario = _memoryScenarios.CreateBasicMemoryTest(facts, queries);
         var result = await _runner.RunAsync(agent, scenario, ct);
-        scores.Add(result.OverallScore);
+        Record(scores, result);
 
         // Standard+: Categorized memory
         if (presetName is "Standard" or "Full")
@@ -786,10 +851,10 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
             };
             var catScenario = MemoryScenarios.CategorizedMemory(categorizedFacts);
             var catResult = await _runner.RunAsync(agent, catScenario, ct);
-            scores.Add(catResult.OverallScore);
+            Record(scores, catResult);
         }
 
-        return (scores.Average(), false, null);
+        return Mean(scores);
     }
 
     private async Task<(double Score, bool Skipped, string? SkipReason)> RunCrossSessionAsync(
@@ -810,7 +875,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
             MemoryFact.Create("I'm allergic to peanuts")
         };
         var result = await _crossSessionEvaluator.EvaluateAsync(agent, facts, 0.8, ct);
-        scores.Add(result.OverallScore);
+        Record(scores, result);
 
         // Standard+: Multi-session with 3 resets
         if (presetName is "Standard" or "Full")
@@ -819,7 +884,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
             var multiSessionScenario = _crossSessionScenarios.CreateCrossSessionMemoryTest(
                 facts, sessionCount: 3, sessionGapMinutes: 30);
             var multiResult = await _runner.RunAsync(agent, multiSessionScenario, ct);
-            scores.Add(multiResult.OverallScore);
+            Record(scores, multiResult);
         }
 
         // Full: Incremental learning across sessions
@@ -833,10 +898,10 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
                 new List<MemoryFact> { MemoryFact.Create("My birthday is March 15th") }
             ]);
             var incResult = await _runner.RunAsync(agent, incrementalScenario, ct);
-            scores.Add(incResult.OverallScore);
+            Record(scores, incResult);
         }
 
-        return (scores.Average(), false, null);
+        return Mean(scores);
     }
 
     private async Task<(double Score, bool Skipped, string? SkipReason)> RunReducerFidelityAsync(
@@ -852,7 +917,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
             MemoryFact.Create("I prefer email over Slack", "preference", 50)
         };
         var result = await _reducerEvaluator.EvaluateAsync(agent, facts, 20, ct);
-        scores.Add(result.FidelityScore);
+        Record(scores, result);
 
         // Standard+: More facts, more noise (5 facts, 40 noise)
         if (presetName is "Standard" or "Full")
@@ -867,10 +932,10 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
                 MemoryFact.Create("I work at Contoso", "work", 70)
             };
             var moreResult = await _reducerEvaluator.EvaluateAsync(agent, moreFacts, 40, ct);
-            scores.Add(moreResult.FidelityScore);
+            Record(scores, moreResult);
         }
 
-        return (scores.Average(), false, null);
+        return Mean(scores);
     }
 
     private async Task<(double Score, bool Skipped, string? SkipReason)> RunMultiSessionReasoningAsync(
@@ -921,11 +986,12 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
             };
 
             var result = await _runner.RunAsync(agent, scenario, ct);
-            return (result.OverallScore, false, null);
+            return Single(result);
         }
-        catch (FileNotFoundException)
+        catch (FileNotFoundException ex)
         {
-            return (0, true, "Multi-session reasoning scenario JSON not found");
+            // A missing data file is a broken install, not a designed skip (#203 review, B6c-9): it errors the category, which counts as 0 and makes the run incomplete. As a skip it left the weights and the run could PASS.
+            throw new FileNotFoundException("Multi-session reasoning scenario JSON not found", ex);
         }
     }
 
@@ -935,8 +1001,9 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
         var jsonResult = await TryRunFromJsonAsync(agent, "conflict-resolution", presetName, overrides, ct);
         if (jsonResult.HasValue) return jsonResult.Value;
 
-        // No hardcoded fallback — conflict resolution is JSON-only
-        return (0, true, "Conflict resolution scenario JSON not found");
+        // No hardcoded fallback — conflict resolution is JSON-only.
+        // A missing data file is a broken install, not a designed skip (#203 review, B6c-9): it errors the category, which counts as 0 and makes the run incomplete. As a skip it left the weights and the run could PASS.
+        throw new FileNotFoundException("Conflict resolution scenario JSON not found");
     }
 
     private async Task<(double Score, bool Skipped, string? SkipReason)> RunAbstentionAsync(
@@ -996,6 +1063,6 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
         };
 
         var result = await _runner.RunAsync(agent, scenario, ct);
-        return (result.OverallScore, false, null);
+        return Single(result);
     }
 }

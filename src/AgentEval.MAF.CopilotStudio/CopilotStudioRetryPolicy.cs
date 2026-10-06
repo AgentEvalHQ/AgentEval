@@ -9,7 +9,7 @@ using AgentEval.Core;
 namespace AgentEval.MAF.CopilotStudio;
 
 /// <summary>
-/// P6 item B (<c>strategy/CopilotStudio/Copilot-Studio-P6-Connector-Health-and-Resilience-Design.md</c> §1B):
+/// P6 item B (Copilot Studio connector health and resilience):
 /// 429-specific retry for <see cref="CopilotStudioChatClient"/>'s network calls. This is NOT a new retry
 /// engine — <see cref="AgentEval.Core.RetryPolicy"/> already exists and is reused as-is; this class is only
 /// the 429-classification predicate plus one pre-configured instance.

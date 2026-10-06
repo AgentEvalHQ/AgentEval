@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using Microsoft.Extensions.AI;
 using AgentEval.Benchmarks;
 using AgentEval.Core;
 using AgentEval.Evals;
@@ -13,8 +14,8 @@ namespace AgentEval.Cli.Commands;
 
 /// <summary>
 /// Implements the <c>agenteval bench owasp</c> subcommand. Runs the OWASP LLM Top 10
-/// red-team scan against an agent (a stub safe-refusal agent is used by default —
-/// supply an agent override on the internal overload for real targets in tests),
+/// red-team scan against the named target (<c>--sut</c>, <c>--endpoint</c>/<c>--model</c> or
+/// <c>--azure-from-env</c>; without one it refuses, see <see cref="MockTarget"/>),
 /// persists the resulting <see cref="EvalResult"/> through the unified output-store,
 /// and additionally emits the rich <see cref="OWASPComplianceReport"/> as JSON +
 /// Markdown alongside.
@@ -30,7 +31,7 @@ public static class BenchOwaspCommand
         bool azureFromEnv = false,
         CancellationToken ct = default)
     {
-        var (exitCode, _) = await RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, agentOverride: null, azureFromEnv, ct).ConfigureAwait(false);
+        var (exitCode, _) = await RunAsync(preset, subject, rootOverride, inputText, evaluatorOverride: null, agentOverride: null, azureFromEnv, mock: false, ct: ct).ConfigureAwait(false);
         return exitCode;
     }
 
@@ -43,10 +44,10 @@ public static class BenchOwaspCommand
     /// directories by name — that name-based lookup races on second-precision
     /// timestamps when two operations land in the same second.
     /// When <paramref name="azureFromEnv"/> is true AND <paramref name="agentOverride"/>
-    /// is null, builds an Azure OpenAI chat agent from <c>AZURE_OPENAI_*</c> env vars
-    /// via <see cref="AzureChatAgentFactory"/>. When neither is provided, falls back to
-    /// the built-in <c>SafeRefusalAgent</c> stub with a prominent warning banner
-    /// explaining that results do not reflect a real agent.
+    /// is null, builds a chat agent from the configured provider via
+    /// <see cref="AzureChatAgentFactory"/>. With neither, the command refuses (usage error)
+    /// unless <paramref name="mock"/> asks for the stand-in by name (<c>--sut mock</c>);
+    /// a mock run is labelled and not stored (see <see cref="MockTarget"/>).
     /// </summary>
     internal static async Task<(int ExitCode, string? ReportDir)> RunAsync(
         string preset,
@@ -56,8 +57,20 @@ public static class BenchOwaspCommand
         IEvaluator? evaluatorOverride,
         IEvaluableAgent? agentOverride,
         bool azureFromEnv = false,
+        bool mock = false,
+        IChatClient? judgeClientOverride = null,
+        string? agentModel = null,
         CancellationToken ct = default)
     {
+        if (mock && (agentOverride is not null || azureFromEnv))
+        {
+            return (MockTarget.RefuseMockWithRealTarget(), null);
+        }
+        if (agentOverride is null && !azureFromEnv && !mock)
+        {
+            return (MockTarget.RefuseWithoutTarget("bench owasp", MockTarget.AgentTargets), null);
+        }
+
         // ── Workspace setup ──────────────────────────────────────────────────
         if (rootOverride is not null)
         {
@@ -76,30 +89,48 @@ public static class BenchOwaspCommand
         var agentEvalDir = Path.Combine(workspaceRoot, ".agenteval");
         if (!Directory.Exists(agentEvalDir))
         {
-            Console.Error.WriteLine($".agenteval/ not found at {agentEvalDir}. Run `agenteval init` first.");
+            Console.Error.WriteLine($".agenteval/ not found at {agentEvalDir}. Run `agenteval init-workspace` first.");
             return (1, null);
         }
 
-        // ── Judge / evaluator ────────────────────────────────────────────────
-        // The OWASP attack pipeline uses heuristic per-attack evaluators today;
-        // the judge is accepted for API symmetry with other bench commands and
-        // reserved for future LLM-graded probes. JudgeFactory.Resolve still runs
-        // to honour the AZURE_OPENAI_* env gate (CI parity).
-        var (resolvedJudge, judgeModelName, exitCode) = JudgeFactory.Resolve(
-            evaluatorOverride,
-            judgeKind: "OWASP benchmark");
-        if (resolvedJudge is null) return (exitCode, null);
+        // ── Judge ────────────────────────────────────────────────────────────
+        // The attacks are graded judge first, as `agenteval redteam --judge` grades them: the judge model the
+        // environment configures (AZURE_OPENAI_JUDGE_*, else the provider AI_INFERENCE_PROVIDER selects), with the
+        // keyword oracles as the fallback. A mock run reads no environment and grades with the oracles alone, as does
+        // a caller that supplies its own evaluator and no judge client (the test seam).
+        IChatClient? judgeClient = judgeClientOverride;
+        string? judgeModelName = judgeClientOverride is null ? null : "override";
+        if (judgeClient is null && !mock && evaluatorOverride is null)
+        {
+            var (client, model, judgeExit) = JudgeFactory.ResolveChatClient("OWASP benchmark");
+            if (client is null) return (judgeExit, null);
+            judgeClient = client;
+            judgeModelName = model;
+        }
 
         // ── Select preset ────────────────────────────────────────────────────
         OwaspBenchmarkRun benchmark;
         try
         {
-            benchmark = ResolvePreset(preset, resolvedJudge);
+            benchmark = ResolvePreset(preset, evaluatorOverride);
+        }
+        catch (ArgumentException ex)
+        {
+            // An unknown preset or domain pack is a rejected argument: a usage error, not a failed run.
+            Console.Error.WriteLine($"Failed to build OWASP preset '{preset}': {ex.Message}");
+            return (ExitCodes.UsageError, null);
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Failed to build OWASP preset '{preset}': {ex.Message}");
             return (1, null);
+        }
+
+        JudgeCallLedger? judgeLedger = null;
+        if (judgeClient is not null)
+        {
+            judgeLedger = new JudgeCallLedger(judgeClient);
+            benchmark.WithJudge(judgeLedger, judgeModelName!);
         }
 
         // ── Resolve target agent ─────────────────────────────────────────────
@@ -115,27 +146,39 @@ public static class BenchOwaspCommand
         }
         else if (azureFromEnv)
         {
-            var (azureAgent, azureExitCode) = AzureChatAgentFactory.TryBuildFromEnv(subject);
+            var (azureAgent, envModel, azureExitCode) = AzureChatAgentFactory.TryBuildFromEnvWithModel(subject);
             if (azureAgent is null) return (azureExitCode, null);
             agent = azureAgent;
+            agentModel = envModel;
         }
         else
         {
-            AzureChatAgentFactory.PrintStubAgentWarning(
-                benchmarkName: "OWASP LLM Top 10",
-                stubAgentDescription: "SafeRefusalAgent stub",
-                sampleFileName: "06_OwaspBenchmark.cs");
-            agent = new SafeRefusalAgent(subject);
+            MockTarget.PrintBanner("bench owasp", "a stand-in that refuses every request");
+            agent = new MockTarget.RefusingAgent(subject);
+        }
+        var isMock = agent is MockTarget.RefusingAgent;
+
+        // One cheap call before the scan: a judge that cannot answer (a wrong key, deployment or quota) stops the run
+        // here instead of turning every semantic probe into "inconclusive" and the composite into a pass.
+        if (judgeLedger is not null && await judgeLedger.PreflightAsync(ct).ConfigureAwait(false) is { } judgeDown)
+        {
+            Console.Error.WriteLine(
+                $"Error: the judge ({judgeModelName}) did not answer a test call, so the attacks cannot be graded: {judgeDown}");
+            return (ExitCodes.RuntimeError, null);
         }
 
         // ── Run benchmark ────────────────────────────────────────────────────
-        var store = new FileSystemOutputStore(agentEvalDir);
-        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
         var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
-        await store.EnsureSolutionAsync();
-        await store.EnsureSubjectAsync(subjectIdentity);
+        FileSystemOutputStore? store = null;
+        if (!isMock)
+        {
+            store = new FileSystemOutputStore(agentEvalDir);
+            await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
+            await store.EnsureSolutionAsync();
+            await store.EnsureSubjectAsync(subjectIdentity);
+        }
 
-        Console.WriteLine($"Running OWASP benchmark ({preset}) for subject '{subject}'...");
+        Console.WriteLine($"{(isMock ? "MOCK RUN: " : "")}Running OWASP benchmark ({preset}) for subject '{subject}'...");
 
         EvalResult compositeEval;
         RedTeamResult redTeamResult;
@@ -157,12 +200,34 @@ public static class BenchOwaspCommand
         }
 
         var report = benchmark.GenerateReport(redTeamResult);
+        if (isMock)
+        {
+            return (MockTarget.Finish("bench owasp",
+                $"{compositeEval.Score.Label.ToUpperInvariant()} (score {compositeEval.Score.Value:F3}) for a stand-in that refuses every request"), null);
+        }
+
+        var incompleteReasons = new List<string>();
+        if (judgeLedger is { Failures: > 0 } ledger)
+        {
+            incompleteReasons.Add($"the judge failed {ledger.Failures} of {ledger.Calls} grading calls");
+        }
+        if (redTeamResult.WasTruncated)
+        {
+            incompleteReasons.Add(ComplianceReportOptions.TruncatedIncompleteReason);
+        }
+        var incomplete = incompleteReasons.Count > 0;
+        if (incomplete)   // report.md / report.json say so too, not "✅ Strong security posture" (B10ay)
+            report = benchmark.GenerateReport(redTeamResult, string.Join("; ", incompleteReasons));
+        // An incomplete run is never a pass: its composite must not be stored or rendered as PASS (B10ak). It is
+        // indeterminate unless what it measured already fails it (B10ap).
+        compositeEval = IncompleteRunPolicy.Withhold(compositeEval, incompleteReasons);
+        var indeterminate = IncompleteRunPolicy.IsIndeterminate(compositeEval, incompleteReasons);
 
         // ── Persist through the unified output-store ─────────────────────────
         string runId;
         try
         {
-            var manifest = await store.StartRunAsync(
+            var manifest = await store!.StartRunAsync(
                 subjectIdentity,
                 new RunContext(
                     EvalProject: "AgentEval.RedTeam",
@@ -180,30 +245,23 @@ public static class BenchOwaspCommand
             var scenarioResult = EvalResultPersistence.ToScenarioResult(
                 compositeEval,
                 scenarioId: $"owasp-{preset.ToLowerInvariant()}",
-                scenarioName: $"OWASP LLM Top 10 — {preset}");
-            await store.WriteScenarioResultAsync(runId, scenarioResult);
+                scenarioName: $"OWASP LLM Top 10 — {preset}",
+                subjectModel: agentModel);
+            await store!.WriteScenarioResultAsync(runId, scenarioResult);
 
-            var verdict = compositeEval.Score.Label.ToUpperInvariant() switch
-            {
-                "PASS" => "PASS",
-                "WARN" => "WARN",
-                _      => "FAIL"
-            };
+            var runStats = new[] { compositeEval.Score }.ToRunStats();   // a skipped or errored result is not a failure (B8)
+            var verdict = indeterminate ? "WARN" : compositeEval.Score.RunVerdict(runStats);   // nor a FAIL verdict (B9b)
             var summary = new RunSummary(
                 SchemaVersion: "1.0",
                 RunId: runId,
                 Verdict: verdict,
-                Stats: new RunStats(
-                    Total: 1,
-                    Passed: compositeEval.Score.Passed ? 1 : 0,
-                    Failed: !compositeEval.Score.Passed && compositeEval.Score.Label != "warn" ? 1 : 0,
-                    Warnings: compositeEval.Score.Label == "warn" ? 1 : 0),
+                Stats: runStats,
                 Metrics: new Dictionary<string, double>
                 {
                     ["overallScore"] = compositeEval.Score.Value,
                     ["overallPassRate"] = report.Summary.OverallPassRate / 100.0,
                 });
-            await store.CompleteRunAsync(manifest, summary, ct);
+            await store!.CompleteRunAsync(manifest, summary, ct);
             Console.WriteLine($"Persisted run {runId} to {agentEvalDir}");
         }
         catch (Exception ex)
@@ -216,7 +274,8 @@ public static class BenchOwaspCommand
         try
         {
             var reporter = new OWASPComplianceReporter();
-            await reporter.SaveReportAsync(store, subjectIdentity, runId, redTeamResult);
+            await reporter.SaveReportAsync(store!, subjectIdentity, runId, redTeamResult,
+                new ComplianceReportOptions { IncompleteReason = incomplete ? string.Join("; ", incompleteReasons) : null });
         }
         catch (Exception ex)
         {
@@ -267,6 +326,16 @@ public static class BenchOwaspCommand
             $"({report.Summary.CriticalFindings} critical / {report.Summary.HighFindings} high findings); " +
             $"composite verdict {compositeEval.Score.Label.ToUpperInvariant()}");
 
+        if (indeterminate)
+        {
+            // A judge that failed, or a scan that ran out of time, leaves categories ungraded; the composite above
+            // cannot say pass or fail. Stored as WARN, the schema's indeterminate value.
+            Console.WriteLine($"INCOMPLETE: {string.Join("; ", incompleteReasons)}. This run is neither a pass nor a fail.");
+            return (ExitCodes.GateIndeterminate, outputDir);
+        }
+        if (incomplete)   // a measured failure stands whatever the unmeasured part would show (B10ap): FAIL, exit 9
+            Console.WriteLine($"INCOMPLETE: {string.Join("; ", incompleteReasons)}. What was measured already fails the run.");
+
         var finalExit = BenchExitCodes.FromLabel(compositeEval.Score.Label);  // pass → 0, fail → 9 (GateFailed), warn → 10 (GateWarning), skipped → 11 (GateIndeterminate) — BUG-22
         return (finalExit, outputDir);
     }
@@ -279,10 +348,9 @@ public static class BenchOwaspCommand
     /// <c>top10-rag</c>/<c>top10forrag</c>.
     /// </param>
     /// <param name="judge">LLM evaluator passed through to the preset factory.</param>
-    internal static OwaspBenchmarkRun ResolvePreset(string presetSpec, IEvaluator judge)
+    internal static OwaspBenchmarkRun ResolvePreset(string presetSpec, IEvaluator? judge = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(presetSpec);
-        ArgumentNullException.ThrowIfNull(judge);
 
         return presetSpec.Trim().ToLowerInvariant() switch
         {
@@ -296,6 +364,4 @@ public static class BenchOwaspCommand
                 nameof(presetSpec))
         };
     }
-
-    // SafeRefusalAgent hoisted to a shared internal type — see SafeRefusalAgent.cs (MNT-02).
 }

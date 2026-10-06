@@ -2,7 +2,9 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Reflection;
 using AgentEval.Cli.Infrastructure;
+using AgentEval.Benchmarks;
 using AgentEval.Providers;
 using AgentEval.Core;
 using Azure;
@@ -31,14 +33,45 @@ namespace AgentEval.Cli.Commands;
 ///         AZURE_OPENAI_DEPLOYMENT are set → build a real Azure OpenAI
 ///         <c>IChatClient</c> and wrap it in
 ///         <see cref="ChatClientEvaluator"/>.</item>
-///   <item>Otherwise, allow <c>AGENTEVAL_ALLOW_STUB_JUDGE=1</c> opt-in to fall
-///         back to <see cref="StubEvaluator"/>; without the opt-in, fail with
-///         exit code 2 so CI cannot silently produce stub-graded evidence.</item>
+///   <item>Otherwise fail with exit code 3 and say what is missing. There is no stand-in judge: through 0.42
+///         <c>AGENTEVAL_ALLOW_STUB_JUDGE=1</c> selected one that scored 75 on everything, including in
+///         <c>calibrate</c>, which then reported figures that measured no judge. The variable is now ignored.
+///         A <c>--sut mock</c> run uses its own judge (<see cref="MockTarget"/>) and is never stored.</item>
 /// </list>
 /// </para>
 /// </remarks>
 internal static class JudgeFactory
 {
+    /// <summary>The embedded system prompt the GDPR judge sends, for <c>bench gdpr</c> AND <c>bench gdpr calibrate</c>.</summary>
+    internal const string GdprJudgeSystemPromptFile = "gdpr-judge-system.v1.md";
+
+    /// <summary>The embedded system prompt the EU AI Act judge sends, for <c>bench eu-ai-act</c> AND its calibrate.</summary>
+    internal const string EuAiActJudgeSystemPromptFile = "eu-ai-act-judge-system.v1.md";
+
+    /// <summary>
+    /// The GDPR judge — one resolver for the benchmark AND its calibration, so the instrument that is calibrated is
+    /// the instrument that runs.
+    /// </summary>
+    /// <remarks>
+    /// Before this existed, <c>bench gdpr</c> loaded and sent <see cref="GdprJudgeSystemPromptFile"/> while
+    /// <c>bench gdpr calibrate</c> called <see cref="Resolve"/> without it, so every published GDPR calibration figure
+    /// described a judge on the generic default prompt — not the one the benchmark used. Same for EU AI Act.
+    /// </remarks>
+    internal static (IEvaluator? Judge, string JudgeModel, int ExitCode) ResolveGdpr(
+        IEvaluator? evaluatorOverride, string judgeKind) =>
+        ResolveWithFamilyPrompt(evaluatorOverride, judgeKind, typeof(GdprBenchmark).Assembly, GdprJudgeSystemPromptFile);
+
+    /// <summary>The EU AI Act judge — one resolver for the benchmark AND its calibration (see <see cref="ResolveGdpr"/>).</summary>
+    internal static (IEvaluator? Judge, string JudgeModel, int ExitCode) ResolveEuAiAct(
+        IEvaluator? evaluatorOverride, string judgeKind) =>
+        ResolveWithFamilyPrompt(evaluatorOverride, judgeKind, typeof(EuAiActBenchmark).Assembly, EuAiActJudgeSystemPromptFile);
+
+    private static (IEvaluator? Judge, string JudgeModel, int ExitCode) ResolveWithFamilyPrompt(
+        IEvaluator? evaluatorOverride, string judgeKind, Assembly promptAssembly, string promptFile) =>
+        evaluatorOverride is not null
+            ? (evaluatorOverride, "override", 0)
+            : Resolve(evaluatorOverride, judgeKind, EmbeddedPromptLoader.Load(promptAssembly, promptFile), systemPromptId: promptFile);
+
     /// <summary>
     /// Resolves the judge to use for a bench run.
     /// </summary>
@@ -48,23 +81,45 @@ internal static class JudgeFactory
     /// Optional system prompt to wire into <see cref="ChatClientEvaluator"/>. Phase-6 Task 6.8:
     /// the GDPR / EU AI Act bench paths load their embedded judge prompts and pass them here
     /// so the LLM is actually steered by the "Cite articles / Be conservative / Flag evasive
-    /// responses" rules. <c>null</c> (the default) preserves the prior behaviour of using
-    /// <see cref="ChatClientEvaluator"/>'s built-in default system prompt.
+    /// responses" rules. <c>null</c> (the default) uses <see cref="ChatClientEvaluator"/>'s built-in default
+    /// system prompt; an agentic check then binds its own rubric over it (B9).
+    /// </param>
+    /// <param name="systemPromptId">
+    /// A stable name for <paramref name="systemPrompt"/>, reported as the judge's
+    /// <see cref="IJudgePromptSource.SystemPromptId"/> and so recorded as provenance <c>PromptId</c>.
+    /// Ignored when <paramref name="systemPrompt"/> is <c>null</c>.
     /// </param>
     /// <returns>
     /// <c>(judge, judgeModel, exitCode)</c>. When <c>judge</c> is <c>null</c>, the caller
     /// MUST return <c>exitCode</c> immediately (the helper already wrote the user-facing
-    /// error to <see cref="Console.Error"/>). <c>judgeModel</c> is the deployment / "stub"
+    /// error to <see cref="Console.Error"/>). <c>judgeModel</c> is the deployment or model
     /// label to record in provenance.
     /// </returns>
     internal static (IEvaluator? Judge, string JudgeModel, int ExitCode) Resolve(
         IEvaluator? evaluatorOverride,
         string judgeKind = "benchmark",
-        string? systemPrompt = null)
+        string? systemPrompt = null,
+        string? systemPromptId = null)
     {
         if (evaluatorOverride is not null)
             return (evaluatorOverride, "override", 0);
 
+        var (client, model, exitCode) = ResolveChatClient(judgeKind, systemPrompt?.Length);
+        return client is null
+            ? (null, "", exitCode)
+            : (new ChatClientEvaluator(client, systemPrompt, systemPromptId), model, 0);
+    }
+
+    /// <summary>
+    /// The judge's chat client, resolved from the environment exactly as <see cref="Resolve"/> resolves the judge:
+    /// the <c>AZURE_OPENAI_JUDGE_*</c> override first, then the provider <c>AI_INFERENCE_PROVIDER</c> selects. For a
+    /// caller that hands the model itself to a pipeline (the red-team benches' attack judge) rather than wrapping it
+    /// in an <see cref="IEvaluator"/>. On failure the reason is already written to stderr.
+    /// </summary>
+    internal static (IChatClient? Client, string JudgeModel, int ExitCode) ResolveChatClient(
+        string judgeKind = "benchmark",
+        int? systemPromptLength = null)
+    {
         // AZURE_OPENAI_JUDGE_* still wins outright, so the judge and the agent-under-test can point at
         // DIFFERENT endpoints in the same run — a capable grader against a cheap subject. It is the only
         // path that still hard-codes a provider, because naming a judge endpoint is the whole point of it.
@@ -94,11 +149,10 @@ internal static class JudgeFactory
             {
                 var azureClient = new AzureOpenAIClient(new Uri(endpoint!), new AzureKeyCredential(apiKey!));
                 IChatClient chatClient = CliChatClientDiagnostics.Wrap(azureClient.GetChatClient(deployment!).AsIChatClient(), "judge");
-                IEvaluator real = new ChatClientEvaluator(chatClient, systemPrompt);
                 Console.Error.WriteLine(
                     $"✔ Azure OpenAI judge configured — endpoint={ProviderChatClientFactory.SafeEndpoint(new Uri(endpoint!))}, deployment={deployment} ({judgeKind})" +
-                    (systemPrompt is null ? "." : $" [system prompt: {systemPrompt.Length} chars]."));
-                return (real, deployment!, 0);
+                    (systemPromptLength is null ? "." : $" [system prompt: {systemPromptLength} chars]."));
+                return (chatClient, deployment!, 0);
             }
             catch (Exception ex)
             {
@@ -134,46 +188,27 @@ internal static class JudgeFactory
         var (providerClient, providerModel, diagnostic) = ProviderChatClientFactory.TryCreate("judge");
         if (providerClient is not null)
         {
-            IEvaluator providerJudge = new ChatClientEvaluator(providerClient, systemPrompt);
             Console.Error.WriteLine(
                 $"{ProviderChatClientFactory.Describe($"{judgeKind} judge", providerModel!)}" +
-                (systemPrompt is null ? "" : $" [system prompt: {systemPrompt.Length} chars]"));
-            return (providerJudge, providerModel!, 0);
+                (systemPromptLength is null ? "" : $" [system prompt: {systemPromptLength} chars]"));
+            return (providerClient, providerModel!, 0);
         }
 
         // A provider WAS named or half-configured and could not be built: that is a typo, not an
-        // unconfigured machine, and the stub must not rescue it. Falling through here would turn
-        // AI_INFERENCE_PROVIDER=foundry with missing variables plus AGENTEVAL_ALLOW_STUB_JUDGE=1 into
-        // stub-graded evidence — the resolver's fail-closed contract undone by the fallback beneath it.
+        // unconfigured machine, so say that rather than "nothing is configured".
         if (InferenceProviderEnvironment.AnyConfigurationAttempted(Environment.GetEnvironmentVariable))
         {
             Console.Error.WriteLine(
                 $"✖ A provider is selected or partially configured but could not be used. {diagnostic}\n" +
-                "  Fix it, or unset every provider variable to run with AGENTEVAL_ALLOW_STUB_JUDGE=1.\n" +
-                "  The stub is for a machine with no provider at all, never for a misconfigured one.");
+                "  Fix its variables and retry.");
             return (null, "", ExitCodes.RuntimeError);
         }
 
-        // No provider configured anywhere — gate the stub behind an explicit opt-in so CI
-        // cannot silently produce stub-graded evidence.
-        var allowStub = Environment.GetEnvironmentVariable("AGENTEVAL_ALLOW_STUB_JUDGE");
-        var stubAllowed =
-               string.Equals(allowStub, "1", StringComparison.Ordinal)
-            || string.Equals(allowStub, "true", StringComparison.OrdinalIgnoreCase);
-
-        if (!stubAllowed)
-        {
-            Console.Error.WriteLine(
-                $"✖ No LLM evaluator configured. {diagnostic}\n" +
-                "  Configure a provider to enable real judging, or set AGENTEVAL_ALLOW_STUB_JUDGE=1 to run\n" +
-                "  with a deterministic stub (results are not meaningful — CI must NOT do this).");
-            return (null, "", ExitCodes.RuntimeError);
-        }
-
+        // No provider at all. There is no stand-in judge: a verdict no judge gave measures nothing.
         Console.Error.WriteLine(
-            $"⚠ AGENTEVAL_ALLOW_STUB_JUDGE=1 — using stub evaluator for {judgeKind}. " +
-            "Results are not a real judgement; do not rely on the verdict in CI.");
-        return (new StubEvaluator(), "stub", 0);
+            $"✖ No LLM judge configured for {judgeKind}. {diagnostic}\n" +
+            $"  Configure a provider ({InferenceProviderEnvironment.SelectorVariable}; see docs/cli.md) and retry.");
+        return (null, "", ExitCodes.RuntimeError);
     }
 
     /// <summary>Returns the value of the first environment variable in <paramref name="names"/>
@@ -187,40 +222,5 @@ internal static class JudgeFactory
                 return value;
         }
         return null;
-    }
-
-    /// <summary>
-    /// Deterministic placeholder evaluator. Returns score=75 with every criterion
-    /// "met" so the pipeline produces a complete (but meaningless) evidence file
-    /// for smoke-testing the workflow without LLM cost.
-    /// </summary>
-    /// <remarks>
-    /// Only reachable when <c>AGENTEVAL_ALLOW_STUB_JUDGE=1</c> is opted-in
-    /// explicitly. The "Stub: assumed met" explanation is intentionally obvious
-    /// in artefacts so consumers can spot stub-graded evidence at a glance.
-    /// </remarks>
-    internal sealed class StubEvaluator : IEvaluator
-    {
-        public Task<EvaluationResult> EvaluateAsync(
-            string input,
-            string output,
-            IEnumerable<string> criteria,
-            CancellationToken cancellationToken = default)
-        {
-            var criteriaList = criteria.ToList();
-            return Task.FromResult(new EvaluationResult
-            {
-                OverallScore = 75,
-                Summary = "Stub evaluation — no real LLM judge configured.",
-                CriteriaResults = criteriaList
-                    .Select(c => new CriterionResult
-                    {
-                        Criterion = c,
-                        Met = true,
-                        Explanation = "Stub: assumed met."
-                    })
-                    .ToList()
-            });
-        }
     }
 }

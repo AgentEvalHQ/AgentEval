@@ -137,7 +137,7 @@ public class JUnitXmlExporter : IResultExporter
                 }
                 
                 // System output
-                if (!string.IsNullOrEmpty(test.Output) || test.MetricScores.Count > 0)
+                if (!string.IsNullOrEmpty(test.Output) || test.MetricScores.Count > 0 || test.MetricsNotMeasured.Count > 0)
                 {
                     await writer.WriteStartElementAsync(null, "system-out", null);
                     var outputContent = new StringBuilder();
@@ -145,6 +145,10 @@ public class JUnitXmlExporter : IResultExporter
                     foreach (var (metric, score) in test.MetricScores)
                     {
                         outputContent.AppendLine(string.Create(CultureInfo.InvariantCulture, $"{metric}: {score:F1}"));
+                    }
+                    foreach (var (metric, reason) in test.MetricsNotMeasured)
+                    {
+                        outputContent.AppendLine($"{metric}: not measured — {reason}");
                     }
                     if (!string.IsNullOrEmpty(test.Output))
                     {

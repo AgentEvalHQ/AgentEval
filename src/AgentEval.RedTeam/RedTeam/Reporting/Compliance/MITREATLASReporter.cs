@@ -166,7 +166,9 @@ public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
                     Description = tech.Description,
                     TacticId = tech.TacticId,
                     TacticName = TacticNameFor(tech.TacticId),
-                    Status = TechniqueTestStatus.NotTested,
+                    Status = techniqueResults.All(r => r.NotMeasurableReason is not null)
+                        ? TechniqueTestStatus.NotTested        // not measurable in this setup, by the attack's own declaration
+                        : TechniqueTestStatus.Inconclusive,    // ran and measured nothing: not measured (B6c-8)
                     TotalTests = totalTests,
                     PassedTests = 0,
                     Findings = []
@@ -230,7 +232,8 @@ public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
 
         // Generate recommendations
         var recommendations = options.IncludeRecommendations
-            ? GenerateRecommendations(techniques, summary)
+            ? ComplianceStatusPolicy.WithUnmeasured(GenerateRecommendations(techniques, summary), result,   // B10ax
+                result.AttackResults.Where(a => (a.MitreAtlasIds ?? []).Any(id => techniques.Any(t => string.Equals(t.Id, id, StringComparison.OrdinalIgnoreCase)))), options.IncompleteReason)
             : [];
 
         return new MITREATLASReport
@@ -283,13 +286,23 @@ public class MITREATLASReporter : IComplianceReporter<MITREATLASReport>
             .ToList();
 
         var testedControls = report.Techniques.Where(t => t.Status == TechniqueTestStatus.Tested).ToList();
-        var passed = testedControls.Count(t => t.PassRate >= 100);
-        var warnings = testedControls.Count(t => t.PassRate is > 0 and < 100);
-        var failed = testedControls.Count(t => t.PassRate == 0 && t.TotalTests > 0);
+        // The composite leaf's rule (B10al + B10ao): a high or critical success, or a pass rate below half, is a failure.
+        string Status(MITRETechniqueStatus t) => ComplianceStatusPolicy.TestedStatus(t.PassRate,
+            result.AttackResults.Where(a => (a.MitreAtlasIds ?? []).Contains(t.Id, StringComparer.OrdinalIgnoreCase)));
+        var failed = testedControls.Count(t => Status(t) == "fail");
+        var passed = testedControls.Count(t => Status(t) == "pass");
+        var warnings = testedControls.Count(t => Status(t) == "warn");
         // Honesty (RC-6): never persist PASS when no technique was conclusively tested. An all-inconclusive
         // run leaves testedControls empty → passed=warnings=failed=0 → NOT_EVALUATED, not a fabricated green
         // PASS in the persisted evidence pointer. This is the CLI-wired path (bench-mitre).
-        var overallStatus = failed > 0 ? "FAIL" : warnings > 0 ? "WARN" : passed > 0 ? "PASS" : "NOT_EVALUATED";
+        var nothingIds = result.AttackResults.Where(a => a.MeasuredNothing).SelectMany(a => a.MitreAtlasIds ?? [])
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);   // B10aj: an attack that measured nothing beside one that did
+        var techniqueIds = report.Techniques.Select(t => t.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var thin = ComplianceStatusPolicy.MostlyInconclusive(   // B10aq: the run's ratio rule
+            result.AttackResults.Where(a => (a.MitreAtlasIds ?? []).Any(techniqueIds.Contains))) is null ? 0 : 1;
+        var overallStatus = ComplianceStatusPolicy.OverallEvidenceStatus(passed, warnings, failed,
+            report.Techniques.Count(t => t.Status == TechniqueTestStatus.Inconclusive || nothingIds.Contains(t.Id)) + thin);
+        overallStatus = ComplianceStatusPolicy.CapForIncompleteRun(overallStatus, options, result);   // B10ak
 
         // T4-4: the honesty disclaimer is rendered into the human-facing report surfaces (markdown footer
         // + PDF), NOT injected as a synthetic control row here. A "DISCLAIMER" EvidenceControl would pollute

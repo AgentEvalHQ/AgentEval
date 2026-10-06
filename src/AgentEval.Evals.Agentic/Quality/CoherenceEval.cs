@@ -10,24 +10,24 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// <summary>
 /// Evaluates the logical organization, internal consistency, and natural flow of an AI response.
 /// <para>
-/// Wraps an <see cref="AtomicLlmEval"/> using a 5-point ordinal scale.
-/// Both the 0..1 normalized <c>score</c> and the integer <c>ordinal</c> (1–5) are
-/// emitted in <see cref="EvalResult.Details"/> metadata (per findings-and-suggestions §2
-/// universal envelope: always emit both ordinal and normalized score).
+/// Wraps an <see cref="AtomicLlmEval"/> with four criteria; the first names a 5-point ordinal
+/// scale (1=incoherent, 2=poor, 3=moderate, 4=mostly coherent, 5=highly coherent). The score is the judge's overall score normalised to <c>[0,1]</c>; no separate
+/// ordinal is emitted.
 /// </para>
 /// <para>
-/// Scale: 1=incoherent, 2=poor, 3=moderate, 4=mostly coherent, 5=highly coherent.
-/// Normalized score = ordinal / 5.0.
+/// The ordinal-plus-score envelope (normalised score = ordinal / 5.0) is specified in the rubric the
+/// judge is sent; the result keeps the score, not the ordinal.
 /// </para>
 /// <para>
 /// <b>Input contract</b>: requires <see cref="EvalInput.Query"/> and
 /// <see cref="EvalInput.Response"/>.
 /// </para>
 /// <para>
-/// Source: forked from Azure/azure-sdk-for-python (commit &lt;TBD-foundry-sha&gt; see CHANGELOG T3.7)
-/// sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_coherence/coherence.prompty
-/// License: MIT. Modifications: temperature=0, 5-point ordinal normalized to 0..1,
-/// structured evidence[], both ordinal and score in output, label table, severity=low.
+/// Lineage: AgentEval's own criteria and reference prompt, modelled on the evaluator concept (name,
+/// inputs and scoring dimensions) of Azure/azure-sdk-for-python
+/// <c>sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_coherence/coherence.prompty</c>.
+/// A 2026-10-02 check found no upstream prompt text in the rubric file under
+/// <c>Resources/Prompts/</c>, which the judge is sent as its system prompt.
 /// </para>
 /// </summary>
 public sealed class CoherenceEval : IEval
@@ -63,7 +63,7 @@ public sealed class CoherenceEval : IEval
             key: "coherence",
             name: "Coherence",
             category: "rag",
-            version: "1.0.0",
+            version: "1.1.0",
             criteria: new[]
             {
                 "Response is logically organized with a clear structure (ordinal 1–5: 5=highly coherent, 1=incoherent)",

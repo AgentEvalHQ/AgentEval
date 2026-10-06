@@ -12,34 +12,21 @@ Compare models across your evaluation suite and get actionable recommendations:
 var stochasticRunner = new StochasticRunner(harness);
 var comparer = new ModelComparer(stochasticRunner);
 
-var result = await comparer.CompareModelsAsync(
+// CreateAgent(deployment) is your code: it returns an IEvaluableAgent for that model
+var results = await comparer.CompareModelsAsync(
     factories: new IAgentFactory[]
     {
-        new AzureModelFactory("gpt-4o", "GPT-4o"),
-        new AzureModelFactory("gpt-4o-mini", "GPT-4o Mini"),  
-        new AzureModelFactory("gpt-35-turbo", "GPT-3.5 Turbo")
+        new DelegateAgentFactory("gpt-4o", "GPT-4o", () => CreateAgent("gpt-4o")),
+        new DelegateAgentFactory("gpt-4o-mini", "GPT-4o Mini", () => CreateAgent("gpt-4o-mini")),
+        new DelegateAgentFactory("gpt-35-turbo", "GPT-3.5 Turbo", () => CreateAgent("gpt-35-turbo"))
     },
     testCases: agenticTestSuite,
-    metrics: new[] { new ToolSuccessMetric(), new RelevanceMetric(evaluator) },
-    options: new ComparisonOptions(RunsPerModel: 5));
+    options: new ModelComparisonOptions(RunsPerModel: 5));
 
-// Get markdown table
-Console.WriteLine(result.ToMarkdown());
+Console.WriteLine(results.ToMarkdown());
 ```
 
-**Output:**
-```markdown
-## Model Comparison Results
-
-| Rank | Model         | Tool Accuracy | Relevance | Mean Latency | Cost/1K Req |
-|------|---------------|---------------|-----------|--------------|-------------|
-| 1    | GPT-4o        | 94.2%         | 91.5      | 1,234ms      | $0.0150     |
-| 2    | GPT-4o Mini   | 87.5%         | 84.2      | 456ms        | $0.0003     |
-| 3    | GPT-3.5 Turbo | 72.1%         | 68.9      | 312ms        | $0.0005     |
-
-**Recommendation:** GPT-4o - Highest quality (94.2% tool accuracy)
-**Best Value:** GPT-4o Mini - 87.5% accuracy at 50x lower cost
-```
+`ToMarkdown()` on the list of results writes how many test cases each model won, each model's average composite, quality, speed, cost and reliability scores, and a rankings table for every test case. The scores run from 0 to 100 *relative to the models compared*: the best model on a dimension gets 100 and the worst 0. Cost needs care: the harness prices every model at the rate of one model name, `EvaluationOptions.ModelName`, and with none set (as here) it prices nothing, so every model gets the same cost score. See [How the Scores Are Computed](../model-comparison.md#how-the-scores-are-computed).
 
 ---
 
@@ -50,25 +37,25 @@ LLMs are non-deterministic. Run evaluations multiple times and analyze statistic
 ```csharp
 var result = await stochasticRunner.RunStochasticTestAsync(
     agent, testCase,
-    new StochasticOptions
-    {
-        Runs = 20,                    // Run 20 times
-        SuccessRateThreshold = 0.85   // 85% must pass
-    });
+    new StochasticOptions(
+        Runs: 20,                     // Run 20 times
+        SuccessRateThreshold: 0.85)); // 85% of runs must pass
 
 // What the statistics mean:
-// - Mean: Average score across all runs (higher = better quality)
-// - StandardDeviation: How much scores vary (lower = more consistent)
-// - SuccessRate: % of runs that passed (score >= threshold)
-
-Console.WriteLine($"Mean Score: {result.Statistics.Mean:F1}");          // e.g., 87.3
-Console.WriteLine($"Std Dev: {result.Statistics.StandardDeviation:F1}"); // e.g., 5.2
-Console.WriteLine($"Success Rate: {result.Statistics.PassRate:P0}");     // e.g., 90%
+// - MeanScore: average score across all runs (higher = better quality)
+// - StandardDeviation: how much scores vary (lower = more consistent)
+// - PassRate: fraction of runs that passed
+var stats = result.Statistics;
+Console.WriteLine($"Mean score: {stats.MeanScore:F1}");
+Console.WriteLine($"Std dev:    {stats.StandardDeviation:F1}");
+Console.WriteLine($"Pass rate:  {stats.PassRate:P0}");
+Console.WriteLine(result.Summary);   // e.g. ✅ PASSED: 18/20 runs passed (90.0% >= 85% threshold)
 
 // Assert with statistical confidence
-result.Statistics.Mean.Should().BeGreaterThan(80);
-result.Statistics.StandardDeviation.Should().BeLessThan(15);  // Consistent behavior
-Assert.True(result.PassedThreshold, $"Success rate {result.SuccessRate:P0} below 85%");
+result.Should()
+    .HavePassRateAtLeast(0.85)        // reliability
+    .HaveMeanScoreAtLeast(80)         // avg quality
+    .HaveStandardDeviationAtMost(10); // consistency
 ```
 
 ---
@@ -78,25 +65,20 @@ Assert.True(result.PassedThreshold, $"Success rate {result.SuccessRate:P0} below
 The most powerful pattern - compare models with statistical rigor:
 
 ```csharp
-// Based on Sample16_CombinedStochasticComparison
+// Based on Sample D4 (04_CombinedStochasticComparison.cs)
 var factories = new IAgentFactory[]
 {
-    new AzureModelFactory("gpt-4o", "GPT-4o"),
-    new AzureModelFactory("gpt-4o-mini", "GPT-4o Mini")
+    new DelegateAgentFactory("gpt-4o", "GPT-4o", () => CreateAgent("gpt-4o")),
+    new DelegateAgentFactory("gpt-4o-mini", "GPT-4o Mini", () => CreateAgent("gpt-4o-mini"))
 };
-
-var stochasticOptions = new StochasticOptions(
-    Runs: 5,                         // 5 runs per model
-    SuccessRateThreshold: 0.8,       // 80% must pass
-    EnableStatisticalAnalysis: true
-);
 
 var modelResults = new List<(string ModelName, StochasticResult Result)>();
 
 foreach (var factory in factories)
 {
     var result = await stochasticRunner.RunStochasticTestAsync(
-        factory, testCase, stochasticOptions);
+        factory, testCase,
+        new StochasticOptions(Runs: 5, SuccessRateThreshold: 0.8));
     modelResults.Add((factory.ModelName, result));
 }
 
@@ -104,17 +86,7 @@ foreach (var factory in factories)
 modelResults.PrintComparisonTable();
 ```
 
-**Output:**
-```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                     Model Comparison (5 runs each)                           │
-├──────────────┬─────────────┬────────────┬──────────┬────────────┬───────────┤
-│ Model        │ Pass Rate   │ Mean Score │ Std Dev  │ Latency    │ Winner    │
-├──────────────┼─────────────┼────────────┼──────────┼────────────┼───────────┤
-│ GPT-4o       │ 100%        │ 92.4       │ 3.2      │ 1,456ms    │ 🏆 Quality│
-│ GPT-4o Mini  │ 80%         │ 84.1       │ 8.7      │ 523ms      │ ⚡ Speed  │
-└──────────────┴─────────────┴────────────┴──────────┴────────────┴───────────┘
-```
+`PrintComparisonTable()` writes one console row per model: pass rate, mean score, mean duration and its spread, time to first token, tokens, cost, tool success rate, and the mean of every metric the runs recorded. `OutputOptions` turns columns on and off.
 
 ---
 
@@ -175,6 +147,8 @@ result.Performance!.Should()
     .HaveTokenCountUnder(2000);
 ```
 
+A metric that was not captured cannot fail its check: time to first token is recorded only on streaming runs, and cost only when `EvaluationOptions.ModelName` names a model in the price table. Inside an `AgentEvalScope` such a check is recorded as inconclusive; outside one it is skipped.
+
 ---
 
 ## RAG Quality Metrics
@@ -190,17 +164,19 @@ var context = new EvaluationContext
     GroundTruth = "30-day return policy"  // Optional reference
 };
 
-var faithfulness = await new FaithfulnessMetric(evaluator).EvaluateAsync(context);
-var relevance = await new RelevanceMetric(evaluator).EvaluateAsync(context);
+// judgeClient is the IChatClient that grades the answer
+var faithfulness = await new FaithfulnessMetric(judgeClient).EvaluateAsync(context);
+var relevance = await new RelevanceMetric(judgeClient).EvaluateAsync(context);
 
 Console.WriteLine($"Faithfulness: {faithfulness.Score}/100");  // Is it grounded?
 Console.WriteLine($"Relevance: {relevance.Score}/100");        // Does it answer the question?
 
-// Detect hallucinations
-if (faithfulness.Score < 70)
+// Detect hallucinations. Passed is also false when the judge's reply could not be parsed,
+// so read Explanation before blaming the agent.
+if (!faithfulness.Passed)
 {
-    throw new HallucinationDetectedException(
-        $"Response not grounded in context. Faithfulness: {faithfulness.Score}");
+    throw new InvalidOperationException(
+        $"Faithfulness {faithfulness.Score:F0}: {faithfulness.Explanation}");
 }
 ```
 
@@ -211,44 +187,71 @@ if (faithfulness.Score < 70)
 Record agent executions for debugging and reproduction:
 
 ```csharp
-// RECORD: Capture live execution for debugging
-var recorder = new TraceRecordingAgent(realAgent);
-var response = await recorder.ExecuteAsync("Book flight to Paris");
-var trace = recorder.GetTrace();
+using AgentEval.Tracing;
+
+// RECORD: capture a live execution
+await using var recorder = new TraceRecordingAgent(realAgent, "booking-issue-123");
+var response = await recorder.InvokeAsync("Book flight to Paris");
 
 // Save for debugging/reproduction
-await TraceSerializer.SaveAsync(trace, "debug-traces/booking-issue-123.json");
+await recorder.SaveAsync("debug-traces/booking-issue-123.trace.json");
 
-// The trace contains:
-// - Full tool call sequence with arguments
-// - Timing information per step
-// - Model responses
-// - Error details if any failed
+// The trace contains, per call:
+// - The prompt and the response text
+// - Timing, and token usage when the provider reports it
+// - Tool calls with their arguments and results
+// - Error details if the call failed
 
-// Use for: Debugging, reproduction, step-by-step analysis
-// NOT for: Running as automated tests (replaying doesn't prove anything)
+// REPLAY: the same response again, with no model call
+var replayer = await TraceReplayingAgent.FromFileAsync("debug-traces/booking-issue-123.trace.json");
+var replayed = await replayer.InvokeAsync("Book flight to Paris");
+
+// A replay re-checks your assertions and grading against a fixed response.
+// It does not test the model again.
 ```
 
 ---
 
 ## Snapshot Evaluation
 
-Detect regressions with semantic similarity:
+Detect regressions against a saved baseline:
 
 ```csharp
-var comparer = new SnapshotComparer(embeddingClient);
+using System.Text.Json;
+using AgentEval.Snapshots;
 
-// Save baseline
-await comparer.SaveBaselineAsync("booking-flow", result);
-
-// Later: Compare against baseline
-var comparison = await comparer.CompareAsync("booking-flow", newResult);
-
-if (comparison.SimilarityScore < 0.85)
+var store = new SnapshotStore("snapshots");
+var comparer = new SnapshotComparer(new SnapshotOptions
 {
-    Console.WriteLine($"⚠️ Regression detected!");
-    Console.WriteLine($"Similarity: {comparison.SimilarityScore:P0}");
-    Console.WriteLine($"Diff: {comparison.SemanticDiff}");
+    UseSemanticComparison = true,   // applies to fields named response, output, content, message, answer, text
+    SemanticThreshold = 0.85        // word-overlap similarity of the two texts, not embeddings
+});
+
+var current = new
+{
+    response = result.ActualOutput,
+    tools = result.ToolUsage?.Calls.Select(c => c.Name).ToArray()
+};
+
+if (!store.Exists("booking-flow"))
+{
+    // First run: save the baseline
+    await store.SaveAsync("booking-flow", current);
+}
+else
+{
+    // Later runs: compare against the baseline
+    var baseline = await store.LoadAsync<JsonElement>("booking-flow");
+    var comparison = comparer.Compare(baseline.GetRawText(), JsonSerializer.Serialize(current));
+
+    if (!comparison.IsMatch)
+    {
+        Console.WriteLine("⚠️ Regression detected!");
+        foreach (var difference in comparison.Differences)
+        {
+            Console.WriteLine($"{difference.Path}: {difference.Message}");
+        }
+    }
 }
 ```
 
@@ -259,21 +262,34 @@ if (comparison.SimilarityScore < 0.85)
 Test complete conversation flows:
 
 ```csharp
-var conversation = new ConversationRunner(harness);
+using AgentEval.Testing;
 
-await conversation.AddUserTurnAsync("I need to book a flight");
-var turn1 = await conversation.GetLastResponseAsync();
-turn1.Should().Contain("Where would you like to go?");
+var testCase = ConversationalTestCase.Create("Flight booking")
+    .AddUserTurn("I need to book a flight")
+    .AddUserTurn("Paris, next Monday")
+    .AddUserTurn("Book the first option")
+    .ExpectTools("SearchFlights", "BookFlight")
+    .WithMaxDuration(TimeSpan.FromMinutes(2))
+    .Build();
 
-await conversation.AddUserTurnAsync("Paris, next Monday");
-var turn2 = await conversation.GetLastResponseAsync();
-turn2.ToolUsage!.Should().HaveCalledTool("SearchFlights");
+// The agent keeps its own history across turns,
+// for example chatClient.AsEvaluableAgent(includeHistory: true)
+var runner = new ConversationRunner(agent);
+var result = await runner.RunAsync(testCase);
 
-await conversation.AddUserTurnAsync("Book the first option");
-var turn3 = await conversation.GetLastResponseAsync();
-turn3.ToolUsage!.Should()
-    .HaveCalledTool("BookFlight")
-    .AfterTool("SearchFlights");
+// The runner checks that every expected tool was called, the duration limit,
+// and that every user turn got a reply
+foreach (var assertion in result.Assertions)
+{
+    Console.WriteLine($"{(assertion.Passed ? "pass" : "FAIL")} {assertion.Name} {assertion.Message}");
+}
+
+// Tool calls across the whole conversation, in call order
+var search = result.ToolsCalled.IndexOf("SearchFlights");
+var book = result.ToolsCalled.IndexOf("BookFlight");
+Console.WriteLine(search >= 0 && book > search
+    ? "Searched before booking"
+    : "No search followed by a booking");
 ```
 
 ---
@@ -283,5 +299,4 @@ turn3.ToolUsage!.Should()
 - [stochastic evaluation Guide](../stochastic-evaluation.md) - Full statistical evaluation documentation
 - [Model Comparison Guide](../model-comparison.md) - Comparing models in depth
 - [Assertions Reference](../assertions.md) - Complete assertion API
-- [Sample 16](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Sample16_CombinedStochasticComparison.cs) - Full working example
-
+- [Sample D4](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/PerformanceAndStatistics/04_CombinedStochasticComparison.cs) - Full working example

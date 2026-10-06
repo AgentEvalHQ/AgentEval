@@ -244,4 +244,3 @@ The RC1 upgrade revealed that `ChatClientAgentOptions.Instructions` was removed 
 ## Related Instructions
 
 - **Pre-upgrade analysis:** `.github/instructions/maf-upgrade-preparation.instructions.md` — Diff MAF source before updating NuGet
-- **Detailed architecture:** `strategy/MAF-Integration-Analysis.md` — Full MAF integration analysis, versioning decisions, extraction contingency plan

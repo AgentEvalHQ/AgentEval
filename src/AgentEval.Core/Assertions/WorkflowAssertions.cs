@@ -4,6 +4,7 @@
 
 using System.Diagnostics;
 using AgentEval.Benchmarks;
+using AgentEval.Evals;
 using AgentEval.Models;
 using AgentTrace = AgentEval.Tracing.AgentTrace;
 
@@ -218,12 +219,31 @@ public class WorkflowAssertionBuilder
     /// a real divergence.
     /// </summary>
     /// <param name="chatTraces">Per-executor chat-boundary traces keyed by executor ID (e.g. from
-    /// <c>WorkflowTrace.ExecutorTraces</c>). When <c>null</c>, every executor is <c>NoTruth</c> (score 1.0).</param>
+    /// <c>WorkflowTrace.ExecutorTraces</c>). An executor without one is <c>NoTruth</c>: not checked, and left out of the
+    /// score. When no executor can be checked (e.g. <c>null</c>), the assertion fails: nothing was checked.</param>
     /// <param name="minScore">Minimum acceptable overall fidelity score in [0, 1]. Defaults to 1.0 (exact).</param>
     /// <param name="because">Optional reason for the assertion.</param>
     [StackTraceHidden]
     public WorkflowAssertionBuilder HaveTraceFidelity(
         IReadOnlyDictionary<string, AgentTrace>? chatTraces = null,
+        double minScore = 1.0,
+        string? because = null)
+        => HaveTraceFidelity(chatTraces, allowUncheckedExecutors: false, minScore, because);
+
+    /// <summary>
+    /// <see cref="HaveTraceFidelity(IReadOnlyDictionary{string, AgentTrace}?, double, string?)"/>, choosing whether
+    /// executors that could not be checked are allowed (a separate overload so callers compiled against the original
+    /// three-parameter signature keep working — review round 8 L7, B10am).
+    /// </summary>
+    /// <param name="chatTraces">Per-executor chat-boundary traces keyed by executor ID.</param>
+    /// <param name="allowUncheckedExecutors">Judge only the checked executors (e.g. router or function executors that never
+    /// call a model); by default an unchecked executor fails the assertion.</param>
+    /// <param name="minScore">Minimum acceptable overall fidelity score in [0, 1].</param>
+    /// <param name="because">Optional reason for the assertion.</param>
+    [StackTraceHidden]
+    public WorkflowAssertionBuilder HaveTraceFidelity(
+        IReadOnlyDictionary<string, AgentTrace>? chatTraces,
+        bool allowUncheckedExecutors,
         double minScore = 1.0,
         string? because = null)
     {
@@ -235,12 +255,29 @@ public class WorkflowAssertionBuilder
 
         _currentBecause = because;
         var result = new WorkflowTraceFidelityReconciler().ReconcileToEvalResult(_result, chatTraces);
-        if (result.Score.Value < minScore)
+        if (result.Score.Label == "skipped")
+        {
+            // Nothing checked is not fidelity (#203 review round 6, B10y): every executor NoTruth scored 1.0 and passed.
+            AddFailure(
+                $"Expected workflow trace fidelity >= {minScore:F2} but nothing could be checked: no executor had a " +
+                "chat-boundary trace to reconcile against (pass per-executor chat traces, e.g. WorkflowTrace.ExecutorTraces).");
+        }
+        else if (!allowUncheckedExecutors
+                 && result.Details.SubResults?.Where(s => s.Score.Label == "skipped").Select(s => s.Metric.Name).ToList()
+                    is { Count: > 0 } uncheckedNames)
+        {
+            // A pass on part of the executors is withheld by the bench verdict; the assertion said nothing (B10af).
+            AddFailure(
+                $"Expected workflow trace fidelity >= {minScore:F2} for every executor, but {uncheckedNames.Count} could not be " +
+                $"checked (no chat-boundary trace): {string.Join(", ", uncheckedNames)}. Supply their chat traces, or pass " +
+                "allowUncheckedExecutors: true to judge only the checked ones.");
+        }
+        if (result.Score.Label != "skipped" && result.Score.Value < minScore)
         {
             // The reconciler leaves the root Evidence null and attaches per-executor evidence (executor id +
-            // framework-vs-chat detail) to each sub-result; surface the DIVERGING executors' messages.
+            // framework-vs-chat detail) to each sub-result; surface the DIVERGING executors' messages (checked ones only).
             var divergences = (result.Details.SubResults ?? [])
-                .Where(s => s.Score.Value < 1.0)
+                .Where(s => s.Score.CountsTowardAggregate() && s.Score.Value < 1.0)
                 .SelectMany(s => s.Details.Evidence ?? [])
                 .Select(e => e.Message)
                 .ToList();

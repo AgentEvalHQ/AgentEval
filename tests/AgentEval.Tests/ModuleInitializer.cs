@@ -15,6 +15,11 @@ public static class ModuleInitializer
     [ModuleInitializer]
     public static void Init()
     {
+        // Never launch a diff tool from a test run. On a failing snapshot Verify otherwise opens the first diff
+        // tool it finds (on a maintainer machine that was Vim), popping a window per failure in the middle of a
+        // build. The received/verified files and the test message already carry the difference.
+        DiffEngine.DiffRunner.Disabled = true;
+
         // Use directory next to test file for snapshots
         UseProjectRelativeDirectory("Snapshots");
         

@@ -120,8 +120,9 @@ public class ReducerEvaluator : IReducerEvaluator
                 factResults.Add(new ReducerFactResult
                 {
                     Fact = facts[i],
-                    Retained = queryResult.Score >= 80,
+                    Retained = queryResult.Measured && queryResult.Score >= 80,
                     Score = queryResult.Score,
+                    Measured = queryResult.Measured,
                     Response = queryResult.Response
                 });
             }

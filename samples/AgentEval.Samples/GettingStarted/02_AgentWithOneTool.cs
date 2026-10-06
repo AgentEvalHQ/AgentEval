@@ -28,6 +28,9 @@ public static class AgentWithOneTool
     {
         PrintHeader();
 
+        if (!AIConfig.StartModelSample())
+            return;
+
         var agent = CreateCalculatorAgent();
         PrintAgentCreated(agent);
 
@@ -79,7 +82,7 @@ public static class AgentWithOneTool
         Console.WriteLine(new string('─', 60));
         
         PrintPassFail(result.Passed);
-        Console.WriteLine($"   Score: {result.Score}/100");
+        Console.WriteLine($"   Score: {result.Score}/100{AIConfig.MockLabel}");
         
         if (result.ToolUsage != null && result.ToolUsage.Count > 0)
         {
@@ -110,7 +113,7 @@ public static class AgentWithOneTool
                     .HaveNoErrors(because: "all tool calls must succeed");
 
                 Console.ForegroundColor = ConsoleColor.Green;
-                Console.WriteLine("   ✅ All assertions passed!");
+                Console.WriteLine($"   ✅ All assertions passed!{AIConfig.MockLabel}");
                 Console.WriteLine(@"
    CODE USED:
    ┌─────────────────────────────────────────────────────────────┐
@@ -128,7 +131,7 @@ public static class AgentWithOneTool
             catch (ToolAssertionException ex)
             {
                 Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine($"   ❌ Assertion failed: {ex.Message}");
+                Console.WriteLine($"   ❌ Assertion failed: {ex.Message}{AIConfig.MockLabel}");
                 Console.ResetColor();
             }
         }
@@ -158,7 +161,7 @@ public static class AgentWithOneTool
 
     private static AIAgent CreateCalculatorAgent()
     {
-        if (!AIConfig.IsConfigured)
+        if (AIConfig.UseMock)
         {
             return CreateMockCalculatorAgent();
         }
@@ -223,12 +226,12 @@ public static class AgentWithOneTool
         if (passed)
         {
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("✅ PASSED");
+            Console.WriteLine($"✅ PASSED{AIConfig.MockLabel}");
         }
         else
         {
             Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine("❌ FAILED");
+            Console.WriteLine($"❌ FAILED{AIConfig.MockLabel}");
         }
         Console.ResetColor();
     }

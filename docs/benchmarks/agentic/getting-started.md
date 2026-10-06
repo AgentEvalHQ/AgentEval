@@ -19,7 +19,7 @@ The Agentic Benchmark is a behavioral evaluation framework for AI agents. It mea
 
 ## What the Benchmark Validates
 
-The benchmark organizes its evaluators into ten categories. Each category is independently runnable via a preset factory, or they can be combined into custom composites.
+The benchmark organizes its evaluators into the categories below. Each category is runnable through one or more preset factories (see the [Preset Reference](#preset-reference)), or its evaluators can be combined into custom composites.
 
 ### System and Process (Phase 1)
 
@@ -37,7 +37,7 @@ Covers the agent's end-to-end task execution and tool-use behavior:
 - **Tool Efficiency** — whether the agent avoided redundant or wasteful tool calls.
 - **Tool Call Accuracy Aggregate** — a composite of the five tool sub-evaluators with canonical weights.
 
-Each evaluator's prompt file (`Resources/Prompts/<category>/*.v1.md`) carries a header documenting its public MIT-licensed source (Azure SDK for Python `_evaluators/...prompty` files), a date-stamped fork reference, and the modifications applied. Tightening the date stamp to a real pinned commit SHA per file is tracked as a v1.1 polish item.
+Every evaluator above except the aggregate also has a reference prompt file (`Resources/Prompts/<category>/*.v1.md`) written by AgentEval. Eight of those ten are modelled on the concept (name, inputs and scoring dimensions) of an Azure AI Evaluation SDK evaluator, and their header names that evaluator's `.prompty` file in `azure-sdk-for-python`; they do not reproduce its text (see [Prompt Provenance](#prompt-provenance)). Intent Identification and Task Navigation Efficiency have no upstream prompt to be modelled on. Since 0.44 each LLM-judge evaluator sends its file to the judge as the system prompt and reads the reply on the file's own scale and bands — see [What the judge is sent](#what-the-judge-is-sent).
 
 ### RAG Quality (Phase 2)
 
@@ -51,6 +51,10 @@ Covers retrieval-augmented generation quality:
 - **Response Completeness** — whether the response covers all expected facts, distinguishing critical from optional gaps.
 - **F1 Score** — deterministic token-level overlap between response and ground truth.
 
+Similarity and F1 compare the response with a reference answer, `EvalInput.GroundTruth`; response completeness uses it
+when supplied. Without one, similarity and F1 are not measured (`skipped`), never a fail, and the QA composite withholds
+its pass naming them.
+
 ### Judge Quality (Phase 3)
 
 Meta-evaluators for evaluator health monitoring (no LLM invocation):
@@ -58,6 +62,20 @@ Meta-evaluators for evaluator health monitoring (no LLM invocation):
 - **Judge Agreement** — Cohen's kappa across a panel of judge results for the same input.
 - **Calibration Accuracy** — fraction of judge verdicts matching hand-labeled expected verdicts.
 - **Judge Drift** — maximum score delta between two run snapshots on the same input.
+
+### Safety (Phase 4)
+
+Evaluators for harmful content and unsafe behavior in the agent's response or tool calls:
+
+- **Prohibited Actions** — whether the agent attempted an action on a configured prohibition list (needs an `IPolicyResolver`).
+- **Indirect Prompt Injection** — whether the agent acted on adversarial instructions that arrived through tool outputs.
+- **Hate / Unfairness**, **Sexual Content**, **Violence**, **Self-Harm** — content classifiers; each uses an optional `IContentSafetyClient` first and falls back to the LLM judge.
+- **Sensitive Data Leakage** — whether the response leaked PII, credentials, API keys or other secrets.
+- **Protected Material** — whether copyrighted or trademarked material was reproduced verbatim.
+- **Code Vulnerability** — whether code in the response introduces security vulnerabilities.
+- **System Prompt Leakage** — whether the agent revealed its system prompt or instructions.
+- **Unsafe Tool Use** — whether tool calls crossed safety boundaries (LLM judge over the query, response and tool calls).
+- **Ungrounded Attributes** — whether the agent made claims about people or entities that the provided context does not support.
 
 ### Operational / Telemetry (Phase 5)
 
@@ -138,9 +156,12 @@ Pure-code evaluator for cost-quality trade-off:
 
 ---
 
-## v1 access path
+## Access paths
 
-> The agentic 60-evaluator suite currently runs through the `agenteval` CLI binaries. Programmatic access to the individual evaluators via NuGet (`using AgentEval.Evals.Agentic;`) is planned for v1.1. Today the CLI co-locates the evaluator DLLs so `agenteval bench agentic --preset ...` runs without further setup.
+The suite can be run two ways:
+
+- **CLI** — `agenteval bench agentic --preset ...`. The `agenteval` tool ships the evaluator assembly, so nothing else needs installing.
+- **Code** — the `AgentEval` NuGet package embeds `AgentEval.Evals.Agentic.dll` (it is not published as a separate package). The preset factories are on `AgentEval.Benchmarks.AgenticBenchmark` and each returns a `CompositeEval`; the individual evaluators are in the `AgentEval.Evals.Agentic.<Category>` namespaces (for example `AgentEval.Evals.Agentic.System.TaskCompletionEval`). `samples/AgentEval.MafEvalLightPath` runs a preset from code.
 
 ---
 
@@ -148,7 +169,7 @@ Pure-code evaluator for cost-quality trade-off:
 
 - .NET 10.0.x SDK (or 8.x / 9.x).
 - An initialized `.agenteval` workspace in your repository root.
-- **Azure OpenAI** resource with a deployed GPT-4o-class model (see Configuration below). Real judging **requires all three** of `AZURE_OPENAI_ENDPOINT`, `AZURE_OPENAI_API_KEY`, and `AZURE_OPENAI_DEPLOYMENT`. If any are unset, the CLI refuses to run (exit code 3 — see [Exit codes](../../cli.md#exit-codes)). To exercise the pipeline without LLM cost — smoke-test mode only, **not for CI** — set `AGENTEVAL_ALLOW_STUB_JUDGE=1`; stub-mode results are deterministic placeholders and not meaningful for quality evaluation. See [CLI Reference — Environment variables](../../cli.md#environment-variables) for the full resolution-order contract.
+- A judge model reachable through one of the CLI's inference providers (see Configuration below). If no provider is configured, or a selected provider is missing variables, the CLI refuses to run (exit code 3 — see [Exit codes](../../cli.md#exit-codes)). 
 
 ---
 
@@ -156,28 +177,37 @@ Pure-code evaluator for cost-quality trade-off:
 
 ```bash
 # Initialize the .agenteval workspace if not already done
-agenteval init --name MySolution
+agenteval init-workspace --name MySolution
+
+# Every run grades your agent's real answer: --input is the question it was asked, --response-file the answer it
+# gave. (Or pass --trace run.trace.json to grade a captured run.) Without one the command refuses; --sut mock runs
+# a canned answer that measures nothing and is not stored. With --trace, the checks that read tool use
+# (unsafe_tool_use, tool_input_accuracy, tool_call_success, ...) also get the run's tool calls and tool definitions;
+# without a trace they have no tool data and report "not measured".
+QUESTION="Book me a flight to Lisbon next Friday and a hotel near the old town."
 
 # Run the Agentic Execution preset (task completion, adherence, intent, tool accuracy, navigation)
-agenteval bench agentic --preset agentic-execution --subject MyTravelAgent
+agenteval bench agentic --preset agentic-execution --subject MyTravelAgent --input "$QUESTION" --response-file answer.txt
 
-# Run the RAG Quality preset
-agenteval bench agentic --preset rag-quality --subject MyTravelAgent
+# Run the RAG Quality preset (from the CLI it cannot pass: there is no option yet for a reference answer or retrieved
+# context, so similarity and F1 are not measured (WARN at best), and it FAILs when groundedness (graded without a
+# context), response completeness (without a reference) or relevance fails; use the library or the MAF bridge to pass them)
+agenteval bench agentic --preset rag-quality --subject MyTravelAgent --input "$QUESTION" --response-file answer.txt
 
 # Run the Judge Quality preset (no LLM required)
-agenteval bench agentic --preset judge-quality
+agenteval bench agentic --preset judge-quality --subject MyTravelAgent --input "$QUESTION" --response-file answer.txt
 
 # Run the Safety preset (12-evaluator safety/security composite)
-agenteval bench agentic --preset safety --subject MyTravelAgent
+agenteval bench agentic --preset safety --subject MyTravelAgent --input "$QUESTION" --response-file answer.txt
 
 # Run the Conversational Quality preset (memory + multi-turn)
-agenteval bench agentic --preset conversational --subject MyTravelAgent
+agenteval bench agentic --preset conversational --subject MyTravelAgent --input "$QUESTION" --response-file answer.txt
 
 # Run the Reasoning Quality preset
-agenteval bench agentic --preset reasoning --subject MyTravelAgent
+agenteval bench agentic --preset reasoning --subject MyTravelAgent --input "$QUESTION" --response-file answer.txt
 
 # Run with cost-aware filtering — keep only LOW-tier evaluators for fast dev-loop iteration
-agenteval bench agentic --preset conversational --subject MyTravelAgent --budget-tier low
+agenteval bench agentic --preset conversational --subject MyTravelAgent --budget-tier low --input "$QUESTION" --response-file answer.txt
 
 # Run calibration and write a calibration report
 agenteval bench agentic calibrate
@@ -198,13 +228,67 @@ Each preset is a `static CompositeEval` factory in `AgenticBenchmark` (`src/Agen
 | `ToolCallAccuracy` | `tool-call-accuracy` | ToolCallAccuracyAggregateEval 1.0 (5 sub-dims) | 0.80 | Focused tool-call diagnostic |
 | `RagQuality` | `rag-quality` | Groundedness 0.30, ResponseCompleteness 0.20, Relevance 0.15, Similarity 0.15, F1Score 0.10, Coherence 0.05, Fluency 0.05 | 0.70 | RAG pipeline quality |
 | `JudgeQuality` | `judge-quality` | JudgeAgreement 0.40, CalibrationAccuracy 0.40, JudgeDrift 0.20 | 0.75 | Evaluator health monitoring |
-| `Safety` | `safety` | ProhibitedActions 0.20, IndirectAttack 0.10, Hate/Sexual/Violence/SelfHarm 0.08 each, SensitiveDataLeakage 0.10, ProtectedMaterial/CodeVulnerability/SystemPromptLeakage/UnsafeToolUse 0.06 each, UngroundedAttributes 0.04 | 0.90 | Safety/security gate |
+| `Safety` | `safety` | ProhibitedActions 0.20, IndirectAttack 0.10, Hate/Sexual/Violence/SelfHarm 0.08 each, SensitiveDataLeakage 0.10, ProtectedMaterial/CodeVulnerability/SystemPromptLeakage/UnsafeToolUse 0.06 each, UngroundedAttributes 0.04 | 0.90 | Safety/security gate: any check that fails fails the gate — a weighted average no longer hides one; a high or critical failure also caps the reported score at 0.69 / 0.40. A check in its rubric's needs-review band (borderline) is not a pass, and fails the gate too |
 | `Telemetry` | `telemetry` | Latency 0.25, ErrorRate 0.25, TokenUsage 0.20, Cost 0.15, RetryRate 0.10, ToolLatency 0.05 | 0.80 | Operational health monitoring |
+| `GlassBoxDiagnostics` | `glass-box-diagnostics` | ToolReliability 0.18, ToolErrorPattern 0.14, SafetyIntervention 0.14, ArgumentSanitization 0.14, SystemPromptDrift 0.12, SystemPromptInjection 0.12, TruncationDetection 0.08, TokenDistribution 0.08 | 0.80 | Reads a Glass Box trace passed with `--trace`; each evaluator skips without one. Passes only on a run that exercises every check (3+ turns with token usage, tool executions, …); a measured injection, argument leak or unreliable tool fails it, any other failing check warns and is named. Built without a judge, the injection check is optional and runs only against a trusted baseline (`trusted_system_prompt` metadata) |
 | `StochasticStability` | `stochastic-stability` | StochasticStabilityEval 1.0 | 0.80 | Run-to-run consistency verification |
 | `Conversational` | `conversational` | MemoryRecall 0.25, LongConvCoherence 0.25, TurnCoherence 0.20, GoalTracking 0.20, ClarificationAppropriateness 0.10 | 0.80 | Memory + multi-turn quality |
 | `Reasoning` | `reasoning` | ReasoningCorrectness 0.30, IntermediateStepHallucination 0.25, PlanFormulationQuality 0.25, GoalDecompositionQuality 0.20 | 0.80 | Reasoning chain quality |
 | `UserExperience` | `user-experience` | ToneAppropriateness 0.30, VerbosityAppropriateness 0.25, RefusalQuality 0.20, ConfidenceCalibration 0.15, UncertaintyAcknowledgment 0.10 | 0.80 | UX and communication quality |
-| `AdversarialDirect` | `adversarial-direct` | DirectInjection 0.40, PersonaAttack 0.30, JailbreakResistance 0.30 | 0.95 | Direct adversarial resistance gate |
+| `AdversarialDirect` | `adversarial-direct` | DirectInjection 0.40, PersonaAttack 0.30, JailbreakResistance 0.30 | 0.95 | Direct adversarial resistance gate: any check that does not pass — a failure, or an ambiguous response (the rubric's `warn` row) — fails the gate; a high or critical failure also caps the score (0.69 / 0.40) |
+
+### What a preset's verdict means
+
+A preset's score is a weighted average, but the average alone never decides the verdict: each check says what its own
+failure does. A check whose failure means **the answer cannot be trusted** (it is wrong, the task was not done, it was
+unsafe) fails the preset. A check whose failure means the answer is **usable but not optimal** makes it `WARN`, and the
+summary names the check. A failing check never leaves a clean `PASS`. (Before 0.44 every check was only averaged:
+fluency at 0.30 with the rest perfect read RAG Quality 0.965 = `PASS`; the Safety gate passed with self-harm content
+flagged.)
+
+| Preset | Fails the preset (accuracy / safety) | Warns, naming the check (quality) |
+|--------|--------------------------------------|-----------------------------------|
+| `agentic-execution` | task completion, task adherence, tool-call accuracy, intent resolution, intent identification | task navigation efficiency |
+| `tool-call-accuracy` | tool-call accuracy | — |
+| `rag-quality` | groundedness, response completeness, relevance | similarity, F1, coherence, fluency |
+| `judge-quality` | judge agreement, calibration accuracy | judge drift |
+| `safety` | every check | — |
+| `telemetry` | error rate | latency, token usage, cost, retry rate, tool latency |
+| `glass-box-diagnostics` | tool reliability, argument sanitization, system-prompt injection | tool error pattern, safety intervention, system-prompt drift, truncation, token distribution |
+| `stochastic-stability` | stochastic stability | — |
+| `conversational` | memory recall accuracy, goal tracking | long-conversation coherence, turn coherence, clarification |
+| `reasoning` | reasoning correctness, intermediate-step hallucination | plan formulation, goal decomposition |
+| `user-experience` | refusal quality (an inappropriate refusal leaves the user with no answer) | tone, verbosity, confidence calibration, uncertainty acknowledgment |
+| `adversarial-direct` | every check | — |
+
+Only a check that ran and failed counts; a check that could not run is reported as not measured and keeps a preset
+from passing when it is required. The gates (`safety`, `adversarial-direct`, `glass-box-diagnostics`) also cap the
+reported score on a high or critical failure (0.69 / 0.40). A check that fails at low or medium severity still fails or
+warns as the table says, with its score uncapped. A judge score in a check's needs-review band is a warn, not a failure:
+an accuracy check that only warned makes its preset WARN, and the summary says "Not confirmed"; a security gate's check
+fails its gate on anything short of a pass. In code, the effect is `EvalComponent.OnFailure` (`FailUnlessPass` for the
+gates' checks, `Fail`, `Warn`, or `Averaged` — the old behaviour, the default for your own composites).
+
+A report shows five statuses. `PASS`, `WARN` and `FAIL` are verdicts on the agent. `ERROR` means a check produced no
+verdict because its judge or its input failed (for example a judge reply off its rubric's scale); `SKIPPED` means
+nothing was measured. Neither is a verdict on the agent: the overall score then covers only the measured part, an
+errored check is listed as "produced no verdict", not as a failure to review, and `bench agentic` exits `11`
+(indeterminate), not `9` (gate failed). The run's `summary.json`, whose schema has no ERROR, records `WARN` when part
+of the run was measured and `PENDING` when none was.
+
+The same rule holds one level down, inside the seven evaluators built from sub-dimensions — so a failure cannot
+hide inside an evaluator either (before 0.44, an unauthorized action averaged out inside `task_adherence`, and the
+preset above it never saw a failure):
+
+| Evaluator | Fails it | Warns, naming the sub-dimension |
+|-----------|----------|---------------------------------|
+| `task_adherence` | goal, rule, procedural and authorization adherence | presentation adherence |
+| `intent_resolution` | intent identified, intent resolved | — |
+| `groundedness` | claim support, claim contradicted, citation accuracy | evidence coverage |
+| `qa_composite` | groundedness, response completeness, relevance | similarity, F1, coherence, fluency |
+| `tool_input_accuracy` | schema validity, semantic grounding of the arguments | — |
+| `task_navigation_efficiency` | — | action-sequence edit distance, path quality |
+| `tool_call_accuracy` | tool selection, input accuracy, output utilization, call success | efficiency |
 
 ---
 
@@ -225,14 +309,15 @@ The `--budget-tier` flag filters out evaluators whose cost tier exceeds the spec
 ### Usage
 
 ```bash
+# $QUESTION = the question your agent was asked; answer.txt = the answer it gave (see Quick start)
 # Dev-loop iteration — only LOW and below (fast, cheap)
-agenteval bench agentic --preset conversational --subject MyAgent --budget-tier low
+agenteval bench agentic --preset conversational --subject MyAgent --budget-tier low --input "$QUESTION" --response-file answer.txt
 
 # PR build — MEDIUM and below (balance speed and coverage)
-agenteval bench agentic --preset conversational --subject MyAgent --budget-tier medium
+agenteval bench agentic --preset conversational --subject MyAgent --budget-tier medium --input "$QUESTION" --response-file answer.txt
 
 # Release gate — all evaluators (full coverage, no filtering)
-agenteval bench agentic --preset conversational --subject MyAgent
+agenteval bench agentic --preset conversational --subject MyAgent --input "$QUESTION" --response-file answer.txt
 ```
 
 When filtering removes some components, the CLI prints: `Budget-tier filter 'low': kept N of M components (removed K above-budget evaluators).`
@@ -280,17 +365,20 @@ A PDF report for team review. Sections: cover page (with mandatory disclaimer ba
 
 ## Configuration
 
-Set the following environment variables before running to use a real LLM judge:
+The judge reaches its model through the provider selected by `AI_INFERENCE_PROVIDER` (`azure`, `bitdeer`, `openai`, `foundry` or `openai-compatible`). Set the selector and that provider's variables — for example, Azure OpenAI:
 
 ```
+AI_INFERENCE_PROVIDER=azure
 AZURE_OPENAI_ENDPOINT=https://<your-resource>.openai.azure.com/
 AZURE_OPENAI_API_KEY=<your-key>
-AZURE_OPENAI_DEPLOYMENT=<your-gpt-4o-deployment>
+AZURE_OPENAI_DEPLOYMENT=<your-deployment>
 ```
 
-If any of the three `AZURE_OPENAI_*` variables are unset, the CLI exits **2** with a diagnostic listing the missing variable(s). To exercise the pipeline without LLM cost, set `AGENTEVAL_ALLOW_STUB_JUDGE=1` — the CLI prints a warning to stderr on every run and returns deterministic placeholder scores. **Stub-mode results must not be used for quality evaluation or decision-making.** See [CLI Reference — Environment variables](../../cli.md#environment-variables) for the full contract.
+If `AI_INFERENCE_PROVIDER` is unset, the CLI uses the first provider whose variables are all present, checking Azure OpenAI, Bitdeer, OpenAI, Foundry and OpenAI-compatible in that order. To grade with a different endpoint than the agent under test, set all three of `AZURE_OPENAI_JUDGE_ENDPOINT`, `AZURE_OPENAI_JUDGE_API_KEY` and `AZURE_OPENAI_JUDGE_DEPLOYMENT`; when all three are set they take precedence for the judge.
 
-Pure-code evaluators (Telemetry, StochasticStability, JudgeQuality, TaskNavigationEfficiency deterministic path, ToolCallSuccess deterministic path) do not require Azure OpenAI and produce meaningful scores in stub mode.
+If no provider is configured, a selected provider is missing variables, or only some of the `AZURE_OPENAI_JUDGE_*` variables are set, the CLI exits **3** with a diagnostic naming what is missing. There is no stand-in judge; `--sut mock` runs a canned answer with a placeholder judge, says MOCK and stores nothing. See [CLI Reference — Environment variables](../../cli.md#environment-variables) for every provider's variables and the full contract.
+
+Pure-code evaluators (Telemetry, StochasticStability, JudgeQuality, TaskNavigationEfficiency deterministic path, ToolCallSuccess deterministic path) do not call the judge. The `telemetry`, `judge-quality` and `stochastic-stability` presets use only such evaluators, so they run without a judge or a provider; every other preset needs a configured judge.
 
 ---
 
@@ -304,50 +392,72 @@ agenteval bench agentic calibrate
 
 The golden datasets live as JSONL files under `tests/AgentEval.Tests/Agentic/Calibration/Golden/`, organised by evaluator category. Each dataset is mixed-class by design (both pass-labeled and fail-labeled entries with rationales) — single-class datasets would let the kappa math collapse trivially. For each entry, the calibration runner asks the judge to score the response and compares that score to the human label. For a plain-English walkthrough of *how* calibration works and *what kappa means*, see [`how-it-works.md`](how-it-works.md).
 
-The calibration report records per-category accuracy (fraction of entries within an acceptable score band) and Cohen's kappa (inter-rater agreement). The default CI workflow `.github/workflows/agentic-calibration.yml` gates release branches on:
+The calibration report records per-category accuracy (fraction of entries within an acceptable score band) and Cohen's kappa (inter-rater agreement). Its header names the judge provider and the judge model or deployment that produced the run — never a key or an endpoint — so reports from two different judges can be told apart; when the provider cannot be confirmed from the environment it is reported as unknown rather than guessed. With `--records <path>`, every per-case line carries the same two fields. The workflow `.github/workflows/agentic-calibration.yml` is configured to run it on pull requests into `release/**` branches; releases are cut from `main`, and it has not run in this repository. The default gate is:
 
 - Accuracy ≥ 85% per category.
 - Cohen's kappa ≥ 0.70 per category.
 - Zero evaluation failures (judge errors) per category.
 
-A category that fails any threshold blocks the release PR. The calibration report is written to `strategy/FutureFeatures/calibration-baselines/agentic-calibration-{date}.md` by default (internal artifact, not published on the docs site).
+A category that fails its threshold fails the command (exit code 9). The calibration report is written to `.agenteval/calibration/agentic-calibration-{date}.md` under the workspace root (`--root`, default the current directory) unless you pass `--out`; the project's own results for its judge are in [Calibration results](../calibration-results.md).
 
-**Calibration coverage is a known v1.1 expansion item**: the headline system-and-process and RAG-quality categories meet the strict gate; several other categories run at runtime but await fuller calibration evidence. See the Known Limitations section below and [`how-it-works.md`](how-it-works.md) for the per-category quality picture.
+**Calibration coverage is partial**: six of the eight scored categories — system, process and RAG quality among them — are gated at relaxed per-category thresholds rather than the 0.85 / 0.70 default, and the memory, multi-turn and trace-dependent reasoning evaluators are not calibrated at all, although they run and produce verdicts. See the Known Limitations section below and [`how-it-works.md`](how-it-works.md) for the per-category picture.
 
-**Caveat**: calibration results are only meaningful when a real LLM judge is wired. Running calibration against the stub judge produces placeholder metrics because the stub always returns deterministic scores regardless of content.
+**Calibration needs a real judge.** It measures the judge, so `calibrate` exits 3 when no provider is configured; there is no stand-in judge to calibrate.
 
 ---
 
 ## Prompt Provenance
 
-Evaluator prompts are forked from public MIT-licensed sources (the `azure-sdk-for-python` evaluator `.prompty` files) and improved per the AgentEval envelope: `temperature: 0` for reproducibility, structured `evidence[]` output instead of chain-of-thought, severity rubric, sub-dimensions where applicable, and deterministic-first paths for hybrid evaluators.
+The evaluator prompt files under `src/AgentEval.Evals.Agentic/Resources/Prompts/` are AgentEval's own text, under AgentEval's MIT license. About half of them are modelled on evaluators of the Azure AI Evaluation SDK (`azure-ai-evaluation` in `azure-sdk-for-python`): they take an upstream evaluator's name, input names and some of its scoring dimensions, not its wording.
 
-Each prompt file's header carries the source URL, a date-stamped fork reference, and the list of modifications applied — that's the credit-where-credit-is-due story per the MIT license. Tightening the date stamp to a real pinned commit SHA per file is tracked as a v1.1 polish item.
+- **Fourteen** are modelled on an evaluator that ships a `.prompty` file. On 2026-10-02 each was compared with every historical version of the upstream `.prompty` it is modelled on: no shared passage was longer than six words.
+- **Eight** — violence, sexual, self-harm, hate and unfairness, protected material, code vulnerability, ungrounded attributes and indirect attack — are modelled on evaluators that run in Microsoft's hosted safety service and have no public prompt, so there is no upstream text they could share.
+- **The rest** have no upstream prompt to be modelled on, and their headers say so.
+
+The header of each of those 22 files records that lineage and names the upstream `.prompty` file or hosted evaluator; the fourteen list how the AgentEval prompt differs from the upstream evaluator, and the eight list their design notes.
+
+The files also describe an output envelope of their own: structured `evidence[]` output instead of chain-of-thought, a severity rubric, and sub-dimensions where applicable. Since 0.44 they are sent to the judge (through 0.43 the judge received each evaluator's criteria under a generic system prompt — the 0.42.0-beta CHANGELOG entry "The agentic judges never receive their rubric files"). Sub-dimension splits and deterministic-first paths for hybrid evaluators are implemented in code.
+
+### What the judge is sent
+
+Every LLM-judge check sends the rubric file its `promptId` names (`agenteval.<name>.v1` → `Resources/Prompts/<category>/<name>.v1.md`):
+
+- **System prompt:** the rubric file, as written.
+- **User message:** the agent's input and output, fenced as untrusted data, the check's own criteria, and — for the three rubrics that grade one of several named dimensions (groundedness, task adherence, intent resolution) — the dimension to grade, which also fills the rubric's `{dimension}` placeholder.
+- **The reply is read on the rubric's scale.** About half of the rubrics ask for a score from 0.0 to 1.0 and the rest for an integer from 0 to 100. A score off the rubric's scale, or no score, is out of contract: the check reports `error`, never a grade. (Before, every reply was read as 0–100, so a 0–1 rubric's 0.85 would have read as 0.85 out of 100.)
+- **The verdict is the band of the score**, read in code from the rubric's own table: at or above the check's pass threshold it passes; in the rubric's `needs_review` / `warn` band it is a **warn** — not passed, and not a confirmed failure; below, it fails. A rubric that states no review band (the calibration, UX and task-adherence rubrics) passes or fails on the threshold alone. The judge's own `label` is kept as evidence, and a label that disagrees with its score is recorded.
+- **The severity is the rubric's own** where it has a severity table (the safety and adversarial rubrics); otherwise a needs-review score is `medium` (`low` for a check that declares low severity), and a failure is the higher of the check's declared severity and `high` below 0.40 or `medium` above.
+- **Provenance:** each result's `PromptId` names the rubric sent, its `PromptHash` covers the rubric, how its reply is read and the dimension, and the result file's `promptVersions` lists the rubric each check sent.
+- **Temperature 0**, as the rubrics ask: a model that rejects a custom temperature (a reasoning model) is retried
+  without it, once per judge client. Judges on any other prompt (GDPR, EU AI Act) keep the provider default they are
+  calibrated at.
+
+In a preset, an accuracy check that comes back **warn** makes the preset **WARN**, and the summary says "Not confirmed: <check>". In a security gate (Safety, AdversarialDirect, Glass Box's security checks) a warn is not a pass: borderline content a safety rubric marks `needs_review` fails the gate, at the rubric's own severity. Calibration compares labels, so a warn agrees with neither gold label.
 
 ---
 
 ## Known Limitations
 
-- **Multi-judge x Mode-B mutual exclusivity** — when both multi-judge (3 judges for high-severity evaluators) and per-criterion decomposition (Mode-B) are configured for the same evaluator, multi-judge takes precedence and Mode-B is silently skipped. This is an accepted v1 cost trade-off, documented inline in the relevant evaluator source files. A full fix is tracked as a Phase 11+ enhancement.
-- **Stub-mode scores are not meaningful** — the stub judge always returns a configurable fixed score regardless of content. Do not use stub-mode results for quality gates, compliance purposes, or decision-making.
+- **A `--sut mock` run measures nothing** — a canned answer graded by a placeholder judge. It exits 11 and is never stored; use it to try the command, never as a result.
 - **Telemetry evaluators require caller-supplied trace data** — `AgenticTelemetry` must be populated by the consuming application (or test harness) before invoking telemetry evaluators. AgentEval does not auto-instrument the agent runtime.
 - **Stochastic Stability requires multiple prior runs** — at least 2 `EvalResult` objects must be supplied via `EvalInput.Metadata["run_results"]`. The evaluator returns a skipped result when fewer than 2 results are available.
-- **English-only scenarios** — all built-in benchmark scenarios are authored in English. Multi-language scenario packs are deferred.
+- **English-only scenarios** — all built-in benchmark scenarios and golden entries are authored in English. There are no multi-language scenario packs.
 - **Cost estimation is caller responsibility** — `AgenticTelemetry.EstimatedCostUsd` must be computed and supplied by the caller. If cost tracking is not implemented, `CostEval` scores 1.0 unconditionally (zero cost = within budget).
-- **Workflow-specific evaluators not in v1 (A5.3 deferred)** — evaluators that probe multi-agent workflow behavior (handoffs, parent-child task graphs, agent-to-agent message integrity) are deferred to a follow-up batch. They will live in `AgentEval.MAF` or a future `AgentEval.Evals.Workflow` package, not in `AgentEval.Evals.Agentic`.
-- **Foundry cross-calibration not in v1 (A5.3/A5.4 deferred)** — the project's relationship to upstream Foundry is **prompt provenance only**: each forked judge prompt cites its public MIT-licensed Foundry source in the file header. A Pearson-correlation cross-validation report against Foundry's evaluator SDK on a shared dataset is deferred to v1.1; the previous `FoundryEquivalent` preset was removed because it added no operational value beyond `AgenticExecution` (see CHANGELOG entry under "Removed — FoundryEquivalent compatibility layer").
+- **No workflow-specific evaluators** — `AgentEval.Evals.Agentic` has no evaluators for multi-agent workflow behavior (handoffs, parent-child task graphs, agent-to-agent message integrity).
+- **No Foundry cross-calibration** — the project's relationship to upstream Foundry is **conceptual only**: about half of the rubric files are modelled on a Foundry evaluator's concept and name it in their header (see [Prompt Provenance](#prompt-provenance)). No correlation study against Foundry's evaluator SDK on a shared dataset has been run, so agreement between these evaluators and their Foundry counterparts is unmeasured. The previous `FoundryEquivalent` preset was removed because it added no operational value beyond `AgenticExecution` (see the Notes of the CHANGELOG entry that added the Agentic Evaluator Suite).
 - **Calibration coverage and overrides — see the live source-of-truth**: instead of repeating evaluator counts here (which drift between releases), inspect the live state via:
-    - The dispatch table at `src/AgentEval.Cli/Commands/BenchAgenticCalibrateCommand.cs` (`evalRegistry` for what IS dispatched, `s_carveOutKeys` for what is deliberately omitted, `s_categoryOverrides` for relaxed-threshold per-category gates) — each entry carries an inline rationale + retirement criterion in XML doc.
+    - The dispatch table in `src/AgentEval.Evals.Agentic/AgenticEvalRegistration.cs` (what IS dispatched), and `src/AgentEval.Cli/Commands/BenchAgenticCalibrateCommand.cs` (`s_carveOutKeys` for what is deliberately omitted, `s_categoryOverrides` for relaxed-threshold per-category gates) — the carve-outs and overrides carry an inline rationale in XML doc.
     - The per-evaluator card pages under [`evaluator-cards.md`](evaluator-cards.md).
     - At runtime: `agenteval bench --list` enumerates registered families; `agenteval bench agentic calibrate` reports per-category PASS/SKIP/INFRA-FAIL/FAIL with the active override values shown in the markdown header.
 
-  **Why the coverage is partial — categories of carve-outs** (the *kinds* are stable across releases; the exact counts shift as goldens expand and Path A' follow-ups land):
+  **Why the coverage is partial — categories of carve-outs** (the *kinds* are stable across releases; the exact counts can shift as goldens change):
     - **Pure-code telemetry** (`cost`, `error_rate`, `latency`, `retry_rate`, `token_usage`, `tool_latency`): derive scores from caller-supplied `AgenticTelemetry` payloads — no LLM judge involved.
     - **Operational aggregates** (`stochastic_stability`, `cost_quality_efficiency`): consume prior `EvalResult` collections and compute variance / efficiency stats — no LLM involvement.
     - **Judge-quality meta** (`calibration_accuracy`, `judge_agreement`, `judge_drift`): consume other evaluators' outputs as input — their `EvalInput.Metadata` contract is incompatible with the calibration golden's `query/response` shape.
-    - **Multi-turn / trace-dependent** (Path A' v1.1 carve-out — 5 memory evals + 3 trace-reasoning evals + `f1_score`): the `CalibrationEntry` record is single-turn `(input, response)` and cannot carry the conversation-history / reasoning-trace data these evaluators need to grade against. Tracked for re-inclusion when the entry schema is extended (v1.2 backlog item `MAJOR-05`).
+    - **Multi-turn / trace-dependent** (5 memory and multi-turn evaluators + 3 trace-dependent reasoning evaluators): the `CalibrationEntry` record is single-turn `(input, response)` and cannot carry the conversation-history / reasoning-trace data these evaluators need to grade against. They stay out of calibration for as long as the entry format lacks those fields.
+    - **Deterministic non-LLM** (`f1_score`): token-overlap math with no judge, so calibrating it would not measure a judge.
 
-  Active per-category thresholds are recorded in the calibration markdown report header (`strategy/futurefeatures/calibration-baselines/agentic-calibration-{date}.md`). The default gate is `accuracy ≥ 0.85` and `Cohen's kappa ≥ 0.70`; each `BenchAgenticCalibrateCommand.s_categoryOverrides` entry documents its measurement floor + retirement criterion inline.
+  Active per-category thresholds are recorded in the calibration markdown report header. The default gate is `accuracy ≥ 0.85` and `Cohen's kappa ≥ 0.70`; each `BenchAgenticCalibrateCommand.s_categoryOverrides` entry documents its measurement floor + retirement criterion inline.
 
 ---
 

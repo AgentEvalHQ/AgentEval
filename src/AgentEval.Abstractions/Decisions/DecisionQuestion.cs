@@ -2,6 +2,8 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Diagnostics.CodeAnalysis;
+
 namespace AgentEval.Decisions;
 
 /// <summary>
@@ -11,6 +13,7 @@ namespace AgentEval.Decisions;
 /// and a probability-weighted position on an ordered scale (<see cref="ScoreQuestion"/>).
 /// </summary>
 /// <param name="Instructions">What is being asked about the state. Plain text.</param>
+[Experimental(DecisionsPreview.DiagnosticId)]
 public abstract record DecisionQuestion(string Instructions)
 {
     /// <summary>What is being asked; never blank.</summary>
@@ -28,6 +31,7 @@ public abstract record DecisionQuestion(string Instructions)
 /// <param name="Instructions">The yes/no question.</param>
 /// <param name="TrueCriteria">Optional: what a <c>yes</c> means, to sharpen the boundary.</param>
 /// <param name="FalseCriteria">Optional: what a <c>no</c> means.</param>
+[Experimental(DecisionsPreview.DiagnosticId)]
 public sealed record BinaryQuestion(
     string Instructions,
     string? TrueCriteria = null,
@@ -39,6 +43,7 @@ public sealed record BinaryQuestion(
 /// </summary>
 /// <param name="Instructions">The classification question.</param>
 /// <param name="Criteria">The options, keyed by option id, each with a description. At least 2 entries; a provider may cap the count.</param>
+[Experimental(DecisionsPreview.DiagnosticId)]
 public sealed record ChoiceQuestion(
     string Instructions,
     IReadOnlyDictionary<string, string> Criteria) : DecisionQuestion(Instructions)
@@ -71,6 +76,7 @@ public sealed record ChoiceQuestion(
 /// </summary>
 /// <param name="Instructions">The scoring question.</param>
 /// <param name="Criteria">Level descriptions in ascending order. At least 2 levels; a provider may cap the count.</param>
+[Experimental(DecisionsPreview.DiagnosticId)]
 public sealed record ScoreQuestion(
     string Instructions,
     IReadOnlyList<string> Criteria) : DecisionQuestion(Instructions)

@@ -1,11 +1,11 @@
 <!--
-Source: forked from Azure/azure-sdk-for-python (commit <TBD-foundry-sha> see CHANGELOG T3.7)
-        sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_intent_resolution/intent_resolution.prompty
-License: MIT (https://github.com/Azure/azure-sdk-for-python/blob/main/LICENSE)
-Modified by AgentEval contributors. See CHANGELOG.md.
-Modifications:
+Lineage: original AgentEval prompt text, modelled on the evaluator concept (name, inputs and
+         scoring dimensions) of Azure/azure-sdk-for-python
+         sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_intent_resolution/intent_resolution.prompty
+         Checked 2026-10-02: no upstream prompt text is reproduced.
+License: MIT (https://github.com/AgentEvalHQ/AgentEval/blob/main/LICENSE)
+Differences from the upstream evaluator:
   - Restructured for the AgentEval EvalResult envelope
-  - temperature 1.0 → 0
   - Split into two independent sub-dimensions: intent_identified and intent_resolved
   - Each sub-dimension has its own criteria set and can fail independently
   - Replaced chain-of-thought output with structured evidence[]

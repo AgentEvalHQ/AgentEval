@@ -194,14 +194,13 @@ public class CliProviderSelectionTests
         Assert.DoesNotContain("sekret", printed, StringComparison.Ordinal);
     }
 
-    // ── The stub rescues an unconfigured machine, never a misconfigured one ──────────────
+    // ── No stand-in judge, for an unconfigured machine or a misconfigured one ──────────────
 
     [Fact]
-    public void Judge_ExplicitSelectorWithMissingVariables_DoesNotFallThroughToTheStub_EvenWhenItIsAllowed()
+    public void Judge_ExplicitSelectorWithMissingVariables_FailsAndSaysItIsMisconfigured()
     {
-        // The hole this pins: AI_INFERENCE_PROVIDER=foundry with its variables missing, plus the stub
-        // opt-in, used to return a StubEvaluator — turning a typo into stub-graded evidence and undoing
-        // the resolver's fail-closed contract from underneath.
+        // AI_INFERENCE_PROVIDER=foundry with its variables missing is a typo, not an unconfigured machine. The
+        // retired stub opt-in is set too: through 0.42 it could turn such a typo into stub-graded evidence.
         using var _ = new ProviderEnvironmentScope(
             ("AI_INFERENCE_PROVIDER", "foundry"),
             ("AGENTEVAL_ALLOW_STUB_JUDGE", "1"));
@@ -214,7 +213,7 @@ public class CliProviderSelectionTests
 
             Assert.Null(judge);
             Assert.NotEqual(0, exitCode);
-            Assert.Contains("misconfigured", stderr.ToString(), StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("could not be used", stderr.ToString(), StringComparison.Ordinal);
         }
         finally
         {
@@ -223,16 +222,16 @@ public class CliProviderSelectionTests
     }
 
     [Fact]
-    public void Judge_NothingConfiguredAtAll_StillAllowsTheStubWhenItIsExplicitlyEnabled()
+    public void Judge_NothingConfiguredAtAll_GetsNoJudge_EvenWithTheRetiredStubOptIn()
     {
-        // The other side of the same gate: a machine with no provider at all is the stub's legitimate use.
+        // Through 0.42 this returned a judge that scored 75 on everything. A verdict no judge gave measures nothing.
         using var _ = new ProviderEnvironmentScope(("AGENTEVAL_ALLOW_STUB_JUDGE", "1"));
 
         var (judge, judgeModel, exitCode) = JudgeFactory.Resolve(evaluatorOverride: null);
 
-        Assert.NotNull(judge);
-        Assert.Equal(0, exitCode);
-        Assert.Equal("stub", judgeModel);
+        Assert.Null(judge);
+        Assert.Equal(3, exitCode);
+        Assert.Equal("", judgeModel);
     }
 
     [Fact]

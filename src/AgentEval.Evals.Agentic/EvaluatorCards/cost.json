@@ -6,8 +6,8 @@
   "version": "1.0.0",
   "description": "Pure-code telemetry evaluator returning the agent estimated dollar cost from AgenticTelemetry. Lower is better; pass when within budget.",
   "costTier": "Trivial",
-  "higherIsBetter": false,
-  "defaultThreshold": 1.0,
+  "higherIsBetter": true,
+  "defaultThreshold": 0.8,
   "expectedInputs": [
     {
       "kind": "metadata",

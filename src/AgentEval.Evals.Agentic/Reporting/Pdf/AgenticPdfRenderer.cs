@@ -15,9 +15,9 @@ namespace AgentEval.Evals.Agentic.Reporting.Pdf;
 /// per-evaluator failure pages, audit-chain appendix, and methodology appendix.
 /// </summary>
 /// <remarks>
-/// QuestPDF community license is accepted in the static constructor so that
-/// unit tests that instantiate this type do not need to configure the license
-/// themselves.
+/// The static constructor declares the QuestPDF Community licence when no licence
+/// type has been set yet, so unit tests that instantiate this type do not need to
+/// configure it. A licence type the host application set earlier is left unchanged.
 /// </remarks>
 public sealed class AgenticPdfRenderer
 {
@@ -36,12 +36,14 @@ public sealed class AgenticPdfRenderer
     ];
 
     /// <summary>
-    /// Accepts the QuestPDF Community license. Called once when the type is first loaded,
-    /// so that both production code and unit tests work without additional setup.
+    /// Declares the QuestPDF Community licence when no licence type has been set yet. Runs once,
+    /// when the type is first used, so production code and unit tests work without extra setup.
+    /// <c>QuestPDF.Settings.License</c> is process-wide: a licence type the host application set
+    /// earlier (for example Professional) is left unchanged.
     /// </summary>
     static AgenticPdfRenderer()
     {
-        QuestPDF.Settings.License = LicenseType.Community;
+        QuestPDF.Settings.License ??= LicenseType.Community;
     }
 
     /// <summary>
@@ -79,7 +81,7 @@ public sealed class AgenticPdfRenderer
 
             // L2 Evaluator pages — one per failed or warned evaluator
             var failedOrWarnedEvaluators = result.Summary.PerEvaluator
-                .Where(kv => kv.Value.Status is "FAIL" or "WARN")
+                .Where(kv => kv.Value.Status is "FAIL" or "WARN" or "ERROR")
                 .OrderBy(kv => kv.Key, StringComparer.Ordinal)
                 .ToList();
 
@@ -278,8 +280,9 @@ public sealed class AgenticPdfRenderer
             col.Item().PaddingTop(10);
 
             // Top criteria failures — up to 5 failed sub-results
+            // Measured failures only (B10p): an errored, skipped or needs-review check is not a criteria failure.
             var topFailures = subResults
-                .Where(s => !s.Score.Passed)
+                .Where(s => s.Score.ReportStatus() == "FAIL")
                 .Take(5)
                 .ToList();
 
@@ -371,11 +374,12 @@ public sealed class AgenticPdfRenderer
 
             col.Item().PaddingTop(15).Text("Prompt Provenance").FontSize(14).Bold();
             col.Item().PaddingTop(5).Text(
-                "Evaluator prompts are forked from public MIT-licensed sources (Azure SDK for Python " +
-                "azure-ai-evaluation evaluator prompty files) and improved per the AgentEval " +
-                "envelope (temperature=0, structured evidence[], severity rubric, sub-dimensions, " +
-                "deterministic-first paths where applicable). Each prompt file's header carries " +
-                "source URL + commit SHA + the list of modifications applied.").FontSize(11);
+                "Evaluator prompt files are AgentEval's own text, under AgentEval's MIT license. About half " +
+                "are modelled on the evaluator concepts (name, inputs and scoring dimensions) of the Azure AI " +
+                "Evaluation SDK (azure-sdk-for-python); none reproduces upstream prompt text. Each prompt " +
+                "file's header records its lineage and how it differs from the upstream evaluator. Each " +
+                "judge-backed check sends its file as the judge's system prompt and reads the reply on the " +
+                "file's own scale and bands; the versions below are the files each check sent.").FontSize(11);
 
             col.Item().PaddingTop(15).Text("Prompt Versions").FontSize(14).Bold();
             col.Item().PaddingTop(5);
@@ -393,7 +397,8 @@ public sealed class AgenticPdfRenderer
     {
         "PASS" => Colors.Green.Medium,
         "WARN" => Colors.Orange.Medium,
-        _ => Colors.Red.Medium
+        "FAIL" => Colors.Red.Medium,
+        _ => Colors.Grey.Medium   // ERROR, SKIPPED: no verdict on the agent (B9b)
     };
 
     private static string FormatPresetTitle(string preset)
@@ -406,12 +411,12 @@ public sealed class AgenticPdfRenderer
                 : part));
     }
 
-    private static string GetJudgeModeDescription(string judgeMode) => judgeMode.ToLowerInvariant() switch
+    internal static string GetJudgeModeDescription(string judgeMode) => judgeMode.ToLowerInvariant() switch
     {
-        "stub" or "mode-a" =>
-            "Stub judge mode: evaluators return deterministic fixed responses based on scenario metadata. " +
-            "Designed for fast CI validation without requiring a live LLM endpoint.",
-        "single" or "mode-b" or "real" or "llm" =>
+        "none" =>
+            "No judge: every evaluator in this preset is computed in code from the answer, trace or telemetry; no " +
+            "language model graded anything.",
+        "single" or "mode-a" or "mode-b" or "real" or "llm" =>
             "Single LLM judge mode: each scenario is evaluated by a single live language model call " +
             "configured via the benchmark's judge pipeline. Results reflect genuine model behavior " +
             "against each scenario's evaluation criteria.",

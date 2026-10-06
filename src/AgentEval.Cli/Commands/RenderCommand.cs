@@ -12,8 +12,7 @@ namespace AgentEval.Cli.Commands;
 
 /// <summary>
 /// Implements the <c>agenteval render</c> subcommand.
-/// Reads an existing <c>agentic-result.json</c> and renders a Markdown report without any LLM cost.
-/// PDF rendering is deferred (plan-05 §G/A1.26).
+/// Reads an existing <c>agentic-result.json</c> and renders a Markdown report and a PDF report without any LLM cost.
 /// </summary>
 public static class RenderCommand
 {

@@ -167,8 +167,9 @@ public class EndToEndReportingTests : IDisposable
         // report.html (auto-copied from embedded resource)
         Assert.True(File.Exists(Path.Combine(agentDir, "report.html")));
 
-        // archetypes.json (auto-copied from embedded resource)
-        Assert.True(File.Exists(Path.Combine(agentDir, "archetypes.json")));
+        // archetypes.json is opt-in (MemoryReportingOptions.IncludeArchetypes defaults to false):
+        // nothing in the shipped report reads it, so a default save must not write it.
+        Assert.False(File.Exists(Path.Combine(agentDir, "archetypes.json")));
     }
 
     // --- Helpers ---

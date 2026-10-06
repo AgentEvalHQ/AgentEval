@@ -9,9 +9,13 @@
 - **Evaluation** (LLM-as-judge scores, metrics) → always real or gracefully skipped
 - **Structure** (tool ordering, workflows, conversations) → can be demonstrated with mock data
 
-Group A samples A1–A4 run fully without credentials (A5 Light Path, A6 Session Lifecycle, and A7 Advanced MAF Features require Azure), as do Dataset Loaders / Extensibility in Group F.
-Sample H1 (Registry Discovery) and H13 (Report Browser), plus all of Group J (Gatekeeper) except 11A (which
-needs a separately consented remote A2A endpoint), also run without credentials.
+Group A (Getting Started) runs against a real model. With no provider configured, A1–A5 stop and say what to set;
+pass `--mock` for an offline walkthrough with canned replies, labelled MOCK on every result. A6 Session Lifecycle and
+A7 Advanced MAF Features need a provider.
+Dataset Loaders / Extensibility in Group F run without credentials.
+Sample H1 (Registry Discovery) and H13 (Report Browser), plus Group J (Gatekeeper) except 11A and 11B, also run
+without credentials. With a provider configured, the Group J hybrids call (and bill) that model; see group J
+below.
 Most other samples need a model provider — Azure OpenAI, Bitdeer, or any OpenAI-compatible endpoint, selected with `--provider` (see [Choosing a provider](#choosing-a-provider)); check each group's **Azure?** column for the authoritative per-sample requirement.
 
 ---
@@ -48,15 +52,15 @@ family-specific — see H1 Registry Discovery or `Benchmarks/README.md` for the 
 
 ## Sample Groups
 
-### A — Getting Started  ★ mostly no credentials needed
+### A — Getting Started  🔑 real model — `--mock` for an offline walkthrough (A1–A5)
 
 | # | Sample | What You'll Learn | Azure? | Time |
 |---|--------|-------------------|--------|------|
-| 1 | **Hello World** | Basic test setup, TestCase, TestResult, pass/fail | No | 2 min |
-| 2 | **Agent + One Tool** | Tool tracking, fluent assertions (`HaveCalledTool`, `WithoutError`) | No | 5 min |
-| 3 | **Agent + Multiple Tools** | Tool ordering (`BeforeTool`/`AfterTool`), visual timeline | No | 7 min |
-| 4 | **Performance Metrics** | Latency, cost, TTFT, token budget — basic assertions | No | 5 min |
-| 5 | **Light Path (MEAI)** | AgentEval as MEAI `IEvaluator` — plug into MAF's evaluation pipeline | Yes | 5 min |
+| 1 | **Hello World** | Basic test setup, TestCase, TestResult, pass/fail | Yes (or `--mock`) | 2 min |
+| 2 | **Agent + One Tool** | Tool tracking, fluent assertions (`HaveCalledTool`, `WithoutError`) | Yes (or `--mock`) | 5 min |
+| 3 | **Agent + Multiple Tools** | Tool ordering (`BeforeTool`/`AfterTool`), visual timeline | Yes (or `--mock`) | 7 min |
+| 4 | **Performance Metrics** | Latency, cost, TTFT, token budget — basic assertions | Yes (or `--mock`) | 5 min |
+| 5 | **Light Path (MEAI)** | AgentEval as MEAI `IEvaluator` — plug into MAF's evaluation pipeline | Yes (or `--mock`, without the LLM-judged demo) | 5 min |
 | 6 | **Session Lifecycle** | MAF `AgentSession`: create → multi-turn → reset → isolation | Yes | 8 min |
 | 7 | **Advanced MAF Features** | ChatHistory, middleware, structured output, approval, agent-as-tool | Yes | 10 min |
 
@@ -165,22 +169,38 @@ The dual-boundary trace that records what an agent actually did, turn by turn �
 | # | Sample | What It Exercises | Azure? | Time |
 |---|--------|-------------------|--------|------|
 | 1 | **Glass Box Full Stack** | Per-turn tracing + injection pre-gate + PII post-gate + a wrapped tool (offline API tour) | No | <2 min |
-| 2 | **Auto-Audit (synthetic)** | Ranked honesty / safety / cost over 3 scripted endpoints — offline preview of the table shape | No | <2 min |
+| 2 | **Auto-Audit** | Ranked honesty / safety / cost over your configured models, one support task each (`--mock`: 3 scripted endpoints, labelled MOCK) | Yes (or `--mock`) | <2 min |
 | 3 | **Real vs Framework: Agent** | A REAL travel agent — MAF's account vs the Glass Box: what the framework hides per turn | Yes | 1–5 min |
 | 4 | **Real vs Framework: Workflow** | Per-executor ledger vs chat truth — what a multi-agent workflow hides (offline; scripted) | No | <2 min |
 
 ---
 
-### J — Gatekeeper (Runtime Protection)  ★ no credentials needed — fail-closed runtime enforcement
+### J — Gatekeeper (Runtime Protection)  ★ real model when configured, scripted or model-free otherwise — fail-closed runtime enforcement
 
 AgentEval doesn't only MEASURE agents — it can STOP them. The same probes/evaluators you red-team with become
 runtime gates that block bad actions before they happen. See **`docs/gatekeeper/introduction.md`** for the developer guide.
 
 The launcher opens group J on the **six recommended samples** (the 15-minute tour `00 → 16 → 14 → 04 → 10 → 23`,
-marked ★ below); press **M** for all 29, **P** for the named learning paths. 17 of 29 are offline by design;
-samples 00–10 are hybrids that run a deterministic offline oracle without credentials (or under
-`AGENTEVAL_GATEKEEPER_FORCE_OFFLINE=true`) and add a live Azure OpenAI overlay when configured. Only 11A needs a
-separately consented remote endpoint. CI executes all 28 offline-capable samples on every PR.
+marked ★ below); press **M** for all 29, **P** for the named learning paths.
+
+How each sample runs (the **Execution** column):
+
+- **Hybrid** (00–10, 14–17, 25, 28): live-first. With a model provider configured (any provider
+  `AI_INFERENCE_PROVIDER` selects, not only Azure OpenAI), the sample runs on that model, so it calls and bills it.
+  Without a provider, or with `AGENTEVAL_GATEKEEPER_FORCE_OFFLINE=true`, it runs a deterministic scripted path and
+  prints `SCRIPTED (…)`. A live run of 14–17, 25 or 28 reports each scene as ✅ attempted and blocked, ➖ no attempt
+  or not measured (this says nothing about the gate), or ❌ the effect the attack seeks happened, or the gate
+  blocked a benign control (the sample fails). In 25 the judge is the configured model, not a calibrated
+  trajectory judge, and the run says so.
+- **Offline (no model)** (13, 18–20, 22–24, 26, 27, 29): the sample drives the gate directly and prints `NO MODEL`.
+  Deterministic and free.
+- **Offline (scripted)** (21): scripted by design. Its scripted model supplies a same-batch race that a real model
+  would not produce on demand.
+- **Live boundary** (11A) needs a separately consented remote endpoint; **Live model** (11B, direct-only) needs a
+  provider.
+
+Without a provider, every sample except 11A and 11B runs free. With one, the hybrids call the model. CI runs all 28
+offline-capable samples on every PR with the offline path forced: deterministic, no provider needed.
 
 | ID | Sample | What it exercises | Execution | Time |
 |----|--------|-------------------|-----------|------|
@@ -197,23 +217,23 @@ separately consented remote endpoint. CI executes all 28 offline-capable samples
 | 10 | **Explainability & Trust** ★ | `GateProvenance` → `GateReplayer` counterfactual → `TrustScoreCalculator` — see [docs/gatekeeper/explainability-and-trust.md](../../docs/gatekeeper/explainability-and-trust.md) | Hybrid | 4 min |
 | 11A | **Real A2A Boundary** | Calibrate, then guard a consented real remote agent-to-agent call | Live boundary | 5 min |
 | 11B | **A2A Calibration** | Both A2A boundary judges calibrated (direct-only, via the validation runner) | Live model | 5 min |
-| 13 | **Mocked Dangerous Tools** | SQL/browser/cloud/package narrow-contract fixtures — no side effects | Offline | 2 min |
-| 14 | **Poisoned Tool Kill Chain** ★ | Poison, exfil, delete, worm — all zeroed, with an effect-ledger proof | Offline | 5 min |
-| 15 | **Harness-Owned Tool Misuse** | A runtime-injected capability discovered, its misuse blocked | Offline | 2 min |
-| 16 | **Jailbreak + Tool Abuse** ★ | The paraphrase gets through — authorization still holds | Offline | 3 min |
-| 17 | **Tool Result Admission** | Secrets masked + oversized results truncated before model context | Offline | 2 min |
-| 18 | **Hosted Tool Coverage** | Honesty: hosted code execution cannot be claimed as covered | Offline | 2 min |
-| 19 | **Bulkhead + Containment** | Contained saturation cannot starve normal work — measured peaks | Offline | 2 min |
-| 20 | **Stateful Gate Timeline** | Call/run/session/durable state resets, reloads, containment | Offline | 2 min |
-| 21 | **Same-Batch Exfil Race** | The sibling-call race `SequenceGate` honestly cannot stop | Offline | 2 min |
-| 22 | **Security Graph Incident** | Observations → graph → containment; incomplete evidence mints no verdict | Offline | 2 min |
-| 23 | **HTTP Wire Boundary** ★ | DNS rebind + redirect escape blocked at the actual wire | Offline | 2 min |
-| 24 | **Dynamic Context Provider** | Dynamic tool inventory refused; the real provider seam filtered | Offline | 2 min |
-| 25 | **Crescendo Trajectory** | Slow-burn escalation → shadow verdict → next-run quarantine | Offline | 2 min |
-| 26 | **Session Identity Takeover** | Reload, poisoning, and concurrent actor-drift defenses | Offline | 2 min |
-| 27 | **Manifest Provenance Drift** | Prompt rug-pulls and MCP drift fail construction closed | Offline | 2 min |
-| 28 | **Approval Decision Matrix** | Auto/escalate/error/reject/approve — judge failure escalates | Offline | 2 min |
-| 29 | **Result Behavioral Anomaly** | Fixed cap vs per-tool learned baseline for result anomalies | Offline | 2 min |
+| 13 | **Mocked Dangerous Tools** | SQL/browser/cloud/package narrow-contract fixtures — no side effects | Offline (no model) | 2 min |
+| 14 | **Poisoned Tool Kill Chain** ★ | Poison, exfil, delete, worm — all zeroed, with an effect-ledger proof | Hybrid | 5 min |
+| 15 | **Harness-Owned Tool Misuse** | A runtime-injected capability discovered, its misuse blocked | Hybrid | 2 min |
+| 16 | **Jailbreak + Tool Abuse** ★ | The paraphrase gets through — authorization still holds | Hybrid | 3 min |
+| 17 | **Tool Result Admission** | Secrets masked + oversized results truncated before model context | Hybrid | 2 min |
+| 18 | **Hosted Tool Coverage** | Honesty: hosted code execution cannot be claimed as covered | Offline (no model) | 2 min |
+| 19 | **Bulkhead + Containment** | Contained saturation cannot starve normal work — measured peaks | Offline (no model) | 2 min |
+| 20 | **Stateful Gate Timeline** | Call/run/session/durable state resets, reloads, containment | Offline (no model) | 2 min |
+| 21 | **Same-Batch Exfil Race** | The sibling-call race `SequenceGate` honestly cannot stop | Offline (scripted) | 2 min |
+| 22 | **Security Graph Incident** | Observations → graph → containment; incomplete evidence mints no verdict | Offline (no model) | 2 min |
+| 23 | **HTTP Wire Boundary** ★ | DNS rebind + redirect escape blocked at the actual wire | Offline (no model) | 2 min |
+| 24 | **Dynamic Context Provider** | Dynamic tool inventory refused; the real provider seam filtered | Offline (no model) | 2 min |
+| 25 | **Crescendo Trajectory** | Slow-burn escalation → shadow verdict → next-run quarantine | Hybrid | 2 min |
+| 26 | **Session Identity Takeover** | Reload, poisoning, and concurrent actor-drift defenses | Offline (no model) | 2 min |
+| 27 | **Manifest Provenance Drift** | Prompt rug-pulls and MCP drift fail construction closed | Offline (no model) | 2 min |
+| 28 | **Approval Decision Matrix** | Auto/escalate/error/reject/approve — judge failure escalates | Hybrid | 2 min |
+| 29 | **Result Behavioral Anomaly** | Fixed cap vs per-tool learned baseline for result anomalies | Offline (no model) | 2 min |
 
 Knobs: `AGENTEVAL_GATEKEEPER_SHOW_CONTRACTS=true` prints each sample's full audited threat/guarantee contract
 (a compact two-line version prints by default); `dotnet run -- --gatekeeper-offline-suite` runs all 28
@@ -354,19 +374,48 @@ export AZURE_OPENAI_API_KEY="your-api-key"
 export AZURE_OPENAI_DEPLOYMENT="gpt-4o"
 ```
 
-### Without Azure (mock mode — Group A samples A1–A4 + H1 + H13 + all of Group J)
+### Without a provider (Group A with `--mock`; H1 + H13 + Group J except 11A/11B)
 
-Samples in **Group A (A1–A4)**, **H1 Registry Discovery**, **H13 Report Browser**, and all of **Group J (Gatekeeper)**
-work fully without credentials. You'll see:
+**H1 Registry Discovery**, **H13 Report Browser**, and **Group J (Gatekeeper)** except 11A and 11B work without
+credentials. The Group J hybrids then run their scripted path and print `SCRIPTED (…)`.
+Samples that need a model stop. You'll see:
 
 ```
-╔══════════════════════════════════════════════════════════════╗
-║  ⚠️  Azure OpenAI credentials not configured                  ║
-║  All samples will run in MOCK MODE without real AI.          ║
-╚══════════════════════════════════════════════════════════════╝
+╔══════════════════════════════════════════════════════════════════════════════╗
+║  ⚠️  No chat provider configured                                             ║
+║                                                                              ║
+║  AI_INFERENCE_PROVIDER = bitdeer | openai | foundry | azure | openai-compatible ║
+║                                                                              ║
+║   bitdeer            BITDEER_API_KEY                                          ║
+║   openai             OPENAI_API_KEY                                           ║
+║   foundry            FOUNDRY_ENDPOINT + FOUNDRY_API_KEY + FOUNDRY_MODEL       ║
+║   azure              AZURE_OPENAI_ENDPOINT + _API_KEY + _DEPLOYMENT           ║
+║   openai-compatible  OPENAI_COMPATIBLE_ENDPOINT + _MODEL  (_API_KEY optional) ║
+║                                                                              ║
+║  or pass --provider <name> for one run.                                       ║
+║  Samples that need a model stop without one. The Getting Started samples     ║
+║  also have an offline walkthrough with canned replies: pass --mock.          ║
+╚══════════════════════════════════════════════════════════════════════════════╝
 ```
 
-Samples requiring credentials show a skip banner and return gracefully.
+The Getting Started samples (A1–A5) then say:
+
+```
+   This sample runs a real model. Configure a provider above and re-run,
+   or pass --mock for an offline walkthrough with canned replies.
+```
+
+The offline walkthrough runs only when you ask for it:
+
+```bash
+dotnet run -- 1 --mock    # Hello World (A1) with canned replies
+dotnet run -- --mock      # the interactive menu, same flag
+```
+
+A mock run prints `🎭 MOCK MODE (--mock): the agent returns canned replies. Nothing here measures a model.`, and every
+pass/fail line ends with `(MOCK: a canned reply, not a measurement)`. In mock mode A5 does not run its LLM-judged demo
+(Quality/Safety); it lists the bundles instead. A6 and A7 have no mock mode. Through 0.42, A1–A5 switched to canned
+replies by themselves when no provider was set, and printed ✅ passes.
 
 ---
 
@@ -506,7 +555,7 @@ Mission Control, and **H1 Registry Discovery** all walk this registry. Plug new 
 
 ## Next Steps
 
-1. Run Group A (no credentials) to understand the core API
+1. Run Group A against your provider (or with `--mock` for the offline walkthrough) to understand the core API
 2. Run **H1 Registry Discovery** (no credentials) to see every benchmark family
 3. Add Azure creds and walk Group H end-to-end — every family produces a canonical audit-chained run
 4. Copy patterns into your own test project

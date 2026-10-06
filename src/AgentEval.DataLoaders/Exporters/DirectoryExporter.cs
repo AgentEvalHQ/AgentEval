@@ -36,7 +36,7 @@ namespace AgentEval.Exporters;
 /// <para>
 /// <b>CLI usage:</b>
 /// <code>
-/// agenteval bench agentic --subject MyAgent --input "..."   // writes results under .agenteval/
+/// agenteval bench agentic --subject MyAgent --input "..." --response-file answer.txt   // writes results under .agenteval/
 /// agenteval render --benchmark agentic --subject MyAgent    // re-renders (no LLM cost)
 /// </code>
 /// </para>
@@ -190,7 +190,15 @@ public sealed class DirectoryExporter : IResultExporter
             await store.WriteScenarioResultAsync(manifest.Run.RunId, sr, ct);
         }
 
-        var stats = new RunStats(report.TotalTests, report.PassedTests, report.FailedTests, report.SkippedTests);
+        // Named, not positional: RunStats is (Total, Passed, Failed, Warnings, Skipped = 0), so the positional
+        // fourth argument used to land SkippedTests in Warnings — every directory export reported Skipped = 0
+        // and a Warnings count that was really the skip count.
+        var stats = new RunStats(
+            Total: report.TotalTests,
+            Passed: report.PassedTests,
+            Failed: report.FailedTests,
+            Warnings: 0,
+            Skipped: report.SkippedTests);
         var metrics = ComputeMetricMeans(report);
         var verdict = report.FailedTests > 0 ? "FAIL" : (report.PassedTests > 0 ? "PASS" : "WARN");
         var summary = new RunSummary("1.0", manifest.Run.RunId, verdict, stats, metrics);
@@ -252,7 +260,8 @@ public sealed class DirectoryExporter : IResultExporter
                 Score = result.Score,
                 DurationMs = result.DurationMs,
                 Error = result.Error,
-                Metrics = result.MetricScores.Count > 0 ? result.MetricScores : null
+                Metrics = result.MetricScores.Count > 0 ? result.MetricScores : null,
+                MetricsNotMeasured = result.MetricsNotMeasured.Count > 0 ? result.MetricsNotMeasured : null
             };
 
             sb.AppendLine(JsonSerializer.Serialize(line, s_jsonlOptions));
@@ -353,6 +362,13 @@ public sealed class DirectoryExporter : IResultExporter
                 SampleSize = values.Count
             };
         }
+
+        var notMeasured = report.TestResults
+            .SelectMany(t => t.MetricsNotMeasured.Keys)
+            .GroupBy(name => name, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(g => g.Key, g => g.Count(), StringComparer.OrdinalIgnoreCase);
+        if (notMeasured.Count > 0)
+            summary.MetricsNotMeasured = notMeasured;
 
         return summary;
     }

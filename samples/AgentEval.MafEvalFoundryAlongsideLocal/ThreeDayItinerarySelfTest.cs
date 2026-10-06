@@ -51,7 +51,7 @@ public static class ThreeDayItinerarySelfTest
             "Day 1: Fushimi Inari and Gion. Day 2: Arashiyama and the monkey park. "
             + "Kyoto is wonderful with children and there is plenty more to see.");
 
-        // 3 - empty => UNDECIDABLE. The door collapses a missing response into "" (:74).
+        // 3 - empty => UNDECIDABLE. The door collapses a missing response into "".
         var empty = await RunAsync(Kyoto, "");
 
         // 4 - the sample's OTHER query. Not a 3-day request => declined on the QUERY, not scored 0.

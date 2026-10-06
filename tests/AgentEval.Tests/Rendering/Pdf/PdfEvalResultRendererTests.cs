@@ -234,6 +234,83 @@ public class PdfEvalResultRendererTests
         Assert.DoesNotContain("more chars", extractedText, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task TheCover_SaysWhyTheOverallVerdictIsWhatItIs()
+    {
+        // Review round 13 L4 (B10bd): the root composite's summary and recommendations were rendered nowhere, so a
+        // withheld WARN read only "OVERALL: WARN".
+        var root = new EvalResult(
+            Metric: new("owasp.top10", "OWASP", "compliance.owasp", "1.0.0"),
+            Score: new(0.9, null, "warn", false, 1.0, "none", null),
+            Details: new(null, null, ["Not measured: ZQXJAILBREAKUNMEASURED produced no conclusive verdict."],
+                [MakeAtomic("leaf", 1.0, "pass", true, "none")], "Min") { Summary = "WHYSUMMARYQZX" },
+            Provenance: new("composite", null, null, null, null, 0, false),
+            EvaluatedAt: DateTimeOffset.UtcNow);
+
+        var text = ExtractAllTextFromPdf(await new PdfEvalResultRenderer().RenderAsync(root, DefaultOpts()));
+
+        Assert.Contains("ZQXJAILBREAKUNMEASURED", text, StringComparison.Ordinal);
+        Assert.Contains("WHYSUMMARYQZX", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TheCover_NamesTheNoteOnce_WhenTheSummaryIsTheFirstRecommendation()
+    {
+        // Review round 14 L1 (B12f): the summary is usually the first recommendation (a withheld pass, a coverage note,
+        // a skipped result), and the cover printed it twice.
+        const string note = "ONCEONLYNOTEZQ the pass is withheld.";
+        var root = new EvalResult(
+            Metric: new("owasp.top10", "OWASP", "compliance.owasp", "1.0.0"),
+            Score: new(0.9, null, "warn", false, 1.0, "none", null),
+            Details: new(null, null, [note, "SECONDRECZQ re-run."], [MakeAtomic("leaf", 1.0, "pass", true, "none")], "Min") { Summary = note },
+            Provenance: new("composite", null, null, null, null, 0, false),
+            EvaluatedAt: DateTimeOffset.UtcNow);
+
+        using var doc = UglyToad.PdfPig.PdfDocument.Open(await new PdfEvalResultRenderer().RenderAsync(root, DefaultOpts()));
+        var cover = doc.GetPage(1).Text;
+
+        Assert.Equal(1, System.Text.RegularExpressions.Regex.Matches(cover, "ONCEONLYNOTEZQ").Count);
+        Assert.Contains("SECONDRECZQ", cover, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task TheCover_KeepsAShortBullet_ThatAppearsInsideTheSummary()
+    {
+        // Review round 15 L1 (B12j): the dedupe dropped any recommendation the summary contained, so a short bullet
+        // ("ZQSHORT") sitting inside an unrelated summary sentence vanished from the cover.
+        var root = new EvalResult(
+            Metric: new("x", "X", "test", "1.0.0"),
+            Score: new(0.5, null, "warn", false, 1.0, "none", null),
+            Details: new(null, null, ["ZQSHORT"], [MakeAtomic("leaf", 1.0, "pass", true, "none")], "Min")
+                { Summary = "The ZQSHORT check is part of this longer summary sentence." },
+            Provenance: new("composite", null, null, null, null, 0, false),
+            EvaluatedAt: DateTimeOffset.UtcNow);
+
+        using var doc = UglyToad.PdfPig.PdfDocument.Open(await new PdfEvalResultRenderer().RenderAsync(root, DefaultOpts()));
+
+        Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(doc.GetPage(1).Text, "ZQSHORT").Count);
+    }
+
+    [Fact]
+    public async Task TheCover_PrintsAShortSummaryOnce_AndNoEmptyBullet()
+    {
+        // Review round 16 (B12n): a recommendation under 20 characters that IS the whole summary printed twice, and a
+        // blank recommendation printed an empty bullet.
+        var root = new EvalResult(
+            Metric: new("x", "X", "test", "1.0.0"),
+            Score: new(0.5, null, "warn", false, 1.0, "none", null),
+            Details: new(null, null, ["ZQTINY", "  ", "ZQOTHER"], [MakeAtomic("leaf", 1.0, "pass", true, "none")], "Min")
+                { Summary = "ZQTINY" },
+            Provenance: new("composite", null, null, null, null, 0, false),
+            EvaluatedAt: DateTimeOffset.UtcNow);
+
+        using var doc = UglyToad.PdfPig.PdfDocument.Open(await new PdfEvalResultRenderer().RenderAsync(root, DefaultOpts()));
+        var cover = doc.GetPage(1).Text;
+
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(cover, "ZQTINY"));
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(cover, "•"));   // ZQOTHER only
+    }
+
     private static string ExtractAllTextFromPdf(byte[] bytes)
     {
         var sb = new StringBuilder();

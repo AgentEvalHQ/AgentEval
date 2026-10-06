@@ -100,7 +100,9 @@ public class OWASPComplianceReporter : IComplianceReporter<OWASPComplianceReport
                     Id = cat.Id,
                     Name = cat.Name,
                     Description = cat.Description,
-                    Status = CategoryTestStatus.NotTested,
+                    Status = categoryResults.All(r => r.NotMeasurableReason is not null)
+                        ? CategoryTestStatus.NotTested        // not measurable in this setup, by the attack's own declaration
+                        : CategoryTestStatus.Inconclusive,    // ran and measured nothing: not measured (B6c-8)
                     TotalTests = totalTests,
                     PassedTests = 0,
                     Findings = []
@@ -147,7 +149,8 @@ public class OWASPComplianceReporter : IComplianceReporter<OWASPComplianceReport
 
         // Generate recommendations
         var recommendations = options.IncludeRecommendations
-            ? GenerateRecommendations(categories, summary)
+            ? ComplianceStatusPolicy.WithUnmeasured(GenerateRecommendations(categories, summary), result,   // B10ax
+                result.AttackResults.Where(a => a.OwaspId is { } id && categories.Any(c => string.Equals(c.Id, id, StringComparison.OrdinalIgnoreCase))), options.IncompleteReason)
             : [];
 
         return new OWASPComplianceReport
@@ -199,13 +202,24 @@ public class OWASPComplianceReporter : IComplianceReporter<OWASPComplianceReport
             .ToList();
 
         var testedControls = report.Categories.Where(c => c.Status == CategoryTestStatus.Tested).ToList();
-        var passed = testedControls.Count(c => c.PassRate >= 100);
-        var warnings = testedControls.Count(c => c.PassRate is > 0 and < 100);
-        var failed = testedControls.Count(c => c.PassRate == 0 && c.TotalTests > 0);
+        // The composite leaf's rule (#203 review rounds 8 and 9, B10al + B10ao): a high or critical success, or a pass rate
+        // below half, is a failure, as the composite reads it (FAIL, exit 9) — bucketed by "0% fails" it was stored WARN.
+        string Status(OWASPCategoryStatus c) => ComplianceStatusPolicy.TestedStatus(c.PassRate,
+            result.AttackResults.Where(a => string.Equals(a.OwaspId, c.Id, StringComparison.OrdinalIgnoreCase)));
+        var failed = testedControls.Count(c => Status(c) == "fail");
+        var passed = testedControls.Count(c => Status(c) == "pass");
+        var warnings = testedControls.Count(c => Status(c) == "warn");
         // Honesty (RC-6): never persist PASS when no category was conclusively tested. An all-inconclusive
         // run (e.g. a timed-out SUT) leaves testedControls empty → passed=warnings=failed=0 → NOT_EVALUATED,
         // not a fabricated green PASS in the persisted evidence pointer. This is the CLI-wired path (bench-owasp).
-        var overallStatus = failed > 0 ? "FAIL" : warnings > 0 ? "WARN" : passed > 0 ? "PASS" : "NOT_EVALUATED";
+        var nothingIds = result.AttackResults.Where(a => a.MeasuredNothing && a.OwaspId is not null).Select(a => a.OwaspId!)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);   // B10aj: an attack that measured nothing beside one that did
+        var categoryIds = report.Categories.Select(c => c.Id).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var thin = ComplianceStatusPolicy.MostlyInconclusive(   // B10aq: the run's ratio rule
+            result.AttackResults.Where(a => a.OwaspId is { } id && categoryIds.Contains(id))) is null ? 0 : 1;
+        var overallStatus = ComplianceStatusPolicy.OverallEvidenceStatus(passed, warnings, failed,
+            report.Categories.Count(c => c.Status == CategoryTestStatus.Inconclusive || nothingIds.Contains(c.Id)) + thin);
+        overallStatus = ComplianceStatusPolicy.CapForIncompleteRun(overallStatus, options, result);   // B10ak
 
         // T4-4: the honesty disclaimer is rendered into the human-facing report surfaces (markdown footer
         // + PDF), NOT injected as a synthetic control row here. A "DISCLAIMER" EvidenceControl would pollute

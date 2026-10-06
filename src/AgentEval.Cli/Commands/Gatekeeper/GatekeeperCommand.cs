@@ -20,20 +20,11 @@ internal static class GatekeeperCommand
         cmd.Subcommands.Add(GatekeeperListGatesCommand.Create());
         cmd.Subcommands.Add(GatekeeperInspectCommand.Create());
         cmd.Subcommands.Add(GatekeeperCalibrateCommand.Create());
-        cmd.Subcommands.Add(CreateServeStub());
         return cmd;
     }
 
-    // The stateful daemon (accumulator gates over held run-state) is a designed but deferred follow-up (design §14).
-    private static Command CreateServeStub()
-    {
-        var cmd = new Command("serve", "Stateful gate daemon (stdio/http) — DEFERRED (holds run-state for accumulator gates).");
-        cmd.SetAction((_, _) =>
-        {
-            Console.Error.WriteLine("  'gatekeeper serve' is not yet implemented — a deferred follow-up for the stateful");
-            Console.Error.WriteLine("  accumulator gates (run-budget, sequence). Stateless 'inspect' covers text + flow-control gates today.");
-            return Task.FromResult(ExitCodes.RuntimeError);
-        });
-        return cmd;
-    }
+    // No `serve` subcommand: the stateful daemon (accumulator gates over held run-state) is a designed but deferred
+    // follow-up (design §14). A visible stub that always exited RuntimeError used to be registered here, which
+    // contradicted docs/gatekeeper-cli.md ("not part of the current CLI surface"); it is removed rather than
+    // advertised. `list-gates --phase serve` still classifies the gates that would need it.
 }

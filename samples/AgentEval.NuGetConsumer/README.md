@@ -20,7 +20,7 @@ dotnet run --project samples/AgentEval.NuGetConsumer -- --mock --demo all
 |----------|-------|-------------|
 | `--help` | `-h` | Show usage information |
 | `--mock` | `-m` | Use mock mode (no API keys required) |
-| `--real` | `-r` | Use real mode (requires Azure OpenAI credentials) |
+| `--real` | `-r` | Use real mode (requires a configured inference provider) |
 | `--demo <N>` | `-d <N>` | Run specific demo (0, 1, 2, 3, or `all`) |
 
 **Examples:**
@@ -59,14 +59,22 @@ Interactive menu with **focused, advanced demos**:
 
 ## 🔧 Configuration (for Real Mode)
 
-To run with actual LLM calls, set environment variables:
+To run with actual LLM calls, select a provider:
 
 ```powershell
-$env:AZURE_OPENAI_ENDPOINT = "https://your-resource.openai.azure.com/"
-$env:AZURE_OPENAI_API_KEY = "your-api-key"
-$env:AZURE_OPENAI_DEPLOYMENT = "gpt-4o"           # Primary model
-$env:AZURE_OPENAI_DEPLOYMENT_2 = "gpt-4o-mini"    # For model comparison
+# Pick a provider, then set its variables (same contract as the AgentEval CLI and samples).
+$env:AI_INFERENCE_PROVIDER = "bitdeer"
+$env:BITDEER_API_KEY = "your-api-key"               # BITDEER_MODEL / BITDEER_MODEL_2 are optional
+
+# Or Azure OpenAI:
+# $env:AI_INFERENCE_PROVIDER = "azure"
+# $env:AZURE_OPENAI_ENDPOINT = "https://your-resource.openai.azure.com/"
+# $env:AZURE_OPENAI_API_KEY = "your-api-key"
+# $env:AZURE_OPENAI_DEPLOYMENT = "gpt-4o"
 ```
+
+`openai`, `foundry` and `openai-compatible` work the same way. With `AI_INFERENCE_PROVIDER` unset, the first provider with
+complete credentials is used.
 
 **Mock Mode** works without configuration and provides identical output structure.
 

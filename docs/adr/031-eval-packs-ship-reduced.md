@@ -8,7 +8,7 @@
 > `docs/findings/`.
 
 
-> **Location note (superseded 2026-09-05):** the two companion documents this ADR used to defer to — `EvalPacks_Design.md` (the reduced-scope design) and `EvalPack_Galaxus_WorkedExample.md` (the worked evidence) — lived in `strategy/Galaxus/`, which is gitignored and local-only, so **no reader of this repository could ever open them.** Both were **deleted on 2026-09-05** and everything this ADR depended on them for is now stated in-repo: **S1–S5 in §0.1**, the findings **V1–V7 in §0.2**, and the portability verdict in **§0.3**. This ADR no longer points outside the repository for anything load-bearing.
+> **Location note (superseded 2026-09-05):** the two companion documents this ADR used to defer to — `EvalPacks_Design.md` (the reduced-scope design) and `EvalPack_Galaxus_WorkedExample.md` (the worked evidence) — lived in a gitignored, local-only directory, so **no reader of this repository could ever open them.** Both were **deleted on 2026-09-05** and everything this ADR depended on them for is now stated in-repo: **S1–S5 in §0.1**, the findings **V1–V7 in §0.2**, and the portability verdict in **§0.3**. This ADR no longer points outside the repository for anything load-bearing.
 
 **Status: REJECTED AS SCOPED — adversarial verdict 2026-09-04: DON'T BUILD the pack as scoped. SHIP REDUCED.** ↪ *(one name with the README index: §12.3)*
 **What survives:** five items, no new format, no new root, no new verbs — **S1**–**S5**, stated in full in **[§0.1](#01-the-five-surviving-items-s1s5--the-authoritative-statement)**, which is the authoritative statement of them. The findings that sank the format and set the Stage-2 gate are **V1–V7 in [§0.2](#02-the-findings-that-sank-the-format--v1v7)**. `pack.json` is Stage 2, unproven, gated on a real second use case.
@@ -41,7 +41,7 @@
 ## §0.1 THE FIVE SURVIVING ITEMS (S1–S5) — THE AUTHORITATIVE STATEMENT
 
 Restated in-repo on **2026-09-05**, because the companion document that held them
-(`EvalPacks_Design.md`) lived under `strategy/`, which is gitignored: the header's link to it did not
+(`EvalPacks_Design.md`) lived in a gitignored local directory: the header's link to it did not
 resolve from `docs/adr/`, and the surviving scope existed only as one sentence. That file has since
 been deleted. Anyone reading this ADR to find out what is still on the table reads this section.
 

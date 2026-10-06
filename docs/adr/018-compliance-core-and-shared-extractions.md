@@ -18,6 +18,8 @@ A repository-wide thorough review flagged a cluster of **DRY / SOLID architectur
 
 The hard constraint: the compliance gates were carefully calibrated over a prior arc (GDPR 5/5; EU AI Act with documented carve-outs — Pillar 1 / Art 5 at 0.65/0.35, GPAI at 0.60/0.25). **No refactor may change any scoring weight, pass threshold, pillar/article definition, aggregation rule, or judge constant.**
 
+> **Note (2026-10-01, correction of record):** "carefully calibrated" refers to runs in May 2026 on the maintainer's Azure OpenAI deployments. Those runs used `ChatClientEvaluator`'s generic default system prompt — `bench gdpr calibrate` and `bench eu-ai-act calibrate` did not send the regulation prompts that `bench gdpr` and `bench eu-ai-act` send (fixed in 0.42.0-beta) — and their reports were not committed. "GDPR 5/5" was already incomplete when this ADR was written: the sixth (governance) pillar had been added and cleared only a relaxed κ ≥ 0.60 gate. The thresholds quoted above are correct, and the constraint this ADR sets is unaffected. See the CHANGELOG, `[Unreleased]` → Corrected.
+
 ## Decision
 
 1. **Create `AgentEval.Compliance.Core`** — a new embedded sub-project holding the regulation-neutral building blocks shared by both compliance packs. The wave seeds it with the provably-identical, self-contained, calibration-neutral types (`CompositeExtensions`, `Recommendation`, `CriticalFindingExtractor`); the remaining entangled files (models, loaders, validators, builders, runners, renderers, calibration) migrate into it incrementally as test-gated follow-ups.

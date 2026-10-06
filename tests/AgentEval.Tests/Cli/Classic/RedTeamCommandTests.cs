@@ -39,7 +39,7 @@ public class RedTeamCommandTests
     }
 
     [Fact]
-    public void Create_Has49Options()
+    public void Create_Has51Options()
     {
         // 16 base + Wave E (save-baseline, baseline, fail-on) = 19
         // + Wave C′ (attacker, attacker-model) = 21
@@ -59,8 +59,10 @@ public class RedTeamCommandTests
         // + Copilot Studio P6 item A config-fingerprint drift (--copilotstudio-save-config-baseline,
         //   --copilotstudio-config-baseline, --fail-on-config-drift; redteam-only, not on the shared eval/bench
         //   --sut seam) = 49
+        // + benign-control arm (--benign-controls: over-refusal beside the attack success rate) = 50
+        // + gatekeeper-demo --scripted (the deterministic model on request, for a stable CI baseline) = 51
         var command = RedTeamCommand.Create();
-        Assert.Equal(49, command.Options.Count);
+        Assert.Equal(51, command.Options.Count);
     }
 
     [Theory] // ADR-021: --judge-rubric maps strict | lenient | evidence-anchored (case- and alias-tolerant).
@@ -220,6 +222,23 @@ public class RedTeamCommandTests
             () => RedTeamCommand.ExecuteAsync(opts, CancellationToken.None));
         Assert.Contains("--endpoint", ex.Message);
         Assert.Contains("--azure", ex.Message);
+    }
+
+    [Fact]
+    public void BenignControls_WithoutAJudge_AreRefusedBeforeAnyIo()
+    {
+        // A benign control is graded by the over-refusal judge, so without --judge the arm cannot run. The check is in
+        // the step-1 validation, so it fails before the target, the import or a pack download is touched.
+        var opts = new RedTeamOptions { Sut = "gatekeeper-demo", BenignControls = true, Intensity = "quick", Format = "json" };
+
+        var ex = Assert.Throws<ArgumentException>(() => RedTeamCommand.ValidateTimeouts(opts));
+        Assert.Contains("--benign-controls needs --judge", ex.Message, StringComparison.Ordinal);
+
+        // With a judge the same options are valid.
+        RedTeamCommand.ValidateTimeouts(new RedTeamOptions
+        {
+            Sut = "gatekeeper-demo", BenignControls = true, JudgeEndpoint = "https://judge.example", Intensity = "quick", Format = "json",
+        });
     }
 
     // ── --sut gatekeeper-demo validation (the credential-free on-ramp) ──
@@ -393,6 +412,38 @@ public class RedTeamCommandTests
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(
             () => RedTeamCommand.ExecuteAsync(opts, CancellationToken.None));
         Assert.Contains("Baseline file not found", ex.Message);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_GatekeeperDemo_ABaselineFromAnotherModel_IsRefused()
+    {
+        // A scripted-demo baseline compared with a real-model run compares two different instruments; the comparer never
+        // looked at the name, so the documented CI loop would have diffed them silently.
+        var dir = Path.Combine(Path.GetTempPath(), $"agenteval-demo-baseline-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var baselineFile = new FileInfo(Path.Combine(dir, "demo.baseline.json"));
+            RedTeamOptions Options(FileInfo? save = null, FileInfo? compare = null) => new()
+            {
+                Sut = "gatekeeper-demo", Intensity = "quick", Format = "json", Attacks = "PromptInjection", Quiet = true,
+                Output = new FileInfo(Path.Combine(dir, $"report-{Guid.NewGuid():N}.json")),
+                SaveBaseline = save, Baseline = compare, FailOn = "regression",
+            };
+            AgentEval.Core.IEvaluableAgent Demo(string name) => GatekeeperDemoSut.Build(new AgentEval.Tracing.AgentTrace(), model: null, name);
+
+            await RedTeamCommand.ExecuteAsync(Options(save: baselineFile), CancellationToken.None, Demo("gatekeeper-demo (scripted)"));
+
+            Assert.Equal(ExitCodes.Success, await RedTeamCommand.ExecuteAsync(
+                Options(compare: baselineFile), CancellationToken.None, Demo("gatekeeper-demo (scripted)")));
+            var ex = await Assert.ThrowsAsync<InvalidOperationException>(() => RedTeamCommand.ExecuteAsync(
+                Options(compare: baselineFile), CancellationToken.None, Demo("gatekeeper-demo (real model m@p)")));
+            Assert.Contains("different instruments", ex.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            try { Directory.Delete(dir, recursive: true); } catch { /* best-effort cleanup */ }
+        }
     }
 
     [Theory]

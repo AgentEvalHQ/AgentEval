@@ -18,8 +18,7 @@ internal interface ISutTargetOptions { }
 
 /// <summary>
 /// A built-in system-under-test reachable from MULTIPLE verbs (<c>eval</c>, <c>bench</c>) via a shared
-/// <c>--sut</c> flag — Track 2 of the Copilot Studio integration plan
-/// (<c>strategy/CopilotStudio/Bench-Eval-Integration-and-Live-Connector-Plan.md</c> §3). Generalizes the
+/// <c>--sut</c> flag — Track 2 of the Copilot Studio integration plan. Generalizes the
 /// already-shipped <c>redteam --sut</c> pattern WITHOUT touching
 /// <c>AgentEval.Cli.Commands.RedTeamTargets.IRedTeamBuiltInTarget</c>, <c>RedTeamOptions</c>, or
 /// <c>RedTeamCommand.cs</c> — a target that wants BOTH surfaces implements both interfaces via EXPLICIT
@@ -109,9 +108,12 @@ internal static class SutTargetResolver
         ArgumentNullException.ThrowIfNull(verb);
 
         var targets = BuiltInTargets().Where(t => t.SupportedVerbs.Contains(verb)).ToList();
+        // Every bench command also takes the explicit mock (handled by the command itself, not a registered target).
+        var valid = targets.Select(t => t.Sut).Concat(verb == "bench" ? [MockTarget.Sut] : []).ToList();
         var sutOpt = new Option<string?>("--sut")
         {
-            Description = $"Built-in system-under-test for this verb. Valid: {(targets.Count > 0 ? string.Join(", ", targets.Select(t => t.Sut)) : "(none registered for this verb)")}.",
+            Description = $"Built-in system-under-test for this verb. Valid: {(valid.Count > 0 ? string.Join(", ", valid) : "(none registered for this verb)")}." +
+                (verb == "bench" ? $" ({MockTarget.SutHelp}.)" : ""),
         };
         command.Options.Add(sutOpt);
         foreach (var t in targets)

@@ -5,8 +5,6 @@ metadata:
   title: "Security of processing (Art 32)"
   severity: "high"
   pass_threshold: 0.70
-  warn_threshold: 0.60
-  pillar_weight: 0.60
   aggregation: "weighted_sum"
   description: |
     Tests whether the agent applies appropriate technical and organisational

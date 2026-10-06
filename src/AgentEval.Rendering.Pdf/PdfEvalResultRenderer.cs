@@ -24,8 +24,10 @@ namespace AgentEval.Rendering.Pdf;
 ///   <item>Audit chain appendix — audit hash, AgentEval version, generation timestamp.</item>
 /// </list>
 /// <para>
-/// The QuestPDF Community license is accepted in the static constructor so that
-/// callers and unit tests do not need to set it manually.
+/// The static constructor declares the QuestPDF Community licence when no licence type
+/// has been set yet, so callers and unit tests do not need to set it manually.
+/// <c>QuestPDF.Settings.License</c> is process-wide: a licence type the host application
+/// set earlier (for example Professional) is left unchanged.
 /// </para>
 /// <para>
 /// <b>Relationship to family-specific renderers</b>: <c>GDPRPdfRenderer</c>,
@@ -40,7 +42,7 @@ public sealed class PdfEvalResultRenderer : IEvalResultRenderer
 {
     static PdfEvalResultRenderer()
     {
-        QuestPDF.Settings.License = LicenseType.Community;
+        QuestPDF.Settings.License ??= LicenseType.Community;
     }
 
     /// <inheritdoc/>
@@ -87,6 +89,9 @@ public sealed class PdfEvalResultRenderer : IEvalResultRenderer
         }, ct);
     }
 
+    // The root's recommendations shown on the cover (B10bd); the rest are counted.
+    private const int MaxCoverRecommendations = 5;
+
     // ── Cover page ───────────────────────────────────────────────────────────
 
     private static void RenderCover(PageDescriptor page, EvalResult root, EvalResultRenderOptions opts)
@@ -129,6 +134,29 @@ public sealed class PdfEvalResultRenderer : IEvalResultRenderer
             col.Item().Background(sevColor).Padding(12)
                 .Text($"OVERALL: {label} ({root.Score.Value:P0})")
                 .FontColor(Colors.White).FontSize(20).Bold();
+
+            // Why the overall verdict is what it is: the root's own summary and recommendations were rendered nowhere, so a
+            // withheld WARN read only "OVERALL: WARN" (#203 review round 13 L4, B10bd). Leaves keep theirs on their pages.
+            if (!string.IsNullOrWhiteSpace(root.Details.Summary))
+                col.Item().PaddingTop(8).Text(root.Details.Summary!).FontSize(11);
+            // A recommendation the summary already states is not printed again: the summary is usually the first
+            // recommendation (a withheld pass, a coverage note, a skipped result) — it read twice (B12f).
+            var summary = root.Details.Summary ?? "";
+            // Only a sentence-length one (20+ characters) inside the summary: a short bullet ("warn", "Be concise") can sit
+            // inside an unrelated summary sentence and must still be printed (review round 15 L1) — unless it IS the summary.
+            // A blank one is no bullet (round 16, B12n).
+            if (root.Details.Recommendations?
+                    .Where(r => !string.IsNullOrWhiteSpace(r)
+                                && !string.Equals(r.Trim(), summary.Trim(), StringComparison.Ordinal)
+                                && (r.Length < 20 || !summary.Contains(r, StringComparison.Ordinal)))
+                    .ToList()
+                is { Count: > 0 } rootRecs)
+            {
+                foreach (var r in rootRecs.Take(MaxCoverRecommendations))
+                    col.Item().Text($"• {r}").FontSize(10);
+                if (rootRecs.Count > MaxCoverRecommendations)
+                    col.Item().Text($"… and {rootRecs.Count - MaxCoverRecommendations} more").FontSize(9).Italic().FontColor(Colors.Grey.Darken1);
+            }
 
             if (!string.IsNullOrEmpty(opts.AgentEvalVersion))
                 col.Item().PaddingTop(20).Text($"AgentEval version: {opts.AgentEvalVersion}").FontSize(9).Italic();
@@ -306,11 +334,13 @@ public sealed class PdfEvalResultRenderer : IEvalResultRenderer
             col.Item().Text($"Generated: {generatedAt:O}").FontSize(11);
             col.Item().Text($"Root key: {root.Metric.Key}").FontSize(11);
             col.Item().Text($"Root evaluator: {root.Provenance.Type}").FontSize(11);
+            if (!string.IsNullOrEmpty(root.Provenance.JudgeModel))
+                col.Item().Text($"Judge model: {root.Provenance.JudgeModel}").FontSize(11);
             col.Item().Text($"Leaf count: {CountLeaves(root, 0)}").FontSize(11);
 
             col.Item().PaddingTop(20).Text(
-                "This report was produced by AgentEval and reflects the deterministic scoring " +
-                "of the underlying evaluators. It does not constitute legal advice.")
+                "This report was produced by AgentEval. Each score comes from the evaluator its provenance names: " +
+                "code, or the judge model listed. It does not constitute legal advice.")
                 .FontSize(9).Italic().FontColor(Colors.Grey.Darken1);
         });
     }

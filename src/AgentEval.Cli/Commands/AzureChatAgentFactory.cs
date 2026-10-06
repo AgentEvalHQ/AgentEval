@@ -11,28 +11,37 @@ using Microsoft.Extensions.AI;
 namespace AgentEval.Cli.Commands;
 
 /// <summary>
-/// Builds an <see cref="IEvaluableAgent"/> from <c>AZURE_OPENAI_*</c> env vars by wrapping an
-/// Azure OpenAI <c>ChatClient</c> in <see cref="ChatClientAgentAdapter"/>. Used by the CLI
-/// stub-only commands (<c>bench owasp</c> / <c>bench mitre</c> / <c>bench perf</c>) when the
-/// caller passes <c>--azure-from-env</c>.
+/// Builds the CLI's real model client from the environment, for whichever provider
+/// <c>AI_INFERENCE_PROVIDER</c> selects (Azure OpenAI, Bitdeer, OpenAI, Azure AI Foundry or any
+/// OpenAI-compatible endpoint; auto-detected when the selector is unset). Every path goes through
+/// <see cref="ProviderChatClientFactory.TryCreate"/>, so the provider rules live in one place.
 /// </summary>
 /// <remarks>
 /// <para>
-/// Same env-var convention as <see cref="JudgeFactory"/>: <c>AZURE_OPENAI_ENDPOINT</c>,
-/// <c>AZURE_OPENAI_API_KEY</c>, <c>AZURE_OPENAI_DEPLOYMENT</c>. All three are required;
-/// partial config is treated as a misconfiguration and surfaces a friendly error rather
-/// than silently falling back to the stub.
+/// The name predates provider selection, as does the <c>--azure-from-env</c> flag: neither is
+/// Azure-only any more. With only the <c>AZURE_OPENAI_*</c> trio set, the resolver auto-detects
+/// Azure OpenAI and behaves as before.
 /// </para>
 /// <para>
-/// This is the v1.1 honest fix for the "CLI scans stub agents" gap (plan-13 T0.2). A
-/// richer agent-manifest schema (multi-provider, tool-using, custom-shape) is deferred to
-/// a dedicated ADR (T3.11 in plan-13 / future Tier 3 work).
+/// Two entry points. <see cref="TryBuildFromEnv(string, string?)"/> wraps the client in
+/// <see cref="ChatClientAgentAdapter"/> as the agent under test when the caller passes
+/// <c>--azure-from-env</c> to a command that otherwise needs <c>--sut</c>, <c>--endpoint</c> or a supplied response
+/// (for example <c>bench owasp</c>, <c>bench mitre</c>, <c>bench nist</c>, <c>bench perf</c>,
+/// <c>bench eu-ai-act</c>). <see cref="TryBuildChatClientFromEnv"/> returns the raw client, for
+/// <c>bench memory</c>, <c>bench longmemeval</c> and <c>bench typedmemeval</c>
+/// and for the <c>log-file</c> utilities.
+/// </para>
+/// <para>
+/// A selector naming a provider whose variables are missing fails closed with a diagnostic naming
+/// them, and so does an unset selector when no provider is fully configured; neither case falls back
+/// to a stand-in or to another provider. The agent built here is a plain chat model; an agent with its
+/// own tools or memory is not described by environment variables and needs a program of its own.
 /// </para>
 /// </remarks>
 internal static class AzureChatAgentFactory
 {
     /// <summary>
-    /// Attempts to build an <see cref="IEvaluableAgent"/> from the Azure OpenAI env vars.
+    /// Attempts to build an <see cref="IEvaluableAgent"/> from the selected provider's env vars.
     /// </summary>
     /// <param name="subject">The subject identifier; passed as the agent's <c>Name</c>.</param>
     /// <param name="systemPrompt">
@@ -44,9 +53,22 @@ internal static class AzureChatAgentFactory
     /// A tuple of <c>(agent, exitCode)</c>. When successful, <c>agent</c> is non-null and
     /// <c>exitCode</c> is 0. On any failure (missing env vars, construction failure) the
     /// method writes a friendly error to <c>stderr</c>, returns a null agent, and sets
-    /// <c>exitCode</c> to 2.
+    /// <c>exitCode</c> to <see cref="ExitCodes.RuntimeError"/> (3).
     /// </returns>
     public static (IEvaluableAgent? Agent, int ExitCode) TryBuildFromEnv(
+        string subject,
+        string? systemPrompt = null)
+    {
+        var (agent, _, exitCode) = TryBuildFromEnvWithModel(subject, systemPrompt);
+        return (agent, exitCode);
+    }
+
+    /// <summary>
+    /// <see cref="TryBuildFromEnv(string, string?)"/>, also returning the model the provider resolved (for example
+    /// the Azure deployment or the Bitdeer model id), so a caller that prices calls can look up the model it
+    /// actually used.
+    /// </summary>
+    public static (IEvaluableAgent? Agent, string? Model, int ExitCode) TryBuildFromEnvWithModel(
         string subject,
         string? systemPrompt = null)
     {
@@ -56,8 +78,8 @@ internal static class AzureChatAgentFactory
             Console.Error.WriteLine(
                 "✖ --azure-from-env was passed but no inference provider is configured.\n" +
                 $"  {diagnostic}\n" +
-                "  Configure one and retry, or drop --azure-from-env to use the built-in stub agent.");
-            return (null, ExitCodes.RuntimeError);
+                "  Configure one and retry, or name another target (--sut, --endpoint/--model).");
+            return (null, null, ExitCodes.RuntimeError);
         }
 
         IEvaluableAgent agent = new ChatClientAgentAdapter(
@@ -65,15 +87,18 @@ internal static class AzureChatAgentFactory
             name: subject,
             systemPrompt: systemPrompt);
         Console.Error.WriteLine($"{ProviderChatClientFactory.Describe("agent", model!)} subject={subject}");
-        return (agent, 0);
+        return (agent, model, 0);
     }
 
     /// <summary>
-    /// Attempts to build a raw <see cref="IChatClient"/> from Azure OpenAI env vars. Used
-    /// by CLI commands like <c>bench longmemeval</c> and <c>bench memory</c> that need
-    /// a chat client directly (e.g., to feed both the agent-under-test and the judge),
-    /// rather than the pre-wrapped <see cref="IEvaluableAgent"/> from
-    /// <see cref="TryBuildFromEnv(string, string?)"/>. Same env-var convention.
+    /// Attempts to build a raw <see cref="IChatClient"/> for the provider <c>AI_INFERENCE_PROVIDER</c>
+    /// selects (or auto-detects). Used by <c>bench memory</c>, <c>bench longmemeval</c> and
+    /// <c>bench typedmemeval</c>, which feed the one client to both the agent under test and the
+    /// judge (and by <see cref="LogFileCommand"/>), rather than the pre-wrapped <see cref="IEvaluableAgent"/> from
+    /// <see cref="TryBuildFromEnv(string, string?)"/>. The <c>AZURE_OPENAI_JUDGE_*</c> override is
+    /// not consulted here. On failure it writes the diagnostic to <c>stderr</c> and returns
+    /// <see cref="ExitCodes.RuntimeError"/> (3); the second tuple item is the resolved model or
+    /// deployment name.
     /// </summary>
     public static (IChatClient? ChatClient, string? Deployment, int ExitCode) TryBuildChatClientFromEnv()
     {
@@ -87,58 +112,5 @@ internal static class AzureChatAgentFactory
         }
 
         return (chatClient, model, 0);
-    }
-
-    /// <summary>
-    /// Prints a prominent banner warning the operator that the built-in stub agent is in use
-    /// — call from any CLI command that defaults to a stub agent when neither <c>--azure-from-env</c>
-    /// nor an explicit override was provided. The banner explains how to scan a real agent so
-    /// operators don't unwittingly publish a "PASS" verdict that only reflects the stub's
-    /// hardcoded refusal posture.
-    /// </summary>
-    /// <param name="benchmarkName">Friendly benchmark name (e.g., "OWASP LLM Top 10").</param>
-    /// <param name="stubAgentDescription">Short label for the stub (e.g., "SafeRefusalAgent stub").</param>
-    /// <param name="sampleFileName">
-    /// Name of the canonical sample file demonstrating real-agent wiring for this benchmark
-    /// (e.g., "06_OwaspBenchmark.cs"). Surfaces the right file to read for the operator's
-    /// specific command, not always OWASP.
-    /// </param>
-    public static void PrintStubAgentWarning(string benchmarkName, string stubAgentDescription, string sampleFileName = "06_OwaspBenchmark.cs")
-    {
-        const int innerWidth = 77; // total line width minus the two "│" borders + spacing
-        var prevColor = Console.ForegroundColor;
-        try
-        {
-            Console.ForegroundColor = ConsoleColor.Yellow;
-            Console.Error.WriteLine();
-            Console.Error.WriteLine("┌" + new string('─', innerWidth) + "┐");
-            WriteLine($"⚠  {benchmarkName} is scanning the built-in {stubAgentDescription}.", innerWidth);
-            WriteLine("   This is a smoke-test stub, NOT your agent. Results will not reflect your", innerWidth);
-            WriteLine("   agent's real behaviour.", innerWidth);
-            WriteLine("", innerWidth);
-            WriteLine("   To scan a real Azure OpenAI agent: pass --azure-from-env and set", innerWidth);
-            WriteLine("     AZURE_OPENAI_ENDPOINT / AZURE_OPENAI_API_KEY / AZURE_OPENAI_DEPLOYMENT", innerWidth);
-            WriteLine("   To scan any other agent: write a small program — see", innerWidth);
-            WriteLine($"     samples/AgentEval.Samples/Benchmarks/{sampleFileName}", innerWidth);
-            Console.Error.WriteLine("└" + new string('─', innerWidth) + "┘");
-            Console.Error.WriteLine();
-        }
-        finally
-        {
-            Console.ForegroundColor = prevColor;
-        }
-
-        // Per-line writer that handles overflow gracefully — if the text is longer than the
-        // inner width minus borders, it's truncated with an ellipsis so the box stays aligned
-        // regardless of benchmark-name length.
-        static void WriteLine(string text, int width)
-        {
-            const int padding = 1; // single space inside each border
-            var maxText = width - 2 * padding;
-            string content = text.Length <= maxText
-                ? text.PadRight(maxText)
-                : text.Substring(0, maxText - 1) + "…";
-            Console.Error.WriteLine("│" + new string(' ', padding) + content + new string(' ', padding) + "│");
-        }
     }
 }

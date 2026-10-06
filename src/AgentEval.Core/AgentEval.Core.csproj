@@ -4,10 +4,16 @@
     <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
     <IsPackable>false</IsPackable>
     <RootNamespace>AgentEval</RootNamespace>
+    <!-- AgentEval's own use of its preview decision abstraction (DecisionsPreview): acknowledged here; consumers still see it. -->
+    <NoWarn>$(NoWarn);AGENTEVAL_DECISIONS_PREVIEW001</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
     <InternalsVisibleTo Include="AgentEval" />
+    <!-- Gatekeeper's inline-judge calibration check looks through judge wrappers via the internal IDelegatingGate. -->
+    <InternalsVisibleTo Include="AgentEval.MAF" />
+    <!-- One "is there a reference answer" test (ReferenceText) for F1 here and the agentic similarity judges. -->
+    <InternalsVisibleTo Include="AgentEval.Evals.Agentic" />
     <InternalsVisibleTo Include="AgentEval.Tests" />
     <!-- Phase 8 (v0.10.0-beta): Memory.Tests touches BenchmarkFamilyRegistry.Reset()
          to isolate registry state between integration tests. Reset() is internal. -->

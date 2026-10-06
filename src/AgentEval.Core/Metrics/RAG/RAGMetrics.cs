@@ -4,6 +4,7 @@
 
 using Microsoft.Extensions.AI;
 using AgentEval.Core;
+using AgentEval.Evals;
 
 namespace AgentEval.Metrics.RAG;
 
@@ -34,9 +35,9 @@ public class FaithfulnessMetric : IRAGMetric, IQualityMetric
     
     public async Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(context.Context))
+        if (string.IsNullOrWhiteSpace(context.Context))   // not measured, never a fail (B12i)
         {
-            return MetricResult.Fail(Name, "Faithfulness requires context to be provided.");
+            return MetricResult.NotMeasured(Name, "Faithfulness requires a retrieved context, and none was supplied: not measured.");
         }
         
         var prompt = BuildFaithfulnessPrompt(context.Context, context.Input, context.Output);
@@ -225,9 +226,9 @@ public class ContextPrecisionMetric : IRAGMetric
     
     public async Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(context.Context))
+        if (string.IsNullOrWhiteSpace(context.Context))   // not measured, never a fail (B12i)
         {
-            return MetricResult.Fail(Name, "Context precision requires context to be provided.");
+            return MetricResult.NotMeasured(Name, "Context precision requires a retrieved context, and none was supplied: not measured.");
         }
         
         var prompt = BuildPrecisionPrompt(context.Input, context.Context);
@@ -318,14 +319,14 @@ public class ContextRecallMetric : IRAGMetric
     
     public async Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(context.Context))
+        if (string.IsNullOrWhiteSpace(context.Context))   // not measured, never a fail (B12i)
         {
-            return MetricResult.Fail(Name, "Context recall requires context to be provided.");
+            return MetricResult.NotMeasured(Name, "Context recall requires a retrieved context, and none was supplied: not measured.");
         }
         
-        if (string.IsNullOrEmpty(context.GroundTruth))
+        if (!ReferenceText.HasWords(context.GroundTruth))   // a wordless reference ("?") is none (round 17)
         {
-            return MetricResult.Fail(Name, "Context recall requires ground truth to be provided.");
+            return MetricResult.NotMeasured(Name, "Context recall requires a reference answer, and none was supplied: not measured.");
         }
         
         var prompt = BuildRecallPrompt(context.Input, context.GroundTruth, context.Context);
@@ -421,9 +422,9 @@ public class AnswerCorrectnessMetric : IRAGMetric
     
     public async Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrEmpty(context.GroundTruth))
+        if (!ReferenceText.HasWords(context.GroundTruth))   // not measured, never a fail (B12i); "?" is none (round 17)
         {
-            return MetricResult.Fail(Name, "Answer correctness requires ground truth to be provided.");
+            return MetricResult.NotMeasured(Name, "Answer correctness requires a reference answer, and none was supplied: not measured.");
         }
         
         var prompt = BuildCorrectnessPrompt(context.Input, context.GroundTruth, context.Output);

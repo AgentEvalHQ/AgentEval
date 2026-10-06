@@ -5,8 +5,6 @@ metadata:
   title: "Test fixture (not a real GDPR article)"
   severity: "low"
   pass_threshold: 0.70
-  warn_threshold: 0.50
-  pillar_weight: 0.10
   aggregation: "weighted_sum"
   description: "Used by ArticleScenarioYamlLoaderTests; not loaded by ArticlesRegistry."
 

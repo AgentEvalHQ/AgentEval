@@ -73,6 +73,8 @@
     href: gatekeeper/attack-the-gate.md
   - name: CLI (from any language)
     href: gatekeeper-cli.md
+  - name: AEVP 0.1 (draft evidence profile)
+    href: aevp/AEVP-0.1.md
   - name: Implementation Status
     href: gatekeeper/implementation-status.md
   - name: Capability History
@@ -129,6 +131,8 @@
     href: benchmarks.md
   - name: Eval & Benchmark Architecture
     href: eval-benchmark-architecture.md
+  - name: Calibration Results
+    href: benchmarks/calibration-results.md
   - name: Deterministic Evals
     href: deterministic-evals.md
   - name: Agentic Benchmark

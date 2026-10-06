@@ -20,6 +20,7 @@ namespace AgentEval.Samples.Benchmarks;
 ///   <item><see cref="SamplePreset.Standard"/> → <see cref="NistBenchmark.RmfBaseline"/></item>
 ///   <item><see cref="SamplePreset.AuditGrade"/> → <see cref="NistBenchmark.RmfAuditGrade"/></item>
 /// </list>
+/// The run is graded judge first via <see cref="NistBenchmarkRun.WithJudge"/>, with the configured model as the judge.
 /// </summary>
 /// <remarks>Requires a model provider (see AIConfig). Skips gracefully when missing.</remarks>
 public static class NistBenchmarkSample
@@ -40,12 +41,16 @@ public static class NistBenchmarkSample
         BenchmarkSampleHelpers.PrintPreset(preset);
 
         var agent = CreateAgent();
-        var run = preset switch
+
+        // Grade judge first, as `agenteval bench nist` does. Without WithJudge the per-attack oracles grade alone.
+        // This sample uses the configured model as its judge.
+        var judgeModel = AIConfig.ModelDeployment;
+        var run = (preset switch
         {
             SamplePreset.Standard => NistBenchmark.RmfBaseline(),
             SamplePreset.AuditGrade => NistBenchmark.RmfAuditGrade(),
             _ => NistBenchmark.RmfSmoke(),
-        };
+        }).WithJudge(AIConfig.CreateChatClient(judgeModel), judgeModel);
 
         Console.WriteLine($"Scanning {agent.Name} with {run.PresetName} preset...");
         Console.WriteLine($"Covered NIST MEASURE controls: {string.Join(", ", run.CoveredControlIds)}");
@@ -66,7 +71,7 @@ public static class NistBenchmarkSample
             includePdf: true,
             regulationCodeForEvidence: null,
             presetLabel: preset.ToString().ToLowerInvariant(),
-            judgeModel: AIConfig.ModelDeployment);
+            judgeModel: judgeModel);
 
         try
         {
@@ -87,6 +92,8 @@ public static class NistBenchmarkSample
         Console.WriteLine("     a black-box red-team can exercise (2.7 Security & Resilience, 2.10 Privacy, 2.5 Validity).");
         Console.WriteLine("   - GOVERN / MAP / MANAGE controls (and MEASURE 2.6 Safety) render as NOT APPLICABLE —");
         Console.WriteLine("     they are organizational and never PASS.");
+        Console.WriteLine("   - Graded judge first: Composite Judges decide the semantic attacks; the other attacks");
+        Console.WriteLine("     are decided by their oracle, which asks the judge only when it is inconclusive.");
         Console.WriteLine("   - A passing run is ONE input into an AI RMF program, not RMF conformance.");
 
         // Advanced red-team capabilities — folded in at Standard/AuditGrade tiers.

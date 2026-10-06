@@ -15,8 +15,8 @@ namespace AgentEval.Tests.Cli;
 ///   <item>Test override supplied → passthrough with model name "override".</item>
 ///   <item>All three AZURE_OPENAI_* set → real Azure judge constructed.</item>
 ///   <item>Partial Azure config → exit code 2 with diagnostic.</item>
-///   <item>No config + no opt-in → exit code 2 with help message.</item>
-///   <item>No config + AGENTEVAL_ALLOW_STUB_JUDGE=1 → stub judge with warning.</item>
+///   <item>No config → exit code 3 with help message.</item>
+///   <item>No config + the retired <c>AGENTEVAL_ALLOW_STUB_JUDGE</c> → still exit code 3: there is no stand-in judge.</item>
 /// </list>
 /// </summary>
 [Collection("EnvVarTests")]
@@ -92,10 +92,10 @@ public class JudgeFactoryTests : IDisposable
         Assert.Equal("", model);
     }
 
-    // ── Branch 4: no config + no opt-in → exit 3 (RuntimeError, BUG-22) ─────────────────────────
+    // ── Branch 4: no config → exit 3 (RuntimeError, BUG-22) ─────────────────────────
 
     [Fact]
-    public void Resolve_NoConfig_NoStubOptIn_ReturnsExitCode3()
+    public void Resolve_NoConfig_ReturnsExitCode3()
     {
         // env already scrubbed by ctor
 
@@ -106,65 +106,109 @@ public class JudgeFactoryTests : IDisposable
         Assert.Equal("", model);
     }
 
-    // ── Branch 5: opt-in stub ────────────────────────────────────────────
+    // ── Branch 5: the retired stub opt-in ────────────────────────────────
 
+    /// <summary>
+    /// Through 0.42, <c>AGENTEVAL_ALLOW_STUB_JUDGE=1</c> on a machine with no provider returned a judge that scored
+    /// 75 with every criterion met, for benchmarks and for calibration. There is no stand-in judge now: whatever the
+    /// variable says, a machine with no provider gets exit 3 and no judge.
+    /// </summary>
     [Theory]
     [InlineData("1")]
     [InlineData("true")]
     [InlineData("TRUE")]
-    [InlineData("True")]
-    public void Resolve_NoConfig_StubOptIn_ReturnsStubEvaluator(string optInValue)
-    {
-        Environment.SetEnvironmentVariable("AGENTEVAL_ALLOW_STUB_JUDGE", optInValue);
-
-        var (judge, model, exit) = JudgeFactory.Resolve(evaluatorOverride: null, judgeKind: "stub-opt-in");
-
-        Assert.NotNull(judge);
-        Assert.IsType<JudgeFactory.StubEvaluator>(judge);
-        Assert.Equal("stub", model);
-        Assert.Equal(0, exit);
-    }
-
-    /// <summary>
-    /// Negative test for the stub opt-in: only "1" and "true" (case-insensitive)
-    /// should engage the stub. Other values (including "yes", "0", "false", empty)
-    /// must continue to gate.
-    /// </summary>
-    [Theory]
     [InlineData("0")]
-    [InlineData("false")]
-    [InlineData("yes")]
     [InlineData("")]
-    [InlineData("anything-else")]
-    public void Resolve_NoConfig_InvalidStubOptInValue_ReturnsExitCode3(string optInValue)
+    public void Resolve_NoConfig_TheRetiredStubOptIn_ChangesNothing(string optInValue)
     {
         Environment.SetEnvironmentVariable("AGENTEVAL_ALLOW_STUB_JUDGE", optInValue);
 
-        var (judge, _, exit) = JudgeFactory.Resolve(evaluatorOverride: null, judgeKind: "invalid-opt-in");
+        var (judge, model, exit) = JudgeFactory.Resolve(evaluatorOverride: null, judgeKind: "retired-opt-in");
 
         Assert.Null(judge);
+        Assert.Equal("", model);
         Assert.Equal(3, exit);
     }
+}
 
-    // ── Stub evaluator behaviour ─────────────────────────────────────────
+/// <summary>
+/// The compliance families resolve ONE judge for the benchmark and its calibration. Before this, <c>bench gdpr</c>
+/// sent <c>gdpr-judge-system.v1.md</c> while <c>bench gdpr calibrate</c> sent the generic default prompt, so every
+/// published GDPR (and EU AI Act) calibration figure described a different judge from the one the benchmark ran.
+/// </summary>
+[Collection("EnvVarTests")]
+public class JudgeFactoryFamilyPromptTests : IDisposable
+{
+    private readonly ProviderEnvironmentScope _env = new();
 
-    /// <summary>
-    /// Sanity-check that the stub evaluator returned by branch 5 actually
-    /// produces deterministic placeholder output. Documents the contract so
-    /// downstream consumers expecting score=75 / criteria-met don't get
-    /// surprised by a future stub-shape change.
-    /// </summary>
-    [Fact]
-    public async Task StubEvaluator_ReturnsDeterministic75WithAllCriteriaMet()
+    public void Dispose() => _env.Dispose();
+
+    private static void ConfigureAzureJudge()
     {
-        Environment.SetEnvironmentVariable("AGENTEVAL_ALLOW_STUB_JUDGE", "1");
-        var (judge, _, _) = JudgeFactory.Resolve(evaluatorOverride: null);
-        Assert.NotNull(judge);
+        Environment.SetEnvironmentVariable("AZURE_OPENAI_ENDPOINT", "https://example.openai.azure.com/");
+        Environment.SetEnvironmentVariable("AZURE_OPENAI_API_KEY", "test-key-not-real");
+        Environment.SetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT", "gpt-4o-test");
+    }
 
-        var result = await judge!.EvaluateAsync("input", "output", new[] { "criterion-a", "criterion-b" });
+    [Fact]
+    public void ResolveGdpr_SendsAndNamesTheGdprSystemPrompt()
+    {
+        ConfigureAzureJudge();
 
-        Assert.Equal(75, result.OverallScore);
-        Assert.Equal(2, result.CriteriaResults.Count);
-        Assert.All(result.CriteriaResults, c => Assert.True(c.Met));
+        var (judge, _, exit) = JudgeFactory.ResolveGdpr(evaluatorOverride: null, judgeKind: "test");
+
+        Assert.Equal(0, exit);
+        var chat = Assert.IsType<ChatClientEvaluator>(judge);
+        Assert.Equal(JudgeFactory.GdprJudgeSystemPromptFile, chat.SystemPromptId);
+        Assert.DoesNotContain("You are a Test Evaluator Agent", chat.PromptMaterial, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ResolveEuAiAct_SendsAndNamesTheEuAiActSystemPrompt()
+    {
+        ConfigureAzureJudge();
+
+        var (judge, _, exit) = JudgeFactory.ResolveEuAiAct(evaluatorOverride: null, judgeKind: "test");
+
+        Assert.Equal(0, exit);
+        var chat = Assert.IsType<ChatClientEvaluator>(judge);
+        Assert.Equal(JudgeFactory.EuAiActJudgeSystemPromptFile, chat.SystemPromptId);
+        Assert.DoesNotContain("You are a Test Evaluator Agent", chat.PromptMaterial, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("BenchCommand.cs", "JudgeFactory.ResolveGdpr(")]
+    [InlineData("BenchCalibrateCommand.cs", "JudgeFactory.ResolveGdpr(")]
+    [InlineData("BenchEuAiActCommand.cs", "JudgeFactory.ResolveEuAiAct(")]
+    [InlineData("BenchEuAiActCalibrateCommand.cs", "JudgeFactory.ResolveEuAiAct(")]
+    public void BenchAndCalibrate_GoThroughTheSameFamilyResolver(string file, string resolver)
+    {
+        // A guard on the source, because the defect was a CALL SITE that bypassed the resolver: the benchmark
+        // and its calibration must not be able to drift onto two different judges again.
+        var source = File.ReadAllText(Path.Combine(RepoRoot(), "src", "AgentEval.Cli", "Commands", file));
+
+        Assert.Contains(resolver, source, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void NoCommand_LoadsAFamilyJudgePrompt_OutsideTheResolver()
+    {
+        var commands = Path.Combine(RepoRoot(), "src", "AgentEval.Cli", "Commands");
+        var offenders = Directory.EnumerateFiles(commands, "*.cs", SearchOption.AllDirectories)
+            .Where(f => Path.GetFileName(f) is not ("JudgeFactory.cs" or "EmbeddedPromptLoader.cs"))
+            .Where(f => File.ReadAllText(f).Contains("EmbeddedPromptLoader.Load(", StringComparison.Ordinal))
+            .Select(Path.GetFileName)
+            .ToList();
+
+        Assert.Empty(offenders);
+    }
+
+    private static string RepoRoot()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null && !File.Exists(Path.Combine(dir.FullName, "AgentEval.sln")))
+            dir = dir.Parent;
+        return dir?.FullName ?? throw new InvalidOperationException("Could not find repo root (AgentEval.sln).");
     }
 }
+

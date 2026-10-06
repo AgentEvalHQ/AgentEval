@@ -466,6 +466,44 @@ public class DataLoaderGapCoverageTests : IDisposable
         Assert.Throws<ArgumentException>(() => factory.Create("parquet"));
     }
 
+    private sealed class MarkerLoader(string format) : IDatasetLoader
+    {
+        public string Format => format;
+        public IReadOnlyList<string> SupportedExtensions => [];
+        public bool IsTrulyStreaming => false;
+        public Task<IReadOnlyList<DatasetTestCase>> LoadAsync(string path, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+        public IAsyncEnumerable<DatasetTestCase> LoadStreamingAsync(string path, CancellationToken ct = default) =>
+            throw new NotSupportedException();
+    }
+
+    [Theory]
+    [InlineData(".csv", "csv")]        // replaces a built-in
+    [InlineData(".csv", "CSV")]
+    [InlineData(".parquet", "parquet")] // adds a new one
+    public void Factory_Register_ReachesCreateByName_AsItDoesCreateFromExtension(string extension, string format)
+    {
+        // B7 (#203 review): Register replaced the loader only for CreateFromExtension; Create("csv") kept the built-in,
+        // and a registered ".parquet" was an unknown format.
+        var factory = new DefaultDatasetLoaderFactory();
+        var mine = new MarkerLoader("mine");
+        factory.Register(extension, () => mine);
+
+        Assert.Same(mine, factory.CreateFromExtension(extension));
+        Assert.Same(mine, factory.Create(format));
+    }
+
+    [Fact]
+    public void Factory_Create_WithoutRegister_KeepsBuiltInsFirst_ThenDiFormatNames()
+    {
+        // Guard: the fix must not widen. A DI loader cannot take over a built-in name, and is found by its own Format.
+        var parquet = new MarkerLoader("parquet");
+        var factory = new DefaultDatasetLoaderFactory([new MarkerLoader("csv"), parquet]);
+
+        Assert.IsType<CsvDatasetLoader>(factory.Create("csv"));
+        Assert.Same(parquet, factory.Create("parquet"));
+    }
+
     #endregion
 
     #region DatasetLoaderFactory convenience methods with other formats

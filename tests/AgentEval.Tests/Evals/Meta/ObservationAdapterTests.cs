@@ -177,6 +177,15 @@ public class ObservationAdapterTests
         Assert.Equal(MeasurementState.NotMeasured, broken.ToObservation("c1", "metric-arm").State);
     }
 
+    [Fact]
+    public void MetricResult_NotMeasured_IsNotAMeasuredZero()
+    {
+        // #203 review round 16 (B12m): its placeholder score 0 is finite, so the meta lane counted it as a measured 0.
+        var notMeasured = MetricResult.NotMeasured("llm_faithfulness", "no context");
+
+        Assert.Equal(MeasurementState.NotMeasured, notMeasured.ToObservation("c1", "metric-arm").State);
+    }
+
     // ── M.E.AI EvaluationResult → Observation ─────────────────────────────────────────────────
 
     [Fact]

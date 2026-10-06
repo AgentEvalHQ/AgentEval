@@ -262,8 +262,8 @@ internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget, ISutTa
     {
         // No gate trace for a live conversational target — nothing to render there.
         //
-        // P6 item C1 (narrow cut — strategy/CopilotStudio/Copilot-Studio-P6-Connector-Health-and-Resilience-Design.md
-        // §1C): EvidenceFidelity is already stamped per-verdict on every ProbeResult (RC-1), but that's easy to
+        // P6 item C1 (narrow cut, Copilot Studio connector health and resilience):
+        // EvidenceFidelity is already stamped per-verdict on every ProbeResult (RC-1), but that's easy to
         // miss unless a caller inspects the raw report. This surfaces the AGGREGATE fidelity breakdown once, in
         // THIS target's own summary line — not a change to the shared RedTeam report renderers (that's C2, a
         // separate, larger, all-targets change explicitly out of scope here). --sut copilot-studio caps at

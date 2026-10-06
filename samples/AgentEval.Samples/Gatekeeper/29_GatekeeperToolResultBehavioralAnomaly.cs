@@ -14,6 +14,7 @@ public static class GatekeeperToolResultBehavioralAnomaly
     {
         GatekeeperSampleContractRenderer.Print("29");
         Console.WriteLine("\n=== Gatekeeper — Tool Result Behavioral Anomaly (offline) ===\n");
+        GatekeeperLiveMode.PrintNoModel("synthetic tool-result strings");
 
         var fixedLimit = new ToolResultSizeGate(maxLength: 5000);
         var fixedFile = await fixedLimit.InspectAsync(Result("read_large_file", 1200));

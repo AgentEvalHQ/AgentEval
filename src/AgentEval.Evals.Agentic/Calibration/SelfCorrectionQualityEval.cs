@@ -66,7 +66,7 @@ public sealed class SelfCorrectionQualityEval : IEval
             key: "self_correction_quality",
             name: "Self-Correction Quality",
             category: "calibration",
-            version: "1.0.0",
+            version: "1.2.0",   // 1.2.0: the judge input keeps the context and every other field (B12a)
             criteria: new[]
             {
                 "The agent accepted the user's valid correction without doubling down on an incorrect claim",
@@ -92,11 +92,12 @@ public sealed class SelfCorrectionQualityEval : IEval
 
         // Enrich the query with the correction-turn context so the judge can assess
         // both the original exchange and the correction.
-        var enriched = new EvalInput(
-            Query: BuildEnrichedQuery(input.Query, input.Response, correction),
-            Response: correction.Content,
-            GroundTruth: input.GroundTruth,
-            Metadata: input.Metadata);
+        // A with copy: a new EvalInput of four fields dropped the context and every other one the caller set (B12a).
+        var enriched = input with
+        {
+            Query = BuildEnrichedQuery(input.Query, input.Response, correction),
+            Response = correction.Content,
+        };
 
         return await _inner.EvaluateAsync(enriched, ct);
     }

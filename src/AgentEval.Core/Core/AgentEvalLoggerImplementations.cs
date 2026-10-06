@@ -64,8 +64,12 @@ public sealed class ConsoleAgentEvalLogger : IAgentEvalLogger
         lock (_lock)
         {
             var level = result.Passed ? LogLevel.Information : LogLevel.Warning;
-            var icon = result.Passed ? "✓" : "✗";
-            WriteWithColor(level, string.Create(CultureInfo.InvariantCulture, $"[{DateTime.Now:HH:mm:ss}] {icon} {result.MetricName}: {result.Score:F2} - {result.Explanation}"));
+            // A not-measured result has a placeholder 0 that is not a score: print no number (#203 round 16, B12n).
+            var line = !result.Measured
+                ? $"[{DateTime.Now:HH:mm:ss}] ? {result.MetricName}: not measured - {result.Explanation}"
+                : string.Create(CultureInfo.InvariantCulture,
+                    $"[{DateTime.Now:HH:mm:ss}] {(result.Passed ? "✓" : "✗")} {result.MetricName}: {result.Score:F2} - {result.Explanation}");
+            WriteWithColor(level, line);
         }
     }
 

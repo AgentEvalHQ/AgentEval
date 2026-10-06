@@ -47,6 +47,20 @@ read signals that were previously invisible. Run them as the **`glass-box-diagno
 agenteval bench agentic --preset glass-box-diagnostics --subject my-agent --trace run.trace.json
 ```
 
+**What its verdict means.** The preset passes only on a run that exercises its checks: a check that cannot run on
+this trace (fewer than three turns with token usage for token distribution, no tool executions for the tool checks)
+reads "not measured" and keeps it from passing. A measured high-severity finding — an injected system prompt, a
+secret or PII in tool arguments, an unreliable tool — fails it however clean the rest is; any other failing check
+(error patterns, provider safety interventions, prompt drift, truncation, token skew) makes it WARN and is named. The injection check compares the trace's
+system prompts with a trusted baseline (`trusted_system_prompt` in the input metadata) or, without one, asks the
+judge; built without a judge (the API default, `AgenticBenchmark.GlassBoxDiagnostics()`), it is optional — it runs
+when a baseline is supplied, and decides the verdict when it finds an injection — and otherwise shows as skipped.
+
+Attaching the trace also gives every other preset the run's tool data: the tool calls (executed ones with their
+recorded outcome, else the calls the model requested) and the tool definitions the model was offered. A trace that
+recorded the chat layer and no tool call says "no tool call was made" — a safe refusal then passes `unsafe_tool_use`
+instead of reading as not measured; a trace without a chat layer says nothing about tools.
+
 | Evaluator | Reads | Flags |
 |---|---|---|
 | **Tool Reliability** | tool-execution successes | the least-reliable tool's success rate |
@@ -74,7 +88,8 @@ turn before a bad action reaches a tool. See the `Glass Box Full Stack` sample (
 Inside a live MAF `InProcessExecution` workflow, executor responses are **not** currently routed back through
 the instrumented chat client, so a live run yields per-executor traces **without** chat-boundary `ChatTurn`
 entries. Until an upstream per-executor forwarding hook lands (tracked upstream in MAF), live workflow runs
-report every executor as `NoTruth`; real per-executor reconciliation works today for **direct-agent, pre-wired,
+report every executor as `NoTruth`, so a live run has no verdict (nothing was checked); real per-executor
+reconciliation works today for **direct-agent, pre-wired,
 or replayed** traces (the offline `Real vs Framework: Workflow` sample, Observability item 4, shows the shape).
 
 ## Try it

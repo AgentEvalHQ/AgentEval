@@ -18,7 +18,13 @@ public static class AutoAuditRunner
     /// Evaluates one endpoint from its agent-boundary and chat-boundary traces. Gate Block verdicts are read
     /// from the chat trace's top-level <see cref="AgentTrace.Metadata"/> (where <c>EvalGatingChatClient</c> records them).
     /// </summary>
-    public static AutoAuditEndpointResult Evaluate(string endpoint, AgentTrace agentBoundary, AgentTrace chatBoundary, bool completed = true)
+    /// <param name="endpoint">The name the endpoint is reported under.</param>
+    /// <param name="agentBoundary">The framework's own account of the run.</param>
+    /// <param name="chatBoundary">The chat-boundary recording, with the gate's verdicts in its metadata.</param>
+    /// <param name="completed">Whether the scenario completed.</param>
+    /// <param name="leakedPastGate">Whether protected data reached the caller although the gate let the reply through.</param>
+    public static AutoAuditEndpointResult Evaluate(
+        string endpoint, AgentTrace agentBoundary, AgentTrace chatBoundary, bool completed = true, bool leakedPastGate = false)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(endpoint);
         ArgumentNullException.ThrowIfNull(agentBoundary);
@@ -43,7 +49,7 @@ public static class AutoAuditRunner
             .ToList();
 
         return new AutoAuditEndpointResult(
-            endpoint, fidelity.OverallScore, gateBlocks, promptTokens, completionTokens, latency, completed, top);
+            endpoint, fidelity.OverallScore, gateBlocks, promptTokens, completionTokens, latency, completed, top, leakedPastGate);
     }
 
     /// <summary>Assembles a cross-endpoint <see cref="AutoAuditReport"/> from per-endpoint results.</summary>

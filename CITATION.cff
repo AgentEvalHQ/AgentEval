@@ -1,0 +1,19 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: AgentEval
+type: software
+authors:
+  - family-names: "Latorre Millas"
+    given-names: "Jose Luis"
+repository-code: "https://github.com/AgentEvalHQ/AgentEval"
+url: "https://agenteval.dev"
+license: MIT
+version: "0.42.0-beta"
+date-released: "2026-10-01"
+abstract: >-
+  AgentEval is a .NET toolkit for evaluating AI agents, built for Microsoft Agent
+  Framework (MAF) and Microsoft.Extensions.AI. It covers tool-usage validation, RAG
+  quality metrics, stochastic evaluation, model comparison and memory benchmarks,
+  with fluent assertion APIs, and targets .NET 8, 9 and 10. Its red-team probes and
+  evaluators can also run as fail-closed runtime gates in an agent's request path
+  (Gatekeeper).

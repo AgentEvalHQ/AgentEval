@@ -85,6 +85,29 @@ public class TapAttackTests
         Assert.Equal(EvaluationOutcome.Succeeded, result.Outcome);
         Assert.True(attacker.CallCount >= 1);
         Assert.Equal(ConversationFidelity.Flattened, result.ConversationFidelity);   // independent single-turn calls
+        // E6: every node is one single-turn call, so the conversation behind the verdict is one turn; the search
+        // size is the node count, and there is no "deciding turn" of a conversation that never happened.
+        Assert.Equal(1, result.TurnsUsed);
+        Assert.Equal(result.Transcript.Count / 2, result.NodesExplored);
+        Assert.Null(result.DecidingTurn);
+    }
+
+    [Fact]
+    public async Task Runner_TapFold_LabelsNodesAsNodes_NotTurns()
+    {
+        // E6: the fold used to print the NODE count under the word "turn" in every exported reason (SARIF, JSON).
+        var attacker = new FakeChatClient();
+        var target = new CannedAgent(_ => "I refuse.");
+
+        var result = await new RedTeamRunner().ScanAsync(target,
+            new ScanOptions { AttackTypes = [_attack], Intensity = Intensity.Quick, AttackerClient = attacker });
+
+        var probe = result.AttackResults.Single().ProbeResults.Single();
+        Assert.Contains("node(s), each a single-turn call]", probe.Reason, StringComparison.Ordinal);
+        Assert.DoesNotContain("turn(s)]", probe.Reason, StringComparison.Ordinal);
+        Assert.NotNull(probe.NodesExplored);
+        Assert.Null(probe.TurnsUsed);
+        Assert.Null(probe.DecidingTurn);
     }
 
     [Fact]

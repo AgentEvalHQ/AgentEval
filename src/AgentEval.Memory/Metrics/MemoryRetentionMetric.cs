@@ -41,7 +41,13 @@ public class MemoryRetentionMetric : IMemoryMetric
                     "This metric requires memory evaluation results."));
             }
 
-            // Use memory evaluation scores as basis
+            if (!memoryResult.IsMeasured)
+            {
+                return Task.FromResult(MetricResult.Fail(Name,
+                    "Not measured: the judge produced no score for any query."));
+            }
+
+            // Use memory evaluation scores as basis (over the measured queries)
             var score = memoryResult.OverallScore;
             var passed = score >= 80; // Default threshold for memory retention
 

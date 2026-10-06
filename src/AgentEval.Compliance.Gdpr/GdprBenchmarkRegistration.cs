@@ -47,7 +47,7 @@ internal static class GdprBenchmarkRegistration
             ],
             compositeFactory: (preset, judge) => BuildPreset(preset, RequireJudge(judge, preset)),
             evaluateAsync: null,  // CompositeEval-native; consumers call CompositeEval.EvaluateAsync.
-            docLinkUrl: "https://github.com/joslat/AgentEval/blob/main/docs/compliance/gdpr.md",
+            docLinkUrl: "https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/benchmarks/gdpr/getting-started.md",
             owningAssemblyName: typeof(GdprBenchmark).Assembly.GetName().Name));
     }
 

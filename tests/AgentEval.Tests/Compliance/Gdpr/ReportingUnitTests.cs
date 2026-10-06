@@ -229,6 +229,37 @@ public class ReportingUnitTests
         Assert.Equal("FAIL", summary.PerArticle["gdpr.art17.erasure"].Status);
     }
 
+    private static EvalResult Labelled(string key, string label) => new(
+        Metric: new(key, key, "compliance.test", "1.0"),
+        Score: new(label == "pass" ? 1.0 : 0.0, null, label, label == "pass", 0.75, "none", null),
+        Details: new(null, null, null, null, null),
+        Provenance: new("atomic", "stub", null, null, null, 0, false),
+        EvaluatedAt: DateTimeOffset.UtcNow);
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void SummaryBuilder_CountsOnlyMeasuredFailuresAsFailedScenarios(bool pillarLayer)
+    {
+        // Review round 4 M6 (B10p): ScenariosFailed was !Passed, so an article with one judge error read "Failed 1/3"
+        // beside status ERROR, and a needs-review or withheld scenario counted as failed too.
+        var article = new EvalResult(
+            Metric: new("gdpr.art17.erasure", "erasure", "test", "1.0"),
+            Score: new(0.5, null, "error", false, 0.85, "none", null),
+            Details: new(null, null, null,
+                [Labelled("s1", "error"), Labelled("s2", "skipped"), Labelled("s3", "warn"), Labelled("s4", "fail"), Labelled("s5", "pass")], null),
+            Provenance: new("composite", null, null, null, null, 0, false),
+            EvaluatedAt: DateTimeOffset.UtcNow);
+        var root = pillarLayer
+            ? MakeComposite("root", 0.5, false, "none", [MakeComposite("Pillar1", 0.5, false, "none", [article])])
+            : MakeComposite("root", 0.5, false, "none", [article]);
+
+        var summary = new SummaryBuilder(BuildRegistry()).Build(root);
+
+        Assert.Equal(1, summary.PerArticle["gdpr.art17.erasure"].ScenariosFailed);
+        Assert.Equal(5, summary.PerArticle["gdpr.art17.erasure"].ScenarioCount);
+    }
+
     // ── MarkdownRenderer ──────────────────────────────────────────────────────
 
     [Fact]
@@ -331,10 +362,33 @@ public class ReportingUnitTests
         Assert.Contains("Source run", md, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Manifest hash", md, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Chain status", md, StringComparison.OrdinalIgnoreCase);
-        // MakeSampleEvidence supplies a non-empty manifest hash → chain is VALID.
-        Assert.Contains("VALID", md);
         Assert.Contains("`run-001`", md);
         Assert.Contains("`hash-abc`", md);
+    }
+
+    [Fact]
+    public void MarkdownRenderer_AuditChain_RecordedHash_IsNotVerified_NeverValid()
+    {
+        // The renderer only has the hash copied into the evidence, not the source run, so it cannot
+        // verify the chain. It used to print "**VALID**" for any non-empty hash, which this test rejects.
+        var md = new MarkdownRenderer().Render(MakeSampleEvidence());
+
+        Assert.DoesNotContain("VALID", md, StringComparison.Ordinal);
+        Assert.Contains("**Chain status**: hash recorded, **not verified** in this report", md, StringComparison.Ordinal);
+        Assert.Contains("`agenteval doctor`", md, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void MarkdownRenderer_AuditChain_NoHash_SaysNoHashRecorded_NotBroken(string manifestHash)
+    {
+        // It used to print "**BROKEN**" here, which reads as a failed check; no check ran.
+        var md = new MarkdownRenderer().Render(MakeSampleEvidence(manifestHash: manifestHash));
+
+        Assert.DoesNotContain("BROKEN", md, StringComparison.Ordinal);
+        Assert.DoesNotContain("VALID", md, StringComparison.Ordinal);
+        Assert.Contains("**Chain status**: **no hash recorded**", md, StringComparison.Ordinal);
     }
 
     // ── GDPRComplianceReporter constant ──────────────────────────────────────
@@ -438,7 +492,8 @@ public class ReportingUnitTests
         string preset = "standard",
         IReadOnlyList<EvalResult>? criticalFindings = null,
         IReadOnlyList<AgentEval.Compliance.Core.Recommendation>? recommendations = null,
-        string subjectName = "TestAgent")
+        string subjectName = "TestAgent",
+        string manifestHash = "hash-abc")
     {
         criticalFindings ??= [];
         recommendations ??= [];
@@ -449,7 +504,7 @@ public class ReportingUnitTests
             Regulation: "GDPR",
             Subject: subject,
             GeneratedAt: DateTimeOffset.UtcNow,
-            SourceRun: new SourceRunRef("run-001", "hash-abc"),
+            SourceRun: new SourceRunRef("run-001", manifestHash),
             Controls: [],
             Summary: new EvidenceSummary(5, 4, 0, 1, "WARN"),
             Attestation: new Attestation("0.0.0", null, "test", "stub"));

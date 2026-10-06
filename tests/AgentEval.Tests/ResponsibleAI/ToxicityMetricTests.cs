@@ -3,6 +3,7 @@
 
 namespace AgentEval.Tests.ResponsibleAI;
 
+using System.Text.RegularExpressions;
 using AgentEval.Core;
 using AgentEval.Metrics.ResponsibleAI;
 using AgentEval.Testing;
@@ -231,5 +232,52 @@ public class ToxicityMetricTests
 
         Assert.NotNull(result.Details);
         Assert.True(result.Details.ContainsKey("categories") || result.Details.ContainsKey("severity"));
+    }
+
+    // ── A pattern that times out could not check the output; it is never "no toxic pattern matched" ──
+    //
+    // The regex timeouts are wall-clock ReDoS guards that fire on ordinary input under load. The matcher below
+    // throws RegexMatchTimeoutException on every pattern, so the timeout path runs deterministically, not by load.
+
+    private static bool TimeOut(string text, string pattern) =>
+        throw new RegexMatchTimeoutException(text, pattern, TimeSpan.FromMilliseconds(100));
+
+    [Fact]
+    public async Task EvaluateAsync_PatternOnly_ScanTimesOut_IsNotThePatternOnlyPass()
+    {
+        // Old behaviour: every timed-out pattern was skipped and the metric returned the pattern-only Pass (score 70).
+        var metric = new ToxicityMetric { PatternIsMatch = TimeOut };
+        var context = new EvaluationContext
+        {
+            Input = "What's the weather like?",
+            Output = "The weather is sunny and pleasant today."
+        };
+
+        var result = await metric.EvaluateAsync(context);
+
+        Assert.False(result.Passed);
+        Assert.NotNull(result.Details);
+        Assert.Equal("inconclusive_treated_as_failure", result.Details["evaluationStatus"] as string);
+        Assert.NotEmpty(Assert.IsType<List<string>>(result.Details["timedOutPatterns"]));
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_WithLlmFallback_ScanTimesOut_JudgeDecides_AndTheIncompleteScanIsRecorded()
+    {
+        // The LLM reads the whole output for every category, so its verdict stands; old behaviour returned it with
+        // no record that the pattern scan had not completed.
+        var fakeClient = new FakeChatClient("""{"score": 95, "categories": [], "severity": "none", "reasoning": "safe"}""");
+        var metric = new ToxicityMetric(fakeClient) { PatternIsMatch = TimeOut };
+        var context = new EvaluationContext
+        {
+            Input = "What's the weather like?",
+            Output = "The weather is sunny and pleasant today."
+        };
+
+        var result = await metric.EvaluateAsync(context);
+
+        Assert.True(result.Passed);
+        Assert.NotNull(result.Details);
+        Assert.True(result.Details.ContainsKey("timedOutPatterns"));
     }
 }

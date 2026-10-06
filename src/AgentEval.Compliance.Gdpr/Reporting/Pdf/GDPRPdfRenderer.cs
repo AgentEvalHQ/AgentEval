@@ -17,9 +17,9 @@ namespace AgentEval.Compliance.Gdpr.Reporting.Pdf;
 /// per-article scenario tables, audit-chain appendix, and methodology appendix.
 /// </summary>
 /// <remarks>
-/// QuestPDF community license is accepted in the static constructor so that
-/// unit tests that instantiate this type do not need to configure the license
-/// themselves.
+/// The static constructor declares the QuestPDF Community licence when no licence
+/// type has been set yet, so unit tests that instantiate this type do not need to
+/// configure it. A licence type the host application set earlier is left unchanged.
 /// <para>
 /// <b>Recommendations omission (intentional).</b> The PDF report does NOT
 /// surface the <see cref="GdprComplianceEvidence.Recommendations"/> array.
@@ -36,12 +36,14 @@ public sealed class GDPRPdfRenderer
     private const string RedactedSentinel = "[REDACTED — sensitive scenario]";
 
     /// <summary>
-    /// Accepts the QuestPDF Community license. Called once when the type is first loaded,
-    /// so that both production code and unit tests work without additional setup.
+    /// Declares the QuestPDF Community licence when no licence type has been set yet. Runs once,
+    /// when the type is first used, so production code and unit tests work without extra setup.
+    /// <c>QuestPDF.Settings.License</c> is process-wide: a licence type the host application set
+    /// earlier (for example Professional) is left unchanged.
     /// </summary>
     static GDPRPdfRenderer()
     {
-        QuestPDF.Settings.License = LicenseType.Community;
+        QuestPDF.Settings.License ??= LicenseType.Community;
     }
 
     private readonly ArticlesRegistry? _articles;
@@ -373,7 +375,8 @@ public sealed class GDPRPdfRenderer
             col.Item().PaddingTop(15);
 
             col.Item().Text($"Source run ID: {ev.Base.SourceRun.RunId}");
-            col.Item().Text($"Manifest hash: {ev.Base.SourceRun.ManifestHash}");
+            foreach (var line in AuditChainLines(ev.Base.SourceRun))
+                col.Item().Text(line);
             col.Item().PaddingTop(10);
 
             col.Item().Text($"AgentEval version: {ev.Base.Attestation.AgentEvalVersion}");
@@ -385,6 +388,37 @@ public sealed class GDPRPdfRenderer
             foreach (var kv in ev.GdprAttestation.PromptVersions)
                 col.Item().PaddingLeft(20).Text($"{kv.Key}: {kv.Value}");
         });
+    }
+
+    /// <summary>
+    /// The manifest-hash and chain-status lines of the audit-chain appendix. Same states as the
+    /// Markdown report's <c>## Audit Chain</c> section: this renderer only has the hash copied into
+    /// the evidence, never the source run it points at, so it does not verify the chain and never
+    /// prints a verified state. A recorded hash reads "not verified in this report" with how to
+    /// verify it; an empty one reads "no hash recorded".
+    /// </summary>
+    internal static IReadOnlyList<string> AuditChainLines(AgentEval.Output.SourceRunRef sourceRun)
+    {
+        ArgumentNullException.ThrowIfNull(sourceRun);
+
+        if (string.IsNullOrWhiteSpace(sourceRun.ManifestHash))
+        {
+            return new[]
+            {
+                "Manifest hash: —",
+                "Chain status: no hash recorded, so this evidence cannot be checked against its source run.",
+            };
+        }
+
+        return new[]
+        {
+            $"Manifest hash: {sourceRun.ManifestHash}",
+            "Chain status: hash recorded, not verified in this report.",
+            "To verify, run 'agenteval doctor' inside the solution whose .agenteval/ workspace holds this " +
+            "source run. It re-hashes each run's files against that run's manifest.json and checks the " +
+            "manifest hash in every compliance evidence.json against its source run. Then confirm the hash " +
+            "above equals contentHash in that run's manifest.json.",
+        };
     }
 
     // ── G6.6 Methodology appendix ────────────────────────────────────────────
@@ -436,7 +470,8 @@ public sealed class GDPRPdfRenderer
     {
         "PASS" => Colors.Green.Medium,
         "WARN" => Colors.Orange.Medium,
-        _ => Colors.Red.Medium
+        "FAIL" => Colors.Red.Medium,
+        _ => Colors.Grey.Medium   // ERROR, SKIPPED: no verdict (B9b)
     };
 
     private static string Capitalize(string s) => EvalReportHelpers.Capitalize(s); // ARC-02: shared

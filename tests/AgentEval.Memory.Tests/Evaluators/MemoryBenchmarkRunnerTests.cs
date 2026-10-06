@@ -72,6 +72,28 @@ public class MemoryBenchmarkRunnerTests
         Assert.NotNull(crossSession);
         Assert.True(crossSession.Skipped);
         Assert.Contains("ISessionResettableAgent", crossSession.SkipReason);
+        // Unsupported is not a crash: it leaves the denominator rather than counting as 0.
+        Assert.False(crossSession.Errored);
+    }
+
+    private sealed class ThrowingAgent : AgentEval.Core.IEvaluableAgent
+    {
+        public string Name => "throwing";
+        public Task<AgentEval.Core.AgentResponse> InvokeAsync(string prompt, CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("the agent's transport failed");
+    }
+
+    [Fact]
+    public async Task RunBenchmarkAsync_ACategoryThatThrows_IsErrored_AndCountsAsZero()
+    {
+        var result = await _runner.RunBenchmarkAsync(new ThrowingAgent(), MemoryBenchmark.Quick);
+
+        var errored = result.CategoryResults.Where(c => c.Errored).ToList();
+        Assert.NotEmpty(errored);
+        Assert.All(errored, c => Assert.StartsWith("Error: ", c.SkipReason, StringComparison.Ordinal));
+        // Every category crashed, so nothing may renormalise into a score.
+        Assert.Equal(0, result.OverallScore);
+        Assert.Equal(errored.Select(c => c.CategoryName), result.ErroredCategories);
     }
 
     [Fact]
@@ -489,5 +511,27 @@ public class MemoryBenchmarkRunnerTests
         // the 128K window") actually holds.
         Assert.Equal(192_000, overflow.TargetTokensOverride);
         Assert.Equal(20, overflow.OverflowCallsOverride);
+    }
+
+    // ── B6c-9 (mid-branch review): a broken configuration errors the category; it is not a designed skip ──────────
+    // A missing scenario data file (and an unknown scenario type) returned "skipped": the category left the weights and the
+    // run could PASS. All four such paths now throw, which the runner records as an errored category (counted as 0, the
+    // run incomplete). The data files are embedded, so this test drives the same path through an unknown type.
+
+    [Fact]
+    public async Task RunBenchmarkAsync_AnUnknownScenarioType_ErrorsTheCategory_AndTheRunIsIncomplete()
+    {
+        var benchmark = new MemoryBenchmark
+        {
+            Name = "broken",
+            Categories = [new MemoryBenchmarkCategory { Name = "Broken", Weight = 1.0, ScenarioType = (BenchmarkScenarioType)999 }],
+        };
+
+        var result = await _runner.RunBenchmarkAsync(_agent, benchmark);
+
+        var category = Assert.Single(result.CategoryResults);
+        Assert.True(category.Errored);
+        Assert.StartsWith("Error: Unknown scenario type", category.SkipReason, StringComparison.Ordinal);
+        Assert.False(result.IsComplete);
     }
 }

@@ -384,6 +384,15 @@ public class TraceToolCall
     /// </summary>
     [JsonPropertyName("error")]
     public string? Error { get; set; }
+
+    /// <summary>
+    /// Whether the call failed: a recorded <see cref="Error"/> is a failure whatever <see cref="Succeeded"/> says. The
+    /// flag defaults to <see langword="true"/>, so a trace written without it read an errored call as a success — in the
+    /// tool-call projection (fixed in B6c-5), and in the Glass Box tool checks and the workflow replayer until #203 review
+    /// round 3 (B10f). Every reader of a call's outcome uses this. Not serialized.
+    /// </summary>
+    [JsonIgnore]
+    public bool Failed => !Succeeded || Error is not null;
 }
 
 /// <summary>

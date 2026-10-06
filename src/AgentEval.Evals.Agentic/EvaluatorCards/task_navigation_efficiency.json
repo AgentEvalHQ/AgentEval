@@ -3,7 +3,7 @@
   "key": "task_navigation_efficiency",
   "name": "Task Navigation Efficiency",
   "category": "system-outcome",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "Hybrid algorithmic + LLM evaluator. The deterministic part (AtomicCodeEval, free) measures the agent's tool-call path length vs. the optimal path. The LLM judge then assesses whether deviations were justified (e.g., good error recovery) or wasteful (redundant calls). Gives credit for navigating efficiently while not penalising legitimate exploration.",
   "costTier": "Low",
   "higherIsBetter": true,

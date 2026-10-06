@@ -3,8 +3,7 @@ AgentEval Mission Control — Self-hosted fonts
 
 This directory ships two self-hosted webfonts so the portal renders typography
 correctly without contacting Google Fonts (closes plan-08 portal-review B2 /
-CSP contradiction; tracked as T2.3 in
-strategy/FutureFeatures/todo/13-pending-issues-tasks.md).
+CSP contradiction).
 
 Both fonts are distributed under the SIL Open Font License, Version 1.1
 (SPDX: OFL-1.1). The license text is reproduced in the per-font sections

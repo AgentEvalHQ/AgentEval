@@ -452,6 +452,7 @@ public class PerformanceBenchmarkTests
         var stderr = captured.ToString();
         Assert.Contains("WARNING", stderr);
         Assert.Contains("gpt4o", stderr); // the unrecognised name is surfaced
+        Assert.Contains("not measured", stderr); // and the cost is reported as unmeasured, never as $0
     }
 
     // ARC-08: when an IAgentEvalLogger is injected, the no-pricing warning is routed to it (at Warning)

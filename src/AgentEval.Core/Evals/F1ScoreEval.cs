@@ -23,12 +23,13 @@ namespace AgentEval.Evals;
 ///   <item>Recall    = overlap / |ground_truth_tokens| (counting duplicates)</item>
 ///   <item>F1        = 2 × (precision × recall) / (precision + recall)</item>
 /// </list>
-/// Edge cases: empty response → F1=0; empty ground truth → F1=0; both empty → F1=1.0.
+/// Edge cases: empty response → F1=0; a reference with no word tokens (e.g. punctuation only) is no reference — not
+/// measured, like a blank one (review round 15 L2).
 /// </para>
 /// <para>
-/// <b>Ground-truth resolution</b>: uses <see cref="EvalInput.GroundTruth"/> if set;
-/// otherwise falls back to the constructor-supplied <c>groundTruth</c> parameter.
-/// If neither is available, the evaluator returns score=0 with a note in evidence.
+/// <b>Ground-truth resolution</b>: uses <see cref="EvalInput.GroundTruth"/> if it has a word in it; otherwise (null,
+/// blank, punctuation only) falls back to the constructor-supplied <c>groundTruth</c> parameter. If neither has a word,
+/// F1 cannot be computed: the result is <c>skipped</c> (not measured), never a fail (#203, B12a / B12c / B12n).
 /// </para>
 /// <para>
 /// <b>Provenance</b>: <c>Score.Confidence = 1.0</c> (deterministic — no sampling variance).
@@ -55,7 +56,7 @@ public sealed class F1ScoreEval : AtomicCodeEval
     /// is not supplied. Per-input <see cref="EvalInput.GroundTruth"/> always takes precedence.
     /// </param>
     public F1ScoreEval(double passThreshold = 0.50, string? groundTruth = null)
-        : base("f1_score", "F1 Score", "rag", "1.0.0")
+        : base("f1_score", "F1 Score", "rag", "1.1.0")   // 1.1.0: no reference → not measured, not a fail (#203, B12a)
     {
         if (!double.IsFinite(passThreshold) || passThreshold < 0.0 || passThreshold > 1.0)
             throw new ArgumentOutOfRangeException(nameof(passThreshold), passThreshold, "passThreshold must be a finite value in [0, 1].");
@@ -67,34 +68,23 @@ public sealed class F1ScoreEval : AtomicCodeEval
     protected override EvalResult Evaluate(EvalInput input)
     {
         var response = input.Response ?? string.Empty;
-        // Per-input GroundTruth takes precedence over constructor fallback.
-        var groundTruth = input.GroundTruth ?? _groundTruth;
+        // Per-input GroundTruth takes precedence over the constructor fallback; one with no words (blank, "?") is none and
+        // falls back, as the similarity judges read it (B12c; round 16 B12n: a wordless one skipped the fallback).
+        var groundTruth = ReferenceText.HasWords(input.GroundTruth) ? input.GroundTruth : _groundTruth;
 
-        if (groundTruth is null)
-        {
-            return Build(
-                value: 0.0,
-                passed: false,
-                severity: "medium",
-                evidence: new[]
-                {
-                    new EvalEvidence("deterministic", "f1_score",
-                        "Ground truth not provided via EvalInput.GroundTruth or constructor parameter — F1 cannot be computed. Score = 0."),
-                });
-        }
+        // No reference: F1 cannot be computed, so it is not measured — scored 0 and failed, it marked the agent down for
+        // an input the caller did not give (#203, B12a). A reference with no words ("?", "...") gives nothing to compare
+        // either — it passed at 1.0 beside an empty response and failed at 0 beside any answer (review round 15 L2).
+        if (string.IsNullOrWhiteSpace(groundTruth))
+            return EvalResult.Skipped(this,
+                "F1 compares the response with a reference answer, and none was supplied (EvalInput.GroundTruth or the constructor): not measured.");
 
-        var responseTokens = Tokenize(response);
-        var truthTokens = Tokenize(groundTruth);
+        if (!ReferenceText.HasWords(groundTruth))
+            return EvalResult.Skipped(this,
+                "F1 compares the response with a reference answer, and the one supplied has no words to compare: not measured.");
 
-        // Both empty → trivially perfect.
-        if (responseTokens.Count == 0 && truthTokens.Count == 0)
-        {
-            return BuildWithConfidence(
-                value: 1.0,
-                passed: 1.0 >= _passThreshold,
-                severity: "none",
-                message: "Both response and ground truth are empty; F1 = 1.0 (trivially perfect).");
-        }
+        var responseTokens = ReferenceText.Tokenize(response);
+        var truthTokens = ReferenceText.Tokenize(groundTruth);
 
         // Phase-7 Task 7.8: empty-input branches compute `passed = f1 >= threshold`
         // uniformly with the non-empty branch. A threshold of 0.0 makes f1=0.0 a pass
@@ -110,18 +100,6 @@ public sealed class F1ScoreEval : AtomicCodeEval
                 message: "Response is empty; F1 = 0.0.");
         }
 
-        if (truthTokens.Count == 0)
-        {
-            return BuildWithConfidence(
-                value: 0.0,
-                passed: 0.0 >= _passThreshold,
-                severity: _passThreshold <= 0 ? "none" : "medium",
-                message: "Ground truth is empty; F1 = 0.0.");
-        }
-
-        // Multiset (bag-of-tokens) overlap — standard SQuAD token-F1. For each distinct token the
-        // overlap contributes min(count in response, count in truth), so duplicated/over-emitted
-        // tokens are penalised rather than collapsed by a set intersection (BUG-59).
         // Multiset (bag-of-tokens) overlap — standard SQuAD token-F1. For each distinct token the
         // overlap contributes min(count in response, count in truth), so duplicated/over-emitted
         // tokens are penalised rather than collapsed by a set intersection (BUG-59).
@@ -185,21 +163,5 @@ public sealed class F1ScoreEval : AtomicCodeEval
             Details: new(null, new[] { new EvalEvidence("deterministic", "f1_score", message) }, null, null, null),
             Provenance: new("atomic-code", null, null, null, null, 0, false),
             EvaluatedAt: DateTimeOffset.UtcNow);
-    }
-
-    /// <summary>
-    /// Tokenizes a string into a lowercased word set using whitespace splitting.
-    /// Punctuation attached to words is stripped for fairer token matching.
-    /// </summary>
-    private static IReadOnlyCollection<string> Tokenize(string text)
-    {
-        if (string.IsNullOrWhiteSpace(text))
-            return Array.Empty<string>();
-
-        return text
-            .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
-            .Select(t => t.ToLowerInvariant().Trim('.', ',', '!', '?', ';', ':', '"', '\'', '(', ')', '[', ']'))
-            .Where(t => t.Length > 0)
-            .ToList(); // multiset — preserve token multiplicity for standard token-F1 (BUG-59)
     }
 }

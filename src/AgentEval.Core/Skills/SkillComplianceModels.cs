@@ -62,7 +62,7 @@ public enum SkillComplianceRule
     /// <c>AgentFileSkillsSource.GetSkillsAsync()</c> silently excluded it from discovery — it will never
     /// load into any agent. Distinct from every rule above: those describe a problem with an otherwise-
     /// working skill; this means the skill is <em>non-functional as authored</em>. See
-    /// <c>strategy/FutureFeatures/Skills/Skill-Discovery-Exclusion-Detection-Design.md</c>.
+    /// <c>docs/agent-skills.md</c> §5.
     /// </summary>
     SkillExcludedFromDiscovery,
 

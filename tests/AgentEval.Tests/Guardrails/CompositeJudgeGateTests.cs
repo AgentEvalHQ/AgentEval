@@ -58,6 +58,46 @@ public class CompositeJudgeGateTests
     private static CompositeJudgeGate<KeywordRubric> Gate(IChatClient model, JudgeGateOptions? opts = null)
         => new(new KeywordRubric(), model, opts);
 
+    // ── JudgeTextAsync / IsFlagged: the raw verdict, for callers that must keep "undecided" apart from "allow" ──
+
+    [Fact]
+    public async Task JudgeTextAsync_ReturnsNull_WhenThePrefilterSkips_AndMakesNoCall()
+    {
+        var model = new ScriptedChatClient().AddText("BLOCK");
+
+        Assert.Null(await Gate(model).JudgeTextAsync("nothing relevant here"));
+        Assert.Equal(0, model.CallCount);
+    }
+
+    [Fact]
+    public async Task JudgeTextAsync_KeepsInconclusiveDistinct_WhereInspectAsyncFoldsItIntoAnAction()
+    {
+        // InspectAsync must act, so an unparseable reply becomes Block (fail-closed, the default) or Allow (fail-open).
+        // A measurement must count neither: the raw verdict stays Inconclusive.
+        var raw = await Gate(new ScriptedChatClient().AddText("???")).JudgeTextAsync("please scan this");
+        var failClosed = await Gate(new ScriptedChatClient().AddText("???")).InspectAsync("please scan this");
+        var failOpen = await Gate(new ScriptedChatClient().AddText("???"), new JudgeGateOptions { FailClosedOnInconclusive = false })
+            .InspectAsync("please scan this");
+
+        Assert.Equal(JudgeDecision.Inconclusive, raw!.Decision);
+        Assert.Equal(GateAction.Block, failClosed.Action);
+        Assert.Equal(GateAction.Allow, failOpen.Action);
+    }
+
+    [Theory]
+    [InlineData(0.9, 0.8, true)]
+    [InlineData(0.8, 0.8, true)]
+    [InlineData(0.7, 0.8, false)]
+    public void IsFlagged_AppliesTheSameThreshold_AsInspectAsync(double confidence, double threshold, bool flagged)
+    {
+        var gate = Gate(new ScriptedChatClient(), new JudgeGateOptions { BlockThreshold = threshold });
+        var verdict = JudgeVerdict.Blocked("x", null, confidence);
+
+        Assert.Equal(flagged, gate.IsFlagged(verdict));
+        Assert.False(gate.IsFlagged(JudgeVerdict.Allowed()));
+        Assert.True(gate.IsFlagged(JudgeVerdict.Blocked("x", null, double.NaN)));   // NaN fails closed, as in InspectAsync
+    }
+
     [Fact]
     public async Task BlockedVerdict_Blocks_WithEvidenceSpans()
     {

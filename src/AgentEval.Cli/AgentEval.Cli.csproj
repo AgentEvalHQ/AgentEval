@@ -35,6 +35,8 @@
          step INTO the CLI source while debugging from their own code that depends on it. -->
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <!-- AgentEval's own use of its preview decision abstraction (DecisionsPreview): acknowledged here; consumers still see it. -->
+    <NoWarn>$(NoWarn);AGENTEVAL_DECISIONS_PREVIEW001</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
@@ -44,6 +46,11 @@
   <ItemGroup>
     <!-- CLI-specific package README (install + command surface), not the umbrella's root README. -->
     <None Include="README.md" Pack="true" PackagePath="\" />
+    <!-- A .NET tool package carries its dependencies, so this package redistributes third-party
+         assemblies (among them ChilliCream.Nitro.App, whose licence requires that recipients get a copy
+         of its terms, and BSD-3-Clause / Apache-2.0 packages whose notices must travel with binaries).
+         The repo-root notices file, with those licence texts, goes to the package root. -->
+    <None Include="..\..\THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="\" Visible="false" />
   </ItemGroup>
 
   <ItemGroup>
@@ -67,9 +74,10 @@
          to the harness via DataLoaders / Compliance / RedTeam abstractions and do not need
          this reference directly. -->
     <ProjectReference Include="..\AgentEval.MAF\AgentEval.MAF.csproj" />
-    <!-- The Copilot Studio bridge (CopilotStudioAgentFactory/ChatClient/Config/TokenProvider) now lives in
-         its own public package, AgentEval.MAF.CopilotStudio, so it's usable directly in code without the
-         CLI; CopilotStudioRedTeamTarget still consumes it here for the sut=copilot-studio target. -->
+    <!-- The Copilot Studio bridge (CopilotStudioAgentFactory/ChatClient/Config/TokenProvider) lives in its
+         own project, AgentEval.MAF.CopilotStudio. That project sets IsPackable=true, but the release workflow
+         does not pack or publish it, so it is not on NuGet: its code reaches users only inside this CLI tool.
+         CopilotStudioRedTeamTarget consumes it here for the sut=copilot-studio target. -->
     <ProjectReference Include="..\AgentEval.MAF.CopilotStudio\AgentEval.MAF.CopilotStudio.csproj" />
   </ItemGroup>
 
@@ -81,6 +89,18 @@
     <ProjectReference Include="..\AgentEval.MissionControl\AgentEval.MissionControl.csproj" />
   </ItemGroup>
 
+  <!-- The Mission Control UI (the SPA build output, gitignored) must ship INSIDE this tool: `mc serve` looks for
+       {tool dir}/wwwroot/index.html. The referenced web project copies its wwwroot into this project's build output,
+       but the Web SDK's static-asset handling keeps it out of the publish output a tool package is made from, so
+       every published tool through 0.42.0-beta had no UI. Including it here puts it at tools/net10.0/any/wwwroot/.
+       The release workflow builds the SPA first and fails if the packed tool has no wwwroot/index.html. -->
+  <ItemGroup Condition="'$(TargetFramework)' == 'net10.0'">
+    <None Include="..\AgentEval.MissionControl\wwwroot\**\*"
+          Link="wwwroot\%(RecursiveDir)%(Filename)%(Extension)"
+          CopyToPublishDirectory="PreserveNewest"
+          Visible="false" />
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="System.CommandLine" />
     <!-- Real Azure OpenAI judge for `agenteval bench ...` when env vars are set. -->
@@ -90,6 +110,23 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Resources/*" />
+  </ItemGroup>
+
+  <!-- The calibration golden sets ship INSIDE the CLI, so `bench gdpr|eu-ai-act|agentic calibrate` works from the
+       installed tool: users are told to calibrate the judges for their own model, and through 0.42.0-beta the
+       goldens existed only in AgentEval.Tests.dll, so calibrate failed outside a source checkout. One source of
+       truth: the files stay in the test project, which embeds the same files for its own tests. Each logical name
+       keeps the fragment its loader filters on (.Compliance.Gdpr.Calibration.Golden. and so on). -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\tests\AgentEval.Tests\Compliance\Gdpr\Calibration\Golden\*.jsonl"
+                      LogicalName="AgentEval.Cli.Goldens.Compliance.Gdpr.Calibration.Golden.%(Filename)%(Extension)"
+                      Visible="false" />
+    <EmbeddedResource Include="..\..\tests\AgentEval.Tests\Compliance\EuAiAct\Calibration\Golden\*.jsonl"
+                      LogicalName="AgentEval.Cli.Goldens.Compliance.EuAiAct.Calibration.Golden.%(Filename)%(Extension)"
+                      Visible="false" />
+    <EmbeddedResource Include="..\..\tests\AgentEval.Tests\Agentic\Calibration\Golden\*.jsonl"
+                      LogicalName="AgentEval.Cli.Goldens.Agentic.Calibration.Golden.%(Filename)%(Extension)"
+                      Visible="false" />
   </ItemGroup>
 
   <ItemGroup>

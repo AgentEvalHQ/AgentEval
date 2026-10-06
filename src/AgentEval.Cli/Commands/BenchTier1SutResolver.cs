@@ -10,28 +10,28 @@ namespace AgentEval.Cli.Commands;
 
 /// <summary>
 /// Resolves an optional agent override for a <c>bench</c> subcommand from either the shared <c>--sut</c> seam
-/// (Track 2 PR3 — <c>strategy/CopilotStudio/Bench-Eval-Integration-and-Live-Connector-Plan.md</c> §3.4 "bench
-/// Tier 1") or a generic OpenAI-compatible <c>--endpoint</c>/<c>--model</c>/<c>--api-key</c> set (Part C —
-/// <c>strategy/CLI-Custom-Benchmarks-CopilotStudio-OpenAI-and-Metrics-Remediation-Design.md</c> §2). Despite
-/// the "Tier1" name (kept for history — it shipped for <c>bench owasp</c>/<c>mitre</c>/<c>nist</c> first), the
-/// <see cref="Resolve"/> logic itself is verb/tier-agnostic and is also reused verbatim by <c>bench gdpr</c>/
-/// <c>eu-ai-act</c> (Tier 2, §2.2 of <c>strategy/CopilotStudio/Remaining-Backlog-Implementation-Plan-2026-07-16.md</c>)
+/// (Track 2 PR3, "bench Tier 1") or a generic OpenAI-compatible <c>--endpoint</c>/<c>--model</c>/<c>--api-key</c>
+/// set (Part C). Despite the "Tier1" name (kept for history — it shipped for <c>bench owasp</c>/<c>mitre</c>/
+/// <c>nist</c> first), the <see cref="Resolve"/> logic itself is verb/tier-agnostic and is also reused verbatim
+/// by <c>bench gdpr</c>/<c>eu-ai-act</c> (Tier 2)
 /// with <c>endpoint</c>/<c>model</c>/<c>apiKey</c> passed as <see langword="null"/> — a separate
 /// <c>BenchTier2SutResolver</c> would have been byte-identical duplication. Pure/testable — kept out of
 /// <c>Program.cs</c>'s top-level statements (which aren't a unit-testable surface) on purpose.
 /// <c>BenchOwaspCommand</c>/<c>BenchMitreCommand</c>/<c>BenchNistCommand</c>/<c>BenchCommand</c>/
 /// <c>BenchEuAiActCommand</c> are themselves untouched by this resolver: each already has its own
-/// <c>agentOverride</c> seam that wins over <c>--azure-from-env</c>/the stub/the supplied response, so this
-/// class only needs to decide WHAT (if anything) to pass as that override.
+/// <c>agentOverride</c> seam that wins over <c>--azure-from-env</c>/the supplied response, so this
+/// class only needs to decide WHAT (if anything) to pass as that override. <c>--sut mock</c> never reaches it:
+/// the command line hands it to the command as its own flag (see <see cref="MockTarget"/>).
 /// </summary>
 internal static class BenchTier1SutResolver
 {
     /// <summary>
     /// Resolves the agent override, if any. <c>--sut</c> wins when set (its own <see cref="ISutTarget.Validate"/>
     /// runs, surfaced here as a friendly error rather than an exception so the caller can print it and exit
-    /// cleanly — mirroring every other bench command's "Error: ..." + exit 1 convention); otherwise a non-empty
+    /// cleanly with <c>ExitCodes.UsageError</c> (2), as for any other rejected argument); otherwise a non-empty
     /// <paramref name="endpoint"/> builds a plain OpenAI-compatible agent. Neither set → <c>(null, null)</c>,
-    /// letting the caller's existing <c>--azure-from-env</c>/stub fallback (inside <c>RunAsync</c>) run unchanged.
+    /// leaving the caller's <c>--azure-from-env</c> or supplied response to name the target, or its refusal to run
+    /// without one (inside <c>RunAsync</c>).
     /// </summary>
     /// <param name="sut">The parsed <c>--sut</c> value, or <see langword="null"/> if not set.</param>
     /// <param name="targetOptions">Every registered target's own bound options, keyed by <see cref="ISutTarget.Sut"/>.</param>
@@ -58,6 +58,12 @@ internal static class BenchTier1SutResolver
     {
         if (sut is not null)
         {
+            if (!targets.Any(t => string.Equals(t.Sut, sut.Trim(), StringComparison.OrdinalIgnoreCase)))
+            {
+                // Name the mock too: it is a valid --sut on every bench command, handled before this resolver.
+                return (null, $"Unknown --sut value: '{sut}'. Valid: {string.Join(", ", targets.Select(t => t.Sut).Append(MockTarget.Sut))}.");
+            }
+
             var common = new CommonTargetOptions { Sut = sut, TargetOptions = targetOptions };
             try
             {

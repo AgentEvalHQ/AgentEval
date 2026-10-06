@@ -1,11 +1,12 @@
 <!--
-Source: forked from Azure/azure-sdk-for-python (commit <TBD-foundry-sha> see CHANGELOG T3.7)
-        sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_groundedness/groundedness.prompty
-License: MIT (https://github.com/Azure/azure-sdk-for-python/blob/main/LICENSE)
-Modified by AgentEval contributors. See CHANGELOG.md.
-Modifications:
+Lineage: original AgentEval prompt text, modelled on the evaluator concept (name, inputs and
+         scoring dimensions) of Azure/azure-sdk-for-python
+         sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_groundedness/groundedness_with_query.prompty
+         and groundedness_without_query.prompty (which replaced groundedness.prompty in October 2024).
+         Checked 2026-10-02: no upstream prompt text is reproduced.
+License: MIT (https://github.com/AgentEvalHQ/AgentEval/blob/main/LICENSE)
+Differences from the upstream evaluator:
   - Restructured for the AgentEval EvalResult envelope
-  - temperature 1.0 → 0
   - Split monolithic Groundedness into 4 sub-dimensions (claim_support, claim_contradicted, citation_accuracy, evidence_coverage)
   - Added structured evidence[] output; replaced chain-of-thought with per-claim evidence array
   - Added severity rubric (medium severity for groundedness failures per RAG quality taxonomy)

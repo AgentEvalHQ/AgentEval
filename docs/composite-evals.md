@@ -105,17 +105,49 @@ Composites can nest. Because `CompositeEval` implements `IEval`, it can itself a
 
 ## Verdict matrix
 
-The composite verdict is determined after aggregation. `warn` is a soft fail: `Passed = false` but `Label = "warn"` distinguishes it from a hard fail.
+The composite verdict is determined after aggregation. `warn` is a soft fail: `Passed = false` but `Label = "warn"` distinguishes it from a hard fail. The rows are checked in order:
 
-| Threshold set? | Condition | `Label` | `Passed` |
-|----------------|-----------|---------|----------|
-| Yes | `score >= threshold` | `"pass"` | `true` |
-| Yes | `score < threshold` | `"fail"` | `false` |
-| No | severity is `critical` or `high` | `"fail"` | `false` |
-| No | severity is `medium` | `"warn"` | `false` |
-| No | severity is `none` or `low` | `"pass"` | `true` |
+| # | Condition | `Label` | `Passed` |
+|---|-----------|---------|----------|
+| 1 | a `Required` component errored | `"error"` — unless the measured parts already decide `"fail"`, that is, the composite fails even if every errored required part had passed perfectly: under the severity rule (no threshold, or `SeverityCapsThreshold`) a high or critical failure among the measured required parts; under a threshold, a score that cannot reach it. An errored nested composite decided nothing (had it, it would read `"fail"`) and reports no severity, so a failure its own threshold would have absorbed never decides its parent | `false` |
+| 2 | no component produced a measurement | `"error"` if a component the verdict rests on errored (a `Required` one is row 1; any one when none is required); `"warn"` (recorded `notMeasured`) if one of them is a nested composite that withheld its own pass — its parts were measured, but a required part inside did not run; else `"skipped"`. An optional component that errored or withheld is not the verdict, so it reads like an optional skip, here and in a parent | `false` |
+| 3 | threshold set, `score >= threshold` | `"pass"` (see rows 6–7); with `SeverityCapsThreshold = true`, required-component severity still decides as in row 5 (`critical`/`high` → `"fail"`, `medium` → `"warn"`) | `true` only on pass |
+| 4 | threshold set, `score < threshold` | `"fail"` | `false` |
+| 5 | no threshold: severity `critical` or `high` → `"fail"`; `medium` → `"warn"`; `none` or `low` → `"pass"` (see rows 6–7) | as stated | |
+| 6 | the label would be `"pass"`, but a `Required` component did not run (`skipped`, or any not-measured result) or is a nested composite that withheld its own pass for that reason (it records `measurement: notMeasured`) | `"warn"` | `false` |
+| 7 | the label would be `"pass"`, but fewer than `MinimumMeasuredShare` (default **0.5**) of the components produced a measurement | `"warn"` | `false` |
 
-Composite severity is the maximum severity across all sub-results (`none < low < medium < high < critical`), computed by `SeverityRollup.Max`.
+After the matrix, each component's `EvalComponent.OnFailure` applies to a component that ran and failed: `Fail`
+makes the composite `"fail"`, `Warn` turns a `"pass"` into `"warn"` and the summary names the component, and
+`Averaged` (the default) leaves it to the score. The effect only escalates: under `Fail` or `Warn`, a component that
+only warned passes a warn up, never a fail. `FailUnlessPass` is for a security gate's checks: the composite fails on
+anything short of a pass, a warn included (fail-closed). The agentic presets set it on every component (see the agentic getting-started
+guide, "What a preset's verdict means").
+
+Skipped, inapplicable and errored components are left out of the score, so they never count as 0. Rows 6 and 7 stop
+that from turning into a pass on whatever is left. Row 6: a pass cannot rest on a required component that never ran
+— components are `Required` by default, so mark a component `Required: false` if the composite may pass without it.
+When no component is marked required, each one's measured failure still counts in the severity rule (otherwise nothing
+could ever fail the composite), while one that errored or did not run blocks nothing unless nothing at all was measured
+(row 2); row 7's coverage bar still applies.
+A nested composite tells its parent through its **measurement state**, not its label: one that withheld its pass
+this way records `notMeasured`, and one whose required components are all inapplicable records `notApplicable`. A
+nested `warn` from a measured medium-severity failure, or from a nested composite's own coverage bar, is a measurement
+like any other (the coverage bar is per level). Under the default `Averaged` effect a nested `warn` — or `fail` — is
+averaged into its parent like any other score, so the parent can still pass; set `OnFailure` to `Warn` or `Fail` on the
+component to carry its verdict up (the agentic presets do, on every component). The parent's summary names what it
+absorbed this way ("Absorbed by the score (OnFailure = Averaged): <key> (fail), <key> (warn)"), so a pass never
+hides it; the verdict does not change. Under the severity rule (no threshold, or `SeverityCapsThreshold`) a required
+part failing at medium or more decides the label instead, and the summary says so ("Decided by severity: <key> (fail,
+medium)"). An `inapplicable` component (the case cannot test the thing) never
+triggers row 6. Row 7: a composite whose components mostly report "not applicable" cannot pass on
+the few that remain; `MinimumMeasuredShare = 0` drops this bar, not row 6. Only a pass is withheld; a measured
+failure stays a failure. Whenever components were left out, the result's `Details.Summary` says how many were
+measured and why the others were not, and names the required components that did not run — behind a row-6 `warn`,
+and under a `warn` or `fail` the measured part decided. Through the CLI,
+`warn` exits with code 10 (`GateWarning`), which CI can treat as blocking or not.
+
+Composite severity (`none < low < medium < high < critical`) follows the verdict: a pass reports `none`; a fail reports the aggregation's severity (`SeverityRollup.Max` over the measured parts), at least `medium`; a warn reports that severity capped at `medium`; `error` reports `none` (no verdict, so no severity, as for an errored leaf); `skipped` reports it unchanged. A passing composite therefore never carries the severity of a failure its own scoring absorbed.
 
 ---
 

@@ -13,9 +13,9 @@ namespace AgentEval.Core.Reporting;
 /// (GDPR / EU AI Act) for parity. Phase-8 T2.5: methodology + audit-chain.
 /// <para>
 /// Each helper writes a self-contained <c>## Heading</c> block to the supplied
-/// <see cref="StringBuilder"/> followed by a blank line. Helpers are no-ops when
-/// their inputs lack the required data (e.g. no pillars, no manifest hash) so
-/// they can be called unconditionally.
+/// <see cref="StringBuilder"/> followed by a blank line. Helpers tolerate missing
+/// data (e.g. no pillars, no manifest hash) and say so in the section instead of
+/// throwing, so they can be called unconditionally.
 /// </para>
 /// </summary>
 public static class MarkdownSectionBuilder
@@ -68,12 +68,19 @@ public static class MarkdownSectionBuilder
     }
 
     /// <summary>
-    /// Renders a <c>## Audit Chain</c> section covering the manifest hash, the source-run
-    /// reference, and an inferred chain-valid indicator.
+    /// Renders a <c>## Audit Chain</c> section covering the source-run reference, the manifest
+    /// hash, and what this report can say about the chain.
     /// <para>
-    /// Chain validity is inferred from presence of a non-empty <see cref="SourceRunRef.ManifestHash"/>:
-    /// the manifest hash is the anchor every downstream verification step uses; absence indicates
-    /// the evidence cannot be re-verified against its source run.
+    /// This helper does not verify the chain, so it never reports it as verified. It only receives
+    /// the <see cref="SourceRunRef"/> copied into the evidence; checking that reference needs the
+    /// source run's <c>manifest.json</c> and the run files its hash covers, which a report renderer
+    /// does not have. A recorded hash is shown as recorded and not verified, followed by how to
+    /// verify it (<c>agenteval doctor</c>). An empty hash is shown as no hash recorded.
+    /// </para>
+    /// <para>
+    /// This section used to print <c>VALID</c> for any non-empty hash and <c>BROKEN</c> for an empty
+    /// one. The first reported a check that never ran as passed; the second reported a missing anchor
+    /// as a failed check.
     /// </para>
     /// </summary>
     /// <param name="sb">Target string builder.</param>
@@ -91,19 +98,32 @@ public static class MarkdownSectionBuilder
         sb.AppendLine();
         sb.AppendLine($"**Source run**: `{sourceRun.RunId}`  ");
 
-        var hashShown = string.IsNullOrWhiteSpace(sourceRun.ManifestHash)
-            ? "—"
-            : sourceRun.ManifestHash;
-        sb.AppendLine($"**Manifest hash**: `{hashShown}`  ");
+        var hashRecorded = !string.IsNullOrWhiteSpace(sourceRun.ManifestHash);
+        sb.AppendLine(hashRecorded
+            ? $"**Manifest hash**: `{sourceRun.ManifestHash}`  "
+            : "**Manifest hash**: —  ");
 
         if (!string.IsNullOrWhiteSpace(previousEvidenceRef))
             sb.AppendLine($"**Previous evidence**: `{previousEvidenceRef}`  ");
         else
             sb.AppendLine("**Previous evidence**: —  ");
 
-        var chainValid = !string.IsNullOrWhiteSpace(sourceRun.ManifestHash);
-        var indicator = chainValid ? "VALID" : "BROKEN";
-        sb.AppendLine($"**Chain status**: **{indicator}**");
+        // Nothing here compares the hash with anything, so the status says what is on the page:
+        // whether a hash was recorded. Only a real check may print a verified state.
+        if (hashRecorded)
+        {
+            sb.AppendLine("**Chain status**: hash recorded, **not verified** in this report");
+            sb.AppendLine();
+            sb.AppendLine(
+                "To verify, run `agenteval doctor` inside the solution whose `.agenteval/` workspace holds the " +
+                "source run above. It re-hashes each run's files against that run's `manifest.json` and checks " +
+                "the manifest hash in every compliance `evidence.json` against its source run. Then confirm the " +
+                "hash above equals `contentHash` in that run's `manifest.json`.");
+        }
+        else
+        {
+            sb.AppendLine("**Chain status**: **no hash recorded**, so this evidence cannot be checked against its source run");
+        }
         sb.AppendLine();
     }
 }

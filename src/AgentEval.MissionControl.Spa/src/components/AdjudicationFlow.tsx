@@ -18,9 +18,10 @@ import { formatScore, formatCost } from "@/lib/format";
 //   2. Adjudicated, disputed → panel disagreed, adjudicator overrode.
 //      Show panel grid + adjudicator card with "OVERRIDES" arrow.
 //
-// Plan-07 §6.1 specced Visx NodeLink for adjudication; CSS Grid/Flexbox
-// keeps the bundle smaller and renders cleanly for the typical 2-5 judge
-// panel size. Visx upgrade documented as polish item if larger panels emerge.
+// An earlier design planned a Visx node-link diagram for adjudication. It
+// was not built: this view is CSS grid / flexbox, which keeps Recharts the
+// SPA's only chart dependency (docs/missioncontrol/charting.md) and suits a
+// panel of a few judges.
 
 interface Props {
   node: EvalResultNodeShape;

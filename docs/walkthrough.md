@@ -505,7 +505,7 @@ public class TravelAgentTests
 AgentEval includes comprehensive examples covering every evaluation scenario. Here's what each sample demonstrates:
 
 ### Foundation Samples (1-4): Getting Started
-**Mock Mode Available (No Azure OpenAI Required)**
+**Runs against your configured model; `--mock` gives an offline walkthrough with canned replies**
 
 - **Sample01**: Hello World - Basic agent evaluation setup
 - **Sample02**: Tool Usage Assertions - Validate tool calls with fluent syntax
@@ -548,22 +548,29 @@ AgentEval includes comprehensive examples covering every evaluation scenario. He
 git clone https://github.com/AgentEvalHQ/AgentEval
 cd AgentEval/samples/AgentEval.Samples
 
-# No API keys needed - samples 1-4 fall back to a mock agent when AIConfig is
-# unconfigured, so they run and print real assertions with no Azure and no spend.
+# Offline: the menu marks group M as offline, and CI runs the Gatekeeper suite as
+#   dotnet run --project samples/AgentEval.Samples -- --gatekeeper-offline-suite
+dotnet run -- 98   # Eval + Chance Floor         (M1)
+dotnet run -- 99   # Deterministic Benchmark     (M2)
+
+# A REAL model (and real spend) needs a provider: AI_INFERENCE_PROVIDER
+# (bitdeer | openai | foundry | azure | openai-compatible) with that provider's variables,
+# or, with the selector unset, the Azure OpenAI variables:
+export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/"
+export AZURE_OPENAI_API_KEY="your-api-key"
+export AZURE_OPENAI_DEPLOYMENT="gpt-4o"
+
+# Samples 1-4 need one too. With none configured they stop and say what to set.
 dotnet run -- 1    # Hello World                 (A1)
 dotnet run -- 2    # Agent + One Tool            (A2)
 dotnet run -- 3    # Agent + Multiple Tools      (A3)
 dotnet run -- 4    # Performance Metrics         (A4)
 
-# Also offline: the menu marks group M as offline, and CI runs the Gatekeeper suite as
-#   dotnet run --project samples/AgentEval.Samples -- --gatekeeper-offline-suite
-dotnet run -- 98   # Eval + Chance Floor         (M1)
-dotnet run -- 99   # Deterministic Benchmark     (M2)
+# --mock runs them as an offline walkthrough with canned replies, only on request.
+# Nothing in it measures a model; every pass/fail line ends "(MOCK: a canned reply, not a measurement)".
+dotnet run -- 1 --mock
 
-# A REAL model (and real spend) needs Azure OpenAI:
-export AZURE_OPENAI_ENDPOINT="https://your-resource.openai.azure.com/"
-export AZURE_OPENAI_API_KEY="your-api-key"
-
+# Other samples that need a model:
 dotnet run -- 8    # Comprehensive RAG           (B1)
 dotnet run -- 12   # Calibrated Evaluator        (B5)
 dotnet run -- 14   # Real MAF Workflow           (C2)

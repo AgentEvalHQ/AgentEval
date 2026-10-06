@@ -21,6 +21,7 @@ public static class GatekeeperSessionIdentityTakeover
     {
         GatekeeperSampleContractRenderer.Print("26");
         Console.WriteLine("\n=== Gatekeeper — Session Identity Takeover + Reload (offline) ===\n");
+        GatekeeperLiveMode.PrintNoModel("in-memory MAF sessions and fixed identities (its scripted client is never called)");
 
         await WeakObjectIdentityBoundaryAsync();
         await StableReloadAndPoisoningDefenseAsync();

@@ -263,6 +263,7 @@ public class MemoryTestRunner : IMemoryTestRunner
                 Query = query,
                 Response = response.Text,
                 Score = judgmentResult.Score,
+                Measured = judgmentResult.Measured,
                 FoundFacts = judgmentResult.FoundFacts,
                 MissingFacts = judgmentResult.MissingFacts,
                 ForbiddenFound = judgmentResult.ForbiddenFound,
@@ -295,7 +296,10 @@ public class MemoryTestRunner : IMemoryTestRunner
         // Forbidden fact penalties are already applied by the LLM judge at the per-query level
         // (the judge prompt instructs "Subtract 10-20 points per forbidden fact found").
         // No additional penalty here — that would double-penalize.
-        var overallScore = queryResults.Count > 0 ? queryResults.Average(r => r.Score) : 0;
+        // Over the measured queries only: a query the judge produced no score for is not a 0 (it is counted instead,
+        // as MemoryEvaluationResult.UnmeasuredQueries).
+        var measured = queryResults.Where(r => r.Measured).ToList();
+        var overallScore = measured.Count > 0 ? measured.Average(r => r.Score) : 0;
         
         // Cost estimation: $0.003 per 1K tokens (approximate, varies by model/provider).
         // Users should compute exact costs from TokensUsed with their own pricing.

@@ -396,7 +396,7 @@ public class PerformanceBenchmark
         {
             LogWarning(
                 $"[perf-cost] WARNING: no pricing entry found for '{resolvedModelName}'. " +
-                "Cost will be reported as $0 and the cost leaf will pass by default. " +
+                "Cost is not measured: no cost is reported and the cost check is skipped. " +
                 "Check PerformanceBenchmarkEvaluateOptions.CostModelName for a typo (e.g. 'gpt-4o', not 'gpt4o'), " +
                 "pass a known model id, or ensure your IEvaluableAgent populates AgentResponse.ModelId.");
         }
@@ -521,8 +521,11 @@ public class PerformanceBenchmark
         {
             ["p99_ms"]    = latencyResult.P99Latency.TotalMilliseconds,
             ["rps"]       = throughputResult.RequestsPerSecond,
-            ["cost_usd"]  = (double)(costResult.EstimatedCostUSD ?? 0m),
         };
+        if (costResult.EstimatedCostUSD is { } measuredCost)
+        {
+            dimensions["cost_usd"] = (double)measuredCost;
+        }
 
         return new EvalResult(
             Metric: new("perf_benchmark", "Performance Benchmark", "performance", "1.0.0"),
@@ -640,31 +643,44 @@ public class PerformanceBenchmark
 
     private static EvalResult BuildCostLeaf(CostBenchmarkResult r, PerformanceBenchmarkEvaluateOptions opts)
     {
-        var costUsd = (double)(r.EstimatedCostUSD ?? 0m);
-        var maxCost = opts.MaxCostUSD;
-
-        double score;
-        string label, severity;
-
         if (r.EstimatedCostUSD is null)
         {
-            // No pricing data available — treat as pass with low severity.
-            score = 1.0; label = "pass"; severity = "none";
+            // No price for the model: the cost was not measured. Skipped, so it neither passes nor counts toward the
+            // composite, and no $0 is reported. The token counts were measured and are kept.
+            var reason = $"Cost not measured: no price for model '{r.ModelName}'. Name a priced model " +
+                         "(PerformanceBenchmarkEvaluateOptions.CostModelName, or the CLI target's --model).";
+            return new EvalResult(
+                Metric: new("perf_cost", "Cost", "performance", "1.0.0"),
+                Score: new(0.0, null, "skipped", false, null, "none", null),
+                Details: new(
+                    Dimensions: new Dictionary<string, double>
+                    {
+                        ["total_tokens"] = r.TotalTokens,
+                        ["input_tokens"] = r.TotalInputTokens,
+                        ["output_tokens"] = r.TotalOutputTokens,
+                    },
+                    Evidence: [new EvalEvidence("cost", $"{r.AgentName} ({r.ModelName})", reason)],
+                    Recommendations: [reason],
+                    SubResults: null,
+                    AggregationStrategy: null),
+                Provenance: new("skipped", null, null, null, null, 0.0, false),
+                EvaluatedAt: DateTimeOffset.UtcNow);
         }
-        else
+
+        var costUsd = (double)r.EstimatedCostUSD.Value;
+        var maxCost = opts.MaxCostUSD;
+
+        // score: 1 − (cost / maxCost), clamped [0, 1]. Lower cost → higher score.
+        var rawScore = maxCost > 0 ? 1.0 - (costUsd / maxCost) : 1.0;
+        var score = Math.Max(0.0, Math.Min(1.0, rawScore));
+        var (label, severity) = score switch
         {
-            // score: 1 − (cost / maxCost), clamped [0, 1]. Lower cost → higher score.
-            var rawScore = maxCost > 0 ? 1.0 - (costUsd / maxCost) : 1.0;
-            score = Math.Max(0.0, Math.Min(1.0, rawScore));
-            (label, severity) = score switch
-            {
-                >= 0.8 => ("pass", "none"),
-                >= 0.5 => ("warn", "low"),
-                >= 0.3 => ("warn", "medium"),
-                >= 0.1 => ("fail", "high"),
-                _      => ("fail", "critical"),
-            };
-        }
+            >= 0.8 => ("pass", "none"),
+            >= 0.5 => ("warn", "low"),
+            >= 0.3 => ("warn", "medium"),
+            >= 0.1 => ("fail", "high"),
+            _      => ("fail", "critical"),
+        };
 
         bool passed = label == "pass";
 
@@ -679,10 +695,7 @@ public class PerformanceBenchmark
                     ["output_tokens"] = r.TotalOutputTokens,
                     ["cost_usd"] = costUsd,
                 },
-                Evidence: [new EvalEvidence("cost", $"{r.AgentName} ({r.ModelName})",
-                    r.EstimatedCostUSD.HasValue
-                        ? $"${costUsd:F6} vs max ${maxCost:F6}"
-                        : "Cost unknown — no pricing data for model")],
+                Evidence: [new EvalEvidence("cost", $"{r.AgentName} ({r.ModelName})", $"${costUsd:F6} vs max ${maxCost:F6}")],
                 Recommendations: passed ? null : [$"Estimated cost ${costUsd:F6} exceeds budget ${maxCost:F6}. Consider a smaller model or caching repeated prompts."],
                 SubResults: null,
                 AggregationStrategy: null),

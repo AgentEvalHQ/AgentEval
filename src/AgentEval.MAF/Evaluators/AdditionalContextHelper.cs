@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using MEAIEvaluationContext = Microsoft.Extensions.AI.Evaluation.EvaluationContext;
+using AgentEval.Evals;
 
 namespace AgentEval.MAF.Evaluators;
 
@@ -20,7 +21,7 @@ public static class AdditionalContextHelper
 
         foreach (var ctx in additionalContext)
         {
-            if (ctx is AgentEvalRAGContext ragCtx)
+            if (ctx is AgentEvalRAGContext ragCtx && !string.IsNullOrWhiteSpace(ragCtx.RetrievedContext))   // a blank one is none (B12j)
                 return ragCtx.RetrievedContext;
         }
         return null;
@@ -35,7 +36,7 @@ public static class AdditionalContextHelper
 
         foreach (var ctx in additionalContext)
         {
-            if (ctx is AgentEvalGroundTruthContext gtCtx)
+            if (ctx is AgentEvalGroundTruthContext gtCtx && ReferenceText.HasWords(gtCtx.GroundTruth))   // a blank or wordless one is none (B12j, round 17)
                 return gtCtx.GroundTruth;
         }
         return null;
@@ -48,12 +49,19 @@ public static class AdditionalContextHelper
     {
         if (additionalContext == null) return null;
 
+        // A carrier that names tools wins over an empty one before it, as a blank reference or context does (B12j);
+        // an empty list alone still says "no tool is expected" (#203 review round 16, B12n).
+        IReadOnlyList<string>? empty = null;
         foreach (var ctx in additionalContext)
         {
             if (ctx is AgentEvalExpectedToolsContext toolsCtx)
-                return toolsCtx.ExpectedToolNames;
+            {
+                if (toolsCtx.ExpectedToolNames.Any(n => !string.IsNullOrWhiteSpace(n)))
+                    return toolsCtx.ExpectedToolNames;
+                empty ??= toolsCtx.ExpectedToolNames;
+            }
         }
-        return null;
+        return empty;
     }
 }
 

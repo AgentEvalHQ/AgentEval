@@ -64,6 +64,7 @@ public sealed class DecisionEval : AtomicEval
     private readonly Func<EvalInput, object>? _stateProjector;
     private readonly Func<string?, JudgeCostMap.ModelRate>? _rateResolver;
     private readonly string _promptHash;
+    private readonly string? _reference;
 
     /// <summary>Initialises a new <see cref="DecisionEval"/>.</summary>
     /// <param name="client">The decision-model transport.</param>
@@ -93,6 +94,12 @@ public sealed class DecisionEval : AtomicEval
     /// Optional per-instance cost-rate resolver, used only when the provider does not report a cost
     /// itself. When <see langword="null"/>, falls back to <see cref="JudgeCostMap.GetRate(string?)"/>.
     /// </param>
+    /// <param name="reference">
+    /// Optional reference block: a description of what is being judged and what is not, sent ahead of the state
+    /// (see <see cref="AgentEval.Decisions.DecisionReferences"/>). It stops a decision model from grading the content
+    /// it is shown instead of the agent's handling of it, and it is part of the prompt fingerprint. Without one, the
+    /// request is exactly what it was before references existed.
+    /// </param>
     public DecisionEval(
         IDecisionClient client,
         string key,
@@ -106,7 +113,8 @@ public sealed class DecisionEval : AtomicEval
         string? model = null,
         string? failureSeverity = null,
         Func<EvalInput, object>? stateProjector = null,
-        Func<string?, JudgeCostMap.ModelRate>? rateResolver = null)
+        Func<string?, JudgeCostMap.ModelRate>? rateResolver = null,
+        string? reference = null)
         : base(key, name, category, version)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
@@ -122,11 +130,18 @@ public sealed class DecisionEval : AtomicEval
         _failureSeverity = failureSeverity;
         _stateProjector = stateProjector;
         _rateResolver = rateResolver;
-        _promptHash = HashPrompt(instructions, trueCriteria, falseCriteria);
+        _reference = string.IsNullOrWhiteSpace(reference) ? null : reference;
+        _promptHash = HashPrompt(instructions, trueCriteria, falseCriteria, _reference);
     }
 
     /// <summary>The yes/no question this eval asks.</summary>
     public string Instructions => _instructions;
+
+    /// <summary>
+    /// The reference block sent ahead of the state (what is being judged and what is not), or <see langword="null"/>.
+    /// See <see cref="AgentEval.Decisions.DecisionReferences"/>.
+    /// </summary>
+    public string? Reference => _reference;
 
     /// <summary><c>P(yes)</c> at or above which the eval passes.</summary>
     public double PassThreshold => _passThreshold;
@@ -138,7 +153,8 @@ public sealed class DecisionEval : AtomicEval
         if (input.Response is null)
             throw new InvalidOperationException("DecisionEval requires EvalInput.Response to be set.");
 
-        var state = _stateProjector?.Invoke(input) ?? DefaultState(input);
+        var projected = _stateProjector?.Invoke(input) ?? DefaultState(input);
+        var state = _reference is null ? projected : new ReferencedDecisionState(_reference, projected);
         var request = new DecisionRequest(
             state,
             new Dictionary<string, DecisionQuestion>(StringComparer.Ordinal)
@@ -223,13 +239,17 @@ public sealed class DecisionEval : AtomicEval
     internal static DefaultDecisionState DefaultState(EvalInput input) => new(
         input.Query,
         input.Response,
-        input.Context,
-        input.GroundTruth,
+        string.IsNullOrWhiteSpace(input.Context) ? null : input.Context,   // a blank context is none (round 16, B12n)
+        ReferenceText.HasWords(input.GroundTruth) ? input.GroundTruth : null,   // a wordless reference is none (round 15 L5, B12n)
         input.SystemMessage);
 
-    private static string HashPrompt(string instructions, string? trueCriteria, string? falseCriteria)
+    private static string HashPrompt(string instructions, string? trueCriteria, string? falseCriteria, string? reference)
     {
-        var bytes = Encoding.UTF8.GetBytes(instructions + "\u001f" + (trueCriteria ?? "") + "\u001f" + (falseCriteria ?? ""));
+        // Normalised line endings: a CRLF (Windows checkout) and an LF build of the same prompt are one instrument.
+        // The reference is appended only when present, so every hash recorded before references existed still holds.
+        var material = instructions + "\u001f" + (trueCriteria ?? "") + "\u001f" + (falseCriteria ?? "")
+            + (reference is null ? "" : "\u001f" + reference);
+        var bytes = Encoding.UTF8.GetBytes(material.Replace("\r\n", "\n", StringComparison.Ordinal));
         return Convert.ToHexString(SHA256.HashData(bytes))[..16].ToLowerInvariant();
     }
 }
@@ -241,3 +261,6 @@ internal sealed record DefaultDecisionState(
     string? Context,
     string? GroundTruth,
     string? SystemMessage);
+
+/// <summary>The state when a reference is set: the reference first, then the projected state, unchanged.</summary>
+internal sealed record ReferencedDecisionState(string Reference, object State);

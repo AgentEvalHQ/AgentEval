@@ -18,13 +18,13 @@ written by the CLI, the test harnesses, and the benchmark runners.
 
 ## Bootstrap
 
-Run `agenteval init` once per repository. It walks up from the current
+Run `agenteval init-workspace` once per repository. It walks up from the current
 directory to find a `.sln`, `.slnx`, or `.git` marker, treats that as the
 workspace root, and creates `.agenteval/` if it does not exist.
 
 ```bash
-agenteval init
-agenteval init --name "My Solution"   # set a display name explicitly
+agenteval init-workspace
+agenteval init-workspace --name "My Solution"   # set a display name explicitly
 ```
 
 Three files are written:
@@ -36,7 +36,7 @@ Three files are written:
   runs index, and red-team outputs from source control. Baselines and
   compliance evidence are not excluded.
 
-If `.agenteval/solution.json` already exists, `agenteval init` exits cleanly
+If `.agenteval/solution.json` already exists, `agenteval init-workspace` exits cleanly
 without overwriting anything.
 
 ---
@@ -283,4 +283,4 @@ registered and DI resolution fails for any code that depends on it.
 
 - [Mission Control Getting Started](missioncontrol/getting-started.md) — read-only portal that consumes `.agenteval/`.
 - [Composite Evaluations](composite-evals.md) — recursive `EvalResult` persistence inside `subjects/*/runs/{runId}/scenarios/`.
-- [CLI Reference](cli.md) — `agenteval init`, `agenteval doctor`.
+- [CLI Reference](cli.md) — `agenteval init-workspace`, `agenteval doctor`.

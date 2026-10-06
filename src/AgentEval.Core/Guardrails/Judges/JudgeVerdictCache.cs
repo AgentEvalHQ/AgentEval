@@ -22,7 +22,7 @@ namespace AgentEval.Guardrails.Judges;
 /// so a config change never serves a stale precedent. The bound is a <i>hard</i> cap under a lock, so it cannot
 /// overshoot.</para>
 /// </summary>
-public sealed class JudgeVerdictCache : IChatGate
+public sealed class JudgeVerdictCache : IChatGate, IDelegatingGate
 {
     private readonly IChatGate _inner;
     private readonly int _maxEntries;
@@ -41,6 +41,9 @@ public sealed class JudgeVerdictCache : IChatGate
 
     /// <inheritdoc/>
     public string PolicyName => _inner.PolicyName;
+
+    // The cached judge still decides every miss, so the inline-judge calibration check must see it through the cache.
+    IEnumerable<object> IDelegatingGate.InnerGates => new object[] { _inner };
 
     /// <summary>Cache hits served so far (P3-7).</summary>
     public long Hits => Interlocked.Read(ref _hits);

@@ -17,8 +17,7 @@ public sealed record RawSkillFrontmatter(string? Name, string? Description, stri
 /// line scan, not a general YAML parser.
 /// </summary>
 /// <remarks>
-/// <b>Why this exists (honest deviation from the original design sketch):</b> the design doc
-/// (<c>strategy/FutureFeatures/Skills/Skill-Discovery-Exclusion-Detection-Design.md</c> §3) assumed
+/// <b>Why this exists (honest deviation from the original design sketch):</b> the design doc assumed
 /// reusable frontmatter-parsing logic already existed somewhere in this codebase for
 /// <see cref="SkillManifest"/>/<see cref="SkillComplianceValidator"/> to call directly. It does not —
 /// grepped for it before writing this file: every existing frontmatter read in this repo goes through

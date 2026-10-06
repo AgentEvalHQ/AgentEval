@@ -7,8 +7,8 @@ using AgentEval.Skills;
 namespace AgentEval.MAF.Gatekeeper;
 
 /// <summary>
-/// Deterministic hard gate on <c>run_skill_script</c> (MAF Agent Skills Phase 3, Part B —
-/// <c>strategy/FutureFeatures/Skills/AgentEval-AgentSkills-Evals-Design-and-Plan.md</c> §6.2). Blocks a
+/// Deterministic hard gate on <c>run_skill_script</c> (MAF Agent Skills Phase 3, Part B — see
+/// <c>docs/agent-skills.md</c> §3, "<c>run_skill_script</c> governance"). Blocks a
 /// <c>run_skill_script</c> call whose script identifier is not on the allowlist. <see cref="GateCost.PureCode"/>.
 /// <see cref="MinimumPolicy"/> is <see cref="ToolGatePolicy.ReplaceResult"/> — its whole purpose is to STOP
 /// unapproved code execution, so it must not be silently registered under <see cref="ToolGatePolicy.WarnOnly"/>.

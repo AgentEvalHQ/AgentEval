@@ -11,12 +11,11 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// Evaluates whether an AI response covers all information the user would reasonably expect
 /// given the query and available context.
 /// <para>
-/// Wraps an <see cref="AtomicLlmEval"/> configured with the response-completeness rubric.
-/// The prompt instructs the judge to enumerate expected facts, classify each as
-/// <c>critical</c> or <c>optional</c>, and compute a weighted score
-/// (critical gaps weighted at 0.80, optional gaps at 0.20). The <c>missing_facts[]</c>
-/// array in the judge output is surfaced via <see cref="EvalDetails"/> evidence
-/// for diagnosability.
+/// Wraps an <see cref="AtomicLlmEval"/> configured with three response-completeness criteria;
+/// each criterion's verdict and explanation is surfaced via <see cref="EvalDetails"/> evidence.
+/// The critical/optional fact classification, its 0.80 / 0.20 weighting and the
+/// <c>missing_facts[]</c> array are specified in the rubric the judge is sent; the result keeps the score,
+/// criteria and evidence, not the <c>missing_facts[]</c> array.
 /// </para>
 /// <para>
 /// <b>Input contract</b>: requires <see cref="EvalInput.Query"/> and
@@ -26,10 +25,11 @@ namespace AgentEval.Evals.Agentic.Quality;
 /// infers expected facts from the query alone, which may undercount expectations.
 /// </para>
 /// <para>
-/// Source: forked from Azure/azure-sdk-for-python (commit &lt;TBD-foundry-sha&gt; see CHANGELOG T3.7)
-/// sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_response_completeness/response_completeness.prompty
-/// License: MIT. Modifications: temperature=0, critical/optional gap classification,
-/// missing_facts[] array, structured evidence[], label table, severity=medium.
+/// Lineage: AgentEval's own criteria and reference prompt, modelled on the evaluator concept (name,
+/// inputs and scoring dimensions) of Azure/azure-sdk-for-python
+/// <c>sdk/evaluation/azure-ai-evaluation/azure/ai/evaluation/_evaluators/_response_completeness/response_completeness.prompty</c>.
+/// A 2026-10-02 check found no upstream prompt text in the rubric file under
+/// <c>Resources/Prompts/</c>, which the judge is sent as its system prompt.
 /// </para>
 /// </summary>
 public sealed class ResponseCompletenessEval : IEval
@@ -62,7 +62,7 @@ public sealed class ResponseCompletenessEval : IEval
             key: "response_completeness",
             name: "Response Completeness",
             category: "rag",
-            version: "1.0.0",
+            version: "1.2.0",   // 1.2.0: a supplied reference answer reaches the judge (B12a)
             criteria: new[]
             {
                 "All critical facts expected from the query are covered in the response",
@@ -76,6 +76,10 @@ public sealed class ResponseCompletenessEval : IEval
     }
 
     /// <inheritdoc/>
-    public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default) =>
-        _inner.EvaluateAsync(input, ct);
+    public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+        // The reference answer derives the expected facts when supplied; it was never sent (#203, B12a).
+        return _inner.EvaluateAsync(GroundTruthInput.Fold(input), ct);
+    }
 }

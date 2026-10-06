@@ -21,7 +21,12 @@ Despite review:
 
 ## External Services and APIs
 
-AgentEval is an evaluation and testing toolkit. It does **not** make network calls or access external services on its own. However, the agents you evaluate through AgentEval may call external services such as Azure OpenAI, OpenAI, or other AI providers.
+AgentEval is an evaluation and testing toolkit. It contacts external services only when you use a feature that needs them:
+
+- **Model calls.** Evaluators, judges, red-team attacks and Gatekeeper call the model clients you pass in. The CLI builds model clients from your flags and environment variables, and can pick up a provider key already set for another tool (see [PRIVACY.md](PRIVACY.md#provider-auto-detection)).
+- **Opt-in network features.** Benchmark pack downloads, the live package-registry check, the decision-model judge and the Copilot Studio connector each contact a remote service once you turn them on. [PRIVACY.md](PRIVACY.md) lists each one, what it contacts and what it sends.
+
+The agents you evaluate through AgentEval may also call external services such as Azure OpenAI, OpenAI, or other AI providers. Those calls are made by your code.
 
 When using AgentEval with external AI services:
 - **You are responsible** for your own API keys, credentials, costs, and data sent to external services.
@@ -45,7 +50,7 @@ This project is licensed under the **MIT License**. As stated in the [LICENSE](L
 
 ## Data and Privacy
 
-AgentEval does **not** collect telemetry, analytics, or usage data. It does **not** phone home or transmit any information. See [PRIVACY.md](PRIVACY.md) for details.
+AgentEval has **no** telemetry, analytics, crash reporting or update check, and it does not send usage data to its authors or to anyone else. It opens network connections only for the features listed in [PRIVACY.md](PRIVACY.md), each of which stays off until you turn it on. Results, transcripts and reports are written to local files and are not uploaded. See [PRIVACY.md](PRIVACY.md) for details, including the browser-side requests made by the memory benchmark HTML report and the Mission Control GraphQL IDE.
 
 ---
 

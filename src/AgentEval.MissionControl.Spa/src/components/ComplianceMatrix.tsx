@@ -1,9 +1,9 @@
 // Plan-08 Wave 4 (MC1.6.7): the killer-feature compliance matrix.
 //
-// CSS Grid implementation — handles up to ~2,500 cells comfortably, which
-// covers any realistic regulation × subject deployment. Visx HeatmapCircle
-// upgrade is documented in docs/missioncontrol/charting.md as a polish
-// move when matrices get genuinely dense (1000+ subjects).
+// CSS Grid implementation with Tailwind classes; no chart library. A Visx
+// heatmap was once planned for this view and was not built, so Recharts
+// stays the SPA's only chart dependency (docs/missioncontrol/charting.md).
+// No test measures how the grid behaves at large subject counts.
 
 type CellStatus = "pass" | "warn" | "fail" | "no-data";
 

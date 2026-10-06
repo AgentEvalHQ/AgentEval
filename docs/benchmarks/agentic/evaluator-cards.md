@@ -1,7 +1,14 @@
 # Agentic Benchmark — Evaluator Cards
 
-The 60 evaluators shipped across Phases 1–6 are organized below by category, with their key,
-implementing class, and (where applicable) the Foundry evaluator they fork from.
+The 68 evaluators that have an `EvaluatorCard` are listed below by category, with their key and
+implementing class. The Foundry URI column repeats the Azure AI Foundry entry in the card's
+`compatibleWith` list. Where the card lists none, the cell says what the class's own source comment
+says about its origin; "AgentEval-original" means the class cites no Foundry source.
+
+The eight Glass Box Diagnostics evaluators that `AgenticBenchmark.GlassBoxDiagnostics` uses gained
+cards in 0.44 (they had none, and none had a cost tier, so a cost cap dropped all eight); they are
+listed under [Glass Box Diagnostics](#glass-box-diagnostics-8-evaluators). They read the trace attached
+to the input, not the key registry, so they are not resolved by key.
 
 The authoritative source for each evaluator's full metadata — score formula, severity, pass
 threshold, expected inputs, recommended visualisation, and external compatibility — is the
@@ -20,9 +27,9 @@ calibration, UX, adversarial, efficiency) are listed in [Cost Guidance](cost-gui
 |-----|-------|-------------|
 | `task_completion` | `TaskCompletionEval` | `azureai://built-in/evaluators/task_completion` |
 | `task_adherence` | `TaskAdherenceEval` | `azureai://built-in/evaluators/task_adherence` |
-| `intent_identification` | `IntentIdentificationEval` | AgentEval-original |
+| `intent_identification` | `IntentIdentificationEval` | None in the card; the class says it was split out of Foundry's `intent_resolution` |
 | `intent_resolution` | `IntentResolutionEval` | `azureai://built-in/evaluators/intent_resolution` |
-| `task_navigation_efficiency` | `TaskNavigationEfficiencyEval` | AgentEval-original (hybrid) |
+| `task_navigation_efficiency` | `TaskNavigationEfficiencyEval` | `azureai://built-in/evaluators/task_navigation_efficiency` (hybrid; the class describes its LLM half as having no direct Foundry equivalent) |
 
 ---
 
@@ -33,9 +40,9 @@ calibration, UX, adversarial, efficiency) are listed in [Cost Guidance](cost-gui
 | `tool_selection` | `ToolSelectionEval` | `azureai://built-in/evaluators/tool_selection` |
 | `tool_input_accuracy` | `ToolInputAccuracyEval` | `azureai://built-in/evaluators/tool_input_accuracy` |
 | `tool_output_utilization` | `ToolOutputUtilizationEval` | `azureai://built-in/evaluators/tool_output_utilization` |
-| `tool_call_success` | `ToolCallSuccessEval` | `azureai://built-in/evaluators/tool_call_success` |
-| `tool_efficiency` | `ToolEfficiencyEval` | AgentEval-original |
-| `tool_call_accuracy` | `ToolCallAccuracyAggregateEval` | Aggregate — no 1:1 Foundry equivalent |
+| `tool_call_success` | `ToolCallSuccessEval` | None in the card; the class's LLM-fallback reference prompt is AgentEval's own text, modelled on Foundry's `tool_call_success` evaluator concept |
+| `tool_efficiency` | `ToolEfficiencyEval` | None in the card; the class's reference prompt is modelled on the efficiency part of Foundry's `tool_call_accuracy` evaluator concept |
+| `tool_call_accuracy` | `ToolCallAccuracyAggregateEval` | `azureai://built-in/evaluators/tool_call_accuracy` (aggregate of the five tool evaluators above) |
 
 ---
 
@@ -49,7 +56,7 @@ calibration, UX, adversarial, efficiency) are listed in [Cost Guidance](cost-gui
 | `fluency` | `FluencyEval` | `azureai://built-in/evaluators/fluency` |
 | `similarity` | `SimilarityEval` | `azureai://built-in/evaluators/similarity` |
 | `response_completeness` | `ResponseCompletenessEval` | `azureai://built-in/evaluators/response_completeness` |
-| `f1_score` | `F1ScoreEval` | `azureai://built-in/evaluators/f1_score` |
+| `f1_score` | `F1ScoreEval` | None in the card (pure-code token overlap; the class lives in `AgentEval.Core`) |
 
 ---
 
@@ -84,10 +91,22 @@ calibration, UX, adversarial, efficiency) are listed in [Cost Guidance](cost-gui
 
 ---
 
-## UX Evaluators (Phase 6 — 3 evaluators)
+## Glass Box Diagnostics (8 evaluators)
 
-Plan-13 T4.1e LR3-005..LR3-013 closeout: append the Phase 6 evaluator tables that were
-authored as `EvaluatorCard` JSONs but not surfaced here.
+| Key | Class | Score formula |
+|-----|-------|---------------|
+| `tool_reliability` | `ToolReliabilityEval` | Lowest per-tool success rate across the trace's tool executions (bar 0.90; high) |
+| `tool_error_pattern` | `ToolErrorPatternEval` | 1 − largest (tool, normalised error) failure cluster / all tool calls (bar 0.80; medium) |
+| `safety_intervention` | `SafetyInterventionEval` | 1 − `content_filter` turns / chat responses (bar 1.0; medium) |
+| `argument_sanitization` | `ArgumentSanitizationEval` | PII / secret markers in tool arguments on the wire (bar 1.0; high) |
+| `system_prompt_drift` | `SystemPromptDriftEval` | 1.0 when every chat request has the same system prompt, else 0.0 (bar 1.0; medium) |
+| `system_prompt_injection` | `SystemPromptInjectionEval` | System prompts vs a trusted baseline (bar 1.0), else the judge (bar 0.75); high |
+| `truncation_detection` | `TruncationDetectionEval` | 1 − `length`-finish turns / chat responses (bar 1.0; low) |
+| `token_distribution` | `TokenDistributionEval` | 1 − largest turn's completion tokens / all, 3+ turns (bar 0.5; low) |
+
+---
+
+## UX Evaluators (Phase 6 — 3 evaluators)
 
 | Key | Class | Foundry URI |
 |-----|-------|-------------|
@@ -97,15 +116,22 @@ authored as `EvaluatorCard` JSONs but not surfaced here.
 
 ---
 
-## Adversarial-Resistance Evaluators (Phase 6 — 5 evaluators)
+## Adversarial-Resistance Evaluators (Phase 6 — 3 evaluators)
 
 | Key | Class | Foundry URI |
 |-----|-------|-------------|
 | `direct_injection` | `DirectInjectionEval` | AgentEval-original (mirrors OWASP LLM01) |
 | `persona_attack` | `PersonaAttackEval` | AgentEval-original |
 | `jailbreak_resistance` | `JailbreakResistanceEval` | AgentEval-original (mirrors OWASP LLM01) |
-| `prompt_leak` | `PromptLeakEval` | AgentEval-original |
-| `escalation_resistance` | `EscalationResistanceEval` | AgentEval-original |
+
+The calibration runner also accepts two adversarial keys that have no card and no class of their
+own. `AgenticEvalRegistration` maps them onto existing evaluators so their golden entries can be
+graded:
+
+| Calibration-only key | Evaluated by |
+|----------------------|--------------|
+| `prompt_leak` | `SystemPromptLeakageEval` (the `system_prompt_leakage` evaluator below) |
+| `escalation_resistance` | `JailbreakResistanceEval` (privilege-escalation prompts treated as jailbreak variants) |
 
 ---
 
@@ -117,7 +143,11 @@ authored as `EvaluatorCard` JSONs but not surfaced here.
 | `intermediate_step_hallucination` | `IntermediateStepHallucinationEval` | AgentEval-original |
 | `plan_formulation_quality` | `PlanFormulationQualityEval` | AgentEval-original |
 | `goal_decomposition_quality` | `GoalDecompositionQualityEval` | AgentEval-original |
-| `self_correction_quality` | `SelfCorrectionQualityEval` | AgentEval-original |
+| `self_correction_quality` | `SelfCorrectionQualityEval` | AgentEval-original. Its card and namespace put it in the calibration category; the calibration runner files it under reasoning |
+
+`intermediate_step_hallucination`, `plan_formulation_quality` and `self_correction_quality` need the
+agent's reasoning trace, which a single-turn `CalibrationEntry` cannot carry, so
+`agenteval bench agentic calibrate` skips them (`BenchAgenticCalibrateCommand.s_carveOutKeys`).
 
 ---
 
@@ -125,15 +155,16 @@ authored as `EvaluatorCard` JSONs but not surfaced here.
 
 | Key | Class | Notes |
 |-----|-------|-------|
-| `confidence_calibration` | `ConfidenceCalibrationEval` | Flagged "noisy" — relaxed thresholds tracked in calibration overrides |
-| `uncertainty_acknowledgment` | `UncertaintyAcknowledgmentEval` | Flagged "noisy" — relaxed thresholds tracked in calibration overrides |
+| `confidence_calibration` | `ConfidenceCalibrationEval` | Expected to be noisy; the calibration category is gated at a relaxed 0.75 / 0.55 (`s_categoryOverrides`) |
+| `uncertainty_acknowledgment` | `UncertaintyAcknowledgmentEval` | Expected to be noisy; the calibration category is gated at a relaxed 0.75 / 0.55 (`s_categoryOverrides`) |
 
 ---
 
 ## Memory / Multi-Turn Evaluators (Phase 6 — 5 evaluators)
 
-Note: these evaluators require `conversationHistory[]` on `CalibrationEntry`; they remain carved
-out of the agentic calibration runner until T3.13 ships (see plan-13 Phase 6 lessons-learned).
+Note: these evaluators grade recall of earlier conversation turns. A `CalibrationEntry` is
+single-turn and has no conversation history, so `agenteval bench agentic calibrate` skips all five
+(`BenchAgenticCalibrateCommand.s_carveOutKeys`).
 
 | Key | Class | Foundry URI |
 |-----|-------|-------------|
@@ -145,11 +176,13 @@ out of the agentic calibration runner until T3.13 ships (see plan-13 Phase 6 les
 
 ---
 
-## Safety / Content-Classifier Evaluators (Phase 6 — 12 evaluators)
+## Safety / Content-Classifier Evaluators (Phase 4 — 12 evaluators)
 
-All twelve evaluators route through the IContentSafety / safety pipeline rather than the
-adversarial-prompt-resistance library; see `CalibrationDataset.DeriveCategory` for the
-dispatch rules.
+All twelve are reported under the `safety` calibration category (`CalibrationDataset.DeriveCategory`).
+Four of them — `hate_unfairness`, `self_harm`, `sexual` and `violence` — accept an optional
+`IContentSafetyClient` and use it before the LLM judge when one is supplied; the calibration runner
+passes none. `prohibited_actions` needs an `IPolicyResolver` and a subject id, so the calibration
+runner does not dispatch it.
 
 | Key | Class | Foundry URI |
 |-----|-------|-------------|
@@ -159,7 +192,7 @@ dispatch rules.
 | `violence` | `ViolenceEval` | `azureai://built-in/evaluators/violence` |
 | `code_vulnerability` | `CodeVulnerabilityEval` | `azureai://built-in/evaluators/code_vulnerability` |
 | `ungrounded_attributes` | `UngroundedAttributesEval` | `azureai://built-in/evaluators/ungrounded_attributes` |
-| `sensitive_data_leakage` | `SensitiveDataLeakageEval` | AgentEval-original |
+| `sensitive_data_leakage` | `SensitiveDataLeakageEval` | None in the card; the class calls it analogous to Foundry's `sensitive_data_leakage` concept, with an AgentEval-original regex path |
 | `protected_material` | `ProtectedMaterialEval` | `azureai://built-in/evaluators/protected_material` |
 | `unsafe_tool_use` | `UnsafeToolUseEval` | AgentEval-original |
 | `indirect_attack` | `IndirectAttackEval` | `azureai://built-in/evaluators/indirect_attack` |
@@ -172,18 +205,18 @@ dispatch rules.
 
 | Key | Class | Score formula |
 |-----|-------|---------------|
-| `cost_quality_efficiency` | `CostQualityEfficiencyEval` | Quality ÷ cost ratio against per-tier budget |
+| `cost_quality_efficiency` | `CostQualityEfficiencyEval` | `clamp((scenario_score / max(cost_usd, 0.001)) / 5.0, 0, 1)`; default pass threshold 0.50 |
 
 ---
 
-## QA Composite (Phase 6 — 1 evaluator)
+## QA Composite (Phase 2 — 1 evaluator)
 
 | Key | Class | Notes |
 |-----|-------|-------|
-| `qa_composite` | `QaCompositeEval` | Aggregator over groundedness + relevance + correctness for a single bound score |
+| `qa_composite` | `QaCompositeEval` | Weighted sum of the seven RAG evaluators: groundedness 0.30, response completeness 0.20, relevance 0.15, similarity 0.15, F1 0.10, coherence 0.05, fluency 0.05; pass threshold 0.70. The card lists `azureai://built-in/evaluators/qa` |
 
 ---
 
-> Detailed per-evaluator scoring rubrics, input contracts, and calibration guidance live in
+> Per-evaluator descriptions, input contracts, default thresholds and Foundry cross-references live in
 > the `EvaluatorCard` JSON files (60 total under `src/AgentEval.Evals.Agentic/EvaluatorCards/`).
 > The same metadata is available at runtime via Mission Control's GraphQL `evaluators` query.

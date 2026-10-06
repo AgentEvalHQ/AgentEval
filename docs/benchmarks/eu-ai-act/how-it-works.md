@@ -96,7 +96,7 @@ The benchmark is only as good as its judge. **Calibration** is how we keep it ho
 
 ### The golden datasets — our reference truth
 
-For each pillar, we hand-labeled scenario+response pairs as **pass** or **fail**, each carrying a rationale that cites the specific AI Act article (and sub-article). These live as JSONL files under `tests/AgentEval.Tests/EuAiActBenchmark/Calibration/Golden/`.
+For each pillar, we hand-labeled scenario+response pairs as **pass** or **fail**, each carrying a rationale that cites the specific AI Act article (and sub-article). These live as JSONL files under `tests/AgentEval.Tests/Compliance/EuAiAct/Calibration/Golden/`.
 
 Each dataset deliberately contains **both kinds of examples**. A single-class dataset (all-pass or all-fail) would let the math hit a trivial *"agree with everything by chance"* state and produce a meaningless perfect score. Mixed datasets force the judge to make real distinctions.
 
@@ -142,18 +142,14 @@ A judge can fail to produce a verdict — Azure throttles requests, transient er
 
 ### Calibration quality today
 
-Specific kappa and accuracy values live in the dated baseline report under `strategy/FutureFeatures/calibration-baselines/eu-ai-act-calibration-{date}.md`. Here's the qualitative picture across the six pillars.
+The project's latest figures are in [Calibration results](../calibration-results.md): on 2026-10-05, with Bitdeer `zai-org/GLM-5.3-Flash` as the judge, five of six pillars passed, and pillar 1 read INFRA-FAIL because one judge call timed out at the provider (its 24 measured cases cleared its gate). They describe that judge model on that day. What is known about the earlier runs:
 
-| Pillar | Calibration quality | Notes |
-|---|---|---|
-| 1 — Prohibited practices | **HIGH (relaxed gate)** | Met relaxed kappa/accuracy thresholds with documented investigation path |
-| 2 — Transparency | **HIGH** | Strict default gate met |
-| 3 — Human oversight | **HIGH** | Strict default gate met; previously trivial (all-pass dataset) — now defended on a two-class dataset |
-| 4 — Risk-tier behaviour | **HIGH** | Strict default gate met; same story as pillar 3 |
-| 5 — Robustness | **HIGH** | Strict default gate met |
-| 6 — GPAI self-awareness | **HIGH (relaxed gate)** | Probe-only weak signal; small dataset; relaxed gate with documented growth path |
+- The last recorded runs were in May 2026, on the maintainer's Azure OpenAI deployments. The reports were not committed and do not record which judge model produced them.
+- Results moved with the judge model: the source of `BenchEuAiActCalibrateCommand` records that pillars 3–5 passed with gpt-5-chat and fell to 71% / 78% / 73% accuracy with gpt-4o-mini (2026-05-24).
+- Pillars 1 and 6 are gated at relaxed thresholds (0.65 / 0.35 and 0.60 / 0.25), each with its reason documented in that file.
+- Those runs predate 0.42.0-beta, when `calibrate` graded with the generic default judge prompt rather than the EU AI Act prompt `bench eu-ai-act` sends, so none of them measured the judge configuration the benchmark uses. From 0.42.0-beta, `calibrate` sends the same prompt.
 
-If any pillar were to drop into MEDIUM or LOW, the finding lands in the consolidated tracker (`strategy/FutureFeatures/todo/12-6plan-review-findings-and-fixes.md`) with a fix path before the next release.
+Treat the judge as uncalibrated for your deployment until you re-run `calibrate` (0.42.0-beta or later) against your own judge.
 
 ---
 
@@ -163,7 +159,7 @@ If any pillar were to drop into MEDIUM or LOW, the finding lands in the consolid
 2. **Repeatability.** Same scenarios on every release. Trends visible over time.
 3. **Defensible evidence.** Each run produces JSON evidence, markdown report, and PDF — all audit-chain-hashed and re-verifiable by `agenteval doctor`.
 4. **Regulator-grade reasoning.** The judge cites specific articles (Art 14(4)(b), Annex III(4)(b), Art 25(1)(b)) — not paraphrases.
-5. **Calibrated quality.** We don't ship the benchmark until every pillar's judge agrees with hand-labeled experts. The two-class-dataset bug above is one example of what calibration catches that nothing else does.
+5. **Calibration built in.** Hand-labelled golden sets ship with the benchmark, and `calibrate` measures a judge against them. The two-class-dataset bug above is one example of what calibration catches that nothing else does; see *Calibration quality today* for what has and has not been measured.
 6. **Open and inspectable.** Every prompt, scenario, and golden entry sits in the repo.
 
 ---

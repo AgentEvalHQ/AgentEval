@@ -44,12 +44,18 @@ public static class GatekeeperToolApproval
             "issue_refund", "Issue a refund to the customer for the given whole-dollar amount.");
 
         // Routine refunds (under $1000) auto-approve; a 4+ digit amount ($1000+) is escalated to a human.
-        var gate = new ArgumentPatternApprovalGate("\"amount\":\\s*[0-9]{4,}", "large-refund-approval");
+        // Escalate unless the amount is a plain number below 1000 (and when there is none): the gate auto-approves what
+        // its pattern does not match, so the pattern names what is routine. `"amount":\s*[0-9]{4,}` missed
+        // "amount":"5000", a JSON string some models emit, and that refund ran with no human (found by sample 28).
+        var gate = new ArgumentPatternApprovalGate(
+            @"^(?![\s\S]*""amount""\s*:)|""amount""\s*:(?!\s*[0-9]{1,3}(?:\.[0-9]+)?\s*[,}])", "large-refund-approval");
 
         AIAgent BuildAgent() => new ChatClientAgent(chatClient, new ChatClientAgentOptions
         {
             Name = "SupportAgent",
-            ChatOptions = new ChatOptions { Tools = [refund.RequiresApproval()], MaxOutputTokens = 256 },
+            // 1024, not 256: a reasoning model (e.g. GLM-5.3-Flash) can spend a 256-token cap on reasoning and return
+            // neither text nor a tool call, which reads as "no approval request surfaced" (seen 4 of 10 live runs).
+            ChatOptions = new ChatOptions { Tools = [refund.RequiresApproval()], MaxOutputTokens = 1024 },
         }).AsBuilder().UseAgentEvalToolApproval([gate]).Build();
 
         // ── A routine refund flows straight through ──

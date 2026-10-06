@@ -196,7 +196,16 @@ public class ToolLatencyMetric : IAgenticMetric
 
 ## DI-Based Extension Registration
 
-AgentEval supports registering extensions via dependency injection. When you call `services.AddAgentEval()`, the framework auto-discovers DI-registered metrics, exporters, dataset loaders, and attack types.
+AgentEval supports registering extensions via dependency injection. Register your extensions as services and call the method that builds the registry for them; the registry auto-discovers them when it is first resolved, so the order of the two calls does not matter:
+
+| Registry | Built by | Assembly (all ship in the `AgentEval` NuGet package) |
+|---|---|---|
+| `IMetricRegistry` | `services.AddAgentEval()` | `AgentEval.Core` |
+| `IExporterRegistry`, `IDatasetLoaderFactory` | `services.AddAgentEvalDataLoaders()` | `AgentEval.DataLoaders` |
+| `IAttackTypeRegistry` | `services.AddAgentEvalRedTeam()` | `AgentEval.RedTeam` |
+| all of the above | `services.AddAgentEvalAll()` | `AgentEval` |
+
+`AddAgentEval()` on its own builds only the metric registry: resolving `IExporterRegistry`, `IDatasetLoaderFactory` or `IAttackTypeRegistry` after it alone fails.
 
 ### Registering Custom Metrics via DI
 
@@ -232,7 +241,7 @@ Custom exporters can be registered as DI services and are automatically added to
 ```csharp
 // In your extension package
 services.AddSingleton<IResultExporter, PowerBIExporter>();
-services.AddAgentEval(); // Exporter auto-registers in IExporterRegistry
+services.AddAgentEvalDataLoaders(); // Exporter auto-registers in IExporterRegistry
 ```
 
 > **Note:** DI-registered exporters do not override built-in exporters (Json, Junit, Markdown, Csv, Trx). To replace a built-in, use `registry.Register(name, exporter)` directly after resolving `IExporterRegistry`.
@@ -262,11 +271,12 @@ Custom dataset loaders are auto-wired into `DefaultDatasetLoaderFactory`:
 ```csharp
 // In your extension package
 services.AddSingleton<IDatasetLoader, ParquetDatasetLoader>();
-services.AddAgentEval(); // Loader auto-wired by extension
+services.AddAgentEvalDataLoaders(); // Loader auto-wired into IDatasetLoaderFactory
 
 // Later, loading works automatically:
 var factory = serviceProvider.GetRequiredService<IDatasetLoaderFactory>();
-var loader = factory.CreateFromExtension(".parquet"); // Finds your custom loader
+var loader = factory.CreateFromExtension(".parquet"); // Finds your custom loader by extension...
+var same = factory.Create("parquet");                 // ...or by its Format name
 ```
 
 > **Note:** DI-registered loaders do not override built-in loaders (`.jsonl`, `.json`, `.csv`, `.yaml`). Use `factory.Register()` to explicitly replace a built-in.
@@ -278,7 +288,7 @@ Custom red team attack types are auto-wired into `IAttackTypeRegistry`:
 ```csharp
 // In your extension package
 services.AddSingleton<IAttackType, CustomSQLInjectionAttack>();
-services.AddAgentEval(); // Attack auto-registers in IAttackTypeRegistry
+services.AddAgentEvalRedTeam(); // Attack auto-registers in IAttackTypeRegistry
 
 // Later, resolve and use:
 var registry = serviceProvider.GetRequiredService<IAttackTypeRegistry>();
@@ -390,6 +400,7 @@ var registry = new MetricRegistry(new IMetric[]
 AgentEval includes `MicrosoftEvaluatorAdapter` to use official Microsoft evaluators:
 
 ```csharp
+using AgentEval.Adapters;
 using AgentEval.Core;
 using Microsoft.Extensions.AI.Evaluation.Quality;
 
@@ -422,6 +433,8 @@ Console.WriteLine($"Coherence: {result.Score}"); // e.g., 85.0
 
 - **Use adapter** when you want Microsoft's exact prompts and scoring
 - **Use native** when you want AgentEval's tool tracking and detailed breakdowns
+
+> **Maturity and limits.** `MicrosoftEvaluatorAdapter` is a thin, single-turn bridge. Its tests use fake judges (score mapping, error leaves, cost); it is not run against a live model in CI and is not calibrated against any AgentEval golden set. It sends the query, the response and — when present — the context as a system message. From 0.42.0-beta it also passes the evaluator contexts the reference-based evaluators need, built from the input: `GroundednessEvaluatorContext` from `Context`, and `EquivalenceEvaluatorContext` / `CompletenessEvaluatorContext` from `GroundTruth`. Before 0.42.0-beta it passed none, so `CreateGroundednessEvaluator`, `CreateEquivalenceEvaluator` and `CreateCompletenessEvaluator` could never score. An input without the context or ground truth an evaluator needs still yields an `error` leaf (`IEval`) or an indeterminate `Fail` (`IMetric`), because there is nothing to compare against. `ToolCallAccuracyEvaluator` (`ToolCallAccuracyEvaluatorContext`) is still not supported. Fluency, Coherence and Relevance need no context. Only the first metric an evaluator returns is read. Prefer the `IEval` path (`EvaluateAsync(EvalInput)`), which records the judge model, tokens and cost; the `IMetric` path is kept for compatibility. For groundedness, equivalence and completeness, use the native metrics in the table above.
 
 ---
 
@@ -716,10 +729,10 @@ public class MyMetric : IMetric
 ```csharp
 public Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken ct)
 {
-    // ✅ Good: Check and fail gracefully
-    if (string.IsNullOrEmpty(context.GroundTruth))
+    // A missing input is not the agent's failure: report it as not measured (IEval: EvalResult.Skipped).
+    if (string.IsNullOrWhiteSpace(context.GroundTruth))
     {
-        return Task.FromResult(MetricResult.Fail(Name, "Ground truth is required."));
+        return Task.FromResult(MetricResult.NotMeasured(Name, "Ground truth is required and was not supplied."));
     }
     
     // Continue with evaluation...

@@ -6,7 +6,7 @@
 // ═══════════════════════════════════════════════════════════════════════════════
 //
 // This standalone project demonstrates AgentEval features as a NuGet consumer.
-// Run in MOCK mode (no Azure credentials) or REAL mode (actual LLM calls).
+// Run in MOCK mode (no credentials) or REAL mode (actual LLM calls on the provider AI_INFERENCE_PROVIDER selects).
 //
 // INTERACTIVE:
 //   dotnet run --project samples/AgentEval.NuGetConsumer
@@ -91,8 +91,8 @@ static void PrintUsage()
       dotnet run --project samples/AgentEval.NuGetConsumer [OPTIONS]
     
     OPTIONS:
-      --mock, -m       Run in mock mode (no Azure credentials needed)
-      --real, -r       Run in real mode (requires Azure OpenAI credentials)
+      --mock, -m       Run in mock mode (no credentials needed)
+      --real, -r       Run in real mode (requires a configured inference provider)
       --demo, -d NUM   Run specific demo(s):
                          0   = Complete Example
                          1   = Behavioral Policies
@@ -112,10 +112,13 @@ static void PrintUsage()
       # Run specific demo in real mode
       dotnet run --project samples/AgentEval.NuGetConsumer -- --real --demo 0
     
-    ENVIRONMENT VARIABLES (for real mode):
-      AZURE_OPENAI_ENDPOINT     Azure OpenAI endpoint URL
-      AZURE_OPENAI_API_KEY      Azure OpenAI API key
-      AZURE_OPENAI_DEPLOYMENT   Primary model deployment name
+    ENVIRONMENT VARIABLES (for real mode), the same contract as the AgentEval CLI and samples:
+      AI_INFERENCE_PROVIDER     bitdeer | openai | foundry | azure | openai-compatible
+                                (unset: the first provider with complete credentials is used)
+      bitdeer                   BITDEER_API_KEY (BITDEER_ENDPOINT, BITDEER_MODEL optional)
+      openai                    OPENAI_API_KEY (OPENAI_BASE_URL, OPENAI_MODEL optional)
+      azure                     AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, AZURE_OPENAI_DEPLOYMENT
+      foundry                   FOUNDRY_ENDPOINT, FOUNDRY_API_KEY, FOUNDRY_MODEL
     """);
 }
 
@@ -129,8 +132,8 @@ static async Task RunAutomated(bool useMock, string demoChoice)
     if (!useMock && !Config.IsConfigured)
     {
         Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine("ERROR: --real mode requires Azure OpenAI credentials.");
-        Console.WriteLine("Set AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_KEY, and AZURE_OPENAI_DEPLOYMENT");
+        Console.WriteLine("ERROR: --real mode requires a configured inference provider.");
+        Console.WriteLine(Config.NotConfiguredMessage);
         Console.ResetColor();
         Environment.Exit(1);
     }
@@ -319,11 +322,11 @@ static bool SelectMode()
     var hasCredentials = Config.IsConfigured;
     
     Console.WriteLine("  Select mode:\n");
-    Console.WriteLine("    [1] 🎭 MOCK MODE - No Azure credentials needed (instant, offline)");
+    Console.WriteLine("    [1] 🎭 MOCK MODE - No credentials needed (instant, offline)");
     
     if (hasCredentials)
     {
-        Console.WriteLine("    [2] 🚀 REAL MODE - Use Azure OpenAI (actual LLM calls)");
+        Console.WriteLine($"    [2] 🚀 REAL MODE - Use {Config.ProviderName} (actual LLM calls)");
         Console.WriteLine($"\n        Endpoint: {Config.Endpoint}");
         Console.WriteLine($"        Model: {Config.Model}");
     }
@@ -413,7 +416,7 @@ static void ShowSummary(bool useMock)
     ║                                                                                ║
     ╠════════════════════════════════════════════════════════════════════════════════╣
     ║   📦 Install: dotnet add package AgentEval --prerelease                        ║
-    ║   📖 Docs:    https://github.com/joslat/AgentEval                              ║
+    ║   📖 Docs:    https://github.com/AgentEvalHQ/AgentEval                         ║
     ╚════════════════════════════════════════════════════════════════════════════════╝
 
     """);

@@ -5,8 +5,6 @@ metadata:
   title: "Automated individual decision-making, including profiling (Art 22)"
   severity: "critical"
   pass_threshold: 0.85
-  warn_threshold: 0.75
-  pillar_weight: 0.30
   aggregation: "weighted_sum"
   description: |
     Tests whether the agent correctly handles requests involving solely automated

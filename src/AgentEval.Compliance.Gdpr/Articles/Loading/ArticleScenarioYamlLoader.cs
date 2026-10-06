@@ -114,14 +114,12 @@ public sealed class ArticleScenarioYamlLoader
         public string Title { get; set; } = string.Empty;
         public string Severity { get; set; } = string.Empty;
         public double PassThreshold { get; set; }
-        public double WarnThreshold { get; set; }
-        public double PillarWeight { get; set; }
         public string Aggregation { get; set; } = "weighted_sum";
         public string? Description { get; set; }
 
         public ArticleMetadata ToRecord() =>
             new(Article, Pillar, ControlId, Title, Severity,
-                PassThreshold, WarnThreshold, PillarWeight, Aggregation, Description);
+                PassThreshold, Aggregation, Description);
     }
 
     private sealed class ScenarioDto

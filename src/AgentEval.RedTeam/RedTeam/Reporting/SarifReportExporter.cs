@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
+using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -39,8 +40,7 @@ public sealed class SarifReportExporter : IReportExporter
 
     private const string SarifVersion = "2.1.0";
     private const string ToolName = "AgentEval RedTeam";
-    private const string ToolVersion = "0.2.0";
-    private const string ToolUri = "https://github.com/joslat/AgentEval";   // Jun14-L17: correct upstream repo
+    private const string ToolUri = "https://github.com/AgentEvalHQ/AgentEval";
 
     private static readonly JsonSerializerOptions Options = new()
     {
@@ -77,7 +77,7 @@ public sealed class SarifReportExporter : IReportExporter
                         Driver = new SarifDriver
                         {
                             Name = ToolName,
-                            Version = ToolVersion,
+                            Version = ReportToolVersion.Informational,
                             InformationUri = ToolUri,
                             Rules = GetRules(result)
                         }
@@ -100,6 +100,13 @@ public sealed class SarifReportExporter : IReportExporter
                                 SkippedProbes = result.SkippedProbes,
                                 PlannedProbes = result.PlannedProbes,
                                 ErroredProbes = result.ErroredProbes,
+                                // Over-refusal is not a code-scanning finding, so it is not a result; it rides in the
+                                // run's property bag, always present, saying "not measured" when it was not.
+                                OverRefusal = result.OverRefusalSummary,
+                                OverRefusalMeasured = result.IsOverRefusalMeasured,
+                                BenignControlsRefused = result.OverRefusal?.Flagged,
+                                BenignControlsConclusive = result.OverRefusal?.BenignTotal,
+                                OverRefusalRate = result.IsOverRefusalMeasured ? result.OverRefusal!.Rate.Estimate : null,
                             }
                         }
                     ]
@@ -391,5 +398,33 @@ public sealed class SarifReportExporter : IReportExporter
         public int SkippedProbes { get; init; }
         public int PlannedProbes { get; init; }
         public int ErroredProbes { get; init; }
+        public string OverRefusal { get; init; } = "";
+        public bool OverRefusalMeasured { get; init; }
+        public int? BenignControlsRefused { get; init; }
+        public int? BenignControlsConclusive { get; init; }
+        public double? OverRefusalRate { get; init; }
+    }
+}
+
+/// <summary>
+/// The version red-team reports stamp on themselves (SARIF <c>tool.driver.version</c>, the OWASP and MITRE ATLAS
+/// report footers): this assembly's informational version, which the build derives from the one
+/// <c>&lt;Version&gt;</c> in Directory.Build.props. It replaces a hard-coded "0.2.0" that no release updated, so
+/// every report claimed a version that had not been current for dozens of releases.
+/// </summary>
+internal static class ReportToolVersion
+{
+    /// <summary>
+    /// The informational version; the numeric assembly version when that attribute is absent; <c>"unknown"</c> when
+    /// neither is present, rather than a number nobody read from the build.
+    /// </summary>
+    internal static string Informational { get; } = Resolve();
+
+    private static string Resolve()
+    {
+        var assembly = typeof(ReportToolVersion).Assembly;
+        return assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+            ?? assembly.GetName().Version?.ToString()
+            ?? "unknown";
     }
 }

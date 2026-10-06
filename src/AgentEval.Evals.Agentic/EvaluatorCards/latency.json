@@ -4,10 +4,10 @@
   "name": "Telemetry: Latency",
   "category": "operational",
   "version": "1.0.0",
-  "description": "Pure-code telemetry evaluator surfacing the agent p50/p95/p99 latency from AgenticTelemetry. Lower is better.",
+  "description": "Pure-code telemetry evaluator surfacing the agent p50/p95/p99 latency from AgenticTelemetry. The rate is better lower; the score is its inverse, so a higher score is better.",
   "costTier": "Trivial",
-  "higherIsBetter": false,
-  "defaultThreshold": 1.0,
+  "higherIsBetter": true,
+  "defaultThreshold": 0.8,
   "expectedInputs": [
     {
       "kind": "metadata",

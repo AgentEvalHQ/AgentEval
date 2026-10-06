@@ -33,7 +33,7 @@ public static class Program
 
     private static readonly IReadOnlyList<SampleGroup> Groups =
     [
-        new('A', "Getting Started", "★ mostly no credentials (A5–A7 need a model provider)",
+        new('A', "Getting Started", "🔑 a model provider (A1–A5: --mock for a labelled offline walkthrough)",
         [
             new("Hello World",               "Minimal AgentEval test — TestCase, TestResult, pass/fail",               HelloWorld.RunAsync),
             new("Agent + One Tool",          "Tool tracking and fluent assertions (HaveCalledTool, WithoutError)",      AgentWithOneTool.RunAsync),
@@ -129,10 +129,10 @@ public static class Program
             new("Report Browser",            "Open previously-generated JSON / HTML / PDF runs",                    ReportBrowserBenchmark.RunAsync),
         ]),
 
-        new('I', "Observability (Glass Box)", "★ 1-2,4 offline · 3 needs Azure",
+        new('I', "Observability (Glass Box)", "★ 1,4 offline · 2-3 need a model provider (2: --mock)",
         [
             new("Glass Box Full Stack",      "Per-turn tracing + injection pre-gate + PII post-gate + wrapped tool (offline; API tour)",     GlassBoxFullStack.RunAsync),
-            new("Auto-Audit (synthetic)",    "Ranked honesty/safety/cost over 3 SCRIPTED endpoints — offline preview of the table shape",     AutoAudit.RunAsync),
+            new("Auto-Audit",                "Ranked honesty/safety/cost over your configured models (--mock: 3 scripted endpoints, labelled)", AutoAudit.RunAsync),
             new("Real vs Framework: Agent",  "REAL travel agent — MAF's account vs Glass Box: what the framework HIDES per turn (needs Azure)", RealVsFrameworkTravelAgent.RunAsync),
             new("Real vs Framework: Workflow","Per-EXECUTOR ledger vs chat truth — what a multi-agent workflow HIDES (offline; scripted)",     RealVsFrameworkWorkflow.RunAsync),
         ]),
@@ -244,6 +244,18 @@ public static class Program
                 Environment.SetEnvironmentVariable("AGENTEVAL_SAMPLES_PRESET", args[i + 1]);
                 break;
             }
+        }
+
+        // Forward `--mock` the same way: the Getting Started samples' offline walkthrough. Only on request; a sample
+        // with no provider configured stops instead of switching to canned replies.
+        if (args.Any(a => string.Equals(a, "--mock", StringComparison.OrdinalIgnoreCase)))
+        {
+            Environment.SetEnvironmentVariable(AIConfig.MockVariable, "1");
+            // Every other sample ignores the flag: with a provider configured it runs (and spends) for real.
+            Console.ForegroundColor = ConsoleColor.Magenta;
+            Console.WriteLine("🎭 --mock applies to Getting Started A1–A5 and Observability Auto-Audit only. Every other sample");
+            Console.WriteLine("   runs as usual: on your configured model if there is one, which calls (and bills) that model.\n");
+            Console.ResetColor();
         }
 
         // Forward `--dry-run` the same way (group N: render every provider payload, send nothing).
@@ -492,6 +504,8 @@ public static class Program
             Console.ForegroundColor = ConsoleColor.Red;
             Console.WriteLine($"\n  ❌ Error: {ex.Message}");
             Console.ResetColor();
+            // A sample that fails says so to whatever ran it: `dotnet run -- <n>` used to exit 0 over a thrown ❌.
+            Environment.ExitCode = 1;
         }
 
         Console.WriteLine("\n  Press any key to continue...");
@@ -504,8 +518,9 @@ public static class Program
 
     /// <summary>
     /// Runs every offline-capable Gatekeeper sample non-interactively so CI executes their
-    /// deterministic invariants. Samples 00–10 run their forced-offline oracles; 13–29 are
-    /// offline by design. Sample 11A is excluded because it requires a consented live endpoint.
+    /// deterministic invariants, forced offline: samples 00–10 and the live-first scenario samples (14–17, 25, 28) run
+    /// their labelled scripted fallbacks; the rest involve no model, or a scripted one by design. Sample 11A is
+    /// excluded because it requires a consented live endpoint.
     /// </summary>
     private static async Task<int> RunGatekeeperOfflineSuiteAsync()
     {
@@ -578,6 +593,7 @@ public static class Program
         if (n < 1 || n > all.Count)
         {
             Console.WriteLine($"  ❌ Sample {n} not found. Valid range: 1–{all.Count}");
+            Environment.ExitCode = 2;
             return;
         }
         await RunEntry(all[n - 1]);

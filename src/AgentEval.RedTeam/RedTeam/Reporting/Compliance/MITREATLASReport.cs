@@ -30,8 +30,11 @@ public class MITREATLASReport : IComplianceReport
     /// <summary>Duration of the original scan.</summary>
     public TimeSpan ScanDuration { get; init; }
 
-    /// <summary>AgentEval version used.</summary>
-    public string AgentEvalVersion { get; init; } = "0.2.0";
+    /// <summary>
+    /// AgentEval version that produced the report: the red-team assembly's informational version, read from the
+    /// build rather than written as a literal. Printed in the Markdown footer.
+    /// </summary>
+    public string AgentEvalVersion { get; init; } = ReportToolVersion.Informational;
 
     /// <summary>Status for each MITRE ATLAS technique.</summary>
     public required IReadOnlyList<MITRETechniqueStatus> Techniques { get; init; }
@@ -73,6 +76,9 @@ public class MITREATLASReport : IComplianceReport
     /// <summary>Number of techniques not tested.</summary>
     public int NotTestedCount => Techniques.Count(t => t.Status == TechniqueTestStatus.NotTested);
 
+    /// <summary>Number of techniques whose probes ran but reached no conclusive verdict. The four counts add up to the techniques.</summary>
+    public int InconclusiveCount => Techniques.Count(t => t.Status == TechniqueTestStatus.Inconclusive);
+
     // === Export Methods ===
 
     /// <inheritdoc />
@@ -95,6 +101,8 @@ public class MITREATLASReport : IComplianceReport
         sb.AppendLine("| Metric | Value |");
         sb.AppendLine("|--------|-------|");
         sb.AppendLine($"| Techniques Tested | {TestedCount}/{Techniques.Count} |");
+        if (InconclusiveCount > 0)
+            sb.AppendLine($"| Techniques Inconclusive (not measured) | {InconclusiveCount}/{Techniques.Count} |");
         sb.AppendLine($"| Tactics Covered | {Tactics.Count(t => t.TestedCount > 0)}/{Tactics.Count} |");
         sb.AppendLine($"| Overall Pass Rate | {Summary.OverallPassRate:F1}% |");
         sb.AppendLine($"| Risk Level | {RiskLevel} |");
@@ -280,7 +288,15 @@ public enum TechniqueTestStatus
     NotTested,
 
     /// <summary>Technique is not applicable.</summary>
-    NotApplicable
+    NotApplicable,
+
+    // Appended last (#203 review round 3, B10j): inserted before NotApplicable it shifted that member's numeric
+    // value, a binary break for compiled consumers. JSON writes the name, so stored reports are unaffected.
+    /// <summary>
+    /// Probes for the technique ran but none produced a conclusive verdict (#203 review, B6c-8): not measured — unlike
+    /// <see cref="NotTested"/> (not in this preset), it keeps a run from passing.
+    /// </summary>
+    Inconclusive
 }
 
 /// <summary>Coverage summary for a MITRE ATLAS tactic.</summary>

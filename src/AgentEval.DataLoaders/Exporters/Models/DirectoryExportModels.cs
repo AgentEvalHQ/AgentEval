@@ -33,6 +33,9 @@ internal sealed class DirectoryTestResult
     
     /// <summary>Per-metric scores for this test.</summary>
     public Dictionary<string, double>? Metrics { get; set; }
+
+    /// <summary>Metrics that ran but were not measured, each with its reason (no score, so not in <see cref="Metrics"/>).</summary>
+    public Dictionary<string, string>? MetricsNotMeasured { get; set; }
 }
 
 /// <summary>
@@ -61,6 +64,12 @@ internal sealed class DirectorySummary
     
     /// <summary>Per-metric aggregate statistics.</summary>
     public Dictionary<string, DirectoryMetricStats> Metrics { get; set; } = new();
+
+    /// <summary>
+    /// Per metric, how many tests it ran on without being measured; those tests are not in its <see cref="Metrics"/>
+    /// statistics. Null when every metric was measured on every test.
+    /// </summary>
+    public Dictionary<string, int>? MetricsNotMeasured { get; set; }
 }
 
 /// <summary>

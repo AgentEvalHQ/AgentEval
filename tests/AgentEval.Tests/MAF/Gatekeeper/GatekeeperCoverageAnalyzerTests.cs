@@ -208,10 +208,115 @@ public class GatekeeperCoverageAnalyzerTests
     [Fact]
     public void EmptyToolList_Is100PercentCoverage_Vacuously()
     {
+        // The numeric property keeps its vacuous 100 for compatibility; no rendering prints it (see the tests below).
         var report = GatekeeperCoverageAnalyzer.Analyze(BuildAgent());
         Assert.Empty(report.Tools);
         Assert.Equal(100.0, report.EnforcementCoveragePercent);
         Assert.False(report.HasUnprotectedHighRiskTools);
+    }
+
+    // ── Coverage honesty: a rendering never reads as full coverage when nothing (or not everything) was measured ──
+
+    [Fact]
+    public void Render_EmptyInventory_SaysNotMeasurable_NeverOneHundredPercent()
+    {
+        var report = GatekeeperCoverageAnalyzer.Analyze(Array.Empty<AITool>());
+        Assert.True(report.ToolInventoryAvailable);
+
+        var rendered = report.Render();
+        Assert.Contains("no tools in the inventory", rendered, StringComparison.Ordinal);
+        Assert.Contains("not measurable", rendered, StringComparison.Ordinal);
+        Assert.DoesNotContain("100%", rendered, StringComparison.Ordinal);
+
+        var printed = report.ToString();
+        Assert.Contains("EnforcementCoveragePercent = not measured (no tools in the inventory)", printed, StringComparison.Ordinal);
+        Assert.DoesNotContain("EnforcementCoveragePercent = 100", printed, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Render_InventoryUnavailable_SaysNotMeasured()
+    {
+        var report = GatekeeperCoverageAnalyzer.Analyze(new OpaqueAgent());
+
+        Assert.Contains("UNAVAILABLE", report.Render(), StringComparison.Ordinal);
+        Assert.Contains("not measured", report.Render(), StringComparison.Ordinal);
+        Assert.Contains("EnforcementCoveragePercent = not measured (tool inventory unavailable)", report.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Render_PartialCoverage_IsRoundedDown_So299Of300NeverPrintsAs100Percent()
+    {
+        // 299 gate-visible local functions + 1 provider-hosted tool no gate can see = 99.67% structural coverage.
+        var tools = Enumerable.Range(0, 299)
+            .Select(i => (AITool)AIFunctionFactory.Create((string x) => x, $"lookup_{i}"))
+            .Append(new HostedWebSearchTool())
+            .ToList();
+        var report = GatekeeperCoverageAnalyzer.Analyze(tools, [new ForbiddenToolGate("x")]);
+
+        var rendered = report.Render();
+        Assert.Contains("99% enforcement coverage (299/300 protected)", rendered, StringComparison.Ordinal);
+        Assert.DoesNotContain("100%", rendered, StringComparison.Ordinal);
+        Assert.Contains("EnforcementCoveragePercent = 99.66", report.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DynamicToolProvider_WithStaticTools_RenderAndToString_WarnInjectedToolsWereNotInventoried()
+    {
+        var options = new AnalyzeOptions { HasDynamicToolProvider = true };
+        var tool = AIFunctionFactory.Create((string x) => x, "lookup");
+        var report = GatekeeperCoverageAnalyzer.Analyze(BuildAgent(tool), [new ForbiddenToolGate("x")], options);
+
+        Assert.Equal(100.0, report.EnforcementCoveragePercent);   // the numeric value still describes the static tool
+        var rendered = report.Render();
+        Assert.Contains("1 static tool(s)", rendered, StringComparison.Ordinal);
+        Assert.Contains("NOT inventoried", rendered, StringComparison.Ordinal);
+        Assert.Contains("NOT inventoried", report.ToString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void DynamicToolProvider_WithStaticTools_AnalyzeOrThrow_StillDecidesOnTheStaticTools_ButTheReportWarns()
+    {
+        // Exception semantics are unchanged here: a provider alone does not refuse the agent. The warning travels in
+        // the returned report instead, so a pass is never rendered as full coverage.
+        var options = new AnalyzeOptions { HasDynamicToolProvider = true };
+        var tool = AIFunctionFactory.Create((string id) => "ok", "delete_account");
+
+        var report = GatekeeperCoverageAnalyzer.AnalyzeOrThrow(BuildAgent(tool), [new ForbiddenToolGate("delete_account")], options);
+
+        Assert.False(report.HasUnprotectedHighRiskTools);
+        Assert.Contains("NOT inventoried", report.Render(), StringComparison.Ordinal);
+        Assert.Throws<UnprotectedHighRiskToolException>(
+            () => GatekeeperCoverageAnalyzer.AnalyzeOrThrow(BuildAgent(tool), options: options));   // static gap still refused
+    }
+
+    [Fact]
+    public void ToolListOverload_HonoursDeclaredDynamicToolProvider_LikeTheAgentOverload()
+    {
+        // The list overload is what UseGatekeeper's KnownTools path calls; it used to ignore HasDynamicToolProvider.
+        var options = new AnalyzeOptions { HasDynamicToolProvider = true };
+        var tool = AIFunctionFactory.Create((string x) => x, "lookup");
+
+        var withStatic = GatekeeperCoverageAnalyzer.Analyze([tool], [new ForbiddenToolGate("x")], options);
+        Assert.True(withStatic.ToolInventoryAvailable);
+        Assert.Contains("NOT inventoried", withStatic.Render(), StringComparison.Ordinal);
+
+        var empty = GatekeeperCoverageAnalyzer.Analyze(Array.Empty<AITool>(), options: options);
+        Assert.False(empty.ToolInventoryAvailable);
+        Assert.Throws<ToolInventoryUnavailableException>(
+            () => GatekeeperCoverageAnalyzer.AnalyzeOrThrow(Array.Empty<AITool>(), options: options));
+    }
+
+    [Fact]
+    public void DynamicToolProvider_EmptyStaticTools_ExceptionAndRender_NameTheRealCause()
+    {
+        var options = new AnalyzeOptions { HasDynamicToolProvider = true };
+
+        var ex = Assert.Throws<ToolInventoryUnavailableException>(() => GatekeeperCoverageAnalyzer.AnalyzeOrThrow(BuildAgent(), options: options));
+
+        Assert.Contains("ToolInventoryAvailable=false", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("dynamic tool provider", ex.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain("does not expose ChatOptions", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("dynamic tool provider", ex.Report.Render(), StringComparison.Ordinal);
     }
 
     [Fact]

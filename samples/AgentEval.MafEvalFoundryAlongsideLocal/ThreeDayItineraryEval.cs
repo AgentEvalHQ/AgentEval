@@ -13,8 +13,8 @@ namespace AgentEval.MafEvalFoundryAlongsideLocal;
 /// <remarks>
 /// <para>
 /// <b>Why this property.</b> The composite reaches this leaf through
-/// <c>AgentEvalCompositeEvaluator</c>, whose projection is a two-field
-/// <c>EvalInput(Query, Response)</c> (<c>AgentEvalCompositeEvaluator.cs:74</c>): no
+/// <c>AgentEvalCompositeEvaluator</c>, whose projection is an
+/// <c>EvalInput(Query, Response, Context, GroundTruth)</c> (<c>AgentEvalCompositeEvaluator</c>): no
 /// <c>ToolCalls</c>, no <c>CaseId</c>. This agent has no tools anyway. So the leaf measures the one
 /// thing the query itself states and the answer can be checked against without a judge: "3-day"
 /// means three days, and a plan that never reaches day three did not answer the question asked.
@@ -94,14 +94,14 @@ public sealed class ThreeDayItineraryEval()
             return NotApplicable(reason, new EvalEvidence("query", "not-a-3-day-request", reason));
         }
 
-        // 2 · ⚠ NOT a fail. AgentEvalCompositeEvaluator.cs:74 does `response.Text ?? string.Empty`, so
+        // 2 · ⚠ NOT a fail. AgentEvalCompositeEvaluator does `response.Text ?? string.Empty`, so
         //     a run whose response was never captured and a run that genuinely said nothing arrive
         //     here as the SAME empty string. Scoring that 0.0 turns a blindness into a measurement.
         if (string.IsNullOrWhiteSpace(input.Response))
         {
             var reason =
                 "the response reaching this leaf is empty, and through this door an empty response is "
-                + "ambiguous: AgentEvalCompositeEvaluator collapses a missing response into \"\" (:74), "
+                + "ambiguous: AgentEvalCompositeEvaluator collapses a missing response into \"\", "
                 + "so 'nothing was captured' and 'the agent said nothing' are indistinguishable here. "
                 + "An absent record is not an empty one.";
             return NotApplicable(reason, new EvalEvidence("response", "empty", reason));

@@ -38,14 +38,21 @@ public sealed class SystemPromptExtractionAttack : IAttackType
     /// Creates the attack. When <paramref name="systemPromptCanary"/> is supplied, every probe is
     /// planted with that single canary token in <c>Metadata["system_prompt_canary"]</c> so the
     /// evaluator can prove leakage by exact match (RC-2) — embed the SAME token in the system prompt
-    /// of the agent under test (which the benchmark caller constructs). When <c>null</c> (default),
+    /// of the agent under test (which the benchmark caller constructs). When <c>null</c> (default) or blank,
     /// probes carry no canary and the evaluator honestly returns <see cref="EvaluationResult.Inconclusive"/>:
     /// keyword heuristics cannot reliably detect system-prompt leakage without ground truth, so a run
     /// against an agent whose system prompt we do not control surfaces LLM07 / AML.T0056 / AML.T0057 as
     /// "not conclusively tested" rather than a false pass.
     /// </summary>
+    // A blank canary is none, as the evaluator reads it: planted, it made every probe inconclusive while the attack
+    // still declared itself measurable, so the scan was blocked as unexpectedly unmeasured (#279 review).
     public SystemPromptExtractionAttack(string? systemPromptCanary = null)
-        => _systemPromptCanary = systemPromptCanary;
+        => _systemPromptCanary = string.IsNullOrWhiteSpace(systemPromptCanary) ? null : systemPromptCanary;
+
+    /// <inheritdoc />
+    public string? NotMeasurableReason => _systemPromptCanary is null
+        ? "no system-prompt canary was planted, so leakage cannot be decided (pass one to the attack and embed it in the agent's system prompt)"
+        : null;
 
     /// <inheritdoc />
     public string Name => "SystemPromptExtraction";

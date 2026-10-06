@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Text.RegularExpressions;
 using AgentEval.Guardrails;
 using AgentEval.Guardrails.Judges;
 using Microsoft.Extensions.AI;
@@ -61,10 +62,16 @@ public class HallucinatedCitationJudgeTests
         public void Dispose() { }
     }
 
+    // The parse regexes carry a wall-clock ReDoS timeout. Under load (the full parallel test run) it fired on these
+    // small inputs, and the verdict then depended on the machine, not on the parse. The verdict tests below run the
+    // same patterns with no timeout, so they test the parse; the timeout path has its own deterministic test.
+    private static Match NoTimeout(Regex regex, string input) =>
+        Regex.Match(input, regex.ToString(), regex.Options, Regex.InfiniteMatchTimeout);
+
     [Fact]
     public async Task InspectAsync_CitationToNonexistentSource_BlocksWithoutCallingModel()
     {
-        var gate = new HallucinatedCitationJudge(new ThrowingChatClient());
+        var gate = new HallucinatedCitationJudge(new ThrowingChatClient()) { RegexMatch = NoTimeout };
         var text = HallucinatedCitationJudge.FormatCase(
             new Dictionary<string, string> { ["S1"] = "Returns within 30 days." },
             citedSourceId: "S99", claim: "Returns within 30 days.");
@@ -78,7 +85,7 @@ public class HallucinatedCitationJudgeTests
     [Fact]
     public async Task InspectAsync_CitationToRealSource_UnsupportedClaim_Blocks()
     {
-        var gate = new HallucinatedCitationJudge(new ScriptedSupportChatClient(supported: false));
+        var gate = new HallucinatedCitationJudge(new ScriptedSupportChatClient(supported: false)) { RegexMatch = NoTimeout };
         var text = HallucinatedCitationJudge.FormatCase(
             new Dictionary<string, string> { ["S1"] = "Returns within 30 days." },
             citedSourceId: "S1", claim: "Returns within 90 days, no receipt needed.");
@@ -90,7 +97,7 @@ public class HallucinatedCitationJudgeTests
     [Fact]
     public async Task InspectAsync_CitationToRealSource_SupportedClaim_Allows()
     {
-        var gate = new HallucinatedCitationJudge(new ScriptedSupportChatClient(supported: true));
+        var gate = new HallucinatedCitationJudge(new ScriptedSupportChatClient(supported: true)) { RegexMatch = NoTimeout };
         var text = HallucinatedCitationJudge.FormatCase(
             new Dictionary<string, string> { ["S1"] = "Returns within 30 days." },
             citedSourceId: "S1", claim: "You can return items within 30 days.");
@@ -102,7 +109,7 @@ public class HallucinatedCitationJudgeTests
     [Fact]
     public async Task InspectAsync_UnparseableText_Allows()
     {
-        var gate = new HallucinatedCitationJudge(new ThrowingChatClient());
+        var gate = new HallucinatedCitationJudge(new ThrowingChatClient()) { RegexMatch = NoTimeout };
         var verdict = await gate.InspectAsync("not in the expected format at all");
         Assert.Equal(GateAction.Allow, verdict.Action);
     }
@@ -125,7 +132,7 @@ public class HallucinatedCitationJudgeTests
         // first before the judge ever saw it, risking a false BLOCK for a claim genuinely supported by the
         // truncated-away part of the source.
         var capturing = new CapturingChatClient();
-        var gate = new HallucinatedCitationJudge(capturing);
+        var gate = new HallucinatedCitationJudge(capturing) { RegexMatch = NoTimeout };
         var text = HallucinatedCitationJudge.FormatCase(
             new Dictionary<string, string>
             {
@@ -150,7 +157,7 @@ public class HallucinatedCitationJudgeTests
         // multi-line content greedily swallow source 2, CITED SOURCE, and CLAIM too — which would make "S2"
         // vanish from the parsed sources dictionary entirely and turn this into a false "does not exist"
         // Block instead of proceeding to the judge.
-        var gate = new HallucinatedCitationJudge(new ScriptedSupportChatClient(supported: true));
+        var gate = new HallucinatedCitationJudge(new ScriptedSupportChatClient(supported: true)) { RegexMatch = NoTimeout };
         var text = HallucinatedCitationJudge.FormatCase(
             new Dictionary<string, string>
             {
@@ -162,6 +169,32 @@ public class HallucinatedCitationJudgeTests
         var verdict = await gate.InspectAsync(text);
 
         Assert.Equal(GateAction.Allow, verdict.Action);
+    }
+
+    // ── A parse regex that times out is "could not check", never "nothing to check" ──
+    //
+    // The full test run failed InspectAsync_CitationToRealSource_UnsupportedClaim_Blocks with Allow under load:
+    // Parse caught RegexMatchTimeoutException and returned "no citation", which InspectAsync allows. The matcher
+    // below throws that exception on every call, so the timeout path runs deterministically, not by load.
+
+    private static Match TimeOut(Regex regex, string input) =>
+        throw new RegexMatchTimeoutException(input, regex.ToString(), regex.MatchTimeout);
+
+    private static string UnsupportedCitationCase() => HallucinatedCitationJudge.FormatCase(
+        new Dictionary<string, string> { ["S1"] = "Returns within 30 days." },
+        citedSourceId: "S1", claim: "Returns within 90 days, no receipt needed.");
+
+    [Fact]
+    public async Task InspectAsync_ParseTimesOut_FailClosedByDefault_Blocks_WithoutCallingModel_AndNamesTheTimeout()
+    {
+        // Old behaviour: the timed-out parse read as "not a citation" and the gate returned Allow, so this fails
+        // there. Text that is merely not in the citation shape still allows (InspectAsync_UnparseableText_Allows).
+        var gate = new HallucinatedCitationJudge(new ThrowingChatClient()) { RegexMatch = TimeOut };
+
+        var verdict = await gate.InspectAsync(UnsupportedCitationCase());
+
+        Assert.Equal(GateAction.Block, verdict.Action);
+        Assert.Contains("timed out", verdict.Reason);
     }
 
     [Fact]

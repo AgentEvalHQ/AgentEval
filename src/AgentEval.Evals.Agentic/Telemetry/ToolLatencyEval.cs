@@ -37,6 +37,9 @@ public sealed class ToolLatencyEval : IEval
     private readonly AgenticTelemetry? _data;
     private readonly double _perToolBudgetMs;
 
+    // The score a check must reach (its evaluator card's defaultThreshold; B9a found the card at 1.0).
+    private const double PassThreshold = 0.80;
+
     /// <inheritdoc/>
     public string Key      => KeyValue;
 
@@ -112,8 +115,7 @@ public sealed class ToolLatencyEval : IEval
             .First();
 
         var score = TelemetryHelper.LinearScore(worstLatency, _perToolBudgetMs);
-        const double passThreshold = 0.80;
-        var passed = score >= passThreshold;
+        var passed = score >= PassThreshold;
         var severity = passed ? "none" : "low";
 
         // Build per-tool dimensions.
@@ -128,7 +130,7 @@ public sealed class ToolLatencyEval : IEval
 
         return Task.FromResult(new EvalResult(
             Metric: new(KeyValue, NameValue, CategoryValue, VersionValue),
-            Score: new(score, null, passed ? "pass" : "fail", passed, passThreshold, severity, null),
+            Score: new(score, null, passed ? "pass" : "fail", passed, PassThreshold, severity, null),
             Details: new(
                 Dimensions: dimensions,
                 Evidence:
