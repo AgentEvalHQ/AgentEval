@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>AgentEval.HealthcareSafetyPack.Tests</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The sample under test. Its data\*.jsonl fixtures are marked CopyToOutputDirectory and flow through this
+         reference into this project's output, so the tests read the same files the runner ships. -->
+    <ProjectReference Include="..\AgentEval.HealthcareSafetyPack\AgentEval.HealthcareSafetyPack.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="coverlet.collector" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <!-- Sample O1's work once it has its model (AgentEval.Samples), linked rather than copied, so what the menu's
+       sample does with its model is the code these tests run. Its other file reads AIConfig to choose the model,
+       which is why the work is in a file of its own. -->
+  <ItemGroup>
+    <Compile Include="..\AgentEval.Samples\DomainPacks\01_HealthcareSafetyPack.Run.cs" Link="SampleO1\01_HealthcareSafetyPack.Run.cs" />
+  </ItemGroup>
+
+</Project>

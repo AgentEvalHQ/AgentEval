@@ -24,6 +24,9 @@
     <ProjectReference Include="..\..\src\AgentEval.Evals.Performance\AgentEval.Evals.Performance.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Rendering.Pdf\AgentEval.Rendering.Pdf.csproj" />
     <ProjectReference Include="..\..\src\AgentEval\AgentEval.csproj" />
+    <!-- O1 runs the healthcare domain pack's own checks and runner, so the sample and the full project cannot drift.
+         Its data\*.jsonl fixtures flow into this output through the reference. -->
+    <ProjectReference Include="..\AgentEval.HealthcareSafetyPack\AgentEval.HealthcareSafetyPack.csproj" />
   </ItemGroup>
 
   <ItemGroup>
