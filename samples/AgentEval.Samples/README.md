@@ -27,7 +27,7 @@ cd samples/AgentEval.Samples
 dotnet run
 ```
 
-The interactive menu organises samples into **groups (A–L)**. Select a group letter, then a sample number.
+The interactive menu organises samples into **groups (A–O)**. Select a group letter, then a sample number.
 You can also run a specific sample directly from the command line by its **legacy index** (1-based across the flat sample list, A1=1, A7=7, B1=8, …):
 
 ```bash
@@ -42,6 +42,7 @@ dotnet run -- 101  # Jev Decisions           (N2)
 dotnet run -- 102  # Judge vs Judge          (N3)
 dotnet run -- 103  # Memory Judge vs Judge   (N4)
 dotnet run -- 104  # Judge Reference Experiment (N5)
+dotnet run -- 105  # Healthcare Safety Pack  (O1)
 ```
 
 The benchmark samples (H2–H10) also respect a preset tier via `--preset <presetName>` (preset names are
@@ -309,6 +310,22 @@ $env:JEV_MODEL     = "jev-1.13.0"                     # pin a versioned id for a
 $env:AGENTEVAL_SAMPLES_SHOW_RAW = "1"                 # N2: print every request and reply body (the key is never printed)
 $env:BITDEER_PRICE_INPUT_PER_1M  = "0.00"             # Bitdeer's list price was not verifiable from their public
 $env:BITDEER_PRICE_OUTPUT_PER_1M = "0.00"             # pages on 2026-09-20; unset → the run prints "not priced"
+```
+
+### O — Domain Packs  🔑 a model provider
+
+A domain pack is the checks of one field composed into one verdict, the shape of the GDPR and EU AI Act
+benchmarks. O1 runs three cases of the healthcare safety pack contributed in
+[#273](https://github.com/AgentEvalHQ/AgentEval/pull/273), through the same checks and runner as the
+full project, [`samples/AgentEval.HealthcareSafetyPack`](../AgentEval.HealthcareSafetyPack) (all 15 cases,
+a `--calibrate` mode that measures the judges against the author's gold labels, and offline tests).
+
+| # | Sample | What It Exercises | Azure? | Time |
+|---|--------|-------------------|--------|------|
+| 1 | **Healthcare Safety Pack** | A `CompositeEval` with `MinAggregation`: four `AtomicLlmEval` judges for what the agent said, a deterministic check of the tool calls it made against what the deployment permits, and checks a case does not need left not applicable (no judge called); one critical failure fails the case. Synthetic cases; not clinical validation | No (any provider) | 5 min |
+
+```bash
+dotnet run -- 105   # Healthcare Safety Pack  (O1)
 ```
 
 ---

@@ -61,6 +61,9 @@ dotnet run --project samples/AgentEval.HealthcareSafetyPack
 dotnet run --project samples/AgentEval.HealthcareSafetyPack -- --calibrate
 ```
 
+For a short tour, `samples/AgentEval.Samples` runs three of these cases through the same checks and runner as
+sample **O1** (`dotnet run -- 105` from `samples/AgentEval.Samples`).
+
 Every result line starts with `[LIVE]` or `[CALIBRATION]`. The audit file goes to `output/` next to
 the binary, or to `--out <dir>`, under a name no other run reuses (the path is printed at the end).
 
