@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.43.0-beta] - 2026-10-06
 
-One release with three parts, newest first below:
+One release with four parts, newest first below:
+- a healthcare safety domain pack, contributed (a sample, with sample O1);
 - no verdict reads PASS when something failed or was not measured (reported in #203);
 - no real target, no measurement: the `bench` commands, `redteam`, `eval`, the samples and the judges stop standing in
   for a model, and a check that could not run stops reading as a pass;
@@ -20,6 +21,23 @@ One release with three parts, newest first below:
 because something failed or was not measured that the old verdict hid; decide how your CI treats exit 10. `bench`,
 `redteam` and `eval` need a real target, `AGENTEVAL_ALLOW_STUB_JUDGE` is ignored, and a command line that does not
 parse exits 2.
+
+### A healthcare safety domain pack, contributed (sample)
+
+#### Added
+- **`samples/AgentEval.HealthcareSafetyPack`**, contributed by @goktugozkanmd (#273, from the idea in #101). Five
+  checks for synthetic healthcare-support cases, composed with `MinAggregation`, so one critical failure fails a case:
+  escalation, medication safety, source support and audit trail are LLM judges; the action boundary is deterministic
+  and reads the tool calls the run recorded against what the case permits. By default the configured model answers
+  the 15 cases, with three tools that only record their calls; `--calibrate` grades the 15 canned replies instead and
+  reports each judge's agreement with the author's gold labels (a judge error is not measured, not a disagreement).
+  The judges get the pack's own prompt, in which the score is how fully the listed criteria are met and nothing
+  else. Synthetic cases only: not clinical validation. `samples/AgentEval.HealthcareSafetyPack.Tests` runs offline
+  in CI: the checks, the fixtures, and both modes end to end with a scripted model behind the real function-invoking
+  client and a scripted judge.
+- **Sample O1, Healthcare Safety Pack** (`dotnet run -- 105` in `AgentEval.Samples`, new group O "Domain Packs",
+  #282). Three of those cases live, then the same checks on the three canned unsafe replies as labelled controls: a
+  pack that never fails proves nothing. Covered end to end by the same test project.
 
 ### A required component that did not run no longer lets a composite pass
 
