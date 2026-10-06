@@ -11,6 +11,7 @@ using System.Text.Json;
 using AgentEval.Calibration;
 using AgentEval.Core;
 using AgentEval.Evals;
+using AgentEval.Evals.Meta;
 using AgentEval.HealthcareSafetyPack;
 using Microsoft.Extensions.AI;
 
@@ -76,7 +77,7 @@ var scenarios = await HealthcareSafetyData.LoadJsonlAsync<HealthcareScenario>(
 var gold = await HealthcareSafetyData.LoadJsonlAsync<GoldLabel>(
     Path.Combine(dataDir, "gold.jsonl"));
 
-// ── Cross-check: the gold labels refer to the SAME fixtures the runner loads. ──
+// ── Cross-check the fixtures before any model call: a bad fixture must not surface after paid calls. ──
 var scenarioById = scenarios.ToDictionary(s => s.ScenarioId, StringComparer.Ordinal);
 if (scenarios.Count != gold.Count)
     throw new InvalidOperationException(
@@ -89,6 +90,14 @@ foreach (var label in gold)
         !string.Equals(scenario.AgentResponse, label.AgentResponse, StringComparison.Ordinal))
         throw new InvalidOperationException(
             $"fixture drift on '{label.ScenarioId}': scenario and gold input/response differ.");
+    if (!CheckKeys.All.Contains(scenario.CheckId, StringComparer.Ordinal))
+        throw new InvalidOperationException($"'{scenario.ScenarioId}' names an unknown check '{scenario.CheckId}'.");
+    if (!string.Equals(label.ArticleControlId, scenario.CheckId, StringComparison.Ordinal))
+        throw new InvalidOperationException(
+            $"'{scenario.ScenarioId}': gold labels '{label.ArticleControlId}' but the scenario targets '{scenario.CheckId}'.");
+    if (CaseKeys.GateFor(scenario.CheckId) is { } gate && !IsSet(scenario, gate))
+        throw new InvalidOperationException(
+            $"'{scenario.ScenarioId}' targets {scenario.CheckId} but does not set '{gate}', so that check would not apply.");
 }
 
 Console.WriteLine($"Provider: {Config.ProviderName}, model {Config.Model} (agent and judges).");
@@ -98,70 +107,79 @@ var judge = new ChatClientEvaluator(Config.CreateChatClient());
 var pack = HealthcareSafetyPackFactory.Build(judge, Config.Model);
 var agent = new ChatClientBuilder(Config.CreateChatClient()).UseFunctionInvocation().Build();
 
-var packPairs = new List<(string Expected, string Actual)>();
 var perCheckPairs = CheckKeys.All.ToDictionary(k => k, _ => new List<(string Expected, string Actual)>(), StringComparer.Ordinal);
+var notMeasured = CheckKeys.All.ToDictionary(k => k, _ => 0, StringComparer.Ordinal);
 var packLabels = new List<string>();
 var checkLabels = CheckKeys.All.ToDictionary(k => k, _ => new List<string>(), StringComparer.Ordinal);
 var auditRows = new List<object>();
+var failedCases = 0;
 var tag = $"[{mode}]";
 
-Console.WriteLine($"Per-scenario verdicts (pack '{pack.Key}', aggregation {pack.Aggregation.Name}, threshold none)");
-Console.WriteLine(new string('-', 78));
+Console.WriteLine($"{tag} Per-scenario verdicts (pack '{pack.Key}', aggregation {pack.Aggregation.Name}, threshold none)");
+Console.WriteLine($"{tag} {new string('-', 70)}");
 foreach (var label in gold)
 {
     var scenario = scenarioById[label.ScenarioId];
 
     string response;
-    IReadOnlyList<ToolCall> toolCalls;
-    if (calibrate)
+    IReadOnlyList<ToolCall>? toolCalls;
+    EvalResult result;
+    try
     {
-        response = scenario.AgentResponse;
-        toolCalls = (scenario.ToolCalls ?? []).Select(tc => new ToolCall(
-            tc.Name,
-            tc.Arguments?.ToDictionary(k => k.Key, v => (object)v.Value),
-            tc.Result)).ToList();
-    }
-    else
-    {
-        var recorded = new List<ToolCall>();
-        try
+        if (calibrate)
         {
+            response = scenario.AgentResponse;
+            // A fixture without a toolCalls field recorded nothing: the action boundary is then not measured.
+            toolCalls = scenario.ToolCalls?.Select(tc => new ToolCall(
+                tc.Name,
+                tc.Arguments?.ToDictionary(k => k.Key, v => (object)v.Value),
+                tc.Result)).ToList();
+        }
+        else
+        {
+            var recorded = new List<ToolCall>();
             response = await RunAgentAsync(agent, scenario, recorded);
+            toolCalls = recorded;
         }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            // The agent produced nothing to grade: report it, and do not count it as a verdict.
-            Console.WriteLine($"{tag} {scenario.ScenarioId,-12} agent call failed, not graded: {ex.Message}");
-            auditRows.Add(new { mode, scenarioId = scenario.ScenarioId, checkId = scenario.CheckId, agentError = ex.Message });
-            packLabels.Add("error");
-            continue;
-        }
-        toolCalls = recorded;
+
+        result = await pack.EvaluateAsync(BuildInput(scenario, response, toolCalls));
+    }
+    catch (Exception ex)
+    {
+        // A provider error, a timeout or a content filter: nothing was graded for this case. Say so, keep the
+        // audit row, and go on; the run then exits non-zero.
+        failedCases++;
+        Console.WriteLine($"{tag} {scenario.ScenarioId,-12} {scenario.CheckId,-22} NOT GRADED: {ex.GetType().Name}: {ex.Message}");
+        auditRows.Add(new { mode, scenarioId = scenario.ScenarioId, checkId = scenario.CheckId, error = ex.Message });
+        continue;
     }
 
-    var result = await pack.EvaluateAsync(BuildInput(scenario, response, toolCalls));
     var subs = result.Details.SubResults!.ToDictionary(s => s.Metric.Key, StringComparer.Ordinal);
     var target = subs[scenario.CheckId];
 
-    packPairs.Add((label.ExpectedVerdict, result.Score.Label));
-    perCheckPairs[scenario.CheckId].Add((label.ExpectedVerdict, target.Score.Label));
+    // As the compliance calibration runners do: a verdict the judge did not produce (error, skipped) is reported
+    // as not measured, never counted as a disagreement.
+    if (target.Score.CensusBucket() == MeasurementState.Measured)
+        perCheckPairs[scenario.CheckId].Add((label.ExpectedVerdict, target.Score.Label));
+    else
+        notMeasured[scenario.CheckId]++;
     packLabels.Add(result.Score.Label);
     foreach (var key in CheckKeys.All)
         checkLabels[key].Add(subs[key].Score.Label);
 
     Console.WriteLine(
-        $"{tag} {scenario.ScenarioId,-12} {scenario.CheckId,-22} " +
-        (calibrate ? $"expected={label.ExpectedVerdict,-4} " : "") +
-        $"pack={result.Score.Label,-4} ({result.Score.Severity})");
+        $"{tag} {scenario.ScenarioId,-12} {scenario.CheckId,-22} {Short(target.Score.Label),-5}" +
+        (calibrate ? $" expected={label.ExpectedVerdict,-5}" : "") +
+        $" pack={result.Score.Label} ({result.Score.Severity})");
     Console.WriteLine(
-        "   checks: " + string.Join("  ", CheckKeys.All.Select(k =>
+        $"{tag}    checks: " + string.Join("  ", CheckKeys.All.Select(k =>
             $"{Abbrev(k)}={Short(subs[k].Score.Label)}/{subs[k].Score.Severity}")));
-    Console.WriteLine($"   target: {target.Details.Summary ?? "(no reason)"}");
+    Console.WriteLine($"{tag}    target: {target.Details.Summary ?? "(no reason)"}");
     if (!calibrate)
     {
-        Console.WriteLine($"   reply:  {Clip(response, 150)}");
-        if (toolCalls.Count > 0)
-            Console.WriteLine($"   tools:  {string.Join(", ", toolCalls.Select(c => c.Name))}");
+        Console.WriteLine($"{tag}    reply:  {Clip(response, 150)}");
+        if (toolCalls is { Count: > 0 })
+            Console.WriteLine($"{tag}    tools:  {string.Join(", ", toolCalls.Select(c => c.Name))}");
     }
 
     auditRows.Add(new
@@ -171,7 +189,7 @@ foreach (var label in gold)
         checkId = scenario.CheckId,
         expectedVerdict = calibrate ? label.ExpectedVerdict : null,
         response,
-        toolCalls = toolCalls.Select(c => c.Name),
+        toolCalls = toolCalls?.Select(c => c.Name),
         packVerdict = result.Score.Label,
         packSeverity = result.Score.Severity,
         packScore = result.Score.Value,
@@ -191,30 +209,32 @@ Console.WriteLine();
 
 if (calibrate)
 {
-    // ── Agreement: pack + per check, via the shared single-sourced metrics. ──
-    Console.WriteLine($"{tag} Agreement with the author-labelled gold (accuracy + Cohen's kappa)");
-    Console.WriteLine(new string('-', 78));
-    Console.WriteLine($"{"scope",-26} {"n",3} {"accuracy",9} {"kappa",7}");
-    PrintRow("pack (Min, 5 checks)", packPairs);
+    // ── Agreement per check, via the shared single-sourced metrics. The gold labels grade each case's target check
+    // only, so there is no pack-level agreement: the other four checks were never labelled. ──
+    Console.WriteLine($"{tag} Agreement of each check with the author-labelled gold (accuracy + Cohen's kappa)");
+    Console.WriteLine($"{tag} {new string('-', 70)}");
+    Console.WriteLine($"{tag} {"check",-22} {"n",3} {"accuracy",9} {"kappa",7} {"not measured",13}");
     foreach (var key in CheckKeys.All)
-        PrintRow(key, perCheckPairs[key]);
+        PrintRow(tag, key, perCheckPairs[key], notMeasured[key]);
     Console.WriteLine();
-    Console.WriteLine("Each check has 3 labelled replies, so read this as a smoke test of the judges, not a validated");
-    Console.WriteLine("accuracy: one disagreement moves a check's accuracy by a third. A disagreement on");
-    Console.WriteLine("hc_action_boundary is a fixture problem, not a judge problem (that check is deterministic).");
+    Console.WriteLine($"{tag} Each check has 3 labelled replies, so read this as a smoke test of the judges, not a");
+    Console.WriteLine($"{tag} validated accuracy: one disagreement moves a check's accuracy by a third. A disagreement");
+    Console.WriteLine($"{tag} on hc_action_boundary is a fixture problem, not a judge problem (that check is deterministic).");
 }
 else
 {
     // ── Verdict counts. The gold labels describe the canned replies, not this model's, so there is no agreement. ──
-    Console.WriteLine($"{tag} Verdicts over {packLabels.Count} cases");
-    Console.WriteLine(new string('-', 78));
-    Console.WriteLine($"{"pack (Min, 5 checks)",-26} {Counts(packLabels)}");
+    Console.WriteLine($"{tag} Verdicts over {packLabels.Count} graded cases");
+    Console.WriteLine($"{tag} {new string('-', 70)}");
+    Console.WriteLine($"{tag} {"pack (Min, 5 checks)",-22} {Counts(packLabels)}");
     foreach (var key in CheckKeys.All)
-        Console.WriteLine($"{key,-26} {Counts(checkLabels[key])}");
+        Console.WriteLine($"{tag} {key,-22} {Counts(checkLabels[key])}");
     Console.WriteLine();
-    Console.WriteLine("The gold labels describe the canned replies, so a live run has no agreement figure;");
-    Console.WriteLine("run with --calibrate to see how far the judges agree with them.");
+    Console.WriteLine($"{tag} The gold labels describe the canned replies, so a live run has no agreement figure;");
+    Console.WriteLine($"{tag} run with --calibrate to see how far the judges agree with them.");
 }
+if (failedCases > 0)
+    Console.WriteLine($"{tag} {failedCases} of {gold.Count} cases were NOT GRADED (see above); the run is incomplete.");
 Console.WriteLine();
 
 // ── Audit artifact: per-check verdict + reason for every scenario, at a path no other run reuses. ──
@@ -228,7 +248,7 @@ Console.WriteLine($"Wrote {auditPath}");
 Console.WriteLine();
 Console.WriteLine("Result: VERIFICATION ARTIFACT ONLY. Synthetic cases, no clinical claim.");
 
-return 0;
+return failedCases > 0 ? 3 : 0;
 
 static async Task<string> RunAgentAsync(IChatClient agent, HealthcareScenario scenario, List<ToolCall> recorded)
 {
@@ -265,7 +285,7 @@ static async Task<string> RunAgentAsync(IChatClient agent, HealthcareScenario sc
     return response.Text;
 }
 
-static EvalInput BuildInput(HealthcareScenario scenario, string response, IReadOnlyList<ToolCall> toolCalls)
+static EvalInput BuildInput(HealthcareScenario scenario, string response, IReadOnlyList<ToolCall>? toolCalls)
 {
     var metadata = new Dictionary<string, object>
     {
@@ -294,12 +314,20 @@ static EvalInput BuildInput(HealthcareScenario scenario, string response, IReadO
     };
 }
 
-static void PrintRow(string scope, IReadOnlyList<(string Expected, string Actual)> pairs)
+static void PrintRow(string tag, string scope, IReadOnlyList<(string Expected, string Actual)> pairs, int notMeasured)
 {
-    var accuracy = AgreementMetrics.Accuracy(pairs);
-    var kappa = AgreementMetrics.CohensKappa(pairs);
-    Console.WriteLine($"{scope,-26} {pairs.Count,3} {accuracy,9:0.00} {Fmt(kappa),7}");
+    var accuracy = pairs.Count == 0 ? "n/a" : AgreementMetrics.Accuracy(pairs).ToString("0.00");
+    var kappa = pairs.Count == 0 ? "n/a" : Fmt(AgreementMetrics.CohensKappa(pairs));
+    Console.WriteLine($"{tag} {scope,-22} {pairs.Count,3} {accuracy,9} {kappa,7} {notMeasured,13}");
 }
+
+static bool IsSet(HealthcareScenario scenario, string flag) => flag switch
+{
+    CaseKeys.Urgent => scenario.Urgent,
+    CaseKeys.MedicationCase => scenario.MedicationCase,
+    CaseKeys.ClinicalClaimCase => scenario.ClinicalClaimCase,
+    _ => false,
+};
 
 static string Counts(IEnumerable<string> labels) =>
     string.Join("  ", labels.GroupBy(l => l).OrderBy(g => g.Key, StringComparer.Ordinal).Select(g => $"{g.Key}={g.Count()}"));
@@ -339,4 +367,6 @@ static void PrintUsage()
     Console.WriteLine("  --out <dir>    where to write the audit file (default: output/ next to the binary)");
     Console.WriteLine();
     Console.WriteLine("Both modes need a model provider: set AI_INFERENCE_PROVIDER and that provider's variables.");
+    Console.WriteLine("Exit codes: 0 every case graded, 1 no provider configured, 2 unknown argument,");
+    Console.WriteLine("3 some cases not graded (a provider error or timeout; the audit file says which).");
 }
