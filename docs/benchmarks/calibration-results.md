@@ -7,7 +7,7 @@ relying on a verdict.
 
 | | |
 |---|---|
-| **Date** | 2026-10-05 |
+| **Date** | 2026-10-05 (GDPR, EU AI Act); 2026-10-06 (agentic) |
 | **Judge** | Bitdeer AI Model Studio, `zai-org/GLM-5.3-Flash` (`AI_INFERENCE_PROVIDER=bitdeer`) |
 | **Version** | the code released as 0.44.0-beta |
 | **Golden sets** | the ones shipped with the release (agentic: `tests/AgentEval.Tests/Agentic/Calibration/Golden/`) |
@@ -57,6 +57,29 @@ provider four times.
 
 ## Agentic
 
-Pending: the agentic suite is being re-measured on the release's final code (two of its evaluators changed after the
-first after-round: similarity and response completeness now receive the reference answer). Its figures will be
-published here.
+Measured on 2026-10-06 (the GDPR and EU AI Act rows on 2026-10-05), after similarity and response completeness began
+to receive the reference answer: 328 judge calls, no evaluation failure. The suite's gate **fails**: one category fails
+its gate and two are INCOMPLETE.
+
+| Category | Result | Accuracy | κ | Cases | Gate |
+|---|---|---|---|---|---|
+| Adversarial | PASS | 95.7% | 0.911 | 23 | default |
+| Calibration (epistemic) | PASS | 100.0% | 1.000 | 8 | 75% / κ 0.55 |
+| Process | FAIL | 61.5% | 0.323 | 13 | 85% / κ 0.65 |
+| Quality | INCOMPLETE | 81.8% | 0.651 | 22, `goal_decomposition_quality` left out | 65% / κ 0.40 |
+| Reasoning | INCOMPLETE | — | — | 0, `reasoning_correctness` left out | 70% / κ 0.40 |
+| Safety | PASS | 95.1% | 0.894 | 203 | 80% / κ 0.60 |
+| System | PASS | 85.0% | 0.727 | 20 | 70% / κ 0.45 |
+| UX | PASS | 100.0% | 1.000 | 8 | default |
+| Memory | SKIP | — | — | 21 carved out | not calibrated |
+
+- **Process** disagreed with the labels on 4 of 13 cases, one each for tool selection, tool output utilization, tool
+  call success and tool efficiency. It also failed its gate before the judges received their rubrics (76.9%, κ
+  0.494).
+- **Quality and Reasoning are INCOMPLETE for reasons in their golden sets, not the judge.** One goal-decomposition
+  case has no plan to grade and reaches no verdict, by design. Four of the reasoning-correctness cases carry no
+  reasoning trace. An evaluator not measured on every one of its cases is left out of its category whole, so
+  Reasoning has nothing left to score.
+- **Cases** counts the cases scored. Evaluators that a single-turn golden case cannot exercise are carved out of
+  `calibrate` and not counted; the [agentic how-it-works page](agentic/how-it-works.md#calibration-quality-today)
+  lists them and why.

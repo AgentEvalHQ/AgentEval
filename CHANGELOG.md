@@ -35,7 +35,11 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   a rubric's needs-review band makes a quality or accuracy preset WARN ("Not confirmed"); the security gates fail on
   anything short of a pass.
 - **Calibration reports only measured verdicts.** A judge outage is INFRA-FAIL; an evaluator not measured on every
-  record is left out whole (INCOMPLETE).
+  record is left out whole (INCOMPLETE). This release's figures for one judge (Bitdeer GLM-5.3-Flash) are published in
+  [Calibration results](docs/benchmarks/calibration-results.md): GDPR five of six pillars pass (pillar 4 misses κ by one
+  case); EU AI Act five of six (pillar 1 INFRA-FAIL from one provider timeout); agentic five of eight scored categories
+  pass — process fails its gate (61.5%, κ 0.323) and quality and reasoning are INCOMPLETE for reasons in their golden
+  sets.
 - **A missing reference answer or context is not a failure.** `similarity` and `f1_score` without `EvalInput.GroundTruth` (or with a blank one) are
   not measured (`skipped`); the QA composite withholds its pass naming them. With one, the judge now receives it.
   `bench agentic --preset rag-quality` has no option for a reference answer or retrieved context yet, so from the CLI it

@@ -398,7 +398,7 @@ The calibration report records per-category accuracy (fraction of entries within
 - Cohen's kappa ≥ 0.70 per category.
 - Zero evaluation failures (judge errors) per category.
 
-A category that fails its threshold fails the command (exit code 9). The calibration report is written to `.agenteval/calibration/agentic-calibration-{date}.md` under the workspace root (`--root`, default the current directory) unless you pass `--out`; the project's own calibration reports are not published.
+A category that fails its threshold fails the command (exit code 9). The calibration report is written to `.agenteval/calibration/agentic-calibration-{date}.md` under the workspace root (`--root`, default the current directory) unless you pass `--out`; the project's own results for its judge are in [Calibration results](../calibration-results.md).
 
 **Calibration coverage is partial**: six of the eight scored categories — system, process and RAG quality among them — are gated at relaxed per-category thresholds rather than the 0.85 / 0.70 default, and the memory, multi-turn and trace-dependent reasoning evaluators are not calibrated at all, although they run and produce verdicts. See the Known Limitations section below and [`how-it-works.md`](how-it-works.md) for the per-category picture.
 
