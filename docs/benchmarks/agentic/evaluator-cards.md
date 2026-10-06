@@ -6,7 +6,7 @@ implementing class. The Foundry URI column repeats the Azure AI Foundry entry in
 says about its origin; "AgentEval-original" means the class cites no Foundry source.
 
 The eight Glass Box Diagnostics evaluators that `AgenticBenchmark.GlassBoxDiagnostics` uses gained
-cards in 0.44 (they had none, and none had a cost tier, so a cost cap dropped all eight); they are
+cards in 0.43 (they had none, and none had a cost tier, so a cost cap dropped all eight); they are
 listed under [Glass Box Diagnostics](#glass-box-diagnostics-8-evaluators). They read the trace attached
 to the input, not the key registry, so they are not resolved by key.
 

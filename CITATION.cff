@@ -8,8 +8,8 @@ authors:
 repository-code: "https://github.com/AgentEvalHQ/AgentEval"
 url: "https://agenteval.dev"
 license: MIT
-version: "0.42.0-beta"
-date-released: "2026-10-01"
+version: "0.43.0-beta"
+date-released: "2026-10-06"
 abstract: >-
   AgentEval is a .NET toolkit for evaluating AI agents, built for Microsoft Agent
   Framework (MAF) and Microsoft.Extensions.AI. It covers tool-usage validation, RAG

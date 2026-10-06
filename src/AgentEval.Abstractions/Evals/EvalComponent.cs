@@ -24,7 +24,7 @@ public sealed record EvalComponent(IEval Eval, double Weight = 1.0, bool Require
 /// </summary>
 public enum ComponentFailureEffect
 {
-    /// <summary>The failure only moves the aggregate score (the behaviour before 0.44).</summary>
+    /// <summary>The failure only moves the aggregate score (the behaviour before 0.43).</summary>
     Averaged = 0,
 
     /// <summary>A pass becomes a warn, and the summary names the component: usable, but not optimal.</summary>

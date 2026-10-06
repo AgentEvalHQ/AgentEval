@@ -84,7 +84,7 @@ public sealed record AgenticEvaluatorSummary(
 /// </param>
 /// <param name="PromptVersions">
 /// Map of check key to the prompt actually sent to its judge: the rubric under <c>Resources/Prompts/</c> its
-/// <c>promptId</c> names (since 0.44, #203 review B9), as each check's provenance records it. Empty for a preset whose
+/// <c>promptId</c> names (since 0.43, #203 review B9), as each check's provenance records it. Empty for a preset whose
 /// checks call no judge.
 /// </param>
 public sealed record AgenticAttestation(
