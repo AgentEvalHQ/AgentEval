@@ -39,8 +39,9 @@ that the old verdict hid. The entries below give the cause and the evidence for 
 - **A missing reference answer or context is not a failure.** `similarity` and `f1_score` without `EvalInput.GroundTruth` (or with a blank one) are
   not measured (`skipped`); the QA composite withholds its pass naming them. With one, the judge now receives it.
   `bench agentic --preset rag-quality` has no option for a reference answer or retrieved context yet, so from the CLI it
-  cannot pass: it reads WARN (exit 10), or FAIL (exit 9) when groundedness — graded without a context — fails; pass
-  them through the library or the MAF bridge.
+  cannot pass: similarity and F1 are not measured, so at best it reads WARN (exit 10), and it reads FAIL (exit 9) when
+  any of the three checks whose failure fails the preset fails — groundedness (graded without a context), response
+  completeness (graded without a reference) or relevance; pass them through the library or the MAF bridge.
 - **Versions** (the ones this release ships): `unsafe_tool_use` 1.2.0, `tool_call_success` 1.2.0,
   `tool_input_accuracy` 2.6.0, `task_adherence` / `intent_resolution` / `task_navigation_efficiency` 1.2.0, the other
   tool-aware and sub-dimension evaluators 1.1.0, every other agentic LLM check one minor version up for its rubric (1.1.0;
@@ -52,12 +53,22 @@ that the old verdict hid. The entries below give the cause and the evidence for 
 
 #### Fixed
 - **The legacy metrics failed an agent for an input it was never given.** Faithfulness, context precision, context
-  recall, answer correctness, the embedding similarities and the groundedness safety metric returned a fail at score 0
-  when their retrieved context or reference answer was missing, and treated a whitespace one as present.
-  `MetricResult` gains a not-measured state (`Measured`, `MetricResult.NotMeasured`): neither a pass nor a fail. The
-  MEAI bridge reports it as inconclusive, not failed — so MAF no longer fails the item (the `Quality` preset failed
-  every item without a context) — report scores and stochastic statistics leave it out, and the console and trace
-  artifacts say "not measured". The safety-metric gate still blocks on it (fail-closed).
+  recall, answer correctness, the embedding similarities, MRR, Recall@K, the groundedness safety metric and the
+  Microsoft.Extensions.AI Groundedness / Equivalence / Completeness adapters (`MicrosoftEvaluatorAdapter`, `IMetric`
+  and `IEval` paths; result version 1.1.0) returned a fail at score 0 — or an `error` — when their retrieved context,
+  reference answer or relevant document IDs were missing, and treated a whitespace one as present. The agent's own
+  output is still measured: an empty answer, or an empty retrieved-document list, fails at 0 as before.
+  `MetricResult` gains a not-measured state (`Measured`, `MetricResult.NotMeasured`): neither a pass nor a fail. MAF
+  has no item state between the two, so through the MEAI bridge a not-measured metric fails its item (fail-closed),
+  its reason saying "not measured" and which input was missing, and the reverse bridge reads it back as `skipped`, not
+  as an error. **Behaviour change:** the text-only `AgentEvalEvaluators.Quality` preset is now relevance, coherence and
+  fluency — it included faithfulness, which needs a retrieved context the `agent.EvaluateAsync` text path cannot pass,
+  so it failed every item; faithfulness stays in `RAG`, `Advanced` and `Faithfulness()`. Report scores, stochastic
+  statistics and the meta lane's observations leave a not-measured metric out; the console, the loggers and the trace
+  artifacts say "not measured", with no score. `agenteval eval --metrics` exports name it instead of dropping it — a
+  "not measured" CSV or Markdown cell, a JUnit / TRX output line, a `metricsNotMeasured` field in the JSON and
+  directory exports (`TestResultSummary.MetricsNotMeasured`) — so "not measured" is no longer indistinguishable from
+  "not requested". The safety-metric gate still blocks on it (fail-closed).
 - **`similarity` never sent the reference answer to its judge.** `SimilarityEval` and `ResponseCompletenessEval`
   documented that they read `EvalInput.GroundTruth`, but the judge received only the query, the response and the
   context. Similarity's judge therefore improvised a comparison — the calibration case "Paris is the capital of France"
@@ -73,11 +84,15 @@ that the old verdict hid. The entries below give the cause and the evidence for 
   now (to every composite it wraps: a non-RAG composite's judges see the retrieved context too, as on the library
   path). On MAF's native path, `AgentEvalAgentEvaluator` dropped `EvalItem.ExpectedOutput` and `EvalItem.Context`
   (MAF's own adapter forwards no additional context), so faithfulness never had its context and the `Quality`
-  preset failed every item; it forwards both now. A blank carrier no longer hides a real one. Found by the release's
-  own recalibration round.
+  preset failed every item; it forwards both now, also as the evaluator contexts Microsoft.Extensions.AI's own
+  Groundedness / Equivalence / Completeness evaluators read. A blank carrier — or an empty expected-tools list — no
+  longer hides a real one. One test now decides "a reference was supplied" everywhere: a reference with no word in it
+  (blank, "?", "...") is none, for similarity, confidence calibration and the decision judge as for F1, and F1 falls
+  back to its constructor reference for it as it does for a blank one. Found by the release's own recalibration round.
 - **The PDF report's cover gave a verdict and no reason.** The cover showed "OVERALL: WARN" and nothing else; the
   overall result's summary and recommendations — for a withheld pass, what was not measured — were rendered on no
-  page. They now follow the verdict on the cover (the first five recommendations, the rest counted). Also: a blank
+  page. They now follow the verdict on the cover (the first five recommendations, the rest counted; one that repeats
+  the summary, or a blank one, is not printed again). Also: a blank
   `ComplianceReportOptions.IncompleteReason` is read as "complete" by the evidence and the report alike, and the bench
   commands' timeout reason is `ComplianceReportOptions.TruncatedIncompleteReason`, named once in a report or composite
   that already says how far the scan got.

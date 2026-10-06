@@ -14,8 +14,11 @@ namespace AgentEval.Evals.Agentic;
 /// </summary>
 internal static class GroundTruthInput
 {
-    /// <summary>Whether the input carries a reference answer.</summary>
-    public static bool Has(EvalInput input) => !string.IsNullOrWhiteSpace(input.GroundTruth);
+    /// <summary>
+    /// Whether the input carries a reference answer — one with a word in it, the test F1 uses (a "?" reference was graded
+    /// here and "none" for F1, #203 review round 16, B12n).
+    /// </summary>
+    public static bool Has(EvalInput input) => ReferenceText.HasWords(input.GroundTruth);
 
     /// <summary>
     /// The input with its reference answer after the query, every other field kept (a <c>with</c> copy); unchanged when

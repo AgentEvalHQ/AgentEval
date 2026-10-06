@@ -31,7 +31,7 @@ public class CsvExporter : IResultExporter
         
         // Collect all unique metric names for dynamic columns
         var metricNames = report.TestResults
-            .SelectMany(r => r.MetricScores.Keys)
+            .SelectMany(r => r.MetricScores.Keys.Concat(r.MetricsNotMeasured.Keys))
             .Distinct()
             .OrderBy(n => n)
             .ToList();
@@ -59,7 +59,9 @@ public class CsvExporter : IResultExporter
             // Append metric score values
             foreach (var metric in metricNames)
             {
-                var value = result.MetricScores.TryGetValue(metric, out var s) ? s.ToString("F2", CultureInfo.InvariantCulture) : "";
+                var value = result.MetricScores.TryGetValue(metric, out var s) ? s.ToString("F2", CultureInfo.InvariantCulture)
+                    : result.MetricsNotMeasured.ContainsKey(metric) ? "not measured"
+                    : "";
                 row += $",{value}";
             }
             

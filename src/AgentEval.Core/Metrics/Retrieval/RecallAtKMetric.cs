@@ -86,32 +86,38 @@ public class RecallAtKMetric : IRAGMetric
     {
         ArgumentNullException.ThrowIfNull(context);
         
-        // Get retrieved document IDs
-        var retrieved = context.GetProperty<IReadOnlyList<string>>(RetrievedDocumentIdsKey);
-        if (retrieved is null || retrieved.Count == 0)
+        // An input the caller did not supply is not measured — the retrieved list, or the relevant IDs (the reference) — it
+        // failed at 0 (#203 review round 16, B12n). A supplied but EMPTY retrieved list is the system's own result: nothing
+        // was retrieved, a measured recall of 0.
+        var relevant = context.GetProperty<IReadOnlyList<string>>(RelevantDocumentIdsKey);
+        if (relevant is null || relevant.Count == 0)
         {
-            return Task.FromResult(MetricResult.Fail(
-                Name, 
-                $"Missing required property '{RetrievedDocumentIdsKey}'. Set context.Properties[\"{RetrievedDocumentIdsKey}\"] to the list of retrieved document IDs.",
+            return Task.FromResult(MetricResult.NotMeasured(
+                Name,
+                $"Recall@K requires the ground-truth relevant document IDs (context.Properties[\"{RelevantDocumentIdsKey}\"]), and none were supplied: not measured.",
+                details: new Dictionary<string, object>
+                {
+                    ["error"] = "missing_relevant_ids",
+                    ["suggestion"] = $"context.SetProperty(\"{RelevantDocumentIdsKey}\", relevantIds);"
+                }));
+        }
+
+        var retrieved = context.GetProperty<IReadOnlyList<string>>(RetrievedDocumentIdsKey);
+        if (retrieved is null)
+        {
+            return Task.FromResult(MetricResult.NotMeasured(
+                Name,
+                $"Recall@K requires the list of retrieved document IDs (context.Properties[\"{RetrievedDocumentIdsKey}\"]), and none was supplied: not measured.",
                 details: new Dictionary<string, object>
                 {
                     ["error"] = "missing_retrieved_ids",
                     ["suggestion"] = $"context.SetProperty(\"{RetrievedDocumentIdsKey}\", retrievedIds);"
                 }));
         }
-        
-        // Get relevant document IDs (ground truth)
-        var relevant = context.GetProperty<IReadOnlyList<string>>(RelevantDocumentIdsKey);
-        if (relevant is null || relevant.Count == 0)
+        if (retrieved.Count == 0)
         {
-            return Task.FromResult(MetricResult.Fail(
-                Name, 
-                $"Missing required property '{RelevantDocumentIdsKey}'. Set context.Properties[\"{RelevantDocumentIdsKey}\"] to the list of ground truth relevant document IDs.",
-                details: new Dictionary<string, object>
-                {
-                    ["error"] = "missing_relevant_ids",
-                    ["suggestion"] = $"context.SetProperty(\"{RelevantDocumentIdsKey}\", relevantIds);"
-                }));
+            return Task.FromResult(MetricResult.Fail(Name, "No document was retrieved, so none of the relevant ones was found: recall = 0.",
+                details: new Dictionary<string, object> { ["recall"] = 0.0, ["retrievedCount"] = 0 }));
         }
         
         // Take top K retrieved

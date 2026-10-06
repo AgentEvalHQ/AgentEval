@@ -34,14 +34,15 @@ public static class ResultConverter
     /// </summary>
     public static void AddToEvaluationResult(MEAIEvaluationResult result, MetricResult metricResult)
     {
-        // Not measured (an input it needs was not supplied) is neither a pass nor a fail: no value, inconclusive, not
-        // failed — as a skipped leaf reads in AgentEvalCompositeEvaluator (#203 review round 15, B12i).
+        // MAF has no item state between pass and fail, so not measured fails the item (fail-closed), as a skipped
+        // composite root does in AgentEvalCompositeEvaluator; the marker's "skipped" label lets MeaiToEvalResultBridge read
+        // it back as not measured. As failed:false it passed an item where nothing was measured (#203 review round 16, B12k).
         if (!metricResult.Measured)
         {
-            var notMeasured = $"AgentEval: not measured — {metricResult.Explanation}";
-            result.Metrics[metricResult.MetricName] = new NumericMetric(metricResult.MetricName, value: null, reason: notMeasured)
+            var notMeasured = $"AgentEval score: 0/100 (skipped, severity none) — not measured: {metricResult.Explanation}";
+            result.Metrics[metricResult.MetricName] = new NumericMetric(metricResult.MetricName, value: 1.0, reason: notMeasured)
             {
-                Interpretation = new EvaluationMetricInterpretation(EvaluationRating.Inconclusive, failed: false, reason: notMeasured),
+                Interpretation = new EvaluationMetricInterpretation(EvaluationRating.Inconclusive, failed: true, reason: notMeasured),
             };
             return;
         }

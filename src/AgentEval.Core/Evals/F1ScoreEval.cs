@@ -27,9 +27,9 @@ namespace AgentEval.Evals;
 /// measured, like a blank one (review round 15 L2).
 /// </para>
 /// <para>
-/// <b>Ground-truth resolution</b>: uses <see cref="EvalInput.GroundTruth"/> if it is not blank; otherwise falls back to
-/// the constructor-supplied <c>groundTruth</c> parameter. If neither is available (null, empty or whitespace), F1 cannot
-/// be computed: the result is <c>skipped</c> (not measured), never a fail (#203, B12a / B12c).
+/// <b>Ground-truth resolution</b>: uses <see cref="EvalInput.GroundTruth"/> if it has a word in it; otherwise (null,
+/// blank, punctuation only) falls back to the constructor-supplied <c>groundTruth</c> parameter. If neither has a word,
+/// F1 cannot be computed: the result is <c>skipped</c> (not measured), never a fail (#203, B12a / B12c / B12n).
 /// </para>
 /// <para>
 /// <b>Provenance</b>: <c>Score.Confidence = 1.0</c> (deterministic — no sampling variance).
@@ -68,21 +68,20 @@ public sealed class F1ScoreEval : AtomicCodeEval
     protected override EvalResult Evaluate(EvalInput input)
     {
         var response = input.Response ?? string.Empty;
-        // Per-input GroundTruth takes precedence over constructor fallback; a blank one is none (B12c: "" or spaces failed
-        // the agent at 0 while similarity read them as no reference).
-        var groundTruth = !string.IsNullOrWhiteSpace(input.GroundTruth) ? input.GroundTruth : _groundTruth;
+        // Per-input GroundTruth takes precedence over the constructor fallback; one with no words (blank, "?") is none and
+        // falls back, as the similarity judges read it (B12c; round 16 B12n: a wordless one skipped the fallback).
+        var groundTruth = ReferenceText.HasWords(input.GroundTruth) ? input.GroundTruth : _groundTruth;
 
         // No reference: F1 cannot be computed, so it is not measured — scored 0 and failed, it marked the agent down for
-        // an input the caller did not give (#203, B12a).
+        // an input the caller did not give (#203, B12a). A reference with no words ("?", "...") gives nothing to compare
+        // either — it passed at 1.0 beside an empty response and failed at 0 beside any answer (review round 15 L2).
         if (string.IsNullOrWhiteSpace(groundTruth))
             return EvalResult.Skipped(this,
                 "F1 compares the response with a reference answer, and none was supplied (EvalInput.GroundTruth or the constructor): not measured.");
 
-        var responseTokens = Tokenize(response);
-        var truthTokens = Tokenize(groundTruth);
+        var responseTokens = ReferenceText.Tokenize(response);
+        var truthTokens = ReferenceText.Tokenize(groundTruth);
 
-        // A reference with no word tokens ("?", "...") gives nothing to compare: not measured, like a blank one — it passed
-        // at 1.0 beside an empty response and failed at 0 beside any answer (review round 15 L2).
         if (truthTokens.Count == 0)
             return EvalResult.Skipped(this,
                 "F1 compares the response with a reference answer, and the one supplied has no words to compare: not measured.");
@@ -101,9 +100,6 @@ public sealed class F1ScoreEval : AtomicCodeEval
                 message: "Response is empty; F1 = 0.0.");
         }
 
-        // Multiset (bag-of-tokens) overlap — standard SQuAD token-F1. For each distinct token the
-        // overlap contributes min(count in response, count in truth), so duplicated/over-emitted
-        // tokens are penalised rather than collapsed by a set intersection (BUG-59).
         // Multiset (bag-of-tokens) overlap — standard SQuAD token-F1. For each distinct token the
         // overlap contributes min(count in response, count in truth), so duplicated/over-emitted
         // tokens are penalised rather than collapsed by a set intersection (BUG-59).
@@ -167,21 +163,5 @@ public sealed class F1ScoreEval : AtomicCodeEval
             Details: new(null, new[] { new EvalEvidence("deterministic", "f1_score", message) }, null, null, null),
             Provenance: new("atomic-code", null, null, null, null, 0, false),
             EvaluatedAt: DateTimeOffset.UtcNow);
-    }
-
-    /// <summary>
-    /// Tokenizes a string into a lowercased word set using whitespace splitting.
-    /// Punctuation attached to words is stripped for fairer token matching.
-    /// </summary>
-    private static IReadOnlyCollection<string> Tokenize(string text)
-    {
-        if (string.IsNullOrWhiteSpace(text))
-            return Array.Empty<string>();
-
-        return text
-            .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
-            .Select(t => t.ToLowerInvariant().Trim('.', ',', '!', '?', ';', ':', '"', '\'', '(', ')', '[', ']'))
-            .Where(t => t.Length > 0)
-            .ToList(); // multiset — preserve token multiplicity for standard token-F1 (BUG-59)
     }
 }

@@ -28,20 +28,20 @@ public static class AgentEvalEvaluators
     // ═══════════════════════════════════════════════════════════════════
 
     /// <summary>
-    /// Quality metrics: faithfulness, relevance, coherence, fluency. Relevance, coherence and fluency grade the text
-    /// alone; faithfulness grades the response against the retrieved context — <c>EvalItem.Context</c> on the MAF path,
-    /// <see cref="AgentEvalRAGContext"/> on a direct MEAI call — and without one it is not measured (never a failure).
+    /// Quality metrics: relevance, coherence, fluency — all three grade the text alone, so they work on every MAF path.
+    /// Faithfulness needs a retrieved context and is in <see cref="RAG"/> and <see cref="Faithfulness"/>.
     /// </summary>
     public static AgentEvalEvaluator Quality(IChatClient judgeClient) => new([
-        new FaithfulnessMetric(judgeClient),
         new RelevanceMetric(judgeClient),
         new CoherenceMetric(judgeClient),
         new FluencyMetric(judgeClient)]);
 
     /// <summary>
     /// RAG metrics: faithfulness, relevance, context precision, context recall, answer correctness.
-    /// Requires <see cref="AgentEvalRAGContext"/> and/or <see cref="AgentEvalGroundTruthContext"/>
-    /// via <c>additionalContext</c>.
+    /// Requires the retrieved context and the reference answer — <c>EvalItem.Context</c> / <c>EvalItem.ExpectedOutput</c>
+    /// on the native MAF path, <see cref="AgentEvalRAGContext"/> / <see cref="AgentEvalGroundTruthContext"/> via
+    /// <c>additionalContext</c> on a direct MEAI call. A metric whose input is missing is not measured, which fails the
+    /// MAF item (MAF has no state between pass and fail), its reason saying what was not supplied.
     /// </summary>
     public static AgentEvalEvaluator RAG(IChatClient judgeClient) => new([
         new FaithfulnessMetric(judgeClient),
@@ -75,7 +75,8 @@ public static class AgentEvalEvaluators
 
     /// <summary>
     /// All available metrics (quality + agentic + safety + task completion).
-    /// The most comprehensive single-call evaluation.
+    /// The most comprehensive single-call evaluation. Faithfulness and groundedness need the retrieved context
+    /// (<c>EvalItem.Context</c> on the native MAF path); without it they are not measured, which fails the MAF item.
     /// </summary>
     public static AgentEvalEvaluator Advanced(IChatClient judgeClient) => new([
         new FaithfulnessMetric(judgeClient),

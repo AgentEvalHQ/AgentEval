@@ -43,7 +43,8 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
     public const string EvalCategory = "quality.meai";
 
     /// <summary><see cref="IEval.Version"/> of the adapter's result shape.</summary>
-    public const string EvalVersion = "1.0.0";
+    /// <remarks>1.1.0: a missing grounding context or reference answer is not measured (skipped), not an error.</remarks>
+    public const string EvalVersion = "1.1.0";
 
     private readonly MicrosoftIEvaluator _evaluator;
     private readonly IChatClient _chatClient;
@@ -120,6 +121,9 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
         ArgumentNullException.ThrowIfNull(input);
         if (input.Response is null)
             throw new InvalidOperationException($"{nameof(MicrosoftEvaluatorAdapter)} requires EvalInput.Response to be set.");
+
+        if (NotSupplied(input.Context, input.GroundTruth) is { } notMeasured)
+            return EvalResult.Skipped(this, notMeasured);
 
         var meter = new UsageMeteringChatClient(_chatClient);
         try
@@ -347,6 +351,9 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
         Core.EvaluationContext context,
         CancellationToken cancellationToken = default)
     {
+        if (NotSupplied(context.Context, context.GroundTruth) is { } notMeasured)
+            return MetricResult.NotMeasured(Name, notMeasured);
+
         try
         {
             var (messages, response) = BuildConversation(context.Input, context.Output, context.Context);
@@ -478,8 +485,8 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
     /// <remarks>
     /// This used to be an empty list on both paths, and those three evaluators return no value without their
     /// context: they could never produce a score through this adapter, only an <c>error</c> leaf or an
-    /// indeterminate <c>Fail</c>. An input with no context or no ground truth still yields that error — honestly,
-    /// because there is nothing to compare against.
+    /// indeterminate <c>Fail</c>. An input with no context or no ground truth is now not measured, with no judge call
+    /// (see <see cref="NotSupplied"/>).
     /// </remarks>
     internal static List<MicrosoftEvaluationContext> BuildAdditionalContext(string? groundingContext, string? groundTruth)
     {
@@ -493,6 +500,20 @@ public class MicrosoftEvaluatorAdapter : IMetric, IEval
         }
         return contexts;
     }
+
+    /// <summary>
+    /// Why the wrapped evaluator cannot be measured on this input — a reference-based M.E.AI evaluator whose grounding
+    /// context or reference answer was not supplied — or <see langword="null"/>. Without one it failed at 0 (IMetric) or
+    /// read <c>error</c> (IEval), marking the agent down for an input the caller did not give (#203 review round 16, B12n).
+    /// </summary>
+    private string? NotSupplied(string? groundingContext, string? groundTruth) => _evaluator switch
+    {
+        GroundednessEvaluator when string.IsNullOrWhiteSpace(groundingContext) =>
+            $"{Name} requires a grounding context (EvalInput.Context), and none was supplied: not measured.",
+        EquivalenceEvaluator or CompletenessEvaluator when string.IsNullOrWhiteSpace(groundTruth) =>
+            $"{Name} requires a reference answer (EvalInput.GroundTruth), and none was supplied: not measured.",
+        _ => null,
+    };
 
     /// <summary>
     /// Creates a Groundedness evaluator (answer is grounded in context).

@@ -144,7 +144,7 @@ public sealed class MRRMetricTests
     }
 
     [Fact]
-    public async Task EvaluateAsync_MissingRetrievedDocs_Returns0()
+    public async Task EvaluateAsync_MissingRetrievedDocs_IsNotMeasured()
     {
         // Arrange
         var context = new EvaluationContext
@@ -159,12 +159,13 @@ public sealed class MRRMetricTests
         var result = await _metric.EvaluateAsync(context);
 
         // Assert
-        Assert.Equal(0, result.Score);
+        Assert.False(result.Measured);   // not supplied: not measured, not a fail at 0 (B12n)
+        Assert.False(result.Passed);
         Assert.Contains("RetrievedDocumentIds", result.Explanation!);
     }
 
     [Fact]
-    public async Task EvaluateAsync_MissingRelevantDocs_Returns0()
+    public async Task EvaluateAsync_MissingRelevantDocs_IsNotMeasured()
     {
         // Arrange
         var context = new EvaluationContext
@@ -179,7 +180,7 @@ public sealed class MRRMetricTests
         var result = await _metric.EvaluateAsync(context);
 
         // Assert
-        Assert.Equal(0, result.Score);
+        Assert.False(result.Measured);   // no reference: not measured (B12n)
         Assert.Contains("RelevantDocumentIds", result.Explanation!);
     }
 
@@ -226,7 +227,7 @@ public sealed class MRRMetricTests
     }
 
     [Fact]
-    public async Task EvaluateAsync_EmptyRetrievedDocs_Returns0()
+    public async Task EvaluateAsync_EmptyRetrievedDocs_IsAMeasuredZero()
     {
         // Arrange
         var context = new EvaluationContext
@@ -240,12 +241,14 @@ public sealed class MRRMetricTests
         // Act
         var result = await _metric.EvaluateAsync(context);
 
-        // Assert
+        // Assert - nothing retrieved is the system's own result, not a missing input (B12n)
+        Assert.True(result.Measured);
+        Assert.False(result.Passed);
         Assert.Equal(0, result.Score);
     }
 
     [Fact]
-    public async Task EvaluateAsync_EmptyRelevantDocs_Returns0()
+    public async Task EvaluateAsync_EmptyRelevantDocs_IsNotMeasured()
     {
         // Arrange - No relevant docs means nothing to find
         var context = new EvaluationContext
@@ -259,7 +262,7 @@ public sealed class MRRMetricTests
         // Act
         var result = await _metric.EvaluateAsync(context);
 
-        // Assert
-        Assert.Equal(0, result.Score);
+        // Assert - no reference: not measured (B12n)
+        Assert.False(result.Measured);
     }
 }

@@ -141,11 +141,43 @@ public sealed class GroundTruthWiringTests
     }
 
     [Fact]
+    public async Task AReferenceWithNoWords_IsNoReference_ForTheJudgesToo()
+    {
+        // Review round 16 (B12n): F1 read "?" as no reference while similarity sent it to its judge as one.
+        var judge = new CapturingJudge();
+        var input = new EvalInput(Query: "What is the capital of France?", Response: "Paris.", GroundTruth: "?");
+
+        Assert.Equal("skipped", (await new SimilarityEval(judge).EvaluateAsync(input)).Score.Label);
+        await new ConfidenceCalibrationEval(judge).EvaluateAsync(input);
+        Assert.DoesNotContain(judge.Inputs, i => i.Contains("Ground truth reference", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task F1_AWordlessPerInputReference_FallsBackToTheConstructorReference()
+    {
+        // Review round 16 (B12n): a blank per-input reference fell back to the constructor's, a "?" one skipped instead.
+        var f1 = await new F1ScoreEval(groundTruth: "Paris is the capital").EvaluateAsync(
+            new EvalInput(Query: "q", Response: "Paris is the capital", GroundTruth: "?"));
+
+        Assert.Equal("pass", f1.Score.Label);
+        Assert.Equal(1.0, f1.Score.Value, 6);
+    }
+
+    [Fact]
     public void DecisionEval_DoesNotSendABlankReference()
     {
         // Review round 15 L5 (B12j): a blank reference was serialised into the decision judge's state.
         Assert.Null(DecisionEval.DefaultState(new EvalInput(Query: "q", Response: "r", GroundTruth: "   ")).GroundTruth);
+        Assert.Null(DecisionEval.DefaultState(new EvalInput(Query: "q", Response: "r", GroundTruth: "?")).GroundTruth);
         Assert.Equal("REF", DecisionEval.DefaultState(new EvalInput(Query: "q", Response: "r", GroundTruth: "REF")).GroundTruth);
+    }
+
+    [Fact]
+    public void DecisionEval_DoesNotSendABlankContext()
+    {
+        // Review round 16 (B12n): the reference was dropped when blank, the context was still sent.
+        Assert.Null(DecisionEval.DefaultState(new EvalInput(Query: "q", Response: "r", Context: "  ")).Context);
+        Assert.Equal("CTX", DecisionEval.DefaultState(new EvalInput(Query: "q", Response: "r", Context: "CTX")).Context);
     }
 
     [Fact]

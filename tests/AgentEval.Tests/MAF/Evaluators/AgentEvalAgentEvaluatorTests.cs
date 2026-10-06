@@ -23,6 +23,7 @@ public class AgentEvalAgentEvaluatorTests
     private sealed class CapturingEvaluator : Microsoft.Extensions.AI.Evaluation.IEvaluator
     {
         public List<ChatMessage>? Captured { get; private set; }
+        public List<EvaluationContext> Contexts { get; } = [];
 
         public IReadOnlyCollection<string> EvaluationMetricNames => ["captured"];
 
@@ -34,6 +35,7 @@ public class AgentEvalAgentEvaluatorTests
             CancellationToken cancellationToken = default)
         {
             Captured = messages.ToList();
+            Contexts.AddRange(additionalContext ?? []);
             var result = new EvaluationResult();
             result.Metrics["captured"] = new NumericMetric("captured", 5.0, "ok");
             return ValueTask.FromResult(result);
@@ -55,5 +57,21 @@ public class AgentEvalAgentEvaluatorTests
         // match the item's conversation exactly.
         Assert.Equal(item.Conversation.ToList(), capturing.Captured!);
         Assert.Contains(capturing.Captured!, m => m.Role == ChatRole.Assistant);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_ForwardsTheReferenceAndContext_AsMeaisOwnEvaluatorContextsToo()
+    {
+        // #203 review round 16 (B12n): only AgentEval's carriers were forwarded, so M.E.AI's Groundedness / Equivalence /
+        // Completeness evaluators wrapped with AsAgentEvaluator never saw the item's context or reference.
+        var capturing = new CapturingEvaluator();
+        var adapter = new AgentEvalAgentEvaluator(capturing, new ChatConfiguration(new FakeChatClient("judge")));
+
+        await adapter.EvaluateAsync([new EvalItem("q", "a") { ExpectedOutput = "REF", Context = "CTX" }]);
+
+        Assert.Contains(capturing.Contexts, c => c is Microsoft.Extensions.AI.Evaluation.Quality.GroundednessEvaluatorContext);
+        Assert.Contains(capturing.Contexts, c => c is Microsoft.Extensions.AI.Evaluation.Quality.EquivalenceEvaluatorContext);
+        Assert.Contains(capturing.Contexts, c => c is AgentEvalGroundTruthContext);
+        Assert.Contains(capturing.Contexts, c => c is AgentEvalRAGContext);
     }
 }

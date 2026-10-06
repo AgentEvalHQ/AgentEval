@@ -142,9 +142,14 @@ public sealed class PdfEvalResultRenderer : IEvalResultRenderer
             // A recommendation the summary already states is not printed again: the summary is usually the first
             // recommendation (a withheld pass, a coverage note, a skipped result) — it read twice (B12f).
             var summary = root.Details.Summary ?? "";
-            // Only a sentence-length one (20+ characters): a short bullet ("warn", "Be concise") can sit inside an unrelated
-            // summary sentence and must still be printed (review round 15 L1).
-            if (root.Details.Recommendations?.Where(r => r.Length < 20 || !summary.Contains(r, StringComparison.Ordinal)).ToList()
+            // Only a sentence-length one (20+ characters) inside the summary: a short bullet ("warn", "Be concise") can sit
+            // inside an unrelated summary sentence and must still be printed (review round 15 L1) — unless it IS the summary.
+            // A blank one is no bullet (round 16, B12n).
+            if (root.Details.Recommendations?
+                    .Where(r => !string.IsNullOrWhiteSpace(r)
+                                && !string.Equals(r.Trim(), summary.Trim(), StringComparison.Ordinal)
+                                && (r.Length < 20 || !summary.Contains(r, StringComparison.Ordinal)))
+                    .ToList()
                 is { Count: > 0 } rootRecs)
             {
                 foreach (var r in rootRecs.Take(MaxCoverRecommendations))

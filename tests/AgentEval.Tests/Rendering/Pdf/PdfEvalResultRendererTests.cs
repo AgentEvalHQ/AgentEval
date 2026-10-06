@@ -291,6 +291,26 @@ public class PdfEvalResultRendererTests
         Assert.Equal(2, System.Text.RegularExpressions.Regex.Matches(doc.GetPage(1).Text, "ZQSHORT").Count);
     }
 
+    [Fact]
+    public async Task TheCover_PrintsAShortSummaryOnce_AndNoEmptyBullet()
+    {
+        // Review round 16 (B12n): a recommendation under 20 characters that IS the whole summary printed twice, and a
+        // blank recommendation printed an empty bullet.
+        var root = new EvalResult(
+            Metric: new("x", "X", "test", "1.0.0"),
+            Score: new(0.5, null, "warn", false, 1.0, "none", null),
+            Details: new(null, null, ["ZQTINY", "  ", "ZQOTHER"], [MakeAtomic("leaf", 1.0, "pass", true, "none")], "Min")
+                { Summary = "ZQTINY" },
+            Provenance: new("composite", null, null, null, null, 0, false),
+            EvaluatedAt: DateTimeOffset.UtcNow);
+
+        using var doc = UglyToad.PdfPig.PdfDocument.Open(await new PdfEvalResultRenderer().RenderAsync(root, DefaultOpts()));
+        var cover = doc.GetPage(1).Text;
+
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(cover, "ZQTINY"));
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(cover, "•"));   // ZQOTHER only
+    }
+
     private static string ExtractAllTextFromPdf(byte[] bytes)
     {
         var sb = new StringBuilder();

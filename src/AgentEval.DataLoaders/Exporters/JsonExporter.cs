@@ -65,7 +65,8 @@ public class JsonExporter : IResultExporter
                 Skipped = r.Skipped,
                 DurationMs = r.DurationMs,
                 Error = r.Error,
-                MetricScores = r.MetricScores.Count > 0 ? r.MetricScores : null
+                MetricScores = r.MetricScores.Count > 0 ? r.MetricScores : null,
+                MetricsNotMeasured = r.MetricsNotMeasured.Count > 0 ? r.MetricsNotMeasured : null
             }).ToList(),
             Metadata = report.Metadata.Count > 0 ? report.Metadata : null
         };
@@ -127,4 +128,5 @@ internal class JsonTestResult
     public long DurationMs { get; set; }
     public string? Error { get; set; }
     public Dictionary<string, double>? MetricScores { get; set; }
+    public Dictionary<string, string>? MetricsNotMeasured { get; set; }
 }

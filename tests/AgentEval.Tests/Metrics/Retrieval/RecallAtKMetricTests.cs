@@ -125,7 +125,7 @@ public sealed class RecallAtKMetricTests
     }
 
     [Fact]
-    public async Task EvaluateAsync_MissingRetrievedDocs_Returns0()
+    public async Task EvaluateAsync_MissingRetrievedDocs_IsNotMeasured()
     {
         // Arrange
         var context = new EvaluationContext
@@ -140,12 +140,13 @@ public sealed class RecallAtKMetricTests
         var result = await _metric.EvaluateAsync(context);
 
         // Assert
-        Assert.Equal(0, result.Score);
+        Assert.False(result.Measured);   // not supplied: not measured, not a fail at 0 (B12n)
+        Assert.False(result.Passed);
         Assert.Contains("RetrievedDocumentIds", result.Explanation!);
     }
 
     [Fact]
-    public async Task EvaluateAsync_MissingRelevantDocs_Returns0()
+    public async Task EvaluateAsync_MissingRelevantDocs_IsNotMeasured()
     {
         // Arrange
         var context = new EvaluationContext
@@ -160,14 +161,14 @@ public sealed class RecallAtKMetricTests
         var result = await _metric.EvaluateAsync(context);
 
         // Assert
-        Assert.Equal(0, result.Score);
+        Assert.False(result.Measured);   // no reference: not measured (B12n)
         Assert.Contains("RelevantDocumentIds", result.Explanation!);
     }
 
     [Fact]
-    public async Task EvaluateAsync_EmptyRelevantDocs_Returns0()
+    public async Task EvaluateAsync_EmptyRelevantDocs_IsNotMeasured()
     {
-        // Arrange - No relevant docs means nothing to recall
+        // Arrange - No relevant docs means nothing to recall: no reference, so recall is undefined (B12n)
         var context = new EvaluationContext
         {
             Input = "test query",
@@ -179,9 +180,23 @@ public sealed class RecallAtKMetricTests
         // Act
         var result = await _metric.EvaluateAsync(context);
 
-        // Assert - 0 because there are no relevant docs to find
-        Assert.Equal(0, result.Score);
+        Assert.False(result.Measured);
         Assert.False(result.Passed);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_EmptyRetrievedDocs_IsAMeasuredZero()
+    {
+        // Nothing retrieved is the system's own result, not a missing input (B12n).
+        var context = new EvaluationContext { Input = "test query", Output = "test output" };
+        context.SetProperty("RetrievedDocumentIds", Array.Empty<string>());
+        context.SetProperty("RelevantDocumentIds", new[] { "doc1" });
+
+        var result = await _metric.EvaluateAsync(context);
+
+        Assert.True(result.Measured);
+        Assert.False(result.Passed);
+        Assert.Equal(0, result.Score);
     }
 
     [Fact]

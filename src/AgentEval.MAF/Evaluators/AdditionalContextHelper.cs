@@ -48,12 +48,19 @@ public static class AdditionalContextHelper
     {
         if (additionalContext == null) return null;
 
+        // A carrier that names tools wins over an empty one before it, as a blank reference or context does (B12j);
+        // an empty list alone still says "no tool is expected" (#203 review round 16, B12n).
+        IReadOnlyList<string>? empty = null;
         foreach (var ctx in additionalContext)
         {
             if (ctx is AgentEvalExpectedToolsContext toolsCtx)
-                return toolsCtx.ExpectedToolNames;
+            {
+                if (toolsCtx.ExpectedToolNames.Any(n => !string.IsNullOrWhiteSpace(n)))
+                    return toolsCtx.ExpectedToolNames;
+                empty ??= toolsCtx.ExpectedToolNames;
+            }
         }
-        return null;
+        return empty;
     }
 }
 

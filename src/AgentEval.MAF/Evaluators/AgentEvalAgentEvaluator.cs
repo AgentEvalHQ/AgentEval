@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using AgentEval.Adapters;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.AI.Evaluation;
@@ -80,12 +81,14 @@ public sealed class AgentEvalAgentEvaluator : IAgentEvaluator
             // MAF puts the reference answer and the retrieved context on the item (agent.EvaluateAsync(...,
             // expectedOutput:) / EvalItem.Context); MAF's own adapter forwards no additional context, so AgentEval's
             // evaluators never saw them — similarity / F1 read "none was supplied", faithfulness had no context (#203
-            // review round 15, B12g). They travel as the carriers AgentEval's MEAI evaluators read.
+            // review round 15, B12g). They travel as the carriers AgentEval's MEAI evaluators read, and as the contexts
+            // M.E.AI's own Groundedness / Equivalence / Completeness evaluators read, which got none (round 16, B12n).
             var additionalContext = new List<MEAIEvaluationContext>();
             if (!string.IsNullOrWhiteSpace(item.ExpectedOutput))
                 additionalContext.Add(new AgentEvalGroundTruthContext(item.ExpectedOutput!));
             if (!string.IsNullOrWhiteSpace(item.Context))
                 additionalContext.Add(new AgentEvalRAGContext(item.Context!));
+            additionalContext.AddRange(MicrosoftEvaluatorAdapter.BuildAdditionalContext(item.Context, item.ExpectedOutput));
 
             var result = await _evaluator.EvaluateAsync(
                 item.Conversation,

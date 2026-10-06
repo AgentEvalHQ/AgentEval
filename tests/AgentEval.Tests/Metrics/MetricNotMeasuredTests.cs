@@ -3,6 +3,8 @@
 // Licensed under the MIT License.
 
 using AgentEval.Core;
+using AgentEval.Evals;
+using AgentEval.Evals.Meta;
 using AgentEval.MAF.Evaluators;
 using AgentEval.Metrics.RAG;
 using AgentEval.Models;
@@ -44,29 +46,53 @@ public sealed class MetricNotMeasuredTests
     }
 
     [Fact]
-    public void TheMeaiBridge_ReportsNotMeasured_AsInconclusive_NotFailed()
+    public void TheMeaiBridge_FailsNotMeasured_AndTheReportReadsItAsSkipped()
     {
-        var meai = ResultConverter.ToMEAI(MetricResult.NotMeasured("llm_faithfulness", "no context"));
+        // #203 review round 16 (B12k): MAF has no item state between pass and fail. As failed:false, a not-measured metric
+        // passed an item where nothing was measured, and the reverse bridge read its empty value as an error.
+        var meai = ResultConverter.ToMEAI(MetricResult.NotMeasured("llm_faithfulness",
+            "Faithfulness requires a retrieved context, and none was supplied: not measured."));
         var metric = (NumericMetric)meai.Metrics["llm_faithfulness"];
 
-        Assert.Null(metric.Value);
-        Assert.False(metric.Interpretation!.Failed);
+        Assert.True(metric.Interpretation!.Failed);
         Assert.Equal(EvaluationRating.Inconclusive, metric.Interpretation.Rating);
+        Assert.Contains("not measured", metric.Interpretation.Reason, StringComparison.Ordinal);
+
+        var report = MeaiToEvalResultBridge.Build("run", ["q"], new AgentEvaluationResults("agenteval", [meai]));
+        var leaf = report.Details.SubResults![0].Details.SubResults![0];
+        Assert.Equal("skipped", leaf.Score.Label);
+        Assert.Equal(MeasurementState.NotMeasured, leaf.Score.CensusBucket());
+        Assert.NotEqual("pass", report.Score.Label);
+        Assert.NotEqual("error", report.Score.Label);
     }
 
     [Fact]
-    public async Task TheQualityPreset_OnTheNativeMafPath_DoesNotFailAnItemWithoutContext()
+    public async Task AnItemWhereNothingWasMeasured_FailsOnTheNativeMafPath()
     {
-        // The MAF doc's headline example: AgentEvalEvaluators.Quality(judge).AsAgentEvaluator(chatConfig) failed every
-        // item - faithfulness failed at 0 without a context, and the native path never forwarded one.
+        var judge = new FakeChatClient();
+        var evaluator = AgentEvalEvaluators.Custom(new FaithfulnessMetric(judge), new AnswerCorrectnessMetric(judge))
+            .AsAgentEvaluator(new ChatConfiguration(judge));
+
+        var results = await evaluator.EvaluateAsync([new EvalItem("What is the capital of France?", "Paris.")]);
+
+        Assert.False(results.AllPassed);
+        Assert.All(results.Items[0].Metrics.Values,
+            m => Assert.Contains("not measured", m.Interpretation!.Reason, StringComparison.Ordinal));
+        Assert.Empty(judge.ReceivedMessages);
+    }
+
+    [Fact]
+    public async Task TheQualityPreset_GradesTheTextAlone()
+    {
+        // The MAF doc's headline example: AgentEvalEvaluators.Quality(judge).AsAgentEvaluator(chatConfig). Its faithfulness
+        // needs a retrieved context that agent.EvaluateAsync's text path cannot pass, so it failed (or, under B12i,
+        // passed unmeasured) every item. It stays in RAG / Advanced / Faithfulness().
         var judge = new FakeChatClient();
         var evaluator = AgentEvalEvaluators.Quality(judge).AsAgentEvaluator(new ChatConfiguration(judge));
 
         var results = await evaluator.EvaluateAsync([new EvalItem("What is the capital of France?", "Paris.")]);
 
-        var faithfulness = results.Items[0].Metrics["llm_faithfulness"];
-        Assert.False(faithfulness.Interpretation!.Failed);
-        Assert.Contains("not measured", faithfulness.Interpretation.Reason, StringComparison.Ordinal);
+        Assert.Equal(["llm_coherence", "llm_fluency", "llm_relevance"], results.Items[0].Metrics.Keys.Order());
     }
 
     [Fact]

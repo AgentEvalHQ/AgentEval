@@ -84,8 +84,15 @@ public class TestResultSummary
     /// <summary>Output/logs from the test.</summary>
     public string? Output { get; set; }
     
-    /// <summary>Metric scores for this test.</summary>
+    /// <summary>Metric scores for this test. A metric that was not measured has no score and is not here.</summary>
     public Dictionary<string, double> MetricScores { get; set; } = new();
+
+    /// <summary>
+    /// Metrics that ran on this test but were not measured (an input they need was not supplied), each with its reason.
+    /// They have no score, so they are not in <see cref="MetricScores"/>; this keeps "not measured" apart from "not
+    /// requested".
+    /// </summary>
+    public Dictionary<string, string> MetricsNotMeasured { get; set; } = new();
 
     /// <summary>
     /// Assertion outcomes for this test — passes, failures, and checks that could not decide.

@@ -12,6 +12,8 @@
     <InternalsVisibleTo Include="AgentEval" />
     <!-- Gatekeeper's inline-judge calibration check looks through judge wrappers via the internal IDelegatingGate. -->
     <InternalsVisibleTo Include="AgentEval.MAF" />
+    <!-- One "is there a reference answer" test (ReferenceText) for F1 here and the agentic similarity judges. -->
+    <InternalsVisibleTo Include="AgentEval.Evals.Agentic" />
     <InternalsVisibleTo Include="AgentEval.Tests" />
     <!-- Phase 8 (v0.10.0-beta): Memory.Tests touches BenchmarkFamilyRegistry.Reset()
          to isolate registry state between integration tests. Reset() is internal. -->

@@ -19,7 +19,7 @@
       "kind": "groundTruth",
       "key": "",
       "required": true,
-      "description": "Reference / expected answer. Wired via EvalInput.GroundTruth (top-level field, NOT a metadata bag entry); a non-blank one takes precedence over the constructor fallback. If neither is supplied (or it is blank) the eval skips: not measured, never a fail."
+      "description": "Reference / expected answer. Wired via EvalInput.GroundTruth (top-level field, NOT a metadata bag entry); one with a word in it takes precedence over the constructor fallback. If neither has a word (missing, blank, punctuation only) the eval skips: not measured, never a fail."
     }
   ],
   "recommendedVisualization": "histogram",
