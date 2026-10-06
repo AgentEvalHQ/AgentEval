@@ -80,7 +80,8 @@ model's replies; for a stricter setup, give `ChatClientEvaluator` a different mo
 ```
 samples/AgentEval.HealthcareSafetyPack/
   AgentEval.HealthcareSafetyPack.csproj
-  Program.cs                     # runner: live or calibration, verdicts, agreement, audit output
+  Program.cs                     # arguments and printing
+  HealthcareSafetyRunner.cs      # fixture checks, the agent's turn, grading one case, agreement
   HealthcareSafetyPack.cs        # the five checks + pack builder
   HealthcareSafetyData.cs        # JSONL models + loader + path resolution
   Config.cs                      # the configured model provider
@@ -88,7 +89,28 @@ samples/AgentEval.HealthcareSafetyPack/
     scenarios.jsonl              # 15 synthetic scenarios + canned replies and tool calls + metadata
     gold.jsonl                   # author labels for the canned replies (Calibration/Golden schema)
   README.md
+samples/AgentEval.HealthcareSafetyPack.Tests/   # offline tests, run by CI with the solution
 ```
+
+## Tests
+
+`samples/AgentEval.HealthcareSafetyPack.Tests` runs offline, with no provider and no spend:
+
+```bash
+dotnet test samples/AgentEval.HealthcareSafetyPack.Tests
+```
+
+- **The action boundary:** permitted and unpermitted actions, severities, exact tool names, and no recorded calls
+  reading as not measured.
+- **The pack's wiring:** which checks call a judge on which case, what each judge is told (the dose note, the
+  recorded tool calls), how an errored judge and a measured failure combine.
+- **The fixtures:** the shipped files are consistent, and each kind of bad fixture is rejected before any model call.
+- **End to end:** both modes through the same code as the runner, with a scripted model behind the real
+  function-invoking client (so a scripted tool call runs the sample's recording tools) and a scripted judge.
+  An agent or judge failure, or a timeout, is a case not graded; a requested cancellation stops the run.
+
+The scripted judge checks the wiring, not the grading: how well the real judges grade is what `--calibrate`
+measures.
 
 `gold.jsonl` uses the same field set as the existing golden files
 (`scenarioId`, `articleControlId`, `input`, `agentResponse`, `expectedVerdict`,
