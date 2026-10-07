@@ -512,6 +512,38 @@ class AgentEval.Calibration.CalibratedJudge
     ctor(System.Collections.Generic.IEnumerable<System.ValueTuple<System.String, Microsoft.Extensions.AI.IChatClient>> judges, AgentEval.Calibration.CalibratedJudgeOptions options = null)
     static AgentEval.Calibration.CalibratedJudge Create(AgentEval.Calibration.CalibratedJudgeOptions options, System.ValueTuple<System.String, Microsoft.Extensions.AI.IChatClient>[] judges)
     static AgentEval.Calibration.CalibratedJudge Create(System.ValueTuple<System.String, Microsoft.Extensions.AI.IChatClient>[] judges)
+enum AgentEval.Calibration.CutObjective
+    Accuracy
+    BalancedAccuracy
+class AgentEval.Calibration.HeldOutEvaluation
+    AgentEval.Calibration.CutObjective Objective { get; init; }
+    AgentEval.Calibration.HeldOutEvaluation <Clone>$()
+    System.Boolean Equals(AgentEval.Calibration.HeldOutEvaluation other)
+    System.Boolean Equals(System.Object obj)
+    System.Double Cut { get; init; }
+    System.Double HeldOutAuroc { get; init; }
+    System.Double TrainingAccuracy { get; init; }
+    System.Double TrainingAuroc { get; init; }
+    System.Int32 GetHashCode()
+    System.Int32 TrainingCount { get; init; }
+    System.String ToString()
+    System.Void Deconstruct(out System.Double Cut, out AgentEval.Calibration.CutObjective Objective, out System.Int32 TrainingCount, out System.Double TrainingAccuracy, out System.Double TrainingAuroc, out WilsonInterval HeldOutAccuracy, out System.Double HeldOutAuroc)
+    WilsonInterval HeldOutAccuracy { get; init; }
+    ctor(System.Double Cut, AgentEval.Calibration.CutObjective Objective, System.Int32 TrainingCount, System.Double TrainingAccuracy, System.Double TrainingAuroc, WilsonInterval HeldOutAccuracy, System.Double HeldOutAuroc)
+struct AgentEval.Calibration.ScoredCase
+    System.Boolean Equals(AgentEval.Calibration.ScoredCase other)
+    System.Boolean Equals(System.Object obj)
+    System.Boolean Positive { get; init; }
+    System.Double Score { get; init; }
+    System.Int32 GetHashCode()
+    System.String ToString()
+    System.Void Deconstruct(out System.Double Score, out System.Boolean Positive)
+    ctor(System.Double Score, System.Boolean Positive)
+static class AgentEval.Calibration.ThresholdCalibration
+    static AgentEval.Calibration.HeldOutEvaluation EvaluateHeldOut(System.Collections.Generic.IReadOnlyList<AgentEval.Calibration.ScoredCase> training, System.Collections.Generic.IReadOnlyList<AgentEval.Calibration.ScoredCase> heldOut, AgentEval.Calibration.CutObjective objective = CutObjective.Accuracy)
+    static System.Double Auroc(System.Collections.Generic.IReadOnlyList<AgentEval.Calibration.ScoredCase> cases)
+    static System.Double ChooseCut(System.Collections.Generic.IReadOnlyList<AgentEval.Calibration.ScoredCase> cases, AgentEval.Calibration.CutObjective objective = CutObjective.Accuracy)
+    static System.ValueTuple<System.Collections.Generic.IReadOnlyList<AgentEval.Calibration.ScoredCase>, System.Collections.Generic.IReadOnlyList<AgentEval.Calibration.ScoredCase>> Split(System.Collections.Generic.IReadOnlyList<AgentEval.Calibration.ScoredCase> cases, System.Double heldOutFraction, System.Int32 seed)
 class AgentEval.Comparison.DefaultStatisticsCalculator
     AgentEval.Comparison.ConfidenceInterval CalculateConfidenceInterval(System.Collections.Generic.IReadOnlyList<System.Double> values, System.Double confidenceLevel = 0.95)
     AgentEval.Comparison.DistributionStatistics CreateDistribution(System.Collections.Generic.IReadOnlyList<System.Decimal> values)

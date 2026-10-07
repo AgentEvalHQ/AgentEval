@@ -40,6 +40,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   single-turn. An unknown codec fails before any probe runs. The red-team docs listed three codecs that do not exist
   (NATO, homoglyph, zero-width) and said the library example kept the original probes, which `WithTransform` drops
   unless `keepOriginal: true`; both are corrected.
+- **AUROC and held-out accuracy for scored classifiers** — `AgentEval.Calibration.ThresholdCalibration` (`AgentEval.Core`)
+  calibrates a judge or decision model that outputs a score rather than a verdict. `Auroc` measures how well the scores
+  separate the gold classes with no cut, and is `NaN` with one class present, never 0.5. `EvaluateHeldOut` chooses the
+  cut on training cases (`ChooseCut`, by accuracy or balanced accuracy) and measures it unchanged on held-out cases, with
+  a 95% Wilson interval. `Split` makes a stratified split that is reproducible for a given seed. New public types:
+  `ScoredCase`, `CutObjective`, `HeldOutEvaluation`, `ThresholdCalibration`. Documented in the eval and benchmark
+  architecture guide, §7.5.
 - **Core and Abstractions API snapshots** — `CorePublicApiSnapshotTests` and
   `AbstractionsPublicApiSnapshotTests` freeze the public surface of `AgentEval.Core` and
   `AgentEval.Abstractions` using the same Verify-based pattern as the existing Gatekeeper snapshot.

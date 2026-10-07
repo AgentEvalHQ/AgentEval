@@ -362,6 +362,29 @@ The criteria-resolution logic in `CalibrationRunner` has two special cases — s
 
 Anyone reading the calibration code should expect more such cases to accumulate over time. That's the system working as intended.
 
+### 7.5 Scores rather than verdicts: AUROC and a held-out cut
+
+Accuracy and κ compare verdicts. A judge's 0–100 score and a decision model's probability need a cut before they
+become verdicts, and the cut is a choice that can overfit. `AgentEval.Calibration.ThresholdCalibration` (in
+`AgentEval.Core`) covers both halves:
+
+- **`Auroc(cases)`**: how well the scores separate the gold positives from the negatives, with no cut at all. It is the
+  probability that a random positive scores above a random negative, counting a tie as half. With only one class
+  present it returns `NaN`, never 0.5, like κ.
+- **`EvaluateHeldOut(training, heldOut)`**: chooses the cut on the training cases (`ChooseCut`, maximising accuracy or,
+  for an imbalanced set, balanced accuracy) and applies it unchanged to the held-out cases. Report the held-out
+  accuracy, which comes with its 95% Wilson interval. The training accuracy is a maximum chosen on those same cases, so
+  it is optimistic.
+- **`Split(cases, heldOutFraction, seed)`**: a stratified split that gives the same result for the same seed. Fix the
+  seed before looking at any result, and report it with the numbers.
+
+```csharp
+var cases = gold.Select(g => new ScoredCase(judgeScore[g.Id], g.ShouldFlag)).ToList();
+var (training, heldOut) = ThresholdCalibration.Split(cases, heldOutFraction: 0.3, seed: 20261007);
+var result = ThresholdCalibration.EvaluateHeldOut(training, heldOut);
+// result.Cut, result.HeldOutAccuracy (Estimate, Lower, Upper), result.HeldOutAuroc
+```
+
 ---
 
 ## 8. Toward better-calibrated benchmarks — techniques and the road forward
