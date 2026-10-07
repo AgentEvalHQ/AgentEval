@@ -16,7 +16,8 @@ namespace AgentEval.Cli.Commands;
 /// The <c>agenteval log-file</c> command group — <c>to-fixture</c> turns a <c>--capture-fixture</c> JSONL
 /// capture into a deterministic, versionable test fixture (see <see cref="LogFixtureGenerator"/>);
 /// <c>replay</c> resends every captured round-trip to a different target and diffs structurally/behaviorally
-/// (see <see cref="LogFileReplayer"/>).
+/// (see <see cref="LogFileReplayer"/>); <c>gate-replay</c> runs two tool-gate configurations over the captured
+/// tool calls (see <see cref="LogFileGateReplay"/>).
 /// </summary>
 internal static class LogFileCommand
 {
@@ -31,6 +32,7 @@ internal static class LogFileCommand
         var logFileCmd = new Command("log-file", "Utilities for working with --capture-fixture JSONL captures.");
         logFileCmd.Subcommands.Add(BuildToFixtureCommand());
         logFileCmd.Subcommands.Add(BuildReplayCommand());
+        logFileCmd.Subcommands.Add(LogFileGateReplay.Create());
         return logFileCmd;
     }
 
@@ -239,7 +241,7 @@ internal static class LogFileCommand
         return $"{provider}:{shownModel}";
     }
 
-    private static async Task<IReadOnlyList<FixtureCaptureEntry>> LoadCapturedEntriesAsync(string path, CancellationToken ct)
+    internal static async Task<IReadOnlyList<FixtureCaptureEntry>> LoadCapturedEntriesAsync(string path, CancellationToken ct)
     {
         var lines = await File.ReadAllLinesAsync(path, ct).ConfigureAwait(false);
         var entries = new List<FixtureCaptureEntry>();

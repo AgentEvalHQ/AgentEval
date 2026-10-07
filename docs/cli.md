@@ -813,6 +813,7 @@ Work with a file written by [`--capture-fixture`](#fixture-capture).
 ```
 agenteval log-file to-fixture <captured.jsonl> --out <fixture.json>
 agenteval log-file replay     <captured.jsonl> --out <report.md> (--from-env | --endpoint <url> --model <name> [--api-key <key>]) [--strict-text]
+agenteval log-file gate-replay <captured.jsonl> --baseline <gates.json> --candidate <gates.json> [--json]
 ```
 
 **`to-fixture`** writes a JSON array of scripted turns that `ScriptedChatClient.FromFixture` loads, so a test
@@ -836,6 +837,26 @@ Token usage and latency are shown for information and never change a verdict. `e
 are not replayed; the report counts them as skipped. The Markdown report is written to `--out` and also printed
 to stdout.
 
+**`gate-replay`** answers "what would this gate change have done to real traffic?" without a model or a network
+call. It takes every tool call in the capture's `response` lines and runs two Gatekeeper tool-gate configurations
+over each one with the real gates (`GateReplayer`): `--baseline`, the gates in force, and `--candidate`, the
+proposed ones. It prints both verdicts for every call, marks the calls whose verdict differs, and counts the calls
+the candidate newly blocks and newly lets through (`--json` gives the same as JSON). A configuration is a JSON
+array of gates, named by the ids `agenteval gatekeeper list-gates` prints; `[]` is no gate:
+
+```json
+[
+  { "gate": "tool:forbidden-tool", "forbidden": ["send_email", "delete_db"] },
+  { "gate": "tool:argument-pattern", "pattern": "rm\s+-rf" },
+  { "gate": "tool:domain-allowlist", "allowedDomains": ["docs.example.com"] }
+]
+```
+
+Only these three gates, which read a call's own arguments, are replayed. A capture keeps the text of earlier
+messages but not tool results, so a gate that reads the conversation (`tool:referential-integrity`,
+`tool:taint-tracking`) would not decide here what it decided live; it is refused with that reason rather than
+replayed on half a history.
+
 **Options**
 
 | Option | Description |
@@ -845,14 +866,16 @@ to stdout.
 | `--from-env` (`replay`) | Replay against the provider `AI_INFERENCE_PROVIDER` selects (see [Environment variables](#environment-variables)). `--azure-from-env` is its old name and still works. Checked before `--endpoint`. |
 | `--endpoint <url>` / `--model <name>` / `--api-key <key>` (`replay`) | Replay against an OpenAI-compatible endpoint. `--model` is required with `--endpoint`. Without `--api-key`, `OPENAI_API_KEY` is used, and without that a placeholder key for keyless local servers. |
 | `--strict-text` (`replay`) | Also fail a round-trip whose text is not identical. Off by default: model output is not reproducible, even against the same model with the same settings. |
+| `--baseline <gates.json>` / `--candidate <gates.json>` (`gate-replay`) | Required. The two gate configurations to compare. |
+| `--json` (`gate-replay`) | Print the comparison as JSON on stdout instead of the report. |
 
 **Exit codes**
 
 | Code | Meaning |
 |------|---------|
-| `0` | `to-fixture`: the fixture was written. `replay`: no round-trip failed (flags do not fail the run). |
+| `0` | `to-fixture`: the fixture was written. `replay`: no round-trip failed (flags do not fail the run). `gate-replay`: the replay ran, whatever it found. |
 | `1` | `replay`: at least one round-trip failed. |
-| `2` | `replay`: no target was given, `--endpoint` was given without `--model`, or `--from-env` found no configured provider. |
+| `2` | `replay`: no target was given, `--endpoint` was given without `--model`, or `--from-env` found no configured provider. `gate-replay`: a configuration file is missing, is not a JSON array of gates, or names a gate it cannot replay; or the capture holds no tool call. |
 | `3` | The capture file does not exist, or another error occurred (for example, a line that is not a capture record). |
 
 ---

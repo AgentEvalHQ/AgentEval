@@ -76,6 +76,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `compare` never failed on a regression. With the flag it exits 1 when a scenario the baseline passed fails in the
   candidate, and names those scenarios; incomparable runs still exit 13. The default exit codes are unchanged. `--json`
   now also carries `recovered`, `regressed` and `regressedScenarios` when the runs are comparable.
+- **`agenteval log-file gate-replay`.** `GateReplayer` (what would a different tool-gate configuration have done to
+  the same traffic?) was reachable only from code. The command runs two configurations, each a JSON array of gate ids
+  and parameters (`[{"gate": "tool:forbidden-tool", "forbidden": ["send_email"]}]`), over every tool call in a
+  `--capture-fixture` capture, with no model and no network; it prints both verdicts per call, marks the divergences,
+  and counts the calls the candidate newly blocks and newly lets through (`--json` too). It replays the three gates
+  that read a call's own arguments; a capture holds no tool results, so a gate that reads the conversation is refused
+  with that reason rather than replayed on half a history.
 
 ### Changed
 - **`--azure-from-env` is now `--from-env`.** The flag builds the target from whichever provider `AI_INFERENCE_PROVIDER`
