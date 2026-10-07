@@ -108,7 +108,9 @@ public class DatasetInitCommandTests : IDisposable
         var content = await File.ReadAllTextAsync(filePath);
         Assert.Contains("expected:", content);
         Assert.Contains("context:", content);
-        Assert.Contains("groundTruth:", content);
+        // `groundTruth:` was text, but the dataset field of that name is an expected tool call; `expected` carries
+        // the reference answer.
+        Assert.DoesNotContain("groundTruth", content);
         Assert.Contains("tags:", content);
         Assert.Contains("examples:", content);
         Assert.Contains("AgentEval Evaluation Dataset", content);
@@ -282,6 +284,33 @@ public class DatasetInitCommandTests : IDisposable
 
         Assert.Equal(0, result);
         Assert.True(File.Exists(filePath));
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════════
+    // THE FILE LOADS: `init` then `eval --dataset` works
+    // ═══════════════════════════════════════════════════════════════════════════
+
+    [Theory]
+    [InlineData("yaml")]
+    [InlineData("json")]
+    public async Task ExecuteAsync_TheFileItWrites_LoadsThroughTheDatasetLoaders(string format)
+    {
+        // The template once carried `groundTruth: "<text>"`; read as the tool-call ground-truth field it failed
+        // the YAML load, so `init` followed by `eval --dataset` stopped at the first step.
+        var filePath = Path.Combine(_tempDir, $"agenteval.{format}");
+        await DatasetInitCommand.ExecuteAsync(format, filePath, force: false);
+
+        var cases = await AgentEval.DataLoaders.DatasetLoaderFactory.CreateFromExtension(Path.GetExtension(filePath))
+            .LoadAsync(filePath);
+
+        Assert.Equal(["greeting_test", "knowledge_test", "reasoning_test"], cases.Select(c => c.Id));
+        Assert.All(cases, c =>
+        {
+            Assert.False(string.IsNullOrWhiteSpace(c.Input));
+            Assert.False(string.IsNullOrWhiteSpace(c.ExpectedOutput));
+            Assert.NotEmpty(c.Tags!);
+            Assert.Empty(c.Metadata);   // every key in the template is a field the loaders read
+        });
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

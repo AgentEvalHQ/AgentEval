@@ -112,24 +112,29 @@ public class JsonDatasetLoader : IDatasetLoader
         int index = 0;
         foreach (var item in arrayElement.EnumerateArray())
         {
-            var testCase = ParseTestCase(item, index);
-            if (testCase != null)
-            {
-                results.Add(testCase);
-            }
+            results.Add(ParseTestCase(item, index, path));
             index++;
         }
 
         return results;
     }
 
-    private static DatasetTestCase? ParseTestCase(JsonElement element, int index)
+    private static DatasetTestCase ParseTestCase(JsonElement element, int index, string path)
     {
+        // An item that is not an object used to be skipped without a word, so a dataset could run fewer cases than
+        // it holds.
         if (element.ValueKind != JsonValueKind.Object)
         {
-            return null;
+            throw new InvalidDataException($"Test case {index} in {path} is a JSON {element.ValueKind}, not an object.");
         }
 
-        return JsonParsingHelper.ParseTestCase(element, $"item_{index}");
+        try
+        {
+            return JsonParsingHelper.ParseTestCase(element, $"item_{index}");
+        }
+        catch (InvalidDataException ex)
+        {
+            throw new InvalidDataException($"Test case {index} in {path}: {ex.Message}", ex);
+        }
     }
 }

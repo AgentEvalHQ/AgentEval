@@ -86,7 +86,8 @@ public class YamlDatasetLoader : IDatasetLoader
         object? root;
         try
         {
-            root = s_deserializer.Deserialize<object?>(content);
+            // MergingParser applies `<<: *anchor` merge keys, so shared defaults reach every case that merges them.
+            root = s_deserializer.Deserialize<object?>(new MergingParser(new Parser(new StringReader(content))));
         }
         catch (YamlException ex)
         {
@@ -129,9 +130,9 @@ public class YamlDatasetLoader : IDatasetLoader
             var wanted = DatasetFieldNames.Normalize(listKey);
             foreach (var (key, value) in map)
             {
-                if (DatasetFieldNames.Normalize(KeyName(key)) != wanted)
+                if (DatasetFieldNames.Normalize(KeyName(key)) != wanted || value is null)
                 {
-                    continue;
+                    continue;   // an empty key falls through to the next, as the old loader's `??` chain did
                 }
 
                 return value as List<object?>
@@ -146,7 +147,8 @@ public class YamlDatasetLoader : IDatasetLoader
     {
         var testCase = new DatasetTestCase();
 
-        // Known fields by normalized name (the first spelling wins); everything else is metadata.
+        // Known fields by normalized name; everything else is metadata. Two spellings of one field are an error: one
+        // of them would be lost, and which one would depend on the order of the keys.
         var fields = new Dictionary<string, (string Key, object? Value)>(StringComparer.Ordinal);
         foreach (var (rawKey, value) in map)
         {
@@ -154,7 +156,11 @@ public class YamlDatasetLoader : IDatasetLoader
             var name = DatasetFieldNames.Normalize(key);
             if (DatasetFieldNames.KnownFields.Contains(name))
             {
-                fields.TryAdd(name, (key, value));
+                if (!fields.TryAdd(name, (key, value)))
+                {
+                    throw new InvalidDataException(
+                        $"'{fields[name].Key}' and '{key}' of test case {index} in {path} are the same field in two spellings; keep one.");
+                }
             }
             else if (name == "metadata" && value is Dictionary<object, object?> metadata)
             {
@@ -171,40 +177,38 @@ public class YamlDatasetLoader : IDatasetLoader
 
         string Where(string key) => $"'{key}' of test case {index} in {path}";
 
-        string? Scalar(params string[] names)
+        // A plain scalar is a string; a tagged one (`!!int 4`) arrives typed, and reads as written.
+        static string? AsText(object? value) => value switch
+        {
+            string s => s,
+            IConvertible c => c.ToString(CultureInfo.InvariantCulture),
+            _ => null,
+        };
+
+        (string Key, object? Value)? Field(params string[] names)
         {
             foreach (var n in names)
             {
                 if (fields.TryGetValue(DatasetFieldNames.Normalize(n), out var field) && field.Value is not null)
                 {
-                    return field.Value as string
-                        ?? throw new InvalidDataException($"{Where(field.Key)} must be a single value, not a list or mapping.");
+                    return field;
                 }
             }
             return null;
         }
 
-        IReadOnlyList<string>? Strings(params string[] names)
-        {
-            foreach (var n in names)
+        string? Scalar(params string[] names) => Field(names) is { } field
+            ? AsText(field.Value) ?? throw new InvalidDataException($"{Where(field.Key)} must be a single value, not a list or mapping.")
+            : null;
+
+        IReadOnlyList<string>? Strings(params string[] names) => Field(names) is { } field
+            ? field.Value switch
             {
-                if (fields.TryGetValue(DatasetFieldNames.Normalize(n), out var field) && field.Value is not null)
-                {
-                    return field.Value switch
-                    {
-                        string single => [single],
-                        List<object?> list => list.Select(item => item switch
-                        {
-                            null => "",
-                            string s => s,
-                            _ => throw new InvalidDataException($"{Where(field.Key)} must be a list of strings."),
-                        }).ToList(),
-                        _ => throw new InvalidDataException($"{Where(field.Key)} must be a string or a list of strings."),
-                    };
-                }
+                List<object?> list => list.Where(item => item is not null).Select(item =>
+                    AsText(item) ?? throw new InvalidDataException($"{Where(field.Key)} must be a list of single values.")).ToList(),
+                _ => [AsText(field.Value) ?? throw new InvalidDataException($"{Where(field.Key)} must be a value or a list of values.")],
             }
-            return null;
-        }
+            : null;
 
         testCase.Id = Scalar("id") ?? $"item_{index}";
         testCase.Category = Scalar("category");
@@ -215,32 +219,37 @@ public class YamlDatasetLoader : IDatasetLoader
         testCase.EvaluationCriteria = Strings("evaluation_criteria");
         testCase.Tags = Strings("tags");
 
-        if (Scalar("passing_score") is { } passingScore)
+        if (Field("passing_score") is { } passing)
         {
-            testCase.PassingScore = int.TryParse(passingScore, NumberStyles.Integer, CultureInfo.InvariantCulture, out var score)
+            var text = Scalar("passing_score");
+            testCase.PassingScore = int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var score)
                 ? score
-                : throw new InvalidDataException($"{Where(fields["passingscore"].Key)} must be a whole number, not '{passingScore}'.");
+                : throw new InvalidDataException($"{Where(passing.Key)} must be a whole number, not '{text}'.");
         }
 
-        if (fields.TryGetValue("groundtruth", out var groundTruth) && groundTruth.Value is not null)
+        if (Field("ground_truth") is { } groundTruth)
         {
-            if (groundTruth.Value is not Dictionary<object, object?> gt)
+            if (groundTruth.Value is Dictionary<object, object?> gt)
             {
-                throw new InvalidDataException($"{Where(groundTruth.Key)} must be a mapping with 'name' and 'arguments'.");
+                testCase.GroundTruth = new GroundTruthToolCall
+                {
+                    Name = AsText(Lookup(gt, "name")) ?? AsText(Lookup(gt, "function")) ?? "",
+                    Arguments = ToArguments(Lookup(gt, "arguments")),
+                };
             }
-
-            testCase.GroundTruth = new GroundTruthToolCall
+            else
             {
-                Name = Lookup(gt, "name") as string ?? Lookup(gt, "function") as string ?? "",
-                Arguments = ToArguments(Lookup(gt, "arguments")),
-            };
+                // The ground-truth field is an expected TOOL CALL (name + arguments). Text here is a reference answer
+                // by another name (`dataset init` wrote one through 0.43); keep it as metadata, as the JSON loader did.
+                testCase.Metadata[groundTruth.Key] = ToPlain(groundTruth.Value);
+            }
         }
         else if (Scalar("function") is { Length: > 0 } function)
         {
             testCase.GroundTruth = new GroundTruthToolCall
             {
                 Name = function,
-                Arguments = ToArguments(fields.TryGetValue("arguments", out var args) ? args.Value : null),
+                Arguments = ToArguments(Field("arguments")?.Value),
             };
         }
 

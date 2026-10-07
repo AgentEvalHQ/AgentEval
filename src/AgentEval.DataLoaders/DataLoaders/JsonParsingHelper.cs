@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Globalization;
 using System.Text.Json;
 using AgentEval.Models;
 
@@ -64,67 +65,113 @@ internal static class JsonParsingHelper
     /// </summary>
     /// <param name="element">A JSON object.</param>
     /// <param name="defaultId">The id to use when the object has none.</param>
+    /// <exception cref="InvalidDataException">
+    /// Two properties name the same field in different spellings, a single-value field holds a list or object, a list
+    /// holds an object, or <c>passing_score</c> is not a whole number.
+    /// </exception>
     public static DatasetTestCase ParseTestCase(JsonElement element, string defaultId)
     {
-        var testCase = new DatasetTestCase
+        // The test-case fields by normalized name, read once. Two spellings of one field are an error: one of them
+        // would be lost, and which one would depend on the order of the keys.
+        var fields = new Dictionary<string, JsonProperty>(StringComparer.Ordinal);
+        var testCase = new DatasetTestCase();
+        foreach (var prop in element.EnumerateObject())
         {
-            Id = GetStringOrDefault(element, "id", defaultId),
-            Category = GetStringOrNull(element, "category"),
-            Input = GetInput(element),
-            ExpectedOutput = GetExpectedOutput(element),
-        };
-
-        if (TryGetField(element, "context", out var context)
-            || TryGetField(element, "contexts", out context)
-            || TryGetField(element, "documents", out context))
-        {
-            testCase.Context = ParseStringArray(context);
+            var name = DatasetFieldNames.Normalize(prop.Name);
+            if (!DatasetFieldNames.KnownFields.Contains(name))
+            {
+                testCase.Metadata[prop.Name] = GetJsonValue(prop.Value);
+            }
+            else if (!fields.TryAdd(name, prop))
+            {
+                throw new InvalidDataException(
+                    $"'{fields[name].Name}' and '{prop.Name}' are the same field in two spellings; keep one.");
+            }
         }
 
-        if (TryGetField(element, "expected_tools", out var tools) || TryGetField(element, "tools", out tools))
+        JsonProperty? Field(params string[] names)
         {
-            testCase.ExpectedTools = ParseStringArray(tools);
+            foreach (var n in names)
+            {
+                if (fields.TryGetValue(DatasetFieldNames.Normalize(n), out var prop) && prop.Value.ValueKind != JsonValueKind.Null)
+                {
+                    return prop;
+                }
+            }
+            return null;
         }
 
-        if (TryGetField(element, "ground_truth", out var groundTruth))
+        string? Scalar(params string[] names) => Field(names) is { } prop ? ScalarText(prop) : null;
+        IReadOnlyList<string>? Strings(params string[] names) => Field(names) is { } prop ? StringList(prop) : null;
+
+        testCase.Id = Scalar("id") ?? defaultId;
+        testCase.Category = Scalar("category");
+        testCase.Input = Scalar("input", "question", "prompt", "query") ?? "";
+        testCase.ExpectedOutput = Scalar("expected", "expected_output", "answer", "response");
+        testCase.Context = Strings("context", "contexts", "documents");
+        testCase.ExpectedTools = Strings("expected_tools", "tools");
+        testCase.EvaluationCriteria = Strings("evaluation_criteria");
+        testCase.Tags = Strings("tags");
+
+        if (Field("passing_score") is { } score)
         {
-            testCase.GroundTruth = ParseGroundTruth(groundTruth);
+            testCase.PassingScore = score.Value.ValueKind switch
+            {
+                JsonValueKind.Number when score.Value.TryGetInt32(out var n) => n,
+                JsonValueKind.String when int.TryParse(score.Value.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var n) => n,
+                _ => throw new InvalidDataException($"'{score.Name}' must be a whole number, not {score.Value.GetRawText()}."),
+            };
         }
-        else if (TryGetField(element, "function", out var function) && TryGetField(element, "arguments", out var arguments))
+
+        if (Field("ground_truth") is { } groundTruth)
+        {
+            if (groundTruth.Value.ValueKind == JsonValueKind.Object)
+            {
+                testCase.GroundTruth = ParseGroundTruth(groundTruth.Value);
+            }
+            else
+            {
+                // The ground-truth field is an expected TOOL CALL ({ "name", "arguments" }). Text here is a reference
+                // answer by another name (`dataset init` wrote one through 0.43); keep it as metadata, as before.
+                testCase.Metadata[groundTruth.Name] = GetJsonValue(groundTruth.Value);
+            }
+        }
+        else if (Field("function") is { } function && Field("arguments") is { } arguments)
         {
             // BFCL style: { "function": "name", "arguments": {...} }
             testCase.GroundTruth = new GroundTruthToolCall
             {
-                Name = function.ValueKind == JsonValueKind.String ? function.GetString() ?? "" : "",
-                Arguments = ParseArguments(arguments),
+                Name = ScalarText(function),
+                Arguments = ParseArguments(arguments.Value),
             };
-        }
-
-        if (TryGetField(element, "evaluation_criteria", out var criteria))
-        {
-            testCase.EvaluationCriteria = ParseStringArray(criteria);
-        }
-
-        if (TryGetField(element, "tags", out var tags))
-        {
-            testCase.Tags = ParseStringArray(tags);
-        }
-
-        if (TryGetField(element, "passing_score", out var score) && score.ValueKind == JsonValueKind.Number)
-        {
-            testCase.PassingScore = score.GetInt32();
-        }
-
-        foreach (var prop in element.EnumerateObject())
-        {
-            if (!IsKnownProperty(prop.Name))
-            {
-                testCase.Metadata[prop.Name] = GetJsonValue(prop.Value);
-            }
         }
 
         return testCase;
     }
+
+    /// <summary>A single-value field as text: a string as is, a number or boolean as written.</summary>
+    private static string ScalarText(JsonProperty prop) => prop.Value.ValueKind switch
+    {
+        JsonValueKind.String => prop.Value.GetString() ?? "",
+        JsonValueKind.Number or JsonValueKind.True or JsonValueKind.False => prop.Value.GetRawText(),
+        _ => throw new InvalidDataException($"'{prop.Name}' must be a single value, not {prop.Value.ValueKind}."),
+    };
+
+    /// <summary>A list field: an array of single values (nulls skipped), or one value as a one-item list.</summary>
+    private static IReadOnlyList<string> StringList(JsonProperty prop) => prop.Value.ValueKind switch
+    {
+        JsonValueKind.Array => prop.Value.EnumerateArray()
+            .Where(item => item.ValueKind != JsonValueKind.Null)
+            .Select(item => item.ValueKind switch
+            {
+                JsonValueKind.String => item.GetString() ?? "",
+                JsonValueKind.Number or JsonValueKind.True or JsonValueKind.False => item.GetRawText(),
+                _ => throw new InvalidDataException($"'{prop.Name}' must be a list of single values, not of {item.ValueKind}."),
+            })
+            .ToList(),
+        JsonValueKind.Object => throw new InvalidDataException($"'{prop.Name}' must be a value or a list of values, not an object."),
+        _ => [ScalarText(prop)],
+    };
 
     /// <summary>
     /// Parses a JSON element that can be either a string or an array of strings.

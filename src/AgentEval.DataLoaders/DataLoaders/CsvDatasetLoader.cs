@@ -230,9 +230,12 @@ public class CsvDatasetLoader : IDatasetLoader
 
         // Parse passing score
         var passingScoreValue = GetValue("passing_score");
-        if (!string.IsNullOrEmpty(passingScoreValue) && int.TryParse(passingScoreValue, out var parsedScore))
+        if (!string.IsNullOrEmpty(passingScoreValue))
         {
-            testCase.PassingScore = parsedScore;
+            // An unparseable value used to be ignored, so the default threshold applied without a word.
+            testCase.PassingScore = int.TryParse(passingScoreValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedScore)
+                ? parsedScore
+                : throw new InvalidDataException($"passing_score must be a whole number, not '{passingScoreValue}'.");
         }
 
         // Parse ground_truth JSON blob (e.g., {"name":"tool","arguments":{"key":"value"}})
@@ -243,14 +246,18 @@ public class CsvDatasetLoader : IDatasetLoader
             {
                 using var doc = JsonDocument.Parse(groundTruthValue);
                 var root = doc.RootElement;
+                if (root.ValueKind != JsonValueKind.Object)
+                {
+                    throw new JsonException("not a tool call object");   // text such as a quoted answer: metadata, below
+                }
 
                 var gt = new GroundTruthToolCall();
-                if (root.TryGetProperty("name", out var nameEl))
+                if (JsonParsingHelper.TryGetField(root, "name", out var nameEl))
                 {
                     gt.Name = nameEl.GetString() ?? "";
                 }
 
-                if (root.TryGetProperty("arguments", out var argsEl) && argsEl.ValueKind == JsonValueKind.Object)
+                if (JsonParsingHelper.TryGetField(root, "arguments", out var argsEl) && argsEl.ValueKind == JsonValueKind.Object)
                 {
                     foreach (var prop in argsEl.EnumerateObject())
                     {

@@ -66,25 +66,26 @@ public class JsonlDatasetLoader : IDatasetLoader
                 continue; // Skip empty lines
             }
             
-            DatasetTestCase? testCase;
+            DatasetTestCase testCase;
             try
             {
-                testCase = ParseLine(line, lineNumber, path);
+                testCase = ParseLine(line, lineNumber);
             }
             catch (JsonException ex)
             {
                 throw new InvalidDataException(
                     $"Invalid JSON at line {lineNumber} in {path}: {ex.Message}", ex);
             }
-            
-            if (testCase != null)
+            catch (InvalidDataException ex)
             {
-                yield return testCase;
+                throw new InvalidDataException($"Line {lineNumber} in {path}: {ex.Message}", ex);
             }
+
+            yield return testCase;
         }
     }
 
-    private static DatasetTestCase? ParseLine(string line, int lineNumber, string path)
+    private static DatasetTestCase ParseLine(string line, int lineNumber)
     {
         using var doc = JsonDocument.Parse(line, new JsonDocumentOptions
         {
@@ -95,8 +96,7 @@ public class JsonlDatasetLoader : IDatasetLoader
         var root = doc.RootElement;
         if (root.ValueKind != JsonValueKind.Object)
         {
-            throw new InvalidDataException(
-                $"Line {lineNumber} in {path} is a JSON {root.ValueKind}, not a test case object.");
+            throw new InvalidDataException($"the line is a JSON {root.ValueKind}, not a test case object.");
         }
 
         return JsonParsingHelper.ParseTestCase(root, $"line_{lineNumber}");
