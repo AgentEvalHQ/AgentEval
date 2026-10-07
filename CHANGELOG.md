@@ -44,6 +44,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`SystemOneClientOptions.TypeSafeDefaultModel`** is now `"jev-1.13.0"` (was `"jev-latest"`). The moving alias
   `"jev-latest"` always resolved to `"jev-1.13.0"` and `DecisionResponse.Model` echoes the resolved build, so
   provenance is unchanged; the default is pinned for reproducibility in line with `OpenRouterDefaultModel`.
+- **Breaking at compile time: `DecisionEval`, `DecisionJudge` and `DecisionBenchmarkJudge` are now
+  `[Experimental("AGENTEVAL_DECISIONS_PREVIEW001")]`**, like the rest of the decision-model surface they are built on
+  (`IDecisionClient`, `SystemOneDecisionClient`). Microsoft.Extensions.AI is defining its own decision abstraction, and
+  AgentEval will adapt to it, so these three can change shape too; until now nothing told a caller that. Code that uses
+  them must acknowledge the preview: `<NoWarn>$(NoWarn);AGENTEVAL_DECISIONS_PREVIEW001</NoWarn>` or a `#pragma`.
 
 ### Fixed
 - **`CalibratedJudge` no longer votes a not-measured judge in as 0.** A metric that lacks an input (Faithfulness

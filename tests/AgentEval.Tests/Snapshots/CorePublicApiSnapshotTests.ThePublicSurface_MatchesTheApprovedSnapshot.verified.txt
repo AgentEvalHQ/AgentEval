@@ -791,7 +791,7 @@ static class AgentEval.Core.ToolUsageExtractor
     static AgentEval.Models.ToolUsageReport Extract(System.Collections.Generic.IReadOnlyList<System.Object> rawMessages, System.Boolean includeApprovalGatedCalls)
     static System.Collections.Generic.IReadOnlyList<System.String> ApprovalGatedToolNames(System.Collections.Generic.IReadOnlyList<System.Object> rawMessages)
     static System.Void EnrichFromTrace(AgentEval.Models.ToolUsageReport report, AgentEval.Tracing.AgentTrace trace)
-class AgentEval.Decisions.DecisionJudge
+class AgentEval.Decisions.DecisionJudge [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
     AgentEval.Decisions.DecisionRequest BuildRequest(System.String input, System.String output, System.Collections.Generic.IReadOnlyList<System.String> criteria)
     System.String PromptMaterial { get; }
     System.String SystemPromptId { get; }
@@ -943,7 +943,7 @@ static class AgentEval.Evals.CompositeEvalsServiceExtensions
     static Microsoft.Extensions.DependencyInjection.IServiceCollection AddCompositeEvals(Microsoft.Extensions.DependencyInjection.IServiceCollection services)
 static class AgentEval.Evals.CostRollup
     static System.ValueTuple<System.Double, System.Boolean> Aggregate(System.Collections.Generic.IEnumerable<AgentEval.Evals.EvalResult> results)
-class AgentEval.Evals.DecisionEval
+class AgentEval.Evals.DecisionEval [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
     System.Double PassThreshold { get; }
     System.String Instructions { get; }
     System.String Reference { get; }

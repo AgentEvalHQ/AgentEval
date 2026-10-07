@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics;
 using AgentEval.Core;
 
@@ -29,6 +30,7 @@ namespace AgentEval.Decisions;
 /// receive the same criteria the evaluator was written with, which is the whole point of the comparison.
 /// </para>
 /// </remarks>
+[Experimental(DecisionsPreview.DiagnosticId)]
 public sealed class DecisionJudge : IEvaluator, IJudgePromptSource
 {
     /// <summary>One judge call, as it went over the wire — for the comparison's per-criterion analysis.</summary>
