@@ -132,9 +132,12 @@ class AgentEval.Guardrails.Judges.CalibrationOptions
     Int32 MaxConcurrency { get; init; }
     Int32 MaxDangerousErrors { get; init; }
     Int32 MinCasesPerDirection { get; init; }
+    String SplitLabel { get; init; }
     TimeProvider TimeProvider { get; init; }
     ctor()
 class AgentEval.Guardrails.Judges.CalibrationReport
+    AgentEval.Guardrails.Judges.WilsonInterval AccuracyInterval { get; }
+    AgentEval.Guardrails.Judges.WilsonInterval FprInterval { get; }
     Boolean IsInlineReady { get; }
     Boolean IsStale(TimeSpan maxAge, TimeProvider clock = null)
     Boolean MeetsThresholds { get; }
@@ -154,6 +157,7 @@ class AgentEval.Guardrails.Judges.CalibrationReport
     Int32 TrueNegatives { get; }
     Int32 TruePositives { get; }
     String Axis { get; }
+    String SplitLabel { get; }
     Void AssertInlineReady()
 class AgentEval.Guardrails.Judges.CompositeJudgeGate<TRubric>
     Boolean IsFlagged(AgentEval.Guardrails.Judges.JudgeVerdict verdict)
@@ -176,6 +180,7 @@ static class AgentEval.Guardrails.Judges.ExfiltrationIntentJudge
     static IReadOnlyList<String> DefaultExfilKeywords
     static Task<AgentEval.Guardrails.Judges.CalibrationReport> CalibrateAsync(IChatClient fastModel, AgentEval.Guardrails.Judges.JudgeGoldSet goldSet = null, AgentEval.Guardrails.IChatGate baseline = null, Int32 maxDangerousErrors = 0, AgentEval.Guardrails.Judges.JudgeGateOptions options = null, CancellationToken cancellationToken = default)
 static class AgentEval.Guardrails.Judges.GateCalibrationHarness
+    const String ActivitySourceName
     static Task<AgentEval.Guardrails.Judges.CalibrationReport> EvaluateAsync(AgentEval.Guardrails.IChatGate judge, AgentEval.Guardrails.Judges.JudgeGoldSet goldSet, AgentEval.Guardrails.Judges.CalibrationOptions options = null, CancellationToken cancellationToken = default)
 static class AgentEval.Guardrails.Judges.GatekeeperFleetHealthIndex [Experimental(AGENTEVAL_GATEKEEPER_PREVIEW001)]
     static AgentEval.Guardrails.Judges.GatekeeperFleetHealthReport Compute(IReadOnlyDictionary<String, AgentEval.Guardrails.Judges.CalibrationReport> reportsByAxis, TimeSpan staleAfter, TimeProvider clock = null)
@@ -438,6 +443,20 @@ static class AgentEval.Guardrails.Judges.UngroundedClaimJudge
     static AgentEval.Guardrails.IChatGate KeywordBaseline()
     static AgentEval.Guardrails.Judges.JudgeGoldSet GoldSet()
     static Task<AgentEval.Guardrails.Judges.CalibrationReport> CalibrateAsync(IChatClient fastModel, AgentEval.Guardrails.Judges.JudgeGoldSet goldSet = null, AgentEval.Guardrails.IChatGate baseline = null, Int32 maxDangerousErrors = 0, AgentEval.Guardrails.Judges.JudgeGateOptions options = null, CancellationToken cancellationToken = default)
+struct AgentEval.Guardrails.Judges.WilsonInterval
+    Boolean Equals(AgentEval.Guardrails.Judges.WilsonInterval other)
+    Boolean Equals(Object obj)
+    Boolean IsMeasured { get; }
+    Double Estimate { get; init; }
+    Double Lower { get; init; }
+    Double Upper { get; init; }
+    Int32 GetHashCode()
+    Int32 Successes { get; init; }
+    Int32 Total { get; init; }
+    String ToString()
+    Void Deconstruct(out Int32 Successes, out Int32 Total, out Double Estimate, out Double Lower, out Double Upper)
+    ctor(Int32 Successes, Int32 Total, Double Estimate, Double Lower, Double Upper)
+    static AgentEval.Guardrails.Judges.WilsonInterval Compute(Int32 successes, Int32 total, Double z = 1.959963984540054)
 static class AgentEval.Guardrails.ManifestDriftDetector
     static IReadOnlyList<AgentEval.Guardrails.ManifestDriftFinding> Detect(IReadOnlyDictionary<String, String> baselineHashesByKey, IReadOnlyDictionary<String, String> currentHashesByKey)
 class AgentEval.Guardrails.ManifestDriftFinding
@@ -1142,6 +1161,9 @@ enum AgentEval.MAF.Gatekeeper.GatekeeperEnforcement
     Observe
     ReplaceResult
     Terminate
+static class AgentEval.MAF.Gatekeeper.GatekeeperInstrumentation
+    const String ActivitySourceName
+    const String MeterName
 class AgentEval.MAF.Gatekeeper.GatekeeperOptions
     AgentEval.Guardrails.Judges.ICalibrationReportStore CalibrationReportStore { get; set; }
     AgentEval.MAF.Gatekeeper.AnalyzeOptions CoverageAnalyzeOptions { get; set; }
@@ -1936,6 +1958,9 @@ class AgentEval.MAF.Gatekeeper.OperatorAuthGate
     String PolicyName { get; }
     const String OperatorMetadataKey
     ctor(String[] allowedOperators)
+class AgentEval.MAF.Gatekeeper.OtelGatekeeperObserver
+    Void OnFinding(AgentEval.MAF.Gatekeeper.GateEvidence evidence)
+    ctor()
 class AgentEval.MAF.Gatekeeper.PathContainmentPredicate
     IReadOnlyList<String> AllowedRoots { get; }
     String BasePath { get; }
