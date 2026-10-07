@@ -147,7 +147,7 @@ jobs:
       run: dotnet build --configuration Release --no-restore
 
     - name: Test
-      run: dotnet test --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory coverage
+      run: dotnet test --configuration Release --no-build --verbosity normal --collect:"XPlat Code Coverage" --results-directory coverage --logger trx
       env:
         # `dotnet test` on the solution starts a test host per project per target framework — up to a
         # dozen at once on a two-core runner. vstest waits 90 s by default for a host process to CONNECT,
@@ -157,6 +157,14 @@ jobs:
         VSTEST_CONNECTION_TIMEOUT: '300'
         AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
         AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+
+    - name: Upload test results (Linux)
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results-linux-${{ matrix.dotnet-version }}
+        path: coverage/**/*.trx
+        retention-days: 30
 
     - name: Security Scan - .NET Dependency Check
       if: matrix.dotnet-version == '10.0.x'
@@ -217,7 +225,7 @@ jobs:
       run: dotnet build --configuration Release --no-restore
 
     - name: Test
-      run: dotnet test --configuration Release --no-build --verbosity normal
+      run: dotnet test --configuration Release --no-build --verbosity normal --logger trx --results-directory TestResults
       env:
         # `dotnet test` on the solution starts a test host per project per target framework — up to a
         # dozen at once on a two-core runner. vstest waits 90 s by default for a host process to CONNECT,
@@ -227,5 +235,13 @@ jobs:
         VSTEST_CONNECTION_TIMEOUT: '300'
         AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
         AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
+
+    - name: Upload test results (Windows)
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results-windows-${{ matrix.dotnet-version }}
+        path: TestResults/**/*.trx
+        retention-days: 30
 
 
