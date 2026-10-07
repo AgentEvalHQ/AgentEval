@@ -39,7 +39,7 @@ public class RedTeamCommandTests
     }
 
     [Fact]
-    public void Create_Has52Options()
+    public void Create_Has53Options()
     {
         // 16 base + Wave E (save-baseline, baseline, fail-on) = 19
         // + Wave C′ (attacker, attacker-model) = 21
@@ -62,8 +62,9 @@ public class RedTeamCommandTests
         // + benign-control arm (--benign-controls: over-refusal beside the attack success rate) = 50
         // + gatekeeper-demo --scripted (the deterministic model on request, for a stable CI baseline) = 51
         // + --transform (the 18 encoding codecs, reachable from the CLI) = 52
+        // + --memory-trials (runs per case for --attacks memory-poisoning) = 53
         var command = RedTeamCommand.Create();
-        Assert.Equal(52, command.Options.Count);
+        Assert.Equal(53, command.Options.Count);
     }
 
     [Theory] // ADR-021: --judge-rubric maps strict | lenient | evidence-anchored (case- and alias-tolerant).

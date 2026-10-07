@@ -69,7 +69,12 @@ internal static class RedTeamCommand
 
         // Attack selection
         var attacksOpt = new Option<string?>("--attacks")
-            { Description = "Comma-separated attack types (e.g., PromptInjection,Jailbreak). Default: all. Opt-in multi-turn: Crescendo, PAIR, TAP (PAIR/TAP require --attacker), ToolEscalation (best at --sut-tier instrumented)." };
+            { Description = "Comma-separated attack types (e.g., PromptInjection,Jailbreak). Default: all. Opt-in multi-turn: Crescendo, PAIR, TAP (PAIR/TAP require --attacker), ToolEscalation (best at --sut-tier instrumented). memory-poisoning runs on its own: the memory-security corpus against the model you name behind AgentEval's memory protection (--scripted: the scripted worst-case model)." };
+        var memoryTrialsOpt = new Option<int>("--memory-trials")
+        {
+            DefaultValueFactory = _ => 1,
+            Description = "With --attacks memory-poisoning: runs per case (1-100). Every case runs the same number of times.",
+        };
         var transformOpt = new Option<string?>("--transform")
             { Description = "Also run every single-turn probe encoded: comma-separated codecs (base64, base32, hex, url, rot13, caesar, atbash, reversed, xor, binary, octal, ascii_decimal, html_entities, html_hex_entities, unicode_escapes, fullwidth, morse, leetspeak) or a group (reversible | lossy | all). The plaintext probes still run as the control; each codec adds one encoded variant per probe, so the probe count (and judge cost) multiplies. Multi-turn, tool-aware and tree attacks run unencoded." };
         var importProbesOpt = new Option<FileInfo?>("--import-probes")
@@ -176,6 +181,7 @@ internal static class RedTeamCommand
         }
         command.Options.Add(systemPromptCanaryOpt);
         command.Options.Add(attacksOpt);
+        command.Options.Add(memoryTrialsOpt);
         command.Options.Add(transformOpt);
         command.Options.Add(importProbesOpt);
         command.Options.Add(importPromptFieldOpt);
@@ -229,6 +235,7 @@ internal static class RedTeamCommand
                     t => t.Sut, t => t.BindOptions(parseResult), StringComparer.OrdinalIgnoreCase),
                 SystemPromptCanary = parseResult.GetValue(systemPromptCanaryOpt),
                 Attacks = parseResult.GetValue(attacksOpt),
+                MemoryTrials = parseResult.GetValue(memoryTrialsOpt),
                 Transform = parseResult.GetValue(transformOpt),
                 ImportProbes = parseResult.GetValue(importProbesOpt),
                 ImportPromptField = parseResult.GetValue(importPromptFieldOpt),
@@ -270,7 +277,9 @@ internal static class RedTeamCommand
             // nothing to evaluate. ExecuteAsync still throws for it, for its direct callers; through 0.42 the
             // command line reported that throw as a runtime error (exit 3). `--pack list` evaluates nothing and needs
             // no target: ExecuteAsync prints the catalog before anything else.
-            if (opts.Sut is null && opts.Endpoint is null && !opts.Azure && !IsPackList(opts))
+            // memory-poisoning validates its own target (it also accepts --scripted, and says so).
+            if (opts.Sut is null && opts.Endpoint is null && !opts.Azure && !IsPackList(opts)
+                && !MemoryPoisoningRedTeamDriver.IsSelected(opts.Attacks))
             {
                 Console.Error.WriteLine("  Error: Specify --endpoint <url> or --azure, or --sut <target>.");
                 return ExitCodes.UsageError;
@@ -362,7 +371,8 @@ internal static class RedTeamCommand
     private static bool IsPackList(RedTeamOptions opts) =>
         string.Equals(opts.Pack?.Trim(), "list", StringComparison.OrdinalIgnoreCase);
 
-    internal static async Task<int> ExecuteAsync(RedTeamOptions opts, CancellationToken ct, IEvaluableAgent? sutOverride = null)
+    internal static async Task<int> ExecuteAsync(
+        RedTeamOptions opts, CancellationToken ct, IEvaluableAgent? sutOverride = null, IChatClient? memoryModelOverride = null)
     {
         // 0. `--pack list`: print the benchmark-pack catalog and exit (no scan, no endpoint required).
         if (IsPackList(opts))
@@ -373,6 +383,11 @@ internal static class RedTeamCommand
             Console.WriteLine("  AgentEval bundles no benchmark data; packs are downloaded on demand under their own license.");
             return ExitCodes.Success;
         }
+
+        // `--attacks memory-poisoning` is not a probe scan: multi-session cases over a memory store, scored by the
+        // memory-security checks (MemoryPoisoningRedTeamDriver). memoryModelOverride is its credential-free test seam.
+        if (MemoryPoisoningRedTeamDriver.IsSelected(opts.Attacks))
+            return await MemoryPoisoningRedTeamDriver.RunAsync(opts, memoryModelOverride, ct).ConfigureAwait(false);
 
         // 1. Validate. Built-in --sut targets (gatekeeper-demo, copilot-studio) each own their validation +
         // construction (IRedTeamBuiltInTarget). The endpoint/--azure path is the default fallback, not a target.
@@ -1021,6 +1036,8 @@ internal sealed class RedTeamOptions
     }
     public string? SystemPromptCanary { get; init; }
     public string? Attacks { get; init; }
+    /// <summary>With <c>--attacks memory-poisoning</c>: runs per case.</summary>
+    public int MemoryTrials { get; init; } = 1;
     public string? Transform { get; init; }
     public FileInfo? ImportProbes { get; init; }
     public string? ImportPromptField { get; init; }

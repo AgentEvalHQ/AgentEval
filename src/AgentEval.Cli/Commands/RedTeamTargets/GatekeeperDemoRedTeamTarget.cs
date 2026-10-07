@@ -26,8 +26,8 @@ internal sealed class GatekeeperDemoRedTeamTarget : IRedTeamBuiltInTarget
 {
     private readonly Option<bool> _scripted = new("--scripted")
     {
-        Description = "With --sut gatekeeper-demo: run the scripted, fully compromised model even when a provider is " +
-                      "configured. Deterministic and free, so its baseline is stable; it shows the gate, not a model.",
+        Description = "With --sut gatekeeper-demo or --attacks memory-poisoning: run the scripted, fully compromised model " +
+                      "instead of a real one. Deterministic and free, so its result is stable; it shows the gates, not a model.",
     };
 
     private (IChatClient? Client, string? Model, string? Why)? _model;

@@ -89,6 +89,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and ref on the snapshot. `SkillBaselineEntry.Source`/`Ref` and the renderers' provenance parameter existed but
   nothing filled them. Offline; an unreadable lock file is a warning, and an entry holding control characters is
   ignored.
+- **`agenteval redteam --attacks memory-poisoning`.** The memory-security corpus (12 attacks, 4 benign controls) and its
+  five checks had no CLI path and nothing that produced observations from a run. The new run puts the model you name
+  behind AgentEval's default memory protection (`UseGatekeeper` + `ProtectMemory` over the five memory gates), runs
+  each case as a plant session, a restart and a trigger session over a shared memory store, then a recall through the
+  same result gate, and scores the observations: one row per case and the five verdicts (`--format markdown|json`,
+  `--memory-trials`, exit 0 / 1 / 11). `--scripted` runs a scripted worst-case model instead, labelled. With the
+  defaults it contains cross-user recall, higher-trust overwrites, untrusted procedure promotion and recalled data
+  reaching a sensitive tool; it stores and recalls low-trust poison (delimited), delivers a tampered record
+  (integrity verification is off by default) and lets a flood crowd a trusted record out. The OWASP Agentic page
+  said the recall gate drops tampered records; it does only when integrity verification is required.
 
 ### Changed
 - **The extensibility guide starts with `IEval`.** It opened with `IMetric`, the older interface, and mentioned

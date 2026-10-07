@@ -15,7 +15,7 @@
 | **ASI03** | Identity and Privilege Abuse | None aimed at identity or privilege | `OperatorAuthGate`, `ContainedIdentityGate`, `SessionIdentityDriftGate` (experimental) | ⚠️ Gates only |
 | **ASI04** | Agentic Supply Chain Vulnerabilities | `SkillInjection` (a poisoned third-party skill); `SupplyChain` (package recommendations) | `SkillScriptExecutionGate`, `SkillScriptApprovalGate` | ⚠️ Partial |
 | **ASI05** | Unexpected Code Execution (RCE) | `InsecureOutput` (includes command- and code-injection probes) | `ToolUsageContractGate` with `ShellMetacharDenyPredicate`, `SkillScriptExecutionGate`, `SkillScriptApprovalGate` | ⚠️ Partial |
-| **ASI06** | Memory and Context Poisoning | Memory-security corpus (library only); `DataPoisoning` (in-context) | `MemoryScopeIntegrityGate`, `MemoryWriteAdmissionGate`, `MemoryConflictGate`, `MemoryRecallAdmissionGate`, `MemoryResourceBudgetGate`, `MemoryToolCallGate`, `MemoryToolResultGate`, `MemoryInfluenceGate` | ⚠️ Partial |
+| **ASI06** | Memory and Context Poisoning | Memory-security corpus (`redteam --attacks memory-poisoning`); `DataPoisoning` (in-context) | `MemoryScopeIntegrityGate`, `MemoryWriteAdmissionGate`, `MemoryConflictGate`, `MemoryRecallAdmissionGate`, `MemoryResourceBudgetGate`, `MemoryToolCallGate`, `MemoryToolResultGate`, `MemoryInfluenceGate` | ⚠️ Partial |
 | **ASI07** | Insecure Inter-Agent Communication | None | None specific | ❌ Not covered |
 | **ASI08** | Cascading Failures | None | `BlockStormSentinelGate`, `ContainmentOverrideGate`, `RateLimitGate`, `RunBudgetGate`, `ToolResultSizeGate`, `ToolResultSizeAnomalyGate` (experimental) | ⚠️ Gates only |
 | **ASI09** | Human-Agent Trust Exploitation | `Misinformation` (nearest) | The approval gates, which hand a decision to a person | ⚠️ Partial |
@@ -145,21 +145,26 @@ Malicious content is written into the agent's memory or long-lived context and s
 - The memory-security corpus, `MemorySecurityAttackCorpus.Default`: 12 attack scenarios and 4 benign controls. Five
   deterministic evaluators score a batch of memory operations against it (`MemoryPoisonContainmentEval`,
   `MemoryScopeIsolationEval`, `MemoryInfluenceSafetyEval`, `MemoryAuditabilityEval`, `MemoryUtilityEval`), combined by
-  `MemorySecurityCompositeEvals.Create()`. This is a library API. No CLI command runs it, and nothing yet drives the
-  scenarios against a live agent.
+  `MemorySecurityCompositeEvals.Create()`. `agenteval redteam --attacks memory-poisoning` runs it against the model
+  you name, behind AgentEval's default memory protection (see [Memory poisoning](redteam.md#memory-poisoning)).
+  `--scripted` runs a scripted worst-case model instead, which shows the gates, not a model.
 - `DataPoisoning`: 12 in-context poisoning probes (LLM04).
 
 **Gates**
 - `MemoryScopeIntegrityGate`: fails closed when the trusted scope is missing or contradicted.
 - `MemoryWriteAdmissionGate`: checks provenance, trust and content before a write.
 - `MemoryConflictGate`: blocks lower-trust overwrites and repeated writes from one source posing as agreement.
-- `MemoryRecallAdmissionGate`: drops stale, cross-scope or tampered records on recall.
+- `MemoryRecallAdmissionGate`: drops stale or cross-scope records on recall, and tampered ones only when integrity
+  verification is required (`MemoryRecallAdmissionOptions.RequireIntegrityVerification`, off by default).
 - `MemoryResourceBudgetGate`: caps writes, recalls and quarantined records.
 - `MemoryToolCallGate` and `MemoryToolResultGate`: run the memory checks on registered memory write and read tool
   calls, and on what the reads return.
 - `MemoryInfluenceGate`: taints values read from memory so they cannot flow into sensitive tool calls.
 
-**Gaps:** the corpus is not run against a real agent from the CLI.
+**Gaps:** with the default options, a record tampered with after it was stored is still recalled (integrity
+verification is off), and a flood of low-trust records under one query crowds the trusted record out of a naive store;
+the memory-poisoning run reports both. MCP, context-provider and direct-store plants are performed by the harness on
+the attacker's channel, and dormancy between sessions is not simulated.
 
 ---
 

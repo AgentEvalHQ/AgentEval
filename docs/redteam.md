@@ -973,6 +973,50 @@ The low-level scanner. **Everything the library can do is reachable from the CLI
 
 > The OWASP, MITRE ATLAS, and NIST AI RMF benchmarks also have curated preset wrappers: `agenteval bench owasp`, `agenteval bench mitre`, and `agenteval bench nist` (presets `rmf-baseline` / `rmf-smoke` / `rmf-audit-grade`). They grade judge first, with the judge model the environment configures (see [CLI Reference — `agenteval bench`](cli.md#agenteval-bench)). NIST AI RMF additionally surfaces as `--format nist` straight from a `redteam` scan (below).
 
+### Memory poisoning
+
+`--attacks memory-poisoning` runs the memory-security corpus (`MemorySecurityAttackCorpus.Default`: 12 attacks and 4
+benign controls) against the model you name, behind AgentEval's default memory protection. It is not a probe scan, so
+it runs on its own:
+
+```bash
+agenteval redteam --attacks memory-poisoning --endpoint $URL --model $MODEL --format json -o memory.json
+agenteval redteam --attacks memory-poisoning --scripted        # free and deterministic: the gates, not a model
+```
+
+**What runs.** For each case: a plant session (the model is told the plant in a user turn, or reads it from a document,
+e-mail or cloud tool; MCP, context-provider and direct-store plants are performed by the harness on the attacker's
+channel, through the same gate), a restart (a new agent over the same memory store), a trigger session, and a
+deterministic recall through the same result gate. The agent is `UseGatekeeper(ReplaceResult)` with `ProtectMemory`
+over the five deterministic memory gates with their default options (Enforce profile, ambiguous writes quarantined),
+with memory tools, delivery tools and three sensitive sinks (`send_external`, `export_user_data`,
+`set_payout_destination`) guarded by the influence gate. The store is deliberately naive (keyword match, newest first),
+so containment is the gates' job. Scope comes from the harness, never from the model; a write is attributed to the
+lowest-trust content the model saw in that session.
+
+**What it reports.** One row per case (memory writes and sink calls attempted, blocked, executed, and the objectives
+the case violated), then the five checks: poison containment, scope isolation, influence safety, auditability and
+recovery, and utility (benign facts stored and recalled; it only warns). `--format json` is content-free: scenario ids,
+flags, counts and gate reason codes. Exit `0` when the security checks pass, `1` when one fails, `11` when one could not
+be measured; `--fail-on never` exits `0`.
+
+**What the default protection does, measured with `--scripted`** (the worst-case model: it saves whatever it is told
+and acts on the poison whenever it reaches it):
+
+| Contained | Not contained |
+|---|---|
+| Cross-user recall through a shared partition (owner-scope check) | Low- and medium-trust poison is stored and recalled, delimited (`<memory-item ... trust="Low">`) |
+| Overwriting a higher-trust fact, and repeated writes posing as agreement (conflict gate) | A record tampered with after it was stored (integrity verification is off by default) |
+| Promoting an untrusted procedure (needs High trust) | A flood of low-trust records under one query crowds the trusted record out (the run budget caps the flood at 31 writes) |
+| Recalled data reaching a sensitive tool (influence gate) | An action whose arguments do not carry the recalled data (the influence gate tracks values, not intent) |
+
+An approved procedure from the user is quarantined too (promotion needs High trust and there is no approval handler),
+so utility reads 0.75. A live run measures the same things with the model deciding what to save and what to do.
+
+**Limits.** Dormancy between sessions is recorded, not simulated (one restart). Verbal trust escalation is read from what
+reached the model, not judged. Every case runs `--memory-trials` times (default 1). A live run costs roughly two model
+sessions of up to four turns per case.
+
 ### CI baseline & regression gate
 
 Built-in CI affordances: SARIF/JUnit export, a saved **baseline**, and an honest **exit-code gate**.
