@@ -36,7 +36,7 @@ namespace AgentEval.NuGetConsumer.Tests;
 public class PackageReachabilityTests
 {
     /// <summary>The package version this project pins. One place, so the pin and the assertion move together.</summary>
-    private const string ExpectedPackageVersion = "0.42.0-beta";
+    private const string ExpectedPackageVersion = "0.43.0-beta";
 
     private sealed class ContainsEval(string needle)
         : AtomicCodeEval("consumer.contains", "Response contains the needle", "test", "1.0.0")
