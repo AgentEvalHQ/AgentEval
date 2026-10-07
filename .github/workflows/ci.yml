@@ -19,6 +19,12 @@ env:
 permissions:
   contents: read
 
+# Actions minutes cost money. A new push to a pull request makes the run on the previous commit
+# worthless, so it is cancelled; runs on main are never cancelled, each one is a merge to verify.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   # Every tag must have a CHANGELOG section of its own. This gate exists because the rule was
   # assumed to be enforced and was not: the sibling checker for the status doc says in its own
@@ -92,30 +98,37 @@ jobs:
       with:
         fail-on-severity: high
 
+  # ONE job per OS, not one per .NET version. global.json pins SDK 10 and every project targets
+  # net8.0;net9.0;net10.0, so `dotnet test` on the solution already runs every framework. Until
+  # 2026-10-07 a three-leg matrix on dotnet-version repeated that same full build and test three
+  # times on each OS (the "8.0.x" leg ran net8, net9 and net10 tests alike): six jobs, about 37
+  # runner-minutes per push, for the coverage two jobs give.
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     if: "!contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, '[ci skip]')"
-    
-    strategy:
-      fail-fast: false
-      matrix:
-        dotnet-version: [ '8.0.x', '9.0.x', '10.0.x' ]
-    
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v7
 
+    # Bounded: on 2026-10-07 an Ubuntu mirror stopped answering mid-`apt-get update` and the step
+    # sat silent until the job's 15-minute timeout cancelled it, before any test ran. With a
+    # per-request timeout apt gives up on a dead mirror and retries; the step limit catches the rest.
     - name: Install fonts for PDF generation (Linux)
+      timeout-minutes: 5
       run: |
-        sudo apt-get update
-        sudo apt-get install -y fonts-liberation fontconfig
+        sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
+        sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y fonts-liberation fontconfig
 
-    - name: Setup .NET ${{ matrix.dotnet-version }}
+    # Every runtime the tests target; the SDK that builds is the one global.json names.
+    - name: Setup .NET
       uses: actions/setup-dotnet@v6
       with:
-        dotnet-version: ${{ matrix.dotnet-version }}
-        dotnet-quality: ${{ matrix.dotnet-version == '10.0.x' && 'preview' || '' }}
+        dotnet-version: |
+          8.0.x
+          9.0.x
+          10.0.x
 
     - name: Cache NuGet packages
       uses: actions/cache@v6
@@ -128,16 +141,14 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore
 
-    # One leg builds the Mission Control UI, so a TypeScript or bundling break fails here and not at release
-    # time, and the .NET build on this leg includes the UI the way the released tool does.
+    # The Linux job builds the Mission Control UI, so a TypeScript or bundling break fails here and not at
+    # release time, and the .NET build here includes the UI the way the released tool does.
     - name: Setup Node (Mission Control UI)
-      if: matrix.dotnet-version == '10.0.x'
       uses: actions/setup-node@v7
       with:
         node-version: '22'
 
     - name: Build the Mission Control UI
-      if: matrix.dotnet-version == '10.0.x'
       working-directory: src/AgentEval.MissionControl.Spa
       run: |
         npm ci
@@ -154,20 +165,20 @@ jobs:
         # and on 2026-09-21 a Windows net10 leg blew that budget and reported `Test Run Aborted` with no
         # failing test. This governs process startup, before any test runs, so it hides no assertion: a
         # host that never comes up still fails the job, just with the real reason in the log.
+        # No provider secrets here: the unit tests are offline by design and scrub the provider variables
+        # themselves (ProviderEnvironmentScope), so a key in this environment could only ever turn a test
+        # that forgot to scrub into a paid model call. Live tests run in llm-integration-tests.yml.
         VSTEST_CONNECTION_TIMEOUT: '300'
-        AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
-        AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
 
     - name: Upload test results (Linux)
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: test-results-linux-${{ matrix.dotnet-version }}
+        name: test-results-linux
         path: coverage/**/*.trx
         retention-days: 30
 
     - name: Security Scan - .NET Dependency Check
-      if: matrix.dotnet-version == '10.0.x'
       run: |
         dotnet list package --vulnerable --include-transitive 2>&1 | tee vulnerability-report.txt
         if grep -q 'has the following vulnerable packages' vulnerability-report.txt; then
@@ -177,7 +188,6 @@ jobs:
         fi
 
     - name: Upload coverage reports
-      if: matrix.dotnet-version == '10.0.x'
       # SHA-pinned (SEC-04): third-party action runs in CI with the workflow token. Dependabot
       # (github-actions ecosystem) keeps this current. Resolved from the v5 moving tag.
       uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v5
@@ -194,21 +204,19 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 15
     if: "!contains(github.event.head_commit.message, '[skip ci]') && !contains(github.event.head_commit.message, '[ci skip]')"
-    
-    strategy:
-      fail-fast: false
-      matrix:
-        dotnet-version: [ '8.0.x', '9.0.x', '10.0.x' ]
-    
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v7
 
-    - name: Setup .NET ${{ matrix.dotnet-version }}
+    # One job, every framework: see the comment on the Linux job.
+    - name: Setup .NET
       uses: actions/setup-dotnet@v6
       with:
-        dotnet-version: ${{ matrix.dotnet-version }}
-        dotnet-quality: ${{ matrix.dotnet-version == '10.0.x' && 'preview' || '' }}
+        dotnet-version: |
+          8.0.x
+          9.0.x
+          10.0.x
 
     - name: Cache NuGet packages
       uses: actions/cache@v6
@@ -232,15 +240,14 @@ jobs:
         # and on 2026-09-21 a Windows net10 leg blew that budget and reported `Test Run Aborted` with no
         # failing test. This governs process startup, before any test runs, so it hides no assertion: a
         # host that never comes up still fails the job, just with the real reason in the log.
+        # No provider secrets, as on Linux.
         VSTEST_CONNECTION_TIMEOUT: '300'
-        AZURE_OPENAI_ENDPOINT: ${{ secrets.AZURE_OPENAI_ENDPOINT }}
-        AZURE_OPENAI_API_KEY: ${{ secrets.AZURE_OPENAI_API_KEY }}
 
     - name: Upload test results (Windows)
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: test-results-windows-${{ matrix.dotnet-version }}
+        name: test-results-windows
         path: TestResults/**/*.trx
         retention-days: 30
 
