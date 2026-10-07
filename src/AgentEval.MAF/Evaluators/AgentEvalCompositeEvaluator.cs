@@ -237,8 +237,12 @@ public sealed class AgentEvalCompositeEvaluator : MEAIIEvaluator
 
     private static void AddMetric(MEAIEvaluationResult result, EvalResult node, bool isRoot)
     {
+        // A skipped, errored or not-applicable node's 0 is a placeholder. As 1.0 — the lowest score on MEAI's 1–5
+        // scale — rated Poor, a reader of Value counted it as a real worst score; no value and Inconclusive, as
+        // ResultConverter emits not measured (#203 review round 17, M1). The marker below still carries its label.
+        var measured = node.Score.CountsTowardAggregate();
         // AgentEval EvalScore.Value is 0..1; MEAI NumericMetric convention is 1..5.
-        var meaiValue = 1.0 + Math.Clamp(node.Score.Value, 0, 1) * 4.0;
+        double? meaiValue = measured ? 1.0 + Math.Clamp(node.Score.Value, 0, 1) * 4.0 : null;
         var pct = node.Score.Value * 100.0;
         // The marker comes FIRST and keeps the node's own label: MeaiToEvalResultBridge recovers the leaf's
         // verdict from it, so making a leaf informational below loses nothing on the way back.
@@ -249,7 +253,7 @@ public sealed class AgentEvalCompositeEvaluator : MEAIIEvaluator
         var metric = new NumericMetric(isRoot ? $"{node.Metric.Name} (overall)" : node.Metric.Name, meaiValue, reason)
         {
             Interpretation = new EvaluationMetricInterpretation(
-                rating: pct switch
+                rating: !measured ? EvaluationRating.Inconclusive : pct switch
                 {
                     >= 90 => EvaluationRating.Exceptional,
                     >= 75 => EvaluationRating.Good,

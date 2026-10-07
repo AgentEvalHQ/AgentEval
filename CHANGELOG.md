@@ -53,6 +53,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   nothing measured and now report not measured too: reach-back on a scenario with no questions (passed at 0)
   and reducer fidelity on a scenario with no expected facts (passed at 100). The temporal metric gained the
   "judge scored no query" check it was missing. An exception during evaluation is still a failure.
+- **`AgentEvalCompositeEvaluator` no longer reports a skipped node as MEAI's lowest score.** A skipped, errored or
+  not-applicable node in the composite tree reached MAF as value 1.0 (the bottom of MEAI's 1–5 scale) rated
+  Poor, so anything averaging metric values counted a placeholder as a real worst score. It now carries no
+  value and an Inconclusive rating, as `ResultConverter` already did for a not-measured metric; the reason
+  marker keeps its label, so the report bridge still reads it back as skipped, and a skipped root still fails
+  the MAF item.
 
 ## [0.43.0-beta] - 2026-10-06
 
