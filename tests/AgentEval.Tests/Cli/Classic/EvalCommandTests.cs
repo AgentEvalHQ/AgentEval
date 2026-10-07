@@ -116,7 +116,6 @@ public class EvalCommandTests
         Assert.Null(opts.SystemPrompt);
         Assert.Null(opts.SystemPromptFile);
         Assert.Null(opts.Temperature);   // not given = not sent; the provider's default applies
-        Assert.False(opts.FormatGiven);
         Assert.Null(opts.MaxTokens);
         Assert.Null(opts.JudgeEndpoint);
         Assert.Null(opts.JudgeModel);
@@ -852,18 +851,6 @@ public class EvalCommandTests
 
         Assert.DoesNotContain("= deterministic", option.Description, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("provider's default", option.Description, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public void WasGiven_DistinguishesAnExplicitFormatFromTheDefault()
-    {
-        // FormatGiven relies on System.CommandLine marking a defaulted option result as Implicit. Pin that
-        // here, through the real command, so a parser upgrade that changed it would fail loudly.
-        var command = EvalCommand.Create();
-        var format = command.Options.Single(o => o.Name == "--format");
-
-        Assert.False(EvalCommand.WasGiven(command.Parse(new[] { "--dataset", "d.yaml" }), format));
-        Assert.True(EvalCommand.WasGiven(command.Parse(new[] { "--dataset", "d.yaml", "--format", "json" }), format));
     }
 
     [Fact]

@@ -52,6 +52,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   selects, not only Azure, and the name said otherwise (0.41 called it a misnomer and kept it). `bench gdpr`,
   `eu-ai-act`, `owasp`, `mitre`, `nist`, `perf` and `log-file replay` take `--from-env`; `--azure-from-env` is kept as an
   alias, so no script that passes it breaks. Help, messages and docs use the new name.
+- **`eval --runs N` (N above 1) now writes its export.** It used to write none: `--format`, `-o` and `--output-dir`
+  were ignored with a warning, and an output file left by an earlier run stayed in place, looking current to whatever
+  read it next. The export now has one entry per test case, not one per run. The entry passes or fails on the pass
+  rate against `--success-threshold`, and its score is the mean over the runs. Every format carries the runs as metric
+  columns (`stochastic_runs`, `stochastic_runs_passed`, `stochastic_pass_rate`, `stochastic_score_sd`). A failure
+  message names the pass rate and threshold, and JUnit system-out and TRX stdout list each run. The report's name says
+  `(stochastic, N runs per test)`. `EvalOptions.FormatGiven`, which existed only for the old warning, is removed.
 - **`SystemOneClientOptions.TypeSafeDefaultModel`** is now `"jev-1.13.0"` (was `"jev-latest"`). The moving alias
   `"jev-latest"` always resolved to `"jev-1.13.0"` and `DecisionResponse.Model` echoes the resolved build, so
   provenance is unchanged; the default is pinned for reproducibility in line with `OpenRouterDefaultModel`.

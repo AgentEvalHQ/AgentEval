@@ -87,8 +87,9 @@ internal static class EvalCommand
         {
             DefaultValueFactory = _ => 1,
             Description = "Runs per test case (default: 1; must be at least 1). Above 1 is stochastic analysis, which " +
-                          "the stochastic runner accepts from 3 runs; it prints per-test statistics to stderr and " +
-                          "writes no export, so --format, -o and --output-dir are ignored with a warning.",
+                          "the stochastic runner accepts from 3 runs: a test case passes when its pass rate reaches " +
+                          "--success-threshold. The export has one entry per test case, scored as the mean over its " +
+                          "runs, with the run count, runs passed, pass rate and score SD as metric columns.",
         };
         var thresholdOpt = new Option<double>("--success-threshold")
             { DefaultValueFactory = _ => 0.8, Description = "Success rate threshold for stochastic evaluation (default: 0.8)" };
@@ -150,7 +151,6 @@ internal static class EvalCommand
                 JudgeEndpoint = parseResult.GetValue(judgeEndpointOpt),
                 JudgeModel = parseResult.GetValue(judgeModelOpt),
                 Format = parseResult.GetValue(formatOpt)!,
-                FormatGiven = WasGiven(parseResult, formatOpt),
                 Output = parseResult.GetValue(outputOpt),
                 OutputDir = parseResult.GetValue(outputDirOpt),
                 Verbose = parseResult.GetValue(verboseFlag),
@@ -363,19 +363,7 @@ internal static class EvalCommand
                     "  Warning: --metrics has no effect combined with --runs > 1 in this release " +
                     "(stochastic scoring is not wired to the named-metric pipeline yet).");
 
-            // No exporter accepts a stochastic result. EvaluationReport holds one score per test, and the
-            // JUnit, TRX, CSV and Markdown exporters do not write its metadata, so a projected report would read
-            // as a single run. Rather than export something that looks like a different measurement, name every
-            // export option this mode does not honour — before any agent call is made. Printed even with
-            // --quiet: --quiet keeps only the export, and the export is what is missing.
-            var ignoredExport = ExportOptionsIgnoredByStochasticMode(opts);
-            if (ignoredExport.Count > 0)
-                Console.Error.WriteLine(
-                    $"  Warning: --runs {opts.Runs} (stochastic mode) writes no export: nothing is written to stdout " +
-                    "or to any path named here, and a file already at one of them is left unchanged. " +
-                    $"Ignored: {string.Join(", ", ignoredExport)}.");
-
-            return await ExecuteStochasticAsync(opts, harness, agent, testCases, evalOptions, ct);
+            return await ExecuteStochasticAsync(opts, harness, agent, testCases, evalOptions, resolvedName, ct);
         }
 
         // 6c. Standard single-run evaluation path
@@ -406,30 +394,8 @@ internal static class EvalCommand
         var report = summary.ToEvaluationReport(
             agentName: resolvedName,
             modelName: resolvedName,
-            endpoint: opts.Sut is not null ? $"sut:{opts.Sut}" : (opts.Endpoint ?? "azure"));
-
-        // Directory format is handled exclusively via --output-dir, not the stream-based export path
-        var isDirectoryFormat = opts.Format.Equals("directory", StringComparison.OrdinalIgnoreCase)
-            || opts.Format.Equals("dir", StringComparison.OrdinalIgnoreCase);
-
-        if (isDirectoryFormat && opts.OutputDir is null)
-            throw new ArgumentException(
-                "The 'directory' format produces a structured directory (results.jsonl, summary.json, run.json). " +
-                "Specify --output-dir <path> to write the directory output.",
-                nameof(opts.Format));
-
-        if (!isDirectoryFormat)
-            await ExportHandler.ExportAsync(report, opts.Format, opts.Output, ct);
-
-        // 7b. Directory export (ADR-002) — can coexist with single-file export
-        if (opts.OutputDir is not null)
-        {
-            var dirName = DirectoryExporter.GenerateDirectoryName(report);
-            var dirPath = new DirectoryInfo(Path.Combine(opts.OutputDir.FullName, dirName));
-            await ExportHandler.ExportToDirectoryAsync(report, dirPath, opts.Dataset.FullName, ct);
-            if (!opts.Quiet)
-                Console.Error.WriteLine($"  Results written to: {dirPath.FullName}");
-        }
+            endpoint: EndpointLabel(opts));
+        await ExportReportAsync(opts, report, ct);
 
         // 8. Summary (unless --quiet)
         if (!opts.Quiet)
@@ -456,9 +422,38 @@ internal static class EvalCommand
         Performance = testResult.Performance,
     };
 
-    /// <summary>True when <paramref name="option"/> appeared on the command line rather than taking its default.</summary>
-    internal static bool WasGiven(ParseResult parseResult, Option option) =>
-        parseResult.GetResult(option) is { Implicit: false };
+    private static string EndpointLabel(EvalOptions opts) =>
+        opts.Sut is not null ? $"sut:{opts.Sut}" : (opts.Endpoint ?? "azure");
+
+    /// <summary>
+    /// Writes <paramref name="report"/> in the requested <c>--format</c> (to <c>-o</c>, or stdout) and, with
+    /// <c>--output-dir</c>, as the ADR-002 directory too. The single-run and the stochastic path both export here.
+    /// </summary>
+    private static async Task ExportReportAsync(EvalOptions opts, EvaluationReport report, CancellationToken ct)
+    {
+        // Directory format is handled exclusively via --output-dir, not the stream-based export path
+        var isDirectoryFormat = opts.Format.Equals("directory", StringComparison.OrdinalIgnoreCase)
+            || opts.Format.Equals("dir", StringComparison.OrdinalIgnoreCase);
+
+        if (isDirectoryFormat && opts.OutputDir is null)
+            throw new ArgumentException(
+                "The 'directory' format produces a structured directory (results.jsonl, summary.json, run.json). " +
+                "Specify --output-dir <path> to write the directory output.",
+                nameof(opts.Format));
+
+        if (!isDirectoryFormat)
+            await ExportHandler.ExportAsync(report, opts.Format, opts.Output, ct);
+
+        // Directory export (ADR-002) — can coexist with single-file export
+        if (opts.OutputDir is not null)
+        {
+            var dirName = DirectoryExporter.GenerateDirectoryName(report);
+            var dirPath = new DirectoryInfo(Path.Combine(opts.OutputDir.FullName, dirName));
+            await ExportHandler.ExportToDirectoryAsync(report, dirPath, opts.Dataset.FullName, ct);
+            if (!opts.Quiet)
+                Console.Error.WriteLine($"  Results written to: {dirPath.FullName}");
+        }
+    }
 
     /// <summary>
     /// Why <c>--runs</c> cannot be honoured, or <see langword="null"/> when it can. Below 1 is refused here. Above 1
@@ -532,24 +527,8 @@ internal static class EvalCommand
     }
 
     /// <summary>
-    /// The export options stochastic mode (<c>--runs</c> greater than 1) does not honour, each with the value given.
-    /// <c>--format</c> counts when it was given on the command line, or when a caller set a value other than the
-    /// default.
-    /// </summary>
-    internal static IReadOnlyList<string> ExportOptionsIgnoredByStochasticMode(EvalOptions opts)
-    {
-        var ignored = new List<string>();
-        if (opts.FormatGiven || !string.Equals(opts.Format, DefaultFormat, StringComparison.OrdinalIgnoreCase))
-            ignored.Add($"--format {opts.Format}");
-        if (opts.Output is not null)
-            ignored.Add($"-o/--output {opts.Output.FullName}");
-        if (opts.OutputDir is not null)
-            ignored.Add($"--output-dir {opts.OutputDir.FullName}");
-        return ignored;
-    }
-
-    /// <summary>
-    /// Stochastic evaluation path — runs each test case N times and reports statistics.
+    /// Stochastic evaluation path — runs each test case N times, exports one entry per test case
+    /// (<see cref="StochasticReport"/>) and prints the statistics to stderr.
     /// </summary>
     private static async Task<int> ExecuteStochasticAsync(
         EvalOptions opts,
@@ -557,6 +536,7 @@ internal static class EvalCommand
         IEvaluableAgent agent,
         IReadOnlyList<DatasetTestCase> datasetTestCases,
         EvaluationOptions evalOptions,
+        string resolvedName,
         CancellationToken ct)
     {
         var runner = new StochasticRunner(harness, statisticsCalculator: null, evalOptions);
@@ -567,6 +547,7 @@ internal static class EvalCommand
 
         var allPassed = true;
         var results = new List<StochasticResult>();
+        var startTime = DateTimeOffset.UtcNow;
 
         foreach (var datasetTestCase in datasetTestCases)
         {
@@ -589,6 +570,12 @@ internal static class EvalCommand
             if (!result.Passed)
                 allPassed = false;
         }
+
+        // Export: one entry per test case, its verdict the stochastic one. Same suite name as the single-run batch.
+        var report = StochasticReport.Build(
+            results, "BatchEvaluation", opts.Runs, opts.SuccessThreshold, startTime, DateTimeOffset.UtcNow,
+            agentName: resolvedName, modelName: resolvedName, endpoint: EndpointLabel(opts));
+        await ExportReportAsync(opts, report, ct);
 
         // Summary
         if (!opts.Quiet)
@@ -640,12 +627,6 @@ internal sealed class EvalOptions
     public string? JudgeEndpoint { get; init; }
     public string? JudgeModel { get; init; }
     public required string Format { get; init; }
-
-    /// <summary>
-    /// True when <c>--format</c> appeared on the command line, as opposed to <see cref="Format"/> holding the
-    /// default — so stochastic mode can name an explicitly requested format it will not write.
-    /// </summary>
-    public bool FormatGiven { get; init; }
 
     public FileInfo? Output { get; init; }
     public DirectoryInfo? OutputDir { get; init; }

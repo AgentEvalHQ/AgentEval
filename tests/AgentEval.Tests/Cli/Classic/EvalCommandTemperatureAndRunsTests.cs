@@ -188,47 +188,48 @@ public class EvalCommandTemperatureAndRunsTests
     }
 
     // ═══════════════════════════════════════════════════════════════════════════
-    //  --runs > 1: every export option it does not honour is named
+    //  --runs > 1: the export has one entry per test case, with its runs
     // ═══════════════════════════════════════════════════════════════════════════
 
     [Fact]
-    public async Task Eval_RunsAboveOne_NamesEveryIgnoredExportOption_EvenWithQuiet_AndWritesNothing()
+    public async Task Eval_RunsAboveOne_WritesTheExport_OneEntryPerTestCaseWithItsRuns()
     {
-        // Old behaviour: ExecuteStochasticAsync never called the export handler and said nothing, so
-        // "-o results.xml --format junit" produced no file — and a stale file from an earlier run stayed in place.
+        // Through 0.43 the stochastic path wrote no export: "-o results.xml --format junit" produced no file, and a
+        // stale file from an earlier run stayed in place, looking current.
         var client = new RecordingChatClient();
         var dataset = CreateTempDataset();
         var output = TempPath(".xml");
         var outputDir = new DirectoryInfo(Path.Combine(Path.GetTempPath(), "agenteval-eval-runs-dir-" + Guid.NewGuid().ToString("N")));
         try
         {
+            File.WriteAllText(output.FullName, "stale export from an earlier run");
             var opts = new EvalOptions
             {
                 Dataset = dataset,
                 Endpoint = "http://localhost:11434/v1",
                 Model = "fake-model",
                 Format = "junit",
-                FormatGiven = true,
                 Output = output,
                 OutputDir = outputDir,
                 Runs = 3,
                 Quiet = true,
             };
 
-            var (exit, stderr) = await CaptureStdErrAsync(
+            var (exit, _) = await CaptureStdErrAsync(
                 () => EvalCommand.ExecuteAsync(opts, default, agentClientOverride: client));
 
             Assert.Equal(ExitCodes.Success, exit);
             Assert.Equal(3, client.Calls);   // one test case × 3 runs: the stochastic path really ran
-            Assert.Contains("--runs 3 (stochastic mode) writes no export", stderr);
-            Assert.Contains("--format junit", stderr);
-            Assert.Contains($"-o/--output {output.FullName}", stderr);
-            Assert.Contains($"--output-dir {outputDir.FullName}", stderr);
 
-            output.Refresh();
+            var junit = File.ReadAllText(output.FullName);
+            Assert.DoesNotContain("stale export", junit);
+            Assert.Single(System.Text.RegularExpressions.Regex.Matches(junit, "<testcase "));   // one entry, not one per run
+            Assert.Contains(StochasticReport.RunsMetric, junit);
+            Assert.Contains("3 runs, ", junit);
+            Assert.Contains("Run 3: ", junit);
+
             outputDir.Refresh();
-            Assert.False(output.Exists);
-            Assert.False(outputDir.Exists);
+            Assert.True(outputDir.Exists);
         }
         finally
         {
@@ -240,13 +241,13 @@ public class EvalCommandTemperatureAndRunsTests
     }
 
     [Fact]
-    public async Task Eval_RunsAboveOne_PrintsItsTablesToStdErr_LeavingStdOutEmpty()
+    public async Task Eval_RunsAboveOne_PrintsItsTablesToStdErr_AndExportsJsonWithTheRuns()
     {
-        // Old behaviour: the per-test table went to stdout (OutputOptions' default writer), the channel the
-        // single-run export uses — so `eval ... | jq .` received a text table. The warning above says stochastic
-        // mode sends nothing to stdout; this holds it to that.
+        // The per-test table is a human report and goes to stderr, never to Console.Out: stdout is the export's
+        // channel, so `eval --runs 5 | jq .` must read only JSON.
         var client = new RecordingChatClient();
         var dataset = CreateTempDataset();
+        var output = TempPath(".json");
         try
         {
             var notQuiet = new EvalOptions
@@ -255,6 +256,7 @@ public class EvalCommandTemperatureAndRunsTests
                 Endpoint = "http://localhost:11434/v1",
                 Model = "fake-model",
                 Format = "json",
+                Output = output,
                 Runs = 3,
             };
 
@@ -276,28 +278,18 @@ public class EvalCommandTemperatureAndRunsTests
             Assert.Equal(ExitCodes.Success, exit);
             Assert.Contains("📊", stderr);   // the table title TableFormatter writes
             Assert.True(string.IsNullOrWhiteSpace(stdout.ToString()),
-                $"stochastic mode wrote to stdout:{Environment.NewLine}{stdout}");
-        }
-        finally { TryDelete(dataset); }
-    }
+                $"stochastic mode wrote to Console.Out:{Environment.NewLine}{stdout}");
 
-    [Fact]
-    public async Task Eval_RunsAboveOne_WithNoExportOptionGiven_PrintsNoExportWarning()
-    {
-        var client = new RecordingChatClient();
-        var dataset = CreateTempDataset();
-        try
+            using var json = System.Text.Json.JsonDocument.Parse(File.ReadAllText(output.FullName));
+            var result = Assert.Single(json.RootElement.GetProperty("results").EnumerateArray());
+            Assert.Equal(3, result.GetProperty("metricScores").GetProperty(StochasticReport.RunsMetric).GetDouble());
+            Assert.Equal("stochastic", json.RootElement.GetProperty("metadata").GetProperty("Mode").GetString());
+        }
+        finally
         {
-            var opts = Copy(ClassicOptions(dataset, output: null), runs: 3);
-
-            var (exit, stderr) = await CaptureStdErrAsync(
-                () => EvalCommand.ExecuteAsync(opts, default, agentClientOverride: client));
-
-            Assert.Equal(ExitCodes.Success, exit);
-            Assert.Equal(3, client.Calls);
-            Assert.DoesNotContain("writes no export", stderr);
+            TryDelete(dataset);
+            TryDelete(output);
         }
-        finally { TryDelete(dataset); }
     }
 
     // ── helpers ──
@@ -346,7 +338,6 @@ public class EvalCommandTemperatureAndRunsTests
         Endpoint = o.Endpoint,
         Model = o.Model,
         Format = o.Format,
-        FormatGiven = o.FormatGiven,
         Output = o.Output,
         OutputDir = o.OutputDir,
         Quiet = o.Quiet,

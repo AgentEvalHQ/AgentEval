@@ -7,6 +7,8 @@
 // unvalidated --runs values and the stochastic path's silent export drop were rewritten when both were fixed.
 
 using AgentEval.Cli.Commands;
+using AgentEval.Comparison;
+using AgentEval.Models;
 using Xunit;
 
 namespace AgentEval.Tests.Cli.Classic;
@@ -256,40 +258,67 @@ public class StochasticFlagTests
     }
 
     [Fact]
-    public void StochasticPath_DoesNotExport_AndNamesEveryExportOptionItIgnores()
+    public void StochasticReport_HasOneEntryPerTestCase_WithTheStochasticVerdictAndItsRuns()
     {
-        // The stochastic path (--runs > 1) still writes no export: no exporter accepts a stochastic result, and
-        // projecting one into EvaluationReport would read as a single run in the formats that drop its metadata.
-        // What changed is that it says so, naming each option with the value given.
-        var opts = new EvalOptions
-        {
-            Dataset = new FileInfo("test.yaml"),
-            Model = "gpt-4o",
-            Format = "csv",
-            Output = new FileInfo("results.csv"),
-            OutputDir = new DirectoryInfo("out"),
-            Runs = 5,
-        };
+        // 3 of 5 runs passed against an 80% threshold: the test fails as a whole, and every format can see why.
+        var runs = new[] { 90, 85, 40, 88, 30 }
+            .Select((score, i) => new TestResult { TestName = "t", Score = score, Passed = score >= 50 })
+            .ToList();
+        var result = new StochasticResult(
+            new TestCase { Name = "refund-policy", Input = "q" },
+            runs,
+            new StochasticStatistics(PassRate: 0.6, MeanScore: 66.6, MedianScore: 85, StandardDeviation: 28.1,
+                MinScore: 30, MaxScore: 90, Percentile25: 40, Percentile75: 88, Percentile95: 90,
+                ConfidenceInterval: new ConfidenceInterval(31.7, 101.5, 0.95), SampleSize: 5),
+            new StochasticOptions(Runs: 5, SuccessRateThreshold: 0.8),
+            Passed: false);
 
-        var ignored = EvalCommand.ExportOptionsIgnoredByStochasticMode(opts);
+        var report = StochasticReport.Build(
+            [result], "BatchEvaluation", runs: 5, successThreshold: 0.8, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow,
+            agentName: "gpt-4o", modelName: "gpt-4o");
 
-        Assert.Equal(
-            new[]
-            {
-                "--format csv",
-                $"-o/--output {opts.Output!.FullName}",
-                $"--output-dir {opts.OutputDir!.FullName}",
-            },
-            ignored.ToArray());
+        var test = Assert.Single(report.TestResults);
+        Assert.Equal("refund-policy", test.Name);
+        Assert.False(test.Passed);
+        Assert.Equal(66.6, test.Score);
+        Assert.Equal("3 of 5 runs passed (60.0%), below the 80% threshold.", test.Error);
+        Assert.Equal(5, test.MetricScores[StochasticReport.RunsMetric]);
+        Assert.Equal(3, test.MetricScores[StochasticReport.RunsPassedMetric]);
+        Assert.Equal(60, test.MetricScores[StochasticReport.PassRateMetric], precision: 6);
+        Assert.Equal(28.1, test.MetricScores[StochasticReport.ScoreSdMetric]);
+        Assert.Contains("95% CI for the mean [31.7, 101.5]", test.Output);
+        Assert.Contains("Run 3: fail, score 40", test.Output);
+
+        Assert.Equal(1, report.FailedTests);
+        Assert.Equal("BatchEvaluation (stochastic, 5 runs per test)", report.Name);
+        Assert.Equal("5", report.Metadata["RunsPerTest"]);
+        Assert.Equal("0.8", report.Metadata["SuccessThreshold"]);
     }
 
     [Fact]
-    public void StochasticPath_DefaultFormat_IsNamedOnlyWhenGivenExplicitly()
+    public void StochasticReport_AnErroredRun_IsListedWithItsError()
     {
-        var defaulted = new EvalOptions { Dataset = new FileInfo("test.yaml"), Format = "json", Runs = 5 };
-        var explicitJson = new EvalOptions { Dataset = new FileInfo("test.yaml"), Format = "json", FormatGiven = true, Runs = 5 };
+        var runs = new List<TestResult>
+        {
+            new() { TestName = "t", Score = 90, Passed = true },
+            new() { TestName = "t", Score = 0, Passed = false, Error = new TimeoutException("the model timed out") },
+            new() { TestName = "t", Score = 92, Passed = true },
+        };
+        var result = new StochasticResult(
+            new TestCase { Name = "t", Input = "q" },
+            runs,
+            new StochasticStatistics(PassRate: 2.0 / 3, MeanScore: 60.7, MedianScore: 90, StandardDeviation: 52.6,
+                MinScore: 0, MaxScore: 92, Percentile25: 45, Percentile75: 91, Percentile95: 92,
+                ConfidenceInterval: null, SampleSize: 3),
+            new StochasticOptions(Runs: 3, SuccessRateThreshold: 0.6),
+            Passed: true);
 
-        Assert.Empty(EvalCommand.ExportOptionsIgnoredByStochasticMode(defaulted));
-        Assert.Equal(new[] { "--format json" }, EvalCommand.ExportOptionsIgnoredByStochasticMode(explicitJson).ToArray());
+        var test = Assert.Single(StochasticReport.Build(
+            [result], "BatchEvaluation", 3, 0.6, DateTimeOffset.UtcNow, DateTimeOffset.UtcNow).TestResults);
+
+        Assert.True(test.Passed);
+        Assert.Null(test.Error);
+        Assert.Contains("Run 2: error: the model timed out", test.Output);
+        Assert.DoesNotContain("CI for the mean", test.Output);   // no interval was computed, none is printed
     }
 }

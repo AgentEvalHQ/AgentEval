@@ -244,7 +244,7 @@ LLM-as-judge, named metrics (`--metrics`), and the `--output-dir` ADR-002 direct
 | `--format <fmt>` | Export format. Default `json`. Not written in stochastic mode. |
 | `-o, --output <path>` | Output file for single-file formats. Default: stdout. Not written in stochastic mode. |
 | `--output-dir <path>` | Structured directory output (`results.jsonl`, `summary.json`, `run.json`). Not written in stochastic mode. |
-| `--quiet` | Suppress the header, progress, summary, and the `--metrics` and `--sut` warnings. Errors, and the stochastic-mode export warning below, are still printed. |
+| `--quiet` | Suppress the header, progress, summary, and the `--metrics` and `--sut` warnings. Errors are still printed. |
 
 **Stochastic mode (`--runs` greater than 1)**
 
@@ -253,12 +253,14 @@ Each test case is run N times. A test case passes when the share of its runs tha
 least 3 runs, so `--runs 2` is a usage error (exit `2`), as are `0` and negative values; in this mode a
 `--success-threshold` outside 0–1 is a usage error too. These checks run before anything is loaded or called.
 
-A table and a pass/fail line per test case, and a closing summary, are printed to stderr. **No export is
-written**: nothing goes to stdout, to `-o`, or to `--output-dir`, because no exporter accepts a stochastic
-result — the report the exporters take holds one score per test, and the JUnit, TRX, CSV and Markdown
-exporters do not write its metadata, so a stochastic result would read as a single run. When `--format`, `-o` or
-`--output-dir` is given, a warning names each one with its value before the first agent call, and a file
-already at one of those paths is left unchanged. `--metrics` is ignored in this mode, with a warning.
+A table and a pass/fail line per test case, and a closing summary, are printed to stderr. The export (`--format`,
+`-o`, `--output-dir`) has **one entry per test case**, not one per run: it passes or fails on the pass rate, and its
+score is the mean over the runs. Every format carries the runs as four metric columns: `stochastic_runs`,
+`stochastic_runs_passed`, `stochastic_pass_rate` (0–100) and `stochastic_score_sd`. A failed test case's message names
+its pass rate and the threshold (`3 of 5 runs passed (60.0%), below the 80% threshold.`). JUnit system-out and TRX
+stdout also list each run with its score or error and the confidence interval for the mean. The report's name ends in
+`(stochastic, N runs per test)`, and `Mode`, `RunsPerTest` and `SuccessThreshold` are recorded in the JSON export's
+`metadata` and in the directory export's `run.json`. Through 0.43 this mode wrote no export at all. `--metrics` is ignored in this mode, with a warning.
 
 **With `--sut`**
 
