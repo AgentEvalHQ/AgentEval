@@ -34,6 +34,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reference. Through 0.43 the CLI had no way to supply either, and the preset could not pass. A blank value counts as
   none; a missing file is a usage error (exit 2). When every check in `rag-quality` is skipped, the run's note now
   names these flags.
+- **`redteam --transform <codecs>`.** The 18 encoding codecs were reachable only from code (`AttackPipeline.WithTransform`).
+  The flag takes codec names (`base64`, `rot13`, `hex`, …) or a group (`reversible`, `lossy`, `all`) and runs every
+  single-turn probe in the scan once per codec as well as in plaintext, which stays as the control. Multi-turn,
+  tool-aware and tree attacks run unencoded and are named, since encoding them would silently downgrade them to
+  single-turn. An unknown codec fails before any probe runs. The red-team docs listed three codecs that do not exist
+  (NATO, homoglyph, zero-width) and said the library example kept the original probes, which `WithTransform` drops
+  unless `keepOriginal: true`; both are corrected.
 - **Core and Abstractions API snapshots** — `CorePublicApiSnapshotTests` and
   `AbstractionsPublicApiSnapshotTests` freeze the public surface of `AgentEval.Core` and
   `AgentEval.Abstractions` using the same Verify-based pattern as the existing Gatekeeper snapshot.

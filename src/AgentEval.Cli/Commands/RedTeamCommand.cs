@@ -23,6 +23,7 @@ using AgentEval.RedTeam.Evaluators;
 using AgentEval.RedTeam.Importers;
 using AgentEval.RedTeam.Reporting;
 using AgentEval.RedTeam.Reporting.Compliance;
+using AgentEval.RedTeam.Transforms;
 using Microsoft.Extensions.AI;
 
 namespace AgentEval.Cli.Commands;
@@ -69,6 +70,8 @@ internal static class RedTeamCommand
         // Attack selection
         var attacksOpt = new Option<string?>("--attacks")
             { Description = "Comma-separated attack types (e.g., PromptInjection,Jailbreak). Default: all. Opt-in multi-turn: Crescendo, PAIR, TAP (PAIR/TAP require --attacker), ToolEscalation (best at --sut-tier instrumented)." };
+        var transformOpt = new Option<string?>("--transform")
+            { Description = "Also run every single-turn probe encoded: comma-separated codecs (base64, base32, hex, url, rot13, caesar, atbash, reversed, xor, binary, octal, ascii_decimal, html_entities, html_hex_entities, unicode_escapes, fullwidth, morse, leetspeak) or a group (reversible | lossy | all). The plaintext probes still run as the control; each codec adds one encoded variant per probe, so the probe count (and judge cost) multiplies. Multi-turn, tool-aware and tree attacks run unencoded." };
         var importProbesOpt = new Option<FileInfo?>("--import-probes")
             { Description = "Import a JSON or CSV seed-prompt dataset (HarmBench/JailbreakBench/etc.; dispatched by .json/.csv extension) and run it alongside the built-in attacks. Probes without an expected-token oracle are Inconclusive unless --judge is set." };
         var importPromptFieldOpt = new Option<string?>("--import-prompt-field")
@@ -173,6 +176,7 @@ internal static class RedTeamCommand
         }
         command.Options.Add(systemPromptCanaryOpt);
         command.Options.Add(attacksOpt);
+        command.Options.Add(transformOpt);
         command.Options.Add(importProbesOpt);
         command.Options.Add(importPromptFieldOpt);
         command.Options.Add(importIdColumnOpt);
@@ -225,6 +229,7 @@ internal static class RedTeamCommand
                     t => t.Sut, t => t.BindOptions(parseResult), StringComparer.OrdinalIgnoreCase),
                 SystemPromptCanary = parseResult.GetValue(systemPromptCanaryOpt),
                 Attacks = parseResult.GetValue(attacksOpt),
+                Transform = parseResult.GetValue(transformOpt),
                 ImportProbes = parseResult.GetValue(importProbesOpt),
                 ImportPromptField = parseResult.GetValue(importPromptFieldOpt),
                 ImportIdColumn = parseResult.GetValue(importIdColumnOpt),
@@ -290,6 +295,63 @@ internal static class RedTeamCommand
         });
 
         return command;
+    }
+
+    /// <summary>
+    /// Parses <c>--transform</c>: codec names and the groups <c>reversible</c>, <c>lossy</c>, <c>all</c>, comma-separated,
+    /// case-insensitive, duplicates collapsed. Null when the option is absent or blank.
+    /// </summary>
+    /// <exception cref="ArgumentException">A name is neither a codec nor a group.</exception>
+    internal static IReadOnlyList<IProbeTransformer>? ResolveTransformers(string? spec)
+    {
+        if (string.IsNullOrWhiteSpace(spec))
+            return null;
+
+        var byName = Transformers.AllEncodings.ToDictionary(t => t.Name, StringComparer.OrdinalIgnoreCase);
+        var resolved = new List<IProbeTransformer>();
+        foreach (var name in spec.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            IReadOnlyList<IProbeTransformer>? group = name.ToLowerInvariant() switch
+            {
+                "all" => Transformers.AllEncodings,
+                "reversible" => Transformers.ReversibleEncodings,
+                "lossy" => Transformers.LossyEncodings,
+                _ => null,
+            };
+            if (group is not null)
+                resolved.AddRange(group);
+            else if (byName.TryGetValue(name, out var transformer))
+                resolved.Add(transformer);
+            else
+                throw new ArgumentException(
+                    $"Unknown --transform '{name}'. Valid: reversible | lossy | all, or any of: {string.Join(", ", byName.Keys)}");
+        }
+
+        // Expand mode refuses two transformers with one name (their probe ids would collide).
+        var distinct = resolved.DistinctBy(t => t.Name, StringComparer.Ordinal).ToList();
+        return distinct.Count == 0 ? null : distinct;
+    }
+
+    /// <summary>
+    /// Wraps every single-turn attack in <paramref name="roster"/> so each probe also runs once per transformer, keeping
+    /// the plaintext probe as the control. Multi-turn, tool-aware and tree attacks are left as they are (encoding them
+    /// would silently downgrade them to single-turn) and named in <paramref name="unencoded"/>.
+    /// </summary>
+    internal static IReadOnlyList<IAttackType> ApplyTransforms(
+        IReadOnlyList<IAttackType> roster, IReadOnlyList<IProbeTransformer> transformers, out IReadOnlyList<string> unencoded)
+    {
+        var skipped = new List<string>();
+        var result = roster.Select(a =>
+        {
+            if (a is IMultiTurnAttack or IToolAwareAttack or ITreeAttack)
+            {
+                skipped.Add(a.Name);
+                return a;
+            }
+            return new TransformedAttack(a, transformers, TransformMode.Expand, keepOriginal: true);
+        }).ToList();
+        unencoded = skipped;
+        return result;
     }
 
     /// <summary>
@@ -363,6 +425,9 @@ internal static class RedTeamCommand
         var packageRegistry = (opts.PackageRegistry ?? "none").Trim().ToLowerInvariant();
         if (packageRegistry is not ("none" or "live"))
             throw new ArgumentException($"Unknown --package-registry: '{opts.PackageRegistry}'. Valid: none | live");
+
+        // A --transform typo fails here too, before any import, download or probe.
+        var transformers = ResolveTransformers(opts.Transform);
 
         // Jun14v2-L4: the timeout/throttle bounds are a static config error knowable before any I/O — validate here in
         // step 1 (matching L22) so `--timeout-per-probe 0` / an over-the-ceiling value fails fast, not after the
@@ -493,6 +558,18 @@ internal static class RedTeamCommand
                 Console.Error.WriteLine(hasSupplyChain
                     ? "  SupplyChain: live package registry (PyPI/npm/NuGet) enabled — a registry outage under-detects rather than false-flagging."
                     : "  Warning: --package-registry live has no effect — the SupplyChain attack is not in the selected --attacks set.");
+        }
+
+        if (transformers is not null)
+        {
+            attacks = ApplyTransforms(attacks ?? Attack.All, transformers, out var unencoded);
+            if (!opts.Quiet)
+            {
+                Console.Error.WriteLine($"  Transforms: {string.Join(", ", transformers.Select(t => t.Name))} — each single-turn probe also runs " +
+                                        $"encoded ({transformers.Count} variant(s) per probe, plus the plaintext control).");
+                if (unencoded.Count > 0)
+                    Console.Error.WriteLine($"  Not encoded (multi-turn / tool-aware / tree): {string.Join(", ", unencoded)}");
+            }
         }
 
         // 4. Resolve intensity
@@ -944,6 +1021,7 @@ internal sealed class RedTeamOptions
     }
     public string? SystemPromptCanary { get; init; }
     public string? Attacks { get; init; }
+    public string? Transform { get; init; }
     public FileInfo? ImportProbes { get; init; }
     public string? ImportPromptField { get; init; }
     public string? ImportIdColumn { get; init; }

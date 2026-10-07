@@ -525,6 +525,7 @@ agenteval redteam [--azure] [--endpoint <url>] [--model <name>] [--deployment-na
 | `--sut` | Built-in target instead of an endpoint: `gatekeeper-demo` (the Gatekeeper demo: the configured model behind the gate, or a labelled scripted model when no provider is configured) or `copilot-studio` (a live Microsoft Copilot Studio agent). |
 | `--scripted` | With `--sut gatekeeper-demo`: run the scripted model even when a provider is configured. Deterministic and free; use it for stable CI baselines. A baseline taken on one model is refused against a run on another (exit 3). See [Attack the gate](gatekeeper/attack-the-gate.md). |
 | `--attacks` | Comma-separated attack list; `--pack` imports external benchmark packs. |
+| `--transform` | Also run every single-turn probe encoded: codecs (`base64`, `rot13`, `hex`, …) or a group (`reversible`, `lossy`, `all`). The plaintext probes still run; each codec multiplies the probe count. See [Transform pipeline](redteam.md#transform-pipeline). |
 | `--judge` / `--attacker` | Separate judge/attacker models for LLM-as-judge and attacker-LLM flows. |
 | `--format` / `-o` | Export format and output destination. |
 | `--baseline`, `--save-baseline`, `--fail-on` | Regression gating for CI. |

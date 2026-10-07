@@ -961,7 +961,7 @@ The low-level scanner. **Everything the library can do is reachable from the CLI
 |-------|---------|
 | **Target / auth** | `--endpoint`, `--azure`, `--model`, `--deployment-name`, `--api-key`, `--system-prompt` |
 | **Built-in SUT (`--sut`)** | `--sut gatekeeper-demo\|copilot-studio` — swaps the endpoint/`--azure` path for a self-contained target: `gatekeeper-demo` is the Gatekeeper-gated demo, on the configured provider's model (a scripted, fully compromised model when no provider is configured, labelled as such; `--scripted` forces the scripted model, deterministic and free, for a stable CI baseline — see [Attack the gate](gatekeeper/attack-the-gate.md)); `copilot-studio` red-teams a **live** Microsoft Copilot Studio agent at text-only/`Verbal` fidelity (`--copilotstudio-config <file.json>`, required consent `--i-understand-live-side-effects`, `--max-credits <n>` spend cap) — see [Copilot Studio](copilot-studio.md) for the full guide |
-| **Attacks** | `--attacks` (comma-list; default all 13; opt-in `Crescendo,PAIR,TAP,ToolEscalation`), `--intensity quick\|moderate\|comprehensive`, `--max-probes`, `--fail-fast`, `--import-probes <file.json>` (run an imported seed-prompt dataset alongside the built-ins), `--benign-controls` (also run the benign look-alike corpus and report over-refusal beside the attack success rate, graded by the over-refusal judge; needs `--judge`; see [Over-refusal](#over-refusal-the-second-headline-number)) |
+| **Attacks** | `--attacks` (comma-list; default all 13; opt-in `Crescendo,PAIR,TAP,ToolEscalation`), `--intensity quick\|moderate\|comprehensive`, `--max-probes`, `--fail-fast`, `--transform <codecs>` (also run every single-turn probe encoded; see [Transform pipeline](#transform-pipeline)), `--import-probes <file.json>` (run an imported seed-prompt dataset alongside the built-ins), `--benign-controls` (also run the benign look-alike corpus and report over-refusal beside the attack success rate, graded by the over-refusal judge; needs `--judge`; see [Over-refusal](#over-refusal-the-second-headline-number)) |
 | **Benchmark packs** | `--pack <name\|list>` (download + run an external pack — HarmBench / JailbreakBench / CyberSecEval — alongside the built-ins; `list` shows the catalog), `--accept-license` (required; no data is bundled, datasets carry harmful content) |
 | **Real attack surface** | `--sut-tier text\|function-calling\|instrumented`, `--system-prompt-canary <token>`, `--package-registry none\|live` (LLM03: `live` queries PyPI/npm/NuGet to flag model-invented hallucinated packages) |
 | **Attacker-LLM (multi-turn)** | `--attacker <url>`, `--attacker-model`, `--attacker-api-key`, `--judge <url>`, `--judge-model`, `--judge-api-key` |
@@ -1083,16 +1083,23 @@ The oracles are substring/clause heuristics, and the recurring failure across re
 
 ### Transform pipeline
 
-Multiply any attack's probes through **18 correct-by-construction encoders** (Base64, Hex, ROT13, URL, Atbash, Caesar, reversed, leetspeak, Morse, binary, NATO, homoglyph, zero-width…) — the same obfuscations attackers use to slip a payload past a filter, generated programmatically so the encoding is never mistyped.
+Multiply any attack's probes through **18 correct-by-construction encoders**: 16 that decode exactly (`base64`, `base32`, `hex`, `url`, `rot13`, `caesar`, `atbash`, `reversed`, `xor`, `binary`, `octal`, `ascii_decimal`, `html_entities`, `html_hex_entities`, `unicode_escapes`, `fullwidth`) and 2 lossy ones (`morse`, `leetspeak`). These are the obfuscations attackers use to slip a payload past a filter, generated programmatically so the encoding is never mistyped.
+
+From the CLI, `--transform` takes codec names or a group (`reversible`, `lossy`, `all`) and applies them to every single-turn attack in the run. The plaintext probes still run as the control, and each codec adds one encoded variant per probe, so the probe count (and any judge cost) multiplies. Multi-turn, tool-aware and tree attacks run unencoded, and the run says which:
+
+```bash
+agenteval redteam --azure --attacks PromptInjection,Jailbreak --transform base64,rot13,hex
+```
 
 ```csharp
 var result = await AttackPipeline.Create()
     .WithAttack(Attack.PromptInjection)
-    .WithTransform(new Base64Transformer(), new Rot13Transformer(), new HexTransformer())
+    .WithTransform(keepOriginal: true, new Base64Transformer(), new Rot13Transformer(), new HexTransformer())
     .WithIntensity(Intensity.Quick)
     .ScanAsync(agent);
-// Each base probe → 1 original + N encoded variants. Transforms carry provenance and a round-trip
-// winnability guard so a lossy codec can't silently produce an unwinnable (always-Resisted) probe.
+// Each base probe → 1 original + 3 encoded variants (without keepOriginal: true the originals are dropped).
+// Transforms carry provenance and a round-trip winnability guard so a lossy codec can't silently
+// produce an unwinnable (always-Resisted) probe.
 ```
 
 `EncodingEvasion` (LLM01) is the built-in attack that ships a curated encoded set; the transform pipeline applies the same codecs to *any* attack. Transforms are deterministic — safe for baselines.
