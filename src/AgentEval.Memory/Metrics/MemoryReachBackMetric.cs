@@ -36,7 +36,8 @@ public class MemoryReachBackMetric : IMemoryMetric
             var memoryResult = context.GetProperty<MemoryEvaluationResult>(MemoryEvaluationContextExtensions.MemoryResultKey);
             if (memoryResult == null)
             {
-                return Task.FromResult(MetricResult.Fail(Name, "MemoryEvaluationResult not found in evaluation context."));
+                return Task.FromResult(MetricResult.NotMeasured(Name,
+                    "MemoryEvaluationResult not found in evaluation context, and this metric reads it: not measured."));
             }
 
             // Check if this was a reach-back evaluation
@@ -62,7 +63,8 @@ public class MemoryReachBackMetric : IMemoryMetric
 
         if (queryResults.Length == 0)
         {
-            return Task.FromResult(MetricResult.Pass(Name, 0, "No queries to analyze for reach-back capability"));
+            return Task.FromResult(MetricResult.NotMeasured(Name,
+                "The scenario asked no questions, so reach-back capability was not tested: not measured."));
         }
 
         // Simple heuristic: if agent can answer multiple queries about established facts,
@@ -71,7 +73,7 @@ public class MemoryReachBackMetric : IMemoryMetric
         var measured = queryResults.Where(r => r.Measured).ToArray();
         if (measured.Length == 0)
         {
-            return Task.FromResult(MetricResult.Fail(Name,
+            return Task.FromResult(MetricResult.NotMeasured(Name,
                 "Not measured: the judge produced no score for any query."));
         }
         var successfulReachBack = measured.Count(r => r.Passed);

@@ -46,6 +46,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   consensus. A not-measured judge is now left out of the vote, like a timed-out one. When too few judges measured
   because the input lacked something, the result is not measured (`CalibratedResult.Measured` is false,
   `NotMeasuredReason` carries the metric's reason) instead of a score or an exception.
+- **Memory metrics report not measured instead of failing at 0 or passing.** All five code-computed memory
+  metrics (`code_memory_retention`, reach-back, noise resilience, temporal, reducer fidelity) failed at 0 when
+  the context carried no `MemoryEvaluationResult`, and three failed at 0 with an explanation that already said
+  "Not measured" when the judge scored no query. They now return `MetricResult.NotMeasured`. Two passed with
+  nothing measured and now report not measured too: reach-back on a scenario with no questions (passed at 0)
+  and reducer fidelity on a scenario with no expected facts (passed at 100). The temporal metric gained the
+  "judge scored no query" check it was missing. An exception during evaluation is still a failure.
 
 ## [0.43.0-beta] - 2026-10-06
 

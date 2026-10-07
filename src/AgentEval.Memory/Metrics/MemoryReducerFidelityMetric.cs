@@ -36,7 +36,8 @@ public class MemoryReducerFidelityMetric : IMemoryMetric
             var memoryResult = context.GetProperty<MemoryEvaluationResult>(MemoryEvaluationContextExtensions.MemoryResultKey);
             if (memoryResult == null)
             {
-                return Task.FromResult(MetricResult.Fail(Name, "MemoryEvaluationResult not found in evaluation context."));
+                return Task.FromResult(MetricResult.NotMeasured(Name,
+                    "MemoryEvaluationResult not found in evaluation context, and this metric reads it: not measured."));
             }
 
             // Check if this was a reducer fidelity test
@@ -62,7 +63,8 @@ public class MemoryReducerFidelityMetric : IMemoryMetric
 
         if (totalExpectedFacts == 0)
         {
-            return Task.FromResult(MetricResult.Pass(Name, 100, "No facts to evaluate for reduction fidelity"));
+            return Task.FromResult(MetricResult.NotMeasured(Name,
+                "The scenario expected no facts, so reduction fidelity was not tested: not measured."));
         }
 
         var preservationRate = (double)memoryResult.FoundFacts.Count / totalExpectedFacts * 100;

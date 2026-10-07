@@ -36,12 +36,13 @@ public class MemoryNoiseResilienceMetric : IMemoryMetric
             var memoryResult = context.GetProperty<MemoryEvaluationResult>(MemoryEvaluationContextExtensions.MemoryResultKey);
             if (memoryResult == null)
             {
-                return Task.FromResult(MetricResult.Fail(Name, "MemoryEvaluationResult not found in evaluation context."));
+                return Task.FromResult(MetricResult.NotMeasured(Name,
+                    "MemoryEvaluationResult not found in evaluation context, and this metric reads it: not measured."));
             }
 
             if (!memoryResult.IsMeasured)
             {
-                return Task.FromResult(MetricResult.Fail(Name,
+                return Task.FromResult(MetricResult.NotMeasured(Name,
                     "Not measured: the judge produced no score for any query."));
             }
 

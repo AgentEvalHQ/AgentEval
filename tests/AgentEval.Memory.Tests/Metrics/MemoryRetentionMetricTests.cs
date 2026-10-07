@@ -41,12 +41,13 @@ public class MemoryRetentionMetricTests
     }
 
     [Fact]
-    public async Task EvaluateAsync_WithoutMemoryResult_ReturnsFailWithNotFound()
+    public async Task EvaluateAsync_WithoutMemoryResult_IsNotMeasured()
     {
         var context = new EvaluationContext { Input = "test", Output = "test" };
 
         var metricResult = await _metric.EvaluateAsync(context);
 
+        Assert.False(metricResult.Measured);
         Assert.False(metricResult.Passed);
         Assert.Contains("not found", metricResult.Explanation, StringComparison.OrdinalIgnoreCase);
     }
