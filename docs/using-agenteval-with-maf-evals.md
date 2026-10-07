@@ -10,7 +10,7 @@
 `Microsoft.Agents.AI` (.NET). MAF's Python evaluation story is out of scope.
 
 A runnable end-to-end reference lives in
-[`samples/AgentEval.MafEvalLightPath`](../samples/AgentEval.MafEvalLightPath).
+[`samples/AgentEval.MafEvalLightPath`](https://github.com/AgentEvalHQ/AgentEval/tree/main/samples/AgentEval.MafEvalLightPath).
 
 ---
 

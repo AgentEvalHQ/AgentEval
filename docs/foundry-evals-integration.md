@@ -68,7 +68,7 @@ EvalResult tree = await benchmark.EvaluateAsync(new EvalInput(query, response));
 |--------|-----------|
 | `AgentEval.Samples` → Benchmarks → **Foundry Hybrid** | Alongside (batched) |
 | `AgentEval.Samples` → Benchmarks → **Foundry Hierarchy** | Inside (weighted leaves) |
-| [`samples/AgentEval.MafEvalFoundryAlongsideLocal`](../samples/AgentEval.MafEvalFoundryAlongsideLocal) | Alongside, standalone end-to-end |
+| [`samples/AgentEval.MafEvalFoundryAlongsideLocal`](https://github.com/AgentEvalHQ/AgentEval/tree/main/samples/AgentEval.MafEvalFoundryAlongsideLocal) | Alongside, standalone end-to-end |
 
 Set `FOUNDRY_PROJECT_ENDPOINT` (+ Azure credentials) to include the Foundry branch; without it the samples run
 AgentEval-local-only and say so.

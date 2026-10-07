@@ -19,7 +19,7 @@
 
 ## Quick Start
 
-> **Access path.** The GDPR benchmark runs through the `agenteval` CLI binaries and is also available programmatically via NuGet (`using AgentEval.Compliance.Gdpr;`) — see [NuGet samples](../../samples/) for end-to-end consumer tests.
+> **Access path.** The GDPR benchmark runs through the `agenteval` CLI binaries and is also available programmatically via NuGet (`using AgentEval.Compliance.Gdpr;`) — see the [GDPR benchmark sample](../../../samples/AgentEval.Samples/Benchmarks/04_GdprBenchmark.cs) for an end-to-end example.
 
 > **Real judging needs a configured inference provider**: the one `AI_INFERENCE_PROVIDER` selects — Azure OpenAI, Bitdeer, OpenAI, Azure AI Foundry or any OpenAI-compatible host; see the [provider table](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to) for the variables each needs — or a judge-only Azure OpenAI endpoint set with all three `AZURE_OPENAI_JUDGE_*` variables, which wins when present. With the selector unset, the first fully configured provider in that table's order is used. If no provider is configured, or a selected provider is missing variables, the CLI refuses to run (exit code **3** — see [Exit codes](../../cli.md#exit-codes)). See [CLI Reference — Environment variables](../../cli.md#environment-variables) for the full contract.
 

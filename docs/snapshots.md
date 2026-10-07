@@ -450,7 +450,7 @@ public async Task Response_Format_MatchesSnapshot(string format)
 
 - [Conversations](conversations.md) — Multi-turn conversation evaluation
 - [Evaluation Guide](evaluation-guide.md) — Strategies including snapshot regression testing
-- [Sample 07](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Sample07_SnapshotTesting.cs) — Runnable snapshot testing example
+- [Sample 07](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/DataAndInfrastructure/01_SnapshotTesting.cs) — Runnable snapshot testing example
 
 ---
 

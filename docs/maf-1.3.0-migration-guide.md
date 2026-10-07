@@ -86,7 +86,7 @@ Or manually:
 2. Copy the raw content
 3. Save to `.github/skills/dotnet-inspect/SKILL.md` in your repository
 
-> **This repository** already has the skill installed at [`.github/skills/dotnet-inspect/SKILL.md`](../.github/skills/dotnet-inspect/SKILL.md) (version 0.7.6).
+> **This repository** already has the skill installed at [`.github/skills/dotnet-inspect/SKILL.md`](https://github.com/AgentEvalHQ/AgentEval/blob/main/.github/skills/dotnet-inspect/SKILL.md) (version 0.7.6).
 
 #### Installing the `dotnet-inspect` CLI Tool
 
@@ -905,7 +905,6 @@ AIAgent agent = chatClient.AsAIAgent(new ChatClientAgentOptions
 ```csharp
 var provider = agent.GetService<InMemoryChatHistoryProvider>();
 List<ChatMessage>? messages = provider?.GetMessages(session);
-```
 ```
 
 ---

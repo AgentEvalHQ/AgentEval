@@ -353,4 +353,4 @@ Assert.True(newDuration <= oldDuration * 1.1,
 
 ---
 
-See [Sample 13](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Sample13_TraceRecordReplay.cs) for runnable examples of single-agent, multi-turn, workflow, and streaming traces.
+See [Sample 13](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/DataAndInfrastructure/03_TraceRecordReplay.cs) for runnable examples of single-agent, multi-turn, workflow, and streaming traces.

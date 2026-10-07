@@ -19,7 +19,7 @@ AgentEval's Red Team module provides **automated security evaluation** for AI ag
 | **LLM03 live registry** | `--package-registry live` flags model-invented packages (PyPI/npm/NuGet) | [CLI reference](#agenteval-redteam--cli-reference) |
 | **LLM08 real RAG boundary** | `VectorEmbedding` poisons via a real `retrieve_context` tool | [Attack Types](#attack-types) |
 | **z-score calibration** | rank a model vs a peer cohort (`--calibration`) | [Relative scoring](#relative-scoring--calibration---calibration) |
-| **Explainable findings** | `--explain` attaches an LLM rationale narrating the verdict | [Explainable findings](#explainable-findings) |
+| **Explainable findings** | `--explain` attaches an LLM rationale narrating the verdict | [Explainable findings](#explainable-findings---explain) |
 | **Dataset import + packs** | `--import-probes` / `--pack` (HarmBench/JailbreakBench/CyberSecEval) | [Benchmark packs walkthrough](#benchmark-packs---pack--install--run-walkthrough) |
 | **Compliance** | OWASP, MITRE, SOC 2, ISO 27001, NIST AI RMF reporters; OWASP / MITRE / NIST also via `bench owasp\|mitre\|nist` (SOC 2 and ISO 27001: library API only) | [Compliance Reports](#compliance-reports) |
 | **CI/CD** | SARIF + JUnit export, baseline regression gate, honest exit codes | [CI/CD Integration](#cicd-integration) |

@@ -36,7 +36,7 @@ A mock run prints `🎭 MOCK MODE (--mock): the agent returns canned replies. No
 Every pass/fail line ends with `(MOCK: a canned reply, not a measurement)`.
 Through 0.42 these samples switched to canned replies by themselves when no provider was set, and printed ✅ passes.
 
-**Without credentials:** the Getting Started samples stop and say what to set, unless you pass `--mock`. Other samples that need a model stop too. Some samples run offline by design, such as Dataset Loaders and Extensibility (group F) and H1 Registry Discovery; the [samples README](../samples/AgentEval.Samples/README.md) lists each sample's requirement.
+**Without credentials:** the Getting Started samples stop and say what to set, unless you pass `--mock`. Other samples that need a model stop too. Some samples run offline by design, such as Dataset Loaders and Extensibility (group F) and H1 Registry Discovery; the [samples README](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/README.md) lists each sample's requirement.
 
 ### Required Environment Variables
 
@@ -64,7 +64,7 @@ OpenAI, Azure AI Foundry or any OpenAI-compatible endpoint. Leaving the selector
 Azure behaviour above exactly as it is. See
 [CLI Reference → Environment variables](cli.md#environment-variables) for each provider's variables.
 The samples read the same selector (`bitdeer` | `openai` | `foundry` | `azure` | `openai-compatible`), or take
-`--provider <name>` for one run; see [Choosing a provider](../samples/AgentEval.Samples/README.md#choosing-a-provider).
+`--provider <name>` for one run; see [Choosing a provider](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/README.md#choosing-a-provider).
 
 ### Running Without Credentials (`--mock`)
 

@@ -241,7 +241,7 @@ Any provider that speaks `IChatClient` gets the full AgentEval evaluation suite 
 
 ## See Also
 
-- [Sample 27: Cross-Framework Evaluation](../samples/AgentEval.Samples/Sample27_CrossFrameworkEvaluation.cs) — Universal IChatClient adapter demo
+- [Sample 27: Cross-Framework Evaluation](../samples/AgentEval.Samples/DataAndInfrastructure/07_CrossFrameworkEvaluation.cs) — Universal IChatClient adapter demo
 - [NuGet Consumer SK Demo](../samples/AgentEval.NuGetConsumer/SemanticKernelDemo.cs) — Real Semantic Kernel integration
 - [CLI Reference](cli.md) — Terminal-based evaluation for any provider
 - [Model Comparison](model-comparison.md) — Compare models across providers

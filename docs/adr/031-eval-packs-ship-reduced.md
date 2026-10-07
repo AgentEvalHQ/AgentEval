@@ -1453,7 +1453,7 @@ Note also that **11 already means "nothing was measured"** — the same concept 
 
 ## §9. PORTABILITY LIMITS — stated plainly
 
-> ⚠️ **SUPERSEDED 2026-09-05 by [§0.3](#03-portability--the-recordtemplate-split).** This section's
+> ⚠️ **SUPERSEDED 2026-09-05 by [§0.3](#03-portability--the-record--template-split).** This section's
 > claim that a pack is portable "as an executable suite to any machine that has (a) the eval assembly
 > and (b) the host project" is the specific sentence the worked example refuted: **there is no eval
 > assembly** (0 of 9 evals implement `IEval`), and the pack cannot express this suite even inside this
