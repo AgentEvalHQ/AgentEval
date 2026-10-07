@@ -112,12 +112,18 @@ public static class ModelPricing
     private static readonly ConcurrentDictionary<string, (decimal InputPer1K, decimal OutputPer1K)> _pricing = 
         new(StringComparer.OrdinalIgnoreCase)
     {
-        // OpenAI models (GPT family)
-        ["gpt-5.5"] = (0.005m, 0.03m),        // $5 / $30 per 1M tokens (2026-08)
-        ["gpt-5"] = (0.005m, 0.02m),          // GPT-5 (estimated pricing)
-        ["gpt-5-chat"] = (0.005m, 0.02m),     // GPT-5 chat variant
-        ["gpt-5-mini"] = (0.0001m, 0.0004m),  // GPT-5 mini (placeholder)
-        ["gpt-4o"] = (0.005m, 0.015m),
+        // OpenAI standard-tier list prices, checked against developers.openai.com/api/docs/pricing on 2026-10-07.
+        // Rows the page no longer lists keep their last known value and say so. JudgeCostMap carries the same
+        // prices for the models both tables know (ModelPricingConsistencyTests).
+        ["gpt-5.5"] = (0.005m, 0.03m),        // $5 / $30 per 1M
+        ["gpt-5"] = (0.00125m, 0.01m),        // $1.25 / $10 per 1M
+        ["gpt-5-chat"] = (0.005m, 0.02m),     // not on OpenAI's page (2026-10-07); last known value
+        ["gpt-5-mini"] = (0.00025m, 0.002m),  // $0.25 / $2 per 1M
+        ["gpt-5-nano"] = (0.00005m, 0.0004m), // $0.05 / $0.40 per 1M
+        ["gpt-4.1"] = (0.002m, 0.008m),
+        ["gpt-4.1-mini"] = (0.0004m, 0.0016m),
+        ["gpt-4.1-nano"] = (0.0001m, 0.0004m),
+        ["gpt-4o"] = (0.0025m, 0.01m),        // $2.50 / $10 per 1M
         ["gpt-4o-2024-11-20"] = (0.0025m, 0.01m),
         ["gpt-4o-mini"] = (0.00015m, 0.0006m),
         ["gpt-4o-mini-2024-07-18"] = (0.00015m, 0.0006m),
@@ -132,17 +138,18 @@ public static class ModelPricing
         ["o1"] = (0.015m, 0.06m),
         ["o1-preview"] = (0.015m, 0.06m),
         ["o1-mini"] = (0.003m, 0.012m),
-        ["o3-mini"] = (0.00165m, 0.0066m),
+        ["o3-mini"] = (0.0011m, 0.0044m),     // $1.10 / $4.40 per 1M
         
         // OpenAI embedding models
         ["text-embedding-3-small"] = (0.00002m, 0m),  // Embedding models have no output cost
         ["text-embedding-3-large"] = (0.00013m, 0m),
         ["text-embedding-ada-002"] = (0.0001m, 0m),
         
-        // Anthropic Claude models
+        // Anthropic Claude models. Haiku 3.5 checked against platform.claude.com pricing on 2026-10-07 ($0.80 / $4,
+        // retired except on Bedrock and Google Cloud); the other rows are retired models no longer listed there.
         ["claude-3-5-sonnet"] = (0.003m, 0.015m),
         ["claude-3-5-sonnet-20241022"] = (0.003m, 0.015m),
-        ["claude-3-5-haiku"] = (0.00025m, 0.00125m),
+        ["claude-3-5-haiku"] = (0.0008m, 0.004m),
         ["claude-3-opus"] = (0.015m, 0.075m),
         ["claude-3-sonnet"] = (0.003m, 0.015m),
         ["claude-3-haiku"] = (0.00025m, 0.00125m),
@@ -178,12 +185,12 @@ public static class ModelPricing
         ["command-light"] = (0.0003m, 0.0006m),
         
         // Azure OpenAI Service (same pricing as OpenAI but with different deployment names)
-        ["gpt-4o-deployment"] = (0.005m, 0.015m),  // Common Azure deployment name
+        ["gpt-4o-deployment"] = (0.0025m, 0.01m),  // Common Azure deployment name
         ["gpt-4o-mini-deployment"] = (0.00015m, 0.0006m),
         ["gpt-35-turbo"] = (0.0005m, 0.0015m),     // Azure naming convention
         
         // GitHub Models (GitHub-hosted versions)
-        ["gpt-4o-github"] = (0.005m, 0.015m),  // GitHub Models naming
+        ["gpt-4o-github"] = (0.0025m, 0.01m),  // GitHub Models naming
         ["claude-3-5-sonnet-github"] = (0.003m, 0.015m),
     };
     

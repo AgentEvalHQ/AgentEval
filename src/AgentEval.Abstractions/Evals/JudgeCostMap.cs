@@ -41,9 +41,10 @@ public static class JudgeCostMap
 
     private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, ModelRate> s_rates = new(StringComparer.OrdinalIgnoreCase)
     {
-        // OpenAI / Azure OpenAI list prices snapshot (2026-05). These are intentionally
-        // conservative defaults; downstream consumers should Register(...) more precise
-        // rates if they hit a different list price or volume discount.
+        // OpenAI / Azure OpenAI standard-tier list prices, checked against developers.openai.com/api/docs/pricing
+        // on 2026-10-07 (rows the page no longer lists keep their last known value). ModelPricing carries the same
+        // prices for the models both tables know (ModelPricingConsistencyTests). Consumers should Register(...)
+        // their own rates for a different list price or a volume discount.
         ["gpt-4o"]                   = new(0.00250, 0.01000),
         ["gpt-4o-mini"]              = new(0.00015, 0.00060),
         ["gpt-4.1"]                  = new(0.00200, 0.00800),
@@ -52,9 +53,12 @@ public static class JudgeCostMap
         ["gpt-4-turbo"]              = new(0.01000, 0.03000),
         ["gpt-4"]                    = new(0.03000, 0.06000),
         ["gpt-3.5-turbo"]            = new(0.00050, 0.00150),
-        ["gpt-5"]                    = new(0.00500, 0.02000),
+        // "gpt-5.5" must stay listed: without it a gpt-5.5 judge substring-matches "gpt-5" at a quarter of its price.
+        ["gpt-5.5"]                  = new(0.00500, 0.03000),
+        ["gpt-5"]                    = new(0.00125, 0.01000),
         ["gpt-5-chat"]               = new(0.00500, 0.02000),
-        ["gpt-5-mini"]               = new(0.00030, 0.00120),
+        ["gpt-5-mini"]               = new(0.00025, 0.00200),
+        ["gpt-5-nano"]               = new(0.00005, 0.00040),
         // TypeSafe Jev (decision model, ADR-033). OpenRouter's published list price for
         // typesafe/jev-1.13 on 2026-09-20: $0.042 per 1M input tokens, output free. Used only when
         // the provider does not report a cost itself — OpenRouter does (usage.cost), and that wins.
@@ -62,7 +66,7 @@ public static class JudgeCostMap
         ["jev"]                      = new(0.000042, 0.0),
         ["o1-preview"]               = new(0.01500, 0.06000),
         ["o1-mini"]                  = new(0.00300, 0.01200),
-        ["o3-mini"]                  = new(0.00100, 0.00400),
+        ["o3-mini"]                  = new(0.00110, 0.00440),
         // Anthropic Claude (Bedrock / direct) — used by some calibration harnesses
         ["claude-3-5-sonnet"]        = new(0.00300, 0.01500),
         ["claude-3-5-haiku"]         = new(0.00080, 0.00400),
@@ -94,6 +98,8 @@ public static class JudgeCostMap
             ? rate
             : new ModelRate(DefaultInputRatePer1K, DefaultOutputRatePer1K);
     }
+
+    internal static IEnumerable<KeyValuePair<string, ModelRate>> Rates => s_rates;
 
     /// <summary>
     /// Returns <c>true</c> when <paramref name="judgeModel"/> has an explicit registration

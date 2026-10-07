@@ -51,6 +51,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   them must acknowledge the preview: `<NoWarn>$(NoWarn);AGENTEVAL_DECISIONS_PREVIEW001</NoWarn>` or a `#pragma`.
 
 ### Fixed
+- **One set of model prices, dated.** `ModelPricing` (run cost) and `JudgeCostMap` (judge cost) disagreed, so a model
+  cost different amounts depending on the report. Both now carry OpenAI's and Anthropic's published standard-tier prices
+  as checked on 2026-10-07, and a test fails when a model both tables know is priced differently. Estimates change for:
+  `gpt-4o` $2.50 / $10 per 1M (was the 2024 $5 / $15 in `ModelPricing`), `gpt-5` $1.25 / $10 (was $5 / $20 in both),
+  `gpt-5-mini` $0.25 / $2 (was a placeholder), `o3-mini` $1.10 / $4.40, `claude-3-5-haiku` $0.80 / $4 (`ModelPricing`
+  had Claude 3 Haiku's price). Added `gpt-5-nano`, the `gpt-4.1` family to `ModelPricing`, and `gpt-5.5` to
+  `JudgeCostMap`, where a gpt-5.5 judge otherwise matched `gpt-5` and, after this fix, would have read a quarter of its cost.
 - **`CalibratedJudge` no longer votes a not-measured judge in as 0.** A metric that lacks an input (Faithfulness
   without a retrieved context, for example) returns not measured with a placeholder score of 0; the calibrated
   judge averaged that 0 in, so three judges on Faithfulness without context reported score 0, 100 % agreement and
