@@ -176,7 +176,7 @@ public static class ThresholdCalibration
             throw new ArgumentOutOfRangeException(nameof(heldOutFraction), heldOutFraction,
                 "The held-out fraction must be greater than 0 and less than 1.");
 
-        var random = new Random(seed);
+        var random = new Random(seed); // DevSkim: ignore DS148264 — a seeded split must be reproducible; nothing secret
         var training = new List<ScoredCase>();
         var heldOut = new List<ScoredCase>();
         foreach (var label in new[] { true, false })
