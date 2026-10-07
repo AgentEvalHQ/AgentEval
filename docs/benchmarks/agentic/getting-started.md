@@ -189,10 +189,11 @@ QUESTION="Book me a flight to Lisbon next Friday and a hotel near the old town."
 # Run the Agentic Execution preset (task completion, adherence, intent, tool accuracy, navigation)
 agenteval bench agentic --preset agentic-execution --subject MyTravelAgent --input "$QUESTION" --response-file answer.txt
 
-# Run the RAG Quality preset (from the CLI it cannot pass: there is no option yet for a reference answer or retrieved
-# context, so similarity and F1 are not measured (WARN at best), and it FAILs when groundedness (graded without a
-# context), response completeness (without a reference) or relevance fails; use the library or the MAF bridge to pass them)
-agenteval bench agentic --preset rag-quality --subject MyTravelAgent --input "$QUESTION" --response-file answer.txt
+# Run the RAG Quality preset. Groundedness grades against the retrieved context (--context/--context-file);
+# similarity, F1 and response completeness grade against the reference answer (--reference/--reference-file).
+# Without them those checks report "not measured" and the preset cannot pass.
+agenteval bench agentic --preset rag-quality --subject MyTravelAgent --input "$QUESTION" --response-file answer.txt \
+  --reference-file expected.txt --context-file retrieved.txt
 
 # Run the Judge Quality preset (no LLM required)
 agenteval bench agentic --preset judge-quality --subject MyTravelAgent --input "$QUESTION" --response-file answer.txt

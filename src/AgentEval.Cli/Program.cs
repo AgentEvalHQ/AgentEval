@@ -47,18 +47,21 @@ migrateCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 
 // Resolves the agent response to grade for compliance benchmarks from --response / --response-file
 // (BUG-18). Returns Error=true (after printing) if --response-file is given but missing.
-static async Task<(bool Error, string? Text)> ResolveBenchResponseAsync(string? response, string? responseFile, CancellationToken ct)
+static Task<(bool Error, string? Text)> ResolveBenchResponseAsync(string? response, string? responseFile, CancellationToken ct) =>
+    ResolveTextOrFileAsync(response, responseFile, "--response-file", ct);
+
+static async Task<(bool Error, string? Text)> ResolveTextOrFileAsync(string? text, string? file, string fileOption, CancellationToken ct)
 {
-    if (!string.IsNullOrWhiteSpace(response))
-        return (false, response);
-    if (!string.IsNullOrWhiteSpace(responseFile))
+    if (!string.IsNullOrWhiteSpace(text))
+        return (false, text);
+    if (!string.IsNullOrWhiteSpace(file))
     {
-        if (!File.Exists(responseFile))
+        if (!File.Exists(file))
         {
-            Console.Error.WriteLine($"Error: --response-file not found: {responseFile}");
+            Console.Error.WriteLine($"Error: {fileOption} not found: {file}");
             return (true, null);
         }
-        return (false, await File.ReadAllTextAsync(responseFile, ct));
+        return (false, await File.ReadAllTextAsync(file, ct));
     }
     return (false, null);
 }
@@ -275,6 +278,10 @@ var benchAgenticSutOpt = MockTarget.MockOnlySutOption();
 var benchAgenticResponseFileOpt = new Option<string?>("--response-file") { Description = "Path to a file containing the agent's actual response to grade (alternative to --response, for multi-line output)." };
 var benchAgenticBudgetTierOpt = new Option<string?>("--budget-tier") { Description = "Budget tier filter: trivial | low | medium | high | all (default: all). Components with a cost tier above the budget are filtered out and remaining weights are renormalized. Use 'low' or 'medium' for fast feedback loops; 'all' for full audit runs." };
 var benchAgenticTraceOpt = new Option<string?>("--trace") { Description = "Path to a captured Glass Box trace (JSON). Attaches the dual-boundary trace to the evaluation so trace-aware evaluators (e.g. the glass-box-diagnostics preset) read real chat/tool-boundary data instead of skipping." };
+var benchAgenticReferenceOpt = new Option<string?>("--reference") { Description = "The reference (expected) answer. Similarity, F1 and completeness grade against it (rag-quality); without one they report not measured." };
+var benchAgenticReferenceFileOpt = new Option<string?>("--reference-file") { Description = "Path to a file containing the reference answer (alternative to --reference)." };
+var benchAgenticContextOpt = new Option<string?>("--context") { Description = "The retrieved context the answer should be grounded in. Groundedness grades against it (rag-quality); without one it reports not measured." };
+var benchAgenticContextFileOpt = new Option<string?>("--context-file") { Description = "Path to a file containing the retrieved context (alternative to --context)." };
 var benchAgenticCmd = new Command("agentic", "Run the agentic behavior benchmark on an answer the agent gave (--response/--response-file with its --input) or a captured run (--trace). Without one it refuses; --sut mock grades a canned answer that measures nothing and is not stored.");
 benchAgenticCmd.Add(benchAgenticPresetOpt);
 benchAgenticCmd.Add(benchAgenticSubjectOpt);
@@ -284,6 +291,10 @@ benchAgenticCmd.Add(benchAgenticResponseOpt);
 benchAgenticCmd.Add(benchAgenticResponseFileOpt);
 benchAgenticCmd.Add(benchAgenticBudgetTierOpt);
 benchAgenticCmd.Add(benchAgenticTraceOpt);
+benchAgenticCmd.Add(benchAgenticReferenceOpt);
+benchAgenticCmd.Add(benchAgenticReferenceFileOpt);
+benchAgenticCmd.Add(benchAgenticContextOpt);
+benchAgenticCmd.Add(benchAgenticContextFileOpt);
 benchAgenticCmd.Add(benchAgenticSutOpt);
 benchAgenticCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
@@ -298,6 +309,10 @@ benchAgenticCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) 
     var input = parseResult.GetValue(benchAgenticInputOpt);
     var response = await ResolveBenchResponseAsync(parseResult.GetValue(benchAgenticResponseOpt), parseResult.GetValue(benchAgenticResponseFileOpt), ct);
     if (response.Error) return AgentEval.Cli.ExitCodes.UsageError;
+    var reference = await ResolveTextOrFileAsync(parseResult.GetValue(benchAgenticReferenceOpt), parseResult.GetValue(benchAgenticReferenceFileOpt), "--reference-file", ct);
+    if (reference.Error) return AgentEval.Cli.ExitCodes.UsageError;
+    var context = await ResolveTextOrFileAsync(parseResult.GetValue(benchAgenticContextOpt), parseResult.GetValue(benchAgenticContextFileOpt), "--context-file", ct);
+    if (context.Error) return AgentEval.Cli.ExitCodes.UsageError;
     var budgetTier = parseResult.GetValue(benchAgenticBudgetTierOpt);
     var traceFile = parseResult.GetValue(benchAgenticTraceOpt);
     var (mock, otherSut, mockError) = MockTarget.Parse(parseResult.GetValue(benchAgenticSutOpt), anotherTargetNamed: response.Text is not null);
@@ -310,7 +325,8 @@ benchAgenticCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) 
         Console.Error.WriteLine($"Error: {mockError}");
         return AgentEval.Cli.ExitCodes.UsageError;
     }
-    return await BenchAgenticCommand.RunAsync(preset, subject, root, input, response.Text, evaluatorOverride: null, budgetTier, traceFile, mock, ct);
+    return await BenchAgenticCommand.RunAsync(preset, subject, root, input, response.Text, evaluatorOverride: null, budgetTier, traceFile, mock,
+        reference: reference.Text, context: context.Text, ct: ct);
 });
 // bench agentic calibrate
 var agenticCalibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };

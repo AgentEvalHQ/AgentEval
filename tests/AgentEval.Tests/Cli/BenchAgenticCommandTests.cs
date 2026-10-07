@@ -225,6 +225,63 @@ public class BenchAgenticCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task BenchAgentic_RagQuality_WithoutAReferenceOrContext_CannotPass()
+    {
+        // Groundedness needs the retrieved context; similarity, F1 and completeness need the reference. Through 0.43
+        // the CLI had no way to supply either, so rag-quality could not pass from the command line however good the answer.
+        InitWorkspace();
+
+        var exit = await BenchAgenticCommand.RunAsync(
+            preset: "rag-quality",
+            subject: "AgenticRagNoInputs",
+            rootOverride: _root,
+            inputText: SuppliedQuestion,
+            responseText: SuppliedAnswer,
+            evaluatorOverride: new PassingStubEvaluator(),
+            budgetTier: null);
+
+        Assert.True(exit is 9 or 10 or 11, $"Expected a non-pass gate verdict; got {exit}.");
+    }
+
+    [Fact]
+    public async Task BenchAgentic_RagQuality_WithAReferenceAndContext_GradesEveryLeaf_AndPasses()
+    {
+        InitWorkspace();
+
+        var exit = await BenchAgenticCommand.RunAsync(
+            preset: "rag-quality",
+            subject: "AgenticRagWithInputs",
+            rootOverride: _root,
+            inputText: SuppliedQuestion,
+            responseText: SuppliedAnswer,
+            evaluatorOverride: new PassingStubEvaluator(),
+            budgetTier: null,
+            reference: SuppliedAnswer,   // F1 is pure code: an identical reference scores 1.0
+            context: "ACME Corp 10-Q: quarterly revenue $4.2B, up 12% year over year.");
+
+        Assert.Equal(0, exit);
+    }
+
+    [Fact]
+    public async Task BenchAgentic_ABlankReferenceOrContext_IsNone()
+    {
+        InitWorkspace();
+
+        var exit = await BenchAgenticCommand.RunAsync(
+            preset: "rag-quality",
+            subject: "AgenticRagBlankInputs",
+            rootOverride: _root,
+            inputText: SuppliedQuestion,
+            responseText: SuppliedAnswer,
+            evaluatorOverride: new PassingStubEvaluator(),
+            budgetTier: null,
+            reference: "   ",
+            context: "");
+
+        Assert.True(exit is 9 or 10 or 11, $"A blank reference/context must not pass; got {exit}.");
+    }
+
+    [Fact]
     public async Task BenchAgentic_NoProvider_ReturnsExitCode3()
     {
         InitWorkspace();

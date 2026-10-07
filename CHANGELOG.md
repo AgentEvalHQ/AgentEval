@@ -28,6 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Known gaps recorded: ASI04 runtime supply-chain vectors, ASI07 inter-agent injection probes, ASI08
   cascade probes, ASI10 rogue-agent probes. Added to docs TOC alongside the ASSERT Interoperability
   spec.
+- **`bench agentic --reference/--reference-file` and `--context/--context-file`.** The reference answer and the
+  retrieved context reach every check as `EvalInput.GroundTruth` / `EvalInput.Context`, so `rag-quality` can pass
+  from the CLI: groundedness grades against the context; similarity, F1 and response completeness against the
+  reference. Through 0.43 the CLI had no way to supply either, and the preset could not pass. A blank value counts as
+  none; a missing file is a usage error (exit 2). When every check in `rag-quality` is skipped, the run's note now
+  names these flags.
 - **Core and Abstractions API snapshots** — `CorePublicApiSnapshotTests` and
   `AbstractionsPublicApiSnapshotTests` freeze the public surface of `AgentEval.Core` and
   `AgentEval.Abstractions` using the same Verify-based pattern as the existing Gatekeeper snapshot.

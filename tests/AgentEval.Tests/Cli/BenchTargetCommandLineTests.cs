@@ -64,6 +64,20 @@ public sealed class BenchTargetCommandLineTests : IDisposable
         Assert.Contains("--sut mock", stderr, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("--reference-file")]
+    [InlineData("--context-file")]
+    public async Task BenchAgentic_AMissingReferenceOrContextFile_IsAUsageError_BeforeAnyJudge(string option)
+    {
+        var missing = Path.Combine(_root, "does-not-exist.txt");
+
+        var (exit, _, stderr) = await CliParseErrorExitCodeTests.RunCliAsync(
+            ["bench", "agentic", "--subject", "A", "--input", "q", "--response", "r", option, missing, "--root", _root]);
+
+        Assert.Equal(ExitCodes.UsageError, exit);
+        Assert.Contains($"{option} not found", stderr, StringComparison.Ordinal);
+    }
+
     public static TheoryData<string[]> NoTargetOutsideBench => new()
     {
         new[] { "redteam" },
