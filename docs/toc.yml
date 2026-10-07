@@ -105,6 +105,8 @@
     href: responsible-ai.md
   - name: ASSERT Interoperability
     href: assert-interop.md
+  - name: OWASP Agentic Top 10 Crosswalk
+    href: owasp-agentic-top10.md
   - name: Memory Evaluation
     href: memory-evaluation.md
   - name: Conversations

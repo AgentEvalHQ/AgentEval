@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is an `IGatekeeperObserver` that emits a span and increments the `agenteval.gatekeeper.findings`
   counter for every actionable finding (Block / Mutate / Redact / Incident). `GateCalibrationHarness`
   emits `AgentEval.Calibration` spans with accuracy, dangerous-error count, and inline-ready tags.
+- **OWASP Agentic Top 10 crosswalk** (`docs/owasp-agentic-top10.md`) — per-category table for
+  ASI01–ASI10 (OWASP "Version 2026", published 2025-12-09): which red-team probes test it, which
+  Gatekeeper gates defend against it at runtime, and an honest coverage verdict (✅ Full / ⚠️ Partial).
+  Known gaps recorded: ASI04 runtime supply-chain vectors, ASI07 inter-agent injection probes, ASI08
+  cascade probes, ASI10 rogue-agent probes. Added to docs TOC alongside the ASSERT Interoperability
+  spec.
 
 ### Changed
 - **`SystemOneClientOptions.TypeSafeDefaultModel`** is now `"jev-1.13.0"` (was `"jev-latest"`). The moving alias
