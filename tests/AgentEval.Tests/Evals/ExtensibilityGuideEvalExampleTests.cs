@@ -1,0 +1,79 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
+
+using AgentEval.Core;
+using AgentEval.Evals;
+using AgentEval.Evals.Meta;
+using Xunit;
+
+namespace AgentEval.Tests.Evals;
+
+/// <summary>
+/// The <c>ResponseLengthEval</c> example that opens docs/extensibility.md, copied here verbatim so the guide's first
+/// example is known to compile and to do what the text says. Change both together.
+/// </summary>
+public class ExtensibilityGuideEvalExampleTests
+{
+    /// <summary>Passes when the response length is within [minLength, maxLength].</summary>
+    public sealed class ResponseLengthEval(int minLength = 50, int maxLength = 500)
+        : AtomicCodeEval("response_length", "Response length", "quality.format", "1.0.0")
+    {
+        protected override EvalResult Evaluate(EvalInput input)
+        {
+            // No response is not a short response: say it was not measured, never score it as a 0 fail.
+            if (input.Response is null)
+            {
+                return EvalResult.Skipped(this, "There is no response to measure.");
+            }
+
+            var length = input.Response.Length;
+            var passed = length >= minLength && length <= maxLength;
+            var score = passed ? 1.0
+                : length < minLength ? (double)length / minLength
+                : Math.Max(0.0, 1.0 - (double)(length - maxLength) / maxLength);
+
+            return Build(score, passed, severity: passed ? "none" : "low",
+                dimensions: new Dictionary<string, double> { ["length"] = length });
+        }
+    }
+
+    [Fact]
+    public async Task AResponseInRange_Passes()
+    {
+        var result = await new ResponseLengthEval().EvaluateAsync(new EvalInput("Summarise the ticket", Response: new string('x', 120)));
+
+        Assert.Equal("pass", result.Score.Label);
+        Assert.Equal(1.0, result.Score.Value);
+        Assert.Equal(120, result.Details.Dimensions!["length"]);
+    }
+
+    [Fact]
+    public async Task AShortResponse_FailsWithAPartialScore()
+    {
+        var result = await new ResponseLengthEval().EvaluateAsync(new EvalInput("q", Response: new string('x', 25)));
+
+        Assert.Equal("fail", result.Score.Label);
+        Assert.Equal(0.5, result.Score.Value);
+        Assert.Equal("low", result.Score.Severity);
+    }
+
+    [Fact]
+    public async Task NoResponse_IsNotMeasured_NotAZeroFail()
+    {
+        var result = await new ResponseLengthEval().EvaluateAsync(new EvalInput("q"));
+
+        Assert.Equal("skipped", result.Score.Label);
+        Assert.False(result.Score.Passed);
+        Assert.Equal("There is no response to measure.", result.Details.Summary);
+    }
+
+    [Fact]
+    public void ItIsAdmittedWithTheFloorTheGuideShows()
+    {
+        var builder = new AgentEvalBuilder()
+            .AddEval(new ResponseLengthEval(), ChanceFloor.NotDerivable("no draw model: any length can be written"));
+
+        Assert.NotNull(builder);
+    }
+}

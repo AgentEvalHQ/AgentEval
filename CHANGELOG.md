@@ -91,6 +91,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ignored.
 
 ### Changed
+- **The extensibility guide starts with `IEval`.** It opened with `IMetric`, the older interface, and mentioned
+  `IEval` (what the benchmarks, composites, calibration and exporters read) only in a note halfway down. It now leads
+  with a custom `AtomicCodeEval`, how to admit it with a chance floor, and how to report "not measured"; `IMetric`
+  follows as the compatibility path. The example is compiled and run by a test.
 - **`--azure-from-env` is now `--from-env`.** The flag builds the target from whichever provider `AI_INFERENCE_PROVIDER`
   selects, not only Azure, and the name said otherwise (0.41 called it a misnomer and kept it). `bench gdpr`,
   `eu-ai-act`, `owasp`, `mitre`, `nist`, `perf` and `log-file replay` take `--from-env`; `--azure-from-env` is kept as an
