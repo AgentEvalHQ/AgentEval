@@ -32,16 +32,26 @@ public class CategoryScoreEntry
     /// <summary>
     /// Multi-run statistics for this category. Not populated by any shipped runner: no AgentEval code
     /// path sets it, so it is <see langword="null"/> on every baseline AgentEval produces, and the
-    /// shipped report does not read it. It exists so a caller that runs the benchmark several times
-    /// can record its own statistics on the baseline.
+    /// shipped report does not read it. Obsolete, and to be removed in a later release.
     /// </summary>
+    [Obsolete(StochasticObsoleteMessage)]
     public StochasticData? Stochastic { get; init; }
+
+    internal const string StochasticObsoleteMessage =
+        "Nothing fills StochasticData: the memory benchmark has no multi-run mode. It will be removed in a later " +
+        "release. For repeated runs of a test case use AgentEval.Comparison.StochasticRunner.";
 }
 
 /// <summary>
 /// Statistical data from running the same benchmark multiple times.
 /// Not populated by any shipped runner; see <see cref="CategoryScoreEntry.Stochastic"/>.
 /// </summary>
+/// <remarks>
+/// The memory benchmark has no multi-run mode, so nothing ever filled this and the report never read it.
+/// Repeated runs of one test case are measured by <c>AgentEval.Comparison.StochasticRunner</c>, whose
+/// <c>StochasticResult</c> carries the pass rate, score distribution and confidence interval.
+/// </remarks>
+[Obsolete(CategoryScoreEntry.StochasticObsoleteMessage)]
 public class StochasticData
 {
     /// <summary>Number of runs performed.</summary>

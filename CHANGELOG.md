@@ -68,6 +68,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   AgentEval will adapt to it, so these three can change shape too; until now nothing told a caller that. Code that uses
   them must acknowledge the preview: `<NoWarn>$(NoWarn);AGENTEVAL_DECISIONS_PREVIEW001</NoWarn>` or a `#pragma`.
 
+### Deprecated
+- **`StochasticData` and `CategoryScoreEntry.Stochastic`** (`AgentEval.Memory`) are `[Obsolete]` and will be removed in a
+  later release. Nothing ever filled them: the memory benchmark has no multi-run mode, and the report never read them.
+  Repeated runs of a test case are measured by `AgentEval.Comparison.StochasticRunner`.
+
 ### Fixed
 - **A tool assertion on a result with no tool data fails with the reason.** When the agent's adapter returns no
   `RawMessages`, or tool tracking is off, `TestResult.ToolUsage` is null and AgentEval cannot see the agent's tool calls.
