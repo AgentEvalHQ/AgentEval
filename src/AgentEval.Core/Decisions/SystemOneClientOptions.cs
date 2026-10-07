@@ -26,11 +26,11 @@ public sealed class SystemOneClientOptions
     public const string OpenRouterEndpoint = "https://openrouter.ai/api/v1/systemone";
 
     /// <summary>
-    /// TypeSafe's documented flagship alias. An alias moves; the <see cref="DecisionResponse.Model"/> the
-    /// provider echoes back is the resolved build and is what provenance records. Pin a versioned id
-    /// (TypeSafe's reference shows the <c>jev-1.13.0</c> form) for a reproducible baseline.
+    /// The pinned Jev release on TypeSafe's own endpoint. Pass <c>"jev-latest"</c> to always resolve
+    /// the current build; the <see cref="DecisionResponse.Model"/> the provider echoes back names the
+    /// resolved build regardless of which id you send, so provenance is accurate in either case.
     /// </summary>
-    public const string TypeSafeDefaultModel = "jev-latest";
+    public const string TypeSafeDefaultModel = "jev-1.13.0";
 
     /// <summary>The pinned Jev release on OpenRouter. <c>~typesafe/jev-latest</c> is the moving alias.</summary>
     public const string OpenRouterDefaultModel = "typesafe/jev-1.13";

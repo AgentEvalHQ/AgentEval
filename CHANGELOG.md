@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **`SystemOneClientOptions.TypeSafeDefaultModel`** is now `"jev-1.13.0"` (was `"jev-latest"`). The moving alias
+  `"jev-latest"` always resolved to `"jev-1.13.0"` and `DecisionResponse.Model` echoes the resolved build, so
+  provenance is unchanged; the default is pinned for reproducibility in line with `OpenRouterDefaultModel`.
+
 ## [0.43.0-beta] - 2026-10-06
 
 One release with four parts, newest first below:
