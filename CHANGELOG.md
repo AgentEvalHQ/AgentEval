@@ -58,6 +58,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of containing it), `self_correction_quality` (its correction turn has room for one message) and
   `plan_formulation_quality` (its only failing case is skipped as having no plan). None of the five has been measured
   against a judge yet. Three pass bands started below their evaluator's threshold and now start at it, as in 0.43.
+- **Golden-trace regression.** `agenteval eval --save-golden <file>` saves a run as a golden trace: each test case's
+  verdict, score, output, and tool calls in order with their arguments. `--golden <file>` compares a later run with it
+  and reports each test case as regressed, improved, tools changed, output changed, unchanged, added or removed. With
+  `--golden` the exit code follows the comparison: `1` only when a test case that passed in the golden trace fails now,
+  so a test that was already failing does not fail the build. `--fail-on-tool-change` also fails on changed tool calls.
+  Output changes are reported but never fail the run, since model output varies. A run with no tool data is not
+  compared on tools. In code: `GoldenTrace.FromResults`, `SaveAsync`/`LoadAsync` and `GoldenTraceComparer.Compare` in
+  `AgentEval.Snapshots` (new public types: `GoldenTrace`, `GoldenTraceCase`, `GoldenToolCall`, `GoldenTraceComparer`,
+  `GoldenTraceComparison`, `TraceCaseComparison`, `TraceChange`).
 - **Core and Abstractions API snapshots** — `CorePublicApiSnapshotTests` and
   `AbstractionsPublicApiSnapshotTests` freeze the public surface of `AgentEval.Core` and
   `AgentEval.Abstractions` using the same Verify-based pattern as the existing Gatekeeper snapshot.

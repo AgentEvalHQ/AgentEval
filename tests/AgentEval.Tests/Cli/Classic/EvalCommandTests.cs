@@ -56,15 +56,16 @@ public class EvalCommandTests
     }
 
     [Fact]
-    public void Create_Has24Options()
+    public void Create_Has27Options()
     {
         // dataset, endpoint, azure, model, deployment-name, api-key, system-prompt, system-prompt-file,
         // temperature, max-tokens, metrics, runs, success-threshold, judge, judge-model,
         // format, output, output-dir, verbose, quiet = 20
         // + Track 2 PR2 (--sut copilot-studio): sut, copilotstudio-config, i-understand-live-side-effects,
         // max-credits = 4 (SutTargetResolver.AddOptionsTo("eval")) => 24
+        // + golden trace: save-golden, golden, fail-on-tool-change => 27
         var command = EvalCommand.Create();
-        Assert.Equal(24, command.Options.Count);
+        Assert.Equal(27, command.Options.Count);
     }
 
     [Theory]

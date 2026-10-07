@@ -241,9 +241,12 @@ LLM-as-judge, named metrics (`--metrics`), and the `--output-dir` ADR-002 direct
 | `--runs <N>` | Runs per test case. Default `1`. Must be at least `1`; greater than `1` is stochastic mode (below), which needs at least 3 runs. |
 | `--success-threshold <0..1>` | Stochastic mode only: the share of a test case's runs that must pass for the test case to pass. Default `0.8`. Not used, and not checked, when `--runs` is `1`. |
 | `--judge` / `--judge-model` | Separate LLM-as-judge endpoint/model. |
-| `--format <fmt>` | Export format. Default `json`. Not written in stochastic mode. |
-| `-o, --output <path>` | Output file for single-file formats. Default: stdout. Not written in stochastic mode. |
-| `--output-dir <path>` | Structured directory output (`results.jsonl`, `summary.json`, `run.json`). Not written in stochastic mode. |
+| `--format <fmt>` | Export format. Default `json`. In stochastic mode, one entry per test case (below). |
+| `-o, --output <path>` | Output file for single-file formats. Default: stdout. |
+| `--output-dir <path>` | Structured directory output (`results.jsonl`, `summary.json`, `run.json`). |
+| `--save-golden <path>` | Save this run as a golden trace: each test case's verdict, output, and tool calls with their arguments, as JSON to commit beside the dataset (below). |
+| `--golden <path>` | Compare this run with a golden trace and exit on regressions only (below). |
+| `--fail-on-tool-change` | With `--golden`, also exit `1` when a test case's tool calls changed. |
 | `--quiet` | Suppress the header, progress, summary, and the `--metrics` and `--sut` warnings. Errors are still printed. |
 
 **Stochastic mode (`--runs` greater than 1)**
@@ -262,6 +265,35 @@ stdout also list each run with its score or error and the confidence interval fo
 `(stochastic, N runs per test)`, and `Mode`, `RunsPerTest` and `SuccessThreshold` are recorded in the JSON export's
 `metadata` and in the directory export's `run.json`. Through 0.43 this mode wrote no export at all. `--metrics` is ignored in this mode, with a warning.
 
+**Golden traces (`--save-golden`, `--golden`)**
+
+A golden trace is a saved run: for each test case, whether it passed, its score, the agent's output, and the tool calls
+it made in order, with their arguments (object keys sorted, so key order is not a change). Save one from a run you
+trust and commit it:
+
+```bash
+agenteval eval --dataset cases.yaml --endpoint <url> --model <name> --save-golden golden/cases.trace.json
+```
+
+Later runs compare against it:
+
+```bash
+agenteval eval --dataset cases.yaml --endpoint <url> --model <name> --golden golden/cases.trace.json
+```
+
+Each test case is reported on stderr as **regressed** (passed in the golden trace, fails now), **improved**, **tools
+changed** (a tool added, dropped or reordered, or called with other arguments), **output changed**, unchanged, **added**
+or **removed**. Test cases are matched by name. Output is compared after trimming and normalising line endings. Model
+output varies from run to run, so an output change is reported and does not fail the run. When either run recorded no
+tool data, tool calls are not compared.
+
+With `--golden` the exit code follows the comparison, not the raw verdicts: `1` when a test case regressed (or, with
+`--fail-on-tool-change`, called different tools), `0` otherwise. A test that already failed in the golden trace does
+not fail the build. Regressions are printed even with `--quiet`. Give both options to compare and then update the
+file. A golden trace records one run per test case, so neither option combines with `--runs` above 1. A
+`--golden` file that is missing or unreadable is a usage error, raised before any agent call. In code, the same is
+`GoldenTrace.FromResults(results)` and `GoldenTraceComparer.Compare(golden, current)` in `AgentEval.Snapshots`.
+
 **With `--sut`**
 
 The target configures its own model, so `--temperature`, `--max-tokens`, `--system-prompt` and
@@ -271,9 +303,9 @@ The target configures its own model, so `--temperature`, `--max-tokens`, `--syst
 
 | Code | Meaning |
 |------|---------|
-| `0` | Every test case passed. |
-| `1` | At least one test case failed — in stochastic mode, its pass rate was below `--success-threshold`. |
-| `2` | Usage error: a missing `--dataset`, an unknown option, a value that does not parse (such as `--runs abc`), `--runs` below 1, or a `--runs` or `--success-threshold` value stochastic mode does not accept. |
+| `0` | Every test case passed. With `--golden`: no test case regressed (and, with `--fail-on-tool-change`, none changed its tool calls). |
+| `1` | At least one test case failed — in stochastic mode, its pass rate was below `--success-threshold`. With `--golden`: a test case regressed, or changed its tool calls under `--fail-on-tool-change`. |
+| `2` | Usage error: a missing `--dataset`, an unknown option, a value that does not parse (such as `--runs abc`), `--runs` below 1, a `--runs` or `--success-threshold` value stochastic mode does not accept, a `--golden` file that is missing or not a golden trace, `--fail-on-tool-change` without `--golden`, or a golden-trace option with `--runs` above 1. |
 | `3` | Runtime or configuration error — including a missing `--endpoint`/`--azure`/`--model`, a dataset that does not exist or is empty, an unknown `--metrics` name, and an unknown `--format`, which is reported only after the evaluation has run. |
 
 ---

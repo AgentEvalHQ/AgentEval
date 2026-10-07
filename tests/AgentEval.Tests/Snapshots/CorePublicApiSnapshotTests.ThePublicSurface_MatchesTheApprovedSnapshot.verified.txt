@@ -1592,6 +1592,59 @@ static class AgentEval.Skills.SkillToolNames
     const System.String ScriptNameArg
     const System.String SkillNameArg
     static System.Collections.Generic.IReadOnlyList<System.String> All
+class AgentEval.Snapshots.GoldenToolCall
+    AgentEval.Snapshots.GoldenToolCall <Clone>$()
+    System.Boolean Equals(AgentEval.Snapshots.GoldenToolCall other)
+    System.Boolean Equals(System.Object obj)
+    System.Int32 GetHashCode()
+    System.String Arguments { get; init; }
+    System.String Name { get; init; }
+    System.String ToString()
+    System.Void Deconstruct(out System.String Name, out System.String Arguments)
+    ctor(System.String Name, System.String Arguments)
+class AgentEval.Snapshots.GoldenTrace
+    AgentEval.Snapshots.GoldenTrace <Clone>$()
+    System.Boolean Equals(AgentEval.Snapshots.GoldenTrace other)
+    System.Boolean Equals(System.Object obj)
+    System.Collections.Generic.IReadOnlyList<AgentEval.Snapshots.GoldenTraceCase> Cases { get; init; }
+    System.DateTimeOffset CreatedAt { get; init; }
+    System.Int32 GetHashCode()
+    System.Int32 SchemaVersion { get; init; }
+    System.String Model { get; init; }
+    System.String ToString()
+    System.Threading.Tasks.Task SaveAsync(System.String path, System.Threading.CancellationToken ct = default)
+    System.Void Deconstruct(out System.Int32 SchemaVersion, out System.DateTimeOffset CreatedAt, out System.String Model, out System.Collections.Generic.IReadOnlyList<AgentEval.Snapshots.GoldenTraceCase> Cases)
+    const System.Int32 CurrentSchemaVersion
+    ctor(System.Int32 SchemaVersion, System.DateTimeOffset CreatedAt, System.String Model, System.Collections.Generic.IReadOnlyList<AgentEval.Snapshots.GoldenTraceCase> Cases)
+    static AgentEval.Snapshots.GoldenTrace FromResults(System.Collections.Generic.IEnumerable<AgentEval.Models.TestResult> results, System.String model = null, System.DateTimeOffset? createdAt = null)
+    static System.Threading.Tasks.Task<AgentEval.Snapshots.GoldenTrace> LoadAsync(System.String path, System.Threading.CancellationToken ct = default)
+class AgentEval.Snapshots.GoldenTraceCase
+    AgentEval.Snapshots.GoldenTraceCase <Clone>$()
+    System.Boolean Equals(AgentEval.Snapshots.GoldenTraceCase other)
+    System.Boolean Equals(System.Object obj)
+    System.Boolean Passed { get; init; }
+    System.Collections.Generic.IReadOnlyList<AgentEval.Snapshots.GoldenToolCall> ToolCalls { get; init; }
+    System.Int32 GetHashCode()
+    System.Int32 Score { get; init; }
+    System.String Name { get; init; }
+    System.String Output { get; init; }
+    System.String ToString()
+    System.Void Deconstruct(out System.String Name, out System.Boolean Passed, out System.Int32 Score, out System.String Output, out System.Collections.Generic.IReadOnlyList<AgentEval.Snapshots.GoldenToolCall> ToolCalls)
+    ctor(System.String Name, System.Boolean Passed, System.Int32 Score, System.String Output, System.Collections.Generic.IReadOnlyList<AgentEval.Snapshots.GoldenToolCall> ToolCalls)
+static class AgentEval.Snapshots.GoldenTraceComparer
+    static AgentEval.Snapshots.GoldenTraceComparison Compare(AgentEval.Snapshots.GoldenTrace golden, AgentEval.Snapshots.GoldenTrace current)
+class AgentEval.Snapshots.GoldenTraceComparison
+    AgentEval.Snapshots.GoldenTraceComparison <Clone>$()
+    System.Boolean Equals(AgentEval.Snapshots.GoldenTraceComparison other)
+    System.Boolean Equals(System.Object obj)
+    System.Boolean HasRegression { get; }
+    System.Boolean HasToolChange { get; }
+    System.Collections.Generic.IReadOnlyList<AgentEval.Snapshots.TraceCaseComparison> Cases { get; init; }
+    System.Int32 Count(AgentEval.Snapshots.TraceChange change)
+    System.Int32 GetHashCode()
+    System.String ToString()
+    System.Void Deconstruct(out System.Collections.Generic.IReadOnlyList<AgentEval.Snapshots.TraceCaseComparison> Cases)
+    ctor(System.Collections.Generic.IReadOnlyList<AgentEval.Snapshots.TraceCaseComparison> Cases)
 class AgentEval.Snapshots.SnapshotComparer
     AgentEval.Snapshots.SnapshotComparisonResult Compare(System.String expected, System.String actual)
     System.String ApplyScrubbing(System.String value)
@@ -1605,6 +1658,27 @@ class AgentEval.Snapshots.SnapshotStore
     System.Threading.Tasks.Task SaveAsync<T>(System.String testName, T value, System.String suffix = "", System.Threading.CancellationToken cancellationToken = default)
     System.Threading.Tasks.Task<T> LoadAsync<T>(System.String testName, System.String suffix = "", System.Threading.CancellationToken cancellationToken = default)
     ctor(System.String basePath)
+class AgentEval.Snapshots.TraceCaseComparison
+    AgentEval.Snapshots.TraceCaseComparison <Clone>$()
+    AgentEval.Snapshots.TraceChange Change { get; init; }
+    System.Boolean Equals(AgentEval.Snapshots.TraceCaseComparison other)
+    System.Boolean Equals(System.Object obj)
+    System.Boolean OutputChanged { get; init; }
+    System.Boolean ToolsChanged { get; init; }
+    System.Int32 GetHashCode()
+    System.String Detail { get; init; }
+    System.String Name { get; init; }
+    System.String ToString()
+    System.Void Deconstruct(out System.String Name, out AgentEval.Snapshots.TraceChange Change, out System.Boolean ToolsChanged, out System.Boolean OutputChanged, out System.String Detail)
+    ctor(System.String Name, AgentEval.Snapshots.TraceChange Change, System.Boolean ToolsChanged, System.Boolean OutputChanged, System.String Detail)
+enum AgentEval.Snapshots.TraceChange
+    Regressed
+    Improved
+    ToolsChanged
+    OutputChanged
+    Unchanged
+    Added
+    Removed
 class AgentEval.Testing.AssertionResult
     AgentEval.Output.AssertionResult ToAssertionResult()
     AgentEval.Testing.AssertionResult <Clone>$()
