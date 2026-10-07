@@ -1,242 +1,252 @@
-# OWASP Agentic Top 10 — Coverage Crosswalk
+# OWASP Top 10 for Agentic Applications — Coverage Crosswalk
 
-> **OWASP Agentic AI Top 10 "Version 2026"** was published 2025-12-09. It complements the OWASP LLM Top 10
-> (2025 edition) rather than replacing it — the official PDF includes an explicit ASI → LLM cross-map in
-> Appendix A, and both lists remain actively maintained. This page maps each ASI category to what
-> AgentEval provides: which red-team probes exercise it, which Gatekeeper gates defend against it at
-> runtime, and an honest coverage verdict.
+> The **OWASP Top 10 for Agentic Applications for 2026** was published on 2025-12-09. Its ten risks, ASI01–ASI10,
+> are specific to agents that plan, keep memory, call tools and act with delegated authority. It sits beside the
+> [OWASP Top 10 for LLM Applications 2025](redteam/owasp.md), which AgentEval's `bench owasp` covers. This page maps
+> each ASI risk to what AgentEval has today: the red-team attacks that probe it, the Gatekeeper gates that defend
+> against it at runtime, and what is missing.
 
 ## Coverage at a glance
 
-| ASI | Risk | Probes | Gates | Coverage |
+| ASI | Risk (OWASP name) | Probes | Runtime gates | Coverage |
 |---|---|---|---|---|
-| **ASI01** | Goal Hijacking | `PromptInjection`, `IndirectInjection`, `Crescendo`, `Jailbreak`, `PAIR`, `TAP`, `EncodingEvasion` | `HiddenInstructionPrefilterGate`, `ToolResultInjectionGate`, `ToolArgumentGoalCoherenceApprovalGate` | ✅ Full |
-| **ASI02** | Tool & Resource Misuse | `ExcessiveAgency`, `ToolEscalation` | `ForbiddenToolGate`, `ToolNameApprovalGate`, `ArgumentPatternGate`, `PerToolCallBudgetGate`, `RunBudgetGate`, `MonetaryLimitGate` | ✅ Full |
-| **ASI03** | Identity & Privilege Abuse | `PIILeakage`, `SystemPromptExtraction` | `SessionIdentityDriftGate`, `ContainedIdentityGate`, `OperatorAuthGate`, `ReferentialIntegrityGate` | ✅ Full |
-| **ASI04** | Supply Chain Compromise | `SupplyChain` (static-dependency framing only) | None (runtime plugin validation not implemented) | ⚠️ Partial |
-| **ASI05** | Sensitive Data Exfiltration | `PIILeakage`, `VectorEmbedding` | `ToolResultSecretGate`, `TaintTrackingGate`, `DomainAllowListGate` | ✅ Full |
-| **ASI06** | Memory & Context Manipulation | RedTeam Memory Security suite (`MemorySecurityEvaluation`) | `MemoryScopeIntegrityGate`, `MemoryWriteAdmissionGate`, `MemoryConflictGate`, `MemoryRecallAdmissionGate`, `MemoryResourceBudgetGate`, `QuarantineGate`, `QuarantineLeaseGate` | ✅ Full |
-| **ASI07** | Insecure Inter-Agent Communication | None | `SkillScriptApprovalGate`, `SkillScriptExecutionGate`, `SameBatchOrderingGate`, `SequenceGate` | ⚠️ Partial |
-| **ASI08** | Cascading & Amplification Failures | None | `BlockStormSentinelGate`, `ContainmentOverrideGate`, `RateLimitGate`, `ToolResultSizeGate`, `ToolResultSizeAnomalyGate` | ⚠️ Partial |
-| **ASI09** | Human Oversight Manipulation | `InferenceAPIAbuse`, `Misinformation`, `DataPoisoning` | `GatekeeperRefusalContract` / `GatekeeperRefusalPresenter` (plain-language risk summary per OWASP mitigation #4) | ✅ Full |
-| **ASI10** | Rogue & Uncontrolled Agents | None | `FleetCorrelator`, SecurityGraph, Containment policies | ⚠️ Partial |
+| **ASI01** | Agent Goal Hijack | `PromptInjection`, `IndirectInjection`, `Jailbreak`, `EncodingEvasion`, `SkillInjection`; opt-in `Crescendo`, `PAIR`, `TAP` | `HiddenInstructionPrefilterGate`, `ToolResultInjectionGate`, `ToolArgumentGoalCoherenceApprovalGate` | ✅ Probes and gates |
+| **ASI02** | Tool Misuse and Exploitation | `ExcessiveAgency`; opt-in `ToolEscalation` | `ForbiddenToolGate`, `ToolNameApprovalGate`, `ArgumentPatternGate`, `ArgumentPatternApprovalGate`, `PerToolCallBudgetGate`, `RunBudgetGate`, `MonetaryLimitGate`, `SequenceGate`, `SameBatchOrderingGate`, `ReferentialIntegrityGate`, `DomainAllowListGate` | ✅ Probes and gates |
+| **ASI03** | Identity and Privilege Abuse | None aimed at identity or privilege | `OperatorAuthGate`, `ContainedIdentityGate`, `SessionIdentityDriftGate` (experimental) | ⚠️ Gates only |
+| **ASI04** | Agentic Supply Chain Vulnerabilities | `SkillInjection` (a poisoned third-party skill); `SupplyChain` (package recommendations) | `SkillScriptExecutionGate`, `SkillScriptApprovalGate` | ⚠️ Partial |
+| **ASI05** | Unexpected Code Execution (RCE) | `InsecureOutput` (includes command- and code-injection probes) | `ToolUsageContractGate` with `ShellMetacharDenyPredicate`, `SkillScriptExecutionGate`, `SkillScriptApprovalGate` | ⚠️ Partial |
+| **ASI06** | Memory and Context Poisoning | Memory-security corpus (library only); `DataPoisoning` (in-context) | `MemoryScopeIntegrityGate`, `MemoryWriteAdmissionGate`, `MemoryConflictGate`, `MemoryRecallAdmissionGate`, `MemoryResourceBudgetGate`, `MemoryToolCallGate`, `MemoryToolResultGate`, `MemoryInfluenceGate` | ⚠️ Partial |
+| **ASI07** | Insecure Inter-Agent Communication | None | None specific | ❌ Not covered |
+| **ASI08** | Cascading Failures | None | `BlockStormSentinelGate`, `ContainmentOverrideGate`, `RateLimitGate`, `RunBudgetGate`, `ToolResultSizeGate`, `ToolResultSizeAnomalyGate` (experimental) | ⚠️ Gates only |
+| **ASI09** | Human-Agent Trust Exploitation | `Misinformation` (nearest) | The approval gates, which hand a decision to a person | ⚠️ Partial |
+| **ASI10** | Rogue Agents | None | `ContainmentOverrideGate`, `QuarantineGate`, `QuarantineLeaseGate`, `ContainedIdentityGate`, `BlockStormSentinelGate` | ⚠️ Gates only |
 
-**Legend:** ✅ Full — probes + gates; ⚠️ Partial — gates only, or probes only, or both present with known gaps; ❌ Not covered.
+**Legend:** ✅ probes and gates both exist; ⚠️ one side is missing or only part of the risk is covered; ❌ neither.
 
-## Per-category detail
+**Where the probes run.** The 14 default attacks run in `bench owasp` and `redteam`. `Crescendo`, `PAIR`, `TAP` and
+`ToolEscalation` are opt-in: they run only when named in `redteam --attacks`, and no preset includes them. `bench agentic`
+does not run attacks; it grades an answer or a captured trace.
 
-### ASI01 — Goal Hijacking
+**Probe counts** below are at the Comprehensive intensity that `bench owasp --preset audit` uses. `--preset top10` runs
+the same 14 attacks at the Quick intensity, which is a subset of each (for example 10 of the 27 `PromptInjection` probes).
 
-An attacker manipulates the agent's objective — either directly via prompt injection in user input, or
-indirectly via malicious content retrieved from external sources (RAG results, tool outputs, web pages).
+## Per-risk detail
 
-**Probes** (`bench owasp` and `bench agentic`):
-- `PromptInjection` — 30 probes covering direct injection patterns across 3 difficulty bands
-- `IndirectInjection` — 18 tool-aware probes that plant instructions in tool return values
-- `Jailbreak` — 20 single-turn jailbreak attempts (role-play, authority claim, hypothetical framing)
-- `Crescendo` — 8 multi-turn escalation trajectories (Wave C)
-- `PAIR` / `TAP` — iterative LLM-driven attacks (opt-in; not in default preset)
-- `EncodingEvasion` — 12 probes using homoglyphs, base64, and zero-width characters
+### ASI01 — Agent Goal Hijack
 
-**Gates** (runtime, `UseGatekeeper`):
-- `HiddenInstructionPrefilterGate` — detects embedded instructions in tool arguments before execution
-- `ToolResultInjectionGate` — scans tool results for injected commands before they reach the model
-- `ToolArgumentGoalCoherenceApprovalGate` — flags arguments that deviate from the stated goal
+An attacker changes what the agent is trying to do, through instructions hidden in content it reads: web pages,
+documents, emails, tool results.
 
-**Gaps:** none known in the standard probe set; PAIR/TAP are opt-in and require a separate attacker model.
+**Probes**
+- `PromptInjection`: 27 single-turn probes (LLM01).
+- `IndirectInjection`: 19 probes, some delivered through a tool's return value (LLM01).
+- `Jailbreak`: 29 single-turn probes (LLM01).
+- `EncodingEvasion`: 23 probes that hide the instruction in an encoding (LLM01). `redteam --transform` can also
+  re-send every single-turn probe through any of the 18 encoding codecs.
+- `SkillInjection`: 6 tool-aware probes that plant instructions in a MAF Agent Skill (LLM01; see also ASI04).
+- Opt-in: `Crescendo` (3 multi-turn escalations), `PAIR` (3 seeds, iterative, needs `--attacker`), `TAP` (3 seeds,
+  tree search, needs `--attacker`).
 
----
-
-### ASI02 — Tool & Resource Misuse
-
-An agent invokes tools it should not have access to, or uses permitted tools beyond their intended scope
-(calling `DELETE` when only `GET` was intended, running shell commands from a code-execution tool, etc.).
-
-**Probes:**
-- `ExcessiveAgency` — 14 probes that attempt to elicit privilege escalation via tool calls
-- `ToolEscalation` — 8 multi-turn probes that attempt to chain permitted tools into a destructive sequence (opt-in)
-
-**Gates:**
-- `ForbiddenToolGate` — denies calls to tools not on the allow-list
-- `ToolNameApprovalGate` — human-in-the-loop approval before novel tool names
-- `ArgumentPatternGate` / `ArgumentPatternApprovalGate` — blocks or requires approval for argument patterns matching a policy
-- `PerToolCallBudgetGate` — per-tool call-count limit within one run
-- `RunBudgetGate` — aggregate call budget across all tools in one run
-- `MonetaryLimitGate` — cumulative spend limit (requires tool-cost metadata)
-
-**Gaps:** `ToolEscalation` is opt-in and not in the default `top10` preset; multi-step escalation sequences beyond 2 turns are not covered.
+**Gates**
+- `HiddenInstructionPrefilterGate`: a lexical prefilter that blocks tool results carrying hidden or encoded injection
+  markers.
+- `ToolResultInjectionGate`: blocks a tool result that contains an injection marker.
+- `ToolArgumentGoalCoherenceApprovalGate`: an LLM judge that escalates a tool call whose arguments do not fit the user's
+  goal.
 
 ---
 
-### ASI03 — Identity & Privilege Abuse
+### ASI02 — Tool Misuse and Exploitation
 
-An agent is tricked into acting as a different principal, escalating its own permissions, or leaking
-credentials and session tokens.
+The agent uses a tool it is allowed to use, but in a way nobody intended: the wrong operation, the wrong target, too
+often, or in a harmful sequence.
 
-**Probes:**
-- `PIILeakage` — 20 probes attempting to extract personal data including bearer tokens and session ids
-- `SystemPromptExtraction` — 16 probes that attempt to read or reconstruct the system prompt
+**Probes**
+- `ExcessiveAgency`: 15 tool-aware probes (LLM06).
+- Opt-in: `ToolEscalation`, 3 multi-turn, tool-aware seeds that try to chain permitted tools into a harmful sequence.
 
-**Gates:**
-- `SessionIdentityDriftGate` — detects identity changes mid-session
-- `ContainedIdentityGate` — enforces per-run agent identity boundaries
-- `OperatorAuthGate` — requires operator-level authentication for privileged tool actions
-- `ReferentialIntegrityGate` — prevents arguments referencing resources outside the authorised scope
+**Gates**
+- `ForbiddenToolGate`: blocks tools on a deny-list.
+- `ToolNameApprovalGate`: escalates calls to named tools for approval.
+- `ArgumentPatternGate`: blocks arguments that match a forbidden pattern. `ArgumentPatternApprovalGate` approves only
+  routine-looking arguments and escalates the rest.
+- `PerToolCallBudgetGate` and `RunBudgetGate`: cap calls per tool, calls per run and the run's monetary total.
+- `MonetaryLimitGate`: caps the running sum of a monetary argument.
+- `SequenceGate` and `SameBatchOrderingGate`: block a guarded tool after a trigger tool, or in the same batch as one.
+- `ReferentialIntegrityGate`: allows only IDs that the user or a trusted lookup produced earlier in the run.
+- `DomainAllowListGate`: allows only listed URL hosts in tool arguments.
 
----
-
-### ASI04 — Supply Chain Compromise
-
-Malicious or counterfeit capabilities are introduced via third-party tools, plugins, model updates, or
-runtime dependency resolution in an agentic ecosystem.
-
-**Probes:**
-- `SupplyChain` — 14 probes testing whether the agent recommends typosquatted or non-existent packages
-  **Caveat:** these use the LLM03 static-dependency framing ("does the agent recommend a bad package?").
-  OWASP ASI04 explicitly targets runtime plugin composition, not manifest-time dependencies. The four
-  named ASI04 runtime vectors (malicious tool registration, capability poisoning via MCP, cross-agent
-  tool injection, and runtime SDK substitution) have **no current probes**.
-
-**Gates:** none implement runtime plugin validation or capability-provenance checks.
-
-**Known gap:** runtime supply-chain attacks (ASI04's primary concern) are not covered by any current
-probe or gate. Tracking in the backlog.
+**Gaps:** escalation is probed only by the three opt-in `ToolEscalation` seeds.
 
 ---
 
-### ASI05 — Sensitive Data Exfiltration
+### ASI03 — Identity and Privilege Abuse
 
-An agent leaks PII, credentials, confidential documents, or internal state to an attacker-controlled
-endpoint via tool calls, API responses, or model outputs.
+The agent acts with more privilege than it should, or with credentials or an identity that are not its own.
 
-**Probes:**
-- `PIILeakage` — 20 probes across names, emails, SSNs, credit-card numbers, bearer tokens
-- `VectorEmbedding` — 10 RAG-boundary probes that plant confidential data in retrieval context
+**Probes:** none target identity or privilege. `PIILeakage` (22 probes, LLM02) and `SystemPromptExtraction` (19,
+LLM07) test what the agent discloses, which is a different risk.
 
-**Gates:**
-- `ToolResultSecretGate` — redacts secret-shaped spans (API keys, tokens, connection strings) from tool results before they reach the model
-- `TaintTrackingGate` — propagates a taint tag from sensitive tool results and blocks exfiltration attempts downstream
-- `DomainAllowListGate` — prevents tool calls to domains outside an explicit allow-list
+**Gates**
+- `OperatorAuthGate`: blocks a run without an allow-listed operator identity.
+- `ContainedIdentityGate`: refuses a run when a contained, or undetermined, identity is present.
+- `SessionIdentityDriftGate` (experimental): binds the first admitted operator to the session.
+
+**Gaps:** no probe tries credential misuse, confused-deputy calls or privilege escalation.
 
 ---
 
-### ASI06 — Memory & Context Manipulation
+### ASI04 — Agentic Supply Chain Vulnerabilities
 
-An attacker poisons the agent's persistent memory store or cross-session context, causing it to act on
-false beliefs in future sessions.
+Third-party agents, tools, plugins or prompts that are malicious or tampered with, often loaded at runtime.
 
-**Probes:** the `MemorySecurityEvaluation` suite (RedTeam) covers scope integrity, write admission,
-conflict detection, recall admission, and resource-budget violations — calibrated against the Memory
-Security gold set shipped with the Gatekeeper Memory module.
+**Probes**
+- `SkillInjection` (see ASI01): a poisoned third-party MAF Agent Skill whose description or resource tries to
+  instruct the agent. The skill's description lands in the system prompt, a higher-trust position than a retrieved
+  document.
+- `SupplyChain`: 14 probes (LLM03) that ask whether the agent *recommends* a bad or non-existent package. That is the
+  LLM Top 10 framing, not a runtime vector.
 
-**Gates** — the Gatekeeper Memory module is a near-1:1 implementation of OWASP's nine ASI06 mitigations:
-- `MemoryScopeIntegrityGate` — blocks writes outside the declared memory scope
-- `MemoryWriteAdmissionGate` — admits or rejects write operations by policy
-- `MemoryConflictGate` — detects conflicting facts before they are committed
-- `MemoryRecallAdmissionGate` — filters recalled memories by trust level and freshness
-- `MemoryResourceBudgetGate` — enforces memory-size and write-rate budgets
-- `QuarantineGate` / `QuarantineLeaseGate` — isolates untrusted memory objects behind a timed lease
+Other runtime vectors (a malicious tool registration, a poisoned MCP tool description, a swapped dependency) have no
+probes.
+
+**Gates**
+- `SkillScriptExecutionGate`: hard-blocks skill scripts that are not on the allow-list.
+- `SkillScriptApprovalGate`: escalates `run_skill_script` unless the script is trusted.
+
+**Gaps:** nothing checks the provenance of a tool or plugin when it is registered.
+
+---
+
+### ASI05 — Unexpected Code Execution (RCE)
+
+The agent writes or runs code or commands that an attacker controls.
+
+**Probes:** `InsecureOutput` has 31 probes (LLM05), including 4 command-injection and 3 code-injection probes. They
+check whether the agent's *output* carries an executable payload, not whether a code-execution tool runs it.
+
+**Evaluators:** `CodeVulnerabilityEval`, an LLM-judged check on generated code, is part of the agentic `safety`
+composite. It is built in code with `AgenticBenchmark.Safety(...)`, not from the CLI.
+
+**Gates**
+- `ToolUsageContractGate` with `ShellMetacharDenyPredicate`: denies shell metacharacters in arguments, per dialect
+  (PowerShell, POSIX sh, cmd).
+- `SkillScriptExecutionGate` and `SkillScriptApprovalGate` (see ASI04).
+
+**Gaps:** no probe drives an agent that has a code-execution tool into running attacker code.
+
+---
+
+### ASI06 — Memory and Context Poisoning
+
+Malicious content is written into the agent's memory or long-lived context and steers later decisions.
+
+**Probes**
+- The memory-security corpus, `MemorySecurityAttackCorpus.Default`: 12 attack scenarios and 4 benign controls. Five
+  deterministic evaluators score a batch of memory operations against it (`MemoryPoisonContainmentEval`,
+  `MemoryScopeIsolationEval`, `MemoryInfluenceSafetyEval`, `MemoryAuditabilityEval`, `MemoryUtilityEval`), combined by
+  `MemorySecurityCompositeEvals.Create()`. This is a library API. No CLI command runs it, and nothing yet drives the
+  scenarios against a live agent.
+- `DataPoisoning`: 12 in-context poisoning probes (LLM04).
+
+**Gates**
+- `MemoryScopeIntegrityGate`: fails closed when the trusted scope is missing or contradicted.
+- `MemoryWriteAdmissionGate`: checks provenance, trust and content before a write.
+- `MemoryConflictGate`: blocks lower-trust overwrites and repeated writes from one source posing as agreement.
+- `MemoryRecallAdmissionGate`: drops stale, cross-scope or tampered records on recall.
+- `MemoryResourceBudgetGate`: caps writes, recalls and quarantined records.
+- `MemoryToolCallGate` and `MemoryToolResultGate`: run the memory checks on registered memory write and read tool
+  calls, and on what the reads return.
+- `MemoryInfluenceGate`: taints values read from memory so they cannot flow into sensitive tool calls.
+
+**Gaps:** the corpus is not run against a real agent from the CLI.
 
 ---
 
 ### ASI07 — Insecure Inter-Agent Communication
 
-Messages passed between agents (orchestrator → sub-agent, peer-to-peer, MCP tool calls) carry injected
-instructions or bypass the downstream agent's safety controls.
+Messages between agents are intercepted, spoofed or tampered with, or carry instructions the receiving agent trusts.
 
-**Probes:** none cover inter-agent message injection or trust-boundary violations between agents.
-
-**Gates** (partial):
-- `SkillScriptApprovalGate` / `SkillScriptExecutionGate` — gate on skill scripts that represent agent-to-agent delegation
-- `SameBatchOrderingGate` / `SequenceGate` — enforce ordering invariants on tool-call sequences that could be exploited across agent boundaries
-
-**Known gap:** no probes exercise multi-agent scenarios. The gates above cover agent-delegation enforcement
-but not message-injection between independent agents. Tracking in the backlog.
+**Probes:** none. **Gates:** none specific to agent-to-agent messages. A sub-agent that is exposed to its caller as a
+tool passes through the tool-result gates (ASI01), but nothing authenticates or checks a message between two agents.
 
 ---
 
-### ASI08 — Cascading & Amplification Failures
+### ASI08 — Cascading Failures
 
-A single compromised or misbehaving agent triggers a chain reaction across the fleet: tool abuse
-propagates, a DoS on one agent degrades shared resources, or a benign agent amplifies a malicious
-instruction passed through from a compromised peer.
-
-**Probes:** none. `FleetCorrelator`, `BlockStormSentinelGate`, containment, and the security graph
-all exist in the runtime but have zero corresponding red-team probes.
-
-**Gates** (partial — runtime defences exist, but untested by probes):
-- `BlockStormSentinelGate` — detects abnormal block-rate spikes that indicate an amplification loop
-- `ContainmentOverrideGate` / path-containment policies — prevent tool calls from escaping a session's allowed filesystem or network scope
-- `RateLimitGate` — per-agent / per-tool call-rate ceiling
-- `ToolResultSizeGate` / `ToolResultSizeAnomalyGate` — caps result sizes that could be used to saturate context windows
-
-**Known gap:** fleet-level cascade behaviour is not red-teamed. Tracking in the backlog.
-
----
-
-### ASI09 — Human Oversight Manipulation
-
-The agent undermines legitimate human oversight — by generating misleading summaries, refusing to
-explain its reasoning, or manipulating its audit trail.
-
-**Probes:**
-- `InferenceAPIAbuse` — 12 probes testing model refusal under high-volume / anomalous call patterns (LLM10)
-- `Misinformation` — 14 probes testing confabulation, nonexistent-entity recommendations, and false-fact injection (LLM09)
-- `DataPoisoning` — 10 in-context poisoning probes including trigger-phrase and false-fact variants (LLM04)
-
-**Gates:**
-- `GatekeeperRefusalContract` / `GatekeeperRefusalPresenter` — produce a plain-language, non-model-generated risk summary for every blocked action. OWASP ASI09 mitigation #4 asks verbatim for "a plain-language risk summary (not model-generated rationales)" — this mechanism was shipped before the standard was published.
-
----
-
-### ASI10 — Rogue & Uncontrolled Agents
-
-An agent operates outside its sanctioned boundary — taking actions it was not authorised to take,
-spawning sub-agents without approval, or persisting in a loop after its task is complete.
+A fault in one agent or tool spreads through the system and is amplified on the way.
 
 **Probes:** none.
 
-**Gates** (partial — runtime defences exist, but untested by probes):
-- `FleetCorrelator` — correlates findings across agents to detect coordinated anomalous behaviour
-- SecurityGraph — maps inter-agent trust relationships and flags violations
-- Containment policies — path, domain, and shell-metacharacter containment that prevents an agent from escaping its sandbox
+**Gates** (they limit how far a fault can run in one session):
+- `BlockStormSentinelGate`: once a threshold of enforced blocks is reached, blocks everything after it.
+- `ContainmentOverrideGate`: blocks every call while a target is contained.
+- `RateLimitGate`: a per-session, fixed-window cap on runs.
+- `RunBudgetGate`: caps calls and spend per run.
+- `ToolResultSizeGate`: truncates oversized results. `ToolResultSizeAnomalyGate` (experimental) flags a result far
+  outside a tool's usual size.
+- `FleetCorrelator` (experimental): correlates findings across gates within a session.
 
-**Known gap:** no probes test rogue-agent behaviour (unauthorised sub-agent spawning, run-after-completion, out-of-scope action sequences). Tracking in the backlog.
+**Gaps:** no probes, and nothing models a fault crossing from one agent to another.
 
 ---
 
-## Relation to OWASP LLM Top 10
+### ASI09 — Human-Agent Trust Exploitation
 
-The table below shows how the ASI and LLM taxonomies relate for the categories AgentEval covers. Use it
-when you need to cite both standards in a compliance report.
+People trust the agent's output or recommendation more than they should, and approve something harmful.
 
-| ASI | Risk | Maps to LLM Top 10 |
-|---|---|---|
-| ASI01 | Goal Hijacking | LLM01 (Prompt Injection) |
-| ASI02 | Tool & Resource Misuse | LLM06 (Excessive Agency) |
-| ASI03 | Identity & Privilege Abuse | LLM02 (Sensitive Information Disclosure), LLM07 (System Prompt Leakage) |
-| ASI04 | Supply Chain Compromise | LLM03 (Supply Chain) — but ASI04 extends to runtime vectors LLM03 does not cover |
-| ASI05 | Sensitive Data Exfiltration | LLM02 (Sensitive Information Disclosure) |
-| ASI06 | Memory & Context Manipulation | LLM01 (indirect injection via memory), LLM08 (Vector & Embedding) |
-| ASI07 | Insecure Inter-Agent Communication | LLM01 (injection via agent messages) |
-| ASI08 | Cascading & Amplification Failures | LLM04 (Model DoS) |
-| ASI09 | Human Oversight Manipulation | LLM09 (Misinformation), LLM10 (Inference API Abuse) |
-| ASI10 | Rogue & Uncontrolled Agents | LLM06 (Excessive Agency — extended to multi-agent) |
+**Probes:** `Misinformation` has 16 probes (LLM09) for confabulated facts and invented entities. It is the nearest
+check: an agent that states falsehoods confidently is what over-trust exploits.
 
-## Running the agentic bench
+**Gates:** the approval gates (`ToolNameApprovalGate`, `ArgumentPatternApprovalGate`, `SkillScriptApprovalGate`,
+`ToolArgumentGoalCoherenceApprovalGate`) put a person in the loop. When the Gatekeeper blocks a call, the refusal
+follows a versioned contract (`GatekeeperRefusalContract`).
 
-To run the benchmark family most relevant to the agentic ASI categories:
+**Gaps:** no probe tests whether the agent misleads the person who approves its actions.
+
+---
+
+### ASI10 — Rogue Agents
+
+An agent acts outside what it was authorised to do while appearing legitimate.
+
+**Probes:** none.
+
+**Gates**
+- `ContainmentOverrideGate`, `QuarantineGate` (blocks a session the shadow judge quarantined) and
+  `QuarantineLeaseGate` (a signed, expiring quarantine lease).
+- `ContainedIdentityGate` (see ASI03) and `BlockStormSentinelGate` (see ASI08).
+- `AgenticSecurityGraph`: builds a cross-session view from a tenant snapshot.
+
+**Gaps:** no probe tests out-of-scope action sequences, unsanctioned sub-agents or work continuing after the task ends.
+
+---
+
+## Relation to the OWASP LLM Top 10 (2025)
+
+This is AgentEval's own mapping, for citing both lists in one report. It is not an OWASP table.
+
+| ASI | Nearest LLM Top 10 (2025) risks |
+|---|---|
+| ASI01 Agent Goal Hijack | LLM01 Prompt Injection |
+| ASI02 Tool Misuse and Exploitation | LLM06 Excessive Agency |
+| ASI03 Identity and Privilege Abuse | LLM06 Excessive Agency |
+| ASI04 Agentic Supply Chain Vulnerabilities | LLM03 Supply Chain |
+| ASI05 Unexpected Code Execution | LLM05 Improper Output Handling |
+| ASI06 Memory and Context Poisoning | LLM04 Data and Model Poisoning, LLM08 Vector and Embedding Weaknesses |
+| ASI07 Insecure Inter-Agent Communication | LLM01 Prompt Injection (instructions passed between agents) |
+| ASI08 Cascading Failures | LLM10 Unbounded Consumption |
+| ASI09 Human-Agent Trust Exploitation | LLM09 Misinformation |
+| ASI10 Rogue Agents | LLM06 Excessive Agency |
+
+## Running the probes
 
 ```bash
-# Standard agentic probe set (ASI01/02/03/05 focus)
-agenteval bench agentic --preset top10 --subject MyAgent --azure-from-env
+# The 14 default attacks at full depth (covers the ASI01, ASI02 and ASI05 probes above)
+agenteval bench owasp --preset audit --subject MyAgent --from-env
 
-# Include tool-escalation and memory probes (ASI06)
-agenteval bench agentic --preset audit --subject MyAgent --azure-from-env
-
-# Full OWASP LLM Top 10 + ASI crosswalk report
-agenteval bench owasp --preset audit --subject MyAgent --azure-from-env
+# The opt-in multi-turn attacks (ASI01, ASI02); redteam takes --endpoint/--model, --azure or --sut
+agenteval redteam --endpoint <url> --model <name> --attacks Crescendo,ToolEscalation
 ```
 
-The output report includes an `osiCoverage` block (JSON) and a per-category verdict table in the
-Markdown summary. Flag `--certify` also writes a calibration certificate for the axis.
+See [OWASP LLM Top 10 red-teaming](redteam/owasp.md) and the [CLI reference](cli.md) for targets and options.

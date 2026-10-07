@@ -22,12 +22,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is an `IGatekeeperObserver` that emits a span and increments the `agenteval.gatekeeper.findings`
   counter for every actionable finding (Block / Mutate / Redact / Incident). `GateCalibrationHarness`
   emits `AgentEval.Calibration` spans with accuracy, dangerous-error count, and inline-ready tags.
-- **OWASP Agentic Top 10 crosswalk** (`docs/owasp-agentic-top10.md`) — per-category table for
-  ASI01–ASI10 (OWASP "Version 2026", published 2025-12-09): which red-team probes test it, which
-  Gatekeeper gates defend against it at runtime, and an honest coverage verdict (✅ Full / ⚠️ Partial).
-  Known gaps recorded: ASI04 runtime supply-chain vectors, ASI07 inter-agent injection probes, ASI08
-  cascade probes, ASI10 rogue-agent probes. Added to docs TOC alongside the ASSERT Interoperability
-  spec.
+- **OWASP Top 10 for Agentic Applications crosswalk** (`docs/owasp-agentic-top10.md`) — for each of ASI01–ASI10
+  (the 2026 list, published 2025-12-09): which red-team attacks probe it, which Gatekeeper gates defend against it at
+  runtime, and what is missing. Probes and gates both exist for ASI01 Agent Goal Hijack and ASI02 Tool Misuse and
+  Exploitation. ASI03–ASI06 and ASI08–ASI10 are partly covered, most of them by gates with no probes. ASI07 Insecure
+  Inter-Agent Communication is not covered. Added to the docs TOC alongside the ASSERT Interoperability spec.
 - **`bench agentic --reference/--reference-file` and `--context/--context-file`.** The reference answer and the
   retrieved context reach every check as `EvalInput.GroundTruth` / `EvalInput.Context`, so `rag-quality` can pass
   from the CLI: groundedness grades against the context; similarity, F1 and response completeness against the
