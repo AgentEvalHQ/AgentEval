@@ -72,6 +72,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `AgentEval.Abstractions` using the same Verify-based pattern as the existing Gatekeeper snapshot.
   Any silent API change now fails CI. `EnablePackageValidation` added to both project files for
   additional binary-compat detection.
+- **`agenteval compare --fail-on-regression`.** A comparable result exited 0 whatever it showed, so a CI step running
+  `compare` never failed on a regression. With the flag it exits 1 when a scenario the baseline passed fails in the
+  candidate, and names those scenarios; incomparable runs still exit 13. The default exit codes are unchanged. `--json`
+  now also carries `recovered`, `regressed` and `regressedScenarios` when the runs are comparable.
 
 ### Changed
 - **`--azure-from-env` is now `--from-env`.** The flag builds the target from whichever provider `AI_INFERENCE_PROVIDER`

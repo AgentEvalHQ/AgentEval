@@ -21,7 +21,7 @@ namespace AgentEval.Tests.Cli;
 
 public class CompareCommandTests
 {
-    private static ComparabilityFacts Facts(
+    internal static ComparabilityFacts Facts(
         string key = "eval.k",
         string version = "1.0.0",
         double? bar = 0.7,
@@ -34,7 +34,7 @@ public class CompareCommandTests
         };
 
     /// <summary>Writes one run through the shipped store and returns its run directory.</summary>
-    private static async Task<string> WriteRunAsync(
+    internal static async Task<string> WriteRunAsync(
         TempWorkspace temp,
         string subjectName,
         IReadOnlyList<ScenarioResult> scenarios)
@@ -58,7 +58,7 @@ public class CompareCommandTests
         return dir;
     }
 
-    private static ScenarioResult Scenario(
+    internal static ScenarioResult Scenario(
         string id, double score, bool passed, string? stimulusHash, ComparabilityFacts? facts) =>
         new(id, id, "in", "out", passed, score,
             new Dictionary<string, double>(), [], TimeSpan.Zero, 0.0)
