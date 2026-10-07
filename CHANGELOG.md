@@ -121,6 +121,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Repeated runs of a test case are measured by `AgentEval.Comparison.StochasticRunner`.
 
 ### Fixed
+- **Mission Control's run page shows the checks that did not run.** It showed Verdict, Scenarios, Failures and Cost; a
+  skipped or errored check is neither a pass nor a fail (it counts in the run's `skipped` bucket and keeps the run from
+  passing), so a run whose every check errored read FAIL beside "Failures 0". A **Not measured** tile (skipped or
+  errored) now shows that count, in red when it is not 0.
 - **`SafetyMetricGate` refuses a metric it can never measure.** The gate gives its metric only the inspected text, so
   a metric that needs a retrieved context or a reference answer (`GroundednessMetric`) was never measured and the gate
   blocked every message, with "safety metric failed"-style reasons. Building the gate with such a metric now throws
