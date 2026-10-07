@@ -499,6 +499,56 @@ public sealed class MemoryGatePipelineTests
             requirements,
             (context, _) => ValueTask.FromResult(inspect(context)));
 
+    [Fact]
+    public async Task AfterASanitize_TheNextGateStillSeesTheRecordMetadataAndBudget()
+    {
+        // The recall-admission gate delimits untrusted recalled content (Sanitize) by default; the pipeline evaluates the
+        // gates after it on the sanitized copy, and WithContent used to drop the budget snapshot and record metadata, so
+        // the resource-budget gate blocked every such recall with memory.budget.snapshot_missing.
+        var scope = new MemorySecurityScope(tenantId: "tenant-1", userId: "user-1");
+        var recall = new MemoryOperationContract(
+            "memory_recall", MemoryOperationKind.Recall, MemorySurface.Tool, ["query"], [], MemoryCategory.Unknown,
+            isSideEffecting: false, mayReturnSensitiveContent: true);
+        var pipeline = new MemoryGatePipeline(
+            [new MemoryRecallAdmissionGate(), new MemoryResourceBudgetGate()],
+            new MemoryGateCapabilities(guaranteesRunScope: true),
+            new MemorySecurityPolicy("policy-1", "1", MemorySecurityProfile.Enforce, MemoryGateAction.Reject));
+        var context = new MemoryGateContext(
+            "operation-1", MemoryGateStage.AfterRead, recall, "provider-1", scope,
+            new MemoryProvenance(MemorySourceKind.User, "user-1", MemoryTrustLevel.Medium),
+            "The user prefers metric units.",
+            recordMetadata: new MemoryRecordMetadata("memory-1", scope, integrityVerified: true),
+            budget: new MemoryBudgetSnapshot(recalledItemCount: 1, recalledContentCharacters: 30));
+
+        var decision = await pipeline.EvaluateAsync(context);
+
+        Assert.Equal(MemoryGateAction.Sanitize, decision.Action);
+        Assert.Contains("<memory-item", decision.EffectiveContent);
+        Assert.DoesNotContain(decision.Receipts, r => r.ReasonCode == "memory.budget.snapshot_missing");
+    }
+
+    [Fact]
+    public void WithContent_CarriesEveryFieldButTheContent()
+    {
+        var scope = new MemorySecurityScope(tenantId: "tenant-1", userId: "user-1");
+        var metadata = new MemoryRecordMetadata("memory-1", scope);
+        var budget = new MemoryBudgetSnapshot(writesInRun: 3);
+        var context = CreateContext() is var c
+            ? new MemoryGateContext(c.OperationId, MemoryGateStage.AfterRead,
+                new MemoryOperationContract("recall", MemoryOperationKind.Recall, MemorySurface.Tool, null, null,
+                    MemoryCategory.Fact, isSideEffecting: false, mayReturnSensitiveContent: true),
+                c.ProviderId, scope, c.Provenance, "old", recordMetadata: metadata, budget: budget,
+                hasAdministrativeCrossScopeCapability: true)
+            : throw new InvalidOperationException();
+
+        var copy = context.WithContent("new");
+
+        Assert.Equal("new", copy.Content);
+        Assert.Same(metadata, copy.RecordMetadata);
+        Assert.Same(budget, copy.Budget);
+        Assert.True(copy.HasAdministrativeCrossScopeCapability);
+    }
+
     private static string Digest(string value)
         => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
             System.Text.Encoding.UTF8.GetBytes(value))).ToLowerInvariant();

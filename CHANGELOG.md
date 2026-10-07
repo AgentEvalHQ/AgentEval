@@ -121,6 +121,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Repeated runs of a test case are measured by `AgentEval.Comparison.StochasticRunner`.
 
 ### Fixed
+- **Gatekeeper memory protection blocked every recall of untrusted content, and every write it redacted.**
+  `MemoryGateContext.WithContent` copied the context without its record metadata, budget snapshot and
+  administrative cross-scope flag, and the pipeline evaluates every gate after a Sanitize verdict on that copy. The
+  recall-admission gate delimits untrusted recalled content by default, so the resource-budget gate after it found no
+  snapshot and blocked the recall (`memory.budget.snapshot_missing`); a write whose credential or e-mail address
+  was redacted was blocked the same way. It failed closed, so nothing unsafe got through, but recall did not work
+  with the default gates. Found by the memory-poisoning harness.
 - **Three Mission Control pages showed nothing, or were rejected, under `mc serve`.** The tests wrote their own
   GraphQL queries, so all three were green.
   - The compliance matrix looked statuses up in lower case while the evidence stores them upper case (`PASS`), so
