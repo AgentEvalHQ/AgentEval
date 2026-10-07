@@ -206,6 +206,27 @@ internal static class SkillsScanCommand
         bool checkBaseline, FileInfo? saveManifestBaseline, FileInfo? manifestBaseline, string? baselineNotes,
         string scannedRoot, CancellationToken ct)
     {
+        // Provenance pointer (§4.5 tier 1): where each skill came from, when a skills-lock.json beside the project
+        // records it. Shown next to each finding (every format) and stored on the baseline entries; read-only and
+        // offline, it never changes a finding or the exit code.
+        var lockPath = SkillsLockFile.Find(scannedRoot);
+        var provenance = lockPath is null
+            ? new Dictionary<string, SkillLockProvenance>(StringComparer.Ordinal)
+            : SkillsLockFile.Read(lockPath);
+        if (provenance.Count > 0)
+        {
+            entries = entries
+                .Select(e => provenance.TryGetValue(e.Name, out var p) ? e with { Source = p.Source, SourceUrl = p.SourceUrl, Ref = p.Ref } : e)
+                .ToList();
+            Console.Error.WriteLine($"  Provenance: {provenance.Count} skill(s) recorded in {lockPath}");
+        }
+
+        // The renderers read only Source / SourceUrl / Ref from these entries.
+        var provenanceByName = provenance.ToDictionary(
+            kv => kv.Key,
+            kv => new SkillBaselineEntry(kv.Key, SkillSourceKind.File, "", "", null, kv.Value.Source, kv.Value.SourceUrl, kv.Value.Ref, []),
+            StringComparer.Ordinal);
+
         // --check-baseline trust-on-first-use matching is opt-in (meaningless without prior baseline history).
         var extraFindings = new List<SkillComplianceFinding>();
         if (checkCrossLocationDrift)
@@ -264,7 +285,7 @@ internal static class SkillsScanCommand
             report = report with { Findings = [.. report.Findings, .. extraFindings] };
         }
 
-        var rendered = RenderReport(report, format);
+        var rendered = RenderReport(report, format, provenanceByName);
 
         if (output is not null)
         {
@@ -310,12 +331,13 @@ internal static class SkillsScanCommand
         return ComputeExitCode(report, failOnNoncompliant);
     }
 
-    private static string RenderReport(SkillComplianceReport report, string format) =>
+    private static string RenderReport(
+        SkillComplianceReport report, string format, IReadOnlyDictionary<string, SkillBaselineEntry> provenanceByName) =>
         (format ?? "console").Trim().ToLowerInvariant() switch
         {
-            "json" => SkillComplianceReportRenderer.RenderJson(report),
-            "markdown" or "md" => SkillComplianceReportRenderer.RenderMarkdown(report),
-            "console" or "" => SkillComplianceReportRenderer.RenderConsole(report),
+            "json" => SkillComplianceReportRenderer.RenderJson(report, provenanceByName),
+            "markdown" or "md" => SkillComplianceReportRenderer.RenderMarkdown(report, provenanceByName),
+            "console" or "" => SkillComplianceReportRenderer.RenderConsole(report, provenanceByName),
             _ => throw new ArgumentException($"Unknown --format '{format}'. Valid: console, markdown, json."),
         };
 
@@ -781,6 +803,7 @@ internal static class SkillsScanCommand
             .Where(f => string.Equals(f.SkillName, manifest.Name, StringComparison.Ordinal))
             .ToList();
 
+        // Provenance is filled from a skills-lock.json, if any, in FinishScanAsync (one read for every scan mode).
         return new SkillBaselineEntry(
             manifest.Name, manifest.SourceKind, relativePath, structuralFingerprint, contentHash,
             Source: null, SourceUrl: null, Ref: null, skillFindings);

@@ -83,6 +83,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and counts the calls the candidate newly blocks and newly lets through (`--json` too). It replays the three gates
   that read a call's own arguments; a capture holds no tool results, so a gate that reads the conversation is refused
   with that reason rather than replayed on half a history.
+- **`skills scan` names where a skill came from.** When a project `skills-lock.json` (the file ChilliCream's `skills`
+  CLI writes) is in the scanned directory or a parent up to the repository root, each finding carries a pointer such
+  as `→ from chillicream/agent-skills@a1b2c3d` (console, Markdown and JSON), and `--write-baseline` stores the source
+  and ref on the snapshot. `SkillBaselineEntry.Source`/`Ref` and the renderers' provenance parameter existed but
+  nothing filled them. Offline; an unreadable lock file is a warning, and an entry holding control characters is
+  ignored.
 
 ### Changed
 - **`--azure-from-env` is now `--from-env`.** The flag builds the target from whichever provider `AI_INFERENCE_PROVIDER`

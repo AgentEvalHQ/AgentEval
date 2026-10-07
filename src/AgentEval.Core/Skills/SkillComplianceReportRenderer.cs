@@ -22,9 +22,8 @@ public static class SkillComplianceReportRenderer
     /// Agent Skills Wave 1 (§4.5 tier 1) — optional, keyed by skill name. When a finding's skill has a
     /// <see cref="SkillBaselineEntry.Source"/>/<see cref="SkillBaselineEntry.SourceUrl"/>, prints it inline
     /// next to the finding (e.g. <c>"→ from chillicream/agent-skills@a1b2c3d"</c>). <see langword="null"/>-safe
-    /// and backward compatible — every existing call site keeps working unchanged when omitted. No lock-file
-    /// parser exists yet to populate this from a real source (Wave 1 scope) — the wiring is real and tested,
-    /// the data source is a Wave 2/3 follow-on.
+    /// and backward compatible — every existing call site keeps working unchanged when omitted. <c>agenteval skills
+    /// scan</c> fills it from a project's <c>skills-lock.json</c> when one is found.
     /// </param>
     public static string RenderConsole(SkillComplianceReport report, IReadOnlyDictionary<string, SkillBaselineEntry>? provenanceByName = null)
     {

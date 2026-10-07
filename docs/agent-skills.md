@@ -141,6 +141,12 @@ pattern). `agenteval skills baseline list|diff|history` inspects it. `--repo` sc
 skill-directory convention under a repo root (`AgentEval.Skills.AgentSkillDirectoryConventions`) and
 aggregates the results. See [CLI reference](cli.md#agenteval-skills-baseline) for the full command surface.
 
+**Provenance pointer:** when a project `skills-lock.json` (`{"version": 1, "skills": {"<name>": {"source",
+"ref", …}}}`, as ChilliCream's `skills` CLI writes it) sits in the scanned directory or a parent up to the
+repository root, `skills scan` prints each flagged skill's source and ref next to its findings and stores them on
+the baseline entries (`SkillBaselineEntry.Source` / `Ref`). It reads only those fields, fetches nothing, and
+ignores an entry holding control characters.
+
 **Cross-location drift + trust-on-first-use (Wave 2):** two governance signals built directly on Wave 1's
 content hashing, both surfaced as ordinary `SkillComplianceFinding`s (so they render in console/markdown/
 json output automatically, no new schema):

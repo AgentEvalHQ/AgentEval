@@ -628,6 +628,12 @@ cross-location content drift (`--repo`/`scan-workspace` only, always on), trust-
 matching (`--check-baseline`, opt-in), and manifest hash-pin drift against an explicit trust-time pin
 (`--manifest-baseline`, opt-in) — see [Agent Skills](agent-skills.md#2--compliance-scanner) for how each works.
 
+When a `skills-lock.json` (the project lock file skill installers such as ChilliCream's `skills` CLI write) is in
+`<path>` or a parent of it up to the repository root, each finding names where its skill came from
+(`→ from chillicream/agent-skills@a1b2c3d`, in every format), and `--write-baseline` stores the source and ref on
+the snapshot. Nothing is fetched: it is a pointer for a person to check upstream, and it never changes a finding
+or the exit code.
+
 **Options**
 
 | Option | Description |

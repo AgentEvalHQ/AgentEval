@@ -26,7 +26,7 @@ namespace AgentEval.Skills;
 /// alone cannot see this — it only hashes resource/script NAMES, not bytes). <see langword="null"/> for
 /// non-file-sourced skills (no folder to hash).
 /// </param>
-/// <param name="Source">From a discovered <c>skills-lock.json</c> if present, else <see langword="null"/> — not required, most repos won't have one. No lock-file parser exists yet in Wave 1; this field is wired end-to-end (store → renderer) but always <see langword="null"/> until Wave 2/3 populates it from a real source.</param>
+/// <param name="Source">From a discovered <c>skills-lock.json</c> if present, else <see langword="null"/> — not required, most repos won't have one. <c>agenteval skills scan</c> looks for the file in the scanned directory and its parents up to the repository root.</param>
 /// <param name="SourceUrl">As <see cref="Source"/>.</param>
 /// <param name="Ref">Git ref/commit, if known from a discovered lock file. As <see cref="Source"/>.</param>
 /// <param name="ComplianceFindings">This skill's findings, filtered from the scan's <see cref="SkillComplianceReport.Findings"/> by <see cref="SkillComplianceFinding.SkillName"/> — <see cref="SkillComplianceReport"/> is flat, no per-skill grouping type exists, so this is a client-side filter, not a reuse of an existing per-skill type.</param>
