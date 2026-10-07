@@ -114,6 +114,14 @@ public static class McHost
             // the EvalResult tree. The execution-depth limit therefore stays at 10 (a ChatTurn-aware raise
             // belongs with the v0.13 timeline UI that actually wires the resolver).
             .AddMaxExecutionDepthRule(10, skipIntrospectionFields: true)
+            // Hot Chocolate 16 also applies a coordinate-cycle rule outside Development (so under `mc serve` and
+            // Docker, never in a default test host): the same field may repeat at most 3 times in one path. The
+            // scenario-tree page repeats `details` / `subResults` 4 times (root -> pillar -> article -> judge), so
+            // Production rejected it with HC0087 while every test passed (MC 01 P1-2). 4 cycles is exactly the
+            // drill-down; the depth-10 rule above and the cost caps below still bound everything else.
+            // SpaQueriesValidateTests sends every query the web app sends under Production settings.
+            .RemoveMaxAllowedFieldCycleDepthRule()
+            .AddMaxAllowedFieldCycleDepthRule(defaultCycleLimit: 4)
             // SEC-11: the depth rule alone does not bound a request that invokes expensive resolvers
             // many times via field aliases within depth<=10 (e.g. dozens of aliased evaluatorTimeline /
             // subjectsConnection fields). Enforce Hot Chocolate's operation-cost analysis with explicit

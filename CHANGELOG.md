@@ -121,6 +121,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Repeated runs of a test case are measured by `AgentEval.Comparison.StochasticRunner`.
 
 ### Fixed
+- **Three Mission Control pages showed nothing, or were rejected, under `mc serve`.** The tests wrote their own
+  GraphQL queries, so all three were green.
+  - The compliance matrix looked statuses up in lower case while the evidence stores them upper case (`PASS`), so
+    every cell rendered with no colour and no symbol. Statuses are mapped now, and `ERROR` and `SKIPPED` get cells and
+    legend entries of their own instead of passing for "no evidence".
+  - The evaluator list declared its filter as `CostTier`; the schema's type is `EvaluatorCostTier`, so every load
+    failed with HTTP 400.
+  - The scenario tree nests `details` four levels deep (root, pillar, article, judge), and Hot Chocolate's
+    coordinate-cycle rule, which runs outside Development only, allows three: every drill-down failed with HC0087.
+    The rule now allows four, in every environment; the depth and cost limits are unchanged.
+  A new test sends every GraphQL operation in the web app's source to the server under Production settings.
 - **Mission Control's run page shows the checks that did not run.** It showed Verdict, Scenarios, Failures and Cost; a
   skipped or errored check is neither a pass nor a fail (it counts in the run's `skipped` bucket and keeps the run from
   passing), so a run whose every check errored read FAIL beside "Failures 0". A **Not measured** tile (skipped or
