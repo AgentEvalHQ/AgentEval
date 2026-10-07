@@ -18,6 +18,7 @@ namespace AgentEval.DataLoaders;
 /// <list type="bullet">
 ///   <item>First row must be headers</item>
 ///   <item>Columns: id, input/question/prompt, expected/answer, category (all optional except input)</item>
+///   <item>Header names match in any spelling: <c>expected_output</c>, <c>expectedOutput</c>, <c>Expected Output</c></item>
 ///   <item>Quoted strings with escaped quotes ("") supported</item>
 ///   <item>Empty fields handled gracefully</item>
 /// </list>
@@ -125,14 +126,18 @@ public class CsvDatasetLoader : IDatasetLoader
         for (int i = 0; i < headers.Count; i++)
         {
             var header = headers[i].Trim().ToLowerInvariant();
-            
-            // Map common column name variants to standard names
-            var standardName = header switch
+
+            // Map column name variants to standard names, in any spelling (DatasetFieldNames): expectedOutput,
+            // expected_output and Expected Output are one column. Other columns keep their header as the metadata key.
+            var standardName = DatasetFieldNames.Normalize(header) switch
             {
-                "question" or "prompt" or "query" => "input",
-                "answer" or "expected_output" or "response" => "expected",
-                "contexts" or "documents" => "context",
-                "ground_truth" => "ground_truth",
+                "input" or "question" or "prompt" or "query" => "input",
+                "expected" or "answer" or "expectedoutput" or "response" => "expected",
+                "context" or "contexts" or "documents" => "context",
+                "expectedtools" => "expected_tools",
+                "evaluationcriteria" => "evaluation_criteria",
+                "passingscore" => "passing_score",
+                "groundtruth" => "ground_truth",
                 _ => header
             };
             

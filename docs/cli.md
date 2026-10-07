@@ -229,7 +229,7 @@ LLM-as-judge, named metrics (`--metrics`), and the `--output-dir` ADR-002 direct
 
 | Option | Description |
 |--------|-------------|
-| `--dataset <path>` | Required. Input dataset file. |
+| `--dataset <path>` | Required. Input dataset file: JSON, JSONL, CSV/TSV or YAML. Field names match in any spelling (`expected_output`, `expectedOutput`, `ExpectedOutput`). |
 | `--endpoint <url>` / `--azure` / `--deployment-name <name>` | Choose OpenAI-compatible or Azure OpenAI mode. |
 | `--model <name>` | Required for non-Azure endpoints. |
 | `--api-key <key>` | API key or environment variable fallback. |

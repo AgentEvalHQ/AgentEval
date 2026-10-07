@@ -450,6 +450,8 @@ Example `testcases.yaml`:
 > **Note:** Dataset files use `DatasetTestCase` field names (e.g., `id`, `input`, `expected`),
 > which differ from `TestCase` field names (e.g., `Name`, `ExpectedOutputContains`).
 > The `ToTestCase()` extension handles the conversion automatically.
+> Field names match in any spelling in every format: `expected_output`, `expectedOutput` and `ExpectedOutput` are the
+> same field, and a key that is not a field is kept in the test case's metadata.
 
 ```yaml
 - id: Greeting Test

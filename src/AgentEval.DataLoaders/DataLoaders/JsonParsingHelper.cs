@@ -13,24 +13,29 @@ namespace AgentEval.DataLoaders;
 /// </summary>
 internal static class JsonParsingHelper
 {
-    private static readonly string[] KnownPropertyNames = new[]
-    {
-        "id", "category",
-        "input", "question", "prompt", "query",
-        "expected", "expected_output", "answer", "response",
-        "context", "contexts", "documents",
-        "expected_tools", "tools",
-        "ground_truth", "function", "arguments",
-        "evaluation_criteria", "tags", "passing_score"
-    };
+    /// <summary>
+    /// Checks if a property name, in any spelling (<see cref="DatasetFieldNames"/>), is a known/standard property.
+    /// </summary>
+    public static bool IsKnownProperty(string name) => DatasetFieldNames.IsKnown(name);
 
     /// <summary>
-    /// Checks if a property name is a known/standard property.
+    /// Finds the first property of <paramref name="element"/> whose name is <paramref name="field"/> in any spelling:
+    /// <c>expected_output</c>, <c>expectedOutput</c> and <c>ExpectedOutput</c> all match (<see cref="DatasetFieldNames"/>).
     /// </summary>
-    public static bool IsKnownProperty(string name)
+    public static bool TryGetField(JsonElement element, string field, out JsonElement value)
     {
-        return Array.Exists(KnownPropertyNames, p => 
-            string.Equals(p, name, StringComparison.OrdinalIgnoreCase));
+        var wanted = DatasetFieldNames.Normalize(field);
+        foreach (var prop in element.EnumerateObject())
+        {
+            if (DatasetFieldNames.Normalize(prop.Name) == wanted)
+            {
+                value = prop.Value;
+                return true;
+            }
+        }
+
+        value = default;
+        return false;
     }
 
     /// <summary>
@@ -38,7 +43,7 @@ internal static class JsonParsingHelper
     /// </summary>
     public static string GetStringOrDefault(JsonElement element, string propertyName, string defaultValue)
     {
-        return element.TryGetProperty(propertyName, out var prop) && prop.ValueKind == JsonValueKind.String
+        return TryGetField(element, propertyName, out var prop) && prop.ValueKind == JsonValueKind.String
             ? prop.GetString() ?? defaultValue
             : defaultValue;
     }
@@ -48,9 +53,77 @@ internal static class JsonParsingHelper
     /// </summary>
     public static string? GetStringOrNull(JsonElement element, string propertyName)
     {
-        return element.TryGetProperty(propertyName, out var prop) && prop.ValueKind == JsonValueKind.String
+        return TryGetField(element, propertyName, out var prop) && prop.ValueKind == JsonValueKind.String
             ? prop.GetString()
             : null;
+    }
+
+    /// <summary>
+    /// Reads one test case from a JSON object, the same way for <c>.json</c> and <c>.jsonl</c>. Field names match in
+    /// any spelling (<see cref="DatasetFieldNames"/>); any other property is kept in <see cref="DatasetTestCase.Metadata"/>.
+    /// </summary>
+    /// <param name="element">A JSON object.</param>
+    /// <param name="defaultId">The id to use when the object has none.</param>
+    public static DatasetTestCase ParseTestCase(JsonElement element, string defaultId)
+    {
+        var testCase = new DatasetTestCase
+        {
+            Id = GetStringOrDefault(element, "id", defaultId),
+            Category = GetStringOrNull(element, "category"),
+            Input = GetInput(element),
+            ExpectedOutput = GetExpectedOutput(element),
+        };
+
+        if (TryGetField(element, "context", out var context)
+            || TryGetField(element, "contexts", out context)
+            || TryGetField(element, "documents", out context))
+        {
+            testCase.Context = ParseStringArray(context);
+        }
+
+        if (TryGetField(element, "expected_tools", out var tools) || TryGetField(element, "tools", out tools))
+        {
+            testCase.ExpectedTools = ParseStringArray(tools);
+        }
+
+        if (TryGetField(element, "ground_truth", out var groundTruth))
+        {
+            testCase.GroundTruth = ParseGroundTruth(groundTruth);
+        }
+        else if (TryGetField(element, "function", out var function) && TryGetField(element, "arguments", out var arguments))
+        {
+            // BFCL style: { "function": "name", "arguments": {...} }
+            testCase.GroundTruth = new GroundTruthToolCall
+            {
+                Name = function.ValueKind == JsonValueKind.String ? function.GetString() ?? "" : "",
+                Arguments = ParseArguments(arguments),
+            };
+        }
+
+        if (TryGetField(element, "evaluation_criteria", out var criteria))
+        {
+            testCase.EvaluationCriteria = ParseStringArray(criteria);
+        }
+
+        if (TryGetField(element, "tags", out var tags))
+        {
+            testCase.Tags = ParseStringArray(tags);
+        }
+
+        if (TryGetField(element, "passing_score", out var score) && score.ValueKind == JsonValueKind.Number)
+        {
+            testCase.PassingScore = score.GetInt32();
+        }
+
+        foreach (var prop in element.EnumerateObject())
+        {
+            if (!IsKnownProperty(prop.Name))
+            {
+                testCase.Metadata[prop.Name] = GetJsonValue(prop.Value);
+            }
+        }
+
+        return testCase;
     }
 
     /// <summary>
@@ -83,7 +156,7 @@ internal static class JsonParsingHelper
         }
 
         var name = GetStringOrDefault(element, "name", GetStringOrDefault(element, "function", ""));
-        var args = element.TryGetProperty("arguments", out var argsProp)
+        var args = TryGetField(element, "arguments", out var argsProp)
             ? ParseArguments(argsProp)
             : new Dictionary<string, object?>();
 

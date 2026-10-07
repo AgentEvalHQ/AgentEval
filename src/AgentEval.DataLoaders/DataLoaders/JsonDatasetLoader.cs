@@ -86,28 +86,11 @@ public class JsonDatasetLoader : IDatasetLoader
         }
         else if (root.ValueKind == JsonValueKind.Object)
         {
-            // Try common property names for the array
-            if (root.TryGetProperty("data", out var dataProp))
-            {
-                arrayElement = dataProp;
-            }
-            else if (root.TryGetProperty("testCases", out var testCasesProp))
-            {
-                arrayElement = testCasesProp;
-            }
-            else if (root.TryGetProperty("test_cases", out var testCasesSnakeProp))
-            {
-                arrayElement = testCasesSnakeProp;
-            }
-            else if (root.TryGetProperty("examples", out var examplesProp))
-            {
-                arrayElement = examplesProp;
-            }
-            else if (root.TryGetProperty("samples", out var samplesProp))
-            {
-                arrayElement = samplesProp;
-            }
-            else
+            // Try common property names for the array (any spelling: testCases, test_cases, TestCases)
+            if (!JsonParsingHelper.TryGetField(root, "data", out arrayElement)
+                && !JsonParsingHelper.TryGetField(root, "test_cases", out arrayElement)
+                && !JsonParsingHelper.TryGetField(root, "examples", out arrayElement)
+                && !JsonParsingHelper.TryGetField(root, "samples", out arrayElement))
             {
                 throw new InvalidDataException(
                     $"JSON file must be an array or object with 'data', 'testCases', 'test_cases', 'examples', or 'samples' property: {path}");
@@ -147,81 +130,6 @@ public class JsonDatasetLoader : IDatasetLoader
             return null;
         }
 
-        var testCase = new DatasetTestCase
-        {
-            Id = JsonParsingHelper.GetStringOrDefault(element, "id", $"item_{index}"),
-            Category = JsonParsingHelper.GetStringOrNull(element, "category"),
-            Input = JsonParsingHelper.GetInput(element),
-            ExpectedOutput = JsonParsingHelper.GetExpectedOutput(element),
-        };
-
-        // Parse context
-        if (element.TryGetProperty("context", out var contextProp))
-        {
-            testCase.Context = JsonParsingHelper.ParseStringArray(contextProp);
-        }
-        else if (element.TryGetProperty("contexts", out var contextsProp))
-        {
-            testCase.Context = JsonParsingHelper.ParseStringArray(contextsProp);
-        }
-        else if (element.TryGetProperty("documents", out var docsProp))
-        {
-            testCase.Context = JsonParsingHelper.ParseStringArray(docsProp);
-        }
-
-        // Parse expected tools
-        if (element.TryGetProperty("expected_tools", out var toolsProp))
-        {
-            testCase.ExpectedTools = JsonParsingHelper.ParseStringArray(toolsProp);
-        }
-        else if (element.TryGetProperty("tools", out var toolsProp2))
-        {
-            testCase.ExpectedTools = JsonParsingHelper.ParseStringArray(toolsProp2);
-        }
-
-        // Parse ground truth
-        if (element.TryGetProperty("ground_truth", out var gtProp))
-        {
-            testCase.GroundTruth = JsonParsingHelper.ParseGroundTruth(gtProp);
-        }
-        else if (element.TryGetProperty("function", out var funcProp) &&
-                 element.TryGetProperty("arguments", out var argsProp))
-        {
-            testCase.GroundTruth = new GroundTruthToolCall
-            {
-                Name = funcProp.GetString() ?? "",
-                Arguments = JsonParsingHelper.ParseArguments(argsProp)
-            };
-        }
-
-        // Parse evaluation criteria
-        if (element.TryGetProperty("evaluation_criteria", out var criteriaProp))
-        {
-            testCase.EvaluationCriteria = JsonParsingHelper.ParseStringArray(criteriaProp);
-        }
-        
-        // Parse tags
-        if (element.TryGetProperty("tags", out var tagsProp))
-        {
-            testCase.Tags = JsonParsingHelper.ParseStringArray(tagsProp);
-        }
-        
-        // Parse passing score
-        if (element.TryGetProperty("passing_score", out var scoreProp) && scoreProp.ValueKind == JsonValueKind.Number)
-        {
-            testCase.PassingScore = scoreProp.GetInt32();
-        }
-        
-        // Collect metadata
-        foreach (var prop in element.EnumerateObject())
-        {
-            var name = prop.Name.ToLowerInvariant();
-            if (!JsonParsingHelper.IsKnownProperty(name))
-            {
-                testCase.Metadata[prop.Name] = JsonParsingHelper.GetJsonValue(prop.Value);
-            }
-        }
-
-        return testCase;
+        return JsonParsingHelper.ParseTestCase(element, $"item_{index}");
     }
 }

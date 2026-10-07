@@ -100,6 +100,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Repeated runs of a test case are measured by `AgentEval.Comparison.StochasticRunner`.
 
 ### Fixed
+- **Datasets written in camelCase lost their expected outputs, and every test passed.** The JSON, JSONL, CSV and YAML
+  loaders read snake_case keys only. `expectedOutput` (and `expectedTools`, `groundTruth`, `evaluationCriteria`,
+  `passingScore`, the `testCases:` wrapper) was kept as metadata by the JSON loaders and dropped by the YAML loader,
+  and a test case with no expected output and no judge passes any non-empty answer at 100. `eval` on such a dataset
+  passed whatever the agent said. Field names now match in any spelling in every format: `expected_output`,
+  `expectedOutput`, `ExpectedOutput`, `expected-output`. The YAML loader also keeps unknown keys as metadata, as the
+  JSON loaders do, accepts a single string where a list is expected, and reports a syntax error with its line instead
+  of "must be an array of test cases". A JSONL line that is valid JSON but not an object names its line number.
 - **Agentic calibration filed every evaluator whose key ends in "quality" under Quality.** The category router checked
   golden-filename suffixes before evaluator keys, so `refusal_quality` (UX) and `goal_decomposition_quality`,
   `plan_formulation_quality` and `self_correction_quality` (Reasoning) were scored and gated with Quality, against
