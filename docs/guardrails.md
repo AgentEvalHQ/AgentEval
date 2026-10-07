@@ -16,7 +16,7 @@ AgentEval's behavioural policies (`NeverCallTool`, `NeverPassArgumentMatching`, 
 - **`GateVerdict`** — `Allow` or `Block` (binary finding), with an optional `RedactedText` (a masked replacement the client may apply) and `Matches`.
 - **`EvalGatePolicy`** — how a `Block` is enforced: `WarnOnly` (default), `ThrowOnFail`, `Redact`.
 - **`EvalGatingChatClient`** — the `DelegatingChatClient` that runs the gates.
-- Built-in gates: **`RegexPiiGate`** (Email/Phone/SSN/CreditCard/IP, ReDoS-bounded; supplies redacted text), **`TokenInjectionGate`** (configurable injection markers), **`SafetyMetricGate`** (adapts any `ISafetyMetric`, e.g. `ToxicityMetric`).
+- Built-in gates: **`RegexPiiGate`** (Email/Phone/SSN/CreditCard/IP, ReDoS-bounded; supplies redacted text), **`TokenInjectionGate`** (configurable injection markers), **`SafetyMetricGate`** (adapts any `ISafetyMetric` that judges the text alone, e.g. `ToxicityMetric`; a metric that needs a retrieved context or a reference answer, such as `GroundednessMetric`, is refused when the gate is built, since the gate has only the text and would block every message).
 
 ## Policies
 

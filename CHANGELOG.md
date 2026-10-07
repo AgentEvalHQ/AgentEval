@@ -111,6 +111,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Repeated runs of a test case are measured by `AgentEval.Comparison.StochasticRunner`.
 
 ### Fixed
+- **`SafetyMetricGate` refuses a metric it can never measure.** The gate gives its metric only the inspected text, so
+  a metric that needs a retrieved context or a reference answer (`GroundednessMetric`) was never measured and the gate
+  blocked every message, with "safety metric failed"-style reasons. Building the gate with such a metric now throws
+  `ArgumentException` saying why. A metric not measured at run time for another reason still blocks (fail-closed), and
+  the reason now says it was not measured.
 - **The Skill Health & Security Index no longer scores what was not measured.** An efficiency `MetricResult` that was
   not measured carries a placeholder score of 0, and the index averaged it in: a clean compliance scan (100) read as
   50. A security outcome with no probe run and no drift finding scored a perfect 100, though the code said that axis
