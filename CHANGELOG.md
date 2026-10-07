@@ -69,6 +69,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   them must acknowledge the preview: `<NoWarn>$(NoWarn);AGENTEVAL_DECISIONS_PREVIEW001</NoWarn>` or a `#pragma`.
 
 ### Fixed
+- **A tool assertion on a result with no tool data fails with the reason.** When the agent's adapter returns no
+  `RawMessages`, or tool tracking is off, `TestResult.ToolUsage` is null and AgentEval cannot see the agent's tool calls.
+  `result.ToolUsage!.Should().HaveCalledTool(...)` then crashed with `ArgumentNullException (Parameter 'report')`. It
+  now fails with a `ToolAssertionException` that says there is no tool-call data and names both causes. It still
+  fails: an assertion that cannot see the tool calls must not pass, or be skipped. An agent that cannot call tools, or
+  did not, produces an empty report and fails as before, with "No tools were called".
 - **One set of model prices, dated.** `ModelPricing` (run cost) and `JudgeCostMap` (judge cost) disagreed, so a model
   cost different amounts depending on the report. Both now carry OpenAI's and Anthropic's published standard-tier prices
   as checked on 2026-10-07, and a test fails when a model both tables know is priced differently. Estimates change for:

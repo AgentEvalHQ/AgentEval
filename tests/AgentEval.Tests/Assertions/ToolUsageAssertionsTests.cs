@@ -14,6 +14,32 @@ namespace AgentEval.Tests;
 public class ToolUsageAssertionsTests
 {
     [Fact]
+    public void Should_OnANullReport_FailsAndSaysWhyThereIsNoToolData()
+    {
+        // A null ToolUsage means AgentEval never saw the agent's tool calls (an adapter that returns no RawMessages, or
+        // TrackTools off). The assertion must fail, and say so; it used to crash with
+        // ArgumentNullException "Value cannot be null. (Parameter 'report')".
+        ToolUsageReport? report = null;
+
+        var ex = Assert.Throws<ToolAssertionException>(() => report.Should().HaveCalledTool("SearchFlights"));
+
+        Assert.Contains("no tool-call data", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("RawMessages", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("TrackTools", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void HaveCalledTool_OnAnEmptyReport_FailsAsNotCalled()
+    {
+        // An agent that cannot call tools, or did not, produces an empty report: the tool was not called, and that is a
+        // failure, not a missing-data case.
+        var ex = Assert.Throws<ToolAssertionException>(() => new ToolUsageReport().Should().HaveCalledTool("SearchFlights"));
+
+        Assert.Contains("Expected tool 'SearchFlights' to be called, but it was not.", ex.Message, StringComparison.Ordinal);
+        Assert.Contains("No tools were called", ex.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void HaveCalledTool_MissingTool_InScope_RecordsSoftFailure_NoInvalidOperation()
     {
         // BUG-15: inside an AgentEvalScope, FailWith records and RETURNS, so HaveCalledTool used to
