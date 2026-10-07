@@ -16,7 +16,7 @@ namespace AgentEval.Tests.Cli;
 /// </summary>
 /// <remarks>
 /// We do NOT test the success path here because it requires real Azure creds — that
-/// path is covered transitively when the CLI is run with <c>--azure-from-env</c>
+/// path is covered transitively when the CLI is run with <c>--from-env</c>
 /// against a real deployment. See plan-13 T0.2 acceptance criteria.
 ///
 /// T3.3 (2026-05-25): joined the "ConsoleIO" xUnit collection so the

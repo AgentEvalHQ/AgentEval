@@ -469,7 +469,7 @@ agenteval bench agentic calibrate [--root <path>] [--out <path>] [--records <pat
 - **`typedmemeval` takes `--vertical <prospective|episodic|arithmetic|workingmemory|forgetting>` and `--subject`, both required** — the verticals measure different mechanisms, so there is no default. Corpora are embedded (no download, no dataset path); a real model is required, from whichever provider `AI_INFERENCE_PROVIDER` selects (the `AZURE_OPENAI_*` trio when it is unset), and there is no stub fallback. It prints the typed outcome vector with every denominator and gates on nothing: the family publishes no pass threshold, so a run exits **0** when it measured anything and **11** (`GateIndeterminate`) when it measured nothing, and its run summary is recorded as `WARN` (indeterminate) rather than PASS/FAIL. Cite results as `TypedMemEval-<Vertical> v5 (AgentEval)` — never summed or averaged with LongMemEval numbers. `--vertical prospective` additionally requires the agent under test to implement `ITimestampedHistoryInjectableAgent`; the run refuses before its first provider call otherwise.
 - Family-specific options and presets are documented under [Benchmarks](benchmarks.md) and the family pages in the TOC.
 - For the Trace Fidelity and AutoAudit families, see the historical design docs under `docs/glassbox-history/` (linked in the TOC under Resources).
-- **Every `bench` family that grades an agent needs a real target, or it refuses (exit 2).** `owasp`/`mitre`/`nist`/`perf` take `--azure-from-env` (the configured provider), `--sut copilot-studio` (same flags as `eval`/`redteam`) or a generic `--endpoint <url> --model <name> [--api-key <key>]` OpenAI-compatible endpoint. `gdpr`/`eu-ai-act` take `--azure-from-env` or `--sut copilot-studio` (each scenario's prompt is sent to the live agent), or the agent's real answer with `--response`/`--response-file` plus the `--input` it answered. `agentic` grades a supplied `--response`/`--response-file` with its `--input`, plus `--reference`/`--reference-file` (the expected answer) and `--context`/`--context-file` (the retrieved context) for the checks that grade against them (`rag-quality`); without them those checks report not measured. `--sut mock` runs a built-in stand-in instead of an agent: the run says MOCK, exits 11 whatever it scores, and nothing is written to `.agenteval/`. Through 0.42 these commands quietly fell back to a stand-in and stored the result as a measurement.
+- **Every `bench` family that grades an agent needs a real target, or it refuses (exit 2).** `owasp`/`mitre`/`nist`/`perf` take `--from-env` (the configured provider; `--azure-from-env`, its old name, still works), `--sut copilot-studio` (same flags as `eval`/`redteam`) or a generic `--endpoint <url> --model <name> [--api-key <key>]` OpenAI-compatible endpoint. `gdpr`/`eu-ai-act` take `--from-env` or `--sut copilot-studio` (each scenario's prompt is sent to the live agent), or the agent's real answer with `--response`/`--response-file` plus the `--input` it answered. `agentic` grades a supplied `--response`/`--response-file` with its `--input`, plus `--reference`/`--reference-file` (the expected answer) and `--context`/`--context-file` (the retrieved context) for the checks that grade against them (`rag-quality`); without them those checks report not measured. `--sut mock` runs a built-in stand-in instead of an agent: the run says MOCK, exits 11 whatever it scores, and nothing is written to `.agenteval/`. Through 0.42 these commands quietly fell back to a stand-in and stored the result as a measurement.
 - **`owasp`/`mitre`/`nist` grade judge first, as `redteam --judge` does.** The judge model comes from the environment (the `AZURE_OPENAI_JUDGE_*` override if set, otherwise the provider `AI_INFERENCE_PROVIDER` selects); there is no option to pick it. With no provider configured the command exits **3**; `--sut mock` needs none and grades with the oracles alone. Before the scan the command makes one short call to the judge and exits **3** if it does not answer. The semantic attacks are graded by Composite Judges (several judge calls per probe); the other attacks by their per-attack oracle, which asks the judge only when it is inconclusive, and the judge may then only raise the probe to "attack succeeded". If a judge call fails during the scan, or the scan runs out of time, the run is INCOMPLETE: stored as `WARN` and exit **11**, never a pass — unless what it did measure already fails it,
 which stays a fail (`FAIL`, exit **9**). See the [OWASP](benchmarks/owasp/getting-started.md#presets) and [MITRE](benchmarks/mitre/getting-started.md#presets) pages for probe counts.
 
@@ -776,7 +776,7 @@ Work with a file written by [`--capture-fixture`](#fixture-capture).
 
 ```
 agenteval log-file to-fixture <captured.jsonl> --out <fixture.json>
-agenteval log-file replay     <captured.jsonl> --out <report.md> (--azure-from-env | --endpoint <url> --model <name> [--api-key <key>]) [--strict-text]
+agenteval log-file replay     <captured.jsonl> --out <report.md> (--from-env | --endpoint <url> --model <name> [--api-key <key>]) [--strict-text]
 ```
 
 **`to-fixture`** writes a JSON array of scripted turns that `ScriptedChatClient.FromFixture` loads, so a test
@@ -806,7 +806,7 @@ to stdout.
 |--------|-------------|
 | `<captured>` | Required, positional. A file written by `--capture-fixture`. |
 | `--out <path>` | Required. `to-fixture`: the fixture JSON array. `replay`: the Markdown report. A missing parent directory is created. |
-| `--azure-from-env` (`replay`) | Replay against the provider `AI_INFERENCE_PROVIDER` selects (see [Environment variables](#environment-variables)) — despite its name, not only Azure OpenAI. Checked before `--endpoint`. |
+| `--from-env` (`replay`) | Replay against the provider `AI_INFERENCE_PROVIDER` selects (see [Environment variables](#environment-variables)). `--azure-from-env` is its old name and still works. Checked before `--endpoint`. |
 | `--endpoint <url>` / `--model <name>` / `--api-key <key>` (`replay`) | Replay against an OpenAI-compatible endpoint. `--model` is required with `--endpoint`. Without `--api-key`, `OPENAI_API_KEY` is used, and without that a placeholder key for keyless local servers. |
 | `--strict-text` (`replay`) | Also fail a round-trip whose text is not identical. Off by default: model output is not reproducible, even against the same model with the same settings. |
 
@@ -816,7 +816,7 @@ to stdout.
 |------|---------|
 | `0` | `to-fixture`: the fixture was written. `replay`: no round-trip failed (flags do not fail the run). |
 | `1` | `replay`: at least one round-trip failed. |
-| `2` | `replay`: no target was given, `--endpoint` was given without `--model`, or `--azure-from-env` found no configured provider. |
+| `2` | `replay`: no target was given, `--endpoint` was given without `--model`, or `--from-env` found no configured provider. |
 | `3` | The capture file does not exist, or another error occurred (for example, a line that is not a capture record). |
 
 ---

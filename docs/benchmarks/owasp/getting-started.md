@@ -52,21 +52,21 @@ Cost: one agent call per probe (23 for `smoke`, 73 for `top10`, 264 for `audit` 
 
 ```bash
 # Real model from the configured inference provider
-agenteval bench owasp --preset top10 --subject MyAgent --azure-from-env
+agenteval bench owasp --preset top10 --subject MyAgent --from-env
 
 # Smoke (CI-friendly)
-agenteval bench owasp --preset smoke --subject MyAgent --azure-from-env
+agenteval bench owasp --preset smoke --subject MyAgent --from-env
 
 # Audit-grade
-agenteval bench owasp --preset audit --subject MyAgent --azure-from-env
+agenteval bench owasp --preset audit --subject MyAgent --from-env
 
 # RAG-focused
-agenteval bench owasp --preset top10-rag --subject MyAgent --azure-from-env
+agenteval bench owasp --preset top10-rag --subject MyAgent --from-env
 ```
 
 The `--input` flag is accepted for provenance but the OWASP pipeline generates its own probes — `--input` is recorded in the run manifest, not consumed by the attacks.
 
-`--azure-from-env` builds the agent from whichever provider `AI_INFERENCE_PROVIDER` selects — Azure OpenAI, Bitdeer, OpenAI, Azure AI Foundry or any OpenAI-compatible host; see the [provider table](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to) for the variables each one needs. Despite its name, the flag is not Azure-only: with the selector unset, the first fully configured provider in that table's order is used, so an environment with only the `AZURE_OPENAI_*` trio still gets Azure OpenAI. If no provider is configured, the command fails and names what is missing. `--endpoint <url> --model <name>` targets any OpenAI-compatible endpoint directly instead. Without a target the command refuses (exit 2). `--sut mock` runs a built-in stand-in instead: the run says MOCK, exits 11 whatever it scores, and nothing is written to `.agenteval/`, because it measures no agent.
+`--from-env` builds the agent from whichever provider `AI_INFERENCE_PROVIDER` selects — Azure OpenAI, Bitdeer, OpenAI, Azure AI Foundry or any OpenAI-compatible host; see the [provider table](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to) for the variables each one needs. Despite its name, the flag is not Azure-only: with the selector unset, the first fully configured provider in that table's order is used, so an environment with only the `AZURE_OPENAI_*` trio still gets Azure OpenAI. If no provider is configured, the command fails and names what is missing. `--endpoint <url> --model <name>` targets any OpenAI-compatible endpoint directly instead. Without a target the command refuses (exit 2). `--sut mock` runs a built-in stand-in instead: the run says MOCK, exits 11 whatever it scores, and nothing is written to `.agenteval/`, because it measures no agent.
 
 ## Attack → OWASP category mapping
 
@@ -184,7 +184,7 @@ Known limitations:
 - The CLI has no option to pick the judge: it is the model the environment configures, and the run's provenance records it.
 - LLM08 (Vector / Embedding Weaknesses) exercises a real retrieval boundary via the `retrieve_context` canary; there is no deeper retrieval-corpus-poisoning probe pack.
 - The built-in attack roster (14 attacks) is fixed; custom attack-type injection beyond the built-in roster plus `--import-probes` dataset packs is not yet exposed via CLI.
-- The CLI can scan a plain chat model (`--azure-from-env` with any configured provider, or `--endpoint`/`--model` for an OpenAI-compatible endpoint) or the built-in `--sut` targets. There is no option that loads an agent from a manifest file. An agent with its own tools, memory or a non-chat interface is scanned from a small program that wraps it as an `IEvaluableAgent` — see `samples/AgentEval.Samples/Benchmarks/06_OwaspBenchmark.cs` and [Programmatic use](#programmatic-use).
+- The CLI can scan a plain chat model (`--from-env` with any configured provider, or `--endpoint`/`--model` for an OpenAI-compatible endpoint) or the built-in `--sut` targets. There is no option that loads an agent from a manifest file. An agent with its own tools, memory or a non-chat interface is scanned from a small program that wraps it as an `IEvaluableAgent` — see `samples/AgentEval.Samples/Benchmarks/06_OwaspBenchmark.cs` and [Programmatic use](#programmatic-use).
 
 See also:
 - [GDPR getting-started](../gdpr/getting-started.md) — for dialog-based compliance benchmarking.

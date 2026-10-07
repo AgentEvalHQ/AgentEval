@@ -56,18 +56,18 @@ Cost: one agent call per probe (23 for `atlas-smoke`, 73 for `atlas-baseline`, 2
 
 ```bash
 # Real agent from the configured inference provider
-agenteval bench mitre --preset atlas-baseline --subject MyAgent --azure-from-env
+agenteval bench mitre --preset atlas-baseline --subject MyAgent --from-env
 
 # Smoke (CI-friendly)
-agenteval bench mitre --preset atlas-smoke --subject MyAgent --azure-from-env
+agenteval bench mitre --preset atlas-smoke --subject MyAgent --from-env
 
 # Audit-grade
-agenteval bench mitre --preset atlas-audit-grade --subject MyAgent --azure-from-env
+agenteval bench mitre --preset atlas-audit-grade --subject MyAgent --from-env
 ```
 
 The `--input` flag is accepted for provenance but the MITRE pipeline generates its own probes — `--input` is recorded in the run manifest, not consumed by the attacks.
 
-`--azure-from-env` builds the agent from whichever provider `AI_INFERENCE_PROVIDER` selects (Azure OpenAI included; see the [provider table](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to)) and fails, naming what is missing, if none is configured. `--endpoint <url> --model <name>` targets any OpenAI-compatible endpoint directly instead. Without a target the command refuses (exit 2). `--sut mock` runs a built-in stand-in instead: the run says MOCK, exits 11 whatever it scores, and nothing is written to `.agenteval/`, because it measures no agent.
+`--from-env` builds the agent from whichever provider `AI_INFERENCE_PROVIDER` selects (Azure OpenAI included; see the [provider table](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to)) and fails, naming what is missing, if none is configured. `--endpoint <url> --model <name>` targets any OpenAI-compatible endpoint directly instead. Without a target the command refuses (exit 2). `--sut mock` runs a built-in stand-in instead: the run says MOCK, exits 11 whatever it scores, and nothing is written to `.agenteval/`, because it measures no agent.
 
 ## Output
 
@@ -158,7 +158,7 @@ Known limitations:
 - Only the semantic attacks are decided by the judge. The other attacks are decided by per-attack (keyword/structural) oracles, and the judge is asked only when one of them is inconclusive. See [Presets](#presets).
 - The CLI has no option to pick the judge: it is the model the environment configures, and the run's provenance records it.
 - The presets run a fixed roster — the 14 built-in attacks (`atlas-baseline`, `atlas-audit-grade`) or 3 (`atlas-smoke`); custom attack injection (per-org policy probes) is not yet supported via CLI.
-- The CLI can scan a plain chat model (`--azure-from-env` with any configured provider, or `--endpoint`/`--model` for an OpenAI-compatible endpoint) or the built-in `--sut` targets. There is no option that loads an agent from a manifest file. An agent with its own tools, memory or a non-chat interface is scanned from a small program that wraps it as an `IEvaluableAgent` — see `samples/AgentEval.Samples/Benchmarks/07_MitreBenchmark.cs` and [Programmatic use](#programmatic-use).
+- The CLI can scan a plain chat model (`--from-env` with any configured provider, or `--endpoint`/`--model` for an OpenAI-compatible endpoint) or the built-in `--sut` targets. There is no option that loads an agent from a manifest file. An agent with its own tools, memory or a non-chat interface is scanned from a small program that wraps it as an `IEvaluableAgent` — see `samples/AgentEval.Samples/Benchmarks/07_MitreBenchmark.cs` and [Programmatic use](#programmatic-use).
 
 See also:
 - [OWASP getting-started](../owasp/getting-started.md) — sister red-team family; same attack pipeline tagged against OWASP categories.

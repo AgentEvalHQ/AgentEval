@@ -591,13 +591,13 @@ Every family auto-registers via `[ModuleInitializer]` into `BenchmarkFamilyRegis
 | **GDPR** | `smoke` / `standard` / `audit` + 3 domain packs (healthcare / HR / children) | ✅ end-to-end | 29 article YAMLs across 6 pillars | Medium |
 | **EU AI Act** | `smoke` / `standard` / `audit` + 3 domain packs (high-risk-employment / -credit / -education) | ✅ end-to-end | 15 article YAMLs across 6 pillars (Reg (EU) 2024/1689) | Medium |
 | **Agentic** | 12 presets (`agentic-execution` / `tool-call-accuracy` / `rag-quality` / `telemetry` etc.; `safety` is programmatic only) plus a `--budget-tier {trivial,low,medium,high,all}` filter | ✅ end-to-end | Foundry-equivalent 60-evaluator universe — system / process / UX / quality / safety / adversarial / reasoning / calibration / memory | Medium |
-| **OWASP LLM Top 10** | `top10` / `smoke` / `audit` / `top10-rag` | ✅ end-to-end (`--azure-from-env` or `--endpoint`/`--model` for a real target; without one it refuses, exit 2; `--sut mock` runs a stand-in; graded judge first) | 14 attack types covering all 10 OWASP LLM Top 10 v2.0 categories (LLM03/04/08/09 added in Wave D; SkillInjection added for MAF Agent Skills) | Medium |
+| **OWASP LLM Top 10** | `top10` / `smoke` / `audit` / `top10-rag` | ✅ end-to-end (`--from-env` or `--endpoint`/`--model` for a real target; without one it refuses, exit 2; `--sut mock` runs a stand-in; graded judge first) | 14 attack types covering all 10 OWASP LLM Top 10 v2.0 categories (LLM03/04/08/09 added in Wave D; SkillInjection added for MAF Agent Skills) | Medium |
 | **MITRE ATLAS** | `atlas-baseline` / `atlas-smoke` / `atlas-audit-grade` | ✅ end-to-end (same targets as OWASP; graded judge first) | Same 14 attacks mapped via `IAttackType.MitreAtlasIds` covering 8 applicable ATLAS techniques | Medium |
-| **NIST AI RMF** | `rmf-baseline` / `rmf-smoke` / `rmf-audit-grade` | ✅ end-to-end (`--azure-from-env` or `--endpoint`/`--model` for a real target; without one it refuses, exit 2; `--sut mock` runs a stand-in; graded judge first) | Same 14 attacks mapped to NIST AI RMF (AI 100-1) MEASURE security/privacy/validity sub-actions (GOVERN/MAP/MANAGE not applicable) | Medium |
+| **NIST AI RMF** | `rmf-baseline` / `rmf-smoke` / `rmf-audit-grade` | ✅ end-to-end (`--from-env` or `--endpoint`/`--model` for a real target; without one it refuses, exit 2; `--sut mock` runs a stand-in; graded judge first) | Same 14 attacks mapped to NIST AI RMF (AI 100-1) MEASURE security/privacy/validity sub-actions (GOVERN/MAP/MANAGE not applicable) | Medium |
 | **LongMemEval** | `subset` / `full` (ICLR 2025) | ✅ end-to-end | Cross-platform memory benchmark — paper-published GPT-4o baseline ≈ 57.7% | Medium |
 | **Memory** | `quick` / `standard` / `full` / `diagnostic` / `overflow` | ✅ end-to-end | Native AgentEval memory benchmark — 3/8/12 categories, weighted grading | Medium |
 | **TypedMemEval** | one preset per vertical: `prospective` / `episodic` / `arithmetic` / `workingmemory` / `forgetting` / `bitemporal` / `semantic` / `conjunction` / `procedural` / `temporal` | ✅ `agenteval bench typedmemeval` | AgentEval's own typed memory corpora, embedded (no download); results are not comparable with LongMemEval numbers | Medium |
-| **Performance** | `latency` / `throughput` / `cost` | ✅ end-to-end (`--azure-from-env`) | P99 latency / concurrent throughput / per-prompt cost against your deployment | Low |
+| **Performance** | `latency` / `throughput` / `cost` | ✅ end-to-end (`--from-env`) | P99 latency / concurrent throughput / per-prompt cost against your deployment | Low |
 | **Trace Fidelity** | `smoke` / `standard` / `audit-grade` | ✅ end-to-end (pure code, no LLM cost — reconciles two supplied `.trace.json` files) | Agent-boundary vs chat-boundary trace reconciliation — missing/phantom calls, hidden retries, argument drift, token under-reporting, suppressed finish reasons | Free |
 | **Workflow Trace Fidelity** | `smoke` / `standard` / `audit-grade` | ✅ end-to-end (pure code, no LLM cost — reconciles a workflow `.trace.json`) | Per-executor workflow ledger (tokens + finish reason) vs chat-boundary truth — per-executor fidelity (Agree / TokenMismatch / FinishMismatch / NoTruth) | Free |
 
@@ -670,8 +670,8 @@ dotnet tool install --global AgentEval.Cli --prerelease
 # Use
 agenteval init-workspace                                       # bootstrap .agenteval/ workspace
 agenteval bench --list                                         # discover the 11 benchmark families
-agenteval bench gdpr --preset smoke --subject MyAgent --azure-from-env   # GDPR benchmark against your real agent
-agenteval bench owasp --preset smoke --subject MyAgent --azure-from-env   # OWASP red-team against your real agent
+agenteval bench gdpr --preset smoke --subject MyAgent --from-env   # GDPR benchmark against your real agent
+agenteval bench owasp --preset smoke --subject MyAgent --from-env   # OWASP red-team against your real agent
 agenteval mc serve                                             # open Mission Control (requires .NET 10)
 agenteval doctor                                               # verify workspace integrity
 ```

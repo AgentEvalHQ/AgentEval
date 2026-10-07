@@ -48,6 +48,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   additional binary-compat detection.
 
 ### Changed
+- **`--azure-from-env` is now `--from-env`.** The flag builds the target from whichever provider `AI_INFERENCE_PROVIDER`
+  selects, not only Azure, and the name said otherwise (0.41 called it a misnomer and kept it). `bench gdpr`,
+  `eu-ai-act`, `owasp`, `mitre`, `nist`, `perf` and `log-file replay` take `--from-env`; `--azure-from-env` is kept as an
+  alias, so no script that passes it breaks. Help, messages and docs use the new name.
 - **`SystemOneClientOptions.TypeSafeDefaultModel`** is now `"jev-1.13.0"` (was `"jev-latest"`). The moving alias
   `"jev-latest"` always resolved to `"jev-1.13.0"` and `DecisionResponse.Model` echoes the resolved build, so
   provenance is unchanged; the default is pinned for reproducibility in line with `OpenRouterDefaultModel`.

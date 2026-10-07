@@ -111,7 +111,7 @@ public sealed class BenchTargetCommandLineTests : IDisposable
     {
         new[] { "bench", "owasp", "--subject", "A", "--sut", "mock", "--azure-from-env" },
         new[] { "bench", "mitre", "--subject", "A", "--sut", "mock", "--endpoint", "http://127.0.0.1:9/v1", "--model", "m" },
-        new[] { "bench", "nist", "--subject", "A", "--sut", "mock", "--azure-from-env" },
+        new[] { "bench", "nist", "--subject", "A", "--sut", "mock", "--from-env" },
         new[] { "bench", "perf", "latency", "--subject", "A", "--sut", "mock", "--endpoint", "http://127.0.0.1:9/v1", "--model", "m" },
         new[] { "bench", "gdpr", "--subject", "A", "--sut", "mock", "--response", "We keep your email." },
         new[] { "bench", "eu-ai-act", "--subject", "A", "--input", "Q", "--sut", "mock", "--azure-from-env" },
@@ -126,6 +126,32 @@ public sealed class BenchTargetCommandLineTests : IDisposable
 
         Assert.Equal(ExitCodes.UsageError, exit);
         Assert.Contains("cannot be combined with a real target", stderr, StringComparison.Ordinal);
+    }
+
+    public static TheoryData<string[]> FromEnvCommands => new()
+    {
+        new[] { "bench", "owasp" },
+        new[] { "bench", "mitre" },
+        new[] { "bench", "nist" },
+        new[] { "bench", "perf", "latency" },
+        new[] { "bench", "gdpr" },
+        new[] { "bench", "eu-ai-act", "--input", "Q" },
+    };
+
+    [Theory]
+    [MemberData(nameof(FromEnvCommands))]
+    public async Task FromEnv_AndItsOldName_AzureFromEnv_AreTheSameOption(string[] command)
+    {
+        // --azure-from-env was renamed --from-env (it never meant Azure only); the old name must keep working. Both
+        // reach the command as a real target, which the mock then refuses to be combined with.
+        foreach (var flag in new[] { "--from-env", "--azure-from-env" })
+        {
+            var (exit, _, stderr) = await CliParseErrorExitCodeTests.RunCliAsync(
+                [.. command, "--subject", "A", "--sut", "mock", flag, "--root", _root]);
+
+            Assert.Equal(ExitCodes.UsageError, exit);
+            Assert.Contains("cannot be combined with a real target", stderr, StringComparison.Ordinal);
+        }
     }
 
     [Fact]

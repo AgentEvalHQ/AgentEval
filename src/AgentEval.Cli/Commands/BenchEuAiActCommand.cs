@@ -92,7 +92,7 @@ public static class BenchEuAiActCommand
         IEvaluator judge = resolvedJudge;
 
         // ── Agent under test ─────────────────────────────────────────────────
-        // Priority: --sut (agentOverride, e.g. copilot-studio) > --azure-from-env > grade the supplied
+        // Priority: --sut (agentOverride, e.g. copilot-studio) > --from-env > grade the supplied
         // --response as before. The judge resolves AZURE_OPENAI_JUDGE_* first (see JudgeFactory) so
         // agent and judge can point at different endpoints.
         AgentEval.Core.IEvaluableAgent? agent = agentOverride;
@@ -158,7 +158,7 @@ public static class BenchEuAiActCommand
             // Response is produced per scenario by the live agent (see AgentScenarioEval);
             // this placeholder is never graded.
             agentResponse = "(driven per-scenario by the live agent under test)";
-            var agentSource = agentOverride is not null ? "--sut" : "--azure-from-env";
+            var agentSource = agentOverride is not null ? "--sut" : "--from-env";
             Console.Error.WriteLine(
                 $"[bench eu-ai-act] Driving live agent '{subject}' per scenario via {agentSource}; " +
                 "each scenario's own prompt is sent to the agent and its real answer is graded.");

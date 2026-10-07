@@ -93,12 +93,12 @@ static string PresetsHelpFromRegistry(string familyName)
 var benchPresetOpt = new Option<string?>("--preset") { Description = PresetsHelpFromRegistry("gdpr") + Environment.NewLine + "Default: standard. Domain-pack composition: standard+healthcare | standard+hr | standard+childrens (multi-pack composition like standard+healthcare+hr also supported)." };
 var benchSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent or workflow under evaluation). REQUIRED — no default; previously defaulted to 'default-agent'." };
 var benchRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
-var benchInputOpt = new Option<string?>("--input") { Description = "The question the agent answered. Required with --response/--response-file; with --sut or --azure-from-env each scenario sends its own prompt." };
-var benchResponseOpt = new Option<string?>("--response") { Description = "The agent's actual RESPONSE to grade (needs --input). Without it, --sut or --azure-from-env must name a live agent; --sut mock grades a canned answer that measures nothing and is not stored." };
+var benchInputOpt = new Option<string?>("--input") { Description = "The question the agent answered. Required with --response/--response-file; with --sut or --from-env each scenario sends its own prompt." };
+var benchResponseOpt = new Option<string?>("--response") { Description = "The agent's actual RESPONSE to grade (needs --input). Without it, --sut or --from-env must name a live agent; --sut mock grades a canned answer that measures nothing and is not stored." };
 var benchResponseFileOpt = new Option<string?>("--response-file") { Description = "Path to a file containing the agent's actual response to grade (alternative to --response, for multi-line output)." };
 var benchRunsOpt = new Option<int?>("--runs") { Description = "Number of stochastic runs (default: 1). When > 1, runs the benchmark N times and aggregates via MajorityVote." };
-var benchGdprAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Drive a live agent from the environment (the provider AI_INFERENCE_PROVIDER selects) per scenario: each scenario's own prompt is sent to the agent and its real answer is graded, instead of grading a single --response. The judge resolves AZURE_OPENAI_JUDGE_* first, then the selected provider, so agent and judge can target different endpoints." };
-var benchGdprCmd = new Command("gdpr", "Run the GDPR compliance benchmark. Needs a target: --sut or --azure-from-env drives a live agent per scenario, or --response/--response-file grades an answer the agent gave (with its --input). Without one it refuses; --sut mock grades a canned answer that measures nothing and is not stored.");
+var benchGdprAzureFromEnvOpt = FromEnvOption.Create("Drive a live agent from the environment (the provider AI_INFERENCE_PROVIDER selects) per scenario: each scenario's own prompt is sent to the agent and its real answer is graded, instead of grading a single --response. The judge resolves AZURE_OPENAI_JUDGE_* first, then the selected provider, so agent and judge can target different endpoints.");
+var benchGdprCmd = new Command("gdpr", "Run the GDPR compliance benchmark. Needs a target: --sut or --from-env drives a live agent per scenario, or --response/--response-file grades an answer the agent gave (with its --input). Without one it refuses; --sut mock grades a canned answer that measures nothing and is not stored.");
 benchGdprCmd.Add(benchPresetOpt);
 benchGdprCmd.Add(benchSubjectOpt);
 benchGdprCmd.Add(benchRootOpt);
@@ -185,10 +185,10 @@ var benchEuAiActPresetOpt = new Option<string?>("--preset") { Description = Pres
 var benchEuAiActSubjectOpt = new Option<string?>("--subject") { Description = "Subject name. REQUIRED — no default; previously defaulted to 'default-agent'." };
 var benchEuAiActRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
 var benchEuAiActInputOpt = new Option<string?>("--input") { Description = "Agent input text for the evaluation. REQUIRED; there is no default." };
-var benchEuAiActResponseOpt = new Option<string?>("--response") { Description = "The agent's actual RESPONSE to grade. Without it, --sut or --azure-from-env must name a live agent; --sut mock grades a canned answer that measures nothing and is not stored." };
+var benchEuAiActResponseOpt = new Option<string?>("--response") { Description = "The agent's actual RESPONSE to grade. Without it, --sut or --from-env must name a live agent; --sut mock grades a canned answer that measures nothing and is not stored." };
 var benchEuAiActResponseFileOpt = new Option<string?>("--response-file") { Description = "Path to a file containing the agent's actual response to grade (alternative to --response)." };
-var benchEuAiActAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Drive a live agent from the environment (the provider AI_INFERENCE_PROVIDER selects) per scenario: each scenario's own prompt is sent to the agent and its real answer is graded, instead of grading a single --response. The judge resolves AZURE_OPENAI_JUDGE_* first, then the selected provider, so agent and judge can target different endpoints." };
-var benchEuAiActCmd = new Command("eu-ai-act", "Run the EU AI Act compliance benchmark. Needs a target: --sut or --azure-from-env drives a live agent per scenario, or --response/--response-file grades an answer the agent gave. Without one it refuses; --sut mock grades a canned answer that measures nothing and is not stored.");
+var benchEuAiActAzureFromEnvOpt = FromEnvOption.Create("Drive a live agent from the environment (the provider AI_INFERENCE_PROVIDER selects) per scenario: each scenario's own prompt is sent to the agent and its real answer is graded, instead of grading a single --response. The judge resolves AZURE_OPENAI_JUDGE_* first, then the selected provider, so agent and judge can target different endpoints.");
+var benchEuAiActCmd = new Command("eu-ai-act", "Run the EU AI Act compliance benchmark. Needs a target: --sut or --from-env drives a live agent per scenario, or --response/--response-file grades an answer the agent gave. Without one it refuses; --sut mock grades a canned answer that measures nothing and is not stored.");
 benchEuAiActCmd.Add(benchEuAiActPresetOpt);
 benchEuAiActCmd.Add(benchEuAiActSubjectOpt);
 benchEuAiActCmd.Add(benchEuAiActRootOpt);
@@ -356,11 +356,11 @@ var benchOwaspPresetOpt = new Option<string?>("--preset") { Description = Preset
 var benchOwaspSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent or workflow under evaluation). REQUIRED." };
 var benchOwaspRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
 var benchOwaspInputOpt = new Option<string?>("--input") { Description = "Provenance text for the run (the OWASP attack pipeline generates its own probes; --input is recorded for traceability, not consumed by attacks)." };
-var benchOwaspAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Scan a chat agent built from the environment (the provider AI_INFERENCE_PROVIDER selects). Requires a configured provider; run with none set to see what is missing." };
-var benchOwaspEndpointOpt = new Option<string?>("--endpoint") { Description = "OpenAI-compatible API endpoint URL (Ollama, LM Studio, vLLM, Groq, Together.ai, Mistral, etc.) — an alternative to --azure-from-env. Requires --model." };
+var benchOwaspAzureFromEnvOpt = FromEnvOption.Create("Scan a chat agent built from the environment (the provider AI_INFERENCE_PROVIDER selects). Requires a configured provider; run with none set to see what is missing.");
+var benchOwaspEndpointOpt = new Option<string?>("--endpoint") { Description = "OpenAI-compatible API endpoint URL (Ollama, LM Studio, vLLM, Groq, Together.ai, Mistral, etc.) — an alternative to --from-env. Requires --model." };
 var benchOwaspModelOpt = new Option<string?>("--model") { Description = "Model name (required with --endpoint)." };
 var benchOwaspApiKeyOpt = new Option<string?>("--api-key") { Description = "API key for --endpoint (or set OPENAI_API_KEY env var)." };
-var benchOwaspCmd = new Command("owasp", "Run the OWASP LLM Top 10 red-team benchmark. Needs a target: --sut, --endpoint/--model, or --azure-from-env (the provider AI_INFERENCE_PROVIDER selects); without one it refuses. --sut mock runs a stand-in that measures nothing and is not stored. Attacks are graded judge first by the judge the environment configures (AZURE_OPENAI_JUDGE_*, else AI_INFERENCE_PROVIDER), as `agenteval redteam --judge` grades them; use `agenteval redteam` for a fully-parameterised scan.");
+var benchOwaspCmd = new Command("owasp", "Run the OWASP LLM Top 10 red-team benchmark. Needs a target: --sut, --endpoint/--model, or --from-env (the provider AI_INFERENCE_PROVIDER selects); without one it refuses. --sut mock runs a stand-in that measures nothing and is not stored. Attacks are graded judge first by the judge the environment configures (AZURE_OPENAI_JUDGE_*, else AI_INFERENCE_PROVIDER), as `agenteval redteam --judge` grades them; use `agenteval redteam` for a fully-parameterised scan.");
 benchOwaspCmd.Add(benchOwaspPresetOpt);
 benchOwaspCmd.Add(benchOwaspSubjectOpt);
 benchOwaspCmd.Add(benchOwaspRootOpt);
@@ -417,11 +417,11 @@ var benchMitrePresetOpt = new Option<string?>("--preset") { Description = Preset
 var benchMitreSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent or workflow under evaluation). REQUIRED." };
 var benchMitreRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
 var benchMitreInputOpt = new Option<string?>("--input") { Description = "Provenance text for the run (the MITRE ATLAS attack pipeline generates its own probes; --input is recorded for traceability, not consumed by attacks)." };
-var benchMitreAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Scan a chat agent built from the environment (the provider AI_INFERENCE_PROVIDER selects). Requires a configured provider; run with none set to see what is missing." };
-var benchMitreEndpointOpt = new Option<string?>("--endpoint") { Description = "OpenAI-compatible API endpoint URL (Ollama, LM Studio, vLLM, Groq, Together.ai, Mistral, etc.) — an alternative to --azure-from-env. Requires --model." };
+var benchMitreAzureFromEnvOpt = FromEnvOption.Create("Scan a chat agent built from the environment (the provider AI_INFERENCE_PROVIDER selects). Requires a configured provider; run with none set to see what is missing.");
+var benchMitreEndpointOpt = new Option<string?>("--endpoint") { Description = "OpenAI-compatible API endpoint URL (Ollama, LM Studio, vLLM, Groq, Together.ai, Mistral, etc.) — an alternative to --from-env. Requires --model." };
 var benchMitreModelOpt = new Option<string?>("--model") { Description = "Model name (required with --endpoint)." };
 var benchMitreApiKeyOpt = new Option<string?>("--api-key") { Description = "API key for --endpoint (or set OPENAI_API_KEY env var)." };
-var benchMitreCmd = new Command("mitre", "Run the MITRE ATLAS red-team benchmark. Needs a target: --sut, --endpoint/--model, or --azure-from-env (the provider AI_INFERENCE_PROVIDER selects); without one it refuses. --sut mock runs a stand-in that measures nothing and is not stored. Attacks are graded judge first by the judge the environment configures (AZURE_OPENAI_JUDGE_*, else AI_INFERENCE_PROVIDER), as `agenteval redteam --judge` grades them; use `agenteval redteam` for a fully-parameterised scan.");
+var benchMitreCmd = new Command("mitre", "Run the MITRE ATLAS red-team benchmark. Needs a target: --sut, --endpoint/--model, or --from-env (the provider AI_INFERENCE_PROVIDER selects); without one it refuses. --sut mock runs a stand-in that measures nothing and is not stored. Attacks are graded judge first by the judge the environment configures (AZURE_OPENAI_JUDGE_*, else AI_INFERENCE_PROVIDER), as `agenteval redteam --judge` grades them; use `agenteval redteam` for a fully-parameterised scan.");
 benchMitreCmd.Add(benchMitrePresetOpt);
 benchMitreCmd.Add(benchMitreSubjectOpt);
 benchMitreCmd.Add(benchMitreRootOpt);
@@ -477,11 +477,11 @@ var benchNistPresetOpt = new Option<string?>("--preset") { Description = Presets
 var benchNistSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent or workflow under evaluation). REQUIRED." };
 var benchNistRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
 var benchNistInputOpt = new Option<string?>("--input") { Description = "Provenance text for the run (the attack pipeline generates its own probes; --input is recorded for traceability, not consumed by attacks)." };
-var benchNistAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Scan a chat agent built from the environment (the provider AI_INFERENCE_PROVIDER selects). Requires a configured provider; run with none set to see what is missing." };
-var benchNistEndpointOpt = new Option<string?>("--endpoint") { Description = "OpenAI-compatible API endpoint URL (Ollama, LM Studio, vLLM, Groq, Together.ai, Mistral, etc.) — an alternative to --azure-from-env. Requires --model." };
+var benchNistAzureFromEnvOpt = FromEnvOption.Create("Scan a chat agent built from the environment (the provider AI_INFERENCE_PROVIDER selects). Requires a configured provider; run with none set to see what is missing.");
+var benchNistEndpointOpt = new Option<string?>("--endpoint") { Description = "OpenAI-compatible API endpoint URL (Ollama, LM Studio, vLLM, Groq, Together.ai, Mistral, etc.) — an alternative to --from-env. Requires --model." };
 var benchNistModelOpt = new Option<string?>("--model") { Description = "Model name (required with --endpoint)." };
 var benchNistApiKeyOpt = new Option<string?>("--api-key") { Description = "API key for --endpoint (or set OPENAI_API_KEY env var)." };
-var benchNistCmd = new Command("nist", "Run the NIST AI RMF (AI 100-1) red-team benchmark. Needs a target: --sut, --endpoint/--model, or --azure-from-env (the provider AI_INFERENCE_PROVIDER selects); without one it refuses. --sut mock runs a stand-in that measures nothing and is not stored. Attacks are graded judge first by the judge the environment configures (AZURE_OPENAI_JUDGE_*, else AI_INFERENCE_PROVIDER), as `agenteval redteam --judge` grades them; use `agenteval redteam` for a fully-parameterised scan.");
+var benchNistCmd = new Command("nist", "Run the NIST AI RMF (AI 100-1) red-team benchmark. Needs a target: --sut, --endpoint/--model, or --from-env (the provider AI_INFERENCE_PROVIDER selects); without one it refuses. --sut mock runs a stand-in that measures nothing and is not stored. Attacks are graded judge first by the judge the environment configures (AZURE_OPENAI_JUDGE_*, else AI_INFERENCE_PROVIDER), as `agenteval redteam --judge` grades them; use `agenteval redteam` for a fully-parameterised scan.");
 benchNistCmd.Add(benchNistPresetOpt);
 benchNistCmd.Add(benchNistSubjectOpt);
 benchNistCmd.Add(benchNistRootOpt);
@@ -539,8 +539,8 @@ benchCmd.Add(benchNistCmd);
     var benchPerfSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent or workflow under evaluation). REQUIRED." };
     var benchPerfPromptOpt = new Option<string?>("--prompt") { Description = "Prompt to measure against (default: 'Hello!')." };
     var benchPerfRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
-    var benchPerfAzureFromEnvOpt = new Option<bool>("--azure-from-env") { Description = "Measure a chat agent built from the environment (the provider AI_INFERENCE_PROVIDER selects). Requires a configured provider; run with none set to see what is missing." };
-    var benchPerfEndpointOpt = new Option<string?>("--endpoint") { Description = "OpenAI-compatible API endpoint URL (Ollama, LM Studio, vLLM, Groq, Together.ai, Mistral, etc.) — an alternative to --azure-from-env. Requires --model." };
+    var benchPerfAzureFromEnvOpt = FromEnvOption.Create("Measure a chat agent built from the environment (the provider AI_INFERENCE_PROVIDER selects). Requires a configured provider; run with none set to see what is missing.");
+    var benchPerfEndpointOpt = new Option<string?>("--endpoint") { Description = "OpenAI-compatible API endpoint URL (Ollama, LM Studio, vLLM, Groq, Together.ai, Mistral, etc.) — an alternative to --from-env. Requires --model." };
     var benchPerfModelOpt = new Option<string?>("--model") { Description = "Model name (required with --endpoint)." };
     var benchPerfApiKeyOpt = new Option<string?>("--api-key") { Description = "API key for --endpoint (or set OPENAI_API_KEY env var)." };
 
@@ -736,7 +736,7 @@ benchCmd.Add(benchNistCmd);
         benchCmd.Add(benchAutoAuditCmd);
     }
 
-    var benchPerfCmd = new Command("perf", "Run a performance benchmark (latency, throughput, cost). Needs a target: --sut, --endpoint/--model, or --azure-from-env; without one it refuses. --sut mock measures a stand-in and is not stored.");
+    var benchPerfCmd = new Command("perf", "Run a performance benchmark (latency, throughput, cost). Needs a target: --sut, --endpoint/--model, or --from-env; without one it refuses. --sut mock measures a stand-in and is not stored.");
 
     foreach (var presetName in new[] { "latency", "throughput", "cost" })
     {

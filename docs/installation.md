@@ -116,7 +116,7 @@ dotnet tool install --global AgentEval.Cli --prerelease
 agenteval init-workspace                                       # bootstrap .agenteval/ workspace
 agenteval bench --list                                         # discover available benchmark families
 agenteval bench gdpr --preset smoke --subject MyAgent          # run a GDPR compliance benchmark
-agenteval bench owasp --preset smoke --subject MyAgent --azure-from-env   # OWASP red-team against your real agent
+agenteval bench owasp --preset smoke --subject MyAgent --from-env   # OWASP red-team against your real agent
 agenteval mc serve                                             # open Mission Control on http://localhost:5000 (requires .NET 10)
 agenteval doctor                                               # verify workspace integrity (audit-chain v2 hashing)
 ```

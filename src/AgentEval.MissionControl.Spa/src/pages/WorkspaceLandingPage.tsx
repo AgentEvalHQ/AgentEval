@@ -46,7 +46,7 @@ export function WorkspaceLandingPage({ root, agentEvalVersion }: Props) {
           <Step
             n={2}
             title="Run an evaluation"
-            command={`agenteval bench owasp --preset smoke --subject MyAgent --azure-from-env`}
+            command={`agenteval bench owasp --preset smoke --subject MyAgent --from-env`}
             description="Points a benchmark at your agent (the provider AI_INFERENCE_PROVIDER selects), or use any other bench command with a target. Results land in .agenteval/."
           />
           <Step

@@ -19,7 +19,7 @@ namespace AgentEval.Cli.Commands;
 /// <c>Program.cs</c>'s top-level statements (which aren't a unit-testable surface) on purpose.
 /// <c>BenchOwaspCommand</c>/<c>BenchMitreCommand</c>/<c>BenchNistCommand</c>/<c>BenchCommand</c>/
 /// <c>BenchEuAiActCommand</c> are themselves untouched by this resolver: each already has its own
-/// <c>agentOverride</c> seam that wins over <c>--azure-from-env</c>/the supplied response, so this
+/// <c>agentOverride</c> seam that wins over <c>--from-env</c>/the supplied response, so this
 /// class only needs to decide WHAT (if anything) to pass as that override. <c>--sut mock</c> never reaches it:
 /// the command line hands it to the command as its own flag (see <see cref="MockTarget"/>).
 /// </summary>
@@ -30,7 +30,7 @@ internal static class BenchTier1SutResolver
     /// runs, surfaced here as a friendly error rather than an exception so the caller can print it and exit
     /// cleanly with <c>ExitCodes.UsageError</c> (2), as for any other rejected argument); otherwise a non-empty
     /// <paramref name="endpoint"/> builds a plain OpenAI-compatible agent. Neither set → <c>(null, null)</c>,
-    /// leaving the caller's <c>--azure-from-env</c> or supplied response to name the target, or its refusal to run
+    /// leaving the caller's <c>--from-env</c> or supplied response to name the target, or its refusal to run
     /// without one (inside <c>RunAsync</c>).
     /// </summary>
     /// <param name="sut">The parsed <c>--sut</c> value, or <see langword="null"/> if not set.</param>
