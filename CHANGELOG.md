@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Calibration confidence intervals** — `CalibrationReport` now exposes `AccuracyInterval` and `FprInterval`
+  (`WilsonInterval` structs) alongside the point estimates. A small gold set no longer hides its own
+  uncertainty: `0/8` reads `0.0 % [0.0 %, 32.4 %]` instead of a deceptively tidy `0.0 %`. The 95 % Wilson
+  interval is printed in `AssertInlineReady` error messages and serialised in the CLI `--certify` JSON
+  (schema bumped to `1.1`).
+- **Calibration split label** — `CalibrationOptions.SplitLabel` (e.g. `"held-out"` or `"training"`) is
+  threaded through to `CalibrationReport.SplitLabel` and shown in the CLI report and error messages. No
+  effect on promotion logic; purely informational metadata so readers can see whether numbers are overfitted.
+- **Gatekeeper OpenTelemetry bridge** — `GatekeeperInstrumentation` (`AgentEval.MAF`) declares the
+  `AgentEval.Gatekeeper` `ActivitySource` and `Meter`; subscribe with
+  `AddSource("AgentEval.Gatekeeper")` / `AddMeter("AgentEval.Gatekeeper")`. `OtelGatekeeperObserver`
+  is an `IGatekeeperObserver` that emits a span and increments the `agenteval.gatekeeper.findings`
+  counter for every actionable finding (Block / Mutate / Redact / Incident). `GateCalibrationHarness`
+  emits `AgentEval.Calibration` spans with accuracy, dangerous-error count, and inline-ready tags.
+
 ### Changed
 - **`SystemOneClientOptions.TypeSafeDefaultModel`** is now `"jev-1.13.0"` (was `"jev-latest"`). The moving alias
   `"jev-latest"` always resolved to `"jev-1.13.0"` and `DecisionResponse.Model` echoes the resolved build, so

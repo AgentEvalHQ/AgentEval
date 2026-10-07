@@ -35,6 +35,14 @@ public sealed class CalibrationOptions
     public int MaxConcurrency { get; init; } = 4;
 
     /// <summary>
+    /// An optional label identifying which split of the gold set this calibration covers, e.g.
+    /// <c>"held-out"</c>, <c>"training"</c>, or <c>"full"</c>. Surfaced in
+    /// <see cref="CalibrationReport.SplitLabel"/> and printed in the CLI calibration report.
+    /// Has no effect on promotion logic — it is metadata for the reader.
+    /// </summary>
+    public string? SplitLabel { get; init; }
+
+    /// <summary>
     /// Clock used to stamp <see cref="CalibrationReport.CapturedAt"/>. Default <see cref="System.TimeProvider.System"/>;
     /// override in a test to assert staleness (<see cref="CalibrationReport.IsStale"/>) deterministically,
     /// without a real wall-clock wait — the same injectable-clock convention <c>RateLimitGate</c> already uses.

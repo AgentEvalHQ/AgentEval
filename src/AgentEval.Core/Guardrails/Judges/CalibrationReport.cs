@@ -58,6 +58,25 @@ public sealed class CalibrationReport
     /// <summary>Cohen's κ between the judge's decisions and the gold labels.</summary>
     public double KappaVsGold { get; }
 
+    /// <summary>
+    /// Wilson 95 % confidence interval for <see cref="DecisiveAccuracy"/> — the honest signal width behind
+    /// the point estimate. On a small gold set the interval is wide by design; a wide interval is diagnostic
+    /// information, not a flaw. A <see cref="WilsonInterval.IsMeasured"/> value of <see langword="false"/>
+    /// means the set was empty.
+    /// </summary>
+    public WilsonInterval AccuracyInterval { get; }
+
+    /// <summary>Wilson 95 % confidence interval for <see cref="FalsePositiveRate"/>.</summary>
+    public WilsonInterval FprInterval { get; }
+
+    /// <summary>
+    /// An optional caller-supplied label identifying which split of the gold set this report covers —
+    /// e.g. <c>"held-out"</c>, <c>"training"</c>, or <c>"full"</c>. Purely informational: it does not
+    /// affect <see cref="IsInlineReady"/>, but it is printed in <see cref="AssertInlineReady"/>'s error
+    /// message and in the CLI calibration report so readers know whether the numbers are overfitted.
+    /// </summary>
+    public string? SplitLabel { get; }
+
     /// <summary>The baseline's decisive accuracy on the same set, if a baseline was supplied.</summary>
     public double? BaselineAccuracy { get; }
 
@@ -102,7 +121,7 @@ public sealed class CalibrationReport
         string axis, int tp, int tn, int fp, int fn, double kappa,
         double? baselineAccuracy, bool? beatsBaseline, bool meetsThresholds,
         bool promotionCriteriaConfigured, bool sufficientData, IReadOnlyList<CalibrationCaseResult> cases,
-        DateTimeOffset capturedAt)
+        DateTimeOffset capturedAt, string? splitLabel = null)
     {
         PromotionCriteriaConfigured = promotionCriteriaConfigured;
         SufficientData = sufficientData;
@@ -116,6 +135,9 @@ public sealed class CalibrationReport
         var benign = fp + tn;
         FalsePositiveRate = benign == 0 ? 0.0 : (double)fp / benign;
         KappaVsGold = kappa;
+        AccuracyInterval = WilsonInterval.Compute(tp + tn, n);
+        FprInterval = WilsonInterval.Compute(fp, benign);
+        SplitLabel = splitLabel;
         BaselineAccuracy = baselineAccuracy;
         BeatsBaseline = beatsBaseline;
         MeetsThresholds = meetsThresholds;
@@ -142,9 +164,10 @@ public sealed class CalibrationReport
                 !SufficientData ? "the gold set is too small per direction to trust (raise MinCasesPerDirection or add cases)" :
                 !MeetsThresholds ? "the configured thresholds were not met" :
                 BeatsBaseline == false ? "it did not beat the deterministic baseline" : "unknown";
+            var split = SplitLabel is not null ? $" [{SplitLabel} split]" : string.Empty;
             throw new InvalidOperationException(
-                $"Judge for axis '{Axis}' is NOT inline-ready — {why} (accuracy {DecisiveAccuracy:P1}, " +
-                $"{DangerousErrorCount} missed attacks, FP rate {FalsePositiveRate:P1}, κ {KappaVsGold:F3}). Keep it in shadow.");
+                $"Judge for axis '{Axis}'{split} is NOT inline-ready — {why} (accuracy {AccuracyInterval}, " +
+                $"{DangerousErrorCount} missed attacks, FP rate {FprInterval}, κ {KappaVsGold:F3}). Keep it in shadow.");
         }
     }
 }

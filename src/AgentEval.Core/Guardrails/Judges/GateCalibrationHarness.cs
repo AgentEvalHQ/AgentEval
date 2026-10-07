@@ -2,6 +2,8 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Diagnostics;
+
 namespace AgentEval.Guardrails.Judges;
 
 /// <summary>
@@ -15,6 +17,14 @@ namespace AgentEval.Guardrails.Judges;
 /// </summary>
 public static class GateCalibrationHarness
 {
+    /// <summary>
+    /// OTel source name: <c>AgentEval.Calibration</c>. Subscribe to it in your tracing pipeline to see
+    /// calibration runs as spans; the <c>AgentEval.Gatekeeper</c> source (MAF) covers enforcement-path findings.
+    /// </summary>
+    public const string ActivitySourceName = "AgentEval.Calibration";
+
+    private static readonly ActivitySource _activitySource = new(ActivitySourceName);
+
     /// <summary>Scores <paramref name="judge"/> against <paramref name="goldSet"/> and returns the calibration report.</summary>
     public static async Task<CalibrationReport> EvaluateAsync(
         IChatGate judge, JudgeGoldSet goldSet, CalibrationOptions? options = null, CancellationToken cancellationToken = default)
@@ -22,6 +32,11 @@ public static class GateCalibrationHarness
         ArgumentNullException.ThrowIfNull(judge);
         ArgumentNullException.ThrowIfNull(goldSet);
         options ??= new CalibrationOptions();
+
+        using var activity = _activitySource.StartActivity("agenteval.calibration.evaluate", ActivityKind.Internal);
+        activity?.SetTag("agenteval.calibration.axis", goldSet.Axis);
+        activity?.SetTag("agenteval.calibration.cases", goldSet.Cases.Count);
+        if (options.SplitLabel is not null) activity?.SetTag("agenteval.calibration.split", options.SplitLabel);
 
         var judgeResults = await ScoreAsync(judge, goldSet, options.MaxConcurrency, cancellationToken).ConfigureAwait(false);
         var (tp, tn, fp, fn) = Confusion(judgeResults);
@@ -61,9 +76,15 @@ public static class GateCalibrationHarness
 
         var capturedAt = (options.TimeProvider ?? TimeProvider.System).GetUtcNow();
 
-        return new CalibrationReport(
+        var report = new CalibrationReport(
             goldSet.Axis, tp, tn, fp, fn, kappa, baselineAccuracy, beatsBaseline, meetsThresholds,
-            criteriaConfigured, sufficientData, judgeResults, capturedAt);
+            criteriaConfigured, sufficientData, judgeResults, capturedAt, options.SplitLabel);
+
+        activity?.SetTag("agenteval.calibration.accuracy", report.DecisiveAccuracy);
+        activity?.SetTag("agenteval.calibration.dangerous_errors", report.DangerousErrorCount);
+        activity?.SetTag("agenteval.calibration.inline_ready", report.IsInlineReady);
+
+        return report;
     }
 
     private static async Task<IReadOnlyList<CalibrationCaseResult>> ScoreAsync(
