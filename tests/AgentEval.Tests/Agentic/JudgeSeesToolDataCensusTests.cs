@@ -87,12 +87,9 @@ public class JudgeSeesToolDataCensusTests
     // Evaluators that ship with a rubric but are not in the key registry, built the way their callers build them:
     //   prohibited_actions — needs an IPolicyResolver and a subject id, so the registry cannot dispatch it (see
     //     AgenticEvalRegistration); an empty policy finds no violation in code, so the judge fallback runs.
-    //   intermediate_step_hallucination — a trace-dependent reasoning evaluator, carved out of calibration and built
-    //     directly by the agentic benchmark.
     private static readonly Dictionary<string, Func<IEvaluator, IEval>> BuiltDirectly = new(StringComparer.Ordinal)
     {
         ["prohibited_actions"] = judge => new ProhibitedActionsEval(judge, new EmptyPolicy(), "census-subject"),
-        ["intermediate_step_hallucination"] = judge => new AgentEval.Evals.Agentic.Reasoning.IntermediateStepHallucinationEval(judge),
     };
 
     private sealed class EmptyPolicy : AgentEval.Evals.Agentic.Safety.Policy.IPolicyResolver

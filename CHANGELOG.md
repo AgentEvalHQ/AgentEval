@@ -47,6 +47,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   a 95% Wilson interval. `Split` makes a stratified split that is reproducible for a given seed. New public types:
   `ScoredCase`, `CutObjective`, `HeldOutEvaluation`, `ThresholdCalibration`. Documented in the eval and benchmark
   architecture guide, §7.5.
+- **Calibration entries carry earlier turns, context and tool calls; five more agentic evaluators are calibrated.**
+  `CalibrationEntry` gained `ConversationHistory`, `Context` and `ToolCalls`, and `ToEvalInput()`. The runner passes them
+  where the evaluators read them at run time (the history as `Metadata["conversation_history"]`). The multi-turn goldens
+  had pasted the earlier turns into `input` as text, which the evaluators do not read, so every entry skipped and the
+  memory evaluators were carved out of `bench agentic calibrate`. 13 multi-turn and 4 step-hallucination cases now carry
+  them structured, and `memory_recall_accuracy`, `turn_coherence`, `goal_tracking`, `clarification_appropriateness`
+  and `intermediate_step_hallucination` are dispatched: 45 of 60 evaluators, was 40. Three stay carved out because
+  their golden cases cannot be graded as written: `long_conversation_coherence` (its cases describe the conversation
+  instead of containing it), `self_correction_quality` (its correction turn has room for one message) and
+  `plan_formulation_quality` (its only failing case is skipped as having no plan). None of the five has been measured
+  against a judge yet. Three pass bands started below their evaluator's threshold and now start at it, as in 0.43.
 - **Core and Abstractions API snapshots** — `CorePublicApiSnapshotTests` and
   `AbstractionsPublicApiSnapshotTests` freeze the public surface of `AgentEval.Core` and
   `AgentEval.Abstractions` using the same Verify-based pattern as the existing Gatekeeper snapshot.
@@ -80,6 +91,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Repeated runs of a test case are measured by `AgentEval.Comparison.StochasticRunner`.
 
 ### Fixed
+- **Agentic calibration filed every evaluator whose key ends in "quality" under Quality.** The category router checked
+  golden-filename suffixes before evaluator keys, so `refusal_quality` (UX) and `goal_decomposition_quality`,
+  `plan_formulation_quality` and `self_correction_quality` (Reasoning) were scored and gated with Quality, against
+  its relaxed 0.65 / 0.40 gate. Exact keys now route first. The 2026-10-05 calibration results grouped them that way,
+  and say so.
 - **A tool assertion on a result with no tool data fails with the reason.** When the agent's adapter returns no
   `RawMessages`, or tool tracking is off, `TestResult.ToolUsage` is null and AgentEval cannot see the agent's tool calls.
   `result.ToolUsage!.Should().HaveCalledTool(...)` then crashed with `ArgumentNullException (Parameter 'report')`. It

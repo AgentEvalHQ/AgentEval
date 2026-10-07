@@ -7,6 +7,8 @@ using AgentEval.Core;
 using AgentEval.Evals;
 using AgentEval.Evals.Agentic.Adversarial;
 using AgentEval.Evals.Agentic.Calibration;
+using AgentEval.Evals.Agentic.Memory;
+using AgentEval.Evals.Agentic.MultiTurn;
 using AgentEval.Evals.Agentic.Process;
 using AgentEval.Evals.Agentic.Quality;
 using AgentEval.Evals.Agentic.Reasoning;
@@ -17,7 +19,7 @@ using AgentEval.Evals.Agentic.UX;
 namespace AgentEval.Evals.Agentic;
 
 /// <summary>
-/// Registers the 40 calibration-dispatchable agentic evaluators with
+/// Registers the 45 calibration-dispatchable agentic evaluators with
 /// <see cref="EvalRegistry.Shared"/> (ADR-031 C1, built to the corrected
 /// <c>Key → Func&lt;IEvaluator?, string?, IEval&gt;</c> signature — see
 /// <see cref="EvalRegistration"/> and <c>MEASUREMENT_STATUS</c> §67.6).
@@ -33,10 +35,11 @@ namespace AgentEval.Evals.Agentic;
 /// is that construction is deferred until a judge exists.
 /// </para>
 /// <para>
-/// <b>Path A' (v1.1) scope, unchanged.</b> 40 dispatched entries across 9 categories: system (5),
-/// process (6), ux (3), adversarial (5), reasoning (2 — the 3 trace-dependent ones are carved out),
-/// calibration (2), memory (0 — fully carved), quality (6 — <c>f1_score</c> carved), safety (11).
-/// The 20-key carve-out list and its per-bucket rationale stay in
+/// <b>Scope.</b> 45 dispatched entries across 9 categories: system (5), process (6), ux (3), adversarial (5),
+/// reasoning (3), calibration (2), memory (4), quality (6 — <c>f1_score</c> carved), safety (11). Path A' (v1.1) had
+/// carved out the multi-turn and trace-dependent evaluators because a calibration entry could not carry history or
+/// tool calls; entries now can (<c>CalibrationEntry.ConversationHistory</c>, <c>ToolCalls</c>, <c>Context</c>), so the
+/// five whose goldens can be graded are dispatched again. The 15-key carve-out list and its per-bucket rationale stay in
 /// <c>BenchAgenticCalibrateCommand.s_carveOutKeys</c>, which is where the calibration report reads
 /// them from.
 /// </para>
@@ -62,7 +65,7 @@ public static class AgenticEvalRegistration
     /// The number of evaluator keys this registrar contributes. Pinned as a constant so a dropped
     /// or duplicated entry is a test failure rather than a silently smaller calibration run.
     /// </summary>
-    public const int DispatchedEvaluatorCount = 40;
+    public const int DispatchedEvaluatorCount = 45;
 
     // CA2255: ModuleInitializer is the canonical auto-registration mechanism in this codebase
     // (ADR-017 Convention 3; see AgenticBenchmarkRegistration for the benchmark-family twin).
@@ -79,7 +82,7 @@ public static class AgenticEvalRegistration
     }
 
     /// <summary>
-    /// Registers the 40 entries into <paramref name="registry"/>. Exposed separately from
+    /// Registers the 45 entries into <paramref name="registry"/>. Exposed separately from
     /// <see cref="Register"/> so a test can populate an isolated registry rather than the shared
     /// one.
     /// </summary>
@@ -126,15 +129,20 @@ public static class AgenticEvalRegistration
         Add<SystemPromptLeakageEval>("prompt_leak", (j, m) => new SystemPromptLeakageEval(j!, judgeModel: m));
         Add<JailbreakResistanceEval>("escalation_resistance", (j, m) => new JailbreakResistanceEval(j!, judgeModel: m));
 
-        // ── Reasoning evaluators (2 — Path A' carved out the 3 trace-dependent) ──
+        // ── Reasoning evaluators (3 — plan_formulation_quality and self_correction_quality stay carved out) ──
         Add<ReasoningCorrectnessEval>("reasoning_correctness", (j, m) => new ReasoningCorrectnessEval(j!, judgeModel: m));
         Add<GoalDecompositionQualityEval>("goal_decomposition_quality", (j, m) => new GoalDecompositionQualityEval(j!, judgeModel: m));
+        Add<IntermediateStepHallucinationEval>("intermediate_step_hallucination", (j, m) => new IntermediateStepHallucinationEval(j!, judgeModel: m));
 
         // ── Confidence-calibration evaluators (2) ────────────────────────────
         Add<ConfidenceCalibrationEval>("confidence_calibration", (j, m) => new ConfidenceCalibrationEval(j!, judgeModel: m));
         Add<UncertaintyAcknowledgmentEval>("uncertainty_acknowledgment", (j, m) => new UncertaintyAcknowledgmentEval(j!, judgeModel: m));
 
-        // ── Memory / multi-turn evaluators (0 — Path A' fully carved) ────────
+        // ── Memory / multi-turn evaluators (4 — long_conversation_coherence stays carved out) ──
+        Add<MemoryRecallAccuracyEval>("memory_recall_accuracy", (j, m) => new MemoryRecallAccuracyEval(j!, judgeModel: m));
+        Add<TurnCoherenceEval>("turn_coherence", (j, m) => new TurnCoherenceEval(j!, judgeModel: m));
+        Add<GoalTrackingEval>("goal_tracking", (j, m) => new GoalTrackingEval(j!, judgeModel: m));
+        Add<ClarificationAppropriatenessEval>("clarification_appropriateness", (j, m) => new ClarificationAppropriatenessEval(j!, judgeModel: m));
 
         // ── Quality / RAG evaluators (6 — Path A' carved out f1_score) ───────
         Add<GroundednessEval>("groundedness", (j, m) => new GroundednessEval(j!, judgeModel: m));

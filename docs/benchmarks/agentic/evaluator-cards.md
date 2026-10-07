@@ -145,9 +145,10 @@ graded:
 | `goal_decomposition_quality` | `GoalDecompositionQualityEval` | AgentEval-original |
 | `self_correction_quality` | `SelfCorrectionQualityEval` | AgentEval-original. Its card and namespace put it in the calibration category; the calibration runner files it under reasoning |
 
-`intermediate_step_hallucination`, `plan_formulation_quality` and `self_correction_quality` need the
-agent's reasoning trace, which a single-turn `CalibrationEntry` cannot carry, so
-`agenteval bench agentic calibrate` skips them (`BenchAgenticCalibrateCommand.s_carveOutKeys`).
+`agenteval bench agentic calibrate` runs `intermediate_step_hallucination` on golden cases that carry the tool calls
+and context it checks the answer against. It skips `plan_formulation_quality`, whose only failing case has no plan the
+evaluator recognises, and `self_correction_quality`, whose correction turn has room for one message
+(`BenchAgenticCalibrateCommand.s_carveOutKeys`).
 
 ---
 
@@ -162,8 +163,9 @@ agent's reasoning trace, which a single-turn `CalibrationEntry` cannot carry, so
 
 ## Memory / Multi-Turn Evaluators (Phase 6 — 5 evaluators)
 
-Note: these evaluators grade recall of earlier conversation turns. A `CalibrationEntry` is
-single-turn and has no conversation history, so `agenteval bench agentic calibrate` skips all five
+Note: these evaluators grade a reply against the earlier conversation turns. Their golden cases carry those turns as
+`conversationHistory`, and `agenteval bench agentic calibrate` runs four of the five. It skips
+`long_conversation_coherence`, whose golden cases describe the conversation instead of containing it
 (`BenchAgenticCalibrateCommand.s_carveOutKeys`).
 
 | Key | Class | Foundry URI |

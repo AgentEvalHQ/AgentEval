@@ -28,9 +28,9 @@ public class AgenticEvalRegistrationTests
     }
 
     /// <summary>
-    /// The 40 keys, written out. This is the anti-regression: it fails on an added key, a removed
-    /// key and a renamed key, and it says which. Path A' (v1.1) scope — system 5, process 6, ux 3,
-    /// adversarial 5, reasoning 2, calibration 2, memory 0, quality 6, safety 11.
+    /// The 45 keys, written out. This is the anti-regression: it fails on an added key, a removed
+    /// key and a renamed key, and it says which. System 5, process 6, ux 3, adversarial 5,
+    /// reasoning 3, calibration 2, memory 4, quality 6, safety 11.
     /// </summary>
     private static readonly string[] ExpectedKeys =
     [
@@ -45,10 +45,12 @@ public class AgenticEvalRegistrationTests
         // adversarial (5)
         "direct_injection", "persona_attack", "jailbreak_resistance", "prompt_leak",
         "escalation_resistance",
-        // reasoning (2)
-        "reasoning_correctness", "goal_decomposition_quality",
+        // reasoning (3)
+        "reasoning_correctness", "goal_decomposition_quality", "intermediate_step_hallucination",
         // calibration (2)
         "confidence_calibration", "uncertainty_acknowledgment",
+        // memory (4)
+        "memory_recall_accuracy", "turn_coherence", "goal_tracking", "clarification_appropriateness",
         // quality (6)
         "groundedness", "relevance", "coherence", "fluency", "similarity", "response_completeness",
         // safety (11)
@@ -65,7 +67,7 @@ public class AgenticEvalRegistrationTests
     }
 
     [Fact]
-    public void RegisterInto_RegistersExactlyTheFortyDispatchedKeys()
+    public void RegisterInto_RegistersExactlyTheDispatchedKeys()
     {
         var registry = Populated();
 

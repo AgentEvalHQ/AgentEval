@@ -120,8 +120,7 @@ public sealed class CalibrationRunner
                 EvalResult result;
                 try
                 {
-                    result = await eval.EvaluateAsync(
-                        new EvalInput(Query: entry.Input, Response: entry.AgentResponse, GroundTruth: entry.GroundTruth), ct);
+                    result = await eval.EvaluateAsync(entry.ToEvalInput(), ct);
                 }
                 catch (OperationCanceledException)
                 {
