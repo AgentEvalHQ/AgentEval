@@ -302,11 +302,13 @@ score:
 | Efficiency | Phase 1's `SkillDisclosureEfficiencyMetric` (optional) |
 | Security | Phase 3's real attack outcome + hash-pin drift findings |
 
-A missing axis is **never** fabricated as perfect — the score is the mean of only the axes actually supplied,
-and `SkillSecurityIndexResult.AxesMeasured` tells you how many of the three went in.
+A missing axis is **never** fabricated as perfect — the score is the mean of only the axes actually measured,
+and `SkillSecurityIndexResult.AxesMeasured` tells you how many of the three went in. An axis that was supplied but
+measured nothing counts as missing, and the explanation says so: an efficiency `MetricResult` that is not measured
+(its score is a placeholder 0), or a security outcome with no probe run and no drift finding.
 
 ```csharp
-var indexResult = SkillSecurityIndex.Compute(new SkillSecurityIndexInputs(complianceReport, efficiencyResult: null, securityOutcome));
+var indexResult = SkillSecurityIndex.Compute(new SkillSecurityIndexInputs(complianceReport, Efficiency: null, securityOutcome));
 Console.WriteLine($"Skill Security Index: {indexResult.Score:F0}/100 ({indexResult.AxesMeasured}/3 axes measured)");
 ```
 

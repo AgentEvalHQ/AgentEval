@@ -111,6 +111,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Repeated runs of a test case are measured by `AgentEval.Comparison.StochasticRunner`.
 
 ### Fixed
+- **The Skill Health & Security Index no longer scores what was not measured.** An efficiency `MetricResult` that was
+  not measured carries a placeholder score of 0, and the index averaged it in: a clean compliance scan (100) read as
+  50. A security outcome with no probe run and no drift finding scored a perfect 100, though the code said that axis
+  had no data. Both now count as not measured and are named so in the explanation; a non-finite efficiency score
+  is not a measurement either. The `agent-skills.md` example also named a parameter that does not exist.
 - **Datasets written in camelCase lost their expected outputs, and every test passed.** The JSON, JSONL, CSV and YAML
   loaders read snake_case keys only. `expectedOutput` (and `expectedTools`, `groundTruth`, `evaluationCriteria`,
   `passingScore`) was kept as metadata by the JSON loaders and dropped by the YAML loader, and a test case with no

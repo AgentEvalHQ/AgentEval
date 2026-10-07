@@ -74,8 +74,13 @@ public static class SkillSecurityIndex
         ArgumentNullException.ThrowIfNull(inputs);
 
         var complianceComponent = inputs.Compliance is { } compliance ? ComplianceScore(compliance) : (double?)null;
-        var efficiencyComponent = inputs.Efficiency is { } efficiency ? Math.Clamp(efficiency.Score, 0.0, 100.0) : (double?)null;
-        var securityComponent = inputs.Security is { } security ? SecurityScore(security) : (double?)null;
+
+        // A not-measured metric carries a placeholder 0 that no aggregate counts (MetricResult.Measured); averaged in,
+        // it would drag the index down for a measurement nobody made. A non-finite score is no measurement either.
+        var efficiencyComponent = inputs.Efficiency is { Measured: true } efficiency && double.IsFinite(efficiency.Score)
+            ? Math.Clamp(efficiency.Score, 0.0, 100.0)
+            : (double?)null;
+        var securityComponent = inputs.Security is { } security ? SecurityScore(security) : null;
 
         var components = new List<double>();
         if (complianceComponent is { } c)
@@ -98,8 +103,12 @@ public static class SkillSecurityIndex
         var measuredAxes = new List<string>();
         var missingAxes = new List<string>();
         (complianceComponent is not null ? measuredAxes : missingAxes).Add("compliance");
-        (efficiencyComponent is not null ? measuredAxes : missingAxes).Add("efficiency");
-        (securityComponent is not null ? measuredAxes : missingAxes).Add("security");
+        (efficiencyComponent is not null ? measuredAxes : missingAxes).Add(
+            inputs.Efficiency is { } supplied && efficiencyComponent is null
+                ? $"efficiency (supplied but not measured: {supplied.Explanation ?? "no score"})"
+                : "efficiency");
+        (securityComponent is not null ? measuredAxes : missingAxes).Add(
+            inputs.Security is not null && securityComponent is null ? "security (no probe run and no drift check finding)" : "security");
 
         var explanation = components.Count == 0
             ? "No axis was supplied — nothing to score. Run the Phase 2 scanner, the Phase 1 metric, and/or a Phase 3 red-team pass first."
@@ -120,10 +129,16 @@ public static class SkillSecurityIndex
         return Math.Clamp(100.0 - penalty, 0.0, 100.0);
     }
 
-    private static double SecurityScore(SkillSecurityOutcome outcome)
+    private static double? SecurityScore(SkillSecurityOutcome outcome)
     {
-        // No probes run yet ⇒ the red-team axis has no data. A drift finding alone (no probes) still
-        // contributes a penalty off a clean 100 baseline — a rug-pull is real evidence even with no probe runs.
+        // No probe run and no drift finding ⇒ the red-team axis has no data: not measured, never a perfect 100.
+        // A drift finding alone (no probes) still contributes a penalty off a clean 100 baseline — a rug-pull is
+        // real evidence even with no probe runs.
+        if (outcome.ProbesRun <= 0 && outcome.ChangedManifestCount <= 0)
+        {
+            return null;
+        }
+
         var baseline = outcome.ProbesRun > 0
             ? 100.0 * outcome.ProbesResisted / outcome.ProbesRun
             : 100.0;
