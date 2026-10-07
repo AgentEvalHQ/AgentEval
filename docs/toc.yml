@@ -103,6 +103,8 @@
       href: agent-skills-whats-new.md
   - name: Responsible AI
     href: responsible-ai.md
+  - name: ASSERT Interoperability
+    href: assert-interop.md
   - name: Memory Evaluation
     href: memory-evaluation.md
   - name: Conversations
