@@ -17,6 +17,7 @@ class AgentEval.Calibration.CalibratedResult
     Boolean Equals(AgentEval.Calibration.CalibratedResult other)
     Boolean Equals(Object obj)
     Boolean HasConsensus { get; init; }
+    Boolean Measured { get; init; }
     Double Agreement { get; init; }
     Double MeanScore { get; }
     Double Score { get; init; }
@@ -27,6 +28,7 @@ class AgentEval.Calibration.CalibratedResult
     Int32 GetHashCode()
     Int32 JudgeCount { get; }
     String JudgeBreakdown { get; }
+    String NotMeasuredReason { get; init; }
     String Summary { get; }
     String ToString()
     ctor()

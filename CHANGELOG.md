@@ -39,6 +39,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `"jev-latest"` always resolved to `"jev-1.13.0"` and `DecisionResponse.Model` echoes the resolved build, so
   provenance is unchanged; the default is pinned for reproducibility in line with `OpenRouterDefaultModel`.
 
+### Fixed
+- **`CalibratedJudge` no longer votes a not-measured judge in as 0.** A metric that lacks an input (Faithfulness
+  without a retrieved context, for example) returns not measured with a placeholder score of 0; the calibrated
+  judge averaged that 0 in, so three judges on Faithfulness without context reported score 0, 100 % agreement and
+  consensus. A not-measured judge is now left out of the vote, like a timed-out one. When too few judges measured
+  because the input lacked something, the result is not measured (`CalibratedResult.Measured` is false,
+  `NotMeasuredReason` carries the metric's reason) instead of a score or an exception.
+
 ## [0.43.0-beta] - 2026-10-06
 
 One release with four parts, newest first below:
