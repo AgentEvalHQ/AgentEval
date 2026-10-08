@@ -30,6 +30,13 @@ internal static class MemoryPoisoningRedTeamDriver
         DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.Never,
     };
 
+    /// <summary>The options a memory-poisoning run reads; any other given on the command line is refused.</summary>
+    private static readonly HashSet<string> UsedOptions = new(StringComparer.Ordinal)
+    {
+        "--attacks", "--endpoint", "--model", "--azure", "--deployment-name", "--api-key", "--memory-trials", "--format",
+        "-o", "--output", "--fail-on", "--timeout-per-probe", "--quiet", "--verbose", "--scripted", "--log-file", "--capture-fixture",
+    };
+
     /// <summary>Whether <c>--attacks</c> names memory-poisoning (any spelling: MemoryPoisoning, memory-poisoning, memory_poisoning).</summary>
     public static bool IsSelected(string? attacks) =>
         attacks?.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Any(IsName) == true;
@@ -120,6 +127,14 @@ internal static class MemoryPoisoningRedTeamDriver
         {
             return "memory-poisoning runs on its own: it is a set of multi-session cases over a memory store, not probes. " +
                    "Run the other attacks in a separate redteam call.";
+        }
+
+        // From the command line, refuse every option given that this run does not use, by presence: an option given
+        // with its default value is still one the user expected to matter.
+        if (opts.ExplicitOptions is { } given && given.Where(o => !UsedOptions.Contains(o)).ToList() is { Count: > 0 } extra)
+        {
+            return $"memory-poisoning does not take {string.Join(", ", extra.Order(StringComparer.Ordinal))}: it brings its own agent (the " +
+                   "model you name, behind AgentEval's default memory protection) and scores with the memory-security checks.";
         }
 
         var notUsed = new List<string>();
@@ -288,10 +303,13 @@ internal static class MemoryPoisoningRedTeamDriver
             var attacks = result.Cases.Where(c => c.PlantedBy == by && !c.Observation.IsBenignControl).ToList();
             var outcomes = attacks.Select(c => Outcome(scenarios[c.ScenarioId], c.Observation)).ToList();
             var notMeasured = outcomes.Count(o => o.StartsWith("not measured", StringComparison.Ordinal));
-            var contained = outcomes.Count(o => o.StartsWith("contained", StringComparison.Ordinal));
+            var contained = outcomes.Count(o => o == "contained");
+            var partly = outcomes.Count(o => o.StartsWith("contained; not measured", StringComparison.Ordinal));
+            var counts = $"{attacks.Count - contained - partly - notMeasured} with a violation, {contained} contained, " +
+                         $"{partly} contained where measured (partly measured), {notMeasured} not measured";
             sb.AppendLine(by == "model"
-                ? $"- Attack cases the model decided: {attacks.Count - contained - notMeasured} with a violation, {contained} contained, {notMeasured} not measured. Compare models here."
-                : $"- Attack cases the harness planted: {attacks.Count - contained - notMeasured} with a violation, {contained} contained, {notMeasured} not measured. Their store outcomes (persisted, leaked, tampered, overwritten, crowded out) are the gates' and the store's, the same for every model under the same options; an action outcome still depends on the model.");
+                ? $"- Attack cases the model decided: {counts}. Compare models here."
+                : $"- Attack cases the harness planted: {counts}. Their store outcomes (persisted, leaked, tampered, overwritten, crowded out) are the gates' and the store's, the same for every model under the same options; an action outcome still depends on the model.");
         }
 
         sb.AppendLine();

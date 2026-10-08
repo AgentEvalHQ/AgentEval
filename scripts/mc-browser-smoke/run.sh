@@ -45,11 +45,14 @@ echo "== install the tool ($version)"
 dotnet tool install AgentEval.Cli --tool-path "$work/tool" --add-source "$feed" --version "$version"
 
 echo "== write a workspace with stored runs (the Mission Control test fixture)"
-ids=$(dotnet run -c Release --project "$here/fixture" -- "$work/ws" | tail -1)
+# Debug, so the Release outputs a release job packed from are not rebuilt without its -p:Version.
+ids=$(dotnet run --project "$here/fixture" -- "$work/ws" | tail -1)
 echo "$ids"
 
 port=${MC_SMOKE_PORT:-5055}
-if curl -fs "http://localhost:$port/" > /dev/null 2>&1; then
+# Every probe is bounded: a server that accepts and never answers must fail the run, not hold it for hours.
+probe() { curl -fs --max-time 2 "http://localhost:$port/" > /dev/null 2>&1; }
+if probe; then
   echo "Something already answers on port $port: the pages would come from it, not from this install." >&2
   exit 2
 fi
@@ -57,10 +60,10 @@ echo "== agenteval mc serve on port $port"
 "$work/tool/agenteval" mc serve --port "$port" --workspace "$work/ws" > "$work/serve.log" 2>&1 &
 server=$!
 for _ in $(seq 1 60); do
-  curl -fs "http://localhost:$port/" > /dev/null 2>&1 && break
+  probe && break
   sleep 0.5
 done
-if ! curl -fs "http://localhost:$port/" > /dev/null 2>&1; then
+if ! probe; then
   echo "mc serve did not answer on port $port:" >&2
   cat "$work/serve.log" >&2
   exit 1
@@ -80,10 +83,10 @@ node "$here/smoke.mjs" "http://localhost:$port" "$ids"
 echo "== SIGTERM stops the server"
 kill -TERM "$server"
 for _ in $(seq 1 20); do
-  curl -fs "http://localhost:$port/" > /dev/null 2>&1 || break
+  probe || break
   sleep 0.5
 done
-if curl -fs "http://localhost:$port/" > /dev/null 2>&1; then
+if probe; then
   echo "FAIL: mc serve was terminated, but the server still answers on port $port" >&2
   exit 1
 fi

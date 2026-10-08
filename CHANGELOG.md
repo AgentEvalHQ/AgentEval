@@ -9,9 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Releases open Mission Control in a browser before publishing.** `scripts/mc-browser-smoke/run.sh` installs the
-  packed tool the way a user does, serves a workspace with stored runs, and opens every page in headless Chromium; a
-  blank page, a console or GraphQL error, a "Failed to load" state, a matrix cell with no status, or a server that
-  outlives SIGTERM fails it. The release workflow runs it after packing, before the push. On the code before this
+  packed tool the way a user does, serves a workspace with stored runs, and opens every page in headless Chromium. A
+  page fails on a console, request or GraphQL error, an error or empty state ("Failed to load", "No … found"), a main
+  area with almost no text, missing the data the fixture put there, or a matrix cell whose status shows blank or "?";
+  the run fails if the server outlives a SIGTERM. The release workflow runs it after packing, before the push. On the code before this
   week's three page fixes it fails exactly those three pages, which the server tests had passed: they sent their own
   queries, and their fixture stored compliance statuses lower-case where real evidence stores `PASS`/`WARN` (the
   fixture now stores what real runs store).
@@ -106,8 +107,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it, and the five verdicts (`--format markdown|json`, `--memory-trials`, exit 0 / 1 / 11; not measured is `null` in
   the JSON). Five cases are planted by the harness; their store outcomes are the gates' and the store's, the same
   for every model, and the report ends with the attack cases split by who planted them. The cases the model decides
-  are not measured when it never read the plant, a call timed out or failed, or it used no memory tool on the benign
-  controls and did nothing in the case; an action is not measured when the poison is stored but never reached it. `--scripted` runs a scripted worst-case model instead, labelled. With the
+  are not measured when it never read the plant, a call timed out or failed, or it did nothing in the case and was
+  not shown to use the memory tools (no memory write proposed on a benign control it completed in that trial); an
+  action is not measured when the poison is stored but no recall the model made matched it. `--scripted` runs a scripted worst-case model instead, labelled. With the
   defaults it contains cross-user recall, a low-trust write under a protected fact's key, untrusted procedure
   promotion and recalled data copied into a sensitive tool; it stores and recalls low-trust poison (labelled), lets a
   fact rewritten under a new key be recalled ahead of the trusted one, recalls a tampered record (integrity
@@ -147,7 +149,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Stopping `agenteval mc serve` with SIGTERM left the server running.** The command starts the server as a child
   process and stopped it on Ctrl+C only. A service manager, `kill` or a CI step sends SIGTERM to the launcher alone,
-  so the launcher exited and the server kept the port and went on serving. It is now stopped with the launcher.
+  so the launcher exited and the server kept the port and went on serving. Ctrl+C and SIGTERM now both stop the
+  server at once (it only reads the workspace, so nothing is lost); the 10-second grace and the second-press
+  escalation are gone, since the command line cancels on the first signal before the tool's own handler ran.
 - **Gatekeeper memory protection blocked every recall of untrusted content, and every write it redacted.**
   `MemoryGateContext.WithContent` copied the context without its record metadata, budget snapshot and
   administrative cross-scope flag, and the pipeline evaluates every gate after a Sanitize verdict on that copy. The

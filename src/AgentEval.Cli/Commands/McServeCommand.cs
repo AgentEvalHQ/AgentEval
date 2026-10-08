@@ -133,32 +133,15 @@ public static class McServeCommand
         Console.WriteLine($"  rest:      http://localhost:{port}/api/v1/version");
         Console.WriteLine("  Ctrl+C to stop");
 
-        // Wire Ctrl+C so it cleanly stops the child instead of orphaning it.
-        // On Windows the console-control event reaches both processes (Kestrel
-        // handles its own SIGINT), so we just need to wait for the child to
-        // exit gracefully. If the user hits Ctrl+C a SECOND time the child
-        // hasn't responded — escalate to Kill immediately on the next press.
-        using var cts = new CancellationTokenSource();
-        Process? procHandle = null;
-        var pressCount = 0;
+        // Ctrl+C and SIGTERM both stop the server. The command line cancels `stop` on either signal, before this
+        // process's own Ctrl+C handler runs, and the server child does not always receive the signal (SIGTERM reaches
+        // this process alone). Mission Control only reads the workspace, so the child is stopped at once: nothing is
+        // lost. The Ctrl+C handler covers a host that does not cancel `stop`.
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(stop);
         ConsoleCancelEventHandler cancelHandler = (_, e) =>
         {
-            e.Cancel = true; // suppress immediate process termination
-            pressCount++;
-            if (pressCount == 1)
-            {
-                cts.Cancel();
-            }
-            else
-            {
-                // Second (or later) press — operator wants out NOW.
-                try
-                {
-                    if (procHandle is { HasExited: false })
-                        procHandle.Kill(entireProcessTree: true);
-                }
-                catch { /* best-effort */ }
-            }
+            e.Cancel = true; // suppress immediate process termination; the child is stopped below
+            cts.Cancel();
         };
         Console.CancelKeyPress += cancelHandler;
 
@@ -167,39 +150,15 @@ public static class McServeCommand
             var startStopwatch = System.Diagnostics.Stopwatch.StartNew();
             using var proc = Process.Start(psi)
                 ?? throw new InvalidOperationException("Process.Start returned null.");
-            procHandle = proc;
-            using var either = CancellationTokenSource.CreateLinkedTokenSource(cts.Token, stop);
             try
             {
-                await proc.WaitForExitAsync(either.Token);
-            }
-            catch (OperationCanceledException) when (!cts.IsCancellationRequested)
-            {
-                // Terminated from outside (SIGTERM): only this process got the signal, so the server child would
-                // outlive it and keep the port. Mission Control only reads the workspace, so stopping it at once
-                // loses nothing.
-                try { proc.Kill(entireProcessTree: true); }
-                catch { /* best-effort: it may have exited meanwhile */ }
-                return 0;
+                await proc.WaitForExitAsync(cts.Token);
             }
             catch (OperationCanceledException)
             {
-                Console.WriteLine("⏹ Stopping Mission Control… (Ctrl+C again to force-kill)");
-                if (!proc.HasExited)
-                {
-                    // 10 s grace — Kestrel typically releases in <2 s but
-                    // cold container hosts / slow CI can take longer.
-                    using var graceCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-                    try
-                    {
-                        await proc.WaitForExitAsync(graceCts.Token);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        try { proc.Kill(entireProcessTree: true); }
-                        catch { /* best-effort */ }
-                    }
-                }
+                Console.WriteLine("⏹ Stopping Mission Control…");
+                try { proc.Kill(entireProcessTree: true); }
+                catch { /* best-effort: it may have exited meanwhile */ }
                 return 0;
             }
 

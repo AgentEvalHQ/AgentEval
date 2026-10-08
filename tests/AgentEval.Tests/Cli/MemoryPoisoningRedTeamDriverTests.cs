@@ -203,6 +203,31 @@ public sealed class MemoryPoisoningRedTeamDriverTests : IDisposable
         Assert.Contains(direct.GetProperty("notes").EnumerateArray(), n => n.GetString()!.StartsWith("not measured", StringComparison.Ordinal));
     }
 
+    [Theory]
+    [InlineData("--judge-mode", "primary")]
+    [InlineData("--intensity", "moderate")]
+    [InlineData("--judge-api-key", "k")]
+    public async Task CommandLine_AnOptionItDoesNotRead_IsRefusedEvenAtItsDefault(string option, string value)
+    {
+        var stderr = new StringWriter();
+        var original = Console.Error;
+        Console.SetError(stderr);
+        int exit;
+        try
+        {
+            exit = await RedTeamCommand.Create()
+                .Parse(["--attacks", "memory-poisoning", "--scripted", option, value, "--quiet"])
+                .InvokeAsync();
+        }
+        finally
+        {
+            Console.SetError(original);
+        }
+
+        Assert.Equal(ExitCodes.UsageError, exit);
+        Assert.Contains($"does not take {option}", stderr.ToString(), StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task CommandLine_ScriptedNeedsNoEndpoint()
     {

@@ -222,6 +222,10 @@ internal static class RedTeamCommand
         {
             var opts = new RedTeamOptions
             {
+                ExplicitOptions = parseResult.CommandResult.Children.OfType<OptionResult>()
+                    .Where(r => !r.Implicit)
+                    .SelectMany(r => r.Option.Aliases.Prepend(r.Option.Name))
+                    .ToHashSet(StringComparer.Ordinal),
                 Endpoint = parseResult.GetValue(endpointOpt),
                 Azure = parseResult.GetValue(azureFlag),
                 Model = parseResult.GetValue(modelOpt),
@@ -1025,6 +1029,12 @@ internal sealed class RedTeamOptions
     /// </summary>
     public IReadOnlyDictionary<string, IRedTeamTargetOptions?> TargetOptions { get; init; }
         = new Dictionary<string, IRedTeamTargetOptions?>(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Every name and alias of the options given on the command line (null when built in code). A run that reads only
+    /// some options refuses the others by presence, so a flag given with its default value is not silently ignored.
+    /// </summary>
+    public IReadOnlySet<string>? ExplicitOptions { get; init; }
 
     /// <summary>Reads the bound options a built-in target contributed (see <see cref="TargetOptions"/>) for target
     /// <paramref name="sut"/>, cast to <typeparamref name="T"/>; <c>null</c> if the target contributed none. Matches
