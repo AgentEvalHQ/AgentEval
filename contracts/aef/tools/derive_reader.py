@@ -2,9 +2,10 @@
 """Derives the AEF v2 reader schemas (tolerant) from the writer schemas (strict).
 
 A reader accepts what a later minor version may add: unknown fields, enum values it does not know (it treats them as
-'other'), and any 2.x schemaVersion. Everything else stays: required fields, types, patterns, consts and the
-conditional rules. Conditions (the 'if' of an if/then) are copied unchanged, since they select a rule rather than
-restrict a value. The .NET conformance tests derive the same schemas independently and compare.
+'other'), any 2.x schemaVersion, and a kind it does not know in a union discriminated by 'kind'. Everything else
+stays: required fields, types, patterns, consts and the conditional rules. The subtrees of 'if' and 'not' are copied
+unchanged: an 'if' selects a rule and a 'not' prohibits, so relaxing either would change what the rule means. The
+.NET conformance tests derive the same schemas independently and compare.
 
 Usage: python contracts/aef/tools/derive_reader.py
 """
@@ -14,26 +15,41 @@ from pathlib import Path
 V2 = Path(__file__).resolve().parents[1] / "v2" / "schemas"
 
 
-def derive(node, in_condition=False):
+def kind_of(branch):
+    """The const 'kind' of a branch of a discriminated union, or None."""
+    if not isinstance(branch, dict):
+        return None
+    kind = branch.get("properties", {}).get("kind", {})
+    return kind.get("const") if isinstance(kind, dict) and isinstance(kind.get("const"), str) else None
+
+
+def derive(node, strict=False):
     if isinstance(node, list):
-        return [derive(item, in_condition) for item in node]
+        return [derive(item, strict) for item in node]
     if not isinstance(node, dict):
         return node
     out = {}
     for key, value in node.items():
         if key == "$id":
             out[key] = value.replace("/aef/v2/writer/", "/aef/v2/reader/")
-        elif key == "additionalProperties" and value is False and not in_condition:
+        elif strict:
+            out[key] = derive(value, True)
+        elif key == "additionalProperties" and value is False:
             continue  # unknown fields are allowed
-        elif key == "enum" and not in_condition:
+        elif key == "enum":
             out["type"] = "string"  # open: an unknown value reads as 'other'
-        elif key == "const" and value == "2.0" and not in_condition:
+        elif key == "const" and value == "2.0":
             out["type"] = "string"
             out["pattern"] = "^2\\.[0-9]+$"  # any minor of the known major
-        elif key == "if":
-            out[key] = derive(value, in_condition=True)
+        elif key in ("if", "not"):
+            out[key] = derive(value, True)
+        elif key == "oneOf" and isinstance(value, list) and value and all(kind_of(b) for b in value):
+            # A union discriminated by kind: known kinds keep their rules; an unknown kind is accepted as 'other'.
+            known = [kind_of(b) for b in value]
+            out["anyOf"] = [derive(b) for b in value] + [
+                {"type": "object", "required": ["kind"], "properties": {"kind": {"type": "string", "not": {"enum": known}}}}]
         else:
-            out[key] = derive(value, in_condition)
+            out[key] = derive(value)
     return out
 
 

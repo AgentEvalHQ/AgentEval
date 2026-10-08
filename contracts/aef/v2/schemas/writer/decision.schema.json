@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/aef/v2/writer/decision.schema.json",
+  "title": "AEF v2: the checkpoint decision function's input and output",
+  "description": "Decide(input) -> output is pure: no I/O, no clock (the evaluation time is an input). Its vectors are in conformance/decision-vectors/. See v2/README.md, 'The decision function'. This schema is the output; $defs/input is the input.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["outcome", "lanes", "reasons"],
+  "properties": {
+    "outcome": { "enum": ["approved", "blocked", "inconclusive", "expired"] },
+    "lanes": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["lane", "status", "blocking"],
+        "properties": {
+          "lane": { "type": "string", "minLength": 1, "maxLength": 64 },
+          "status": { "$ref": "#/$defs/laneStatus" },
+          "blocking": { "type": "boolean" },
+          "axes": { "description": "For incomparable: the comparability axes that differ.", "type": "array", "items": { "type": "string", "maxLength": 64 } }
+        }
+      }
+    },
+    "reasons": {
+      "description": "Why, one line per lane that kept the outcome from approved (in the input's lane order), then the rule that set the outcome. Codes, not prose, so every implementation produces the same list.",
+      "type": "array",
+      "maxItems": 256,
+      "items": { "type": "string", "pattern": "^[a-z][a-z0-9-]*(:[^\\s]{1,128})?$" }
+    }
+  },
+  "$defs": {
+    "laneStatus": {
+      "description": "passed / failed: the lane's rule held or did not on its evidence. missing: no evidence for this exact version. not_measured: the evidence exists but measured nothing the rule reads. incomparable: a comparison's runs differ on a required axis. stale: older than the lane's freshness at the evaluation time.",
+      "enum": ["passed", "failed", "missing", "not_measured", "incomparable", "stale"]
+    },
+    "input": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subjectVersion", "evaluatedAt", "lanes"],
+      "properties": {
+        "subjectVersion": { "description": "The checkpoint's exact subject version.", "type": "string", "minLength": 1, "maxLength": 256 },
+        "evaluatedAt": { "$ref": "common.schema.json#/$defs/timestamp" },
+        "supersededBy": { "description": "A newer subject version known at the evaluation time, if any: the checkpoint expires.", "type": ["string", "null"], "maxLength": 256 },
+        "lanes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["lane", "blocking", "result"],
+            "properties": {
+              "lane": { "type": "string", "minLength": 1, "maxLength": 64 },
+              "blocking": { "type": "boolean" },
+              "freshness": { "type": "string", "pattern": "^P(?=\\d|T\\d)(\\d+D)?(T\\d+H)?$" },
+              "result": {
+                "description": "What the lane's rule gave on its evidence (computed from the runs, outside this function), or null when there is no evidence.",
+                "anyOf": [
+                  { "type": "null" },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["status", "subjectVersion", "closedAt"],
+                    "properties": {
+                      "status": { "enum": ["passed", "failed", "not_measured", "incomparable"] },
+                      "subjectVersion": { "description": "The version the evidence was produced for.", "type": "string", "minLength": 1, "maxLength": 256 },
+                      "closedAt": { "description": "When the newest run of the lane closed.", "$ref": "common.schema.json#/$defs/timestamp" },
+                      "axes": { "type": "array", "items": { "type": "string", "maxLength": 64 } }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

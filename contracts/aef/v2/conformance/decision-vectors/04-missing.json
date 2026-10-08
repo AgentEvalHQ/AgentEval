@@ -1,0 +1,42 @@
+{
+  "description": "A lane with no evidence is missing: at best inconclusive, never a pass.",
+  "input": {
+    "subjectVersion": "git:3f2a1c",
+    "evaluatedAt": "2026-10-08T12:00:00Z",
+    "lanes": [
+      {
+        "lane": "quality",
+        "blocking": true,
+        "result": {
+          "status": "passed",
+          "subjectVersion": "git:3f2a1c",
+          "closedAt": "2026-10-07T10:00:00Z"
+        }
+      },
+      {
+        "lane": "memory",
+        "blocking": true,
+        "result": null
+      }
+    ]
+  },
+  "expected": {
+    "outcome": "inconclusive",
+    "lanes": [
+      {
+        "lane": "quality",
+        "status": "passed",
+        "blocking": true
+      },
+      {
+        "lane": "memory",
+        "status": "missing",
+        "blocking": true
+      }
+    ],
+    "reasons": [
+      "missing:memory",
+      "outcome:inconclusive"
+    ]
+  }
+}

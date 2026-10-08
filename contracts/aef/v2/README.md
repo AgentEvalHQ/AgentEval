@@ -176,17 +176,70 @@ text and a CRLF inside a sealed blob to prove it.
 `conformance/seal-vectors/` holds sealed runs with their expected manifests, and runs changed after sealing (a byte
 changed, a file added, a file removed) with the expected differences.
 
-## 9. Not yet in this draft
+## 9. Checkpoints
+
+A **checkpoint** is a release decision over several evidence lanes (a quality suite, a red-team campaign, a memory
+benchmark, a compliance pack) for **one exact subject version** (schema `checkpoint`). "latest" is never an identity:
+it is resolved to an exact version before anything runs, and the manifest records what was asked (`resolvedFrom`) and
+what it resolved to (`version`).
+
+- Each **lane** names its `rule`, the requirements it answers, the exact sealed `runs` it used, where they came from
+  (`origin`: `launched`, `adopted:<source>` for an existing sealed run that matched the exact version and the
+  comparability requirements, or `pending`), whether it is `blocking`, and its `freshness` (an ISO 8601 duration of
+  days and hours: `P14D`, `PT36H`, `P1DT12H`).
+- A lane's rule is one of: `threshold` (a metric against a value), `severity` (the worst severity allowed), `comparison`
+  (no significant regression against a baseline), `evidence-present` (a number of evidence groups exist and verify).
+  A family that publishes no pass threshold takes `comparison` or `evidence-present`, never `threshold`.
+- `state` moves `draft` → `planned` → `approved_to_spend` → `running` → `evidence_complete` → `decided` → `sealed`.
+  `outcome` is `null` until the state is `decided`; from then on it is set, and `decision` records the decision
+  function's output.
+
+## 10. The decision function
+
+`Decide(input) → output` (schema `decision`: `$defs/input` and the document itself) is pure: no I/O and no clock, the
+evaluation time is an input. Anyone can recompute why a checkpoint was approved, blocked, inconclusive or expired.
+
+**Input:** the checkpoint's exact `subjectVersion`, `evaluatedAt`, an optional `supersededBy` (a newer version known at
+that time), and per lane: `lane`, `blocking`, an optional `freshness`, and `result`: what the lane's rule gave on its
+evidence (`passed`, `failed`, `not_measured`, `incomparable` with the differing `axes`), the version it was produced
+for and when its newest run closed, or `null` when there is no evidence. Computing a lane's result from its runs is
+outside this function.
+
+**Each lane's status**, in this order:
+
+1. `result` is `null` → `missing` (reason `missing:<lane>`).
+2. The result is for another version → `missing` (reason `wrong-version:<lane>`).
+3. A `freshness` is set and `closedAt + freshness < evaluatedAt` → `stale` (reason `stale:<lane>`). Evidence exactly
+   as old as the freshness is still fresh.
+4. Otherwise the result's status: `passed` (no reason), `failed` (reason `failed:<lane>`, or `advisory-failed:<lane>`
+   for a lane that is not blocking), `not_measured` (`not-measured:<lane>`), `incomparable` (`incomparable:<lane>`,
+   and the lane carries its `axes`).
+
+**The outcome**, first rule that holds:
+
+1. `supersededBy` is set and differs from `subjectVersion`, or any lane is `stale` → `expired`.
+2. Any blocking lane is `failed` → `blocked`.
+3. Any lane, blocking or not, is `missing`, `not_measured` or `incomparable` → `inconclusive`.
+4. Otherwise → `approved`. A failed advisory lane does not block, and is reported.
+
+Missing evidence is never converted into a pass, and nothing is averaged.
+
+**Reasons** are codes, so every implementation produces the same list: the lane reasons in input order, then
+`superseded:<version>` if it applies, then `outcome:<outcome>`.
+
+`conformance/decision-vectors/` holds inputs with expected outputs written by hand from these rules; the reference
+implementation `tools/aef_decide.py` and the .NET one (`AgentEval.Results`) reproduce them.
+
+## 11. Not yet in this draft
 
 These are specified in the design and will be added to v2 before it is released, each with its schema and vectors:
 
-- the checkpoint manifest and the open decision function, with decision vectors;
 - the run plan, the runner capability manifest and the runner event stream, with protocol vectors;
 - DSSE vectors (valid, wrong key, tampered payload) with test keys;
 - v1-to-v2 migration vectors;
 - `views.json` and the catalog manifest.
 
-## 10. Conformance
+## 12. Conformance
 
 A writer or reader in any language conforms when it passes `conformance/`:
 
@@ -196,4 +249,7 @@ A writer or reader in any language conforms when it passes `conformance/`:
 - every vector in `result-ids.json` reproduces;
 - every run in `valid/` that has a `seal.json` verifies, with the manifest in `seal-vectors/<name>/`, and every changed
   run in `seal-vectors/` fails verification with exactly the expected differences;
-- the overlay batches of every run in `valid/` form an unbroken chain over the whole events file.
+- the overlay batches of every run in `valid/` form an unbroken chain over the whole events file;
+- every checkpoint in `checkpoints/` is accepted or refused by the writer and the reader schemas as its `expected.json`
+  says;
+- every vector in `decision-vectors/` reproduces exactly.

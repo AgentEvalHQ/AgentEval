@@ -17,11 +17,11 @@ namespace AgentEval.Tests.Contracts;
 /// </summary>
 public class AefV2ConformanceTests
 {
-    private static readonly string V2 = Path.Combine(RepoRoot(), "contracts", "aef", "v2");
+    private static readonly string V2 = AefSchemaSet.V2;
     private static readonly string Conformance = Path.Combine(V2, "conformance");
 
-    private static readonly Lazy<SchemaSet> Writer = new(() => SchemaSet.Load(Path.Combine(V2, "schemas", "writer")));
-    private static readonly Lazy<SchemaSet> Reader = new(() => SchemaSet.Load(Path.Combine(V2, "schemas", "reader")));
+    private static readonly Lazy<AefSchemaSet> Writer = AefSchemaSet.Writer;
+    private static readonly Lazy<AefSchemaSet> Reader = AefSchemaSet.Reader;
 
     // ------------------------------------------------------------------ schemas
 
@@ -30,7 +30,7 @@ public class AefV2ConformanceTests
     {
         var files = Directory.GetFiles(Path.Combine(V2, "schemas", "writer"), "*.schema.json");
 
-        Assert.Equal(10, files.Length);
+        Assert.Equal(12, files.Length);
         Assert.All(files, f =>
         {
             var node = JsonNode.Parse(File.ReadAllText(f))!;
@@ -68,22 +68,50 @@ public class AefV2ConformanceTests
                     {
                         result[key] = ((string)value!).Replace("/aef/v2/writer/", "/aef/v2/reader/", StringComparison.Ordinal);
                     }
-                    else if (key == "additionalProperties" && value is JsonValue v && v.TryGetValue<bool>(out var b) && !b && !inCondition)
+                    else if (inCondition)
+                    {
+                        result[key] = Derive(value, true);
+                    }
+                    else if (key == "additionalProperties" && value is JsonValue v && v.TryGetValue<bool>(out var b) && !b)
                     {
                         // unknown fields are allowed
                     }
-                    else if (key == "enum" && !inCondition)
+                    else if (key == "enum")
                     {
                         result["type"] = "string";
                     }
-                    else if (key == "const" && value is JsonValue c && c.TryGetValue<string>(out var s) && s == "2.0" && !inCondition)
+                    else if (key == "const" && value is JsonValue c && c.TryGetValue<string>(out var s) && s == "2.0")
                     {
                         result["type"] = "string";
                         result["pattern"] = "^2\\.[0-9]+$";
                     }
+                    else if (key is "if" or "not")
+                    {
+                        // A condition selects a rule and a prohibition forbids: relaxing either changes what it means.
+                        result[key] = Derive(value, true);
+                    }
+                    else if (key == "oneOf" && value is JsonArray branches && branches.Count > 0 && branches.All(br => KindOf(br) is not null))
+                    {
+                        // A union discriminated by kind: known kinds keep their rules; an unknown kind reads as "other".
+                        var anyOf = new JsonArray(branches.Select(br => Derive(br, false)).ToArray());
+                        anyOf.Add(new JsonObject
+                        {
+                            ["type"] = "object",
+                            ["required"] = new JsonArray("kind"),
+                            ["properties"] = new JsonObject
+                            {
+                                ["kind"] = new JsonObject
+                                {
+                                    ["type"] = "string",
+                                    ["not"] = new JsonObject { ["enum"] = new JsonArray(branches.Select(br => (JsonNode?)KindOf(br)).ToArray()) },
+                                },
+                            },
+                        });
+                        result["anyOf"] = anyOf;
+                    }
                     else
                     {
-                        result[key] = Derive(value, inCondition || key == "if");
+                        result[key] = Derive(value, false);
                     }
                 }
 
@@ -92,6 +120,9 @@ public class AefV2ConformanceTests
                 return node?.DeepClone();
         }
     }
+
+    private static string? KindOf(JsonNode? branch) =>
+        branch?["properties"]?["kind"]?["const"] is JsonValue k && k.TryGetValue<string>(out var kind) ? kind : null;
 
     // ------------------------------------------------------------------ the corpus against the schemas
 
@@ -288,7 +319,7 @@ public class AefV2ConformanceTests
     [Fact]
     public void TheRuntimeVerdictProfile_IsTheAevpSchemaTheLibraryShips()
     {
-        var root = RepoRoot();
+        var root = AefSchemaSet.RepoRoot();
 
         Assert.Equal(
             File.ReadAllBytes(Path.Combine(root, "src", "AgentEval.MAF.AgentHooks", "Aevp", "aevp-0.1.schema.json")),
@@ -298,45 +329,4 @@ public class AefV2ConformanceTests
     private static string Hex(byte[] bytes) => Convert.ToHexString(bytes).ToLowerInvariant();
 
     private static string Hex(ReadOnlySpan<byte> bytes) => Hex(bytes.ToArray());
-
-    private static string RepoRoot()
-    {
-        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
-        {
-            if (Directory.Exists(Path.Combine(dir.FullName, "contracts", "aef")))
-                return dir.FullName;
-        }
-
-        throw new DirectoryNotFoundException("contracts/aef was not found above the test directory.");
-    }
-
-    /// <summary>One set of schemas (writer or reader), registered together so their relative $refs resolve.</summary>
-    private sealed class SchemaSet
-    {
-        private readonly Dictionary<string, JsonSchema> _schemas = new(StringComparer.Ordinal);
-        private readonly EvaluationOptions _options = new() { OutputFormat = OutputFormat.List, RequireFormatValidation = true };
-
-        public static SchemaSet Load(string dir)
-        {
-            var set = new SchemaSet();
-            foreach (var file in Directory.GetFiles(dir, "*.schema.json"))
-            {
-                var schema = JsonSchema.FromText(File.ReadAllText(file));
-                set._options.SchemaRegistry.Register(schema);
-                set._schemas[Path.GetFileName(file)[..^".schema.json".Length]] = schema;
-            }
-
-            return set;
-        }
-
-        public bool IsValid(string name, JsonNode? document, out string errors)
-        {
-            var result = _schemas[name].Evaluate(document, _options);
-            errors = result.IsValid
-                ? ""
-                : string.Join("; ", (result.Details ?? []).Where(d => d.Errors is { Count: > 0 })
-                    .SelectMany(d => d.Errors!.Select(e => $"{d.InstanceLocation} {e.Key}: {e.Value}")).Take(8));
-            return result.IsValid;
-        }
-    }
 }

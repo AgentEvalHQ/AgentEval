@@ -48,6 +48,7 @@
     <ProjectReference Include="..\..\src\AgentEval.Abstractions\AgentEval.Abstractions.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.Core\AgentEval.Core.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.DataLoaders\AgentEval.DataLoaders.csproj" />
+    <ProjectReference Include="..\..\src\AgentEval.Results\AgentEval.Results.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.MAF\AgentEval.MAF.csproj" />
     <ProjectReference Include="..\..\src\AgentEval.MAF.CopilotStudio\AgentEval.MAF.CopilotStudio.csproj" />
     <!-- S1: the AGENT-HOOKS-0.1 interceptor adapter. Targets net8.0 only (the SDK ships lib/net8.0

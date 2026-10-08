@@ -286,6 +286,48 @@ def invalid_cases():
     ]
 
 
+# ---------------------------------------------------------------------------- checkpoints
+
+def checkpoints():
+    """Checkpoint manifests: (name, document, writer verdict, reader verdict, why)."""
+    lanes = [
+        {"lane": "quality", "rule": {"kind": "threshold", "metric": "triage.passRate", "op": ">=", "value": 0.8},
+         "requirements": ["REQ-07"], "runs": ["Q-184"], "origin": "launched", "blocking": True},
+        {"lane": "security", "rule": {"kind": "severity", "max": "low"}, "requirements": ["REQ-15"], "runs": ["R-921"],
+         "origin": "adopted:ci", "blocking": True, "freshness": "P14D"},
+        {"lane": "memory", "rule": {"kind": "comparison", "baseline": "policy:same-branch", "significance": 0.05},
+         "runs": [], "origin": "pending", "blocking": False},
+    ]
+    decided = {
+        "schemaVersion": V, "checkpointId": "cp_01J9K4", "template": {"ref": "template:support/release-candidate", "version": "3"},
+        "subject": {"ref": "agent:support/support-triage", "version": "git:3f2a1c", "image": "sha256:" + "9d" * 32,
+                    "deployment": "deployment:support/support-triage@prod-eu", "resolvedFrom": "latest", "resolvedAt": "2026-10-02T13:58:00Z"},
+        "lanes": lanes, "comparability": {"required": ["judge.modelId", "judge.rubricDigest", "stimulus", "executionPolicy"]},
+        "budget": {"approvedUsd": 10.0, "spentUsd": 6.4, "approvedBy": {"identity": "git:owner@example.com", "assurance": "self-attested"}},
+        "state": "decided", "outcome": "inconclusive",
+        "decision": {"outcome": "inconclusive",
+                     "lanes": [{"lane": "quality", "status": "passed", "blocking": True},
+                               {"lane": "security", "status": "passed", "blocking": True},
+                               {"lane": "memory", "status": "missing", "blocking": False}],
+                     "reasons": ["missing:memory", "outcome:inconclusive"]},
+    }
+    planned = dict(decided, state="planned", outcome=None)
+    del planned["decision"]
+    unknown_kind = dict(planned, lanes=[dict(lanes[0], rule={"kind": "drift", "window": "P7D"})])
+    return [
+        ("valid-decided", decided, "valid", "valid", "a decided checkpoint with its decision"),
+        ("valid-planned", planned, "valid", "valid", "a planned checkpoint has no outcome yet"),
+        ("decided-without-outcome", dict(decided, outcome=None), "invalid", "invalid", "a decided checkpoint has an outcome"),
+        ("latest-is-not-a-version", dict(planned, subject=dict(planned["subject"], version="latest")), "invalid", "invalid",
+         "'latest' is resolved to an exact version before anything runs"),
+        ("threshold-without-value", dict(planned, lanes=[dict(lanes[0], rule={"kind": "threshold", "metric": "m", "op": ">="})]),
+         "invalid", "invalid", "a threshold rule names its value"),
+        ("unknown-rule-kind", unknown_kind, "invalid", "valid",
+         "a rule kind this version does not know: the writer refuses it, a reader accepts it as other"),
+        ("planned-with-outcome", dict(planned, outcome="approved"), "invalid", "invalid", "no outcome before the decision"),
+    ]
+
+
 # ---------------------------------------------------------------------------- seal vectors
 
 def seal_vectors(valid):
@@ -317,8 +359,10 @@ def seal_vectors(valid):
 
 
 def main():
-    if ROOT.exists():
-        shutil.rmtree(ROOT)
+    # Only what this script writes: decision-vectors/ are hand-written and stay.
+    for owned in ("valid", "invalid", "seal-vectors"):
+        if (ROOT / owned).exists():
+            shutil.rmtree(ROOT / owned)
     valid = ROOT / "valid"
     completed_eval(valid / "completed-eval")
     aborted_early(valid / "aborted-early")
@@ -329,6 +373,12 @@ def main():
         write_json(ROOT / "invalid" / name / "expected.json", {"schema": schema, "writer": "invalid", "reader": reader, "rule": rule})
 
     seal_vectors(valid)
+
+    if (ROOT / "checkpoints").exists():
+        shutil.rmtree(ROOT / "checkpoints")
+    for name, doc, writer, reader, rule in checkpoints():
+        write_json(ROOT / "checkpoints" / name / "document.json", doc)
+        write_json(ROOT / "checkpoints" / name / "expected.json", {"schema": "checkpoint", "writer": writer, "reader": reader, "rule": rule})
 
     vectors = [(run, case, path, trial) for run, case, path, trial in [
         ("01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10", "case-17", "triage", None),

@@ -1,0 +1,6 @@
+{
+  "schema": "checkpoint",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rule": "a decided checkpoint has an outcome"
+}

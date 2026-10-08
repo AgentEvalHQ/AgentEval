@@ -10,3 +10,5 @@
 - The seal over exact bytes (no canonical JSON): the manifest, the run hash, an in-toto Statement v1.
 - The conformance corpus: valid runs, invalid documents with the rule each breaks, seal vectors, result-id vectors.
 - The runtime-verdict profile (AEVP 0.1).
+- Checkpoint manifests and the decision function (pure, with hand-written vectors); the reader derivation keeps
+  `not` subtrees strict and accepts an unknown kind in a union discriminated by `kind`.

@@ -1,0 +1,48 @@
+{
+  "description": "Stale evidence cannot decide, even a failure: expired before blocked.",
+  "input": {
+    "subjectVersion": "git:3f2a1c",
+    "evaluatedAt": "2026-10-08T12:00:00Z",
+    "lanes": [
+      {
+        "lane": "quality",
+        "blocking": true,
+        "result": {
+          "status": "failed",
+          "subjectVersion": "git:3f2a1c",
+          "closedAt": "2026-10-07T10:00:00Z"
+        }
+      },
+      {
+        "lane": "security",
+        "blocking": true,
+        "freshness": "P14D",
+        "result": {
+          "status": "passed",
+          "subjectVersion": "git:3f2a1c",
+          "closedAt": "2026-09-20T12:00:00Z"
+        }
+      }
+    ]
+  },
+  "expected": {
+    "outcome": "expired",
+    "lanes": [
+      {
+        "lane": "quality",
+        "status": "failed",
+        "blocking": true
+      },
+      {
+        "lane": "security",
+        "status": "stale",
+        "blocking": true
+      }
+    ],
+    "reasons": [
+      "failed:quality",
+      "stale:security",
+      "outcome:expired"
+    ]
+  }
+}

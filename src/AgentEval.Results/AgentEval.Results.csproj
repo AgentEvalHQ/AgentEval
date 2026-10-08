@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- AEF v2 in .NET (strategy/MissionControl 05 §3.1): today the checkpoint decision function; the run writer, reader,
+       validator and sealer come next. Not packed until it ships (it writes and reads a draft format). -->
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>AgentEval.Results</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="AgentEval.Tests" />
+  </ItemGroup>
+</Project>
