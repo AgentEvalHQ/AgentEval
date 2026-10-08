@@ -869,7 +869,7 @@ mcServeCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
     var port = parseResult.GetValue(mcServePortOpt) ?? 5000;
     var workspace = parseResult.GetValue(mcServeWorkspaceOpt);
-    return await McServeCommand.RunAsync(port, workspace);
+    return await McServeCommand.RunAsync(port, workspace, ct);
 });
 mcCmd.Add(mcServeCmd);
 

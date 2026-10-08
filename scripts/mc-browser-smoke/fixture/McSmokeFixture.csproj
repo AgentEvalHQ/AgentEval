@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Writes the Mission Control test fixture (tests/.../MissionControlFixtureBuilder.cs, the data the server tests
+       read) into a workspace for the browser smoke, and prints the ids the smoke navigates to. Not in the solution:
+       run.sh builds it on demand. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\src\AgentEval.Core\AgentEval.Core.csproj" />
+    <ProjectReference Include="..\..\..\src\AgentEval.DataLoaders\AgentEval.DataLoaders.csproj" />
+    <Compile Include="..\..\..\tests\AgentEval.Tests\MissionControl\Fixtures\MissionControlFixtureBuilder.cs" Link="MissionControlFixtureBuilder.cs" />
+  </ItemGroup>
+</Project>

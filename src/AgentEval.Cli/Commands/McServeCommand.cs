@@ -32,7 +32,13 @@ namespace AgentEval.Cli.Commands;
 /// </remarks>
 public static class McServeCommand
 {
-    public static async Task<int> RunAsync(int port, string? workspaceRoot)
+    /// <param name="port">The port to bind.</param>
+    /// <param name="workspaceRoot">The workspace root, or null for the current directory.</param>
+    /// <param name="stop">
+    /// Cancelled by the command line on SIGTERM (a service manager, <c>kill</c>, CI). The server child never receives
+    /// that signal, so it is stopped here; before, the launcher exited and the server kept the port.
+    /// </param>
+    public static async Task<int> RunAsync(int port, string? workspaceRoot, CancellationToken stop = default)
     {
 #if NET10_0_OR_GREATER
         // Defense-in-depth canonicalisation for operator-supplied --workspace.
@@ -162,9 +168,19 @@ public static class McServeCommand
             using var proc = Process.Start(psi)
                 ?? throw new InvalidOperationException("Process.Start returned null.");
             procHandle = proc;
+            using var either = CancellationTokenSource.CreateLinkedTokenSource(cts.Token, stop);
             try
             {
-                await proc.WaitForExitAsync(cts.Token);
+                await proc.WaitForExitAsync(either.Token);
+            }
+            catch (OperationCanceledException) when (!cts.IsCancellationRequested)
+            {
+                // Terminated from outside (SIGTERM): only this process got the signal, so the server child would
+                // outlive it and keep the port. Mission Control only reads the workspace, so stopping it at once
+                // loses nothing.
+                try { proc.Kill(entireProcessTree: true); }
+                catch { /* best-effort: it may have exited meanwhile */ }
+                return 0;
             }
             catch (OperationCanceledException)
             {
@@ -218,7 +234,7 @@ public static class McServeCommand
         await Task.CompletedTask;
         Console.Error.WriteLine("✖ `agenteval mc serve` requires .NET 10 or newer.");
         Console.Error.WriteLine("    Run with `dotnet --version` to check; install from https://dot.net.");
-        _ = port; _ = workspaceRoot;
+        _ = port; _ = workspaceRoot; _ = stop;
         return ExitCodes.RuntimeError;
 #endif
     }

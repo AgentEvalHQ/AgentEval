@@ -8,6 +8,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Releases open Mission Control in a browser before publishing.** `scripts/mc-browser-smoke/run.sh` installs the
+  packed tool the way a user does, serves a workspace with stored runs, and opens every page in headless Chromium; a
+  blank page, a console or GraphQL error, a "Failed to load" state, a matrix cell with no status, or a server that
+  outlives SIGTERM fails it. The release workflow runs it after packing, before the push. On the code before this
+  week's three page fixes it fails exactly those three pages, which the server tests had passed: they sent their own
+  queries, and their fixture stored compliance statuses lower-case where real evidence stores `PASS`/`WARN` (the
+  fixture now stores what real runs store).
 - **Calibration confidence intervals** — `CalibrationReport` now exposes `AccuracyInterval` and `FprInterval`
   (`WilsonInterval` structs) alongside the point estimates. A small gold set no longer hides its own
   uncertainty: `0/8` reads `0.0 % [0.0 %, 32.4 %]` instead of a deceptively tidy `0.0 %`. The 95 % Wilson
@@ -137,6 +144,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Repeated runs of a test case are measured by `AgentEval.Comparison.StochasticRunner`.
 
 ### Fixed
+- **Stopping `agenteval mc serve` with SIGTERM left the server running.** The command starts the server as a child
+  process and stopped it on Ctrl+C only. A service manager, `kill` or a CI step sends SIGTERM to the launcher alone,
+  so the launcher exited and the server kept the port and went on serving. It is now stopped with the launcher.
 - **Gatekeeper memory protection blocked every recall of untrusted content, and every write it redacted.**
   `MemoryGateContext.WithContent` copied the context without its record metadata, budget snapshot and
   administrative cross-scope flag, and the pipeline evaluates every gate after a Sanitize verdict on that copy. The

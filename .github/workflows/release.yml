@@ -133,6 +133,15 @@ jobs:
         fi
         echo "Mission Control UI present in $pkg"
 
+    # Present is not working: install the packed tool the way a user does, serve a workspace with stored runs, and open
+    # every Mission Control page in a headless browser. A page that is blank, errors or shows no data stops the release
+    # before anything is pushed, and so does a server that outlives a SIGTERM. Releases only, to keep Actions minutes
+    # down; scripts/mc-browser-smoke/run.sh runs the same locally.
+    - name: Open Mission Control from the packed tool in a browser
+      env:
+        MC_SMOKE_WITH_DEPS: '1'
+      run: bash scripts/mc-browser-smoke/run.sh --feed ./nupkgs --version ${{ steps.version.outputs.version }}
+
     - name: Verify the packed corpora are the corpora in this repository
       shell: pwsh
       run: |

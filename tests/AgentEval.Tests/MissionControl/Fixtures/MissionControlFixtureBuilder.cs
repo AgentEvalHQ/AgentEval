@@ -361,14 +361,16 @@ public static class MissionControlFixtureBuilder
             Subject: subject,
             GeneratedAt: generatedAt,
             SourceRun: new SourceRunRef(sourceManifest.Run.RunId, sourceManifest.ContentHash),
+            // Statuses as real evidence stores them (EvalScore.ReportStatus: "PASS", "WARN", ...). The fixture once
+            // wrote them lower-case, so the matrix page worked on test data and rendered blank on real data.
             Controls: new[]
             {
-                new EvidenceControl("art-5",  "Lawfulness, fairness and transparency", "pass", 1.00, Array.Empty<string>(), Notes: null),
-                new EvidenceControl("art-13", "Information to be provided",            "pass", 0.95, Array.Empty<string>(), Notes: null),
-                new EvidenceControl("art-15", "Right of access",                       "warn", 0.78, Array.Empty<string>(), Notes: "Partial coverage"),
-                new EvidenceControl("art-32", "Security of processing",                "pass", 1.00, Array.Empty<string>(), Notes: null),
+                new EvidenceControl("art-5",  "Lawfulness, fairness and transparency", "PASS", 1.00, Array.Empty<string>(), Notes: null),
+                new EvidenceControl("art-13", "Information to be provided",            "PASS", 0.95, Array.Empty<string>(), Notes: null),
+                new EvidenceControl("art-15", "Right of access",                       "WARN", 0.78, Array.Empty<string>(), Notes: "Partial coverage"),
+                new EvidenceControl("art-32", "Security of processing",                "PASS", 1.00, Array.Empty<string>(), Notes: null),
             },
-            Summary: new EvidenceSummary(ControlsTotal: 4, Passed: 3, Warnings: 1, Failed: 0, OverallStatus: "warn"),
+            Summary: new EvidenceSummary(ControlsTotal: 4, Passed: 3, Warnings: 1, Failed: 0, OverallStatus: "WARN"),
             Attestation: new Attestation(
                 AgentEvalVersion: "1.7.0",
                 ConfigurationId: null,
@@ -393,11 +395,11 @@ public static class MissionControlFixtureBuilder
             SourceRun: new SourceRunRef(sourceManifest.Run.RunId, sourceManifest.ContentHash),
             Controls: new[]
             {
-                new EvidenceControl("art-9",  "Risk management system",         "pass", 1.0, Array.Empty<string>(), Notes: null),
-                new EvidenceControl("art-13", "Transparency for deployers",     "pass", 0.92, Array.Empty<string>(), Notes: null),
-                new EvidenceControl("art-15", "Accuracy, robustness, security", "warn", 0.76, Array.Empty<string>(), Notes: "Robustness margin tight"),
+                new EvidenceControl("art-9",  "Risk management system",         "PASS", 1.0, Array.Empty<string>(), Notes: null),
+                new EvidenceControl("art-13", "Transparency for deployers",     "PASS", 0.92, Array.Empty<string>(), Notes: null),
+                new EvidenceControl("art-15", "Accuracy, robustness, security", "WARN", 0.76, Array.Empty<string>(), Notes: "Robustness margin tight"),
             },
-            Summary: new EvidenceSummary(ControlsTotal: 3, Passed: 2, Warnings: 1, Failed: 0, OverallStatus: "warn"),
+            Summary: new EvidenceSummary(ControlsTotal: 3, Passed: 2, Warnings: 1, Failed: 0, OverallStatus: "WARN"),
             Attestation: new Attestation("1.7.0", null, "eu-ai-act-judge", "gpt-4o-2024-08-06"));
         await store.SaveComplianceEvidenceAsync("eu-ai-act", subject, evidence, ct);
         return generatedAt.ToString("yyyy-MM-dd_HH-mm-ss");
