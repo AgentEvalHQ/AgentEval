@@ -23,6 +23,8 @@ internal sealed class HarnessMemoryRecord
     public required MemoryProvenance Provenance { get; init; }
     public required DateTimeOffset CreatedAt { get; init; }
     public required string Session { get; init; }
+    /// <summary>The gate operation that admitted the write (null for seeded state): what attribution follows.</summary>
+    public string? OperationId { get; init; }
     public MemoryRecordState State { get; set; } = MemoryRecordState.Active;
 
     public bool IntegrityVerified => string.Equals(Digest, HarnessMemoryStore.Sha256(Content), StringComparison.Ordinal);
@@ -30,14 +32,16 @@ internal sealed class HarnessMemoryRecord
 
 /// <summary>
 /// The memory store behind the harness tools: a naive store on purpose. A recall returns the newest active records that
-/// share a word with the query, up to <see cref="RecallWindow"/> (the default recall budget's item cap, the most the
-/// defaults let through); it does not rank by trust or check integrity, so containment is the gates' job, not the
-/// store's.
+/// share a word with the query, up to <see cref="RecallWindow"/> (the bench's recall budget cap, the most the gates let
+/// through); it does not rank by trust or check integrity, so containment is the gates' job, not the store's.
 /// </summary>
 internal sealed class HarnessMemoryStore
 {
-    /// <summary>The most records one recall returns: <see cref="MemoryResourceBudgetOptions.MaximumRecalledItems"/> by default.</summary>
-    public static readonly int RecallWindow = new MemoryResourceBudgetOptions().MaximumRecalledItems;
+    /// <summary>The resource budget the bench's gate enforces: the library defaults.</summary>
+    public static readonly MemoryResourceBudgetOptions BudgetOptions = new();
+
+    /// <summary>The most records one recall returns: the budget's recalled-item cap.</summary>
+    public static readonly int RecallWindow = BudgetOptions.MaximumRecalledItems;
 
     private readonly List<HarnessMemoryRecord> _records = [];
     private readonly Dictionary<string, int> _writesPerSource = new(StringComparer.Ordinal);
@@ -60,13 +64,14 @@ internal sealed class HarnessMemoryStore
 
     /// <summary>State a real deployment already holds before the case: not a write in the run, so not counted.</summary>
     public HarnessMemoryRecord Seed(MemorySecurityScope owner, string key, string content, MemoryCategory category, MemoryProvenance provenance) =>
-        Add(owner, key, content, category, provenance, "seed");
+        Add(owner, key, content, category, provenance, "seed", operationId: null);
 
-    /// <summary>A write the gates admitted, counted for the next budget snapshot.</summary>
+    /// <summary>A write the gates admitted (operation <paramref name="operationId"/>), counted for the next budget snapshot.</summary>
     public HarnessMemoryRecord Write(
-        MemorySecurityScope owner, string key, string content, MemoryCategory category, MemoryProvenance provenance, string session)
+        MemorySecurityScope owner, string key, string content, MemoryCategory category, MemoryProvenance provenance, string session,
+        string? operationId)
     {
-        var record = Add(owner, key, content, category, provenance, session);
+        var record = Add(owner, key, content, category, provenance, session, operationId);
         WritesInRun++;
         WritesInSession++;
         _writesPerSource[provenance.SourceId] = WritesForSource(provenance.SourceId) + 1;
@@ -92,11 +97,12 @@ internal sealed class HarnessMemoryStore
     /// The newest active records in <paramref name="scope"/> (or any scope, with the shared-partition bug) that share a
     /// word of four letters or more with the query, at most <see cref="RecallWindow"/>.
     /// </summary>
-    public IReadOnlyList<HarnessMemoryRecord> Recall(MemorySecurityScope scope, string query)
+    public IReadOnlyList<HarnessMemoryRecord> Recall(MemorySecurityScope scope, string query, Func<HarnessMemoryRecord, bool>? include = null)
     {
         var terms = Terms(query);
         return _records
             .Where(r => r.State is MemoryRecordState.Active)
+            .Where(r => include is null || include(r))
             .Where(r => SharedPartitionBug || SameScope(r.Owner, scope))
             .Where(r => terms.Count == 0 || terms.Any(t =>
                 r.Key.Contains(t, StringComparison.OrdinalIgnoreCase) || r.Content.Contains(t, StringComparison.OrdinalIgnoreCase)))
@@ -135,7 +141,8 @@ internal sealed class HarnessMemoryStore
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
 
     private HarnessMemoryRecord Add(
-        MemorySecurityScope owner, string key, string content, MemoryCategory category, MemoryProvenance provenance, string session)
+        MemorySecurityScope owner, string key, string content, MemoryCategory category, MemoryProvenance provenance, string session,
+        string? operationId)
     {
         var record = new HarnessMemoryRecord
         {
@@ -148,6 +155,7 @@ internal sealed class HarnessMemoryStore
             Provenance = provenance,
             CreatedAt = DateTimeOffset.UnixEpoch.AddSeconds(++_clock),
             Session = session,
+            OperationId = operationId,
         };
         _records.Add(record);
         return record;
@@ -173,8 +181,8 @@ internal sealed class HarnessMemoryStore
             .ToList();
 }
 
-/// <summary>A quarantined candidate: kept out of recall, with the lineage and content digest it came with.</summary>
-internal sealed record HarnessQuarantinedCandidate(string OperationId, string ContentDigest, string RootLineageId, string Session);
+/// <summary>A quarantined candidate: kept out of recall, with the gate operation and lineage it came with.</summary>
+internal sealed record HarnessQuarantinedCandidate(string OperationId, string RootLineageId, string Session);
 
 /// <summary>The quarantine boundary the enforcing policy needs.</summary>
 internal sealed class HarnessQuarantineStore(HarnessMemoryStore store) : IMemoryQuarantineStore
@@ -188,17 +196,16 @@ internal sealed class HarnessQuarantineStore(HarnessMemoryStore store) : IMemory
     public ValueTask<MemoryQuarantineReceipt> StoreAsync(MemoryQuarantineRequest request, CancellationToken cancellationToken = default)
     {
         var content = request.Context.Content ?? "";
-        Candidates.Add(new HarnessQuarantinedCandidate(
-            request.Context.OperationId, HarnessMemoryStore.Sha256(content), request.Context.Provenance.RootLineageId, Session));
+        Candidates.Add(new HarnessQuarantinedCandidate(request.Context.OperationId, request.Context.Provenance.RootLineageId, Session));
         store.Quarantined(request.Context.Provenance, content);
         return ValueTask.FromResult(new MemoryQuarantineReceipt($"q-{++_ids}", request.Context.OperationId, DateTimeOffset.UtcNow));
     }
 }
 
-/// <summary>One memory-gate decision, content-free: the lineage and the digest of the content it decided on.</summary>
+/// <summary>One memory-gate decision, content-free, with the lineage of what it decided on.</summary>
 internal sealed record HarnessDecision(
     string OperationId, MemoryGateStage Stage, MemoryOperationKind Kind, MemoryGateAction Action, string ReasonCode,
-    string RootLineageId, string ContentDigest, string Session);
+    string RootLineageId, string Session);
 
 /// <summary>The audit log the pipeline writes to: what attribution and rollback read.</summary>
 internal sealed class HarnessDecisionLog : IMemoryGateDecisionSink
@@ -211,7 +218,7 @@ internal sealed class HarnessDecisionLog : IMemoryGateDecisionSink
     {
         Decisions.Add(new HarnessDecision(
             context.OperationId, context.Stage, context.Kind, decision.Action, decision.ReasonCode,
-            context.Provenance.RootLineageId, HarnessMemoryStore.Sha256(context.Content ?? ""), Session));
+            context.Provenance.RootLineageId, Session));
         return ValueTask.CompletedTask;
     }
 }
@@ -232,7 +239,7 @@ internal sealed class HarnessMemoryHost : IMemoryToolContextAdapter, IMemoryScop
     private static readonly MemorySecurityScope MixedOwners = new(tenantId: "mixed-owners", userId: "mixed-owners");
 
     private readonly HarnessMemoryStore _store;
-    private readonly Dictionary<string, MemoryProvenance> _admitted = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (MemoryProvenance Provenance, string OperationId)> _admitted = new(StringComparer.Ordinal);
     private readonly Dictionary<string, IReadOnlyList<HarnessMemoryRecord>> _recalled = new(StringComparer.Ordinal);
     private int _operations;
 
@@ -282,11 +289,12 @@ internal sealed class HarnessMemoryHost : IMemoryToolContextAdapter, IMemoryScop
         new(MemorySourceKind.User, $"user-turn-{session}", MemoryTrustLevel.Medium);
 
     /// <summary>
-    /// The provenance the call gate attributed to a write of <paramref name="content"/>, consumed by the tool body so the
-    /// store keeps the same one; the session's current provenance when the gate saw no such write.
+    /// The provenance and gate operation the call gate attributed to a write of <paramref name="content"/> (as admitted,
+    /// or as the gate rewrote it), consumed by the tool body so the store keeps both; the session's provenance and no
+    /// operation when the gate saw no such write.
     /// </summary>
-    public MemoryProvenance TakeAdmitted(string content) =>
-        _admitted.Remove(HarnessMemoryStore.Sha256(content), out var provenance) ? provenance : SessionProvenance;
+    public (MemoryProvenance Provenance, string? OperationId) TakeAdmitted(string content) =>
+        _admitted.Remove(HarnessMemoryStore.Sha256(content), out var admitted) ? admitted : (SessionProvenance, null);
 
     /// <summary>Records what a recall for <paramref name="query"/> returned, for the result gate's context.</summary>
     public void Recalled(string query, IReadOnlyList<HarnessMemoryRecord> records) => _recalled[query] = records;
@@ -306,7 +314,7 @@ internal sealed class HarnessMemoryHost : IMemoryToolContextAdapter, IMemoryScop
 
         var key = Argument(call, "key") ?? Argument(call, "name") ?? "note";
         var provenance = SessionProvenance;
-        _admitted[HarnessMemoryStore.Sha256(content ?? "")] = provenance;
+        _admitted[HarnessMemoryStore.Sha256(content ?? "")] = (provenance, operationId);
         var conflicts = _store.ActiveWithKey(Scope, key)
             .Take(64)
             .Select(r => new MemoryConflictCandidate(r.Id, r.Digest, r.Provenance.Trust, r.Provenance.RootLineageId, r.Category));
@@ -349,6 +357,14 @@ internal sealed class HarnessMemoryHost : IMemoryToolContextAdapter, IMemoryScop
     public IReadOnlyDictionary<string, object?> ApplySanitizedArguments(
         GatedToolCall call, MemoryOperationContract operation, string sanitizedContent)
     {
+        // The write the gate rewrote is stored as rewritten: it keeps the provenance and operation of the original, so
+        // attribution follows the decision, not the bytes.
+        var original = HarnessMemoryStore.Sha256(Argument(call, operation.ContentArguments.FirstOrDefault()) ?? "");
+        if (_admitted.TryGetValue(original, out var admitted))
+        {
+            _admitted[HarnessMemoryStore.Sha256(sanitizedContent)] = admitted;
+        }
+
         var copy = call.Arguments is null
             ? new Dictionary<string, object?>(StringComparer.Ordinal)
             : new Dictionary<string, object?>(call.Arguments, StringComparer.Ordinal);

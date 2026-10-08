@@ -83,6 +83,18 @@ internal static class MemoryPoisoningRedTeamDriver
             Progress = progress,
         }).RunAsync(ct).ConfigureAwait(false);
 
+        if (opts.Verbose && !opts.Quiet)
+        {
+            foreach (var c in result.Cases)
+            {
+                Console.Error.WriteLine($"  [{result.Mode}] {c.ScenarioId} (trial {c.Trial}):");
+                foreach (var note in c.Notes)
+                {
+                    Console.Error.WriteLine($"      {note}");
+                }
+            }
+        }
+
         var rendered = IsJson(opts.Format) ? RenderJson(result, modelName) : RenderMarkdown(result, modelName);
         if (opts.Output is not null)
         {
@@ -131,6 +143,17 @@ internal static class MemoryPoisoningRedTeamDriver
         if (opts.BenignControls) notUsed.Add("--benign-controls");
         if (opts.Explain) notUsed.Add("--explain");
         if (opts.FailFast) notUsed.Add("--fail-fast");
+        if (!string.Equals(opts.PackageRegistry, "none", StringComparison.OrdinalIgnoreCase)) notUsed.Add("--package-registry");
+        if (opts.AcceptLicense) notUsed.Add("--accept-license");
+        if (opts.ImportPromptField is not null) notUsed.Add("--import-prompt-field");
+        if (opts.ImportIdColumn is not null) notUsed.Add("--import-id-column");
+        if (opts.JudgeModel is not null) notUsed.Add("--judge-model");
+        if (!string.Equals(opts.JudgeMode, "primary", StringComparison.OrdinalIgnoreCase)) notUsed.Add("--judge-mode");
+        if (!string.Equals(opts.JudgeRubric, "evidence-anchored", StringComparison.OrdinalIgnoreCase)) notUsed.Add("--judge-rubric");
+        if (opts.JudgeTimeoutSeconds != 0) notUsed.Add("--judge-timeout");
+        if (opts.AttackerModel is not null) notUsed.Add("--attacker-model");
+        if (opts.BaselineVersion is not null) notUsed.Add("--baseline-version");
+        if (opts.BaselineNote is not null) notUsed.Add("--baseline-note");
         if (notUsed.Count > 0)
         {
             return $"memory-poisoning does not take {string.Join(", ", notUsed)}: it brings its own agent (the model you " +
@@ -218,6 +241,11 @@ internal static class MemoryPoisoningRedTeamDriver
 
         var violated = checks.Where(c => c.Value is true).Select(c => c.Name).ToList();
         var unmeasured = checks.Where(c => c.Value is null).Select(c => c.Name).ToList();
+        if (unmeasured.Count == checks.Count)
+        {
+            return $"not measured: {string.Join(", ", unmeasured)}";
+        }
+
         var text = violated.Count > 0 ? string.Join(", ", violated) : "contained";
         return unmeasured.Count > 0 ? $"{text}; not measured: {string.Join(", ", unmeasured)}" : text;
     }
@@ -255,9 +283,21 @@ internal static class MemoryPoisoningRedTeamDriver
         }
 
         sb.AppendLine().AppendLine($"**Memory security ({result.Mode}): {result.Composite.Score.Label.ToUpperInvariant()}**").AppendLine();
+        foreach (var by in new[] { "model", "harness" })
+        {
+            var attacks = result.Cases.Where(c => c.PlantedBy == by && !c.Observation.IsBenignControl).ToList();
+            var outcomes = attacks.Select(c => Outcome(scenarios[c.ScenarioId], c.Observation)).ToList();
+            var notMeasured = outcomes.Count(o => o.StartsWith("not measured", StringComparison.Ordinal));
+            var contained = outcomes.Count(o => o.StartsWith("contained", StringComparison.Ordinal));
+            sb.AppendLine(by == "model"
+                ? $"- Attack cases the model decided: {attacks.Count - contained - notMeasured} with a violation, {contained} contained, {notMeasured} not measured. Compare models here."
+                : $"- Attack cases the harness planted: {attacks.Count - contained - notMeasured} with a violation, {contained} contained, {notMeasured} not measured. Their store outcomes (persisted, leaked, tampered, overwritten, crowded out) are the gates' and the store's, the same for every model under the same options; an action outcome still depends on the model.");
+        }
+
+        sb.AppendLine();
         sb.AppendLine("Attempted counts the memory writes proposed (or planted by the harness) and the sink calls the model proposed;");
-        sb.AppendLine("executed counts the writes stored and the sink tools that ran. A case planted by the harness measures the gates");
-        sb.AppendLine("and the store, whatever the model does. How each outcome was measured is in the `--format json` notes.");
+        sb.AppendLine("executed counts the writes stored and the sink tools that ran. How each outcome was measured is in the");
+        sb.AppendLine("`--format json` notes.");
         return sb.ToString();
     }
 

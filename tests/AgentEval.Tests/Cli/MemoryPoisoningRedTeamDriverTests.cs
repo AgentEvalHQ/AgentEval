@@ -7,6 +7,7 @@ using AgentEval.Cli;
 using AgentEval.Cli.Commands;
 using AgentEval.Cli.Commands.RedTeamTargets;
 using AgentEval.RedTeam.Gatekeeper.MemorySecurity;
+using AgentEval.RedTeam.MemorySecurity;
 using Microsoft.Extensions.AI;
 using Xunit;
 
@@ -77,6 +78,8 @@ public sealed class MemoryPoisoningRedTeamDriverTests : IDisposable
         Assert.Contains("# Memory poisoning (LIVE)", report, StringComparison.Ordinal);
         Assert.Contains("- Model: fake-model", report, StringComparison.Ordinal);
         Assert.Contains("| LIVE | MS-SCOPE-001 | 1 | harness |", report, StringComparison.Ordinal);
+        Assert.Contains("- Attack cases the model decided: ", report, StringComparison.Ordinal);
+        Assert.Contains("- Attack cases the harness planted: ", report, StringComparison.Ordinal);
         Assert.DoesNotContain("SCRIPTED", report, StringComparison.Ordinal);
     }
 
@@ -94,6 +97,7 @@ public sealed class MemoryPoisoningRedTeamDriverTests : IDisposable
         { "--benign-controls", "does not take --benign-controls" },
         { "--pack list", "does not take --pack" },
         { "timeout", "--timeout-per-probe must be" },
+        { "--judge-mode", "does not take --judge-mode" },
     };
 
     private static RedTeamOptions Options(string change)
@@ -116,6 +120,7 @@ public sealed class MemoryPoisoningRedTeamDriverTests : IDisposable
             "--benign-controls" => o.With(benignControls: true),
             "--pack list" => o.With(pack: "list"),
             "timeout" => o.With(timeout: 0),
+            "--judge-mode" => o.With(judgeMode: "shadow"),
             _ => throw new ArgumentOutOfRangeException(nameof(change)),
         };
     }
@@ -142,6 +147,17 @@ public sealed class MemoryPoisoningRedTeamDriverTests : IDisposable
         Assert.Equal(ExitCodes.UsageError, exit);
         Assert.Contains(message, stderr.ToString(), StringComparison.Ordinal);
         Assert.Equal(0, model.Calls);
+    }
+
+    [Fact]
+    public void ACaseWithNothingMeasured_ReadsNotMeasured_NeverContained()
+    {
+        var scenario = MemorySecurityAttackCorpus.Default.Scenarios.Single(s => s.Id == "MS-DIRECT-001");
+
+        var outcome = MemoryPoisoningRedTeamDriver.Outcome(scenario, new AgentEval.RedTeam.MemorySecurity.MemorySecurityObservation("MS-DIRECT-001", false));
+
+        Assert.StartsWith("not measured: ", outcome, StringComparison.Ordinal);
+        Assert.DoesNotContain("contained", outcome, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -225,7 +241,7 @@ internal static class RedTeamOptionsTestExtensions
     public static RedTeamOptions With(
         this RedTeamOptions o, string? attacks = "", string? sut = "", string? transform = "", string? format = null,
         string? failOn = null, int? trials = null, string? endpoint = "", string? systemPrompt = null, string? intensity = null,
-        bool benignControls = false, string? pack = null, double? timeout = null) => new()
+        bool benignControls = false, string? pack = null, double? timeout = null, string? judgeMode = null) => new()
     {
         Endpoint = endpoint == "" ? o.Endpoint : endpoint,
         Model = o.Model,
@@ -240,5 +256,6 @@ internal static class RedTeamOptionsTestExtensions
         BenignControls = benignControls || o.BenignControls,
         Pack = pack ?? o.Pack,
         TimeoutPerProbeSeconds = timeout ?? o.TimeoutPerProbeSeconds,
+        JudgeMode = judgeMode ?? o.JudgeMode,
     };
 }

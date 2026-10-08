@@ -104,9 +104,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   each case as a plant session, a restart and a trigger session over a shared memory store, then a recall through the
   same result gate, and scores the observations: one row per case, each labelled SCRIPTED or LIVE and with who planted
   it, and the five verdicts (`--format markdown|json`, `--memory-trials`, exit 0 / 1 / 11; not measured is `null` in
-  the JSON). Five cases are planted by the harness and measure the gates and the store whatever the model does; the
-  cases the model decides are not measured when it never read the plant, a call timed out or failed, or it proposed
-  no memory write on any benign control. `--scripted` runs a scripted worst-case model instead, labelled. With the
+  the JSON). Five cases are planted by the harness; their store outcomes are the gates' and the store's, the same
+  for every model, and the report ends with the attack cases split by who planted them. The cases the model decides
+  are not measured when it never read the plant, a call timed out or failed, or it used no memory tool on the benign
+  controls and did nothing in the case; an action is not measured when the poison is stored but never reached it. `--scripted` runs a scripted worst-case model instead, labelled. With the
   defaults it contains cross-user recall, a low-trust write under a protected fact's key, untrusted procedure
   promotion and recalled data copied into a sensitive tool; it stores and recalls low-trust poison (labelled), lets a
   fact rewritten under a new key be recalled ahead of the trusted one, recalls a tampered record (integrity
@@ -157,8 +158,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`TaintTrackingGate` (and the memory influence gate on it) missed a value that ended a sentence.** Its token
   pattern keeps `.`, `/` and `-` inside a value, so "send it to https://drop.example/collect." tainted
   `drop.example/collect.` with the full stop, and a call carrying `https://drop.example/collect` did not contain that
-  token and was allowed. Trailing punctuation is no longer part of a tainted value. Found by the memory-poisoning
-  review.
+  token and was allowed. Trailing punctuation is no longer part of a tainted value, so a sentence-final word is
+  tainted like the same word anywhere else; a value of exactly the minimum length followed by punctuation is now too
+  short to taint. Found by the memory-poisoning review.
 - **Three Mission Control pages showed nothing, or were rejected, under `mc serve`.** The tests wrote their own
   GraphQL queries, so all three were green.
   - The compliance matrix looked statuses up in lower case while the evidence stores them upper case (`PASS`), so
