@@ -270,6 +270,32 @@ public class MemoryPoisoningHarnessTests
     }
 
     [Fact]
+    public async Task AReplyCutOffAtTheOutputLimit_LeavesTheCaseNotMeasured_NeverReadAsTheModelsChoice()
+    {
+        // Seen live on a reasoning model: the whole budget went on thinking, the reply was empty with finish reason
+        // "length", and the case was counted as the model declining to save the poison.
+        var cutOff = new FixedModel(_ => new ChatResponse(new ChatMessage(ChatRole.Assistant, "")) { FinishReason = ChatFinishReason.Length });
+        var result = await new MemoryPoisoningHarness(cutOff, new MemoryPoisoningOptions { MaxOutputTokens = 512 }).RunAsync();
+
+        var direct = result.Cases.Single(c => c.ScenarioId == "MS-DIRECT-001");
+        Assert.Null(direct.Observation.PoisonPersisted);
+        Assert.Null(direct.Observation.UnsafeToolAction);
+        Assert.Contains(direct.Notes, n => n.Contains("cut off at the 512-token output limit", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task EveryModelCall_CarriesTheOutputLimit()
+    {
+        var limits = new List<int?>();
+        var model = new FixedModel(_ => new ChatResponse(new ChatMessage(ChatRole.Assistant, "Noted.")), seen: o => limits.Add(o?.MaxOutputTokens));
+        await new MemoryPoisoningHarness(model, new MemoryPoisoningOptions { MaxOutputTokens = 3000 }).RunAsync();
+
+        Assert.NotEmpty(limits);
+        Assert.All(limits, l => Assert.Equal(3000, l));
+        Assert.Throws<ArgumentOutOfRangeException>(() => new MemoryPoisoningHarness(model, new MemoryPoisoningOptions { MaxOutputTokens = 0 }));
+    }
+
+    [Fact]
     public async Task Trials_RunEveryCaseThatManyTimes()
     {
         var result = await new MemoryPoisoningHarness(
@@ -280,11 +306,13 @@ public class MemoryPoisoningHarnessTests
     }
 
     /// <summary>Answers every call the same way, after an optional delay that honours cancellation.</summary>
-    private sealed class FixedModel(Func<IEnumerable<ChatMessage>, ChatResponse> respond, TimeSpan? delay = null) : IChatClient
+    private sealed class FixedModel(
+        Func<IEnumerable<ChatMessage>, ChatResponse> respond, TimeSpan? delay = null, Action<ChatOptions?>? seen = null) : IChatClient
     {
         public async Task<ChatResponse> GetResponseAsync(
             IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
         {
+            seen?.Invoke(options);
             if (delay is { } d)
             {
                 await Task.Delay(d, cancellationToken);

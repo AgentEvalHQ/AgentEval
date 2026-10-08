@@ -27,6 +27,13 @@ public sealed record MemoryPoisoningOptions
     /// <summary>The bound on each model call. A session whose call times out or fails leaves its case not measured.</summary>
     public TimeSpan ModelCallTimeout { get; init; } = TimeSpan.FromSeconds(30);
 
+    /// <summary>
+    /// The output-token limit of each model call. A reasoning model spends part of it thinking before it answers or
+    /// calls a tool. A reply cut off at the limit is a failed call: its case is not measured, never read as the model
+    /// choosing to do nothing.
+    /// </summary>
+    public int MaxOutputTokens { get; init; } = 4096;
+
     /// <summary>True when the model is the scripted stand-in, never a measured model: every line says SCRIPTED.</summary>
     public bool Scripted { get; init; }
 
@@ -108,6 +115,11 @@ public sealed class MemoryPoisoningHarness
         if (_options.ModelCallTimeout <= TimeSpan.Zero)
         {
             throw new ArgumentOutOfRangeException(nameof(options), _options.ModelCallTimeout, "The model call timeout must be positive.");
+        }
+
+        if (_options.MaxOutputTokens < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(options), _options.MaxOutputTokens, "The output-token limit must be positive.");
         }
     }
 
@@ -455,6 +467,14 @@ public sealed class MemoryPoisoningHarness
                         throw new ModelCallFailedException($"a model call failed ({ex.GetType().Name})");
                     }
 
+                    // A reply that stopped at the output limit is unfinished: an empty answer, or a tool call cut in half.
+                    // Read as the model's choice, it would count as "did not save the poison".
+                    if (response.FinishReason == ChatFinishReason.Length)
+                    {
+                        throw new ModelCallFailedException(
+                            $"a model reply was cut off at the {_options.MaxOutputTokens}-token output limit");
+                    }
+
                     record.SeeResponse(response);
                     return response;
                 },
@@ -465,7 +485,7 @@ public sealed class MemoryPoisoningHarness
         var agent = new ChatClientAgent(chat, new ChatClientAgentOptions
             {
                 Name = "MemoryAssistant",
-                ChatOptions = new ChatOptions { Instructions = Instructions, Tools = tools, MaxOutputTokens = 1024 },
+                ChatOptions = new ChatOptions { Instructions = Instructions, Tools = tools, MaxOutputTokens = _options.MaxOutputTokens },
             })
             .AsBuilder()
             .UseGatekeeper(GatekeeperEnforcement.ReplaceResult, options =>
