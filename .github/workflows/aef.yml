@@ -35,7 +35,7 @@ jobs:
         run: |
           set -e
           cd contracts/aef/tools
-          for tool in derive_reader build_conformance lane_vectors signature_vectors decision_vectors protocol_vectors build_index; do
+          for tool in derive_reader build_conformance lane_vectors signature_vectors decision_vectors protocol_vectors write_vectors build_index; do
             python -X utf8 -I "$tool.py" > /dev/null
           done
           cd "$GITHUB_WORKSPACE"

@@ -18,8 +18,8 @@ run captured (prompts, responses, reasoning), which may be confidential or perso
 | A **truncater** | remove the newest overlay batches with their seals | a reader that saw a longer chain, a signed newest batch, a copy held elsewhere ([OVL-5]) | a first-time reader of a truncated copy |
 | A **substituter** | swap a run a checkpoint relied on for another with the same `runId` | the checkpoint records each run's run hash ([CKP-2]); the verifier checks it ([CKP-8]) | an unsigned checkpoint can itself be rewritten |
 | A **parser exploit** | write a file two readers read differently (duplicate members, lone surrogates) | I-JSON is required and checked ([ENC-2]) | none known |
-| A **resource exhaustion** attempt | write enormous files, deep nesting, millions of lines | limits ([ENC-17]) a reader may enforce | a reader that enforces none |
-| A **runner** | overspend, run other cases, report runs it did not seal | the stream verifier ([STRM-3]) against the plan's bytes | a runner that lies consistently in stream and runs: only the signature on its runs attributes it |
+| A **resource exhaustion** attempt | write enormous files, deep nesting, millions of lines | limits ([ENC-17]) every reader enforces, checked on the bytes before the content is trusted | a reader that does not enforce them is not conforming ([ENC-18]) |
+| A **runner** | overspend, run other cases, report runs it did not seal, return runs other than those planned | the stream verifier ([STRM-3]) against the plan's bytes, and plan conformance ([STRM-4]) against the runs themselves | a runner that lies consistently in stream and runs: only the signature on its runs attributes it |
 
 ## 8.2 What each mechanism does not do
 
@@ -46,8 +46,8 @@ run captured (prompts, responses, reasoning), which may be confidential or perso
 - **[SEC-5]** A captured blob holding personal data is erased with a `redact` overlay and by deleting the blob
   ([OVL-10]); the seal then reports it `withheld` and the rest of the run stays verifiable.
 - **[SEC-6]** Traces (`traces.otlp.jsonl`) and logs (`logs.otlp.jsonl`) follow OpenTelemetry's GenAI conventions,
-  which may carry prompt and completion text. In a run with `contentCapture: off`, no span, span event or log record
-  carries `gen_ai.input.messages`, `gen_ai.output.messages`, `gen_ai.system_instructions`,
+  which may carry prompt and completion text. In a run with `contentCapture: off`, no span, span event, log record,
+  resource or scope (their `attributes`) carries `gen_ai.input.messages`, `gen_ai.output.messages`, `gen_ai.system_instructions`,
   `gen_ai.tool.call.arguments`, `gen_ai.tool.call.result`, `gen_ai.evaluation.explanation` (a judge's reasoning), or
   the deprecated `gen_ai.prompt` and `gen_ai.completion`, and no log record has a `body` member, whatever its value. A run verifier reports each
   such line as `content-capture` (§3.9). Content in an attribute these conventions do not name cannot be detected: a producer

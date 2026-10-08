@@ -4,7 +4,6 @@
 
 using System.Security.Cryptography;
 using System.Text.Json.Nodes;
-using AgentEval.Results.Json;
 using AgentEval.Results.Runner;
 using AgentEval.Results.Schemas;
 
@@ -27,37 +26,25 @@ internal static class ProtocolOps
 
     /// <summary>
     /// <c>stream EVENTS PLAN</c>: <c>{"problems": [[where, problem], …]}</c>, the problems of [STRM-3] against the
-    /// plan and the SHA-256 of its bytes. A last line without LF is still being written and is not read ([STRM-2]).
-    /// A stream whose complete lines are not framed as [ENC-5] requires, or hold a line that is not an I-JSON object
-    /// valid against the reader runner-event schema, is an input error: [STRM-3] has no code for it.
+    /// plan and the SHA-256 of its bytes. A last line without LF is still being written and is not read ([STRM-2]); a
+    /// line that is not an I-JSON object valid against the reader runner-event schema is <c>event-invalid</c>, and
+    /// finished lines not framed as [ENC-5] requires are <c>encoding</c> at <c>stream</c>. A plan the reader refuses is
+    /// an input error (spec 09 §9.3).
     /// </summary>
     public static int Stream(string[] args, TextWriter stdout)
     {
         DriverIO.Arguments(args, 2, 2, "stream EVENTS PLAN");
-        var planBytes = DriverIO.Bytes(args[1]);
-        var plan = Accepted(DriverIO.Document(planBytes, args[1]), "run-plan", args[1]);
-        var planDigest = Convert.ToHexString(SHA256.HashData(planBytes)).ToLowerInvariant();
-
-        var bytes = DriverIO.Bytes(args[0]);
-        var file = AefNdjson.Read(bytes.AsSpan(0, AefNdjson.CompleteLength(bytes)));
-        if (file.Problem is { } problem)
-        {
-            throw new UsageException($"{args[0]}: {problem.Message}");
-        }
-
-        var events = new List<JsonNode>(file.Lines.Count);
-        foreach (var line in file.Lines)
-        {
-            if (line.Problem is { } bad)
-            {
-                throw new UsageException($"{args[0]}:{line.Number}: {bad.Message}");
-            }
-
-            events.Add(Accepted(line.Value!, "runner-event", $"{args[0]}:{line.Number}"));
-        }
-
-        var problems = RunnerEventStream.Verify(events, plan, planDigest);
+        var (plan, planDigest) = Plan(args[1]);
+        var problems = RunnerEventStream.Verify(RunnerEventStream.Read(DriverIO.Bytes(args[0])), plan, planDigest);
         return DriverIO.Print(stdout, new JsonObject { ["problems"] = DriverIO.Pairs(problems.Select(p => (p.Where, p.Problem))) });
+    }
+
+    /// <summary>A plan file the reader run-plan schema accepts, and the SHA-256 of its bytes; anything else is an input error.</summary>
+    public static (JsonObject Plan, string Digest) Plan(string path)
+    {
+        var bytes = DriverIO.Bytes(path);
+        var plan = Accepted(DriverIO.Document(bytes, path), "run-plan", path);
+        return (plan, Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant());
     }
 
     // A document the reader schema accepts, else an input error.

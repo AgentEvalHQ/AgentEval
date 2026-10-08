@@ -287,7 +287,7 @@
       ]
     },
     "usage": {
-      "description": "What producing this node consumed, one entry per party (the agent, a judge, an attacker): no role twice (RES-10).",
+      "description": "What producing this node consumed, one entry per party (the agent, a judge, an attacker): no role and model twice (RES-10).",
       "type": "array",
       "minItems": 1,
       "maxItems": 8,
@@ -295,6 +295,16 @@
         "description": "What one party consumed producing this node: tokens in OpenTelemetry's gen_ai.usage.* names, and cost (RES-10).",
         "type": "object",
         "properties": {
+          "role": {
+            "description": "Whose usage this is: agent (the subject), judge, attacker (an attacker model) or other.",
+            "type": "string"
+          },
+          "model": {
+            "description": "The model this party used, when it used one: with role, it tells two judges of a panel apart (RES-10).",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
           "gen_ai.usage.input_tokens": {
             "description": "Input tokens, as OpenTelemetry's gen_ai.usage.input_tokens (RES-10).",
             "type": "integer",
@@ -316,10 +326,6 @@
             "description": "Where the cost figure came from, such as a price table.",
             "type": "string",
             "maxLength": 128
-          },
-          "role": {
-            "description": "Whose usage this is: agent (the subject), judge, attacker (an attacker model) or other.",
-            "type": "string"
           },
           "gen_ai.usage.cache_read.input_tokens": {
             "description": "Input tokens served from a cache, as OpenTelemetry's gen_ai.usage.cache_read.input_tokens; included in input_tokens (RES-10).",

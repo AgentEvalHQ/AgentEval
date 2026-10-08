@@ -18,7 +18,11 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from build_conformance import overlay_batches, result_id, run_hash, seal, write_bytes, write_json, write_ndjson  # noqa: E402
+from build_conformance import ndjson_bytes, overlay_batches, result_id, run_hash, seal, write_bytes, write_json, write_ndjson  # noqa: E402
+
+
+def dumps_line(obj):
+    return ndjson_bytes([obj])
 from signature_vectors import ID, INTOTO, KA, WHO, envelope, policy, sig  # noqa: E402  (test keys: never trust them)
 
 ROOT = Path(__file__).resolve().parents[1] / "1" / "conformance" / "protocol"
@@ -187,6 +191,11 @@ STREAM_RULES = {
     "first-not-accepted": ["STRM-3"],
     "other-job": ["STRM-1", "STRM-3"],
     "seq-and-job-id-at-one-event": ["STRM-3", "CONF-2"],
+    "event-invalid-mid-stream": ["STRM-3"],
+    "event-not-json": ["STRM-3", "ENC-2"],
+    "event-duplicate-member": ["STRM-3", "ENC-2"],
+    "first-line-invalid": ["STRM-3"],
+    "framing-crlf": ["STRM-3", "ENC-5"],
     "other-plan": ["PLAN-5", "STRM-3"],
     "plan-changed": ["PLAN-5", "STRM-3"],
     "accepted-twice": ["STRM-3"],
@@ -269,6 +278,17 @@ def streams(digest, small_digest, day_digest):
                                   ev(4, "job.cancelled", "2026-10-09T12:00:01Z", reason="x")],
          [("event:3", "over-time")], False),
         ("unknown-kind-mid-stream", p, [accepted, ev(2, "job.paused", T.format(1)), cancel(3, 2)], [], True),
+        ("event-invalid-mid-stream", p, [accepted, json.dumps(dict(ev(2, "spend.updated", T.format(1), spentUsd=0.1), seq="2"),
+                                                              separators=(",", ":")).encode(),
+                                          ev(3, "spend.updated", T.format(2), spentUsd=0.2), cancel(4, 3)],
+         [("event:2", "event-invalid")], False),
+        ("event-not-json", p, [accepted, b'{"schemaVersion":"1.0","seq":2,', ev(3, "spend.updated", T.format(2), spentUsd=0.2),
+                               cancel(4, 3)], [("event:2", "event-invalid")], False),
+        ("event-duplicate-member", p, [accepted, b'{"schemaVersion":"1.0","seq":2,"seq":2,"kind":"spend.updated","jobId":"job-7","at":"2026-10-08T12:00:01Z","spentUsd":0.1}',
+                                       ev(3, "spend.updated", T.format(2), spentUsd=0.2), cancel(4, 3)],
+         [("event:2", "event-invalid")], False),
+        ("first-line-invalid", p, [b"[]", accepted, cancel(2, 1)], [("event:1", "event-invalid")], False),
+        ("framing-crlf", p, [accepted, cancel(2, 1)], [("stream", "encoding")], False),
         ("seq-and-job-id-at-one-event", p, [accepted, dict(ev(3, "spend.updated", T.format(1), spentUsd=0.1), jobId="job-8"),
                                             cancel(4, 2)], [("event:2", "job-id"), ("event:2", "seq")], False),
     ]
@@ -353,7 +373,9 @@ def make_run(runs, folder, run_id, plan, digest, *, cases=TWO_CASES, lane="quali
          "verdict": "passed" if total / len(values) >= 0.8 else "failed", "rule": "triage-score >= 0.8",
          "sum": total, "sumSq": sum(v * v for v in values)}]}],
         **({"cost": {"totalUsd": cost, "source": "provider-billing"}} if cost is not None else {})})
-    return seal(run_dir, run, "producer", sealed_at="2026-10-08T12:00:55Z") if sealed else run_hash(run_dir)
+    # Sealed when it closed or at 12:00:55, whichever is later: a seal is never earlier than closedAt (SEAL-1).
+    sealed_at = max("2026-10-08T12:00:55Z", run.get("endedAt") or "")  # same date and hour: strings order as times
+    return seal(run_dir, run, "producer", sealed_at=sealed_at) if sealed else run_hash(run_dir)
 
 
 def security_run(runs, run_id, plan, digest, *, cases=SECURITY_CASE, **kw):
@@ -585,7 +607,14 @@ def main():
     vectors = streams(digest, small_digest, hashlib.sha256(dumps(DAY)).hexdigest())
     assert sorted(STREAM_RULES) == sorted(name for name, *_ in vectors)
     for name, plan, events, problems, reader_only in vectors:
-        write_ndjson(ROOT / "streams" / name / "events.ndjson", events)
+        if any(isinstance(e, bytes) for e in events):  # raw lines a writer would never produce (STRM-3)
+            write_bytes(ROOT / "streams" / name / "events.ndjson",
+                        b"".join(e + b"\n" if isinstance(e, bytes) else dumps_line(e) for e in events))
+        else:
+            write_ndjson(ROOT / "streams" / name / "events.ndjson", events)
+        if name == "framing-crlf":
+            path = ROOT / "streams" / name / "events.ndjson"
+            path.write_bytes(path.read_bytes().replace(b"\n", b"\r\n"))
         if name in UNFINISHED:  # the job.cancelled is still being written: a verifier does not read it
             path = ROOT / "streams" / name / "events.ndjson"
             path.write_bytes(path.read_bytes()[:-1])

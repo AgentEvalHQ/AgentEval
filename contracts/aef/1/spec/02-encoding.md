@@ -10,7 +10,10 @@ verifier reports it as `encoding` (§3.9) under the file's path.
 - **[ENC-2]** Every JSON text is an I-JSON message ([RFC 7493]): no object has two members with the same name, and no
   string contains an unpaired surrogate (an escape `\ud800`–`\udfff` that is not part of a valid pair). A reader
   **MUST** refuse a document that breaks this, rather than keep the first or the last of two members: implementations
-  disagree on which, and a sealed file that two readers read differently defeats the seal.
+  disagree on which, and a sealed file that two readers read differently defeats the seal. Member order and
+  whitespace are free, and a reader never depends on them (a writer may follow the schema's `properties` order).
+  On an optional field, `null` and absence mean the same, except where a schema gives `null` its own meaning
+  (a summary entry's `value` when `n` is 0); a writer omits the field.
 - **[ENC-3]** Numbers are finite: no `NaN` or `Infinity`, and no literal whose value overflows binary64 (`1e400`);
   such a file is reported as `encoding`. A literal too small for binary64 (`1e-400`) is not an overflow: it reads as
   the nearest binary64 value (0) and is not refused.
@@ -18,7 +21,9 @@ verifier reports it as `encoding` (§3.9) under the file's path.
   (amounts such as `spentUsd` and `maxUsd` included). A field the schemas type as an integer holds an integral value
   of at most 2^53 − 1 (9,007,199,254,740,991) in magnitude, so every binary64 reader reads it exactly: `2`, `2.0`
   and `2e0` are the integer 2; a fractional value, or one beyond that range, is refused (the schemas bound every
-  integer field, so it is reported as `schema`). A writer writes integers in plain digits. String lengths in the
+  integer field, so it is reported as `schema`). A writer writes integers in plain digits, and other numbers in any
+  form that reads back as the same binary64 value (the shortest such form is recommended): every reader reads them
+  alike, so no verdict depends on the form, though two writers' bytes, and so their run hashes, may differ. String lengths in the
   schemas (`minLength`, `maxLength`) count Unicode code points, as JSON Schema defines them: not bytes, UTF-16 code
   units or user-perceived characters.
 
@@ -68,22 +73,29 @@ verifier reports it as `encoding` (§3.9) under the file's path.
   (Python's `re`, .NET) **MUST** compile patterns so that it does not (for example by replacing a final `$` with `\Z`
   in Python or `\z` in .NET). The corpus holds values ending in a newline that a conforming validator refuses.
 - **[ENC-16]** Patterns are the rule; `format` is an annotation. Times, URIs and ids are checked by their patterns,
-  whether or not a validator asserts `format`.
+  whether or not a validator asserts `format`. In this specification a document is **valid against a schema** when
+  the schema accepts it, with numbers read as [ENC-4] says, and every timestamp in it is a time that exists
+  ([ENC-8]): `2026-02-31T00:00:00Z` matches the pattern and is still refused.
 
 ## 2.6 Limits
 
 So that a reader can bound its work, and a hostile file cannot exhaust it:
 
-- **[ENC-17]** A writer **MUST NOT** exceed, and a reader **MAY** refuse anything beyond:
+- **[ENC-17]** A writer **MUST NOT** exceed, and a reader **MUST** refuse, anything beyond these limits, so that two
+  readers never disagree on a file. Each is checked on the bytes before the content is trusted (a size, a count of
+  LFs, a depth scan that counts `{` and `[` outside strings, whatever else the bytes hold), and a file or line beyond
+  a limit is `limit` whatever else is wrong with it:
 
   | Limit | Value |
   |---|---|
   | JSON nesting depth (objects and arrays) | 64 |
   | Size of a JSON file or of one NDJSON line, except the next row | 4 MiB |
-  | Size of `seal.json`, a batch seal, or a DSSE envelope (`*.dsse.json`): they list or hold every sealed file | 32 MiB |
+  | Size of `seal.json` or a batch seal: they list every sealed file | 40 MiB |
+  | Size of a DSSE envelope (`*.dsse.json`): the base64 of a seal, 4/3 of its size | 56 MiB |
   | Lines in one NDJSON file | 1,000,000 |
-  | Files in one run folder | 100,000 |
-  | Size of one blob | 1 GiB |
+  | Files in one run folder, not counting `seal.json`, `attestation.dsse.json` and `overlays/` (a run at the limit can still be sealed and take overlays) | 100,000 |
+  | Overlay batches (so files under `overlays/`: at most one events file and two per batch) | 9,999 |
+  | Size of one blob, or of one NDJSON file | 1 GiB |
 
   Depth counts the top-level value as 1 (`{}` is at depth 1, `{"a": []}` at depth 2). A line's size does not include
   its LF.

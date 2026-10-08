@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "1.0",
+  "metrics": [
+    {
+      "id": "quality",
+      "kind": "score",
+      "direction": "higher_better",
+      "scale": {
+        "min": 0,
+        "max": 1
+      }
+    },
+    {
+      "id": "pass_rate",
+      "kind": "rate",
+      "direction": "higher_better",
+      "scale": {
+        "min": 0,
+        "max": 1
+      }
+    },
+    {
+      "id": "latency",
+      "kind": "duration",
+      "direction": "lower_better",
+      "scale": {
+        "min": 0,
+        "max": 60000
+      },
+      "unit": "ms"
+    }
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "kind": "sign",
+  "rules": [
+    "SIG-1",
+    "SIG-2",
+    "SIG-3"
+  ],
+  "algorithm": "ecdsa-p256",
+  "file": "seal.json",
+  "payloadType": "application/vnd.in-toto+json",
+  "key": "../../../signature-vectors/keys/ecdsa-a.key.pem",
+  "policy": "policy.json",
+  "keyid": "sha256:b5465da5f72069887e490258fc60e5319c05344df17f2c9d91ad2c779d07734e",
+  "identity": "git:alice@example.com",
+  "why": "A run's seal.json signed with a P-256 key: the envelope verifies for its identity (an ECDSA signature is not compared: it need not be deterministic)."
+}

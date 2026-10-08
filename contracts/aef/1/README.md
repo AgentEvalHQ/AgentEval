@@ -13,9 +13,9 @@ whose it is, that a release decision follows from that evidence, and that a runn
 | 1 | [Introduction](spec/01-introduction.md) | Purpose, audience, scope and non-goals, conventions, terminology, conformance classes |
 | 2 | [Encoding](spec/02-encoding.md) | JSON (I-JSON) and NDJSON, values and times, identifiers, portable patterns, limits, `ext` |
 | 3 | [The run](spec/03-run.md) | The run folder, `run.json`, results, metrics, the summary, evidence, gates, the rules across files |
-| 4 | [Integrity](spec/04-integrity.md) | Sealing, overlays and their effective view, signatures, verification outcomes |
-| 5 | [Checkpoints](spec/05-checkpoints.md) | Checkpoints, lane evaluation, the decision function, verifying a checkpoint |
-| 6 | [Runners](spec/06-runners.md) | Run plans, runner manifests, matching, the event stream |
+| 4 | [Integrity](spec/04-integrity.md) | Sealing, overlays and their effective view, redaction, signatures and trust policies, verification outcomes |
+| 5 | [Checkpoints](spec/05-checkpoints.md) | Checkpoints, lane evaluation, the decision function and its exceptions, verifying a checkpoint |
+| 6 | [Runners](spec/06-runners.md) | Run plans, runner manifests, matching, the event stream, plan conformance |
 | 7 | [Versioning](spec/07-versioning.md) | Writers and readers, minor and major versions, unknown values, deprecation, AgentEval store v1 |
 | 8 | [Security and privacy](spec/08-security.md) | Threat model, what each mechanism protects, secrets, privacy |
 | 9 | [Conformance](spec/09-conformance.md) | Classes, the corpus, running it, claiming conformance |
@@ -29,7 +29,7 @@ specification.
 |---|---|
 | [Primer](primer.md) | AEF in one walk-through: a run from start to verified checkpoint |
 | [Field reference](reference/) | Every field of every schema, generated from the schemas |
-| [Interoperability](interop/) | Mappings to OpenTelemetry GenAI evaluation events, Inspect, OpenAI Evals and EvalPort; the in-toto predicate types and media types |
+| [Interoperability](interop/) | Mappings to OpenTelemetry GenAI evaluation events, Inspect, OpenAI Evals, EvalPort and ASSERT; the in-toto predicate types and media types |
 | [Rationale and FAQ](rationale.md) | Why AEF is the way it is |
 | [Changelog](CHANGELOG.md) | What changed, draft by draft |
 

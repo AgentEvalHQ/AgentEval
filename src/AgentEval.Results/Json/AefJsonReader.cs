@@ -14,7 +14,7 @@ namespace AgentEval.Results.Json;
 /// Reads JSON the way every AEF reader must (contracts/aef/1/spec/02-encoding.md, §2.1 and §2.6): one I-JSON value in
 /// UTF-8 with no byte-order mark ([ENC-1], [RFC 7493]), no member named twice after unescaping (<c>"a"</c> and
 /// <c>"\u0061"</c> are the same name) and no unpaired surrogate ([ENC-2]), every number a finite binary64 value
-/// ([ENC-3]: <c>1e400</c> is refused, <c>1e-400</c> reads as 0), at most 4 MiB (32 MiB for a seal or an envelope)
+/// ([ENC-3]: <c>1e400</c> is refused, <c>1e-400</c> reads as 0), at most 4 MiB (40 MiB for a seal, 56 MiB for an envelope)
 /// and nested at most 64 deep ([ENC-17]).
 /// A text that breaks a rule of §2.1 throws <see cref="AefEncodingException"/>; one beyond a limit throws
 /// <see cref="AefLimitException"/>, and is never read in part.
@@ -51,7 +51,7 @@ public static class AefJsonReader
     /// <param name="utf8">The bytes.</param>
     /// <param name="maxBytes">
     /// The size limit of this file ([ENC-17]): <see cref="AefLimits.MaxJsonBytes"/>, or for a seal or an envelope
-    /// <see cref="AefLimits.MaxSealBytes"/> (<see cref="AefLimits.MaxBytesOf"/> gives it by path).
+    /// <see cref="AefLimits.MaxSealBytes"/> or <see cref="AefLimits.MaxEnvelopeBytes"/> (<see cref="AefLimits.MaxBytesOf"/> gives it by path).
     /// </param>
     /// <exception cref="AefEncodingException">Not an I-JSON text, or the top-level value is not an object.</exception>
     /// <exception cref="AefLimitException">Larger than <paramref name="maxBytes"/>, or nested deeper than 64.</exception>
@@ -82,6 +82,13 @@ public static class AefJsonReader
         if (utf8.Length > maxBytes)
         {
             throw new AefLimitException($"{utf8.Length} bytes: this JSON text is at most {maxBytes} bytes ([ENC-17]).");
+        }
+
+        // [ENC-17]: the limits are checked on the bytes before the content is trusted, so a text both too deep and not
+        // I-JSON is refused for the limit, whichever a parser would meet first.
+        if (DepthOf(utf8) > AefLimits.MaxDepth)
+        {
+            throw new AefLimitException($"Nested deeper than {AefLimits.MaxDepth} objects and arrays ([ENC-17]).");
         }
 
         if (utf8.StartsWith(ByteOrderMark))
@@ -152,6 +159,41 @@ public static class AefJsonReader
             // Syntax: an unclosed value, a trailing comma, a comment, NaN, a raw control character, a second value.
             throw new AefEncodingException($"Not a JSON text: {e.Message}");
         }
+    }
+
+    /// <summary>
+    /// The deepest nesting of objects and arrays, scanned on the bytes without parsing ([ENC-17]: a depth scan): every
+    /// <c>[</c> or <c>{</c> outside a string opens a level, every <c>]</c> or <c>}</c> outside a string closes one, and a
+    /// string runs from a <c>"</c> to the next <c>"</c> not escaped by <c>\</c> (to the end of the text when it is not
+    /// closed). For an I-JSON text this is its depth; the top-level value is at depth 1.
+    /// </summary>
+    public static int DepthOf(ReadOnlySpan<byte> utf8)
+    {
+        int depth = 0, deepest = 0;
+        for (var i = 0; i < utf8.Length; i++)
+        {
+            switch (utf8[i])
+            {
+                case (byte)'"':
+                    for (i++; i < utf8.Length && utf8[i] != (byte)'"'; i++)
+                    {
+                        if (utf8[i] == (byte)'\\')
+                        {
+                            i++;   // the escaped byte, a quote included
+                        }
+                    }
+
+                    break;
+                case (byte)'[' or (byte)'{':
+                    deepest = Math.Max(deepest, ++depth);
+                    break;
+                case (byte)']' or (byte)'}':
+                    depth--;
+                    break;
+            }
+        }
+
+        return deepest;
     }
 
     /// <summary>

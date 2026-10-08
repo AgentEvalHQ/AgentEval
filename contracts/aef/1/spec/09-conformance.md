@@ -7,19 +7,30 @@ that class. Requirements not listed for a class still apply to it where it does 
 
 | Class | Requirements | Vectors (§9.2 `kind`) |
 |---|---|---|
-| **Producer** | ENC-1–ENC-19, RUN-1–RUN-15, RES-1–RES-11, SUM-1–SUM-9, EVD-1–EVD-3, GATE-1–GATE-2, VER-1, VER-2, VER-6, VER-9 | `document` (writer side), `run` (valid runs), `result-id`, `paths` |
-| **Sealer** | SEAL-1–SEAL-5, SIG-1–SIG-3 | `seal` (expected manifests), `signature` (signing side) |
+| **Producer** | ENC-1–ENC-19, RUN-1–RUN-15, RES-1–RES-11, SUM-1–SUM-9, EVD-1–EVD-3, GATE-1–GATE-2, VER-1, VER-2, VER-6, VER-9 | `document` (writer side), `run` (valid runs), `result-id`, `paths`, and the write-side `summarize` |
+| **Sealer** | SEAL-1–SEAL-5, SIG-1–SIG-3; signs with at least one of [SIG-2]'s algorithms | `seal` (expected manifests), `signature` (signing side), and the write-side `seal-write`, and `sign` for the algorithms it claims |
 | **Reader** | ENC-1–ENC-19, VER-3, VER-4, VER-8 (the reading rules of §7.3), VER-9 | `document` (reader side, including every encoding defect as a single document), `reader-only` |
 | **Run verifier** | Reader, plus §3.9, SEAL-4, SEAL-6, SIG-4, SIG-5, SIG-7, and OVL-4, OVL-5, OVL-10 (to tell a withheld blob from a missing one) | `run`, `seal`, `encoding`, `paths`; at the *signed* level also `signature` |
 | **Overlay verifier** | OVL-1–OVL-11 | `chain`, `overlay-view` |
 | **Checkpoint verifier** | CKP-1–CKP-10, LANE-1–LANE-11, DEC-1–DEC-5, SIG-8, and Run verifier | `checkpoint`, `lane`, `decision` |
 | **Decision engine** | DEC-1–DEC-5 | `decision` |
-| **Runner** | PLAN-1–PLAN-7, STRM-1–STRM-2, RUN-12, and Producer and Sealer for the runs it produces | `plan`, `matching` |
+| **Runner** | PLAN-1–PLAN-7, STRM-1–STRM-2, RUN-12, and Producer and Sealer for the runs it produces | `plan`, `matching`, and the Producer and Sealer vectors (below) |
 | **Stream verifier** | STRM-1–STRM-4 | `stream`, `plan-conformance` |
 
 A Run verifier conforms at the **intact** level, or at the **signed** level when it also verifies signatures (§4.4).
 `index.json` marks the vectors only the signed level must pass (`"level": "signed"`: the signature vectors, and
 the runs and seals verified against a trust policy).
+
+The **write-side** vectors (`summarize`, `seal-write`, `sign`) test a Producer and a Sealer as writers: the
+implementation computes or writes something, and the conformance runner judges it, partly through the reference
+verifier (§9.3), so a correct validator over a broken writer does not pass. A Runner has no write-side vector of its
+own: what it writes is a job over a live subject, which a corpus cannot hold. It is tested by `plan` and `matching`,
+and by the Producer and Sealer vectors, which it passes for the runs it produces; the event stream it writes is
+checked against [STRM-3] and [STRM-4] whenever someone verifies it (a Stream verifier).
+
+A Sealer signs with at least one of [SIG-2]'s algorithms (a verifier supports both; a signer uses one), and passes
+the `sign` vectors of those it claims: `index.json` gives each `sign` vector's `algorithm`, `ecdsa-p256` or
+`ed25519`.
 
 ## 9.2 The corpus
 
@@ -51,6 +62,9 @@ and is cross-checked by a second, independent implementation.
 | `plan-conformance` | an event stream, its plan, the runs it produced, and optionally a trust policy | the problems of [STRM-4] |
 | `fixture` | files several vectors use (test keys, a stream's plans) | nothing to run: the runner checks their digests |
 | `paths` | a list of paths in a run folder | the problems of [RUN-3] |
+| `summarize` | a run without its `summary.json`, and the entries to compute (lane, metric, path; optionally `aggregate`, `rule`, `verdict`) | the `summary.json` [SUM-2]–[SUM-9] give; or that it refuses the request |
+| `seal-write` | an unsealed run, `sealedBy` and `sealedAt` | the subjects and predicate of the `seal.json` it writes ([SEAL-1]–[SEAL-5]), and the outcome `intact`; or that it refuses the run (open, a `sealedAt` before it closed, or sealed on custody with a path or file that is not valid) |
+| `sign` | a file, its payload type, a test private key of one algorithm | an envelope that verifies for that key's identity ([SIG-1]–[SIG-3]); for Ed25519 the signature itself |
 
 - **[CONF-2] Comparing problems.** A list of problems is compared as an ordered list of `[path, code]` pairs (codes
   alone for [CKP-7]), in the order of §3.9; a vector passes only when the lists are equal. Times are compared as written, numbers as binary64.
@@ -78,6 +92,9 @@ or `[` is written `["name"]`, a JSON string), the known value a reader takes the
 | `decision` | `decision-vectors/<name>.json`: one file per vector | `input` (a decision input, §5.4), `description`, `rules`, and either `expected` (the output: `outcome`, `lanes`, `reasons`) or `expectedError` (the function refuses the input; the value names why, such as `no-lanes`, for people: an implementation's message need not match); `schemaInvalid: true` when the input is also invalid against the decision schema, `readerOnly: true` when only the reader schema accepts it |
 | `plan`, `matching`, `stream` | `protocol/` | as `tools/aef_stream.py` documents |
 | `plan-conformance` | `protocol/plan-conformance/<name>/`: `events.ndjson`, `plan.json`, and the runs in `runs/` (found by their `run.json`) | `events`, `plan` and `runs` (those inputs, beside `expected.json`), optionally `policy` (a trust policy, for runs with authorized redactions), `problems`: the problems of [STRM-4] as `[path, code]` pairs, ordered, and `why` |
+| `summarize` | `write-vectors/summarize/<name>/`: the run in `run/` (`run.json`, `results.ndjson`, `metrics.json`; no `summary.json`) and `request.json` | `run`, `request` (the request file: `{"lanes": [{"lane", "metrics": [{"metric", "path", "aggregate"?, "rule"?, "verdict"?, "value"?}]}]}`, the entries to compute in order; `verdict` is the producer's under its `rule`, and `value` its figure for an `aggregate` method AEF does not define, [SUM-8]), and either `summary` (the expected `summary.json`) or `refused: true` (an input error of §9.3); `why` |
+| `seal-write` | `write-vectors/seal-write/<name>/run/` | `run`, `sealedBy`, `sealedAt`, and either `manifest` (a file beside `expected.json` holding the expected manifest) and `predicate` (the expected predicate), or `refused: true` (the run is open; `sealedAt` is before its `endedAt`; or, sealed by `ingest`, a path breaks [RUN-3] or a file is not valid against its reader schema: [SEAL-1]); `why` |
+| `sign` | `write-vectors/sign/<name>/` (private test keys in `signature-vectors/keys/`) | `algorithm` (`ecdsa-p256` or `ed25519`: what a Sealer needs to run it, also in `index.json`), `file`, `payloadType`, `key` (an unencrypted PKCS#8 PEM private key, P-256 or Ed25519, as a path from the vector's folder), `policy` (a trust policy holding its public key), `keyid`, `identity`, `why`, and for Ed25519 `sig` (the expected signature, base64) |
 
 **The effective view** of an `overlay-view` vector (§4.3) is an object with:
 - `results`: one entry per result that a verified `override` or `adjudicate` targets, in `results.ndjson` order:
@@ -86,7 +103,7 @@ or `[` is written `["name"]`, a JSON string), the known value a reader takes the
   `results.ndjson` order: `target` (`"run"` or the `resultId`), `status` (`approve` or `reject`), `event`;
 - `waivers`: every verified `waive`, in file order: `target` (the event's target without `run` and `runHash`),
   `expires`, `active` (`at` ≤ the view time < `expires`), `event`;
-- `withheld`: the blobs withheld by authorized `redact` events ([OVL-10]; a vector that has some carries the `policy`
+- `withheld`: the blobs authorized `redact` events name (redacted, whether or not they are gone yet) ([OVL-10]; a vector that has some carries the `policy`
   that authorizes them), in file order;
 - `unsealedEvents`: the number of events after the last verified batch.
 
@@ -99,7 +116,8 @@ id is computed from its public key ([SIG-3]), never read from the policy. `seal`
 - **[CONF-3]** A conformance runner reads `index.json`, selects the vectors of the classes it claims, performs for each
   the operation its `kind` names on the input, and compares the result with the expected one. It checks the SHA-256 of
   every file it reads against the index, so a modified corpus cannot pass.
-- `tools/aef_conformance.py` is such a runner for the reference implementation (`tools/aef_verify.py`). An
+- `tools/aef_conformance.py` is such a runner for the reference implementation (`tools/aef_verify.py`, and
+  `tools/aef_produce.py` for the write operations). An
   implementation in another language is driven by it through this command-line contract: one invocation per
   operation, input paths as arguments, one JSON value (UTF-8, no BOM) on standard output, exit status 0 when the
   operation ran and 2 with a message on standard error for a usage or input error. Problems are `[path, code]` pairs
@@ -111,7 +129,7 @@ id is computed from its public key ([SIG-3]), never read from the policy. `seal`
   | `run`, `encoding` | `run DIR [--policy P] [--anchors A]` | `{"outcome", "problems"}`; `withheld` (a count) when not 0; `signedBy` (identities, in policy order) with `--policy`; `anchored` (true or false) with `--anchors`, a file holding a JSON list of run hashes |
   | `seal` | `seal DIR [--policy P]` | `{"manifest": text, "runHash": hex, "problems"}` |
   | `chain` | `chain DIR` | `{"problems"}` |
-  | `overlay-view` | `view DIR --at T [--policy P]` | the effective view of §9.2.1 |
+  | `overlay-view` | `view DIR --at T [--policy P]` (`--at` is always given) | the effective view of §9.2.1 |
   | `document`, `reader-only`, `plan` | `document SCHEMA FILE` | `{"writer": "valid"/"invalid", "reader": …, "reads": {field path: value as read}}` (every line of an NDJSON file; `reads` is `{}` unless the reader accepts the file and it holds one document or one line) |
   | `checkpoint` | `checkpoint FILE` | `{"writer", "reader", "problems": [code, …] or null when the reader refuses it}` |
   | `lane` | `lanes CHECKPOINT --runs DIR [--at T] [--policy P]` | `{"lanes": [{"lane", "result"}], "problems"}` |
@@ -122,14 +140,38 @@ id is computed from its public key ([SIG-3]), never read from the policy. `seal`
   | `plan-conformance` | `conform EVENTS PLAN RUNS [--policy P]` | `{"problems"}` at `run:<runId>` and `job` |
   | `paths` | `paths FILE` | `[{"name", "problems"}]` for the corpus file |
   | `result-id` | `result-id RUNID CASEID PATH [TRIAL]` | `{"resultId"}` |
+  | `summarize` | `summarize DIR REQUEST` | the `summary.json` document of the run in `DIR` for the entries of `REQUEST`: `schemaVersion`, the run's `runId` ([SUM-2]), and per lane and entry, in request order, `metric`, `path`, `N`, `n`, `notMeasured`, `sum`, `sumSq`, `value`, `verdict` (`not_measured` when `n` is 0, [SUM-6]; otherwise the request's, or `scored` when it gives none), and `rule` and `aggregate` as requested. Input errors (exit 2): a metric `metrics.json` does not declare; a lane named twice, or one lane, metric and path twice ([SUM-9]); an `aggregate` method AEF does not define without a `value`; a `value` for an entry AEF computes (the mean or sum, or `median`, `min` or `max`), which would contradict it; results or metrics that do not read |
+  | `seal-write` | `seal-write DIR --sealed-by B --sealed-at T` | writes `DIR/seal.json` ([SEAL-5]) and changes nothing else; `{"runHash": hex}`. Input errors (exit 2), with nothing written: an open run; a `T` before the run's `endedAt`; with `--sealed-by ingest`, a run with a path that breaks [RUN-3] or a file that is missing, does not read, or is not valid against its reader schema ([SEAL-1], [ENC-16]) |
+  | `sign` | `sign FILE KEY --payload-type T` (`KEY`: an unencrypted PKCS#8 PEM private key, P-256 or Ed25519) | the DSSE envelope over `FILE`'s bytes ([SIG-1]): `payloadType`, `payload`, and one signature with the key's `keyid` ([SIG-3]). Input errors (exit 2): a key of an algorithm the implementation does not sign with, a key that is not an unencrypted PKCS#8 PEM, or an EC key on a curve other than P-256 |
 
-  `--at` defaults to the time of the call; `--policy` names a trust policy file ([SIG-4]).
+  For `lanes`, `--at` defaults to the time of the call; a plan or trust policy the reader refuses is an input error
+  (exit 2); `--policy` names a trust policy file ([SIG-4]).
+
+  The write operations are judged rather than compared byte for byte: JSON formatting is free, so two conforming
+  writers may write different bytes for one `summary.json` or `seal.json`, and an ECDSA signature need not be
+  deterministic. The runner judges what was written with the reference verifier, whichever implementation is under
+  test:
+  - `summarize`: the output is valid against the writer `summary` schema; `runId`, the lanes and entries in request
+    order, `N`, `n`, `notMeasured`, `verdict`, `rule` and `aggregate` are as expected; `sum`, `sumSq` and `value` match
+    the expected values (the exact computation, rounded once) under §3.6's rule, within 1e-9 × max(1, |expected|);
+    and the run, with the output added as its `summary.json`, verifies `unsealed` with no problems.
+  - `seal-write`: the runner seals a fresh copy of the run, never the corpus's. The `seal.json` written is valid
+    against the writer `seal` schema; its subjects are the expected manifest's paths and digests, in its order; its
+    predicate equals the expected one (`closedAt` and `sealedAt` compared as times, [ENC-8], at full precision); the
+    printed `runHash` is the SHA-256 of the expected manifest; every other file of the copy is unchanged and none is
+    added; and the copy verifies `intact` with no problems. `seal.json`'s bytes are not compared.
+  - `sign`: the envelope has one signature, under the key's `keyid`, and its base64 is in the standard alphabet with
+    padding ([SIG-1]); the `signature` operation, with the vector's trust policy, gives `envelopeResult` null, that
+    signature `verified` for the vector's identity, and `verifiesFor` that identity. For Ed25519, whose signatures are
+    deterministic ([RFC 8032]), `sig` must also be the expected one; an ECDSA signature is not compared.
+  - A vector with `refused: true` passes when the operation is an input error (exit 2); for `seal-write`, the run's
+    folder must also be unchanged.
 
 ## 9.4 Claiming conformance
 
 - **[CONF-4]** A claim names the implementation and its version, the AEF version (`1.0`), the classes (and the Run
-  verifier level), and the corpus version (the SHA-256 of `index.json`) it passed in full. A claim with exceptions is
-  not a conformance claim.
+  verifier level; a Sealer claim names its signing algorithms), and the corpus version (the SHA-256 of `index.json`)
+  it passed in full. A claim with exceptions is not a conformance claim.
 
 > *Examples:* "aef-tools (the reference tools in `tools/`) conform to AEF 1.0 in every class, the Run verifier at the
 > signed level, against corpus `sha256:…`." "agenteval-results 1.0.0 conforms to AEF 1.0 as Decision engine and

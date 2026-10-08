@@ -1,0 +1,15 @@
+{
+  "lanes": [
+    {
+      "lane": "quality",
+      "metrics": [
+        {
+          "metric": "tool_calls",
+          "path": "q",
+          "rule": "tool_calls <= 12",
+          "verdict": "passed"
+        }
+      ]
+    }
+  ]
+}

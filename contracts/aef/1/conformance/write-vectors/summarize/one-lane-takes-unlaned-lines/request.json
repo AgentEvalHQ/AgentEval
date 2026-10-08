@@ -1,0 +1,13 @@
+{
+  "lanes": [
+    {
+      "lane": "main",
+      "metrics": [
+        {
+          "metric": "quality",
+          "path": "q"
+        }
+      ]
+    }
+  ]
+}

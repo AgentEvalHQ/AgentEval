@@ -1,0 +1,11 @@
+{
+  "kind": "seal-write",
+  "rules": [
+    "SEAL-1"
+  ],
+  "run": "run",
+  "sealedBy": "producer",
+  "sealedAt": "2026-10-08T09:00:00Z",
+  "refused": true,
+  "why": "Only a closed run is sealed: run.json says running. The sealer refuses (exit status 2) and writes nothing."
+}

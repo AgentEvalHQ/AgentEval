@@ -131,7 +131,7 @@ public sealed class DsseEnvelope
     /// <summary>
     /// Reads an envelope from its JSON bytes. False, with the reason, for an envelope [SIG-5] calls <c>malformed</c>:
     /// not a JSON document as <see cref="AefJsonReader.ParseDocument"/> reads one (an I-JSON object, [ENC-1]–[ENC-3],
-    /// within the limits of [ENC-17]: 32 MiB for an envelope, <see cref="AefLimits.MaxSealBytes"/>); <c>payloadType</c>
+    /// within the limits of [ENC-17]: 56 MiB for an envelope, <see cref="AefLimits.MaxEnvelopeBytes"/>); <c>payloadType</c>
     /// absent or not a string; <c>payload</c>
     /// absent, not a string or not base64 ([SIG-1]); <c>signatures</c> absent, not an array, or empty; a signature
     /// that is not an object, whose <c>sig</c> is absent, not a string or not base64, or whose <c>keyid</c> is
@@ -147,7 +147,7 @@ public sealed class DsseEnvelope
         JsonObject root;
         try
         {
-            root = AefJsonReader.ParseDocument(utf8Json, AefLimits.MaxSealBytes);
+            root = AefJsonReader.ParseDocument(utf8Json, AefLimits.MaxEnvelopeBytes);
         }
         catch (AefReadException e)
         {
@@ -209,7 +209,7 @@ public sealed class DsseEnvelope
     /// standard alphabet with padding ([SIG-1]). A signature without a key id is written with an empty <c>keyid</c>.
     /// </summary>
     /// <exception cref="ArgumentException">
-    /// The envelope would exceed the 32 MiB [ENC-17] allows a DSSE envelope (<see cref="AefLimits.MaxSealBytes"/>).
+    /// The envelope would exceed the 56 MiB [ENC-17] allows a DSSE envelope (<see cref="AefLimits.MaxEnvelopeBytes"/>).
     /// </exception>
     public byte[] ToJson()
     {
@@ -223,7 +223,7 @@ public sealed class DsseEnvelope
             ["payloadType"] = PayloadType,
             ["payload"] = Base64Strict.Encode(_payload),
             ["signatures"] = signatures,
-        }, AefLimits.MaxSealBytes);
+        }, AefLimits.MaxEnvelopeBytes);
     }
 
     private static bool TryString(JsonObject obj, string name, [NotNullWhen(true)] out string? value)

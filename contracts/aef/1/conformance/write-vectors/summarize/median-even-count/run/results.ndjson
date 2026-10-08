@@ -1,0 +1,5 @@
+{"schemaVersion":"1.0","resultId":"r_bf527750ba13aaf53cd6628bcbdc298f","caseId":"k1","path":"q","evaluator":{"id":"e:q"},"state":"passed","scores":[{"metric":"latency","value":120}]}
+{"schemaVersion":"1.0","resultId":"r_3b13689d43587aa9d51a6e13f3e93541","caseId":"k2","path":"q","evaluator":{"id":"e:q"},"state":"passed","scores":[{"metric":"latency","value":200}]}
+{"schemaVersion":"1.0","resultId":"r_340886ae97d1ddc60903af152babd0f6","caseId":"k3","path":"q","evaluator":{"id":"e:q"},"state":"failed","scores":[{"metric":"latency","value":900}]}
+{"schemaVersion":"1.0","resultId":"r_0bd2013acd7e09a6f426d028743f153b","caseId":"k4","path":"q","evaluator":{"id":"e:q"},"state":"passed","scores":[{"metric":"latency","value":260}]}
+{"schemaVersion":"1.0","resultId":"r_24ecffc05d87735ce663a1682b16dce5","caseId":"k5","path":"q","evaluator":{"id":"e:q"},"state":"error","reason":"The agent timed out."}

@@ -11,11 +11,11 @@
           "n": 4,
           "N": 4,
           "notMeasured": 0,
-          "value": 0.5,
+          "value": 0.25,
           "verdict": "passed",
           "rule": "recorded by the producer",
-          "sum": 2,
-          "sumSq": 2
+          "sum": 1,
+          "sumSq": 1
         }
       ]
     }

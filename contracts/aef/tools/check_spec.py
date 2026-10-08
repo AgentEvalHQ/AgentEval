@@ -24,16 +24,14 @@ PREFIXES = "(?:ENC|RUN|RES|SUM|EVD|GATE|SEAL|OVL|SIG|CKP|LANE|DEC|PLAN|STRM|VER|
 
 # Backticked camelCase words in the prose that are not schema fields: placeholders, JSON Schema keywords, code.
 NOT_FIELDS = {"ExportTraceServiceRequest", "signedBy", "LaneResult", "MeasurementState", "additionalProperties", "allOf",
-              "anyOf", "effectiveState", "endTimeUnixNano", "envelopeResult", "expectedError", "keyid", "maxItems",
+              "anyOf", "effectiveState", "endTimeUnixNano", "envelopeResult", "expectedError", "instrumentationLibrarySpans", "keyid", "maxItems",
               "maxLength", "minItems", "minLength", "oneOf", "payloadType", "publicKey", "readOnly", "sealedState",
               "startTimeUnixNano", "uniqueItems", "unsealedEvents", "verifiesFor", "writeOnly"}
 
 
 # Rules no corpus vector can test, and why. Everything else needs a vector that names it (CONF-1).
 # Problem codes no vector can expect, with the reason.
-CODES_UNTESTED = {
-    "limit": "ENC-17 lets a reader refuse beyond a limit but never requires it, so no vector can expect the refusal",
-}
+CODES_UNTESTED = {}
 # Backticked words in the rules that define codes in prose which are not codes: DSSE fields, manifest fields a code's
 # explanation names, a state value, literals.
 NOT_CODES = {"payload", "payloadType", "signatures", "keyid", "sig", "runs", "status", "axes", "s", "null", "aborted"}

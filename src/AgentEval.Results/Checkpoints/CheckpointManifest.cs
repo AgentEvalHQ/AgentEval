@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using System.Text.Json.Nodes;
+using AgentEval.Results.Runs;
 
 namespace AgentEval.Results.Checkpoints;
 
@@ -19,7 +20,8 @@ public static class CheckpointManifest
 
     /// <summary>
     /// The problems, in name order: <c>decision</c> (not what the recorded input gives), <c>evidence</c> (a lane has
-    /// runs but no result, or a result but no runs), <c>exception-evidence</c> (an exception names a run hash that is not
+    /// runs but no result in the input, a lane the input leaves out included, or a result but no runs, a result for a
+    /// lane the manifest does not have included), <c>exception-evidence</c> (an exception names a run hash that is not
     /// one of its lane's runs), <c>lane-evidence</c> (a lane's evidence in the input is not the set of its runs' run
     /// hashes), <c>lanes</c> (the input does not decide exactly the manifest's lanes), <c>outcome</c> (not the
     /// decision's), <c>version</c> (the input is for another version). Or only
@@ -30,8 +32,8 @@ public static class CheckpointManifest
     public static IReadOnlyList<string> Verify(JsonNode manifest)
     {
         ArgumentNullException.ThrowIfNull(manifest);
-        var state = (string?)manifest["state"];
-        var outcome = (string?)manifest["outcome"];
+        var state = AefNode.String(manifest["state"]);
+        var outcome = AefNode.String(manifest["outcome"]);
         if (state is null || !States.Contains(state))
         {
             return ["unverifiable"];
@@ -42,23 +44,22 @@ public static class CheckpointManifest
             return [];
         }
 
-        var input = manifest["decisionInput"];
-        var decision = manifest["decision"];
-        if (!Outcomes.Contains(outcome) || input is null || decision is null
-            || !Outcomes.Contains((string?)decision["outcome"] ?? "")
-            || (decision["lanes"]?.AsArray() ?? []).Any(l => !LaneStatuses.Contains((string?)l?["status"] ?? ""))
-            || (input["lanes"]?.AsArray() ?? []).Any(l => l?["result"] is { } r && !EvidenceStatuses.Contains((string?)r["status"] ?? "")))
+        if (!Outcomes.Contains(outcome) || manifest["decisionInput"] is not JsonObject input || manifest["decision"] is not JsonObject decision
+            || !Outcomes.Contains(AefNode.String(decision["outcome"]) ?? "")
+            || AefNode.Objects(decision["lanes"]).Any(l => !LaneStatuses.Contains(AefNode.String(l["status"]) ?? ""))
+            || AefNode.Objects(input["lanes"]).Any(l => l["result"] is JsonObject r && !EvidenceStatuses.Contains(AefNode.String(r["status"]) ?? "")))
         {
             return ["unverifiable"];
         }
 
         var problems = new SortedSet<string>(StringComparer.Ordinal);
-        if (outcome != (string?)decision["outcome"]) problems.Add("outcome");
-        if ((string?)input["subjectVersion"] != (string?)manifest["subject"]?["version"]) problems.Add("version");
+        if (outcome != AefNode.String(decision["outcome"])) problems.Add("outcome");
+        if (AefNode.String(input["subjectVersion"]) != AefNode.String(AefNode.At(manifest, "subject", "version"))) problems.Add("version");
 
-        var lanes = manifest["lanes"]!.AsArray();
-        var inputLanes = input["lanes"]!.AsArray();
-        static string Key(JsonNode? lane) => $"{(string?)lane!["lane"]}|{(bool?)lane["blocking"]}|{(string?)lane["freshness"]}";
+        var lanes = AefNode.Objects(manifest["lanes"]).ToList();
+        var inputLanes = AefNode.Objects(input["lanes"]).ToList();
+        static string Key(JsonObject lane) =>
+            $"{AefNode.String(lane["lane"])}|{AefNode.IsTrue(lane["blocking"])}|{AefNode.String(lane["freshness"])}";
         if (!lanes.Select(Key).SequenceEqual(inputLanes.Select(Key), StringComparer.Ordinal))
         {
             problems.Add("lanes");
@@ -66,30 +67,37 @@ public static class CheckpointManifest
 
         // The run hashes of the runs a lane of the manifest names: the evidence its result and its exceptions may name.
         HashSet<string> RunsOf(string? name) => lanes
-            .Where(l => (string?)l!["lane"] == name)
-            .SelectMany(l => l!["runs"]!.AsArray())
-            .Select(r => (string?)r!["runHash"] ?? "")
+            .Where(l => AefNode.String(l["lane"]) == name)
+            .SelectMany(l => AefNode.Objects(l["runs"]))
+            .Select(r => AefNode.String(r["runHash"]) ?? "")
             .ToHashSet(StringComparer.Ordinal);
 
         foreach (var lane in lanes)
         {
-            var inputLane = inputLanes.FirstOrDefault(l => (string?)l!["lane"] == (string?)lane!["lane"]);
-            if (inputLane is not null && (lane!["runs"]!.AsArray().Count == 0) != (inputLane["result"] is null))
+            // "A lane has runs but no result in the input": a lane the input leaves out has no result there either.
+            var inputLane = inputLanes.FirstOrDefault(l => AefNode.String(l["lane"]) == AefNode.String(lane["lane"]));
+            if (AefNode.Items(lane["runs"]).Any() != (inputLane?["result"] is JsonObject))
             {
                 problems.Add("evidence");
             }
 
             // A lane's evidence in the input is the set of its runs' run hashes; none is the empty set.
-            if (inputLane is not null && !RunsOf((string?)lane!["lane"]).SetEquals(CheckpointDecisionJson.RunHashes(inputLane["evidence"]) ?? []))
+            if (inputLane is not null && !RunsOf(AefNode.String(lane["lane"])).SetEquals(CheckpointDecisionJson.RunHashes(inputLane["evidence"]) ?? []))
             {
                 problems.Add("lane-evidence");
             }
         }
 
-        // An exception names only run hashes of its lane's runs: it accepts evidence this checkpoint holds.
-        foreach (var grant in input["exceptions"]?.AsArray() ?? [])
+        // "Or a result but no runs": a result for a lane the manifest does not have, which has no runs.
+        if (inputLanes.Any(l => l["result"] is JsonObject && !lanes.Any(m => AefNode.String(m["lane"]) == AefNode.String(l["lane"]))))
         {
-            if (!(CheckpointDecisionJson.RunHashes(grant?["evidence"]) ?? []).All(RunsOf((string?)grant?["lane"]).Contains))
+            problems.Add("evidence");
+        }
+
+        // An exception names only run hashes of its lane's runs: it accepts evidence this checkpoint holds.
+        foreach (var grant in AefNode.Objects(input["exceptions"]))
+        {
+            if (!AefNode.Strings(grant["evidence"]).All(RunsOf(AefNode.String(grant["lane"])).Contains))
             {
                 problems.Add("exception-evidence");
             }

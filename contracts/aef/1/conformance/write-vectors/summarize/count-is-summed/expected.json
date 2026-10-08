@@ -1,0 +1,33 @@
+{
+  "kind": "summarize",
+  "rules": [
+    "SUM-4",
+    "SUM-5"
+  ],
+  "run": "run",
+  "request": "request.json",
+  "summary": {
+    "schemaVersion": "1.0",
+    "runId": "summarize-count-is-summed",
+    "lanes": [
+      {
+        "lane": "quality",
+        "metrics": [
+          {
+            "metric": "tool_calls",
+            "path": "q",
+            "N": 5,
+            "n": 4,
+            "notMeasured": 1,
+            "sum": 10,
+            "sumSq": 38,
+            "value": 10,
+            "verdict": "passed",
+            "rule": "tool_calls <= 12"
+          }
+        ]
+      }
+    ]
+  },
+  "why": "A metric of kind count has the sum as its value, not the mean; a skipped line is counted in N, not measured."
+}

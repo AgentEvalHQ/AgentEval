@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1.0",
+  "metrics": [
+    {
+      "id": "latency",
+      "kind": "duration",
+      "direction": "lower_better",
+      "scale": {
+        "min": 0,
+        "max": 60000
+      },
+      "unit": "ms"
+    }
+  ]
+}

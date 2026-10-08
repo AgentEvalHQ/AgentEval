@@ -138,14 +138,164 @@ public class CorpusTheories
         }
     }
 
+    [Theory]
+    [MemberData(nameof(Vectors), "run")]
+    [MemberData(nameof(Vectors), "encoding")]
+    public void RunVerification(string id)
+    {
+        var folder = Folder(id);
+        var expected = Expected(folder);
+        string[] args = ["run", Path.Combine(folder, (string?)expected["run"] ?? "run")];
+        if ((string?)expected["policy"] is { } policy)
+        {
+            args = [.. args, "--policy", Path.Combine(folder, policy)];
+        }
+
+        if ((string?)expected["anchors"] is { } anchors)
+        {
+            args = [.. args, "--anchors", Path.Combine(folder, anchors)];
+        }
+
+        var result = Run(args);
+
+        Assert.Equal((string?)expected["outcome"], (string?)result["outcome"]);
+        AssertProblems(expected["problems"], result["problems"]);
+        foreach (var field in new[] { "signedBy", "anchored", "withheld" })
+        {
+            if (expected.AsObject().ContainsKey(field))
+            {
+                Assert.True(JsonNode.DeepEquals(expected[field], result[field]), $"{field}: expected {expected[field]?.ToJsonString()}, got {result[field]?.ToJsonString()}");
+            }
+            else if (field == "withheld")
+            {
+                Assert.Null(result[field]);   // printed only when not 0
+            }
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(Vectors), "seal")]
+    public void Seal(string id)
+    {
+        var folder = Folder(id);
+        var expected = Expected(folder);
+        string[] args = ["seal", Path.Combine(folder, (string?)expected["run"] ?? "run")];
+        if ((string?)expected["policy"] is { } policy)
+        {
+            args = [.. args, "--policy", Path.Combine(folder, policy)];
+        }
+
+        var result = Run(args);
+
+        AssertProblems(expected["problems"], result["problems"]);
+        if ((string?)expected["manifest"] is { } manifest)
+        {
+            Assert.Equal(File.ReadAllText(Path.Combine(folder, manifest), new UTF8Encoding(false)), (string?)result["manifest"]);
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(Vectors), "chain")]
+    public void Chain(string id)
+    {
+        var folder = Folder(id);
+        var expected = Expected(folder);
+        var result = Run("chain", Path.Combine(folder, (string?)expected["run"] ?? "run"));
+
+        AssertProblems(expected["problems"], result["problems"]);
+    }
+
+    [Theory]
+    [MemberData(nameof(Vectors), "overlay-view")]
+    public void OverlayView(string id)
+    {
+        var folder = Folder(id);
+        var expected = Expected(folder);
+        string[] args = ["view", Path.Combine(folder, (string?)expected["run"] ?? "run"), "--at", (string)expected["at"]!];
+        if ((string?)expected["policy"] is { } policy)
+        {
+            args = [.. args, "--policy", Path.Combine(folder, policy)];
+        }
+
+        var result = Run(args);
+
+        foreach (var field in new[] { "results", "reviews", "waivers", "withheld", "unsealedEvents" })
+        {
+            Assert.True(JsonNode.DeepEquals(expected["view"]![field], result[field]),
+                $"view.{field}: expected {expected["view"]![field]?.ToJsonString()}, got {result[field]?.ToJsonString()}");
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(Vectors), "checkpoint")]
+    public void Checkpoint(string id)
+    {
+        var folder = Folder(id);
+        var expected = Expected(folder);
+        var result = Run("checkpoint", Path.Combine(folder, "document.json"));
+
+        Assert.Equal((string?)expected["writer"], (string?)result["writer"]);
+        Assert.Equal((string?)expected["reader"], (string?)result["reader"]);
+        if (expected.AsObject().ContainsKey("problems"))
+        {
+            Assert.True(JsonNode.DeepEquals(expected["problems"], result["problems"]),
+                $"problems: expected {expected["problems"]?.ToJsonString()}, got {result["problems"]?.ToJsonString()}");
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(Vectors), "lane")]
+    public void Lane(string id)
+    {
+        var folder = Folder(id);
+        var expected = Expected(folder);
+        string[] args = ["lanes", Path.Combine(folder, (string?)expected["checkpoint"] ?? "checkpoint.json"), "--runs", Path.Combine(folder, (string?)expected["runs"] ?? "runs")];
+        if ((string?)expected["at"] is { } at)
+        {
+            args = [.. args, "--at", at];   // the evaluation time of a checkpoint with no recorded input ([LANE-9])
+        }
+
+        if ((string?)expected["policy"] is { } policy)
+        {
+            args = [.. args, "--policy", Path.Combine(folder, policy)];
+        }
+
+        var result = Run(args);
+
+        Assert.True(JsonNode.DeepEquals(expected["lanes"], result["lanes"]),
+            $"lanes: expected {expected["lanes"]!.ToJsonString()}, got {result["lanes"]!.ToJsonString()}");
+        AssertProblems(expected["problems"], result["problems"]);
+    }
+
+    [Theory]
+    [MemberData(nameof(Vectors), "plan-conformance")]
+    public void PlanConformance(string id)
+    {
+        var folder = Folder(id);
+        var expected = Expected(folder);
+        string[] args = ["conform", Path.Combine(folder, (string)expected["events"]!), Path.Combine(folder, (string)expected["plan"]!), Path.Combine(folder, (string)expected["runs"]!)];
+        if ((string?)expected["policy"] is { } policy)
+        {
+            args = [.. args, "--policy", Path.Combine(folder, policy)];
+        }
+
+        AssertProblems(expected["problems"], Run(args)["problems"]);
+    }
+
     [Fact]
     public void EveryKindThisComponentCovers_HasVectors()
     {
-        foreach (var kind in new[] { "decision", "document", "reader-only", "plan", "matching", "stream", "result-id", "paths" })
+        foreach (var kind in new[] { "decision", "document", "reader-only", "plan", "matching", "stream", "result-id", "paths", "run", "encoding", "seal", "chain", "overlay-view", "checkpoint", "lane", "plan-conformance" })
         {
             Assert.Contains(Index, v => (string?)v!["kind"] == kind);
         }
     }
+
+    // [CONF-2]: problem lists compare as ordered lists of [path, code] pairs.
+    private static void AssertProblems(JsonNode? expected, JsonNode? actual) =>
+        Assert.Equal(
+            expected!.AsArray().Select(p => $"{(string)p![0]!} {(string)p[1]!}"),
+            actual!.AsArray().Select(p => $"{(string)p![0]!} {(string)p[1]!}"));
 
     // A vector's folder (or file, for a decision vector), from index.json.
     private static string Folder(string id) =>

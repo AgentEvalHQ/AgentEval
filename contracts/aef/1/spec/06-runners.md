@@ -94,6 +94,11 @@ output for a local runner, over its channel for a remote one.
   | `unannounced-run` | `job.sealed` or `job.failed` naming a run no `evidence.produced` announced |
   | `unsealed-run` | `job.sealed` or `job.failed` not naming a run that was announced |
   | `no-terminal` | at path `stream`, after every event's problems: a finished stream with no terminal event |
+  | `event-invalid` | a line that is not an I-JSON object within the limits of [ENC-17] valid against the reader `runner-event` schema. It takes no part in the other checks: the first event is the first valid one, and the line after it is not checked for `seq` |
+
+  A stream whose finished lines break [ENC-5] or [ENC-7] (a CR, a blank line, a byte-order mark) is reported once as
+  `encoding` at `stream` and not checked further; a stream of more lines than [ENC-17] allows, as one `limit` at
+  `stream`.
 - **[STRM-4] Plan conformance.** Given also the runs the job produced (a folder of runs, found by their `run.json`,
   [RUN-1]) and, optionally, a trust policy, a stream verifier checks that the runs the `job.sealed` and `job.failed`
   events name are the runs the plan asked for: of what, where, how, within which limits, and made by this job, between
@@ -114,7 +119,7 @@ output for a local runner, over its channel for a remote one.
   | `deployment` | the plan's `subject` names a `deployment` and the run's `deployment.ref` is not it, or names an `endpoint` and the run's `deployment.endpoint` is not it (an absent value is not it) |
   | `judges` | the plan's `judges` is not empty, and the run's is not the same list: each `model` and `rubricDigest`, in order (an absent value equals only an absent value) |
   | `no-cost` | at `run:<runId>`: a run found whose `summary.json` has no `cost.totalUsd`; the budget cannot be checked without it, so a runner cannot stay under it by leaving cost out |
-  | `over-budget` | at `job`, once: the sum of `summary.json`'s `cost.totalUsd` over the runs found is above the plan's `maxUsd` (equal is within it) |
+  | `over-budget` | at `job`, once: the sum of `summary.json`'s `cost.totalUsd` over the runs found, computed exactly and rounded once ([SUM-5]), is above the plan's `maxUsd` (equal is within it), whatever order the runs are named in |
   | `over-cases` | at `job`, once: the plan sets `cases`, and the runs found have more: the distinct `caseId`s of their result lines without `parentResultId`, whatever their state, counted across the whole job (a `caseId` in two runs counts once) |
   | `provenance` | `provenance` ([RUN-12]) is not the `planId`, `planDigest`, `jobId` and `runnerId` of the stream's first `job.accepted`, or the stream has none |
   | `run-hash` | folders have the `runId`, but none is intact with the run hash announced for it, or none was announced |

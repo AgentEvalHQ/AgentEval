@@ -163,6 +163,27 @@ public class AefJsonReaderTests
         Assert.Equal("limit", Code(Nested(open, 65)));
     }
 
+    [Theory]
+    [InlineData("{\"a\":1,\"a\":2,\"d\":__DEEP__}")]     // a member named twice before the depth
+    [InlineData("{\"d\":__DEEP__,\"x\":NaN}")]          // not a number after it
+    [InlineData("﻿{\"d\":__DEEP__}")]              // a byte-order mark
+    public void TheDepthIsCheckedOnTheBytesFirst_SoATextTooDeepAndNotIJson_IsALimit(string text)
+    {
+        // [ENC-17]: "checked on the bytes before the content is trusted": the answer does not depend on which defect a
+        // parser meets first.
+        var deep = string.Concat(Enumerable.Repeat("[", 64)) + string.Concat(Enumerable.Repeat("]", 64));
+        Assert.Equal("limit", Code(text.Replace("__DEEP__", deep, StringComparison.Ordinal)));
+    }
+
+    [Theory]
+    [InlineData("{}", 1)]
+    [InlineData("{\"a\":[]}", 2)]
+    [InlineData("{\"a\":\"[[[{{{\"}", 1)]                 // brackets inside a string do not count
+    [InlineData("{\"a\":\"\\\"[[[\"}", 1)]               // nor after an escaped quote
+    [InlineData("[[]][[[]]]", 3)]
+    public void DepthOf_ScansTheBytes(string text, int depth) =>
+        Assert.Equal(depth, AefJsonReader.DepthOf(Encoding.UTF8.GetBytes(text)));
+
     [Fact]
     public void DeepNestingOfEmptyArrays_IsALimitNotAStackOverflow()
     {
@@ -184,7 +205,7 @@ public class AefJsonReaderTests
     }
 
     [Fact]
-    public void ASealOrAnEnvelope_MayBeUpTo32Mebibytes()
+    public void ASealMayBeUpTo40Mebibytes_AndAnEnvelopeUpTo56()
     {
         var bytes = Encoding.UTF8.GetBytes("{\"s\":\"" + new string('a', AefLimits.MaxJsonBytes) + "\"}");
 
@@ -198,9 +219,9 @@ public class AefJsonReaderTests
     [InlineData("runs/r1/seal.json", AefLimits.MaxSealBytes)]
     [InlineData("overlays/seal-0001.json", AefLimits.MaxSealBytes)]
     [InlineData("run/overlays/seal-0012.json", AefLimits.MaxSealBytes)]
-    [InlineData("attestation.dsse.json", AefLimits.MaxSealBytes)]
-    [InlineData("overlays/seal-0001.dsse.json", AefLimits.MaxSealBytes)]
-    [InlineData("checkpoints/cp-1.dsse.json", AefLimits.MaxSealBytes)]
+    [InlineData("attestation.dsse.json", AefLimits.MaxEnvelopeBytes)]
+    [InlineData("overlays/seal-0001.dsse.json", AefLimits.MaxEnvelopeBytes)]
+    [InlineData("checkpoints/cp-1.dsse.json", AefLimits.MaxEnvelopeBytes)]
     [InlineData("run.json", AefLimits.MaxJsonBytes)]
     [InlineData("summary.json", AefLimits.MaxJsonBytes)]
     [InlineData("overlays/seal-1.json", AefLimits.MaxJsonBytes)]

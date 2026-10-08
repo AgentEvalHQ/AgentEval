@@ -7,7 +7,8 @@ Python 3.12 (tested on Windows and Linux), standard library only. Run each as `p
 | Tool | Does | Self-check |
 |---|---|---|
 | `aef_verify.py` | The reference verifier: runs, seals, overlay chains and views, checkpoints, lanes, signatures, paths, result ids. Written from the specification alone. | through `aef_conformance.py` |
-| `aef_conformance.py` | The conformance runner ([CONF-3](../1/spec/09-conformance.md#93-running-the-corpus)): runs every vector of the corpus through an implementation and compares the results. `--self-check` switches checks of the verifier off one at a time and confirms the corpus notices each. | `--self-check` |
+| `aef_conformance.py` | The conformance runner ([CONF-3](../1/spec/09-conformance.md#93-running-the-corpus)): runs every vector of the corpus through an implementation and compares the results; judges the write-side vectors with the reference verifier. `--self-check` switches checks of the verifier off, and breaks writers of `aef_produce.py`, one at a time, and confirms the corpus notices each. | `--self-check` |
+| `aef_produce.py` | The reference writer for the write-side vectors: computes a run's `summary.json`, seals a run, signs a file with a PKCS#8 key. Written from the specification alone. | through `aef_conformance.py --self-check` |
 | `aef_decide.py` | The decision function (spec 05, §5.4). | `--check` |
 | `aef_stream.py` | The runner stream verifier and plan matching (spec 06). | `--check` |
 | `aef_schema.py` | A JSON Schema 2020-12 validator with the pattern semantics AEF requires ([ENC-14], [ENC-15]). | `--self-test` (compares with the `jsonschema` package when it is installed) |
@@ -24,10 +25,11 @@ writes (a seal, a result id, a key id). Run them in this order; they rewrite the
 2. `build_conformance.py`: valid runs, run, encoding, seal, chain and overlay-view vectors, invalid and reader-only
    documents, checkpoint manifests, path lists, result ids.
 3. `lane_vectors.py`: checkpoints with small sealed runs.
-4. `signature_vectors.py`: envelopes, test keys and trust policies, and signed runs.
+4. `signature_vectors.py`: envelopes, test keys (public and private) and trust policies, and signed runs.
 5. `decision_vectors.py`, `protocol_vectors.py`: the decision function's and the runner protocol's vectors.
-6. `build_index.py`: `conformance/index.json`, last.
-7. `gen_reference.py`: the field reference from the schemas (`--check` fails when the pages are stale; no CI job runs it yet).
+6. `write_vectors.py`: the write-side vectors (`summarize`, `seal-write`, `sign`), from the runs, seals and keys above.
+7. `build_index.py`: `conformance/index.json`, last.
+8. `gen_reference.py`: the field reference from the schemas (`--check` fails when the pages are stale; the AEF CI job runs it).
 
 ## Testing your implementation
 

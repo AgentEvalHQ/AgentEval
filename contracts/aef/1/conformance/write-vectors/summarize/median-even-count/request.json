@@ -1,0 +1,18 @@
+{
+  "lanes": [
+    {
+      "lane": "performance",
+      "metrics": [
+        {
+          "metric": "latency",
+          "path": "q",
+          "rule": "median latency <= 300 ms",
+          "verdict": "passed",
+          "aggregate": {
+            "method": "median"
+          }
+        }
+      ]
+    }
+  ]
+}

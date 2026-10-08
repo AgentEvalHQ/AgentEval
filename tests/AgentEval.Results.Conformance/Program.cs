@@ -24,7 +24,11 @@ public static class Program
         // WP2: signature
         ["signature"] = Ops.SignatureOps.Signature,
         // WP3: run, seal, chain, view
+        ["run"] = Ops.RunOps.Run, ["seal"] = Ops.RunOps.Seal, ["chain"] = Ops.RunOps.Chain, ["view"] = Ops.RunOps.View,
         // WP4: checkpoint, lanes, conform
+        ["checkpoint"] = Ops.CheckpointOps.Checkpoint, ["lanes"] = Ops.CheckpointOps.Lanes, ["conform"] = Ops.CheckpointOps.Conform,
+        // WP5a: summarize, seal-write, sign (the write side); write-samples (not a spec 09 operation: writer-crosscheck.sh)
+        ["summarize"] = Ops.WriteSideOps.Summarize, ["seal-write"] = Ops.WriteSideOps.SealWrite, ["sign"] = Ops.WriteSideOps.Sign, ["write-samples"] = Ops.WriterOps.WriteSamples,
     };
 
     public static int Main(string[] args)

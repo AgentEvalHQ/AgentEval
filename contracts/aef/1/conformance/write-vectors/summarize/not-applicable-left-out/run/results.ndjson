@@ -1,0 +1,6 @@
+{"schemaVersion":"1.0","resultId":"r_d820a4d26aed1805031924d233fcc3f7","caseId":"k1","path":"q","evaluator":{"id":"e:q"},"state":"passed","scores":[{"metric":"quality","value":1.0}]}
+{"schemaVersion":"1.0","resultId":"r_dd707b2fb2855828c75411787bd6cc49","caseId":"k2","path":"q","evaluator":{"id":"e:q"},"state":"not_applicable","reason":"The input the evaluator needs was not there."}
+{"schemaVersion":"1.0","resultId":"r_71ffc80d90d788d4fb15e997b39a95d1","caseId":"k3","path":"q","evaluator":{"id":"e:q"},"state":"not_applicable","reason":"The input the evaluator needs was not there."}
+{"schemaVersion":"1.0","resultId":"r_1161432dc377783465486ce1805f7f38","caseId":"k4","path":"q","evaluator":{"id":"e:q"},"state":"failed","scores":[{"metric":"quality","value":0.5}]}
+{"schemaVersion":"1.0","resultId":"r_5c7e1c13f80af1442431bfb05e079abc","caseId":"k1","path":"g","evaluator":{"id":"e:g"},"state":"not_applicable","reason":"The input the evaluator needs was not there."}
+{"schemaVersion":"1.0","resultId":"r_3f0b6630abd1afda37e3c8ab43bdc839","caseId":"k2","path":"g","evaluator":{"id":"e:g"},"state":"not_applicable","reason":"The input the evaluator needs was not there."}

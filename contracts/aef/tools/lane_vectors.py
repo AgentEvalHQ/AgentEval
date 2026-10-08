@@ -195,10 +195,11 @@ def v_severity(runs):
     s1 = make_run(runs, "S1", [dict(case="c1", path="a", state="passed"),
                                dict(case="c2", path="a", state="failed", severity="low"),
                                dict(case="c3", path="a", state="warn", severity="none"),
-                               # A trial line is not counted: its critical failure must not fail the lane.
-                               dict(case="c4", path="a", state="failed", severity="critical", trial=0),
+                               # A failing trial counts for the severity (LANE-3): low here. MajorityVote breaks the
+                               # 1-to-1 tie toward the more severe verdict (RES-6), so the rollup fails too.
+                               dict(case="c4", path="a", state="failed", severity="low", trial=0),
                                dict(case="c4", path="a", state="passed", trial=1),
-                               dict(case="c4", path="a", state="passed",
+                               dict(case="c4", path="a", state="failed", severity="low",
                                     trials={"n": 2, "passed": 1, "aggregation": "MajorityVote", "agree": False})],
                   metrics=(("ok", "rate", "higher_better"),), entries=(("ok", "a"),), lane="security", ended="2026-10-03T00:00:00Z")
     s2 = make_run(runs, "S2", [dict(case="c1", path="a", state="failed")],
@@ -214,6 +215,12 @@ def v_severity(runs):
     s_empty = make_run(runs, "S-empty", [], **ok_rate)
     s_na = make_run(runs, "S-not-applicable", [dict(case="c1", path="a", state="passed"), dict(case="c2", path="a", state="not_applicable")], **ok_rate)
     s_two = make_run(runs, "S-two-passed", [dict(case="c1", path="a", state="passed"), dict(case="c2", path="a", state="passed")], **ok_rate)
+    # A critical failure in one trial, behind a rollup that passes (AnyPass): the lane still fails (LANE-3).
+    s_trial = make_run(runs, "S-failing-trial", [dict(case="c1", path="a", state="failed", severity="critical", trial=0),
+                                                dict(case="c1", path="a", state="passed", trial=1),
+                                                dict(case="c1", path="a", state="passed",
+                                                     trials={"n": 2, "passed": 1, "aggregation": "AnyPass", "agree": False})],
+                       **ok_rate)
     T = "2026-10-03T00:00:00Z"
     sev = lambda m, n=None: {"kind": "severity", "max": m, **({"minimumN": n} if n else {})}
     lanes = [
@@ -229,22 +236,28 @@ def v_severity(runs):
         ("not-applicable-ignored", sev("none"), [s_na], True),     # one passed line; not_applicable takes no part
         ("minimum-not-met", sev("none", 3), [s_two], True),        # two decided lines, three needed
         ("minimum-met", sev("none", 2), [s_two], True),
+        ("failing-trial-counts", sev("high"), [s_trial], True),
     ]
     results = {"low-allows-low": res("passed", T), "none-refuses-low": res("failed", T), "missing-is-critical": res("failed", T),
                "unmeasured": res("not_measured", T), "failure-beats-unmeasured": res("failed", T),
                "two-runs": res("not_measured", T), "warn-counts": res("failed", T),
                "all-inconclusive": res("not_measured", T), "no-results": res("not_measured", T),
                "not-applicable-ignored": res("passed", T), "minimum-not-met": res("not_measured", T),
-               "minimum-met": res("passed", T)}
-    return lanes, results, [], ["LANE-3", "RES-9", "RES-2"], None
+               "minimum-met": res("passed", T), "failing-trial-counts": res("failed", T)}
+    return lanes, results, [], ["LANE-3", "RES-9", "RES-2", "RES-8"], None
 
 
 def v_severity_max_unknown(runs):
     """VER-8, §7.3: a severity level a later minor added (reader-valid only) gives not_measured, never a pass."""
     s = make_run(runs, "SM", [dict(case="c1", path="a", state="passed")], metrics=(("ok", "rate", "higher_better"),),
                  entries=(("ok", "a"),), lane="security", ended="2026-10-03T00:00:00Z")
-    lanes = [("max-unknown", {"kind": "severity", "max": "catastrophic"}, [s], True)]
-    return lanes, {"max-unknown": res("not_measured", "2026-10-03T00:00:00Z")}, [], ["LANE-3", "VER-8"], None
+    lanes = [("max-unknown", {"kind": "severity", "max": "catastrophic"}, [s], True),
+             ("kind-unknown", {"kind": "percentile", "lane": "security", "metric": "ok", "path": "a", "value": 0.9}, [s], True)]
+    T = "2026-10-03T00:00:00Z"
+    # What a 1.1 verifier recorded: passed. A 1.0 verifier cannot recompute it, so it does not call it wrong (CKP-8).
+    recorded = {"max-unknown": res("passed", T), "kind-unknown": res("passed", T)}
+    return (lanes, {"max-unknown": res("not_measured", T), "kind-unknown": res("not_measured", T)},
+            [["lanes/kind-unknown", "unverifiable"], ["lanes/max-unknown", "unverifiable"]], ["LANE-3", "VER-8", "CKP-8"], recorded)
 
 
 def v_evidence_present(runs):
@@ -298,9 +311,9 @@ def v_eligibility(runs):
     results = {
         "live": res("passed", T), "scripted": res("not_measured", T), "replayed": res("not_measured", T),
         "mocked": res("not_measured", T), "aborted": res("not_measured", T), "other-version": res("passed", T, "v6"),
-        "mixed-versions": res("passed", T, "v6"), "no-version": res("not_measured", T), "unsealed": res("not_measured", T),
+        "mixed-versions": res("passed", T, "v6"), "no-version": res("not_measured", T), "unsealed": res("not_measured", EVALUATED_AT),
         # A run changed after sealing is found by its seal's run hash (SEAL-4), and is not intact.
-        "tampered": res("not_measured", T), "not-intact": res("not_measured", T), "missing": None, "wrong-hash": None,
+        "tampered": res("not_measured", EVALUATED_AT), "not-intact": res("not_measured", EVALUATED_AT), "missing": None, "wrong-hash": None,
         "one-missing": res("not_measured", T),
         "intact-copy-beside-a-tampered-one": res("passed", T),
     }
@@ -430,13 +443,13 @@ def v_binding(runs):
         ("minimum-n-met", dict(rule, minimumN=2), [right], True),
         ("evidence-present-other-subject", {"kind": "evidence-present", "runs": 1}, [other_subject], True),
     ]
-    results = {"right": res("passed", T), "other-subject": res("not_measured", T), "other-deployment": res("not_measured", T),
-               "no-deployment": res("not_measured", T), "one-of-two-other-subject": res("not_measured", T),
-               "suite-matches": res("passed", T), "suite-version-differs": res("not_measured", T),
-               "suite-digest-differs": res("not_measured", T), "suite-by-ref-only": res("passed", T),
+    results = {"right": res("passed", T), "other-subject": res("not_measured", EVALUATED_AT), "other-deployment": res("not_measured", EVALUATED_AT),
+               "no-deployment": res("not_measured", EVALUATED_AT), "one-of-two-other-subject": res("not_measured", T),
+               "suite-matches": res("passed", T), "suite-version-differs": res("not_measured", EVALUATED_AT),
+               "suite-digest-differs": res("not_measured", EVALUATED_AT), "suite-by-ref-only": res("passed", T),
                "minimum-n-not-met": res("not_measured", T), "minimum-n-met": res("passed", T),
-               "evidence-present-other-subject": res("not_measured", T)}
-    return lanes, results, [], ["LANE-1", "LANE-2", "LANE-4"], None
+               "evidence-present-other-subject": res("not_measured", EVALUATED_AT)}
+    return lanes, results, [], ["LANE-1", "LANE-2", "LANE-4", "LANE-9"], None
 
 
 def v_comparison_large(runs):
@@ -503,7 +516,7 @@ def v_comparison_unknown_axis(runs):
     r = comparison_runs(runs)
     lanes = [("unknown-axis", cmp_rule(r["B"], axes=("suite", "weather")), [r["C13"]], True)]
     results = {"unknown-axis": res("incomparable", "2026-10-06T00:00:00Z", axes=["weather"])}
-    return lanes, results, [], ["LANE-6", "VER-3"], None
+    return lanes, results, [["lanes/unknown-axis", "unverifiable"]], ["LANE-6", "VER-3", "CKP-8"], None
 
 
 def v_recorded_differs(runs):

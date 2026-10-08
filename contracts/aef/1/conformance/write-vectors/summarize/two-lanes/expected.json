@@ -1,0 +1,60 @@
+{
+  "kind": "summarize",
+  "rules": [
+    "SUM-3",
+    "SUM-9"
+  ],
+  "run": "run",
+  "request": "request.json",
+  "summary": {
+    "schemaVersion": "1.0",
+    "runId": "summarize-two-lanes",
+    "lanes": [
+      {
+        "lane": "quality",
+        "metrics": [
+          {
+            "metric": "pass_rate",
+            "path": "q",
+            "N": 2,
+            "n": 2,
+            "notMeasured": 0,
+            "sum": 1,
+            "sumSq": 1,
+            "value": 0.5,
+            "verdict": "scored"
+          },
+          {
+            "metric": "helpfulness",
+            "path": "q",
+            "N": 2,
+            "n": 2,
+            "notMeasured": 0,
+            "sum": 1.2000000000000002,
+            "sumSq": 0.8,
+            "value": 0.6000000000000001,
+            "verdict": "scored"
+          }
+        ]
+      },
+      {
+        "lane": "security",
+        "metrics": [
+          {
+            "metric": "pass_rate",
+            "path": "q",
+            "N": 3,
+            "n": 3,
+            "notMeasured": 0,
+            "sum": 1,
+            "sumSq": 1,
+            "value": 0.3333333333333333,
+            "verdict": "failed",
+            "rule": "pass_rate == 1"
+          }
+        ]
+      }
+    ]
+  },
+  "why": "With two lanes a line belongs to the lane its lane names: a line without lane belongs to neither, and a line of a lane the summary does not have to no entry."
+}

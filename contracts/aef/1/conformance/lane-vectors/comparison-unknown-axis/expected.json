@@ -15,10 +15,16 @@
       }
     }
   ],
-  "problems": [],
+  "problems": [
+    [
+      "lanes/unknown-axis",
+      "unverifiable"
+    ]
+  ],
   "rules": [
     "LANE-6",
     "VER-3",
+    "CKP-8",
     "LANE-10"
   ]
 }

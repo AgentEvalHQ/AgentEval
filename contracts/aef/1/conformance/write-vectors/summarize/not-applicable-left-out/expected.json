@@ -1,0 +1,45 @@
+{
+  "kind": "summarize",
+  "rules": [
+    "SUM-4",
+    "SUM-5",
+    "SUM-6"
+  ],
+  "run": "run",
+  "request": "request.json",
+  "summary": {
+    "schemaVersion": "1.0",
+    "runId": "summarize-not-applicable-left-out",
+    "lanes": [
+      {
+        "lane": "quality",
+        "metrics": [
+          {
+            "metric": "quality",
+            "path": "q",
+            "N": 2,
+            "n": 2,
+            "notMeasured": 0,
+            "sum": 1.5,
+            "sumSq": 1.25,
+            "value": 0.75,
+            "verdict": "scored"
+          },
+          {
+            "metric": "quality",
+            "path": "g",
+            "N": 0,
+            "n": 0,
+            "notMeasured": 0,
+            "sum": 0,
+            "sumSq": 0,
+            "value": null,
+            "verdict": "not_measured",
+            "rule": "quality >= 0.5"
+          }
+        ]
+      }
+    ]
+  },
+  "why": "not_applicable lines are left out entirely. At path g every line is not_applicable: N and n are 0, the value is null and the verdict not_measured, whatever the producer's rule would say."
+}

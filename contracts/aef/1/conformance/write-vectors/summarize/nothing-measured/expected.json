@@ -1,0 +1,59 @@
+{
+  "kind": "summarize",
+  "rules": [
+    "SUM-5",
+    "SUM-6",
+    "SUM-8"
+  ],
+  "run": "run",
+  "request": "request.json",
+  "summary": {
+    "schemaVersion": "1.0",
+    "runId": "summarize-nothing-measured",
+    "lanes": [
+      {
+        "lane": "quality",
+        "metrics": [
+          {
+            "metric": "quality",
+            "path": "q",
+            "N": 3,
+            "n": 0,
+            "notMeasured": 3,
+            "sum": 0,
+            "sumSq": 0,
+            "value": null,
+            "verdict": "not_measured",
+            "rule": "quality >= 0.5"
+          },
+          {
+            "metric": "latency",
+            "path": "q",
+            "N": 3,
+            "n": 0,
+            "notMeasured": 3,
+            "sum": 0,
+            "sumSq": 0,
+            "value": null,
+            "verdict": "not_measured",
+            "aggregate": {
+              "method": "median"
+            }
+          },
+          {
+            "metric": "quality",
+            "path": "q/absent",
+            "N": 0,
+            "n": 0,
+            "notMeasured": 0,
+            "sum": 0,
+            "sumSq": 0,
+            "value": null,
+            "verdict": "not_measured"
+          }
+        ]
+      }
+    ]
+  },
+  "why": "n = 0: sum and sumSq are 0, the value is null (with an aggregate too) and the verdict not_measured, whatever the producer's rule would say; a path with no line at all has N = 0."
+}

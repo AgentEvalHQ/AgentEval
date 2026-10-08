@@ -79,3 +79,4 @@ The header of one run folder. Identity lives here, not in the folder path.
 | `imported.asserted` | array of string | yes | ≤ 64 items; unique | The run.json fields the converter supplied, as dotted paths (subject.version, execution.targetMode). |
 
 - **Rule:** An open run has not ended.
+- **Rule:** Only an aborted run has an abortReason (RUN-5).

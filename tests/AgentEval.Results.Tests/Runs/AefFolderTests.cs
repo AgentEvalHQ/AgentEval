@@ -51,8 +51,33 @@ public sealed class AefFolderTests : IDisposable
 
         var listing = AefFolder.List(_run);
 
+        // [RUN-3]'s rules are on the paths of files: the empty folder ext/.empty is ignored (W3-9, ruled 10-08).
         Assert.Contains(".DS_Store", listing.Files);
-        Assert.Equal(new[] { ".DS_Store", "ext/.empty" }, listing.Problems.Select(p => p.Path));
+        Assert.Equal(new[] { ".DS_Store" }, listing.Problems.Select(p => p.Path));
+    }
+
+    [Fact]
+    public void AFolderBreaksTheRules_OnlyThroughTheFilesInIt_AndACaseClashReportsTheFilesUnderTheLaterFolder()
+    {
+        Directory.CreateDirectory(Path.Combine(_run, "ext", "Data"));
+        File.WriteAllText(Path.Combine(_run, "ext", "Data", "x"), "");
+        Directory.CreateDirectory(Path.Combine(_run, ".hidden"));
+        File.WriteAllText(Path.Combine(_run, ".hidden", "y"), "");
+        var caseSensitive = !Directory.Exists(Path.Combine(_run, "ext", "dATA"));
+        if (caseSensitive)
+        {
+            // Only a case-sensitive file system can hold the clash.
+            Directory.CreateDirectory(Path.Combine(_run, "ext", "data"));
+            File.WriteAllText(Path.Combine(_run, "ext", "data", "y"), "");
+            File.WriteAllText(Path.Combine(_run, "ext", "data", "z"), "");
+        }
+
+        var listing = AefFolder.List(_run);
+
+        // The files, never the folders .hidden or ext/data.
+        Assert.Equal(
+            caseSensitive ? new[] { ".hidden/y", "ext/data/y", "ext/data/z" } : new[] { ".hidden/y" },
+            listing.Problems.Select(p => p.Path));
     }
 
     [Fact]
@@ -112,6 +137,71 @@ public sealed class AefFolderTests : IDisposable
         }
 
         Assert.Equal(AefEntryKind.Other, AefFolder.KindOf("/dev/null"));
+    }
+
+    [Fact]
+    public void OnUnix_TheGuardedNativeCall_PassesItsProbe_AndIsUsed()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            Assert.False(AefFolder.NativeInUse);   // Windows never uses it
+            return;
+        }
+
+        Assert.True(AefFolder.NativeInUse);
+    }
+
+    [Fact]
+    public void TheFallback_StillTellsFilesFoldersAndLinks_WithoutTheNativeCall()
+    {
+        var linked = TryLink(Path.Combine(_run, "notes.txt"), Path.Combine(_outside, "secret.txt"), folder: false)
+                     && TryLink(Path.Combine(_run, "ext"), _outside, folder: true);
+
+        using (AefFolder.UseFallbackForTesting())
+        {
+            Assert.False(AefFolder.NativeInUse);
+            var listing = AefFolder.List(_run);
+
+            Assert.Equal(new[] { "blobs/sha256/ab/abcd", "results.ndjson", "run.json" }, listing.Files);   // nothing from outside
+            Assert.Equal(AefEntryKind.Folder, AefFolder.KindOf(Path.Combine(_run, "blobs")));
+            Assert.Equal(AefEntryKind.File, AefFolder.KindOf(Path.Combine(_run, "run.json")));
+            if (linked)
+            {
+                Assert.Equal(new[] { new AefProblem("ext", "path"), new AefProblem("notes.txt", "path") }, listing.Problems);
+                Assert.Equal(AefEntryKind.Link, AefFolder.KindOf(Path.Combine(_run, "ext")));
+            }
+        }
+
+        Assert.Equal(!OperatingSystem.IsWindows(), AefFolder.NativeInUse);   // the switch is undone
+    }
+
+    [Fact]
+    public void TheFallback_TakesAPipeForAFile_TheDocumentedTradeOff_ButNeverOpensItWhileListing()
+    {
+        if (OperatingSystem.IsWindows() || !Run("mkfifo", Path.Combine(_run, "evidence.ndjson")))
+        {
+            return;
+        }
+
+        using (AefFolder.UseFallbackForTesting())
+        {
+            var listing = AefFolder.List(_run);   // opening the pipe would block: listing returns
+
+            Assert.Contains("evidence.ndjson", listing.Files);
+            Assert.Empty(listing.Problems);
+            Assert.Equal(AefEntryKind.File, AefFolder.FallbackKindOf(Path.Combine(_run, "evidence.ndjson")));
+        }
+
+        Assert.Equal(new[] { new AefProblem("evidence.ndjson", "path") }, AefFolder.List(_run).Problems);   // native: a path problem
+    }
+
+    [Fact]
+    public void AnEntryThatIsGone_IsAnIOException_InTheFallbackToo()
+    {
+        using (AefFolder.UseFallbackForTesting())
+        {
+            Assert.ThrowsAny<IOException>(() => AefFolder.KindOf(Path.Combine(_run, "no-such-entry")));
+        }
     }
 
     private static bool TryLink(string link, string target, bool folder)

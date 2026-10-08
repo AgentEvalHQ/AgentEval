@@ -1,11 +1,48 @@
 # AEF 1.0 changelog
 
+## Unreleased (draft): rework after critic round 3
+
+Critic round 3 scored 8.4 of 10, with no blocker: every round-2 finding addressed, and AgentEval's own implementation
+passing the whole corpus. Changes since:
+
+- **Limits decide, not implementations** ([ENC-17], [ENC-18]): a reader **must** refuse anything beyond the limits, so
+  two conforming verifiers never split on a run; `limit` has vectors at last (a run file, a results line, a seal, a
+  batch seal, an events line, a document, each 65 deep). Seals may reach 40 MiB and envelopes 56 MiB, so a legal run
+  of 100,000 files can be sealed and signed; seals and overlays do not count toward the file limit; at most 9,999
+  overlay batches.
+- **1.0 verifiers and 1.1 checkpoints** ([CKP-8], [VER-5], [SUM-8]): a lane whose rule holds a value this version does
+  not know is `unverifiable`, never `lane-result`; the recomputed aggregates are fixed for major 1; a minor's new
+  problem code applies only to what it adds.
+- **No failure hides behind a rollup** ([RES-5], [RES-6], [RES-8], [LANE-3]): a rollup must match its trial lines, and a
+  trial line needs its rollup; `total` is the number of children; a child has `component`, a parent `aggregation`; a
+  trial's lines all carry its number; a failing trial counts for a severity lane by itself.
+- **Writers tested as writers** (§9.1–§9.3): three write-side vector kinds, judged with the reference verifier rather
+  than compared byte for byte. `summarize`: a Producer computes `summary.json` for a run and a list of entries (means,
+  counts, rates, typed absences, scored and trial lines, median, min and max, lanes, an exact sum that cancels; a
+  `value` given for what AEF computes refused). `seal-write`: a Sealer seals a copy of a run (subjects in byte order,
+  the predicate as `run.json` gives it, times at full precision, the copy `intact`; refused: an open run, a seal dated
+  before the run closed, and on custody (`ingest`) a run whose paths or files are not valid, [SEAL-1]). `sign`: a Sealer
+  signs with a PKCS#8 test key, now in `signature-vectors/keys/` (the envelope must verify; an Ed25519 signature must
+  be RFC 8032's). A Sealer signs with at least one of [SIG-2]'s algorithms and passes the `sign` vectors of those it
+  claims (each names its `algorithm`; `aef_conformance.py --sign-algorithms`); its claim names them ([CONF-4]). A
+  Runner is tested through its runs and its stream. Reference writer `tools/aef_produce.py`; generator
+  `tools/write_vectors.py`.
+- **Smaller rules**: a line's `usage` per role and model ([RES-10]); `oldestClosedAt` from `run.json` ([LANE-9]); PEM
+  lines of 64 characters ([SIG-3]); a seal dated before its run closed is a `predicate` problem; only an aborted run
+  has an `abortReason`; content in resource and scope attributes counts ([SEC-6]); a producer's aggregate has a value
+  whenever `n` is not 0; what "valid against a schema" and "does not read" mean ([ENC-16], [OVL-2]); member order,
+  whitespace, number forms and null-or-absent are free ([ENC-2], [ENC-4]).
+- **Documents**: the interop pages, rationale, primer and READMEs brought up to the specification; new primer
+  sections on exceptions and plan conformance; new rationale on exceptions, closed enums, redaction authority and
+  recomputed aggregates.
+
+
 ## Unreleased (draft): what implementing it in .NET found
 
 AgentEval's own implementation (AgentEval.Results, TODO Q4-39) is written from the text alone, as the second
 implementation every class needs. Its design pass and its first two work packages found 39 places where the text was
 ambiguous, contradictory or silent; running both implementations on crafted inputs found three real disagreements.
-Each was ruled, written into the specification and pinned by a vector (488 vectors now):
+Each was ruled, written into the specification and pinned by a vector (488 vectors at the time):
 
 - **Signatures** ([SIG-1]–[SIG-5]): Ed25519 is required of verifiers, as P-256 is, since a signer may use either.
   Pinned where libraries differ: Ed25519's k reduced mod L, the equation without the cofactor, small-order keys
@@ -27,6 +64,15 @@ Each was ruled, written into the specification and pinned by a vector (488 vecto
   refuses; a migrated AgentEval store run is an imported run ([RUN-15], §7.5).
 - **Tools**: the reference verifier reads its known values from the writer schemas, so they cannot drift (it had read
   a `scored` summary verdict as `inconclusive`); `check_spec.py` fails on a problem code no vector expects.
+- **Runs, seals and overlays** (from the run verifier's implementation, six disagreements with the reference found
+  on crafted runs): an absent `unmeasured` count is 0 ([RES-6]); a lane name twice is `summary-duplicate` and "a
+  single lane" means a single lane name ([SUM-3], [SUM-9]); sums are exact, rounded once ([SUM-5]); a duplicated seal
+  subject reports every code that applies ([SEAL-6]); only a sealed run's blob can be withheld (§3.9); RUN-3 is about
+  the paths of files, empty folders are ignored, and a sealed path that is no longer a regular file is `missing`;
+  OTLP/JSON 1.x names only ([RUN-14]); `limit` rows for seals, batch seals and events lines; an NDJSON file is at most
+  1 GiB; "withheld" and "redacted" are separate terms (§4.5). The reference verifier no longer follows symbolic links.
+- **Streams** ([STRM-3]): a line that does not read is `event-invalid` and takes no other part; a framing defect is
+  one `encoding` problem at `stream`. Before, both made a verifier stop with an error.
 
 ## Unreleased (draft): rework after critic round 2
 
@@ -112,7 +158,7 @@ blockers). Changes since:
 - **The specification** is nine numbered documents with BCP 14 keywords, an id on every rule, roles and conformance
   classes, a threat model (§8) and a conformance chapter (§9). The old one-page text is gone.
 - **Verification outcomes**: unsealed, intact, signed, anchored, or invalid. An intact run is never called authentic.
-- **Signatures**: DSSE v1; ECDSA P-256 required, Ed25519 recommended (required since the round-2 rework); `keyid` is the SHA-256 of the SPKI DER; the trust
+- **Signatures**: DSSE v1; ECDSA P-256 required, Ed25519 recommended (required since the Q4-39 rulings); `keyid` is the SHA-256 of the SPKI DER; the trust
   policy is the verifier's input; an envelope needs at least one signature; no low-S rule.
 - **Lanes bound to evidence**: a checkpoint lane's result is a function of its sealed runs (`threshold`, `severity`,
   `evidence-present`, `comparison` with an exact one-sided sign test). Only intact, completed, live runs are eligible.

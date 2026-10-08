@@ -1,0 +1,46 @@
+{
+  "kind": "summarize",
+  "rules": [
+    "SUM-1",
+    "SUM-4",
+    "SUM-5",
+    "RES-1"
+  ],
+  "run": "run",
+  "request": "request.json",
+  "summary": {
+    "schemaVersion": "1.0",
+    "runId": "summarize-rate-and-verdict",
+    "lanes": [
+      {
+        "lane": "quality",
+        "metrics": [
+          {
+            "metric": "pass_rate",
+            "path": "q",
+            "N": 7,
+            "n": 5,
+            "notMeasured": 2,
+            "sum": 2,
+            "sumSq": 2,
+            "value": 0.4,
+            "verdict": "failed",
+            "rule": "pass_rate >= 0.8"
+          },
+          {
+            "metric": "ok",
+            "path": "q",
+            "N": 7,
+            "n": 5,
+            "notMeasured": 2,
+            "sum": 2,
+            "sumSq": 2,
+            "value": 0.4,
+            "verdict": "scored"
+          }
+        ]
+      }
+    ]
+  },
+  "why": "For a rate or a verdict metric a line counts 1 when passed and 0 otherwise (warn and inconclusive are not a pass); a scored line has no verdict and is not measured; not_measured is counted, not measured; not_applicable is left out."
+}

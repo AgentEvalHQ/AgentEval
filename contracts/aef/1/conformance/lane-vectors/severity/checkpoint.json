@@ -15,7 +15,7 @@
       "runs": [
         {
           "runId": "S1",
-          "runHash": "bb2639c18529299f8b7fff2f7d133c3448ef92f04b76bb2a6d00182d49394fc6",
+          "runHash": "f7dcdb10996223bf4c3bd5cef406dd7d9a1be3f7f9cff6365521b6e45d744a15",
           "origin": "launched"
         }
       ],
@@ -30,7 +30,7 @@
       "runs": [
         {
           "runId": "S1",
-          "runHash": "bb2639c18529299f8b7fff2f7d133c3448ef92f04b76bb2a6d00182d49394fc6",
+          "runHash": "f7dcdb10996223bf4c3bd5cef406dd7d9a1be3f7f9cff6365521b6e45d744a15",
           "origin": "launched"
         }
       ],
@@ -90,7 +90,7 @@
       "runs": [
         {
           "runId": "S1",
-          "runHash": "bb2639c18529299f8b7fff2f7d133c3448ef92f04b76bb2a6d00182d49394fc6",
+          "runHash": "f7dcdb10996223bf4c3bd5cef406dd7d9a1be3f7f9cff6365521b6e45d744a15",
           "origin": "launched"
         },
         {
@@ -192,6 +192,21 @@
         }
       ],
       "blocking": true
+    },
+    {
+      "lane": "failing-trial-counts",
+      "rule": {
+        "kind": "severity",
+        "max": "high"
+      },
+      "runs": [
+        {
+          "runId": "S-failing-trial",
+          "runHash": "0505578b65e50063cd68e13a9e8875d35a8bb131895a9759923e9e1ba3a2a0ef",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
     }
   ],
   "state": "decided",
@@ -210,7 +225,7 @@
           "oldestClosedAt": "2026-10-03T00:00:00Z"
         },
         "evidence": [
-          "bb2639c18529299f8b7fff2f7d133c3448ef92f04b76bb2a6d00182d49394fc6"
+          "f7dcdb10996223bf4c3bd5cef406dd7d9a1be3f7f9cff6365521b6e45d744a15"
         ]
       },
       {
@@ -222,7 +237,7 @@
           "oldestClosedAt": "2026-10-03T00:00:00Z"
         },
         "evidence": [
-          "bb2639c18529299f8b7fff2f7d133c3448ef92f04b76bb2a6d00182d49394fc6"
+          "f7dcdb10996223bf4c3bd5cef406dd7d9a1be3f7f9cff6365521b6e45d744a15"
         ]
       },
       {
@@ -270,8 +285,8 @@
           "oldestClosedAt": "2026-10-03T00:00:00Z"
         },
         "evidence": [
-          "bb2639c18529299f8b7fff2f7d133c3448ef92f04b76bb2a6d00182d49394fc6",
-          "e0f554f95847b0ae639c1c389d74d384544f4adab5af078856ce11802f0dda47"
+          "e0f554f95847b0ae639c1c389d74d384544f4adab5af078856ce11802f0dda47",
+          "f7dcdb10996223bf4c3bd5cef406dd7d9a1be3f7f9cff6365521b6e45d744a15"
         ]
       },
       {
@@ -345,6 +360,18 @@
         "evidence": [
           "c5d7f6ac7c1145879710982a695da3fec2b0c96b62effdcae00f7c42c19893ff"
         ]
+      },
+      {
+        "lane": "failing-trial-counts",
+        "blocking": true,
+        "result": {
+          "status": "failed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-03T00:00:00Z"
+        },
+        "evidence": [
+          "0505578b65e50063cd68e13a9e8875d35a8bb131895a9759923e9e1ba3a2a0ef"
+        ]
       }
     ]
   },
@@ -410,6 +437,11 @@
         "lane": "minimum-met",
         "status": "passed",
         "blocking": true
+      },
+      {
+        "lane": "failing-trial-counts",
+        "status": "failed",
+        "blocking": true
       }
     ],
     "reasons": [
@@ -422,6 +454,7 @@
       "not-measured:all-inconclusive",
       "not-measured:no-results",
       "not-measured:minimum-not-met",
+      "failed:failing-trial-counts",
       "outcome:blocked"
     ]
   }

@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "1.0",
+  "metrics": [
+    {
+      "id": "quality",
+      "kind": "score",
+      "direction": "higher_better",
+      "scale": {
+        "min": 0,
+        "max": 1
+      }
+    },
+    {
+      "id": "cost",
+      "kind": "cost",
+      "direction": "lower_better",
+      "scale": "unbounded",
+      "unit": "USD"
+    },
+    {
+      "id": "turns",
+      "kind": "count",
+      "direction": "lower_better",
+      "scale": {
+        "min": 1,
+        "max": 50
+      }
+    }
+  ]
+}

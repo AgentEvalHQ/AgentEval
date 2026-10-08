@@ -1,0 +1,8 @@
+{"schemaVersion":"1.0","resultId":"r_c5f00bc50d83b5dc0896f20ca12455e7","caseId":"k1","path":"q","evaluator":{"id":"e:q"},"state":"passed","scores":[{"metric":"quality","value":0.9}],"trial":0}
+{"schemaVersion":"1.0","resultId":"r_8ac111dea9619cf2a829304d8cccad49","caseId":"k1","path":"q","evaluator":{"id":"e:q"},"state":"failed","scores":[{"metric":"quality","value":0.3}],"trial":1}
+{"schemaVersion":"1.0","resultId":"r_8db20da5d81102dcf8f11d341466c8c1","caseId":"k1","path":"q","evaluator":{"id":"e:q"},"state":"passed","scores":[{"metric":"quality","value":0.9}],"trial":2}
+{"schemaVersion":"1.0","resultId":"r_253670d171f16e31a4635a4c0fb483dd","caseId":"k1","path":"q","evaluator":{"id":"e:q"},"state":"passed","scores":[{"metric":"quality","value":0.7}],"trials":{"n":3,"passed":2,"aggregation":"Mean","agree":false}}
+{"schemaVersion":"1.0","resultId":"r_16868013a7cbf8f52299fb0914eda980","caseId":"k2","path":"q","evaluator":{"id":"e:q"},"state":"failed","scores":[{"metric":"quality","value":0.5}]}
+{"schemaVersion":"1.0","resultId":"r_2d1b523f7cb41db397b77504f19e39cf","caseId":"k3","path":"q","evaluator":{"id":"e:q"},"state":"not_measured","reason":"The input the evaluator needs was not there.","trial":0}
+{"schemaVersion":"1.0","resultId":"r_d8480ad120a0c05c5f782dbdf2b19f29","caseId":"k3","path":"q","evaluator":{"id":"e:q"},"state":"passed","scores":[{"metric":"quality","value":0.8}],"trial":1}
+{"schemaVersion":"1.0","resultId":"r_8bf46d12aa8103a72b9d73377c5a5707","caseId":"k3","path":"q","evaluator":{"id":"e:q"},"state":"passed","scores":[{"metric":"quality","value":0.8}],"trials":{"n":2,"passed":1,"aggregation":"AnyPass","agree":false}}

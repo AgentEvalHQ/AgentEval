@@ -1,0 +1,8 @@
+{"schemaVersion":"1.0","resultId":"r_c7f3e958bb0ab837e031ff849d08e165","caseId":"k1","path":"q","evaluator":{"id":"e:q"},"state":"passed","scores":[{"metric":"quality","value":0.9}]}
+{"schemaVersion":"1.0","resultId":"r_8d478480a19d8466e445f18bc6e829e3","caseId":"k2","path":"q","evaluator":{"id":"e:q"},"state":"failed","scores":[{"metric":"quality","value":0.4}]}
+{"schemaVersion":"1.0","resultId":"r_5a4b04f5e5f841eb0b00e2008e86bd75","caseId":"k3","path":"q","evaluator":{"id":"e:q"},"state":"warn","scores":[{"metric":"quality","value":0.65}]}
+{"schemaVersion":"1.0","resultId":"r_ff0df08246366a4314e9e7925ab4696a","caseId":"k4","path":"q","evaluator":{"id":"e:q"},"state":"inconclusive","scores":[{"metric":"quality","value":0.5}]}
+{"schemaVersion":"1.0","resultId":"r_ee03f151bd3bd991f79ff87a73353d67","caseId":"k5","path":"q","evaluator":{"id":"e:q"},"state":"scored","scores":[{"metric":"quality","value":0.7}]}
+{"schemaVersion":"1.0","resultId":"r_9e8cf532a59b8d3bf7fd3fb79eb1359f","caseId":"k6","path":"q","evaluator":{"id":"e:q"},"state":"inconclusive"}
+{"schemaVersion":"1.0","resultId":"r_87f90490247c20bf6dfa0bb6e17da4a3","caseId":"k7","path":"q","evaluator":{"id":"e:q"},"state":"passed","scores":[{"metric":"latency","value":120}]}
+{"schemaVersion":"1.0","resultId":"r_d9b49e2f59f757c53a91d4fc89beca22","caseId":"k8","path":"q/sub","evaluator":{"id":"e:q/sub"},"state":"passed","scores":[{"metric":"quality","value":0.1}]}

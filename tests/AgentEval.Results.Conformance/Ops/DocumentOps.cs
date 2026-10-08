@@ -43,7 +43,7 @@ internal static class DocumentOps
         {
             try
             {
-                // [ENC-17]: a seal or a batch seal may be up to 32 MiB, whatever the file is called here.
+                // [ENC-17]: a seal or a batch seal may be up to 40 MiB, whatever the file is called here.
                 var maxBytes = schema.Split('#')[0] is "seal" or "overlay-seal" ? AefLimits.MaxSealBytes : AefLimits.MaxBytesOf(path);
                 documents = [AefJsonReader.ParseDocument(bytes, maxBytes)];
             }

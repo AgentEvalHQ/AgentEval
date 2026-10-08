@@ -1,0 +1,14 @@
+{
+  "kind": "stream",
+  "plan": "../plan.json",
+  "problems": [
+    {
+      "where": "stream",
+      "problem": "encoding"
+    }
+  ],
+  "rules": [
+    "STRM-3",
+    "ENC-5"
+  ]
+}

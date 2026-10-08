@@ -1,0 +1,3 @@
+{"schemaVersion":"1.0","resultId":"r_0584ce58b3744ace5d89fbfde62075b0","caseId":"k1","path":"q","evaluator":{"id":"e:q"},"state":"not_measured","reason":"The input the evaluator needs was not there."}
+{"schemaVersion":"1.0","resultId":"r_20d0fa2882341fde517384f8f699104a","caseId":"k2","path":"q","evaluator":{"id":"e:q"},"state":"skipped","reason":"Not run."}
+{"schemaVersion":"1.0","resultId":"r_5727a2853b67f429a15ecd09b1d2cdc4","caseId":"k3","path":"q","evaluator":{"id":"e:q"},"state":"error","reason":"Crashed."}

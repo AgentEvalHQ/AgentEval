@@ -1,0 +1,15 @@
+{
+  "kind": "run",
+  "run": "run",
+  "outcome": "invalid",
+  "problems": [
+    [
+      "traces.otlp.jsonl:1",
+      "content-capture"
+    ]
+  ],
+  "rules": [
+    "SEC-6",
+    "RUN-11"
+  ]
+}

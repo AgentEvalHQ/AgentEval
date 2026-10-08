@@ -100,7 +100,8 @@ GraderResult.
 | `isolation`, `group` | `ext` | none |
 | `metadata.openeval.partial: true` | `status: aborted` with an `abortReason`, or `completed` with `skipped` lines for the missing cases | lossy |
 | `test_case_id` | `caseId` | exact |
-| `attempt` | `trial` = `attempt` − 1 | exact |
+| `attempt` | `trial` = `attempt` − 1, on the Result's root line and on each of its grader lines ([RES-8](../spec/03-run.md#344-repeated-trials)) | exact |
+| (several attempts of a case; EvalPort has no rollup) | one rollup line per case and path, with `trials`: `n` the attempts, `passed` those whose line is `passed` ([RES-8](../spec/03-run.md#344-repeated-trials)) | lossy: the rollup's `trials.aggregation` and state are the converter's reading |
 | a Result | a root line | exact |
 | `Result.passed`, with the graders | root `state`: `passed`; else `failed` when a scored grader failed; else `not_measured` when every grader is null | lossy: which aggregation produced `passed` is often undeclared |
 | `Result.error` | `state: error`, `reason` = `type: message` | exact |
@@ -111,14 +112,14 @@ GraderResult.
 | `score: null` | `state: not_measured` with a `reason` | lossy: null does not say whether the grader was skipped, pending or failed |
 | `reason` | `reason` | exact |
 | the grader's `weight` | `component.weight`; `required` is `true` for `all` | lossy |
-| `openeval.aggregation` | `aggregation.strategy`: `weighted` → `WeightedSum`, `majority` → `MajorityVote`, `all` → `Min`; `any` has no counterpart | lossy |
+| `openeval.aggregation` | `aggregation.strategy`: `weighted` → `WeightedSum`, `majority` → `MajorityVote`, `all` → `Min`; `any` has no counterpart. A root with grader lines always carries `aggregation`, and each grader line `component` ([RES-5](../spec/03-run.md#343-composites)), so a Result without the extension takes EvalPort's default, `all` | lossy |
 | `actual_output`; a test case's `input`, `expected_output` | blobs cited by evidence of kind `output`, `input`, `expected` ([EVD-1](../spec/03-run.md#37-evidencendjson-and-blobs)), only with `contentCapture: on` ([RUN-11](../spec/03-run.md#32-runjson)) | exact when captured |
 | a test case's `context`, `retrieval_context` | blobs cited by evidence of kind `document` (capture `on`) | exact when captured |
 | `duration_ms` | `durationMs` | exact |
 | `Result.completed_at` | `endedAt` on the root line | exact |
 | `metadata.openeval.trace_id` | `traceLink.traceId` | exact |
 | `metadata.openeval.cost` | `usage` entries | lossy: EvalPort does not fix the key's shape |
-| `summary` | a recomputed `summary.json` ([SUM-5](../spec/03-run.md#36-summaryjson)) | lossy: the entries' `verdict` has no source (see [Still open](#still-open)) |
+| `summary` | a recomputed `summary.json` ([SUM-5](../spec/03-run.md#36-summaryjson)); each entry's `verdict` is `scored`, with no `rule`, since a ResultSet's pass rate has no run-level rule ([SUM-6](../spec/03-run.md#36-summaryjson)) | exact for the counts and rates, which the verifier recomputes |
 | proposed `verdict` (`passed`, `failed`, `unverified`) | root `state` `passed`, `failed`, `not_measured` (or `inconclusive` when graders scored) | exact |
 | a `.sigstore.json` bundle | outside the run; AEF accepts Sigstore as a trust-policy input ([SIG-4](../spec/04-integrity.md#44-signatures)) | lossy |
 
@@ -198,8 +199,5 @@ from metadata.
 
 ## Still open
 
-- **A summary entry for a pass rate with no run-level rule.** A `summary.json` entry needs a `verdict`, and none of its
-  values (`passed`, `failed`, `warn`, `inconclusive`, `not_measured`; [SUM-6](../spec/03-run.md#36-summaryjson))
-  means "no rule was applied". A ResultSet's `summary` has a pass rate and no rule for it.
 - **`isolation` and `group`.** AEF has no field for a ResultSet's trial isolation or for its membership in a group of
   sibling runs.

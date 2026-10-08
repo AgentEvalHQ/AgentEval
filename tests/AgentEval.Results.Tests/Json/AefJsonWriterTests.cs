@@ -136,7 +136,7 @@ public class AefJsonWriterTests
 
         Assert.Throws<ArgumentException>(() => AefJsonWriter.Line(big));
         Assert.Throws<ArgumentException>(() => AefJsonWriter.Document(big));
-        Assert.NotEmpty(AefJsonWriter.Document(big, AefLimits.MaxSealBytes));   // a seal or an envelope: 32 MiB
+        Assert.NotEmpty(AefJsonWriter.Document(big, AefLimits.MaxSealBytes));   // a seal: 40 MiB (an envelope: 56 MiB)
         Assert.NotEmpty(AefJsonWriter.Compact(big));   // a tool's output has no such limit
     }
 }

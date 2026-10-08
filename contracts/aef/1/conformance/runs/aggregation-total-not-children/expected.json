@@ -1,0 +1,14 @@
+{
+  "kind": "run",
+  "run": "run",
+  "outcome": "invalid",
+  "problems": [
+    [
+      "results.ndjson:1",
+      "aggregation"
+    ]
+  ],
+  "rules": [
+    "RES-6"
+  ]
+}

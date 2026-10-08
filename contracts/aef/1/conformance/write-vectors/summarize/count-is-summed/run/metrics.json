@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0",
+  "metrics": [
+    {
+      "id": "tool_calls",
+      "kind": "count",
+      "direction": "lower_better",
+      "scale": {
+        "min": 0,
+        "max": 100
+      }
+    }
+  ]
+}

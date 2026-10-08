@@ -45,7 +45,8 @@ A checkpoint manifest is a JSON document (schema `checkpoint`), conventionally `
 
 `LaneResult(rule, runs, baseline?) → result | null` turns a lane's sealed runs into the `result` the decision function
 takes (§5.4). It is pure: it reads only the runs' sealed files. A lane with no runs, or none of whose runs is found,
-has the result `null`. A rule kind this version does not know gives `not_measured` ([VER-3]).
+has the result `null`. A rule kind this version does not know gives `not_measured` ([VER-3]), and [CKP-8] does not
+compare it.
 
 ### 5.3.1 `threshold`
 
@@ -66,7 +67,8 @@ has the result `null`. A rule kind this version does not know gives `not_measure
 `medium`, `high`). With `lane`, only result lines of that summary lane count ([SUM-3]); with `path`, only lines at that
 path or below it (`path` itself, or starting with `path/`).
 
-- **[LANE-3]** Over every result line of every run, trial lines excluded:
+- **[LANE-3]** Over the result lines of every run (trial lines count for step 1, so a failing trial beyond `max`
+  fails the lane, as a red team expects; they take no part in the counts of step 2, where a case is its rollup):
   1. `failed` when a line in state `failed` or `warn` has a severity worse than `max` (order `none` < `low` <
      `medium` < `high` < `critical`; a missing severity counts as `critical`);
   2. otherwise `not_measured` when any line is `inconclusive`, `not_measured`, `skipped`, `error` or `pending`, or
@@ -82,7 +84,8 @@ path or below it (`path` itself, or starting with `path/`).
 `{kind: "evidence-present", runs, suite?}`: at least this many runs exist.
 
 - **[LANE-4]** `passed` when every run of the lane is eligible ([LANE-1]) and there are at least `runs` of them;
-  otherwise `not_measured`.
+  otherwise `not_measured`. A lane's runs are its distinct pairs of `runId` and `runHash`: a run named twice counts
+  once, here and in every rule.
 
 ### 5.3.4 `comparison`
 
@@ -91,7 +94,7 @@ regression of one run against a baseline run. The baseline is checked as the can
 version.
 
 - **[LANE-5]** The lane has exactly one run, the candidate; `baseline` is a run reference (`runId`, `runHash`) to an
-  intact, completed, live run. Otherwise the result is `not_measured`.
+  intact, completed, live run (it may have no `subject.version`). Otherwise the result is `not_measured`.
 - **[LANE-6] Comparability.** For each axis named in `axes`, the candidate's and the baseline's `run.json` give the
   same value (an absent value equals only an absent value):
 
@@ -100,7 +103,7 @@ version.
   | `subject` | `subject.ref` |
   | `suite` | `suite.ref` and `suite.version` |
   | `suite-content` | `suite.digest` |
-  | `judges` | the list of `judges[].model`, in order |
+  | `judges` | the list of `judges[].model`, in order (a run without `judges` has the empty list) |
   | `rubrics` | the list of `judges[].rubricDigest`, in order |
   | `target-mode` | `execution.targetMode` |
   | `deployment` | `deployment.ref` |
@@ -133,10 +136,12 @@ version.
 ### 5.3.5 The lane's version and age
 
 - **[LANE-9]** The lane's runs are found by `runId` and run hash ([CKP-8]); a lane none of whose runs is found has the
-  result `null`, as a lane with no runs. Over the runs found (the baseline excluded): the result's `subjectVersion` is
+  result `null`, as a lane with no runs. Over the runs found that are intact and of the checkpoint's subject,
+  deployment and the rule's suite ([LANE-1]'s binding; the baseline excluded; a run of something else never gives
+  the lane its version or its age): the result's `subjectVersion` is
   the checkpoint's version when every one with a `subject.version` has it, otherwise the `subject.version` of the first
-  (in lane order) that does not; `oldestClosedAt` is the earliest `run.json` `endedAt` among them (for an intact run,
-  its seal's `closedAt`): a re-run yesterday does not make 60-day-old evidence fresh. A run found without `endedAt`
+  (in lane order) that does not; `oldestClosedAt` is the earliest `run.json` `endedAt` among them, compared as times
+  ([ENC-8]) and written as that `endedAt` is written: a re-run yesterday does not make 60-day-old evidence fresh. A run found without `endedAt`
   (still running) has no closing time and is not eligible; when no run found has one, `oldestClosedAt` is the
   checkpoint's `decisionInput.evaluatedAt` (or, for an undecided checkpoint, the evaluation time the verifier is
   given as an input).
@@ -150,7 +155,8 @@ evaluation time is an input.
 - **[DEC-1] Input:** the exact `subjectVersion`, `evaluatedAt`, an optional `supersededBy` (a newer version known at
   that time), per lane: `lane`, `blocking`, an optional `freshness`, `result` (§5.3: `status`, `subjectVersion`,
   `oldestClosedAt`, and `axes` when incomparable) or `null` when there is no evidence, and `evidence`, the `runHash` of
-  each of the lane's `runs` (each once, in ascending order; required with a result); and optional `exceptions`. An
+  each of the lane's `runs` (each once; a writer writes them in ascending order, a reader compares them as a set;
+  required with a result); and optional `exceptions`. An
   **exception** accepts the failure of named, sealed evidence for a while: the `lane`, the `evidence` it accepts (run
   hashes, at least one, in the same form), optionally the `requirement` whose risk it accepts (for display: it takes
   no part in the decision), a `reason`, who granted it (`by`), when (`at`) and until when (`expires`). `by` is a claim,
@@ -209,7 +215,7 @@ policy. It reports problems as a path and a code, ordered by path and code.
 - **[CKP-7] The manifest alone.** The manifest is one file, so these problems are codes alone, reported in code order.
   For a checkpoint decided by the decision function: `decision` (the decision is not what the function gives on the
   recorded input, its exceptions included, or the input cannot be decided), `evidence` (a lane has runs but no
-  result in the input, or a result but no runs), `exception-evidence` (an exception's `evidence` names a run hash that
+  result in the input, or a result but no runs, a lane on one side only included), `exception-evidence` (an exception's `evidence` names a run hash that
   is not one of its lane's `runs`), `lane-evidence` (a lane's `evidence` in the input is not the set of its `runs`' run
   hashes in the manifest; none is the empty set), `lanes` (the input does not decide exactly the manifest's lanes, with
   the same names, blocking and freshness, in order), `outcome` (the outcome is not the decision's), `version` (the input
@@ -227,10 +233,13 @@ policy. It reports problems as a path and a code, ordered by path and code.
   not a problem). The verifier takes the trust policy (for authorized redactions) and the evaluation time as inputs. Then, for a
   decided checkpoint, each lane's result recomputed with §5.3 is compared with the recorded input (path
   `lanes/<lane>`): `lane-result` (another `status` or other `axes`, or a result where `null` was recorded or the
-  reverse), `lane-version` (another `subjectVersion`), `oldest-closed` (another `oldestClosedAt`).
+  reverse), `lane-version` (another `subjectVersion`), `oldest-closed` (another `oldestClosedAt`). A lane whose rule
+  the recorded input decides and that holds a value this version does not know (a rule kind, a severity maximum, a threshold operator or a comparison
+  axis, §7.3) is not compared, since a later minor recorded a result this version cannot recompute: it is
+  `unverifiable` (that lane cannot be checked here), never `lane-result`.
 - **[CKP-9] The signature**, when an envelope is present and a trust policy given: the per-signature results of §4.4.
-  A checkpoint that verifies with no problems and a signature verified for a trusted identity **anchors** its runs
-  (§4.5).
+  A checkpoint that verifies with no problems and a signature verified for a trusted identity **anchors** its runs,
+  its comparison baselines included (§4.5).
 - `conformance/checkpoints/` holds manifests with the expected problems of the manifest rules;
   `conformance/lane-vectors/` holds checkpoints with their runs and the expected problems against the runs.
 

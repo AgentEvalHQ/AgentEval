@@ -181,7 +181,29 @@ public class PublicKeyInfoTests
             string.Join('\n', lines[0], lines[1] + lines[2].TrimEnd('='), lines[3]) + "\n",                         // unpadded
             "-----BEGIN PUBLIC KEY-----\n-----END PUBLIC KEY-----\n",
             "-----BEGIN PUBLIC KEY-----\nAAAA\n-----END PUBLIC KEY-----\n",                // base64, but no SPKI
+            Wrap(lines, 76),                                                                // RFC 7468: 64 characters a line
+            Wrap(lines, 200),                                                               // the body on one line
+            Wrap(lines, 60),                                                                // short lines
         };
+
+        // The body rewrapped at `width` characters a line.
+        static string Wrap(string[] lines, int width)
+        {
+            var body = string.Concat(lines[1..^1]);
+            var wrapped = Enumerable.Range(0, (body.Length + width - 1) / width).Select(i => body.Substring(i * width, Math.Min(width, body.Length - (i * width))));
+            return string.Join('\n', [lines[0], .. wrapped, lines[^1]]) + "\n";
+        }
+    }
+
+    [Fact]
+    public void APemsBase64Lines_Are64CharactersButTheLast()
+    {
+        var good = File.ReadAllText(Path.Combine(SignatureCorpus.Root, "keys", "ecdsa-a.pub.pem"));
+        var lines = good.TrimEnd('\n').Split('\n');
+
+        Assert.All(lines[1..^2], l => Assert.Equal(64, l.Length));   // the corpus key, wrapped as RFC 7468 says
+        Assert.Equal(SignatureCorpus.EcdsaA, PublicKeyInfo.FromPem(good).KeyId);
+        Assert.Equal(good, PublicKeyInfo.FromPem(good).ToPem());
     }
 
     [Theory]

@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "seal-write-overlays",
+  "lanes": [
+    {
+      "lane": "main",
+      "metrics": [
+        {
+          "metric": "m",
+          "path": "q",
+          "N": 1,
+          "n": 1,
+          "notMeasured": 0,
+          "sum": 1,
+          "sumSq": 1,
+          "value": 1,
+          "verdict": "passed",
+          "rule": "m >= 0.5"
+        }
+      ]
+    }
+  ]
+}

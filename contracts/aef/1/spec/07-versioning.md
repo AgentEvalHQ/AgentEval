@@ -15,8 +15,8 @@
 
 ## 7.2 What a minor version may change
 
-- **[VER-5]** A minor version only **adds**: optional fields, enum values, union kinds, problem codes, rule ids,
-  corpus vectors. It never removes or renames anything, makes something required, narrows a bound or a pattern, or
+- **[VER-5]** A minor version only **adds**: optional fields, enum values, union kinds, problem codes (a new code
+  applies only to what that minor adds: a file valid under an earlier minor stays valid), rule ids, corpus vectors. It never removes or renames anything, makes something required, narrows a bound or a pattern, or
   changes a rule's meaning. Anything else is a new major version.
 - **[VER-9] Closed enums.** Three enums are closed for major 1, because the rules across files (§3.9) compute with
   them, and a reader could not check a run holding a value it does not know: a result's `state`, `run.json`'s
@@ -24,7 +24,7 @@
   enum (`tools/derive_reader.py`), so a value outside it is a `schema` problem, never read as another value.
 - **[VER-6]** A run may mix minors only as their files were written: a reader reads each document at its own
   `schemaVersion`. A writer writes one minor throughout a run.
-- `tools/schema_diff.py` compares two versions of the writer schemas and fails on any change §VER-5 does not allow
+- `tools/schema_diff.py` compares two versions of the writer schemas and fails on any change [VER-5] does not allow
   (§9.5).
 
 ## 7.3 Reading a value this version does not know

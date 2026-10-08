@@ -93,19 +93,26 @@ def verify(events, plan=None, plan_digest=None):
     problems = []
     previous_seq, previous_at, spent, terminal, accepted, cases, over_time = 0, None, None, False, False, 0, False
     announced = {}
-    first = events[0] if events else None
+    valid = [e for e in events if e is not None]  # None: an event-invalid line, which takes no other part
+    first = valid[0] if valid else None
     start = parse_time(first["at"]) if first else None
     limit = None
     if plan is not None and "timeout" in plan["limits"]:
         limit = parse_duration(plan["limits"]["timeout"])
+    seen, after_invalid = False, False
     for i, e in enumerate(events, start=1):
+        if e is None:
+            problems.append((f"event:{i}", "event-invalid"))
+            after_invalid = True
+            continue
         found, kind = [], e["kind"]
-        if i == 1 and kind not in ("job.accepted", "job.refused"):
+        if not seen and kind not in ("job.accepted", "job.refused"):
             found.append("first")
+        seen = True
         seq = int(e["seq"])  # an integral number, also when written 2.0
-        if seq != previous_seq + 1:
+        if seq != previous_seq + 1 and not after_invalid:
             found.append("seq")
-        previous_seq = seq
+        previous_seq, after_invalid = seq, False
         if e["jobId"] != first["jobId"]:
             found.append("job-id")
         at = parse_time(e["at"])
@@ -269,11 +276,23 @@ def conform(events, plan, runs, policy=None, examine=examine):
     return sorted(problems, key=lambda p: (p[0].encode("utf-8"), p[1].encode("utf-8")))
 
 
-def read_stream(path):
-    """STRM-2: the finished lines only; a last line without LF is still being written."""
+def read_stream_lines(path):
+    """STRM-2 and STRM-3: the finished lines of a stream (a last line without LF is still being written), each the
+    event it holds or None when it is not an I-JSON object valid against the reader schema; or None for the whole when
+    its framing breaks ENC-5 or ENC-7. Read through the reference verifier's I-JSON reader and schemas."""
+    if str(TOOLS) not in sys.path:
+        sys.path.insert(0, str(TOOLS))
+    import aef_verify  # noqa: E402
     data = Path(path).read_bytes()
     complete = data[:data.rfind(b"\n") + 1]
-    return [json.loads(line) for line in complete.decode("utf-8").split("\n") if line]
+    if aef_verify.ndjson_framing(complete):
+        return None
+    return [aef_verify._stream_event(raw) for _, _, raw in aef_verify.ndjson_lines(complete)]
+
+
+def read_stream(path):
+    """The events STRM-4 reads: the valid ones of read_stream_lines."""
+    return [e for e in read_stream_lines(path) or [] if e is not None]
 
 
 def conform_files(events_path, plan_path, runs_path, policy_path=None):
@@ -292,9 +311,10 @@ def check():
         expected_doc = json.loads((d / "expected.json").read_text(encoding="utf-8"))
         plan_path = (d / expected_doc["plan"]).resolve()
         plan = json.loads(plan_path.read_text(encoding="utf-8"))
-        events = read_stream(d / "events.ndjson")
+        events = read_stream_lines(d / "events.ndjson")
         expected = [(p["where"], p["problem"]) for p in expected_doc["problems"]]
-        actual = verify(events, plan, hashlib.sha256(plan_path.read_bytes()).hexdigest())
+        actual = ([("stream", "encoding")] if events is None
+                  else verify(events, plan, hashlib.sha256(plan_path.read_bytes()).hexdigest()))
         if actual != expected:
             failed += 1
             print(f"FAIL streams/{d.name}\n  expected {expected}\n  actual   {actual}")

@@ -1,0 +1,17 @@
+{
+  "kind": "seal",
+  "run": "run",
+  "problems": [
+    [
+      "ext/gone.txt",
+      "duplicate-subject"
+    ],
+    [
+      "ext/gone.txt",
+      "missing"
+    ]
+  ],
+  "rules": [
+    "SEAL-6"
+  ]
+}

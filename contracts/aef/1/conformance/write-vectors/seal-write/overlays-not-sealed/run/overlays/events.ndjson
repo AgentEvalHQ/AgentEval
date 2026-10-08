@@ -1,0 +1,1 @@
+{"schemaVersion":"1.0","eventId":"ov_0001","kind":"annotate","target":{"run":"seal-write-overlays"},"reason":"Looked at before it was sealed.","by":{"identity":"git:alice@example.com","assurance":"self-attested"},"at":"2026-10-01T00:05:00Z"}

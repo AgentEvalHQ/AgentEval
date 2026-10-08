@@ -1,0 +1,32 @@
+{
+  "kind": "summarize",
+  "rules": [
+    "SUM-4",
+    "RES-3"
+  ],
+  "run": "run",
+  "request": "request.json",
+  "summary": {
+    "schemaVersion": "1.0",
+    "runId": "summarize-open-run-pending",
+    "lanes": [
+      {
+        "lane": "quality",
+        "metrics": [
+          {
+            "metric": "quality",
+            "path": "q",
+            "N": 3,
+            "n": 2,
+            "notMeasured": 1,
+            "sum": 0.8,
+            "sumSq": 0.39999999999999997,
+            "value": 0.4,
+            "verdict": "scored"
+          }
+        ]
+      }
+    ]
+  },
+  "why": "A pending line (in a run still running) is counted in N and not measured."
+}

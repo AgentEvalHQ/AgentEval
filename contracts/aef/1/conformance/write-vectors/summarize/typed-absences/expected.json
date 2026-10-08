@@ -1,0 +1,45 @@
+{
+  "kind": "summarize",
+  "rules": [
+    "SUM-4",
+    "SUM-5",
+    "RES-1",
+    "RES-2"
+  ],
+  "run": "run",
+  "request": "request.json",
+  "summary": {
+    "schemaVersion": "1.0",
+    "runId": "summarize-typed-absences",
+    "lanes": [
+      {
+        "lane": "quality",
+        "metrics": [
+          {
+            "metric": "quality",
+            "path": "q",
+            "N": 5,
+            "n": 2,
+            "notMeasured": 3,
+            "sum": 1.0,
+            "sumSq": 0.68,
+            "value": 0.5,
+            "verdict": "scored"
+          },
+          {
+            "metric": "pass_rate",
+            "path": "q",
+            "N": 5,
+            "n": 2,
+            "notMeasured": 3,
+            "sum": 1,
+            "sumSq": 1,
+            "value": 0.5,
+            "verdict": "scored"
+          }
+        ]
+      }
+    ]
+  },
+  "why": "not_measured, skipped and error lines are counted in N and are not measured: never a fail with 0."
+}

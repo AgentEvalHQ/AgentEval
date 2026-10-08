@@ -532,7 +532,7 @@ public class AefConformanceTests
             .Distinct().Order(StringComparer.Ordinal);
 
         // Every code of [SEAL-6].
-        Assert.Equal(["digest", "duplicate-subject", "missing", "not-sealed", "predicate", "run-hash", "run-id", "run-open", "seal-invalid",
+        Assert.Equal(["digest", "duplicate-subject", "limit", "missing", "not-sealed", "predicate", "run-hash", "run-id", "run-open", "seal-invalid",
                       "subject-path", "withheld"], problems);
     }
 
@@ -592,7 +592,11 @@ public class AefConformanceTests
     /// </summary>
     private static List<(string Path, string Problem)> Verify(string run, JsonNode? policy)
     {
-        var seal = ReadIJson(File.ReadAllBytes(Path.Combine(run, "seal.json")));
+        // [ENC-17]: a seal beyond 40 MiB or nested deeper than 64 is refused, and not checked further ([SEAL-6] limit).
+        var sealBytes = File.ReadAllBytes(Path.Combine(run, "seal.json"));
+        if (!WithinLimits(sealBytes, MaxSealBytes))
+            return [("seal.json", "limit")];
+        var seal = ReadIJson(sealBytes);
         if (seal is null || !Reader.Value.IsValid("seal", seal, out _))
             return [("seal.json", "seal-invalid")];
         var header = ReadJson(Path.Combine(run, "run.json"));
@@ -600,7 +604,9 @@ public class AefConformanceTests
 
         var subjects = seal["subject"]!.AsArray().Select(s => (Name: (string)s!["name"]!, Digest: (string)s["digest"]!["sha256"]!)).ToList();
         var duplicated = subjects.GroupBy(s => s.Name, StringComparer.Ordinal).Where(g => g.Count() > 1).Select(g => g.Key).ToHashSet(StringComparer.Ordinal);
-        var unsealable = subjects.Select(s => s.Name).Where(n => !duplicated.Contains(n) && !IsSealed(n)).ToHashSet(StringComparer.Ordinal);
+        // A duplicated subject is also reported with every other code whose condition holds for it (subject-path, or
+        // missing when the file is gone); only its digests are not compared ([SEAL-6]).
+        var unsealable = subjects.Select(s => s.Name).Where(n => !IsSealed(n)).ToHashSet(StringComparer.Ordinal);
         problems.AddRange(duplicated.Select(n => (n, "duplicate-subject")));
         problems.AddRange(unsealable.Select(n => (n, "subject-path")));
         var sealedDigests = subjects.Where(s => !duplicated.Contains(s.Name) && !unsealable.Contains(s.Name))
@@ -622,17 +628,51 @@ public class AefConformanceTests
                 everyFileMatches = false;
             }
         }
+        foreach (var rel in duplicated.Where(r => !unsealable.Contains(r) && !present.Contains(r)))
+            problems.Add((rel, withheld.Contains(rel) ? "withheld" : "missing"));
 
         if (everyFileMatches && Hex(SHA256.HashData(Encoding.UTF8.GetBytes(Manifest(run)))) != (string)seal["predicate"]!["runHash"]!)
             problems.Add(("seal.json", "run-hash"));
         if ((string)seal["predicate"]!["runId"]! != (string)header["runId"]!)
             problems.Add(("seal.json", "run-id"));
-        if (!PredicateMatches(seal["predicate"]!, header))
+        if (!PredicateMatches(seal["predicate"]!, header) || SealedBeforeClosed(seal["predicate"]!))
             problems.Add(("seal.json", "predicate"));
         if ((string)header["status"]! == "running")
             problems.Add(("run.json", "run-open"));
 
         return Ordered(problems);
+    }
+
+    /// <summary>[SEAL-6] predicate: a seal made before the run closed (sealedAt earlier than closedAt, as times).</summary>
+    private static bool SealedBeforeClosed(JsonNode predicate) =>
+        AgentEval.Results.AefTime.Parse((string)predicate["sealedAt"]!) < AgentEval.Results.AefTime.Parse((string)predicate["closedAt"]!);
+
+    private const int MaxSealBytes = 40 * 1024 * 1024;   // [ENC-17]: seal.json and a batch seal
+    private const int MaxJsonBytes = 4 * 1024 * 1024;    // [ENC-17]: a JSON file or an NDJSON line
+    private const int MaxDepth = 64;                     // [ENC-17]: the top-level value is at depth 1
+
+    /// <summary>[ENC-17], checked on the bytes before the content is trusted: a size, and a depth scan.</summary>
+    private static bool WithinLimits(ReadOnlySpan<byte> bytes, int maxBytes) => bytes.Length <= maxBytes && Depth(bytes) <= MaxDepth;
+
+    /// <summary>The deepest nesting of objects and arrays, scanned on the bytes (brackets inside strings do not count).</summary>
+    private static int Depth(ReadOnlySpan<byte> bytes)
+    {
+        int depth = 0, deepest = 0;
+        var inString = false;
+        for (var i = 0; i < bytes.Length; i++)
+        {
+            var b = bytes[i];
+            if (inString)
+            {
+                if (b == (byte)'\\') i++;
+                else if (b == (byte)'"') inString = false;
+            }
+            else if (b == (byte)'"') inString = true;
+            else if (b is (byte)'[' or (byte)'{') deepest = Math.Max(deepest, ++depth);
+            else if (b is (byte)']' or (byte)'}') depth--;
+        }
+
+        return deepest;
     }
 
     /// <summary>
@@ -729,7 +769,7 @@ public class AefConformanceTests
             .Distinct().Order(StringComparer.Ordinal);
 
         // Every code of [OVL-5], and encoding for an events file whose framing breaks.
-        Assert.Equal(["batch-digest", "batch-invalid", "batch-number", "encoding", "event-id", "event-invalid", "line-boundary", "missing", "offset",
+        Assert.Equal(["batch-digest", "batch-invalid", "batch-number", "encoding", "event-id", "event-invalid", "limit", "line-boundary", "missing", "offset",
                       "previous", "run-hash", "run-id", "target", "uncovered", "unexpected-file"], problems);
     }
 
@@ -776,6 +816,14 @@ public class AefConformanceTests
             var name = $"overlays/seal-{n:D4}.json";
             var file = Path.Combine(overlays, $"seal-{n:D4}.json");
             var before = problems.Count;
+            if (File.Exists(file) && !WithinLimits(File.ReadAllBytes(file), MaxSealBytes))
+            {
+                problems.Add((name, "limit"));   // [ENC-17]: refused, not checked further, and it ends the verified prefix
+                expectedOffset = -1;
+                verifying = false;
+                continue;
+            }
+
             var statement = File.Exists(file) ? ReadIJson(File.ReadAllBytes(file)) : null;
             if (statement is null || !Reader.Value.IsValid("overlay-seal", statement, out _))
             {
@@ -833,8 +881,16 @@ public class AefConformanceTests
         {
             var start = at;
             var next = Array.IndexOf(events, (byte)'\n', at) is var lf and >= 0 ? lf + 1 : events.Length;
-            var e = ReadIJson(events.AsSpan(at, next - at));
             var where = $"overlays/events.ndjson:{line}";
+            var raw = events.AsSpan(at, next - at - 1);   // without its LF
+            if (!WithinLimits(raw, MaxJsonBytes))
+            {
+                problems.Add((where, "limit"));   // [ENC-18]: at the line; a single event's problem
+                at = next;
+                continue;
+            }
+
+            var e = ReadIJson(events.AsSpan(at, next - at));
             at = next;
             if (e is null || !Reader.Value.IsValid("overlay-event", e, out _))
             {
@@ -862,8 +918,8 @@ public class AefConformanceTests
     /// withholds a blob); otherwise the hash recomputed from the files ([SEAL-4], [OVL-5]).
     /// </summary>
     private static string RunHash(string run) =>
-        File.Exists(Path.Combine(run, "seal.json")) && ReadIJson(File.ReadAllBytes(Path.Combine(run, "seal.json"))) is { } seal
-            && Reader.Value.IsValid("seal", seal, out _)
+        File.Exists(Path.Combine(run, "seal.json")) && File.ReadAllBytes(Path.Combine(run, "seal.json")) is var bytes
+            && WithinLimits(bytes, MaxSealBytes) && ReadIJson(bytes) is { } seal && Reader.Value.IsValid("seal", seal, out _)
             ? (string)seal["predicate"]!["runHash"]!
             : Hex(SHA256.HashData(Encoding.UTF8.GetBytes(Manifest(run))));
 

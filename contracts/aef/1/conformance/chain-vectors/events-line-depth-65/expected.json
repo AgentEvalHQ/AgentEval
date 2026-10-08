@@ -1,0 +1,19 @@
+{
+  "kind": "chain",
+  "run": "run",
+  "problems": [
+    [
+      "overlays/events.ndjson",
+      "uncovered"
+    ],
+    [
+      "overlays/events.ndjson:3",
+      "limit"
+    ]
+  ],
+  "rules": [
+    "ENC-17",
+    "ENC-18",
+    "OVL-5"
+  ]
+}

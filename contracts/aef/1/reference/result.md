@@ -44,12 +44,13 @@ One node of a run's result tree. A composite node carries aggregation; its child
 | `reasoning.blob` | [sha256Uri](common.md#sha256uri) | yes |  | The digest of the blob holding the reasoning; its hex is the blob's file name (EVD-3). |
 | `reasoning.bytes` | integer | yes | ≥ 0; ≤ 9007199254740991 | The blob's size in bytes. A size that is not the blob's is reported as reasoning-size. |
 | `uncertainty` | null or object |  |  | How uncertain the node's score is: a standard error, an interval, or both; null when not given (RES-10). |
-| `usage` | array of object |  | ≥ 1 items; ≤ 8 items | What producing this node consumed, one entry per party (the agent, a judge, an attacker): no role twice (RES-10). |
+| `usage` | array of object |  | ≥ 1 items; ≤ 8 items | What producing this node consumed, one entry per party (the agent, a judge, an attacker): no role and model twice (RES-10). |
+| `usage[].role` | one of `"agent"`, `"judge"`, `"attacker"`, `"other"` | yes |  | Whose usage this is: agent (the subject), judge, attacker (an attacker model) or other. |
+| `usage[].model` | string |  | ≥ 1 chars; ≤ 256 chars | The model this party used, when it used one: with role, it tells two judges of a panel apart (RES-10). |
 | `usage[].gen_ai.usage.input_tokens` | integer |  | ≥ 0; ≤ 9007199254740991 | Input tokens, as OpenTelemetry's gen_ai.usage.input_tokens (RES-10). |
 | `usage[].gen_ai.usage.output_tokens` | integer |  | ≥ 0; ≤ 9007199254740991 | Output tokens, as OpenTelemetry's gen_ai.usage.output_tokens (RES-10). |
 | `usage[].costUsd` | number |  | ≥ 0 | The cost, in US dollars (RES-10). |
 | `usage[].costSource` | string |  | ≤ 128 chars | Where the cost figure came from, such as a price table. |
-| `usage[].role` | one of `"agent"`, `"judge"`, `"attacker"`, `"other"` | yes |  | Whose usage this is: agent (the subject), judge, attacker (an attacker model) or other. |
 | `usage[].gen_ai.usage.cache_read.input_tokens` | integer |  | ≥ 0; ≤ 9007199254740991 | Input tokens served from a cache, as OpenTelemetry's gen_ai.usage.cache_read.input_tokens; included in input_tokens (RES-10). |
 | `usage[].gen_ai.usage.cache_write.input_tokens` | integer |  | ≥ 0; ≤ 9007199254740991 | Input tokens written to a cache, as OpenTelemetry's gen_ai.usage.cache_write.input_tokens; included in input_tokens (RES-10). |
 | `usage[].gen_ai.usage.reasoning.output_tokens` | integer |  | ≥ 0; ≤ 9007199254740991 | Reasoning tokens, as OpenTelemetry's gen_ai.usage.reasoning.output_tokens; included in output_tokens (RES-10). |

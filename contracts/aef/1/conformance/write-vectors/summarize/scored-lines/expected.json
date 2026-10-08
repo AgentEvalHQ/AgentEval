@@ -1,0 +1,43 @@
+{
+  "kind": "summarize",
+  "rules": [
+    "SUM-4",
+    "RES-1"
+  ],
+  "run": "run",
+  "request": "request.json",
+  "summary": {
+    "schemaVersion": "1.0",
+    "runId": "summarize-scored-lines",
+    "lanes": [
+      {
+        "lane": "quality",
+        "metrics": [
+          {
+            "metric": "quality",
+            "path": "q",
+            "N": 4,
+            "n": 3,
+            "notMeasured": 1,
+            "sum": 1.8,
+            "sumSq": 1.26,
+            "value": 0.6,
+            "verdict": "scored"
+          },
+          {
+            "metric": "pass_rate",
+            "path": "q",
+            "N": 4,
+            "n": 1,
+            "notMeasured": 3,
+            "sum": 1,
+            "sumSq": 1,
+            "value": 1,
+            "verdict": "scored"
+          }
+        ]
+      }
+    ]
+  },
+  "why": "A scored line is measured for a score metric when it has a score for it, and never for a rate."
+}

@@ -6,8 +6,9 @@ seals (OVL-4). Every other expected result (problems, effective views, lane resu
 specification (contracts/aef/1/spec/), never computed by an implementation. Two independent implementations check all
 of it: tools/aef_verify.py and the .NET tests. Re-running the script rewrites the corpus byte for byte.
 
-Usage: python contracts/aef/tools/build_conformance.py   (then lane_vectors.py, decision_vectors.py,
-protocol_vectors.py, signature_vectors.py, and build_index.py last)
+Usage: python contracts/aef/tools/build_conformance.py   (after derive_reader.py; then lane_vectors.py,
+signature_vectors.py, decision_vectors.py, protocol_vectors.py, write_vectors.py, and build_index.py last: the order
+of tools/README.md and the AEF CI job)
 """
 import base64
 import hashlib
@@ -378,6 +379,8 @@ def invalid_cases():
     return [
         ("run-unknown-major", "run", base_run(schemaVersion="3.0"), "invalid", ["VER-4"], "an unknown major version is refused"),
         ("run-without-schema-version", "run", base_run(schemaVersion=DROP), "invalid", ["VER-1"], "every document carries schemaVersion"),
+        ("run-completed-with-abort-reason", "run", base_run(abortReason="It was not aborted."), "invalid", ["RUN-5"],
+         "only an aborted run has an abortReason"),
         ("result-state-closed", "result", dict(BASE_RESULT, state="flaky"), "invalid", ["VER-9", "RES-1"],
          "state is closed for major 1: a reader refuses a value it does not know rather than guess"),
         ("run-status-closed", "run", base_run(status="sealed"), "invalid", ["VER-9", "RUN-5"],
@@ -546,6 +549,8 @@ def length_and_number_cases():
     return [
         ("length-astral-at-max", "run", base_run(producer={"name": astral, "version": "1"}), "valid", "valid", ["ENC-4"]),
         ("length-combining-over-max", "run", base_run(producer={"name": combining, "version": "1"}), "invalid", "invalid", ["ENC-4"]),
+        ("document-depth-65", "run", base_run(ext={"agenteval.deep": deep_object(62)}), "invalid", "invalid",
+         ["ENC-17", "ENC-18"]),
         ("number-underflow-reads-as-zero", "run",
          base_run(judges=[dict(calibrated, calibration=dict(calibrated["calibration"], accuracy=RAW_TINY))]),
          "valid", "valid", ["ENC-3", "ENC-4"]),
@@ -718,7 +723,8 @@ def run_vectors():
     L = lambda i: f"results.ndjson:{i}"
     vec("result-id-mismatch", [[L(4), "result-id"]], ["RES-4"], lines=set_line(3, resultId=result_id(SMALL_ID, "k2", "other")))
     vec("result-id-duplicate", [[L(5), "result-id"]], ["RES-4"], lines=lambda ls: ls + [dict(ls[1])])
-    vec("parent-dangling", [[L(2), "parent"]], ["RES-5"], lines=set_line(1, parentResultId=result_id(SMALL_ID, "k1", "nope")))
+    vec("parent-dangling", [[L(1), "aggregation"], [L(2), "parent"]], ["RES-5", "RES-6"],
+        lines=set_line(1, parentResultId=result_id(SMALL_ID, "k1", "nope")))  # and its parent is a child short
     vec("aggregation-counts", [[L(1), "aggregation"]], ["RES-6"],
         lines=lambda ls: set_line(0, aggregation=dict(ls[0]["aggregation"], unmeasured={"not_measured": 0, "not_applicable": 0, "skipped": 1, "error": 0}))(ls))
     vec("decisive-not-child", [[L(1), "aggregation"]], ["RES-6"],
@@ -793,6 +799,69 @@ def run_vectors():
     vec("interval-inverted", [[L(1), "interval"], ["summary.json", "interval"]], ["RES-10", "SUM-5"],
         lines=set_line(0, uncertainty={"ci": {"low": 0.9, "high": 0.1, "level": 0.95}}),
         summary=lambda s: {**s, "lanes": [{"lane": "main", "metrics": [dict(s["lanes"][0]["metrics"][0], ci={"low": 0.9, "high": 0.1, "level": 0.95})]}]})
+    # RES-8 (R3-3): a rollup against its trial lines; trial lines with no rollup; RES-6: total is the children.
+    TL = lambda trial, state, **kw: dict({"schemaVersion": V, "resultId": result_id(SMALL_ID, "k3", "t", trial), "caseId": "k3",
+                                          "path": "t", "trial": trial, "evaluator": {"id": "code:t"}, "state": state}, **kw)
+    rollup = lambda trials, state="passed", **kw: dict({"schemaVersion": V, "resultId": result_id(SMALL_ID, "k3", "t"), "caseId": "k3",
+                                                        "path": "t", "evaluator": {"id": "code:t"}, "state": state, "trials": trials}, **kw)
+    vec("trials-rollup-contradicts-its-trials", [[L(7), "trials"]], ["RES-8"],
+        lines=lambda ls: ls + [TL(0, "failed", severity="critical"), TL(1, "passed"),
+                               rollup({"n": 5, "passed": 5, "aggregation": "AllPass", "agree": True})])
+    vec("trial-lines-without-rollup", [[L(5), "trials"], [L(6), "trials"]], ["RES-8"],
+        lines=lambda ls: ls + [TL(0, "failed", severity="critical"), TL(1, "passed")])
+    vec("trials-rollup-matches", [], ["RES-8"], outcome="intact",
+        lines=lambda ls: ls + [TL(0, "failed", severity="low"), TL(1, "passed"),
+                               rollup({"n": 2, "passed": 1, "aggregation": "AnyPass", "agree": False})])
+    vec("aggregation-total-not-children", [[L(1), "aggregation"]], ["RES-6"],
+        lines=lambda ls: set_line(0, aggregation=dict(ls[0]["aggregation"], total=3, unmeasured={
+            "not_measured": 1, "not_applicable": 0, "skipped": 0, "error": 0}))(ls))
+    # RES-10 (R3-9): two judge models on one line; one role and model twice.
+    vec("usage-two-judge-models", [], ["RES-10"], outcome="intact",
+        lines=set_line(2, usage=[{"role": "judge", "model": "gpt-5.1", "gen_ai.usage.input_tokens": 5},
+                                 {"role": "judge", "model": "o4-mini", "gen_ai.usage.input_tokens": 7}]))
+    vec("usage-role-and-model-twice", [[L(3), "result-times"]], ["RES-10"],
+        lines=set_line(2, usage=[{"role": "judge", "model": "gpt-5.1", "gen_ai.usage.input_tokens": 5},
+                                 {"role": "judge", "model": "gpt-5.1", "gen_ai.usage.input_tokens": 7}]))
+    # RES-5 (W5a-9): a child without component; a node with children and no aggregation.
+    vec("child-without-component", [[L(2), "component"]], ["RES-5"], lines=set_line(1, component=DROP))
+    vec("composite-without-aggregation", [[L(1), "aggregation"]], ["RES-5"], lines=set_line(0, aggregation=DROP))
+    # RES-8 (W5a-10): every line under a trial's line carries its trial.
+    vec("trial-child-without-trial", [[L(6), "trials"]], ["RES-8"], lines=lambda ls: ls + [
+        TL(0, "passed", aggregation={"strategy": "Min", "threshold": 0.5, "score": 1.0, "rulePath": "threshold", "measured": 1,
+                                     "total": 1, "unmeasured": {"not_measured": 0, "not_applicable": 0, "skipped": 0, "error": 0},
+                                     "decisive": []}),
+        {"schemaVersion": V, "resultId": result_id(SMALL_ID, "k3", "t/x"), "parentResultId": result_id(SMALL_ID, "k3", "t", 0),
+         "caseId": "k3", "path": "t/x", "evaluator": {"id": "code:x"}, "state": "passed", "component": {"weight": 1, "required": True}},
+        rollup({"n": 1, "passed": 1, "aggregation": "AllPass", "agree": True})])
+    # SUM-8 (W5a-13): a producer's aggregate gives a value whenever n is not 0.
+    vec("aggregate-producer-value-null", [["summary.json", "summary"]], ["SUM-8"],
+        summary=lambda s: {**s, "lanes": [{"lane": "main", "metrics": [dict(s["lanes"][0]["metrics"][0], aggregate={"method": "pass@k", "k": 2}, value=None)]}]})
+    # SEC-6 (W5a-15): content on a resource, in a run that keeps none.
+    vec("content-capture-off-resource", [["traces.otlp.jsonl:1", "content-capture"]], ["SEC-6", "RUN-11"],
+        run={"contentCapture": "off"}, lines=lambda ls: [{k: v for k, v in l.items() if k not in ("reasoning", "evidence")} for l in ls],
+        evidence=lambda e: [], remove=["blobs/"],
+        extra={"traces.otlp.jsonl": ndjson_bytes([{"resourceSpans": [{"resource": {"attributes": [
+            {"key": "gen_ai.system_instructions", "value": {"stringValue": "You are the refund agent. Card on file: 4242."}}]},
+            "scopeSpans": [{"scope": {"name": "p"}, "spans": [{"traceId": TRACE, "spanId": SPAN, "name": "invoke_agent a", "kind": 1,
+                                                              "startTimeUnixNano": "1790812810000000000",
+                                                              "endTimeUnixNano": "1790812812000000000"}]}]}]}])})
+    # ENC-17, ENC-18 (R3-1): beyond the depth limit, refused at the file or the line.
+    vec("run-json-depth-65", [["run.json", "limit"]], ["ENC-17", "ENC-18"], run={"ext": {"agenteval.deep": deep_object(62)}})
+    vec("results-line-depth-65", [[L(4), "limit"]], ["ENC-17", "ENC-18"],
+        lines=set_line(3, ext={"agenteval.deep": deep_object(62)}))
+    # RES-6: an absent unmeasured counts as 0 (W3-1).
+    vec("aggregation-without-unmeasured", [[L(1), "aggregation"]], ["RES-6"],
+        lines=lambda ls: set_line(0, aggregation={k: v for k, v in dict(ls[0]["aggregation"], measured=1).items() if k != "unmeasured"})(ls))
+    vec("aggregation-without-unmeasured-all-measured", [], ["RES-6"], outcome="intact",
+        lines=lambda ls: set_line(0, aggregation={k: v for k, v in ls[0]["aggregation"].items() if k != "unmeasured"})(ls))
+    # SUM-9: a lane name twice (W3-2).
+    vec("summary-lane-twice", [["summary.json", "summary-duplicate"]], ["SUM-9", "SUM-3"],
+        summary=lambda s: {**s, "lanes": s["lanes"] + [{"lane": "main", "metrics": []}]})
+    # RUN-14: OTLP/JSON 1.x only; a span under the pre-1.0 name is not read, so the traceLink resolves to nothing.
+    vec("traces-pre-otlp-1-names", [[L(1), "trace-link"]], ["RUN-14"],
+        extra={"traces.otlp.jsonl": ndjson_bytes([{"resourceSpans": [{"resource": {"attributes": []}, "instrumentationLibrarySpans": [
+            {"scope": {"name": "p"}, "spans": [{"traceId": TRACE, "spanId": SPAN, "name": "invoke_agent a", "kind": 1,
+                                                "startTimeUnixNano": "1790812810000000000", "endTimeUnixNano": "1790812812000000000"}]}]}]}])})
     # SUM-9: two entries for one lane, metric and path.
     vec("summary-duplicate", [["summary.json", "summary-duplicate"]], ["SUM-9"],
         summary=lambda s: {**s, "lanes": [{"lane": "main", "metrics": [s["lanes"][0]["metrics"][0], dict(s["lanes"][0]["metrics"][0])]}]})
@@ -845,7 +914,7 @@ def run_vectors():
     vec("run-times", [["run.json", "run-times"]], ["RUN-5"], run={"endedAt": "2025-12-31T23:59:59Z"})
     vec("schema-invalid-line", [[L(4), "schema"]], ["VER-3"], lines=set_line(3, evaluator=DROP))
     vec("time-does-not-exist", [["run.json", "schema"]], ["ENC-8"], run={"startedAt": "2026-02-31T00:00:00Z"})
-    vec("time-leap-day-exists", [], ["ENC-8"], outcome="intact", run={"startedAt": "2028-02-29T23:59:59.999999999Z", "endedAt": "2028-03-01T00:00:00Z"})
+    vec("time-leap-day-exists", [], ["ENC-8"], outcome="intact", run={"startedAt": "2024-02-29T23:59:59.999999999Z", "endedAt": "2024-03-01T00:00:00Z"})  # sealed after it ended
     # A blob whose bytes do not hash to its name (EVD-3): unreferenced, so only blob-digest is wrong.
     wrong_name = h("the name of other bytes")
     vectors.append(("blob-digest", {"extra": {f"blobs/sha256/{wrong_name[:2]}/{wrong_name}": b"these bytes have another hash\n"}},
@@ -1079,6 +1148,17 @@ def seal_vectors(valid):
     expect("other-run-id", [["seal.json", "run-id"]], ["SEAL-6"])
     run = edit_seal("duplicate-subject", lambda s: s["subject"].append(dict(s["subject"][0])))
     expect("duplicate-subject", [[read_json(run / "seal.json")["subject"][0]["name"], "duplicate-subject"]], ["SEAL-6"])
+    events_subject = {"name": "overlays/events.ndjson", "digest": {"sha256": "0" * 64}}
+    edit_seal("duplicate-subject-path", lambda s: s["subject"].extend([dict(events_subject), dict(events_subject)]))
+    expect("duplicate-subject-path", [["overlays/events.ndjson", "duplicate-subject"], ["overlays/events.ndjson", "subject-path"]],
+           ["SEAL-6"])
+    gone = {"name": "ext/gone.txt", "digest": {"sha256": "0" * 64}}
+    edit_seal("duplicate-subject-missing", lambda s: s["subject"].extend([dict(gone), dict(gone)]))
+    expect("duplicate-subject-missing", [["ext/gone.txt", "duplicate-subject"], ["ext/gone.txt", "missing"]], ["SEAL-6"])
+    edit_seal("sealed-before-closed", lambda s: s["predicate"].update(sealedAt="2000-01-01T00:00:00Z"))
+    expect("sealed-before-closed", [["seal.json", "predicate"]], ["SEAL-6", "SEAL-1"])
+    edit_seal("seal-depth-65", lambda s: s["predicate"].update({"agenteval.deep": deep_object(62)}))
+    expect("seal-depth-65", [["seal.json", "limit"]], ["ENC-17", "SEAL-6"])
     edit_seal("predicate-differs", lambda s: s["predicate"]["subject"].update(version="git:good"), "completed-eval")
     expect("predicate-differs", [["seal.json", "predicate"]], ["SEAL-6"])
     run = copy("seal-duplicate-member")
@@ -1159,6 +1239,18 @@ def chain_vectors(valid):
 
     copy("intact")
     expect("intact", [], ["OVL-4", "OVL-5"])
+
+    # ENC-17 (R3-1): a batch seal beyond the limits is refused and ends the verified prefix; an events line beyond them
+    # is a single event's problem.
+    run = copy("batch-seal-depth-65")
+    edit_seal(run, 2, lambda s: s["predicate"].update({"agenteval.deep": deep_object(62)}))
+    expect("batch-seal-depth-65", [["overlays/events.ndjson", "uncovered"], ["overlays/seal-0002.json", "limit"]],
+           ["ENC-17", "OVL-5"])
+    run = copy("events-line-depth-65")
+    events = run / "overlays" / "events.ndjson"
+    events.write_bytes(events.read_bytes() + ndjson_bytes([{"x": deep_object(63)}]))
+    expect("events-line-depth-65", [["overlays/events.ndjson", "uncovered"], ["overlays/events.ndjson:3", "limit"]],
+           ["ENC-17", "ENC-18", "OVL-5"])
 
     run = copy("altered-batch")
     events = run / "overlays" / "events.ndjson"

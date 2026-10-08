@@ -1,0 +1,4 @@
+{"schemaVersion":"1.0","resultId":"r_6b9e3a00e4fd044b65a2d3928a1aeade","caseId":"k1","path":"q","evaluator":{"id":"e:q"},"state":"scored","scores":[{"metric":"quality","value":0.3}]}
+{"schemaVersion":"1.0","resultId":"r_88b88bb89e4b69758feb97add2f4ae1a","caseId":"k2","path":"q","evaluator":{"id":"e:q"},"state":"scored","scores":[{"metric":"quality","value":0.6}]}
+{"schemaVersion":"1.0","resultId":"r_1c4d8c744413dd95c93bd75f123b2546","caseId":"k3","path":"q","evaluator":{"id":"e:q"},"state":"passed","scores":[{"metric":"quality","value":0.9}]}
+{"schemaVersion":"1.0","resultId":"r_d9e5cd9b0633d065702e549ff88f01da","caseId":"k4","path":"q","evaluator":{"id":"e:q"},"state":"scored","scores":[{"metric":"latency","value":300}]}

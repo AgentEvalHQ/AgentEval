@@ -24,15 +24,23 @@ older output directory (`.agenteval/`, "AgentEval store v1", which predates AEF;
 
 ## Two implementations
 
-Every expected result in the corpus is written down by hand, independently of the code that checks it, and checked
-by two implementations:
+Every expected result in the corpus is written down independently of the code that checks it: by hand, or by a
+generator in `tools/` that implements only the rule it writes (a seal, a result id), and cross-checked by a second,
+independent implementation ([§9.2](1/spec/09-conformance.md#92-the-corpus)). Two implementations, written apart from
+each other, pass every vector kind through the command-line contract of
+[§9.3](1/spec/09-conformance.md#93-running-the-corpus):
 
-- **The Python reference tools here** check all of it. `aef_verify.py` was written from the specification alone, by
-  someone who had not seen the corpus generators.
-- **AgentEval's .NET library** (`src/AgentEval.Results`) implements the decision function, the checkpoint manifest
-  checks and the runner stream verifier. Its contract tests (`tests/AgentEval.Tests/Contracts/`) also check the
-  schemas, seals and overlay chains, in test code. The rest (writing and sealing runs, lane evaluation, signatures,
-  the rules across files) comes with AgentEval's dedicated AEF component.
+- **The Python reference tools here.** `aef_verify.py` was written from the specification alone, by someone who had
+  not seen the corpus generators.
+- **AgentEval's .NET library** (`src/AgentEval.Results` in the AgentEval repository), written from the text alone.
+  Its driver (`tests/AgentEval.Results.Conformance/`, run by `run-corpus.sh`) covers every operation of the contract:
+  runs, seals, overlay chains and views, signatures, checkpoints and lanes, the decision function, documents and
+  plans, matching, streams and plan conformance. Where the two implementations disagreed, the text was ruled and a
+  vector added ([changelog](1/CHANGELOG.md)).
+
+Every operation of the contract checks what it is given; none writes. AgentEval's run writer, sealer and overlay
+writer are checked outside the contract, by the reference verifier reading what they write
+(`tests/AgentEval.Results.Conformance/writer-crosscheck.sh`).
 
 A third implementation, in any language, is welcome: [§9](1/spec/09-conformance.md) says how to run the corpus and
 claim conformance.

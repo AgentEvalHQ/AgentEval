@@ -1,0 +1,3 @@
+{"schemaVersion":"1.0","resultId":"r_7a16ff5c17504e6b7137370dd56aca82","caseId":"k1","path":"q","evaluator":{"id":"e:q"},"state":"scored","scores":[{"metric":"delta","value":1e+20}]}
+{"schemaVersion":"1.0","resultId":"r_6f054718d5875ac438ad2e5eb539c34a","caseId":"k2","path":"q","evaluator":{"id":"e:q"},"state":"scored","scores":[{"metric":"delta","value":1}]}
+{"schemaVersion":"1.0","resultId":"r_f2271b4a9e6cdcda295e9750b9452959","caseId":"k3","path":"q","evaluator":{"id":"e:q"},"state":"scored","scores":[{"metric":"delta","value":-1e+20}]}

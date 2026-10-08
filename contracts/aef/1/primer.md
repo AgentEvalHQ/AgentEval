@@ -83,7 +83,9 @@ Three ideas carry most of the format:
 - **Ids are computed, not invented.** `resultId` is a hash of the run id, case id, path and trial, so the same run read
   twice gives the same ids ([RES-4]).
 - **Aggregation is descriptive.** A composite records how the producer reached its state (`strategy`, `rulePath`, the
-  `decisive` children). AEF does not define the formula, and a reader never recomputes it ([RES-6]).
+  `decisive` children), and each child its `component` (weight, required) ([RES-5]). AEF does not define the formula,
+  and a reader never recomputes it; a verifier checks only the structure, such as `total` being the number of
+  children ([RES-6]).
 
 ### `summary.json`: defined exactly
 
@@ -96,7 +98,9 @@ N = 6 lines, n = 2 measured, notMeasured = 4, sum = 1.33, value = 1.33 / 2 = 0.6
 ```
 
 The `groundedness` entry has `N = 0`: its only line is `not_applicable`, which is left out. Its value is `null` and its
-verdict `not_measured`: nothing measured is never a pass ([SUM-6]). A verifier recomputes every entry.
+verdict `not_measured`: nothing measured is never a pass ([SUM-6]). A verifier recomputes every entry. The one
+exception is the `value` of an entry whose `aggregate` AEF does not define (pass@k, F1): it is the producer's, shown as
+written, and no lane reads it ([SUM-8]).
 
 ## 2. Sealing: the evidence is the evidence
 
@@ -115,7 +119,8 @@ cd5980b5…9ef87  810  metrics.json
 
 The SHA-256 of that text is the **run hash**: it identifies this run's exact content ([SEAL-4]). `seal.json` is an
 [in-toto](https://github.com/in-toto/attestation) Statement whose subjects are the files and whose predicate repeats
-the run hash with the header facts ([SEAL-5]). The full manifest is in
+the run hash with the header facts; a seal dated before the run closed is reported as a `predicate` problem
+([SEAL-5], [SEAL-6]). The full manifest is in
 [`conformance/seal-vectors/completed-eval/expected-manifest.txt`](conformance/seal-vectors/completed-eval/expected-manifest.txt).
 
 There is no canonical JSON: files are sealed as they are. The blob in this run holds non-ASCII text and a CRLF on
@@ -136,8 +141,9 @@ flowchart LR
 - **Signed.** `attestation.dsse.json` is a [DSSE](https://github.com/secure-systems-lab/dsse) envelope over the exact
   bytes of `seal.json`. Verifiers must support both ECDSA P-256 and Ed25519 ([SIG-2]). Which keys to trust is
   the verifier's input, never something the run says about itself ([SIG-4]).
-- **Anchored.** A signed checkpoint that lists this run with its run hash anchors it: someone cannot later substitute a
-  different run with the same id ([SIG-8]).
+- **Anchored.** A checkpoint that verifies, signed by an identity the verifier trusts, anchors every run it lists with
+  its run hash: someone cannot later substitute a different run with the same id ([SIG-8], [CKP-9]). A transparency
+  log or a list of run hashes the verifier trusts anchors a run the same way ([§4.5](spec/04-integrity.md#45-verification-outcomes)).
 
 [§8](spec/08-security.md) lists the threats each level does and does not address.
 
@@ -182,30 +188,89 @@ flowchart TB
   D --> O[approved / approved with exceptions / blocked / inconclusive / expired]
 ```
 
-1. **Each lane names its rule and its exact runs, by run hash** ([CKP-2]). A run changed after the checkpoint was made
-   is still found by its seal's run hash, and reported as not intact, so its evidence no longer counts ([CKP-8]).
-2. **A lane's result is a function of its sealed runs** ([§5.3](spec/05-checkpoints.md)). A `threshold` reads a summary
-   entry. A `severity` rule looks at every failure, and a failure without a severity counts as critical. An
+1. **Each lane names its rule and its exact runs, by run hash** ([CKP-2]). A run whose files changed after sealing is
+   still found by the run hash its seal records, and reported as not intact (`run-unverified`), so its evidence no
+   longer counts. A run sealed again has another run hash and is not found (`run-missing`) ([CKP-8]).
+2. **A lane's result is a function of its sealed runs** ([§5.3](spec/05-checkpoints.md#53-lane-evaluation)). A
+   `threshold` reads a summary entry. A `severity` rule fails when any failure (a `failed` or `warn` line, a single
+   failing trial included) is worse than its maximum, and a failure without a severity counts as critical; its counts
+   of what was measured take a case's rollup line, not its trials ([LANE-3]). An
    `evidence-present` rule counts eligible runs. A `comparison` runs an exact one-sided sign test against one baseline
-   run, and refuses to compare runs that differ on the axes it names (judges, rubrics, target mode…). Only intact,
-   completed, `live` runs are eligible.
-3. **The decision function turns lane results into an outcome** ([§5.4](spec/05-checkpoints.md)). Missing evidence is
-   never converted into a pass, a failed blocking lane blocks, stale evidence expires the checkpoint, and nothing is
-   averaged. Its input and output are recorded in the manifest, so anyone can recompute it.
-4. **A decided checkpoint is signed** ([CKP-5]); verified, it anchors every run it names.
+   run, and gives `incomparable` for runs that differ on the axes it names (judges, rubrics, target mode…). Only
+   intact, completed, `live` runs of the checkpoint's subject (and of its deployment and the rule's suite, when they
+   are named) are eligible ([LANE-1]).
+3. **The decision function turns lane results into an outcome** ([§5.4](spec/05-checkpoints.md#54-the-decision-function)).
+   Missing evidence is never converted into a pass, a failed blocking lane blocks unless an exception accepts it
+   (below), stale evidence expires the checkpoint, and nothing is averaged. Its input and output are recorded in the
+   manifest, so anyone can recompute it.
+4. **A decided checkpoint never changes, and is signed**: an unsigned one is a claim anyone could have written
+   ([CKP-5]). One that verifies, with a signature verified for a trusted identity, anchors every run it names
+   ([CKP-9]).
 
 [`conformance/checkpoints/valid-decided/document.json`](conformance/checkpoints/valid-decided/document.json) is a
 complete example: two lanes passed and the advisory memory lane has no evidence yet, so the outcome is
 `inconclusive`.
 
+### Exceptions: shipping with a known failure
+
+Sometimes a release goes out with a failure someone has read and accepted. The checkpoint records that as an
+**exception** in its decision input ([DEC-1]). In
+[`conformance/checkpoints/valid-decided-with-exceptions/document.json`](conformance/checkpoints/valid-decided-with-exceptions/document.json),
+the security lane (`severity`, nothing above `low`) failed on runs R-921 and R-930, and the exception names exactly
+those runs, by run hash:
+
+```json
+{"lane": "security", "evidence": ["bbbb…", "cccc…"], "requirement": "REQ-15",
+ "reason": "A medium-severity prompt-injection finding is accepted until the 3.2.1 patch; tracked in the release review.",
+ "by": {"identity": "oidc:https://login.example.com/u-7f3a", "assurance": "authenticated"},
+ "at": "2026-10-02T14:00:00Z", "expires": "2026-10-16T00:00:00Z"}
+```
+
+The lane is `waived` instead of `failed`, and the outcome is `approved_with_exceptions`, never plain `approved`
+([DEC-2], [DEC-3]). An exception accepts that evidence; it is not a rule for the future:
+
+- **Only the evidence it names.** It waives the lane only when its `evidence` is the same set of run hashes as the
+  lane's. A re-run has new run hashes, so the same exception in the checkpoint that relies on the re-run does not
+  accept its failure: the lane stays `failed`, with the reason `exception-other-evidence:security`.
+- **Only until it expires.** It is in force from `at` until `expires`. A reader that shows the checkpoint later
+  evaluates the decision again at the time of reading ([CKP-10]). Once the exception has expired, the lane is `failed`
+  again and the checkpoint reads as `blocked`, or as `expired` if its evidence has also aged past its freshness.
+- **Only a failure.** A `missing`, `stale`, `not_measured` or `incomparable` lane cannot be waived: nothing measured
+  says what would be accepted.
+
+`by` is a claim; the checkpoint's signature is what makes the exception attributable ([DEC-1], [CKP-5]). A
+checkpoint verifier reports an exception that names a run hash outside its lane's runs (`exception-evidence`,
+[CKP-7]). An overlay `waive` (§3 above) is something else: a note on one run, which changes no lane result or decision
+([OVL-7]).
+
 ## 5. Runners
 
 When an evaluation is delegated, the delegating side writes a **run plan** (what to evaluate, the budget, the
 limits, credentials only as references) and the runner publishes a **manifest** (what it can run). A runner reports an
-**event stream**: `job.accepted` (or `job.refused`), `plan.estimated`, `spend.updated`, `case.completed`,
-`lane.completed`, `evidence.produced` for each sealed run, and one terminal event (`job.sealed`, `job.failed`,
-`job.cancelled`). A stream verifier checks the stream
-against the plan: budget kept, limits kept, every announced run sealed ([§6](spec/06-runners.md)).
+**event stream**: `job.accepted` (or `job.refused`, which ends the job), `plan.estimated`, `spend.updated`,
+`case.completed`, `lane.completed`, `evidence.produced` for each sealed run, and one terminal event (`job.sealed`,
+`job.failed`, `job.cancelled`). A stream verifier checks the stream against the plan and the digest of its bytes:
+budget kept, limits kept, every announced run sealed ([STRM-3]).
+
+### Plan conformance: the runs themselves
+
+The stream is the runner's own report. Given also the runs the job produced, a stream verifier opens each run that
+`job.sealed` or `job.failed` names and checks it against the plan ([STRM-4]). It reports each problem at
+`run:<runId>`, or at `job` for a limit of the whole job:
+
+| The run must be | Code when it is not |
+|---|---|
+| the one announced: the run hash of its first `evidence.produced`, and intact | `run-missing`, `run-hash` |
+| made by this job: its `provenance` names the plan, the plan's digest, the job and the runner | `provenance` |
+| of what the plan asked: its subject and version, one of its suites, and its judges and deployment or endpoint when it names them | `subject`, `suite`, `judges`, `deployment` |
+| run as the plan asked: `live`, with the plan's content capture | `target-mode`, `content-capture` |
+| made during the job: started no earlier than `job.accepted`, ended no later than the terminal event | `time` |
+| within the plan's limits: each run states its cost, and the cost and the distinct cases of all the job's runs together stay within them | `no-cost`, `over-budget`, `over-cases` |
+
+Counting over the whole job means a runner cannot stay under a limit by splitting its work across runs. A run that
+started before the job was accepted is evidence the runner already had: adopted, not produced, and a plan does not
+authorize adopting runs. The vectors, including the cases a plausible wrong implementation gets wrong, are in
+[`conformance/protocol/plan-conformance/`](conformance/protocol/plan-conformance/).
 
 ## 6. Reading tolerantly, writing strictly
 
@@ -224,7 +289,7 @@ The reference tools are standard-library Python in [`../tools/`](../tools/):
 | `aef_verify.py run DIR` | verifies a run: encoding, schemas, the rules across files, the seal; prints the outcome and every problem |
 | `aef_verify.py lanes CHECKPOINT --runs DIR` | recomputes a checkpoint's lane results from its runs |
 | `aef_decide.py` | the decision function |
-| `aef_stream.py` | the stream verifier |
+| `aef_stream.py` | the stream verifier, plan matching, and plan conformance (`--conform`) |
 | `aef_conformance.py` | runs the conformance corpus against the reference verifier, or against your implementation |
 | `aef_schema.py` | a JSON Schema validator with the portable pattern semantics AEF requires |
 | `aef_crypto.py` | DSSE, ECDSA P-256 and Ed25519 |
@@ -238,5 +303,6 @@ every rule a file can show broken (`tools/check_spec.py` lists the few rules no 
 
 - [The specification](spec/01-introduction.md), starting with the conformance classes in §1.7.
 - [Rationale and FAQ](rationale.md): why AEF made the choices it did.
-- [Interoperability](interop/): how AEF maps to OpenTelemetry, Inspect, OpenAI Evals and EvalPort.
+- [Interoperability](interop/): how AEF maps to OpenTelemetry, Inspect, OpenAI Evals, EvalPort and ASSERT, and how
+  its seals relate to in-toto, DSSE and SLSA.
 - [Field reference](reference/): every field, generated from the schemas.

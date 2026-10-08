@@ -77,10 +77,10 @@
           "description": "The runId of the run the events belong to (OVL-4)."
         },
         "batch": {
-          "description": "1-based; seal-0001.json is batch 1.",
+          "description": "1-based; seal-0001.json is batch 1 (at most 9,999: four digits, OVL-4).",
           "type": "integer",
           "minimum": 1,
-          "maximum": 9007199254740991
+          "maximum": 9999
         },
         "offset": {
           "description": "Where the batch starts in overlays/events.ndjson, in bytes.",

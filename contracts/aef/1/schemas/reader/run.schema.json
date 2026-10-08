@@ -536,6 +536,29 @@
           ]
         }
       }
+    },
+    {
+      "description": "Only an aborted run has an abortReason (RUN-5).",
+      "if": {
+        "properties": {
+          "status": {
+            "enum": [
+              "running",
+              "completed"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "not": {
+          "required": [
+            "abortReason"
+          ]
+        }
+      }
     }
   ]
 }

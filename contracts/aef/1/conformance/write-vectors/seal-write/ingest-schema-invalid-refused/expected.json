@@ -1,0 +1,13 @@
+{
+  "kind": "seal-write",
+  "rules": [
+    "SEAL-1",
+    "RUN-10",
+    "ENC-16"
+  ],
+  "run": "run",
+  "sealedBy": "ingest",
+  "sealedAt": "2026-10-08T09:00:00Z",
+  "refused": true,
+  "why": "Sealed on custody (ingest), a run is sealed only when its files are valid against the reader schemas; the reader run schema refuses this run.json (a deployment endpoint with a query string, RUN-10). The sealer refuses (exit status 2) and writes nothing."
+}

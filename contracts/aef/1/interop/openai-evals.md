@@ -77,8 +77,8 @@ A run has no status field, and a sample has no state beyond `match.correct`.
 | `endedAt` of the line | the events' `created_at` | exact |
 | `path`, `resultId` | `data` of the event | none: no reader of the format looks there |
 | evidence `input`, `output` (capture `on`) | a `sampling` event's `prompt` and `sampled` | exact when captured |
-| `usage` entry with `role: agent` | `sampling.data.usage` (`prompt_tokens`, `completion_tokens`) | lossy: cache and reasoning tokens, and other roles, have no field |
-| `summary.json` | `final_report` | lossy: N, n, verdicts and intervals are lost |
+| `usage` entry with `role: agent` | `sampling.data.usage` (`prompt_tokens`, `completion_tokens`), and its `model` as `sampling.data.model` | lossy: cache and reasoning tokens, and other roles, have no field |
+| `summary.json` | `final_report` | lossy: N, n, verdicts, intervals and the run's `usage` are lost |
 | the result tree, severity, judges, other evidence, gates, seal, overlays | none | none |
 
 ## The open-source log → AEF
@@ -103,14 +103,14 @@ version when the converter knows it), and lists in `imported.asserted` each `run
 | each event's `created_at` | `endedAt` of the line it becomes | exact |
 | `event_id` | none | none |
 | `sampling.prompt`, `sampling.sampled`; `match.expected` | blobs cited by evidence of kind `input`, `output`, `expected` ([EVD-1](../spec/03-run.md#37-evidencendjson-and-blobs)), only with `contentCapture: on` ([RUN-11](../spec/03-run.md#32-runjson)) | exact when captured |
-| `sampling.usage` | a `usage` entry with `role: agent` | exact for input and output tokens |
+| `sampling.usage`, `sampling.model` | a `usage` entry with `role: agent` and that `model` ([RES-10](../spec/03-run.md#345-facts-about-a-result)) | exact for input and output tokens |
 | `function_call` | evidence of kind `tool_call` (capture `on`) | exact when captured |
 | `cond_logp`, `pick_option`, `embedding`, `raw_sample`, `extra` | `ext` | none |
 | `final_report.accuracy` | a summary entry for a metric of kind `rate`, which the verifier recomputes from the `match` lines ([SUM-5](../spec/03-run.md#36-summaryjson)) | exact |
 | `final_report.boostrap_std` | the entry's `stderr` | lossy: a bootstrap estimate under another name |
-| other `final_report` keys (`f1_score`) | a summary entry with `aggregate` (`method: f1`), whose value the verifier does not recompute | exact |
-| (no pass rule for a metric) | the summary entry's `verdict` | none: see [Still open](#still-open) |
-| (no run status) | `status: completed` when `final_report` is present, else `aborted` | lossy |
+| other `final_report` keys (`f1_score`) | a summary entry with `aggregate` (`method: f1`), whose value the verifier does not recompute and no lane reads ([SUM-8](../spec/03-run.md#36-summaryjson)) | exact |
+| (no pass rule for a metric) | the summary entry's `verdict: scored`, and no `rule`: measured, no rule applied ([SUM-6](../spec/03-run.md#36-summaryjson)) | exact |
+| (no run status) | `status: completed` when `final_report` is present, else `aborted`, with an `abortReason` saying the log has no final report ([RUN-5](../spec/03-run.md#32-runjson)) | lossy |
 
 ## AEF → the hosted API
 
@@ -135,9 +135,9 @@ states, typed absences, judges, tree or seal travels.
 | `label_model` labels | `scores[].label` | exact |
 | the graders' `model` | `judges[].model` | exact |
 | `report_url` | an evidence record with a URI link | exact |
-| `per_testing_criteria_results` | summary entries of kind `rate`, which the verifier recomputes from the child lines | exact for the counts; the entry's `verdict` has no source (see [Still open](#still-open)) |
+| `per_testing_criteria_results` | summary entries of kind `rate`, which the verifier recomputes from the child lines; `verdict: scored`, since a grader's `pass_threshold` decides each item and no rule decides the run's rate ([SUM-6](../spec/03-run.md#36-summaryjson)) | exact |
 | `result_counts.errored` | lines in state `error` | exact |
-| `per_model_usage` | none | none: `summary.json` has no token totals |
+| `per_model_usage` | `summary.json` `usage`: one entry per model, `role: agent` for the run's `model` and `judge` for a grader's; `prompt_tokens`, `completion_tokens` and `cached_tokens` named as for `sample.usage` below ([SUM-7](../spec/03-run.md#36-summaryjson)) | lossy: `invocation_count` has no field, and a model that both answered and graded cannot be split between the two roles |
 | output item `datasource_item_id` | `caseId` (as a string) | exact |
 | output item `status` `pass` / `fail`; `sample.error` set | a root line in `passed` / `failed`; `error` | exact |
 | output item `created_at` | `endedAt` of the root | lossy: the schema's description of this field is ambiguous |
@@ -145,7 +145,7 @@ states, typed absences, judges, tree or seal travels.
 | (how an item's status follows from its graders) | `aggregation` on the root | lossy: OpenAI does not document the rule; the example below records `Min` |
 | `results[].sample` (the grader's own output) | a `reasoning` blob (capture `on`) | exact when captured |
 | `sample.input`, `sample.output`, `datasource_item` | blobs cited by evidence of kind `input`, `output`, `expected` (capture `on`) | exact when captured |
-| `sample.usage` | a `usage` entry on the root: `prompt_tokens` → `gen_ai.usage.input_tokens`, `completion_tokens` → `output_tokens`, `cached_tokens` → `cache_read.input_tokens`, `role: agent` | exact |
+| `sample.usage`, `sample.model` | a `usage` entry on the root: `prompt_tokens` → `gen_ai.usage.input_tokens`, `completion_tokens` → `output_tokens`, `cached_tokens` → `cache_read.input_tokens`, `role: agent`, and `model` ([RES-10](../spec/03-run.md#345-facts-about-a-result)) | exact |
 | `sample.temperature`, `top_p`, `seed`, `max_completion_tokens`, `finish_reason` | `ext` | none: `config` is run-level |
 
 ## What does not carry over
@@ -154,9 +154,9 @@ states, typed absences, judges, tree or seal travels.
 severity, judges, evidence other than the case content, gate decisions, the seal and overlays. In the hosted API:
 everything AEF graded, because the API grades runs itself.
 
-**OpenAI Evals → AEF.** Run-level usage per model (`per_model_usage`): `summary.json` has the run's cost and no token
-totals. Per-item sampling parameters. `event_id`. The open-source framework's own version, which its logs do not
-record. A pass rule for `final_report` keys other than accuracy.
+**OpenAI Evals → AEF.** The number of calls per model (`invocation_count`), and the split of a model's tokens between
+answering and grading when one model did both. Per-item sampling parameters. `event_id`. The open-source framework's
+own version, which its logs do not record.
 
 ## Worked examples
 
@@ -189,19 +189,11 @@ The output item in OpenAI's own OpenAPI example (`EvalRunOutputItem`):
 
 It becomes a root line and one child line in a run whose `runId` is the item's `run_id`. Both are valid against the
 writer schema, and both ids are RES-4 hashes of that run id, case `137` and the path. The usage, cached tokens
-included, becomes the root's `usage` entry. `Min`, the component's weight and `required` are the importer's reading,
+included, becomes the root's `usage` entry, with the sample's model. `Min`, the component's weight and `required` are the importer's reading,
 because OpenAI does not document how an item's status follows from its graders. The sampling parameters go to `ext`
 (not shown):
 
 ```jsonl
-{"schemaVersion":"1.0","resultId":"r_2df32507b8f62ab0e259c92d6fff6628","parentResultId":null,"caseId":"137","path":"output_item","evaluator":{"id":"openai:eval_67abd54d9b0081909a86353f6fb9317a"},"state":"passed","aggregation":{"strategy":"Min","rulePath":"threshold","measured":1,"total":1},"usage":[{"role":"agent","gen_ai.usage.input_tokens":519,"gen_ai.usage.output_tokens":2,"gen_ai.usage.cache_read.input_tokens":0}]}
+{"schemaVersion":"1.0","resultId":"r_2df32507b8f62ab0e259c92d6fff6628","parentResultId":null,"caseId":"137","path":"output_item","evaluator":{"id":"openai:eval_67abd54d9b0081909a86353f6fb9317a"},"state":"passed","aggregation":{"strategy":"Min","rulePath":"threshold","measured":1,"total":1},"usage":[{"role":"agent","model":"gpt-6-astra","gen_ai.usage.input_tokens":519,"gen_ai.usage.output_tokens":2,"gen_ai.usage.cache_read.input_tokens":0}]}
 {"schemaVersion":"1.0","resultId":"r_38b7751f11a7b7e5e5bfad37e1a79f44","parentResultId":"r_2df32507b8f62ab0e259c92d6fff6628","caseId":"137","path":"output_item/String Check Grader","evaluator":{"id":"openai:string-check-grader"},"state":"passed","scores":[{"metric":"String Check Grader","value":1.0}],"annotator":{"kind":"CODE"},"component":{"weight":1,"required":true}}
 ```
-
-## Still open
-
-- **A summary entry for a metric with no rule.** An F1 from `final_report`, or a hosted grader's pass rate, has no
-  run-level pass rule. A `summary.json` entry needs a `verdict`, and none of its values (`passed`,
-  `failed`, `warn`, `inconclusive`, `not_measured`; [SUM-6](../spec/03-run.md#36-summaryjson)) means "no rule was
-  applied". A converter can keep such a metric on the result lines (`scored`) and write no summary entry for it.
-- **Run-level token usage** (`per_model_usage`): `summary.json` has the run's cost and no token totals.

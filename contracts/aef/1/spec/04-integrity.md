@@ -11,7 +11,9 @@ text and a CRLF inside a sealed blob to prove it.
 
 - **[SEAL-1] The sealed files** are every file in the run folder except `seal.json`, `attestation.dsse.json` and
   everything under `overlays/`. Only a closed run is sealed. A host that seals a run on taking custody of it
-  (`sealedBy: ingest`) seals only a run whose files are valid against the reader schemas.
+  (`sealedBy: ingest`) seals only a run whose paths keep [RUN-3] and whose files are valid against the reader
+  schemas, as received: its seal shows the run was not changed afterwards, and the rules of §3.9 still judge it. A
+  producer **SHOULD NOT** seal a run with problems.
 - **[SEAL-2]** Each file's digest is the SHA-256 of its exact bytes.
 - **[SEAL-3] The manifest** has one line per sealed file, ordered by the UTF-8 bytes of its path (`/` separators; so
   `ext/Z` before `ext/a-b` before `ext/a.b` before `ext/a/b`):
@@ -38,15 +40,16 @@ text and a CRLF inside a sealed blob to prove it.
   | Code | Path | When |
   |---|---|---|
   | `seal-invalid` | `seal.json` | it is not valid against the reader seal schema, or not an I-JSON document |
-  | `duplicate-subject` | the subject's name | a subject listed more than once (its digests are not compared) |
+  | `duplicate-subject` | the subject's name | a subject listed more than once (its digests are not compared; every other code whose condition holds for it is reported too) |
   | `subject-path` | the subject's name | a subject that names `seal.json`, `attestation.dsse.json` or a file under `overlays/` |
   | `digest` | the file | a sealed file whose bytes changed |
   | `not-sealed` | the file | a file present but not sealed |
-  | `missing` | the file | a sealed file that is gone, and no authorized redaction withholds it ([OVL-10]) |
+  | `missing` | the file | a sealed file that is gone, or is no longer a regular file ([RUN-3]), and no authorized redaction withholds it ([OVL-10]) |
+  | `limit` | `seal.json` | a seal beyond the limits of [ENC-17], refused: it is not checked further, the run is not intact, and its run hash is the recomputed one ([SEAL-4]) |
   | `withheld` | the file | a sealed blob that is gone, withheld by an authorized redaction ([OVL-10]) |
   | `run-hash` | `seal.json` | every file matches its subject, but the recomputed run hash is not `predicate.runHash` |
   | `run-id` | `seal.json` | `predicate.runId` is not `run.json`'s |
-  | `predicate` | `seal.json` | the predicate differs from `run.json` (times compared as times, [ENC-8]: `…:02Z` equals `…:02.000Z`) about the producer (name, version), subject (ref, version), deployment (ref), suite (ref, version, digest), judges (model, rubric digest, in order), or `closedAt` |
+  | `predicate` | `seal.json` | the predicate differs from `run.json` (times compared as times, [ENC-8]: `…:02Z` equals `…:02.000Z`) about the producer (name, version), subject (ref, version), deployment (ref), suite (ref, version, digest), judges (model, rubric digest, in order), or `closedAt`; or a `sealedAt` earlier than `closedAt` ([SEAL-1]: only a closed run is sealed) |
   | `run-open` | `run.json` | `run.json` says `running` |
 
   A seal **verifies** when there are no problems other than `withheld`. A run with no `seal.json` is **unsealed**:
@@ -69,13 +72,17 @@ What is added to a run after it closed: approvals, rejections, waivers, adjudica
   | `redact` | a blob of the run (its SHA-256), with a `reason` | the blob is withheld (§4.3) |
 
 - **[OVL-2]** An event's `target.run` is the run's own `runId`, and its `target.runHash`, when present, is the run's
-  run hash. An overlay never targets anything outside its run.
+  run hash. An overlay never targets anything outside its run. When `run.json` or `results.ndjson` does not read (it is missing, or is not an I-JSON document within the
+  limits: an `encoding` or `limit` problem), the
+  checks that need it (`run-id`, `predicate`, `run-open`, `target`) are not made: the run is invalid anyway.
 - **[OVL-3]** `by.assurance` is what the writer **claims**: `self-attested`, `signed` or `authenticated`. Anyone who can
   append to the file can write any of them. A reader shows `signed` only when the batch holding the event has a
   signature that verifies against its trust policy (§4.4) for that identity, `authenticated` only for an event it
-  received from a host it trusts, and otherwise `self-attested`, saying the claim was not verified.
+  received from a host it trusts, and otherwise `self-attested`, saying the claim was not verified. A batch's signature
+  covers every event in the batch, including events someone else appended and left unsealed: a signer **MUST** read
+  the events it is about to seal before it signs, since its signature vouches for all of them.
 - **[OVL-4] Batches.** Events are sealed in batches. Batch *n* is the bytes of the events appended since batch *n*−1:
-  whole lines, at `offset` with `length`. `overlays/seal-<nnnn>.json` (1-based, four digits) is an in-toto Statement v1
+  whole lines, at `offset` with `length`. `overlays/seal-<nnnn>.json` (1-based, four digits: at most 9,999 batches) is an in-toto Statement v1
   with `predicateType` `https://agenteval.dev/aef/1/overlay-batch`, whose subject is `overlays/events.ndjson` with the
   SHA-256 of the batch's bytes, and whose predicate holds `batch` (its number), the `runId`, the **`runHash` of the run
   it was appended to**, `offset`, `length`, and `previous` (the previous seal file's name and the SHA-256 of its bytes;
@@ -97,7 +104,8 @@ What is added to a run after it closed: approvals, rejections, waivers, adjudica
   | `batch-number` | a predicate `batch` that is not the file's number |
   | `run-id` | another `runId` |
   | `run-hash` | a `runHash` that is not the run's run hash |
-  | `offset` | an `offset` that does not continue the previous batch (not checked after a missing seal) |
+  | `offset` | an `offset` that does not continue the previous batch (not checked after a missing or invalid seal) |
+  | `limit` | a batch seal, or (at `overlays/events.ndjson:<line>`) an events line, beyond the limits of [ENC-17], refused. A refused batch seal ends the verified prefix; a refused line is a single event's problem |
   | `line-boundary` | a range that does not start and end on a line boundary inside the file |
   | `batch-digest` | bytes that no longer match the batch digest |
   | `previous` | a `previous` that does not name the previous seal file and the SHA-256 of its bytes, including when that file is missing |
@@ -118,8 +126,8 @@ What is added to a run after it closed: approvals, rejections, waivers, adjudica
 
 An overlay never changes a sealed file. A reader that shows a run with its overlays shows the **effective view**,
 computed from the events of the **verified batches**: batch 1 and each following batch, up to the first batch with a
-problem of [OVL-5] about the batch itself (any code but `event-invalid`, `event-id` and `target`, which concern
-single events): that batch and every later one have no effect, even if they verify on their own. Within
+problem of [OVL-5] about the batch itself (any code but `event-invalid`, `event-id`, `target` and a line's
+`limit`, which concern single events): that batch and every later one have no effect, even if they verify on their own. Within
 them, an event reported as `event-invalid`, as `target`, or as `event-id` (the later of two events with one id) has
 no effect either. Events after the last verified batch are shown as unsealed and have no effect:
 
@@ -144,7 +152,7 @@ no effect either. Events after the last verified batch are shown as unsealed and
 
 - **[SIG-1] Envelopes.** A signature is a DSSE v1 envelope ([DSSE]): `payloadType`, `payload` (base64 of the signed
   bytes), and `signatures` (at least one, each a `keyid` and a base64 `sig`). An envelope is `malformed` when it is not
-  an I-JSON object ([ENC-2]); when `payloadType` or `payload` is absent or not a string; when `payload` is not base64;
+  an I-JSON object within the limits of [ENC-17] (56 MiB); when `payloadType` or `payload` is absent or not a string; when `payload` is not base64;
   when `signatures` is absent, not an array or empty; or when an entry of it is not an object, has no `sig`, a `sig`
   that is not a base64 string, or a `keyid` that is present but neither a string nor `null` (`null` reads as absent,
   as DSSE's JSON mapping says). Members DSSE does not define are ignored. Base64 is written in the standard alphabet with padding. A reader accepts either alphabet, the
@@ -180,7 +188,8 @@ no effect either. Events after the last verified batch are shown as unsealed and
   gives `unsupported-algorithm` for a signature it would check, which counts as not verified.
 - **[SIG-3] Key ids.** `keyid` is `sha256:` and the hex SHA-256 of the public key's DER-encoded SubjectPublicKeyInfo,
   the bytes the trust policy's PEM holds, as given (never re-encoded). The PEM is RFC 7468's strict form: the line
-  `-----BEGIN PUBLIC KEY-----`, lines of base64 (standard alphabet, with padding) and nothing else, the line
+  `-----BEGIN PUBLIC KEY-----`, lines of base64 (standard alphabet, with padding) and nothing else, each of 64
+  characters but the last (1 to 64), the line
   `-----END PUBLIC KEY-----`, lines ended by LF or CRLF, no text before or after the block, no blank line and no
   whitespace inside a line. The SubjectPublicKeyInfo is DER, whatever its algorithm (minimal lengths, a key BIT STRING
   with no unused bits, nothing after it). A trust policy is refused as a whole when a key is not such a PEM or such a
@@ -218,7 +227,8 @@ stronger levels:
   for an intact run;
 - **anchored** when the caller gives a list of trusted run hashes (taken from verified checkpoints, a transparency
   log, or its own records) and an intact run's run hash ([SEAL-4]) is in it;
-- **withheld**: the number of blobs withheld by authorized redactions, when there are any (a reader shows "intact,
+- **withheld**: the number of sealed blobs that are gone and that an authorized redaction names (a redacted blob
+  still present is not withheld), when there are any (a reader shows "intact,
   *n* withheld").
 
 Overlay problems (§4.2) are reported by an overlay verifier and do not change a run's outcome.
@@ -226,7 +236,7 @@ Overlay problems (§4.2) are reported by an overlay verifier and do not change a
 | Outcome | Meaning | What it rules out |
 |---|---|---|
 | **unsealed** | no `seal.json` | nothing |
-| **intact** | the seal verifies (§4.1) and the run keeps the rules across files (§3.9) | a change after sealing by someone who did not re-seal; files that contradict each other |
+| **intact** | the seal verifies (§4.1) and the run keeps the rules across files (§3.9) | a change after sealing by someone who did not re-seal; files that break the rules across files of §3.9 |
 | **signed** by *identity* | intact, and `attestation.dsse.json` verifies for *identity* under the caller's trust policy (§4.4) | a change after sealing by anyone without the key: re-sealing is not enough |
 | **anchored** | intact, and the run hash is recorded somewhere the caller trusts: a checkpoint that verifies for a trusted identity and lists this run with this run hash (§5.1), a transparency-log entry, or a list the caller supplies | substituting another run with the same `runId` |
 

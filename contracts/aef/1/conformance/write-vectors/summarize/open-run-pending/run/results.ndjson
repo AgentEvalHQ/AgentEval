@@ -1,0 +1,3 @@
+{"schemaVersion":"1.0","resultId":"r_a5746287757a624e60d94ccec97cdd85","caseId":"k1","path":"q","evaluator":{"id":"e:q"},"state":"passed","scores":[{"metric":"quality","value":0.6}]}
+{"schemaVersion":"1.0","resultId":"r_d8bef04b2c24e26e067f70a1255da510","caseId":"k2","path":"q","evaluator":{"id":"e:q"},"state":"pending","reason":"Still running."}
+{"schemaVersion":"1.0","resultId":"r_d7ff33726f85bfc2fe478a1640d3a465","caseId":"k3","path":"q","evaluator":{"id":"e:q"},"state":"failed","scores":[{"metric":"quality","value":0.2}]}

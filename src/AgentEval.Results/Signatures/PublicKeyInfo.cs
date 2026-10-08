@@ -126,8 +126,9 @@ public sealed class PublicKeyInfo
     /// <summary>
     /// Reads a PEM <c>PUBLIC KEY</c> block in RFC 7468's strict form, as [SIG-3] requires of a trust policy's
     /// <c>publicKey</c>: the <c>-----BEGIN PUBLIC KEY-----</c> line, lines of base64 (standard alphabet, with padding)
-    /// and nothing else, the <c>-----END PUBLIC KEY-----</c> line; LF or CRLF line ends, and an optional final line end.
-    /// No text before or after, no blank line, no whitespace inside a line.
+    /// and nothing else, each of 64 characters but the last (1 to 64), the <c>-----END PUBLIC KEY-----</c> line; LF or
+    /// CRLF line ends, and an optional final line end. No text before or after, no blank line, no whitespace inside a
+    /// line.
     /// </summary>
     /// <exception cref="FormatException">Not such a block, or not a SubjectPublicKeyInfo (<see cref="FromDer"/>).</exception>
     public static PublicKeyInfo FromPem(string pem)
@@ -143,8 +144,15 @@ public sealed class PublicKeyInfo
             throw new FormatException("Not a PEM PUBLIC KEY block.");
         }
 
-        var body = string.Concat(lines[1..^1]);
-        if (lines[1..^1].Any(l => l.Length == 0) || body.IndexOfAny(['-', '_']) >= 0
+        // RFC 7468 §3's strict form: every base64 line holds 64 characters, but the last, which holds 1 to 64.
+        var bodyLines = lines[1..^1];
+        if (bodyLines[..^1].Any(l => l.Length != 64) || bodyLines[^1].Length is < 1 or > 64)
+        {
+            throw new FormatException("The PEM body's lines are not of 64 characters, the last of 1 to 64 (RFC 7468, [SIG-3]).");
+        }
+
+        var body = string.Concat(bodyLines);
+        if (bodyLines.Any(l => l.Length == 0) || body.IndexOfAny(['-', '_']) >= 0
             || !Base64Strict.TryDecode(body, out var der) || (body.Length % 4) != 0)
         {
             throw new FormatException("The PEM body is not base64 in the standard alphabet with padding.");

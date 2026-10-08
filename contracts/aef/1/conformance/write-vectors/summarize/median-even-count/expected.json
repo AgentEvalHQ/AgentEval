@@ -1,0 +1,36 @@
+{
+  "kind": "summarize",
+  "rules": [
+    "SUM-8",
+    "SUM-5"
+  ],
+  "run": "run",
+  "request": "request.json",
+  "summary": {
+    "schemaVersion": "1.0",
+    "runId": "summarize-median-even-count",
+    "lanes": [
+      {
+        "lane": "performance",
+        "metrics": [
+          {
+            "metric": "latency",
+            "path": "q",
+            "N": 5,
+            "n": 4,
+            "notMeasured": 1,
+            "sum": 1480,
+            "sumSq": 932000,
+            "value": 230,
+            "verdict": "passed",
+            "rule": "median latency <= 300 ms",
+            "aggregate": {
+              "method": "median"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "why": "The median of an even count is the mean of the two middle values: (200 + 260) / 2, not the mean 370. sum and sumSq are still those of every measured value."
+}

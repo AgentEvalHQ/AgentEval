@@ -34,7 +34,7 @@
     {
       "name": "run.json",
       "digest": {
-        "sha256": "d9cfa2266c3215da2ad904f6b421f2aee62a5a53fd19da68a31e343082329e61"
+        "sha256": "300b88313dc8271eadd3f723a0d2aaf5020967d01cc8d9e1a70ceacf0ece298a"
       }
     },
     {
@@ -54,7 +54,7 @@
   "predicate": {
     "schemaVersion": "1.0",
     "runId": "run-small-1",
-    "runHash": "d50be6b957277893e6d16d024f8b8aba98feda5acdde8660793ba4d6677aaf52",
+    "runHash": "89ba2a5811c9860c929b73f5fdddbb4e9f0f77219878645b780396c22e8684c9",
     "producer": {
       "name": "p",
       "version": "1"
@@ -66,7 +66,7 @@
     "deployment": null,
     "suite": null,
     "judges": [],
-    "closedAt": "2028-03-01T00:00:00Z",
+    "closedAt": "2024-03-01T00:00:00Z",
     "sealedAt": "2026-10-08T09:00:00Z",
     "sealedBy": "producer"
   }

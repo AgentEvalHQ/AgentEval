@@ -4,6 +4,8 @@
 
 - **[RUN-1]** A run is a self-contained folder. Its identity is in `run.json`, never in the path: a reader finds runs
   by looking for `run.json`. (A conventional location is `<root>/runs/<yyyy>/<mm>/<runId>/`; nothing depends on it.)
+  A folder holding `run.json` is one run, and its subfolders are files of that run, never other runs; a `run.json`
+  a reader cannot read, or that has no string `runId`, names no run.
 - **[RUN-2]** A run folder holds only these files:
 
   | File | Schema | Present |
@@ -35,7 +37,9 @@
   system merges the folders). So no file system re-encodes, re-orders or merges them. A path that breaks this is
   reported as `path`; for a case clash, the later of the two paths in byte order. Every entry of a run folder is a
   regular file or a folder: a symbolic link, device, pipe or socket is a `path` problem and is never followed or
-  read (a link can point outside the run; a pipe would block a reader).
+  read (a link can point outside the run; a pipe would block a reader). The rules above are on the paths of files: a
+  folder breaks them only through the files in it (for a case clash, the files under the later folder are
+  reported), and an empty folder is ignored.
 - **[RUN-4] A closed run never changes.** While `status` is `running` the producer may rewrite its files. When it
   closes the run (`completed` or `aborted`) it writes their final form; from then on nothing edits, adds or removes a
   file outside `overlays/`. Everything added later is an overlay (§4.2).
@@ -47,7 +51,9 @@ was kept.
 
 - **[RUN-5]** `status` is `running`, `completed` or `aborted`. There is no `sealed` status: being sealed is a fact
   about `seal.json`, established by verification (§4.5), never a field. A `completed` run has `endedAt`; an `aborted`
-  run has `endedAt` and an `abortReason`. `endedAt` is not earlier than `startedAt`. A `running` run has no `endedAt`.
+  run has `endedAt` and an `abortReason`, and only an aborted run has one. `endedAt` is not earlier than `startedAt`.
+  A `running` run has no `endedAt`. `startedAt` is when the producer began the run, before its first case; `endedAt`
+  when it closed it, after its last result. A result's times and a gate's `decidedAt` **SHOULD** lie between them.
 - **[RUN-6] What was evaluated.** `subject` names it (`ref`, `kind`, and its exact `version`, required when the run
   serves a checkpoint, §5.3); `deployment` names where it ran.
 - **[RUN-7] How the target was driven.** `execution.targetMode` is **required**:
@@ -118,7 +124,8 @@ One line per node of the run's result tree.
 
 - **[RES-2]** A typed absence is never a pass and never a fail with a score of 0. A line in a typed-absence state
   **MUST** have a `reason`, and carries no `scores`.
-- **[RES-3]** A closed run has no `pending` line.
+- **[RES-3]** A closed run has no `pending` line: when a run closes, a line still pending becomes `skipped` (it never
+  started) or `error` (it started and did not finish), with a `reason`.
 
 ### 3.4.2 Result ids
 
@@ -137,12 +144,14 @@ One line per node of the run's result tree.
 - **[RES-5]** A composite node carries `aggregation`: the `strategy` the producer used, its `threshold` and `score`, how
   many children were `measured` of the `total`, why the others were not (`unmeasured`: counts per typed absence), the
   `rulePath` (which branch of the producer's verdict rules decided the state) and `decisive` (the children that decided
-  it). Each child has `parentResultId` and `component` (`weight`, `required`).
+  it). Each child has `parentResultId` and `component` (`weight`, `required`); a node with children has
+  `aggregation`. Both are checked (§3.9 `component`, `aggregation`).
 - **[RES-6] Aggregation is descriptive.** It records how the producer reached a composite's state; it is not a
   formula AEF defines. A reader **MUST NOT** recompute a composite's state from its children or present a different
   one. `strategy` and `rulePath` are a vocabulary for display (see the table); a reader shows an unknown value as
-  written. A verifier checks only what is structural: `measured` ≤ `total`, the `unmeasured` counts add up to
-  `total` − `measured`, and every `decisive` id is a child of this node (§3.9).
+  written. A verifier checks only what is structural: `total` is the number of the node's children (the distinct `resultId`s of
+  the lines whose `parentResultId` is its `resultId`), `measured` ≤ `total`, the `unmeasured` counts add up to
+  `total` − `measured` (an absent `unmeasured`, or an absent count in it, is 0), and every `decisive` id is a child of this node (§3.9).
 
   | `rulePath` | The state came from (informative) |
   |---|---|
@@ -168,7 +177,13 @@ One line per node of the run's result tree.
 - **[RES-8]** When a case runs several times, each trial's lines carry `trial` (0-based), and one rollup line per case
   and path carries `trials`: `n`, `passed` (≤ `n`), the `aggregation` and `agree` (`false` when the trials disagreed:
   the case is flaky). The case's result at that path is the rollup line, never one trial. A line carries `trial` or
-  `trials`, never both.
+  `trials`, never both. Every line under a trial's line carries the same `trial` (so SUM-3 never counts a trial's
+  children as the case's). When a case has trial lines at a path, exactly one rollup line at that path carries
+  `trials`, whose `n` is the number of those trial lines and `passed` the number of them in state `passed` (in a
+  running run, a case still running may have no rollup yet): a failing trial cannot vanish behind its rollup, nor a
+  case behind a missing one. A composite case run in trials therefore has a rollup at each path its trials have:
+  the rollups form the case's own tree (the rollup at a child path has the rollup at its parent path as parent),
+  and that tree is what [SUM-3] counts.
 
 ### 3.4.5 Facts about a result
 
@@ -178,7 +193,8 @@ One line per node of the run's result tree.
 - **[RES-10]** Other optional facts: `scores` (per metric, with the value and an optional normalised value),
   `uncertainty` (an interval), `annotator` (who graded: code, an LLM, a person; the prompt hash and rubric digest; a
   panel's agreement, `agree` ≤ `of`, checked as `annotator` in §3.9), `usage` (tokens in OpenTelemetry's
-  `gen_ai.usage.*` names, cache and reasoning tokens included, and cost; one entry per party, no role twice),
+  `gen_ai.usage.*` names, cache and reasoning tokens included, and cost; one entry per party and `model`, no role and
+  model twice),
   `startedAt` and `endedAt` (not before `startedAt`), `durationMs`, `turns` (conversation turns the case took), `attack` (for adversarial
   cases: the `technique`, its ids in public taxonomies, and whether it succeeded), `traceLink` (the span of the
   operation the result evaluates, such as the agent's invocation, or with `traceId` only its trace; OpenTelemetry
@@ -210,24 +226,27 @@ evaluation (§5.3) reads it, so it is defined exactly.
   - for any other kind, is measured when it has a score for the metric, with that score's `value`, and is not
     measured when it has none.
 - **[SUM-5]** Then: `N` is the number of lines not left out; `n` the measured ones; `notMeasured` = `N` − `n`; `sum`
-  and `sumSq` are the sum and the sum of squares of the measured values; `value` is `sum` for a metric of kind `count`,
+  and `sumSq` are the sum and the sum of squares of the measured values, computed exactly and rounded once to
+  binary64 (summing in order can lose a value to cancellation: `1e20 + 1 − 1e20`); `value` is `sum` for a metric of kind `count`,
   and `sum` / `n` otherwise, or `null` when `n` is 0. `stderr` and `ci` are the producer's, over the same values.
 - **[SUM-8] Aggregates.** An entry with `aggregate` carries a `value` computed by its `method` instead of the mean:
   - `median`, `min` and `max` are defined here, over the measured values of [SUM-4] (the median of an even count is
-    the mean of the two middle values). A verifier recomputes their `value` like any other.
+    the mean of the two middle values). A verifier recomputes their `value` like any other. This set is fixed for
+    major 1 ([VER-9]): a later minor adds no method a verifier recomputes, so verifiers of every 1.x minor agree on
+    which summary values a lane may read.
   - Any other `method` (pass@k, F1, a bootstrap figure) is the producer's, shown as written. A verifier recomputes the
     entry's `N`, `n`, `notMeasured` and `sum`, never its `value`, and **no lane reads it** ([LANE-2]): a number nobody
     can check never decides a release.
-  In every case `value` is `null` when `n` is 0.
+  In every case `value` is `null` when `n` is 0, and a number when it is not.
 - **[SUM-9]** No two entries of a summary have the same `lane`, `metric` and `path`, so every rule that reads an entry
-  reads one, and no two `usage` entries have the same `role` and `model` (an absent `model` is a value of its own).
-  Reported as `summary-duplicate`.
-- **[SUM-6]** `verdict` is the producer's verdict on the entry under its `rule`; when `n` is 0 it is `not_measured`;
-  `scored` when the producer applied no rule to it (a measurement only).
+  reads one; no lane name appears twice in `lanes`; and no two `usage` entries have the same `role` and `model` (an
+  absent `model` is a value of its own; roles compare as written). Reported as `summary-duplicate`.
+- **[SUM-6]** `verdict` is the producer's verdict on the entry under its `rule`; `scored` when the producer applied
+  no rule to it (a measurement only); and when `n` is 0, `not_measured` in every case, with or without a rule.
 - **[SUM-7]** `cost`, when present, is the run's total cost in US dollars and where the figure came from. `usage`, when
   present, is the run's total usage, one entry per party (`role`) and `model`.
 - A verifier recomputes `N`, `n`, `notMeasured`, `sum` and `value` from `results.ndjson` (§3.9); `value` and `sum`
-  match when they differ by at most 1e-9 × max(1, |recomputed|).
+  match when they differ by at most 1e-9 × max(1, |recomputed|); so do `sumSq` and its recomputed value.
 
 ## 3.7 `evidence.ndjson` and blobs
 
@@ -252,7 +271,7 @@ evaluation (§5.3) reads it, so it is defined exactly.
 ## 3.9 Rules across files
 
 A schema checks one document. A **run verifier** also checks these rules, and reports each problem as a path and a
-code, ordered by path and then by code (its bytes). Paths are ordered by their UTF-8 bytes, except that the line paths of one file, `<file>:<line>` where `<file>` is an
+code, ordered by path and then by code (its bytes). Paths are ordered by their UTF-8 bytes, except that the line paths of one of the run's files, `<file>:<line>` where `<file>` is one of the run's
 NDJSON or JSONL file (`results.ndjson`, `evidence.ndjson`, `gates.ndjson`, `traces.otlp.jsonl`, `logs.otlp.jsonl`,
 `overlays/events.ndjson`), are ordered by line number as a number (`results.ndjson:9` before `results.ndjson:10`).
 Any other path with a colon (`run:<runId>`, [STRM-4]) is ordered by its bytes like every other path. A run with any of these problems is invalid.
@@ -271,22 +290,23 @@ an `encoding`, `limit` or `schema` problem: they would otherwise be checked agai
 | `path` | the path | [RUN-3]; for two paths that differ only in case, the later one in byte order |
 | `result-id` | `results.ndjson:<line>` | a `resultId` that is not the [RES-4] hash of the line, or one an earlier line already has |
 | `parent` | `results.ndjson:<line>` | a `parentResultId` that is no line of the run |
-| `aggregation` | `results.ndjson:<line>` | [RES-6]: counts that do not add up (an absent `unmeasured.pending` is 0), or a `decisive` id that is not a child |
+| `component` | `results.ndjson:<line>` | a child (a line with `parentResultId`) without `component` ([RES-5]) |
+| `aggregation` | `results.ndjson:<line>` | [RES-5], [RES-6]: a node with children and no `aggregation`, a `total` that is not the number of children, counts that do not add up (an absent `unmeasured` or count is 0), or a `decisive` id that is not a child |
 | `annotator` | `results.ndjson:<line>` | a panel whose `agree` exceeds `of` ([RES-10]) |
-| `trials` | `results.ndjson:<line>` | a rollup whose `passed` exceeds `n` |
+| `trials` | `results.ndjson:<line>` | a rollup whose `passed` exceeds `n`, or whose `n` and `passed` are not what its trial lines give; a second rollup for one case and path (at the later one); or, at each trial line of a closed run, a trial line whose case and path have no rollup; or a line whose parent carries `trial` and that does not carry the same one ([RES-8]) |
 | `pending` | `results.ndjson:<line>` | a `pending` line in a closed run ([RES-3]) |
 | `evidence` | `results.ndjson:<line>` | an evidence id no record of `evidence.ndjson` has |
 | `evidence-id` | `evidence.ndjson:<line>` | an `evidenceId` an earlier line already has |
 | `evidence-digest` | `evidence.ndjson:<line>` | [EVD-2] |
-| `blob` | the citing line | a blob a line references that is not in the run, unless a verified `redact` overlay withholds it ([OVL-10]) |
+| `blob` | the citing line | a blob a line references that is not in the run, unless the run is sealed and an authorized redaction withholds it ([OVL-10]) |
 | `blob-digest` | the blob's path | a blob whose bytes do not hash to its name ([EVD-3]) |
 | `reasoning-size` | `results.ndjson:<line>` | a `reasoning.bytes` that is not its blob's size |
 | `metric` | the citing line or file | a metric no entry of `metrics.json` declares; a line that scores one metric twice (the summary then counts that line as not measured for it); in `metrics.json`, a metric declared twice or a `scale` whose `min` exceeds its `max` |
 | `summary-run-id` | `summary.json` | [SUM-2] |
 | `summary` | `summary.json` | an entry whose `N`, `n`, `notMeasured`, `sum` or `value` is not what [SUM-3]–[SUM-5] and [SUM-8] give |
-| `summary-duplicate` | `summary.json` | two entries with the same `lane`, `metric` and `path`, or two `usage` entries with the same `role` and `model` ([SUM-9]) |
+| `summary-duplicate` | `summary.json` | two entries with the same `lane`, `metric` and `path`, a lane name twice, or two `usage` entries with the same `role` and `model` ([SUM-9]) |
 | `gate` | `gates.ndjson:<line>` | a result a decision names that is no line of the run, or `ship` on an incomparable comparison |
-| `trace-link` | the citing line | a span link or `traceLink` that names no span of `traces.otlp.jsonl`, when that file is present (a `traceLink` without `spanId` names a trace: it resolves when any span has that `traceId`; ids compare without regard to letter case, and a writer writes lower case) |
+| `trace-link` | the citing line | a span link or `traceLink` that names no span of `traces.otlp.jsonl`, when that file is present (a `traceLink` without `spanId` names a trace: it resolves when any span has that `traceId`; ids compare without regard to letter case ([RUN-14])) |
 | `content-capture` | the citing line, or `traces.otlp.jsonl:<line>` or `logs.otlp.jsonl:<line>` | [RUN-11], [SEC-6] |
 | `run-times` | `run.json` | [RUN-5] |
 | `unexpected-file` | the path | a file that [RUN-2] does not list (outside `ext/` and `overlays/`) and the seal lists |
@@ -294,7 +314,7 @@ an `encoding`, `limit` or `schema` problem: they would otherwise be checked agai
 | `calibration` | `run.json` | a judge's calibration with `dangerousErrors` above `n`, or `measuredAt` after the run's `startedAt` ([RUN-9]: it was measured before the run) |
 | `execution-policy` | `run.json` | `requirePasses` above `trialsPerCase` |
 | `interval` | the line, or `summary.json` | an `uncertainty.ci` or a summary `ci` whose `low` exceeds its `high` |
-| `result-times` | `results.ndjson:<line>` | a line whose `endedAt` is before its `startedAt`, or whose `usage` names one role twice |
+| `result-times` | `results.ndjson:<line>` | a line whose `endedAt` is before its `startedAt`, or whose `usage` names one role and model twice (as written; an absent `model` is a value of its own) |
 
 When `traces.otlp.jsonl` is absent, a span link points to a trace store outside the run; a reader shows it as
 external, and nothing verifies it.
@@ -302,7 +322,10 @@ external, and nothing verifies it.
 ## 3.10 Traces
 
 - **[RUN-14]** `traces.otlp.jsonl` holds OpenTelemetry traces in the OTLP/JSON encoding, one `TracesData` object (the
-  same JSON as an `ExportTraceServiceRequest`, as OpenTelemetry's file exporter writes it) per line (NDJSON, §2.2). `logs.otlp.jsonl`
+  same JSON as an `ExportTraceServiceRequest`, as OpenTelemetry's file exporter writes it) per line (NDJSON, §2.2),
+  in OTLP/JSON 1.x (trace and span ids in lower-case hex, as a writer writes every id here; a reader compares them
+  without regard to letter case): spans under `resourceSpans[].scopeSpans[]`, log records under `resourceLogs[].scopeLogs[]`; the
+  names before OTLP 1.0 (`instrumentationLibrarySpans`) are not read. `logs.otlp.jsonl`
   likewise holds OTLP/JSON `LogsData` objects, one per line: OpenTelemetry events such as `gen_ai.evaluation.result`.
   `run.json`'s `otel.schemaUrls` names the OpenTelemetry schema URLs both follow. When a producer writes a
   `gen_ai.evaluation.result` event for a result, its `gen_ai.evaluation.score.label` is the result's `state` name,

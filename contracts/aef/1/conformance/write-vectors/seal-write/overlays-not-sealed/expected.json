@@ -1,0 +1,30 @@
+{
+  "kind": "seal-write",
+  "rules": [
+    "SEAL-1"
+  ],
+  "run": "run",
+  "sealedBy": "ingest",
+  "sealedAt": "2026-10-08T09:00:00Z",
+  "manifest": "expected-manifest.txt",
+  "predicate": {
+    "schemaVersion": "1.0",
+    "runId": "seal-write-overlays",
+    "runHash": "bac644d4915a13727ef18b96ad3193ecfa20863e0a89dacbad5c1a82e05b3c1b",
+    "producer": {
+      "name": "p",
+      "version": "1"
+    },
+    "subject": {
+      "ref": "agent:a/b",
+      "version": "v1"
+    },
+    "deployment": null,
+    "suite": null,
+    "judges": [],
+    "closedAt": "2026-10-01T00:01:00Z",
+    "sealedAt": "2026-10-08T09:00:00Z",
+    "sealedBy": "ingest"
+  },
+  "why": "Everything under overlays/ is left out of the seal (an events file and its batch seal, appended after close): the subjects are the run's own files only."
+}

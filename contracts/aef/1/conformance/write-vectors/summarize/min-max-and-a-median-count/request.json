@@ -1,0 +1,32 @@
+{
+  "lanes": [
+    {
+      "lane": "quality",
+      "metrics": [
+        {
+          "metric": "quality",
+          "path": "q",
+          "rule": "min quality >= 0.3",
+          "verdict": "passed",
+          "aggregate": {
+            "method": "min"
+          }
+        },
+        {
+          "metric": "cost",
+          "path": "q",
+          "aggregate": {
+            "method": "max"
+          }
+        },
+        {
+          "metric": "turns",
+          "path": "q",
+          "aggregate": {
+            "method": "median"
+          }
+        }
+      ]
+    }
+  ]
+}

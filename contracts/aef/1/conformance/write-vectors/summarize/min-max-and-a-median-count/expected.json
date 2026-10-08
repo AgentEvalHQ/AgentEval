@@ -1,0 +1,64 @@
+{
+  "kind": "summarize",
+  "rules": [
+    "SUM-8",
+    "SUM-5"
+  ],
+  "run": "run",
+  "request": "request.json",
+  "summary": {
+    "schemaVersion": "1.0",
+    "runId": "summarize-min-max-and-a-median-count",
+    "lanes": [
+      {
+        "lane": "quality",
+        "metrics": [
+          {
+            "metric": "quality",
+            "path": "q",
+            "N": 4,
+            "n": 3,
+            "notMeasured": 1,
+            "sum": 1.95,
+            "sumSq": 1.4224999999999999,
+            "value": 0.35,
+            "verdict": "passed",
+            "rule": "min quality >= 0.3",
+            "aggregate": {
+              "method": "min"
+            }
+          },
+          {
+            "metric": "cost",
+            "path": "q",
+            "N": 4,
+            "n": 3,
+            "notMeasured": 1,
+            "sum": 0.046,
+            "sumSq": 0.00106,
+            "value": 0.03,
+            "verdict": "scored",
+            "aggregate": {
+              "method": "max"
+            }
+          },
+          {
+            "metric": "turns",
+            "path": "q",
+            "N": 4,
+            "n": 3,
+            "notMeasured": 1,
+            "sum": 6,
+            "sumSq": 14,
+            "value": 2,
+            "verdict": "scored",
+            "aggregate": {
+              "method": "median"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "why": "min and max over the measured values; the median of an odd count; and a count with an aggregate takes the aggregate's value (2), not the sum."
+}

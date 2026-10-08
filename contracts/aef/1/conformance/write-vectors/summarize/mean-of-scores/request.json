@@ -1,0 +1,19 @@
+{
+  "lanes": [
+    {
+      "lane": "quality",
+      "metrics": [
+        {
+          "metric": "quality",
+          "path": "q",
+          "rule": "quality >= 0.6",
+          "verdict": "passed"
+        },
+        {
+          "metric": "latency",
+          "path": "q"
+        }
+      ]
+    }
+  ]
+}

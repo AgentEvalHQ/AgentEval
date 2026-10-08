@@ -1,0 +1,15 @@
+{
+  "kind": "run",
+  "run": "run",
+  "outcome": "invalid",
+  "problems": [
+    [
+      "run.json",
+      "limit"
+    ]
+  ],
+  "rules": [
+    "ENC-17",
+    "ENC-18"
+  ]
+}

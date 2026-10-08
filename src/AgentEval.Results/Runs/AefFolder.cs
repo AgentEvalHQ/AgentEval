@@ -23,9 +23,12 @@ public enum AefEntryKind
 }
 
 /// <summary>
-/// The regular files of a run folder, in byte order of their paths, and the <c>path</c> problems of [RUN-3] over every
-/// entry. When the folder holds more files than [ENC-17] allows, the walk stops: <see cref="Problems"/> is the one
-/// <c>limit</c> problem at <c>.</c> ([ENC-18]) and <see cref="Files"/> is not the whole folder.
+/// The regular files of a run folder, in byte order of their paths, and the <c>path</c> problems of [RUN-3]: over the
+/// paths of files (a folder breaks the rules only through the files in it, and for a case clash the files under the
+/// later folder are reported; an empty folder is ignored), and every symbolic link, pipe, socket or device. When the
+/// folder holds more files than [ENC-17] allows (not counting <c>seal.json</c>, <c>attestation.dsse.json</c> and
+/// <c>overlays/</c>), the walk stops: <see cref="Problems"/> is the one <c>limit</c> problem
+/// at <c>.</c> ([ENC-18]) and <see cref="Files"/> is not the whole folder.
 /// </summary>
 public sealed record AefFolderListing(IReadOnlyList<string> Files, IReadOnlyList<AefProblem> Problems);
 
@@ -94,8 +97,8 @@ public static class AefFolder
         };
 
         var files = new List<string>();
-        var entries = new List<string>();
         var irregular = new List<string>();
+        var counted = 0;   // [ENC-17]: the files that count toward the limit
         var pending = new Stack<(string Full, string Relative)>();
         pending.Push((folder, ""));
         while (pending.TryPop(out var current))
@@ -104,7 +107,6 @@ public static class AefFolder
             {
                 var name = Path.GetFileName(full);
                 var relative = current.Relative.Length == 0 ? name : $"{current.Relative}/{name}";
-                entries.Add(relative);
                 switch (KindOf(full))
                 {
                     case AefEntryKind.Folder:
@@ -112,21 +114,34 @@ public static class AefFolder
                         break;
                     case AefEntryKind.File:
                         files.Add(relative);
+                        counted += CountsTowardTheLimit(relative) ? 1 : 0;
                         break;
                     default:
                         irregular.Add(relative);
+                        counted += CountsTowardTheLimit(relative) ? 1 : 0;
                         break;
                 }
 
-                if (files.Count + irregular.Count > AefLimits.MaxFiles)
+                if (counted > AefLimits.MaxFiles)
                 {
                     return new AefFolderListing([.. files.Order(AefProblemOrder.Utf8)], [new AefProblem(".", "limit")]);
                 }
             }
         }
 
-        var problems = AefPaths.Check(entries).Concat(irregular.Select(p => new AefProblem(p, "path"))).Distinct();
+        // [RUN-3]'s rules are on the paths of files; a link, pipe, socket or device is a path problem whatever its name.
+        var problems = AefPaths.Check(files.Concat(irregular)).Concat(irregular.Select(p => new AefProblem(p, "path"))).Distinct();
         return new AefFolderListing([.. files.Order(AefProblemOrder.Utf8)], AefProblemOrder.Sort(problems));
+    }
+
+    /// <summary>
+    /// Whether a file counts toward the 100,000 of [ENC-17]: every file but <c>seal.json</c>, <c>attestation.dsse.json</c>
+    /// and those under <c>overlays/</c>, so a run at the limit can still be sealed and take overlays.
+    /// </summary>
+    public static bool CountsTowardTheLimit(string path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        return path is not ("seal.json" or "attestation.dsse.json") && !path.StartsWith("overlays/", StringComparison.Ordinal);
     }
 
     /// <summary>What the entry at <paramref name="path"/> is, without following it if it is a link.</summary>

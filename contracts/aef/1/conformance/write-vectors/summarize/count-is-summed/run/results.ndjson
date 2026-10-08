@@ -1,0 +1,5 @@
+{"schemaVersion":"1.0","resultId":"r_88a4ac2279352f4e272e4a5bd916da5a","caseId":"k1","path":"q","evaluator":{"id":"e:q"},"state":"passed","scores":[{"metric":"tool_calls","value":3}]}
+{"schemaVersion":"1.0","resultId":"r_c15bc52d113e55b934e1fef06f27d778","caseId":"k2","path":"q","evaluator":{"id":"e:q"},"state":"failed","scores":[{"metric":"tool_calls","value":0}]}
+{"schemaVersion":"1.0","resultId":"r_9a5a03912c33878979b9afeb0cb7a909","caseId":"k3","path":"q","evaluator":{"id":"e:q"},"state":"passed","scores":[{"metric":"tool_calls","value":5}]}
+{"schemaVersion":"1.0","resultId":"r_32208c252be47700fc42a52d2dfefce3","caseId":"k4","path":"q","evaluator":{"id":"e:q"},"state":"warn","scores":[{"metric":"tool_calls","value":2}]}
+{"schemaVersion":"1.0","resultId":"r_ce53ecf6425b03ebfd8fbcc1d8db98a3","caseId":"k5","path":"q","evaluator":{"id":"e:q"},"state":"skipped","reason":"Skipped by --max-cases 4."}

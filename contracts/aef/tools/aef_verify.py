@@ -71,6 +71,7 @@ import hashlib
 import json
 import math
 import os
+import stat
 import re
 import sys
 from collections import Counter, defaultdict
@@ -104,6 +105,15 @@ KNOWN_MUTATIONS = {
     "subject-binding": "eligibility ignores the run's subject, deployment and suite (LANE-1's binding)",
     "severity-evidence": "a severity lane passes without evidence: undecided lines and minimumN are ignored",
     "redaction-authorization": "any redact event in a verified batch withholds its blob, signed or not",
+    "exception-evidence": "an exception in force waives a failed lane whatever evidence it names (DEC-2 step 6)",
+    "run-copies": "CKP-8 takes the first folder holding a run, not an intact copy among several",
+    "plan-where-when": "STRM-4 does not compare the plan's deployment and endpoint, or the job's time window",
+    "logs-content": "SEC-6 does not look at logs.otlp.jsonl",
+    "summary-duplicates": "SUM-9 duplicate entries, lane names and usage entries are accepted",
+    "limits": "nothing beyond ENC-17's limits is refused",
+    "trial-rollups": "a rollup is not compared with its trial lines, and a trial line needs no rollup (RES-8)",
+    "rule-unknown": "a lane whose rule holds an unknown value is compared like any other (CKP-8)",
+    "otlp-names": "spans under the pre-1.0 name instrumentationLibrarySpans are read too",
 }
 _ORIGINAL_COMPILE = aef_schema.compile_pattern
 
@@ -126,11 +136,13 @@ def set_mutations(names):
 # ---------------------------------------------------------------------------- constants
 
 MAX_JSON = 4 * 1024 * 1024  # ENC-17: a JSON file or one NDJSON line
-MAX_SEALING = 32 * 1024 * 1024  # ENC-17: seal.json, a batch seal, a DSSE envelope (they list every sealed file)
+MAX_SEAL = 40 * 1024 * 1024  # ENC-17: seal.json and a batch seal (they list every sealed file)
+MAX_ENVELOPE = 56 * 1024 * 1024  # ENC-17: a DSSE envelope, the base64 of a seal
 MAX_DEPTH = 64
 MAX_LINES = 1_000_000
 MAX_FILES = 100_000
 MAX_BLOB = 1 << 30
+MAX_NDJSON = 1 << 30  # ENC-17: one NDJSON file
 MAX_PATH = 255
 
 def _writer_enum(ref):
@@ -187,6 +199,22 @@ class EncodingProblem(ValueError):
 
 _LONE_SURROGATE = re.compile("[\ud800-\udfff]")
 _DEPTH_TOKENS = re.compile(rb'"[^"\\]*(?:\\.[^"\\]*)*"|[\[\]{}]', re.S)
+
+
+def _max_json(rel):
+    """ENC-17: the size limit of a JSON file of the run."""
+    if rel.endswith(".dsse.json"):
+        return MAX_ENVELOPE
+    if rel == "seal.json" or re.fullmatch(r"overlays/seal-[0-9]{4}\.json", rel):
+        return MAX_SEAL
+    return MAX_JSON
+
+
+def _beyond_limits(f, rel):
+    """ENC-17: whether a JSON file of the run is beyond its size or the depth limit (checked on the bytes)."""
+    if "limits" in MUTATIONS:
+        return False
+    return f.size(rel) > _max_json(rel) or nesting_depth(f.read(rel)) > MAX_DEPTH
 
 
 def nesting_depth(data: bytes) -> int:
@@ -357,7 +385,8 @@ def utf8_key(text: str) -> bytes:
     return text.encode("utf-8", "surrogatepass")
 
 
-_LINE_PATH = re.compile(r"([^:]*\.(?:ndjson|jsonl)):([0-9]+)")
+_LINE_PATH = re.compile(r"(results\.ndjson|evidence\.ndjson|gates\.ndjson|traces\.otlp\.jsonl|logs\.otlp\.jsonl"
+                        r"|overlays/events\.ndjson):([0-9]+)")  # §3.9: the run's own NDJSON files, nothing else
 
 
 def path_key(path: str):
@@ -662,13 +691,20 @@ class Folder:
         self.root = Path(root)
         if not self.root.is_dir():
             raise InputError(f"{root}: not a folder")
-        paths = []
-        for dirpath, dirnames, filenames in os.walk(self.root):
-            dirnames.sort()
+        paths, special = [], []
+        for dirpath, dirnames, filenames in os.walk(self.root):  # followlinks=False: a linked folder is not entered
             rel = os.path.relpath(dirpath, self.root)
+            prefix = "" if rel == "." else rel.replace(os.sep, "/") + "/"
+            for name in list(dirnames):
+                if os.path.islink(os.path.join(dirpath, name)):
+                    dirnames.remove(name)
+                    special.append(prefix + name)
+            dirnames.sort()
             for name in filenames:
-                paths.append(name if rel == "." else f"{rel.replace(os.sep, '/')}/{name}")
+                # RUN-3: a link, pipe, socket or device is a path problem and is never followed or read.
+                (paths if stat.S_ISREG(os.lstat(os.path.join(dirpath, name)).st_mode) else special).append(prefix + name)
         self.paths = sorted(paths, key=utf8_key)
+        self.special = sorted(special, key=utf8_key)
         self.present = set(paths)
         self._bytes, self._digests = {}, {}
 
@@ -737,8 +773,7 @@ class Run:
     def _json_file(self, rel, schema, problems):
         """The document (or None) of a JSON file of the run, adding its encoding, limit and schema problems."""
         f = self.folder
-        if f.size(rel) > (MAX_SEALING if rel == "seal.json" or rel.endswith(".dsse.json") or
-                          re.fullmatch(r"overlays/seal-[0-9]{4}\.json", rel) else MAX_JSON):
+        if f.size(rel) > _max_json(rel):
             problems.add((rel, "limit"))
             return None
         data = f.read(rel)
@@ -762,12 +797,16 @@ class Run:
             problems.add((rel, "encoding"))
             return []
         lines = ndjson_lines(data)
-        if len(lines) > MAX_LINES or any(len(raw) > MAX_JSON or nesting_depth(raw) > MAX_DEPTH for _, _, raw in lines):
+        if len(lines) > MAX_LINES or len(data) > MAX_NDJSON:
             problems.add((rel, "limit"))
             return []
         out = []
         for number, start, raw in lines:
             where = f"{rel}:{number}"
+            if "limits" not in MUTATIONS and (len(raw) > MAX_JSON or nesting_depth(raw) > MAX_DEPTH):  # ENC-18: at the line
+                problems.add((where, "limit"))
+                out.append((number, start, None))
+                continue
             try:
                 obj = load_json_bytes(raw)
             except EncodingProblem:
@@ -785,7 +824,8 @@ class Run:
         §4.4 and §4.2."""
         if self._read is None:
             f, problems, docs, lines = self.folder, set(), {}, {}
-            if len(f.paths) > MAX_FILES:
+            if sum(1 for p in f.paths if p not in ("seal.json", "attestation.dsse.json")
+                   and not p.startswith("overlays/")) > MAX_FILES:
                 problems.add((".", "limit"))
             for rel, schema in RUN_JSON.items():
                 if f.has(rel):
@@ -818,7 +858,7 @@ class Run:
 
     def seal_doc(self):
         """(seal.json as read, or None, whether it is an I-JSON document valid against the reader seal schema)."""
-        if not self.folder.has("seal.json"):
+        if not self.folder.has("seal.json") or _beyond_limits(self.folder, "seal.json"):
             return None, False
         try:
             doc = load_json_bytes(self.folder.read("seal.json"))
@@ -868,6 +908,10 @@ class Run:
             path = f"overlays/seal-{k:04d}.json"
             if k not in seals:
                 problems.add((path, "missing"))
+                verified, previous_ok = False, False
+                continue
+            if _beyond_limits(f, path):  # ENC-17: refused; it ends the verified prefix
+                problems.add((path, "limit"))
                 verified, previous_ok = False, False
                 continue
             try:
@@ -925,12 +969,17 @@ class Run:
             problems.add((EVENTS, "encoding"))
             return [(n, s, s + len(raw) + 1, None, False) for n, s, raw in ndjson_lines(data)]
         result_ids = {o.get("resultId") for _, o in self.objects("results.ndjson")}
-        results_read = "results.ndjson" in self.read()[1] and not any(
-            p[0] == "results.ndjson" or p[0].startswith("results.ndjson:") for p in self.read()[2])
+        results_read = "results.ndjson" in self.read()[1] and not any(  # OVL-2: "does not read"
+            (p[0] == "results.ndjson" or p[0].startswith("results.ndjson:")) and p[1] in ("encoding", "limit")
+            for p in self.read()[2])
         seen, out = set(), []
         for number, start, raw in ndjson_lines(data):
             where = f"{EVENTS}:{number}"
             end = start + len(raw) + 1
+            if "limits" not in MUTATIONS and (len(raw) > MAX_JSON or nesting_depth(raw) > MAX_DEPTH):  # ENC-18
+                problems.add((where, "limit"))
+                out.append((number, start, end, None, False))
+                continue
             try:
                 event = load_json_bytes(raw)
             except EncodingProblem:
@@ -1007,6 +1056,9 @@ class Run:
         if not f.has("seal.json"):
             self._seal = problems
             return problems
+        if _beyond_limits(f, "seal.json"):  # ENC-17: refused, not checked further
+            self._seal = {("seal.json", "limit")}
+            return self._seal
         doc, valid = self.seal_doc()
         if not valid:
             self._seal = {("seal.json", "seal-invalid")}
@@ -1017,10 +1069,12 @@ class Run:
             name = s["name"]
             if names[name] > 1:
                 problems.add((name, "duplicate-subject"))
-            elif name in ("seal.json", "attestation.dsse.json") or name.startswith("overlays/"):
+            if name in ("seal.json", "attestation.dsse.json") or name.startswith("overlays/"):
                 problems.add((name, "subject-path"))
-            else:
+            elif names[name] == 1:
                 subjects[name] = s["digest"]["sha256"]
+        duplicated = {n for n, c in names.items() if c > 1 and n not in ("seal.json", "attestation.dsse.json")
+                      and not n.startswith("overlays/")}
         for p in f.sealed_files():
             if names.get(p, 0) > 1:
                 continue  # a duplicated subject's digests are not compared
@@ -1029,7 +1083,7 @@ class Run:
             elif "seal-digest" not in MUTATIONS and f.digest(p) != subjects[p]:
                 problems.add((p, "digest"))
         withheld = None
-        for name in subjects:
+        for name in sorted(set(subjects) | duplicated, key=utf8_key):
             if f.has(name):
                 continue
             if withheld is None:
@@ -1088,10 +1142,13 @@ class Run:
                     spans.add((str(span.get("traceId", "")).lower(), str(span.get("spanId", "")).lower()))
                     if off and _carries_content(span):
                         P.add((f"traces.otlp.jsonl:{n}", "content-capture"))  # SEC-6
+                if off and _container_carries_content(request, "resourceSpans", "scopeSpans"):
+                    P.add((f"traces.otlp.jsonl:{n}", "content-capture"))  # SEC-6: resource and scope attributes
 
-        if off and f.has("logs.otlp.jsonl"):
+        if off and f.has("logs.otlp.jsonl") and "logs-content" not in MUTATIONS:
             for n, request in self.objects("logs.otlp.jsonl"):
-                if any(_log_carries_content(record) for record in _otlp_log_records(request)):
+                if any(_log_carries_content(record) for record in _otlp_log_records(request)) or \
+                        _container_carries_content(request, "resourceLogs", "scopeLogs"):
                     P.add((f"logs.otlp.jsonl:{n}", "content-capture"))  # SEC-6
 
         def span_known(trace_id, span_id):
@@ -1129,10 +1186,17 @@ class Run:
         # results.ndjson
         all_ids = {o["resultId"] for _, o in results}
         children = defaultdict(set)
+        rollups, trial_lines = Counter(), defaultdict(list)  # RES-8, per (caseId, path)
+        by_id = {o["resultId"]: o for _, o in results}
         for _, o in results:
             if o.get("parentResultId") is not None:
                 children[o["parentResultId"]].add(o["resultId"])
+            if "trials" in o:
+                rollups[(o.get("caseId"), o.get("path"))] += 1
+            if "trial" in o:
+                trial_lines[(o.get("caseId"), o.get("path"))].append(o)
         seen = set()
+        rollup_first = {}  # RES-8: the first rollup line of each (caseId, path)
         for n, o in results:
             where = f"results.ndjson:{n}"
             try:
@@ -1149,13 +1213,29 @@ class Run:
             if isinstance(agg, dict):
                 measured, total = agg["measured"], agg["total"]
                 unmeasured = agg.get("unmeasured")
-                counts_wrong = measured > total or (isinstance(unmeasured, dict) and sum(
-                    v for v in unmeasured.values() if as_number(v) is not None) != total - measured)
+                counts = unmeasured if isinstance(unmeasured, dict) else {}  # RES-6: absent counts are 0
+                counts_wrong = measured > total or total != len(children[o["resultId"]]) or sum(
+                    v for v in counts.values() if as_number(v) is not None) != total - measured
                 if counts_wrong or any(d not in children[o["resultId"]] for d in agg.get("decisive", [])):
                     P.add((where, "aggregation"))
+            if o.get("parentResultId") is not None and "component" not in o:
+                P.add((where, "component"))  # RES-5
+            if children[o["resultId"]] and not isinstance(o.get("aggregation"), dict):
+                P.add((where, "aggregation"))  # RES-5: a node with children has aggregation
+            parent = by_id.get(o.get("parentResultId"))
+            if parent is not None and "trial" in parent and o.get("trial") != parent["trial"]:
+                P.add((where, "trials"))  # RES-8: a trial's tree carries its trial
             trials = o.get("trials")
-            if isinstance(trials, dict) and trials["passed"] > trials["n"]:
-                P.add((where, "trials"))
+            if isinstance(trials, dict):
+                own = trial_lines.get((o.get("caseId"), o.get("path")), [])
+                if "trial-rollups" in MUTATIONS:
+                    own = []
+                second = rollup_first.setdefault((o.get("caseId"), o.get("path")), n) != n
+                if trials["passed"] > trials["n"] or (second and "trial-rollups" not in MUTATIONS) or (own and (
+                        trials["n"] != len(own) or trials["passed"] != sum(1 for t in own if t.get("state") == "passed"))):
+                    P.add((where, "trials"))  # RES-8
+            if closed and "trial" in o and rollups[(o.get("caseId"), o.get("path"))] == 0 and "trial-rollups" not in MUTATIONS:
+                P.add((where, "trials"))  # RES-8: a trial line whose case and path have no rollup
             if closed and o["state"] == "pending":
                 P.add((where, "pending"))
             if any(e not in evidence_ids for e in o.get("evidence", [])):
@@ -1182,7 +1262,7 @@ class Run:
             if any(m not in metric for m in scored) or any(count > 1 for count in scored.values()):
                 P.add((where, "metric"))  # undeclared, or one metric scored twice
             started, ended = time_key(o.get("startedAt")), time_key(o.get("endedAt"))
-            roles = [u["role"] for u in o.get("usage") or [] if isinstance(u, dict) and "role" in u]
+            roles = [(u["role"], u.get("model", _MISSING)) for u in o.get("usage") or [] if isinstance(u, dict) and "role" in u]
             if (started is not None and ended is not None and ended < started) or len(roles) != len(set(roles)):
                 P.add((where, "result-times"))
             if _inverted(get(o, "uncertainty", "ci")):
@@ -1213,7 +1293,7 @@ class Run:
                 P.add(("summary.json", "summary"))
             if any(_inverted(e.get("ci")) for lane in summary.get("lanes", []) for e in lane.get("metrics", [])):
                 P.add(("summary.json", "interval"))
-            if _summary_duplicates(summary):
+            if _summary_duplicates(summary) and "summary-duplicates" not in MUTATIONS:
                 P.add(("summary.json", "summary-duplicate"))
 
         # gates.ndjson
@@ -1250,7 +1330,9 @@ class Run:
 
     def _verify(self):
         _, _, reading = self.read()
-        problems = set(reading) | path_problems(self.folder.paths) | self.seal()
+        problems = (set(reading) | path_problems(self.folder.paths) | {(p, "path") for p in self.folder.special}
+                    | {(p, "limit") for p in self.folder.paths if p.endswith(".dsse.json") and _beyond_limits(self.folder, p)}
+                    | self.seal())
         if not reading:
             problems |= self.cross_file()
         if any(code != "withheld" for _, code in problems):
@@ -1309,6 +1391,22 @@ def _otlp_log_records(request):
                     yield record
 
 
+def _container_carries_content(request, resources, scopes):
+    """SEC-6: a content attribute on a resource or a scope of an OTLP/JSON TracesData or LogsData object."""
+    def holds(attributes):
+        return isinstance(attributes, list) and any(isinstance(a, dict) and a.get("key") in CONTENT_ATTRIBUTES
+                                                     for a in attributes)
+    for resource in request.get(resources, []) if isinstance(request, dict) else []:
+        if not isinstance(resource, dict):
+            continue
+        if holds(get(resource, "resource", "attributes", default=None)):
+            return True
+        for scope in resource.get(scopes) or []:
+            if isinstance(scope, dict) and holds(get(scope, "scope", "attributes", default=None)):
+                return True
+    return False
+
+
 def _log_carries_content(record):
     """SEC-6: a log record with a content attribute, or with a body."""
     attributes = record.get("attributes") if isinstance(record.get("attributes"), list) else []
@@ -1326,7 +1424,9 @@ def _otlp_spans(request):
     for resource in request.get("resourceSpans", []) if isinstance(request, dict) else []:
         if not isinstance(resource, dict):
             continue
-        for scope in (resource.get("scopeSpans") or []) + (resource.get("instrumentationLibrarySpans") or []):
+        scopes = (resource.get("scopeSpans") or []) + (
+            resource.get("instrumentationLibrarySpans") or [] if "otlp-names" in MUTATIONS else [])
+        for scope in scopes:  # OTLP/JSON 1.x only (RUN-14)
             for span in scope.get("spans", []) if isinstance(scope, dict) else []:
                 if isinstance(span, dict):
                     yield span
@@ -1358,13 +1458,16 @@ def _predicate_differs(pred, run):
         return True
     closed, ended = pred.get("closedAt"), run.get("endedAt")
     a, b = time_key(closed), time_key(ended)
+    sealed = time_key(pred.get("sealedAt"))
+    if a is not None and sealed is not None and sealed < a:
+        return True  # SEAL-1: only a closed run is sealed
     return (a != b) if a is not None and b is not None else closed != ended
 
 
 def _belongs(line, lane_name, summary_lanes):
     """SUM-3: a line belongs to the lane its lane names; a line without lane belongs to the summary's lane when the
     summary has a single one. summary_lanes: the summary's lane names, in order."""
-    return line.get("lane") == lane_name or ("lane" not in line and list(summary_lanes) == [lane_name])
+    return line.get("lane") == lane_name or ("lane" not in line and set(summary_lanes) == {lane_name})
 
 
 def _summary_lanes(run):
@@ -1402,7 +1505,8 @@ def _summary_duplicates(summary):
             for lane in summary.get("lanes", []) for e in lane.get("metrics", [])]
     usage = [(get(u, "role", default=_MISSING), get(u, "model", default=_MISSING))
              for u in summary.get("usage") or [] if isinstance(u, dict)]
-    return len(keys) != len(set(keys)) or len(usage) != len(set(usage))
+    names = [lane.get("lane") for lane in summary.get("lanes", [])]
+    return len(keys) != len(set(keys)) or len(usage) != len(set(usage)) or len(names) != len(set(names))
 
 
 def _summary_wrong(summary, results, metric):
@@ -1434,9 +1538,10 @@ def _summary_wrong(summary, results, metric):
                 return True
             if "aggregate" in e:  # SUM-8
                 method = get(e, "aggregate", "method")
+                if (n == 0) != (e.get("value") is None):  # null exactly when n is 0
+                    return True
                 if n == 0:
-                    if e.get("value") is not None:
-                        return True
+                    pass
                 elif method in AGGREGATES and not close_enough(e.get("value"), AGGREGATES[method](values)):
                     return True  # median, min and max are recomputed; any other method is the producer's
             elif (e.get("value") is None) != (value is None) or (value is not None and not close_enough(e["value"], value)):
@@ -1525,8 +1630,15 @@ def document_verdicts(schema, path):
         if str(path).endswith((".ndjson", ".jsonl")):
             if ndjson_framing(data):
                 raise EncodingProblem("framing")
-            docs = [load_json_bytes(raw, object_only=False) for _, _, raw in ndjson_lines(data)]
+            lines = ndjson_lines(data)
+            if len(data) > MAX_NDJSON or len(lines) > MAX_LINES or any(
+                    len(raw) > MAX_JSON or nesting_depth(raw) > MAX_DEPTH for _, _, raw in lines):
+                raise EncodingProblem("limit")  # ENC-17: refused
+            docs = [load_json_bytes(raw, object_only=False) for _, _, raw in lines]
         else:
+            limit = MAX_SEAL if schema.split("#")[0] in ("seal", "overlay-seal") else MAX_JSON
+            if len(data) > limit or nesting_depth(data) > MAX_DEPTH:
+                raise EncodingProblem("limit")  # ENC-17: refused, at the limit of that file
             docs = [load_json_bytes(data, object_only=False)]
     except EncodingProblem:
         return {"writer": "invalid", "reader": "invalid", "documents": None}
@@ -1568,6 +1680,9 @@ def manifest_problems(m):
         has_result = get(given_lanes.get(lane["lane"]), "result") is not None
         if bool(lane["runs"]) != has_result:
             problems.add("evidence")
+    manifest_names = {lane["lane"] for lane in m["lanes"]}
+    if any(l["lane"] not in manifest_names and l.get("result") is not None for l in given["lanes"]):
+        problems.add("evidence")  # a result for a lane the manifest does not have: a result but no runs
     runs_of = {}  # manifest lane -> the run hashes of its runs
     for lane in m["lanes"]:
         runs_of.setdefault(lane["lane"], {r.get("runHash") for r in lane.get("runs", []) if isinstance(r, dict)})
@@ -1632,6 +1747,8 @@ class Store:
         if not isinstance(ref, dict):
             return None
         runs = self.index.get((ref.get("runId"), ref.get("runHash")), [])
+        if "run-copies" in MUTATIONS:
+            return runs[0] if runs else None
         return next((r for r in runs if r.intact), runs[0] if runs else None)
 
 
@@ -1663,11 +1780,7 @@ def _bound(doc, binding):
 
 
 def _closed_at(run):
-    """LANE-9: run.json endedAt (for an intact run, its seal's closedAt, the same instant)."""
-    if run.intact:
-        doc, valid = run.seal_doc()
-        if valid:
-            return doc["predicate"]["closedAt"]
+    """LANE-9: run.json endedAt, as written."""
     ended = (run.run_doc or {}).get("endedAt")
     return ended if time_key(ended) is not None else None
 
@@ -1701,6 +1814,21 @@ def _threshold(rule, runs):
     return "failed" if "failed" in statuses else "not_measured" if "not_measured" in statuses else "passed"
 
 
+def _rule_unknown(rule):
+    """CKP-8: whether a lane rule holds a value this version does not know (§7.3): a kind, a severity max, a threshold
+    op, a comparison axis."""
+    if "rule-unknown" in MUTATIONS:
+        return False
+    kind = rule.get("kind")
+    if kind not in RULE_KINDS:
+        return True
+    if kind == "severity" and rule.get("max") not in _SEVERITY_MAX:
+        return True
+    if kind == "threshold" and rule.get("op") not in _THRESHOLD_OPS:
+        return True
+    return kind == "comparison" and any(a not in AXES for a in rule.get("axes") or [])
+
+
 def _severity(rule, runs):
     """LANE-3: failed on a failure worse than max; else not_measured on an undecided line or fewer decided lines
     than minimumN (at least 1); else passed. not_applicable and scored lines take no part."""
@@ -1712,13 +1840,15 @@ def _severity(rule, runs):
     for run in runs:
         names = _summary_lanes(run)
         for _, o in run.objects("results.ndjson"):
-            if "trial" in o:
-                continue
             if lane is not None and not _belongs(o, lane, names):
                 continue  # only lines of that summary lane (SUM-3)
             if path is not None and not (o.get("path") == path or str(o.get("path", "")).startswith(path + "/")):
                 continue  # only lines at that path or below it
             state = o.get("state")
+            if "trial" in o:  # LANE-3: a failing trial counts for step 1, and takes no part in the counts
+                if state in ("failed", "warn") and SEVERITY_ORDER[read_severity(o.get("severity"))] > limit:
+                    return "failed"
+                continue
             if state in ("failed", "warn"):
                 decided += 1
                 if SEVERITY_ORDER[read_severity(o.get("severity"))] > limit:
@@ -1744,7 +1874,7 @@ def _axis_value(doc, axis):
     if axis == "suite-content":
         return v("suite", "digest")
     if axis in ("judges", "rubrics"):
-        judges = doc.get("judges", _MISSING)
+        judges = doc.get("judges", [])  # LANE-6: no judges is the empty list
         if not isinstance(judges, list):
             return judges
         field = "model" if axis == "judges" else "rubricDigest"
@@ -1842,12 +1972,13 @@ def lane_result(rule, runs, baseline, version, fallback_time, binding):
     if not found:
         return None
     subject_version = version
-    for r in found:
+    counted = [r for r in found if r.intact and _bound(r.run_doc or {}, binding)]  # LANE-9
+    for r in counted:
         v = get(r.run_doc, "subject", "version")
         if v is not None and v != version:
             subject_version = v
             break
-    closings = [(time_key(t), i, t) for i, t in enumerate(_closed_at(r) for r in found) if t is not None]
+    closings = [(time_key(t), i, t) for i, t in enumerate(_closed_at(r) for r in counted) if t is not None]
     oldest = min(closings)[2] if closings else fallback_time
     kind = rule.get("kind") if isinstance(rule, dict) else None
     axes = None
@@ -1897,13 +2028,21 @@ def op_lanes(checkpoint_path, runs_dir, at=None, policy=None):
                 problems.add((where, "run-unverified"))
             return run
 
-        runs = [look(ref) for ref in lane.get("runs", [])]
+        distinct, refs = set(), []  # LANE-4: a run named twice counts once
+        for ref in lane.get("runs", []):
+            key = (get(ref, "runId"), get(ref, "runHash"))
+            if key not in distinct:
+                distinct.add(key)
+                refs.append(ref)
+        runs = [look(ref) for ref in refs]
         baseline = look(rule["baseline"]) if rule.get("kind") == "comparison" and isinstance(rule.get("baseline"), dict) else None
         binding = (get(m, "subject", "ref"), get(m, "subject", "deployment"),
                    rule.get("suite") if isinstance(rule.get("suite"), dict) else None)
         result = lane_result(rule, runs, baseline, version, fallback, binding)
         lanes.append({"lane": name, "result": result})
-        if given is not None and name in recorded:
+        if given is not None and name in recorded and _rule_unknown(rule):
+            problems.add((f"lanes/{name}", "unverifiable"))  # CKP-8: a later minor's rule is not compared
+        elif given is not None and name in recorded:
             before = recorded[name].get("result")
             where = f"lanes/{name}"
             if (before is None) != (result is None):
@@ -1955,6 +2094,8 @@ def _pem_der(pem):
         raise ValueError("not a PEM PUBLIC KEY block, or text around it")
     if any(not re.fullmatch(r"[A-Za-z0-9+/]+={0,2}", line) for line in lines[1:-1]):
         raise ValueError("a PEM line that is not base64 alone (blank, or with whitespace)")
+    if any(len(line) != 64 for line in lines[1:-2]) or not 1 <= len(lines[-2]) <= 64:
+        raise ValueError("PEM lines of 64 characters but the last (RFC 7468's strict form)")
     return base64.b64decode("".join(lines[1:-1]), validate=True)
 
 
@@ -2033,6 +2174,8 @@ def verify_signature(envelope_bytes, file_bytes, payload_type, policy):
     """§4.4: {'envelopeResult', 'signatures', 'verifiesFor'}."""
     keys = load_policy(policy)
     try:
+        if len(envelope_bytes) > MAX_ENVELOPE or nesting_depth(envelope_bytes) > MAX_DEPTH:
+            raise ValueError("an envelope beyond ENC-17's limits")  # SIG-1: malformed
         envelope = load_json_bytes(envelope_bytes)
         if not isinstance(envelope.get("signatures"), list) or not envelope["signatures"]:
             raise aef_crypto.EnvelopeError("an envelope has at least one signature")
@@ -2161,7 +2304,7 @@ def decide(inp):
             if status == "failed":
                 evidence = set(lane.get("evidence") or [])
                 own = [x for x in exceptions if x["lane"] == name]
-                same = [x for x in own if set(x["evidence"]) == evidence]
+                same = [x for x in own if set(x["evidence"]) == evidence or "exception-evidence" in MUTATIONS]
                 applying = [x for x in same if parse_time(x["at"]) <= now < parse_time(x["expires"])]
                 if applying:
                     status, code = "waived", "waived"
@@ -2211,6 +2354,18 @@ def op_match(plan_path, runner_path):
     return {"matches": bool(aef_stream.matches(load_json_file(plan_path), load_json_file(runner_path)))}
 
 
+def _stream_event(raw):
+    """A stream line's event, or None when it is not an I-JSON object valid against the reader schema (STRM-3
+    event-invalid)."""
+    if len(raw) > MAX_JSON or nesting_depth(raw) > MAX_DEPTH:
+        return None  # beyond ENC-17's limits: not read
+    try:
+        event = load_json_bytes(raw)
+    except EncodingProblem:
+        return None
+    return event if isinstance(event, dict) and schema_valid("reader", "runner-event", event) else None
+
+
 def op_stream(events_path, plan_path):
     data = Path(events_path).read_bytes()
     try:
@@ -2219,10 +2374,11 @@ def op_stream(events_path, plan_path):
     except (OSError, EncodingProblem) as error:
         raise InputError(f"{plan_path}: {error}") from None
     complete = data[:data.rfind(b"\n") + 1]  # STRM-2: a last line without LF is still being written
-    try:
-        events = [load_json_bytes(raw) for _, _, raw in ndjson_lines(complete)]
-    except EncodingProblem as error:
-        raise InputError(f"{events_path}: {error}") from None
+    if ndjson_framing(complete):  # STRM-3: one problem, and the stream is not checked further
+        return {"problems": [["stream", "encoding"]]}
+    if len(ndjson_lines(complete)) > MAX_LINES:  # ENC-17: one limit at stream, not checked further
+        return {"problems": [["stream", "limit"]]}
+    events = [_stream_event(raw) for _, _, raw in ndjson_lines(complete)]
     problems = aef_stream.verify(events, plan, sha256_hex(plan_bytes))
     return {"problems": [list(p) for p in problems]}
 
@@ -2243,11 +2399,9 @@ def op_conform(events_path, plan_path, runs_dir, policy=None):
     if not isinstance(plan, dict):
         raise InputError(f"{plan_path}: not a run plan")
     events = []
-    for number, _, raw in ndjson_lines(data[:data.rfind(b"\n") + 1]):  # STRM-2: an unfinished last line is not read
-        try:
-            events.append(load_json_bytes(raw))
-        except EncodingProblem as error:
-            raise InputError(f"{events_path}:{number}: not an I-JSON object: {error}") from None
+    complete = data[:data.rfind(b"\n") + 1]  # STRM-2: an unfinished last line is not read
+    if not ndjson_framing(complete):  # STRM-4 reads the events STRM-3 can read; the others take no part
+        events = [e for e in (_stream_event(raw) for _, _, raw in ndjson_lines(complete)) if e is not None]
 
     named, announced, accepted, terminal = [], {}, None, None
     for e in events:
@@ -2308,14 +2462,14 @@ def _plan_problems(doc, plan, accepted, terminal):
     if read_content_capture(doc.get("contentCapture")) != plan.get("contentCapture"):
         codes.add("content-capture")
     deployment, endpoint = get(plan, "subject", "deployment"), get(plan, "subject", "endpoint")
-    if (deployment is not None and get(doc, "deployment", "ref") != deployment) or (
-            endpoint is not None and get(doc, "deployment", "endpoint") != endpoint):
+    if "plan-where-when" not in MUTATIONS and ((deployment is not None and get(doc, "deployment", "ref") != deployment) or (
+            endpoint is not None and get(doc, "deployment", "endpoint") != endpoint)):
         codes.add("deployment")  # an absent value is not it
     started, ended = time_key(doc.get("startedAt")), time_key(doc.get("endedAt"))
     accepted_at = time_key(accepted.get("at")) if accepted else None
     terminal_at = time_key(terminal.get("at")) if terminal else None
-    if (started is not None and accepted_at is not None and started < accepted_at) or (
-            ended is not None and terminal_at is not None and ended > terminal_at):
+    if "plan-where-when" not in MUTATIONS and ((started is not None and accepted_at is not None and started < accepted_at) or (
+            ended is not None and terminal_at is not None and ended > terminal_at)):
         codes.add("time")  # made by this job, between its acceptance and its end
 
     def judges(items):

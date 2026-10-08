@@ -1,0 +1,13 @@
+{
+  "kind": "seal-write",
+  "rules": [
+    "SEAL-1",
+    "SEAL-6",
+    "ENC-8"
+  ],
+  "run": "run",
+  "sealedBy": "producer",
+  "sealedAt": "2026-10-01T00:00:59.999999999Z",
+  "refused": true,
+  "why": "A seal dated before its run closed is a predicate problem, and a sealer never writes one: --sealed-at is 1 ns before run.json's endedAt (times compare at the precision written, never rounded). The sealer refuses (exit status 2) and writes nothing."
+}

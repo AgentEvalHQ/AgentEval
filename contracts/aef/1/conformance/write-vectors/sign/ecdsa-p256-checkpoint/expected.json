@@ -1,0 +1,17 @@
+{
+  "kind": "sign",
+  "rules": [
+    "SIG-1",
+    "SIG-2",
+    "SIG-3",
+    "CKP-5"
+  ],
+  "algorithm": "ecdsa-p256",
+  "file": "checkpoint.json",
+  "payloadType": "application/vnd.agenteval.aef.checkpoint+json",
+  "key": "../../../signature-vectors/keys/ecdsa-b.key.pem",
+  "policy": "policy.json",
+  "keyid": "sha256:73af97a27d5d09ef4bf48e650748da6cab2b7e75b9345d129ebcef17449d7e34",
+  "identity": "git:bob@example.com",
+  "why": "A checkpoint manifest, with the checkpoint payload type, signed with a P-256 key."
+}

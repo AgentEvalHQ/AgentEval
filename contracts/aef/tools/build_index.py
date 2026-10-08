@@ -30,6 +30,10 @@ CLASSES = {
     "matching": ["Runner"],
     "stream": ["Stream verifier"],
     "plan-conformance": ["Stream verifier"],
+    # The write-side vectors (spec 09 §9.2): the implementation computes or writes, the runner judges.
+    "summarize": ["Producer"],
+    "seal-write": ["Sealer"],
+    "sign": ["Sealer"],
 }
 
 
@@ -84,6 +88,21 @@ def main():
         shared = {p.name: sha(p) for p in sorted(folder.glob("*.json"), key=lambda p: p.name.encode())}
         if shared:  # files several vectors of the folder use (the stream vectors' plans): checked, never run
             vectors.append(entry(f"protocol/{sub}/shared", "fixture", rules, f"protocol/{sub}", shared, CLASSES[kind]))
+    # write-vectors/<kind>/<name>/: summarize (Producer), seal-write and sign (Sealer). A sign vector's private key
+    # is in signature-vectors/keys/, the fixture above.
+    for kind in ("summarize", "seal-write", "sign"):
+        folder = ROOT / "write-vectors" / kind
+        if not folder.exists():
+            continue
+        for d in sorted((p for p in folder.iterdir() if p.is_dir()), key=lambda p: p.name.encode()):
+            exp = json.loads((d / "expected.json").read_text(encoding="utf-8"))
+            assert exp["kind"] == kind, f"{d}: kind {exp['kind']} in the {kind} folder"
+            e = entry(f"write-vectors/{kind}/{d.name}", kind, exp.get("rules", []), f"write-vectors/{kind}/{d.name}",
+                      files_of(d))
+            if kind == "sign":  # spec 09 §9.1: a Sealer passes the sign vectors of the algorithms it signs with
+                assert exp.get("algorithm") in ("ecdsa-p256", "ed25519"), f"{d}: no signing algorithm"
+                e["algorithm"] = exp["algorithm"]
+            vectors.append(e)
 
     ids = [v["id"] for v in vectors]
     assert len(ids) == len(set(ids)), "duplicate vector id"

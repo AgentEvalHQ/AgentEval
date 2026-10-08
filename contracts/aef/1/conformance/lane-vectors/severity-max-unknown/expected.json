@@ -10,12 +10,30 @@
         "subjectVersion": "v7",
         "oldestClosedAt": "2026-10-03T00:00:00Z"
       }
+    },
+    {
+      "lane": "kind-unknown",
+      "result": {
+        "status": "not_measured",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-03T00:00:00Z"
+      }
     }
   ],
-  "problems": [],
+  "problems": [
+    [
+      "lanes/kind-unknown",
+      "unverifiable"
+    ],
+    [
+      "lanes/max-unknown",
+      "unverifiable"
+    ]
+  ],
   "rules": [
     "LANE-3",
     "VER-8",
+    "CKP-8",
     "LANE-10"
   ]
 }

@@ -98,6 +98,14 @@
         "subjectVersion": "v7",
         "oldestClosedAt": "2026-10-03T00:00:00Z"
       }
+    },
+    {
+      "lane": "failing-trial-counts",
+      "result": {
+        "status": "failed",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-03T00:00:00Z"
+      }
     }
   ],
   "problems": [],
@@ -105,6 +113,7 @@
     "LANE-3",
     "RES-9",
     "RES-2",
+    "RES-8",
     "LANE-10"
   ]
 }

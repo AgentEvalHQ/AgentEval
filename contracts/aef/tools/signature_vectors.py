@@ -227,6 +227,12 @@ def policy_and_envelope_vectors(seal_bytes):
     refused("pem-indented-line-in-policy", good, seal_bytes, {"keys": [{"identity": WHO["ecdsa-a"], "publicKey": indented}]},
             ["SIG-3"])
 
+    # SIG-3: lines of 64 characters but the last; the same key wrapped at 76 is refused.
+    body = "".join(PEM["ecdsa-a"].strip().splitlines()[1:-1])
+    long_lines = "-----BEGIN PUBLIC KEY-----\n" + "\n".join(body[i:i + 76] for i in range(0, len(body), 76)) + "\n-----END PUBLIC KEY-----\n"
+    refused("pem-long-lines-in-policy", good, seal_bytes, {"keys": [{"identity": WHO["ecdsa-a"], "publicKey": long_lines}]},
+            ["SIG-3"])
+
     # SIG-3: a key id listed twice.
     refused("key-listed-twice-in-policy", good, seal_bytes,
             {"keys": [alice, {"identity": WHO["ecdsa-b"], "publicKey": PEM["ecdsa-a"]}]}, ["SIG-3", "SIG-4"])
@@ -273,6 +279,7 @@ def main():
         "`rsa.pub.pem` is an RSA key AEF does not support; its modulus is arbitrary.\n\n"
         "| Key | Key id |\n|---|---|\n" + "".join(f"| `{n}` | `{ID.get(n, RSA_ID)}` |\n" for n in ("ecdsa-a", "ecdsa-b", "ed25519-a", "rsa"))
     ).encode())
+    write_private_keys()
 
     seal_bytes = (CONF / "valid" / "completed-eval" / "run" / "seal.json").read_bytes()
     other_seal = (CONF / "valid" / "aborted-early" / "run" / "seal.json").read_bytes()
@@ -424,8 +431,8 @@ def redaction_vectors():
         ("redacted-run", policy("ecdsa-a", may=("ecdsa-a",)),
          {"status": "passed", "subjectVersion": "git:3f2a1c", "oldestClosedAt": "2026-10-02T14:06:23.004Z"}, []),
         ("redacted-run-no-policy", None,
-         {"status": "not_measured", "subjectVersion": "git:3f2a1c", "oldestClosedAt": "2026-10-02T14:06:23.004Z"},
-         [[f"lanes/quality/runs/{COMPLETED_ID}", "run-unverified"]]),
+         {"status": "not_measured", "subjectVersion": "git:3f2a1c", "oldestClosedAt": "2026-10-08T00:00:00Z"},  # LANE-9:
+         [[f"lanes/quality/runs/{COMPLETED_ID}", "run-unverified"]]),  # a run not intact gives no age; the evaluation time
     ]:
         d = CONF / "lane-vectors" / name
         if d.exists():
@@ -461,6 +468,33 @@ def signed_runs():
         write_json(d / "policy.json", pol)
         write_json(d / "expected.json", {"kind": "run", "run": "run", "policy": "policy.json", "outcome": "intact",
                                          "problems": [], "signedBy": signed_by, "rules": ["SIG-5", "SIG-7"]})
+
+
+def write_private_keys():
+    """The private test keys, for the write-side `sign` vectors (spec 09, tools/write_vectors.py): unencrypted PKCS#8
+    PEM (RFC 5208 / RFC 5958). P-256 holds an RFC 5915 ECPrivateKey (version 1, the scalar, and the public key, as
+    OpenSSL writes it); Ed25519 holds its 32-byte seed (RFC 8410). TEST KEYS, derived from public strings: never
+    trust them."""
+    def pem(der):
+        b64 = base64.b64encode(der).decode()
+        return ("-----BEGIN PRIVATE KEY-----\n" + "\n".join(b64[i:i + 64] for i in range(0, len(b64), 64))
+                + "\n-----END PRIVATE KEY-----\n")
+
+    p256 = C._der(0x30, C.ID_EC_PUBLIC_KEY + C.PRIME256V1)
+    for name, key in (("ecdsa-a", KA), ("ecdsa-b", KB)):
+        point = C.spki_der(key.public_key)[-65:]  # 0x04 || X || Y
+        ec = C._der(0x30, C._der(0x02, b"\x01") + C._der(0x04, key.d.to_bytes(32, "big"))
+                    + C._der(0xA1, C._der(0x03, b"\x00" + point)))
+        write(OUT / "keys" / f"{name}.key.pem", pem(C._der(0x30, C._der(0x02, b"\x00") + p256 + C._der(0x04, ec))).encode())
+    ed = C._der(0x30, C._der(0x02, b"\x00") + C._der(0x30, C.ID_ED25519) + C._der(0x04, C._der(0x04, ED.seed)))
+    write(OUT / "keys" / "ed25519-a.key.pem", pem(ed).encode())
+    readme = OUT / "keys" / "README.md"
+    readme.write_bytes(readme.read_bytes() + (
+        "\n## Private keys: test keys, never trust them\n\n"
+        "`<key>.key.pem` is the private key of `<key>.pub.pem`, an unencrypted PKCS#8 `PRIVATE KEY` block (RFC 5208,\n"
+        "RFC 5958): for P-256 an RFC 5915 ECPrivateKey with its public key, for Ed25519 the 32-byte seed (RFC 8410).\n"
+        "The write-side `sign` vectors (spec 09, `write-vectors/sign/`) sign with them. They are published, so anyone\n"
+        "can sign with them: never put them, or their public keys, in a real trust policy.\n").encode())
 
 
 if __name__ == "__main__":

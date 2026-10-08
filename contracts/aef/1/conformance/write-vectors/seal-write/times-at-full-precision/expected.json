@@ -1,0 +1,31 @@
+{
+  "kind": "seal-write",
+  "rules": [
+    "SEAL-5",
+    "ENC-8"
+  ],
+  "run": "run",
+  "sealedBy": "producer",
+  "sealedAt": "2026-10-08T09:00:00.000000001Z",
+  "manifest": "expected-manifest.txt",
+  "predicate": {
+    "schemaVersion": "1.0",
+    "runId": "seal-write-times",
+    "runHash": "b671883009bfd80be786461c7b8ca81e86ce8a7ed8a6e9b3dc2528e1e3d86457",
+    "producer": {
+      "name": "p",
+      "version": "1"
+    },
+    "subject": {
+      "ref": "agent:a/b",
+      "version": "v1"
+    },
+    "deployment": null,
+    "suite": null,
+    "judges": [],
+    "closedAt": "2026-10-01T00:01:00.123456789Z",
+    "sealedAt": "2026-10-08T09:00:00.000000001Z",
+    "sealedBy": "producer"
+  },
+  "why": "closedAt is run.json's endedAt and sealedAt the time given, both at the nine fraction digits written: a writer that rounds them (to 100 ns, say) writes another time."
+}

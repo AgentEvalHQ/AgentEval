@@ -1,0 +1,28 @@
+{
+  "lanes": [
+    {
+      "lane": "quality",
+      "metrics": [
+        {
+          "metric": "pass_rate",
+          "path": "q"
+        },
+        {
+          "metric": "helpfulness",
+          "path": "q"
+        }
+      ]
+    },
+    {
+      "lane": "security",
+      "metrics": [
+        {
+          "metric": "pass_rate",
+          "path": "q",
+          "rule": "pass_rate == 1",
+          "verdict": "failed"
+        }
+      ]
+    }
+  ]
+}

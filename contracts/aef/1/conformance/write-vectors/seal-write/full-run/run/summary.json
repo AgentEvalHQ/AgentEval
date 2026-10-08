@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "seal-write-full",
+  "lanes": [
+    {
+      "lane": "quality",
+      "metrics": [
+        {
+          "metric": "quality",
+          "path": "q",
+          "N": 2,
+          "n": 2,
+          "notMeasured": 0,
+          "sum": 1.4,
+          "sumSq": 1.06,
+          "value": 0.7,
+          "verdict": "passed",
+          "rule": "quality >= 0.6"
+        }
+      ]
+    }
+  ]
+}

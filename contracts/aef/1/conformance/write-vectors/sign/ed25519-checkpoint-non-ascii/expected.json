@@ -1,0 +1,18 @@
+{
+  "kind": "sign",
+  "rules": [
+    "SIG-1",
+    "SIG-2",
+    "SIG-3",
+    "CKP-5"
+  ],
+  "algorithm": "ed25519",
+  "file": "checkpoint.json",
+  "payloadType": "application/vnd.agenteval.aef.checkpoint+json",
+  "key": "../../../signature-vectors/keys/ed25519-a.key.pem",
+  "policy": "policy.json",
+  "keyid": "sha256:2986cef07918485086a97ba70ef87ea966b8c3634fb59bcafc4e8b6a9ea5d787",
+  "identity": "spiffe://example.com/ci/sealer",
+  "why": "A checkpoint manifest holding multi-byte UTF-8 characters: PAE counts the payload's bytes, not its characters.",
+  "sig": "pup45za5YuI2l+47HVObwydoNwdeS2OOfOcoDDBAbGWVIv6nk93A/cXUCkVGqTs1EOMhr/TsabKOqIU3fnS2DA=="
+}

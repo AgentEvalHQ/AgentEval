@@ -1,0 +1,8 @@
+{"schemaVersion":"1.0","resultId":"r_ba52b5a9a4a99260cbec12c4708cab32","caseId":"k1","path":"q","evaluator":{"id":"e:q"},"state":"passed"}
+{"schemaVersion":"1.0","resultId":"r_f3d65235cea101ae79b97f1fa52b33ae","caseId":"k2","path":"q","evaluator":{"id":"e:q"},"state":"failed"}
+{"schemaVersion":"1.0","resultId":"r_d89da8ba1941cd561cd8fcd08f9aa19d","caseId":"k3","path":"q","evaluator":{"id":"e:q"},"state":"warn"}
+{"schemaVersion":"1.0","resultId":"r_41c249fb2a15398a7992769c3c6aa143","caseId":"k4","path":"q","evaluator":{"id":"e:q"},"state":"inconclusive"}
+{"schemaVersion":"1.0","resultId":"r_504ad24113b43733e9065871861b242a","caseId":"k5","path":"q","evaluator":{"id":"e:q"},"state":"passed"}
+{"schemaVersion":"1.0","resultId":"r_1429a029a3c46821d3e277fd2cac74c4","caseId":"k6","path":"q","evaluator":{"id":"e:q"},"state":"scored","scores":[{"metric":"latency","value":850}]}
+{"schemaVersion":"1.0","resultId":"r_16698df1df7d321efff008ef042e4002","caseId":"k7","path":"q","evaluator":{"id":"e:q"},"state":"not_measured","reason":"The input the evaluator needs was not there."}
+{"schemaVersion":"1.0","resultId":"r_4d10b8792cadc0e7bb2bb00ada9db63a","caseId":"k8","path":"q","evaluator":{"id":"e:q"},"state":"not_applicable","reason":"The input the evaluator needs was not there."}

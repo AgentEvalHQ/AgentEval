@@ -1,0 +1,10 @@
+{
+  "kind": "document",
+  "schema": "run",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "RUN-5"
+  ],
+  "why": "only an aborted run has an abortReason"
+}

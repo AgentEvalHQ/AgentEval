@@ -1,0 +1,7 @@
+{"schemaVersion":"1.0","resultId":"r_10c7092ac505cce334ccdec864db178f","caseId":"k1","path":"q","evaluator":{"id":"e:q"},"state":"passed","scores":[{"metric":"helpfulness","value":0.8}],"lane":"quality"}
+{"schemaVersion":"1.0","resultId":"r_5ee54879322169d8221ed768d49bd620","caseId":"k2","path":"q","evaluator":{"id":"e:q"},"state":"failed","scores":[{"metric":"helpfulness","value":0.4}],"lane":"quality"}
+{"schemaVersion":"1.0","resultId":"r_ada03bd6f5cbc1f5709bd0ee2ef2baf0","caseId":"k3","path":"q","evaluator":{"id":"e:q"},"state":"passed","lane":"security"}
+{"schemaVersion":"1.0","resultId":"r_516c6069582819dd8252b1d6ac854005","caseId":"k4","path":"q","evaluator":{"id":"e:q"},"state":"failed","lane":"security"}
+{"schemaVersion":"1.0","resultId":"r_afca7e038676da72f80d62710aa48889","caseId":"k5","path":"q","evaluator":{"id":"e:q"},"state":"failed","lane":"security"}
+{"schemaVersion":"1.0","resultId":"r_b33bd8bff86528250aa16cdc1a4531a2","caseId":"k6","path":"q","evaluator":{"id":"e:q"},"state":"passed","scores":[{"metric":"helpfulness","value":0.9}]}
+{"schemaVersion":"1.0","resultId":"r_94a1b6259c7e854db1a0fcbe82d9bd48","caseId":"k7","path":"q","evaluator":{"id":"e:q"},"state":"passed","lane":"memory"}

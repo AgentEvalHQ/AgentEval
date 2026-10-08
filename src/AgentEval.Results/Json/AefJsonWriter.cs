@@ -14,7 +14,7 @@ namespace AgentEval.Results.Json;
 /// Writes JSON the way an AEF writer must (contracts/aef/1/spec/02-encoding.md): UTF-8 with no byte-order mark, LF line
 /// ends on every platform, every number the binary64 value a reader will read ([ENC-4]) with integers in plain digits
 /// (<c>2</c>, never <c>2.0</c> or <c>2E0</c>), and nothing a reader must refuse: no NaN or infinity ([ENC-3]), no unpaired
-/// surrogate ([ENC-2]), no nesting deeper than 64 and no document or line above 4 MiB (32 MiB for a seal or an
+/// surrogate ([ENC-2]), no nesting deeper than 64 and no document or line above 4 MiB (40 MiB for a seal, 56 MiB for an
 /// envelope) ([ENC-17]).
 /// </summary>
 /// <remarks>
@@ -30,7 +30,7 @@ public static class AefJsonWriter
     /// <param name="document">The document.</param>
     /// <param name="maxBytes">
     /// Its size limit ([ENC-17]): <see cref="AefLimits.MaxJsonBytes"/>, or for a seal or an envelope
-    /// <see cref="AefLimits.MaxSealBytes"/> (<see cref="AefLimits.MaxBytesOf"/> gives it by path).
+    /// <see cref="AefLimits.MaxSealBytes"/> or <see cref="AefLimits.MaxEnvelopeBytes"/> (<see cref="AefLimits.MaxBytesOf"/> gives it by path).
     /// </param>
     /// <exception cref="ArgumentException">A value a reader would refuse, or a document beyond the limits.</exception>
     public static byte[] Document(JsonObject document, int maxBytes = AefLimits.MaxJsonBytes)

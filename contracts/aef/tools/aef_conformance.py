@@ -2,9 +2,9 @@
 """The AEF 1.0 conformance runner (spec 09 §9.3): runs every vector of conformance/ through an implementation and
 compares its result with the expected one. Standard library only.
 
-The implementation is tools/aef_verify.py, called in-process, or any program that follows aef_verify.py's command-line
-contract (one command per operation, input paths as arguments, one JSON value on standard output), given with
---command. Each vector's `kind` names the operation:
+The implementation is tools/aef_verify.py (with tools/aef_produce.py for the write operations), called in-process, or
+any program that follows aef_verify.py's command-line contract (one command per operation, input paths as arguments,
+one JSON value on standard output), given with --command. Each vector's `kind` names the operation:
 
   kind          vectors                                   operation          compared
   run           valid/, runs/                             run DIR [--policy P] [--anchors A]
@@ -30,6 +30,22 @@ contract (one command per operation, input paths as arguments, one JSON value on
                                                                              problems (ordered)
   paths         paths.json                                paths FILE         problems per item (ordered)
   result-id     result-ids.json                           result-id ...      the result id
+  summarize     write-vectors/summarize/                  summarize DIR REQUEST
+                                                                             the summary.json written: writer schema,
+                                                                             each entry (sums under §3.6's tolerance),
+                                                                             and the run verifier on the run with it
+  seal-write    write-vectors/seal-write/                 seal-write COPY --sealed-by B --sealed-at T
+                                                                             on a fresh copy of the run: writer schema,
+                                                                             subjects, predicate, nothing else changed,
+                                                                             and the run verifier: intact
+  sign          write-vectors/sign/                       sign FILE KEY --payload-type T
+                                                                             the envelope: one signature under the
+                                                                             key id, standard base64, verified for the
+                                                                             identity by the signature operation; for
+                                                                             Ed25519 the signature bytes
+
+The write operations (summarize, seal-write, sign) are judged by the reference verifier, in-process, whichever
+implementation is under test: aef_verify.py checks what the implementation wrote.
 
 When conformance/index.json exists (CONF-1), the vectors are read from it and every file's SHA-256 is checked
 against it first: a vector with a file that does not match, or an extra file, fails without being run (CONF-3). An
@@ -39,21 +55,29 @@ Otherwise the folders are walked; a folder that does not exist is skipped with a
 
 Usage:
   python aef_conformance.py [--corpus DIR] [--index FILE | --no-index] [--command "CMD ..."] [--kind KIND ...]
-                            [--class NAME ...] [--level intact|signed] [--quiet]
+                            [--class NAME ...] [--level intact|signed] [--sign-algorithms ecdsa-p256,ed25519]
+                            [--quiet]
+      --sign-algorithms names the algorithms a Sealer signs with (spec 09 §9.1: a signer uses one of SIG-2's two);
+      the sign vectors of the others are skipped and counted as skipped. The default is both.
   python aef_conformance.py --self-check
       Runs the corpus once per mutation of the verifier (each switches one check off: the seal digest, the
       manifest's byte order, the I-JSON duplicate-member check, the $-at-end-of-input pattern rule, the summary
       recomputation, the overlay runHash check, the numeric order of line numbers, the anchor list, the trust
-      policy's key list). Each mutation must make some vector fail that passes unmutated.
+      policy's key list), and once per break of a writer in aef_produce.py (typed absences left out of N, sums in
+      binary64, trial lines counted, a file left out of the seal, paths in segment order, another signing key,
+      unpadded base64). Each mutation must make some vector fail that passes unmutated.
 Exit status: 0 when every vector passes (and, with --self-check, every mutation is caught), else 1.
 """
 from __future__ import annotations
 
 import argparse
+import base64
 import hashlib
 import json
 import os
+import re
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -64,6 +88,7 @@ TOOLS = Path(__file__).resolve().parent
 if str(TOOLS) not in sys.path:  # python -I leaves the script's own folder out of sys.path
     sys.path.insert(0, str(TOOLS))
 
+import aef_produce  # noqa: E402
 import aef_verify  # noqa: E402
 
 CORPUS = TOOLS.parent / "1" / "conformance"
@@ -72,13 +97,16 @@ CORPUS = TOOLS.parent / "1" / "conformance"
 # ---------------------------------------------------------------------------- engines
 
 class InProcess:
-    """The reference verifier, called as a library with the same arguments as its command line."""
-    name = "aef_verify.py (in-process)"
+    """The reference implementation, called as a library with the same arguments as its command line: aef_verify.py,
+    and aef_produce.py for the write operations."""
+    name = "aef_verify.py and aef_produce.py (in-process)"
 
     def call(self, argv):
+        argv = [str(a) for a in argv]
+        module = aef_produce if argv and argv[0] in aef_produce.OPERATIONS else aef_verify
         try:
-            return aef_verify.dispatch([str(a) for a in argv])
-        except aef_verify.InputError as error:
+            return module.dispatch(argv)
+        except (aef_verify.InputError, aef_produce.InputError) as error:
             return {"error": str(error)}
 
 
@@ -114,7 +142,10 @@ KIND_CLASSES = {
     "overlay-view": ["Overlay verifier"], "checkpoint": ["Checkpoint verifier"], "lane": ["Checkpoint verifier"],
     "decision": ["Checkpoint verifier", "Decision engine"], "plan": ["Runner"], "matching": ["Runner"],
     "stream": ["Stream verifier"], "plan-conformance": ["Stream verifier"],
+    "summarize": ["Producer"], "seal-write": ["Sealer"], "sign": ["Sealer"],
 }
+WRITE_KINDS = ("summarize", "seal-write", "sign")  # write-vectors/<kind>/<name>/ (spec 09 §9.2.1)
+SIGN_ALGORITHMS = ("ecdsa-p256", "ed25519")  # SIG-2: a signer uses one of these; a sign vector names the one it needs
 
 
 class Vector:
@@ -122,6 +153,7 @@ class Vector:
         self.kind, self.id, self.path, self.expected, self.item = kind, vid, Path(path), expected, item
         self.classes = classes if classes is not None else KIND_CLASSES.get(kind, [])
         self.guard = None  # with index.json: refuses a file read outside the vector's own (checked) files
+        self.algorithm = expected.get("algorithm") if isinstance(expected, dict) else None  # a sign vector's
 
 
 FOLDER_KINDS = [  # (folder, default kind when expected.json has none)
@@ -159,6 +191,13 @@ def walk(corpus, notices):
                 vectors.append(Vector(kind, f"protocol/{sub}/{d.name}", d, read_json(d / "expected.json")))
     else:
         notices.append("notice: protocol/ does not exist; its vectors are skipped")
+    writes = corpus / "write-vectors"
+    if writes.is_dir():
+        for kind in WRITE_KINDS:
+            for d in sorted(p for p in (writes / kind).iterdir() if p.is_dir()) if (writes / kind).is_dir() else []:
+                vectors.append(Vector(kind, f"write-vectors/{kind}/{d.name}", d, read_json(d / "expected.json")))
+    else:
+        notices.append("notice: write-vectors/ does not exist; its vectors are skipped")
     for name, kind in (("paths.json", "paths"), ("result-ids.json", "result-id")):
         f = corpus / name
         if not f.is_file():
@@ -240,6 +279,7 @@ def from_index(corpus, index_path):
         v = Vector(kind, vid, base, read_json(expected_file), classes=classes)
         v.guard = guard
         v.level = entry.get("level")
+        v.algorithm = entry.get("algorithm", v.algorithm)  # index.json gives a sign vector's algorithm
         vectors.append(v)
     return vectors, refusals
 
@@ -312,7 +352,7 @@ def run_vector(engine, v, scratch):
             compare(diffs, "problems", out.get("problems"), e["problems"])
     elif v.kind == "lane":
         out = engine.call(["lanes", d / e.get("checkpoint", "checkpoint.json"), "--runs", d / e.get("runs", "runs")]
-                          + _policy(e, d))
+                          + (["--at", e["at"]] if "at" in e else []) + _policy(e, d))  # LANE-9's evaluation time
         if "error" in out:
             return [out["error"]]
         got = out.get("lanes") or []
@@ -384,6 +424,8 @@ def run_vector(engine, v, scratch):
             argv.append(json.dumps(item["trial"]))
         out = engine.call(argv)
         compare(diffs, "resultId", out.get("resultId", out), item["resultId"])
+    elif v.kind in WRITE_KINDS:
+        judge_write(engine, v, scratch, diffs)
     else:
         diffs.append(f"no operation for kind {v.kind!r} in this runner yet")
     return diffs
@@ -394,20 +436,183 @@ def _policy(expected, folder):
     return ["--policy", folder / expected["policy"]] if "policy" in expected else []
 
 
-def run_all(engine, vectors, refusals, quiet=False, show=print):
-    """{kind: [passed, failed]} and the failing ids."""
+# ---------------------------------------------------------------------------- the write-side vectors (spec 09 §9.3)
+# The implementation computes or writes something; the runner judges it, partly through the reference verifier
+# (aef_verify.py, in-process), whichever implementation is under test. Nothing is compared byte for byte except an
+# Ed25519 signature: JSON formatting is free, and ECDSA signatures need not be deterministic.
+
+_STANDARD_BASE64 = re.compile(r"(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?")
+
+
+def _close(actual, expected):
+    """§3.6: numbers match when they differ by at most 1e-9 x max(1, |expected|); null matches only null."""
+    if actual is None or expected is None:
+        return actual is None and expected is None
+    if isinstance(actual, bool) or not isinstance(actual, (int, float)):
+        return False
+    return abs(actual - expected) <= 1e-9 * max(1.0, abs(expected))
+
+
+def _files(root):
+    """{path: bytes} of every file under root."""
+    return {p.relative_to(root).as_posix(): p.read_bytes() for p in sorted(Path(root).rglob("*")) if p.is_file()}
+
+
+def _fresh_copy(scratch, source):
+    """A copy of a run folder in a new folder of the scratch directory: a write operation never runs in the corpus."""
+    target = Path(tempfile.mkdtemp(dir=scratch)) / "run"
+    shutil.copytree(source, target)
+    return target
+
+
+def judge_write(engine, v, scratch, diffs):
+    e, d = v.expected, v.path
+    if v.kind == "summarize":
+        out = engine.call(["summarize", d / e.get("run", "run"), d / e["request"]])
+        if e.get("refused"):  # an input that contradicts what the Producer must compute: an input error (exit 2)
+            if not (isinstance(out, dict) and "error" in out):
+                diffs.append(f"computed a summary for a request it must refuse: {json.dumps(out)}")
+            return
+        if not isinstance(out, dict) or "error" in out:
+            diffs.append(out.get("error") if isinstance(out, dict) else f"not a JSON object: {json.dumps(out)}")
+            return
+        _judge_summary(diffs, out, e["summary"])
+        if not aef_verify.document_ok("writer", "summary", out):
+            diffs.append("the summary is not valid against the writer summary schema")
+        work = _fresh_copy(scratch, d / e.get("run", "run"))
+        (work / "summary.json").write_bytes((json.dumps(out, ensure_ascii=False, indent=2) + "\n").encode("utf-8"))
+        verdict = aef_verify.op_run(work)
+        compare(diffs, "the run verifier on the run with this summary.json", [verdict["outcome"],
+                _problems(verdict["problems"])], [e.get("outcome", "unsealed"), []])
+    elif v.kind == "seal-write":
+        _judge_seal_write(engine, v, scratch, diffs)
+    elif v.kind == "sign":
+        _judge_sign(engine, v, scratch, diffs)
+
+
+def _judge_summary(diffs, out, want):
+    """[SUM-2]-[SUM-9]: runId, lanes and entries in request order; counts, verdict, rule and aggregate exactly; sum,
+    sumSq and value under §3.6's tolerance."""
+    compare(diffs, "runId", out.get("runId"), want["runId"])
+    lanes = [l for l in out.get("lanes")] if isinstance(out.get("lanes"), list) else []
+    compare(diffs, "lanes", [l.get("lane") if isinstance(l, dict) else l for l in lanes], [l["lane"] for l in want["lanes"]])
+    for have, lane in zip(lanes, want["lanes"]):
+        entries = have.get("metrics") if isinstance(have, dict) and isinstance(have.get("metrics"), list) else []
+        entries = [x if isinstance(x, dict) else {} for x in entries]
+        compare(diffs, f"{lane['lane']}: entries (metric, path)", [[x.get("metric"), x.get("path")] for x in entries],
+                [[x["metric"], x["path"]] for x in lane["metrics"]])
+        for got, x in zip(entries, lane["metrics"]):
+            label = f"{lane['lane']}/{x['metric']}@{x['path']}"
+            for field in ("N", "n", "notMeasured", "verdict", "rule", "aggregate"):
+                compare(diffs, f"{label} {field}", got.get(field, "<absent>"), x.get(field, "<absent>"))
+            for field in ("sum", "sumSq", "value"):
+                if not _close(got.get(field, "<absent>"), x[field]):
+                    diffs.append(f"{label} {field}: expected {json.dumps(x[field])} (within 1e-9 x max(1, |x|)), "
+                                 f"got {json.dumps(got.get(field, '<absent>'))}")
+
+
+def _judge_seal_write(engine, v, scratch, diffs):
+    """[SEAL-1]-[SEAL-5] on a fresh copy of the run: the seal.json written is valid against the writer schema, lists
+    the expected manifest's paths and digests in its order, holds the expected predicate (times as times), and is
+    the only change; the run verifier then finds the copy intact."""
+    e, d = v.expected, v.path
+    work = _fresh_copy(scratch, d / e.get("run", "run"))
+    before = _files(work)
+    out = engine.call(["seal-write", work, "--sealed-by", e["sealedBy"], "--sealed-at", e["sealedAt"]])
+    after = _files(work)
+    changed = sorted(p for p in set(before) | set(after) if p != "seal.json" and before.get(p) != after.get(p))
+    if e.get("refused"):  # [SEAL-1]: the run cannot be sealed; the operation refuses it and writes nothing
+        if not (isinstance(out, dict) and "error" in out):
+            diffs.append(f"sealed a run it must refuse: {json.dumps(out)}")
+        if after != before:
+            diffs.append(f"changed the run folder although it refused: {sorted(set(before) ^ set(after)) or changed}")
+        return
+    if not isinstance(out, dict) or "error" in out:
+        diffs.append(out.get("error") if isinstance(out, dict) else f"not a JSON object: {json.dumps(out)}")
+        return
+    manifest = (d / e["manifest"]).read_bytes()
+    compare(diffs, "runHash", out.get("runHash"), hashlib.sha256(manifest).hexdigest())
+    if changed:
+        diffs.append(f"files other than seal.json added, removed or changed: {', '.join(changed)}")
+    if "seal.json" not in after:
+        diffs.append("no seal.json was written")
+        return
+    try:
+        seal = aef_verify.load_json_bytes(after["seal.json"])
+    except aef_verify.EncodingProblem as error:
+        diffs.append(f"seal.json is not an I-JSON document: {error}")
+        return
+    if not aef_verify.document_ok("writer", "seal", seal):
+        diffs.append("seal.json is not valid against the writer seal schema")
+    want_subjects = [[line.split("  ", 2)[2], line.split("  ", 2)[0]] for line in manifest.decode("utf-8").splitlines()]
+    subjects = [[s.get("name"), (s.get("digest") or {}).get("sha256") if isinstance(s.get("digest"), dict) else None]
+                for s in seal.get("subject") or [] if isinstance(s, dict)]
+    compare(diffs, "subjects [name, sha256], in order", subjects, want_subjects)
+    predicate = seal.get("predicate") if isinstance(seal.get("predicate"), dict) else {}
+    compare(diffs, "predicate members", sorted(predicate), sorted(e["predicate"]))
+    for field, value in e["predicate"].items():
+        got = predicate.get(field, "<absent>")
+        if field in ("closedAt", "sealedAt"):  # compared as times ([ENC-8]), at the full precision written
+            if aef_verify.time_key(got) is None or aef_verify.time_key(got) != aef_verify.time_key(value):
+                diffs.append(f"predicate.{field}: expected the time {value}, got {json.dumps(got)}")
+        else:
+            compare(diffs, f"predicate.{field}", got, value)
+    verdict = aef_verify.op_run(work)
+    compare(diffs, "the run verifier on the sealed copy", [verdict["outcome"], _problems(verdict["problems"])],
+            ["intact", []])
+
+
+def _judge_sign(engine, v, scratch, diffs):
+    """[SIG-1]-[SIG-3]: the envelope has one signature under the key's id and standard, padded base64, and the
+    signature operation verifies it for the key's identity under the vector's trust policy."""
+    e, d = v.expected, v.path
+    key = d / e["key"]
+    if v.guard is not None:
+        v.guard.check(key)  # the test keys live outside the vector's folder (signature-vectors/keys/)
+    out = engine.call(["sign", d / e["file"], key, "--payload-type", e["payloadType"]])
+    if not isinstance(out, dict) or "error" in out:
+        diffs.append(out.get("error") if isinstance(out, dict) else f"not a JSON object: {json.dumps(out)}")
+        return
+    compare(diffs, "payloadType", out.get("payloadType"), e["payloadType"])
+    signatures = out.get("signatures")
+    if not (isinstance(signatures, list) and len(signatures) == 1 and isinstance(signatures[0], dict)):
+        diffs.append(f"signatures: expected one signature, got {json.dumps(signatures)}")
+        signatures = [{}]
+    compare(diffs, "keyid", signatures[0].get("keyid"), e["keyid"])
+    for field, text in (("payload", out.get("payload")), ("sig", signatures[0].get("sig"))):
+        if not (isinstance(text, str) and _STANDARD_BASE64.fullmatch(text)
+                and base64.b64encode(base64.b64decode(text)).decode("ascii") == text):
+            diffs.append(f"{field}: not base64 in the standard alphabet with padding ([SIG-1]): {json.dumps(text)}")
+    envelope = scratch / "sign-envelope.dsse.json"
+    envelope.write_bytes(json.dumps(out, ensure_ascii=False).encode("utf-8"))
+    verdict = aef_verify.op_signature(envelope, d / e["file"], d / e["policy"], e["payloadType"])
+    compare(diffs, "envelopeResult (the signature operation)", verdict["envelopeResult"], None)
+    compare(diffs, "signatures (the signature operation)", verdict["signatures"],
+            [{"keyid": e["keyid"], "result": "verified", "identity": e["identity"]}])
+    compare(diffs, "verifiesFor (the signature operation)", verdict["verifiesFor"], [e["identity"]])
+    if "sig" in e:  # Ed25519 is deterministic (RFC 8032): these bytes and no others
+        compare(diffs, "sig (Ed25519)", signatures[0].get("sig"), e["sig"])
+
+
+def run_all(engine, vectors, refusals, quiet=False, show=print, skipped=()):
+    """{kind: [passed, failed, skipped]} and the failing ids. `skipped`: vectors not run (the sign vectors of an
+    algorithm the implementation does not sign with), counted as such."""
     tally, failing = OrderedDict(), []
     with tempfile.TemporaryDirectory(prefix="aef-conformance-") as scratch:
         for kind, vid, why, _ in refusals:
-            tally.setdefault(kind, [0, 0])[1] += 1
+            tally.setdefault(kind, [0, 0, 0])[1] += 1
             failing.append(vid)
             show(f"FAIL  {kind:<12} {vid}\n      refused: {why}")
+        for v in skipped:
+            tally.setdefault(v.kind, [0, 0, 0])[2] += 1
+            if not quiet:
+                show(f"skip  {v.kind:<12} {v.id} (needs {v.algorithm}, not in --sign-algorithms)")
         for v in vectors:
             try:
                 diffs = run_vector(engine, v, Path(scratch))
             except Exception as error:  # a crash is a failure of that vector, not of the runner
                 diffs = [f"{type(error).__name__}: {error}"]
-            tally.setdefault(v.kind, [0, 0])[1 if diffs else 0] += 1
+            tally.setdefault(v.kind, [0, 0, 0])[1 if diffs else 0] += 1
             if diffs:
                 failing.append(v.id)
                 show(f"FAIL  {v.kind:<12} {v.id}")
@@ -420,12 +625,13 @@ def run_all(engine, vectors, refusals, quiet=False, show=print):
 
 def summary(tally, show=print):
     show("")
-    show(f"{'kind':<14}{'pass':>6}{'fail':>6}")
-    for kind, (ok, bad) in tally.items():
-        show(f"{kind:<14}{ok:>6}{bad:>6}")
+    skips = any(t[2] for t in tally.values())
+    show(f"{'kind':<14}{'pass':>6}{'fail':>6}" + (f"{'skip':>6}" if skips else ""))
+    for kind, (ok, bad, skip) in tally.items():
+        show(f"{kind:<14}{ok:>6}{bad:>6}" + (f"{skip:>6}" if skips else ""))
     total_ok = sum(t[0] for t in tally.values())
     total_bad = sum(t[1] for t in tally.values())
-    show(f"{'total':<14}{total_ok:>6}{total_bad:>6}")
+    show(f"{'total':<14}{total_ok:>6}{total_bad:>6}" + (f"{sum(t[2] for t in tally.values()):>6}" if skips else ""))
     return total_bad
 
 
@@ -433,16 +639,19 @@ def self_check(vectors, refusals):
     """Runs the corpus under each mutation; every one must make a vector fail."""
     engine = InProcess()
     caught_all = True
-    print("self-check: each mutation switches one check of aef_verify.py off; the corpus must notice")
+    print("self-check: each mutation switches one check of aef_verify.py off, or breaks one writer of aef_produce.py; "
+          "the corpus must notice")
     _, baseline = run_all(engine, vectors, refusals, quiet=True, show=lambda *a: None)
     print(f"  unmutated: {len(baseline)} vector(s) fail{': ' + ', '.join(baseline) if baseline else ''}"
           + (" (a mutation is caught only by a vector that passes unmutated)" if baseline else ""))
-    for name, what in aef_verify.KNOWN_MUTATIONS.items():
-        aef_verify.set_mutations({name})
+    mutations = [(module, name, what) for module in (aef_verify, aef_produce)
+                 for name, what in module.KNOWN_MUTATIONS.items()]
+    for module, name, what in mutations:
+        module.set_mutations({name})
         try:
             _, failing = run_all(engine, vectors, refusals, quiet=True, show=lambda *a: None)
         finally:
-            aef_verify.set_mutations(set())
+            module.set_mutations(set())
         new = [vid for vid in failing if vid not in baseline]
         caught_all &= bool(new)
         sample = ", ".join(new[:4]) + (f" and {len(new) - 4} more" if len(new) > 4 else "")
@@ -465,9 +674,15 @@ def main(argv):
     parser.add_argument("--level", choices=("intact", "signed"), default="signed",
                         help="a Run verifier's level (spec 09 §9.1): 'intact' leaves out the vectors index.json marks "
                              "signed")
+    parser.add_argument("--sign-algorithms", default=",".join(SIGN_ALGORITHMS), metavar="ALG[,ALG]",
+                        help="the algorithms a Sealer signs with (spec 09 §9.1), of " + ", ".join(SIGN_ALGORITHMS)
+                             + "; the sign vectors of the others are skipped and counted as such (default: both)")
     parser.add_argument("--quiet", action="store_true", help="print failures only")
     parser.add_argument("--self-check", action="store_true")
     a = parser.parse_args(argv[1:])
+    algorithms = {x.strip() for x in a.sign_algorithms.split(",") if x.strip()}
+    if not algorithms or algorithms - set(SIGN_ALGORITHMS):
+        parser.error(f"--sign-algorithms: one or both of {', '.join(SIGN_ALGORITHMS)}")
     corpus = Path(a.corpus).resolve()
     notices = []
     index = Path(a.index) if a.index else corpus / "index.json"
@@ -493,13 +708,19 @@ def main(argv):
         refusals = [r for r in refusals if wanted & {c.lower() for c in (r[3] or KIND_CLASSES.get(r[0], []))}]
     if a.level == "intact":
         vectors = [v for v in vectors if getattr(v, "level", None) != "signed"]
+    # A signer uses one of SIG-2's algorithms: a Sealer passes the sign vectors of those it claims (spec 09 §9.1).
+    skipped = [v for v in vectors if v.kind == "sign" and v.algorithm is not None and v.algorithm not in algorithms]
+    vectors = [v for v in vectors if v not in skipped]
+    if skipped:
+        print(f"skipped: {len(skipped)} sign vector(s) of an algorithm not in --sign-algorithms "
+              f"({', '.join(sorted(algorithms))})")
     if a.self_check:
         if a.command:
             parser.error("--self-check mutates the in-process verifier; it does not take --command")
         return 0 if self_check(vectors, refusals) else 1
     engine = External(a.command) if a.command else InProcess()
     print(f"implementation: {engine.name}")
-    tally, _ = run_all(engine, vectors, refusals, quiet=a.quiet)
+    tally, _ = run_all(engine, vectors, refusals, quiet=a.quiet, skipped=skipped)
     return 1 if summary(tally) else 0
 
 
