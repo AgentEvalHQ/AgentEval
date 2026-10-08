@@ -7,7 +7,7 @@ using System.Text.Json.Nodes;
 
 namespace AgentEval.Results;
 
-/// <summary>Reading AEF values the way every implementation must (contracts/aef/v2/README.md, §2).</summary>
+/// <summary>Reading AEF values the way every implementation must (contracts/aef/1/README.md, §2).</summary>
 public static class AefJson
 {
     /// <summary>

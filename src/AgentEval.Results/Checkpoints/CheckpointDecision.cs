@@ -82,9 +82,9 @@ public sealed record LaneDecision(string Lane, LaneStatus Status, bool Blocking,
 public sealed record CheckpointDecisionResult(CheckpointOutcome Outcome, IReadOnlyList<LaneDecision> Lanes, IReadOnlyList<string> Reasons);
 
 /// <summary>
-/// The AEF v2 checkpoint decision function (contracts/aef/v2/README.md, "The decision function"): pure, with no I/O
+/// The AEF 1.0 checkpoint decision function (contracts/aef/1/README.md, "The decision function"): pure, with no I/O
 /// and no clock (the evaluation time is an input), so anyone can recompute why a release was blocked. Versions compare
-/// byte for byte; times at their full precision. Its vectors are contracts/aef/v2/conformance/decision-vectors/.
+/// byte for byte; times at their full precision. Its vectors are contracts/aef/1/conformance/decision-vectors/.
 /// </summary>
 public static class CheckpointDecision
 {

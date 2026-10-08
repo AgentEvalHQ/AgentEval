@@ -1,0 +1,291 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/aef/1/reader/run-plan.schema.json",
+  "title": "AEF 1.0: run plan",
+  "description": "READER (tolerant), derived from the writer schema by tools/derive_reader.py. What a runner is asked to evaluate: the exact subject version, the suites and lanes, the limits, the content policy, where and how it runs, and the credentials it needs, as references only. See 1/README.md, 'Run plans and runners'.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "planId",
+    "subject",
+    "suites",
+    "limits",
+    "contentPolicy",
+    "isolation",
+    "provider"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "common.schema.json#/$defs/schemaVersion"
+    },
+    "planId": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "checkpointId": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "subject": {
+      "description": "Resolved and immutable: 'latest' is resolved before the plan exists.",
+      "type": "object",
+      "required": [
+        "ref",
+        "version"
+      ],
+      "properties": {
+        "ref": {
+          "$ref": "common.schema.json#/$defs/ref"
+        },
+        "version": {
+          "$ref": "common.schema.json#/$defs/exactVersion"
+        },
+        "image": {
+          "description": "The OCI image manifest digest of an already-built image.",
+          "$ref": "common.schema.json#/$defs/sha256Uri"
+        },
+        "deployment": {
+          "$ref": "common.schema.json#/$defs/ref"
+        },
+        "endpoint": {
+          "description": "Where the subject answers. Never carries credentials (no user:password@).",
+          "allOf": [
+            {
+              "$ref": "common.schema.json#/$defs/uri"
+            }
+          ],
+          "not": {
+            "pattern": "^[a-z][a-z0-9+.-]*://[^/]*@"
+          }
+        },
+        "repository": {
+          "description": "Where the image is pulled from (registry/name), when it is.",
+          "type": "string",
+          "pattern": "^[!-~]{1,256}(?!\\n)$"
+        }
+      }
+    },
+    "suites": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "required": [
+          "ref",
+          "version"
+        ],
+        "properties": {
+          "ref": {
+            "$ref": "common.schema.json#/$defs/ref"
+          },
+          "version": {
+            "$ref": "common.schema.json#/$defs/exactVersion"
+          },
+          "digest": {
+            "$ref": "common.schema.json#/$defs/sha256Uri"
+          },
+          "lane": {
+            "$ref": "common.schema.json#/$defs/laneName"
+          }
+        }
+      }
+    },
+    "limits": {
+      "description": "Hard limits the runner enforces: it stops before exceeding them, and says so in the event stream.",
+      "type": "object",
+      "required": [
+        "maxUsd"
+      ],
+      "properties": {
+        "maxUsd": {
+          "type": "number",
+          "minimum": 0
+        },
+        "cases": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "timeout": {
+          "description": "ISO 8601 duration in hours and minutes (PT2H, PT30M).",
+          "type": "string",
+          "pattern": "^PT(?=[0-9])([0-9]{1,5}H)?([0-9]{1,5}M)?(?!\\n)$"
+        }
+      }
+    },
+    "contentPolicy": {
+      "description": "As run.json's contentCapture.",
+      "type": "string"
+    },
+    "isolation": {
+      "type": "string"
+    },
+    "provider": {
+      "$ref": "common.schema.json#/$defs/provider"
+    },
+    "credentialRefs": {
+      "description": "What the runner resolves where it runs, and gives to the process the purpose names as an environment variable called name. A plan holds references, never secret values.",
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "scheme",
+          "path",
+          "purpose"
+        ],
+        "properties": {
+          "name": {
+            "description": "The environment variable the value is given as.",
+            "type": "string",
+            "pattern": "^[A-Z_][A-Z0-9_]{0,127}(?!\\n)$"
+          },
+          "scheme": {
+            "description": "Where the value lives. A scheme a later minor adds is read as other.",
+            "type": "string"
+          },
+          "path": {
+            "description": "The variable, keychain entry or vault path: a name, never the value.",
+            "type": "string",
+            "pattern": "^[!-~]{1,512}(?!\\n)$"
+          },
+          "purpose": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "runnerSelector": {
+      "description": "Tags a runner's capability manifest must all carry.",
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9._:-]{0,63}(?!\\n)$"
+      }
+    },
+    "ext": {
+      "$ref": "common.schema.json#/$defs/ext"
+    },
+    "zone": {
+      "description": "The network zone a remote-zone run must execute in.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._:-]{0,63}(?!\\n)$"
+    },
+    "judges": {
+      "description": "The judge models and rubrics the evaluators use, fixed by the plan.",
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "required": [
+          "model"
+        ],
+        "properties": {
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "provider": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "rubricDigest": {
+            "$ref": "common.schema.json#/$defs/sha256Uri"
+          }
+        }
+      }
+    },
+    "baseline": {
+      "description": "What a comparison lane compares against: a policy, or one sealed run.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "policy"
+          ],
+          "properties": {
+            "policy": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": [
+            "runId",
+            "runHash"
+          ],
+          "properties": {
+            "runId": {
+              "$ref": "common.schema.json#/$defs/id"
+            },
+            "runHash": {
+              "$ref": "common.schema.json#/$defs/sha256Hex"
+            }
+          }
+        }
+      ]
+    },
+    "comparability": {
+      "type": "object",
+      "required": [
+        "required"
+      ],
+      "properties": {
+        "required": {
+          "type": "array",
+          "maxItems": 32,
+          "items": {
+            "type": "string",
+            "maxLength": 64
+          }
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "description": "A container run evaluates an already-built image, identified by digest.",
+      "if": {
+        "properties": {
+          "isolation": {
+            "const": "container"
+          }
+        },
+        "required": [
+          "isolation"
+        ]
+      },
+      "then": {
+        "properties": {
+          "subject": {
+            "required": [
+              "image"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "description": "A remote-zone run names its zone.",
+      "if": {
+        "properties": {
+          "isolation": {
+            "const": "remote-zone"
+          }
+        },
+        "required": [
+          "isolation"
+        ]
+      },
+      "then": {
+        "required": [
+          "zone"
+        ]
+      }
+    }
+  ]
+}

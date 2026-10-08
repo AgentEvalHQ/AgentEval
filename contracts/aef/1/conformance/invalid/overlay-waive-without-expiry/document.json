@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0",
+  "eventId": "ov_1",
+  "kind": "waive",
+  "target": {
+    "requirement": "REQ-1"
+  },
+  "reason": "later",
+  "by": {
+    "identity": "git:a@b",
+    "assurance": "self-attested"
+  },
+  "at": "2026-10-01T00:00:00Z"
+}

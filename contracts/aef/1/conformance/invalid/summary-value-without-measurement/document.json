@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "r-1",
+  "lanes": [
+    {
+      "lane": "quality",
+      "metrics": [
+        {
+          "metric": "m",
+          "n": 0,
+          "N": 3,
+          "notMeasured": 3,
+          "value": 0.5,
+          "verdict": "passed"
+        }
+      ]
+    }
+  ]
+}

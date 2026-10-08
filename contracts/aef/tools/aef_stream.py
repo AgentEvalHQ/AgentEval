@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Runner protocol references for v2/README.md, 'Run plans and runners' and 'The event stream': plan-to-runner
+"""Runner protocol references for 1/README.md, 'Run plans and runners' and 'The event stream': plan-to-runner
 matching, and the verification of a finished event stream.
 
 `python aef_stream.py --check` runs both against conformance/protocol/ and exits 1 on any difference.
@@ -104,7 +104,7 @@ def verify(events, plan=None, plan_digest=None):
 
 
 def check():
-    root = Path(__file__).resolve().parents[1] / "v2" / "conformance" / "protocol"
+    root = Path(__file__).resolve().parents[1] / "1" / "conformance" / "protocol"
     failed, count = 0, 0
     for d in sorted(p for p in (root / "streams").iterdir() if p.is_dir()):
         count += 1

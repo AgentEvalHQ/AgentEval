@@ -1,0 +1,26 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "run.json",
+      "digest": {
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    }
+  ],
+  "predicateType": "https://slsa.dev/provenance/v1",
+  "predicate": {
+    "schemaVersion": "1.0",
+    "runId": "r-1",
+    "runHash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "producer": {
+      "name": "p",
+      "version": "1"
+    },
+    "subject": {
+      "ref": "agent:a/b"
+    },
+    "closedAt": "2026-10-01T00:00:00Z",
+    "sealedBy": "producer"
+  }
+}

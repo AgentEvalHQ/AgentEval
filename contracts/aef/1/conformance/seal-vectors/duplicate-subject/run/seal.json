@@ -1,0 +1,53 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "metrics.json",
+      "digest": {
+        "sha256": "7a8c98009e013cc6380ca5fb1a37fd680c5f96538be5e7fabf6279ab46675465"
+      }
+    },
+    {
+      "name": "results.ndjson",
+      "digest": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "run.json",
+      "digest": {
+        "sha256": "1ec85bfa4306ab788f5ed8802143d1d285ee5f4aa6dd54d93e372b89a6314598"
+      }
+    },
+    {
+      "name": "summary.json",
+      "digest": {
+        "sha256": "d31287707259107e22d53eac3b4dda672267b7017cc53f7ace5d8b919912a7d6"
+      }
+    },
+    {
+      "name": "metrics.json",
+      "digest": {
+        "sha256": "7a8c98009e013cc6380ca5fb1a37fd680c5f96538be5e7fabf6279ab46675465"
+      }
+    }
+  ],
+  "predicateType": "https://agenteval.dev/aef/1/evidence",
+  "predicate": {
+    "schemaVersion": "1.0",
+    "runId": "01928f3f-0000-7000-8000-000000000001",
+    "runHash": "d8561d5f5c59cfd4f637102a9128a5464393f6281b2c765c3be73cb0def13f3e",
+    "producer": {
+      "name": "agenteval-cli",
+      "version": "0.44.0"
+    },
+    "subject": {
+      "ref": "agent:people/hr-bot"
+    },
+    "deployment": null,
+    "suite": null,
+    "judges": [],
+    "closedAt": "2026-10-03T09:00:02Z",
+    "sealedBy": "ingest"
+  }
+}

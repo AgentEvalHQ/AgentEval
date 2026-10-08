@@ -1,0 +1,169 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/aef/1/writer/summary.schema.json",
+  "title": "AEF 1.0: summary.json",
+  "description": "Aggregates per lane and metric, with what was measured beside what was asked for, and the sufficient statistics to pool runs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "lanes"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "common.schema.json#/$defs/schemaVersion"
+    },
+    "runId": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "lanes": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "lane",
+          "metrics"
+        ],
+        "properties": {
+          "lane": {
+            "description": "quality, security, memory, performance, compliance, or a producer's own.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "metrics": {
+            "type": "array",
+            "maxItems": 1024,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "metric",
+                "n",
+                "N",
+                "notMeasured",
+                "value",
+                "verdict"
+              ],
+              "properties": {
+                "metric": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "n": {
+                  "description": "Measured.",
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "N": {
+                  "description": "Asked for.",
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "notMeasured": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "value": {
+                  "description": "The rate or mean over the n measured; null when n is 0.",
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "stderr": {
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "minimum": 0
+                },
+                "ci": {
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "low",
+                        "high",
+                        "level"
+                      ],
+                      "properties": {
+                        "low": {
+                          "type": "number"
+                        },
+                        "high": {
+                          "type": "number"
+                        },
+                        "level": {
+                          "type": "number",
+                          "exclusiveMinimum": 0,
+                          "exclusiveMaximum": 1
+                        },
+                        "method": {
+                          "type": "string",
+                          "maxLength": 64
+                        }
+                      }
+                    }
+                  ]
+                },
+                "verdict": {
+                  "enum": [
+                    "passed",
+                    "failed",
+                    "warn",
+                    "inconclusive",
+                    "not_measured"
+                  ]
+                },
+                "rule": {
+                  "type": "string",
+                  "maxLength": 1024
+                },
+                "sum": {
+                  "type": "number"
+                },
+                "sumSq": {
+                  "type": "number",
+                  "minimum": 0
+                }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "n": {
+                        "const": 0
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "value": {
+                        "type": "null"
+                      },
+                      "verdict": {
+                        "const": "not_measured"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "ext": {
+      "$ref": "common.schema.json#/$defs/ext"
+    }
+  }
+}

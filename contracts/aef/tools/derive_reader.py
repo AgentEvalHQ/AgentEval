@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Derives the AEF v2 reader schemas (tolerant) from the writer schemas (strict).
+"""Derives the AEF 1.0 reader schemas (tolerant) from the writer schemas (strict).
 
 A reader accepts what a later minor version may add: unknown fields, enum values it does not know (it treats them as
 'other'), any 2.x schemaVersion, and a kind it does not know in a union discriminated by 'kind'. Everything else
@@ -12,7 +12,7 @@ Usage: python contracts/aef/tools/derive_reader.py
 import json
 from pathlib import Path
 
-V2 = Path(__file__).resolve().parents[1] / "v2" / "schemas"
+SCHEMAS = Path(__file__).resolve().parents[1] / "1" / "schemas"
 
 
 def kind_of(branch):
@@ -31,7 +31,7 @@ def derive(node, strict=False):
     out = {}
     for key, value in node.items():
         if key == "$id":
-            out[key] = value.replace("/aef/v2/writer/", "/aef/v2/reader/")
+            out[key] = value.replace("/aef/1/writer/", "/aef/1/reader/")
         elif strict:
             out[key] = derive(value, True)
         elif key == "type" and "enum" in node:
@@ -41,9 +41,9 @@ def derive(node, strict=False):
         elif key == "enum":
             # Open: an unknown value reads as 'other'. A nullable enum stays nullable.
             out["type"] = node["type"] if isinstance(node.get("type"), list) else ["string", "null"] if None in value else "string"
-        elif key == "const" and value == "2.0":
+        elif key == "const" and value == "1.0":
             out["type"] = "string"
-            out["pattern"] = "^2\\.[0-9]+(?!\\n)$"  # any minor of the known major
+            out["pattern"] = "^1\\.[0-9]+(?!\\n)$"  # any minor of the known major
         elif key in ("if", "not"):
             out[key] = derive(value, True)
         elif key == "oneOf" and isinstance(value, list) and value and all(kind_of(b) for b in value):
@@ -57,12 +57,12 @@ def derive(node, strict=False):
 
 
 def main():
-    (V2 / "reader").mkdir(exist_ok=True)
-    for writer in sorted((V2 / "writer").glob("*.schema.json")):
+    (SCHEMAS / "reader").mkdir(exist_ok=True)
+    for writer in sorted((SCHEMAS / "writer").glob("*.schema.json")):
         schema = json.loads(writer.read_text(encoding="utf-8"))
         reader = derive(schema)
         reader["description"] = "READER (tolerant), derived from the writer schema by tools/derive_reader.py. " + schema.get("description", "")
-        (V2 / "reader" / writer.name).write_bytes((json.dumps(reader, indent=2, ensure_ascii=False) + "\n").encode("utf-8"))
+        (SCHEMAS / "reader" / writer.name).write_bytes((json.dumps(reader, indent=2, ensure_ascii=False) + "\n").encode("utf-8"))
 
 
 if __name__ == "__main__":

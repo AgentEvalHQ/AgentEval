@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "01928f40-1111-7111-8111-111111111111",
+  "status": "running",
+  "producer": {
+    "name": "agenteval-py",
+    "version": "0.1.0a1",
+    "runtime": {
+      "name": "python",
+      "version": "3.13"
+    }
+  },
+  "subject": {
+    "ref": "workflow:travel/trip-planner",
+    "kind": "workflow"
+  },
+  "suite": {
+    "ref": "suite:travel/bookings",
+    "version": "1",
+    "executionPolicy": {
+      "trialsPerCase": 3,
+      "requirePasses": 2,
+      "aggregation": "MajorityVote"
+    }
+  },
+  "startedAt": "2026-10-04T10:00:00Z",
+  "endedAt": null
+}

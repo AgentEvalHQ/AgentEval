@@ -1,0 +1,6 @@
+{
+  "schema": "seal",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rule": "an AEF seal's predicate type is https://agenteval.dev/aef/1/evidence"
+}

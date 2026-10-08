@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Builds the AEF v2 conformance corpus (contracts/aef/v2/conformance/) from the definitions below.
+"""Builds the AEF 1.0 conformance corpus (contracts/aef/1/conformance/) from the definitions below.
 
-This script is one implementation of the AEF v2 rules it writes (result ids, the seal); the .NET conformance tests
+This script is one implementation of the AEF 1.0 rules it writes (result ids, the seal); the .NET conformance tests
 are another and recompute every value. Re-running it rewrites the corpus byte for byte: commit both together.
 
 Usage: python contracts/aef/tools/build_conformance.py
@@ -12,8 +12,8 @@ import json
 import shutil
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1] / "v2" / "conformance"
-V = "2.0"
+ROOT = Path(__file__).resolve().parents[1] / "1" / "conformance"
+V = "1.0"
 
 
 # ---------------------------------------------------------------------------- rules
@@ -57,7 +57,7 @@ def seal(run_dir, run, sealed_by, closed_at=None, allow_open=False):
             {"name": rel, "digest": {"sha256": hashlib.sha256((run_dir / rel).read_bytes()).hexdigest()}}
             for rel in sealed_files(run_dir)
         ],
-        "predicateType": "https://agenteval.dev/evidence/v2",
+        "predicateType": "https://agenteval.dev/aef/1/evidence",
         "predicate": {
             "schemaVersion": V,
             "runId": run["runId"],
@@ -103,7 +103,7 @@ def overlay_batches(run_dir, run_id, batches):
         write_json(seal_path, {
             "_type": "https://in-toto.io/Statement/v1",
             "subject": [{"name": "overlays/events.ndjson", "digest": {"sha256": hashlib.sha256(chunk).hexdigest()}}],
-            "predicateType": "https://agenteval.dev/evidence/v2/overlay-batch",
+            "predicateType": "https://agenteval.dev/aef/1/overlay-batch",
             "predicate": {"schemaVersion": V, "runId": run_id, "batch": n, "offset": offset, "length": len(chunk), "previous": previous},
         })
         previous = {"path": f"overlays/seal-{n:04d}.json", "sha256": hashlib.sha256(seal_path.read_bytes()).hexdigest()}
@@ -264,7 +264,7 @@ def invalid_cases():
     base_result = {"schemaVersion": V, "resultId": rid, "caseId": "c", "path": "p", "evaluator": {"id": "e"}, "state": "passed"}
     return [
         ("run-unknown-major", "run", dict(base_run, schemaVersion="3.0"), "invalid", "an unknown major version is refused"),
-        ("run-newer-minor-unknown-field", "run", dict(base_run, schemaVersion="2.7", newField={"x": 1}), "valid",
+        ("run-newer-minor-unknown-field", "run", dict(base_run, schemaVersion="1.7", newField={"x": 1}), "valid",
          "a newer minor with a field this version does not know: the writer refuses it, a reader accepts it"),
         ("run-status-sealed", "run", dict(base_run, status="sealed"), "valid",
          "there is no 'sealed' status (sealed is a fact about seal.json); a reader takes an unknown status as other"),
@@ -313,7 +313,7 @@ def invalid_cases():
           "link": {"blob": "sha256:" + "0" * 64, "spanId": "00f067aa0ba902b7"}}, "invalid", "a link is exactly one of blob, span or uri"),
         ("seal-absolute-path", "seal",
          {"_type": "https://in-toto.io/Statement/v1", "subject": [{"name": "/etc/passwd", "digest": {"sha256": "0" * 64}}],
-          "predicateType": "https://agenteval.dev/evidence/v2",
+          "predicateType": "https://agenteval.dev/aef/1/evidence",
           "predicate": {"schemaVersion": V, "runId": "r-1", "runHash": "0" * 64, "producer": {"name": "p", "version": "1"},
                         "subject": {"ref": "agent:a/b"}, "closedAt": "2026-10-01T00:00:00Z", "sealedBy": "producer"}},
          "invalid", "a subject name is a path inside the run folder: no leading slash, no empty or . or .. segment"),
@@ -322,7 +322,7 @@ def invalid_cases():
           "predicateType": "https://slsa.dev/provenance/v1",
           "predicate": {"schemaVersion": V, "runId": "r-1", "runHash": "0" * 64, "producer": {"name": "p", "version": "1"},
                         "subject": {"ref": "agent:a/b"}, "closedAt": "2026-10-01T00:00:00Z", "sealedBy": "producer"}},
-         "invalid", "an AEF seal's predicate type is https://agenteval.dev/evidence/v2"),
+         "invalid", "an AEF seal's predicate type is https://agenteval.dev/aef/1/evidence"),
     ]
 
 
@@ -330,7 +330,7 @@ def invalid_cases():
 
 def checkpoints():
     """Checkpoint manifests: (name, document, writer verdict, reader verdict, problems, why). problems are what the
-    checkpoint verifier reports on a schema-valid manifest (v2/README.md, 'Checkpoints'), written by hand."""
+    checkpoint verifier reports on a schema-valid manifest (1/README.md, 'Checkpoints'), written by hand."""
     h = lambda c: c * 64
     lanes = [
         {"lane": "quality", "rule": {"kind": "threshold", "metric": "triage.passRate", "op": ">=", "value": 0.8},
@@ -571,7 +571,7 @@ def seal_vectors_more(valid):
 
     run = chain_copy("unsealed-tail")
     events = run / "overlays" / "events.ndjson"
-    events.write_bytes(events.read_bytes() + b'{"schemaVersion":"2.0","eventId":"ov_0003","kind":"annotate","target":{"run":"x"},"by":{"identity":"git:a@b","assurance":"self-attested"},"at":"2026-10-02T16:00:00Z"}\n')
+    events.write_bytes(events.read_bytes() + b'{"schemaVersion":"1.0","eventId":"ov_0003","kind":"annotate","target":{"run":"x"},"by":{"identity":"git:a@b","assurance":"self-attested"},"at":"2026-10-02T16:00:00Z"}\n')
     chain_expect("unsealed-tail", [{"path": "overlays/events.ndjson", "problem": "uncovered"}])
 
 

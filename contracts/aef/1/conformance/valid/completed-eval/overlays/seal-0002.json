@@ -1,0 +1,23 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "overlays/events.ndjson",
+      "digest": {
+        "sha256": "ef6d8db130d69b0834a2f8b6358df01aeac948429f95417b86e4e095d0d186a3"
+      }
+    }
+  ],
+  "predicateType": "https://agenteval.dev/aef/1/overlay-batch",
+  "predicate": {
+    "schemaVersion": "1.0",
+    "runId": "01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10",
+    "batch": 2,
+    "offset": 285,
+    "length": 313,
+    "previous": {
+      "path": "overlays/seal-0001.json",
+      "sha256": "a488ad44a1ea2a6b4dd4655d0399807e4e2f5b434b13128b07e7bfb2e754895a"
+    }
+  }
+}

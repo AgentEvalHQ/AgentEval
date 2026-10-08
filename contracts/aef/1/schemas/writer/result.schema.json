@@ -1,0 +1,486 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/aef/1/writer/result.schema.json",
+  "title": "AEF 1.0: one line of results.ndjson",
+  "description": "One node of a run's result tree. A composite node carries aggregation; its children carry component and parentResultId.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "resultId",
+    "caseId",
+    "path",
+    "evaluator",
+    "state"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "common.schema.json#/$defs/schemaVersion"
+    },
+    "resultId": {
+      "$ref": "common.schema.json#/$defs/resultId"
+    },
+    "parentResultId": {
+      "anyOf": [
+        {
+          "$ref": "common.schema.json#/$defs/resultId"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "caseId": {
+      "allOf": [
+        {
+          "$ref": "common.schema.json#/$defs/text"
+        }
+      ],
+      "minLength": 1,
+      "maxLength": 256
+    },
+    "path": {
+      "description": "The node's place in the tree, / between levels.",
+      "allOf": [
+        {
+          "$ref": "common.schema.json#/$defs/text"
+        }
+      ],
+      "minLength": 1,
+      "maxLength": 1024
+    },
+    "trial": {
+      "description": "0-based trial, when the case ran several times. Written as plain integer digits (no fraction, no exponent).",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 999
+    },
+    "trials": {
+      "description": "The rollup line of a case that ran several times. The case's result is this line, never one trial; agree false marks it flaky.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "n",
+        "passed",
+        "aggregation",
+        "agree"
+      ],
+      "properties": {
+        "n": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "passed": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "aggregation": {
+          "enum": [
+            "MajorityVote"
+          ]
+        },
+        "agree": {
+          "type": "boolean"
+        }
+      }
+    },
+    "evaluator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "version": {
+          "type": "string",
+          "maxLength": 64
+        }
+      }
+    },
+    "state": {
+      "$ref": "common.schema.json#/$defs/state"
+    },
+    "reason": {
+      "description": "Why the state is what it is, in words: required for a typed absence (not_measured, not_applicable, skipped, error), so an absence always says why.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "scores": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "metric",
+          "value"
+        ],
+        "properties": {
+          "metric": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "value": {
+            "type": "number"
+          },
+          "normalized": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "verdictRule": {
+      "description": "The rule that turned the scores into the state, and where its threshold came from.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expr"
+      ],
+      "properties": {
+        "expr": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "threshold": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "source": {
+          "type": "string",
+          "maxLength": 512
+        }
+      }
+    },
+    "annotator": {
+      "description": "Who or what decided this node.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind"
+      ],
+      "properties": {
+        "kind": {
+          "enum": [
+            "CODE",
+            "LLM",
+            "HUMAN",
+            "HYBRID"
+          ]
+        },
+        "model": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "promptHash": {
+          "$ref": "common.schema.json#/$defs/sha256Uri"
+        },
+        "rubricDigest": {
+          "$ref": "common.schema.json#/$defs/sha256Uri"
+        },
+        "panel": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "agree",
+            "of"
+          ],
+          "properties": {
+            "agree": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "of": {
+              "type": "integer",
+              "minimum": 1
+            }
+          }
+        }
+      }
+    },
+    "reasoning": {
+      "description": "The judge's reasoning, stored as a content-addressed blob (blobs/sha256/ab/<hex>) when content capture allows.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "blob",
+        "bytes"
+      ],
+      "properties": {
+        "blob": {
+          "$ref": "common.schema.json#/$defs/sha256Uri"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "uncertainty": {
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "stderr": {
+              "type": "number",
+              "minimum": 0
+            },
+            "ci": {
+              "$ref": "#/$defs/interval"
+            }
+          }
+        }
+      ]
+    },
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "gen_ai.usage.input_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "gen_ai.usage.output_tokens": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "costUsd": {
+          "type": "number",
+          "minimum": 0
+        },
+        "costSource": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "role": {
+          "enum": [
+            "agent",
+            "judge",
+            "attacker",
+            "other"
+          ]
+        }
+      }
+    },
+    "traceLink": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "traceId"
+      ],
+      "properties": {
+        "traceId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}(?!\\n)$",
+          "maxLength": 32
+        },
+        "spanId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{16}(?!\\n)$",
+          "maxLength": 16
+        }
+      }
+    },
+    "aggregation": {
+      "description": "On a composite node: how its children became its verdict, and which branch of the verdict rules decided it.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "strategy",
+        "rulePath",
+        "measured",
+        "total"
+      ],
+      "properties": {
+        "strategy": {
+          "enum": [
+            "WeightedSum",
+            "Min",
+            "WeightedMedian",
+            "CapByWorst",
+            "MajorityVote"
+          ]
+        },
+        "threshold": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "score": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "rulePath": {
+          "description": "required-error: a required child errored; nothing-measured: no child measured; threshold: the score against the threshold; severity: the worst required severity; under-covered: too few children measured.",
+          "enum": [
+            "required-error",
+            "nothing-measured",
+            "threshold",
+            "severity",
+            "under-covered"
+          ]
+        },
+        "measured": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "minimumMeasuredShare": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "unmeasured": {
+          "description": "The children not measured, by state.",
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "not_measured": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "not_applicable": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "skipped": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "errored": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "decisive": {
+          "description": "The children that decided the verdict, as the producer knew them. A reader never reverse-engineers this.",
+          "type": "array",
+          "maxItems": 1024,
+          "items": {
+            "$ref": "common.schema.json#/$defs/resultId"
+          }
+        }
+      }
+    },
+    "component": {
+      "description": "On a child of a composite: its weight and whether it is required.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "weight",
+        "required"
+      ],
+      "properties": {
+        "weight": {
+          "type": "number",
+          "minimum": 0
+        },
+        "required": {
+          "type": "boolean"
+        }
+      }
+    },
+    "evidence": {
+      "description": "Ids of records in evidence.ndjson this node cites.",
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "$ref": "common.schema.json#/$defs/evidenceId"
+      }
+    },
+    "ext": {
+      "$ref": "common.schema.json#/$defs/ext"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "enum": [
+              "not_measured",
+              "not_applicable",
+              "skipped",
+              "error"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "required": [
+          "reason"
+        ]
+      }
+    },
+    {
+      "not": {
+        "required": [
+          "trial",
+          "trials"
+        ]
+      }
+    }
+  ],
+  "$defs": {
+    "interval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "low",
+        "high",
+        "level"
+      ],
+      "properties": {
+        "low": {
+          "type": "number"
+        },
+        "high": {
+          "type": "number"
+        },
+        "level": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "method": {
+          "type": "string",
+          "maxLength": 64
+        }
+      }
+    }
+  }
+}

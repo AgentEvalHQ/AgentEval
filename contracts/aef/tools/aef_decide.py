@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The AEF v2 checkpoint decision function: a reference implementation of v2/README.md, 'The decision function'.
+"""The AEF 1.0 checkpoint decision function: a reference implementation of 1/README.md, 'The decision function'.
 
 Pure: no I/O and no clock (the evaluation time is an input). Times compare at the full precision written (up to nine
 fraction digits), never rounded. `python aef_decide.py --check` runs it against conformance/decision-vectors/ and
@@ -86,7 +86,7 @@ def decide(inp):
 
 
 def check():
-    vectors = sorted((Path(__file__).resolve().parents[1] / "v2" / "conformance" / "decision-vectors").glob("*.json"))
+    vectors = sorted((Path(__file__).resolve().parents[1] / "1" / "conformance" / "decision-vectors").glob("*.json"))
     failed = 0
     for path in vectors:
         vector = json.loads(path.read_text(encoding="utf-8"))

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Writes contracts/aef/v2/conformance/protocol/: run plans and runner manifests (valid and invalid), plan-to-runner
+"""Writes contracts/aef/1/conformance/protocol/: run plans and runner manifests (valid and invalid), plan-to-runner
 matching, and runner event streams with the problems a verifier must report. Every expectation below is written by
-hand from v2/README.md ('Run plans and runners', 'The event stream'), never computed by an implementation. (The plan
+hand from 1/README.md ('Run plans and runners', 'The event stream'), never computed by an implementation. (The plan
 digest in each job.accepted is data, not an expectation: the SHA-256 of the plan file's bytes.)
 
 Usage: python contracts/aef/tools/protocol_vectors.py
@@ -11,8 +11,8 @@ import json
 import shutil
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1] / "v2" / "conformance" / "protocol"
-V = "2.0"
+ROOT = Path(__file__).resolve().parents[1] / "1" / "conformance" / "protocol"
+V = "1.0"
 
 
 def dumps(obj):

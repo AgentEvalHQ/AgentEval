@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/aef/1/reader/metrics.schema.json",
+  "title": "AEF 1.0: metrics.json",
+  "description": "READER (tolerant), derived from the writer schema by tools/derive_reader.py. The metrics this run reports. A metric with direction none is shown, never coloured as better or worse.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "metrics"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "common.schema.json#/$defs/schemaVersion"
+    },
+    "metrics": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "kind",
+          "direction",
+          "scale"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "kind": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string"
+          },
+          "scale": {
+            "anyOf": [
+              {
+                "const": "unbounded"
+              },
+              {
+                "type": "object",
+                "required": [
+                  "min",
+                  "max"
+                ],
+                "properties": {
+                  "min": {
+                    "type": "number"
+                  },
+                  "max": {
+                    "type": "number"
+                  }
+                }
+              }
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "maxLength": 32
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 4096
+          }
+        }
+      }
+    },
+    "ext": {
+      "$ref": "common.schema.json#/$defs/ext"
+    }
+  }
+}

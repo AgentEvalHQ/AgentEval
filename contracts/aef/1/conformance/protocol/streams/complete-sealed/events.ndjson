@@ -1,0 +1,9 @@
+{"schemaVersion":"1.0","seq":1,"kind":"job.accepted","jobId":"job-7","at":"2026-10-08T12:00:00Z","planId":"plan-41","planDigest":"e74f39b744629b6f08e686ce947cead6d5c17d731b1d4522503af2308079b8e3","runnerId":"runner-local-01"}
+{"schemaVersion":"1.0","seq":2,"kind":"plan.estimated","jobId":"job-7","at":"2026-10-08T12:00:01Z","cases":2,"usdLow":0.5,"usdHigh":1.5,"priceTable":"2026-09-30"}
+{"schemaVersion":"1.0","seq":3,"kind":"spend.updated","jobId":"job-7","at":"2026-10-08T12:00:02Z","spentUsd":0.4}
+{"schemaVersion":"1.0","seq":4,"kind":"case.completed","jobId":"job-7","at":"2026-10-08T12:00:03Z","caseId":"case-17","state":"failed"}
+{"schemaVersion":"1.0","seq":5,"kind":"case.completed","jobId":"job-7","at":"2026-10-08T12:00:04Z","caseId":"case-18","state":"not_measured"}
+{"schemaVersion":"1.0","seq":6,"kind":"spend.updated","jobId":"job-7","at":"2026-10-08T12:00:05Z","spentUsd":1.1}
+{"schemaVersion":"1.0","seq":7,"kind":"lane.completed","jobId":"job-7","at":"2026-10-08T12:00:06Z","lane":"quality","status":"failed"}
+{"schemaVersion":"1.0","seq":8,"kind":"evidence.produced","jobId":"job-7","at":"2026-10-08T12:00:07Z","runId":"R-1","runHash":"5ad6d0d7e4dbb218bd5503ec4448bd88c8542f18740e0074c4abed6156484985"}
+{"schemaVersion":"1.0","seq":9,"kind":"job.sealed","jobId":"job-7","at":"2026-10-08T12:00:08Z","runs":["R-1"]}

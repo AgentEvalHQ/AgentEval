@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/aef/1/reader/decision.schema.json",
+  "title": "AEF 1.0: the checkpoint decision function's input and output",
+  "description": "READER (tolerant), derived from the writer schema by tools/derive_reader.py. Decide(input) -> output is pure: no I/O, no clock (the evaluation time is an input). Its vectors are in conformance/decision-vectors/. See 1/README.md, 'The decision function'. This schema is the output; $defs/input is the input.",
+  "type": "object",
+  "required": [
+    "outcome",
+    "lanes",
+    "reasons"
+  ],
+  "properties": {
+    "outcome": {
+      "type": "string"
+    },
+    "lanes": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "required": [
+          "lane",
+          "status",
+          "blocking"
+        ],
+        "properties": {
+          "lane": {
+            "$ref": "common.schema.json#/$defs/laneName"
+          },
+          "status": {
+            "$ref": "#/$defs/laneStatus"
+          },
+          "blocking": {
+            "type": "boolean"
+          },
+          "axes": {
+            "description": "For incomparable: the comparability axes that differ.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 64
+            }
+          }
+        }
+      }
+    },
+    "reasons": {
+      "description": "Why, one line per lane that kept the outcome from approved (in the input's lane order), then the rule that set the outcome. Codes, not prose, so every implementation produces the same list.",
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*(:[!-~]{1,128})?(?!\\n)$"
+      }
+    }
+  },
+  "$defs": {
+    "laneStatus": {
+      "description": "passed / failed: the lane's rule held or did not on its evidence. missing: no evidence for this exact version. not_measured: the evidence exists but measured nothing the rule reads. incomparable: a comparison's runs differ on a required axis. stale: older than the lane's freshness at the evaluation time.",
+      "type": "string"
+    },
+    "input": {
+      "type": "object",
+      "required": [
+        "subjectVersion",
+        "evaluatedAt",
+        "lanes"
+      ],
+      "properties": {
+        "subjectVersion": {
+          "description": "The checkpoint's exact subject version.",
+          "$ref": "common.schema.json#/$defs/exactVersion"
+        },
+        "evaluatedAt": {
+          "$ref": "common.schema.json#/$defs/timestamp"
+        },
+        "supersededBy": {
+          "description": "A newer subject version known at the evaluation time, if any: the checkpoint expires.",
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "common.schema.json#/$defs/exactVersion"
+            }
+          ]
+        },
+        "lanes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "required": [
+              "lane",
+              "blocking",
+              "result"
+            ],
+            "properties": {
+              "lane": {
+                "$ref": "common.schema.json#/$defs/laneName"
+              },
+              "blocking": {
+                "type": "boolean"
+              },
+              "freshness": {
+                "$ref": "common.schema.json#/$defs/duration"
+              },
+              "result": {
+                "description": "What the lane's rule gave on its evidence (computed from the runs, outside this function), or null when there is no evidence.",
+                "anyOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "status",
+                      "subjectVersion",
+                      "oldestClosedAt"
+                    ],
+                    "properties": {
+                      "status": {
+                        "type": "string"
+                      },
+                      "subjectVersion": {
+                        "description": "The version the evidence was produced for.",
+                        "$ref": "common.schema.json#/$defs/exactVersion"
+                      },
+                      "oldestClosedAt": {
+                        "description": "When the oldest run the lane's result relied on closed: freshness is measured from it.",
+                        "$ref": "common.schema.json#/$defs/timestamp"
+                      },
+                      "axes": {
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 64
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

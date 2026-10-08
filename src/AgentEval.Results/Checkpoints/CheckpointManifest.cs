@@ -7,7 +7,7 @@ using System.Text.Json.Nodes;
 namespace AgentEval.Results.Checkpoints;
 
 /// <summary>
-/// Checks a decided checkpoint manifest against itself (contracts/aef/v2/README.md, "Checkpoints"): the rules across
+/// Checks a decided checkpoint manifest against itself (contracts/aef/1/README.md, "Checkpoints"): the rules across
 /// its parts that a schema cannot express. The manifest must already be valid against the reader checkpoint schema.
 /// </summary>
 public static class CheckpointManifest

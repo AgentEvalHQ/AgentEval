@@ -7,7 +7,7 @@ using System.Text.Json.Nodes;
 namespace AgentEval.Results.Checkpoints;
 
 /// <summary>
-/// The decision function's input and output in their AEF wire form (contracts/aef/v2/schemas/*/decision.schema.json):
+/// The decision function's input and output in their AEF wire form (contracts/aef/1/schemas/*/decision.schema.json):
 /// statuses as passed / failed / missing / not_measured / incomparable / stale, outcomes in lower case.
 /// </summary>
 public static class CheckpointDecisionJson

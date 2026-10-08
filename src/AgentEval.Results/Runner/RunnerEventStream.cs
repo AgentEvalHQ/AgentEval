@@ -9,8 +9,8 @@ using System.Text.RegularExpressions;
 namespace AgentEval.Results.Runner;
 
 /// <summary>
-/// The runner protocol (contracts/aef/v2/README.md, "Run plans and runners", "The event stream"): plan-to-runner
-/// matching, and the verification of a finished event stream line by line. Vectors: contracts/aef/v2/conformance/protocol/.
+/// The runner protocol (contracts/aef/1/README.md, "Run plans and runners", "The event stream"): plan-to-runner
+/// matching, and the verification of a finished event stream line by line. Vectors: contracts/aef/1/conformance/protocol/.
 /// </summary>
 public static class RunnerEventStream
 {

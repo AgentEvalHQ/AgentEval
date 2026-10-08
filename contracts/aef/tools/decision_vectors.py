@@ -1,9 +1,9 @@
-"""Writes contracts/aef/v2/conformance/decision-vectors/*.json (python contracts/aef/tools/decision_vectors.py). Every expected output below is written by hand from
-the rules in v2/README.md ('The decision function'), never computed by an implementation."""
+"""Writes contracts/aef/1/conformance/decision-vectors/*.json (python contracts/aef/tools/decision_vectors.py). Every expected output below is written by hand from
+the rules in 1/README.md ('The decision function'), never computed by an implementation."""
 import json
 from pathlib import Path
 
-OUT = Path(__file__).resolve().parents[1] / "v2" / "conformance" / "decision-vectors"
+OUT = Path(__file__).resolve().parents[1] / "1" / "conformance" / "decision-vectors"
 V = "git:3f2a1c"
 AT = "2026-10-08T12:00:00Z"
 

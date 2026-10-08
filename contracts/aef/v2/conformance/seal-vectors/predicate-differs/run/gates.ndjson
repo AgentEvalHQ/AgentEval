@@ -1,1 +1,0 @@
-{"schemaVersion":"2.0","gateId":"gate:support/pr","decisionId":"D-31","rule":{"strategy":"threshold","inputs":["quality"]},"inputs":{"results":["r_479d157f3423e95d566bcbfc0c6d2461"]},"comparability":"not_applicable","outcome":"no_ship","exitCode":1,"decisive":["r_1264eeb36620c9cbe97b71ffdbcfd331"],"decidedAt":"2026-10-02T14:06:23.004Z"}

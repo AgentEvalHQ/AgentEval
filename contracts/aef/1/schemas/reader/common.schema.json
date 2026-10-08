@@ -1,0 +1,152 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/aef/1/reader/common.schema.json",
+  "title": "AEF 1.0: shared definitions",
+  "description": "READER (tolerant), derived from the writer schema by tools/derive_reader.py. Definitions the other AEF 1.0 schemas reference. Not a document of its own.",
+  "$defs": {
+    "schemaVersion": {
+      "description": "MAJOR.MINOR. A writer emits the version it implements; a reader accepts any minor of a major it knows and refuses an unknown major.",
+      "type": "string",
+      "pattern": "^1\\.[0-9]+(?!\\n)$"
+    },
+    "id": {
+      "description": "An identifier: 1-128 characters, letters, digits and . _ : -",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,128}(?!\\n)$"
+    },
+    "ref": {
+      "description": "A typed reference, kind:name (for example agent:support/support-triage, suite:support/triage-scenarios).",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*:[!-~]{1,256}(?!\\n)$"
+    },
+    "sha256Hex": {
+      "description": "A SHA-256 digest: 64 lower-case hex characters (the in-toto digest form).",
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}(?!\\n)$",
+      "maxLength": 64
+    },
+    "sha256Uri": {
+      "description": "A SHA-256 digest with its algorithm: sha256:<64 lower-case hex>.",
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}(?!\\n)$",
+      "maxLength": 71
+    },
+    "timestamp": {
+      "description": "An RFC 3339 date-time in UTC, ending in Z, with up to nine fraction digits. The pattern is the rule; format is an annotation.",
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]{1,9})?Z(?!\\n)$"
+    },
+    "resultId": {
+      "description": "r_ + the first 32 lower-case hex characters of SHA-256 over runId, caseId, path and trial joined by U+001F (an absent trial is the empty string). See 1/README.md, 'Result ids'.",
+      "type": "string",
+      "pattern": "^r_[0-9a-f]{32}(?!\\n)$",
+      "maxLength": 34
+    },
+    "evidenceId": {
+      "type": "string",
+      "pattern": "^E-[A-Za-z0-9._-]{1,64}(?!\\n)$"
+    },
+    "state": {
+      "description": "A result's state. Only passed is a pass; not_measured, not_applicable, skipped, error and pending are typed absences, never a pass and never a 0 fail.",
+      "type": "string"
+    },
+    "trustedIdentity": {
+      "type": "object",
+      "required": [
+        "identity",
+        "assurance"
+      ],
+      "properties": {
+        "identity": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "os": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "assurance": {
+          "description": "How the identity is vouched for: self-attested (a local identity), signed (a DSSE signature verifies against a trusted key), authenticated (a server authenticated it).",
+          "type": "string"
+        }
+      }
+    },
+    "ext": {
+      "description": "Producer extensions. Readers ignore what they do not know; nothing in the contract depends on it.",
+      "type": "object"
+    },
+    "text": {
+      "description": "A name with no control character (C0, DEL, C1): caseId and path, which a result id joins with U+001F.",
+      "type": "string",
+      "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+(?!\\n)$"
+    },
+    "uri": {
+      "type": "string",
+      "maxLength": 2048,
+      "pattern": "^[a-z][a-z0-9+.-]*:[!-~]+(?!\\n)$"
+    },
+    "exactVersion": {
+      "description": "An exact version: printable ASCII without spaces, at most 128 characters, compared byte for byte. 'latest' (any case) is never a version: it is resolved before anything runs.",
+      "type": "string",
+      "pattern": "^[!-~]{1,128}(?!\\n)$",
+      "not": {
+        "pattern": "^[Ll][Aa][Tt][Ee][Ss][Tt](?!\\n)$"
+      }
+    },
+    "laneName": {
+      "description": "A lane: an id.",
+      "$ref": "#/$defs/id"
+    },
+    "duration": {
+      "description": "An ISO 8601 duration in days and hours, each at most five digits: P14D, PT36H, P1DT12H.",
+      "type": "string",
+      "pattern": "^P(?=[0-9]|T[0-9])([0-9]{1,5}D)?(T[0-9]{1,5}H)?(?!\\n)$"
+    },
+    "runRef": {
+      "description": "A sealed run a checkpoint lane used: its id, its run hash (frozen evidence), and where it came from.",
+      "type": "object",
+      "required": [
+        "runId",
+        "runHash",
+        "origin"
+      ],
+      "properties": {
+        "runId": {
+          "$ref": "#/$defs/id"
+        },
+        "runHash": {
+          "$ref": "#/$defs/sha256Hex"
+        },
+        "origin": {
+          "description": "launched: run for this checkpoint; adopted:<source>: an existing sealed run that matched the exact version and the comparability requirements.",
+          "type": "string",
+          "pattern": "^(launched|adopted:[A-Za-z0-9._:-]{1,64})(?!\\n)$"
+        }
+      }
+    },
+    "relativePath": {
+      "description": "A path inside a folder: ASCII segments separated by single slashes, no leading slash, no . or .. segment.",
+      "type": "string",
+      "maxLength": 1024,
+      "pattern": "^(?!\\.{1,2}(/|$))(?!.*/\\.{1,2}(/|$))[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*(?!\\n)$"
+    },
+    "provider": {
+      "description": "Where a run executes. A provider a later minor adds is read as other.",
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "string",
+          "pattern": "^ci:[a-z0-9-]{1,64}(?!\\n)$"
+        }
+      ]
+    },
+    "integer": {
+      "description": "Written as plain digits; a reader takes an integral number such as 2.0 as 2.",
+      "type": "integer"
+    }
+  }
+}

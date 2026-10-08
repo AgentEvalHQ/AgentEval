@@ -7,14 +7,14 @@ using Json.Schema;
 
 namespace AgentEval.Tests.Contracts;
 
-/// <summary>One set of AEF v2 schemas (writer or reader), registered together so their relative $refs resolve.</summary>
+/// <summary>One set of AEF 1.0 schemas (writer or reader), registered together so their relative $refs resolve.</summary>
 internal sealed class AefSchemaSet
 {
-    public static readonly string V2 = Path.Combine(RepoRoot(), "contracts", "aef", "v2");
+    public static readonly string Root = Path.Combine(RepoRoot(), "contracts", "aef", "1");
 
-    public static readonly Lazy<AefSchemaSet> Writer = new(() => Load(Path.Combine(V2, "schemas", "writer")));
+    public static readonly Lazy<AefSchemaSet> Writer = new(() => Load(Path.Combine(Root, "schemas", "writer")));
 
-    public static readonly Lazy<AefSchemaSet> Reader = new(() => Load(Path.Combine(V2, "schemas", "reader")));
+    public static readonly Lazy<AefSchemaSet> Reader = new(() => Load(Path.Combine(Root, "schemas", "reader")));
 
     private readonly Dictionary<string, JsonSchema> _schemas = new(StringComparer.Ordinal);
     // Format assertion off: in AEF the patterns are the rule and format is an annotation, so the corpus is checked the
@@ -41,7 +41,7 @@ internal sealed class AefSchemaSet
         var hash = name.IndexOf('#', StringComparison.Ordinal);
         var schema = hash < 0
             ? _schemas[name]
-            : JsonSchema.FromText($$"""{"$ref": "https://agenteval.dev/aef/v2/{{_base}}/{{name[..hash]}}.schema.json{{name[hash..]}}"}""");
+            : JsonSchema.FromText($$"""{"$ref": "https://agenteval.dev/aef/1/{{_base}}/{{name[..hash]}}.schema.json{{name[hash..]}}"}""");
         var result = schema.Evaluate(document, _options);
         errors = result.IsValid
             ? ""
