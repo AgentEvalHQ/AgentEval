@@ -24,7 +24,7 @@
     "cases": 2,
     "timeout": "PT1M"
   },
-  "contentPolicy": "off",
+  "contentCapture": "off",
   "isolation": "process",
   "provider": "local",
   "judges": [

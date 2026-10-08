@@ -24,7 +24,7 @@
     "cases": 200,
     "timeout": "PT2H"
   },
-  "contentPolicy": "off",
+  "contentCapture": "off",
   "isolation": "remote-zone",
   "provider": "local",
   "judges": [

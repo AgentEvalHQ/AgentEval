@@ -34,7 +34,14 @@
           },
           "kind": {
             "description": "score, rate, count, duration, cost or verdict. In the summary a rate or verdict line counts 1 when passed, else 0; a count is summed and every other kind averaged (SUM-1, SUM-4, SUM-5).",
-            "type": "string"
+            "enum": [
+              "score",
+              "rate",
+              "count",
+              "duration",
+              "cost",
+              "verdict"
+            ]
           },
           "direction": {
             "description": "Which way is better: higher_better, lower_better or none. A metric with none is never shown as better or worse, and cannot regress in a comparison (SUM-1, LANE-7).",

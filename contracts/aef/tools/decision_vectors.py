@@ -29,6 +29,17 @@ def out(status, blocking, name, axes=None):
     return item
 
 
+def exception(name, at="2026-10-06T09:00:00Z", expires="2026-10-20T00:00:00Z", requirement=None):
+    """An exception for lane `name`. The defaults are in force at AT: granted two days before, expiring twelve days after."""
+    item = {"lane": name}
+    if requirement:
+        item["requirement"] = requirement
+    item.update(reason=f"The {name} failure is accepted until the fix ships; tracked in the release review.",
+                by={"identity": "oidc:https://login.example.com/u-7f3a", "assurance": "authenticated"},
+                at=at, expires=expires)
+    return item
+
+
 VECTORS = [
     ("01-all-passed", "Every lane passed on fresh evidence for this version.",
      {"lanes": [lane("quality", True, "passed"), lane("security", True, "passed")]},
@@ -128,10 +139,126 @@ VECTORS = [
      {"lanes": [lane("quality", True, "deferred")]},
      {"outcome": "inconclusive", "lanes": [out("not_measured", True, "quality")],
       "reasons": ["not-measured:quality", "outcome:inconclusive"]}),
+    # Exceptions (DEC-1, DEC-2 step 6, DEC-3 rule 4, DEC-4, CKP-10). AT is 2026-10-08T12:00:00Z.
+    ("28-waived-blocking-failure", "A blocking failure with an exception in force is waived: approved_with_exceptions.",
+     {"lanes": [lane("quality", True, "passed"), lane("security", True, "failed")],
+      "exceptions": [exception("security", requirement="REQ-15")]},
+     {"outcome": "approved_with_exceptions", "lanes": [out("passed", True, "quality"), out("waived", True, "security")],
+      "reasons": ["waived:security", "outcome:approved_with_exceptions"]}),
+    ("29-waived-advisory-failure", "An advisory failure with an exception in force is waived too: approved_with_exceptions, not approved.",
+     {"lanes": [lane("quality", True, "passed"), lane("performance", False, "failed")],
+      "exceptions": [exception("performance")]},
+     {"outcome": "approved_with_exceptions", "lanes": [out("passed", True, "quality"), out("waived", False, "performance")],
+      "reasons": ["waived:performance", "outcome:approved_with_exceptions"]}),
+    ("30-exception-at-its-expiry", "An exception is not in force at its expires time (evaluatedAt < expires): the failure blocks.",
+     {"lanes": [lane("quality", True, "passed"), lane("security", True, "failed")],
+      "exceptions": [exception("security", at="2026-10-01T12:00:00Z", expires=AT)]},
+     {"outcome": "blocked", "lanes": [out("passed", True, "quality"), out("failed", True, "security")],
+      "reasons": ["failed:security", "exception-expired:security", "outcome:blocked"]}),
+    ("31-exception-at-its-grant", "An exception is in force from its at time (at <= evaluatedAt): waived.",
+     {"lanes": [lane("quality", True, "passed"), lane("security", True, "failed")],
+      "exceptions": [exception("security", at=AT, expires="2026-10-15T12:00:00Z")]},
+     {"outcome": "approved_with_exceptions", "lanes": [out("passed", True, "quality"), out("waived", True, "security")],
+      "reasons": ["waived:security", "outcome:approved_with_exceptions"]}),
+    ("32-exception-one-nanosecond-left", "Times compare at full precision: an exception expiring one nanosecond after evaluatedAt is in force.",
+     {"lanes": [lane("security", True, "failed")],
+      "exceptions": [exception("security", at="2026-10-01T12:00:00Z", expires="2026-10-08T12:00:00.000000001Z")]},
+     {"outcome": "approved_with_exceptions", "lanes": [out("waived", True, "security")],
+      "reasons": ["waived:security", "outcome:approved_with_exceptions"]}),
+    ("33-exception-on-missing", "Missing evidence is never waived: the exception has no effect and adds no reason.",
+     {"lanes": [lane("quality", True, "passed"), lane("memory", True)],
+      "exceptions": [exception("memory")]},
+     {"outcome": "inconclusive", "lanes": [out("passed", True, "quality"), out("missing", True, "memory")],
+      "reasons": ["missing:memory", "outcome:inconclusive"]}),
+    ("34-exception-on-stale", "Stale evidence is never waived, even of a failure: the checkpoint expired.",
+     {"lanes": [lane("quality", True, "passed"),
+                lane("security", True, "failed", closed="2026-09-20T12:00:00Z", freshness="P14D")],
+      "exceptions": [exception("security")]},
+     {"outcome": "expired", "lanes": [out("passed", True, "quality"), out("stale", True, "security")],
+      "reasons": ["stale:security", "outcome:expired"]}),
+    ("35-exception-on-not-measured", "A lane that measured nothing is never waived.",
+     {"lanes": [lane("quality", True, "not_measured")], "exceptions": [exception("quality")]},
+     {"outcome": "inconclusive", "lanes": [out("not_measured", True, "quality")],
+      "reasons": ["not-measured:quality", "outcome:inconclusive"]}),
+    ("36-exception-on-incomparable", "An incomparable comparison is never waived.",
+     {"lanes": [lane("memory", False, "incomparable", axes=["judges"])], "exceptions": [exception("memory")]},
+     {"outcome": "inconclusive", "lanes": [out("incomparable", False, "memory", ["judges"])],
+      "reasons": ["incomparable:memory", "outcome:inconclusive"]}),
+    ("37-exception-on-passed-lane", "An exception for a lane that passed changes nothing: approved, not approved_with_exceptions.",
+     {"lanes": [lane("quality", True, "passed"), lane("security", True, "passed")],
+      "exceptions": [exception("security")]},
+     {"outcome": "approved", "lanes": [out("passed", True, "quality"), out("passed", True, "security")],
+      "reasons": ["outcome:approved"]}),
+    ("38-two-exceptions-one-in-force", "Two exceptions for one lane, one expired and one in force: waived, and no exception-expired.",
+     {"lanes": [lane("security", True, "failed")],
+      "exceptions": [exception("security", at="2026-09-01T00:00:00Z", expires="2026-10-01T00:00:00Z"), exception("security")]},
+     {"outcome": "approved_with_exceptions", "lanes": [out("waived", True, "security")],
+      "reasons": ["waived:security", "outcome:approved_with_exceptions"]}),
+    ("39-two-exceptions-none-in-force", "Two expired exceptions for one lane: blocked, with one exception-expired for the lane.",
+     {"lanes": [lane("security", True, "failed")],
+      "exceptions": [exception("security", at="2026-09-01T00:00:00Z", expires="2026-09-15T00:00:00Z"),
+                     exception("security", at="2026-09-15T00:00:00Z", expires="2026-10-01T00:00:00Z")]},
+     {"outcome": "blocked", "lanes": [out("failed", True, "security")],
+      "reasons": ["failed:security", "exception-expired:security", "outcome:blocked"]}),
+    ("40-exception-granted-later", "An exception granted after evaluatedAt is not in force then: blocked.",
+     {"lanes": [lane("security", True, "failed")],
+      "exceptions": [exception("security", at="2026-10-09T00:00:00Z", expires="2026-10-20T00:00:00Z")]},
+     {"outcome": "blocked", "lanes": [out("failed", True, "security")],
+      "reasons": ["failed:security", "exception-expired:security", "outcome:blocked"]}),
+    ("41-waived-and-another-blocking-failure", "A waived lane does not block, but another blocking failure still does.",
+     {"lanes": [lane("quality", True, "failed"), lane("security", True, "failed")],
+      "exceptions": [exception("security")]},
+     {"outcome": "blocked", "lanes": [out("failed", True, "quality"), out("waived", True, "security")],
+      "reasons": ["failed:quality", "waived:security", "outcome:blocked"]}),
+    ("42-waived-and-missing", "A waived lane beside a missing one: inconclusive before approved_with_exceptions.",
+     {"lanes": [lane("quality", True), lane("security", True, "failed")],
+      "exceptions": [exception("security")]},
+     {"outcome": "inconclusive", "lanes": [out("missing", True, "quality"), out("waived", True, "security")],
+      "reasons": ["missing:quality", "waived:security", "outcome:inconclusive"]}),
+    ("43-waived-but-superseded", "A superseded version expires the checkpoint whatever its exceptions.",
+     {"supersededBy": "git:9e8d7c", "lanes": [lane("security", True, "failed")],
+      "exceptions": [exception("security")]},
+     {"outcome": "expired", "lanes": [out("waived", True, "security")],
+      "reasons": ["waived:security", "superseded:git:9e8d7c", "outcome:expired"]}),
+    ("44-advisory-exception-expired", "An advisory failure whose exception expired: approved, and both the failure and the lapse are reported.",
+     {"lanes": [lane("quality", True, "passed"), lane("performance", False, "failed")],
+      "exceptions": [exception("performance", at="2026-09-01T00:00:00Z", expires="2026-10-01T00:00:00Z")]},
+     {"outcome": "approved", "lanes": [out("passed", True, "quality"), out("failed", False, "performance")],
+      "reasons": ["advisory-failed:performance", "exception-expired:performance", "outcome:approved"]}),
+    ("45-reasons-in-lane-order", "exception-expired follows its own lane's reason, before the next lane's.",
+     {"lanes": [lane("security", True, "failed"), lane("memory", True)],
+      "exceptions": [exception("security", at="2026-09-01T00:00:00Z", expires="2026-10-01T00:00:00Z")]},
+     {"outcome": "blocked", "lanes": [out("failed", True, "security"), out("missing", True, "memory")],
+      "reasons": ["failed:security", "exception-expired:security", "missing:memory", "outcome:blocked"]}),
+    ("46-advisory-failed-and-waived", "An advisory failure and a waived blocking failure: approved_with_exceptions, reasons in lane order.",
+     {"lanes": [lane("performance", False, "failed"), lane("security", True, "failed")],
+      "exceptions": [exception("security")]},
+     {"outcome": "approved_with_exceptions", "lanes": [out("failed", False, "performance"), out("waived", True, "security")],
+      "reasons": ["advisory-failed:performance", "waived:security", "outcome:approved_with_exceptions"]}),
+    ("47-re-evaluated-after-expiry", "CKP-10: vector 28's input read on 2026-10-21, after its exception expired: approved_with_exceptions now reads as blocked.",
+     {"evaluatedAt": "2026-10-21T12:00:00Z",
+      "lanes": [lane("quality", True, "passed"), lane("security", True, "failed")],
+      "exceptions": [exception("security", requirement="REQ-15")]},
+     {"outcome": "blocked", "lanes": [out("passed", True, "quality"), out("failed", True, "security")],
+      "reasons": ["failed:security", "exception-expired:security", "outcome:blocked"]}),
 ]
 
 # Vectors whose input only a reader accepts (a value a later minor may add).
 READER_ONLY = {"25-unknown-status-fails-closed"}
+
+# The rules each vector tests. Every decided vector reads an input (DEC-1) and checks each lane's status (DEC-2), the
+# outcome (DEC-3) and the reason list (DEC-4); a refused one tests DEC-1. These add the rules a vector turns on besides.
+DECIDED_RULES = ["DEC-1", "DEC-2", "DEC-3", "DEC-4"]
+EXTRA_RULES = {
+    # DEC-5: versions and lane names byte for byte, times at full precision, at a boundary.
+    **{name: ["DEC-5"] for name in (
+        "05-wrong-version", "11-superseded", "12-fresh-at-the-boundary", "15-days-and-hours", "16-superseded-by-itself",
+        "17-version-before-freshness", "23-future-evidence", "24-one-nanosecond-stale", "30-exception-at-its-expiry",
+        "31-exception-at-its-grant", "32-exception-one-nanosecond-left", "48-exception-for-an-unknown-lane",
+        "49-exception-expires-at-its-grant")},
+    # CKP-10: a decided checkpoint's input evaluated again at the time of reading.
+    "47-re-evaluated-after-expiry": ["CKP-10"],
+}
 
 # Inputs the function refuses rather than decide: (name, description, input, error). Schema-invalid inputs say so.
 REFUSED = [
@@ -139,6 +266,16 @@ REFUSED = [
      {"lanes": []}, "no-lanes", True),
     ("27-a-lane-twice", "A lane listed twice is ambiguous: refused.",
      {"lanes": [lane("quality", True, "passed"), lane("quality", True, "failed")]}, "duplicate-lane", False),
+    ("48-exception-for-an-unknown-lane", "An exception for a lane the input does not have: refused, never ignored (DEC-1).",
+     {"lanes": [lane("security", True, "failed")], "exceptions": [exception("memory")]}, "exception-unknown-lane", False),
+    ("49-exception-expires-at-its-grant", "An exception whose expires equals its at is never in force: refused (DEC-1).",
+     {"lanes": [lane("security", True, "failed")],
+      "exceptions": [exception("security", at="2026-10-06T09:00:00Z", expires="2026-10-06T09:00:00Z")]},
+     "exception-never-in-force", False),
+    ("50-exception-expires-before-its-grant", "An exception that expires before it is granted: refused (DEC-1).",
+     {"lanes": [lane("security", True, "failed")],
+      "exceptions": [exception("security", at="2026-10-06T09:00:00Z", expires="2026-10-01T00:00:00Z")]},
+     "exception-never-in-force", False),
 ]
 
 
@@ -147,14 +284,15 @@ def main():
     for old in OUT.glob("*.json"):
         old.unlink()
     for name, description, partial, expected in VECTORS:
-        doc = {"description": description,
+        doc = {"description": description, "rules": DECIDED_RULES + EXTRA_RULES.get(name, []),
                "input": {"subjectVersion": V, "evaluatedAt": AT, **partial},
                "expected": expected}
         if name in READER_ONLY:
             doc["readerOnly"] = True
         (OUT / f"{name}.json").write_bytes((json.dumps(doc, indent=2, ensure_ascii=False) + "\n").encode("utf-8"))
     for name, description, partial, error, schema_invalid in REFUSED:
-        doc = {"description": description, "input": {"subjectVersion": V, "evaluatedAt": AT, **partial}, "expectedError": error}
+        doc = {"description": description, "rules": ["DEC-1"] + EXTRA_RULES.get(name, []),
+               "input": {"subjectVersion": V, "evaluatedAt": AT, **partial}, "expectedError": error}
         if schema_invalid:
             doc["schemaInvalid"] = True
         (OUT / f"{name}.json").write_bytes((json.dumps(doc, indent=2, ensure_ascii=False) + "\n").encode("utf-8"))

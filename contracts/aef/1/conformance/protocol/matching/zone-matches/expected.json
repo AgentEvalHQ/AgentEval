@@ -1,4 +1,8 @@
 {
+  "kind": "matching",
   "matches": true,
+  "rules": [
+    "PLAN-7"
+  ],
   "why": "same zone, provider supported, tags carried"
 }

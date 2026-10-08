@@ -20,7 +20,7 @@
       "description": "The record's id, unique in the run; results cite it (EVD-1)."
     },
     "kind": {
-      "description": "What the evidence is: span, tool_call, judge_reasoning, compliance_artifact, document or other. A run with contentCapture off has no tool_call, judge_reasoning or document record (EVD-1, RUN-11).",
+      "description": "What the evidence is: a span, a tool call, judge reasoning, a compliance artifact, a document, the case's input, its expected answer, the subject's output, a transcript of the conversation, or other. tool_call, judge_reasoning, document, input, expected, output and transcript are content: none is written under contentCapture off (RUN-11).",
       "type": "string"
     },
     "digest": {

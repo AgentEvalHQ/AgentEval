@@ -1,0 +1,11 @@
+{
+  "kind": "document",
+  "schema": "overlay-event",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "OVL-1",
+    "RES-3"
+  ],
+  "why": "a closed run has no pending result"
+}

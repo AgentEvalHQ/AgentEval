@@ -1,0 +1,34 @@
+{
+  "description": "An exception that expires before it is granted: refused (DEC-1).",
+  "rules": [
+    "DEC-1"
+  ],
+  "input": {
+    "subjectVersion": "git:3f2a1c",
+    "evaluatedAt": "2026-10-08T12:00:00Z",
+    "lanes": [
+      {
+        "lane": "security",
+        "blocking": true,
+        "result": {
+          "status": "failed",
+          "subjectVersion": "git:3f2a1c",
+          "oldestClosedAt": "2026-10-07T10:00:00Z"
+        }
+      }
+    ],
+    "exceptions": [
+      {
+        "lane": "security",
+        "reason": "The security failure is accepted until the fix ships; tracked in the release review.",
+        "by": {
+          "identity": "oidc:https://login.example.com/u-7f3a",
+          "assurance": "authenticated"
+        },
+        "at": "2026-10-06T09:00:00Z",
+        "expires": "2026-10-01T00:00:00Z"
+      }
+    ]
+  },
+  "expectedError": "exception-never-in-force"
+}

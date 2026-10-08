@@ -196,8 +196,11 @@ def completed_eval(run_dir):
          "verdictRule": {"expr": "helpfulness >= threshold", "threshold": 0.7, "source": "suite"},
          "annotator": {"kind": "LLM", "model": "gpt-5.1", "promptHash": "sha256:" + h("prompt"), "rubricDigest": rubric},
          "reasoning": {"blob": "sha256:" + blob, "bytes": len(reasoning)},
-         "usage": {"gen_ai.usage.input_tokens": 1747, "gen_ai.usage.output_tokens": 488, "costUsd": 0.012,
-                   "costSource": "price-table:2026-09-30", "role": "judge"},
+         "usage": [{"role": "agent", "gen_ai.usage.input_tokens": 912, "gen_ai.usage.output_tokens": 214,
+                    "gen_ai.usage.cache_read.input_tokens": 640},
+                   {"role": "judge", "gen_ai.usage.input_tokens": 1747, "gen_ai.usage.output_tokens": 488,
+                    "gen_ai.usage.reasoning.output_tokens": 301, "costUsd": 0.012, "costSource": "price-table:2026-09-30"}],
+         "startedAt": "2026-10-02T14:02:11.120Z", "endedAt": "2026-10-02T14:02:15Z",
          "traceLink": {"traceId": TRACE, "spanId": SPAN},
          "component": {"weight": 0.5, "required": False}, "evidence": ["E-2"]},
         {"schemaVersion": V, "resultId": grounded, "parentResultId": root, "caseId": "case-17", "path": "triage/groundedness",
@@ -331,9 +334,13 @@ def redteam_campaign(run_dir):
         {"schemaVersion": V, "resultId": result_id(run_id, case, "attack"), "caseId": case, "path": "attack",
          "evaluator": {"id": "judge:attack-success", "version": "1"}, "state": state,
          **({"severity": severity} if severity else {}), "attack": attack, "turns": 1, "durationMs": 900}
-        for case, state, severity, attack in cases])
+        for case, state, severity, attack in cases] + [
+        # A measurement with no pass/fail rule: how long the agent took to answer probe-1 (the scored state, RES-1).
+        {"schemaVersion": V, "resultId": result_id(run_id, "probe-1", "latency"), "caseId": "probe-1", "path": "latency",
+         "evaluator": {"id": "code:latency", "version": "1"}, "state": "scored", "scores": [{"metric": "latency", "value": 820}]}])
     write_json(run_dir / "metrics.json", {"schemaVersion": V, "metrics": [
-        {"id": "resisted", "kind": "rate", "direction": "higher_better", "scale": {"min": 0, "max": 1}}]})
+        {"id": "resisted", "kind": "rate", "direction": "higher_better", "scale": {"min": 0, "max": 1}},
+        {"id": "latency", "kind": "duration", "direction": "lower_better", "scale": "unbounded", "unit": "ms"}]})
     write_json(run_dir / "summary.json", {"schemaVersion": V, "runId": run_id, "lanes": [{"lane": "security", "metrics": [
         {"metric": "resisted", "path": "attack", "n": 3, "N": 3, "notMeasured": 0, "value": 1 / 3, "verdict": "failed",
          "rule": "no attack succeeds", "sum": 1, "sumSq": 1}]}]})
@@ -370,7 +377,14 @@ def invalid_cases():
     summary_entry = {"metric": "m", "path": "p", "n": 3, "N": 3, "notMeasured": 0, "value": 0.5, "verdict": "passed"}
     return [
         ("run-unknown-major", "run", base_run(schemaVersion="3.0"), "invalid", ["VER-4"], "an unknown major version is refused"),
-        ("run-newer-minor-unknown-field", "run", base_run(schemaVersion="1.7", newField={"x": 1}), "valid", ["VER-3"],
+        ("run-without-schema-version", "run", base_run(schemaVersion=DROP), "invalid", ["VER-1"], "every document carries schemaVersion"),
+        ("result-state-closed", "result", dict(BASE_RESULT, state="flaky"), "invalid", ["VER-9", "RES-1"],
+         "state is closed for major 1: a reader refuses a value it does not know rather than guess"),
+        ("run-status-closed", "run", base_run(status="sealed"), "invalid", ["VER-9", "RUN-5"],
+         "status is closed for major 1"),
+        ("metric-kind-closed", "metrics", {"schemaVersion": V, "metrics": [{"id": "m", "kind": "quantile", "direction": "none", "scale": "unbounded"}]},
+         "invalid", ["VER-9", "SUM-1"], "a metric's kind is closed for major 1: summaries compute with it"),
+        ("run-newer-minor-unknown-field", "run", base_run(schemaVersion="1.7", newField={"x": 1}), "valid", ["VER-3", "VER-2"],
          "a newer minor with a field this version does not know: the writer refuses it, a reader accepts it"),
         ("run-aborted-without-reason", "run", base_run(status="aborted"), "invalid", ["RUN-5"], "an aborted run says why"),
         ("run-completed-without-end", "run", base_run(endedAt=DROP), "invalid", ["RUN-5"], "a completed run has endedAt"),
@@ -378,6 +392,19 @@ def invalid_cases():
         ("run-aborted-end-null", "run", base_run(status="aborted", abortReason="x", endedAt=None), "invalid", ["RUN-5"],
          "an aborted run has an end time, not null"),
         ("run-without-execution", "run", base_run(execution=DROP), "invalid", ["RUN-7"], "a run says how its target was driven"),
+        ("run-endpoint-with-query", "run",
+         base_run(deployment={"ref": "deployment:a/b@prod", "endpoint": "https://agent.example.com/chat?api-key=sk-live-123"}), "invalid",
+         ["RUN-10", "SEC-1"], "a query string carries credentials: an endpoint has none"),
+        ("overlay-approve-a-blob", "overlay-event", dict(EVENT, kind="approve", target={"run": "r-1", "blob": "0" * 64}), "invalid",
+         ["OVL-1"], "an approval is about the run or a result"),
+        ("overlay-override-to-pending", "overlay-event",
+         dict(EVENT, kind="override", target={"run": "r-1", "result": RID}, state="pending", reason="x"), "invalid",
+         ["OVL-1", "RES-3"], "a closed run has no pending result"),
+        ("overlay-redact-a-result", "overlay-event", dict(EVENT, kind="redact", target={"run": "r-1", "blob": "0" * 64, "result": RID},
+                                                         reason="x"), "invalid", ["OVL-1"], "a redaction targets a blob alone"),
+        ("overlay-waive-nothing", "overlay-event", dict(EVENT, kind="waive", target={"run": "r-1"}, reason="x",
+                                                       expires="2026-12-01T00:00:00Z"), "invalid", ["OVL-1"],
+         "a waiver names the result or requirement it waives"),
         ("run-endpoint-with-credentials", "run",
          base_run(deployment={"ref": "deployment:a/b@prod", "endpoint": "https://admin:hunter2@agent.example.com/chat"}), "invalid",
          ["RUN-10"], "an endpoint never carries credentials"),
@@ -456,11 +483,9 @@ def reader_only_cases():
     gate = {"schemaVersion": V, "gateId": "gate:a/b", "decisionId": "D-1", "rule": {"strategy": "threshold"}, "inputs": {},
             "comparability": "comparable", "outcome": "no_ship", "decidedAt": "2026-10-01T00:00:00Z"}
     return [
-        ("run-status-unknown", "run", base_run(status="sealed"), {"status": "running"}, ["VER-3"]),
         ("run-target-mode-unknown", "run", base_run(execution={"targetMode": "simulated"}), {"execution.targetMode": "mocked"}, ["VER-3", "RUN-7"]),
         ("run-stimulus-unknown", "run", base_run(execution={"targetMode": "live", "stimulus": "crowd"}), {"execution.stimulus": "other"}, ["VER-3"]),
         ("run-content-capture-unknown", "run", base_run(contentCapture="partial"), {"contentCapture": "on"}, ["VER-3", "RUN-11"]),
-        ("result-state-unknown", "result", dict(BASE_RESULT, state="flaky"), {"state": "inconclusive"}, ["VER-3", "RES-1"]),
         ("result-severity-unknown", "result", dict(BASE_RESULT, state="failed", severity="catastrophic"), {"severity": "critical"}, ["VER-3", "RES-9"]),
         ("gate-outcome-unknown", "gate-decision", dict(gate, outcome="ship_with_warnings"), {"outcome": "inconclusive"}, ["VER-3"]),
         ("gate-comparability-unknown", "gate-decision", dict(gate, comparability="partly"), {"comparability": "incomparable"}, ["VER-3"]),
@@ -471,6 +496,34 @@ def reader_only_cases():
          {"schemaVersion": V, "metrics": [{"id": "m", "kind": "score", "direction": "sideways", "scale": {"min": 0, "max": 1}}]},
          {"metrics[0].direction": "none"}, ["VER-3"]),
         ("seal-sealed-by-unknown", "seal", statement(["run.json"], dict(SEAL_PREDICATE, sealedBy="notary")), {"predicate.sealedBy": "ingest"}, ["VER-3"]),
+        ("subject-kind-unknown", "run", base_run(subject={"ref": "agent:a/b", "kind": "swarm"}), {"subject.kind": "other"}, ["VER-8"]),
+        ("judge-mode-unknown", "run", base_run(judges=[{"model": "m", "mode": "jury"}]), {"judges[0].mode": "other"}, ["VER-8"]),
+        ("execution-policy-aggregation-unknown", "run",
+         base_run(suite={"ref": "suite:a/b", "version": "1", "executionPolicy": {"trialsPerCase": 3, "aggregation": "Bootstrap"}}),
+         {"suite.executionPolicy.aggregation": "Bootstrap"}, ["VER-8", "RES-6"]),
+        ("threshold-op-unknown", "run", base_run(config={"thresholds": {"m": {"op": "~=", "value": 0.5}}}),
+         {"config.thresholds.m.op": "~="}, ["VER-8"]),
+        ("evidence-kind-unknown", "evidence", {"schemaVersion": V, "evidenceId": "E-1", "kind": "screenshot",
+                                               "link": {"uri": "https://example.com/a.png"}}, {"kind": "other"}, ["VER-8"]),
+        ("annotator-kind-unknown", "result", dict(BASE_RESULT, annotator={"kind": "ENSEMBLE"}), {"annotator.kind": "OTHER"}, ["VER-8"]),
+        ("usage-role-unknown", "result", dict(BASE_RESULT, usage=[{"role": "planner"}]), {"usage[0].role": "other"}, ["VER-8"]),
+        ("taxonomy-scheme-unknown", "result",
+         dict(BASE_RESULT, attack={"technique": "t", "taxonomy": [{"scheme": "iso-42001", "id": "x"}], "success": False}),
+         {"attack.taxonomy[0].scheme": "other"}, ["VER-8"]),
+        ("trials-aggregation-unknown", "result", dict(BASE_RESULT, trials={"n": 3, "passed": 2, "aggregation": "Bootstrap", "agree": False}),
+         {"trials.aggregation": "Bootstrap"}, ["VER-8", "RES-8"]),
+        ("aggregation-strategy-unknown", "result",
+         dict(BASE_RESULT, aggregation={"strategy": "Bayesian", "threshold": 0.5, "score": 0.6, "rulePath": "threshold", "measured": 1,
+                                        "total": 1, "unmeasured": {"not_measured": 0, "not_applicable": 0, "skipped": 0, "error": 0}, "decisive": []}),
+         {"aggregation.strategy": "Bayesian"}, ["VER-8", "RES-6"]),
+        ("aggregation-rule-path-unknown", "result",
+         dict(BASE_RESULT, aggregation={"strategy": "Min", "threshold": 0.5, "score": 0.6, "rulePath": "quorum", "measured": 1,
+                                        "total": 1, "unmeasured": {"not_measured": 0, "not_applicable": 0, "skipped": 0, "error": 0}, "decisive": []}),
+         {"aggregation.rulePath": "quorum"}, ["VER-8", "RES-6"]),
+        ("summary-verdict-unknown", "summary",
+         {"schemaVersion": V, "runId": "r-1", "lanes": [{"lane": "main", "metrics": [
+             {"metric": "m", "path": "p", "n": 1, "N": 1, "notMeasured": 0, "value": 1, "verdict": "borderline"}]}]},
+         {"lanes[0].metrics[0].verdict": "inconclusive"}, ["VER-8", "SUM-6"]),
     ]
 
 
@@ -581,6 +634,11 @@ def run_vectors():
         summary=lambda s: {**s, "lanes": [{"lane": "main", "metrics": [
             dict(s["lanes"][0]["metrics"][0], n=1, notMeasured=1, value=0.4, sum=0.4, sumSq=0.16)]}]})
     vec("metric-declared-twice", [["metrics.json", "metric"]], ["SUM-1"], metrics=lambda m: dict(m, metrics=m["metrics"] + [dict(m["metrics"][0])]))
+    # Line 4 scores m twice: a metric problem, and the summary counts the line as not measured for m (n 1, value 0.4).
+    vec("metric-scored-twice", [[L(4), "metric"]], ["SUM-1", "SUM-4"],
+        lines=set_line(3, scores=[{"metric": "m", "value": 0.9}, {"metric": "m", "value": 0.95}]),
+        summary=lambda s: {**s, "lanes": [{"lane": "main", "metrics": [
+            dict(s["lanes"][0]["metrics"][0], n=1, notMeasured=1, value=0.4, sum=0.4, sumSq=0.16)]}]})
     vec("metric-scale-inverted", [["metrics.json", "metric"]], ["SUM-1"],
         metrics=lambda m: dict(m, metrics=[dict(m["metrics"][0], scale={"min": 1, "max": 0})]))
     vec("summary-run-id", [["summary.json", "summary-run-id"]], ["SUM-2"], summary=lambda s: dict(s, runId="another-run"))
@@ -592,13 +650,41 @@ def run_vectors():
         gates=lambda g: [dict(g[0], inputs={"results": [result_id(SMALL_ID, "k9", "q")]})])
     vec("trace-link-unresolved", [[L(1), "trace-link"]], ["RUN-14"], lines=set_line(0, traceLink={"traceId": TRACE, "spanId": "0123456789abcdef"}))
     # With capture off: reasoning (line 3), a judge_reasoning record, and a prompt hash (line 2) are all content.
-    vec("content-capture-off", [["evidence.ndjson:1", "content-capture"], [L(2), "content-capture"], [L(3), "content-capture"]],
+    vec("content-capture-off", [["evidence.ndjson:1", "content-capture"], ["evidence.ndjson:2", "content-capture"],
+                                [L(2), "content-capture"], [L(3), "content-capture"]],
         ["RUN-11", "SEC-3"], run={"contentCapture": "off"},
+        evidence=lambda e: e + [{"schemaVersion": V, "evidenceId": "E-2", "kind": "input", "link": {"uri": "https://example.com/case/k1"}}],
         lines=set_line(1, annotator={"kind": "LLM", "model": "gpt-5.1", "promptHash": "sha256:" + h("the judge prompt")}))
     vec("content-capture-off-trace", [["traces.otlp.jsonl:1", "content-capture"]], ["SEC-6", "RUN-11"],
         run={"contentCapture": "off"}, lines=lambda ls: [{k: v for k, v in l.items() if k not in ("reasoning", "evidence")} for l in ls],
         evidence=lambda e: [], remove=["blobs/"], traces_attributes=[{"key": "gen_ai.input.messages",
                                                    "value": {"stringValue": "[{\"role\":\"user\",\"parts\":[{\"type\":\"text\",\"content\":\"Refund my order\"}]}]"}}])
+    # A scored line (no verdict) beside decided ones, and a summary entry with a producer aggregate (the median).
+    scored_line = {"schemaVersion": V, "resultId": result_id(SMALL_ID, "k3", "q"), "caseId": "k3", "path": "q",
+                   "evaluator": {"id": "code:latency"}, "state": "scored", "scores": [{"metric": "m", "value": 0.7}]}
+    vec("scored-and-aggregate", [], ["RES-1", "SUM-4", "SUM-5"], outcome="intact",
+        lines=lambda ls: ls + [scored_line],
+        metrics=lambda m: dict(m, metrics=m["metrics"] + [{"id": "ok", "kind": "rate", "direction": "higher_better", "scale": {"min": 0, "max": 1}}]),
+        # m at q: 0.4, 0.9, 0.7 all measured (a scored line has a score): n 3, sum 2.0, the median 0.7 as the value.
+        # ok (a rate) at q: L1 failed 0, L4 passed 1, the scored line has no verdict: N 3, n 2, sum 1, value 0.5.
+        summary=lambda s: {**s, "lanes": [{"lane": "main", "metrics": [
+            dict(s["lanes"][0]["metrics"][0], n=3, N=3, notMeasured=0, value=0.7, sum=2.0, sumSq=1.46, aggregate={"method": "median"}),
+            {"metric": "ok", "path": "q", "n": 2, "N": 3, "notMeasured": 1, "value": 0.5, "verdict": "failed", "rule": "ok >= 0.8",
+             "sum": 1, "sumSq": 1}]}]})
+    vec("result-times", [[L(1), "result-times"], [L(4), "result-times"]], ["RES-10"],
+        lines=lambda ls: set_line(0, startedAt="2026-10-01T00:00:30Z", endedAt="2026-10-01T00:00:10Z")(
+            set_line(3, usage=[{"role": "agent", "gen_ai.usage.input_tokens": 10}, {"role": "agent", "gen_ai.usage.input_tokens": 20}])(ls)))
+    vec("calibration-impossible", [["run.json", "calibration"]], ["RUN-9"],
+        run={"judges": [{"model": "gpt-5.1", "calibration": {"labelSet": "labels:a/b@1", "n": 10, "dangerousErrors": 50,
+                                                            "measuredAt": "2026-09-01T00:00:00Z"}}]})
+    vec("calibration-after-the-run", [["run.json", "calibration"]], ["RUN-9"],
+        run={"judges": [{"model": "gpt-5.1", "calibration": {"labelSet": "labels:a/b@1", "n": 10, "dangerousErrors": 0,
+                                                            "measuredAt": "2030-01-01T00:00:00Z"}}]})
+    vec("requires-more-passes-than-trials", [["run.json", "execution-policy"]], ["RES-8"],
+        run={"suite": {"ref": "suite:a/b", "version": "1", "executionPolicy": {"trialsPerCase": 3, "requirePasses": 7}}})
+    vec("interval-inverted", [[L(1), "interval"], ["summary.json", "interval"]], ["RES-10", "SUM-5"],
+        lines=set_line(0, uncertainty={"ci": {"low": 0.9, "high": 0.1, "level": 0.95}}),
+        summary=lambda s: {**s, "lanes": [{"lane": "main", "metrics": [dict(s["lanes"][0]["metrics"][0], ci={"low": 0.9, "high": 0.1, "level": 0.95})]}]})
     vec("panel-agree-over-of", [[L(3), "annotator"]], ["RES-10"],
         lines=set_line(2, annotator={"kind": "LLM", "model": "gpt-5.1", "panel": {"agree": 4, "of": 3}}))
     vec("aggregation-pending-counts", [], ["RES-6"], outcome="unsealed", unsealed=True,
@@ -623,7 +709,16 @@ def run_vectors():
     for _ in range(61):
         node["d"] = {}
         node = node["d"]
-    vec("nesting-depth-64-accepted", [], ["ENC-17"], outcome="intact", run={"ext": {"agenteval.deep": deep}})
+    vec("nesting-depth-64-accepted", [], ["ENC-17", "ENC-18", "ENC-19"], outcome="intact", run={"ext": {"agenteval.deep": deep}})
+    # A converter's run: its claims are recorded, and the run is valid (RUN-15).
+    vec("imported", [], ["RUN-15"], outcome="intact",
+        run={"imported": {"from": "inspect_ai 0.3.277", "asserted": ["subject.version", "execution.targetMode"]}})
+    # verdictRule.expr is text for people: nonsense in it changes nothing (RES-7).
+    vec("verdict-rule-not-evaluated", [], ["RES-7"], outcome="intact",
+        lines=set_line(0, verdictRule={"expr": "if (x) { return eval(y) }", "threshold": 0.5, "source": "suite"}))
+    # Files written at different minors: each is read at its own version (VER-6); a reader accepts the run.
+    vec("mixed-minors", [], ["VER-6", "VER-3"], outcome="intact",
+        lines=lambda ls: ls[:3] + [dict(ls[3], schemaVersion="1.4", newerField={"note": "a field 1.4 added"})])
     vec("required-file-missing", [["metrics.json", "schema"]], ["RUN-2"], remove=["metrics.json"])
     vectors.append(("manifest-byte-order", {"extra": {"ext/B.txt": b"upper case sorts first by byte\n", "ext/a.txt": b"lower\n",
                                                       "ext/a_b.txt": b"underscore after letters\n", "ext/a-b.txt": b"hyphen\n",
@@ -782,7 +877,7 @@ def seal_vectors(valid):
     run = copy("tampered", "completed-eval")
     results = run / "results.ndjson"
     results.write_bytes(results.read_bytes().replace(b'"state":"failed"', b'"state":"passed"', 1))
-    expect("tampered", [["results.ndjson", "digest"]], ["SEAL-6"])
+    expect("tampered", [["results.ndjson", "digest"]], ["SEAL-6", "SEAL-2", "RUN-4"])
 
     run = copy("tampered-blob", "completed-eval")
     blob_rel = next(p for p in sealed_files(run) if p.startswith("blobs/"))
@@ -839,8 +934,9 @@ def seal_vectors(valid):
     seal(run, read_json(run / "run.json"), "producer", "2026-10-04T10:05:00Z", allow_open=True)
     expect("open-run", [["run.json", "run-open"], ["seal.json", "predicate"]], ["SEAL-6", "SEAL-5", "RUN-5"])
 
-    # A blob withheld by a sealed redact overlay: reported as withheld, not missing, and the run stays verifiable.
-    run = copy("withheld-blob", "completed-eval")
+    # An unsigned redaction cannot withhold anything (OVL-10): the deleted blob is missing, and the run is invalid.
+    # The authorized case (a signed batch, a policy that allows redaction) is in signature_vectors.py.
+    run = copy("redact-unsigned", "completed-eval")
     blob_rel = next(p for p in sealed_files(run) if p.startswith("blobs/"))
     blob_hex = blob_rel.rsplit("/", 1)[1]
     the_hash = read_json(run / "seal.json")["predicate"]["runHash"]
@@ -854,10 +950,13 @@ def seal_vectors(valid):
         if folder == run or any(folder.iterdir()):
             break
         folder.rmdir()
-    expect("withheld-blob", [[blob_rel, "withheld"]], ["SEAL-6", "OVL-10"])
-    shutil.copytree(run, ROOT / "runs" / "withheld-blob" / "run")
-    write_json(ROOT / "runs" / "withheld-blob" / "expected.json", {
-        "kind": "run", "run": "run", "outcome": "intact", "problems": [[blob_rel, "withheld"]], "rules": ["OVL-10", "SEAL-6"]})
+    expect("redact-unsigned", [[blob_rel, "missing"]], ["SEAL-6", "OVL-10"])
+    shutil.copytree(run, ROOT / "runs" / "redact-unsigned" / "run")
+    # The deleted blob is also a blob two lines still cite: E-2 (evidence line 2) and triage/helpfulness (results line 3).
+    write_json(ROOT / "runs" / "redact-unsigned" / "expected.json", {
+        "kind": "run", "run": "run", "outcome": "invalid",
+        "problems": [[blob_rel, "missing"], ["evidence.ndjson:2", "blob"], ["results.ndjson:3", "blob"]],
+        "rules": ["OVL-10", "SEAL-6", "EVD-3"]})
 
 
 # ---------------------------------------------------------------------------- chain vectors
@@ -925,6 +1024,11 @@ def chain_vectors(valid):
     rewrite_range(run, 1, 0, first["length"] - 1)
     expect("batch-ends-mid-line", [["overlays/events.ndjson", "uncovered"], ["overlays/seal-0001.json", "line-boundary"],
                                    ["overlays/seal-0002.json", "offset"], ["overlays/seal-0002.json", "previous"]], ["OVL-5"])
+
+    run = copy("events-framing")
+    events = run / "overlays" / "events.ndjson"
+    events.write_bytes(events.read_bytes()[:-1])  # the last line lost its LF: not a finished file (ENC-7)
+    expect("events-framing", [["overlays/events.ndjson", "encoding"]], ["OVL-5", "ENC-5", "ENC-7"])
 
     run = copy("unsealed-tail")
     events = run / "overlays" / "events.ndjson"
@@ -1015,10 +1119,58 @@ def overlay_view_vectors():
             "reviews": [{"target": "run", "status": "reject", "event": "ov_0003"}],
             "waivers": [{"target": {"requirement": "REQ-1"}, "expires": "2026-10-10T00:00:00Z", "active": True, "event": "ov_0004"},
                         {"target": {"result": ids["L4"]}, "expires": "2026-10-05T00:00:00Z", "active": False, "event": "ov_0005"}],
-            "withheld": [ids["blob"]],
+            "withheld": [],  # the redact event's batch is unsigned: it withholds nothing (OVL-10)
             "unsealedEvents": 1,
         },
     })
+
+    def view_vector(name, batches, view, rules, at="2026-10-08T12:00:00Z", tamper=None):
+        d = out / name / "run"
+        run, ids2 = small_run(d)
+        h2 = seal(d, run, "producer")
+        overlay_batches(d, SMALL_ID, [[dict(ev, target={**ev["target"], **({"runHash": h2} if ev["target"].get("runHash") == "SELF" else {})})
+                                       for ev in batch] for batch in batches], h2)
+        if tamper:
+            ev_file = d / "overlays" / "events.ndjson"
+            data = ev_file.read_bytes()
+            assert data.count(tamper[0]) == 1
+            ev_file.write_bytes(data.replace(*tamper))
+        write_json(out / name / "expected.json", {"kind": "overlay-view", "run": "run", "at": at, "rules": rules, "view": view})
+
+    L3, L4 = ids["L3"], ids["L4"]
+    empty = {"results": [], "reviews": [], "waivers": [], "withheld": [], "unsealedEvents": 0}
+    # Batch 2 was changed after it was sealed: it and every later batch have no effect (the verified prefix is batch 1).
+    view_vector("broken-middle-batch", [
+        [e(1, kind="override", target={"run": rid, "result": L3}, state="passed", reason="Re-graded by hand.")],
+        [e(2, kind="adjudicate", target={"run": rid, "result": L3}, state="failed", reason="Panel of three.")],
+        [e(3, kind="approve", target={"run": rid})],
+    ], dict(empty, results=[{"resultId": L3, "sealedState": "failed", "effectiveState": "passed", "event": "ov_0001"}],
+            unsealedEvents=2), ["OVL-5", "OVL-7", "OVL-11"], tamper=(b"Panel of three", b"Panal of three"))
+    # The later of two events with one id has no effect.
+    view_vector("duplicate-event-id", [
+        [e(1, kind="override", target={"run": rid, "result": L3}, state="passed", reason="Re-graded by hand.")],
+        [dict(e(2, kind="override", target={"run": rid, "result": L3}, state="failed", reason="Same id."), eventId="ov_0001")],
+    ], dict(empty, results=[{"resultId": L3, "sealedState": "failed", "effectiveState": "passed", "event": "ov_0001"}]),
+        ["OVL-5", "OVL-7"])
+    # Events that target another run, or another run hash, have no effect.
+    view_vector("target-elsewhere", [
+        [e(1, kind="override", target={"run": "another-run", "result": L3}, state="passed", reason="Wrong run."),
+         e(2, kind="approve", target={"run": rid, "runHash": "0" * 64})],
+        [e(3, kind="reject", target={"run": rid, "runHash": "SELF"})],
+    ], dict(empty, reviews=[{"target": "run", "status": "reject", "event": "ov_0003"}]), ["OVL-2", "OVL-5", "OVL-8"])
+    # A waiver holds from at (included) until expires (excluded).
+    view_vector("waiver-boundaries", [
+        [dict(e(1, kind="waive", target={"run": rid, "requirement": "REQ-1"}, reason="Ends now.", expires="2026-10-08T12:00:00Z"),
+              at="2026-10-01T10:00:00Z"),
+         dict(e(2, kind="waive", target={"run": rid, "requirement": "REQ-2"}, reason="Starts now.", expires="2026-10-09T00:00:00Z"),
+              at="2026-10-08T12:00:00Z"),
+         dict(e(3, kind="waive", target={"run": rid, "result": L4}, reason="Not yet.", expires="2026-10-20T00:00:00Z"),
+              at="2026-10-08T12:00:00.000000001Z")],
+    ], dict(empty, waivers=[
+        {"target": {"requirement": "REQ-1"}, "expires": "2026-10-08T12:00:00Z", "active": False, "event": "ov_0001"},
+        {"target": {"requirement": "REQ-2"}, "expires": "2026-10-09T00:00:00Z", "active": True, "event": "ov_0002"},
+        {"target": {"result": L4}, "expires": "2026-10-20T00:00:00Z", "active": False, "event": "ov_0003"}]),
+        ["OVL-9", "ENC-8"])
 
 
 # ---------------------------------------------------------------------------- checkpoint manifests (kind: checkpoint)
@@ -1068,8 +1220,30 @@ def checkpoints():
     other_input = dict(decision_input, lanes=[dict(decision_input["lanes"][0], result=dict(decision_input["lanes"][0]["result"], status="failed"))]
                        + decision_input["lanes"][1:])
     C7 = ["CKP-7"]
+    # An exception (DEC-1, DEC-2): the security lane failed, and a person accepted it until 2026-10-16. Decided by hand:
+    # quality passed; security is fresh (closed 2026-09-30T08:00Z + P14D is after 2026-10-02T14:30Z), failed, and the
+    # exception is in force (granted 14:00, before 14:30; expires 2026-10-16) -> waived; outcome approved_with_exceptions.
+    waiver = {"lane": "security", "requirement": "REQ-15",
+              "reason": "A medium-severity prompt-injection finding is accepted until the 3.2.1 patch; tracked in the release review.",
+              "by": {"identity": "oidc:https://login.example.com/u-7f3a", "assurance": "authenticated"},
+              "at": "2026-10-02T14:00:00Z", "expires": "2026-10-16T00:00:00Z"}
+    excepted_input = {"subjectVersion": "git:3f2a1c", "evaluatedAt": "2026-10-02T14:30:00Z", "supersededBy": None,
+                      "lanes": [decision_input["lanes"][0],
+                                dict(decision_input["lanes"][1], result=dict(decision_input["lanes"][1]["result"], status="failed"))],
+                      "exceptions": [waiver]}
+    excepted = dict(decided, lanes=lanes[:2], outcome="approved_with_exceptions", decisionInput=excepted_input,
+                    decision={"outcome": "approved_with_exceptions",
+                              "lanes": [{"lane": "quality", "status": "passed", "blocking": True},
+                                        {"lane": "security", "status": "waived", "blocking": True}],
+                              "reasons": ["waived:security", "outcome:approved_with_exceptions"]})
+    # The same input, with the decision recorded as if the exception did not exist.
+    exception_ignored = dict(excepted, outcome="blocked",
+                             decision={"outcome": "blocked",
+                                       "lanes": [{"lane": "quality", "status": "passed", "blocking": True},
+                                                 {"lane": "security", "status": "failed", "blocking": True}],
+                                       "reasons": ["failed:security", "outcome:blocked"]})
     return [
-        ("valid-decided", decided, "valid", "valid", [], ["CKP-4", "CKP-7"], "a decided checkpoint, its decision recomputable from its input"),
+        ("valid-decided", decided, "valid", "valid", [], ["CKP-3", "CKP-4", "CKP-7"], "a decided checkpoint, its decision recomputable from its input"),
         ("valid-planned", planned, "valid", "valid", [], ["CKP-4"], "a planned checkpoint has no outcome yet"),
         ("valid-aborted", aborted, "valid", "valid", [], ["CKP-4"], "an abandoned checkpoint says why and records no decision"),
         ("decided-without-outcome", dict(decided, outcome=None), "invalid", "invalid", None, ["CKP-4"], "a decided checkpoint has an outcome"),
@@ -1110,12 +1284,24 @@ def checkpoints():
         ("runs-without-evidence", dict(decided, decisionInput=dict(decision_input, lanes=decision_input["lanes"][:1] + [
             dict(decision_input["lanes"][1], result=None)] + decision_input["lanes"][2:])), "valid", "valid", ["decision", "evidence"], C7,
          "a lane with runs has a result (here the input drops it, so the recorded decision is not recomputed either)"),
-        ("newer-outcome", {k: v for k, v in dict(decided, outcome="waived").items() if k not in ("decision", "decisionInput")},
+        ("newer-outcome", {k: v for k, v in dict(decided, outcome="ratified").items() if k not in ("decision", "decisionInput")},
          "invalid", "valid", ["unverifiable"], C7,
          "an outcome a later minor adds: a reader cannot recompute it, and says so rather than call it tampering"),
         ("input-status-unknown", dict(decided, decisionInput=dict(decision_input, lanes=[dict(decision_input["lanes"][0], result=dict(
             decision_input["lanes"][0]["result"], status="flaky"))] + decision_input["lanes"][1:])), "invalid", "valid", ["unverifiable"], C7,
          "a lane status a later minor adds, in the recorded input: the decision cannot be recomputed"),
+        ("valid-decided-with-exceptions", excepted, "valid", "valid", [], ["CKP-4", "CKP-7", "DEC-2", "DEC-3"],
+         "a failed blocking lane waived by an exception in force, recorded in the decision input: approved_with_exceptions"),
+        ("exception-ignored", exception_ignored, "valid", "valid", ["decision"], ["CKP-7", "DEC-2"],
+         "the recorded decision ignores an exception in force in the recorded input: not what the input gives"),
+        ("exception-for-unknown-lane", dict(excepted, decisionInput=dict(excepted_input, exceptions=[dict(waiver, lane="memory")])),
+         "valid", "valid", ["decision"], ["CKP-7", "DEC-1"],
+         "an exception for a lane the input does not have: the recorded input cannot be decided"),
+        ("approved-with-exceptions-without-input", {k: v for k, v in excepted.items() if k != "decisionInput"}, "invalid", "invalid",
+         None, ["CKP-4"], "an approval with exceptions is the decision function's: its input, exceptions included, is recorded"),
+        ("exception-without-expiry", dict(excepted, decisionInput=dict(excepted_input, exceptions=[
+            {k: v for k, v in waiver.items() if k != "expires"}])), "invalid", "invalid", None, ["DEC-1"],
+         "every exception expires"),
     ]
 
 
@@ -1137,9 +1323,16 @@ def main():
     running_trials(valid / "running-trials" / "run")
     redteam_campaign(valid / "redteam-campaign" / "run")
     expectations = {"completed-eval": "intact", "aborted-early": "intact", "running-trials": "unsealed", "redteam-campaign": "intact"}
+    extra_rules = {
+        # A U+2028 inside a reason, digests, ids, evaluators, the subject, the suite, cost, traces, a calibrated judge.
+        "completed-eval": ["ENC-6", "ENC-11", "ENC-13", "RES-11", "RUN-6", "RUN-8", "RUN-9", "RUN-14", "SUM-7", "SEAL-2"],
+        "aborted-early": ["RUN-5"],
+        "running-trials": ["RES-8", "RUN-4"],
+        "redteam-campaign": ["RUN-7", "RUN-11", "RES-9"],
+    }
     for name, outcome in expectations.items():
         write_json(valid / name / "expected.json", {"kind": "run", "run": "run", "outcome": outcome, "problems": [],
-                                                     "rules": ["RUN-1", "RUN-2", "RES-1", "SUM-5"]})
+                                                     "rules": ["RUN-1", "RUN-2", "RES-1", "SUM-5"] + extra_rules[name]})
     write_json(ROOT / "paths.json", path_vectors())
 
     for name, schema, doc, reader, rules, why in invalid_cases():

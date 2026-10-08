@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "run-small-1",
+  "lanes": [
+    {
+      "lane": "main",
+      "metrics": [
+        {
+          "metric": "m",
+          "path": "q",
+          "n": 3,
+          "N": 3,
+          "notMeasured": 0,
+          "value": 0.7,
+          "verdict": "failed",
+          "rule": "m >= 0.8",
+          "sum": 2.0,
+          "sumSq": 1.46,
+          "aggregate": {
+            "method": "median"
+          }
+        },
+        {
+          "metric": "ok",
+          "path": "q",
+          "n": 2,
+          "N": 3,
+          "notMeasured": 1,
+          "value": 0.5,
+          "verdict": "failed",
+          "rule": "ok >= 0.8",
+          "sum": 1,
+          "sumSq": 1
+        }
+      ]
+    }
+  ]
+}

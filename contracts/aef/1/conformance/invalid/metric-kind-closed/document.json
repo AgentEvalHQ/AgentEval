@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.0",
+  "metrics": [
+    {
+      "id": "m",
+      "kind": "quantile",
+      "direction": "none",
+      "scale": "unbounded"
+    }
+  ]
+}

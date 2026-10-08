@@ -25,3 +25,9 @@ Everything after a run closed: a human decision, an adjudication, an annotation,
 - **Rule:** A waiver always says why and until when.
 - **Rule:** An override or adjudication names the result, the state it sets, and why.
 - **Rule:** A redaction names the blob and says why.
+- **Rule:** An approval or rejection is about the run or a result. (OVL-1)
+- **Rule:** An override or adjudication targets one result, never a requirement or a blob. (OVL-1)
+- **Rule:** A waiver targets a result or a requirement, never a blob. (OVL-1)
+- **Rule:** A redaction targets a blob alone. (OVL-1)
+- **Rule:** A note, acknowledgement or baseline acceptance is about the run, a result or a requirement, never a blob. (OVL-1)
+- **Rule:** An override or adjudication never sets pending: a closed run has no pending result (RES-3, OVL-1).

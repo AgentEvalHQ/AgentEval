@@ -9,29 +9,37 @@ contract (one command per operation, input paths as arguments, one JSON value on
   kind          vectors                                   operation          compared
   run           valid/, runs/                             run DIR [--policy P] [--anchors A]
                                                                              outcome, problems (ordered), and
-                                                                             signedBy / anchored when expected
+                                                                             signedBy / anchored / withheld
   encoding      encoding/                                 run DIR            outcome, problems (ordered)
-  seal          seal-vectors/                             seal DIR           problems (ordered), manifest bytes
+  seal          seal-vectors/                             seal DIR [--policy P]
+                                                                             problems (ordered), manifest bytes
   chain         chain-vectors/                            chain DIR          problems (ordered)
-  overlay-view  overlay-views/                            view DIR --at T    the effective view, field by field
+  overlay-view  overlay-views/                            view DIR --at T [--policy P]
+                                                                             the effective view, field by field
   document      invalid/                                  document S FILE    writer and reader verdicts
   reader-only   reader-only/                              document S FILE    verdicts, and each `reads` entry
   checkpoint    checkpoints/                              checkpoint FILE    verdicts, and CKP-7 codes (ordered)
-  lane          lane-vectors/                             lanes CP --runs D  each lane's result, problems (ordered)
+  lane          lane-vectors/                             lanes CP --runs D [--policy P]
+                                                                             each lane's result, problems (ordered)
   signature     signature-vectors/                        signature E F P    envelope result, signatures, verifiesFor
   decision      decision-vectors/                         decide FILE        the output, or that it refuses
   plan          protocol/plans/, protocol/runners/        document S FILE    writer and reader verdicts
   matching      protocol/matching/                        match PLAN RUNNER  matches
   stream        protocol/streams/                         stream EV PLAN     problems (ordered)
+  plan-conformance  protocol/plan-conformance/              conform EV PLAN RUNS [--policy P]
+                                                                             problems (ordered)
   paths         paths.json                                paths FILE         problems per item (ordered)
   result-id     result-ids.json                           result-id ...      the result id
 
 When conformance/index.json exists (CONF-1), the vectors are read from it and every file's SHA-256 is checked
-against it first: a vector with a file that does not match, or an extra file, fails without being run (CONF-3).
+against it first: a vector with a file that does not match, or an extra file, fails without being run (CONF-3). An
+entry of kind "fixture", or one whose folder holds no expected.json (shared keys, shared plans), is checked but not
+run. --class selects vectors by the conformance classes the index gives them (spec 09 §9.1 when folders are walked).
 Otherwise the folders are walked; a folder that does not exist is skipped with a notice.
 
 Usage:
-  python aef_conformance.py [--corpus DIR] [--index FILE] [--command "CMD ..."] [--kind KIND ...] [--quiet]
+  python aef_conformance.py [--corpus DIR] [--index FILE | --no-index] [--command "CMD ..."] [--kind KIND ...]
+                            [--class NAME ...] [--quiet]
   python aef_conformance.py --self-check
       Runs the corpus once per mutation of the verifier (each switches one check off: the seal digest, the
       manifest's byte order, the I-JSON duplicate-member check, the $-at-end-of-input pattern rule, the summary
@@ -97,9 +105,22 @@ def read_json(path):
     return json.loads(Path(path).read_bytes().decode("utf-8"))
 
 
+# Spec 09 §9.1: the classes each kind of vector tests, for --class when the folders are walked (index.json names
+# each vector's classes itself).
+KIND_CLASSES = {
+    "document": ["Producer", "Reader"], "run": ["Producer", "Run verifier"], "result-id": ["Producer"],
+    "paths": ["Producer", "Run verifier"], "seal": ["Sealer", "Run verifier"], "signature": ["Sealer", "Run verifier"],
+    "encoding": ["Reader", "Run verifier"], "reader-only": ["Reader"], "chain": ["Overlay verifier"],
+    "overlay-view": ["Overlay verifier"], "checkpoint": ["Checkpoint verifier"], "lane": ["Checkpoint verifier"],
+    "decision": ["Checkpoint verifier", "Decision engine"], "plan": ["Runner"], "matching": ["Runner"],
+    "stream": ["Stream verifier"], "plan-conformance": ["Stream verifier"],
+}
+
+
 class Vector:
-    def __init__(self, kind, vid, path, expected=None, item=None):
+    def __init__(self, kind, vid, path, expected=None, item=None, classes=None):
         self.kind, self.id, self.path, self.expected, self.item = kind, vid, Path(path), expected, item
+        self.classes = classes if classes is not None else KIND_CLASSES.get(kind, [])
         self.guard = None  # with index.json: refuses a file read outside the vector's own (checked) files
 
 
@@ -132,7 +153,8 @@ def walk(corpus, notices):
         notices.append("notice: decision-vectors/ does not exist; its vectors are skipped")
     protocol = corpus / "protocol"
     if protocol.is_dir():
-        for sub, kind in (("plans", "plan"), ("runners", "plan"), ("matching", "matching"), ("streams", "stream")):
+        for sub, kind in (("plans", "plan"), ("runners", "plan"), ("matching", "matching"), ("streams", "stream"),
+                          ("plan-conformance", "plan-conformance")):
             for d in sorted(p for p in (protocol / sub).iterdir() if p.is_dir()) if (protocol / sub).is_dir() else []:
                 vectors.append(Vector(kind, f"protocol/{sub}/{d.name}", d, read_json(d / "expected.json")))
     else:
@@ -199,23 +221,23 @@ def from_index(corpus, index_path):
         plan.append((entry, base, folder, listed))
     vectors, refusals = [], []
     for entry, base, folder, listed in plan:
-        vid, kind = entry.get("id"), entry.get("kind")
+        vid, kind, classes = entry.get("id"), entry.get("kind"), entry.get("classes")
         wrong = sorted(p for p in listed if (folder / p).resolve() in guard.bad)
         if base.is_dir():
             wrong += sorted(f.relative_to(base).as_posix() for f in base.rglob("*")
                             if f.is_file() and f.resolve() not in guard.listed)
         if wrong:
-            refusals.append((kind, vid, f"files that do not match index.json: {', '.join(wrong)}"))
+            refusals.append((kind, vid, f"files that do not match index.json: {', '.join(wrong)}", classes))
             continue
         if kind in ("paths", "result-id"):
             for i, item in enumerate(read_json(base)):
                 label = item.get("name", i) if isinstance(item, dict) else i
-                vectors.append(Vector(kind, f"{vid}#{label}", base, item, item))
+                vectors.append(Vector(kind, f"{vid}#{label}", base, item, item, classes))
             continue
         expected_file = base / "expected.json" if base.is_dir() else base
-        if not expected_file.is_file():
-            continue  # shared files only (signature-vectors/keys, protocol/streams/shared)
-        v = Vector(kind, vid, base, read_json(expected_file))
+        if kind == "fixture" or not expected_file.is_file():
+            continue  # shared files, checked but not run (signature-vectors/keys, protocol/streams/shared)
+        v = Vector(kind, vid, base, read_json(expected_file), classes=classes)
         v.guard = guard
         vectors.append(v)
     return vectors, refusals
@@ -247,11 +269,13 @@ def run_vector(engine, v, scratch):
             return [out["error"]]
         compare(diffs, "outcome", out.get("outcome"), e["outcome"])
         compare(diffs, "problems", _problems(out.get("problems")), _problems(e["problems"]))
-        for field in ("signedBy", "anchored"):  # the stronger levels of §4.5, whenever the vector states them
+        for field in ("signedBy", "anchored", "withheld"):  # §4.5's further levels, whenever the vector states them
             if field in e:
                 compare(diffs, field, out.get(field, "<not reported>"), e[field])
+        if "withheld" not in e and "withheld" in out:
+            diffs.append(f"withheld: not expected, got {out['withheld']}")
     elif v.kind == "seal":
-        out = engine.call(["seal", d / e.get("run", "run")])
+        out = engine.call(["seal", d / e.get("run", "run")] + _policy(e, d))
         if "error" in out:
             return [out["error"]]
         compare(diffs, "problems", _problems(out.get("problems")), _problems(e["problems"]))
@@ -264,7 +288,7 @@ def run_vector(engine, v, scratch):
             return [out["error"]]
         compare(diffs, "problems", _problems(out.get("problems")), _problems(e["problems"]))
     elif v.kind == "overlay-view":
-        out = engine.call(["view", d / e.get("run", "run"), "--at", e["at"]])
+        out = engine.call(["view", d / e.get("run", "run"), "--at", e["at"]] + _policy(e, d))
         if "error" in out:
             return [out["error"]]
         for field in ("results", "reviews", "waivers", "withheld", "unsealedEvents"):
@@ -286,7 +310,8 @@ def run_vector(engine, v, scratch):
         if "problems" in e:
             compare(diffs, "problems", out.get("problems"), e["problems"])
     elif v.kind == "lane":
-        out = engine.call(["lanes", d / e.get("checkpoint", "checkpoint.json"), "--runs", d / e.get("runs", "runs")])
+        out = engine.call(["lanes", d / e.get("checkpoint", "checkpoint.json"), "--runs", d / e.get("runs", "runs")]
+                          + _policy(e, d))
         if "error" in out:
             return [out["error"]]
         got = out.get("lanes") or []
@@ -317,11 +342,15 @@ def run_vector(engine, v, scratch):
                 diffs.append(f"decided what it must refuse ({e['expectedError']}): {json.dumps(out.get('output'))}")
         else:
             compare(diffs, "output", out.get("output", out), e["expected"])
-        if e.get("schemaInvalid"):
+        if e.get("schemaInvalid") or e.get("readerOnly"):
             f = scratch / "decision-input.json"
             f.write_bytes(json.dumps(e["input"], ensure_ascii=False).encode("utf-8"))
             check = engine.call(["document", "decision#/$defs/input", f])
-            compare(diffs, "reader verdict of the input", check.get("reader"), "invalid")
+            if e.get("schemaInvalid"):
+                compare(diffs, "reader verdict of the input", check.get("reader"), "invalid")
+            if e.get("readerOnly"):
+                compare(diffs, "writer verdict of the input", check.get("writer"), "invalid")
+                compare(diffs, "reader verdict of the input", check.get("reader"), "valid")
     elif v.kind == "matching":
         out = engine.call(["match", d / "plan.json", d / "runner.json"])
         compare(diffs, "matches", out.get("matches", out), e["matches"])
@@ -333,6 +362,11 @@ def run_vector(engine, v, scratch):
             return [out["error"]]
         want = [[p["where"], p["problem"]] for p in e["problems"]]
         compare(diffs, "problems", _problems(out.get("problems")), want)
+    elif v.kind == "plan-conformance":
+        out = engine.call(["conform", d / e["events"], d / e["plan"], d / e["runs"]] + _policy(e, d))
+        if "error" in out:
+            return [out["error"]]
+        compare(diffs, "problems", _problems(out.get("problems")), _problems(e["problems"]))
     elif v.kind == "paths":
         f = scratch / "paths.json"
         f.write_bytes(json.dumps(v.item["paths"], ensure_ascii=False).encode("utf-8"))
@@ -348,15 +382,20 @@ def run_vector(engine, v, scratch):
         out = engine.call(argv)
         compare(diffs, "resultId", out.get("resultId", out), item["resultId"])
     else:
-        diffs.append(f"unknown kind {v.kind!r}")
+        diffs.append(f"no operation for kind {v.kind!r} in this runner yet")
     return diffs
+
+
+def _policy(expected, folder):
+    """['--policy', path] when the vector carries a trust policy (spec 09 §9.2.1), else []."""
+    return ["--policy", folder / expected["policy"]] if "policy" in expected else []
 
 
 def run_all(engine, vectors, refusals, quiet=False, show=print):
     """{kind: [passed, failed]} and the failing ids."""
     tally, failing = OrderedDict(), []
     with tempfile.TemporaryDirectory(prefix="aef-conformance-") as scratch:
-        for kind, vid, why in refusals:
+        for kind, vid, why, _ in refusals:
             tally.setdefault(kind, [0, 0])[1] += 1
             failing.append(vid)
             show(f"FAIL  {kind:<12} {vid}\n      refused: {why}")
@@ -418,6 +457,8 @@ def main(argv):
     parser.add_argument("--no-index", action="store_true", help="walk the folders even when index.json exists")
     parser.add_argument("--command", help="drive this program through the command-line contract instead")
     parser.add_argument("--kind", action="append", help="run only vectors of this kind (repeatable)")
+    parser.add_argument("--class", dest="classes", action="append", metavar="NAME",
+                        help="run only vectors of this conformance class, e.g. 'Run verifier' (repeatable)")
     parser.add_argument("--quiet", action="store_true", help="print failures only")
     parser.add_argument("--self-check", action="store_true")
     a = parser.parse_args(argv[1:])
@@ -437,6 +478,13 @@ def main(argv):
     if a.kind:
         vectors = [v for v in vectors if v.kind in a.kind]
         refusals = [r for r in refusals if r[0] in a.kind]
+    if a.classes:
+        wanted = {c.lower() for c in a.classes}
+        known = {c.lower() for cs in KIND_CLASSES.values() for c in cs}
+        if wanted - known:
+            parser.error(f"unknown class(es): {', '.join(sorted(wanted - known))}")
+        vectors = [v for v in vectors if wanted & {c.lower() for c in v.classes}]
+        refusals = [r for r in refusals if wanted & {c.lower() for c in (r[3] or KIND_CLASSES.get(r[0], []))}]
     if a.self_check:
         if a.command:
             parser.error("--self-check mutates the in-process verifier; it does not take --command")

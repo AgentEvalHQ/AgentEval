@@ -115,6 +115,83 @@
         }
       ],
       "blocking": true
+    },
+    {
+      "lane": "all-inconclusive",
+      "rule": {
+        "kind": "severity",
+        "max": "none"
+      },
+      "runs": [
+        {
+          "runId": "S-inconclusive",
+          "runHash": "7b48abcf3ec25012d60a496d4724724c6d40611ffd3d934f1b04706baf90fdc3",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "no-results",
+      "rule": {
+        "kind": "severity",
+        "max": "none"
+      },
+      "runs": [
+        {
+          "runId": "S-empty",
+          "runHash": "4423e93d676c8b4768d19c731e7771479a8871e36b3f0cc553361e2c0d3a0fc5",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "not-applicable-ignored",
+      "rule": {
+        "kind": "severity",
+        "max": "none"
+      },
+      "runs": [
+        {
+          "runId": "S-not-applicable",
+          "runHash": "1a6d0dc8e675207ee2f750f0ad70e380881f7f713f25322440d07e229e04720e",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "minimum-not-met",
+      "rule": {
+        "kind": "severity",
+        "max": "none",
+        "minimumN": 3
+      },
+      "runs": [
+        {
+          "runId": "S-two-passed",
+          "runHash": "c5d7f6ac7c1145879710982a695da3fec2b0c96b62effdcae00f7c42c19893ff",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "minimum-met",
+      "rule": {
+        "kind": "severity",
+        "max": "none",
+        "minimumN": 2
+      },
+      "runs": [
+        {
+          "runId": "S-two-passed",
+          "runHash": "c5d7f6ac7c1145879710982a695da3fec2b0c96b62effdcae00f7c42c19893ff",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
     }
   ],
   "state": "decided",
@@ -186,6 +263,51 @@
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-03T00:00:00Z"
         }
+      },
+      {
+        "lane": "all-inconclusive",
+        "blocking": true,
+        "result": {
+          "status": "not_measured",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-03T00:00:00Z"
+        }
+      },
+      {
+        "lane": "no-results",
+        "blocking": true,
+        "result": {
+          "status": "not_measured",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-03T00:00:00Z"
+        }
+      },
+      {
+        "lane": "not-applicable-ignored",
+        "blocking": true,
+        "result": {
+          "status": "passed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-03T00:00:00Z"
+        }
+      },
+      {
+        "lane": "minimum-not-met",
+        "blocking": true,
+        "result": {
+          "status": "not_measured",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-03T00:00:00Z"
+        }
+      },
+      {
+        "lane": "minimum-met",
+        "blocking": true,
+        "result": {
+          "status": "passed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-03T00:00:00Z"
+        }
       }
     ]
   },
@@ -226,6 +348,31 @@
         "lane": "warn-counts",
         "status": "failed",
         "blocking": true
+      },
+      {
+        "lane": "all-inconclusive",
+        "status": "not_measured",
+        "blocking": true
+      },
+      {
+        "lane": "no-results",
+        "status": "not_measured",
+        "blocking": true
+      },
+      {
+        "lane": "not-applicable-ignored",
+        "status": "passed",
+        "blocking": true
+      },
+      {
+        "lane": "minimum-not-met",
+        "status": "not_measured",
+        "blocking": true
+      },
+      {
+        "lane": "minimum-met",
+        "status": "passed",
+        "blocking": true
       }
     ],
     "reasons": [
@@ -235,6 +382,9 @@
       "failed:failure-beats-unmeasured",
       "not-measured:two-runs",
       "failed:warn-counts",
+      "not-measured:all-inconclusive",
+      "not-measured:no-results",
+      "not-measured:minimum-not-met",
       "outcome:blocked"
     ]
   }

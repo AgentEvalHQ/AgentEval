@@ -73,7 +73,7 @@ One AEF run gives one `EvalLog` in `.json` form. Writing `.eval` also needs zstd
 | overlays `override`, `adjudicate` ([OVL-1](../spec/04-integrity.md#42-overlays)) | `Score.history` entries with `provenance` (`author` from `by.identity`, `reason`, `timestamp` from `at`) | lossy: Inspect recomputes metrics after an edit; AEF's effective view does not recompute summaries ([OVL-7](../spec/04-integrity.md#43-the-effective-view)) |
 | overlays `approve`, `reject`, `waive`, `annotate` | `log_updates` | lossy |
 | `seal.json`, signatures, the overlay chain | none: an Inspect log is edited in place | none |
-| (case content) | `samples[].input`, `target` are required; AEF has them only as blobs | lossy ([I2](README.md#open-gaps)) |
+| (case content) | `samples[].input`, `target` are required; AEF has them only as blobs | lossy ([I2](README.md#gaps-found-by-these-mappings)) |
 
 ## Inspect → AEF
 
@@ -86,35 +86,35 @@ One AEF run gives one `EvalLog` in `.json` form. Writing `.eval` also needs zstd
 | `eval.packages.inspect_ai` | `producer` (`name: inspect_ai`, `version`) | exact |
 | `eval.task`, `eval.task_version` | `suite.ref` (`suite:<task>`), `suite.version` | exact |
 | `eval.dataset` | `ext` | none: Inspect records no dataset digest, so `suite.digest` stays empty |
-| `eval.model`, `eval.solver`, `plan` | `subject` (`kind: model`, `ref: model:<provider/model>`) | lossy: an Inspect subject is a solver and a model; AEF has one `ref` ([I7](README.md#open-gaps)) |
+| `eval.model`, `eval.solver`, `plan` | `subject` (`kind: model`, `ref: model:<provider/model>`) | lossy: an Inspect subject is a solver and a model; AEF has one `ref` ([I7](README.md#gaps-found-by-these-mappings)) |
 | `eval.model_roles` | `judges[]` (`model`) | exact |
 | `eval.config.epochs` | `suite.executionPolicy.trialsPerCase` | exact |
-| `eval.config.epochs_reducer` | `trials.aggregation` | lossy: only `majority` and `mode` have an AEF value (`MajorityVote`) ([I5](README.md#open-gaps)) |
+| `eval.config.epochs_reducer` | `trials.aggregation` | lossy: only `majority` and `mode` have an AEF value (`MajorityVote`) ([I5](README.md#gaps-found-by-these-mappings)) |
 | `samples[].id` | `caseId` (as a string) | exact |
 | `samples[].epoch` | `trial` = `epoch` − 1, when there is more than one epoch | exact |
 | a key of `samples[].scores` | `path`; the scorer's registry name to `evaluator.id` | exact |
-| `Score.value` as a number | `scores[].value` | exact, but `state` has no source: Inspect sets no pass threshold ([I1](README.md#open-gaps)) |
+| `Score.value` as a number | `scores[].value` | exact, but `state` has no source: Inspect sets no pass threshold ([I1](README.md#gaps-found-by-these-mappings)) |
 | `Score.value` `C` / `I` | `state` `passed` / `failed`; `scores[].value` 1 / 0 | exact |
-| `Score.value` `P`, `N` | `state` `warn` or `failed`; value 0.5 or 0 | lossy: the letter has no field ([I1](README.md#open-gaps)) |
+| `Score.value` `P`, `N` | `state` `warn` or `failed`; value 0.5 or 0 | lossy: the letter has no field ([I1](README.md#gaps-found-by-these-mappings)) |
 | `Score.value` as a map | one `scores[]` entry per numeric member | lossy: string members have no field |
-| `Score.value` as a list, or another string | `ext` | none ([I1](README.md#open-gaps)) |
+| `Score.value` as a list, or another string | `ext` | none ([I1](README.md#gaps-found-by-these-mappings)) |
 | `Score.value` NaN with `reason` `grader_failed` or `scoring_failed` | `state` `error` or `not_measured`, with a `reason` ([RES-2](../spec/03-run.md#341-states)) | exact |
 | `Score.reason` `refusal`, `no_response`, `invalid_response_format` | `state: failed`, with the reason in `reason` | exact |
 | `Score.explanation` | `reason`, or a `reasoning` blob when `contentCapture` is `on` | exact |
 | `Score.answer`, `Score.metadata` | `ext` | none |
 | `Score.history` edits | overlay `override` events targeting the result, with `by.identity` = `author`, `reason`, `at` = `timestamp`; the sealed line holds the original score | lossy: summaries are not recomputed in AEF ([OVL-7](../spec/04-integrity.md#43-the-effective-view)) |
 | `samples[].error`, `samples[].limit` | `state: error` (or `not_measured` for a limit), with the message or limit in `reason` | exact |
-| `samples[].input`, `target`, `messages`, `output` | blobs with evidence records, only when `contentCapture` is `on` | lossy ([I2](README.md#open-gaps)) |
+| `samples[].input`, `target`, `messages`, `output` | blobs with evidence records, only when `contentCapture` is `on` | lossy ([I2](README.md#gaps-found-by-these-mappings)) |
 | `samples[].events` | none: Inspect's events are not OTLP spans | none |
-| `samples[].model_usage`, `role_usage` | `usage` (input and output tokens, `costUsd`, one `role`) | lossy: cache and reasoning tokens, and a second role, have no field ([I4](README.md#open-gaps)) |
+| `samples[].model_usage`, `role_usage` | `usage` (input and output tokens, `costUsd`, one `role`) | lossy: cache and reasoning tokens, and a second role, have no field ([I4](README.md#gaps-found-by-these-mappings)) |
 | `samples[].total_time` | `durationMs` | exact |
-| `samples[].started_at`, `completed_at`, `working_time` | none | none ([I6](README.md#open-gaps)) |
+| `samples[].started_at`, `completed_at`, `working_time` | none | none ([I6](README.md#gaps-found-by-these-mappings)) |
 | `samples[].invalidation`, `log_updates` | overlay `annotate` events | lossy: AEF has no "invalidated" state |
 | `results.scores[].metrics` that are the mean of the sample values (`accuracy`, `mean`) | a `summary.json` entry for a metric of kind `score`: `n` = `scored_samples`, `notMeasured` = `unscored_samples` | exact, because the verifier's recomputation ([SUM-5](../spec/03-run.md#36-summaryjson)) gives the same mean. A metric of kind `rate` would count `P` as 0, where Inspect counts 0.5. |
 | `stderr` | the entry's `stderr` | exact |
-| other metrics (custom, grouped, bootstrap, `pass_at_k`), `headline` | `ext` | none ([I1](README.md#open-gaps)) |
-| (no verdict) | the summary entry's `verdict` has no source | none ([I1](README.md#open-gaps)) |
-| `stats.model_usage` | `summary.cost.totalUsd` from `total_cost` | lossy: run-level tokens have no field ([I4](README.md#open-gaps)) |
+| other metrics (custom, grouped, bootstrap, `pass_at_k`), `headline` | `ext` | none ([I1](README.md#gaps-found-by-these-mappings)) |
+| (no verdict) | the summary entry's `verdict` has no source | none ([I1](README.md#gaps-found-by-these-mappings)) |
+| `stats.model_usage` | `summary.cost.totalUsd` from `total_cost` | lossy: run-level tokens have no field ([I4](README.md#gaps-found-by-these-mappings)) |
 
 ## What does not carry over
 
@@ -123,11 +123,11 @@ result tree and its aggregation, except as metadata. Severity, verdict rules, th
 links and digests, traces, gate decisions. The seal, signatures and the overlay chain: an Inspect log is mutable.
 `execution.targetMode`, judge calibration. The case content, unless the run captured it.
 
-**Inspect → AEF.** A verdict for numeric scores, and categorical or list values ([I1](README.md#open-gaps)). Metrics
-that are not a mean of the sample values ([I1](README.md#open-gaps)). Reducers other than majority
-([I5](README.md#open-gaps)). Sample and run timing ([I6](README.md#open-gaps)). Cache and reasoning token counts and
-run-level usage ([I4](README.md#open-gaps)). The case content when the importer writes `contentCapture: off`
-([I2](README.md#open-gaps)). Inspect's event transcript. Groups of runs (`eval_set_id`).
+**Inspect → AEF.** A verdict for numeric scores, and categorical or list values ([I1](README.md#gaps-found-by-these-mappings)). Metrics
+that are not a mean of the sample values ([I1](README.md#gaps-found-by-these-mappings)). Reducers other than majority
+([I5](README.md#gaps-found-by-these-mappings)). Sample and run timing ([I6](README.md#gaps-found-by-these-mappings)). Cache and reasoning token counts and
+run-level usage ([I4](README.md#gaps-found-by-these-mappings)). The case content when the importer writes `contentCapture: off`
+([I2](README.md#gaps-found-by-these-mappings)). Inspect's event transcript. Groups of runs (`eval_set_id`).
 
 ## Worked example
 
@@ -141,7 +141,7 @@ The corpus line for `triage/policy` of `case-17`. Its `resultId` recomputes with
 It becomes the `triage/policy` score of the Inspect sample for `case-17`. The case's other scored lines, `triage`
 (`r_479d157f3423e95d566bcbfc0c6d2461`) and `triage/helpfulness` (`r_1264eeb36620c9cbe97b71ffdbcfd331`), go into the
 same sample. The run has one trial per case, so the sample is epoch 1. AEF keeps no input or target for the case, so
-those required fields are empty ([I2](README.md#open-gaps)). The AEF facts Inspect has no field for go under
+those required fields are empty ([I2](README.md#gaps-found-by-these-mappings)). The AEF facts Inspect has no field for go under
 `metadata.aef`:
 
 ```json
@@ -184,9 +184,9 @@ and `r_1264eeb36620c9cbe97b71ffdbcfd331`. The states come back only from `metada
 
 ## Open gaps
 
-- [I1](README.md#open-gaps): numeric scores without a pass rule, letters and maps, and metrics that are not means.
-- [I2](README.md#open-gaps): Inspect requires `input` and `target`; AEF has them only as captured blobs.
-- [I4](README.md#open-gaps): cache and reasoning tokens, usage of several roles, run-level usage.
-- [I5](README.md#open-gaps): Inspect's reducers other than majority.
-- [I6](README.md#open-gaps): sample start and end times.
-- [I7](README.md#open-gaps): the subject and target mode an importer supplies.
+- [I1](README.md#gaps-found-by-these-mappings): numeric scores without a pass rule, letters and maps, and metrics that are not means.
+- [I2](README.md#gaps-found-by-these-mappings): Inspect requires `input` and `target`; AEF has them only as captured blobs.
+- [I4](README.md#gaps-found-by-these-mappings): cache and reasoning tokens, usage of several roles, run-level usage.
+- [I5](README.md#gaps-found-by-these-mappings): Inspect's reducers other than majority.
+- [I6](README.md#gaps-found-by-these-mappings): sample start and end times.
+- [I7](README.md#gaps-found-by-these-mappings): the subject and target mode an importer supplies.

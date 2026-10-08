@@ -147,7 +147,7 @@
       "type": "string"
     },
     "outcome": {
-      "description": "Set from state decided on; null before. aborted when the checkpoint was abandoned (abortReason says why), never from the decision function.",
+      "description": "Set from state decided on; null before. approved, approved_with_exceptions, blocked, inconclusive or expired from the decision function (DEC-3); aborted when the checkpoint was abandoned (abortReason says why), never from the decision function (CKP-4).",
       "anyOf": [
         {
           "type": "null"
@@ -172,7 +172,7 @@
       "maxLength": 2048
     },
     "decisionInput": {
-      "description": "The decision function's input, recorded with its output so anyone can recompute it.",
+      "description": "The decision function's input, recorded with its output so anyone can recompute it; its exceptions are recorded here, so the checkpoint's signature covers them (CKP-4, CKP-5, CKP-7).",
       "$ref": "decision.schema.json#/$defs/input"
     }
   },
@@ -186,9 +186,10 @@
             "const": "decided"
           },
           "outcome": {
-            "description": "With an outcome the decision function gave (CKP-4).",
+            "description": "With an outcome the decision function gave (CKP-4, DEC-3).",
             "enum": [
               "approved",
+              "approved_with_exceptions",
               "blocked",
               "inconclusive",
               "expired"
@@ -350,6 +351,33 @@
             "value": {
               "description": "The threshold the entry's value is compared with (LANE-2).",
               "type": "number"
+            },
+            "suite": {
+              "description": "Only runs of this suite are eligible: the same ref, and the same version and digest for those given (LANE-1).",
+              "type": "object",
+              "required": [
+                "ref"
+              ],
+              "properties": {
+                "ref": {
+                  "description": "The suite.",
+                  "$ref": "common.schema.json#/$defs/ref"
+                },
+                "version": {
+                  "description": "Its exact version.",
+                  "$ref": "common.schema.json#/$defs/exactVersion"
+                },
+                "digest": {
+                  "description": "The SHA-256 of its frozen content.",
+                  "$ref": "common.schema.json#/$defs/sha256Uri"
+                }
+              }
+            },
+            "minimumN": {
+              "description": "The fewest measured lines the rule needs; fewer gives not_measured (LANE-2, LANE-3).",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
             }
           }
         },
@@ -367,6 +395,33 @@
             "max": {
               "description": "The worst severity allowed among failures; a failure with no severity counts as critical (spec 05, LANE-3).",
               "type": "string"
+            },
+            "suite": {
+              "description": "Only runs of this suite are eligible: the same ref, and the same version and digest for those given (LANE-1).",
+              "type": "object",
+              "required": [
+                "ref"
+              ],
+              "properties": {
+                "ref": {
+                  "description": "The suite.",
+                  "$ref": "common.schema.json#/$defs/ref"
+                },
+                "version": {
+                  "description": "Its exact version.",
+                  "$ref": "common.schema.json#/$defs/exactVersion"
+                },
+                "digest": {
+                  "description": "The SHA-256 of its frozen content.",
+                  "$ref": "common.schema.json#/$defs/sha256Uri"
+                }
+              }
+            },
+            "minimumN": {
+              "description": "The fewest measured lines the rule needs; fewer gives not_measured (LANE-2, LANE-3).",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
             }
           }
         },
@@ -425,6 +480,27 @@
               "items": {
                 "$ref": "common.schema.json#/$defs/axis"
               }
+            },
+            "suite": {
+              "description": "Only runs of this suite are eligible: the same ref, and the same version and digest for those given (LANE-1).",
+              "type": "object",
+              "required": [
+                "ref"
+              ],
+              "properties": {
+                "ref": {
+                  "description": "The suite.",
+                  "$ref": "common.schema.json#/$defs/ref"
+                },
+                "version": {
+                  "description": "Its exact version.",
+                  "$ref": "common.schema.json#/$defs/exactVersion"
+                },
+                "digest": {
+                  "description": "The SHA-256 of its frozen content.",
+                  "$ref": "common.schema.json#/$defs/sha256Uri"
+                }
+              }
             }
           }
         },
@@ -444,6 +520,27 @@
               "type": "integer",
               "minimum": 1,
               "maximum": 9007199254740991
+            },
+            "suite": {
+              "description": "Only runs of this suite are eligible: the same ref, and the same version and digest for those given (LANE-1).",
+              "type": "object",
+              "required": [
+                "ref"
+              ],
+              "properties": {
+                "ref": {
+                  "description": "The suite.",
+                  "$ref": "common.schema.json#/$defs/ref"
+                },
+                "version": {
+                  "description": "Its exact version.",
+                  "$ref": "common.schema.json#/$defs/exactVersion"
+                },
+                "digest": {
+                  "description": "The SHA-256 of its frozen content.",
+                  "$ref": "common.schema.json#/$defs/sha256Uri"
+                }
+              }
             }
           }
         },

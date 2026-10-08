@@ -1,9 +1,13 @@
 {
+  "kind": "stream",
   "plan": "../plan.json",
   "problems": [
     {
       "where": "event:9",
       "problem": "run-hash-changed"
     }
+  ],
+  "rules": [
+    "STRM-3"
   ]
 }

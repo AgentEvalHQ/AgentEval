@@ -374,7 +374,11 @@
       {
         "lane": "tampered",
         "blocking": true,
-        "result": null
+        "result": {
+          "status": "not_measured",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-05T00:00:00Z"
+        }
       },
       {
         "lane": "not-intact",
@@ -456,7 +460,7 @@
       },
       {
         "lane": "tampered",
-        "status": "missing",
+        "status": "not_measured",
         "blocking": true
       },
       {
@@ -489,7 +493,7 @@
       "wrong-version:mixed-versions",
       "not-measured:no-version",
       "not-measured:unsealed",
-      "missing:tampered",
+      "not-measured:tampered",
       "not-measured:not-intact",
       "missing:missing",
       "missing:wrong-hash",

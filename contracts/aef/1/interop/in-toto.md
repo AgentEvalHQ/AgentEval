@@ -124,9 +124,9 @@ in-toto envelope rules: the generic in-toto payload type, and file names that en
 | root result lines | a Test Result statement: `passed` → `passedTests`, `warn` → `warnedTests`, `failed` → `failedTests`, by `caseId` | lossy: `inconclusive` and the typed absences have no list, and scores, paths and the tree are lost |
 | a gate decision's `outcome` ([GATE-1](../spec/03-run.md#38-gatesndjson)) | Test Result `result`: `ship` → `PASSED`, `no_ship` → `FAILED`; `inconclusive` has no value | lossy |
 | `run.json`, `suite.digest` | Test Result `configuration` (resource descriptors with `sha256`) | exact |
-| a decided checkpoint ([§5](../spec/05-checkpoints.md#51-the-manifest)) | an SVR: `verifier.id`, `timeCreated` from `decisionInput.evaluatedAt`, `policies` = the manifest as a resource descriptor, `properties` such as `AEF_CHECKPOINT_APPROVED` | lossy: only the approved properties are listed, which keeps the policy monotonic |
-| a decided checkpoint | a SLSA VSA: `resourceUri` from `subject.ref` and `version`, `verificationResult` `PASSED` for `approved`, else `FAILED` | lossy: `verifiedLevels` expects SLSA levels, and an outcome is not one |
-| (the evaluated artifact's digest) | the `subject` of any of these statements | none: `run.json` names the subject by `ref` and `version`; the digest of an image appears only in a run plan's `subject.image` ([I8](README.md#open-gaps)) |
+| a decided checkpoint ([§5](../spec/05-checkpoints.md#51-the-manifest)) | an SVR: `verifier.id`, `timeCreated` from `decisionInput.evaluatedAt`, `policies` = the manifest as a resource descriptor, `properties` such as `AEF_CHECKPOINT_APPROVED` | lossy: only the approved properties are listed, which keeps the policy monotonic; `approved_with_exceptions` gets its own property (`AEF_CHECKPOINT_APPROVED_WITH_EXCEPTIONS`), never the plain approved one |
+| a decided checkpoint | a SLSA VSA: `resourceUri` from `subject.ref` and `version`, `verificationResult` `PASSED` for `approved`, else `FAILED` (`approved_with_exceptions` included: a VSA has no way to say "passed, with accepted risks") | lossy: `verifiedLevels` expects SLSA levels, and an outcome is not one |
+| (the evaluated artifact's digest) | the `subject` of any of these statements | none: `run.json` names the subject by `ref` and `version`; the digest of an image appears only in a run plan's `subject.image` ([I8](README.md#gaps-found-by-these-mappings)) |
 
 ## in-toto → AEF
 
@@ -134,14 +134,14 @@ in-toto envelope rules: the generic in-toto payload type, and file names that en
 |---|---|---|
 | another signer's DSSE envelope over the same `seal.json` bytes | another signature in `attestation.dsse.json`, or a second envelope kept beside the run | exact; a verifier checks each signature against its trust policy ([SIG-5](../spec/04-integrity.md#44-signatures)) |
 | a Sigstore bundle | a trust-policy input ([SIG-4](../spec/04-integrity.md#44-signatures)) | exact |
-| a Test Result statement | a run with one root line per listed test: `passed`, `warn` or `failed` | lossy: no scores, and no suite, subject or producer beyond what `configuration` names ([I7](README.md#open-gaps)) |
+| a Test Result statement | a run with one root line per listed test: `passed`, `warn` or `failed` | lossy: no scores, and no suite, subject or producer beyond what `configuration` names ([I7](README.md#gaps-found-by-these-mappings)) |
 | a Test Result's `url` | an evidence record with a URI link | exact |
 
 ## What does not carry over
 
 **AEF → in-toto.** Everything in the run's files beyond their digests: in-toto attests the files, and does not read
 them. In a Test Result: `inconclusive` and typed absences, scores, paths, the tree, severity. A link from the evidence
-to the evaluated artifact by digest ([I8](README.md#open-gaps)).
+to the evaluated artifact by digest ([I8](README.md#gaps-found-by-these-mappings)).
 
 **in-toto → AEF.** In a Test Result: scores and the reasons for each test's outcome. Attestations about other
 artifacts in the same bundle (provenance, SBOMs), which AEF does not hold.
@@ -163,7 +163,7 @@ In a Test Result statement for the whole run, `case-18` is listed in `warnedTest
 - The configuration names `run.json` and the suite by their SHA-256.
 
 The subject is `seal.json` (2336 bytes, SHA-256 below). `run.json` names the evaluated agent only as
-`agent:support/support-triage` at `git:3f2a1c`, which is no digest ([I8](README.md#open-gaps)).
+`agent:support/support-triage` at `git:3f2a1c`, which is no digest ([I8](README.md#gaps-found-by-these-mappings)).
 
 ```json
 {
@@ -481,7 +481,7 @@ The second batch of the corpus run, `overlays/seal-0002.json`, as written:
 
 **Proposed. None of these is registered with IANA.** They follow the vendor-tree form of RFC 6838
 (`vnd.agenteval.aef.*`), and become usable names only after an IANA registration, which is subject to Expert Review
-([I8](README.md#open-gaps)). One is already used by the specification: the checkpoint payload type of SIG-1.
+([I8](README.md#gaps-found-by-these-mappings)). One is already used by the specification: the checkpoint payload type of SIG-1.
 
 | Artifact | Proposed media type | Note |
 |---|---|---|
@@ -509,5 +509,5 @@ manifest ([SEAL-3](../spec/04-integrity.md#41-sealing-a-run)).
 
 ## Open gaps
 
-- [I8](README.md#open-gaps): no attestation names the evaluated artifact by digest, so in-toto and SLSA policies
+- [I8](README.md#gaps-found-by-these-mappings): no attestation names the evaluated artifact by digest, so in-toto and SLSA policies
   keyed on an artifact do not find AEF evidence; the media types above are unregistered.

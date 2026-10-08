@@ -1,4 +1,4 @@
-{"schemaVersion":"1.0","seq":1,"kind":"job.accepted","jobId":"job-7","at":"2026-10-08T12:00:00Z","planId":"plan-41","planDigest":"8fb42b6da3a4d83cb95b47a19e1e27fe46a97ffefe7d0b2d8a9419e04c02c25a","runnerId":"runner-local-01"}
+{"schemaVersion":"1.0","seq":1,"kind":"job.accepted","jobId":"job-7","at":"2026-10-08T12:00:00Z","planId":"plan-41","planDigest":"187f26d366ef3d7c58464707660c0e05be722ffce3406cbe4f0eae9250e22ad9","runnerId":"runner-local-01"}
 {"schemaVersion":"1.0","seq":2,"kind":"spend.updated","jobId":"job-7","at":"2026-10-08T12:00:05.000000001Z","spentUsd":0.1}
 {"schemaVersion":"1.0","seq":3,"kind":"spend.updated","jobId":"job-7","at":"2026-10-08T12:00:05Z","spentUsd":0.2}
 {"schemaVersion":"1.0","seq":4,"kind":"job.cancelled","jobId":"job-7","at":"2026-10-08T12:00:06Z","reason":"Cancelled by the approver."}

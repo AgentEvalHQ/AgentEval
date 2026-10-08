@@ -1,0 +1,14 @@
+{
+  "kind": "run",
+  "run": "run",
+  "outcome": "invalid",
+  "problems": [
+    [
+      "run.json",
+      "calibration"
+    ]
+  ],
+  "rules": [
+    "RUN-9"
+  ]
+}

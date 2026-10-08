@@ -1,0 +1,11 @@
+{
+  "kind": "plan-conformance",
+  "events": "events.ndjson",
+  "plan": "plan.json",
+  "runs": "runs",
+  "problems": [],
+  "rules": [
+    "STRM-4"
+  ],
+  "why": "a plan without judges leaves the runner's judges unchecked"
+}

@@ -1,0 +1,27 @@
+{
+  "kind": "lane",
+  "checkpoint": "checkpoint.json",
+  "runs": "runs",
+  "at": "2026-10-08T00:00:00Z",
+  "lanes": [
+    {
+      "lane": "quality",
+      "result": {
+        "status": "not_measured",
+        "subjectVersion": "git:3f2a1c",
+        "oldestClosedAt": "2026-10-02T14:06:23.004Z"
+      }
+    }
+  ],
+  "problems": [
+    [
+      "lanes/quality/runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10",
+      "run-unverified"
+    ]
+  ],
+  "rules": [
+    "CKP-8",
+    "OVL-10",
+    "SEAL-4"
+  ]
+}

@@ -1,4 +1,8 @@
 {
+  "kind": "matching",
   "matches": true,
+  "rules": [
+    "PLAN-7"
+  ],
   "why": "it carries every selector tag and supports the plan's provider"
 }

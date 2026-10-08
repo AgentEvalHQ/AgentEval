@@ -1,4 +1,4 @@
-{"schemaVersion":"1.0","seq":1,"kind":"job.accepted","jobId":"job-7","at":"2026-10-08T12:00:00Z","planId":"plan-42","planDigest":"7d958fb3043204d99ee6bc50792c4ce6316b3ce97e4e8a729d4711e3a2a46708","runnerId":"runner-local-01"}
+{"schemaVersion":"1.0","seq":1,"kind":"job.accepted","jobId":"job-7","at":"2026-10-08T12:00:00Z","planId":"plan-42","planDigest":"dea00d57e50bf03f0d071ea327eee9bc0622c77e743e40e49608eb999d704b44","runnerId":"runner-local-01"}
 {"schemaVersion":"1.0","seq":2,"kind":"case.completed","jobId":"job-7","at":"2026-10-08T12:00:01Z","caseId":"c1","state":"passed"}
 {"schemaVersion":"1.0","seq":3,"kind":"case.completed","jobId":"job-7","at":"2026-10-08T12:00:02Z","caseId":"c2","state":"passed"}
 {"schemaVersion":"1.0","seq":4,"kind":"case.completed","jobId":"job-7","at":"2026-10-08T12:00:03Z","caseId":"c3","state":"passed"}

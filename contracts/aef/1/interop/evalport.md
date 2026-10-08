@@ -87,10 +87,10 @@ GraderResult.
 |---|---|---|
 | `run_id` | `runId` when it matches the id pattern (letters, digits, `.`, `_`, `:`, `-`; at most 128); otherwise a hash, with the original in `ext` | exact or lossy |
 | `version` | `ext` | none |
-| `suite_id`, `suite_version` | `suite.ref` (`suite:<suite_id>`), `suite.version` | exact; `suite_version` is optional in EvalPort and required in AEF's `suite` ([I7](README.md#open-gaps)) |
+| `suite_id`, `suite_version` | `suite.ref` (`suite:<suite_id>`), `suite.version` | exact; `suite_version` is optional in EvalPort and required in AEF's `suite` ([I7](README.md#gaps-found-by-these-mappings)) |
 | `started_at`, `completed_at` | `startedAt`, `endedAt` in UTC | exact instant |
-| `runner` | `producer` | exact; AEF requires a producer and EvalPort does not ([I7](README.md#open-gaps)) |
-| `provider.model`, `api_base`, `temperature`, `max_tokens` | `subject` (`kind: model`), `deployment.endpoint`, `config` | lossy; `execution.targetMode` has no source ([I7](README.md#open-gaps)) |
+| `runner` | `producer` | exact; AEF requires a producer and EvalPort does not ([I7](README.md#gaps-found-by-these-mappings)) |
+| `provider.model`, `api_base`, `temperature`, `max_tokens` | `subject` (`kind: model`), `deployment.endpoint`, `config` | lossy; `execution.targetMode` has no source ([I7](README.md#gaps-found-by-these-mappings)) |
 | `isolation`, `group` | `ext` | none |
 | `metadata.openeval.partial: true` | `status: aborted` with an `abortReason`, or `completed` with `skipped` lines for the missing cases | lossy |
 | `test_case_id` | `caseId` | exact |
@@ -106,12 +106,12 @@ GraderResult.
 | `reason` | `reason` | exact |
 | the grader's `weight` | `component.weight`; `required` is `true` for `all` | lossy |
 | `openeval.aggregation` | `aggregation.strategy`: `weighted` → `WeightedSum`, `majority` → `MajorityVote`, `all` → `Min`; `any` has no counterpart | lossy |
-| `actual_output`; a test case's `input`, `expected_output`, `context` | blobs with evidence (capture `on`) | lossy ([I2](README.md#open-gaps)) |
+| `actual_output`; a test case's `input`, `expected_output`, `context` | blobs with evidence (capture `on`) | lossy ([I2](README.md#gaps-found-by-these-mappings)) |
 | `duration_ms` | `durationMs` | exact |
-| `Result.completed_at` | none | none ([I6](README.md#open-gaps)) |
+| `Result.completed_at` | none | none ([I6](README.md#gaps-found-by-these-mappings)) |
 | `metadata.openeval.trace_id` | `traceLink.traceId` | exact |
 | `metadata.openeval.cost` | `usage` | lossy |
-| `summary` | a recomputed `summary.json` ([SUM-5](../spec/03-run.md#36-summaryjson)); the entries' `verdict` has no source | lossy ([I1](README.md#open-gaps)) |
+| `summary` | a recomputed `summary.json` ([SUM-5](../spec/03-run.md#36-summaryjson)); the entries' `verdict` has no source | lossy ([I1](README.md#gaps-found-by-these-mappings)) |
 | proposed `verdict` (`passed`, `failed`, `unverified`) | root `state` `passed`, `failed`, `not_measured` (or `inconclusive` when graders scored) | exact |
 | a `.sigstore.json` bundle | outside the run; AEF accepts Sigstore as a trust-policy input ([SIG-4](../spec/04-integrity.md#44-signatures)) | lossy |
 
@@ -123,8 +123,8 @@ agreement. Severity, verdict rules, thresholds and uncertainty. `N` against `n` 
 decisions, the run's seal, overlays and signatures. `execution.targetMode` and judge calibration.
 
 **EvalPort → AEF.** `isolation` and `group`: AEF has no field for either, and no finding tracks them yet. Per-result
-times ([I6](README.md#open-gaps)). The case content without capture ([I2](README.md#open-gaps)). A summary
-verdict ([I1](README.md#open-gaps)). The kind of non-measurement behind a null score.
+times ([I6](README.md#gaps-found-by-these-mappings)). The case content without capture ([I2](README.md#gaps-found-by-these-mappings)). A summary
+verdict ([I1](README.md#gaps-found-by-these-mappings)). The kind of non-measurement behind a null score.
 
 ## Worked example
 
@@ -190,7 +190,7 @@ from metadata.
 
 ## Open gaps
 
-- [I1](README.md#open-gaps): summary entries need a verdict that a ResultSet does not give.
-- [I2](README.md#open-gaps): `actual_output`, `input` and `expected_output` have a place only as captured blobs.
-- [I6](README.md#open-gaps): `Result.completed_at`.
-- [I7](README.md#open-gaps): the subject, target mode, producer and suite version an importer supplies.
+- [I1](README.md#gaps-found-by-these-mappings): summary entries need a verdict that a ResultSet does not give.
+- [I2](README.md#gaps-found-by-these-mappings): `actual_output`, `input` and `expected_output` have a place only as captured blobs.
+- [I6](README.md#gaps-found-by-these-mappings): `Result.completed_at`.
+- [I7](README.md#gaps-found-by-these-mappings): the subject, target mode, producer and suite version an importer supplies.

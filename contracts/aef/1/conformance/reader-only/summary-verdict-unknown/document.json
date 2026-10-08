@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "r-1",
+  "lanes": [
+    {
+      "lane": "main",
+      "metrics": [
+        {
+          "metric": "m",
+          "path": "p",
+          "n": 1,
+          "N": 1,
+          "notMeasured": 0,
+          "value": 1,
+          "verdict": "borderline"
+        }
+      ]
+    }
+  ]
+}

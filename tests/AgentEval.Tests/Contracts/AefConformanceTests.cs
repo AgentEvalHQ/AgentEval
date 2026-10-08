@@ -48,7 +48,7 @@ public class AefConformanceTests
         foreach (var writer in Directory.GetFiles(Path.Combine(Root, "schemas", "writer"), "*.schema.json"))
         {
             var schema = JsonNode.Parse(File.ReadAllText(writer))!.AsObject();
-            var expected = Derive(schema, inCondition: false)!.AsObject();
+            var expected = Derive(schema, inCondition: false, Path.GetFileName(writer), "")!.AsObject();
             expected["description"] = "READER (tolerant), derived from the writer schema by tools/derive_reader.py. " + (string?)schema["description"];
             var committed = JsonNode.Parse(File.ReadAllText(Path.Combine(Root, "schemas", "reader", Path.GetFileName(writer))));
 
@@ -56,12 +56,22 @@ public class AefConformanceTests
         }
     }
 
-    private static JsonNode? Derive(JsonNode? node, bool inCondition)
+    // The enums [VER-9] closes for major 1: the rules across files compute with them, so a reader keeps them closed.
+    private static readonly HashSet<(string File, string Pointer)> ClosedEnums =
+    [
+        ("common.schema.json", "/$defs/state"),
+        ("run.schema.json", "/properties/status"),
+        ("metrics.schema.json", "/properties/metrics/items/properties/kind"),
+    ];
+
+    private static JsonNode? Derive(JsonNode? node, bool inCondition, string file, string pointer)
     {
         switch (node)
         {
             case JsonArray array:
-                return new JsonArray(array.Select(item => Derive(item, inCondition)).ToArray());
+                return new JsonArray(array.Select((item, i) => Derive(item, inCondition, file, $"{pointer}/{i}")).ToArray());
+            case JsonObject when !inCondition && ClosedEnums.Contains((file, pointer)):
+                return Derive(node, true, file, pointer);   // closed: as the writer has it
             case JsonObject obj:
                 var result = new JsonObject();
                 foreach (var (key, value) in obj)
@@ -72,7 +82,7 @@ public class AefConformanceTests
                     }
                     else if (inCondition)
                     {
-                        result[key] = Derive(value, true);
+                        result[key] = Derive(value, true, file, $"{pointer}/{key}");
                     }
                     else if (key == "type" && obj.ContainsKey("enum"))
                     {
@@ -98,12 +108,12 @@ public class AefConformanceTests
                     else if (key is "if" or "not")
                     {
                         // A condition selects a rule and a prohibition forbids: relaxing either changes what it means.
-                        result[key] = Derive(value, true);
+                        result[key] = Derive(value, true, file, $"{pointer}/{key}");
                     }
                     else if (key == "oneOf" && value is JsonArray branches && branches.Count > 0 && branches.All(br => !string.IsNullOrEmpty(KindOf(br))))
                     {
                         // A union discriminated by kind: known kinds keep their rules; an unknown kind reads as "other".
-                        var anyOf = new JsonArray(branches.Select(br => Derive(br, false)).ToArray());
+                        var anyOf = new JsonArray(branches.Select((br, i) => Derive(br, false, file, $"{pointer}/oneOf/{i}")).ToArray());
                         anyOf.Add(new JsonObject
                         {
                             ["type"] = "object",
@@ -121,7 +131,7 @@ public class AefConformanceTests
                     }
                     else
                     {
-                        result[key] = Derive(value, false);
+                        result[key] = Derive(value, false, file, $"{pointer}/{key}");
                     }
                 }
 
@@ -219,7 +229,7 @@ public class AefConformanceTests
                 Assert.False(File.Exists(Path.Combine(run, "seal.json")), $"{name}: an unsealed run has no seal.json");
                 break;
             case "intact":
-                Assert.Empty(Verify(run));
+                Assert.Empty(Verify(run, Policy(Path.Combine(Conformance, "valid", name), expected)));
                 break;
             default:
                 Assert.Fail($"{name}: a valid run is intact or unsealed, not {expected["outcome"]}");
@@ -244,11 +254,16 @@ public class AefConformanceTests
     [Fact]
     public void TheCorpus_HoldsEveryResultState_AndALineSeparatorInsideAString()
     {
-        var lines = Directory.GetFiles(Path.Combine(Conformance, "valid"), "results.ndjson", SearchOption.AllDirectories)
-            .SelectMany(NdjsonLines).ToList();
+        // Every state of the writer schema ([RES-1]), over the runs the corpus says are valid: valid/, and the runs/
+        // vectors that are intact or unsealed.
+        var lines = Directory.GetDirectories(Path.Combine(Conformance, "valid"))
+            .Concat(Directory.GetDirectories(Path.Combine(Conformance, "runs")))
+            .Where(d => (string?)ReadJson(Path.Combine(d, "expected.json"))["outcome"] is "intact" or "unsealed")
+            .SelectMany(d => NdjsonLines(Path.Combine(d, "run", "results.ndjson"))).ToList();
+        var states = ReadJson(Path.Combine(Root, "schemas", "writer", "common.schema.json"))["$defs"]!["state"]!["enum"]!.AsArray();
 
         Assert.Equal(
-            ["error", "failed", "inconclusive", "not_applicable", "not_measured", "passed", "pending", "skipped", "warn"],
+            states.Select(s => (string)s!).Order(StringComparer.Ordinal),
             lines.Select(l => (string)JsonNode.Parse(l)!["state"]!).Distinct().Order(StringComparer.Ordinal));
         Assert.Contains(lines, l => l.Contains('\u2028'));
     }
@@ -498,7 +513,7 @@ public class AefConformanceTests
         var expected = ReadJson(Path.Combine(dir, "expected.json"));
         var run = Path.Combine(dir, (string)expected["run"]!);
 
-        Assert.Equal(Problems(expected), Verify(run));
+        Assert.Equal(Problems(expected), Verify(run, Policy(dir, expected)));
         if ((string?)expected["manifest"] is { } file)
         {
             // A sealable run: the manifest byte for byte, and the run hash is its SHA-256.
@@ -532,6 +547,10 @@ public class AefConformanceTests
         Assert.Contains(bytes, b => b >= 0x80);
         Assert.Equal(Path.GetFileName(blob), Hex(SHA256.HashData(bytes)));
     }
+
+    /// <summary>A vector's trust policy ([SIG-4]): the file its expected.json names as policy, beside it; null without one.</summary>
+    private static JsonNode? Policy(string dir, JsonNode expected) =>
+        (string?)expected["policy"] is { } file ? ReadJson(Path.Combine(dir, file)) : null;
 
     /// <summary>An expected.json's problems: [path, code] pairs, compared as an ordered list ([CONF-2]).</summary>
     private static List<(string Path, string Problem)> Problems(JsonNode expected) =>
@@ -569,9 +588,9 @@ public class AefConformanceTests
     /// Verification stops after seal-invalid. A subject listed twice (duplicate-subject) or naming a file that
     /// is never sealed (subject-path) is not compared further; digest, not-sealed, missing and withheld compare the files
     /// with the other subjects; run-hash is reported only when every file matches its subject; run-id, predicate and
-    /// run-open compare the statement with run.json.
+    /// run-open compare the statement with run.json. The trust policy decides which redactions are authorized.
     /// </summary>
-    private static List<(string Path, string Problem)> Verify(string run)
+    private static List<(string Path, string Problem)> Verify(string run, JsonNode? policy)
     {
         var seal = ReadIJson(File.ReadAllBytes(Path.Combine(run, "seal.json")));
         if (seal is null || !Reader.Value.IsValid("seal", seal, out _))
@@ -587,8 +606,8 @@ public class AefConformanceTests
         var sealedDigests = subjects.Where(s => !duplicated.Contains(s.Name) && !unsealable.Contains(s.Name))
             .ToDictionary(s => s.Name, s => s.Digest, StringComparer.Ordinal);
 
-        // A sealed blob that is gone is withheld when a verified redact event names it ([OVL-10]), and missing otherwise.
-        var withheld = Withheld(run);
+        // A sealed blob that is gone is withheld when an authorized redaction names it ([OVL-10]), and missing otherwise.
+        var withheld = Withheld(run, policy);
         var present = SealedFiles(run).ToHashSet(StringComparer.Ordinal);
         var everyFileMatches = duplicated.Count == 0;
         foreach (var rel in present.Union(sealedDigests.Keys).Where(r => !duplicated.Contains(r)))
@@ -709,19 +728,19 @@ public class AefConformanceTests
             .SelectMany(f => Problems(ReadJson(f)).Select(p => p.Problem))
             .Distinct().Order(StringComparer.Ordinal);
 
-        // Every code of [OVL-5].
-        Assert.Equal(["batch-digest", "batch-invalid", "batch-number", "event-id", "event-invalid", "line-boundary", "missing", "offset", "previous",
-                      "run-hash", "run-id", "target", "uncovered", "unexpected-file"], problems);
+        // Every code of [OVL-5], and encoding for an events file whose framing breaks.
+        Assert.Equal(["batch-digest", "batch-invalid", "batch-number", "encoding", "event-id", "event-invalid", "line-boundary", "missing", "offset",
+                      "previous", "run-hash", "run-id", "target", "uncovered", "unexpected-file"], problems);
     }
 
     /// <summary>
     /// Verifies the overlays (spec 04 §4.2, [OVL-5]): the files under overlays/; every batch seal from 1 to the highest
     /// present, with its number, run id, run hash, offset, line boundaries, digest and previous seal; that the batches
     /// cover the events file; and each event's validity, id and target. Also returns the events the effective view is
-    /// computed from (§4.3): the lines of the batches that verify, from batch 1 up to the first that does not, less any
-    /// line with a problem of its own.
+    /// computed from (§4.3), each with its batch: the lines of the batches that verify, from batch 1 up to the first that
+    /// does not, less any line with a problem of its own.
     /// </summary>
-    private static (List<(string Path, string Problem)> Problems, List<JsonNode> Verified) VerifyChain(string run)
+    private static (List<(string Path, string Problem)> Problems, List<(JsonNode Event, int Batch)> Verified) VerifyChain(string run)
     {
         var overlays = Path.Combine(run, "overlays");
         var runId = (string)ReadJson(Path.Combine(run, "run.json"))["runId"]!;
@@ -736,12 +755,21 @@ public class AefConformanceTests
                 problems.Add((rel, "unexpected-file"));
         }
 
+        // An events file whose framing breaks [ENC-5] or [ENC-7] (a byte-order mark, a CR, a blank line, no final LF) is
+        // reported once, and the chain is not checked further: no batch of it verifies, no event of it has an effect.
+        if (events.Length > 0 && (events is [0xEF, 0xBB, 0xBF, ..] || events.AsSpan().IndexOf((byte)'\r') >= 0 || events[^1] != (byte)'\n'
+                                  || events[0] == (byte)'\n' || events.AsSpan().IndexOf("\n\n"u8) >= 0))
+        {
+            problems.Add(("overlays/events.ndjson", "encoding"));
+            return (Ordered(problems), []);
+        }
+
         var last = BatchSeals(overlays).Select(f => int.Parse(Path.GetFileName(f)[5..9], System.Globalization.CultureInfo.InvariantCulture)).DefaultIfEmpty(0).Max();
         if (File.Exists(Path.Combine(overlays, "seal-0000.json")))
             problems.Add(("overlays/seal-0000.json", "batch-number"));   // batches are 1-based: not checked further
         var covered = new List<(long From, long To)>();
         long expectedOffset = 0;   // where the next batch starts; -1 when unknown (after a missing or an invalid seal)
-        long verifiedTo = 0;       // the end of the batches that verify, from batch 1
+        var verifiedBatches = new List<(int Batch, long From, long To)>();   // the batches that verify, from batch 1
         var verifying = true;
         for (var n = 1; n <= last; n++)
         {
@@ -781,7 +809,7 @@ public class AefConformanceTests
             if (!previousOk) problems.Add((name, "previous"));
             expectedOffset = offset + length;
             verifying &= problems.Count == before;
-            if (verifying) verifiedTo = offset + length;
+            if (verifying) verifiedBatches.Add((n, offset, offset + length));
         }
 
         long reach = 0;   // the union of the claimed ranges, from the first byte
@@ -799,10 +827,11 @@ public class AefConformanceTests
         var resultIds = File.ReadAllText(Path.Combine(run, "results.ndjson")).Split('\n', StringSplitOptions.RemoveEmptyEntries)
             .Select(l => (string?)JsonNode.Parse(l)!["resultId"]).ToHashSet(StringComparer.Ordinal);
         var eventIds = new HashSet<string>(StringComparer.Ordinal);
-        var verified = new List<JsonNode>();
+        var verified = new List<(JsonNode Event, int Batch)>();
         var at = 0;
         for (var line = 1; at < events.Length; line++)
         {
+            var start = at;
             var next = Array.IndexOf(events, (byte)'\n', at) is var lf and >= 0 ? lf + 1 : events.Length;
             var e = ReadIJson(events.AsSpan(at, next - at));
             var where = $"overlays/events.ndjson:{line}";
@@ -820,7 +849,8 @@ public class AefConformanceTests
                 || (target["runHash"] is { } targetHash && (string?)targetHash != runHash)
                 || (target["result"] is { } result && !resultIds.Contains((string?)result)))
                 problems.Add((where, "target"));
-            if (next <= verifiedTo && problems.Count == before) verified.Add(e);
+            if (problems.Count == before && verifiedBatches.FirstOrDefault(b => b.From <= start && next <= b.To) is { Batch: > 0 } batch)
+                verified.Add((e, batch.Batch));
         }
 
         return (Ordered(problems), verified);
@@ -828,8 +858,8 @@ public class AefConformanceTests
 
     /// <summary>
     /// The run hash the batches must name ([OVL-4]): seal.json's predicate.runHash when the seal is valid, which the seal
-    /// verification checks against the files (recomputing it from the files would fail once a verified redact withholds
-    /// a blob); otherwise the hash recomputed from the files ([SEAL-4]).
+    /// verification checks against the files (recomputing it from the files would fail once an authorized redaction
+    /// withholds a blob); otherwise the hash recomputed from the files ([SEAL-4], [OVL-5]).
     /// </summary>
     private static string RunHash(string run) =>
         File.Exists(Path.Combine(run, "seal.json")) && ReadIJson(File.ReadAllBytes(Path.Combine(run, "seal.json"))) is { } seal
@@ -837,16 +867,135 @@ public class AefConformanceTests
             ? (string)seal["predicate"]!["runHash"]!
             : Hex(SHA256.HashData(Encoding.UTF8.GetBytes(Manifest(run))));
 
-    /// <summary>The sealed blobs that verified redact events withhold ([OVL-10]), as paths in the run.</summary>
-    private static HashSet<string> Withheld(string run) =>
-        Directory.Exists(Path.Combine(run, "overlays"))
-            ? VerifyChain(run).Verified.Where(e => (string?)e["kind"] == "redact" && e["target"]?["blob"] is not null)
-                .Select(e => BlobPath((string)e["target"]!["blob"]!)).ToHashSet(StringComparer.Ordinal)
-            : [];
+    /// <summary>
+    /// The sealed blobs that authorized redactions withhold ([OVL-10]), as paths in the run: a redact event of a verified
+    /// batch whose signature (overlays/seal-&lt;nnnn&gt;.dsse.json) verifies for the event's by.identity under the caller's
+    /// trust policy, and the policy lets that identity redact ("may": ["redact"], [SIG-4]). No policy, no redaction.
+    /// </summary>
+    private static HashSet<string> Withheld(string run, JsonNode? policy)
+    {
+        var overlays = Path.Combine(run, "overlays");
+        if (policy is not { } trust || !Directory.Exists(overlays))
+            return [];
+
+        bool MayRedact(string identity) => (trust["keys"]?.AsArray() ?? []).Any(k =>
+            (string?)k?["identity"] == identity && (k["may"]?.AsArray() ?? []).Any(m => (string?)m == "redact"));
+        bool SignedBy(int batch, string identity) =>
+            File.Exists(Path.Combine(overlays, $"seal-{batch:D4}.dsse.json"))
+            && VerifiesFor(File.ReadAllBytes(Path.Combine(overlays, $"seal-{batch:D4}.dsse.json")),
+                File.ReadAllBytes(Path.Combine(overlays, $"seal-{batch:D4}.json")), "application/vnd.in-toto+json", trust).Contains(identity);
+
+        return VerifyChain(run).Verified
+            .Where(v => (string?)v.Event["kind"] == "redact" && v.Event["target"]?["blob"] is not null
+                        && (string?)v.Event["by"]?["identity"] is { } identity && MayRedact(identity) && SignedBy(v.Batch, identity))
+            .Select(v => BlobPath((string)v.Event["target"]!["blob"]!)).ToHashSet(StringComparer.Ordinal);
+    }
 
     // Only seal-, four digits and .json is a batch seal ([OVL-5]).
     private static IEnumerable<string> BatchSeals(string overlays) =>
         Directory.GetFiles(overlays, "seal-*.json").Where(f => Regex.IsMatch(Path.GetFileName(f), "^seal-[0-9]{4}\\.json\\z"));
+
+    // ------------------------------------------------------------------ signatures (what an overlay redaction needs)
+
+    [Fact]
+    public void ABatchSignature_VerifiesOnlyForTheBatchSealsBytes_AndAValidSignature()
+    {
+        // seal-vectors/withheld-blob signs its redaction's batch with the policy's key. No redaction vector has another
+        // payload or a forged signature, so those are made here, from its files, in memory.
+        var dir = Path.Combine(Conformance, "seal-vectors", "withheld-blob");
+        var policy = ReadJson(Path.Combine(dir, "policy.json"));
+        var envelope = File.ReadAllBytes(Path.Combine(dir, "run", "overlays", "seal-0003.dsse.json"));
+        var seal = File.ReadAllBytes(Path.Combine(dir, "run", "overlays", "seal-0003.json"));
+        const string InToto = "application/vnd.in-toto+json";
+        var forged = ReadIJson(envelope)!;
+        var sig = Base64((string)forged["signatures"]![0]!["sig"]!)!;
+        sig[^1] ^= 1;   // the last byte of s: still DER, no longer the signature
+        forged["signatures"]![0]!["sig"] = Convert.ToBase64String(sig);
+
+        Assert.Equal([(string)policy["keys"]![0]!["identity"]!], VerifiesFor(envelope, seal, InToto, policy));
+        Assert.Empty(VerifiesFor(envelope, [.. seal, (byte)'\n'], InToto, policy));   // not the file's bytes
+        Assert.Empty(VerifiesFor(envelope, seal, "application/json", policy));          // not the file's type
+        Assert.Empty(VerifiesFor(Encoding.UTF8.GetBytes(forged.ToJsonString()), seal, InToto, policy));
+    }
+
+    /// <summary>
+    /// The identities a DSSE envelope verifies for (spec 04 §4.4), in policy order: its payload is the file's exact bytes
+    /// with the type [SIG-1] gives that file, and a signature verifies with a key of the caller's trust policy ([SIG-4]),
+    /// the one with its key id ([SIG-3]), or for a signature without one the first in policy order that verifies it. Only
+    /// ECDSA P-256 is checked here, which is all the redaction vectors sign with; a key of another algorithm verifies
+    /// nothing. The signature-vectors/ corpus is not run here.
+    /// </summary>
+    private static List<string> VerifiesFor(byte[] envelopeBytes, byte[] file, string payloadType, JsonNode policy)
+    {
+        var envelope = ReadIJson(envelopeBytes);
+        var payload = Base64((string?)envelope?["payload"]);
+        if (envelope?["signatures"] is not JsonArray { Count: > 0 } signatures || payload is null
+            || (string?)envelope["payloadType"] != payloadType || !payload.AsSpan().SequenceEqual(file))
+            return [];   // malformed, or payload-mismatch
+
+        // PAE(type, body) = "DSSEv1" SP LEN(type) SP type SP LEN(body) SP body, lengths in ASCII decimal bytes.
+        var message = Encoding.UTF8.GetBytes($"DSSEv1 {Encoding.UTF8.GetByteCount(payloadType)} {payloadType} {payload.Length} ").Concat(payload).ToArray();
+        var keys = (policy["keys"]?.AsArray() ?? []).Select(TrustedKey).ToList();
+        var verified = new HashSet<string>(StringComparer.Ordinal);   // key ids
+        foreach (var signature in signatures)
+        {
+            var keyId = (string?)signature?["keyid"] ?? "";
+            if (Base64((string?)signature?["sig"]) is not { } sig)
+                continue;
+            var candidates = keyId.Length == 0 ? keys : keys.Where(k => k.KeyId == keyId).Take(1);
+            var hit = candidates.FirstOrDefault(k => k.Key?.VerifyData(message, sig, HashAlgorithmName.SHA256, DSASignatureFormat.Rfc3279DerSequence) == true);
+            if (hit.Key is not null)
+                verified.Add(hit.KeyId);
+        }
+
+        return [.. keys.Where(k => verified.Contains(k.KeyId)).Select(k => k.Identity).Distinct(StringComparer.Ordinal)];
+    }
+
+    /// <summary>A trust-policy key: its identity, its key id (sha256: and the hex SHA-256 of the SPKI DER), and the key when it is ECDSA P-256.</summary>
+    private static (string Identity, string KeyId, ECDsa? Key) TrustedKey(JsonNode? entry)
+    {
+        var identity = (string?)entry?["identity"] ?? "";
+        var pem = (string?)entry?["publicKey"] ?? "";
+        byte[] der;
+        try
+        {
+            der = Convert.FromBase64String(pem[PemEncoding.Find(pem).Base64Data]);
+        }
+        catch (Exception ex) when (ex is ArgumentException or FormatException)
+        {
+            return (identity, "", null);
+        }
+
+        var keyId = "sha256:" + Hex(SHA256.HashData(der));
+        var key = ECDsa.Create();
+        try
+        {
+            key.ImportSubjectPublicKeyInfo(der, out _);
+        }
+        catch (CryptographicException)
+        {
+            return (identity, keyId, null);   // not an EC key: unsupported-algorithm, which verifies nothing
+        }
+
+        return (identity, keyId, key.ExportParameters(false).Curve.Oid.Value == "1.2.840.10045.3.1.7" ? key : null);   // P-256
+    }
+
+    /// <summary>Base64 as [SIG-1] reads it: the standard or URL-safe alphabet, padded or not; null for whitespace, mixed alphabets or set unused bits.</summary>
+    private static byte[]? Base64(string? text)
+    {
+        if (text is null || text.Any(char.IsWhiteSpace) || (text.IndexOfAny(['+', '/']) >= 0 && text.IndexOfAny(['-', '_']) >= 0))
+            return null;
+        var standard = text.Replace('-', '+').Replace('_', '/').TrimEnd('=');
+        try
+        {
+            var bytes = Convert.FromBase64String(standard + new string('=', (4 - (standard.Length % 4)) % 4));
+            return Convert.ToBase64String(bytes).TrimEnd('=') == standard ? bytes : null;   // set unused bits re-encode differently
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
+    }
 
     // ------------------------------------------------------------------ patterns
 

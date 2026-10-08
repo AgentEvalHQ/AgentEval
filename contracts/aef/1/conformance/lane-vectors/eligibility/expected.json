@@ -77,7 +77,11 @@
     },
     {
       "lane": "tampered",
-      "result": null
+      "result": {
+        "status": "not_measured",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-05T00:00:00Z"
+      }
     },
     {
       "lane": "not-intact",
@@ -119,7 +123,7 @@
     ],
     [
       "lanes/tampered/runs/G-tampered",
-      "run-missing"
+      "run-unverified"
     ],
     [
       "lanes/unsealed/runs/G-unsealed",
@@ -134,6 +138,7 @@
     "LANE-1",
     "LANE-9",
     "CKP-8",
-    "RUN-7"
+    "RUN-7",
+    "LANE-10"
   ]
 }

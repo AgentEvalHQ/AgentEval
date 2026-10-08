@@ -18,6 +18,10 @@
 - **[VER-5]** A minor version only **adds**: optional fields, enum values, union kinds, problem codes, rule ids,
   corpus vectors. It never removes or renames anything, makes something required, narrows a bound or a pattern, or
   changes a rule's meaning. Anything else is a new major version.
+- **[VER-9] Closed enums.** Three enums are closed for major 1, because the rules across files (§3.9) compute with
+  them, and a reader could not check a run holding a value it does not know: a result's `state`, `run.json`'s
+  `status`, and a metric's `kind`. A new value in one of them is a new major version. Their reader schemas keep the
+  enum (`tools/derive_reader.py`), so a value outside it is a `schema` problem, never read as another value.
 - **[VER-6]** A run may mix minors only as their files were written: a reader reads each document at its own
   `schemaVersion`. A writer writes one minor throughout a run.
 - `tools/schema_diff.py` compares two versions of the writer schemas and fails on any change §VER-5 does not allow
@@ -30,16 +34,13 @@ better evidence than it is (each has a reader-only corpus vector):
 
 | Field | An unknown value reads as |
 |---|---|
-| `results` `state` | `inconclusive`: measured, undecided, not a pass |
 | `results` `severity` | `critical` |
-| `run.json` `status` | not closed: the run is treated as `running` (`run-open`) |
 | `run.json` `execution.targetMode` | `mocked`: not evidence about the live subject |
 | `run.json` `execution.stimulus` | `other` |
 | `run.json` `contentCapture` | `on`: content may be present (handle as private) |
 | `run.json` `subject.kind`, evidence `kind`, judges' `mode`, annotator `kind` (`OTHER`), `usage.role`, `attack.taxonomy[].scheme` | `other`, shown as written |
 | summary `verdict` | `inconclusive`: not a pass |
 | `trials.aggregation`, `executionPolicy.aggregation`, `config.thresholds[].op` | shown as written (descriptive) |
-| `metrics` `kind` | shown as written; it takes no part in summaries |
 | `metrics` `direction` | `none` |
 | `aggregation.strategy`, `aggregation.rulePath`, gate `rule.strategy` | shown as written (descriptive, [RES-6]) |
 | gate `outcome` | `inconclusive` |

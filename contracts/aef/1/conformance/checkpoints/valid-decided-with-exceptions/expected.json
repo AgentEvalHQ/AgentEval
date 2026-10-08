@@ -1,0 +1,14 @@
+{
+  "kind": "checkpoint",
+  "schema": "checkpoint",
+  "writer": "valid",
+  "reader": "valid",
+  "rules": [
+    "CKP-4",
+    "CKP-7",
+    "DEC-2",
+    "DEC-3"
+  ],
+  "why": "a failed blocking lane waived by an exception in force, recorded in the decision input: approved_with_exceptions",
+  "problems": []
+}

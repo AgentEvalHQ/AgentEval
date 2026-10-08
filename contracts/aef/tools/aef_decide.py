@@ -15,7 +15,8 @@ from pathlib import Path
 TIME = re.compile(r"^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\.([0-9]{1,9}))?Z$")
 DURATION = re.compile(r"^P(?=[0-9]|T[0-9])(?:([0-9]{1,5})D)?(?:T([0-9]{1,5})H)?$")
 KNOWN = {"passed": "passed", "failed": "failed", "not_measured": "not_measured", "incomparable": "incomparable"}
-REASON = {"failed": "failed", "missing": "missing", "not_measured": "not-measured", "incomparable": "incomparable", "stale": "stale"}
+REASON = {"failed": "failed", "missing": "missing", "not_measured": "not-measured", "incomparable": "incomparable", "stale": "stale",
+          "waived": "waived"}
 
 
 def parse_time(text):
@@ -44,6 +45,14 @@ def decide(inp):
     if len(set(names)) != len(names):
         raise ValueError("a lane is listed twice")
     evaluated_at = parse_time(inp["evaluatedAt"])
+    exceptions = {}  # lane -> [(at, expires)]: DEC-1 refuses an exception for no lane, or one never in force
+    for exception in inp.get("exceptions") or []:
+        if exception["lane"] not in names:
+            raise ValueError(f"an exception names {exception['lane']!r}, which is not a lane of the input")
+        at, expires = parse_time(exception["at"]), parse_time(exception["expires"])
+        if expires <= at:
+            raise ValueError(f"an exception for {exception['lane']!r} expires at or before it is granted: it is never in force")
+        exceptions.setdefault(exception["lane"], []).append((at, expires))
     lanes, reasons = [], []
     for lane in inp["lanes"]:
         result, code = lane["result"], None
@@ -58,6 +67,14 @@ def decide(inp):
         else:
             status = KNOWN.get(result["status"], "not_measured")  # an unknown status fails closed
 
+        # DEC-2 step 6: only a failure is ever waived, by an exception in force (at <= evaluatedAt < expires).
+        lapsed = False
+        if status == "failed" and lane["lane"] in exceptions:
+            if any(at <= evaluated_at < expires for at, expires in exceptions[lane["lane"]]):
+                status = "waived"
+            else:
+                lapsed = True
+
         item = {"lane": lane["lane"], "status": status, "blocking": lane["blocking"]}
         if status == "incomparable" and result.get("axes"):
             item["axes"] = result["axes"]
@@ -67,6 +84,8 @@ def decide(inp):
             if code is None:
                 code = "advisory-failed" if status == "failed" and not lane["blocking"] else REASON[status]
             reasons.append(f"{code}:{lane['lane']}")
+        if lapsed:
+            reasons.append(f"exception-expired:{lane['lane']}")
 
     superseded = inp.get("supersededBy") not in (None, inp["subjectVersion"])
     if superseded:
@@ -79,6 +98,8 @@ def decide(inp):
         outcome = "blocked"
     elif any(s in ("missing", "not_measured", "incomparable") for s, _ in statuses):
         outcome = "inconclusive"
+    elif any(s == "waived" for s, _ in statuses):
+        outcome = "approved_with_exceptions"
     else:
         outcome = "approved"
     reasons.append(f"outcome:{outcome}")

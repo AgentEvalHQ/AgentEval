@@ -83,14 +83,26 @@
           "maximum": 1000
         },
         "aggregation": {
-          "description": "How the trials were combined into this line's state: MajorityVote, the only value in this version (RES-8).",
+          "description": "How the trials were combined into the case's state: MajorityVote, AllPass, AnyPass, Mean, Median, Max or PassAtK (with k). Descriptive: a reader shows it, never recomputes it (RES-8).",
           "enum": [
-            "MajorityVote"
+            "MajorityVote",
+            "AllPass",
+            "AnyPass",
+            "Mean",
+            "Median",
+            "Max",
+            "PassAtK"
           ]
         },
         "agree": {
           "description": "Whether the trials agreed. false marks the case as flaky (RES-8).",
           "type": "boolean"
+        },
+        "k": {
+          "description": "k, for PassAtK: the case passes when at least one of k trials passes.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
         }
       }
     },
@@ -159,6 +171,12 @@
                 "type": "null"
               }
             ]
+          },
+          "label": {
+            "description": "A categorical value for the metric (an OpenTelemetry score label, Inspect's C/I/P/N, a grader's class), shown as written (RES-10).",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
           }
         }
       }
@@ -292,41 +310,68 @@
       ]
     },
     "usage": {
-      "description": "What producing this node consumed: tokens, in OpenTelemetry's gen_ai.usage.* names, and cost (RES-10).",
-      "type": "object",
-      "additionalProperties": false,
-      "properties": {
-        "gen_ai.usage.input_tokens": {
-          "description": "Input tokens, as OpenTelemetry's gen_ai.usage.input_tokens (RES-10).",
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
+      "description": "What producing this node consumed, one entry per party (the agent, a judge, an attacker): no role twice (RES-10).",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 8,
+      "items": {
+        "description": "What one party consumed producing this node: tokens in OpenTelemetry's gen_ai.usage.* names, and cost (RES-10).",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "gen_ai.usage.input_tokens": {
+            "description": "Input tokens, as OpenTelemetry's gen_ai.usage.input_tokens (RES-10).",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "gen_ai.usage.output_tokens": {
+            "description": "Output tokens, as OpenTelemetry's gen_ai.usage.output_tokens (RES-10).",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "costUsd": {
+            "description": "The cost, in US dollars (RES-10).",
+            "type": "number",
+            "minimum": 0
+          },
+          "costSource": {
+            "description": "Where the cost figure came from, such as a price table.",
+            "type": "string",
+            "maxLength": 128
+          },
+          "role": {
+            "description": "Whose usage this is: agent (the subject), judge, attacker (an attacker model) or other.",
+            "enum": [
+              "agent",
+              "judge",
+              "attacker",
+              "other"
+            ]
+          },
+          "gen_ai.usage.cache_read.input_tokens": {
+            "description": "Input tokens served from a cache, as OpenTelemetry's gen_ai.usage.cache_read.input_tokens; included in input_tokens (RES-10).",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "gen_ai.usage.cache_write.input_tokens": {
+            "description": "Input tokens written to a cache, as OpenTelemetry's gen_ai.usage.cache_write.input_tokens; included in input_tokens (RES-10).",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "gen_ai.usage.reasoning.output_tokens": {
+            "description": "Reasoning tokens, as OpenTelemetry's gen_ai.usage.reasoning.output_tokens; included in output_tokens (RES-10).",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
         },
-        "gen_ai.usage.output_tokens": {
-          "description": "Output tokens, as OpenTelemetry's gen_ai.usage.output_tokens (RES-10).",
-          "type": "integer",
-          "minimum": 0,
-          "maximum": 9007199254740991
-        },
-        "costUsd": {
-          "description": "The cost, in US dollars (RES-10).",
-          "type": "number",
-          "minimum": 0
-        },
-        "costSource": {
-          "description": "Where the cost figure came from, such as a price table.",
-          "type": "string",
-          "maxLength": 128
-        },
-        "role": {
-          "description": "Whose usage this is: agent (the subject), judge, attacker (an attacker model) or other.",
-          "enum": [
-            "agent",
-            "judge",
-            "attacker",
-            "other"
-          ]
-        }
+        "required": [
+          "role"
+        ]
       }
     },
     "traceLink": {
@@ -566,6 +611,14 @@
           ]
         }
       }
+    },
+    "startedAt": {
+      "description": "When work on this node started (RES-10).",
+      "$ref": "common.schema.json#/$defs/timestamp"
+    },
+    "endedAt": {
+      "description": "When work on this node ended; not before startedAt (RES-10, result-times in §3.9).",
+      "$ref": "common.schema.json#/$defs/timestamp"
     }
   },
   "allOf": [

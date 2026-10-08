@@ -9,12 +9,15 @@ using System.Text.RegularExpressions;
 namespace AgentEval.Results.Runner;
 
 /// <summary>
-/// The runner protocol (contracts/aef/1/README.md, "Run plans and runners", "The event stream"): plan-to-runner
-/// matching, and the verification of a finished event stream line by line. Vectors: contracts/aef/1/conformance/protocol/.
+/// The runner protocol (contracts/aef/1/spec/06-runners.md): plan-to-runner matching ([PLAN-7]), the verification of a
+/// finished event stream line by line ([STRM-3]), and the check that the runs a stream names keep to its plan
+/// ([STRM-4]). Vectors: contracts/aef/1/conformance/protocol/.
 /// </summary>
 public static class RunnerEventStream
 {
     private static readonly HashSet<string> Terminal = new(StringComparer.Ordinal) { "job.sealed", "job.failed", "job.cancelled", "job.refused" };
+
+    private static readonly string[] Provenance = ["planId", "planDigest", "jobId", "runnerId"];
 
     private static readonly Regex Timeout = new("^PT(?=[0-9])(?:([0-9]{1,5})H)?(?:([0-9]{1,5})M)?\\z", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
 
@@ -120,6 +123,122 @@ public static class RunnerEventStream
         if (!terminal) problems.Add(("stream", "no-terminal"));
         return problems;
     }
+
+    /// <summary>
+    /// [STRM-4]: every problem as (where, problem) of the runs a job.sealed or job.failed names, where is
+    /// <c>run:&lt;runId&gt;</c>, and of the job's limits over the runs found, where is <c>job</c>; ordered by where (its
+    /// UTF-8 bytes), then by problem. A run named twice is checked, and counted, once. A run is the folder with its runId
+    /// that has the run hash the first evidence.produced for it announced and is intact; when there is none, run-missing
+    /// or run-hash is its only problem. Empty when the runs keep to the plan.
+    /// </summary>
+    /// <param name="events">The stream's events, each valid against the reader runner-event schema, in file order.</param>
+    /// <param name="plan">The run plan the job ran.</param>
+    /// <param name="runs">The run folders the job produced (<see cref="RunFolder.Find"/>).</param>
+    /// <param name="intact">
+    /// Whether a run is intact (spec 04, §4.5: its seal verifies, a blob withheld only by a redaction the caller's trust
+    /// policy authorizes, and it keeps the rules across files): the caller's run verifier decides, since
+    /// AgentEval.Results has none yet. A run whose seal.json is not valid against the reader seal schema is not intact.
+    /// </param>
+    public static IReadOnlyList<(string Where, string Problem)> Conform(
+        IReadOnlyList<JsonNode> events, JsonNode plan, IReadOnlyList<RunFolder> runs, Func<RunFolder, bool> intact)
+    {
+        ArgumentNullException.ThrowIfNull(events);
+        ArgumentNullException.ThrowIfNull(plan);
+        ArgumentNullException.ThrowIfNull(runs);
+        ArgumentNullException.ThrowIfNull(intact);
+
+        var accepted = events.FirstOrDefault(e => Text(e["kind"]) == "job.accepted");
+        var announced = new Dictionary<string, string>(StringComparer.Ordinal);
+        var named = new List<string>();
+        foreach (var e in events)
+        {
+            var kind = Text(e["kind"]);
+            if (kind == "evidence.produced")
+            {
+                announced.TryAdd((string)e["runId"]!, (string)e["runHash"]!);   // the first announcement ([STRM-3] reports a change)
+            }
+            else if (kind is "job.sealed" or "job.failed")
+            {
+                foreach (var runId in (e["runs"]?.AsArray() ?? []).Select(r => (string)r!))
+                {
+                    if (!named.Contains(runId, StringComparer.Ordinal)) named.Add(runId);
+                }
+            }
+        }
+
+        var problems = new List<(string Where, string Problem)>();
+        var checkedRuns = new List<RunFolder>();
+        foreach (var runId in named)
+        {
+            var candidates = runs.Where(r => r.RunId == runId).ToList();
+            var run = announced.TryGetValue(runId, out var hash) ? candidates.FirstOrDefault(r => r.RunHash == hash && intact(r)) : null;
+            List<string> found;
+            if (candidates.Count == 0)
+            {
+                found = ["run-missing"];
+            }
+            else if (run is null)
+            {
+                found = ["run-hash"];
+            }
+            else
+            {
+                found = Departures(run, plan, accepted);
+                if (run.Summary()?["cost"]?["totalUsd"] is null) found.Add("no-cost");   // the budget cannot be checked without it
+                checkedRuns.Add(run);
+            }
+
+            problems.AddRange(found.Select(p => ($"run:{runId}", p)));
+        }
+
+        // The job's limits, over the runs found, each once: a runner cannot pass by splitting its work across runs.
+        var cost = checkedRuns.Sum(r => r.Summary()?["cost"]?["totalUsd"] is { } c ? (double)c : 0);
+        if (cost > (double)plan["limits"]!["maxUsd"]!)
+            problems.Add(("job", "over-budget"));
+        if (plan["limits"]?["cases"] is { } allowed
+            && checkedRuns.SelectMany(r => r.Results()).Where(l => l["parentResultId"] is null).Select(l => Text(l["caseId"]))
+                .Distinct(StringComparer.Ordinal).Count() > AefJson.Integer(allowed))
+            problems.Add(("job", "over-cases"));
+
+        return [.. problems.OrderBy(p => p.Where, RunFolder.Utf8Order).ThenBy(p => p.Problem, StringComparer.Ordinal)];
+    }
+
+    /// <summary>How an intact, announced run departs from the plan: [STRM-4]'s codes at <c>run:&lt;runId&gt;</c>.</summary>
+    private static List<string> Departures(RunFolder folder, JsonNode plan, JsonNode? accepted)
+    {
+        var run = folder.Run;
+        var found = new List<string>();
+
+        if (accepted is null || run["provenance"] is not JsonObject provenance || Provenance.Any(k => Text(provenance[k]) != Text(accepted[k])))
+            found.Add("provenance");
+
+        if (Text(run["subject"]?["ref"]) != Text(plan["subject"]?["ref"]) || Text(run["subject"]?["version"]) != Text(plan["subject"]?["version"]))
+            found.Add("subject");
+
+        // The plan's suite, version and, when the plan names one, content digest.
+        var suite = run["suite"];
+        if (Text(suite?["ref"]) is not { } suiteRef
+            || !(plan["suites"]?.AsArray() ?? []).Any(s => Text(s!["ref"]) == suiteRef && Text(s["version"]) == Text(suite!["version"])
+                                                           && (s["digest"] is null || Text(s["digest"]) == Text(suite["digest"]))))
+            found.Add("suite");
+
+        // An absent model or rubric digest equals only an absent one.
+        static List<(string?, string?)> Judges(JsonNode? list) =>
+            [.. (list?.AsArray() ?? []).Select(j => (Text(j!["model"]), Text(j["rubricDigest"])))];
+        if (Judges(plan["judges"]).Count > 0 && !Judges(run["judges"]).SequenceEqual(Judges(plan["judges"])))
+            found.Add("judges");
+
+        // [RUN-11], [VER-8]: an absent or unknown contentCapture reads as on.
+        if ((Text(run["contentCapture"]) == "off" ? "off" : "on") != Text(plan["contentCapture"]))
+            found.Add("content-capture");
+
+        if (Text(run["execution"]?["targetMode"]) != "live")
+            found.Add("target-mode");
+
+        return found;
+    }
+
+    private static string? Text(JsonNode? node) => node is JsonValue v && v.TryGetValue<string>(out var s) ? s : null;
 
     private static long TimeoutSeconds(string text)
     {

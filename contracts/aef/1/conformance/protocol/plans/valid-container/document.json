@@ -26,7 +26,7 @@
     "cases": 200,
     "timeout": "PT2H"
   },
-  "contentPolicy": "off",
+  "contentCapture": "off",
   "isolation": "container",
   "provider": "docker",
   "judges": [

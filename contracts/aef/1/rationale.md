@@ -145,5 +145,7 @@ version only adds ([VER-5]). `tools/schema_diff.py` refuses any schema change a 
 See [GOVERNANCE.md](../GOVERNANCE.md): the editors, the proposal process, and how changes are versioned.
 
 **What licence is AEF under?**
-The specification, schemas, corpus and tools are Apache-2.0 ([LICENSE](../../../LICENSE), [NOTICE](../NOTICE)). A
-patent commitment for independent implementers is under review.
+Today everything is Apache-2.0 ([LICENSE](../LICENSE), [NOTICE](../NOTICE)). For the 1.0 release, the plan (pending
+counsel) is the Community Specification License 1.0 for the specification text, so that anyone who implements AEF
+from the text has a royalty-free patent commitment, limited to [what the specification requires](../SCOPE.md); the
+schemas, corpus and tools stay Apache-2.0. See [GOVERNANCE.md](../GOVERNANCE.md#licence-and-patents).

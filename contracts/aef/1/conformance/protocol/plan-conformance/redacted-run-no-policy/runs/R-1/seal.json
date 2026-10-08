@@ -1,0 +1,64 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "blobs/sha256/d3/d364490e8f1b41bdcd79f00d5633ef9484aeda4c3a2b795525b95c8ddab84348",
+      "digest": {
+        "sha256": "d364490e8f1b41bdcd79f00d5633ef9484aeda4c3a2b795525b95c8ddab84348"
+      }
+    },
+    {
+      "name": "metrics.json",
+      "digest": {
+        "sha256": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8"
+      }
+    },
+    {
+      "name": "results.ndjson",
+      "digest": {
+        "sha256": "9acd16dd1b44cd32e1c1dc37c184722baff562cfba9c413b686f41ade7dcaa64"
+      }
+    },
+    {
+      "name": "run.json",
+      "digest": {
+        "sha256": "e681027b02bef947c5a442ff8a7d62a7a713b5e20a7b271cece61bbbc86f962b"
+      }
+    },
+    {
+      "name": "summary.json",
+      "digest": {
+        "sha256": "5c419eab3b644e909a540ec222c74ce57cf06afa52f2fc278c3667e009025cb7"
+      }
+    }
+  ],
+  "predicateType": "https://agenteval.dev/aef/1/evidence",
+  "predicate": {
+    "schemaVersion": "1.0",
+    "runId": "R-1",
+    "runHash": "7955e21ff1e8c325797571a60a4db6cb222b8c73b10b1a3f4a2e4203492a3d9e",
+    "producer": {
+      "name": "agenteval-cli",
+      "version": "1.0.0"
+    },
+    "subject": {
+      "ref": "agent:support/support-triage",
+      "version": "git:3f2a1c"
+    },
+    "deployment": null,
+    "suite": {
+      "ref": "suite:support/triage-scenarios",
+      "version": "4",
+      "digest": "sha256:4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c"
+    },
+    "judges": [
+      {
+        "model": "gpt-5.1",
+        "rubricDigest": "sha256:a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9"
+      }
+    ],
+    "closedAt": "2026-10-08T12:00:05Z",
+    "sealedAt": "2026-10-08T12:00:06Z",
+    "sealedBy": "producer"
+  }
+}

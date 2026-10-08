@@ -1,0 +1,3 @@
+{"schemaVersion":"1.0","resultId":"r_e71b509bd69ea844dab3fcbce4b449c7","caseId":"c1","path":"a","evaluator":{"id":"code:check"},"state":"inconclusive"}
+{"schemaVersion":"1.0","resultId":"r_abd0aa945a98bd62fe4e61726cc7ce71","caseId":"c2","path":"a","evaluator":{"id":"code:check"},"state":"inconclusive"}
+{"schemaVersion":"1.0","resultId":"r_f44a5dcda65b3821d57c44fc8c4c2702","caseId":"c3","path":"a","evaluator":{"id":"code:check"},"state":"inconclusive"}

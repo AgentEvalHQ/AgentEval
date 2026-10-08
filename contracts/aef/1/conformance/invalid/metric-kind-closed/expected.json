@@ -1,0 +1,11 @@
+{
+  "kind": "document",
+  "schema": "metrics",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "VER-9",
+    "SUM-1"
+  ],
+  "why": "a metric's kind is closed for major 1: summaries compute with it"
+}

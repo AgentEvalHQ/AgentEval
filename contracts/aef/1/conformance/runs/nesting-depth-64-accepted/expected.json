@@ -4,6 +4,8 @@
   "outcome": "intact",
   "problems": [],
   "rules": [
-    "ENC-17"
+    "ENC-17",
+    "ENC-18",
+    "ENC-19"
   ]
 }

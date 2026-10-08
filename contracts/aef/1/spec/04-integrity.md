@@ -22,7 +22,10 @@ text and a CRLF inside a sealed blob to prove it.
 
   (Like `sha256sum` output with a size column; `sha256sum -c` cannot read it, by design.)
 - **[SEAL-4] The run hash** is the SHA-256 of the manifest's bytes. It identifies the run's exact content: two runs
-  with the same run hash have the same sealed files.
+  with the same run hash have the same sealed files. Everywhere this specification says **a run's run hash**, it
+  means: for a run with a `seal.json` valid against the reader seal schema, its `predicate.runHash`; for a run
+  without one, the run hash recomputed from its files. (The seal check, §4.1, is what ties the sealed value to the
+  files; with a withheld blob, only the sealed value can be known.)
 - **[SEAL-5] `seal.json`** is an in-toto Statement v1: `_type` `https://in-toto.io/Statement/v1`; one `subject` per
   sealed file (`name` its path, `digest.sha256` its digest); `predicateType` `https://agenteval.dev/aef/1/evidence`;
   and a `predicate` with the `runId`, the `runHash`, the producer, subject, deployment, suite and judges as `run.json`
@@ -39,8 +42,8 @@ text and a CRLF inside a sealed blob to prove it.
   | `subject-path` | the subject's name | a subject that names `seal.json`, `attestation.dsse.json` or a file under `overlays/` |
   | `digest` | the file | a sealed file whose bytes changed |
   | `not-sealed` | the file | a file present but not sealed |
-  | `missing` | the file | a sealed file that is gone, and no verified overlay withholds it (§4.3) |
-  | `withheld` | the file | a sealed blob that is gone, withheld by a verified `redact` overlay (§4.3) |
+  | `missing` | the file | a sealed file that is gone, and no authorized redaction withholds it ([OVL-10]) |
+  | `withheld` | the file | a sealed blob that is gone, withheld by an authorized redaction ([OVL-10]) |
   | `run-hash` | `seal.json` | every file matches its subject, but the recomputed run hash is not `predicate.runHash` |
   | `run-id` | `seal.json` | `predicate.runId` is not `run.json`'s |
   | `predicate` | `seal.json` | the predicate differs from `run.json` (times compared as times, [ENC-8]: `…:02Z` equals `…:02.000Z`) about the producer (name, version), subject (ref, version), deployment (ref), suite (ref, version, digest), judges (model, rubric digest, in order), or `closedAt` |
@@ -80,7 +83,10 @@ What is added to a run after it closed: approvals, rejections, waivers, adjudica
 - **[OVL-5] Verifying the chain.** A verifier checks the seals from `seal-0001.json` to the highest-numbered one present
   and reports, per path, in the order of §3.9. "The run's run hash" is the `runHash` of the run's `seal.json` when it
   is valid against the reader seal schema, and otherwise the run hash recomputed from the files ([SEAL-4]): with a
-  withheld blob, only the sealed value can be known. A line reported as `event-invalid` is not checked for `event-id`
+  withheld blob, only the sealed value can be known. An events file whose framing breaks [ENC-5] or [ENC-7] (a CR, a
+  blank line, a missing final LF) is reported once as `encoding` at `overlays/events.ndjson`, and the chain is not
+  checked further: no batch of it verifies, and no event of it takes part in the effective view. A line reported as
+  `event-invalid` is not checked for `event-id`
   or `target`, and its id is not recorded. A batch whose range runs past the end of the file is reported as both
   `line-boundary` and `batch-digest`.
 
@@ -111,7 +117,10 @@ What is added to a run after it closed: approvals, rejections, waivers, adjudica
 ## 4.3 The effective view
 
 An overlay never changes a sealed file. A reader that shows a run with its overlays shows the **effective view**,
-computed from the events of the verified batches only (an unsealed tail is shown as unsealed and has no effect):
+computed from the events of the **verified batches**: batch 1 and each following batch, up to the first batch with
+any problem of [OVL-5] (that batch and every later one have no effect, even if they verify on their own). Within
+them, an event reported as `event-invalid`, as `target`, or as `event-id` (the later of two events with one id) has
+no effect either. Events after the last verified batch are shown as unsealed and have no effect:
 
 - **[OVL-6]** Events apply in file order. `at` is shown, never used to reorder.
 - **[OVL-7]** A result's effective state is the `state` of the last `override` or `adjudicate` targeting it, or its
@@ -120,9 +129,14 @@ computed from the events of the verified batches only (an unsealed tail is shown
 - **[OVL-8]** A target's review status is the kind of the last `approve` or `reject` targeting it.
 - **[OVL-9]** A `waive` holds from its `at` until its `expires`, compared with the time the view is computed; an
   expired waiver is shown as expired.
-- **[OVL-10]** A `redact` withholds a blob: a sealed blob file named in a verified `redact` event may be deleted from
-  the run, and seal verification then reports it as `withheld`, not `missing`. Only blobs can be withheld; the rest of
-  the run stays verifiable. This is how personal data in a captured blob is erased without breaking the seal.
+- **[OVL-10]** A `redact` withholds a blob only when it is **authorized**: the event is in a verified batch whose
+  signature (`overlays/seal-<nnnn>.dsse.json`, §4.4) verifies for the event's `by.identity`, and the caller's trust
+  policy allows that identity to redact (`"may": ["redact"]`, [SIG-4]). A sealed blob named in an authorized redaction
+  may be deleted from the run, and seal verification then reports it as `withheld`, not `missing`. Without such a
+  signature, or without a trust policy, a deleted blob is `missing` and the run is invalid: whoever can append an
+  unsigned event cannot suppress evidence. Only blobs can be withheld; the rest of the run stays verifiable, and a
+  reader **MUST** show a run with withheld blobs as "intact, *n* withheld", never as plain intact. This is how
+  personal data in a captured blob is erased without breaking the seal or the checkpoints that rely on the run.
 - **[OVL-11]** `conformance/overlay-views/` holds runs with events and the effective view each gives.
 
 ## 4.4 Signatures
@@ -155,7 +169,9 @@ computed from the events of the verified batches only (an unsealed tail is shown
 - **[SIG-3] Key ids.** `keyid` is `sha256:` and the hex SHA-256 of the public key's DER-encoded SubjectPublicKeyInfo.
 - **[SIG-4] Trust policy.** Which keys to trust is an **input** to verification, never something read from the run: a
   list of public keys, each with the identity it speaks for (for example `git:alice@example.com`, `spiffe://…`,
-  `oidc:issuer/subject`). A verifier **MUST NOT** trust a key because a run, an overlay or a runner manifest names it.
+  `oidc:issuer/subject`) and, optionally, what that identity may do beyond signing: `"may": ["redact"]` allows it to
+  authorize redactions ([OVL-10]). A verifier **MUST NOT** trust a key because a run, an overlay or a runner manifest
+  names it.
   Keyless signing (Sigstore: a short-lived certificate tied to an OIDC identity, logged in a transparency log) **MAY**
   be supported as a trust-policy input; its bundle is then given beside the envelope.
 - **[SIG-5] Results per signature**, in envelope order: `verified` (a trusted key, a valid signature: the identity is
@@ -180,7 +196,9 @@ stronger levels:
 - **signed by** the identities `attestation.dsse.json` verifies for under a trust policy the caller gives (§4.4),
   for an intact run;
 - **anchored** when the caller gives a list of trusted run hashes (taken from verified checkpoints, a transparency
-  log, or its own records) and an intact run's run hash is in it.
+  log, or its own records) and an intact run's run hash ([SEAL-4]) is in it;
+- **withheld**: the number of blobs withheld by authorized redactions, when there are any (a reader shows "intact,
+  *n* withheld").
 
 Overlay problems (§4.2) are reported by an overlay verifier and do not change a run's outcome.
 

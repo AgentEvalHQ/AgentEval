@@ -75,7 +75,6 @@ So that a reader can bound its work, and a hostile file cannot exhaust it:
   | Lines in one NDJSON file | 1,000,000 |
   | Files in one run folder | 100,000 |
   | Size of one blob | 1 GiB |
-  | Length of a path in a run folder | 255 bytes |
 
 - **[ENC-18]** A reader that refuses a file for a limit reports `limit` (§3.9) under its path (the run folder's, `.`,
   for the number of files); it **MUST NOT** read a truncated part of it as the whole. A reader **MUST NOT** refuse

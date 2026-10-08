@@ -61,7 +61,7 @@ OpenTelemetry's file exporter writes one JSON object per line and one signal per
 | `traces.otlp.jsonl` | [RUN-14](../spec/03-run.md#310-traces) | OTLP/JSON traces, one `TracesData` object per line (the JSON of an `ExportTraceServiceRequest`), sealed like every file ([SEAL-2](../spec/04-integrity.md#41-sealing-a-run)) |
 | `traceLink` on a result | [RES-10](../spec/03-run.md#345-facts-about-a-result) | the span of the operation the result evaluates (or, with `traceId` only, its trace); checked against `traces.otlp.jsonl` when present (`trace-link`, [§3.9](../spec/03-run.md#39-rules-across-files)) |
 | evidence with a span link | [EVD-1, EVD-2](../spec/03-run.md#37-evidencendjson-and-blobs) | a span as evidence; a span link carries no digest |
-| `usage` on a result | [RES-10](../spec/03-run.md#345-facts-about-a-result) | `gen_ai.usage.input_tokens`, `gen_ai.usage.output_tokens`, `costUsd`, `costSource`, `role` |
+| `usage` on a result | [RES-10](../spec/03-run.md#345-facts-about-a-result) | one entry per party (`role`): `gen_ai.usage.input_tokens`, `output_tokens`, `cache_read.input_tokens`, `cache_write.input_tokens`, `reasoning.output_tokens`, `costUsd`, `costSource` |
 | `subject.telemetry` in `run.json` | [RUN-6](../spec/03-run.md#32-runjson) | `agentId` and `serviceName`, the keys that join the subject to `gen_ai.agent.id` and `service.name` |
 | `otel` in `run.json` | [RUN-14](../spec/03-run.md#310-traces) | `semconvVersion` (`MAJOR.MINOR[.PATCH]`) and `dialects` |
 | `contentCapture: off` | [RUN-11](../spec/03-run.md#32-runjson), [§8.4](../spec/08-security.md#84-privacy) | traces carry none of the content attributes listed above |
@@ -74,7 +74,7 @@ graded it (cited as evidence `E-1`).
 
 An exporter writes one event per score of a result line. A line without scores gives one event without
 `gen_ai.evaluation.score.value`. The events go to an OTLP logs endpoint or a logs file. AEF has no run file for them
-([I3](README.md#open-gaps)).
+([I3](README.md#gaps-found-by-these-mappings)).
 
 | AEF | OpenTelemetry | Fidelity |
 |---|---|---|
@@ -82,7 +82,7 @@ An exporter writes one event per score of a result line. A line without scores g
 | `scores[].metric` | `gen_ai.evaluation.name` | exact |
 | `scores[].value` | `gen_ai.evaluation.score.value` | exact |
 | `scores[].normalized` | none | none |
-| `state` | `gen_ai.evaluation.score.label`, written as the AEF state name | exact only for a reader that knows this vocabulary; AEF has not published it ([I3](README.md#open-gaps)) |
+| `state` | `gen_ai.evaluation.score.label`, written as the AEF state name | exact only for a reader that knows this vocabulary; AEF has not published it ([I3](README.md#gaps-found-by-these-mappings)) |
 | `reason` | `gen_ai.evaluation.explanation` | exact |
 | `reasoning` (a blob, with `contentCapture: on`) | `gen_ai.evaluation.explanation`, when the line has no `reason` | lossy: the text survives; the blob's digest does not |
 | `state: error` | `error.type: _OTHER` | lossy: AEF records no error class |
@@ -100,7 +100,7 @@ An exporter writes one event per score of a result line. A line without scores g
 | `evidence` | none | none |
 | `usage` | the attributes of the same names on the graded operation's span | exact; the judge's span (`chat gpt-5.1`) in `traces.otlp.jsonl` already carries them |
 | `run.json` `subject.telemetry.serviceName` | resource attribute `service.name` | exact |
-| (no time on a result line) | `timeUnixNano`: the exporter has to choose, e.g. `run.json` `endedAt` | lossy ([I6](README.md#open-gaps)) |
+| (no time on a result line) | `timeUnixNano`: the exporter has to choose, e.g. `run.json` `endedAt` | lossy ([I6](README.md#gaps-found-by-these-mappings)) |
 | `traces.otlp.jsonl` | OTLP traces, sent as they are | exact |
 
 ## OpenTelemetry → AEF
@@ -111,16 +111,16 @@ An exporter writes one event per score of a result line. A line without scores g
 | `gen_ai.evaluation.name` | `scores[].metric`, and `path` when nothing better is known | exact for the metric |
 | (no metric declaration) | a `metrics.json` entry ([SUM-1](../spec/03-run.md#35-metricsjson)) with `kind: score`, `direction: none`, `scale: unbounded` | lossy: the event gives no kind, direction or range |
 | `gen_ai.evaluation.score.value` | `scores[].value` | exact |
-| `gen_ai.evaluation.score.label` | `state`, when the label is an AEF state name or the importer declares a mapping (`pass` → `passed`, `fail` → `failed`) | lossy: other labels have no field ([I1](README.md#open-gaps)) |
-| a value and no label | `state` has no source | none ([I1](README.md#open-gaps)) |
+| `gen_ai.evaluation.score.label` | `state`, when the label is an AEF state name or the importer declares a mapping (`pass` → `passed`, `fail` → `failed`) | lossy: other labels have no field ([I1](README.md#gaps-found-by-these-mappings)) |
+| a value and no label | `state` has no source | none ([I1](README.md#gaps-found-by-these-mappings)) |
 | `gen_ai.evaluation.explanation` | `reason` (at most 4096 characters) | exact up to that length |
 | `error.type` | `state: error`, with the type in `reason` | lossy |
 | `test.case.name` | `caseId` | exact |
 | `gen_ai.response.id` | `caseId`, when no case name is present | lossy |
-| `timeUnixNano` | none | none ([I6](README.md#open-gaps)) |
+| `timeUnixNano` | none | none ([I6](README.md#gaps-found-by-these-mappings)) |
 | resource `service.name`; `gen_ai.agent.id` on the parent span | `subject.telemetry.serviceName`, `subject.telemetry.agentId` | exact |
 | the parent span and its trace | lines of `traces.otlp.jsonl` | exact |
-| the log record itself | no AEF file holds OTLP logs | none ([I3](README.md#open-gaps)) |
+| the log record itself | no AEF file holds OTLP logs | none ([I3](README.md#gaps-found-by-these-mappings)) |
 
 ## What does not carry over
 
@@ -130,9 +130,9 @@ verdict rules and uncertainty. Metric declarations. The summary and gate decisio
 and its digest, judges and their calibration, `execution.targetMode`. Evidence digests, the seal, overlays and
 signatures.
 
-**OpenTelemetry → AEF.** The event as a record, because AEF stores traces only ([I3](README.md#open-gaps)). The time
-of each event ([I6](README.md#open-gaps)). A label that is not a verdict, and a score without a verdict
-([I1](README.md#open-gaps)). The run and the result path: the event has no attribute for either today, so an importer
+**OpenTelemetry → AEF.** The event as a record, because AEF stores traces only ([I3](README.md#gaps-found-by-these-mappings)). The time
+of each event ([I6](README.md#gaps-found-by-these-mappings)). A label that is not a verdict, and a score without a verdict
+([I1](README.md#gaps-found-by-these-mappings)). The run and the result path: the event has no attribute for either today, so an importer
 builds `runId` and `path` itself, and the result id differs from the original's.
 
 ## Worked example
@@ -141,7 +141,7 @@ The corpus line for `triage/helpfulness` of `case-17` (run `01928f3e-7c1a-7b2e-9
 recomputes with [RES-4](../spec/03-run.md#342-result-ids):
 
 ```json
-{"schemaVersion":"1.0","resultId":"r_1264eeb36620c9cbe97b71ffdbcfd331","parentResultId":"r_479d157f3423e95d566bcbfc0c6d2461","caseId":"case-17","path":"triage/helpfulness","evaluator":{"id":"llm:helpfulness","version":"3"},"state":"failed","severity":"medium","scores":[{"metric":"helpfulness","value":0.1,"normalized":0.1}],"verdictRule":{"expr":"helpfulness >= threshold","threshold":0.7,"source":"suite"},"annotator":{"kind":"LLM","model":"gpt-5.1","promptHash":"sha256:cf07194ee232eb531e15f690000d19846dea69cf05504782658afcfacb9228a2","rubricDigest":"sha256:29fd018a9848938bc2b0e33fffa32bde2827e81388d0e03195919be5835c3605"},"reasoning":{"blob":"sha256:635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5","bytes":122},"usage":{"gen_ai.usage.input_tokens":1747,"gen_ai.usage.output_tokens":488,"costUsd":0.012,"costSource":"price-table:2026-09-30","role":"judge"},"traceLink":{"traceId":"4bf92f3577b34da6a3ce929d0e0e4736","spanId":"00f067aa0ba902b7"},"component":{"weight":0.5,"required":false},"evidence":["E-2"]}
+{"schemaVersion":"1.0","resultId":"r_1264eeb36620c9cbe97b71ffdbcfd331","parentResultId":"r_479d157f3423e95d566bcbfc0c6d2461","caseId":"case-17","path":"triage/helpfulness","evaluator":{"id":"llm:helpfulness","version":"3"},"state":"failed","severity":"medium","scores":[{"metric":"helpfulness","value":0.1,"normalized":0.1}],"verdictRule":{"expr":"helpfulness >= threshold","threshold":0.7,"source":"suite"},"annotator":{"kind":"LLM","model":"gpt-5.1","promptHash":"sha256:cf07194ee232eb531e15f690000d19846dea69cf05504782658afcfacb9228a2","rubricDigest":"sha256:29fd018a9848938bc2b0e33fffa32bde2827e81388d0e03195919be5835c3605"},"reasoning":{"blob":"sha256:635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5","bytes":122},"usage":[{"role":"agent","gen_ai.usage.input_tokens":912,"gen_ai.usage.output_tokens":214,"gen_ai.usage.cache_read.input_tokens":640},{"role":"judge","gen_ai.usage.input_tokens":1747,"gen_ai.usage.output_tokens":488,"gen_ai.usage.reasoning.output_tokens":301,"costUsd":0.012,"costSource":"price-table:2026-09-30"}],"startedAt":"2026-10-02T14:02:11.120Z","endedAt":"2026-10-02T14:02:15Z","traceLink":{"traceId":"4bf92f3577b34da6a3ce929d0e0e4736","spanId":"00f067aa0ba902b7"},"component":{"weight":0.5,"required":false},"evidence":["E-2"]}
 ```
 
 Exported as one OTLP/JSON logs line. The explanation is the reasoning blob's text, because the run has
@@ -166,9 +166,8 @@ id is new and the path is the metric name, so the result id changes from `r_1264
 
 ## Open gaps
 
-- [I1](README.md#open-gaps): an event with a score and no label has no AEF state; a label that is not a verdict has no
+- [I1](README.md#gaps-found-by-these-mappings): an event with a score and no label has no AEF state; a label that is not a verdict has no
   field.
-- [I3](README.md#open-gaps): no logs file in a run; `otel.semconvVersion` cannot name the GenAI registry (its schema
+- [I3](README.md#gaps-found-by-these-mappings): no logs file in a run; `otel.semconvVersion` cannot name the GenAI registry (its schema
   URL is `gen-ai-dev/1.42.0-dev`, which the version pattern refuses); no published label vocabulary.
-- [I4](README.md#open-gaps): `usage` has no cache-read, cache-write or reasoning token counts.
-- [I6](README.md#open-gaps): a result line has no time to give an event.
+- [I6](README.md#gaps-found-by-these-mappings): a result line has no time to give an event.

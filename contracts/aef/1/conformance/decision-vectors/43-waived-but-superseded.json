@@ -1,0 +1,52 @@
+{
+  "description": "A superseded version expires the checkpoint whatever its exceptions.",
+  "rules": [
+    "DEC-1",
+    "DEC-2",
+    "DEC-3",
+    "DEC-4"
+  ],
+  "input": {
+    "subjectVersion": "git:3f2a1c",
+    "evaluatedAt": "2026-10-08T12:00:00Z",
+    "supersededBy": "git:9e8d7c",
+    "lanes": [
+      {
+        "lane": "security",
+        "blocking": true,
+        "result": {
+          "status": "failed",
+          "subjectVersion": "git:3f2a1c",
+          "oldestClosedAt": "2026-10-07T10:00:00Z"
+        }
+      }
+    ],
+    "exceptions": [
+      {
+        "lane": "security",
+        "reason": "The security failure is accepted until the fix ships; tracked in the release review.",
+        "by": {
+          "identity": "oidc:https://login.example.com/u-7f3a",
+          "assurance": "authenticated"
+        },
+        "at": "2026-10-06T09:00:00Z",
+        "expires": "2026-10-20T00:00:00Z"
+      }
+    ]
+  },
+  "expected": {
+    "outcome": "expired",
+    "lanes": [
+      {
+        "lane": "security",
+        "status": "waived",
+        "blocking": true
+      }
+    ],
+    "reasons": [
+      "waived:security",
+      "superseded:git:9e8d7c",
+      "outcome:expired"
+    ]
+  }
+}

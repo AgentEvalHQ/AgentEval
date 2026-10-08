@@ -1,0 +1,12 @@
+{
+  "kind": "reader-only",
+  "schema": "evidence",
+  "writer": "invalid",
+  "reader": "valid",
+  "reads": {
+    "kind": "other"
+  },
+  "rules": [
+    "VER-8"
+  ]
+}

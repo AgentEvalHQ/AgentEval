@@ -1,0 +1,18 @@
+{
+  "keys": [
+    {
+      "identity": "git:alice@example.com",
+      "publicKey": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEY/ESX/FSOMxQxHCdDgSs0rU0isoP\n1A/gf5gZq/EoSnBjGCkr/XSKTESh9EFI+AyFpMZhG35f+N/BljAgXSvYug==\n-----END PUBLIC KEY-----\n",
+      "may": [
+        "redact"
+      ]
+    },
+    {
+      "identity": "git:bob@example.com",
+      "publicKey": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyXFlvffFgK8199NWKuNGjOg7bW56\n++8hQj2W3GWuqRRPd1FMiORcxOn0VunYfi55ueXk/LOrKKWXWFFpUmeGxw==\n-----END PUBLIC KEY-----\n",
+      "may": [
+        "redact"
+      ]
+    }
+  ]
+}

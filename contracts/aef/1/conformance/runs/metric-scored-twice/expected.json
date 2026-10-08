@@ -1,0 +1,15 @@
+{
+  "kind": "run",
+  "run": "run",
+  "outcome": "invalid",
+  "problems": [
+    [
+      "results.ndjson:4",
+      "metric"
+    ]
+  ],
+  "rules": [
+    "SUM-1",
+    "SUM-4"
+  ]
+}

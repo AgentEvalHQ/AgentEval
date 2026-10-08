@@ -43,9 +43,7 @@
         "event": "ov_0005"
       }
     ],
-    "withheld": [
-      "474400071c193b3faf9f2c7f82e28fea484a7b59a07fc0a247282870d6441e99"
-    ],
+    "withheld": [],
     "unsealedEvents": 1
   }
 }

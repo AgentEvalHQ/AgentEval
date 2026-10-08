@@ -56,9 +56,9 @@ Type: string. Bounds: pattern `^E-[A-Za-z0-9._-]{1,64}$`
 
 ### state
 
-A result's state. Only passed is a pass; not_measured, not_applicable, skipped, error and pending are typed absences, never a pass and never a 0 fail.
+A result's state. Only passed is a pass; not_measured, not_applicable, skipped, error and pending are typed absences, never a pass and never a 0 fail. scored: measured, with no pass/fail rule applied (a score only); it is never a pass (RES-1).
 
-Type: one of `"passed"`, `"failed"`, `"warn"`, `"inconclusive"`, `"not_measured"`, `"not_applicable"`, `"skipped"`, `"error"`, `"pending"`
+Type: one of `"passed"`, `"failed"`, `"warn"`, `"inconclusive"`, `"scored"`, `"not_measured"`, `"not_applicable"`, `"skipped"`, `"error"`, `"pending"`
 
 ### trustedIdentity
 

@@ -4,13 +4,13 @@
     {
       "name": "metrics.json",
       "digest": {
-        "sha256": "f5b98f2bb15eab82e8c751065ba9f0d6d5c037f5d8525ec54f326170efaa07d1"
+        "sha256": "ac1d74e0bbe1eec6d20b4870cfb13ed65028da77e5f3066dae7ab5ebd1f9e94e"
       }
     },
     {
       "name": "results.ndjson",
       "digest": {
-        "sha256": "5d428ebd2315f59d1413353acf71e81b0fa581ff2ff7f539f04186a706b130c5"
+        "sha256": "f8b8d0cdd7983a81c206a8888c5465845390c50da530182dc80be5e3d8846feb"
       }
     },
     {
@@ -30,7 +30,7 @@
   "predicate": {
     "schemaVersion": "1.0",
     "runId": "01928f41-2222-7222-8222-222222222222",
-    "runHash": "e5198393548da9bc3ce6a7eca2ef899b8dfe6cf19910f71adce165eb5289fc5f",
+    "runHash": "599ee499cd8895e50c078b0e883ed4dda78dd23d3266e90442bd0a983074dafa",
     "producer": {
       "name": "agenteval-cli",
       "version": "1.0.0"

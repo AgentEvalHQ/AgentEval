@@ -1,0 +1,12 @@
+{
+  "kind": "plan-conformance",
+  "events": "events.ndjson",
+  "plan": "plan.json",
+  "runs": "runs",
+  "problems": [],
+  "rules": [
+    "STRM-4",
+    "RUN-12"
+  ],
+  "why": "two runs, one per suite (the frozen one with the plan's digest), each the plan's subject, judges and capture, live; the job has 2 cases and cost $2.50"
+}

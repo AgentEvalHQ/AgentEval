@@ -1,9 +1,14 @@
 {
+  "kind": "stream",
   "plan": "../plan.json",
   "problems": [
     {
       "where": "event:3",
       "problem": "time"
     }
+  ],
+  "rules": [
+    "ENC-8",
+    "STRM-3"
   ]
 }

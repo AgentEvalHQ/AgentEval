@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "1.0",
+  "checkpointId": "cp_redacted-run",
+  "subject": {
+    "ref": "agent:support/support-triage",
+    "version": "git:3f2a1c"
+  },
+  "lanes": [
+    {
+      "lane": "quality",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "triage",
+        "path": "triage",
+        "op": ">=",
+        "value": 0.6
+      },
+      "runs": [
+        {
+          "runId": "01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10",
+          "runHash": "f16b6a74505a359810e44611732c4d53ff61d32852983b165414811eb6a6627b",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    }
+  ],
+  "state": "running",
+  "outcome": null
+}

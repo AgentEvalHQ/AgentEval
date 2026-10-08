@@ -1,5 +1,44 @@
 # AEF 1.0 changelog
 
+## Unreleased (draft): rework after critic round 1
+
+Critic round 1 scored the consolidation 7.2 of 10, with two blockers. Changes since:
+
+- **Lanes bound to their subject** ([LANE-1]): a run counts for a lane only when it is of the checkpoint's subject and
+  deployment, and of the rule's `suite` when the rule names one; threshold and severity rules take a `minimumN`.
+- **No evidence is never a pass** ([LANE-3]): a severity lane over results that are all inconclusive, absent or empty is
+  `not_measured`. LANE-4 requires every run eligible.
+- **Checkpoint exceptions** ([DEC-1]–[DEC-4], [CKP-10]): a person can accept a `failed` lane's risk until a date, recorded
+  in the signed decision input; the lane is `waived` and the outcome `approved_with_exceptions`. Missing, stale,
+  unmeasured or incomparable evidence can never be waived; an expired exception lapses when the checkpoint is re-read.
+- **Redaction needs authority** ([OVL-10], [SIG-4]): a blob is withheld only by a redaction in a batch signed by an
+  identity the verifier's trust policy allows to redact (`"may": ["redact"]`); otherwise it is missing. A reader shows
+  "intact, *n* withheld".
+- **One run hash** ([SEAL-4]): the seal's `runHash` for a sealed run, the recomputed one otherwise; checkpoints and
+  runner checks find runs by it, so a run changed after sealing is found and not intact.
+- **Runner plan conformance** ([STRM-4]): each run a runner sealed is checked against its plan (provenance, subject,
+  suites, judges, content capture, live target, job-wide case and cost limits). The plan's `contentPolicy` is now
+  `contentCapture`.
+- **Closed enums** ([VER-9]): result `state`, run `status` and metric `kind` are closed for major 1, so a later minor can
+  never make a 1.0 verifier reject a legal run.
+- **Expressiveness**: the `scored` state (measured, no rule); a score's `label`; summary entries with a producer
+  `aggregate` (pass@k, F1, median); evidence kinds `input`, `expected`, `output`, `transcript`; result `startedAt` and
+  `endedAt`; `usage` per party with cache and reasoning tokens; trial aggregations beyond `MajorityVote`; `imported`
+  runs ([RUN-15]); an optional `logs.otlp.jsonl` and `otel.schemaUrls`.
+- **Exact and bounded** ([LANE-8], [LANE-11]): the sign test's significance is binary64 compared exactly, computed in
+  O(m) big-integer steps; numbers are binary64 everywhere and integer fields bounded to 2^53 − 1 ([ENC-3], [ENC-4]).
+- **Ambiguities closed**: a metric scored twice, the verified overlay prefix and the events it ignores, case clashes in
+  folders, long paths, OTLP id case, declarative statements are normative ([§1.5](spec/01-introduction.md)).
+- **Invariants**: no query or fragment in an endpoint; codes `calibration`, `execution-policy`, `interval`,
+  `result-times`, `annotator`; per-kind overlay targets.
+- **Corpus**: about 390 vectors; `tools/check_spec.py` fails on any rule no vector names unless it is listed, with the
+  reason, as untestable; a large comparison (1,200 pairs) that defeats floating point; six effective-view vectors;
+  a reader-only vector for every reading of §7.3; fixtures marked as such in `index.json`.
+- **Governance**: lead editor, an open second seat, 90-day succession, DCO sign-off, release criteria (a second
+  implementation per class, or marked at risk), profiles; the Community Specification License 1.0 planned for the
+  specification text, pending counsel, with `SCOPE.md` limiting the patent commitment to what the specification
+  requires.
+
 ## Unreleased (draft): consolidation for 1.0
 
 The draft known as "v2" became AEF 1.0 and went through an independent review (critic round 0: mean 5.5 of 10, two
@@ -26,7 +65,7 @@ blockers). Changes since:
 - **Result fields**: `severity`, `durationMs`, `turns`, `attack` (technique, taxonomy ids, success), `lane`; `pending`
   is a typed absence and needs a reason; `unmeasured.errored` is now `unmeasured.error`.
 - **Summary semantics** defined exactly (each entry names its `path`; `N`, `n`, `notMeasured`, `sum`, `value` are
-  recomputable) and 22 cross-file problem codes (§3.9).
+  recomputable) and the cross-file problem codes of §3.9.
 - **Fail-closed reading** of every unknown value (§7.3), a deprecation policy, and the store-v1 mapping (§7.5).
 - **Comparability axes** are a fixed vocabulary.
 - **Corpus**: rebuilt. Every vector is a folder with `expected.json` beside a `run/`; new families `runs/` (one per

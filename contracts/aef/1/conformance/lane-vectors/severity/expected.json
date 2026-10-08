@@ -58,11 +58,53 @@
         "subjectVersion": "v7",
         "oldestClosedAt": "2026-10-03T00:00:00Z"
       }
+    },
+    {
+      "lane": "all-inconclusive",
+      "result": {
+        "status": "not_measured",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-03T00:00:00Z"
+      }
+    },
+    {
+      "lane": "no-results",
+      "result": {
+        "status": "not_measured",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-03T00:00:00Z"
+      }
+    },
+    {
+      "lane": "not-applicable-ignored",
+      "result": {
+        "status": "passed",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-03T00:00:00Z"
+      }
+    },
+    {
+      "lane": "minimum-not-met",
+      "result": {
+        "status": "not_measured",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-03T00:00:00Z"
+      }
+    },
+    {
+      "lane": "minimum-met",
+      "result": {
+        "status": "passed",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-03T00:00:00Z"
+      }
     }
   ],
   "problems": [],
   "rules": [
     "LANE-3",
-    "RES-9"
+    "RES-9",
+    "RES-2",
+    "LANE-10"
   ]
 }

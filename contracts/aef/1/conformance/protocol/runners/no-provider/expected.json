@@ -1,6 +1,10 @@
 {
+  "kind": "plan",
   "schema": "runner",
   "writer": "invalid",
   "reader": "invalid",
-  "rule": "a runner supports at least one provider"
+  "rules": [
+    "PLAN-6"
+  ],
+  "why": "a runner supports at least one provider"
 }

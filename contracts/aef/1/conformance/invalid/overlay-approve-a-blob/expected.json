@@ -1,0 +1,10 @@
+{
+  "kind": "document",
+  "schema": "overlay-event",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "OVL-1"
+  ],
+  "why": "an approval is about the run or a result"
+}

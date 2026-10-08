@@ -6,35 +6,42 @@ Decide(input) -> output is pure: no I/O, no clock (the evaluation time is an inp
 
 | Field | Type | Required | Bounds | Description |
 |---|---|---|---|---|
-| `outcome` | one of `"approved"`, `"blocked"`, `"inconclusive"`, `"expired"` | yes |  | approved; blocked (a blocking lane failed); inconclusive (a lane is missing, not_measured or incomparable); or expired (superseded, or a lane is stale) (DEC-3). |
+| `outcome` | one of `"approved"`, `"approved_with_exceptions"`, `"blocked"`, `"inconclusive"`, `"expired"` | yes |  | expired (superseded, or a lane is stale); blocked (a blocking lane failed and is not waived); inconclusive (a lane is missing, not_measured or incomparable); approved_with_exceptions (otherwise, when an exception waived a lane); or approved (DEC-3). |
 | `lanes` | array of object | yes | ≤ 64 items | Each input lane's status, in the input's order (DEC-2). |
 | `lanes[].lane` | [laneName](common.md#lanename) | yes |  | The lane's name (DEC-2). |
 | `lanes[].status` | [laneStatus](#lanestatus) | yes |  | The lane's status under the decision rules (DEC-2). |
 | `lanes[].blocking` | boolean | yes |  | Whether the lane blocks the release when it fails, as in the input (DEC-3). |
 | `lanes[].axes` | array of string |  | ≤ 16 items | For incomparable: the comparability axes that differ. |
-| `reasons` | array of string | yes | ≤ 256 items | Reason codes, so every implementation produces the same list: one per lane that did not pass, advisory-failed included, in the input's lane order; then superseded:<version> when it applies; then outcome:<outcome> (DEC-4). |
+| `reasons` | array of string | yes | ≤ 256 items | Reason codes, so every implementation produces the same list: one per lane that did not pass, advisory-failed and waived included, in the input's lane order, each followed by exception-expired:<lane> when the lane failed and none of its exceptions is in force; then superseded:<version> when it applies; then outcome:<outcome> (DEC-2, DEC-4). |
 
 ## Definitions
 
 ### laneStatus
 
-passed / failed: the lane's rule held or did not on its evidence. missing: no evidence for this exact version at the evaluation time (none, another version's, or evidence that did not exist yet). not_measured: the rule could not decide on the evidence, for example nothing was measured or a run is not eligible. incomparable: a comparison's runs differ on a required axis. stale: older than the lane's freshness at the evaluation time (DEC-2, LANE-1).
+passed / failed: the lane's rule held or did not on its evidence. missing: no evidence for this exact version at the evaluation time (none, another version's, or evidence that did not exist yet). not_measured: the rule could not decide on the evidence, for example nothing was measured or a run is not eligible. incomparable: a comparison's runs differ on a required axis. stale: older than the lane's freshness at the evaluation time. waived: failed, with an exception in force at the evaluation time; only a failure is ever waived (DEC-2, LANE-1).
 
-Type: one of `"passed"`, `"failed"`, `"missing"`, `"not_measured"`, `"incomparable"`, `"stale"`
+Type: one of `"passed"`, `"failed"`, `"missing"`, `"not_measured"`, `"incomparable"`, `"stale"`, `"waived"`
 
 ### input
 
-The decision function's input: the exact version, the evaluation time, an optional newer version, and each lane's result. At least one lane and no lane twice (DEC-1).
+The decision function's input: the exact version, the evaluation time, an optional newer version, each lane's result, and any exceptions. At least one lane, no lane twice, and every exception for a lane of the input, expiring after it is granted (DEC-1).
 
 Type: object
 
 | Field | Type | Required | Bounds | Description |
 |---|---|---|---|---|
 | `subjectVersion` | [exactVersion](common.md#exactversion) | yes |  | The checkpoint's exact subject version. |
-| `evaluatedAt` | [timestamp](common.md#timestamp) | yes |  | The time the decision is made for. Freshness and future evidence are judged against it (DEC-1, DEC-2). |
+| `evaluatedAt` | [timestamp](common.md#timestamp) | yes |  | The time the decision is made for. Freshness, future evidence and whether an exception is in force are judged against it (DEC-1, DEC-2). |
 | `supersededBy` | null or [exactVersion](common.md#exactversion) |  |  | A newer subject version known at the evaluation time, if any. When set and different from subjectVersion, the outcome is expired (DEC-3). |
 | `lanes` | array of object | yes | ≥ 1 items; ≤ 64 items | The lanes, at least one and none twice; the reasons follow this order (DEC-1, DEC-4). |
 | `lanes[].lane` | [laneName](common.md#lanename) | yes |  | The lane's name (DEC-1). |
 | `lanes[].blocking` | boolean | yes |  | Whether a failure of this lane blocks the release (DEC-3). |
 | `lanes[].freshness` | [duration](common.md#duration) |  |  | How old the lane's evidence may be. Without it, the lane never goes stale (DEC-2). |
 | `lanes[].result` | null or object | yes |  | What the lane's rule gave on its evidence (computed from the runs, outside this function), or null when there is no evidence. |
+| `exceptions` | array of object |  | ≤ 256 items | Exceptions: a person's decision to accept a failed lane's risk until a time. One in force at evaluatedAt makes its failed lane waived; it never changes a missing, stale, not_measured or incomparable lane. A checkpoint records them in its decisionInput, so its signature covers them (DEC-1, DEC-2, CKP-5). |
+| `exceptions[].lane` | [laneName](common.md#lanename) | yes |  | The lane it applies to: a lane of this input, or the function refuses the input (DEC-1). |
+| `exceptions[].requirement` | [id](common.md#id) |  |  | The external requirement id whose risk it accepts, shown beside the waived lane; it takes no part in the decision (DEC-1, DEC-2). |
+| `exceptions[].reason` | string | yes | ≥ 1 chars; ≤ 2048 chars | Why the risk is accepted, shown beside the waived lane (DEC-1, DEC-2). |
+| `exceptions[].by` | [trustedIdentity](common.md#trustedidentity) | yes |  | Who granted it. A claim: a reader shows its assurance only as far as it verified it; the checkpoint's signature says who recorded it (DEC-1, CKP-5, CKP-6). |
+| `exceptions[].at` | [timestamp](common.md#timestamp) | yes |  | When it was granted: it is in force from this time, inclusive (DEC-2, DEC-5). |
+| `exceptions[].expires` | [timestamp](common.md#timestamp) | yes |  | When it stops being in force: from this time on it waives nothing. Later than at, or the function refuses the input (DEC-1, DEC-2, CKP-10). |

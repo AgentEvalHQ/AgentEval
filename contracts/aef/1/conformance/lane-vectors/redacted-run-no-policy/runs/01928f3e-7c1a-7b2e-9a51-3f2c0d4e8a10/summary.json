@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10",
+  "lanes": [
+    {
+      "lane": "quality",
+      "metrics": [
+        {
+          "metric": "triage",
+          "path": "triage",
+          "n": 2,
+          "N": 6,
+          "notMeasured": 4,
+          "value": 0.665,
+          "stderr": 0.115,
+          "ci": null,
+          "verdict": "failed",
+          "rule": "triage >= 0.8",
+          "sum": 1.33,
+          "sumSq": 0.9109
+        },
+        {
+          "metric": "helpfulness",
+          "path": "triage/helpfulness",
+          "n": 1,
+          "N": 1,
+          "notMeasured": 0,
+          "value": 0.1,
+          "verdict": "failed",
+          "rule": "helpfulness >= 0.7",
+          "sum": 0.1,
+          "sumSq": 0.01
+        },
+        {
+          "metric": "groundedness",
+          "path": "triage/groundedness",
+          "n": 0,
+          "N": 0,
+          "notMeasured": 0,
+          "value": null,
+          "verdict": "not_measured",
+          "rule": "groundedness >= 0.7",
+          "sum": 0,
+          "sumSq": 0
+        }
+      ]
+    }
+  ],
+  "cost": {
+    "totalUsd": 0.012,
+    "source": "price-table:2026-09-30"
+  }
+}

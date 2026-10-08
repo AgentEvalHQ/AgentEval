@@ -8,6 +8,10 @@
       "content-capture"
     ],
     [
+      "evidence.ndjson:2",
+      "content-capture"
+    ],
+    [
       "results.ndjson:2",
       "content-capture"
     ],

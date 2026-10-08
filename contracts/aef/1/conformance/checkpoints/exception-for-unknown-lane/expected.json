@@ -1,0 +1,14 @@
+{
+  "kind": "checkpoint",
+  "schema": "checkpoint",
+  "writer": "valid",
+  "reader": "valid",
+  "rules": [
+    "CKP-7",
+    "DEC-1"
+  ],
+  "why": "an exception for a lane the input does not have: the recorded input cannot be decided",
+  "problems": [
+    "decision"
+  ]
+}

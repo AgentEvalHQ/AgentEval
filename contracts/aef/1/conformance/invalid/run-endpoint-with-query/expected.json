@@ -1,0 +1,11 @@
+{
+  "kind": "document",
+  "schema": "run",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "RUN-10",
+    "SEC-1"
+  ],
+  "why": "a query string carries credentials: an endpoint has none"
+}

@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "run-small-1",
+  "lanes": [
+    {
+      "lane": "main",
+      "metrics": [
+        {
+          "metric": "m",
+          "path": "q",
+          "n": 1,
+          "N": 2,
+          "notMeasured": 1,
+          "value": 0.4,
+          "verdict": "failed",
+          "rule": "m >= 0.8",
+          "sum": 0.4,
+          "sumSq": 0.16
+        }
+      ]
+    }
+  ]
+}

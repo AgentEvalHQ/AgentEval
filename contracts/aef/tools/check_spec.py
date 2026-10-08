@@ -6,7 +6,9 @@
 3. every problem code the corpus expects is defined in a code table of the spec;
 4. every field name the prose writes in backticks (camelCase) is a property in some writer schema;
 5. when the corpus is in a git work tree, git ignores none of its files (a repository's own ignore rules, such as
-   AgentEval's `runs/`, must not drop vectors from a commit).
+   AgentEval's `runs/`, must not drop vectors from a commit);
+6. every rule is named by some corpus vector, or listed in UNTESTED with the reason no vector can test it;
+7. no schema pattern uses lookaround or a backreference ([ENC-14]).
 
 Usage: python contracts/aef/tools/check_spec.py
 """
@@ -25,6 +27,22 @@ NOT_FIELDS = {"ExportTraceServiceRequest", "signedBy", "LaneResult", "Measuremen
               "anyOf", "effectiveState", "endTimeUnixNano", "envelopeResult", "expectedError", "keyid", "maxItems",
               "maxLength", "minItems", "oneOf", "payloadType", "publicKey", "readOnly", "sealedState",
               "startTimeUnixNano", "uniqueItems", "unsealedEvents", "verifiesFor", "writeOnly"}
+
+
+# Rules no corpus vector can test, and why. Everything else needs a vector that names it (CONF-1).
+UNTESTED = {
+    "ENC-12": "a reader must not fetch the $id names: behaviour, not a file property",
+    "ENC-14": "a rule on the schemas themselves: checked here (no lookaround, no backreference)",
+    "CKP-6": "how a reader shows an approver's claimed identity: presentation",
+    "VER-5": "what a minor version may change: checked by tools/schema_diff.py --self-test against the next version",
+    "VER-7": "deprecation: a process rule for later minors",
+    "SEC-2": "a tool must not seal a run holding a secret: a process rule",
+    "SEC-4": "a SHOULD about the identities people choose",
+    "CONF-1": "the index itself: checked by aef_conformance.py and the .NET index test on every file",
+    "CONF-3": "what a conformance runner does: tools/aef_conformance.py is one",
+    "CONF-4": "what a conformance claim says",
+    "CONF-5": "how a new minor is published: tools/schema_diff.py",
+}
 
 
 def schema_properties():
@@ -104,6 +122,22 @@ def main():
                 problems.append(f"git ignores the corpus file {line}: it would be left out of a commit")
     except (OSError, subprocess.SubprocessError):
         pass  # no git: nothing to check
+
+    for p in sorted((conf / "decision-vectors").glob("*.json")):
+        used_rules.update(json.loads(p.read_text(encoding="utf-8")).get("rules", []))
+    for rid in sorted(set(defined) - used_rules - set(UNTESTED)):
+        problems.append(f"rule {rid} is named by no corpus vector (add one, or list it in UNTESTED with the reason)")
+    for rid in sorted(set(UNTESTED) - set(defined)):
+        problems.append(f"UNTESTED lists {rid}, which the spec does not define")
+    for rid in sorted(set(UNTESTED) & used_rules):
+        problems.append(f"UNTESTED lists {rid}, but a vector names it: take it off the list")
+
+    for kind in ("writer", "reader"):
+        for f in sorted((AEF / "schemas" / kind).glob("*.schema.json")):
+            for pat in re.findall(r'"pattern": "((?:[^"\\]|\\.)*)"', f.read_text(encoding="utf-8")):
+                raw = json.loads('"' + pat + '"')
+                if any(s in raw for s in ("(?=", "(?!", "(?<=", "(?<!")) or re.search(r"\\[1-9]", raw):
+                    problems.append(f"{kind}/{f.name}: pattern {raw!r} uses lookaround or a backreference (ENC-14)")
 
     print(f"{len(defined)} rules defined, {len(cited)} cited; {len(used_rules)} named by the corpus; "
           f"{len(used_codes)} problem codes used, {len(codes)} defined")

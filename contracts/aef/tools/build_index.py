@@ -29,6 +29,7 @@ CLASSES = {
     "plan": ["Runner"],
     "matching": ["Runner"],
     "stream": ["Stream verifier"],
+    "plan-conformance": ["Stream verifier"],
 }
 
 
@@ -59,22 +60,26 @@ def main():
             vectors.append(entry(f"{group}/{d.name}", exp["kind"], exp.get("rules", []), f"{group}/{d.name}", files_of(d), classes))
     keys = ROOT / "signature-vectors" / "keys"
     if keys.exists():
-        vectors.append(entry("signature-vectors/keys", "signature", ["SIG-3"], "signature-vectors/keys", files_of(keys),
+        vectors.append(entry("signature-vectors/keys", "fixture", ["SIG-3"], "signature-vectors/keys", files_of(keys),
                              ["Sealer", "Run verifier"]))
     for name, kind, rules in (("result-ids.json", "result-id", ["RES-4"]), ("paths.json", "paths", ["RUN-3"])):
         p = ROOT / name
         vectors.append(entry(name.removesuffix(".json"), kind, rules, name, {name: sha(p)}))
     for p in sorted((ROOT / "decision-vectors").glob("*.json"), key=lambda p: p.name.encode()):
-        vectors.append(entry(f"decision-vectors/{p.stem}", "decision", ["DEC-1", "DEC-2", "DEC-3", "DEC-4", "DEC-5"],
-                             f"decision-vectors/{p.name}", {p.name: sha(p)}))
-    for sub, kind, rules in (("plans", "plan", ["PLAN-1"]), ("runners", "plan", ["PLAN-5"]), ("matching", "matching", ["PLAN-6"]),
-                             ("streams", "stream", ["STRM-1", "STRM-2", "STRM-3"])):
+        rules = json.loads(p.read_text(encoding="utf-8")).get("rules", [])  # each vector names its own rules
+        vectors.append(entry(f"decision-vectors/{p.stem}", "decision", rules, f"decision-vectors/{p.name}", {p.name: sha(p)}))
+    # A protocol vector names its rules in its expected.json; the folder's rules are for the shared files (and an
+    # expected.json without rules).
+    for sub, kind, rules in (("plans", "plan", ["PLAN-1"]), ("runners", "plan", ["PLAN-6"]), ("matching", "matching", ["PLAN-7"]),
+                             ("streams", "stream", ["STRM-1", "STRM-2", "STRM-3"]),
+                             ("plan-conformance", "plan-conformance", ["STRM-4"])):
         folder = ROOT / "protocol" / sub
         for d in sorted((p for p in folder.iterdir() if p.is_dir()), key=lambda p: p.name.encode()):
-            vectors.append(entry(f"protocol/{sub}/{d.name}", kind, rules, f"protocol/{sub}/{d.name}", files_of(d)))
+            own = json.loads((d / "expected.json").read_text(encoding="utf-8")).get("rules", rules)
+            vectors.append(entry(f"protocol/{sub}/{d.name}", kind, own, f"protocol/{sub}/{d.name}", files_of(d)))
         shared = {p.name: sha(p) for p in sorted(folder.glob("*.json"), key=lambda p: p.name.encode())}
-        if shared:  # files several vectors of the folder use (the stream vectors' plans)
-            vectors.append(entry(f"protocol/{sub}/shared", kind, rules, f"protocol/{sub}", shared))
+        if shared:  # files several vectors of the folder use (the stream vectors' plans): checked, never run
+            vectors.append(entry(f"protocol/{sub}/shared", "fixture", rules, f"protocol/{sub}", shared, CLASSES[kind]))
 
     ids = [v["id"] for v in vectors]
     assert len(ids) == len(set(ids)), "duplicate vector id"

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1.0",
+  "eventId": "ov_1",
+  "kind": "redact",
+  "target": {
+    "run": "r-1",
+    "blob": "0000000000000000000000000000000000000000000000000000000000000000",
+    "result": "r_ba65738f221f7575808d2c10c60dc056"
+  },
+  "by": {
+    "identity": "git:a@b",
+    "assurance": "self-attested"
+  },
+  "at": "2026-10-01T00:00:00Z",
+  "reason": "x"
+}

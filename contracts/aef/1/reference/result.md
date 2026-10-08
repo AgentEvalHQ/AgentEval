@@ -15,8 +15,9 @@ One node of a run's result tree. A composite node carries aggregation; its child
 | `trials` | object |  |  | The rollup line of a case that ran several times. The case's result is this line, never one trial; agree false marks it flaky. |
 | `trials.n` | integer | yes | ≥ 1; ≤ 1000 | How many trials the case had, from 1 to 1000 (RES-8). |
 | `trials.passed` | integer | yes | ≥ 0; ≤ 1000 | How many of the n trials passed; never more than n (RES-8). |
-| `trials.aggregation` | one of `"MajorityVote"` | yes |  | How the trials were combined into this line's state: MajorityVote, the only value in this version (RES-8). |
+| `trials.aggregation` | one of `"MajorityVote"`, `"AllPass"`, `"AnyPass"`, `"Mean"`, `"Median"`, `"Max"`, `"PassAtK"` | yes |  | How the trials were combined into the case's state: MajorityVote, AllPass, AnyPass, Mean, Median, Max or PassAtK (with k). Descriptive: a reader shows it, never recomputes it (RES-8). |
 | `trials.agree` | boolean | yes |  | Whether the trials agreed. false marks the case as flaky (RES-8). |
+| `trials.k` | integer |  | ≥ 1; ≤ 9007199254740991 | k, for PassAtK: the case passes when at least one of k trials passes. |
 | `evaluator` | object | yes |  | The evaluator that produced this line. |
 | `evaluator.id` | string | yes | ≥ 1 chars; ≤ 256 chars | The evaluator's id, as the producer names it. |
 | `evaluator.version` | string |  | ≤ 64 chars | The evaluator's version, when known. |
@@ -26,6 +27,7 @@ One node of a run's result tree. A composite node carries aggregation; its child
 | `scores[].metric` | string | yes | ≥ 1 chars; ≤ 256 chars | The metric, by its id in metrics.json (SUM-1). |
 | `scores[].value` | number | yes |  | The score, on the metric's scale (RES-10). |
 | `scores[].normalized` | number or null |  |  | The score normalised to between 0 and 1, or null when the producer gives none (RES-10). |
+| `scores[].label` | string |  | ≥ 1 chars; ≤ 64 chars | A categorical value for the metric (an OpenTelemetry score label, Inspect's C/I/P/N, a grader's class), shown as written (RES-10). |
 | `verdictRule` | object |  |  | The rule that turned the scores into the state, and where its threshold came from. |
 | `verdictRule.expr` | string | yes | ≥ 1 chars; ≤ 1024 chars | A human-readable description of the rule; a reader never evaluates it (spec 03, RES-7). |
 | `verdictRule.threshold` | number or null |  |  | The threshold the rule compared the score with, or null when it has none. |
@@ -42,12 +44,15 @@ One node of a run's result tree. A composite node carries aggregation; its child
 | `reasoning.blob` | [sha256Uri](common.md#sha256uri) | yes |  | The digest of the blob holding the reasoning; its hex is the blob's file name (EVD-3). |
 | `reasoning.bytes` | integer | yes | ≥ 0; ≤ 9007199254740991 | The blob's size in bytes. A size that is not the blob's is reported as reasoning-size. |
 | `uncertainty` | null or object |  |  | How uncertain the node's score is: a standard error, an interval, or both; null when not given (RES-10). |
-| `usage` | object |  |  | What producing this node consumed: tokens, in OpenTelemetry's gen_ai.usage.* names, and cost (RES-10). |
-| `usage.gen_ai.usage.input_tokens` | integer |  | ≥ 0; ≤ 9007199254740991 | Input tokens, as OpenTelemetry's gen_ai.usage.input_tokens (RES-10). |
-| `usage.gen_ai.usage.output_tokens` | integer |  | ≥ 0; ≤ 9007199254740991 | Output tokens, as OpenTelemetry's gen_ai.usage.output_tokens (RES-10). |
-| `usage.costUsd` | number |  | ≥ 0 | The cost, in US dollars (RES-10). |
-| `usage.costSource` | string |  | ≤ 128 chars | Where the cost figure came from, such as a price table. |
-| `usage.role` | one of `"agent"`, `"judge"`, `"attacker"`, `"other"` |  |  | Whose usage this is: agent (the subject), judge, attacker (an attacker model) or other. |
+| `usage` | array of object |  | ≥ 1 items; ≤ 8 items | What producing this node consumed, one entry per party (the agent, a judge, an attacker): no role twice (RES-10). |
+| `usage[].gen_ai.usage.input_tokens` | integer |  | ≥ 0; ≤ 9007199254740991 | Input tokens, as OpenTelemetry's gen_ai.usage.input_tokens (RES-10). |
+| `usage[].gen_ai.usage.output_tokens` | integer |  | ≥ 0; ≤ 9007199254740991 | Output tokens, as OpenTelemetry's gen_ai.usage.output_tokens (RES-10). |
+| `usage[].costUsd` | number |  | ≥ 0 | The cost, in US dollars (RES-10). |
+| `usage[].costSource` | string |  | ≤ 128 chars | Where the cost figure came from, such as a price table. |
+| `usage[].role` | one of `"agent"`, `"judge"`, `"attacker"`, `"other"` | yes |  | Whose usage this is: agent (the subject), judge, attacker (an attacker model) or other. |
+| `usage[].gen_ai.usage.cache_read.input_tokens` | integer |  | ≥ 0; ≤ 9007199254740991 | Input tokens served from a cache, as OpenTelemetry's gen_ai.usage.cache_read.input_tokens; included in input_tokens (RES-10). |
+| `usage[].gen_ai.usage.cache_write.input_tokens` | integer |  | ≥ 0; ≤ 9007199254740991 | Input tokens written to a cache, as OpenTelemetry's gen_ai.usage.cache_write.input_tokens; included in input_tokens (RES-10). |
+| `usage[].gen_ai.usage.reasoning.output_tokens` | integer |  | ≥ 0; ≤ 9007199254740991 | Reasoning tokens, as OpenTelemetry's gen_ai.usage.reasoning.output_tokens; included in output_tokens (RES-10). |
 | `traceLink` | object |  |  | The span this result was produced in, or with traceId only, the trace (RES-10). It resolves against traces.otlp.jsonl when that file is present (spec 03, §3.9 trace-link). |
 | `traceLink.traceId` | string | yes | ≤ 32 chars; pattern `^[0-9a-f]{32}$` | The trace id: 32 lower-case hex characters. |
 | `traceLink.spanId` | string |  | ≤ 16 chars; pattern `^[0-9a-f]{16}$` | The span id: 16 lower-case hex characters. |
@@ -81,6 +86,8 @@ One node of a run's result tree. A composite node carries aggregation; its child
 | `attack.taxonomy[].scheme` | one of `"owasp-llm"`, `"owasp-agentic"`, `"mitre-atlas"`, `"nist-ai-rmf"`, `"other"` | yes |  | owasp-llm, owasp-agentic, mitre-atlas, nist-ai-rmf or other. |
 | `attack.taxonomy[].id` | string | yes | ≥ 1 chars; ≤ 64 chars | The technique's id in that taxonomy, such as LLM01. |
 | `attack.success` | boolean or null |  |  | Whether the attack succeeded; null when that was not decided (RES-10). |
+| `startedAt` | [timestamp](common.md#timestamp) |  |  | When work on this node started (RES-10). |
+| `endedAt` | [timestamp](common.md#timestamp) |  |  | When work on this node ended; not before startedAt (RES-10, result-times in §3.9). |
 
 - **Rule:** A typed absence says why, and carries no scores (spec 03, RES-2).
 

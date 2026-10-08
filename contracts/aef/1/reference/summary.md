@@ -23,6 +23,9 @@ Aggregates per lane and metric, with what was measured beside what was asked for
 | `lanes[].metrics[].sum` | number |  |  | The sum of the measured values (SUM-5). |
 | `lanes[].metrics[].sumSq` | number |  | ≥ 0 | The sum of the squares of the measured values (SUM-5). |
 | `lanes[].metrics[].path` | [text](common.md#text) | yes |  | The result path this entry summarises, one line per case (spec 03, SUM-3). |
+| `lanes[].metrics[].aggregate` | object |  |  | When value is not the mean (or, for a count, the sum) of the measured values: how the producer computed it. A verifier then recomputes N, n, notMeasured and sum, not value (SUM-5). |
+| `lanes[].metrics[].aggregate.method` | string | yes | ≥ 1 chars; ≤ 64 chars; pattern `^[a-z][a-z0-9@._-]*$` | The method: pass@k, f1, median, or another name, shown as written. |
+| `lanes[].metrics[].aggregate.k` | integer |  | ≥ 1; ≤ 9007199254740991 | k, for pass@k and the like. |
 | `ext` | [ext](common.md#ext) |  |  | Producer extensions, named reverse-DNS or with the producer's prefix. A reader ignores what it does not know; never holds a secret (ENC-19). |
 | `cost` | object |  |  | The run's total cost (spec 03, SUM-7). |
 | `cost.totalUsd` | number | yes | ≥ 0 | The run's total cost, in US dollars (SUM-7). |

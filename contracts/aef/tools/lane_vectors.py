@@ -56,16 +56,18 @@ def summarize(lines, lane, entries, kinds):
 
 def make_run(folder, run_id, lines, *, lane="quality", metrics=(("m", "score", "higher_better"),), entries=(("m", "p"),),
              version=VERSION, mode="live", status="completed", ended="2026-10-01T12:00:00Z", judges=JUDGES,
-             sealed=True, tamper=False, break_summary=False):
+             sealed=True, tamper=False, break_summary=False, subject_ref=SUBJECT, deployment=None, suite=SUITE):
     """A small run. lines: dicts with case, path, state and optionally scores, severity, trial, trials, reason.
     Returns (runId, runHash)."""
     run_dir = folder / run_id
-    subject = {"ref": SUBJECT, "kind": "agent"}
+    subject = {"ref": subject_ref, "kind": "agent"}
     if version is not None:
         subject["version"] = version
     run = {"schemaVersion": V, "runId": run_id, "status": status, "producer": {"name": "agenteval-cli", "version": "1.0.0"},
-           "subject": subject, "execution": {"targetMode": mode}, "suite": SUITE, "judges": judges,
+           "subject": subject, "execution": {"targetMode": mode}, "suite": suite, "judges": judges,
            "startedAt": "2026-09-01T00:00:00Z", "endedAt": ended}
+    if deployment is not None:
+        run["deployment"] = {"ref": deployment}
     if status == "aborted":
         run["abortReason"] = "Stopped by the operator."
     full = []
@@ -104,13 +106,14 @@ def scores(**kv):
 
 # ---------------------------------------------------------------------------- checkpoints
 
-def checkpoint(folder, lanes, recorded, *, state="decided"):
+def checkpoint(folder, lanes, recorded, *, state="decided", deployment=None):
     """lanes: (name, rule, [(runId, runHash)], blocking). recorded: lane -> the result the manifest's decisionInput
     records for it (None for no evidence)."""
     manifest_lanes = [{"lane": name, "rule": rule, "runs": [{"runId": r, "runHash": hh, "origin": "launched"} for r, hh in runs],
                        "blocking": blocking} for name, rule, runs, blocking in lanes]
     cp = {"schemaVersion": V, "checkpointId": "cp_" + hashlib.sha256(str(folder.name).encode()).hexdigest()[:12],
-          "subject": {"ref": SUBJECT, "version": VERSION}, "lanes": manifest_lanes, "state": state, "outcome": None}
+          "subject": {"ref": SUBJECT, "version": VERSION, **({"deployment": deployment} if deployment else {})},
+          "lanes": manifest_lanes, "state": state, "outcome": None}
     if state == "decided":
         inp = {"subjectVersion": VERSION, "evaluatedAt": EVALUATED_AT, "supersededBy": None,
                "lanes": [{"lane": name, "blocking": blocking, "result": recorded[name]} for name, _, _, blocking in lanes]}
@@ -123,7 +126,7 @@ def expect(folder, lanes, results, problems, rules):
     write_json(folder / "expected.json", {
         "kind": "lane", "checkpoint": "checkpoint.json", "runs": "runs",
         "lanes": [{"lane": name, "result": results[name]} for name, _, _, _ in lanes],
-        "problems": sorted(problems, key=lambda p: (p[0].encode("utf-8"), p[1])), "rules": rules})
+        "problems": sorted(problems, key=lambda p: (p[0].encode("utf-8"), p[1])), "rules": rules + ["LANE-10"]})
 
 
 def res(status, oldest, version=VERSION, axes=None):
@@ -133,11 +136,11 @@ def res(status, oldest, version=VERSION, axes=None):
     return r
 
 
-def vector(name, build):
+def vector(name, build, deployment=None):
     folder = OUT / name
     runs = folder / "runs"
     lanes, results, problems, rules, recorded = build(runs)
-    checkpoint(folder, lanes, recorded if recorded is not None else results)
+    checkpoint(folder, lanes, recorded if recorded is not None else results, deployment=deployment)
     expect(folder, lanes, results, problems, rules)
 
 
@@ -199,8 +202,13 @@ def v_severity(runs):
                   metrics=(("ok", "rate", "higher_better"),), entries=(("ok", "a"),), lane="security", ended="2026-10-03T00:00:00Z")
     s5 = make_run(runs, "S5", [dict(case="c1", path="a", state="warn", severity="high")],
                   metrics=(("ok", "rate", "higher_better"),), entries=(("ok", "a"),), lane="security", ended="2026-10-03T00:00:00Z")
+    ok_rate = dict(metrics=(("ok", "rate", "higher_better"),), entries=(("ok", "a"),), lane="security", ended="2026-10-03T00:00:00Z")
+    s_inc = make_run(runs, "S-inconclusive", [dict(case=f"c{i}", path="a", state="inconclusive") for i in (1, 2, 3)], **ok_rate)
+    s_empty = make_run(runs, "S-empty", [], **ok_rate)
+    s_na = make_run(runs, "S-not-applicable", [dict(case="c1", path="a", state="passed"), dict(case="c2", path="a", state="not_applicable")], **ok_rate)
+    s_two = make_run(runs, "S-two-passed", [dict(case="c1", path="a", state="passed"), dict(case="c2", path="a", state="passed")], **ok_rate)
     T = "2026-10-03T00:00:00Z"
-    sev = lambda m: {"kind": "severity", "max": m}
+    sev = lambda m, n=None: {"kind": "severity", "max": m, **({"minimumN": n} if n else {})}
     lanes = [
         ("low-allows-low", sev("low"), [s1], True),            # worst counted failure: low (the critical one is a trial)
         ("none-refuses-low", sev("none"), [s1], True),
@@ -209,11 +217,19 @@ def v_severity(runs):
         ("failure-beats-unmeasured", sev("low"), [s4], True),
         ("two-runs", sev("medium"), [s1, s3], True),
         ("warn-counts", sev("medium"), [s5], True),
+        ("all-inconclusive", sev("none"), [s_inc], True),         # no decision anywhere: never a pass
+        ("no-results", sev("none"), [s_empty], True),              # no evidence at all: never a pass
+        ("not-applicable-ignored", sev("none"), [s_na], True),     # one passed line; not_applicable takes no part
+        ("minimum-not-met", sev("none", 3), [s_two], True),        # two decided lines, three needed
+        ("minimum-met", sev("none", 2), [s_two], True),
     ]
     results = {"low-allows-low": res("passed", T), "none-refuses-low": res("failed", T), "missing-is-critical": res("failed", T),
                "unmeasured": res("not_measured", T), "failure-beats-unmeasured": res("failed", T),
-               "two-runs": res("not_measured", T), "warn-counts": res("failed", T)}
-    return lanes, results, [], ["LANE-3", "RES-9"], None
+               "two-runs": res("not_measured", T), "warn-counts": res("failed", T),
+               "all-inconclusive": res("not_measured", T), "no-results": res("not_measured", T),
+               "not-applicable-ignored": res("passed", T), "minimum-not-met": res("not_measured", T),
+               "minimum-met": res("passed", T)}
+    return lanes, results, [], ["LANE-3", "RES-9", "RES-2"], None
 
 
 def v_evidence_present(runs):
@@ -264,13 +280,13 @@ def v_eligibility(runs):
         "live": res("passed", T), "scripted": res("not_measured", T), "replayed": res("not_measured", T),
         "mocked": res("not_measured", T), "aborted": res("not_measured", T), "other-version": res("passed", T, "v6"),
         "mixed-versions": res("passed", T, "v6"), "no-version": res("not_measured", T), "unsealed": res("not_measured", T),
-        # A tampered run's files no longer have the run hash the checkpoint froze: it is not found.
-        "tampered": None, "not-intact": res("not_measured", T), "missing": None, "wrong-hash": None,
+        # A run changed after sealing is found by its seal's run hash (SEAL-4), and is not intact.
+        "tampered": res("not_measured", T), "not-intact": res("not_measured", T), "missing": None, "wrong-hash": None,
         "one-missing": res("not_measured", T),
     }
     problems = [
         ["lanes/unsealed/runs/G-unsealed", "run-unverified"],
-        ["lanes/tampered/runs/G-tampered", "run-missing"],
+        ["lanes/tampered/runs/G-tampered", "run-unverified"],
         ["lanes/not-intact/runs/G-bad-summary", "run-unverified"],
         ["lanes/missing/runs/R-404", "run-missing"],
         ["lanes/wrong-hash/runs/G-live", "run-missing"],
@@ -363,6 +379,63 @@ def v_comparison(runs):
     return lanes, results, problems, ["LANE-5", "LANE-6", "LANE-7", "LANE-8", "LANE-9"], None
 
 
+def v_binding(runs):
+    """Evidence about another subject, deployment or suite never counts (LANE-1); minimumN (LANE-2). The checkpoint names
+    the deployment deployment:shop/assistant@prod."""
+    good = [dict(case="c1", path="p", state="passed", scores=scores(m=1.0)),
+            dict(case="c2", path="p", state="failed", scores=scores(m=0.5))]  # n 2, value 0.75
+    T = "2026-10-05T00:00:00Z"
+    D = "deployment:shop/assistant@prod"
+    right = make_run(runs, "K-right", good, deployment=D, ended=T)
+    other_subject = make_run(runs, "K-other-subject", good, deployment=D, subject_ref="agent:someone-else/other-agent", ended=T)
+    other_deployment = make_run(runs, "K-other-deployment", good, deployment="deployment:shop/assistant@staging", ended=T)
+    no_deployment = make_run(runs, "K-no-deployment", good, ended=T)
+    other_suite_version = make_run(runs, "K-suite-v4", good, deployment=D, suite=dict(SUITE, version="4"), ended=T)
+    other_suite_digest = make_run(runs, "K-suite-other-digest", good, deployment=D,
+                                  suite=dict(SUITE, digest="sha256:" + h("memory@3 edited")), ended=T)
+    rule = threshold("quality", ">=", 0.5)
+    with_suite = dict(rule, suite={"ref": SUITE["ref"], "version": SUITE["version"], "digest": SUITE["digest"]})
+    by_ref_only = dict(rule, suite={"ref": SUITE["ref"]})
+    lanes = [
+        ("right", rule, [right], True),
+        ("other-subject", rule, [other_subject], True),
+        ("other-deployment", rule, [other_deployment], True),
+        ("no-deployment", rule, [no_deployment], True),
+        ("one-of-two-other-subject", rule, [right, other_subject], True),
+        ("suite-matches", with_suite, [right], True),
+        ("suite-version-differs", with_suite, [other_suite_version], True),
+        ("suite-digest-differs", with_suite, [other_suite_digest], True),
+        ("suite-by-ref-only", by_ref_only, [other_suite_version], True),   # only the ref is named: v4 is that suite
+        ("minimum-n-not-met", dict(rule, minimumN=3), [right], True),      # n is 2
+        ("minimum-n-met", dict(rule, minimumN=2), [right], True),
+        ("evidence-present-other-subject", {"kind": "evidence-present", "runs": 1}, [other_subject], True),
+    ]
+    results = {"right": res("passed", T), "other-subject": res("not_measured", T), "other-deployment": res("not_measured", T),
+               "no-deployment": res("not_measured", T), "one-of-two-other-subject": res("not_measured", T),
+               "suite-matches": res("passed", T), "suite-version-differs": res("not_measured", T),
+               "suite-digest-differs": res("not_measured", T), "suite-by-ref-only": res("passed", T),
+               "minimum-n-not-met": res("not_measured", T), "minimum-n-met": res("passed", T),
+               "evidence-present-other-subject": res("not_measured", T)}
+    return lanes, results, [], ["LANE-1", "LANE-2", "LANE-4"], None
+
+
+def v_comparison_large(runs):
+    """m = 1,200 pairs: 2^1200 overflows binary64, so only exact arithmetic gets the answer (LANE-8). 630 regressed,
+    570 improved: p = sum C(1200, k), k = 630..1200, / 2^1200 = 0.044246 (computed exactly once, by hand, for this
+    vector): failed at 0.05, passed at 0.04."""
+    M = (("recall", "score", "higher_better"),)
+    E = (("recall", "mem"),)
+    base = [dict(case=f"b{i:04d}", path="mem", state="passed", scores=scores(recall=0.5)) for i in range(1, 1201)]
+    cand = [dict(case=f"b{i:04d}", path="mem", state="passed", scores=scores(recall=0.4 if i <= 630 else 0.6)) for i in range(1, 1201)]
+    B = make_run(runs, "BL", base, lane="memory", metrics=M, entries=E, version="v6", ended="2026-09-20T00:00:00Z")
+    C = make_run(runs, "CL", cand, lane="memory", metrics=M, entries=E, ended="2026-10-06T00:00:00Z")
+    T = "2026-10-06T00:00:00Z"
+    lanes = [("large-at-005", cmp_rule(B, pairs=1000), [C], True),
+             ("large-at-004", cmp_rule(B, significance=0.04, pairs=1000), [C], True)]
+    results = {"large-at-005": res("failed", T), "large-at-004": res("passed", T)}
+    return lanes, results, [], ["LANE-8", "LANE-11"], None
+
+
 def v_comparison_unknown_axis(runs):
     r = comparison_runs(runs)
     lanes = [("unknown-axis", cmp_rule(r["B"], axes=("suite", "weather")), [r["C13"]], True)]
@@ -407,6 +480,8 @@ def main():
     vector("eligibility", v_eligibility)
     vector("comparison", v_comparison)
     vector("comparison-unknown-axis", v_comparison_unknown_axis)
+    vector("comparison-large", v_comparison_large)
+    vector("binding", v_binding, deployment="deployment:shop/assistant@prod")
     vector("recorded-differs", v_recorded_differs)
     print("lane vectors written:", sorted(p.name for p in OUT.iterdir()))
 

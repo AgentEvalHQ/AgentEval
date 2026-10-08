@@ -13,6 +13,7 @@
   ],
   "verifiesFor": [],
   "rules": [
-    "SIG-2"
+    "SIG-2",
+    "SIG-6"
   ]
 }

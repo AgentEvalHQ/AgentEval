@@ -86,22 +86,22 @@ A run has no status field, and a sample has no state beyond `match.correct`.
 | `spec.run_id` | `runId` | exact |
 | `spec.created_at` | `startedAt` (append `Z`, replace the space with `T`) | exact, since `utcnow` is UTC |
 | the last event's `created_at` | `endedAt` | lossy |
-| `spec.base_eval`, `spec.split`, `spec.eval_name` | `suite.ref` (`suite:openai-evals/<base_eval>`), `suite.version` (the rest of `eval_name`) | lossy: no digest of the samples file ([I7](README.md#open-gaps)) |
-| `spec.completion_fns` | `subject` (`kind: model`) | lossy: AEF has one subject ([I7](README.md#open-gaps)) |
+| `spec.base_eval`, `spec.split`, `spec.eval_name` | `suite.ref` (`suite:openai-evals/<base_eval>`), `suite.version` (the rest of `eval_name`) | lossy: no digest of the samples file ([I7](README.md#gaps-found-by-these-mappings)) |
+| `spec.completion_fns` | `subject` (`kind: model`) | lossy: AEF has one subject ([I7](README.md#gaps-found-by-these-mappings)) |
 | `spec.run_config`, `created_by` | `config`, `ext` | exact as data |
-| (the log does not name the framework version) | `producer.version` | none: the importer supplies it ([I7](README.md#open-gaps)) |
+| (the log does not name the framework version) | `producer.version` | none: the importer supplies it ([I7](README.md#gaps-found-by-these-mappings)) |
 | `sample_id` | `caseId` | exact |
 | `match` | a line with `state` `passed` or `failed`, and a score of 1 or 0 | exact |
-| `match.expected`, `picked`, `sampled`; `sampling.prompt`, `sampled` | blobs with evidence, only with `contentCapture: on` | lossy ([I2](README.md#open-gaps)) |
-| `sampling.usage` | `usage` (`role: agent`) | lossy: cached tokens have no field ([I4](README.md#open-gaps)) |
-| `metrics` | `scores[]` | exact, but `state` has no source ([I1](README.md#open-gaps)) |
+| `match.expected`, `picked`, `sampled`; `sampling.prompt`, `sampled` | blobs with evidence, only with `contentCapture: on` | lossy ([I2](README.md#gaps-found-by-these-mappings)) |
+| `sampling.usage` | `usage` (`role: agent`) | lossy: cached tokens have no field ([I4](README.md#gaps-found-by-these-mappings)) |
+| `metrics` | `scores[]` | exact, but `state` has no source ([I1](README.md#gaps-found-by-these-mappings)) |
 | `error` | `state: error`, `reason` = `type: message` | exact |
 | `function_call` | evidence of kind `tool_call` (capture `on`) | lossy |
 | `cond_logp`, `pick_option`, `embedding`, `raw_sample`, `extra` | `ext` | none |
-| `event_id`, each event's `created_at` | none | none ([I6](README.md#open-gaps)) |
+| `event_id`, each event's `created_at` | none | none ([I6](README.md#gaps-found-by-these-mappings)) |
 | `final_report.accuracy` | a summary entry for a metric of kind `rate`, which the verifier recomputes from the `match` lines ([SUM-5](../spec/03-run.md#36-summaryjson)) | exact |
 | `final_report.boostrap_std` | the entry's `stderr` | lossy: it is a bootstrap estimate under another name |
-| other `final_report` keys | `ext` | none ([I1](README.md#open-gaps)) |
+| other `final_report` keys | `ext` | none ([I1](README.md#gaps-found-by-these-mappings)) |
 | (no run status) | `status: completed` when `final_report` is present, else `aborted` | lossy |
 
 ## AEF → the hosted API
@@ -120,24 +120,24 @@ judges, tree or seal travels.
 | run `status` | `completed` → `completed`; `failed`, `canceled` → `aborted` (with `error.message` or "canceled" as `abortReason`); `queued`, `in_progress` → `running` | exact |
 | run `created_at` | `startedAt` | exact to the second; the run has no end time, so `endedAt` is inferred |
 | `eval_id`, the eval's `name` | `suite.ref` (`suite:openai/<eval_id>`) | exact |
-| (an eval has no version) | `suite.version` and `suite.digest`, computed from the eval's `testing_criteria` and `data_source_config` | lossy ([I7](README.md#open-gaps)) |
+| (an eval has no version) | `suite.version` and `suite.digest`, computed from the eval's `testing_criteria` and `data_source_config` | lossy ([I7](README.md#gaps-found-by-these-mappings)) |
 | run `model` | `subject` (`kind: model`, `ref: model:<model>`) | exact |
 | run `data_source.type` | `execution.targetMode`: `live` for `completions` and `responses`; `replayed` for `jsonl` items that carry a `sample` | exact |
-| `testing_criteria[]` | `metrics.json` entries (`scale` from `score_model.range`, else 0 to 1; `direction: higher_better`) and `config.thresholds` from `pass_threshold` | exact; `label_model` labels have no field ([I1](README.md#open-gaps)) |
+| `testing_criteria[]` | `metrics.json` entries (`scale` from `score_model.range`, else 0 to 1; `direction: higher_better`) and `config.thresholds` from `pass_threshold` | exact; `label_model` labels have no field ([I1](README.md#gaps-found-by-these-mappings)) |
 | the graders' `model` | `judges[].model` | exact |
 | `report_url` | an evidence record with a URI link | exact |
-| `per_testing_criteria_results` | summary entries of kind `rate` | exact; the entry's `verdict` has no source ([I1](README.md#open-gaps)) |
+| `per_testing_criteria_results` | summary entries of kind `rate` | exact; the entry's `verdict` has no source ([I1](README.md#gaps-found-by-these-mappings)) |
 | `result_counts.errored` | lines in state `error` | exact |
-| `per_model_usage` | none | none ([I4](README.md#open-gaps)) |
+| `per_model_usage` | none | none ([I4](README.md#gaps-found-by-these-mappings)) |
 | output item `datasource_item_id` | `caseId` (as a string) | exact |
 | output item `status` `pass` / `fail`; `sample.error` set | a root line in `passed` / `failed`; `error` | exact |
 | `results[]` | one child line per grader: `path` = `output_item/<name>`, `evaluator.id` = `openai:<type>`, `scores[].value` = `score`, `state` from `passed` | exact |
 | (how item status follows from the graders) | `aggregation` on the root | lossy: OpenAI does not document the rule; the example below records `Min` |
-| `results[].sample` (the grader's own output) | a `reasoning` blob (capture `on`) | lossy ([I2](README.md#open-gaps)) |
-| `sample.input`, `sample.output`, `datasource_item` | blobs with evidence (capture `on`) | lossy ([I2](README.md#open-gaps)) |
-| `sample.usage` | `usage` on the root (`role: agent`) | lossy: `cached_tokens` has no field ([I4](README.md#open-gaps)) |
+| `results[].sample` (the grader's own output) | a `reasoning` blob (capture `on`) | lossy ([I2](README.md#gaps-found-by-these-mappings)) |
+| `sample.input`, `sample.output`, `datasource_item` | blobs with evidence (capture `on`) | lossy ([I2](README.md#gaps-found-by-these-mappings)) |
+| `sample.usage` | `usage` on the root (`role: agent`) | lossy: `cached_tokens` has no field ([I4](README.md#gaps-found-by-these-mappings)) |
 | `sample.temperature`, `top_p`, `seed`, `max_completion_tokens`, `finish_reason` | `ext` | none: `config` is run-level |
-| output item `created_at` | none | none ([I6](README.md#open-gaps)) |
+| output item `created_at` | none | none ([I6](README.md#gaps-found-by-these-mappings)) |
 
 ## What does not carry over
 
@@ -146,9 +146,9 @@ severity, judges, evidence, gate decisions, the seal and overlays. In the hosted
 the API grades itself.
 
 **OpenAI Evals → AEF.** A verdict for scores and metrics without a pass rule, and categorical labels
-([I1](README.md#open-gaps)). The case content without capture ([I2](README.md#open-gaps)). Cached tokens and run-level
-usage per model ([I4](README.md#open-gaps)). Per-event and per-item times ([I6](README.md#open-gaps)). A suite version
-and the framework's own version, which the importer has to supply ([I7](README.md#open-gaps)). Per-item sampling
+([I1](README.md#gaps-found-by-these-mappings)). The case content without capture ([I2](README.md#gaps-found-by-these-mappings)). Cached tokens and run-level
+usage per model ([I4](README.md#gaps-found-by-these-mappings)). Per-event and per-item times ([I6](README.md#gaps-found-by-these-mappings)). A suite version
+and the framework's own version, which the importer has to supply ([I7](README.md#gaps-found-by-these-mappings)). Per-item sampling
 parameters.
 
 ## Worked examples
@@ -162,7 +162,7 @@ The corpus line for `case-18`. Its `resultId` recomputes with [RES-4](../spec/03
 ```
 
 It becomes two events. `warn` is not a pass, so `correct` is `false`; the state and the path survive only in `data`.
-A result line has no time, so both events carry `run.json` `endedAt` ([I6](README.md#open-gaps)):
+A result line has no time, so both events carry `run.json` `endedAt` ([I6](README.md#gaps-found-by-these-mappings)):
 
 ```jsonl
 {"run_id":"01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10","event_id":0,"sample_id":"case-18","type":"match","data":{"correct":false,"expected":null,"picked":null,"aef":{"path":"triage","state":"warn","resultId":"r_3b156bcb57417545db27c39e78c955bd"}},"created_by":"agenteval-cli 1.0.0","created_at":"2026-10-02 14:06:23.004000+00:00"}
@@ -186,14 +186,14 @@ and `required` are the importer's reading, because OpenAI does not document how 
 graders. `cached_tokens` and the sampling parameters are lost:
 
 ```jsonl
-{"schemaVersion":"1.0","resultId":"r_2df32507b8f62ab0e259c92d6fff6628","parentResultId":null,"caseId":"137","path":"output_item","evaluator":{"id":"openai:eval_67abd54d9b0081909a86353f6fb9317a"},"state":"passed","aggregation":{"strategy":"Min","rulePath":"threshold","measured":1,"total":1},"usage":{"gen_ai.usage.input_tokens":519,"gen_ai.usage.output_tokens":2,"role":"agent"}}
+{"schemaVersion":"1.0","resultId":"r_2df32507b8f62ab0e259c92d6fff6628","parentResultId":null,"caseId":"137","path":"output_item","evaluator":{"id":"openai:eval_67abd54d9b0081909a86353f6fb9317a"},"state":"passed","aggregation":{"strategy":"Min","rulePath":"threshold","measured":1,"total":1},"usage":[{"gen_ai.usage.input_tokens":519,"gen_ai.usage.output_tokens":2,"role":"agent"}]}
 {"schemaVersion":"1.0","resultId":"r_38b7751f11a7b7e5e5bfad37e1a79f44","parentResultId":"r_2df32507b8f62ab0e259c92d6fff6628","caseId":"137","path":"output_item/String Check Grader","evaluator":{"id":"openai:string-check-grader"},"state":"passed","scores":[{"metric":"String Check Grader","value":1.0}],"annotator":{"kind":"CODE"},"component":{"weight":1,"required":true}}
 ```
 
 ## Open gaps
 
-- [I1](README.md#open-gaps): `metrics` events and `final_report` keys without a pass rule; label graders.
-- [I2](README.md#open-gaps): prompts, outputs and data-source items have a place only as captured blobs.
-- [I4](README.md#open-gaps): cached tokens, `per_model_usage`.
-- [I6](README.md#open-gaps): event and item times.
-- [I7](README.md#open-gaps): the suite version, subject and framework version an importer supplies.
+- [I1](README.md#gaps-found-by-these-mappings): `metrics` events and `final_report` keys without a pass rule; label graders.
+- [I2](README.md#gaps-found-by-these-mappings): prompts, outputs and data-source items have a place only as captured blobs.
+- [I4](README.md#gaps-found-by-these-mappings): cached tokens, `per_model_usage`.
+- [I6](README.md#gaps-found-by-these-mappings): event and item times.
+- [I7](README.md#gaps-found-by-these-mappings): the suite version, subject and framework version an importer supplies.

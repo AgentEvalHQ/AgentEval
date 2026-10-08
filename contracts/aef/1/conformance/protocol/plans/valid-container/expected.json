@@ -1,6 +1,10 @@
 {
+  "kind": "plan",
   "schema": "run-plan",
   "writer": "valid",
   "reader": "valid",
-  "rule": "a container run of an image manifest digest"
+  "rules": [
+    "PLAN-1"
+  ],
+  "why": "a container run of an image manifest digest"
 }

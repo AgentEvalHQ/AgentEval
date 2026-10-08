@@ -64,6 +64,10 @@ The JSON Schemas in `schemas/` and the corpus in `conformance/` are part of this
 schema disagree, the stricter one applies and the disagreement is a defect to report. A field the prose does not
 mention is informative: its meaning is its schema description, and no rule depends on it.
 
+Statements in the specification that use no BCP 14 keyword ("a run is a folder", "X is reported as Y") are
+requirements too: they say what conforming files are and what a conforming implementation does. Notes, examples and
+the documents outside `spec/` are informative.
+
 Paths in this specification use `/` as the separator. "Byte" means an octet. Hexadecimal is lower-case.
 
 ## 1.6 Terminology
@@ -114,7 +118,14 @@ each; a claim names the classes, the AEF version and the corpus version it passe
 | [08 Security and privacy](08-security.md) | Threat model, what is and is not protected, privacy |
 | [09 Conformance](09-conformance.md) | Classes, the corpus, running it, claiming conformance |
 
-## 1.9 References
+## 1.9 Profiles
+
+A **profile** builds on AEF for a narrower use: it adds files or rules for one kind of evidence, has its own `$id`
+outside `/aef/1/`, and is versioned on its own. A profile never changes what AEF requires, and no conformance class of
+§9 requires a profile. The runtime-verdict profile (AEVP 0.1, `profiles/runtime-verdict/`) is the first; it is not part
+of AEF 1.0.
+
+## 1.10 References
 
 - [RFC 2119] Key words for use in RFCs to Indicate Requirement Levels. [RFC 8174] Ambiguity of Uppercase vs Lowercase
   in RFC 2119 Key Words.

@@ -1,6 +1,10 @@
 {
+  "kind": "plan",
   "schema": "run-plan",
   "writer": "invalid",
   "reader": "invalid",
-  "rule": "'latest' in any case is resolved before the plan exists"
+  "rules": [
+    "PLAN-1"
+  ],
+  "why": "'latest' in any case is resolved before the plan exists"
 }

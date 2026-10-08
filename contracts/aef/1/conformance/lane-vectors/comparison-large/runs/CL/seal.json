@@ -1,0 +1,58 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "metrics.json",
+      "digest": {
+        "sha256": "f4118d18bebfbfea8dc38adae3849cd8a1e950acb4d1a4f4188c407100005c3e"
+      }
+    },
+    {
+      "name": "results.ndjson",
+      "digest": {
+        "sha256": "541e4fe593478fc802ba9cb10686f7e5ca169a5b71bea516425f0a22b1017938"
+      }
+    },
+    {
+      "name": "run.json",
+      "digest": {
+        "sha256": "7011ce34baffafa76a2073faf4285c84932689739778db9210738c7844c08b99"
+      }
+    },
+    {
+      "name": "summary.json",
+      "digest": {
+        "sha256": "90aa9bf07710083946e25197cb832a5d6e802b622af704ee870bd97d9915a889"
+      }
+    }
+  ],
+  "predicateType": "https://agenteval.dev/aef/1/evidence",
+  "predicate": {
+    "schemaVersion": "1.0",
+    "runId": "CL",
+    "runHash": "acade308dbbb5e856c2d1651876fcb785139aed8c4589a999a6d362847bf7b4c",
+    "producer": {
+      "name": "agenteval-cli",
+      "version": "1.0.0"
+    },
+    "subject": {
+      "ref": "agent:shop/assistant",
+      "version": "v7"
+    },
+    "deployment": null,
+    "suite": {
+      "ref": "suite:shop/memory",
+      "version": "3",
+      "digest": "sha256:274a646f723ee564ebb96a7bee4170df73b077d42e41ad3fc6a7c825d11dc9b1"
+    },
+    "judges": [
+      {
+        "model": "gpt-5.1",
+        "rubricDigest": "sha256:72e1d3bc7f71a5266fec19a8953d3b8af83375dd9d4efacb5761968ae4605e35"
+      }
+    ],
+    "closedAt": "2026-10-06T00:00:00Z",
+    "sealedAt": "2026-10-07T00:00:00Z",
+    "sealedBy": "producer"
+  }
+}

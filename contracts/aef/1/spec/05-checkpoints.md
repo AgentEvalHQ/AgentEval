@@ -20,8 +20,9 @@ A checkpoint manifest is a JSON document (schema `checkpoint`), conventionally `
   planned and recorded on the lane ([ENC-9]).
 - **[CKP-4] States.** `state` moves `draft` → `planned` → `approved_to_spend` → `running` → `evidence_complete` →
   `decided`. A checkpoint is abandoned from any earlier state by moving to `decided` with the outcome `aborted`.
-  `outcome` is `null` before `decided`; from `decided` on it is either the decision function's outcome, with its input
-  (`decisionInput`) recorded beside its output (`decision`), or `aborted` with an `abortReason` and no decision.
+  `outcome` is `null` before `decided`; from `decided` on it is either the decision function's outcome (`approved`,
+  `approved_with_exceptions`, `blocked`, `inconclusive` or `expired`: [DEC-3]), with its input (`decisionInput`, its
+  exceptions included) recorded beside its output (`decision`), or `aborted` with an `abortReason` and no decision.
 - **[CKP-5] A decided checkpoint never changes.** Its integrity is its signature: a DSSE envelope over the manifest's
   exact bytes, beside it (§4.4). An unsigned decided checkpoint is a claim anyone could have written.
 - **[CKP-6]** `budget.approvedBy`, like an overlay's `by`, is a claim: a reader shows its assurance only as far as it
@@ -29,10 +30,16 @@ A checkpoint manifest is a JSON document (schema `checkpoint`), conventionally `
 
 ## 5.2 What a lane's runs must be
 
-- **[LANE-1]** A run a lane relies on is **eligible** when it is intact (§4.5), closed `completed`, `live`
-  ([RUN-7]), and its `subject.version` is present. A lane result is computed from eligible runs only; a lane whose runs
-  are not all eligible has the result `not_measured` (it fails closed), except that a run for another version gives
-  `wrong-version` (§5.3.5).
+- **[LANE-1]** A run a lane relies on is **eligible** when all of these hold:
+  - it is intact (§4.5), closed `completed`, and `live` ([RUN-7]);
+  - its `subject.ref` is the checkpoint's `subject.ref`, and its `subject.version` is present;
+  - when the checkpoint names `subject.deployment`, its `deployment.ref` is that one;
+  - when the lane's rule names a `suite`, its `suite` matches it: the same `ref`, and the same `version` and `digest`
+    for those the rule gives.
+
+  A lane result is computed from eligible runs only. A lane whose runs are not all eligible has the result
+  `not_measured` (it fails closed), except that a run eligible but for another version gives `wrong-version`
+  (§5.3.5). Evidence about another subject, another deployment or another suite never counts for this one.
 
 ## 5.3 Lane evaluation
 
@@ -42,10 +49,10 @@ has the result `null`. A rule kind this version does not know gives `not_measure
 
 ### 5.3.1 `threshold`
 
-`{kind: "threshold", lane, metric, path, op, value}`: a summary entry against a value.
+`{kind: "threshold", lane, metric, path, op, value, suite?, minimumN?}`: a summary entry against a value.
 
 - **[LANE-2]** For each run, take the `summary.json` entry with this `lane`, `metric` and `path`. The run's status is
-  `not_measured` when there is no such entry or its `n` is 0; otherwise `passed` when the entry's `value`, compared
+  `not_measured` when there is no such entry, its `n` is 0, or its `n` is below the rule's `minimumN`; otherwise `passed` when the entry's `value`, compared
   with the rule's `value` by the rule's `op` (`>=`, `>`, `<=` or `<`, as binary64), holds, else `failed`.
 - The lane's status: `failed` if any run failed; otherwise `not_measured` if any run was not measured; otherwise
   `passed`.
@@ -53,23 +60,31 @@ has the result `null`. A rule kind this version does not know gives `not_measure
 
 ### 5.3.2 `severity`
 
-`{kind: "severity", max}`: the worst severity allowed among failures (`none`, `low`, `medium`, `high`).
+`{kind: "severity", max, suite?, minimumN?}`: the worst severity allowed among failures (`none`, `low`, `medium`,
+`high`).
 
-- **[LANE-3]** Over every result line of every run, trial lines excluded: the lane is `failed` when a line in state
-  `failed` or `warn` has a severity worse than `max` (order `none` < `low` < `medium` < `high` < `critical`; a missing
-  severity counts as `critical`); otherwise `not_measured` when any line is `not_measured`, `skipped`, `error` or
-  `pending`; otherwise `passed`.
+- **[LANE-3]** Over every result line of every run, trial lines excluded:
+  1. `failed` when a line in state `failed` or `warn` has a severity worse than `max` (order `none` < `low` <
+     `medium` < `high` < `critical`; a missing severity counts as `critical`);
+  2. otherwise `not_measured` when any line is `inconclusive`, `not_measured`, `skipped`, `error` or `pending`, or
+     when fewer lines than `minimumN` (at least 1 when the rule gives none) are `passed`, `failed` or `warn`: no
+     evidence, or evidence that does not decide, is never a pass;
+  3. otherwise `passed`.
+
+  `not_applicable` and `scored` lines take no part.
 
 ### 5.3.3 `evidence-present`
 
-`{kind: "evidence-present", runs}`: at least this many runs exist.
+`{kind: "evidence-present", runs, suite?}`: at least this many runs exist.
 
-- **[LANE-4]** `passed` when the lane has at least `runs` eligible runs, otherwise `not_measured`.
+- **[LANE-4]** `passed` when every run of the lane is eligible ([LANE-1]) and there are at least `runs` of them;
+  otherwise `not_measured`.
 
 ### 5.3.4 `comparison`
 
-`{kind: "comparison", lane, metric, path, baseline, significance, minimumPairs, axes}`: no significant regression of
-one run against a baseline run.
+`{kind: "comparison", lane, metric, path, baseline, significance, minimumPairs, axes, suite?}`: no significant
+regression of one run against a baseline run. The baseline is checked as the candidate is ([LANE-1]), except for its
+version.
 
 - **[LANE-5]** The lane has exactly one run, the candidate; `baseline` is a run reference (`runId`, `runHash`) to an
   intact, completed, live run. Otherwise the result is `not_measured`.
@@ -105,6 +120,11 @@ one run against a baseline run.
   manifest ([ENC-4]); the comparison is exact, between the rational `p` and that binary64 value's exact rational value
   (for example `Σ C(m,k) · 2^e ≤ M · 2^m` with integers, where `significance` = `M / 2^e`). An implementation **MUST
   NOT** compute `p` in floating point, approximate the binomial (a normal or z approximation), or use a two-sided test.
+- **[LANE-11] Cost.** `m` is at most the number of result lines of a run, so at most 1,000,000 ([ENC-17]). The tail
+  sum costs O(m) big-integer steps when each term follows from the previous one, C(m, k+1) = C(m, k)·(m − k)/(k + 1),
+  summing whichever side of `r` is shorter (the other is 2^m minus it): the reference takes about 0.1 s at m = 40,000
+  and about a minute at m = 1,000,000 in pure Python. An implementation **MAY** decide sooner when bounds it computes
+  exactly already settle `p ≤ significance` either way; it **MUST NOT** give another result.
 
 ### 5.3.5 The lane's version and age
 
@@ -124,9 +144,14 @@ one run against a baseline run.
 evaluation time is an input.
 
 - **[DEC-1] Input:** the exact `subjectVersion`, `evaluatedAt`, an optional `supersededBy` (a newer version known at
-  that time), and per lane: `lane`, `blocking`, an optional `freshness`, and `result` (§5.3: `status`, `subjectVersion`,
-  `oldestClosedAt`, and `axes` when incomparable), or `null` when there is no evidence. At least one lane and no lane
-  twice: the function refuses anything else rather than decide it.
+  that time), per lane: `lane`, `blocking`, an optional `freshness`, and `result` (§5.3: `status`, `subjectVersion`,
+  `oldestClosedAt`, and `axes` when incomparable), or `null` when there is no evidence; and optional `exceptions`. An
+  **exception** is a person's decision to accept a lane's failure for a while: the `lane` it applies to, optionally
+  the `requirement` whose risk it accepts (for display: it takes no part in the decision), a `reason`, who granted it
+  (`by`, a claim, as in [CKP-6]), when (`at`) and until when (`expires`). A checkpoint records its exceptions in its
+  `decisionInput`, so its signature covers them ([CKP-5]). At least one lane, no lane twice, every exception for a
+  lane of the input, and every exception's `expires` later than its `at`: the function refuses anything else rather
+  than decide it.
 - **[DEC-2] Each lane's status**, in this order:
   1. `result` is `null` → `missing` (reason `missing:<lane>`).
   2. The result is for another version → `missing` (reason `wrong-version:<lane>`).
@@ -137,16 +162,30 @@ evaluation time is an input.
   5. Otherwise the result's status: `passed` (no reason), `failed` (`failed:<lane>`, or `advisory-failed:<lane>` for a
      lane that is not blocking), `not_measured` (`not-measured:<lane>`), `incomparable` (`incomparable:<lane>`, and the
      lane carries its `axes`). A status this version does not know reads as `not_measured`.
+  6. A `failed` lane, blocking or not, with an exception **in force** (`at` ≤ `evaluatedAt` < `expires`) → `waived`
+     (reason `waived:<lane>`, in place of its failure's). When several are in force, the one that waives the lane is
+     the one that expires first (the first in input order among equals): a reader shows its `reason`, `by`,
+     `requirement` and `expires` beside the lane. A `failed` lane that has exceptions, none of them in force (expired,
+     or granted after `evaluatedAt`), stays `failed`, and `exception-expired:<lane>` follows its reason.
+
+  Only a `failed` status is ever waived. An exception for a lane that is `passed`, `missing`, `stale`, `not_measured`
+  or `incomparable` has no effect and adds no reason.
 - **[DEC-3] The outcome**, first rule that holds:
   1. `supersededBy` is set and differs from `subjectVersion`, or any lane is `stale` → `expired`.
-  2. Any blocking lane is `failed` → `blocked`.
+  2. Any blocking lane is `failed` → `blocked`. A `waived` lane is not `failed`.
   3. Any lane, blocking or not, is `missing`, `not_measured` or `incomparable` → `inconclusive`.
-  4. Otherwise → `approved`. A failed advisory lane does not block, and is reported.
+  4. Any lane, blocking or not, is `waived` → `approved_with_exceptions`.
+  5. Otherwise → `approved`. A failed advisory lane does not block, and is reported.
 
-  Missing evidence is never converted into a pass, and nothing is averaged.
-- **[DEC-4] Reasons** are codes, so every implementation produces the same list: the lane reasons in input order,
-  then `superseded:<version>` if it applies, then `outcome:<outcome>`.
-- **[DEC-5]** Versions compare byte for byte; times at full precision ([ENC-8]).
+  Missing evidence is never converted into a pass, and nothing is averaged. An exception cannot convert it either. A
+  `failed` lane is a measured risk: someone can read what failed, accept it by name, and set a date to look again. A
+  `missing`, `stale`, `not_measured` or `incomparable` lane is an unknown risk: nothing current says what would be
+  accepted, so a waiver there would approve what nobody measured. Its remedy is evidence, not a signature.
+- **[DEC-4] Reasons** are codes, so every implementation produces the same list: the lane reasons in input order
+  (each lane's own, then its `exception-expired:<lane>` when [DEC-2] adds one), then `superseded:<version>` if it
+  applies, then `outcome:<outcome>`.
+- **[DEC-5]** Versions and lane names compare byte for byte; times (`evaluatedAt`, `oldestClosedAt`, an exception's
+  `at` and `expires`) at full precision ([ENC-8]).
 - `conformance/decision-vectors/` holds inputs with expected outputs written by hand from these rules.
 
 ## 5.5 Verifying a checkpoint
@@ -155,18 +194,20 @@ A checkpoint verifier is given the manifest, a way to find runs (a folder of run
 policy. It reports problems as a path and a code, ordered by path and code.
 
 - **[CKP-7] The manifest alone.** The manifest is one file, so these problems are codes alone, reported in code order.
-  For a checkpoint decided by the decision function: `decision` (the decision is not
-  what the function gives on the recorded input, or the input cannot be decided), `evidence` (a lane has runs but no
+  For a checkpoint decided by the decision function: `decision` (the decision is not what the function gives on the
+  recorded input, its exceptions included, or the input cannot be decided), `evidence` (a lane has runs but no
   result in the input, or a result but no runs), `lanes` (the input does not decide exactly the manifest's lanes, with
   the same names, blocking and freshness, in order), `outcome` (the outcome is not the decision's), `version` (the input
   is for another version). Only the fields this version defines are compared. A manifest in a state, or with an outcome
   or a lane status, this version does not know, or one with a decided outcome but no decision, is reported only as
   `unverifiable`: a reader cannot recompute it, which is not the same as finding it wrong. A checkpoint not yet
   decided, or abandoned (`aborted`), has nothing to recompute and no problems.
-- **[CKP-8] Against the runs.** A run is **found** when a run folder's `run.json` has the `runId` and the run hash
-  recomputed from its files (§4.1, [SEAL-4]) is the one named: the checkpoint froze those exact bytes, so a run changed
-  since is not found. For each run a lane names, or a comparison's baseline (path `lanes/<lane>/runs/<runId>`):
-  `run-missing` (not found), `run-unverified` (found, but not intact: unsealed, or with problems). Then, for a
+- **[CKP-8] Against the runs.** A run is **found** when a run folder's `run.json` has the `runId` and the run's run
+  hash ([SEAL-4]: its seal's, or for an unsealed run the recomputed one) is the one named. Whether its files still
+  match is then the run verifier's question: a run changed since it was sealed is found, and not intact. For each run
+  a lane names, or a comparison's baseline (path `lanes/<lane>/runs/<runId>`): `run-missing` (not found),
+  `run-unverified` (found, but not intact: unsealed, or with problems; a blob withheld by an authorized redaction is
+  not a problem). The verifier takes the trust policy (for authorized redactions) and the evaluation time as inputs. Then, for a
   decided checkpoint, each lane's result recomputed with §5.3 is compared with the recorded input (path
   `lanes/<lane>`): `lane-result` (another `status` or other `axes`, or a result where `null` was recorded or the
   reverse), `lane-version` (another `subjectVersion`), `oldest-closed` (another `oldestClosedAt`).
@@ -179,5 +220,11 @@ policy. It reports problems as a path and a code, ordered by path and code.
 ## 5.6 Expiry at read time
 
 - **[CKP-10]** A decided checkpoint is never rewritten. A reader that shows it later evaluates the decision function
-  again with the time of reading (and any newer version it knows of as `supersededBy`); when that gives `expired`, it
-  shows the checkpoint as expired beside the recorded outcome.
+  again on its recorded input, with the time of reading as `evaluatedAt` (and any newer version it knows of as
+  `supersededBy`), and shows the recorded outcome with the re-evaluated one beside it when they differ: `expired` once
+  evidence has aged past its freshness. Exceptions lapse the same way: an exception whose `expires` has passed no
+  longer waives its lane, so a checkpoint recorded as `approved_with_exceptions` reads as `blocked` once its waived
+  blocking lanes have no exception left in force (or as `expired`, when its evidence has aged too). The reader adds
+  nothing else to the input: an exception granted after the decision belongs to a new checkpoint ([CKP-5]). The
+  re-evaluated outcome never replaces the recorded one, and never shows an approval the checkpoint did not record: a
+  re-evaluated `approved` or `approved_with_exceptions` is shown only beside a recorded one of these.

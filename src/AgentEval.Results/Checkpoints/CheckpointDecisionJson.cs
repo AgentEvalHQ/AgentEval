@@ -8,7 +8,8 @@ namespace AgentEval.Results.Checkpoints;
 
 /// <summary>
 /// The decision function's input and output in their AEF wire form (contracts/aef/1/schemas/*/decision.schema.json):
-/// statuses as passed / failed / missing / not_measured / incomparable / stale, outcomes in lower case.
+/// statuses as passed / failed / missing / not_measured / incomparable / stale / waived, outcomes in snake case
+/// (approved, approved_with_exceptions, blocked, inconclusive, expired).
 /// </summary>
 public static class CheckpointDecisionJson
 {
@@ -32,8 +33,21 @@ public static class CheckpointDecisionJson
                 evidence, (string?)lane["freshness"]);
         }).ToList();
 
+        var exceptions = (input["exceptions"] as JsonArray)?.Select(node =>
+        {
+            var grant = node ?? throw new FormatException("An exception is null.");
+            var by = grant["by"] ?? throw new FormatException("by is required.");
+            return new ExceptionGrant(
+                Required(grant, "lane"),
+                Required(grant, "reason"),
+                new TrustedIdentity(Required(by, "identity"), Required(by, "assurance")),
+                AefTime.Parse(Required(grant, "at")),
+                AefTime.Parse(Required(grant, "expires")),
+                (string?)grant["requirement"]);
+        }).ToList();
+
         return new CheckpointDecisionInput(
-            Required(input, "subjectVersion"), AefTime.Parse(Required(input, "evaluatedAt")), lanes, (string?)input["supersededBy"]);
+            Required(input, "subjectVersion"), AefTime.Parse(Required(input, "evaluatedAt")), lanes, (string?)input["supersededBy"], exceptions);
     }
 
     /// <summary>Writes a decision result (decision.schema.json).</summary>
@@ -54,7 +68,7 @@ public static class CheckpointDecisionJson
 
         return new JsonObject
         {
-            ["outcome"] = result.Outcome.ToString().ToLowerInvariant(),
+            ["outcome"] = WireName(result.Outcome),
             ["lanes"] = lanes,
             ["reasons"] = new JsonArray(result.Reasons.Select(r => (JsonNode?)r).ToArray()),
         };
@@ -69,7 +83,19 @@ public static class CheckpointDecisionJson
         LaneStatus.NotMeasured => "not_measured",
         LaneStatus.Incomparable => "incomparable",
         LaneStatus.Stale => "stale",
+        LaneStatus.Waived => "waived",
         _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
+    };
+
+    /// <summary>An outcome's wire name.</summary>
+    public static string WireName(CheckpointOutcome outcome) => outcome switch
+    {
+        CheckpointOutcome.Approved => "approved",
+        CheckpointOutcome.ApprovedWithExceptions => "approved_with_exceptions",
+        CheckpointOutcome.Blocked => "blocked",
+        CheckpointOutcome.Inconclusive => "inconclusive",
+        CheckpointOutcome.Expired => "expired",
+        _ => throw new ArgumentOutOfRangeException(nameof(outcome), outcome, null),
     };
 
     // A status this version does not know (a later minor's) fails closed: the lane measured nothing it can read.

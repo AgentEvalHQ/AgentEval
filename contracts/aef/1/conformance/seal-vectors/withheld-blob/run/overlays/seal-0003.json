@@ -4,7 +4,7 @@
     {
       "name": "overlays/events.ndjson",
       "digest": {
-        "sha256": "5b7750ba5334effed36f51d4ddeb4b9613d9085bc265104ad15e4fc3bf0e692d"
+        "sha256": "bc7678a93788463ddcb273c814e8109267d280deaa903f2f5ff5d759f037bb01"
       }
     }
   ],
@@ -12,13 +12,13 @@
   "predicate": {
     "schemaVersion": "1.0",
     "runId": "01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10",
-    "runHash": "ad754a2739fabe07318b54b4f32e8ad8ea3ae6fa5ef16df3c8170fca11174781",
+    "runHash": "f16b6a74505a359810e44611732c4d53ff61d32852983b165414811eb6a6627b",
     "batch": 3,
     "offset": 659,
-    "length": 366,
+    "length": 343,
     "previous": {
       "path": "overlays/seal-0002.json",
-      "sha256": "8cece9a30547a62b9aed300bf374b103ce1b5d16cac1dfd3634d8772f782f869"
+      "sha256": "da28c56b467a871175478413f27ee01973bf9d964b676bffae38ce2ed7b9b606"
     }
   }
 }

@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "R-1",
+  "status": "completed",
+  "producer": {
+    "name": "agenteval-cli",
+    "version": "1.0.0"
+  },
+  "subject": {
+    "ref": "agent:support/support-triage",
+    "kind": "agent",
+    "version": "git:3f2a1c"
+  },
+  "suite": {
+    "ref": "suite:support/triage-scenarios",
+    "version": "4",
+    "digest": "sha256:4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c"
+  },
+  "judges": [
+    {
+      "model": "gpt-5.1",
+      "provider": "azure.ai.openai",
+      "mode": "single",
+      "rubricDigest": "sha256:a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9"
+    }
+  ],
+  "startedAt": "2026-10-08T12:00:00Z",
+  "endedAt": "2026-10-08T12:00:05Z",
+  "contentCapture": "off",
+  "execution": {
+    "targetMode": "live",
+    "stimulus": "suite"
+  },
+  "provenance": {
+    "planId": "plan-44",
+    "planDigest": "60101e16932e5e74c68110d52d27e713924d9cc549c34f4c36292d2eabb30ccd",
+    "jobId": "job-7",
+    "runnerId": "runner-local-01"
+  }
+}

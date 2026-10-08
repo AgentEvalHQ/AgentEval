@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://agenteval.dev/aef/1/reader/runner-event.schema.json",
   "title": "AEF 1.0: one line of a runner event stream",
-  "description": "READER (tolerant), derived from the writer schema by tools/derive_reader.py. A runner reports a job as NDJSON events, each with a sequence number. The stream's own rules (order, one terminal event, spend within the plan) are STRM-1 to STRM-3.",
+  "description": "READER (tolerant), derived from the writer schema by tools/derive_reader.py. A runner reports a job as NDJSON events, each with a sequence number. The stream's own rules (order, one terminal event, spend within the plan) are STRM-1 to STRM-3; STRM-4 checks the runs it names against the plan.",
   "type": "object",
   "required": [
     "schemaVersion",
@@ -28,6 +28,10 @@
     "at": {
       "$ref": "common.schema.json#/$defs/timestamp",
       "description": "When the event happened; never earlier than the previous event's at (STRM-1, STRM-3)."
+    },
+    "ext": {
+      "$ref": "common.schema.json#/$defs/ext",
+      "description": "Producer extensions, named reverse-DNS or with the producer's prefix. A reader ignores what it does not know; never holds a secret (ENC-19, STRM-1)."
     }
   },
   "anyOf": [
@@ -40,10 +44,18 @@
         "runnerId"
       ],
       "properties": {
-        "schemaVersion": true,
-        "seq": true,
-        "jobId": true,
-        "at": true,
+        "schemaVersion": {
+          "$ref": "#/properties/schemaVersion"
+        },
+        "seq": {
+          "$ref": "#/properties/seq"
+        },
+        "jobId": {
+          "$ref": "#/properties/jobId"
+        },
+        "at": {
+          "$ref": "#/properties/at"
+        },
         "kind": {
           "description": "job.accepted: the runner accepted the plan. A stream starts with job.accepted or job.refused (STRM-3).",
           "const": "job.accepted"
@@ -56,7 +68,9 @@
           "$ref": "common.schema.json#/$defs/id",
           "description": "The runner that accepted the plan."
         },
-        "ext": true,
+        "ext": {
+          "$ref": "#/properties/ext"
+        },
         "planDigest": {
           "description": "SHA-256 of the exact bytes of the plan the runner accepted.",
           "$ref": "common.schema.json#/$defs/sha256Hex"
@@ -72,10 +86,18 @@
         "usdHigh"
       ],
       "properties": {
-        "schemaVersion": true,
-        "seq": true,
-        "jobId": true,
-        "at": true,
+        "schemaVersion": {
+          "$ref": "#/properties/schemaVersion"
+        },
+        "seq": {
+          "$ref": "#/properties/seq"
+        },
+        "jobId": {
+          "$ref": "#/properties/jobId"
+        },
+        "at": {
+          "$ref": "#/properties/at"
+        },
         "kind": {
           "description": "plan.estimated: the runner's estimate of cases and cost.",
           "const": "plan.estimated"
@@ -101,7 +123,9 @@
           "type": "string",
           "maxLength": 64
         },
-        "ext": true
+        "ext": {
+          "$ref": "#/properties/ext"
+        }
       }
     },
     {
@@ -111,10 +135,18 @@
         "spentUsd"
       ],
       "properties": {
-        "schemaVersion": true,
-        "seq": true,
-        "jobId": true,
-        "at": true,
+        "schemaVersion": {
+          "$ref": "#/properties/schemaVersion"
+        },
+        "seq": {
+          "$ref": "#/properties/seq"
+        },
+        "jobId": {
+          "$ref": "#/properties/jobId"
+        },
+        "at": {
+          "$ref": "#/properties/at"
+        },
         "kind": {
           "description": "spend.updated: the job's total spend so far (STRM-3).",
           "const": "spend.updated"
@@ -124,7 +156,9 @@
           "type": "number",
           "minimum": 0
         },
-        "ext": true
+        "ext": {
+          "$ref": "#/properties/ext"
+        }
       }
     },
     {
@@ -135,10 +169,18 @@
         "state"
       ],
       "properties": {
-        "schemaVersion": true,
-        "seq": true,
-        "jobId": true,
-        "at": true,
+        "schemaVersion": {
+          "$ref": "#/properties/schemaVersion"
+        },
+        "seq": {
+          "$ref": "#/properties/seq"
+        },
+        "jobId": {
+          "$ref": "#/properties/jobId"
+        },
+        "at": {
+          "$ref": "#/properties/at"
+        },
         "kind": {
           "description": "case.completed: a case finished; the plan's cases limit counts these (STRM-3).",
           "const": "case.completed"
@@ -157,7 +199,9 @@
           "$ref": "common.schema.json#/$defs/state",
           "description": "The case's state (RES-1)."
         },
-        "ext": true
+        "ext": {
+          "$ref": "#/properties/ext"
+        }
       }
     },
     {
@@ -168,10 +212,18 @@
         "status"
       ],
       "properties": {
-        "schemaVersion": true,
-        "seq": true,
-        "jobId": true,
-        "at": true,
+        "schemaVersion": {
+          "$ref": "#/properties/schemaVersion"
+        },
+        "seq": {
+          "$ref": "#/properties/seq"
+        },
+        "jobId": {
+          "$ref": "#/properties/jobId"
+        },
+        "at": {
+          "$ref": "#/properties/at"
+        },
         "kind": {
           "description": "lane.completed: a lane finished.",
           "const": "lane.completed"
@@ -184,7 +236,9 @@
           "description": "The lane's result: passed, failed, not_measured or incomparable.",
           "type": "string"
         },
-        "ext": true
+        "ext": {
+          "$ref": "#/properties/ext"
+        }
       }
     },
     {
@@ -195,10 +249,18 @@
         "runHash"
       ],
       "properties": {
-        "schemaVersion": true,
-        "seq": true,
-        "jobId": true,
-        "at": true,
+        "schemaVersion": {
+          "$ref": "#/properties/schemaVersion"
+        },
+        "seq": {
+          "$ref": "#/properties/seq"
+        },
+        "jobId": {
+          "$ref": "#/properties/jobId"
+        },
+        "at": {
+          "$ref": "#/properties/at"
+        },
         "kind": {
           "description": "evidence.produced: the runner sealed a run (STRM-3).",
           "const": "evidence.produced"
@@ -208,10 +270,12 @@
           "description": "The sealed run's runId. Announcing it again with another run hash is reported (STRM-3)."
         },
         "runHash": {
-          "description": "The sealed run's run hash.",
+          "description": "The sealed run's run hash (SEAL-4): the run the stream names is the one with this hash (STRM-4).",
           "$ref": "common.schema.json#/$defs/sha256Hex"
         },
-        "ext": true
+        "ext": {
+          "$ref": "#/properties/ext"
+        }
       }
     },
     {
@@ -221,10 +285,18 @@
         "reason"
       ],
       "properties": {
-        "schemaVersion": true,
-        "seq": true,
-        "jobId": true,
-        "at": true,
+        "schemaVersion": {
+          "$ref": "#/properties/schemaVersion"
+        },
+        "seq": {
+          "$ref": "#/properties/seq"
+        },
+        "jobId": {
+          "$ref": "#/properties/jobId"
+        },
+        "at": {
+          "$ref": "#/properties/at"
+        },
         "kind": {
           "description": "job.cancelled: the job was cancelled. A terminal event (STRM-1).",
           "const": "job.cancelled"
@@ -235,7 +307,9 @@
           "minLength": 1,
           "maxLength": 2048
         },
-        "ext": true
+        "ext": {
+          "$ref": "#/properties/ext"
+        }
       }
     },
     {
@@ -245,10 +319,18 @@
         "reason"
       ],
       "properties": {
-        "schemaVersion": true,
-        "seq": true,
-        "jobId": true,
-        "at": true,
+        "schemaVersion": {
+          "$ref": "#/properties/schemaVersion"
+        },
+        "seq": {
+          "$ref": "#/properties/seq"
+        },
+        "jobId": {
+          "$ref": "#/properties/jobId"
+        },
+        "at": {
+          "$ref": "#/properties/at"
+        },
         "kind": {
           "description": "job.failed: the job failed or stopped at a plan limit. A terminal event (STRM-1).",
           "const": "job.failed"
@@ -263,9 +345,11 @@
           "description": "Set when the runner stopped at a plan limit.",
           "type": "string"
         },
-        "ext": true,
+        "ext": {
+          "$ref": "#/properties/ext"
+        },
         "runs": {
-          "description": "The runs it sealed before it stopped.",
+          "description": "The runs it sealed before it stopped. Each must keep to the plan (STRM-4).",
           "type": "array",
           "items": {
             "$ref": "common.schema.json#/$defs/id"
@@ -281,16 +365,24 @@
         "runs"
       ],
       "properties": {
-        "schemaVersion": true,
-        "seq": true,
-        "jobId": true,
-        "at": true,
+        "schemaVersion": {
+          "$ref": "#/properties/schemaVersion"
+        },
+        "seq": {
+          "$ref": "#/properties/seq"
+        },
+        "jobId": {
+          "$ref": "#/properties/jobId"
+        },
+        "at": {
+          "$ref": "#/properties/at"
+        },
         "kind": {
           "description": "job.sealed: the job finished and names every run it produced. A terminal event (STRM-1).",
           "const": "job.sealed"
         },
         "runs": {
-          "description": "Every run the job produced, sealed.",
+          "description": "Every run the job produced, sealed. Each must keep to the plan (STRM-4).",
           "type": "array",
           "minItems": 1,
           "items": {
@@ -298,7 +390,9 @@
           },
           "maxItems": 1024
         },
-        "ext": true
+        "ext": {
+          "$ref": "#/properties/ext"
+        }
       }
     },
     {
@@ -311,11 +405,21 @@
         "reason"
       ],
       "properties": {
-        "schemaVersion": true,
-        "seq": true,
-        "jobId": true,
-        "at": true,
-        "ext": true,
+        "schemaVersion": {
+          "$ref": "#/properties/schemaVersion"
+        },
+        "seq": {
+          "$ref": "#/properties/seq"
+        },
+        "jobId": {
+          "$ref": "#/properties/jobId"
+        },
+        "at": {
+          "$ref": "#/properties/at"
+        },
+        "ext": {
+          "$ref": "#/properties/ext"
+        },
         "kind": {
           "description": "job.refused: the runner will not run this plan. A terminal event (STRM-1, PLAN-7).",
           "const": "job.refused"

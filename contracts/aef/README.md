@@ -29,9 +29,10 @@ by two implementations:
 
 - **The Python reference tools here** check all of it. `aef_verify.py` was written from the specification alone, by
   someone who had not seen the corpus generators.
-- **AgentEval's .NET code** (`src/AgentEval.Results`, tested by `tests/AgentEval.Tests/Contracts/`) checks the schemas,
-  seals, overlay chains, checkpoint manifests, the decision function and the runner stream. Lane evaluation, signatures
-  and the rules across files are planned for AgentEval's dedicated AEF component.
+- **AgentEval's .NET library** (`src/AgentEval.Results`) implements the decision function, the checkpoint manifest
+  checks and the runner stream verifier. Its contract tests (`tests/AgentEval.Tests/Contracts/`) also check the
+  schemas, seals and overlay chains, in test code. The rest (writing and sealing runs, lane evaluation, signatures,
+  the rules across files) comes with AgentEval's dedicated AEF component.
 
 A third implementation, in any language, is welcome: [§9](1/spec/09-conformance.md) says how to run the corpus and
 claim conformance.

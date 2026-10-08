@@ -22,7 +22,7 @@
   "limits": {
     "cases": 10
   },
-  "contentPolicy": "off",
+  "contentCapture": "off",
   "isolation": "process",
   "provider": "local",
   "judges": [

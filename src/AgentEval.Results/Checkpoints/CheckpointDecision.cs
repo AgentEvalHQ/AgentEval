@@ -43,6 +43,9 @@ public enum LaneStatus
 
     /// <summary>The oldest evidence the lane relied on is older than its freshness at the evaluation time.</summary>
     Stale,
+
+    /// <summary>The rule did not hold, and an exception in force at the evaluation time accepts the failure. Only a failure is ever waived.</summary>
+    Waived,
 }
 
 /// <summary>A checkpoint's outcome from the decision function. Missing evidence is never converted into a pass; nothing is averaged.</summary>
@@ -59,6 +62,9 @@ public enum CheckpointOutcome
 
     /// <summary>Evidence aged past its freshness, or a newer version superseded this one.</summary>
     Expired,
+
+    /// <summary>Every lane passed or was waived by an exception, and at least one was waived (an advisory lane may have failed, and says so).</summary>
+    ApprovedWithExceptions,
 }
 
 /// <summary>
@@ -71,9 +77,28 @@ public sealed record LaneEvidence(
 /// <summary>One lane of the decision's input. <paramref name="Freshness"/> is an ISO 8601 duration in days and hours.</summary>
 public sealed record LaneInput(string Lane, bool Blocking, LaneEvidence? Result, string? Freshness = null);
 
-/// <summary>The decision function's input: the checkpoint's exact version, the evaluation time, and its lanes.</summary>
+/// <summary>
+/// An identity and the assurance its writer claims for it (self-attested, signed or authenticated). A claim: a reader
+/// shows the assurance only as far as it verified it.
+/// </summary>
+public sealed record TrustedIdentity(string Identity, string Assurance);
+
+/// <summary>
+/// An exception: a person's decision to accept a lane's failure from <c>At</c> until <c>Expires</c>. In force at a time
+/// t when At &lt;= t &lt; Expires; it waives a failed lane, never missing, stale, not-measured or incomparable evidence.
+/// <c>Requirement</c>, <c>Reason</c> and <c>By</c> are for display and take no part in the decision.
+/// </summary>
+public sealed record ExceptionGrant(
+    string Lane, string Reason, TrustedIdentity By, AefTime At, AefTime Expires, string? Requirement = null)
+{
+    /// <summary>Granted at or before <paramref name="time"/>, and expiring after it.</summary>
+    public bool InForceAt(AefTime time) => At <= time && time < Expires;
+}
+
+/// <summary>The decision function's input: the checkpoint's exact version, the evaluation time, its lanes, and any exceptions.</summary>
 public sealed record CheckpointDecisionInput(
-    string SubjectVersion, AefTime EvaluatedAt, IReadOnlyList<LaneInput> Lanes, string? SupersededBy = null);
+    string SubjectVersion, AefTime EvaluatedAt, IReadOnlyList<LaneInput> Lanes, string? SupersededBy = null,
+    IReadOnlyList<ExceptionGrant>? Exceptions = null);
 
 /// <summary>One lane in the decision.</summary>
 public sealed record LaneDecision(string Lane, LaneStatus Status, bool Blocking, IReadOnlyList<string>? Axes = null);
@@ -92,7 +117,8 @@ public static class CheckpointDecision
         "^P(?=[0-9]|T[0-9])(?:([0-9]{1,5})D)?(?:T([0-9]{1,5})H)?\\z", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
 
     /// <summary>Decides a checkpoint.</summary>
-    /// <exception cref="ArgumentException">No lane, or a lane listed twice.</exception>
+    /// <exception cref="ArgumentException">No lane, a lane listed twice, an exception for a lane the input does not
+    /// have, or an exception that expires at or before it is granted.</exception>
     /// <exception cref="FormatException">A lane's freshness is not a duration in days and hours.</exception>
     public static CheckpointDecisionResult Decide(CheckpointDecisionInput input)
     {
@@ -105,6 +131,20 @@ public static class CheckpointDecision
         if (input.Lanes.GroupBy(l => l.Lane, StringComparer.Ordinal).FirstOrDefault(g => g.Count() > 1) is { } twice)
         {
             throw new ArgumentException($"Lane '{twice.Key}' is listed twice.", nameof(input));
+        }
+
+        var names = input.Lanes.Select(l => l.Lane).ToHashSet(StringComparer.Ordinal);
+        foreach (var grant in input.Exceptions ?? [])
+        {
+            if (!names.Contains(grant.Lane))
+            {
+                throw new ArgumentException($"An exception names lane '{grant.Lane}', which is not a lane of the input.", nameof(input));
+            }
+
+            if (grant.Expires <= grant.At)
+            {
+                throw new ArgumentException($"An exception for lane '{grant.Lane}' expires at or before it is granted: it is never in force.", nameof(input));
+            }
         }
 
         var lanes = new List<LaneDecision>(input.Lanes.Count);
@@ -140,6 +180,21 @@ public static class CheckpointDecision
                 };
             }
 
+            // Only a failure is ever waived, by an exception in force at the evaluation time: never missing or unusable evidence.
+            var lapsed = false;
+            if (status is LaneStatus.Failed
+                && input.Exceptions?.Where(e => string.Equals(e.Lane, lane.Lane, StringComparison.Ordinal)).ToList() is { Count: > 0 } grants)
+            {
+                if (grants.Any(e => e.InForceAt(input.EvaluatedAt)))
+                {
+                    status = LaneStatus.Waived;
+                }
+                else
+                {
+                    lapsed = true;
+                }
+            }
+
             lanes.Add(new LaneDecision(lane.Lane, status, lane.Blocking,
                 status is LaneStatus.Incomparable && lane.Result?.Axes is { Count: > 0 } axes ? axes : null));
 
@@ -151,9 +206,15 @@ public static class CheckpointDecision
                     LaneStatus.Missing => "missing",
                     LaneStatus.NotMeasured => "not-measured",
                     LaneStatus.Incomparable => "incomparable",
+                    LaneStatus.Waived => "waived",
                     _ => "stale",
                 };
                 reasons.Add($"{code}:{lane.Lane}");
+            }
+
+            if (lapsed)
+            {
+                reasons.Add($"exception-expired:{lane.Lane}");
             }
         }
 
@@ -167,8 +228,9 @@ public static class CheckpointDecision
             superseded || lanes.Any(l => l.Status is LaneStatus.Stale) ? CheckpointOutcome.Expired
             : lanes.Any(l => l is { Status: LaneStatus.Failed, Blocking: true }) ? CheckpointOutcome.Blocked
             : lanes.Any(l => l.Status is LaneStatus.Missing or LaneStatus.NotMeasured or LaneStatus.Incomparable) ? CheckpointOutcome.Inconclusive
+            : lanes.Any(l => l.Status is LaneStatus.Waived) ? CheckpointOutcome.ApprovedWithExceptions
             : CheckpointOutcome.Approved;
-        reasons.Add($"outcome:{outcome.ToString().ToLowerInvariant()}");
+        reasons.Add($"outcome:{CheckpointDecisionJson.WireName(outcome)}");
         return new CheckpointDecisionResult(outcome, lanes, reasons);
     }
 

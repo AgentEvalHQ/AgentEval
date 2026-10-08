@@ -1,0 +1,17 @@
+{
+  "kind": "plan-conformance",
+  "events": "events.ndjson",
+  "plan": "plan.json",
+  "runs": "runs",
+  "problems": [
+    [
+      "run:R-1",
+      "run-hash"
+    ]
+  ],
+  "rules": [
+    "STRM-4",
+    "SEAL-4"
+  ],
+  "why": "run.json was edited after sealing (to the plan's subject version) and sealed again: intact, but its seal has another run hash than the one announced; nothing else is checked, so its content capture is not reported"
+}

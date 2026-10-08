@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://agenteval.dev/aef/1/writer/run-plan.schema.json",
   "title": "AEF 1.0: run plan",
-  "description": "What a runner is asked to evaluate: the exact subject version, the suites and lanes, the limits, the content policy, where and how it runs, and the credentials it needs, as references only (PLAN-1 to PLAN-5).",
+  "description": "What a runner is asked to evaluate: the exact subject version, the suites and lanes, the limits, what text the runs keep (contentCapture), where and how it runs, and the credentials it needs, as references only (PLAN-1 to PLAN-5).",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -11,7 +11,7 @@
     "subject",
     "suites",
     "limits",
-    "contentPolicy",
+    "contentCapture",
     "isolation",
     "provider"
   ],
@@ -129,8 +129,8 @@
         }
       }
     },
-    "contentPolicy": {
-      "description": "As run.json's contentCapture.",
+    "contentCapture": {
+      "description": "What text the runs keep: off or on, as run.json's contentCapture (RUN-11). Every run the runner produces carries this value (STRM-4).",
       "enum": [
         "off",
         "on"

@@ -104,13 +104,13 @@ When the run closes, the sealer lists every file with its SHA-256 and size, sort
 
 ```
 635221c9…5fef5  122  blobs/sha256/63/635221c9…5fef5
-886e3eba…68101  489  evidence.ndjson
+f76af41e…108b1  489  evidence.ndjson
 6db8527c…b9c63  339  gates.ndjson
-cd5980b5…f5f87  810  metrics.json
-43f705c4…b3a35  3781  results.ndjson
+cd5980b5…9ef87  810  metrics.json
+08719682…36e5c  4023  results.ndjson
 6833f5f2…c1f5c  1863  run.json
 268eda20…14679  1180  summary.json
-27f1bf4e…25f96  626  traces.otlp.jsonl
+3c29fa78…98787  1018  traces.otlp.jsonl
 ```
 
 The SHA-256 of that text is the **run hash**: it identifies this run's exact content ([SEAL-4]). `seal.json` is an
@@ -146,7 +146,9 @@ flowchart LR
 A closed run never changes ([RUN-4]). What people decide about it later goes in `overlays/events.ndjson`: approvals,
 rejections, overrides, adjudications, waivers with an expiry, notes, and redactions. Events are appended in batches;
 each batch is sealed (`seal-0001.json`, `seal-0002.json`, …), bound to the run hash, and chained to the previous batch
-seal ([OVL-4]). Removing or altering an event breaks the chain ([OVL-5]).
+seal ([OVL-4]). Altering or removing an event inside a sealed batch breaks the chain ([OVL-5]). Removing the newest
+batches together with their seals leaves a shorter chain that still verifies: a signed batch, or a copy held
+elsewhere, shows it.
 
 A reader shows the **effective view**: the sealed states, plus what verified overlays say about them ([§4.3](spec/04-integrity.md)).
 
@@ -175,7 +177,7 @@ flowchart TB
   R --> LR
   M --> LR
   LR --> D[decision function<br/>pure, published, no clock]
-  D --> O[approved / blocked / inconclusive / expired]
+  D --> O[approved / approved with exceptions / blocked / inconclusive / expired]
 ```
 
 1. **Each lane names its rule and its exact runs, by run hash** ([CKP-2]). A run changed after the checkpoint was made
@@ -198,7 +200,9 @@ complete example: two lanes passed and the advisory memory lane has no evidence 
 
 When an evaluation is delegated, the delegating side writes a **run plan** (what to evaluate, the budget, the
 limits, credentials only as references) and the runner publishes a **manifest** (what it can run). A runner reports an
-**event stream**: accepted, started, progress, cost, the runs it sealed, the end. A stream verifier checks the stream
+**event stream**: `job.accepted` (or `job.refused`), `plan.estimated`, `spend.updated`, `case.completed`,
+`lane.completed`, `evidence.produced` for each sealed run, and one terminal event (`job.sealed`, `job.failed`,
+`job.cancelled`). A stream verifier checks the stream
 against the plan: budget kept, limits kept, every announced run sealed ([§6](spec/06-runners.md)).
 
 ## 6. Reading tolerantly, writing strictly
@@ -225,7 +229,7 @@ The reference tools are standard-library Python in [`../tools/`](../tools/):
 To write your first run: produce `run.json`, `results.ndjson`, `metrics.json` and `summary.json` against the writer
 schemas; compute each `resultId` with [RES-4]; close the run; seal it with [SEAL-1]–[SEAL-5]. Then check it with
 `aef_verify.py run`. The [conformance corpus](conformance/) holds a valid example of every file, and a broken one for
-every rule.
+every rule a file can show broken (`tools/check_spec.py` lists the few rules no vector can test, and why).
 
 ## Where next
 

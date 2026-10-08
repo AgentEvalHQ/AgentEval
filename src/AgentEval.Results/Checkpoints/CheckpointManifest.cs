@@ -13,8 +13,8 @@ namespace AgentEval.Results.Checkpoints;
 public static class CheckpointManifest
 {
     private static readonly HashSet<string> States = new(StringComparer.Ordinal) { "draft", "planned", "approved_to_spend", "running", "evidence_complete", "decided" };
-    private static readonly HashSet<string> Outcomes = new(StringComparer.Ordinal) { "approved", "blocked", "inconclusive", "expired" };
-    private static readonly HashSet<string> LaneStatuses = new(StringComparer.Ordinal) { "passed", "failed", "missing", "not_measured", "incomparable", "stale" };
+    private static readonly HashSet<string> Outcomes = new(StringComparer.Ordinal) { "approved", "approved_with_exceptions", "blocked", "inconclusive", "expired" };
+    private static readonly HashSet<string> LaneStatuses = new(StringComparer.Ordinal) { "passed", "failed", "missing", "not_measured", "incomparable", "stale", "waived" };
     private static readonly HashSet<string> EvidenceStatuses = new(StringComparer.Ordinal) { "passed", "failed", "not_measured", "incomparable" };
 
     /// <summary>

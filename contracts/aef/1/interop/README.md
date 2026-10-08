@@ -36,7 +36,8 @@ files ([§3.9](../spec/03-run.md#39-rules-across-files)) like any other run. Its
 conversion. It says nothing about the original record. [§7.5](../spec/07-versioning.md#75-agenteval-store-v1) treats a
 run migrated from AgentEval's older store the same way, sealed with `sealedBy: ingest`. Some facts AEF requires are
 missing from most sources: the subject, `execution.targetMode`, a suite version. A converter has to supply them, and
-AEF has no marker yet for a value a converter supplied ([I7](#open-gaps)).
+lists each one in `run.json`'s `imported.asserted` ([RUN-15](../spec/03-run.md#32-runjson)), so a reader shows them as
+the converter's claims.
 
 **Worked examples.** Every target page converts lines of
 [`conformance/valid/completed-eval/run/results.ndjson`](../conformance/valid/completed-eval/run/results.ndjson), or
@@ -62,17 +63,18 @@ AEF → target → AEF, for one result line of the corpus run.
 
 Values kept in the target's free-form metadata are not counted as surviving in this table, except where a row says so.
 
-## Open gaps
+## Gaps found by these mappings
 
-Where AEF lacks something a mapping needs, the pages link one of these findings. Each is tracked; none is decided.
+The research behind these pages found eight things AEF lacked. Seven are now part of AEF 1.0; the pages say where a
+mapping still loses something.
 
-| Id | What AEF lacks | Pages |
+| Id | What was missing | In AEF 1.0 |
 |---|---|---|
-| I1 | A state for "measured, no pass/fail rule". Scores are numbers only, so categorical results have no field (OTel labels, Inspect `C`/`I`/`P`/`N`, OpenAI label graders). Summary values are recomputed as a mean or a sum ([SUM-5](../spec/03-run.md#36-summaryjson)), so other aggregates (F1, pass@k, median, bootstrap figures) have no field outside `ext`. | all |
-| I2 | A typed place for case content: input, expected output, output, transcript. Evidence `kind` has no such values, and with `contentCapture: off` nothing is kept ([RUN-11](../spec/03-run.md#32-runjson)). | Inspect, OpenAI Evals, EvalPort |
-| I3 | OpenTelemetry alignment: no run file for OTLP logs, where evaluation events live; `otel.semconvVersion` cannot name the GenAI registry, whose schema URL is now separate; no published vocabulary for `gen_ai.evaluation.score.label`. | OpenTelemetry |
-| I4 | Usage detail: only input and output tokens, one `role` per line; no cache-read, cache-write or reasoning tokens; no run-level usage per model. | OpenTelemetry, Inspect, OpenAI Evals |
-| I5 | Trial aggregation: `trials.aggregation` and `executionPolicy.aggregation` allow only `MajorityVote`. | Inspect |
-| I6 | Times per result: a result line has `durationMs` but no start or end time. | OpenTelemetry, Inspect, OpenAI Evals, EvalPort |
-| I7 | A marker for facts a converter supplied that the original producer did not record (subject, target mode, a suite version computed from content). | Inspect, OpenAI Evals, EvalPort |
-| I8 | An attestation bound to the evaluated artifact. The seal's subjects are the run's files, so policy engines that look attestations up by the artifact's digest do not find AEF evidence. AEF's media types are unregistered. | in-toto |
+| I1 | A state for "measured, no pass/fail rule"; categorical results; aggregates other than the mean | The `scored` state ([RES-1](../spec/03-run.md#341-states)), a score's `label`, and a summary entry's `aggregate` (pass@k, F1, median; [SUM-5](../spec/03-run.md#36-summaryjson)) |
+| I2 | A typed place for case content | Evidence kinds `input`, `expected`, `output`, `transcript`, all content under [RUN-11](../spec/03-run.md#32-runjson) |
+| I3 | OpenTelemetry alignment | An optional `logs.otlp.jsonl` for OpenTelemetry events, `otel.schemaUrls`, and the label vocabulary: an exported event's label is the result's state name ([RUN-14](../spec/03-run.md#310-traces)) |
+| I4 | Usage detail | `usage` is one entry per party (agent, judge, attacker), with cache-read, cache-write and reasoning tokens in OpenTelemetry's names ([RES-10](../spec/03-run.md#345-facts-about-a-result)) |
+| I5 | Trial aggregations beyond `MajorityVote` | `AllPass`, `AnyPass`, `Mean`, `Median`, `Max`, `PassAtK` (with `k`) |
+| I6 | Times per result | `startedAt` and `endedAt` on a result line |
+| I7 | Facts a converter supplied | `imported` in `run.json`: the original tool and the fields the converter asserted ([RUN-15](../spec/03-run.md#32-runjson)) |
+| I8 | An attestation bound to the evaluated artifact; registered media types | **Open.** [in-toto.md](in-toto.md) gives the companion statement's shape and the proposed media type names; registering them is an external process. |

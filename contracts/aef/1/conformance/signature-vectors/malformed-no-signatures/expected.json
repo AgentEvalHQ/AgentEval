@@ -9,6 +9,7 @@
   "verifiesFor": [],
   "rules": [
     "SIG-1",
-    "SIG-5"
+    "SIG-5",
+    "SIG-6"
   ]
 }

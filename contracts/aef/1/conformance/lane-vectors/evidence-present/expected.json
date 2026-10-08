@@ -31,6 +31,7 @@
   "problems": [],
   "rules": [
     "LANE-1",
-    "LANE-4"
+    "LANE-4",
+    "LANE-10"
   ]
 }

@@ -30,11 +30,11 @@ A release decision over several evidence lanes for one exact subject version: th
 | `budget.spentUsd` | number |  | ≥ 0 | What has been spent so far, in US dollars. |
 | `budget.approvedBy` | [trustedIdentity](common.md#trustedidentity) |  |  | Who approved the budget. A claim: a reader shows its assurance only as far as it verified it (CKP-6). |
 | `state` | one of `"draft"`, `"planned"`, `"approved_to_spend"`, `"running"`, `"evidence_complete"`, `"decided"` | yes |  | draft, planned, approved_to_spend, running, evidence_complete, then decided, in that order. An abandoned checkpoint moves to decided with the outcome aborted (CKP-4). |
-| `outcome` | null or one of `"approved"`, `"blocked"`, `"inconclusive"`, `"expired"`, `"aborted"` |  |  | Set from state decided on; null before. aborted when the checkpoint was abandoned (abortReason says why), never from the decision function. |
+| `outcome` | null or one of `"approved"`, `"approved_with_exceptions"`, `"blocked"`, `"inconclusive"`, `"expired"`, `"aborted"` |  |  | Set from state decided on; null before. approved, approved_with_exceptions, blocked, inconclusive or expired from the decision function (DEC-3); aborted when the checkpoint was abandoned (abortReason says why), never from the decision function (CKP-4). |
 | `decision` | [decision](decision.md) |  |  | The decision function's output, recorded when the state became decided. |
 | `ext` | [ext](common.md#ext) |  |  | Producer extensions, named reverse-DNS or with the producer's prefix. A reader ignores what it does not know; never holds a secret (ENC-19). |
 | `abortReason` | string |  | ≥ 1 chars; ≤ 2048 chars | Why the checkpoint was abandoned. Required with the outcome aborted (CKP-4). |
-| `decisionInput` | [input](decision.md#input) |  |  | The decision function's input, recorded with its output so anyone can recompute it. |
+| `decisionInput` | [input](decision.md#input) |  |  | The decision function's input, recorded with its output so anyone can recompute it; its exceptions are recorded here, so the checkpoint's signature covers them (CKP-4, CKP-5, CKP-7). |
 
 - **Rule:** Decided by the decision function: its input and output are recorded.
 - **Rule:** Abandoned: it says why, and records no decision.

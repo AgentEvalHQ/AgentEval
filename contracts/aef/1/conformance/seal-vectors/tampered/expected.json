@@ -8,6 +8,8 @@
     ]
   ],
   "rules": [
-    "SEAL-6"
+    "SEAL-6",
+    "SEAL-2",
+    "RUN-4"
   ]
 }

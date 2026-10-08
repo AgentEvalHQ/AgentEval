@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "S-inconclusive",
+  "lanes": [
+    {
+      "lane": "security",
+      "metrics": [
+        {
+          "metric": "ok",
+          "path": "a",
+          "n": 3,
+          "N": 3,
+          "notMeasured": 0,
+          "value": 0.0,
+          "verdict": "passed",
+          "rule": "recorded by the producer",
+          "sum": 0,
+          "sumSq": 0
+        }
+      ]
+    }
+  ]
+}

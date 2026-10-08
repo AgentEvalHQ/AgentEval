@@ -172,6 +172,218 @@
           }
         }
       }
+    },
+    {
+      "description": "An approval or rejection is about the run or a result. (OVL-1)",
+      "if": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "approve",
+              "reject"
+            ]
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "target": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "requirement"
+                  ]
+                },
+                {
+                  "required": [
+                    "blob"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "An override or adjudication targets one result, never a requirement or a blob. (OVL-1)",
+      "if": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "override",
+              "adjudicate"
+            ]
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "target": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "requirement"
+                  ]
+                },
+                {
+                  "required": [
+                    "blob"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "A waiver targets a result or a requirement, never a blob. (OVL-1)",
+      "if": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "waive"
+            ]
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "target": {
+            "allOf": [
+              {
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "blob"
+                      ]
+                    }
+                  ]
+                }
+              },
+              {
+                "anyOf": [
+                  {
+                    "required": [
+                      "result"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "requirement"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "description": "A redaction targets a blob alone. (OVL-1)",
+      "if": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "redact"
+            ]
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "target": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "result"
+                  ]
+                },
+                {
+                  "required": [
+                    "requirement"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "A note, acknowledgement or baseline acceptance is about the run, a result or a requirement, never a blob. (OVL-1)",
+      "if": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "acknowledge",
+              "accept_baseline",
+              "annotate"
+            ]
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "target": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "blob"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "An override or adjudication never sets pending: a closed run has no pending result (RES-3, OVL-1).",
+      "if": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "override",
+              "adjudicate"
+            ]
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "state": {
+            "not": {
+              "const": "pending"
+            }
+          }
+        }
+      }
     }
   ]
 }

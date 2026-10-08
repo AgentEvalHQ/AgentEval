@@ -156,6 +156,29 @@
                 "path": {
                   "description": "The result path this entry summarises, one line per case (spec 03, SUM-3).",
                   "$ref": "common.schema.json#/$defs/text"
+                },
+                "aggregate": {
+                  "description": "When value is not the mean (or, for a count, the sum) of the measured values: how the producer computed it. A verifier then recomputes N, n, notMeasured and sum, not value (SUM-5).",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "method"
+                  ],
+                  "properties": {
+                    "method": {
+                      "description": "The method: pass@k, f1, median, or another name, shown as written.",
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64,
+                      "pattern": "^[a-z][a-z0-9@._-]*$"
+                    },
+                    "k": {
+                      "description": "k, for pass@k and the like.",
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    }
+                  }
                 }
               },
               "allOf": [

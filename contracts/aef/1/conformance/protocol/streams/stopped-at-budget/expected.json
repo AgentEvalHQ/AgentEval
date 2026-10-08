@@ -1,4 +1,10 @@
 {
+  "kind": "stream",
   "plan": "../plan.json",
-  "problems": []
+  "problems": [],
+  "rules": [
+    "PLAN-2",
+    "STRM-1",
+    "STRM-3"
+  ]
 }

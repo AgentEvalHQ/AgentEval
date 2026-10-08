@@ -1,6 +1,7 @@
 {
   "kind": "run",
   "run": "run",
+  "policy": "policy.json",
   "outcome": "intact",
   "problems": [
     [
@@ -8,8 +9,12 @@
       "withheld"
     ]
   ],
+  "withheld": 1,
+  "signedBy": [],
   "rules": [
     "OVL-10",
-    "SEAL-6"
+    "SEAL-6",
+    "SEAL-4",
+    "SEC-5"
   ]
 }

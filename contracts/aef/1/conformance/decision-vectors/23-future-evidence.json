@@ -1,5 +1,12 @@
 {
   "description": "Evidence that closed after the evaluation time did not exist then: missing.",
+  "rules": [
+    "DEC-1",
+    "DEC-2",
+    "DEC-3",
+    "DEC-4",
+    "DEC-5"
+  ],
   "input": {
     "subjectVersion": "git:3f2a1c",
     "evaluatedAt": "2026-10-08T12:00:00Z",

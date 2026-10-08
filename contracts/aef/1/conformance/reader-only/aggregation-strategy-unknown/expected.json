@@ -1,0 +1,13 @@
+{
+  "kind": "reader-only",
+  "schema": "result",
+  "writer": "invalid",
+  "reader": "valid",
+  "reads": {
+    "aggregation.strategy": "Bayesian"
+  },
+  "rules": [
+    "VER-8",
+    "RES-6"
+  ]
+}

@@ -1,20 +1,45 @@
 #!/usr/bin/env python3
-"""Runner protocol references for 1/README.md, 'Run plans and runners' and 'The event stream': plan-to-runner
-matching, and the verification of a finished event stream.
+"""Runner protocol references for spec 06 (1/spec/06-runners.md): plan-to-runner matching ([PLAN-7]), the
+verification of a finished event stream ([STRM-3]), and the check that the runs a stream names keep to its plan
+([STRM-4]).
 
-`python aef_stream.py --check` runs both against conformance/protocol/ and exits 1 on any difference.
+Usage:
+  python aef_stream.py --check
+      Runs every vector of conformance/protocol/ (the matching, stream and plan-conformance vectors) and exits 1 on
+      any difference.
+  python aef_stream.py --conform EVENTS PLAN RUNS [--policy POLICY]
+      [STRM-4] for one job: the event stream, its plan, and the folder of the runs it produced; POLICY is a trust
+      policy file, which decides which redactions are authorized when the runs are verified (OVL-10). Prints
+      {"problems": [[where, problem], ...]}; exits 0 when it ran, 2 on a usage or input error.
+
+The vectors of conformance/protocol/ (spec 09 §9.2.1 defers to this list). Every expected.json has `kind` and
+`rules` (the rule ids the vector concerns):
+  plans/<name>/, runners/<name>/   kind plan: document.json; `schema` (run-plan or runner), `writer` and `reader`
+                                   (valid or invalid), `why`
+  matching/<name>/                 kind matching: plan.json and runner.json; `matches` (true or false), `why`
+  streams/<name>/                  kind stream: events.ndjson (read as STRM-2 says: a last line without LF is still
+                                   being written, and not read); `plan` (the plan file, relative to the vector: the
+                                   plans are shared, in streams/), `problems` (a list of {where, problem}, in
+                                   order), and `readerOnly` when a writer could not write the stream (an unknown kind)
+  plan-conformance/<name>/         kind plan-conformance: `events`, `plan` and `runs` (the stream, its plan and the
+                                   folder of the runs it produced, beside expected.json), optional `policy` (a trust
+                                   policy file beside it), `problems` ([where, problem] pairs, in order), `why`
+A stream vector's plan digest is the SHA-256 of its plan file's bytes.
 """
 import calendar
 import datetime
 import hashlib
 import json
+import os
 import re
 import sys
 from pathlib import Path
 
+TOOLS = Path(__file__).resolve().parent
 TERMINAL = {"job.sealed", "job.failed", "job.cancelled", "job.refused"}
 TIME = re.compile(r"^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\.([0-9]{1,9}))?Z$")
 TIMEOUT = re.compile(r"^PT(?=[0-9])(?:([0-9]{1,5})H)?(?:([0-9]{1,5})M)?$")
+PROVENANCE = ("planId", "planDigest", "jobId", "runnerId")
 
 
 def parse_time(text):
@@ -103,15 +128,134 @@ def verify(events, plan=None, plan_digest=None):
     return problems
 
 
+# ---------------------------------------------------------------------------- STRM-4: the runs a stream names
+
+def run_folders(root):
+    """[(folder, run.json)] of every run under root, found by its run.json (RUN-1), in path order. A folder that holds
+    a run holds no other; a run.json that is not a JSON object with a string runId names no run."""
+    found = []
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames.sort()
+        if "run.json" in filenames:
+            dirnames[:] = []
+            try:
+                doc = json.loads(Path(dirpath, "run.json").read_bytes().decode("utf-8"))
+            except ValueError:
+                continue
+            if isinstance(doc, dict) and isinstance(doc.get("runId"), str):
+                found.append((Path(dirpath), doc))
+    return sorted(found, key=lambda f: f[0].as_posix().encode("utf-8"))
+
+
+def examine(folder, policy=None):
+    """(a run's run hash, whether it is intact), by the reference run verifier: SEAL-4's run hash (its seal's
+    predicate.runHash when seal.json is valid against the reader seal schema, else recomputed from the files) and the
+    outcome of §4.5 under the caller's trust policy, which decides which redactions are authorized (OVL-10). Imported
+    here: aef_verify imports this module."""
+    if str(TOOLS) not in sys.path:  # python -I leaves the script's own folder out of sys.path
+        sys.path.insert(0, str(TOOLS))
+    import aef_verify  # noqa: E402
+    run = aef_verify.Run(folder, policy)
+    return run.claimed_run_hash(), run.intact
+
+
+def ndjson(path):
+    """The objects of an NDJSON file, one per LF-terminated line."""
+    return [json.loads(line) for line in Path(path).read_bytes().decode("utf-8").split("\n") if line]
+
+
+def departures(doc, plan, accepted):
+    """The codes of STRM-4 an intact, announced run's run.json breaks (the job's limits apart)."""
+    found = []
+    provenance = doc.get("provenance")
+    if accepted is None or not isinstance(provenance, dict) or any(provenance.get(k) != accepted.get(k) for k in PROVENANCE):
+        found.append("provenance")
+    subject = doc.get("subject") or {}
+    if subject.get("ref") != plan["subject"]["ref"] or subject.get("version") != plan["subject"]["version"]:
+        found.append("subject")
+    suite = doc.get("suite") or {}
+    if not any(suite.get("ref") == s["ref"] and suite.get("version") == s["version"]
+               and ("digest" not in s or suite.get("digest") == s["digest"]) for s in plan["suites"]):
+        found.append("suite")
+    if plan.get("judges"):
+        pairs = lambda judges: [(j.get("model"), j.get("rubricDigest")) for j in judges]
+        if pairs(doc.get("judges", [])) != pairs(plan["judges"]):
+            found.append("judges")
+    capture = "off" if doc.get("contentCapture") == "off" else "on"  # absent or unknown reads as on
+    if capture != plan["contentCapture"]:
+        found.append("content-capture")
+    if (doc.get("execution") or {}).get("targetMode") != "live":
+        found.append("target-mode")
+    return found
+
+
+def conform(events, plan, runs, policy=None, examine=examine):
+    """[STRM-4]: (where, problem) for the runs a job.sealed or job.failed names, at 'run:<runId>', and for the job's
+    limits over those runs, at 'job'; ordered by path (UTF-8 bytes) and then by code. runs is the folder of the runs the
+    job produced; policy the caller's trust policy (or None); examine(folder, policy) gives (run hash, intact)."""
+    accepted = next((e for e in events if e.get("kind") == "job.accepted"), None)
+    announced, named = {}, []
+    for e in events:
+        if e.get("kind") == "evidence.produced":
+            announced.setdefault(e["runId"], e["runHash"])  # the first announcement (STRM-3 reports a change)
+        elif e.get("kind") in ("job.sealed", "job.failed"):
+            named.extend(r for r in e.get("runs", []) if r not in named)  # a run named twice is checked once
+    folders = run_folders(runs)
+    problems, chosen = [], []
+    for run_id in named:
+        candidates = [(f, doc) for f, doc in folders if doc["runId"] == run_id]
+        run = next(((f, doc) for f, doc in candidates if run_id in announced and examine(f, policy) == (announced[run_id], True)), None)
+        if not candidates:
+            found = ["run-missing"]
+        elif run is None:
+            found = ["run-hash"]
+        else:
+            found = departures(run[1], plan, accepted)
+            summary_file = run[0] / "summary.json"
+            summary = json.loads(summary_file.read_bytes()) if summary_file.is_file() else {}
+            if not isinstance((summary.get("cost") or {}).get("totalUsd"), (int, float)):
+                found.append("no-cost")  # a budget cannot be checked without it
+            chosen.append(run[0])
+        problems.extend((f"run:{run_id}", p) for p in found)
+
+    # The job's limits, over the runs found, each once: a runner cannot pass by splitting its work across runs.
+    limits, cost, cases = plan["limits"], 0, set()
+    for folder in chosen:
+        summary = json.loads((folder / "summary.json").read_bytes()) if (folder / "summary.json").is_file() else {}
+        cost += (summary.get("cost") or {}).get("totalUsd", 0)
+        lines = ndjson(folder / "results.ndjson") if (folder / "results.ndjson").is_file() else []
+        cases |= {line["caseId"] for line in lines if line.get("parentResultId") is None}
+    if cost > limits["maxUsd"]:
+        problems.append(("job", "over-budget"))
+    if "cases" in limits and len(cases) > limits["cases"]:
+        problems.append(("job", "over-cases"))
+    return sorted(problems, key=lambda p: (p[0].encode("utf-8"), p[1].encode("utf-8")))
+
+
+def read_stream(path):
+    """STRM-2: the finished lines only; a last line without LF is still being written."""
+    data = Path(path).read_bytes()
+    complete = data[:data.rfind(b"\n") + 1]
+    return [json.loads(line) for line in complete.decode("utf-8").split("\n") if line]
+
+
+def conform_files(events_path, plan_path, runs_path, policy_path=None):
+    plan = json.loads(Path(plan_path).read_bytes().decode("utf-8"))
+    policy = json.loads(Path(policy_path).read_bytes().decode("utf-8")) if policy_path else None
+    return conform(read_stream(events_path), plan, Path(runs_path), policy)
+
+
+# ---------------------------------------------------------------------------- the vectors
+
 def check():
-    root = Path(__file__).resolve().parents[1] / "1" / "conformance" / "protocol"
+    root = TOOLS.parent / "1" / "conformance" / "protocol"
     failed, count = 0, 0
     for d in sorted(p for p in (root / "streams").iterdir() if p.is_dir()):
         count += 1
         expected_doc = json.loads((d / "expected.json").read_text(encoding="utf-8"))
         plan_path = (d / expected_doc["plan"]).resolve()
         plan = json.loads(plan_path.read_text(encoding="utf-8"))
-        events = [json.loads(line) for line in (d / "events.ndjson").read_bytes().decode("utf-8").split("\n") if line]
+        events = read_stream(d / "events.ndjson")
         expected = [(p["where"], p["problem"]) for p in expected_doc["problems"]]
         actual = verify(events, plan, hashlib.sha256(plan_path.read_bytes()).hexdigest())
         if actual != expected:
@@ -123,6 +267,14 @@ def check():
         if matches(load("plan.json"), load("runner.json")) != load("expected.json")["matches"]:
             failed += 1
             print(f"FAIL matching/{d.name}")
+    for d in sorted(p for p in (root / "plan-conformance").iterdir() if p.is_dir()):
+        count += 1
+        e = json.loads((d / "expected.json").read_text(encoding="utf-8"))
+        expected = [tuple(p) for p in e["problems"]]
+        actual = conform_files(d / e["events"], d / e["plan"], d / e["runs"], d / e["policy"] if "policy" in e else None)
+        if actual != expected:
+            failed += 1
+            print(f"FAIL plan-conformance/{d.name}\n  expected {expected}\n  actual   {actual}")
     for bad in ("2026-02-31T00:00:00Z", "2026-10-08T12:00:00Z\n"):
         try:
             parse_time(bad)
@@ -134,5 +286,28 @@ def check():
     return 1 if failed or not count else 0
 
 
+def main(argv):
+    if "--check" in argv:
+        return check()
+    if "--conform" in argv:
+        args = argv[argv.index("--conform") + 1:]
+        policy = None
+        if len(args) == 5 and args[3] == "--policy":
+            args, policy = args[:3], args[4]
+        if len(args) != 3:
+            print("usage: aef_stream.py --conform EVENTS PLAN RUNS [--policy POLICY]", file=sys.stderr)
+            return 2
+        try:
+            problems = conform_files(*args, policy)
+        except (OSError, ValueError, KeyError, TypeError) as error:
+            print(f"aef_stream.py: {error}", file=sys.stderr)
+            return 2
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", newline="\n")
+        sys.stdout.write(json.dumps({"problems": [list(p) for p in problems]}, ensure_ascii=False) + "\n")
+        return 0
+    return 0
+
+
 if __name__ == "__main__":
-    sys.exit(check() if "--check" in sys.argv else 0)
+    sys.exit(main(sys.argv[1:]))

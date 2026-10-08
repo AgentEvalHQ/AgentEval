@@ -2,7 +2,7 @@
 
 A **runner** executes an evaluation on someone's behalf: a local process, a CI job, a remote service. It is given a
 **plan**, reports an **event stream**, and produces sealed runs that carry the plan's provenance ([RUN-12]). A
-verifier can then check that the stream keeps to the plan.
+verifier can then check that the stream, and the runs it names, keep to the plan ([STRM-3], [STRM-4]).
 
 ## 6.1 Run plans
 
@@ -14,8 +14,9 @@ A run plan (schema `run-plan`) is what a runner is asked to evaluate:
 - the suites, each with an exact version and the lane it serves;
 - **[PLAN-2]** the limits the runner **MUST** stop at: `maxUsd` always; `cases` and `timeout` (hours and minutes) when
   set;
-- the content policy, the isolation (`process`, `container`, `remote-zone` with its `zone`), and the provider (`local`,
-  `docker`, `k8s`, `ci:<name>`);
+- the content capture (`contentCapture`: `off` or `on`, what text the runs keep, as in `run.json`, [RUN-11]), the
+  isolation (`process`, `container`, `remote-zone` with its `zone`), and the provider (`local`, `docker`, `k8s`,
+  `ci:<name>`);
 - the judges (model, provider, rubric digest), the baseline a comparison lane uses (a policy, or one sealed run by id
   and run hash) and the comparability axes, so a runner cannot pick them;
 - the tags a runner must carry (`runnerSelector`);
@@ -91,8 +92,41 @@ output for a local runner, over its channel for a remote one.
   | `unannounced-run` | `job.sealed` or `job.failed` naming a run no `evidence.produced` announced |
   | `unsealed-run` | `job.sealed` or `job.failed` not naming a run that was announced |
   | `no-terminal` | at path `stream`, after every event's problems: a finished stream with no terminal event |
+- **[STRM-4] Plan conformance.** Given also the runs the job produced (a folder of runs, found by their `run.json`,
+  [RUN-1]) and, optionally, a trust policy, a stream verifier checks that the runs the `job.sealed` and `job.failed`
+  events name are the runs the plan asked for. Each run is checked once, however often it is named. The run is the
+  run folder whose `run.json` has its `runId`, whose run hash ([SEAL-4]: its seal's, or, without a seal, recomputed
+  from its files) is the one the first `evidence.produced` for that `runId` announced, and that is intact (§4.5; a
+  blob withheld by a redaction the trust policy authorizes, [OVL-10], leaves it intact). When no folder has the
+  `runId`, the problem is `run-missing`; when folders have it but none is that run, or no `evidence.produced`
+  announced the `runId`, it is `run-hash`. Either is the run's only problem: its other rules would be checked against
+  files the runner did not announce. The other runs, the runs **found**, are each checked against the plan at
+  `run:<runId>`, and together against the plan's limits at `job`: a runner cannot pass by splitting its work across
+  runs. Problems are ordered as §3.9 orders them: by path (its UTF-8 bytes, so `job` first), then by code, the order
+  of this table:
+
+  | Code | When |
+  |---|---|
+  | `content-capture` | `contentCapture`, read as [RUN-11] and [VER-8] read it (absent or unknown is `on`), is not the plan's |
+  | `judges` | the plan's `judges` is not empty, and the run's is not the same list: each `model` and `rubricDigest`, in order (an absent value equals only an absent value) |
+  | `over-budget` | at `job`, once: the sum of `summary.json`'s `cost.totalUsd` over the runs found is above the plan's `maxUsd` (equal is within it) |
+  | `no-cost` | at `run:<runId>`: a run found whose `summary.json` has no `cost.totalUsd`; the budget cannot be checked without it, so a runner cannot stay under it by leaving cost out |
+  | `over-cases` | at `job`, once: the plan sets `cases`, and the runs found have more: the distinct `caseId`s of their result lines without `parentResultId`, whatever their state, counted across the whole job (a `caseId` in two runs counts once) |
+  | `provenance` | `provenance` ([RUN-12]) is not the `planId`, `planDigest`, `jobId` and `runnerId` of the stream's first `job.accepted`, or the stream has none |
+  | `run-hash` | folders have the `runId`, but none is intact with the run hash announced for it, or none was announced |
+  | `run-missing` | no folder has the `runId` |
+  | `subject` | `subject.ref` or `subject.version` is not the plan's |
+  | `suite` | `suite` is none of the plan's suites: the same `ref` and `version`, and, when the plan's suite names a `digest`, that `digest` |
+  | `target-mode` | `execution.targetMode` is not `live` ([RUN-7]) |
+
+  [STRM-3] ties the stream to the plan's bytes and checks the spend and cases the job reported; [STRM-4] ties each run
+  the stream names to the stream, and checks the runs themselves against the plan. A check of a job runs both.
 - `conformance/protocol/` holds plans, runner manifests, matching pairs, and streams with the problems written by hand,
   including the cases a plausible wrong implementation gets wrong (a gap followed by more events, times a nanosecond
-  apart, spend equal to the budget, a decrease followed by a rise, an unknown kind mid-stream).
+  apart, spend equal to the budget, a decrease followed by a rise, an unknown kind mid-stream, a terminal event still
+  being written). Its `plan-conformance/` holds streams with their plan and the runs they name, with the problems of
+  [STRM-4] and the same kind of cases (a run named twice, two folders with one `runId`, a run edited and sealed again,
+  a run without a seal, a redacted run with and without the policy that authorizes it, the job's cost and cases
+  exactly at the limit, runs each within the limits whose sum is not, a case with a child line or repeated trials).
 - **Not in 1.0:** signed jobs a remote runner pulls from a queue (so it can check who sent a plan). A later minor adds
   them; until then a remote runner authenticates its channel by other means.

@@ -1,5 +1,11 @@
 {
   "description": "Lane reasons come first, then the supersession, then the outcome.",
+  "rules": [
+    "DEC-1",
+    "DEC-2",
+    "DEC-3",
+    "DEC-4"
+  ],
   "input": {
     "subjectVersion": "git:3f2a1c",
     "evaluatedAt": "2026-10-08T12:00:00Z",

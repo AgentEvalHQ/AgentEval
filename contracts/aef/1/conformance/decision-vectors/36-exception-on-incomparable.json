@@ -1,0 +1,56 @@
+{
+  "description": "An incomparable comparison is never waived.",
+  "rules": [
+    "DEC-1",
+    "DEC-2",
+    "DEC-3",
+    "DEC-4"
+  ],
+  "input": {
+    "subjectVersion": "git:3f2a1c",
+    "evaluatedAt": "2026-10-08T12:00:00Z",
+    "lanes": [
+      {
+        "lane": "memory",
+        "blocking": false,
+        "result": {
+          "status": "incomparable",
+          "subjectVersion": "git:3f2a1c",
+          "oldestClosedAt": "2026-10-07T10:00:00Z",
+          "axes": [
+            "judges"
+          ]
+        }
+      }
+    ],
+    "exceptions": [
+      {
+        "lane": "memory",
+        "reason": "The memory failure is accepted until the fix ships; tracked in the release review.",
+        "by": {
+          "identity": "oidc:https://login.example.com/u-7f3a",
+          "assurance": "authenticated"
+        },
+        "at": "2026-10-06T09:00:00Z",
+        "expires": "2026-10-20T00:00:00Z"
+      }
+    ]
+  },
+  "expected": {
+    "outcome": "inconclusive",
+    "lanes": [
+      {
+        "lane": "memory",
+        "status": "incomparable",
+        "blocking": false,
+        "axes": [
+          "judges"
+        ]
+      }
+    ],
+    "reasons": [
+      "incomparable:memory",
+      "outcome:inconclusive"
+    ]
+  }
+}

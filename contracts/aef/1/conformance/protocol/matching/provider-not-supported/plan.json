@@ -24,7 +24,7 @@
     "cases": 200,
     "timeout": "PT2H"
   },
-  "contentPolicy": "off",
+  "contentCapture": "off",
   "isolation": "process",
   "provider": "k8s",
   "judges": [

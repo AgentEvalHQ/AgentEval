@@ -1,0 +1,17 @@
+{
+  "kind": "plan-conformance",
+  "events": "events.ndjson",
+  "plan": "plan.json",
+  "runs": "runs",
+  "problems": [
+    [
+      "run:R-1",
+      "content-capture"
+    ]
+  ],
+  "rules": [
+    "STRM-4",
+    "PLAN-2"
+  ],
+  "why": "job.sealed names R-1 twice: it is checked and reported once, and its $2.00 counts once in the job's cost"
+}

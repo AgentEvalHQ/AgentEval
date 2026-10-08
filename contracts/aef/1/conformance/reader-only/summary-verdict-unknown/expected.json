@@ -1,0 +1,13 @@
+{
+  "kind": "reader-only",
+  "schema": "summary",
+  "writer": "invalid",
+  "reader": "valid",
+  "reads": {
+    "lanes[0].metrics[0].verdict": "inconclusive"
+  },
+  "rules": [
+    "VER-8",
+    "SUM-6"
+  ]
+}

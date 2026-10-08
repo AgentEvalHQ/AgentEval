@@ -1,5 +1,8 @@
 {
   "description": "A lane listed twice is ambiguous: refused.",
+  "rules": [
+    "DEC-1"
+  ],
   "input": {
     "subjectVersion": "git:3f2a1c",
     "evaluatedAt": "2026-10-08T12:00:00Z",

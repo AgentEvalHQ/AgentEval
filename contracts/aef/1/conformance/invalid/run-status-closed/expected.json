@@ -1,0 +1,11 @@
+{
+  "kind": "document",
+  "schema": "run",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "VER-9",
+    "RUN-5"
+  ],
+  "why": "status is closed for major 1"
+}

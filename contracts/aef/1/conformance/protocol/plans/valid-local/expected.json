@@ -1,6 +1,12 @@
 {
+  "kind": "plan",
   "schema": "run-plan",
   "writer": "valid",
   "reader": "valid",
-  "rule": "a local process run"
+  "rules": [
+    "PLAN-1",
+    "PLAN-2",
+    "PLAN-3"
+  ],
+  "why": "a local process run: an exact subject version, a budget, credentials as references"
 }

@@ -1,0 +1,12 @@
+{
+  "kind": "reader-only",
+  "schema": "result",
+  "writer": "invalid",
+  "reader": "valid",
+  "reads": {
+    "attack.taxonomy[0].scheme": "other"
+  },
+  "rules": [
+    "VER-8"
+  ]
+}

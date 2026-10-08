@@ -2,7 +2,7 @@
 
 *Generated from [`schemas/writer/run-plan.schema.json`](../schemas/writer/run-plan.schema.json) by `tools/gen_reference.py`. Do not edit: edit the schema.*
 
-What a runner is asked to evaluate: the exact subject version, the suites and lanes, the limits, the content policy, where and how it runs, and the credentials it needs, as references only (PLAN-1 to PLAN-5).
+What a runner is asked to evaluate: the exact subject version, the suites and lanes, the limits, what text the runs keep (contentCapture), where and how it runs, and the credentials it needs, as references only (PLAN-1 to PLAN-5).
 
 | Field | Type | Required | Bounds | Description |
 |---|---|---|---|---|
@@ -25,7 +25,7 @@ What a runner is asked to evaluate: the exact subject version, the suites and la
 | `limits.maxUsd` | number | yes | ≥ 0 | The most the runner may spend, in US dollars. Always set; spend equal to it is within it (PLAN-2, STRM-3). |
 | `limits.cases` | integer |  | ≥ 1; ≤ 9007199254740991 | The most cases the runner may complete, when set (PLAN-2). |
 | `limits.timeout` | string |  | pattern `^PT([0-9]{1,5}H([0-9]{1,5}M)?\|[0-9]{1,5}M)$` | ISO 8601 duration in hours and minutes (PT2H, PT30M). |
-| `contentPolicy` | one of `"off"`, `"on"` | yes |  | As run.json's contentCapture. |
+| `contentCapture` | one of `"off"`, `"on"` | yes |  | What text the runs keep: off or on, as run.json's contentCapture (RUN-11). Every run the runner produces carries this value (STRM-4). |
 | `isolation` | one of `"process"`, `"container"`, `"remote-zone"` | yes |  | How the run is isolated: process, container (an already-built image, named by digest) or remote-zone (in the network zone given by zone) (PLAN-1). |
 | `provider` | [provider](common.md#provider) | yes |  | Where the run executes: local, docker, k8s or ci:<name>. A runner that does not support it, or does not know it, refuses the plan (PLAN-7). |
 | `credentialRefs` | array of object |  | ≤ 64 items | What the runner resolves where it runs, and gives to the process the purpose names as an environment variable called name. A plan holds references, never secret values. |

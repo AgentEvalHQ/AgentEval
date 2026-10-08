@@ -1,0 +1,67 @@
+{
+  "description": "CKP-10: vector 28's input read on 2026-10-21, after its exception expired: approved_with_exceptions now reads as blocked.",
+  "rules": [
+    "DEC-1",
+    "DEC-2",
+    "DEC-3",
+    "DEC-4",
+    "CKP-10"
+  ],
+  "input": {
+    "subjectVersion": "git:3f2a1c",
+    "evaluatedAt": "2026-10-21T12:00:00Z",
+    "lanes": [
+      {
+        "lane": "quality",
+        "blocking": true,
+        "result": {
+          "status": "passed",
+          "subjectVersion": "git:3f2a1c",
+          "oldestClosedAt": "2026-10-07T10:00:00Z"
+        }
+      },
+      {
+        "lane": "security",
+        "blocking": true,
+        "result": {
+          "status": "failed",
+          "subjectVersion": "git:3f2a1c",
+          "oldestClosedAt": "2026-10-07T10:00:00Z"
+        }
+      }
+    ],
+    "exceptions": [
+      {
+        "lane": "security",
+        "requirement": "REQ-15",
+        "reason": "The security failure is accepted until the fix ships; tracked in the release review.",
+        "by": {
+          "identity": "oidc:https://login.example.com/u-7f3a",
+          "assurance": "authenticated"
+        },
+        "at": "2026-10-06T09:00:00Z",
+        "expires": "2026-10-20T00:00:00Z"
+      }
+    ]
+  },
+  "expected": {
+    "outcome": "blocked",
+    "lanes": [
+      {
+        "lane": "quality",
+        "status": "passed",
+        "blocking": true
+      },
+      {
+        "lane": "security",
+        "status": "failed",
+        "blocking": true
+      }
+    ],
+    "reasons": [
+      "failed:security",
+      "exception-expired:security",
+      "outcome:blocked"
+    ]
+  }
+}

@@ -1,0 +1,66 @@
+{
+  "description": "An exception is not in force at its expires time (evaluatedAt < expires): the failure blocks.",
+  "rules": [
+    "DEC-1",
+    "DEC-2",
+    "DEC-3",
+    "DEC-4",
+    "DEC-5"
+  ],
+  "input": {
+    "subjectVersion": "git:3f2a1c",
+    "evaluatedAt": "2026-10-08T12:00:00Z",
+    "lanes": [
+      {
+        "lane": "quality",
+        "blocking": true,
+        "result": {
+          "status": "passed",
+          "subjectVersion": "git:3f2a1c",
+          "oldestClosedAt": "2026-10-07T10:00:00Z"
+        }
+      },
+      {
+        "lane": "security",
+        "blocking": true,
+        "result": {
+          "status": "failed",
+          "subjectVersion": "git:3f2a1c",
+          "oldestClosedAt": "2026-10-07T10:00:00Z"
+        }
+      }
+    ],
+    "exceptions": [
+      {
+        "lane": "security",
+        "reason": "The security failure is accepted until the fix ships; tracked in the release review.",
+        "by": {
+          "identity": "oidc:https://login.example.com/u-7f3a",
+          "assurance": "authenticated"
+        },
+        "at": "2026-10-01T12:00:00Z",
+        "expires": "2026-10-08T12:00:00Z"
+      }
+    ]
+  },
+  "expected": {
+    "outcome": "blocked",
+    "lanes": [
+      {
+        "lane": "quality",
+        "status": "passed",
+        "blocking": true
+      },
+      {
+        "lane": "security",
+        "status": "failed",
+        "blocking": true
+      }
+    ],
+    "reasons": [
+      "failed:security",
+      "exception-expired:security",
+      "outcome:blocked"
+    ]
+  }
+}

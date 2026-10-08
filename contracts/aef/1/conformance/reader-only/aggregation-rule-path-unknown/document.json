@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0",
+  "resultId": "r_ba65738f221f7575808d2c10c60dc056",
+  "caseId": "c",
+  "path": "p",
+  "evaluator": {
+    "id": "e"
+  },
+  "state": "passed",
+  "aggregation": {
+    "strategy": "Min",
+    "threshold": 0.5,
+    "score": 0.6,
+    "rulePath": "quorum",
+    "measured": 1,
+    "total": 1,
+    "unmeasured": {
+      "not_measured": 0,
+      "not_applicable": 0,
+      "skipped": 0,
+      "error": 0
+    },
+    "decisive": []
+  }
+}

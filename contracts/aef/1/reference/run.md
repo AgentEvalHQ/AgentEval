@@ -28,7 +28,7 @@ The header of one run folder. Identity lives here, not in the folder path.
 | `deployment` | object |  |  | Where the subject ran (RUN-6). |
 | `deployment.ref` | [ref](common.md#ref) | yes |  | The deployment, as a typed reference. Compared by the deployment comparability axis (LANE-6). |
 | `deployment.environment` | string |  | ≤ 64 chars | The deployment's environment, as the producer names it. |
-| `deployment.endpoint` | string |  | ≤ 2048 chars; pattern `^[a-z][a-z0-9+.-]*://[!-.0-?A-~]+(/[!-~]*)?$` | Where the subject was reached. Never with credentials: no user information before the host (spec 03, RUN-10). |
+| `deployment.endpoint` | string |  | ≤ 2048 chars; pattern `^[a-z][a-z0-9+.-]*://[!"$-.0->A-~]+(/[!"$->@-~]*)?$` | Where the subject was reached: scheme, host and path only. No user information, no query string and no fragment, where credentials hide (RUN-10). |
 | `deployment.externalIds` | object |  |  | The deployment's ids in other systems, by system name; each value is a string or null. |
 | `suite` | object |  |  | The test cases run. A frozen suite's digest identifies its exact content. |
 | `suite.ref` | [ref](common.md#ref) | yes |  | The suite, as a typed reference. With version, compared by the suite comparability axis (RUN-8, LANE-6). |
@@ -38,7 +38,8 @@ The header of one run folder. Identity lives here, not in the folder path.
 | `suite.executionPolicy` | object |  |  | How many trials each case had, and how they were combined (RUN-8). |
 | `suite.executionPolicy.trialsPerCase` | integer | yes | ≥ 1; ≤ 1000 | Trials per case, from 1 to 1000. With more than one, each trial has its own lines and the case has a rollup line (RES-8). |
 | `suite.executionPolicy.requirePasses` | integer |  | ≥ 1; ≤ 1000 | How many of a case's trials must pass for the case to pass, from 1 to 1000. |
-| `suite.executionPolicy.aggregation` | one of `"MajorityVote"` |  |  | How a case's trials are combined: MajorityVote, the only value in this version. |
+| `suite.executionPolicy.aggregation` | one of `"MajorityVote"`, `"AllPass"`, `"AnyPass"`, `"Mean"`, `"Median"`, `"Max"`, `"PassAtK"` |  |  | How a case's trials are combined (RES-8): the same vocabulary as a rollup line's trials.aggregation. |
+| `suite.executionPolicy.k` | integer |  | ≥ 1; ≤ 9007199254740991 | k, for PassAtK. |
 | `judges` | array of object |  | ≤ 64 items | The models that graded results, in order. The judges and rubrics comparability axes compare this list in order (RUN-9, LANE-6). |
 | `judges[].model` | string | yes | ≥ 1 chars; ≤ 256 chars | The judge model, as its provider names it. Part of the judges comparability axis (RUN-9, LANE-6). |
 | `judges[].provider` | string |  | ≤ 128 chars | Who serves the judge model (RUN-9). |
@@ -59,6 +60,7 @@ The header of one run folder. Identity lives here, not in the folder path.
 | `otel` | object |  |  | The OpenTelemetry conventions the run's traces follow (RUN-14). |
 | `otel.semconvVersion` | string |  | pattern `^[0-9]+\.[0-9]+(\.[0-9]+)?$` | The version of the OpenTelemetry semantic conventions the traces use, as MAJOR.MINOR or MAJOR.MINOR.PATCH (RUN-14). |
 | `otel.dialects` | array of string |  | ≤ 16 items | The semantic-convention namespaces the traces use, such as gen_ai. |
+| `otel.schemaUrls` | array of [uri](common.md#uri) |  | ≤ 16 items; unique | The OpenTelemetry schema URLs the traces and logs follow, such as the GenAI registry's (RUN-14). |
 | `contentCapture` | one of `"off"`, `"on"` |  |  | What text the run keeps: on (prompts, responses, tool arguments and judge reasoning may be kept, in blobs) or off (none of it, and no digest of it). A producer SHOULD write it; a reader treats a run without it as on (RUN-11). |
 | `costPolicy` | object |  |  | The spending limit and the price table the producer used to estimate cost. |
 | `costPolicy.maxUsd` | number |  | ≥ 0 | The spending limit, in US dollars. |
@@ -72,5 +74,8 @@ The header of one run folder. Identity lives here, not in the folder path.
 | `execution` | object | yes |  | How the evaluated target was driven (spec 03, RUN-7). Only live evidence describes how the subject behaves. |
 | `execution.targetMode` | one of `"live"`, `"replayed"`, `"scripted"`, `"mocked"` | yes |  | live: the real subject at run time; replayed: its recorded answers played back; scripted: a scripted stand-in; mocked: a stand-in that is not the subject. |
 | `execution.stimulus` | one of `"suite"`, `"generated"`, `"imported"`, `"other"` |  |  | Where the inputs came from: a fixed suite, generated at run time, imported from another tool, or other. |
+| `imported` | object |  |  | For a run converted from another tool's output: the tool, and every run.json field the converter supplied because the original did not record it (RUN-15). A reader shows those as the converter's claims. |
+| `imported.from` | string | yes | ≥ 1 chars; ≤ 256 chars | The original tool and its version, such as inspect_ai 0.3.277. |
+| `imported.asserted` | array of string | yes | ≤ 64 items; unique | The run.json fields the converter supplied, as dotted paths (subject.version, execution.targetMode). |
 
 - **Rule:** An open run has not ended.

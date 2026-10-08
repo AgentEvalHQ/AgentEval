@@ -8,7 +8,9 @@
     ]
   ],
   "rules": [
+    "OVL-10",
     "SEAL-6",
-    "OVL-10"
-  ]
+    "SIG-4"
+  ],
+  "policy": "policy.json"
 }

@@ -1,6 +1,10 @@
 {
+  "kind": "plan",
   "schema": "run-plan",
   "writer": "invalid",
   "reader": "invalid",
-  "rule": "a plan always caps spend"
+  "rules": [
+    "PLAN-2"
+  ],
+  "why": "a plan always caps spend"
 }

@@ -160,10 +160,10 @@
           "maxLength": 64
         },
         "endpoint": {
-          "description": "Where the subject was reached. Never with credentials: no user information before the host (spec 03, RUN-10).",
+          "description": "Where the subject was reached: scheme, host and path only. No user information, no query string and no fragment, where credentials hide (RUN-10).",
           "type": "string",
           "maxLength": 2048,
-          "pattern": "^[a-z][a-z0-9+.-]*://[!-.0-?A-~]+(/[!-~]*)?$"
+          "pattern": "^[a-z][a-z0-9+.-]*://[!\"$-.0->A-~]+(/[!\"$->@-~]*)?$"
         },
         "externalIds": {
           "description": "The deployment's ids in other systems, by system name; each value is a string or null.",
@@ -224,10 +224,22 @@
               "maximum": 1000
             },
             "aggregation": {
-              "description": "How a case's trials are combined: MajorityVote, the only value in this version.",
+              "description": "How a case's trials are combined (RES-8): the same vocabulary as a rollup line's trials.aggregation.",
               "enum": [
-                "MajorityVote"
+                "MajorityVote",
+                "AllPass",
+                "AnyPass",
+                "Mean",
+                "Median",
+                "Max",
+                "PassAtK"
               ]
+            },
+            "k": {
+              "description": "k, for PassAtK.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
             }
           }
         }
@@ -383,6 +395,15 @@
             "type": "string",
             "maxLength": 64
           }
+        },
+        "schemaUrls": {
+          "description": "The OpenTelemetry schema URLs the traces and logs follow, such as the GenAI registry's (RUN-14).",
+          "type": "array",
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "common.schema.json#/$defs/uri"
+          }
         }
       }
     },
@@ -468,6 +489,35 @@
             "imported",
             "other"
           ]
+        }
+      }
+    },
+    "imported": {
+      "description": "For a run converted from another tool's output: the tool, and every run.json field the converter supplied because the original did not record it (RUN-15). A reader shows those as the converter's claims.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "from",
+        "asserted"
+      ],
+      "properties": {
+        "from": {
+          "description": "The original tool and its version, such as inspect_ai 0.3.277.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "asserted": {
+          "description": "The run.json fields the converter supplied, as dotted paths (subject.version, execution.targetMode).",
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z][A-Za-z0-9_.\\[\\]-]*$"
+          }
         }
       }
     }

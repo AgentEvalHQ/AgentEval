@@ -16,6 +16,7 @@
   | `gates.ndjson` | `gate-decision`, one line each | when the producer took a gate decision |
   | `blobs/sha256/<ab>/<hex>` | none: raw bytes | when a line references a blob |
   | `traces.otlp.jsonl` | OTLP/JSON, one `ExportTraceServiceRequest` per line | optional |
+  | `logs.otlp.jsonl` | OTLP/JSON, one `LogsData` object per line | optional: OpenTelemetry events, such as `gen_ai.evaluation.result` |
   | `ext/…` | none: the producer's files | optional |
   | `seal.json` | `seal` | in a sealed run (§4.1) |
   | `attestation.dsse.json` | DSSE envelope (§4.4) | optional |
@@ -26,11 +27,12 @@
   A file not in this list (a `notes.txt` someone added) is reported as `not-sealed` (§4.1) or, under `overlays/`, as
   `unexpected-file` (§4.2); a hidden file a file manager added (`.DS_Store`) also breaks [RUN-3]. Tools that copy runs **MUST NOT** add files.
 - **[RUN-3] Paths.** Every path in a run folder is made of segments of ASCII letters, digits, `.`, `_` and `-`,
-  separated by `/`, at most 255 bytes in all. No segment starts or ends with `.` (so `.`, `..` and hidden files such
-  as `.DS_Store` are excluded), or is (ignoring case and any
-  extension) a name Windows reserves (`CON`, `PRN`, `AUX`, `NUL`, `COM1`–`COM9`, `LPT1`–`LPT9`). No two paths in a run
-  differ only in letter case. So no file system re-encodes, re-orders or merges them. A path that breaks this is
-  reported as `path`.
+  separated by `/`, at most 255 bytes in all (a longer path is a `path` problem, not a `limit`). No segment starts or
+  ends with `.` (so `.`, `..` and hidden files such as `.DS_Store` are excluded), or is (ignoring case and any
+  extension) a name Windows reserves (`CON`, `PRN`, `AUX`, `NUL`, `COM1`–`COM9`, `LPT1`–`LPT9`). No two paths, and no
+  two of their folders, differ only in letter case (`ext/Data/x` and `ext/data/y` clash: a case-insensitive file
+  system merges the folders). So no file system re-encodes, re-orders or merges them. A path that breaks this is
+  reported as `path`; for a case clash, the later of the two paths in byte order.
 - **[RUN-4] A closed run never changes.** While `status` is `running` the producer may rewrite its files. When it
   closes the run (`completed` or `aborted`) it writes their final form; from then on nothing edits, adds or removes a
   file outside `overlays/`. Everything added later is an overlay (§4.2).
@@ -65,14 +67,19 @@ was kept.
   `accuracy`, `kappa`, `dangerousErrors`, `measuredAt`). It is the producer's claim about the judge, sealed with the
   run; a reader shows it as such.
 - **[RUN-10] No secrets.** `run.json` **MUST NOT** hold a credential: `deployment.endpoint` has no user information
-  (no `user:password@`; the schema refuses it), and nothing in `config` or `ext` is a key, token or password. A run is
+  (no `user:password@`), no query string and no fragment (no `?api-key=…`; the schema refuses all three), and nothing in `config` or `ext` is a key, token or password. A run is
   sealed and kept: a secret written there cannot be taken back.
 - **[RUN-11] Content capture.** `contentCapture` says what text the run keeps:
   - `on`: prompts, responses, tool arguments and judge reasoning **MAY** be kept, in blobs.
   - `off`: they are not kept, **and neither is any digest of them**: a SHA-256 of a short prompt is reversed by trying
     candidates. In a run with `off`, no result carries `reasoning` or an `annotator.promptHash`, and no evidence
-    record of kind `judge_reasoning`, `tool_call` or `document` is written. Reported as `content-capture` (§3.9).
+    record of a content kind (`judge_reasoning`, `tool_call`, `document`, `input`, `expected`, `output`,
+    `transcript`) is written. Reported as `content-capture` (§3.9).
   A producer **SHOULD** write `contentCapture`; a reader treats a run without it as `on` (content may be present).
+- **[RUN-15] Imported runs.** A run converted from another tool's output carries `imported`: the tool (`from`) and
+  every `run.json` field the converter supplied because the original did not record it (`asserted`, dotted paths). A
+  reader **MUST** show those fields as the converter's claims, not the original producer's. The producer named in
+  `producer` is the converter.
 - **[RUN-12]** `provenance` is written by a runner into every run it produces: the plan (`planId`, and `planDigest`,
   the SHA-256 of the plan's bytes), the `jobId` and the `runnerId` (§6). Sealed with `run.json`, it ties the run to
   the job that made it.
@@ -98,6 +105,7 @@ One line per node of the run's result tree.
   | `failed` | Measured, and the rule was not met | a failure |
   | `warn` | Measured; a soft failure | not a pass |
   | `inconclusive` | Measured, but the evidence does not decide (a split panel, an interval across the threshold) | not a pass |
+  | `scored` | Measured, with no pass/fail rule applied: a score only (a latency, an imported score without a label) | not a pass, not a fail |
   | `not_measured` | An input the evaluator needs was not there | a typed absence |
   | `not_applicable` | The evaluator does not apply to this case | a typed absence |
   | `skipped` | Not run | a typed absence |
@@ -166,7 +174,8 @@ One line per node of the run's result tree.
 - **[RES-10]** Other optional facts: `scores` (per metric, with the value and an optional normalised value),
   `uncertainty` (an interval), `annotator` (who graded: code, an LLM, a person; the prompt hash and rubric digest; a
   panel's agreement, `agree` ≤ `of`, checked as `annotator` in §3.9), `usage` (tokens in OpenTelemetry's
-  `gen_ai.usage.*` names, cost), `durationMs`, `turns` (conversation turns the case took), `attack` (for adversarial
+  `gen_ai.usage.*` names, cache and reasoning tokens included, and cost; one entry per party, no role twice),
+  `startedAt` and `endedAt` (not before `startedAt`), `durationMs`, `turns` (conversation turns the case took), `attack` (for adversarial
   cases: the `technique`, its ids in public taxonomies, and whether it succeeded), `traceLink` (the span of the
   operation the result evaluates, such as the agent's invocation, or with `traceId` only its trace; OpenTelemetry
   parents an evaluation result to that span, and a judge's own call is cited as `evidence` instead), `evidence`
@@ -190,14 +199,17 @@ evaluation (§5.3) reads it, so it is defined exactly.
   path, one per case. A result line belongs to the lane its `lane` names; when the summary has a single lane, a line
   without `lane` belongs to it. Trial lines are not counted; their rollup line is.
 - **[SUM-4]** For each such line: `not_applicable` lines are left out entirely; `not_measured`, `skipped`, `error` and
-  `pending` lines are **not measured**. Every other line (`passed`, `failed`, `warn`, `inconclusive`):
+  `pending` lines are **not measured**. Every other line (`passed`, `failed`, `warn`, `inconclusive`, `scored`):
   - for a metric of kind `rate` or `verdict`, is measured, with the value 1 when its state is `passed` and 0
-    otherwise (`warn` and `inconclusive` count as 0: not a pass);
+    otherwise (`warn` and `inconclusive` count as 0: not a pass), except a `scored` line, which has no verdict and is
+    not measured;
   - for any other kind, is measured when it has a score for the metric, with that score's `value`, and is not
     measured when it has none.
 - **[SUM-5]** Then: `N` is the number of lines not left out; `n` the measured ones; `notMeasured` = `N` − `n`; `sum`
   and `sumSq` are the sum and the sum of squares of the measured values; `value` is `sum` for a metric of kind `count`,
-  and `sum` / `n` otherwise, or `null` when `n` is 0. `stderr` and `ci` are the producer's, over the same values.
+  and `sum` / `n` otherwise, or `null` when `n` is 0. `stderr` and `ci` are the producer's, over the same values. An
+  entry with `aggregate` (pass@k, F1, a median) carries the producer's `value`, computed by that `method`; a verifier
+  recomputes its `N`, `n`, `notMeasured` and `sum` and not its `value`, which is still `null` when `n` is 0.
 - **[SUM-6]** `verdict` is the producer's verdict on the entry under its `rule`; when `n` is 0 it is `not_measured`.
 - **[SUM-7]** `cost`, when present, is the run's total cost in US dollars and where the figure came from.
 - A verifier recomputes `N`, `n`, `notMeasured`, `sum` and `value` from `results.ndjson` (§3.9); `value` and `sum`
@@ -252,13 +264,17 @@ an `encoding`, `limit` or `schema` problem: they would otherwise be checked agai
 | `blob` | the citing line | a blob a line references that is not in the run, unless a verified `redact` overlay withholds it ([OVL-10]) |
 | `blob-digest` | the blob's path | a blob whose bytes do not hash to its name ([EVD-3]) |
 | `reasoning-size` | `results.ndjson:<line>` | a `reasoning.bytes` that is not its blob's size |
-| `metric` | the citing line or file | a metric no entry of `metrics.json` declares; in `metrics.json`, a metric declared twice or a `scale` whose `min` exceeds its `max` |
+| `metric` | the citing line or file | a metric no entry of `metrics.json` declares; a line that scores one metric twice (the summary then counts that line as not measured for it); in `metrics.json`, a metric declared twice or a `scale` whose `min` exceeds its `max` |
 | `summary-run-id` | `summary.json` | [SUM-2] |
 | `summary` | `summary.json` | an entry whose `N`, `n`, `notMeasured`, `sum` or `value` is not what [SUM-3]–[SUM-5] give |
 | `gate` | `gates.ndjson:<line>` | a result a decision names that is no line of the run, or `ship` on an incomparable comparison |
-| `trace-link` | the citing line | a span link or `traceLink` that names no span of `traces.otlp.jsonl`, when that file is present (a `traceLink` without `spanId` names a trace: it resolves when any span has that `traceId`) |
+| `trace-link` | the citing line | a span link or `traceLink` that names no span of `traces.otlp.jsonl`, when that file is present (a `traceLink` without `spanId` names a trace: it resolves when any span has that `traceId`; ids compare without regard to letter case, and a writer writes lower case) |
 | `content-capture` | the citing line, or `traces.otlp.jsonl:<line>` | [RUN-11], [SEC-6] |
 | `run-times` | `run.json` | [RUN-5] |
+| `calibration` | `run.json` | a judge's calibration with `dangerousErrors` above `n`, or `measuredAt` after the run's `startedAt` ([RUN-9]: it was measured before the run) |
+| `execution-policy` | `run.json` | `requirePasses` above `trialsPerCase` |
+| `interval` | the line, or `summary.json` | an `uncertainty.ci` or a summary `ci` whose `low` exceeds its `high` |
+| `result-times` | `results.ndjson:<line>` | a line whose `endedAt` is before its `startedAt`, or whose `usage` names one role twice |
 
 When `traces.otlp.jsonl` is absent, a span link points to a trace store outside the run; a reader shows it as
 external, and nothing verifies it.
@@ -266,5 +282,9 @@ external, and nothing verifies it.
 ## 3.10 Traces
 
 - **[RUN-14]** `traces.otlp.jsonl` holds OpenTelemetry traces in the OTLP/JSON encoding, one `TracesData` object (the
-  same JSON as an `ExportTraceServiceRequest`, as OpenTelemetry's file exporter writes it) per line (NDJSON, §2.2). Spans use the OpenTelemetry GenAI semantic conventions where
+  same JSON as an `ExportTraceServiceRequest`, as OpenTelemetry's file exporter writes it) per line (NDJSON, §2.2). `logs.otlp.jsonl`
+  likewise holds OTLP/JSON `LogsData` objects, one per line: OpenTelemetry events such as `gen_ai.evaluation.result`.
+  `run.json`'s `otel.schemaUrls` names the OpenTelemetry schema URLs both follow. When a producer writes a
+  `gen_ai.evaluation.result` event for a result, its `gen_ai.evaluation.score.label` is the result's `state` name,
+  so the nine states survive the trip (interop/opentelemetry.md). Spans use the OpenTelemetry GenAI semantic conventions where
   they apply; `run.json`'s `otel` names the convention version.

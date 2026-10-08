@@ -31,7 +31,7 @@ public class AefCheckpointTests
         var vector = Vector(name);
         if (vector["expectedError"] is not null)
         {
-            // Refused rather than decided: no lane, or a lane twice.
+            // Refused rather than decided: no lane, a lane twice, an exception for no lane, or one never in force.
             Assert.Throws<ArgumentException>(() => CheckpointDecision.Decide(CheckpointDecisionJson.ReadInput(vector["input"]!)));
             return;
         }
@@ -64,11 +64,12 @@ public class AefCheckpointTests
         var expected = Directory.GetFiles(Path.Combine(Conformance, "decision-vectors"), "*.json")
             .Select(f => JsonNode.Parse(File.ReadAllText(f))!["expected"]).OfType<JsonNode>().ToList();
 
-        Assert.Equal(["approved", "blocked", "expired", "inconclusive"],
+        Assert.Equal(["approved", "approved_with_exceptions", "blocked", "expired", "inconclusive"],
             expected.Select(e => (string)e["outcome"]!).Distinct().Order(StringComparer.Ordinal));
-        Assert.Equal(["failed", "incomparable", "missing", "not_measured", "passed", "stale"],
+        Assert.Equal(["failed", "incomparable", "missing", "not_measured", "passed", "stale", "waived"],
             expected.SelectMany(e => e["lanes"]!.AsArray()).Select(l => (string)l!["status"]!).Distinct().Order(StringComparer.Ordinal));
-        Assert.Equal(["advisory-failed", "failed", "future-evidence", "incomparable", "missing", "not-measured", "outcome", "stale", "superseded", "wrong-version"],
+        Assert.Equal(["advisory-failed", "exception-expired", "failed", "future-evidence", "incomparable", "missing", "not-measured", "outcome", "stale",
+                      "superseded", "waived", "wrong-version"],
             expected.SelectMany(e => e["reasons"]!.AsArray()).Select(r => ((string)r!).Split(':')[0]).Distinct().Order(StringComparer.Ordinal));
     }
 
@@ -80,6 +81,22 @@ public class AefCheckpointTests
 
         Assert.Throws<ArgumentException>(() => CheckpointDecision.Decide(new CheckpointDecisionInput("v", at, [])));
         Assert.Throws<ArgumentException>(() => CheckpointDecision.Decide(new CheckpointDecisionInput("v", at, [lane, lane])));
+    }
+
+    [Fact]
+    public void AnExceptionForNoLane_OrNeverInForce_IsRefused_NeverIgnored()
+    {
+        var at = AefTime.Parse("2026-10-08T12:00:00Z");
+        var failed = new LaneInput("security", true, new LaneEvidence(LaneEvidenceStatus.Failed, "v", AefTime.Parse("2026-10-07T10:00:00Z")));
+        var by = new TrustedIdentity("oidc:https://login.example.com/u-7f3a", "authenticated");
+        ExceptionGrant Grant(string lane, string from, string until) => new(lane, "Accepted.", by, AefTime.Parse(from), AefTime.Parse(until));
+
+        Assert.Throws<ArgumentException>(() => CheckpointDecision.Decide(new CheckpointDecisionInput("v", at, [failed],
+            Exceptions: [Grant("memory", "2026-10-06T00:00:00Z", "2026-10-20T00:00:00Z")])));
+        Assert.Throws<ArgumentException>(() => CheckpointDecision.Decide(new CheckpointDecisionInput("v", at, [failed],
+            Exceptions: [Grant("security", "2026-10-06T00:00:00Z", "2026-10-06T00:00:00Z")])));
+        Assert.Equal(CheckpointOutcome.ApprovedWithExceptions, CheckpointDecision.Decide(new CheckpointDecisionInput("v", at, [failed],
+            Exceptions: [Grant("security", "2026-10-06T00:00:00Z", "2026-10-20T00:00:00Z")])).Outcome);
     }
 
     public static TheoryData<string> Checkpoints() =>
