@@ -222,6 +222,14 @@ So a format that needs to keep "not measured" apart from "failed" cannot get it 
 [ADR-034](adr/034-exporters-and-the-result-model.md) for why the two are separate and the planned path to export the
 result model through a registry.
 
+### Third-party exporters
+
+These are written and maintained outside AgentEval. Check each one's own documentation for what it supports.
+
+| Package | What it does | Version |
+|---|---|---|
+| [EvalPort.AgentEval](https://github.com/adhabnr-ux/evalport/blob/evalport-agenteval-dotnet/v0.1.1-beta/adapters/agenteval-dotnet-openeval-adapter/README.md) | Writes AgentEval results in the [EvalPort](https://github.com/adhabnr-ux/evalport) format and reads EvalPort suites as datasets. Besides `IResultExporter` and `IDatasetLoader`, it takes `EvalResult` trees directly (`EvalPortDocuments.Build`), so "not measured" stays apart from "failed" | `evalport-agenteval-dotnet/v0.1.1-beta`, built against AgentEval 0.43.0-beta; not on NuGet, build it from the tag |
+
 ### Creating Custom Exporters
 
 Implement `IResultExporter` to add new formats. Use the `FormatName` property for registry identification:
