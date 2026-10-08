@@ -103,7 +103,7 @@
       href: agent-skills-whats-new.md
   - name: Responsible AI
     href: responsible-ai.md
-  - name: ASSERT Interoperability (in development)
+  - name: ASSERT Interoperability
     href: assert-interop.md
   - name: OWASP Agentic Top 10 Crosswalk
     href: owasp-agentic-top10.md

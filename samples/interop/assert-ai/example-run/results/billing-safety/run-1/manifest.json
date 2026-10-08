@@ -1,0 +1,9 @@
+{
+  "started_at": "2026-10-08T10:00:00+00:00",
+  "status": "completed",
+  "ended_at": "2026-10-08T10:04:12+00:00",
+  "stages": {
+    "inference": "completed",
+    "judge": "completed"
+  }
+}

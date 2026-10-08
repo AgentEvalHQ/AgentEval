@@ -937,6 +937,40 @@ agenteval mc doctor
 
 Prints `Errors: N | Warnings: N | OK: N` and exits `2` on any error.
 
+### `agenteval assert-ai`
+
+Work with Microsoft's [ASSERT](https://github.com/responsibleai/ASSERT) (`assert-ai` 0.3.0 formats). The guide is
+[ASSERT Interoperability](assert-interop.md).
+
+**Synopsis**
+
+```
+agenteval assert-ai serve (--from-env [--model <m>] | --endpoint <url> --model <m> [--api-key <key>]) [--system-prompt <text>] [--port 8765] [--path /assert] [--host localhost]
+agenteval assert-ai import <run-dir> [--format text|json|markdown] [-o <file>] [--taxonomy <file>] [--test-set <file>] [--calibration <file>] [--max-harm-rate <0-1>] [--max-over-refusal-rate <0-1>]
+agenteval assert-ai export --golden <file.jsonl>... --taxonomy <taxonomy.json> --judge-model <model> --out <dir> [--evaluator <key>...] [--suite agenteval] [--run judge-1] [--assert-root <path>]
+agenteval assert-ai calibrate <run-dir> --cases <agenteval-cases.json> [--format text|json] [-o <calibration.json>]
+```
+
+**`serve`** answers ASSERT's endpoint requests (`{message, history}` → `{response, events}`) with the model your
+provider variables select, or an OpenAI-compatible endpoint, until Ctrl+C. Point ASSERT's
+`pipeline.inference.target.endpoint` at the URL it prints; keep the host name `localhost` (ASSERT refuses a literal
+`127.0.0.1` unless `ASSERT_ALLOW_PRIVATE_ENDPOINTS=1`). It serves a bare model; to serve an agent with tools, use
+`AssertAiTarget` from code.
+
+**`import`** reads an ASSERT run directory (the one holding `scores.jsonl`) and prints ASSERT's harm and over-refusal
+rates per kind of test case, computed as ASSERT computes them, every case's verdict, and the cases with no score row.
+A failed judge is an error and a case with no row is named, never counted as a pass. Exit `1` when a rate is above
+`--max-harm-rate` or `--max-over-refusal-rate`, `11` when a gate is set and no rate could be measured, `2` for a
+directory or file that cannot be read.
+
+**`export`** writes labelled golden cases (the agentic calibration JSONL format) as an ASSERT judge-only run, with the
+config to run it and `agenteval-cases.json` mapping ASSERT's positional ids back to the case ids. `--taxonomy` is
+required: ASSERT's judge cannot run without one.
+
+**`calibrate`** compares ASSERT's verdicts on exported cases with their labels: accuracy with a 95% Wilson interval,
+Cohen's κ, dangerous errors (a labelled failure passed) and false alarms; a case the judge did not decide is counted
+as not measured. `-o` writes the result for `import --calibration`. Exit `11` when the judge decided no case.
+
 ---
 
 ## Exit codes

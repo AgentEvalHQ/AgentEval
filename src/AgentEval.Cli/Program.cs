@@ -940,6 +940,7 @@ rootCmd.Add(SkillsScanCommand.Create());
 // `log-file to-fixture` — turns a --capture-fixture JSONL capture into a deterministic, versionable test
 // fixture (ScriptedChatClient.FromFixture).
 rootCmd.Add(LogFileCommand.Create());
+rootCmd.Add(AssertAiCommand.Create());             // assert-ai — serve/import/export/calibrate with Microsoft's ASSERT (assert-ai 0.3)
 
 var parseResult = rootCmd.Parse(args);
 

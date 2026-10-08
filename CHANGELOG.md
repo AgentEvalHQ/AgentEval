@@ -99,6 +99,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and ref on the snapshot. `SkillBaselineEntry.Source`/`Ref` and the renderers' provenance parameter existed but
   nothing filled them. Offline; an unreadable lock file is a warning, and an entry holding control characters is
   ignored.
+- **Microsoft ASSERT interoperability (`agenteval assert-ai`, `AgentEval.Interop.AssertAi`).** Formats of `assert-ai`
+  0.3.0, read from ASSERT's source and checked against its own tests: serve a .NET chat client or MAF agent as ASSERT's
+  HTTP endpoint target (every tool call sent as a result with its arguments, since ASSERT's judge never sees a call
+  without one); read an ASSERT run into AgentEval results (a failed judge is `error`, a case with no score row is
+  named and `skipped`, a case with no relevant category `inapplicable`), with ASSERT's harm and over-refusal rates
+  computed as ASSERT computes them and an `IEval` that puts its verdicts in a composite; write AgentEval's
+  conversations as an ASSERT judge-only run; calibrate ASSERT's judge on AgentEval's labelled cases (accuracy, κ,
+  dangerous errors). Sample P1 (`dotnet run -- 106`), `docs/assert-interop.md`. A round trip with a running ASSERT
+  has not been done yet. (An earlier draft of the docs page, never released, described this as already shipped.)
 - **`agenteval redteam --attacks memory-poisoning`.** The memory-security corpus (12 attacks, 4 benign controls) and its
   five checks had no CLI path and nothing that produced observations from a run. The new run puts the model you name
   behind AgentEval's default memory protection (`UseGatekeeper` + `ProtectMemory` over the five memory gates), runs
