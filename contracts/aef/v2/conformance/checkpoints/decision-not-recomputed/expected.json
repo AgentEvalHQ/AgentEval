@@ -1,0 +1,9 @@
+{
+  "schema": "checkpoint",
+  "writer": "valid",
+  "reader": "valid",
+  "rule": "the recorded decision is what the recorded input gives",
+  "problems": [
+    "decision"
+  ]
+}

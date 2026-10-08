@@ -1,30 +1,46 @@
 #!/usr/bin/env python3
 """The AEF v2 checkpoint decision function: a reference implementation of v2/README.md, 'The decision function'.
 
-Pure: no I/O and no clock (the evaluation time is an input). `python aef_decide.py --check` runs it against
-conformance/decision-vectors/ and exits 1 on any difference.
+Pure: no I/O and no clock (the evaluation time is an input). Times compare at the full precision written (up to nine
+fraction digits), never rounded. `python aef_decide.py --check` runs it against conformance/decision-vectors/ and
+exits 1 on any difference.
 """
+import calendar
 import json
 import re
 import sys
-from datetime import datetime, timedelta
 from pathlib import Path
 
-DURATION = re.compile(r"^P(?=\d|T\d)(?:(\d+)D)?(?:T(\d+)H)?$")
+TIME = re.compile(r"^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\.([0-9]{1,9}))?Z$")
+DURATION = re.compile(r"^P(?=[0-9]|T[0-9])(?:([0-9]{1,5})D)?(?:T([0-9]{1,5})H)?$")
+KNOWN = {"passed": "passed", "failed": "failed", "not_measured": "not_measured", "incomparable": "incomparable"}
 REASON = {"failed": "failed", "missing": "missing", "not_measured": "not-measured", "incomparable": "incomparable", "stale": "stale"}
 
 
 def parse_time(text):
-    return datetime.strptime(text.replace("Z", "+0000"), "%Y-%m-%dT%H:%M:%S%z") if "." not in text \
-        else datetime.strptime(text.replace("Z", "+0000"), "%Y-%m-%dT%H:%M:%S.%f%z")
+    """(seconds since the epoch, nanoseconds): exact, so 12:00:00.000000001Z is later than 12:00:00Z."""
+    m = TIME.fullmatch(text)
+    if not m:
+        raise ValueError(f"{text!r} is not an RFC 3339 UTC time")
+    y, mo, d, h, mi, s, frac = m.groups()
+    seconds = calendar.timegm((int(y), int(mo), int(d), int(h), int(mi), int(s), 0, 0, 0))
+    return seconds, int((frac or "").ljust(9, "0"))
 
 
 def parse_duration(text):
-    days, hours = DURATION.match(text).groups()
-    return timedelta(days=int(days or 0), hours=int(hours or 0))
+    m = DURATION.fullmatch(text)
+    if not m:
+        raise ValueError(f"{text!r} is not a duration in days and hours")
+    days, hours = m.groups()
+    return int(days or 0) * 86400 + int(hours or 0) * 3600
 
 
 def decide(inp):
+    names = [lane["lane"] for lane in inp["lanes"]]
+    if not names:
+        raise ValueError("a checkpoint has at least one lane")
+    if len(set(names)) != len(names):
+        raise ValueError("a lane is listed twice")
     evaluated_at = parse_time(inp["evaluatedAt"])
     lanes, reasons = [], []
     for lane in inp["lanes"]:
@@ -33,10 +49,12 @@ def decide(inp):
             status = "missing"
         elif result["subjectVersion"] != inp["subjectVersion"]:
             status, code = "missing", "wrong-version"
-        elif "freshness" in lane and parse_time(result["closedAt"]) + parse_duration(lane["freshness"]) < evaluated_at:
+        elif parse_time(result["oldestClosedAt"]) > evaluated_at:
+            status, code = "missing", "future-evidence"
+        elif "freshness" in lane and (lambda c: (c[0] + parse_duration(lane["freshness"]), c[1]))(parse_time(result["oldestClosedAt"])) < evaluated_at:
             status = "stale"
         else:
-            status = result["status"]
+            status = KNOWN.get(result["status"], "not_measured")  # an unknown status fails closed
 
         item = {"lane": lane["lane"], "status": status, "blocking": lane["blocking"]}
         if status == "incomparable" and result.get("axes"):
@@ -74,6 +92,15 @@ def check():
         if actual != vector["expected"]:
             failed += 1
             print(f"FAIL {path.name}\n  expected {vector['expected']}\n  actual   {actual}")
+    for bad, why in (({"subjectVersion": "v", "evaluatedAt": "2026-01-01T00:00:00Z", "lanes": []}, "no lanes"),
+                     ({"subjectVersion": "v", "evaluatedAt": "2026-01-01T00:00:00Z",
+                       "lanes": [{"lane": "q", "blocking": True, "result": None}] * 2}, "a lane twice")):
+        try:
+            decide(bad)
+            failed += 1
+            print(f"FAIL {why}: accepted")
+        except ValueError:
+            pass
     print(f"{len(vectors) - failed} of {len(vectors)} decision vectors pass")
     return 1 if failed or not vectors else 0
 

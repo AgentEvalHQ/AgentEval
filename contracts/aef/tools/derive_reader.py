@@ -34,11 +34,13 @@ def derive(node, strict=False):
             out[key] = value.replace("/aef/v2/writer/", "/aef/v2/reader/")
         elif strict:
             out[key] = derive(value, True)
+        elif key == "type" and "enum" in node:
+            continue  # the enum below decides the type, whatever the key order
         elif key == "additionalProperties" and value is False:
             continue  # unknown fields are allowed
         elif key == "enum":
             # Open: an unknown value reads as 'other'. A nullable enum stays nullable.
-            out["type"] = node["type"] if isinstance(node.get("type"), list) else "string"
+            out["type"] = node["type"] if isinstance(node.get("type"), list) else ["string", "null"] if None in value else "string"
         elif key == "const" and value == "2.0":
             out["type"] = "string"
             out["pattern"] = "^2\\.[0-9]+(?!\\n)$"  # any minor of the known major

@@ -1,0 +1,10 @@
+{
+  "schema": "checkpoint",
+  "writer": "valid",
+  "reader": "valid",
+  "rule": "the input is for the checkpoint's version",
+  "problems": [
+    "decision",
+    "version"
+  ]
+}

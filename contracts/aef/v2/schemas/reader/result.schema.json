@@ -272,12 +272,12 @@
       "properties": {
         "traceId": {
           "type": "string",
-          "pattern": "^[0-9a-f]{32}$",
+          "pattern": "^[0-9a-f]{32}(?!\\n)$",
           "maxLength": 32
         },
         "spanId": {
           "type": "string",
-          "pattern": "^[0-9a-f]{16}$",
+          "pattern": "^[0-9a-f]{16}(?!\\n)$",
           "maxLength": 16
         }
       }

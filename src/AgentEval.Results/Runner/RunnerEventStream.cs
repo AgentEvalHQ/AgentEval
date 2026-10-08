@@ -2,7 +2,6 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using System.Globalization;
 using System.Text.Json.Nodes;
 
 namespace AgentEval.Results.Runner;
@@ -27,7 +26,7 @@ public static class RunnerEventStream
 
         var problems = new List<(string, string)>();
         long previousSeq = 0;
-        DateTimeOffset? previousAt = null;
+        AefTime? previousAt = null;
         double? spent = null;
         var terminal = false;
         var announced = new HashSet<string>(StringComparer.Ordinal);
@@ -45,7 +44,7 @@ public static class RunnerEventStream
 
             if ((string?)e["jobId"] != job) found.Add("job-id");
 
-            var at = DateTimeOffset.Parse((string)e["at"]!, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal);
+            var at = AefTime.Parse((string)e["at"]!);
             if (previousAt is { } before && at < before) found.Add("time");
             previousAt = at;
 

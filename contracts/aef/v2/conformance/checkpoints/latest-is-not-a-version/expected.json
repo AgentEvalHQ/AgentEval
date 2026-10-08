@@ -2,5 +2,5 @@
   "schema": "checkpoint",
   "writer": "invalid",
   "reader": "invalid",
-  "rule": "'latest' is resolved to an exact version before anything runs"
+  "rule": "'latest' (any case) is resolved to an exact version before anything runs"
 }

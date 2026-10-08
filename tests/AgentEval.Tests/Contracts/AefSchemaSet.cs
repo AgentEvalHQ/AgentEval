@@ -17,7 +17,9 @@ internal sealed class AefSchemaSet
     public static readonly Lazy<AefSchemaSet> Reader = new(() => Load(Path.Combine(V2, "schemas", "reader")));
 
     private readonly Dictionary<string, JsonSchema> _schemas = new(StringComparer.Ordinal);
-    private readonly EvaluationOptions _options = new() { OutputFormat = OutputFormat.List, RequireFormatValidation = true };
+    // Format assertion off: in AEF the patterns are the rule and format is an annotation, so the corpus is checked the
+    // way a validator that ignores format checks it.
+    private readonly EvaluationOptions _options = new() { OutputFormat = OutputFormat.List, RequireFormatValidation = false };
     private string _base = "";
 
     public static AefSchemaSet Load(string dir)

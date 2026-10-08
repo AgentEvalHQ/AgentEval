@@ -5,36 +5,85 @@
   "description": "The metrics this run reports. A metric with direction none is shown, never coloured as better or worse.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "metrics"],
+  "required": [
+    "schemaVersion",
+    "metrics"
+  ],
   "properties": {
-    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+    "schemaVersion": {
+      "$ref": "common.schema.json#/$defs/schemaVersion"
+    },
     "metrics": {
       "type": "array",
       "maxItems": 4096,
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["id", "kind", "direction", "scale"],
+        "required": [
+          "id",
+          "kind",
+          "direction",
+          "scale"
+        ],
         "properties": {
-          "id": { "type": "string", "minLength": 1, "maxLength": 256 },
-          "kind": { "enum": ["score", "rate", "count", "duration", "cost", "verdict"] },
-          "direction": { "enum": ["higher_better", "lower_better", "none"] },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "kind": {
+            "enum": [
+              "score",
+              "rate",
+              "count",
+              "duration",
+              "cost",
+              "verdict"
+            ]
+          },
+          "direction": {
+            "enum": [
+              "higher_better",
+              "lower_better",
+              "none"
+            ]
+          },
           "scale": {
             "anyOf": [
-              { "const": "unbounded" },
+              {
+                "const": "unbounded"
+              },
               {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["min", "max"],
-                "properties": { "min": { "type": "number" }, "max": { "type": "number" } }
+                "required": [
+                  "min",
+                  "max"
+                ],
+                "properties": {
+                  "min": {
+                    "type": "number"
+                  },
+                  "max": {
+                    "type": "number"
+                  }
+                }
               }
             ]
           },
-          "unit": { "type": "string", "maxLength": 32 },
-          "description": { "type": "string", "maxLength": 4096 }
+          "unit": {
+            "type": "string",
+            "maxLength": 32
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 4096
+          }
         }
       }
     },
-    "ext": { "$ref": "common.schema.json#/$defs/ext" }
+    "ext": {
+      "$ref": "common.schema.json#/$defs/ext"
+    }
   }
 }

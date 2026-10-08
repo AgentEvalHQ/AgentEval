@@ -26,9 +26,12 @@
         "REQ-07"
       ],
       "runs": [
-        "Q-184"
+        {
+          "runId": "Q-184",
+          "runHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "origin": "launched"
+        }
       ],
-      "origin": "launched",
       "blocking": true
     },
     {
@@ -41,9 +44,17 @@
         "REQ-15"
       ],
       "runs": [
-        "R-921"
+        {
+          "runId": "R-921",
+          "runHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "origin": "adopted:ci"
+        },
+        {
+          "runId": "R-930",
+          "runHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "origin": "launched"
+        }
       ],
-      "origin": "adopted:ci",
       "blocking": true,
       "freshness": "P14D"
     },
@@ -55,7 +66,6 @@
         "significance": 0.05
       },
       "runs": [],
-      "origin": "pending",
       "blocking": false
     }
   ],

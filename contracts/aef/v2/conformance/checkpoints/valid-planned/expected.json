@@ -2,5 +2,6 @@
   "schema": "checkpoint",
   "writer": "valid",
   "reader": "valid",
-  "rule": "a planned checkpoint has no outcome yet"
+  "rule": "a planned checkpoint has no outcome yet",
+  "problems": []
 }

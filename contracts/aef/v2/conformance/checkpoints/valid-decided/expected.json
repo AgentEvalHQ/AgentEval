@@ -2,5 +2,6 @@
   "schema": "checkpoint",
   "writer": "valid",
   "reader": "valid",
-  "rule": "a decided checkpoint with its decision"
+  "rule": "a decided checkpoint, its decision recomputable from its input",
+  "problems": []
 }

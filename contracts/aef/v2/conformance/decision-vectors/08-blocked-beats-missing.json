@@ -10,7 +10,7 @@
         "result": {
           "status": "failed",
           "subjectVersion": "git:3f2a1c",
-          "closedAt": "2026-10-07T10:00:00Z"
+          "oldestClosedAt": "2026-10-07T10:00:00Z"
         }
       },
       {

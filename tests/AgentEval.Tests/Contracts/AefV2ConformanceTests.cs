@@ -72,6 +72,10 @@ public class AefV2ConformanceTests
                     {
                         result[key] = Derive(value, true);
                     }
+                    else if (key == "type" && obj.ContainsKey("enum"))
+                    {
+                        // the enum below decides the type, whatever the key order
+                    }
                     else if (key == "additionalProperties" && value is JsonValue v && v.TryGetValue<bool>(out var b) && !b)
                     {
                         // unknown fields are allowed
@@ -79,7 +83,9 @@ public class AefV2ConformanceTests
                     else if (key == "enum")
                     {
                         // Open: an unknown value reads as "other". A nullable enum stays nullable.
-                        result["type"] = obj["type"] is JsonArray types ? types.DeepClone() : "string";
+                        result["type"] = obj["type"] is JsonArray types ? types.DeepClone()
+                            : value is JsonArray values && values.Any(x => x is null) ? new JsonArray("string", "null")
+                            : "string";
                     }
                     else if (key == "const" && value is JsonValue c && c.TryGetValue<string>(out var s) && s == "2.0")
                     {
@@ -255,7 +261,7 @@ public class AefV2ConformanceTests
 
         if (Directory.Exists(Path.Combine(run, "overlays")))
         {
-            foreach (var seal in Directory.GetFiles(Path.Combine(run, "overlays"), "seal-*.json"))
+            foreach (var seal in BatchSeals(Path.Combine(run, "overlays")))
                 yield return ("overlay-seal", JsonNode.Parse(File.ReadAllText(seal)), $"overlays/{Path.GetFileName(seal)}");
         }
     }
@@ -350,7 +356,7 @@ public class AefV2ConformanceTests
             .SelectMany(f => JsonNode.Parse(File.ReadAllText(f))!["mismatches"]!.AsArray().Select(m => (string)m!["problem"]!))
             .Distinct().Order(StringComparer.Ordinal);
 
-        Assert.Equal(["digest", "duplicate-subject", "missing", "not-sealed", "run-hash", "run-id", "run-open"], problems);
+        Assert.Equal(["digest", "duplicate-subject", "missing", "not-sealed", "predicate", "run-hash", "run-id", "run-open", "seal-invalid"], problems);
     }
 
     [Fact]
@@ -396,20 +402,22 @@ public class AefV2ConformanceTests
     private static List<(string Path, string Problem)> Verify(string run)
     {
         var seal = JsonNode.Parse(File.ReadAllText(Path.Combine(run, "seal.json")))!;
-        Assert.True(Reader.Value.IsValid("seal", seal, out var errors), $"seal.json: {errors}");
+        if (!Reader.Value.IsValid("seal", seal, out _))
+            return [("seal.json", "seal-invalid")];
         var header = JsonNode.Parse(File.ReadAllText(Path.Combine(run, "run.json")))!;
         var problems = new List<(string, string)>();
 
         var names = seal["subject"]!.AsArray().Select(s => (string)s!["name"]!).ToList();
-        foreach (var duplicate in names.GroupBy(n => n, StringComparer.Ordinal).Where(g => g.Count() > 1))
-            problems.Add((duplicate.Key, "duplicate-subject"));
+        var duplicated = names.GroupBy(n => n, StringComparer.Ordinal).Where(g => g.Count() > 1).Select(g => g.Key).ToHashSet(StringComparer.Ordinal);
+        foreach (var duplicate in duplicated)
+            problems.Add((duplicate, "duplicate-subject"));
         var sealedDigests = seal["subject"]!.AsArray()
             .GroupBy(s => (string)s!["name"]!, StringComparer.Ordinal)
             .ToDictionary(g => g.Key, g => (string)g.First()!["digest"]!["sha256"]!, StringComparer.Ordinal);
 
         var present = SealedFiles(run).ToHashSet(StringComparer.Ordinal);
-        var fileProblems = 0;
-        foreach (var rel in present.Union(sealedDigests.Keys))
+        var fileProblems = duplicated.Count;
+        foreach (var rel in present.Union(sealedDigests.Keys).Where(r => !duplicated.Contains(r)))
         {
             string? problem = !sealedDigests.TryGetValue(rel, out var digest) ? "not-sealed"
                 : !present.Contains(rel) ? "missing"
@@ -426,10 +434,30 @@ public class AefV2ConformanceTests
             problems.Add(("seal.json", "run-hash"));
         if ((string)seal["predicate"]!["runId"]! != (string)header["runId"]!)
             problems.Add(("seal.json", "run-id"));
+        if (!PredicateMatches(seal["predicate"]!, header))
+            problems.Add(("seal.json", "predicate"));
         if ((string)header["status"]! == "running")
             problems.Add(("run.json", "run-open"));
 
         return [.. problems.OrderBy(p => p.Item1, Utf8Order).ThenBy(p => p.Item2, StringComparer.Ordinal)];
+    }
+
+    /// <summary>The fields the predicate copies from run.json say the same (v2/README.md, 'Sealing', step 6).</summary>
+    private static bool PredicateMatches(JsonNode predicate, JsonNode run)
+    {
+        static string? S(JsonNode? n) => n?.ToJsonString();
+        var same = S(predicate["producer"]?["name"]) == S(run["producer"]?["name"])
+                   && S(predicate["producer"]?["version"]) == S(run["producer"]?["version"])
+                   && S(predicate["subject"]?["ref"]) == S(run["subject"]?["ref"])
+                   && S(predicate["subject"]?["version"]) == S(run["subject"]?["version"])
+                   && S(predicate["deployment"]?["ref"]) == S(run["deployment"]?["ref"])
+                   && S(predicate["suite"]?["ref"]) == S(run["suite"]?["ref"])
+                   && S(predicate["suite"]?["version"]) == S(run["suite"]?["version"])
+                   && S(predicate["suite"]?["digest"]) == S(run["suite"]?["digest"]);
+        var judges = (predicate["judges"]?.AsArray() ?? []).Select(j => $"{j!["model"]}|{j["rubricDigest"]}");
+        var runJudges = (run["judges"]?.AsArray() ?? []).Select(j => $"{j!["model"]}|{j["rubricDigest"]}");
+        var closed = run["endedAt"] is null || S(predicate["closedAt"]) == S(run["endedAt"]);   // an open run has no endedAt
+        return same && closed && judges.SequenceEqual(runJudges, StringComparer.Ordinal);
     }
 
     // ------------------------------------------------------------------ the overlay chain
@@ -460,7 +488,7 @@ public class AefV2ConformanceTests
         var overlays = Path.Combine(run, "overlays");
         var runId = (string)JsonNode.Parse(File.ReadAllText(Path.Combine(run, "run.json")))!["runId"]!;
         var events = File.ReadAllBytes(Path.Combine(overlays, "events.ndjson"));
-        var last = Directory.GetFiles(overlays, "seal-*.json").Select(f => int.Parse(Path.GetFileNameWithoutExtension(f)[5..], System.Globalization.CultureInfo.InvariantCulture)).Max();
+        var last = BatchSeals(overlays).Select(f => int.Parse(Path.GetFileNameWithoutExtension(f)[5..], System.Globalization.CultureInfo.InvariantCulture)).Max();
         var problems = new List<(string, string)>();
         var covered = new List<(long From, long To)>();
         long expectedOffset = 0;
@@ -482,15 +510,18 @@ public class AefV2ConformanceTests
             if ((int)p["batch"]! != n) problems.Add((name, "batch-number"));
             if ((string)p["runId"]! != runId) problems.Add((name, "run-id"));
             if (expectedOffset >= 0 && offset != expectedOffset) problems.Add((name, "offset"));
-            // Coverage is what the batches claim; whether a claimed range still holds its bytes is batch-digest.
-            if (offset + length > events.Length || events[(int)(offset + length - 1)] != (byte)'\n' || (offset > 0 && events[(int)offset - 1] != (byte)'\n'))
+            // Coverage is what the batches claim; whether a claimed range holds its bytes is batch-digest, whether it
+            // starts and ends on a line is line-boundary.
+            if (offset + length > events.Length)
             {
                 problems.Add((name, "line-boundary"));
             }
             else
             {
                 covered.Add((offset, offset + length));
-                if (Hex(SHA256.HashData(events.AsSpan((int)offset, (int)length).ToArray())) != (string)statement["subject"]![0]!["digest"]!["sha256"]!)
+                if (events[(int)(offset + length - 1)] != (byte)'\n' || (offset > 0 && events[(int)offset - 1] != (byte)'\n'))
+                    problems.Add((name, "line-boundary"));
+                else if (Hex(SHA256.HashData(events.AsSpan((int)offset, (int)length).ToArray())) != (string)statement["subject"]![0]!["digest"]!["sha256"]!)
                     problems.Add((name, "batch-digest"));
             }
 
@@ -504,11 +535,11 @@ public class AefV2ConformanceTests
             expectedOffset = offset + length;
         }
 
-        long reach = 0;
+        long reach = 0;   // the union of the claimed ranges, from the first byte
         foreach (var (from, to) in covered.OrderBy(c => c.From))
         {
-            if (from != reach) break;
-            reach = to;
+            if (from > reach) break;
+            reach = Math.Max(reach, to);
         }
 
         if (reach != events.Length)
@@ -516,6 +547,32 @@ public class AefV2ConformanceTests
 
         return [.. problems.OrderBy(p => p.Item1, Utf8Order).ThenBy(p => p.Item2, StringComparer.Ordinal)];
     }
+
+    private static IEnumerable<string> BatchSeals(string overlays) =>
+        Directory.GetFiles(overlays, "seal-*.json").Where(f => System.Text.RegularExpressions.Regex.IsMatch(Path.GetFileName(f), "^seal-[0-9]{4}\\.json\\z"));
+
+    // ------------------------------------------------------------------ patterns
+
+    [Fact]
+    public void EveryPattern_EndsAtTheEndOfTheString()
+    {
+        // '$' alone also matches before a final newline in Python and .NET: every anchored pattern carries the guard.
+        foreach (var file in Directory.GetFiles(Path.Combine(V2, "schemas", "writer"), "*.schema.json"))
+        {
+            foreach (var pattern in Patterns(JsonNode.Parse(File.ReadAllText(file))))
+            {
+                Assert.True(pattern.EndsWith("(?!\\n)$", StringComparison.Ordinal), $"{Path.GetFileName(file)}: {pattern}");
+                Assert.DoesNotContain("\\d", pattern, StringComparison.Ordinal);   // \d matches other scripts' digits in .NET and Python
+            }
+        }
+    }
+
+    private static IEnumerable<string> Patterns(JsonNode? node) => node switch
+    {
+        JsonObject o => o.SelectMany(kv => kv.Key == "pattern" && kv.Value is JsonValue v ? [(string)v!] : Patterns(kv.Value)),
+        JsonArray a => a.SelectMany(Patterns),
+        _ => [],
+    };
 
     // ------------------------------------------------------------------ profiles
 

@@ -1,0 +1,33 @@
+{
+  "description": "A status this version does not know (a later minor's) reads as not_measured.",
+  "input": {
+    "subjectVersion": "git:3f2a1c",
+    "evaluatedAt": "2026-10-08T12:00:00Z",
+    "lanes": [
+      {
+        "lane": "quality",
+        "blocking": true,
+        "result": {
+          "status": "deferred",
+          "subjectVersion": "git:3f2a1c",
+          "oldestClosedAt": "2026-10-07T10:00:00Z"
+        }
+      }
+    ]
+  },
+  "expected": {
+    "outcome": "inconclusive",
+    "lanes": [
+      {
+        "lane": "quality",
+        "status": "not_measured",
+        "blocking": true
+      }
+    ],
+    "reasons": [
+      "not-measured:quality",
+      "outcome:inconclusive"
+    ]
+  },
+  "readerOnly": true
+}

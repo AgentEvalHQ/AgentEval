@@ -98,7 +98,7 @@
               "properties": {
                 "path": {
                   "type": "string",
-                  "pattern": "^overlays/seal-[0-9]{4}\\.json$"
+                  "pattern": "^overlays/seal-[0-9]{4}\\.json(?!\\n)$"
                 },
                 "sha256": {
                   "$ref": "common.schema.json#/$defs/sha256Hex"

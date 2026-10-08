@@ -1,0 +1,6 @@
+{
+  "schema": "run",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rule": "an id's pattern ends at the end of the string, not before a final newline"
+}

@@ -25,9 +25,12 @@
         "REQ-07"
       ],
       "runs": [
-        "Q-184"
+        {
+          "runId": "Q-184",
+          "runHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "origin": "launched"
+        }
       ],
-      "origin": "launched",
       "blocking": true
     }
   ],

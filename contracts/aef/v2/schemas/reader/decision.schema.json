@@ -25,9 +25,7 @@
         ],
         "properties": {
           "lane": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 64
+            "$ref": "common.schema.json#/$defs/laneName"
           },
           "status": {
             "$ref": "#/$defs/laneStatus"
@@ -52,7 +50,7 @@
       "maxItems": 256,
       "items": {
         "type": "string",
-        "pattern": "^[a-z][a-z0-9-]*(:[^\\s]{1,128})?$"
+        "pattern": "^[a-z][a-z0-9-]*(:[^\\s]{1,128})?(?!\\n)$"
       }
     }
   },
@@ -71,20 +69,21 @@
       "properties": {
         "subjectVersion": {
           "description": "The checkpoint's exact subject version.",
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 256
+          "$ref": "common.schema.json#/$defs/exactVersion"
         },
         "evaluatedAt": {
           "$ref": "common.schema.json#/$defs/timestamp"
         },
         "supersededBy": {
           "description": "A newer subject version known at the evaluation time, if any: the checkpoint expires.",
-          "type": [
-            "string",
-            "null"
-          ],
-          "maxLength": 256
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "common.schema.json#/$defs/exactVersion"
+            }
+          ]
         },
         "lanes": {
           "type": "array",
@@ -99,16 +98,13 @@
             ],
             "properties": {
               "lane": {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 64
+                "$ref": "common.schema.json#/$defs/laneName"
               },
               "blocking": {
                 "type": "boolean"
               },
               "freshness": {
-                "type": "string",
-                "pattern": "^P(?=\\d|T\\d)(\\d+D)?(T\\d+H)?$"
+                "$ref": "common.schema.json#/$defs/duration"
               },
               "result": {
                 "description": "What the lane's rule gave on its evidence (computed from the runs, outside this function), or null when there is no evidence.",
@@ -121,7 +117,7 @@
                     "required": [
                       "status",
                       "subjectVersion",
-                      "closedAt"
+                      "oldestClosedAt"
                     ],
                     "properties": {
                       "status": {
@@ -129,12 +125,10 @@
                       },
                       "subjectVersion": {
                         "description": "The version the evidence was produced for.",
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 256
+                        "$ref": "common.schema.json#/$defs/exactVersion"
                       },
-                      "closedAt": {
-                        "description": "When the newest run of the lane closed.",
+                      "oldestClosedAt": {
+                        "description": "When the oldest run the lane's result relied on closed: freshness is measured from it.",
                         "$ref": "common.schema.json#/$defs/timestamp"
                       },
                       "axes": {

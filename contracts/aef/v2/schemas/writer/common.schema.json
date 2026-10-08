@@ -21,13 +21,13 @@
     "sha256Hex": {
       "description": "A SHA-256 digest: 64 lower-case hex characters (the in-toto digest form).",
       "type": "string",
-      "pattern": "^[0-9a-f]{64}$",
+      "pattern": "^[0-9a-f]{64}(?!\\n)$",
       "maxLength": 64
     },
     "sha256Uri": {
       "description": "A SHA-256 digest with its algorithm: sha256:<64 lower-case hex>.",
       "type": "string",
-      "pattern": "^sha256:[0-9a-f]{64}$",
+      "pattern": "^sha256:[0-9a-f]{64}(?!\\n)$",
       "maxLength": 71
     },
     "timestamp": {
@@ -39,7 +39,7 @@
     "resultId": {
       "description": "r_ + the first 32 lower-case hex characters of SHA-256 over runId, caseId, path and trial joined by U+001F (an absent trial is the empty string). See v2/README.md, 'Result ids'.",
       "type": "string",
-      "pattern": "^r_[0-9a-f]{32}$",
+      "pattern": "^r_[0-9a-f]{32}(?!\\n)$",
       "maxLength": 34
     },
     "evidenceId": {
@@ -92,14 +92,54 @@
       "type": "object"
     },
     "text": {
-      "description": "A name with no control characters (U+0000-U+001F): caseId and path, which a result id joins with U+001F.",
+      "description": "A name with no control character (C0, DEL, C1): caseId and path, which a result id joins with U+001F.",
       "type": "string",
-      "pattern": "^[^\\u0000-\\u001f]+(?!\\n)$"
+      "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+(?!\\n)$"
     },
     "uri": {
       "type": "string",
       "maxLength": 2048,
       "pattern": "^[a-z][a-z0-9+.-]*:[^\\s]+(?!\\n)$"
+    },
+    "exactVersion": {
+      "description": "An exact version: no whitespace, at most 128 characters, compared byte for byte. 'latest' (any case) is never a version: it is resolved before anything runs.",
+      "type": "string",
+      "pattern": "^[^\\s]{1,128}(?!\\n)$",
+      "not": {
+        "pattern": "^[Ll][Aa][Tt][Ee][Ss][Tt](?!\\n)$"
+      }
+    },
+    "laneName": {
+      "description": "A lane: an id.",
+      "$ref": "#/$defs/id"
+    },
+    "duration": {
+      "description": "An ISO 8601 duration in days and hours, each at most five digits: P14D, PT36H, P1DT12H.",
+      "type": "string",
+      "pattern": "^P(?=[0-9]|T[0-9])([0-9]{1,5}D)?(T[0-9]{1,5}H)?(?!\\n)$"
+    },
+    "runRef": {
+      "description": "A sealed run a checkpoint lane used: its id, its run hash (frozen evidence), and where it came from.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runId",
+        "runHash",
+        "origin"
+      ],
+      "properties": {
+        "runId": {
+          "$ref": "#/$defs/id"
+        },
+        "runHash": {
+          "$ref": "#/$defs/sha256Hex"
+        },
+        "origin": {
+          "description": "launched: run for this checkpoint; adopted:<source>: an existing sealed run that matched the exact version and the comparability requirements.",
+          "type": "string",
+          "pattern": "^(launched|adopted:[A-Za-z0-9._:-]{1,64})(?!\\n)$"
+        }
+      }
     }
   }
 }

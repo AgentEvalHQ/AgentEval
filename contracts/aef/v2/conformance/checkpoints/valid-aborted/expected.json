@@ -1,0 +1,7 @@
+{
+  "schema": "checkpoint",
+  "writer": "valid",
+  "reader": "valid",
+  "rule": "an abandoned checkpoint says why and records no decision",
+  "problems": []
+}

@@ -15,6 +15,11 @@
   ASCII and byte-ordered; NDJSON is LF-only; trials are integer digits; seal predicates carry `schemaVersion`;
   `contentCapture` is `off` or `on`; `unmeasured` uses the v2 state names; rules across files; every result state, a
   U+2028 inside a string, chain vectors and more seal vectors in the corpus.
+- Review of checkpoints: the manifest records the decision's input beside its output and each run's hash and origin;
+  rules across the manifest with a verifier; aborted modelled; freshness from the oldest run, resolved from the
+  requirements; expiry at read time; future evidence is missing; unknown statuses fail closed; no lanes or a lane
+  twice are refused; times compare at full precision; durations bounded; exact versions (no 'latest' in any case);
+  lane names are ids; every pattern guards the end of the string; the predicate is checked against run.json.
 - Run plans (credential references only), runner capability manifests and the runner event stream, with its
   verifier and hand-written stream vectors.
 - Checkpoint manifests and the decision function (pure, with hand-written vectors); the reader derivation keeps

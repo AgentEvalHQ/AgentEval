@@ -2,7 +2,6 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using System.Globalization;
 using System.Text.Json.Nodes;
 
 namespace AgentEval.Results.Checkpoints;
@@ -27,14 +26,14 @@ public static class CheckpointDecisionJson
                 : new LaneEvidence(
                     Status((string?)result["status"]),
                     Required(result, "subjectVersion"),
-                    Time(Required(result, "closedAt")),
+                    AefTime.Parse(Required(result, "oldestClosedAt")),
                     result["axes"] is JsonArray axes ? axes.Select(a => (string)a!).ToList() : null);
             return new LaneInput(Required(lane, "lane"), (bool?)lane["blocking"] ?? throw new FormatException("blocking is required."),
                 evidence, (string?)lane["freshness"]);
         }).ToList();
 
         return new CheckpointDecisionInput(
-            Required(input, "subjectVersion"), Time(Required(input, "evaluatedAt")), lanes, (string?)input["supersededBy"]);
+            Required(input, "subjectVersion"), AefTime.Parse(Required(input, "evaluatedAt")), lanes, (string?)input["supersededBy"]);
     }
 
     /// <summary>Writes a decision result (decision.schema.json).</summary>
@@ -73,21 +72,17 @@ public static class CheckpointDecisionJson
         _ => throw new ArgumentOutOfRangeException(nameof(status), status, null),
     };
 
+    // A status this version does not know (a later minor's) fails closed: the lane measured nothing it can read.
     private static LaneEvidenceStatus Status(string? wire) => wire switch
     {
         "passed" => LaneEvidenceStatus.Passed,
         "failed" => LaneEvidenceStatus.Failed,
-        "not_measured" => LaneEvidenceStatus.NotMeasured,
         "incomparable" => LaneEvidenceStatus.Incomparable,
-        _ => throw new FormatException($"'{wire}' is not a lane evidence status (passed, failed, not_measured, incomparable)."),
+        null => throw new FormatException("status is required."),
+        _ => LaneEvidenceStatus.NotMeasured,
     };
 
     private static string Required(JsonNode node, string name) =>
         (string?)node[name] is { Length: > 0 } value ? value : throw new FormatException($"{name} is required.");
 
-    private static DateTimeOffset Time(string text) =>
-        DateTimeOffset.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal, out var time)
-        && text.EndsWith('Z')
-            ? time
-            : throw new FormatException($"'{text}' is not an RFC 3339 UTC time ending in Z.");
 }

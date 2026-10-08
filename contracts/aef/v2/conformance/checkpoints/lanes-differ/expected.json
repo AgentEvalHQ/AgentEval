@@ -1,0 +1,10 @@
+{
+  "schema": "checkpoint",
+  "writer": "valid",
+  "reader": "valid",
+  "rule": "the input decides exactly the manifest's lanes",
+  "problems": [
+    "decision",
+    "lanes"
+  ]
+}

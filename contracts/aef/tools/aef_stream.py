@@ -3,17 +3,23 @@
 
 `python aef_stream.py --check` runs it against conformance/protocol/streams/ and exits 1 on any difference.
 """
+import calendar
 import json
+import re
 import sys
-from datetime import datetime
 from pathlib import Path
 
 TERMINAL = {"job.sealed", "job.failed", "job.cancelled"}
+TIME = re.compile(r"^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\.([0-9]{1,9}))?Z$")
 
 
 def parse_time(text):
-    base, _, frac = text.rstrip("Z").partition(".")
-    return datetime.strptime(base, "%Y-%m-%dT%H:%M:%S"), int((frac + "000000000")[:9]) if frac else 0
+    """(seconds since the epoch, nanoseconds): exact, as the decision function compares times."""
+    m = TIME.fullmatch(text)
+    if not m:
+        raise ValueError(f"{text!r} is not an RFC 3339 UTC time")
+    y, mo, d, h, mi, s, frac = m.groups()
+    return calendar.timegm((int(y), int(mo), int(d), int(h), int(mi), int(s), 0, 0, 0)), int((frac or "").ljust(9, "0"))
 
 
 def verify(events, plan=None):

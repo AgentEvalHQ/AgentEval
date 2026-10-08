@@ -16,7 +16,7 @@ public enum LaneEvidenceStatus
     /// <summary>The rule did not hold.</summary>
     Failed,
 
-    /// <summary>The evidence measured nothing the rule reads.</summary>
+    /// <summary>The evidence measured nothing the rule reads (also: a status this version does not know, failing closed).</summary>
     NotMeasured,
 
     /// <summary>A comparison's runs differ on a required comparability axis.</summary>
@@ -32,7 +32,7 @@ public enum LaneStatus
     /// <summary>The rule did not hold.</summary>
     Failed,
 
-    /// <summary>No evidence for this exact version.</summary>
+    /// <summary>No evidence for this exact version at the evaluation time.</summary>
     Missing,
 
     /// <summary>The evidence measured nothing the rule reads.</summary>
@@ -41,11 +41,11 @@ public enum LaneStatus
     /// <summary>A comparison's runs differ on a required axis.</summary>
     Incomparable,
 
-    /// <summary>Older than the lane's freshness at the evaluation time.</summary>
+    /// <summary>The oldest evidence the lane relied on is older than its freshness at the evaluation time.</summary>
     Stale,
 }
 
-/// <summary>A checkpoint's outcome. Missing evidence is never converted into a pass; nothing is averaged.</summary>
+/// <summary>A checkpoint's outcome from the decision function. Missing evidence is never converted into a pass; nothing is averaged.</summary>
 public enum CheckpointOutcome
 {
     /// <summary>Every lane passed (an advisory lane may have failed, and says so).</summary>
@@ -61,16 +61,19 @@ public enum CheckpointOutcome
     Expired,
 }
 
-/// <summary>A lane's evidence: its rule's result, the version it was produced for, and when its newest run closed.</summary>
+/// <summary>
+/// A lane's evidence: its rule's result, the version it was produced for, and when the oldest run the result relied on
+/// closed (freshness is measured from it).
+/// </summary>
 public sealed record LaneEvidence(
-    LaneEvidenceStatus Status, string SubjectVersion, DateTimeOffset ClosedAt, IReadOnlyList<string>? Axes = null);
+    LaneEvidenceStatus Status, string SubjectVersion, AefTime OldestClosedAt, IReadOnlyList<string>? Axes = null);
 
 /// <summary>One lane of the decision's input. <paramref name="Freshness"/> is an ISO 8601 duration in days and hours.</summary>
 public sealed record LaneInput(string Lane, bool Blocking, LaneEvidence? Result, string? Freshness = null);
 
 /// <summary>The decision function's input: the checkpoint's exact version, the evaluation time, and its lanes.</summary>
 public sealed record CheckpointDecisionInput(
-    string SubjectVersion, DateTimeOffset EvaluatedAt, IReadOnlyList<LaneInput> Lanes, string? SupersededBy = null);
+    string SubjectVersion, AefTime EvaluatedAt, IReadOnlyList<LaneInput> Lanes, string? SupersededBy = null);
 
 /// <summary>One lane in the decision.</summary>
 public sealed record LaneDecision(string Lane, LaneStatus Status, bool Blocking, IReadOnlyList<string>? Axes = null);
@@ -80,18 +83,29 @@ public sealed record CheckpointDecisionResult(CheckpointOutcome Outcome, IReadOn
 
 /// <summary>
 /// The AEF v2 checkpoint decision function (contracts/aef/v2/README.md, "The decision function"): pure, with no I/O
-/// and no clock (the evaluation time is an input), so anyone can recompute why a release was blocked. Its vectors are
-/// contracts/aef/v2/conformance/decision-vectors/.
+/// and no clock (the evaluation time is an input), so anyone can recompute why a release was blocked. Versions compare
+/// byte for byte; times at their full precision. Its vectors are contracts/aef/v2/conformance/decision-vectors/.
 /// </summary>
 public static class CheckpointDecision
 {
-    private static readonly Regex Duration = new(@"^P(?=\d|T\d)(?:(\d+)D)?(?:T(\d+)H)?$", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
+    private static readonly Regex Duration = new(
+        "^P(?=[0-9]|T[0-9])(?:([0-9]{1,5})D)?(?:T([0-9]{1,5})H)?\\z", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
 
     /// <summary>Decides a checkpoint.</summary>
+    /// <exception cref="ArgumentException">No lane, or a lane listed twice.</exception>
     /// <exception cref="FormatException">A lane's freshness is not a duration in days and hours.</exception>
     public static CheckpointDecisionResult Decide(CheckpointDecisionInput input)
     {
         ArgumentNullException.ThrowIfNull(input);
+        if (input.Lanes.Count == 0)
+        {
+            throw new ArgumentException("A checkpoint has at least one lane: deciding none would approve nothing.", nameof(input));
+        }
+
+        if (input.Lanes.GroupBy(l => l.Lane, StringComparer.Ordinal).FirstOrDefault(g => g.Count() > 1) is { } twice)
+        {
+            throw new ArgumentException($"Lane '{twice.Key}' is listed twice.", nameof(input));
+        }
 
         var lanes = new List<LaneDecision>(input.Lanes.Count);
         var reasons = new List<string>();
@@ -107,7 +121,11 @@ public static class CheckpointDecision
             {
                 (status, code) = (LaneStatus.Missing, "wrong-version");
             }
-            else if (lane.Freshness is { } freshness && evidence.ClosedAt + ParseDuration(freshness) < input.EvaluatedAt)
+            else if (evidence.OldestClosedAt > input.EvaluatedAt)
+            {
+                (status, code) = (LaneStatus.Missing, "future-evidence");
+            }
+            else if (lane.Freshness is { } freshness && evidence.OldestClosedAt.AddSeconds(DurationSeconds(freshness)) < input.EvaluatedAt)
             {
                 status = LaneStatus.Stale;
             }
@@ -117,8 +135,8 @@ public static class CheckpointDecision
                 {
                     LaneEvidenceStatus.Passed => LaneStatus.Passed,
                     LaneEvidenceStatus.Failed => LaneStatus.Failed,
-                    LaneEvidenceStatus.NotMeasured => LaneStatus.NotMeasured,
-                    _ => LaneStatus.Incomparable,
+                    LaneEvidenceStatus.Incomparable => LaneStatus.Incomparable,
+                    _ => LaneStatus.NotMeasured,
                 };
             }
 
@@ -154,19 +172,19 @@ public static class CheckpointDecision
         return new CheckpointDecisionResult(outcome, lanes, reasons);
     }
 
-    /// <summary>An ISO 8601 duration of days and hours (P14D, PT36H, P1DT12H).</summary>
+    /// <summary>An ISO 8601 duration of days and hours (P14D, PT36H, P1DT12H), each at most five digits, in seconds.</summary>
     /// <exception cref="FormatException">Anything else.</exception>
-    public static TimeSpan ParseDuration(string text)
+    public static long DurationSeconds(string text)
     {
         ArgumentNullException.ThrowIfNull(text);
         var match = Duration.Match(text);
         if (!match.Success)
         {
-            throw new FormatException($"'{text}' is not a duration in days and hours (P14D, PT36H, P1DT12H).");
+            throw new FormatException($"'{text}' is not a duration in days and hours (P14D, PT36H, P1DT12H), each at most five digits.");
         }
 
-        var days = match.Groups[1].Success ? int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture) : 0;
-        var hours = match.Groups[2].Success ? int.Parse(match.Groups[2].Value, CultureInfo.InvariantCulture) : 0;
-        return TimeSpan.FromDays(days) + TimeSpan.FromHours(hours);
+        long days = match.Groups[1].Success ? long.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture) : 0;
+        long hours = match.Groups[2].Success ? long.Parse(match.Groups[2].Value, CultureInfo.InvariantCulture) : 0;
+        return (days * 86_400) + (hours * 3_600);
     }
 }

@@ -6,6 +6,7 @@ are another and recompute every value. Re-running it rewrites the corpus byte fo
 
 Usage: python contracts/aef/tools/build_conformance.py
 """
+import base64
 import hashlib
 import json
 import shutil
@@ -47,7 +48,7 @@ def manifest(run_dir):
     return "".join(lines)
 
 
-def seal(run_dir, run, sealed_by, closed_at, allow_open=False):
+def seal(run_dir, run, sealed_by, closed_at=None, allow_open=False):
     assert allow_open or run["status"] != "running", "only a closed run is sealed"
     text = manifest(run_dir)
     statement = {
@@ -66,7 +67,7 @@ def seal(run_dir, run, sealed_by, closed_at, allow_open=False):
             "deployment": {"ref": run["deployment"]["ref"]} if "deployment" in run else None,
             "suite": {k: run["suite"][k] for k in ("ref", "version", "digest") if k in run["suite"]} if "suite" in run else None,
             "judges": [{k: j[k] for k in ("model", "rubricDigest") if k in j} for j in run.get("judges", [])],
-            "closedAt": closed_at,
+            "closedAt": closed_at or run["endedAt"],
             "sealedBy": sealed_by,
         },
     }
@@ -206,7 +207,7 @@ def completed_eval(run_dir):
          "comparability": "not_applicable", "outcome": "no_ship", "exitCode": 1, "decisive": [helpful],
          "decidedAt": "2026-10-02T14:06:23.004Z"},
     ])
-    seal(run_dir, run, "producer", "2026-10-02T14:06:23.004Z")
+    seal(run_dir, run, "producer")
     overlay_batches(run_dir, run_id, [
         [{"schemaVersion": V, "eventId": "ov_0001", "kind": "annotate", "target": {"result": helpful},
           "reason": "Rubric §3 reads « escalate » strictly — see thread.", "by": {"identity": "git:owner@example.com", "assurance": "self-attested"},
@@ -227,7 +228,7 @@ def aborted_early(run_dir):
     write_bytes(run_dir / "results.ndjson", b"")
     write_json(run_dir / "metrics.json", {"schemaVersion": V, "metrics": []})
     write_json(run_dir / "summary.json", {"schemaVersion": V, "runId": run_id, "lanes": []})
-    seal(run_dir, run, "ingest", "2026-10-03T09:00:05Z")
+    seal(run_dir, run, "ingest")
 
 
 def running_trials(run_dir):
@@ -299,6 +300,12 @@ def invalid_cases():
          "a time is RFC 3339 UTC by its pattern, whether or not a validator asserts format"),
         ("result-id-trailing-newline", "result", dict(base_result, resultId=rid + "\n"), "invalid",
          "a pattern's end is the end of the string: '$' alone also matches before a final newline"),
+        ("run-id-trailing-newline", "run", dict(base_run, runId="r-1\n"), "invalid",
+         "an id's pattern ends at the end of the string, not before a final newline"),
+        ("overlay-event-id-trailing-newline", "overlay-event",
+         {"schemaVersion": V, "eventId": "ov_1\n", "kind": "annotate", "target": {"run": "r-1"},
+          "by": {"identity": "git:a@b", "assurance": "self-attested"}, "at": "2026-10-01T00:00:00Z"}, "invalid",
+         "an event id's pattern ends at the end of the string"),
         ("result-case-id-control-char", "result", dict(base_result, caseId="a\u001fb"), "invalid",
          "caseId and path hold no control character, so the U+001F a result id joins with cannot appear in them"),
         ("evidence-blob-and-span-id", "evidence",
@@ -316,42 +323,81 @@ def invalid_cases():
 # ---------------------------------------------------------------------------- checkpoints
 
 def checkpoints():
-    """Checkpoint manifests: (name, document, writer verdict, reader verdict, why)."""
+    """Checkpoint manifests: (name, document, writer verdict, reader verdict, problems, why). problems are what the
+    checkpoint verifier reports on a schema-valid manifest (v2/README.md, 'Checkpoints'), written by hand."""
+    h = lambda c: c * 64
     lanes = [
         {"lane": "quality", "rule": {"kind": "threshold", "metric": "triage.passRate", "op": ">=", "value": 0.8},
-         "requirements": ["REQ-07"], "runs": ["Q-184"], "origin": "launched", "blocking": True},
-        {"lane": "security", "rule": {"kind": "severity", "max": "low"}, "requirements": ["REQ-15"], "runs": ["R-921"],
-         "origin": "adopted:ci", "blocking": True, "freshness": "P14D"},
+         "requirements": ["REQ-07"], "runs": [{"runId": "Q-184", "runHash": h("a"), "origin": "launched"}], "blocking": True},
+        {"lane": "security", "rule": {"kind": "severity", "max": "low"}, "requirements": ["REQ-15"],
+         "runs": [{"runId": "R-921", "runHash": h("b"), "origin": "adopted:ci"},
+                  {"runId": "R-930", "runHash": h("c"), "origin": "launched"}], "blocking": True, "freshness": "P14D"},
         {"lane": "memory", "rule": {"kind": "comparison", "baseline": "policy:same-branch", "significance": 0.05},
-         "runs": [], "origin": "pending", "blocking": False},
+         "runs": [], "blocking": False},
     ]
+    decision_input = {
+        "subjectVersion": "git:3f2a1c", "evaluatedAt": "2026-10-02T14:30:00Z", "supersededBy": None,
+        "lanes": [
+            {"lane": "quality", "blocking": True,
+             "result": {"status": "passed", "subjectVersion": "git:3f2a1c", "oldestClosedAt": "2026-10-02T13:10:00Z"}},
+            {"lane": "security", "blocking": True, "freshness": "P14D",
+             "result": {"status": "passed", "subjectVersion": "git:3f2a1c", "oldestClosedAt": "2026-09-30T08:00:00Z"}},
+            {"lane": "memory", "blocking": False, "result": None},
+        ],
+    }
+    decision = {"outcome": "inconclusive",
+                "lanes": [{"lane": "quality", "status": "passed", "blocking": True},
+                          {"lane": "security", "status": "passed", "blocking": True},
+                          {"lane": "memory", "status": "missing", "blocking": False}],
+                "reasons": ["missing:memory", "outcome:inconclusive"]}
     decided = {
         "schemaVersion": V, "checkpointId": "cp_01J9K4", "template": {"ref": "template:support/release-candidate", "version": "3"},
         "subject": {"ref": "agent:support/support-triage", "version": "git:3f2a1c", "image": "sha256:" + "9d" * 32,
                     "deployment": "deployment:support/support-triage@prod-eu", "resolvedFrom": "latest", "resolvedAt": "2026-10-02T13:58:00Z"},
         "lanes": lanes, "comparability": {"required": ["judge.modelId", "judge.rubricDigest", "stimulus", "executionPolicy"]},
         "budget": {"approvedUsd": 10.0, "spentUsd": 6.4, "approvedBy": {"identity": "git:owner@example.com", "assurance": "self-attested"}},
-        "state": "decided", "outcome": "inconclusive",
-        "decision": {"outcome": "inconclusive",
-                     "lanes": [{"lane": "quality", "status": "passed", "blocking": True},
-                               {"lane": "security", "status": "passed", "blocking": True},
-                               {"lane": "memory", "status": "missing", "blocking": False}],
-                     "reasons": ["missing:memory", "outcome:inconclusive"]},
+        "state": "decided", "outcome": "inconclusive", "decisionInput": decision_input, "decision": decision,
     }
-    planned = dict(decided, state="planned", outcome=None)
-    del planned["decision"]
+    planned = {k: v for k, v in decided.items() if k not in ("decision", "decisionInput")}
+    planned.update(state="planned", outcome=None)
+    aborted = dict(planned, state="decided", outcome="aborted", abortReason="The approver did not approve the spend.")
     unknown_kind = dict(planned, lanes=[dict(lanes[0], rule={"kind": "drift", "window": "P7D"})])
+    other_input = dict(decision_input, lanes=[dict(decision_input["lanes"][0], result=dict(decision_input["lanes"][0]["result"], status="failed"))]
+                       + decision_input["lanes"][1:])
     return [
-        ("valid-decided", decided, "valid", "valid", "a decided checkpoint with its decision"),
-        ("valid-planned", planned, "valid", "valid", "a planned checkpoint has no outcome yet"),
-        ("decided-without-outcome", dict(decided, outcome=None), "invalid", "invalid", "a decided checkpoint has an outcome"),
-        ("latest-is-not-a-version", dict(planned, subject=dict(planned["subject"], version="latest")), "invalid", "invalid",
-         "'latest' is resolved to an exact version before anything runs"),
+        ("valid-decided", decided, "valid", "valid", [], "a decided checkpoint, its decision recomputable from its input"),
+        ("valid-planned", planned, "valid", "valid", [], "a planned checkpoint has no outcome yet"),
+        ("valid-aborted", aborted, "valid", "valid", [], "an abandoned checkpoint says why and records no decision"),
+        ("decided-without-outcome", dict(decided, outcome=None), "invalid", "invalid", None, "a decided checkpoint has an outcome"),
+        ("decided-without-input", {k: v for k, v in decided.items() if k != "decisionInput"}, "invalid", "invalid", None,
+         "a decision is recorded with its input, so it can be recomputed"),
+        ("aborted-without-reason", {k: v for k, v in aborted.items() if k != "abortReason"}, "invalid", "invalid", None,
+         "an abandoned checkpoint says why"),
+        ("aborted-with-decision", dict(aborted, decision=decision), "invalid", "invalid", None,
+         "the decision function never aborts: an aborted checkpoint has no decision"),
+        ("latest-is-not-a-version", dict(planned, subject=dict(planned["subject"], version="Latest")), "invalid", "invalid", None,
+         "'latest' (any case) is resolved to an exact version before anything runs"),
+        ("version-with-space", dict(planned, subject=dict(planned["subject"], version="1.2 beta")), "invalid", "invalid", None,
+         "a version has no whitespace"),
+        ("lane-name-with-space", dict(planned, lanes=[dict(lanes[0], lane="red team")]), "invalid", "invalid", None,
+         "a lane name is an id, so a reason code can carry it"),
+        ("run-without-hash", dict(planned, lanes=[dict(lanes[0], runs=[{"runId": "Q-184", "origin": "launched"}])]), "invalid", "invalid", None,
+         "a lane's runs are frozen by their run hashes"),
         ("threshold-without-value", dict(planned, lanes=[dict(lanes[0], rule={"kind": "threshold", "metric": "m", "op": ">="})]),
-         "invalid", "invalid", "a threshold rule names its value"),
-        ("unknown-rule-kind", unknown_kind, "invalid", "valid",
+         "invalid", "invalid", None, "a threshold rule names its value"),
+        ("unknown-rule-kind", unknown_kind, "invalid", "valid", None,
          "a rule kind this version does not know: the writer refuses it, a reader accepts it as other"),
-        ("planned-with-outcome", dict(planned, outcome="approved"), "invalid", "invalid", "no outcome before the decision"),
+        ("planned-with-outcome", dict(planned, outcome="approved"), "invalid", "invalid", None, "no outcome before the decision"),
+        ("outcome-differs", dict(decided, outcome="approved"), "valid", "valid", ["outcome"],
+         "the outcome is the decision's"),
+        ("decision-not-recomputed", dict(decided, decisionInput=other_input), "valid", "valid", ["decision"],
+         "the recorded decision is what the recorded input gives"),
+        ("lanes-differ", dict(decided, decisionInput=dict(decision_input, lanes=decision_input["lanes"][:2])), "valid", "valid",
+         ["decision", "lanes"], "the input decides exactly the manifest's lanes"),
+        ("version-differs", dict(decided, decisionInput=dict(decision_input, subjectVersion="git:000000")), "valid", "valid",
+         ["decision", "version"], "the input is for the checkpoint's version"),
+        ("evidence-without-runs", dict(decided, lanes=[dict(lanes[0], runs=[])] + lanes[1:]), "valid", "valid", ["evidence"],
+         "a lane with a result names the runs it came from, and a lane with runs has a result"),
     ]
 
 
@@ -402,8 +448,11 @@ def seal_vectors_more(valid):
     (run / "seal.json").unlink()
     for name in ("ext/a.b", "ext/a-b", "ext/a/b", "ext/Z"):  # Z (0x5A) sorts before a: not case-insensitive
         write_bytes(run / name, f"{name}\n".encode("utf-8"))
-    seal(run, json.loads((run / "run.json").read_text(encoding="utf-8")), "ingest", "2026-10-03T09:00:05Z")
-    write_json(run / "attestation.dsse.json", {"payloadType": "application/vnd.in-toto+json", "payload": "", "signatures": []})
+    seal(run, json.loads((run / "run.json").read_text(encoding="utf-8")), "ingest")
+    # A well-formed DSSE envelope over seal.json; its signature is not checked here (DSSE vectors come later).
+    write_json(run / "attestation.dsse.json", {"payloadType": "application/vnd.in-toto+json",
+                                               "payload": base64.b64encode((run / "seal.json").read_bytes()).decode("ascii"),
+                                               "signatures": [{"keyid": "test-key-not-verified", "sig": "AAAA"}]})
     write_bytes(out / "path-order" / "expected-manifest.txt", manifest(run).encode("utf-8"))
     expect("path-order", "match", [])
 
@@ -428,10 +477,25 @@ def seal_vectors_more(valid):
     write_json(run / "seal.json", statement)
     expect("duplicate-subject", "mismatch", [{"path": statement["subject"][0]["name"], "problem": "duplicate-subject"}])
 
+    # The seal's predicate says another version than run.json.
+    run = copy("predicate-differs", "completed-eval")
+    statement = json.loads((run / "seal.json").read_text(encoding="utf-8"))
+    statement["predicate"]["subject"]["version"] = "git:good"
+    write_json(run / "seal.json", statement)
+    expect("predicate-differs", "mismatch", [{"path": "seal.json", "problem": "predicate"}])
+
+    # seal.json itself is not a valid seal.
+    run = copy("seal-invalid")
+    statement = json.loads((run / "seal.json").read_text(encoding="utf-8"))
+    del statement["predicate"]["runHash"]
+    write_json(run / "seal.json", statement)
+    expect("seal-invalid", "mismatch", [{"path": "seal.json", "problem": "seal-invalid"}])
+
     # A run sealed while it was still running.
     run = out / "open-run" / "run"
     shutil.copytree(valid / "running-trials", run)
     seal(run, json.loads((run / "run.json").read_text(encoding="utf-8")), "producer", "2026-10-04T10:05:00Z", allow_open=True)
+    # (an open run has no endedAt; the closedAt given here is the producer's claim)
     expect("open-run", "mismatch", [{"path": "run.json", "problem": "run-open"}])
 
     # The overlay chain: a byte changed inside batch 1, batch 1's seal missing, bytes appended after the last batch.
@@ -483,9 +547,12 @@ def main():
 
     if (ROOT / "checkpoints").exists():
         shutil.rmtree(ROOT / "checkpoints")
-    for name, doc, writer, reader, rule in checkpoints():
+    for name, doc, writer, reader, problems, rule in checkpoints():
         write_json(ROOT / "checkpoints" / name / "document.json", doc)
-        write_json(ROOT / "checkpoints" / name / "expected.json", {"schema": "checkpoint", "writer": writer, "reader": reader, "rule": rule})
+        expected = {"schema": "checkpoint", "writer": writer, "reader": reader, "rule": rule}
+        if problems is not None:
+            expected["problems"] = problems
+        write_json(ROOT / "checkpoints" / name / "expected.json", expected)
 
     vectors = [(run, case, path, trial) for run, case, path, trial in [
         ("01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10", "case-17", "triage", None),

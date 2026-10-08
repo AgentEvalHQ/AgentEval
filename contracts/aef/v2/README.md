@@ -21,6 +21,7 @@ for `run.json`. The conventional location is `<root>/.agenteval/runs/<yyyy>/<mm>
 | `attestation.dsse.json` | DSSE envelope | optional |
 | `overlays/events.ndjson` | `overlay-event`, one line each | after close, when anything is decided or noted |
 | `overlays/seal-<nnnn>.json` | `overlay-seal` | one per batch of overlay events |
+| `overlays/seal-<nnnn>.dsse.json` | DSSE envelope | optional: a batch's signature (§7) |
 | `traces.otlp.jsonl` | OTLP/JSON, one `ExportTraceServiceRequest` per line | optional |
 | `ext/…` | none: producer files | optional; sealed like every other file |
 
@@ -105,7 +106,7 @@ resultId = "r_" + first 32 hex characters of SHA-256( UTF-8( runId + U+001F + ca
 
 The hash is written in lower-case hex. `trial` is the trial number as plain integer digits (a writer writes `3`; a
 reader that meets `3.0` uses `3`), or the empty string on a line without one. `caseId` and `path` contain no control
-character, so the U+001F separator cannot appear in them. `conformance/result-ids.json` holds vectors, non-ASCII and a
+character (C0, DEL or C1), so the U+001F separator cannot appear in them. `conformance/result-ids.json` holds vectors, non-ASCII and a
 trial written as `3.0` included.
 
 ### 4.3 Composites: how a verdict was reached
@@ -153,7 +154,9 @@ statistics (`sum`, `sumSq`) to pool runs. When `n` is 0, `value` is `null` and `
 ## 6. `evidence.ndjson` and `gates.ndjson`
 
 An evidence record (`E-…`) is what a result cites: its `kind`, the `digest` of its content, and a `link` that is
-exactly one of a blob in the run, a span (`traceId` and `spanId`), or a URI outside the run.
+exactly one of a blob in the run, a span (`traceId` and `spanId`), or a URI outside the run. These three are fixed:
+a new kind of link is a new major version (the link is not a union on `kind`, so a reader cannot take an unknown one
+as "other").
 
 A gate decision is a decision the producer took when the run closed (a `--fail-on` gate, a baseline comparison): its
 rule, its inputs, whether a comparison it needed was shown comparable, the `outcome` (`ship`, `no_ship`,
@@ -184,8 +187,10 @@ A reader verifies the chain from `seal-0001.json` to the highest-numbered seal p
 seal missing below the highest (`missing`); a predicate `batch` that is not the file's number (`batch-number`); another
 `runId` (`run-id`); an `offset` that does not continue the previous batch (`offset`); a range that does not start and
 end on a line boundary inside the file (`line-boundary`); bytes that no longer match the batch digest
-(`batch-digest`); a `previous` that does not name the previous seal file and the SHA-256 of its bytes (`previous`); and,
-for `overlays/events.ndjson`, bytes that no batch claims (`uncovered`). `conformance/chain-vectors/` holds a changed
+(`batch-digest`); a `previous` that does not name the previous seal file and the SHA-256 of its bytes, including when
+that file is missing (`previous`); and, for `overlays/events.ndjson`, bytes that no batch claims (`uncovered`: a claimed
+range counts as covered even when its bytes changed, which `batch-digest` reports). Problems are reported ordered by
+path (by its UTF-8 bytes) and then by name. Only files named `seal-` and four digits `.json` are batch seals. `conformance/chain-vectors/` holds a changed
 batch, a missing seal and an unsealed tail with their expected problems. The run's own seal is unaffected by any of
 them.
 
@@ -216,14 +221,20 @@ text and a CRLF inside a sealed blob to prove it.
    `predicate` with the `runId`, the `runHash`, the producer, subject, deployment, suite and judges from `run.json`,
    `closedAt`, and `sealedBy`: `producer` when the producer sealed the run, `ingest` when a host sealed it on taking
    custody of an unsealed run.
-6. **Verification** checks that `seal.json` is valid against the seal schema, then reports every difference as a path
-   and a problem:
+6. **Verification** reports every difference as a path and a problem, ordered by path (by its UTF-8 bytes) and then
+   by name:
+   - a `seal.json` that is not valid against the seal schema (`seal-invalid`, under `seal.json`): verification stops
+     there;
+   - a subject listed more than once (`duplicate-subject`, under the subject's name; its digest is not compared, since
+     the listings may disagree);
    - a sealed file whose bytes changed (`digest`), a file present but not sealed (`not-sealed`), a sealed file that is
      gone (`missing`);
-   - a subject listed more than once (`duplicate-subject`, under the subject's name);
    - when every file matches its subject, a recomputed run hash that is not `predicate.runHash` (`run-hash`, under
      `seal.json`; when a file differs, the run hash necessarily differs too and adds nothing);
    - a `predicate.runId` that is not `run.json`'s (`run-id`, under `seal.json`);
+   - a predicate that says something else than `run.json` about the producer (name, version), the subject (ref,
+     version), the deployment (ref), the suite (ref, version, digest), the judges (model, rubric digest, in order) or,
+     for a closed run, `closedAt` (which is `run.json`'s `endedAt`) (`predicate`, under `seal.json`);
    - a run whose `run.json` says `running` (`run-open`, under `run.json`).
 
    A run verifies only when there are none, and is shown verified only after a recomputation. A run with no
@@ -237,20 +248,37 @@ bytes, beside an `attestation.dsse.json` that is never sealed), and one vector f
 ## 9. Checkpoints
 
 A **checkpoint** is a release decision over several evidence lanes (a quality suite, a red-team campaign, a memory
-benchmark, a compliance pack) for **one exact subject version** (schema `checkpoint`). "latest" is never an identity:
-it is resolved to an exact version before anything runs, and the manifest records what was asked (`resolvedFrom`) and
-what it resolved to (`version`).
+benchmark, a compliance pack) for **one exact subject version** (schema `checkpoint`). A version is an exact string:
+no whitespace, at most 128 characters, compared byte for byte, and never "latest" in any case: "latest" is resolved
+before anything runs, and the manifest records what was asked (`resolvedFrom`) and what it resolved to (`version`).
 
-- Each **lane** names its `rule`, the requirements it answers, the exact sealed `runs` it used, where they came from
-  (`origin`: `launched`, `adopted:<source>` for an existing sealed run that matched the exact version and the
-  comparability requirements, or `pending`), whether it is `blocking`, and its `freshness` (an ISO 8601 duration of
-  days and hours: `P14D`, `PT36H`, `P1DT12H`).
+- Each **lane** names its `rule`, the requirements it answers, whether it is `blocking`, its `freshness`, and the exact
+  sealed `runs` it used: each run's `runId`, its `runHash` (so the evidence is frozen) and its `origin` (`launched` for
+  this checkpoint, or `adopted:<source>` for an existing sealed run that matched the exact version and the
+  comparability requirements). A lane with no runs yet is pending.
+- A lane's **freshness** is the shortest freshness among its requirements, resolved when the checkpoint is planned and
+  recorded on the lane (an ISO 8601 duration of days and hours, each at most five digits: `P14D`, `PT36H`, `P1DT12H`).
 - A lane's rule is one of: `threshold` (a metric against a value), `severity` (the worst severity allowed), `comparison`
   (no significant regression against a baseline), `evidence-present` (a number of evidence groups exist and verify).
-  A family that publishes no pass threshold takes `comparison` or `evidence-present`, never `threshold`.
+  A family that publishes no pass threshold takes `comparison` or `evidence-present`, never `threshold`. A reader that
+  does not know a lane's rule kind cannot evaluate it: the lane's result is `not_measured`.
 - `state` moves `draft` → `planned` → `approved_to_spend` → `running` → `evidence_complete` → `decided` → `sealed`.
-  `outcome` is `null` until the state is `decided`; from then on it is set, and `decision` records the decision
-  function's output.
+  `outcome` is `null` before `decided`. From `decided` on it is set: either the decision function's outcome, with its
+  input recorded (`decisionInput`) beside its output (`decision`) so anyone can recompute it, or `aborted` when the
+  checkpoint was abandoned (spend not approved, runs failed), with an `abortReason` and no decision.
+- `budget.approvedBy`, like an overlay's `by`, is a claim: a reader shows its assurance only as far as it verified it
+  (§7).
+
+**Rules across the manifest** that a schema cannot express, for a checkpoint decided by the decision function. A
+verifier reports them in name order: `outcome` (the outcome is not the decision's), `decision` (the decision is not what
+the decision function gives on the recorded input), `lanes` (the input does not decide exactly the manifest's lanes,
+with the same names, blocking and freshness, in the same order), `version` (the input is for another version),
+`evidence` (a lane has runs but no result in the input, or a result but no runs). `conformance/checkpoints/` holds
+manifests that break each, with the expected problems.
+
+**Expiry at read time.** A decided or sealed checkpoint is never rewritten. A reader that shows it later evaluates the
+decision function again with the time of reading (and any newer version it knows of as `supersededBy`): when that gives
+`expired`, it shows the checkpoint as expired beside the recorded outcome.
 
 ## 10. The decision function
 
@@ -260,16 +288,21 @@ evaluation time is an input. Anyone can recompute why a checkpoint was approved,
 **Input:** the checkpoint's exact `subjectVersion`, `evaluatedAt`, an optional `supersededBy` (a newer version known at
 that time), and per lane: `lane`, `blocking`, an optional `freshness`, and `result`: what the lane's rule gave on its
 evidence (`passed`, `failed`, `not_measured`, `incomparable` with the differing `axes`), the version it was produced
-for and when its newest run closed, or `null` when there is no evidence. Computing a lane's result from its runs is
-outside this function.
+for and when the **oldest** run the result relied on closed (`oldestClosedAt`: a re-run yesterday does not make
+60-day-old evidence fresh), or `null` when there is no evidence. Computing a lane's result from its runs is outside this
+function. A checkpoint has at least one lane and no lane twice: the function refuses anything else rather than decide
+it. Versions compare byte for byte. Times compare at the full precision written (up to nine fraction digits): an
+implementation must not round them.
 
 **Each lane's status**, in this order:
 
 1. `result` is `null` → `missing` (reason `missing:<lane>`).
 2. The result is for another version → `missing` (reason `wrong-version:<lane>`).
-3. A `freshness` is set and `closedAt + freshness < evaluatedAt` → `stale` (reason `stale:<lane>`). Evidence exactly
-   as old as the freshness is still fresh.
-4. Otherwise the result's status: `passed` (no reason), `failed` (reason `failed:<lane>`, or `advisory-failed:<lane>`
+3. `oldestClosedAt` is later than `evaluatedAt`: the evidence did not exist then → `missing` (reason
+   `future-evidence:<lane>`).
+4. A `freshness` is set and `oldestClosedAt + freshness < evaluatedAt` → `stale` (reason `stale:<lane>`). Evidence
+   exactly as old as the freshness is still fresh.
+5. Otherwise the result's status (a status this version does not know reads as `not_measured`, failing closed): `passed` (no reason), `failed` (reason `failed:<lane>`, or `advisory-failed:<lane>`
    for a lane that is not blocking), `not_measured` (`not-measured:<lane>`), `incomparable` (`incomparable:<lane>`,
    and the lane carries its `axes`).
 
@@ -334,6 +367,8 @@ come in event order and then by name; a stream with no terminal event ends with 
 
 These are specified in the design and will be added to v2 before it is released, each with its schema and vectors:
 
+- the checkpoint seal (`checkpoint.seal.json`, an in-toto statement over the manifest and its runs' hashes) and its
+  vectors;
 - DSSE vectors (valid, wrong key, tampered payload) with test keys, for the run and for overlay batches;
 - `tools/schema-diff`, which fails a schema change that removes, narrows or adds a required field without a new major;
 - generated types for Python, TypeScript and Go, each with a conformance runner;
@@ -354,7 +389,7 @@ A writer or reader in any language conforms when it passes `conformance/`:
 - the overlay batches of every run in `valid/` form an unbroken chain, and every vector in `chain-vectors/` reports
   exactly its expected problems;
 - every checkpoint in `checkpoints/` is accepted or refused by the writer and the reader schemas as its `expected.json`
-  says;
+  says, and a schema-valid one verifies with exactly its expected problems;
 - every vector in `decision-vectors/` reproduces exactly;
 - every plan and runner manifest in `protocol/` is accepted or refused as its `expected.json` says, every event of
   every stream in `protocol/streams/` is valid, and each stream's verification reports exactly its expected problems.

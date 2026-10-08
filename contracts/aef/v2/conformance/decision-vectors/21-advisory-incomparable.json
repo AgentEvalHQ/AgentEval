@@ -1,0 +1,52 @@
+{
+  "description": "An advisory comparison that is incomparable keeps the outcome from approved.",
+  "input": {
+    "subjectVersion": "git:3f2a1c",
+    "evaluatedAt": "2026-10-08T12:00:00Z",
+    "lanes": [
+      {
+        "lane": "quality",
+        "blocking": true,
+        "result": {
+          "status": "passed",
+          "subjectVersion": "git:3f2a1c",
+          "oldestClosedAt": "2026-10-07T10:00:00Z"
+        }
+      },
+      {
+        "lane": "memory",
+        "blocking": false,
+        "result": {
+          "status": "incomparable",
+          "subjectVersion": "git:3f2a1c",
+          "oldestClosedAt": "2026-10-07T10:00:00Z",
+          "axes": [
+            "stimulus"
+          ]
+        }
+      }
+    ]
+  },
+  "expected": {
+    "outcome": "inconclusive",
+    "lanes": [
+      {
+        "lane": "quality",
+        "status": "passed",
+        "blocking": true
+      },
+      {
+        "lane": "memory",
+        "status": "incomparable",
+        "blocking": false,
+        "axes": [
+          "stimulus"
+        ]
+      }
+    ],
+    "reasons": [
+      "incomparable:memory",
+      "outcome:inconclusive"
+    ]
+  }
+}

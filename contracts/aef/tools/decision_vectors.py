@@ -15,7 +15,7 @@ def lane(name, blocking, status=None, version=V, closed="2026-10-07T10:00:00Z", 
     if status is None:
         item["result"] = None
     else:
-        result = {"status": status, "subjectVersion": version, "closedAt": closed}
+        result = {"status": status, "subjectVersion": version, "oldestClosedAt": closed}
         if axes:
             result["axes"] = axes
         item["result"] = result
@@ -90,7 +90,48 @@ VECTORS = [
     ("16-superseded-by-itself", "supersededBy equal to the checkpoint's own version is not a supersession.",
      {"supersededBy": V, "lanes": [lane("quality", True, "passed")]},
      {"outcome": "approved", "lanes": [out("passed", True, "quality")], "reasons": ["outcome:approved"]}),
+    ("17-version-before-freshness", "Old evidence for another version is missing (wrong-version), not stale.",
+     {"lanes": [lane("security", True, "passed", version="git:000000", closed="2026-01-01T00:00:00Z", freshness="P14D")]},
+     {"outcome": "inconclusive", "lanes": [out("missing", True, "security")],
+      "reasons": ["wrong-version:security", "outcome:inconclusive"]}),
+    ("18-advisory-stale", "A stale advisory lane expires the checkpoint too: stale evidence decides nothing.",
+     {"lanes": [lane("quality", True, "passed"),
+                lane("performance", False, "passed", closed="2026-09-01T00:00:00Z", freshness="P7D")]},
+     {"outcome": "expired", "lanes": [out("passed", True, "quality"), out("stale", False, "performance")],
+      "reasons": ["stale:performance", "outcome:expired"]}),
+    ("19-superseded-after-lane-reasons", "Lane reasons come first, then the supersession, then the outcome.",
+     {"supersededBy": "git:9e8d7c", "lanes": [lane("quality", True, "failed")]},
+     {"outcome": "expired", "lanes": [out("failed", True, "quality")],
+      "reasons": ["failed:quality", "superseded:git:9e8d7c", "outcome:expired"]}),
+    ("20-advisory-not-measured", "An advisory lane that measured nothing keeps the outcome from approved.",
+     {"lanes": [lane("quality", True, "passed"), lane("performance", False, "not_measured")]},
+     {"outcome": "inconclusive", "lanes": [out("passed", True, "quality"), out("not_measured", False, "performance")],
+      "reasons": ["not-measured:performance", "outcome:inconclusive"]}),
+    ("21-advisory-incomparable", "An advisory comparison that is incomparable keeps the outcome from approved.",
+     {"lanes": [lane("quality", True, "passed"), lane("memory", False, "incomparable", axes=["stimulus"])]},
+     {"outcome": "inconclusive", "lanes": [out("passed", True, "quality"), out("incomparable", False, "memory", ["stimulus"])],
+      "reasons": ["incomparable:memory", "outcome:inconclusive"]}),
+    ("22-empty-axes-are-omitted", "An incomparable lane with no axes named has no axes in the output.",
+     {"lanes": [{"lane": "memory", "blocking": True,
+                 "result": {"status": "incomparable", "subjectVersion": V, "oldestClosedAt": "2026-10-07T10:00:00Z", "axes": []}}]},
+     {"outcome": "inconclusive", "lanes": [out("incomparable", True, "memory")],
+      "reasons": ["incomparable:memory", "outcome:inconclusive"]}),
+    ("23-future-evidence", "Evidence that closed after the evaluation time did not exist then: missing.",
+     {"lanes": [lane("quality", True, "passed", closed="2026-10-09T00:00:00Z")]},
+     {"outcome": "inconclusive", "lanes": [out("missing", True, "quality")],
+      "reasons": ["future-evidence:quality", "outcome:inconclusive"]}),
+    ("24-one-nanosecond-stale", "Times compare at full precision: one nanosecond past the freshness is stale.",
+     {"evaluatedAt": "2026-10-08T12:00:00.000000001Z",
+      "lanes": [lane("security", True, "passed", closed="2026-09-24T12:00:00Z", freshness="P14D")]},
+     {"outcome": "expired", "lanes": [out("stale", True, "security")], "reasons": ["stale:security", "outcome:expired"]}),
+    ("25-unknown-status-fails-closed", "A status this version does not know (a later minor's) reads as not_measured.",
+     {"lanes": [lane("quality", True, "deferred")]},
+     {"outcome": "inconclusive", "lanes": [out("not_measured", True, "quality")],
+      "reasons": ["not-measured:quality", "outcome:inconclusive"]}),
 ]
+
+# Vectors whose input only a reader accepts (a value a later minor may add).
+READER_ONLY = {"25-unknown-status-fails-closed"}
 
 
 def main():
@@ -101,6 +142,8 @@ def main():
         doc = {"description": description,
                "input": {"subjectVersion": V, "evaluatedAt": AT, **partial},
                "expected": expected}
+        if name in READER_ONLY:
+            doc["readerOnly"] = True
         (OUT / f"{name}.json").write_bytes((json.dumps(doc, indent=2, ensure_ascii=False) + "\n").encode("utf-8"))
 
 

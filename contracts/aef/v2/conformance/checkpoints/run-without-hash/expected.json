@@ -1,0 +1,6 @@
+{
+  "schema": "checkpoint",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rule": "a lane's runs are frozen by their run hashes"
+}

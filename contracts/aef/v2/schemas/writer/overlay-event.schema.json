@@ -5,39 +5,123 @@
   "description": "Everything after a run closed: a human decision, an adjudication, an annotation, a waiver. Appended, never edited; the run's own sealed files never change.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "eventId", "kind", "target", "by", "at"],
+  "required": [
+    "schemaVersion",
+    "eventId",
+    "kind",
+    "target",
+    "by",
+    "at"
+  ],
   "properties": {
-    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
-    "eventId": { "type": "string", "pattern": "^ov_[A-Za-z0-9]{1,64}$" },
-    "kind": { "enum": ["approve", "reject", "override", "adjudicate", "acknowledge", "accept_baseline", "waive", "annotate"] },
+    "schemaVersion": {
+      "$ref": "common.schema.json#/$defs/schemaVersion"
+    },
+    "eventId": {
+      "type": "string",
+      "pattern": "^ov_[A-Za-z0-9]{1,64}(?!\\n)$"
+    },
+    "kind": {
+      "enum": [
+        "approve",
+        "reject",
+        "override",
+        "adjudicate",
+        "acknowledge",
+        "accept_baseline",
+        "waive",
+        "annotate"
+      ]
+    },
     "target": {
       "type": "object",
       "additionalProperties": false,
       "minProperties": 1,
       "properties": {
-        "run": { "$ref": "common.schema.json#/$defs/id" },
-        "result": { "$ref": "common.schema.json#/$defs/resultId" },
-        "requirement": { "$ref": "common.schema.json#/$defs/id" },
-        "checkpoint": { "$ref": "common.schema.json#/$defs/id" }
+        "run": {
+          "$ref": "common.schema.json#/$defs/id"
+        },
+        "result": {
+          "$ref": "common.schema.json#/$defs/resultId"
+        },
+        "requirement": {
+          "$ref": "common.schema.json#/$defs/id"
+        },
+        "checkpoint": {
+          "$ref": "common.schema.json#/$defs/id"
+        }
       }
     },
-    "state": { "description": "The state an override or adjudication sets on its result.", "$ref": "common.schema.json#/$defs/state" },
-    "reason": { "type": "string", "minLength": 1, "maxLength": 4096 },
-    "expires": { "$ref": "common.schema.json#/$defs/timestamp" },
-    "by": { "$ref": "common.schema.json#/$defs/trustedIdentity" },
-    "at": { "$ref": "common.schema.json#/$defs/timestamp" },
-    "ext": { "$ref": "common.schema.json#/$defs/ext" }
+    "state": {
+      "description": "The state an override or adjudication sets on its result.",
+      "$ref": "common.schema.json#/$defs/state"
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "expires": {
+      "$ref": "common.schema.json#/$defs/timestamp"
+    },
+    "by": {
+      "$ref": "common.schema.json#/$defs/trustedIdentity"
+    },
+    "at": {
+      "$ref": "common.schema.json#/$defs/timestamp"
+    },
+    "ext": {
+      "$ref": "common.schema.json#/$defs/ext"
+    }
   },
   "allOf": [
     {
       "description": "A waiver always says why and until when.",
-      "if": { "properties": { "kind": { "const": "waive" } }, "required": ["kind"] },
-      "then": { "required": ["reason", "expires"] }
+      "if": {
+        "properties": {
+          "kind": {
+            "const": "waive"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "reason",
+          "expires"
+        ]
+      }
     },
     {
       "description": "An override or adjudication names the result, the state it sets, and why.",
-      "if": { "properties": { "kind": { "enum": ["override", "adjudicate"] } }, "required": ["kind"] },
-      "then": { "required": ["state", "reason"], "properties": { "target": { "required": ["result"] } } }
+      "if": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "override",
+              "adjudicate"
+            ]
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "state",
+          "reason"
+        ],
+        "properties": {
+          "target": {
+            "required": [
+              "result"
+            ]
+          }
+        }
+      }
     }
   ]
 }

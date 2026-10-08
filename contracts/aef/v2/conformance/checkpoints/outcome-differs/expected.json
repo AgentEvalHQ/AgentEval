@@ -1,0 +1,9 @@
+{
+  "schema": "checkpoint",
+  "writer": "valid",
+  "reader": "valid",
+  "rule": "the outcome is the decision's",
+  "problems": [
+    "outcome"
+  ]
+}

@@ -5,40 +5,126 @@
   "description": "A gate decision the producer made when the run closed (a CLI --fail-on gate, a baseline comparison): its rule, inputs, outcome and exit code, sealed with the run.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "gateId", "decisionId", "rule", "inputs", "comparability", "outcome", "decidedAt"],
+  "required": [
+    "schemaVersion",
+    "gateId",
+    "decisionId",
+    "rule",
+    "inputs",
+    "comparability",
+    "outcome",
+    "decidedAt"
+  ],
   "properties": {
-    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
-    "gateId": { "$ref": "common.schema.json#/$defs/ref" },
-    "decisionId": { "$ref": "common.schema.json#/$defs/id" },
+    "schemaVersion": {
+      "$ref": "common.schema.json#/$defs/schemaVersion"
+    },
+    "gateId": {
+      "$ref": "common.schema.json#/$defs/ref"
+    },
+    "decisionId": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
     "rule": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["strategy"],
+      "required": [
+        "strategy"
+      ],
       "properties": {
-        "strategy": { "type": "string", "minLength": 1, "maxLength": 128 },
-        "inputs": { "type": "array", "maxItems": 64, "items": { "type": "string", "maxLength": 128 } }
+        "strategy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "inputs": {
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "string",
+            "maxLength": 128
+          }
+        }
       }
     },
     "inputs": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "results": { "type": "array", "maxItems": 4096, "items": { "$ref": "common.schema.json#/$defs/resultId" } },
-        "requirements": { "type": "array", "maxItems": 1024, "items": { "$ref": "common.schema.json#/$defs/id" } },
-        "baselineRun": { "$ref": "common.schema.json#/$defs/id" }
+        "results": {
+          "type": "array",
+          "maxItems": 4096,
+          "items": {
+            "$ref": "common.schema.json#/$defs/resultId"
+          }
+        },
+        "requirements": {
+          "type": "array",
+          "maxItems": 1024,
+          "items": {
+            "$ref": "common.schema.json#/$defs/id"
+          }
+        },
+        "baselineRun": {
+          "$ref": "common.schema.json#/$defs/id"
+        }
       }
     },
     "comparability": {
       "description": "Whether a comparison the gate needed was shown comparable. incomparable never yields ship.",
-      "enum": ["comparable", "incomparable", "not_applicable"]
+      "enum": [
+        "comparable",
+        "incomparable",
+        "not_applicable"
+      ]
     },
-    "outcome": { "enum": ["ship", "no_ship", "inconclusive"] },
-    "exitCode": { "type": "integer", "minimum": 0, "maximum": 255 },
-    "decisive": { "type": "array", "maxItems": 1024, "items": { "$ref": "common.schema.json#/$defs/resultId" } },
-    "decidedAt": { "$ref": "common.schema.json#/$defs/timestamp" },
-    "ext": { "$ref": "common.schema.json#/$defs/ext" }
+    "outcome": {
+      "enum": [
+        "ship",
+        "no_ship",
+        "inconclusive"
+      ]
+    },
+    "exitCode": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 255
+    },
+    "decisive": {
+      "type": "array",
+      "maxItems": 1024,
+      "items": {
+        "$ref": "common.schema.json#/$defs/resultId"
+      }
+    },
+    "decidedAt": {
+      "$ref": "common.schema.json#/$defs/timestamp"
+    },
+    "ext": {
+      "$ref": "common.schema.json#/$defs/ext"
+    }
   },
   "allOf": [
-    { "if": { "properties": { "comparability": { "const": "incomparable" } }, "required": ["comparability"] }, "then": { "properties": { "outcome": { "not": { "const": "ship" } } } } }
+    {
+      "if": {
+        "properties": {
+          "comparability": {
+            "const": "incomparable"
+          }
+        },
+        "required": [
+          "comparability"
+        ]
+      },
+      "then": {
+        "properties": {
+          "outcome": {
+            "not": {
+              "const": "ship"
+            }
+          }
+        }
+      }
+    }
   ]
 }

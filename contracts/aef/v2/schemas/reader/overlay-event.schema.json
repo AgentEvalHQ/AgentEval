@@ -18,7 +18,7 @@
     },
     "eventId": {
       "type": "string",
-      "pattern": "^ov_[A-Za-z0-9]{1,64}$"
+      "pattern": "^ov_[A-Za-z0-9]{1,64}(?!\\n)$"
     },
     "kind": {
       "type": "string"

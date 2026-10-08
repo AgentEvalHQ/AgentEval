@@ -5,45 +5,110 @@
   "description": "What a runner is and can do: its identity, kind, platform, the providers it supports and its tags. A plan's runnerSelector is matched against the tags.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "runnerId", "kind", "os", "runtime", "providers", "tags", "version"],
+  "required": [
+    "schemaVersion",
+    "runnerId",
+    "kind",
+    "os",
+    "runtime",
+    "providers",
+    "tags",
+    "version"
+  ],
   "properties": {
-    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
-    "runnerId": { "$ref": "common.schema.json#/$defs/id" },
+    "schemaVersion": {
+      "$ref": "common.schema.json#/$defs/schemaVersion"
+    },
+    "runnerId": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
     "identity": {
       "description": "The runner's workload identity, and the id of the key it signs sealed evidence with, if any.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["workloadId"],
+      "required": [
+        "workloadId"
+      ],
       "properties": {
-        "workloadId": { "type": "string", "minLength": 1, "maxLength": 256 },
-        "signingKeyId": { "type": "string", "minLength": 1, "maxLength": 256 }
+        "workloadId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "signingKeyId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        }
       }
     },
-    "kind": { "enum": ["local", "remote", "ci", "pool"] },
-    "os": { "enum": ["linux", "windows", "macos"] },
+    "kind": {
+      "enum": [
+        "local",
+        "remote",
+        "ci",
+        "pool"
+      ]
+    },
+    "os": {
+      "enum": [
+        "linux",
+        "windows",
+        "macos"
+      ]
+    },
     "runtime": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "version"],
+      "required": [
+        "name",
+        "version"
+      ],
       "properties": {
-        "name": { "type": "string", "minLength": 1, "maxLength": 64 },
-        "version": { "type": "string", "minLength": 1, "maxLength": 64 }
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
       }
     },
     "providers": {
       "type": "array",
       "minItems": 1,
       "maxItems": 16,
-      "items": { "type": "string", "pattern": "^(local|docker|k8s|ci:[a-z0-9-]{1,64})(?!\\n)$" }
+      "items": {
+        "type": "string",
+        "pattern": "^(local|docker|k8s|ci:[a-z0-9-]{1,64})(?!\\n)$"
+      }
     },
     "tags": {
       "type": "array",
       "maxItems": 64,
-      "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._:-]{0,63}(?!\\n)$" }
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9._:-]{0,63}(?!\\n)$"
+      }
     },
-    "gpu": { "type": "boolean" },
-    "networkZone": { "type": "string", "maxLength": 128 },
-    "version": { "description": "The runner software's version.", "type": "string", "minLength": 1, "maxLength": 64 },
-    "ext": { "$ref": "common.schema.json#/$defs/ext" }
+    "gpu": {
+      "type": "boolean"
+    },
+    "networkZone": {
+      "type": "string",
+      "maxLength": 128
+    },
+    "version": {
+      "description": "The runner software's version.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "ext": {
+      "$ref": "common.schema.json#/$defs/ext"
+    }
   }
 }

@@ -1,0 +1,77 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "blobs/sha256/63/635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5",
+      "digest": {
+        "sha256": "635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5"
+      }
+    },
+    {
+      "name": "evidence.ndjson",
+      "digest": {
+        "sha256": "c5a7deec92d7ded08231fcc6bee85a4248f75a89da79c7174c91a9733f54c97b"
+      }
+    },
+    {
+      "name": "gates.ndjson",
+      "digest": {
+        "sha256": "5f838b3f8ebaa62fcb9bf42c82a4984ea039562e5e7267ec9624cf96780565d4"
+      }
+    },
+    {
+      "name": "metrics.json",
+      "digest": {
+        "sha256": "13cdfe16971a2f57b25cce718d8689f5098a659a28f072fadae3d8f23f2b1ce4"
+      }
+    },
+    {
+      "name": "results.ndjson",
+      "digest": {
+        "sha256": "94d61f425fd0e9803c95b3074671edb9f11efa135d7cb3fdca7ce385332e5882"
+      }
+    },
+    {
+      "name": "run.json",
+      "digest": {
+        "sha256": "135400e18514161a669981b6d490818bf2f4a5d008bca776a4b5d3892526e8c0"
+      }
+    },
+    {
+      "name": "summary.json",
+      "digest": {
+        "sha256": "5ad6d0d7e4dbb218bd5503ec4448bd88c8542f18740e0074c4abed6156484985"
+      }
+    }
+  ],
+  "predicateType": "https://agenteval.dev/evidence/v2",
+  "predicate": {
+    "schemaVersion": "2.0",
+    "runId": "01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10",
+    "runHash": "0e0d579025ee807a598c78f0855c74f0ba98f88e5aaba075b4f1a5566c202b89",
+    "producer": {
+      "name": "agenteval-cli",
+      "version": "0.44.0"
+    },
+    "subject": {
+      "ref": "agent:support/support-triage",
+      "version": "git:good"
+    },
+    "deployment": {
+      "ref": "deployment:support/support-triage@dev"
+    },
+    "suite": {
+      "ref": "suite:support/triage-scenarios",
+      "version": "4",
+      "digest": "sha256:f1b4f6f2c254e91b0c23b6c40c1554dd8a7b04715858206d4537698e34caaedd"
+    },
+    "judges": [
+      {
+        "model": "gpt-5.1",
+        "rubricDigest": "sha256:29fd018a9848938bc2b0e33fffa32bde2827e81388d0e03195919be5835c3605"
+      }
+    ],
+    "closedAt": "2026-10-02T14:06:23.004Z",
+    "sealedBy": "producer"
+  }
+}

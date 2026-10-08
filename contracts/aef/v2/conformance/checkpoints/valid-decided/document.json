@@ -26,9 +26,12 @@
         "REQ-07"
       ],
       "runs": [
-        "Q-184"
+        {
+          "runId": "Q-184",
+          "runHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "origin": "launched"
+        }
       ],
-      "origin": "launched",
       "blocking": true
     },
     {
@@ -41,9 +44,17 @@
         "REQ-15"
       ],
       "runs": [
-        "R-921"
+        {
+          "runId": "R-921",
+          "runHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "origin": "adopted:ci"
+        },
+        {
+          "runId": "R-930",
+          "runHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "origin": "launched"
+        }
       ],
-      "origin": "adopted:ci",
       "blocking": true,
       "freshness": "P14D"
     },
@@ -55,7 +66,6 @@
         "significance": 0.05
       },
       "runs": [],
-      "origin": "pending",
       "blocking": false
     }
   ],
@@ -77,6 +87,37 @@
   },
   "state": "decided",
   "outcome": "inconclusive",
+  "decisionInput": {
+    "subjectVersion": "git:3f2a1c",
+    "evaluatedAt": "2026-10-02T14:30:00Z",
+    "supersededBy": null,
+    "lanes": [
+      {
+        "lane": "quality",
+        "blocking": true,
+        "result": {
+          "status": "passed",
+          "subjectVersion": "git:3f2a1c",
+          "oldestClosedAt": "2026-10-02T13:10:00Z"
+        }
+      },
+      {
+        "lane": "security",
+        "blocking": true,
+        "freshness": "P14D",
+        "result": {
+          "status": "passed",
+          "subjectVersion": "git:3f2a1c",
+          "oldestClosedAt": "2026-09-30T08:00:00Z"
+        }
+      },
+      {
+        "lane": "memory",
+        "blocking": false,
+        "result": null
+      }
+    ]
+  },
   "decision": {
     "outcome": "inconclusive",
     "lanes": [

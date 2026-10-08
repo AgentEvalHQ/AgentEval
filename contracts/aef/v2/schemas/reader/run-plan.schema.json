@@ -36,12 +36,7 @@
           "$ref": "common.schema.json#/$defs/ref"
         },
         "version": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 256,
-          "not": {
-            "pattern": "^\\s*[Ll][Aa][Tt][Ee][Ss][Tt]\\s*$"
-          }
+          "$ref": "common.schema.json#/$defs/exactVersion"
         },
         "image": {
           "$ref": "common.schema.json#/$defs/sha256Uri"
@@ -77,9 +72,7 @@
             "$ref": "common.schema.json#/$defs/sha256Uri"
           },
           "lane": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 64
+            "$ref": "common.schema.json#/$defs/laneName"
           }
         }
       }
@@ -102,7 +95,7 @@
         "timeout": {
           "description": "ISO 8601 duration in hours and minutes (PT2H, PT30M).",
           "type": "string",
-          "pattern": "^PT(?=\\d)(\\d+H)?(\\d+M)?(?!\\n)$"
+          "pattern": "^PT(?=[0-9])([0-9]{1,5}H)?([0-9]{1,5}M)?(?!\\n)$"
         }
       }
     },

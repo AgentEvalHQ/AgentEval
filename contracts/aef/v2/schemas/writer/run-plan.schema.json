@@ -5,22 +5,50 @@
   "description": "What a runner is asked to evaluate: the exact subject version, the suites and lanes, the limits, the content policy, where and how it runs, and the credentials it needs, as references only. See v2/README.md, 'Run plans and runners'.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "planId", "subject", "suites", "limits", "contentPolicy", "isolation", "provider"],
+  "required": [
+    "schemaVersion",
+    "planId",
+    "subject",
+    "suites",
+    "limits",
+    "contentPolicy",
+    "isolation",
+    "provider"
+  ],
   "properties": {
-    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
-    "planId": { "$ref": "common.schema.json#/$defs/id" },
-    "checkpointId": { "$ref": "common.schema.json#/$defs/id" },
+    "schemaVersion": {
+      "$ref": "common.schema.json#/$defs/schemaVersion"
+    },
+    "planId": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
+    "checkpointId": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
     "subject": {
       "description": "Resolved and immutable: 'latest' is resolved before the plan exists.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["ref", "version"],
+      "required": [
+        "ref",
+        "version"
+      ],
       "properties": {
-        "ref": { "$ref": "common.schema.json#/$defs/ref" },
-        "version": { "type": "string", "minLength": 1, "maxLength": 256, "not": { "pattern": "^\\s*[Ll][Aa][Tt][Ee][Ss][Tt]\\s*$" } },
-        "image": { "$ref": "common.schema.json#/$defs/sha256Uri" },
-        "deployment": { "$ref": "common.schema.json#/$defs/ref" },
-        "endpoint": { "$ref": "common.schema.json#/$defs/uri" }
+        "ref": {
+          "$ref": "common.schema.json#/$defs/ref"
+        },
+        "version": {
+          "$ref": "common.schema.json#/$defs/exactVersion"
+        },
+        "image": {
+          "$ref": "common.schema.json#/$defs/sha256Uri"
+        },
+        "deployment": {
+          "$ref": "common.schema.json#/$defs/ref"
+        },
+        "endpoint": {
+          "$ref": "common.schema.json#/$defs/uri"
+        }
       }
     },
     "suites": {
@@ -30,12 +58,25 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["ref", "version"],
+        "required": [
+          "ref",
+          "version"
+        ],
         "properties": {
-          "ref": { "$ref": "common.schema.json#/$defs/ref" },
-          "version": { "type": "string", "minLength": 1, "maxLength": 64 },
-          "digest": { "$ref": "common.schema.json#/$defs/sha256Uri" },
-          "lane": { "type": "string", "minLength": 1, "maxLength": 64 }
+          "ref": {
+            "$ref": "common.schema.json#/$defs/ref"
+          },
+          "version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "digest": {
+            "$ref": "common.schema.json#/$defs/sha256Uri"
+          },
+          "lane": {
+            "$ref": "common.schema.json#/$defs/laneName"
+          }
         }
       }
     },
@@ -43,15 +84,39 @@
       "description": "Hard limits the runner enforces: it stops before exceeding them, and says so in the event stream.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["maxUsd"],
+      "required": [
+        "maxUsd"
+      ],
       "properties": {
-        "maxUsd": { "type": "number", "minimum": 0 },
-        "cases": { "type": "integer", "minimum": 1 },
-        "timeout": { "description": "ISO 8601 duration in hours and minutes (PT2H, PT30M).", "type": "string", "pattern": "^PT(?=\\d)(\\d+H)?(\\d+M)?(?!\\n)$" }
+        "maxUsd": {
+          "type": "number",
+          "minimum": 0
+        },
+        "cases": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "timeout": {
+          "description": "ISO 8601 duration in hours and minutes (PT2H, PT30M).",
+          "type": "string",
+          "pattern": "^PT(?=[0-9])([0-9]{1,5}H)?([0-9]{1,5}M)?(?!\\n)$"
+        }
       }
     },
-    "contentPolicy": { "description": "As run.json's contentCapture.", "enum": ["off", "on"] },
-    "isolation": { "enum": ["process", "container", "remote-zone"] },
+    "contentPolicy": {
+      "description": "As run.json's contentCapture.",
+      "enum": [
+        "off",
+        "on"
+      ]
+    },
+    "isolation": {
+      "enum": [
+        "process",
+        "container",
+        "remote-zone"
+      ]
+    },
     "provider": {
       "description": "local, docker, k8s, or ci:<name>.",
       "type": "string",
@@ -61,21 +126,46 @@
       "description": "References the runner resolves where it runs (an environment variable, an OS keychain entry, a vault path). A plan never holds a secret value.",
       "type": "array",
       "maxItems": 64,
-      "items": { "type": "string", "pattern": "^(env:[A-Za-z_][A-Za-z0-9_]{0,127}|keychain:[^\\s]{1,256}|vault:[^\\s]{1,512})(?!\\n)$" }
+      "items": {
+        "type": "string",
+        "pattern": "^(env:[A-Za-z_][A-Za-z0-9_]{0,127}|keychain:[^\\s]{1,256}|vault:[^\\s]{1,512})(?!\\n)$"
+      }
     },
     "runnerSelector": {
       "description": "Tags a runner's capability manifest must all carry.",
       "type": "array",
       "maxItems": 32,
-      "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._:-]{0,63}(?!\\n)$" }
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9._:-]{0,63}(?!\\n)$"
+      }
     },
-    "ext": { "$ref": "common.schema.json#/$defs/ext" }
+    "ext": {
+      "$ref": "common.schema.json#/$defs/ext"
+    }
   },
   "allOf": [
     {
       "description": "A container run evaluates an already-built image, identified by digest.",
-      "if": { "properties": { "isolation": { "const": "container" } }, "required": ["isolation"] },
-      "then": { "properties": { "subject": { "required": ["image"] } } }
+      "if": {
+        "properties": {
+          "isolation": {
+            "const": "container"
+          }
+        },
+        "required": [
+          "isolation"
+        ]
+      },
+      "then": {
+        "properties": {
+          "subject": {
+            "required": [
+              "image"
+            ]
+          }
+        }
+      }
     }
   ]
 }
