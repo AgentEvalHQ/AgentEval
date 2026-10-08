@@ -1,0 +1,6 @@
+{
+  "schema": "gate-decision",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rule": "an incomparable comparison never yields ship"
+}

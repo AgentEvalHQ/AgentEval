@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/aef/v2/writer/metrics.schema.json",
+  "title": "AEF v2: metrics.json",
+  "description": "The metrics this run reports. A metric with direction none is shown, never coloured as better or worse.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "metrics"],
+  "properties": {
+    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
+    "metrics": {
+      "type": "array",
+      "maxItems": 4096,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "kind", "direction", "scale"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1, "maxLength": 256 },
+          "kind": { "enum": ["score", "rate", "count", "duration", "cost", "verdict"] },
+          "direction": { "enum": ["higher_better", "lower_better", "none"] },
+          "scale": {
+            "anyOf": [
+              { "const": "unbounded" },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["min", "max"],
+                "properties": { "min": { "type": "number" }, "max": { "type": "number" } }
+              }
+            ]
+          },
+          "unit": { "type": "string", "maxLength": 32 },
+          "description": { "type": "string", "maxLength": 4096 }
+        }
+      }
+    },
+    "ext": { "$ref": "common.schema.json#/$defs/ext" }
+  }
+}

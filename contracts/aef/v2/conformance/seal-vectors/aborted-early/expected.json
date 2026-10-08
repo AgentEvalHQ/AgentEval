@@ -1,0 +1,5 @@
+{
+  "run": "valid/aborted-early",
+  "verdict": "match",
+  "mismatches": []
+}

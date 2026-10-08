@@ -1,0 +1,6 @@
+{
+  "schema": "run",
+  "writer": "invalid",
+  "reader": "valid",
+  "rule": "a newer minor with a field this version does not know: the writer refuses it, a reader accepts it"
+}

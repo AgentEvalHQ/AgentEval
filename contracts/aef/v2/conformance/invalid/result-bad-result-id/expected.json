@@ -1,0 +1,6 @@
+{
+  "schema": "result",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rule": "resultId is r_ and 32 hex"
+}

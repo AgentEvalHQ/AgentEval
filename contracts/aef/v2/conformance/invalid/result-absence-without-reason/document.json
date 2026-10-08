@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "2.0",
+  "resultId": "r_ba65738f221f7575808d2c10c60dc056",
+  "caseId": "c",
+  "path": "p",
+  "evaluator": {
+    "id": "e"
+  },
+  "state": "not_measured"
+}

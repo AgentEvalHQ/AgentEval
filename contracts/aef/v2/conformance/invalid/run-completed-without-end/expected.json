@@ -1,0 +1,6 @@
+{
+  "schema": "run",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rule": "a completed run has endedAt"
+}

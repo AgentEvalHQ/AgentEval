@@ -1,0 +1,10 @@
+{
+  "run": "seal-vectors/added-file/run",
+  "verdict": "mismatch",
+  "mismatches": [
+    {
+      "path": "notes.txt",
+      "problem": "not-sealed"
+    }
+  ]
+}

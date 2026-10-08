@@ -1,0 +1,6 @@
+{
+  "schema": "evidence",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rule": "a link is exactly one of blob, span or uri"
+}

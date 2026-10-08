@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/aef/v2/reader/common.schema.json",
+  "title": "AEF v2: shared definitions",
+  "description": "READER (tolerant), derived from the writer schema by tools/derive_reader.py. Definitions the other AEF v2 schemas reference. Not a document of its own.",
+  "$defs": {
+    "schemaVersion": {
+      "description": "MAJOR.MINOR. A writer emits the version it implements; a reader accepts any minor of a major it knows and refuses an unknown major.",
+      "type": "string",
+      "pattern": "^2\\.[0-9]+$"
+    },
+    "id": {
+      "description": "An identifier: 1-128 characters, letters, digits and . _ : -",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._:-]{1,128}$"
+    },
+    "ref": {
+      "description": "A typed reference, kind:name (for example agent:support/support-triage, suite:support/triage-scenarios).",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*:[^\\s]{1,256}$"
+    },
+    "sha256Hex": {
+      "description": "A SHA-256 digest: 64 lower-case hex characters (the in-toto digest form).",
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "sha256Uri": {
+      "description": "A SHA-256 digest with its algorithm: sha256:<64 lower-case hex>.",
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "timestamp": {
+      "description": "An RFC 3339 date-time in UTC (Z).",
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$"
+    },
+    "resultId": {
+      "description": "r_ + the first 32 hex characters of SHA-256 over runId, caseId, path and trial joined by U+001F (an absent trial is the empty string). See v2/README.md, 'Result ids'.",
+      "type": "string",
+      "pattern": "^r_[0-9a-f]{32}$"
+    },
+    "evidenceId": {
+      "type": "string",
+      "pattern": "^E-[A-Za-z0-9._-]{1,64}$"
+    },
+    "state": {
+      "description": "A result's state. Only passed is a pass; not_measured, not_applicable, skipped, error and pending are typed absences, never a pass and never a 0 fail.",
+      "type": "string"
+    },
+    "trustedIdentity": {
+      "type": "object",
+      "required": [
+        "identity",
+        "assurance"
+      ],
+      "properties": {
+        "identity": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "os": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "assurance": {
+          "description": "How the identity is vouched for: self-attested (a local identity), signed (a DSSE signature verifies against a trusted key), authenticated (a server authenticated it).",
+          "type": "string"
+        }
+      }
+    },
+    "ext": {
+      "description": "Producer extensions. Readers ignore what they do not know; nothing in the contract depends on it.",
+      "type": "object"
+    }
+  }
+}

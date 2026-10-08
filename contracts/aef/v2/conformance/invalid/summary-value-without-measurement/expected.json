@@ -1,0 +1,6 @@
+{
+  "schema": "summary",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rule": "nothing measured has no value and is not_measured, never a pass"
+}

@@ -1,0 +1,71 @@
+{
+  "schemaVersion": "2.0",
+  "runId": "01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10",
+  "status": "completed",
+  "producer": {
+    "name": "agenteval-cli",
+    "version": "0.44.0",
+    "runtime": {
+      "name": "dotnet",
+      "version": "10.0.4"
+    }
+  },
+  "subject": {
+    "ref": "agent:support/support-triage",
+    "kind": "agent",
+    "version": "git:3f2a1c",
+    "environment": "dev",
+    "externalIds": {
+      "entraAgentId": null
+    },
+    "telemetry": {
+      "agentId": "support-triage",
+      "serviceName": "support-api"
+    }
+  },
+  "deployment": {
+    "ref": "deployment:support/support-triage@dev",
+    "environment": "dev",
+    "endpoint": "http://localhost:5080"
+  },
+  "suite": {
+    "ref": "suite:support/triage-scenarios",
+    "version": "4",
+    "digest": "sha256:f1b4f6f2c254e91b0c23b6c40c1554dd8a7b04715858206d4537698e34caaedd",
+    "frozen": true,
+    "executionPolicy": {
+      "trialsPerCase": 1
+    }
+  },
+  "judges": [
+    {
+      "model": "gpt-5.1",
+      "provider": "azure.ai.openai",
+      "mode": "single",
+      "rubricDigest": "sha256:29fd018a9848938bc2b0e33fffa32bde2827e81388d0e03195919be5835c3605"
+    }
+  ],
+  "config": {
+    "thresholds": {
+      "triage": {
+        "op": ">=",
+        "value": 0.8
+      }
+    },
+    "temperature": 0
+  },
+  "startedAt": "2026-10-02T14:02:11.120Z",
+  "endedAt": "2026-10-02T14:06:23.004Z",
+  "otel": {
+    "semconvVersion": "1.41.0",
+    "dialects": [
+      "gen_ai"
+    ]
+  },
+  "contentCapture": "hashes-only",
+  "costPolicy": {
+    "maxUsd": 3.0,
+    "priceTable": "2026-09-30"
+  },
+  "ext": {}
+}

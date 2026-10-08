@@ -1,0 +1,6 @@
+{
+  "schema": "result",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rule": "a line is a trial or a case's rollup, not both"
+}

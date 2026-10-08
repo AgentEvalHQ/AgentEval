@@ -1,0 +1,6 @@
+{
+  "schema": "overlay-event",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rule": "an override names the result it changes"
+}

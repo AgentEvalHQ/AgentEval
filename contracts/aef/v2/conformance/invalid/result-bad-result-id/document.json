@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "2.0",
+  "resultId": "r_xyz",
+  "caseId": "c",
+  "path": "p",
+  "evaluator": {
+    "id": "e"
+  },
+  "state": "passed"
+}

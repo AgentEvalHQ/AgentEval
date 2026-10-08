@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "2.0",
+  "metrics": [
+    {
+      "id": "booking",
+      "kind": "rate",
+      "direction": "higher_better",
+      "scale": {
+        "min": 0,
+        "max": 1
+      }
+    }
+  ]
+}

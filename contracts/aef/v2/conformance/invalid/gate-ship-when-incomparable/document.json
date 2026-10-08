@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "2.0",
+  "gateId": "gate:a/b",
+  "decisionId": "D-1",
+  "rule": {
+    "strategy": "baseline"
+  },
+  "inputs": {},
+  "comparability": "incomparable",
+  "outcome": "ship",
+  "decidedAt": "2026-10-01T00:00:00Z"
+}
