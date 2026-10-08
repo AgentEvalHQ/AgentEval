@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "run-small-1",
+  "status": "completed",
+  "producer": {
+    "name": "p",
+    "version": "1"
+  },
+  "subject": {
+    "ref": "agent:a/b",
+    "kind": "agent",
+    "version": "v1"
+  },
+  "execution": {
+    "targetMode": "live"
+  },
+  "startedAt": "2026-10-01T00:00:00Z",
+  "endedAt": "2026-10-01T00:01:00Z",
+  "contentCapture": "off"
+}

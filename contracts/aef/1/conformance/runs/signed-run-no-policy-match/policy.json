@@ -1,0 +1,12 @@
+{
+  "keys": [
+    {
+      "identity": "spiffe://example.com/ci/sealer",
+      "publicKey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAjwdwkIvg+KoYqBu0CSCOMATb+wG6nVkkG/64rasbBqc=\n-----END PUBLIC KEY-----\n"
+    },
+    {
+      "identity": "git:bob@example.com",
+      "publicKey": "-----BEGIN PUBLIC KEY-----\nMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEyXFlvffFgK8199NWKuNGjOg7bW56\n++8hQj2W3GWuqRRPd1FMiORcxOn0VunYfi55ueXk/LOrKKWXWFFpUmeGxw==\n-----END PUBLIC KEY-----\n"
+    }
+  ]
+}

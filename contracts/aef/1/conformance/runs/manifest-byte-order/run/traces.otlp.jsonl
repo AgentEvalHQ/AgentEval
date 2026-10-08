@@ -1,0 +1,1 @@
+{"resourceSpans":[{"resource":{"attributes":[]},"scopeSpans":[{"scope":{"name":"p"},"spans":[{"traceId":"4bf92f3577b34da6a3ce929d0e0e4736","spanId":"00f067aa0ba902b7","name":"invoke_agent a","kind":1,"startTimeUnixNano":"1790812810000000000","endTimeUnixNano":"1790812812000000000"}]}]}]}

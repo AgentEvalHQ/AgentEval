@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "S3",
+  "lanes": [
+    {
+      "lane": "security",
+      "metrics": [
+        {
+          "metric": "ok",
+          "path": "a",
+          "n": 1,
+          "N": 2,
+          "notMeasured": 1,
+          "value": 1.0,
+          "verdict": "passed",
+          "rule": "recorded by the producer",
+          "sum": 1,
+          "sumSq": 1
+        }
+      ]
+    }
+  ]
+}

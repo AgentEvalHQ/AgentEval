@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "C13",
+  "lanes": [
+    {
+      "lane": "memory",
+      "metrics": [
+        {
+          "metric": "recall",
+          "path": "mem",
+          "n": 22,
+          "N": 23,
+          "notMeasured": 1,
+          "value": 0.4727272727272727,
+          "verdict": "passed",
+          "rule": "recorded by the producer",
+          "sum": 10.4,
+          "sumSq": 5.1000000000000005
+        },
+        {
+          "metric": "latency",
+          "path": "mem",
+          "n": 22,
+          "N": 23,
+          "notMeasured": 1,
+          "value": 105.45454545454545,
+          "verdict": "passed",
+          "rule": "recorded by the producer",
+          "sum": 2320,
+          "sumSq": 252000
+        },
+        {
+          "metric": "tokens",
+          "path": "mem",
+          "n": 22,
+          "N": 23,
+          "notMeasured": 1,
+          "value": 220,
+          "verdict": "passed",
+          "rule": "recorded by the producer",
+          "sum": 220,
+          "sumSq": 2200
+        }
+      ]
+    }
+  ]
+}

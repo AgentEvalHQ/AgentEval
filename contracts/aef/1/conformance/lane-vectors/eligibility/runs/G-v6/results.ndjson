@@ -1,0 +1,2 @@
+{"schemaVersion":"1.0","resultId":"r_f13c3e5ae35493bf1cfaf1f609926631","caseId":"c1","path":"p","evaluator":{"id":"code:check"},"state":"passed","scores":[{"metric":"m","value":1.0}]}
+{"schemaVersion":"1.0","resultId":"r_41be1621404599c4fda84c2b20764fd4","caseId":"c2","path":"p","evaluator":{"id":"code:check"},"state":"failed","scores":[{"metric":"m","value":0.5}]}

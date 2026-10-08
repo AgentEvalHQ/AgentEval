@@ -1,0 +1,14 @@
+{
+  "kind": "run",
+  "run": "run",
+  "outcome": "invalid",
+  "problems": [
+    [
+      "evidence.ndjson:2",
+      "evidence-id"
+    ]
+  ],
+  "rules": [
+    "EVD-1"
+  ]
+}

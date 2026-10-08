@@ -1,0 +1,14 @@
+{
+  "kind": "run",
+  "run": "run",
+  "outcome": "invalid",
+  "problems": [
+    [
+      "results.ndjson:3",
+      "blob"
+    ]
+  ],
+  "rules": [
+    "EVD-3"
+  ]
+}

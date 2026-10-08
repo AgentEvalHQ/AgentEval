@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "Q3",
+  "lanes": [
+    {
+      "lane": "quality",
+      "metrics": [
+        {
+          "metric": "m",
+          "path": "p",
+          "n": 2,
+          "N": 2,
+          "notMeasured": 0,
+          "value": 0.25,
+          "verdict": "passed",
+          "rule": "recorded by the producer",
+          "sum": 0.5,
+          "sumSq": 0.125
+        }
+      ]
+    }
+  ]
+}

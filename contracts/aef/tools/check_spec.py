@@ -4,12 +4,15 @@
 1. every rule id is defined once (**[XXX-n]**) and every cited id ([XXX-n]) is defined;
 2. every rule id a corpus vector names in `rules` is defined;
 3. every problem code the corpus expects is defined in a code table of the spec;
-4. every field name the prose writes in backticks (camelCase) is a property in some writer schema.
+4. every field name the prose writes in backticks (camelCase) is a property in some writer schema;
+5. when the corpus is in a git work tree, git ignores none of its files (a repository's own ignore rules, such as
+   AgentEval's `runs/`, must not drop vectors from a commit).
 
 Usage: python contracts/aef/tools/check_spec.py
 """
 import json
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -92,6 +95,15 @@ def main():
         for word in sorted(set(re.findall(r"`([a-z]+[A-Z][A-Za-z0-9]*)`", t))):
             if word not in props and word not in NOT_FIELDS:
                 problems.append(f"{name}: `{word}` looks like a field but no writer schema has it")
+
+    try:
+        ignored = subprocess.run(["git", "ls-files", "--others", "--ignored", "--exclude-standard", "--", "."],
+                                 cwd=conf, capture_output=True, text=True, timeout=60)
+        if ignored.returncode == 0:
+            for line in ignored.stdout.splitlines():
+                problems.append(f"git ignores the corpus file {line}: it would be left out of a commit")
+    except (OSError, subprocess.SubprocessError):
+        pass  # no git: nothing to check
 
     print(f"{len(defined)} rules defined, {len(cited)} cited; {len(used_rules)} named by the corpus; "
           f"{len(used_codes)} problem codes used, {len(codes)} defined")

@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "Q2",
+  "lanes": [
+    {
+      "lane": "quality",
+      "metrics": [
+        {
+          "metric": "m",
+          "path": "p",
+          "n": 0,
+          "N": 2,
+          "notMeasured": 2,
+          "value": null,
+          "verdict": "not_measured",
+          "rule": "recorded by the producer",
+          "sum": 0,
+          "sumSq": 0
+        }
+      ]
+    }
+  ]
+}

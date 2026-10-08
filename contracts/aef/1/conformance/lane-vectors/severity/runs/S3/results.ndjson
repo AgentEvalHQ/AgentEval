@@ -1,0 +1,2 @@
+{"schemaVersion":"1.0","resultId":"r_187821c43477b3a386cadcb213dee5bb","caseId":"c1","path":"a","evaluator":{"id":"code:check"},"state":"passed"}
+{"schemaVersion":"1.0","resultId":"r_cecdcfd92595a414540b08d0c5e2eb3d","caseId":"c2","path":"a","evaluator":{"id":"code:check"},"state":"not_measured","reason":"Nothing to measure."}
