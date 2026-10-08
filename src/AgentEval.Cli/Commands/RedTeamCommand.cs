@@ -374,6 +374,18 @@ internal static class RedTeamCommand
     internal static async Task<int> ExecuteAsync(
         RedTeamOptions opts, CancellationToken ct, IEvaluableAgent? sutOverride = null, IChatClient? memoryModelOverride = null)
     {
+        // `--attacks memory-poisoning` is not a probe scan: multi-session cases over a memory store, scored by the
+        // memory-security checks (MemoryPoisoningRedTeamDriver). memoryModelOverride is its credential-free test seam.
+        // First, so a probe-scan option beside it (--pack list too) is refused rather than acted on.
+        if (MemoryPoisoningRedTeamDriver.IsSelected(opts.Attacks))
+            return await MemoryPoisoningRedTeamDriver.RunAsync(opts, memoryModelOverride, ct).ConfigureAwait(false);
+
+        if (opts.MemoryTrials != 1)
+        {
+            Console.Error.WriteLine("  Error: --memory-trials applies to --attacks memory-poisoning only.");
+            return ExitCodes.UsageError;
+        }
+
         // 0. `--pack list`: print the benchmark-pack catalog and exit (no scan, no endpoint required).
         if (IsPackList(opts))
         {
@@ -383,11 +395,6 @@ internal static class RedTeamCommand
             Console.WriteLine("  AgentEval bundles no benchmark data; packs are downloaded on demand under their own license.");
             return ExitCodes.Success;
         }
-
-        // `--attacks memory-poisoning` is not a probe scan: multi-session cases over a memory store, scored by the
-        // memory-security checks (MemoryPoisoningRedTeamDriver). memoryModelOverride is its credential-free test seam.
-        if (MemoryPoisoningRedTeamDriver.IsSelected(opts.Attacks))
-            return await MemoryPoisoningRedTeamDriver.RunAsync(opts, memoryModelOverride, ct).ConfigureAwait(false);
 
         // 1. Validate. Built-in --sut targets (gatekeeper-demo, copilot-studio) each own their validation +
         // construction (IRedTeamBuiltInTarget). The endpoint/--azure path is the default fallback, not a target.

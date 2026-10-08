@@ -162,9 +162,10 @@ Malicious content is written into the agent's memory or long-lived context and s
 - `MemoryInfluenceGate`: taints values read from memory so they cannot flow into sensitive tool calls.
 
 **Gaps:** with the default options, a record tampered with after it was stored is still recalled (integrity
-verification is off), and a flood of low-trust records under one query crowds the trusted record out of a naive store;
-the memory-poisoning run reports both. MCP, context-provider and direct-store plants are performed by the harness on
-the attacker's channel, and dormancy between sessions is not simulated.
+verification is off); the per-run write cap (32) lets one source fill the 32-record recall window, crowding a trusted
+record out of a recency-ranked store; and the conflict check compares keys, so a fact rewritten under a new key is not
+a conflict. The memory-poisoning run reports all three. MCP, context-provider and direct-store plants are performed by
+the harness on the attacker's channel, and dormancy between sessions is not simulated.
 
 ---
 

@@ -29,13 +29,19 @@ internal sealed class HarnessMemoryRecord
 }
 
 /// <summary>
-/// The memory store behind the harness tools: a naive store on purpose. Recall is keyword match, newest first, top
-/// one; it does not rank by trust or check integrity, so containment is the gates' job, not the store's.
+/// The memory store behind the harness tools: a naive store on purpose. A recall returns the newest active records that
+/// share a word with the query, up to <see cref="RecallWindow"/> (the default recall budget's item cap, the most the
+/// defaults let through); it does not rank by trust or check integrity, so containment is the gates' job, not the
+/// store's.
 /// </summary>
 internal sealed class HarnessMemoryStore
 {
+    /// <summary>The most records one recall returns: <see cref="MemoryResourceBudgetOptions.MaximumRecalledItems"/> by default.</summary>
+    public static readonly int RecallWindow = new MemoryResourceBudgetOptions().MaximumRecalledItems;
+
     private readonly List<HarnessMemoryRecord> _records = [];
     private readonly Dictionary<string, int> _writesPerSource = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, int> _writesPerUser = new(StringComparer.Ordinal);
     private readonly Dictionary<string, HashSet<string>> _candidatesPerSource = new(StringComparer.Ordinal);
     private long _clock;
     private int _ids;
@@ -45,52 +51,48 @@ internal sealed class HarnessMemoryStore
 
     public IReadOnlyList<HarnessMemoryRecord> Records => _records;
 
-    public int WritesInRun { get; set; }
-    public int WritesInSession { get; set; }
+    /// <summary>Writes stored so far in this case (the budget snapshot counts prior writes: the gate blocks at the cap).</summary>
+    public int WritesInRun { get; private set; }
 
+    public int WritesInSession { get; private set; }
+
+    public int QuarantinedForScope { get; private set; }
+
+    /// <summary>State a real deployment already holds before the case: not a write in the run, so not counted.</summary>
+    public HarnessMemoryRecord Seed(MemorySecurityScope owner, string key, string content, MemoryCategory category, MemoryProvenance provenance) =>
+        Add(owner, key, content, category, provenance, "seed");
+
+    /// <summary>A write the gates admitted, counted for the next budget snapshot.</summary>
     public HarnessMemoryRecord Write(
         MemorySecurityScope owner, string key, string content, MemoryCategory category, MemoryProvenance provenance, string session)
     {
-        var record = new HarnessMemoryRecord
-        {
-            Id = $"mem-{++_ids}",
-            Key = key,
-            Content = content,
-            Digest = Sha256(content),
-            Owner = owner,
-            Category = category,
-            Provenance = provenance,
-            CreatedAt = DateTimeOffset.UnixEpoch.AddSeconds(++_clock),
-            Session = session,
-        };
-        _records.Add(record);
-        return record;
-    }
-
-    /// <summary>Counts a write the gates are about to see, for the resource-budget snapshot.</summary>
-    public void CountWrite(MemoryProvenance provenance, string content)
-    {
+        var record = Add(owner, key, content, category, provenance, session);
         WritesInRun++;
         WritesInSession++;
         _writesPerSource[provenance.SourceId] = WritesForSource(provenance.SourceId) + 1;
-        if (!_candidatesPerSource.TryGetValue(provenance.SourceId, out var candidates))
-        {
-            _candidatesPerSource[provenance.SourceId] = candidates = new HashSet<string>(StringComparer.Ordinal);
-        }
+        _writesPerUser[Correlation(owner)] = WritesForUser(owner) + 1;
+        Candidate(provenance, content);
+        return record;
+    }
 
-        candidates.Add(Sha256(content));
+    /// <summary>A candidate the gates sent to quarantine: it counts toward its source's unique candidates and the scope's quarantine.</summary>
+    public void Quarantined(MemoryProvenance provenance, string content)
+    {
+        QuarantinedForScope++;
+        Candidate(provenance, content);
     }
 
     public int WritesForSource(string sourceId) => _writesPerSource.GetValueOrDefault(sourceId);
 
     public int UniqueCandidatesForSource(string sourceId) => _candidatesPerSource.TryGetValue(sourceId, out var set) ? set.Count : 0;
 
-    public int WritesForUser(MemorySecurityScope owner) => _records.Count(r => SameScope(r.Owner, owner));
+    public int WritesForUser(MemorySecurityScope owner) => _writesPerUser.GetValueOrDefault(Correlation(owner));
 
-    public int QuarantinedForScope { get; set; }
-
-    /// <summary>The newest active record in <paramref name="scope"/> (or any scope, with the shared-partition bug) matching the query.</summary>
-    public HarnessMemoryRecord? Recall(MemorySecurityScope scope, string query)
+    /// <summary>
+    /// The newest active records in <paramref name="scope"/> (or any scope, with the shared-partition bug) that share a
+    /// word of four letters or more with the query, at most <see cref="RecallWindow"/>.
+    /// </summary>
+    public IReadOnlyList<HarnessMemoryRecord> Recall(MemorySecurityScope scope, string query)
     {
         var terms = Terms(query);
         return _records
@@ -99,8 +101,13 @@ internal sealed class HarnessMemoryStore
             .Where(r => terms.Count == 0 || terms.Any(t =>
                 r.Key.Contains(t, StringComparison.OrdinalIgnoreCase) || r.Content.Contains(t, StringComparison.OrdinalIgnoreCase)))
             .OrderByDescending(r => r.CreatedAt)
-            .FirstOrDefault();
+            .Take(RecallWindow)
+            .ToList();
     }
+
+    /// <summary>What a recall tool returns for <paramref name="records"/>: one line per record, newest first.</summary>
+    public static string Render(IReadOnlyList<HarnessMemoryRecord> records) =>
+        records.Count == 0 ? "No matching note found." : string.Join("\n", records.Select(r => $"- {r.Content}"));
 
     public IReadOnlyList<HarnessMemoryRecord> ActiveWithKey(MemorySecurityScope scope, string key) =>
         _records.Where(r => r.State is MemoryRecordState.Active && SameScope(r.Owner, scope)
@@ -127,6 +134,37 @@ internal sealed class HarnessMemoryStore
     public static string Sha256(string value) =>
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(value))).ToLowerInvariant();
 
+    private HarnessMemoryRecord Add(
+        MemorySecurityScope owner, string key, string content, MemoryCategory category, MemoryProvenance provenance, string session)
+    {
+        var record = new HarnessMemoryRecord
+        {
+            Id = $"mem-{++_ids}",
+            Key = key,
+            Content = content,
+            Digest = Sha256(content),
+            Owner = owner,
+            Category = category,
+            Provenance = provenance,
+            CreatedAt = DateTimeOffset.UnixEpoch.AddSeconds(++_clock),
+            Session = session,
+        };
+        _records.Add(record);
+        return record;
+    }
+
+    private void Candidate(MemoryProvenance provenance, string content)
+    {
+        if (!_candidatesPerSource.TryGetValue(provenance.SourceId, out var candidates))
+        {
+            _candidatesPerSource[provenance.SourceId] = candidates = new HashSet<string>(StringComparer.Ordinal);
+        }
+
+        candidates.Add(Sha256(content));
+    }
+
+    private static string Correlation(MemorySecurityScope scope) => $"{scope.TenantId}|{scope.UserId}|{scope.AgentId}|{scope.ApplicationId}";
+
     private static List<string> Terms(string query) =>
         query.Split([' ', ',', '.', '?', '!', ':', ';', '\'', '"', '(', ')'], StringSplitOptions.RemoveEmptyEntries)
             .Where(t => t.Length >= 4)
@@ -135,8 +173,8 @@ internal sealed class HarnessMemoryStore
             .ToList();
 }
 
-/// <summary>A quarantined candidate: kept out of recall, with the lineage it came from.</summary>
-internal sealed record HarnessQuarantinedCandidate(string OperationId, string Content, string RootLineageId, string Session);
+/// <summary>A quarantined candidate: kept out of recall, with the lineage and content digest it came with.</summary>
+internal sealed record HarnessQuarantinedCandidate(string OperationId, string ContentDigest, string RootLineageId, string Session);
 
 /// <summary>The quarantine boundary the enforcing policy needs.</summary>
 internal sealed class HarnessQuarantineStore(HarnessMemoryStore store) : IMemoryQuarantineStore
@@ -149,17 +187,18 @@ internal sealed class HarnessQuarantineStore(HarnessMemoryStore store) : IMemory
 
     public ValueTask<MemoryQuarantineReceipt> StoreAsync(MemoryQuarantineRequest request, CancellationToken cancellationToken = default)
     {
+        var content = request.Context.Content ?? "";
         Candidates.Add(new HarnessQuarantinedCandidate(
-            request.Context.OperationId, request.Context.Content ?? "", request.Context.Provenance.RootLineageId, Session));
-        store.QuarantinedForScope++;
+            request.Context.OperationId, HarnessMemoryStore.Sha256(content), request.Context.Provenance.RootLineageId, Session));
+        store.Quarantined(request.Context.Provenance, content);
         return ValueTask.FromResult(new MemoryQuarantineReceipt($"q-{++_ids}", request.Context.OperationId, DateTimeOffset.UtcNow));
     }
 }
 
-/// <summary>One memory-gate decision, content-free, with the lineage of what it decided on.</summary>
+/// <summary>One memory-gate decision, content-free: the lineage and the digest of the content it decided on.</summary>
 internal sealed record HarnessDecision(
     string OperationId, MemoryGateStage Stage, MemoryOperationKind Kind, MemoryGateAction Action, string ReasonCode,
-    string RootLineageId, string Session);
+    string RootLineageId, string ContentDigest, string Session);
 
 /// <summary>The audit log the pipeline writes to: what attribution and rollback read.</summary>
 internal sealed class HarnessDecisionLog : IMemoryGateDecisionSink
@@ -172,7 +211,7 @@ internal sealed class HarnessDecisionLog : IMemoryGateDecisionSink
     {
         Decisions.Add(new HarnessDecision(
             context.OperationId, context.Stage, context.Kind, decision.Action, decision.ReasonCode,
-            context.Provenance.RootLineageId, Session));
+            context.Provenance.RootLineageId, HarnessMemoryStore.Sha256(context.Content ?? ""), Session));
         return ValueTask.CompletedTask;
     }
 }
@@ -180,7 +219,8 @@ internal sealed class HarnessDecisionLog : IMemoryGateDecisionSink
 /// <summary>
 /// What a real application supplies to the memory gates, done honestly: scope from the harness phase, never from model
 /// arguments; provenance from what the model saw in this session (the lowest trust wins); record metadata, conflicts and
-/// budget counters from the store.
+/// budget counters from the store. A recall result holds several records, and the gates see one context per result:
+/// it carries the lowest trust among them, and an owner and an integrity check that hold only when every record agrees.
 /// </summary>
 internal sealed class HarnessMemoryHost : IMemoryToolContextAdapter, IMemoryScopeResolver
 {
@@ -188,7 +228,12 @@ internal sealed class HarnessMemoryHost : IMemoryToolContextAdapter, IMemoryScop
     public const string RecallTool = "memory_recall";
     public const string ProcedureTool = "memory_save_procedure";
 
+    /// <summary>The owner a recall result reports when its records belong to different owners: it matches no caller.</summary>
+    private static readonly MemorySecurityScope MixedOwners = new(tenantId: "mixed-owners", userId: "mixed-owners");
+
     private readonly HarnessMemoryStore _store;
+    private readonly Dictionary<string, MemoryProvenance> _admitted = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, IReadOnlyList<HarnessMemoryRecord>> _recalled = new(StringComparer.Ordinal);
     private int _operations;
 
     public HarnessMemoryHost(HarnessMemoryStore store) => _store = store;
@@ -211,22 +256,13 @@ internal sealed class HarnessMemoryHost : IMemoryToolContextAdapter, IMemoryScop
     /// <summary>The lowest-trust content the model has seen in this session: what a write in it is attributed to.</summary>
     public MemoryProvenance SessionProvenance { get; private set; } = UserTurn("none");
 
-    /// <summary>The write the call gate just admitted, consumed by the tool body so the store keeps the same provenance.</summary>
-    public (string Key, MemoryProvenance Provenance)? PendingWrite { get; set; }
-
-    /// <summary>The record the recall tool returned last (null: none matched), read by the result gate's context.</summary>
-    public HarnessMemoryRecord? LastRecalled { get; set; }
-
-    public bool RecallRan { get; set; }
-
     public void BeginSession(string session, MemorySecurityScope scope, MemoryProvenance userTurn)
     {
         Session = session;
         Scope = scope;
         SessionProvenance = userTurn;
-        PendingWrite = null;
-        LastRecalled = null;
-        RecallRan = false;
+        _admitted.Clear();
+        _recalled.Clear();
         _store.NewSession();
     }
 
@@ -245,6 +281,16 @@ internal sealed class HarnessMemoryHost : IMemoryToolContextAdapter, IMemoryScop
     public static MemoryProvenance UserTurn(string session) =>
         new(MemorySourceKind.User, $"user-turn-{session}", MemoryTrustLevel.Medium);
 
+    /// <summary>
+    /// The provenance the call gate attributed to a write of <paramref name="content"/>, consumed by the tool body so the
+    /// store keeps the same one; the session's current provenance when the gate saw no such write.
+    /// </summary>
+    public MemoryProvenance TakeAdmitted(string content) =>
+        _admitted.Remove(HarnessMemoryStore.Sha256(content), out var provenance) ? provenance : SessionProvenance;
+
+    /// <summary>Records what a recall for <paramref name="query"/> returned, for the result gate's context.</summary>
+    public void Recalled(string query, IReadOnlyList<HarnessMemoryRecord> records) => _recalled[query] = records;
+
     public MemorySecurityScope Resolve(AgentSession session, string? agentName) => Scope;
 
     public MemoryGateContext CreateCallContext(GatedToolCall call, MemoryOperationContract operation, MemoryGateStage stage)
@@ -260,12 +306,7 @@ internal sealed class HarnessMemoryHost : IMemoryToolContextAdapter, IMemoryScop
 
         var key = Argument(call, "key") ?? Argument(call, "name") ?? "note";
         var provenance = SessionProvenance;
-        if (stage is MemoryGateStage.BeforeWrite)
-        {
-            _store.CountWrite(provenance, content ?? "");
-        }
-
-        PendingWrite = (key, provenance);
+        _admitted[HarnessMemoryStore.Sha256(content ?? "")] = provenance;
         var conflicts = _store.ActiveWithKey(Scope, key)
             .Take(64)
             .Select(r => new MemoryConflictCandidate(r.Id, r.Digest, r.Provenance.Trust, r.Provenance.RootLineageId, r.Category));
@@ -277,7 +318,9 @@ internal sealed class HarnessMemoryHost : IMemoryToolContextAdapter, IMemoryScop
     public MemoryGateContext CreateResultContext(GatedToolResult result, MemoryOperationContract operation)
     {
         var operationId = $"op-{++_operations}";
-        if (LastRecalled is not { } record)
+        var query = Argument(result.Arguments, "query") ?? "";
+        var records = _recalled.GetValueOrDefault(query) ?? [];
+        if (records.Count == 0)
         {
             // The host's own "nothing found" message: application text, not memory content.
             return new MemoryGateContext(
@@ -285,15 +328,22 @@ internal sealed class HarnessMemoryHost : IMemoryToolContextAdapter, IMemoryScop
                 new MemoryProvenance(MemorySourceKind.Application, "harness-store", MemoryTrustLevel.ApplicationTrusted),
                 result.ResultText,
                 logicalSessionId: Session,
-                recordMetadata: new MemoryRecordMetadata("none", Scope, integrityVerified: true));
+                recordMetadata: new MemoryRecordMetadata("none", Scope, integrityVerified: true),
+                budget: new MemoryBudgetSnapshot(recalledItemCount: 0, recalledContentCharacters: result.ResultText?.Length ?? 0));
         }
 
+        var lowest = records.MinBy(r => r.Provenance.Trust)!;
+        var owner = records.All(r => HarnessMemoryStore.SameScope(r.Owner, records[0].Owner)) ? records[0].Owner : MixedOwners;
         return new MemoryGateContext(
-            operationId, MemoryGateStage.AfterRead, operation, "harness-store", Scope, record.Provenance, record.Content,
+            operationId, MemoryGateStage.AfterRead, operation, "harness-store", Scope, lowest.Provenance,
+            HarnessMemoryStore.Render(records),
             logicalSessionId: Session,
             recordMetadata: new MemoryRecordMetadata(
-                record.Id, record.Owner, record.State, createdAtUtc: record.CreatedAt, integrityVerified: record.IntegrityVerified),
-            budget: new MemoryBudgetSnapshot(recalledItemCount: 1, recalledContentCharacters: record.Content.Length));
+                records.Count == 1 ? records[0].Id : $"recall-{HarnessMemoryStore.Sha256(string.Join(",", records.Select(r => r.Id)))[..16]}",
+                owner, MemoryRecordState.Active,
+                createdAtUtc: records.Min(r => r.CreatedAt), integrityVerified: records.All(r => r.IntegrityVerified)),
+            budget: new MemoryBudgetSnapshot(
+                recalledItemCount: records.Count, recalledContentCharacters: records.Sum(r => r.Content.Length)));
     }
 
     public IReadOnlyDictionary<string, object?> ApplySanitizedArguments(
@@ -317,8 +367,10 @@ internal sealed class HarnessMemoryHost : IMemoryToolContextAdapter, IMemoryScop
         uniqueCandidatesForSource: _store.UniqueCandidatesForSource(provenance.SourceId),
         quarantinedItemsForScope: _store.QuarantinedForScope);
 
-    private static string? Argument(GatedToolCall call, string? name) =>
-        name is not null && call.Arguments is not null && call.Arguments.TryGetValue(name, out var value) && value is not null
+    private static string? Argument(GatedToolCall call, string? name) => Argument(call.Arguments, name);
+
+    private static string? Argument(IReadOnlyDictionary<string, object?>? arguments, string? name) =>
+        name is not null && arguments is not null && arguments.TryGetValue(name, out var value) && value is not null
             ? value.ToString()
             : null;
 }

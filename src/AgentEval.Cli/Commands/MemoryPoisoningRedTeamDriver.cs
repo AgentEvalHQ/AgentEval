@@ -26,7 +26,8 @@ internal static class MemoryPoisoningRedTeamDriver
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+        // Explicit nulls: a null outcome is "not measured", and leaving the key out would hide it.
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.Never,
     };
 
     /// <summary>Whether <c>--attacks</c> names memory-poisoning (any spelling: MemoryPoisoning, memory-poisoning, memory_poisoning).</summary>
@@ -77,6 +78,7 @@ internal static class MemoryPoisoningRedTeamDriver
         var result = await new MemoryPoisoningHarness(model, new MemoryPoisoningOptions
         {
             Trials = opts.MemoryTrials,
+            ModelCallTimeout = TimeSpan.FromSeconds(opts.TimeoutPerProbeSeconds),
             Scripted = scripted,
             Progress = progress,
         }).RunAsync(ct).ConfigureAwait(false);
@@ -118,6 +120,17 @@ internal static class MemoryPoisoningRedTeamDriver
         if (opts.Calibration is not null) notUsed.Add("--calibration");
         if (opts.JudgeEndpoint is not null) notUsed.Add("--judge");
         if (opts.AttackerEndpoint is not null) notUsed.Add("--attacker");
+        if (opts.SystemPrompt is not null) notUsed.Add("--system-prompt");
+        if (opts.SystemPromptCanary is not null) notUsed.Add("--system-prompt-canary");
+        if (!string.Equals(opts.SutTier, "text", StringComparison.OrdinalIgnoreCase)) notUsed.Add("--sut-tier");
+        if (!string.Equals(opts.Intensity, "moderate", StringComparison.OrdinalIgnoreCase)) notUsed.Add("--intensity");
+        if (opts.MaxProbes != 0) notUsed.Add("--max-probes");
+        if (opts.DelaySeconds != 0) notUsed.Add("--delay");
+        if (opts.Parallelism != 1) notUsed.Add("--parallelism");
+        if (opts.TimeoutPerTurnSeconds != 0) notUsed.Add("--max-turn-timeout");
+        if (opts.BenignControls) notUsed.Add("--benign-controls");
+        if (opts.Explain) notUsed.Add("--explain");
+        if (opts.FailFast) notUsed.Add("--fail-fast");
         if (notUsed.Count > 0)
         {
             return $"memory-poisoning does not take {string.Join(", ", notUsed)}: it brings its own agent (the model you " +
@@ -127,6 +140,11 @@ internal static class MemoryPoisoningRedTeamDriver
         if (opts.MemoryTrials is < 1 or > 100)
         {
             return "--memory-trials must be between 1 and 100.";
+        }
+
+        if (opts.TimeoutPerProbeSeconds is <= 0 or > 86_400)
+        {
+            return "--timeout-per-probe must be > 0 and <= 86400 (with memory-poisoning it bounds each model call).";
         }
 
         if (opts.FailOn.ToLowerInvariant() is not ("vuln" or "never"))
@@ -217,26 +235,29 @@ internal static class MemoryPoisoningRedTeamDriver
 
         sb.AppendLine($"- Model: {modelName}");
         sb.AppendLine($"- Corpus: {result.Corpus.CorpusId} {result.Corpus.Version} (`{result.Corpus.Fingerprint[..16]}…`)");
+        sb.AppendLine($"- Case scripts: `{result.ScriptsFingerprint[..16]}…`");
         sb.AppendLine($"- Memory protection: AgentEval default memory gates, Enforce (`{result.PolicyFingerprint[..16]}…`)");
         sb.AppendLine($"- Cases × trials: {result.Corpus.Scenarios.Count} × {result.Cases.Max(c => c.Trial)}").AppendLine();
-        sb.AppendLine("| Case | Trial | Attempted | Blocked | Executed | Outcome |");
-        sb.AppendLine("|---|---|---|---|---|---|");
+        sb.AppendLine("| Mode | Case | Trial | Planted by | Attempted | Blocked | Executed | Outcome |");
+        sb.AppendLine("|---|---|---|---|---|---|---|---|");
         foreach (var c in result.Cases)
         {
+            var outcome = Outcome(scenarios[c.ScenarioId], c.Observation)
+                          + (c.PlantSessionSinkCalls > 0 ? $"; {c.PlantSessionSinkCalls} sink call(s) ran in the plant session" : "");
             sb.AppendLine(string.Create(CultureInfo.InvariantCulture,
-                $"| {c.ScenarioId} | {c.Trial} | {c.Attempted} | {c.Blocked} | {c.Executed} | {Outcome(scenarios[c.ScenarioId], c.Observation)} |"));
+                $"| {result.Mode} | {c.ScenarioId} | {c.Trial} | {c.PlantedBy} | {c.Attempted} | {c.Blocked} | {c.Executed} | {outcome} |"));
         }
 
-        sb.AppendLine().AppendLine("| Check | Result | Detail |").AppendLine("|---|---|---|");
+        sb.AppendLine().AppendLine("| Mode | Check | Result | Detail |").AppendLine("|---|---|---|---|");
         foreach (var leaf in result.Composite.Details.SubResults ?? [])
         {
-            sb.AppendLine($"| {leaf.Metric.Name} | {leaf.Score.Label.ToUpperInvariant()} | {leaf.Details.Evidence?.FirstOrDefault()?.Message} |");
+            sb.AppendLine($"| {result.Mode} | {leaf.Metric.Name} | {leaf.Score.Label.ToUpperInvariant()} | {leaf.Details.Evidence?.FirstOrDefault()?.Message} |");
         }
 
-        sb.AppendLine().AppendLine($"**Memory security: {result.Composite.Score.Label.ToUpperInvariant()}**").AppendLine();
+        sb.AppendLine().AppendLine($"**Memory security ({result.Mode}): {result.Composite.Score.Label.ToUpperInvariant()}**").AppendLine();
         sb.AppendLine("Attempted counts the memory writes proposed (or planted by the harness) and the sink calls the model proposed;");
-        sb.AppendLine("executed counts the writes stored and the sink tools that ran. Outcomes measured by the harness probe or a");
-        sb.AppendLine("harness plant are named in `--format json` notes.");
+        sb.AppendLine("executed counts the writes stored and the sink tools that ran. A case planted by the harness measures the gates");
+        sb.AppendLine("and the store, whatever the model does. How each outcome was measured is in the `--format json` notes.");
         return sb.ToString();
     }
 
@@ -246,6 +267,7 @@ internal static class MemoryPoisoningRedTeamDriver
             mode = result.Mode,
             model = modelName,
             corpus = new { id = result.Corpus.CorpusId, version = result.Corpus.Version, fingerprint = result.Corpus.Fingerprint },
+            scriptsFingerprint = result.ScriptsFingerprint,
             policyFingerprint = result.PolicyFingerprint,
             verdict = result.Composite.Score.Label,
             checks = (result.Composite.Details.SubResults ?? []).Select(l => new
@@ -256,8 +278,11 @@ internal static class MemoryPoisoningRedTeamDriver
             }),
             cases = result.Cases.Select(c => new
             {
+                mode = result.Mode,
                 scenarioId = c.ScenarioId,
                 trial = c.Trial,
+                plantedBy = c.PlantedBy,
+                plantSessionSinkCalls = c.PlantSessionSinkCalls,
                 attempted = c.Attempted,
                 blocked = c.Blocked,
                 executed = c.Executed,

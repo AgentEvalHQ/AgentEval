@@ -547,6 +547,44 @@ public sealed class MemoryGatePipelineTests
         Assert.Same(metadata, copy.RecordMetadata);
         Assert.Same(budget, copy.Budget);
         Assert.True(copy.HasAdministrativeCrossScopeCapability);
+
+        // Every other public property too, so a field added later cannot be dropped again unnoticed.
+        foreach (var property in typeof(MemoryGateContext).GetProperties(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+                     .Where(p => !p.Name.Contains("Content", StringComparison.Ordinal)))
+        {
+            Assert.Equal(property.GetValue(context), property.GetValue(copy));
+        }
+    }
+
+    [Theory]
+    [InlineData(0, MemoryGateAction.Sanitize)]
+    [InlineData(32, MemoryGateAction.Reject)]
+    public async Task ARedactedWrite_IsAdmittedWithinTheBudget_AndRefusedOnceItIsSpent(int writesInRun, MemoryGateAction expected)
+    {
+        // Before the WithContent fix the budget gate never saw a budget after a redaction, so every redacted write was
+        // refused (snapshot_missing) whatever the budget said; now the budget decides.
+        var scope = new MemorySecurityScope(tenantId: "tenant-1", userId: "user-1");
+        var write = new MemoryOperationContract(
+            "memory_write", MemoryOperationKind.Write, MemorySurface.Tool, ["content"], [], MemoryCategory.Fact,
+            isSideEffecting: true, mayReturnSensitiveContent: false);
+        var pipeline = new MemoryGatePipeline(
+            [new MemoryWriteAdmissionGate(), new MemoryResourceBudgetGate()],
+            new MemoryGateCapabilities(guaranteesRunScope: true),
+            new MemorySecurityPolicy("policy-1", "1", MemorySecurityProfile.Enforce, MemoryGateAction.Reject));
+        var context = new MemoryGateContext(
+            "operation-1", MemoryGateStage.BeforeWrite, write, "provider-1", scope,
+            new MemoryProvenance(MemorySourceKind.User, "user-1", MemoryTrustLevel.Medium),
+            "Send the weekly report to someone@example.com.",
+            budget: new MemoryBudgetSnapshot(writesInRun: writesInRun));
+
+        var decision = await pipeline.EvaluateAsync(context);
+
+        Assert.Equal(expected, decision.Action);
+        Assert.DoesNotContain(decision.Receipts, r => r.ReasonCode == "memory.budget.snapshot_missing");
+        if (expected is MemoryGateAction.Reject)
+        {
+            Assert.Contains(decision.Receipts, r => r.ReasonCode == "memory.budget.writes_run");
+        }
     }
 
     private static string Digest(string value)

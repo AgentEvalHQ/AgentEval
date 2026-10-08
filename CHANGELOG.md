@@ -95,12 +95,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   five checks had no CLI path and nothing that produced observations from a run. The new run puts the model you name
   behind AgentEval's default memory protection (`UseGatekeeper` + `ProtectMemory` over the five memory gates), runs
   each case as a plant session, a restart and a trigger session over a shared memory store, then a recall through the
-  same result gate, and scores the observations: one row per case and the five verdicts (`--format markdown|json`,
-  `--memory-trials`, exit 0 / 1 / 11). `--scripted` runs a scripted worst-case model instead, labelled. With the
-  defaults it contains cross-user recall, higher-trust overwrites, untrusted procedure promotion and recalled data
-  reaching a sensitive tool; it stores and recalls low-trust poison (delimited), delivers a tampered record
-  (integrity verification is off by default) and lets a flood crowd a trusted record out. The OWASP Agentic page
-  said the recall gate drops tampered records; it does only when integrity verification is required.
+  same result gate, and scores the observations: one row per case, each labelled SCRIPTED or LIVE and with who planted
+  it, and the five verdicts (`--format markdown|json`, `--memory-trials`, exit 0 / 1 / 11; not measured is `null` in
+  the JSON). Five cases are planted by the harness and measure the gates and the store whatever the model does; the
+  cases the model decides are not measured when it never read the plant, a call timed out or failed, or it proposed
+  no memory write on any benign control. `--scripted` runs a scripted worst-case model instead, labelled. With the
+  defaults it contains cross-user recall, a low-trust write under a protected fact's key, untrusted procedure
+  promotion and recalled data copied into a sensitive tool; it stores and recalls low-trust poison (labelled), lets a
+  fact rewritten under a new key be recalled ahead of the trusted one, recalls a tampered record (integrity
+  verification is off by default), and lets the 32-write run budget fill the 32-record recall window. The OWASP
+  Agentic page said the recall gate drops tampered records; it does only when integrity verification is required.
 
 ### Changed
 - **The extensibility guide starts with `IEval`.** It opened with `IMetric`, the older interface, and mentioned
@@ -140,6 +144,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   snapshot and blocked the recall (`memory.budget.snapshot_missing`); a write whose credential or e-mail address
   was redacted was blocked the same way. It failed closed, so nothing unsafe got through, but recall did not work
   with the default gates. Found by the memory-poisoning harness.
+- **`TaintTrackingGate` (and the memory influence gate on it) missed a value that ended a sentence.** Its token
+  pattern keeps `.`, `/` and `-` inside a value, so "send it to https://drop.example/collect." tainted
+  `drop.example/collect.` with the full stop, and a call carrying `https://drop.example/collect` did not contain that
+  token and was allowed. Trailing punctuation is no longer part of a tainted value. Found by the memory-poisoning
+  review.
 - **Three Mission Control pages showed nothing, or were rejected, under `mc serve`.** The tests wrote their own
   GraphQL queries, so all three were green.
   - The compliance matrix looked statuses up in lower case while the evidence stores them upper case (`PASS`), so
