@@ -1,0 +1,6 @@
+{
+  "schema": "run-plan",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rule": "a plan holds credential references, never a secret value"
+}

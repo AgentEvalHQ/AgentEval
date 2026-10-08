@@ -1,0 +1,6 @@
+{
+  "schema": "runner",
+  "writer": "invalid",
+  "reader": "valid",
+  "rule": "an os this version does not know: the writer refuses it, a reader accepts it as other"
+}

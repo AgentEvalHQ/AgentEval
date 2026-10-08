@@ -30,7 +30,7 @@ public class AefV2ConformanceTests
     {
         var files = Directory.GetFiles(Path.Combine(V2, "schemas", "writer"), "*.schema.json");
 
-        Assert.Equal(12, files.Length);
+        Assert.Equal(15, files.Length);
         Assert.All(files, f =>
         {
             var node = JsonNode.Parse(File.ReadAllText(f))!;

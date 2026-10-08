@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "2.0",
+  "planId": "plan-41",
+  "checkpointId": "cp_01J9K4",
+  "subject": {
+    "ref": "agent:support/support-triage",
+    "version": " Latest ",
+    "endpoint": "http://localhost:5080/v1"
+  },
+  "suites": [
+    {
+      "ref": "suite:support/triage-scenarios",
+      "version": "4",
+      "lane": "quality"
+    },
+    {
+      "ref": "suite:owasp/llm-top10",
+      "version": "2026.1",
+      "lane": "security"
+    }
+  ],
+  "limits": {
+    "maxUsd": 3.0,
+    "cases": 200,
+    "timeout": "PT2H"
+  },
+  "contentPolicy": "off",
+  "isolation": "process",
+  "provider": "local",
+  "credentialRefs": [
+    "env:AZURE_OPENAI_API_KEY",
+    "keychain:agenteval/support-dev"
+  ],
+  "runnerSelector": [
+    "os:linux"
+  ]
+}

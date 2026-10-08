@@ -1,0 +1,2 @@
+{"schemaVersion":"2.0","seq":1,"kind":"spend.updated","jobId":"job-7","at":"2026-10-08T12:00:00Z","spentUsd":0.1}
+{"schemaVersion":"2.0","seq":2,"kind":"job.cancelled","jobId":"job-7","at":"2026-10-08T12:00:01Z","reason":"x"}

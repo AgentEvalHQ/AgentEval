@@ -288,18 +288,59 @@ Missing evidence is never converted into a pass, and nothing is averaged.
 `conformance/decision-vectors/` holds inputs with expected outputs written by hand from these rules; the reference
 implementation `tools/aef_decide.py` and the .NET one (`AgentEval.Results`) reproduce them.
 
-## 11. Not yet in this draft
+## 11. Run plans and runners
+
+A **run plan** (schema `run-plan`) is what a runner is asked to evaluate: the exact subject version (never "latest", in
+any spelling; a container run also names the image by digest), the suites and the lanes they serve, the limits it must
+stop at (`maxUsd` always; `cases` and `timeout` when set), the content policy, the isolation (`process`, `container`,
+`remote-zone`), the provider (`local`, `docker`, `k8s`, `ci:<name>`), the tags a runner must carry, and the credentials
+it needs **as references only** (`env:<NAME>`, `keychain:<entry>`, `vault:<path>`): the runner resolves them where it
+runs, and a plan never holds a secret value.
+
+A **runner capability manifest** (schema `runner`) says what a runner is: its id and workload identity (and the id of
+the key it signs sealed evidence with, if any), its kind (`local`, `remote`, `ci`, `pool`), OS, runtime, the providers
+it supports, its tags, GPU and network zone, and its version. A plan's `runnerSelector` matches when the runner carries
+every tag in it.
+
+## 12. The event stream
+
+A runner reports a job as NDJSON (§1) on its standard output (a local runner) or over its channel (a remote one), one
+event per line (schema `runner-event`, a union on `kind`):
+
+| `kind` | Carries |
+|---|---|
+| `job.accepted` | the `planId` and the `runnerId` |
+| `plan.estimated` | the cases and the cost range (`usdLow`, `usdHigh`) with the price table |
+| `spend.updated` | `spentUsd`: the total so far |
+| `case.completed` | the `caseId` and its `state` |
+| `lane.completed` | the `lane` and its `status` |
+| `evidence.produced` | a sealed run: its `runId` and `runHash` |
+| `job.cancelled` | the `reason` |
+| `job.failed` | the `reason`, and the `limit` (`maxUsd`, `cases`, `timeout`) when the runner stopped at one |
+| `job.sealed` | every run the job produced (`runs`) |
+
+Every event has `seq`, `jobId` and `at`. A verifier checks a finished stream line by line and reports, per event
+(`event:<n>`, the 1-based line): the first event is not `job.accepted` (`first`); a `seq` that is not the previous plus
+one (`seq`, starting at 1); another `jobId` than the first event's (`job-id`); an `at` earlier than the previous one
+(`time`); an event after `job.sealed`, `job.failed` or `job.cancelled` (`after-terminal`); a `job.accepted` for another
+plan than the one given (`plan-id`); a `spentUsd` below the previous one (`spend-decreased`) or above the plan's
+`maxUsd` (`over-budget`); a `job.sealed` naming a run no `evidence.produced` announced (`unannounced-run`). Problems
+come in event order and then by name; a stream with no terminal event ends with (`stream`, `no-terminal`).
+
+`conformance/protocol/` holds valid and invalid plans and manifests, and streams with the problems written by hand;
+`tools/aef_stream.py` and the .NET verifier (`AgentEval.Results`) reproduce them.
+
+## 13. Not yet in this draft
 
 These are specified in the design and will be added to v2 before it is released, each with its schema and vectors:
 
-- the run plan, the runner capability manifest and the runner event stream, with protocol vectors;
 - DSSE vectors (valid, wrong key, tampered payload) with test keys, for the run and for overlay batches;
 - `tools/schema-diff`, which fails a schema change that removes, narrows or adds a required field without a new major;
 - generated types for Python, TypeScript and Go, each with a conformance runner;
 - v1-to-v2 migration vectors;
 - `views.json` and the catalog manifest.
 
-## 12. Conformance
+## 14. Conformance
 
 A writer or reader in any language conforms when it passes `conformance/`:
 
@@ -314,4 +355,6 @@ A writer or reader in any language conforms when it passes `conformance/`:
   exactly its expected problems;
 - every checkpoint in `checkpoints/` is accepted or refused by the writer and the reader schemas as its `expected.json`
   says;
-- every vector in `decision-vectors/` reproduces exactly.
+- every vector in `decision-vectors/` reproduces exactly;
+- every plan and runner manifest in `protocol/` is accepted or refused as its `expected.json` says, every event of
+  every stream in `protocol/streams/` is valid, and each stream's verification reports exactly its expected problems.

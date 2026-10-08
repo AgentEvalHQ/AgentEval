@@ -1,0 +1,6 @@
+{
+  "schema": "run-plan",
+  "writer": "valid",
+  "reader": "valid",
+  "rule": "a local process run"
+}

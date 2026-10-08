@@ -1,0 +1,6 @@
+{
+  "schema": "runner",
+  "writer": "valid",
+  "reader": "valid",
+  "rule": "a local runner"
+}

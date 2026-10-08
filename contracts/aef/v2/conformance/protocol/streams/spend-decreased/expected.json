@@ -1,0 +1,9 @@
+{
+  "plan": "../plan.json",
+  "problems": [
+    {
+      "where": "event:3",
+      "problem": "spend-decreased"
+    }
+  ]
+}

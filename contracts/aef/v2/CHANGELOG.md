@@ -15,5 +15,7 @@
   ASCII and byte-ordered; NDJSON is LF-only; trials are integer digits; seal predicates carry `schemaVersion`;
   `contentCapture` is `off` or `on`; `unmeasured` uses the v2 state names; rules across files; every result state, a
   U+2028 inside a string, chain vectors and more seal vectors in the corpus.
+- Run plans (credential references only), runner capability manifests and the runner event stream, with its
+  verifier and hand-written stream vectors.
 - Checkpoint manifests and the decision function (pure, with hand-written vectors); the reader derivation keeps
   `not` subtrees strict and accepts an unknown kind in a union discriminated by `kind`.

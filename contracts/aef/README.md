@@ -18,7 +18,7 @@ in .NET come next; until a release says otherwise, any part of v2 can change.
 | `v2/conformance/` | The corpus every writer and reader must pass: valid runs, invalid documents, seal vectors, result-id vectors |
 | `v2/CHANGELOG.md` | Changes to v2 |
 | `profiles/runtime-verdict/` | The evidence attached to runtime verdicts (AEVP 0.1) |
-| `tools/` | `build_conformance.py` (writes the corpus), `derive_reader.py` (writes the reader schemas) |
+| `tools/` | `build_conformance.py`, `decision_vectors.py`, `protocol_vectors.py` (write the corpus), `derive_reader.py` (writes the reader schemas), `aef_decide.py`, `aef_stream.py` (reference implementations; `--check` runs them on the corpus) |
 
 The .NET conformance tests (`tests/AgentEval.Tests/Contracts/AefV2ConformanceTests.cs`) recompute every value in the
 corpus with a second implementation of the rules.

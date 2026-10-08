@@ -1,0 +1,6 @@
+{
+  "schema": "run-plan",
+  "writer": "valid",
+  "reader": "valid",
+  "rule": "a container run of an image digest"
+}

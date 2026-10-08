@@ -1,0 +1,6 @@
+{
+  "schema": "run-plan",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rule": "'latest' is resolved before the plan exists, in any spelling"
+}
