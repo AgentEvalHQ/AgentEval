@@ -34,7 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (the 2026 list, published 2025-12-09): which red-team attacks probe it, which Gatekeeper gates defend against it at
   runtime, and what is missing. Probes and gates both exist for ASI01 Agent Goal Hijack and ASI02 Tool Misuse and
   Exploitation. ASI03–ASI06 and ASI08–ASI10 are partly covered, most of them by gates with no probes. ASI07 Insecure
-  Inter-Agent Communication is not covered. Added to the docs TOC alongside the ASSERT Interoperability spec.
+  Inter-Agent Communication is not covered.
 - **`bench agentic --reference/--reference-file` and `--context/--context-file`.** The reference answer and the
   retrieved context reach every check as `EvalInput.GroundTruth` / `EvalInput.Context`, so `rag-quality` can pass
   from the CLI: groundedness grades against the context; similarity, F1 and response completeness against the
