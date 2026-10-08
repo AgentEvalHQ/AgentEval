@@ -1,0 +1,6 @@
+{
+  "schema": "run",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rule": "a time is RFC 3339 UTC by its pattern, whether or not a validator asserts format"
+}

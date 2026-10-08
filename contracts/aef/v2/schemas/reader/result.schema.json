@@ -30,18 +30,26 @@
       ]
     },
     "caseId": {
-      "type": "string",
+      "allOf": [
+        {
+          "$ref": "common.schema.json#/$defs/text"
+        }
+      ],
       "minLength": 1,
       "maxLength": 256
     },
     "path": {
       "description": "The node's place in the tree, / between levels.",
-      "type": "string",
+      "allOf": [
+        {
+          "$ref": "common.schema.json#/$defs/text"
+        }
+      ],
       "minLength": 1,
       "maxLength": 1024
     },
     "trial": {
-      "description": "0-based trial, when the case ran several times.",
+      "description": "0-based trial, when the case ran several times. Written as plain integer digits (no fraction, no exponent).",
       "type": "integer",
       "minimum": 0,
       "maximum": 999
@@ -264,11 +272,13 @@
       "properties": {
         "traceId": {
           "type": "string",
-          "pattern": "^[0-9a-f]{32}$"
+          "pattern": "^[0-9a-f]{32}$",
+          "maxLength": 32
         },
         "spanId": {
           "type": "string",
-          "pattern": "^[0-9a-f]{16}$"
+          "pattern": "^[0-9a-f]{16}$",
+          "maxLength": 16
         }
       }
     },
@@ -315,13 +325,18 @@
           "maximum": 1
         },
         "unmeasured": {
+          "description": "The children not measured, by state.",
           "type": "object",
           "properties": {
-            "skipped": {
+            "not_measured": {
               "type": "integer",
               "minimum": 0
             },
-            "inapplicable": {
+            "not_applicable": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "skipped": {
               "type": "integer",
               "minimum": 0
             },

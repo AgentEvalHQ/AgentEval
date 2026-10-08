@@ -1,0 +1,6 @@
+{
+  "schema": "result",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rule": "caseId and path hold no control character, so the U+001F a result id joins with cannot appear in them"
+}

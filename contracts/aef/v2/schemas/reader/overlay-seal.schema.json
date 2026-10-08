@@ -49,6 +49,7 @@
     "predicate": {
       "type": "object",
       "required": [
+        "schemaVersion",
         "runId",
         "batch",
         "offset",
@@ -56,6 +57,9 @@
         "previous"
       ],
       "properties": {
+        "schemaVersion": {
+          "$ref": "common.schema.json#/$defs/schemaVersion"
+        },
         "runId": {
           "$ref": "common.schema.json#/$defs/id"
         },

@@ -1,0 +1,71 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "ext/Z",
+      "digest": {
+        "sha256": "d74bd81ff1eef77da2f7418ef5d16c8c152e36e80e5fd7acd2c0cdde37229718"
+      }
+    },
+    {
+      "name": "ext/a-b",
+      "digest": {
+        "sha256": "c2c06392ab9e0a91a4986f87c7f0d4d158783c022cce49ab4b8f878eb65c5642"
+      }
+    },
+    {
+      "name": "ext/a.b",
+      "digest": {
+        "sha256": "8601235cfb7425df9de896d318d1a9040bd9c96973b065e0c9a5e2d3b513fb74"
+      }
+    },
+    {
+      "name": "ext/a/b",
+      "digest": {
+        "sha256": "3b4910198f1853636f098c480da93f026cd740992ae0058cb2776f4b10a220a2"
+      }
+    },
+    {
+      "name": "metrics.json",
+      "digest": {
+        "sha256": "e24947c835234fff34c5f94d0594884d48aeb5f49d03358c2d6c3f671bd3da1a"
+      }
+    },
+    {
+      "name": "results.ndjson",
+      "digest": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "run.json",
+      "digest": {
+        "sha256": "9490d9b06d37ec2192575b0ee6977a58f100e322b2312e00af7b4bb69da45a2c"
+      }
+    },
+    {
+      "name": "summary.json",
+      "digest": {
+        "sha256": "9564b987de3f4e877683eb9a428348ee1ebb3fbd501af7339f74d4b057dc0d73"
+      }
+    }
+  ],
+  "predicateType": "https://agenteval.dev/evidence/v2",
+  "predicate": {
+    "schemaVersion": "2.0",
+    "runId": "01928f3f-0000-7000-8000-000000000001",
+    "runHash": "d32c8b2461d7b2c360c1b0c28d00d0482b119dbb965346b3cd9aa3be22829285",
+    "producer": {
+      "name": "agenteval-cli",
+      "version": "0.44.0"
+    },
+    "subject": {
+      "ref": "agent:people/hr-bot"
+    },
+    "deployment": null,
+    "suite": null,
+    "judges": [],
+    "closedAt": "2026-10-03T09:00:05Z",
+    "sealedBy": "ingest"
+  }
+}

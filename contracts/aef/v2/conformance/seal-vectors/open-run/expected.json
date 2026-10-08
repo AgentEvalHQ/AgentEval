@@ -1,0 +1,10 @@
+{
+  "run": "seal-vectors/open-run/run",
+  "verdict": "mismatch",
+  "mismatches": [
+    {
+      "path": "run.json",
+      "problem": "run-open"
+    }
+  ]
+}

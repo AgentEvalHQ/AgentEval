@@ -274,7 +274,7 @@
       }
     },
     "contentCapture": {
-      "description": "off: no prompt or response text is stored; hashes-only: digests and sizes; on: content is stored (blobs/).",
+      "description": "off: prompt and response text is not stored, only its size and SHA-256; on: content is stored (blobs/).",
       "type": "string"
     },
     "costPolicy": {
@@ -310,7 +310,12 @@
         "required": [
           "abortReason",
           "endedAt"
-        ]
+        ],
+        "properties": {
+          "endedAt": {
+            "$ref": "common.schema.json#/$defs/timestamp"
+          }
+        }
       }
     },
     {

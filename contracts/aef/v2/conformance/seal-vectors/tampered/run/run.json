@@ -62,7 +62,7 @@
       "gen_ai"
     ]
   },
-  "contentCapture": "hashes-only",
+  "contentCapture": "off",
   "costPolicy": {
     "maxUsd": 3.0,
     "priceTable": "2026-09-30"

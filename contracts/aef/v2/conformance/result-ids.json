@@ -28,10 +28,17 @@
     "resultId": "r_242544b3bd811705238310e91ec2049b"
   },
   {
-    "runId": "ラン-1",
-    "caseId": "casé-été",
+    "runId": "run-7",
+    "caseId": "casé-été ラン",
     "path": "مرحبا/—",
     "trial": null,
-    "resultId": "r_1a000c581a165a70bd93676835656454"
+    "resultId": "r_ee576850e7406d9aeca69c9f03afc2e3"
+  },
+  {
+    "runId": "run-7",
+    "caseId": "case-3",
+    "path": "booking",
+    "trial": 3.0,
+    "resultId": "r_bc898ea424c0f3cd262cbaa096d064c9"
   }
 ]

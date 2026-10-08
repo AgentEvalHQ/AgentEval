@@ -17,6 +17,3 @@ src/AgentEval.Memory/Data/typedmemeval/**/*.json text eol=lf
 
 # Shell scripts run on Linux runners and in containers: a CR breaks `set -o pipefail`.
 *.sh text eol=lf
-
-# AEF conformance corpus: seals hash exact bytes, so git must never convert line endings (a CRLF file is a vector).
-contracts/aef/v2/conformance/** -text

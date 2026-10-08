@@ -1,0 +1,6 @@
+{
+  "schema": "run",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rule": "an aborted run has an end time, not null"
+}

@@ -5,29 +5,68 @@
   "description": "The header of one run folder. Identity lives here, not in the folder path.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "runId", "status", "producer", "subject", "startedAt"],
+  "required": [
+    "schemaVersion",
+    "runId",
+    "status",
+    "producer",
+    "subject",
+    "startedAt"
+  ],
   "properties": {
-    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
-    "runId": { "$ref": "common.schema.json#/$defs/id" },
+    "schemaVersion": {
+      "$ref": "common.schema.json#/$defs/schemaVersion"
+    },
+    "runId": {
+      "$ref": "common.schema.json#/$defs/id"
+    },
     "status": {
       "description": "running while the producer writes; completed or aborted when it closes. There is no 'sealed' status: sealed is a fact about seal.json, never a field.",
-      "enum": ["running", "completed", "aborted"]
+      "enum": [
+        "running",
+        "completed",
+        "aborted"
+      ]
     },
-    "abortReason": { "type": "string", "minLength": 1, "maxLength": 2048 },
+    "abortReason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+    },
     "producer": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["name", "version"],
+      "required": [
+        "name",
+        "version"
+      ],
       "properties": {
-        "name": { "type": "string", "minLength": 1, "maxLength": 128 },
-        "version": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
         "runtime": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["name"],
+          "required": [
+            "name"
+          ],
           "properties": {
-            "name": { "type": "string", "minLength": 1, "maxLength": 64 },
-            "version": { "type": "string", "maxLength": 64 }
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            },
+            "version": {
+              "type": "string",
+              "maxLength": 64
+            }
           }
         }
       }
@@ -36,23 +75,55 @@
       "description": "What was evaluated.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["ref", "kind"],
+      "required": [
+        "ref",
+        "kind"
+      ],
       "properties": {
-        "ref": { "$ref": "common.schema.json#/$defs/ref" },
-        "kind": { "enum": ["agent", "workflow", "model", "endpoint", "mcp-server", "other"] },
-        "version": { "type": "string", "maxLength": 256 },
-        "environment": { "type": "string", "maxLength": 64 },
+        "ref": {
+          "$ref": "common.schema.json#/$defs/ref"
+        },
+        "kind": {
+          "enum": [
+            "agent",
+            "workflow",
+            "model",
+            "endpoint",
+            "mcp-server",
+            "other"
+          ]
+        },
+        "version": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "environment": {
+          "type": "string",
+          "maxLength": 64
+        },
         "externalIds": {
           "type": "object",
-          "additionalProperties": { "type": ["string", "null"], "maxLength": 1024 }
+          "additionalProperties": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 1024
+          }
         },
         "telemetry": {
           "description": "The keys that join this subject to OpenTelemetry (gen_ai.agent.id, service.name).",
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "agentId": { "type": "string", "maxLength": 256 },
-            "serviceName": { "type": "string", "maxLength": 256 }
+            "agentId": {
+              "type": "string",
+              "maxLength": 256
+            },
+            "serviceName": {
+              "type": "string",
+              "maxLength": 256
+            }
           }
         }
       }
@@ -60,14 +131,30 @@
     "deployment": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["ref"],
+      "required": [
+        "ref"
+      ],
       "properties": {
-        "ref": { "$ref": "common.schema.json#/$defs/ref" },
-        "environment": { "type": "string", "maxLength": 64 },
-        "endpoint": { "type": "string", "maxLength": 2048 },
+        "ref": {
+          "$ref": "common.schema.json#/$defs/ref"
+        },
+        "environment": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "endpoint": {
+          "type": "string",
+          "maxLength": 2048
+        },
         "externalIds": {
           "type": "object",
-          "additionalProperties": { "type": ["string", "null"], "maxLength": 1024 }
+          "additionalProperties": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 1024
+          }
         }
       }
     },
@@ -75,20 +162,47 @@
       "description": "The test cases run. A frozen suite's digest identifies its exact content.",
       "type": "object",
       "additionalProperties": false,
-      "required": ["ref", "version"],
+      "required": [
+        "ref",
+        "version"
+      ],
       "properties": {
-        "ref": { "$ref": "common.schema.json#/$defs/ref" },
-        "version": { "type": "string", "minLength": 1, "maxLength": 64 },
-        "digest": { "$ref": "common.schema.json#/$defs/sha256Uri" },
-        "frozen": { "type": "boolean" },
+        "ref": {
+          "$ref": "common.schema.json#/$defs/ref"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "digest": {
+          "$ref": "common.schema.json#/$defs/sha256Uri"
+        },
+        "frozen": {
+          "type": "boolean"
+        },
         "executionPolicy": {
           "type": "object",
           "additionalProperties": false,
-          "required": ["trialsPerCase"],
+          "required": [
+            "trialsPerCase"
+          ],
           "properties": {
-            "trialsPerCase": { "type": "integer", "minimum": 1, "maximum": 1000 },
-            "requirePasses": { "type": "integer", "minimum": 1, "maximum": 1000 },
-            "aggregation": { "enum": ["MajorityVote"] }
+            "trialsPerCase": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            },
+            "requirePasses": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000
+            },
+            "aggregation": {
+              "enum": [
+                "MajorityVote"
+              ]
+            }
           }
         }
       }
@@ -99,13 +213,35 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["model"],
+        "required": [
+          "model"
+        ],
         "properties": {
-          "model": { "type": "string", "minLength": 1, "maxLength": 256 },
-          "provider": { "type": "string", "maxLength": 128 },
-          "mode": { "enum": ["single", "panel", "primary", "shadow"] },
-          "panelSize": { "type": "integer", "minimum": 1, "maximum": 64 },
-          "rubricDigest": { "$ref": "common.schema.json#/$defs/sha256Uri" }
+          "model": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "provider": {
+            "type": "string",
+            "maxLength": 128
+          },
+          "mode": {
+            "enum": [
+              "single",
+              "panel",
+              "primary",
+              "shadow"
+            ]
+          },
+          "panelSize": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 64
+          },
+          "rubricDigest": {
+            "$ref": "common.schema.json#/$defs/sha256Uri"
+          }
         }
       }
     },
@@ -119,49 +255,129 @@
           "additionalProperties": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["op", "value"],
+            "required": [
+              "op",
+              "value"
+            ],
             "properties": {
-              "op": { "enum": [">=", ">", "<=", "<", "=="] },
-              "value": { "type": "number" }
+              "op": {
+                "enum": [
+                  ">=",
+                  ">",
+                  "<=",
+                  "<",
+                  "=="
+                ]
+              },
+              "value": {
+                "type": "number"
+              }
             }
           }
         }
       }
     },
-    "startedAt": { "$ref": "common.schema.json#/$defs/timestamp" },
+    "startedAt": {
+      "$ref": "common.schema.json#/$defs/timestamp"
+    },
     "endedAt": {
-      "anyOf": [ { "$ref": "common.schema.json#/$defs/timestamp" }, { "type": "null" } ]
+      "anyOf": [
+        {
+          "$ref": "common.schema.json#/$defs/timestamp"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "otel": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "semconvVersion": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$" },
-        "dialects": { "type": "array", "maxItems": 16, "items": { "type": "string", "maxLength": 64 } }
+        "semconvVersion": {
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$"
+        },
+        "dialects": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "string",
+            "maxLength": 64
+          }
+        }
       }
     },
     "contentCapture": {
-      "description": "off: no prompt or response text is stored; hashes-only: digests and sizes; on: content is stored (blobs/).",
-      "enum": ["off", "hashes-only", "on"]
+      "description": "off: prompt and response text is not stored, only its size and SHA-256; on: content is stored (blobs/).",
+      "enum": [
+        "off",
+        "on"
+      ]
     },
     "costPolicy": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "maxUsd": { "type": "number", "minimum": 0 },
-        "priceTable": { "type": "string", "maxLength": 64 }
+        "maxUsd": {
+          "type": "number",
+          "minimum": 0
+        },
+        "priceTable": {
+          "type": "string",
+          "maxLength": 64
+        }
       }
     },
-    "ext": { "$ref": "common.schema.json#/$defs/ext" }
+    "ext": {
+      "$ref": "common.schema.json#/$defs/ext"
+    }
   },
   "allOf": [
     {
-      "if": { "properties": { "status": { "const": "aborted" } }, "required": ["status"] },
-      "then": { "required": ["abortReason", "endedAt"] }
+      "if": {
+        "properties": {
+          "status": {
+            "const": "aborted"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "required": [
+          "abortReason",
+          "endedAt"
+        ],
+        "properties": {
+          "endedAt": {
+            "$ref": "common.schema.json#/$defs/timestamp"
+          }
+        }
+      }
     },
     {
-      "if": { "properties": { "status": { "const": "completed" } }, "required": ["status"] },
-      "then": { "required": ["endedAt"], "properties": { "endedAt": { "$ref": "common.schema.json#/$defs/timestamp" } } }
+      "if": {
+        "properties": {
+          "status": {
+            "const": "completed"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "required": [
+          "endedAt"
+        ],
+        "properties": {
+          "endedAt": {
+            "$ref": "common.schema.json#/$defs/timestamp"
+          }
+        }
+      }
     }
   ]
 }

@@ -1,0 +1,5 @@
+{
+  "run": "seal-vectors/path-order/run",
+  "verdict": "match",
+  "mismatches": []
+}

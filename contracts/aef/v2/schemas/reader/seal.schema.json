@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://agenteval.dev/aef/v2/reader/seal.schema.json",
   "title": "AEF v2: seal.json",
-  "description": "READER (tolerant), derived from the writer schema by tools/derive_reader.py. An in-toto Statement v1 over every file of the run (except seal.json and attestation.dsse.json): one subject per file, the exact bytes' SHA-256, and the run hash. See v2/README.md, 'Sealing'.",
+  "description": "READER (tolerant), derived from the writer schema by tools/derive_reader.py. An in-toto Statement v1 over every file of the run except seal.json, attestation.dsse.json and overlays/: one subject per file, the exact bytes' SHA-256, and the run hash. See v2/README.md, 'Sealing'.",
   "type": "object",
   "required": [
     "_type",
@@ -51,6 +51,7 @@
     "predicate": {
       "type": "object",
       "required": [
+        "schemaVersion",
         "runId",
         "runHash",
         "producer",
@@ -59,11 +60,14 @@
         "sealedBy"
       ],
       "properties": {
+        "schemaVersion": {
+          "$ref": "common.schema.json#/$defs/schemaVersion"
+        },
         "runId": {
           "$ref": "common.schema.json#/$defs/id"
         },
         "runHash": {
-          "description": "SHA-256 of the manifest text: one line per file sorted by path (ordinal), '<sha256-hex>  <bytes>  <path>\\n'.",
+          "description": "SHA-256 of the manifest: one line per sealed file, ordered by the UTF-8 bytes of its path, '<sha256-hex>  <size>  <path>\\n'.",
           "$ref": "common.schema.json#/$defs/sha256Hex"
         },
         "producer": {

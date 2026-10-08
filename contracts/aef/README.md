@@ -27,4 +27,5 @@ corpus with a second implementation of the rules.
 
 This folder is licensed under the Apache License 2.0 ([`LICENSE`](LICENSE)), unlike the rest of the repository (MIT),
 so that other tools can implement the format freely. It is kept self-contained so it can move to a neutral repository
-unchanged.
+unchanged: its own `.gitattributes` keeps the corpus byte-exact. Two links point outside it until then: the AEVP
+specification (`docs/aevp/`) and the .NET tests.

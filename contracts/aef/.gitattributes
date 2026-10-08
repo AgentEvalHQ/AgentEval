@@ -1,0 +1,2 @@
+# Seals hash exact bytes: git must never convert line endings in the corpus (a CRLF file is a vector).
+v2/conformance/** -text

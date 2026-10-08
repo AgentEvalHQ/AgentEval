@@ -37,10 +37,11 @@ def derive(node, strict=False):
         elif key == "additionalProperties" and value is False:
             continue  # unknown fields are allowed
         elif key == "enum":
-            out["type"] = "string"  # open: an unknown value reads as 'other'
+            # Open: an unknown value reads as 'other'. A nullable enum stays nullable.
+            out["type"] = node["type"] if isinstance(node.get("type"), list) else "string"
         elif key == "const" and value == "2.0":
             out["type"] = "string"
-            out["pattern"] = "^2\\.[0-9]+$"  # any minor of the known major
+            out["pattern"] = "^2\\.[0-9]+(?!\\n)$"  # any minor of the known major
         elif key in ("if", "not"):
             out[key] = derive(value, True)
         elif key == "oneOf" and isinstance(value, list) and value and all(kind_of(b) for b in value):

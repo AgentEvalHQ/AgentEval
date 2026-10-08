@@ -10,5 +10,10 @@
 - The seal over exact bytes (no canonical JSON): the manifest, the run hash, an in-toto Statement v1.
 - The conformance corpus: valid runs, invalid documents with the rule each breaks, seal vectors, result-id vectors.
 - The runtime-verdict profile (AEVP 0.1).
+- Review of the draft: verification also checks the run hash, the run id, duplicate subjects and open runs; overlay
+  assurance is a claim a reader verifies; patterns rule over `format` and guard the end of the string; run paths are
+  ASCII and byte-ordered; NDJSON is LF-only; trials are integer digits; seal predicates carry `schemaVersion`;
+  `contentCapture` is `off` or `on`; `unmeasured` uses the v2 state names; rules across files; every result state, a
+  U+2028 inside a string, chain vectors and more seal vectors in the corpus.
 - Checkpoint manifests and the decision function (pure, with hand-written vectors); the reader derivation keeps
   `not` subtrees strict and accepts an unknown kind in a union discriminated by `kind`.

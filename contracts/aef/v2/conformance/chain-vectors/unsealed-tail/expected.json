@@ -1,0 +1,9 @@
+{
+  "run": "chain-vectors/unsealed-tail/run",
+  "problems": [
+    {
+      "path": "overlays/events.ndjson",
+      "problem": "uncovered"
+    }
+  ]
+}

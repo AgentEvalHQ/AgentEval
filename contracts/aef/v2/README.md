@@ -22,10 +22,17 @@ for `run.json`. The conventional location is `<root>/.agenteval/runs/<yyyy>/<mm>
 | `overlays/events.ndjson` | `overlay-event`, one line each | after close, when anything is decided or noted |
 | `overlays/seal-<nnnn>.json` | `overlay-seal` | one per batch of overlay events |
 | `traces.otlp.jsonl` | OTLP/JSON, one `ExportTraceServiceRequest` per line | optional |
+| `ext/…` | none: producer files | optional; sealed like every other file |
 
-A blob's file name is the SHA-256 of its bytes (64 lower-case hex), in a folder named by its first two characters.
+A run folder holds only these files. A blob's file name is the SHA-256 of its bytes (64 lower-case hex), in a folder
+named by its first two characters. Every path in a run folder is ASCII letters, digits, `.`, `_`, `-` and `/`, so no
+operating system re-encodes or re-orders it. A file nobody sealed (a `.DS_Store` a file manager added) makes the run
+fail verification: tools that copy runs must not add files.
 
-JSON files are UTF-8 without a byte-order mark. NDJSON files hold one JSON object per line, each line ending in `\n`.
+**JSON files** are UTF-8 without a byte-order mark. **NDJSON files** are UTF-8 without a byte-order mark; lines are
+separated by LF (0x0A) only and a writer writes no CR; every line, the last included, ends in LF; there are no blank
+lines; an empty file is valid. A reader splits on LF alone: U+2028 and U+2029 inside a JSON string are text, not line
+breaks (the corpus has one).
 
 **A closed run never changes.** While `status` is `running` the producer may rewrite its files. When it closes the
 run (`completed` or `aborted`) it writes their final form, and from then on nothing edits them. Everything added later
@@ -33,25 +40,35 @@ goes to `overlays/`.
 
 ## 2. Versions: writers are strict, readers are tolerant
 
-Every JSON file and every NDJSON line carries `schemaVersion`, `MAJOR.MINOR` (this draft: `2.0`).
+Every JSON file and every NDJSON line carries `schemaVersion`, `MAJOR.MINOR` (this draft: `2.0`), except the in-toto
+statements (`seal.json`, `overlays/seal-<nnnn>.json`), whose `_type` is fixed by in-toto: they carry it in
+`predicate.schemaVersion`.
 
 - A **writer** must produce documents valid against `schemas/writer/`: only known fields, only known enum values, its
   own version.
 - A **reader** must accept documents valid against `schemas/reader/`: unknown fields are ignored, an unknown enum value
   is read as "other", and any minor of major 2 is accepted. A reader must refuse a major it does not know, with a
   message that says so. The reader schemas are the writer schemas with exactly those relaxations
-  (`tools/derive_reader.py`); every other rule (required fields, types, patterns, conditional rules) holds for both.
+  (`tools/derive_reader.py`), plus an unknown kind in a union discriminated by `kind`; every other rule (required fields,
+  types, patterns, lengths, conditional rules, prohibitions) holds for both.
+- **A minor version only adds** optional fields, enum values and union kinds. Changing a bound, a pattern or what is
+  required is a new major version.
+- **Patterns are the rule; `format` is an annotation.** Times, URIs and ids are checked by their patterns, whether or
+  not a validator asserts `format`. A pattern's end is the end of the string: the schemas write `(?!\n)$` or a
+  `maxLength`, because `$` alone also matches before a final newline in Python and .NET.
 
 ## 3. `run.json`
 
 The header: who produced the run (`producer`), what was evaluated (`subject`, `deployment`), with which cases
 (`suite`, with a content `digest` when frozen and an `executionPolicy` for repeated trials), which judges, the
 configuration as applied (`config.thresholds` maps a metric or result path to the rule its verdict used), when, what
-content was captured (`contentCapture`: `off`, `hashes-only`, `on`) and the cost policy.
+content was captured (`contentCapture`: `off`, only the size and SHA-256 of prompt and response text; `on`, the
+content in `blobs/`) and the cost policy.
 
 - `status` is `running`, `completed` or `aborted`. There is no `sealed` status: sealed is a fact about `seal.json`
   (present and verified), never a field.
-- A `completed` run has `endedAt`. An `aborted` run has `endedAt` and `abortReason`.
+- A `completed` run has an `endedAt` time. An `aborted` run has an `endedAt` time and an `abortReason`.
+- Times are RFC 3339 in UTC, ending in `Z`, with up to nine fraction digits.
 - `ext` is the extension point on every document: readers ignore what they do not know there, and nothing in the
   contract depends on it.
 
@@ -86,14 +103,16 @@ score of 0. A line in one of these states must have a `reason`.
 resultId = "r_" + first 32 hex characters of SHA-256( UTF-8( runId + U+001F + caseId + U+001F + path + U+001F + trial ) )
 ```
 
-`trial` is the decimal trial number, or the empty string on a line without one. `conformance/result-ids.json` holds
-vectors, non-ASCII included.
+The hash is written in lower-case hex. `trial` is the trial number as plain integer digits (a writer writes `3`; a
+reader that meets `3.0` uses `3`), or the empty string on a line without one. `caseId` and `path` contain no control
+character, so the U+001F separator cannot appear in them. `conformance/result-ids.json` holds vectors, non-ASCII and a
+trial written as `3.0` included.
 
 ### 4.3 Composites: how a verdict was reached
 
 A composite node carries `aggregation`: the `strategy` (`WeightedSum`, `Min`, `WeightedMedian`, `CapByWorst`,
 `MajorityVote`), its `threshold` and `score`, how many children were `measured` of the `total`, why the others were not
-(`unmeasured`), and `rulePath`, the branch of the verdict rules that decided the state:
+(`unmeasured`: `not_measured`, `not_applicable`, `skipped`, `errored`), and `rulePath`, the branch of the verdict rules that decided the state:
 
 | `rulePath` | The state came from |
 |---|---|
@@ -111,6 +130,16 @@ child has `parentResultId` and `component` (`weight`, `required`).
 When a case runs several times, each trial's lines carry `trial` (0-based), and one rollup line per case carries
 `trials`: `n`, `passed`, the `aggregation` and `agree` (`false` when the trials disagreed: the case is flaky). The case's
 result is the rollup line, never one trial. A line carries `trial` or `trials`, never both.
+
+### 4.5 Rules across files
+
+A schema checks one document; a reader also checks these, and treats a run that breaks one as invalid:
+
+- every `resultId` in `results.ndjson` is unique;
+- every `parentResultId`, every id in `aggregation.decisive` and every result a gate decision names is a line of
+  `results.ndjson`;
+- every evidence id a result cites is a line of `evidence.ndjson`;
+- every blob a line references exists, and a `reasoning.bytes` equals its blob's size.
 
 ## 5. `summary.json` and `metrics.json`
 
@@ -134,7 +163,13 @@ rule, its inputs, whether a comparison it needed was shown comparable, the `outc
 
 `overlays/events.ndjson` is append-only. Each event has a `kind` (`approve`, `reject`, `override`, `adjudicate`,
 `acknowledge`, `accept_baseline`, `waive`, `annotate`), a `target` (a run, result, requirement or checkpoint), who
-(`by`, with an `assurance` of `self-attested`, `signed` or `authenticated`, shown exactly as written) and when.
+(`by`) and when (`at`, and for a waiver `expires`: a time, not a date).
+
+`by.assurance` is what the writer **claims**: `self-attested`, `signed` or `authenticated`. Anyone who can append to the
+events file can write any of them, so a reader shows `signed` only when the batch holding the event has a DSSE envelope
+(`overlays/seal-<nnnn>.dsse.json`, payload: the exact bytes of `seal-<nnnn>.json`, `payloadType`
+`application/vnd.in-toto+json`) that verifies against a key it trusts for that identity, and `authenticated` only for
+an event it received from a host it trusts. Otherwise it shows `self-attested`, and says the claim was not verified.
 
 - A `waive` has a `reason` and an `expires`.
 - An `override` or `adjudicate` names the `target.result`, the `state` it sets, and a `reason`.
@@ -143,8 +178,20 @@ Events are sealed in **batches**. Batch *n* is the bytes of the events appended 
 `offset` with `length`. `overlays/seal-<nnnn>.json` (1-based, four digits) is an in-toto Statement v1 whose subject is
 `overlays/events.ndjson` with the SHA-256 of the batch's bytes, and whose predicate names the previous batch's seal
 file and the SHA-256 of that file's bytes (`null` for batch 1). The batches must cover the events file from its first
-byte to its last without gaps. A reader verifies the chain; a missing or altered batch breaks it, and the run's own
-seal is unaffected.
+byte to its last without gaps.
+
+A reader verifies the chain from `seal-0001.json` to the highest-numbered seal present and reports, per seal file: a
+seal missing below the highest (`missing`); a predicate `batch` that is not the file's number (`batch-number`); another
+`runId` (`run-id`); an `offset` that does not continue the previous batch (`offset`); a range that does not start and
+end on a line boundary inside the file (`line-boundary`); bytes that no longer match the batch digest
+(`batch-digest`); a `previous` that does not name the previous seal file and the SHA-256 of its bytes (`previous`); and,
+for `overlays/events.ndjson`, bytes that no batch claims (`uncovered`). `conformance/chain-vectors/` holds a changed
+batch, a missing seal and an unsealed tail with their expected problems. The run's own seal is unaffected by any of
+them.
+
+**What the chain cannot show:** removing the newest batches together with their seals leaves a shorter chain that
+verifies. A reader that has seen a longer chain keeps its length; a signed newest batch, or a copy held elsewhere,
+detects it.
 
 ## 8. Sealing
 
@@ -152,10 +199,12 @@ A run is sealed over its bytes. There is no canonical JSON: nothing is re-encode
 text and a CRLF inside a sealed blob to prove it.
 
 1. **The sealed files** are every file in the run folder except `seal.json`, `attestation.dsse.json` and everything
-   under `overlays/`.
+   under `overlays/`. Only a closed run is sealed, and a host seals only a run whose files validate against the reader
+   schemas.
 2. **Each file's digest** is the SHA-256 of its exact bytes.
-3. **The manifest** has one line per sealed file, ordered by path (ordinal comparison of the UTF-8 bytes, `/`
-   separators), in the `sha256sum` shape:
+3. **The manifest** has one line per sealed file, ordered by the UTF-8 bytes of its path (`/` separators; `ext/Z` before
+   `ext/a-b` before `ext/a.b` before `ext/a/b`), like `sha256sum` output with a size column (so `sha256sum -c` cannot
+   read it):
 
    ```
    <sha256-hex>␠␠<size in bytes>␠␠<path>\n
@@ -167,14 +216,23 @@ text and a CRLF inside a sealed blob to prove it.
    `predicate` with the `runId`, the `runHash`, the producer, subject, deployment, suite and judges from `run.json`,
    `closedAt`, and `sealedBy`: `producer` when the producer sealed the run, `ingest` when a host sealed it on taking
    custody of an unsealed run.
-6. **Verification** recomputes every digest. Each difference is one of: a sealed file whose bytes changed (`digest`),
-   a file present but not sealed (`not-sealed`), a sealed file that is gone (`missing`). A run verifies only when there
-   are none, and is shown verified only after a recomputation.
+6. **Verification** checks that `seal.json` is valid against the seal schema, then reports every difference as a path
+   and a problem:
+   - a sealed file whose bytes changed (`digest`), a file present but not sealed (`not-sealed`), a sealed file that is
+     gone (`missing`);
+   - a subject listed more than once (`duplicate-subject`, under the subject's name);
+   - when every file matches its subject, a recomputed run hash that is not `predicate.runHash` (`run-hash`, under
+     `seal.json`; when a file differs, the run hash necessarily differs too and adds nothing);
+   - a `predicate.runId` that is not `run.json`'s (`run-id`, under `seal.json`);
+   - a run whose `run.json` says `running` (`run-open`, under `run.json`).
+
+   A run verifies only when there are none, and is shown verified only after a recomputation. A run with no
+   `seal.json` is unsealed: neither verified nor failed.
 7. **Signatures** are optional: `attestation.dsse.json` is a DSSE envelope whose payload is the exact bytes of
    `seal.json` (`payloadType` `application/vnd.in-toto+json`), with one or more signatures.
 
-`conformance/seal-vectors/` holds sealed runs with their expected manifests, and runs changed after sealing (a byte
-changed, a file added, a file removed) with the expected differences.
+`conformance/seal-vectors/` holds sealed runs with their expected manifests (one whose paths only sort right by their
+bytes, beside an `attestation.dsse.json` that is never sealed), and one vector for each kind of difference.
 
 ## 9. Checkpoints
 
@@ -235,7 +293,9 @@ implementation `tools/aef_decide.py` and the .NET one (`AgentEval.Results`) repr
 These are specified in the design and will be added to v2 before it is released, each with its schema and vectors:
 
 - the run plan, the runner capability manifest and the runner event stream, with protocol vectors;
-- DSSE vectors (valid, wrong key, tampered payload) with test keys;
+- DSSE vectors (valid, wrong key, tampered payload) with test keys, for the run and for overlay batches;
+- `tools/schema-diff`, which fails a schema change that removes, narrows or adds a required field without a new major;
+- generated types for Python, TypeScript and Go, each with a conformance runner;
 - v1-to-v2 migration vectors;
 - `views.json` and the catalog manifest.
 
@@ -247,9 +307,11 @@ A writer or reader in any language conforms when it passes `conformance/`:
 - every document in `invalid/` is refused by the writer schema, and accepted or refused by the reader schema as its
   `expected.json` says (with the rule it breaks);
 - every vector in `result-ids.json` reproduces;
-- every run in `valid/` that has a `seal.json` verifies, with the manifest in `seal-vectors/<name>/`, and every changed
-  run in `seal-vectors/` fails verification with exactly the expected differences;
-- the overlay batches of every run in `valid/` form an unbroken chain over the whole events file;
+- every run in `valid/` keeps the rules across files (§4.5) and the NDJSON rules (§1);
+- every vector in `seal-vectors/` verifies with exactly its expected differences (none for a match), with the manifest
+  given where there is one;
+- the overlay batches of every run in `valid/` form an unbroken chain, and every vector in `chain-vectors/` reports
+  exactly its expected problems;
 - every checkpoint in `checkpoints/` is accepted or refused by the writer and the reader schemas as its `expected.json`
   says;
 - every vector in `decision-vectors/` reproduces exactly.

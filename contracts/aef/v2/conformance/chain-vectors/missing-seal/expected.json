@@ -1,0 +1,17 @@
+{
+  "run": "chain-vectors/missing-seal/run",
+  "problems": [
+    {
+      "path": "overlays/events.ndjson",
+      "problem": "uncovered"
+    },
+    {
+      "path": "overlays/seal-0001.json",
+      "problem": "missing"
+    },
+    {
+      "path": "overlays/seal-0002.json",
+      "problem": "previous"
+    }
+  ]
+}

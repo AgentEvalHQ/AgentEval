@@ -1,0 +1,10 @@
+{
+  "run": "seal-vectors/duplicate-subject/run",
+  "verdict": "mismatch",
+  "mismatches": [
+    {
+      "path": "metrics.json",
+      "problem": "duplicate-subject"
+    }
+  ]
+}

@@ -34,16 +34,16 @@
         },
         "traceId": {
           "type": "string",
-          "pattern": "^[0-9a-f]{32}$"
+          "pattern": "^[0-9a-f]{32}$",
+          "maxLength": 32
         },
         "spanId": {
           "type": "string",
-          "pattern": "^[0-9a-f]{16}$"
+          "pattern": "^[0-9a-f]{16}$",
+          "maxLength": 16
         },
         "uri": {
-          "type": "string",
-          "format": "uri",
-          "maxLength": 2048
+          "$ref": "common.schema.json#/$defs/uri"
         }
       },
       "oneOf": [
@@ -56,6 +56,11 @@
               {
                 "required": [
                   "traceId"
+                ]
+              },
+              {
+                "required": [
+                  "spanId"
                 ]
               },
               {
@@ -100,6 +105,11 @@
               {
                 "required": [
                   "traceId"
+                ]
+              },
+              {
+                "required": [
+                  "spanId"
                 ]
               }
             ]

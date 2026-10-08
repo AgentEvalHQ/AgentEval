@@ -1,0 +1,6 @@
+{
+  "schema": "result",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rule": "a pattern's end is the end of the string: '$' alone also matches before a final newline"
+}

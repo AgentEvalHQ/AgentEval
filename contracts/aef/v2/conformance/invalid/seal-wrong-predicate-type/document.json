@@ -10,6 +10,7 @@
   ],
   "predicateType": "https://slsa.dev/provenance/v1",
   "predicate": {
+    "schemaVersion": "2.0",
     "runId": "r-1",
     "runHash": "0000000000000000000000000000000000000000000000000000000000000000",
     "producer": {

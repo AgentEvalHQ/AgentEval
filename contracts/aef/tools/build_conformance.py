@@ -19,7 +19,9 @@ V = "2.0"
 
 def result_id(run_id, case_id, path, trial=None):
     """r_ + the first 32 hex of SHA-256 over runId, caseId, path and trial joined by U+001F (no trial: empty)."""
-    text = "\u001f".join([run_id, case_id, path, "" if trial is None else str(trial)])
+    digits = "" if trial is None else str(int(trial))  # plain integer digits: 3.0 is "3"
+    assert trial is None or float(trial).is_integer()
+    text = "\u001f".join([run_id, case_id, path, digits])
     return "r_" + hashlib.sha256(text.encode("utf-8")).hexdigest()[:32]
 
 
@@ -45,7 +47,8 @@ def manifest(run_dir):
     return "".join(lines)
 
 
-def seal(run_dir, run, sealed_by, closed_at):
+def seal(run_dir, run, sealed_by, closed_at, allow_open=False):
+    assert allow_open or run["status"] != "running", "only a closed run is sealed"
     text = manifest(run_dir)
     statement = {
         "_type": "https://in-toto.io/Statement/v1",
@@ -55,6 +58,7 @@ def seal(run_dir, run, sealed_by, closed_at):
         ],
         "predicateType": "https://agenteval.dev/evidence/v2",
         "predicate": {
+            "schemaVersion": V,
             "runId": run["runId"],
             "runHash": hashlib.sha256(text.encode("utf-8")).hexdigest(),
             "producer": {"name": run["producer"]["name"], "version": run["producer"]["version"]},
@@ -99,7 +103,7 @@ def overlay_batches(run_dir, run_id, batches):
             "_type": "https://in-toto.io/Statement/v1",
             "subject": [{"name": "overlays/events.ndjson", "digest": {"sha256": hashlib.sha256(chunk).hexdigest()}}],
             "predicateType": "https://agenteval.dev/evidence/v2/overlay-batch",
-            "predicate": {"runId": run_id, "batch": n, "offset": offset, "length": len(chunk), "previous": previous},
+            "predicate": {"schemaVersion": V, "runId": run_id, "batch": n, "offset": offset, "length": len(chunk), "previous": previous},
         })
         previous = {"path": f"overlays/seal-{n:04d}.json", "sha256": hashlib.sha256(seal_path.read_bytes()).hexdigest()}
         offset += len(chunk)
@@ -127,7 +131,7 @@ def completed_eval(run_dir):
         "config": {"thresholds": {"triage": {"op": ">=", "value": 0.8}}, "temperature": 0},
         "startedAt": "2026-10-02T14:02:11.120Z", "endedAt": "2026-10-02T14:06:23.004Z",
         "otel": {"semconvVersion": "1.41.0", "dialects": ["gen_ai"]},
-        "contentCapture": "hashes-only",
+        "contentCapture": "off",
         "costPolicy": {"maxUsd": 3.0, "priceTable": "2026-09-30"},
         "ext": {},
     }
@@ -144,7 +148,7 @@ def completed_eval(run_dir):
          "verdictRule": {"expr": "triage >= threshold", "threshold": 0.8, "source": "run.config.thresholds.triage"},
          "aggregation": {"strategy": "WeightedSum", "threshold": 0.8, "score": 0.55, "rulePath": "threshold",
                          "measured": 2, "total": 3, "minimumMeasuredShare": 0.5,
-                         "unmeasured": {"skipped": 0, "inapplicable": 1, "errored": 0}, "decisive": [helpful]},
+                         "unmeasured": {"not_measured": 0, "not_applicable": 1, "skipped": 0, "errored": 0}, "decisive": [helpful]},
          "evidence": ["E-1"]},
         {"schemaVersion": V, "resultId": policy, "parentResultId": root, "caseId": "case-17", "path": "triage/policy",
          "evaluator": {"id": "code:refund-escalation", "version": "1"}, "state": "passed",
@@ -165,6 +169,18 @@ def completed_eval(run_dir):
          "evaluator": {"id": "llm:groundedness", "version": "1"}, "state": "not_applicable",
          "reason": "No retrieved context was recorded for this case — nothing to ground against.",
          "component": {"weight": 0.0, "required": False}},
+    ] + [
+        # One top-level case per remaining state. The inconclusive reason holds a raw U+2028: inside a JSON string it is
+        # text, not a line break, and an NDJSON reader that splits on it breaks the line.
+        {"schemaVersion": V, "resultId": result_id(run_id, case, "triage"), "parentResultId": None, "caseId": case, "path": "triage",
+         "evaluator": {"id": "composite:triage", "version": "2"}, "state": state, **extra}
+        for case, state, extra in [
+            ("case-18", "warn", {"scores": [{"metric": "triage", "value": 0.78, "normalized": 0.78}]}),
+            ("case-19", "inconclusive", {"reason": "The panel split 1–1\u2028(a third judge timed out)."}),
+            ("case-20", "not_measured", {"reason": "The agent's reply was empty: there was nothing to grade."}),
+            ("case-21", "skipped", {"reason": "Skipped by --max-cases 20."}),
+            ("case-22", "error", {"reason": "The judge returned HTTP 429 three times."}),
+        ]
     ])
     write_json(run_dir / "metrics.json", {"schemaVersion": V, "metrics": [
         {"id": "triage", "kind": "score", "direction": "higher_better", "scale": {"min": 0, "max": 1}},
@@ -277,10 +293,21 @@ def invalid_cases():
          {"schemaVersion": V, "eventId": "ov_2", "kind": "override", "target": {"run": "r-1"}, "state": "passed", "reason": "re-graded",
           "by": {"identity": "git:a@b", "assurance": "self-attested"}, "at": "2026-10-01T00:00:00Z"}, "invalid",
          "an override names the result it changes"),
+        ("run-aborted-end-null", "run", dict(base_run, status="aborted", abortReason="x", endedAt=None), "invalid",
+         "an aborted run has an end time, not null"),
+        ("run-bad-timestamp", "run", dict(base_run, startedAt="yesterdayZ"), "invalid",
+         "a time is RFC 3339 UTC by its pattern, whether or not a validator asserts format"),
+        ("result-id-trailing-newline", "result", dict(base_result, resultId=rid + "\n"), "invalid",
+         "a pattern's end is the end of the string: '$' alone also matches before a final newline"),
+        ("result-case-id-control-char", "result", dict(base_result, caseId="a\u001fb"), "invalid",
+         "caseId and path hold no control character, so the U+001F a result id joins with cannot appear in them"),
+        ("evidence-blob-and-span-id", "evidence",
+         {"schemaVersion": V, "evidenceId": "E-1", "kind": "document", "digest": "sha256:" + "0" * 64,
+          "link": {"blob": "sha256:" + "0" * 64, "spanId": "00f067aa0ba902b7"}}, "invalid", "a link is exactly one of blob, span or uri"),
         ("seal-wrong-predicate-type", "seal",
          {"_type": "https://in-toto.io/Statement/v1", "subject": [{"name": "run.json", "digest": {"sha256": "0" * 64}}],
           "predicateType": "https://slsa.dev/provenance/v1",
-          "predicate": {"runId": "r-1", "runHash": "0" * 64, "producer": {"name": "p", "version": "1"},
+          "predicate": {"schemaVersion": V, "runId": "r-1", "runHash": "0" * 64, "producer": {"name": "p", "version": "1"},
                         "subject": {"ref": "agent:a/b"}, "closedAt": "2026-10-01T00:00:00Z", "sealedBy": "producer"}},
          "invalid", "an AEF seal's predicate type is https://agenteval.dev/evidence/v2"),
     ]
@@ -358,6 +385,85 @@ def seal_vectors(valid):
                                                          "mismatches": [{"path": "metrics.json", "problem": "missing"}]})
 
 
+def seal_vectors_more(valid):
+    out = ROOT / "seal-vectors"
+
+    def copy(name, source="aborted-early"):
+        run = out / name / "run"
+        shutil.copytree(valid / source, run)
+        return run
+
+    def expect(name, verdict, mismatches):
+        write_json(out / name / "expected.json", {"run": f"seal-vectors/{name}/run", "verdict": verdict, "mismatches": mismatches})
+
+    # Paths that only sort right by their UTF-8 bytes (a-b < a.b < a/b; Z < a), and an attestation, never sealed.
+    run = out / "path-order" / "run"
+    shutil.copytree(valid / "aborted-early", run)
+    (run / "seal.json").unlink()
+    for name in ("ext/a.b", "ext/a-b", "ext/a/b", "ext/Z"):  # Z (0x5A) sorts before a: not case-insensitive
+        write_bytes(run / name, f"{name}\n".encode("utf-8"))
+    seal(run, json.loads((run / "run.json").read_text(encoding="utf-8")), "ingest", "2026-10-03T09:00:05Z")
+    write_json(run / "attestation.dsse.json", {"payloadType": "application/vnd.in-toto+json", "payload": "", "signatures": []})
+    write_bytes(out / "path-order" / "expected-manifest.txt", manifest(run).encode("utf-8"))
+    expect("path-order", "match", [])
+
+    # The seal's run hash is wrong although every file matches its subject.
+    run = copy("wrong-run-hash")
+    statement = json.loads((run / "seal.json").read_text(encoding="utf-8"))
+    statement["predicate"]["runHash"] = "0" * 64
+    write_json(run / "seal.json", statement)
+    expect("wrong-run-hash", "mismatch", [{"path": "seal.json", "problem": "run-hash"}])
+
+    # The seal names another run.
+    run = copy("other-run-id")
+    statement = json.loads((run / "seal.json").read_text(encoding="utf-8"))
+    statement["predicate"]["runId"] = "another-run"
+    write_json(run / "seal.json", statement)
+    expect("other-run-id", "mismatch", [{"path": "seal.json", "problem": "run-id"}])
+
+    # A subject listed twice.
+    run = copy("duplicate-subject")
+    statement = json.loads((run / "seal.json").read_text(encoding="utf-8"))
+    statement["subject"].append(dict(statement["subject"][0]))
+    write_json(run / "seal.json", statement)
+    expect("duplicate-subject", "mismatch", [{"path": statement["subject"][0]["name"], "problem": "duplicate-subject"}])
+
+    # A run sealed while it was still running.
+    run = out / "open-run" / "run"
+    shutil.copytree(valid / "running-trials", run)
+    seal(run, json.loads((run / "run.json").read_text(encoding="utf-8")), "producer", "2026-10-04T10:05:00Z", allow_open=True)
+    expect("open-run", "mismatch", [{"path": "run.json", "problem": "run-open"}])
+
+    # The overlay chain: a byte changed inside batch 1, batch 1's seal missing, bytes appended after the last batch.
+    chain = ROOT / "chain-vectors"
+    if chain.exists():
+        shutil.rmtree(chain)
+
+    def chain_copy(name):
+        run = chain / name / "run"
+        shutil.copytree(valid / "completed-eval", run)
+        return run
+
+    def chain_expect(name, problems):
+        write_json(chain / name / "expected.json", {"run": f"chain-vectors/{name}/run", "problems": problems})
+
+    run = chain_copy("altered-batch")
+    events = run / "overlays" / "events.ndjson"
+    events.write_bytes(events.read_bytes().replace(b"strictly", b"strict!y", 1))
+    chain_expect("altered-batch", [{"path": "overlays/seal-0001.json", "problem": "batch-digest"}])
+
+    run = chain_copy("missing-seal")
+    (run / "overlays" / "seal-0001.json").unlink()
+    chain_expect("missing-seal", [{"path": "overlays/events.ndjson", "problem": "uncovered"},
+                                  {"path": "overlays/seal-0001.json", "problem": "missing"},
+                                  {"path": "overlays/seal-0002.json", "problem": "previous"}])
+
+    run = chain_copy("unsealed-tail")
+    events = run / "overlays" / "events.ndjson"
+    events.write_bytes(events.read_bytes() + b'{"schemaVersion":"2.0","eventId":"ov_0003","kind":"annotate","target":{"run":"x"},"by":{"identity":"git:a@b","assurance":"self-attested"},"at":"2026-10-02T16:00:00Z"}\n')
+    chain_expect("unsealed-tail", [{"path": "overlays/events.ndjson", "problem": "uncovered"}])
+
+
 def main():
     # Only what this script writes: decision-vectors/ are hand-written and stay.
     for owned in ("valid", "invalid", "seal-vectors"):
@@ -373,6 +479,7 @@ def main():
         write_json(ROOT / "invalid" / name / "expected.json", {"schema": schema, "writer": "invalid", "reader": reader, "rule": rule})
 
     seal_vectors(valid)
+    seal_vectors_more(valid)
 
     if (ROOT / "checkpoints").exists():
         shutil.rmtree(ROOT / "checkpoints")
@@ -385,7 +492,8 @@ def main():
         ("01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10", "case-17", "triage/helpfulness", None),
         ("r-1", "case-3", "booking", 0),
         ("r-1", "case-3", "booking", 12),
-        ("ラン-1", "casé-été", "مرحبا/—", None),
+        ("run-7", "casé-été ラン", "مرحبا/—", None),
+        ("run-7", "case-3", "booking", 3.0),
     ]]
     write_json(ROOT / "result-ids.json", [
         {"runId": r, "caseId": c, "path": p, "trial": t, "resultId": result_id(r, c, p, t)} for r, c, p, t in vectors])

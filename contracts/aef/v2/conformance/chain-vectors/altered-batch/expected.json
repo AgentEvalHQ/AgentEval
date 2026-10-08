@@ -1,0 +1,9 @@
+{
+  "run": "chain-vectors/altered-batch/run",
+  "problems": [
+    {
+      "path": "overlays/seal-0001.json",
+      "problem": "batch-digest"
+    }
+  ]
+}

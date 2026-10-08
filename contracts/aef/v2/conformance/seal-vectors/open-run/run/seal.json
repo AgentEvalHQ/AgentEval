@@ -1,0 +1,44 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "metrics.json",
+      "digest": {
+        "sha256": "a0464e73de7f04a398117edff7049614cc3ad5c8f261172d69f0fd57d627b034"
+      }
+    },
+    {
+      "name": "results.ndjson",
+      "digest": {
+        "sha256": "af451a56342bde434f4e964d51f51ed5bd31f7b24e49c4251510f5d5d7814bec"
+      }
+    },
+    {
+      "name": "run.json",
+      "digest": {
+        "sha256": "3ffcb28e3afceb66f28e7b2a6fe8b90410fd0c0fcf0734d77756c31a8b6cba38"
+      }
+    }
+  ],
+  "predicateType": "https://agenteval.dev/evidence/v2",
+  "predicate": {
+    "schemaVersion": "2.0",
+    "runId": "01928f40-1111-7111-8111-111111111111",
+    "runHash": "b88e5d4905e72a3890057c13d82093dfe78bf6accba9d1ad4ce04223396373b3",
+    "producer": {
+      "name": "agenteval-py",
+      "version": "0.1.0a1"
+    },
+    "subject": {
+      "ref": "workflow:travel/trip-planner"
+    },
+    "deployment": null,
+    "suite": {
+      "ref": "suite:travel/bookings",
+      "version": "1"
+    },
+    "judges": [],
+    "closedAt": "2026-10-04T10:05:00Z",
+    "sealedBy": "producer"
+  }
+}

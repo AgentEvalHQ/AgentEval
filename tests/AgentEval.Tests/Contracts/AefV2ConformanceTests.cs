@@ -78,12 +78,13 @@ public class AefV2ConformanceTests
                     }
                     else if (key == "enum")
                     {
-                        result["type"] = "string";
+                        // Open: an unknown value reads as "other". A nullable enum stays nullable.
+                        result["type"] = obj["type"] is JsonArray types ? types.DeepClone() : "string";
                     }
                     else if (key == "const" && value is JsonValue c && c.TryGetValue<string>(out var s) && s == "2.0")
                     {
                         result["type"] = "string";
-                        result["pattern"] = "^2\\.[0-9]+$";
+                        result["pattern"] = "^2\\.[0-9]+(?!\\n)$";
                     }
                     else if (key is "if" or "not")
                     {
@@ -141,6 +142,83 @@ public class AefV2ConformanceTests
         }
     }
 
+    [Theory]
+    [MemberData(nameof(ValidRuns))]
+    public void AValidRun_HasItsRequiredFiles_AndItsReferencesResolve(string name)
+    {
+        var run = Path.Combine(Conformance, "valid", name);
+        var header = JsonNode.Parse(File.ReadAllText(Path.Combine(run, "run.json")))!;
+        var closed = (string)header["status"]! != "running";
+
+        foreach (var required in closed
+                     ? new[] { "run.json", "results.ndjson", "metrics.json", "summary.json", "seal.json" }
+                     : ["run.json", "results.ndjson", "metrics.json"])
+        {
+            Assert.True(File.Exists(Path.Combine(run, required)), $"{name}: {required} is required");
+        }
+
+        // The cross-file rules a reader checks (v2/README.md, 'Rules across files').
+        var results = NdjsonLines(Path.Combine(run, "results.ndjson")).Select(l => JsonNode.Parse(l)!).ToList();
+        var ids = results.Select(r => (string)r["resultId"]!).ToList();
+        Assert.Equal(ids.Count, ids.Distinct(StringComparer.Ordinal).Count());
+        var evidence = File.Exists(Path.Combine(run, "evidence.ndjson"))
+            ? NdjsonLines(Path.Combine(run, "evidence.ndjson")).Select(l => JsonNode.Parse(l)!).ToList()
+            : [];
+        var evidenceIds = evidence.Select(e => (string)e["evidenceId"]!).ToHashSet(StringComparer.Ordinal);
+        foreach (var r in results)
+        {
+            if ((string?)r["parentResultId"] is { } parent) Assert.Contains(parent, ids);
+            foreach (var cited in r["evidence"]?.AsArray() ?? []) Assert.Contains((string)cited!, evidenceIds);
+            foreach (var decisive in r["aggregation"]?["decisive"]?.AsArray() ?? []) Assert.Contains((string)decisive!, ids);
+            if (r["reasoning"] is { } reasoning)
+            {
+                var blob = Blob(run, (string)reasoning["blob"]!);
+                Assert.Equal((long)reasoning["bytes"]!, new FileInfo(blob).Length);
+            }
+        }
+
+        if (File.Exists(Path.Combine(run, "gates.ndjson")))
+        {
+            foreach (var gate in NdjsonLines(Path.Combine(run, "gates.ndjson")).Select(l => JsonNode.Parse(l)!))
+            {
+                foreach (var named in (gate["inputs"]?["results"]?.AsArray() ?? []).Concat(gate["decisive"]?.AsArray() ?? []))
+                    Assert.Contains((string)named!, ids);
+            }
+        }
+
+        foreach (var e in evidence.Where(e => e["link"]?["blob"] is not null))
+        {
+            Assert.True(File.Exists(Blob(run, (string)e["link"]!["blob"]!)), $"{name}: evidence {e["evidenceId"]} blob");
+        }
+    }
+
+    [Theory]
+    [MemberData(nameof(ValidRuns))]
+    public void NdjsonFiles_AreLfOnly_WithoutBom_AndEndInANewline(string name)
+    {
+        // NdjsonLines asserts the rules; a U+2028 inside a string is content, not a line break.
+        var run = Path.Combine(Conformance, "valid", name);
+        foreach (var file in Directory.GetFiles(run, "*.ndjson", SearchOption.AllDirectories))
+        {
+            foreach (var line in NdjsonLines(file))
+            {
+                Assert.NotNull(JsonNode.Parse(line));
+            }
+        }
+    }
+
+    [Fact]
+    public void TheCorpus_HoldsEveryResultState_AndALineSeparatorInsideAString()
+    {
+        var lines = Directory.GetFiles(Path.Combine(Conformance, "valid"), "results.ndjson", SearchOption.AllDirectories)
+            .SelectMany(NdjsonLines).ToList();
+
+        Assert.Equal(
+            ["error", "failed", "inconclusive", "not_applicable", "not_measured", "passed", "pending", "skipped", "warn"],
+            lines.Select(l => (string)JsonNode.Parse(l)!["state"]!).Distinct().Order(StringComparer.Ordinal));
+        Assert.Contains(lines, l => l.Contains('\u2028'));
+    }
+
     public static TheoryData<string> InvalidDocuments() => new(Directory.GetDirectories(Path.Combine(Conformance, "invalid")).Select(Path.GetFileName)!);
 
     [Theory]
@@ -153,8 +231,7 @@ public class AefV2ConformanceTests
         var document = JsonNode.Parse(File.ReadAllText(Path.Combine(dir, "document.json")));
 
         Assert.False(Writer.Value.IsValid(schema, document, out _), $"{name}: the writer schema accepted it ({expected["rule"]})");
-        Assert.Equal((string)expected["reader"]! == "valid", Reader.Value.IsValid(schema, document, out var errors));
-        _ = errors;
+        Assert.Equal((string)expected["reader"]! == "valid", Reader.Value.IsValid(schema, document, out _));
     }
 
     /// <summary>Every JSON document of a run folder and the schema it answers to.</summary>
@@ -162,7 +239,7 @@ public class AefV2ConformanceTests
     {
         IEnumerable<(string, JsonNode?, string)> Lines(string file, string schema) =>
             File.Exists(Path.Combine(run, file))
-                ? File.ReadAllLines(Path.Combine(run, file), Encoding.UTF8).Select((l, i) => (schema, JsonNode.Parse(l), $"{file}:{i + 1}"))
+                ? NdjsonLines(Path.Combine(run, file)).Select((l, i) => (schema, JsonNode.Parse(l), $"{file}:{i + 1}"))
                 : [];
 
         yield return ("run", JsonNode.Parse(File.ReadAllText(Path.Combine(run, "run.json"))), "run.json");
@@ -183,6 +260,27 @@ public class AefV2ConformanceTests
         }
     }
 
+    /// <summary>An NDJSON file's lines, split on LF only, asserting the format's rules.</summary>
+    private static List<string> NdjsonLines(string file)
+    {
+        var bytes = File.ReadAllBytes(file);
+        if (bytes.Length == 0)
+            return [];
+
+        Assert.False(bytes is [0xEF, 0xBB, 0xBF, ..], $"{file}: a byte-order mark");
+        Assert.DoesNotContain((byte)'\r', bytes);
+        Assert.Equal((byte)'\n', bytes[^1]);
+        var lines = Encoding.UTF8.GetString(bytes, 0, bytes.Length - 1).Split('\n');
+        Assert.DoesNotContain(lines, l => l.Length == 0);
+        return [.. lines];
+    }
+
+    private static string Blob(string run, string uri)
+    {
+        var hex = uri["sha256:".Length..];
+        return Path.Combine(run, "blobs", "sha256", hex[..2], hex);
+    }
+
     // ------------------------------------------------------------------ result ids
 
     [Fact]
@@ -190,10 +288,10 @@ public class AefV2ConformanceTests
     {
         var vectors = JsonNode.Parse(File.ReadAllText(Path.Combine(Conformance, "result-ids.json")))!.AsArray();
 
-        Assert.NotEmpty(vectors);
+        Assert.Contains(vectors, v => v!["trial"] is JsonValue t && t.ToJsonString().Contains('.'));   // a trial written as 3.0
         foreach (var v in vectors)
         {
-            Assert.Equal((string)v!["resultId"]!, ResultId((string)v["runId"]!, (string)v["caseId"]!, (string)v["path"]!, (int?)v["trial"]));
+            Assert.Equal((string)v!["resultId"]!, ResultId((string)v["runId"]!, (string)v["caseId"]!, (string)v["path"]!, v["trial"]));
         }
     }
 
@@ -204,43 +302,55 @@ public class AefV2ConformanceTests
         var run = Path.Combine(Conformance, "valid", name);
         var runId = (string)JsonNode.Parse(File.ReadAllText(Path.Combine(run, "run.json")))!["runId"]!;
 
-        foreach (var line in File.ReadAllLines(Path.Combine(run, "results.ndjson"), Encoding.UTF8))
+        foreach (var line in NdjsonLines(Path.Combine(run, "results.ndjson")))
         {
             var r = JsonNode.Parse(line)!;
-            Assert.Equal(ResultId(runId, (string)r["caseId"]!, (string)r["path"]!, (int?)r["trial"]), (string)r["resultId"]!);
+            Assert.Equal(ResultId(runId, (string)r["caseId"]!, (string)r["path"]!, r["trial"]), (string)r["resultId"]!);
         }
     }
 
-    private static string ResultId(string runId, string caseId, string path, int? trial) =>
-        "r_" + Hex(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\u001f', runId, caseId, path, trial?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? ""))))[..32];
+    /// <summary>The trial's plain integer digits: a reader normalises 3.0 to "3".</summary>
+    private static string ResultId(string runId, string caseId, string path, JsonNode? trial)
+    {
+        var digits = trial is null ? "" : decimal.Parse(trial.ToJsonString(), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture) is var d && d == decimal.Truncate(d)
+            ? decimal.Truncate(d).ToString(System.Globalization.CultureInfo.InvariantCulture)
+            : throw new FormatException($"trial {trial} is not an integer");
+        return "r_" + Hex(SHA256.HashData(Encoding.UTF8.GetBytes(string.Join('\u001f', runId, caseId, path, digits))))[..32];
+    }
 
     // ------------------------------------------------------------------ the seal
 
-    [Theory]
-    [InlineData("completed-eval")]
-    [InlineData("aborted-early")]
-    public void ASealedRun_HasTheManifest_AndTheRunHash_TheVectorsGive(string name)
-    {
-        var run = Path.Combine(Conformance, "valid", name);
-        var manifest = Manifest(run);
-        var seal = JsonNode.Parse(File.ReadAllText(Path.Combine(run, "seal.json")))!;
-
-        Assert.Equal(File.ReadAllText(Path.Combine(Conformance, "seal-vectors", name, "expected-manifest.txt"), Encoding.UTF8), manifest);
-        Assert.Equal(Hex(SHA256.HashData(Encoding.UTF8.GetBytes(manifest))), (string)seal["predicate"]!["runHash"]!);
-        Assert.Empty(Verify(run));
-    }
+    public static TheoryData<string> SealVectors() =>
+        new(Directory.GetDirectories(Path.Combine(Conformance, "seal-vectors")).Select(Path.GetFileName)!);
 
     [Theory]
-    [InlineData("tampered")]
-    [InlineData("added-file")]
-    [InlineData("missing-file")]
-    public void AChangedRun_FailsVerification_NamingWhatChanged(string name)
+    [MemberData(nameof(SealVectors))]
+    public void ASealVector_VerifiesWithExactlyTheExpectedDifferences(string name)
     {
         var dir = Path.Combine(Conformance, "seal-vectors", name);
-        var expected = JsonNode.Parse(File.ReadAllText(Path.Combine(dir, "expected.json")))!["mismatches"]!.AsArray()
-            .Select(m => ((string)m!["path"]!, (string)m["problem"]!));
+        var expected = JsonNode.Parse(File.ReadAllText(Path.Combine(dir, "expected.json")))!;
+        var run = Path.Combine(Conformance, ((string)expected["run"]!).Replace('/', Path.DirectorySeparatorChar));
+        var mismatches = expected["mismatches"]!.AsArray().Select(m => ((string)m!["path"]!, (string)m["problem"]!)).ToList();
 
-        Assert.Equal(expected, Verify(Path.Combine(dir, "run")));
+        Assert.Equal(mismatches, Verify(run));
+        Assert.Equal((string)expected["verdict"]! == "match", mismatches.Count == 0);
+        if (File.Exists(Path.Combine(dir, "expected-manifest.txt")))
+        {
+            var manifest = Manifest(run);
+            Assert.Equal(File.ReadAllText(Path.Combine(dir, "expected-manifest.txt"), Encoding.UTF8), manifest);
+            Assert.Equal(Hex(SHA256.HashData(Encoding.UTF8.GetBytes(manifest))),
+                (string)JsonNode.Parse(File.ReadAllText(Path.Combine(run, "seal.json")))!["predicate"]!["runHash"]!);
+        }
+    }
+
+    [Fact]
+    public void TheSealVectors_CoverEveryKindOfDifference()
+    {
+        var problems = Directory.GetFiles(Path.Combine(Conformance, "seal-vectors"), "expected.json", SearchOption.AllDirectories)
+            .SelectMany(f => JsonNode.Parse(File.ReadAllText(f))!["mismatches"]!.AsArray().Select(m => (string)m!["problem"]!))
+            .Distinct().Order(StringComparer.Ordinal);
+
+        Assert.Equal(["digest", "duplicate-subject", "missing", "not-sealed", "run-hash", "run-id", "run-open"], problems);
     }
 
     [Fact]
@@ -255,32 +365,7 @@ public class AefV2ConformanceTests
         Assert.Equal(Path.GetFileName(blob), Hex(SHA256.HashData(bytes)));
     }
 
-    [Fact]
-    public void OverlayBatches_FormAChainOverTheWholeEventsFile()
-    {
-        var overlays = Path.Combine(Conformance, "valid", "completed-eval", "overlays");
-        var events = File.ReadAllBytes(Path.Combine(overlays, "events.ndjson"));
-        var seals = Directory.GetFiles(overlays, "seal-*.json").Order(StringComparer.Ordinal).ToList();
-
-        long offset = 0;
-        string? previous = null;
-        for (var i = 0; i < seals.Count; i++)
-        {
-            var p = JsonNode.Parse(File.ReadAllText(seals[i]))!;
-            var predicate = p["predicate"]!;
-            var length = (int)predicate["length"]!;
-            Assert.Equal(i + 1, (int)predicate["batch"]!);
-            Assert.Equal(offset, (long)predicate["offset"]!);
-            Assert.Equal(Hex(SHA256.HashData(events.AsSpan((int)offset, length))), (string)p["subject"]![0]!["digest"]!["sha256"]!);
-            Assert.Equal(previous, (string?)predicate["previous"]?["sha256"]);
-            previous = Hex(SHA256.HashData(File.ReadAllBytes(seals[i])));
-            offset += length;
-        }
-
-        Assert.Equal(events.Length, offset);
-    }
-
-    /// <summary>The manifest text over a run's sealed files (v2/README.md, 'Sealing').</summary>
+    /// <summary>The manifest over a run's sealed files, ordered by the UTF-8 bytes of their paths (v2/README.md, 'Sealing').</summary>
     private static string Manifest(string run)
     {
         var sb = new StringBuilder();
@@ -293,28 +378,146 @@ public class AefV2ConformanceTests
         return sb.ToString();
     }
 
-    private static IEnumerable<string> SealedFiles(string run) =>
+    private static readonly Comparer<string> Utf8Order = Comparer<string>.Create((a, b) =>
+        Encoding.UTF8.GetBytes(a).AsSpan().SequenceCompareTo(Encoding.UTF8.GetBytes(b)));
+
+    private static List<string> SealedFiles(string run) =>
         Directory.GetFiles(run, "*", SearchOption.AllDirectories)
             .Select(f => Path.GetRelativePath(run, f).Replace('\\', '/'))
             .Where(rel => rel is not ("seal.json" or "attestation.dsse.json") && !rel.StartsWith("overlays/", StringComparison.Ordinal))
-            .OrderBy(rel => rel, StringComparer.Ordinal);
+            .Order(Utf8Order)
+            .ToList();
 
-    /// <summary>Recomputes a run's seal: (path, digest | not-sealed | missing) for every difference, ordered by path.</summary>
+    /// <summary>
+    /// Verifies a run's seal (v2/README.md, 'Sealing', step 6): every difference as (path, problem), ordered by path then
+    /// problem. digest / not-sealed / missing compare the files with the subjects; run-hash is reported when the files
+    /// match but the run hash does not; run-id, duplicate-subject and run-open are the statement's own errors.
+    /// </summary>
     private static List<(string Path, string Problem)> Verify(string run)
     {
         var seal = JsonNode.Parse(File.ReadAllText(Path.Combine(run, "seal.json")))!;
-        var sealedDigests = seal["subject"]!.AsArray().ToDictionary(s => (string)s!["name"]!, s => (string)s!["digest"]!["sha256"]!, StringComparer.Ordinal);
-        var present = SealedFiles(run).ToHashSet(StringComparer.Ordinal);
+        Assert.True(Reader.Value.IsValid("seal", seal, out var errors), $"seal.json: {errors}");
+        var header = JsonNode.Parse(File.ReadAllText(Path.Combine(run, "run.json")))!;
         var problems = new List<(string, string)>();
-        foreach (var rel in present.Union(sealedDigests.Keys).Order(StringComparer.Ordinal))
+
+        var names = seal["subject"]!.AsArray().Select(s => (string)s!["name"]!).ToList();
+        foreach (var duplicate in names.GroupBy(n => n, StringComparer.Ordinal).Where(g => g.Count() > 1))
+            problems.Add((duplicate.Key, "duplicate-subject"));
+        var sealedDigests = seal["subject"]!.AsArray()
+            .GroupBy(s => (string)s!["name"]!, StringComparer.Ordinal)
+            .ToDictionary(g => g.Key, g => (string)g.First()!["digest"]!["sha256"]!, StringComparer.Ordinal);
+
+        var present = SealedFiles(run).ToHashSet(StringComparer.Ordinal);
+        var fileProblems = 0;
+        foreach (var rel in present.Union(sealedDigests.Keys))
         {
-            if (!sealedDigests.TryGetValue(rel, out var digest)) problems.Add((rel, "not-sealed"));
-            else if (!present.Contains(rel)) problems.Add((rel, "missing"));
-            else if (digest != Hex(SHA256.HashData(File.ReadAllBytes(Path.Combine(run, rel))))) problems.Add((rel, "digest"));
+            string? problem = !sealedDigests.TryGetValue(rel, out var digest) ? "not-sealed"
+                : !present.Contains(rel) ? "missing"
+                : digest != Hex(SHA256.HashData(File.ReadAllBytes(Path.Combine(run, rel)))) ? "digest"
+                : null;
+            if (problem is not null)
+            {
+                problems.Add((rel, problem));
+                fileProblems++;
+            }
         }
 
-        return problems;
+        if (fileProblems == 0 && Hex(SHA256.HashData(Encoding.UTF8.GetBytes(Manifest(run)))) != (string)seal["predicate"]!["runHash"]!)
+            problems.Add(("seal.json", "run-hash"));
+        if ((string)seal["predicate"]!["runId"]! != (string)header["runId"]!)
+            problems.Add(("seal.json", "run-id"));
+        if ((string)header["status"]! == "running")
+            problems.Add(("run.json", "run-open"));
+
+        return [.. problems.OrderBy(p => p.Item1, Utf8Order).ThenBy(p => p.Item2, StringComparer.Ordinal)];
     }
+
+    // ------------------------------------------------------------------ the overlay chain
+
+    [Fact]
+    public void AValidRunsOverlayBatches_FormAnUnbrokenChain() =>
+        Assert.Empty(VerifyChain(Path.Combine(Conformance, "valid", "completed-eval")));
+
+    public static TheoryData<string> ChainVectors() =>
+        new(Directory.GetDirectories(Path.Combine(Conformance, "chain-vectors")).Select(Path.GetFileName)!);
+
+    [Theory]
+    [MemberData(nameof(ChainVectors))]
+    public void ABrokenChain_IsReported_WithExactlyTheExpectedProblems(string name)
+    {
+        var expected = JsonNode.Parse(File.ReadAllText(Path.Combine(Conformance, "chain-vectors", name, "expected.json")))!;
+        var run = Path.Combine(Conformance, ((string)expected["run"]!).Replace('/', Path.DirectorySeparatorChar));
+
+        Assert.Equal(expected["problems"]!.AsArray().Select(p => ((string)p!["path"]!, (string)p["problem"]!)), VerifyChain(run));
+    }
+
+    /// <summary>
+    /// Verifies the overlay batches (v2/README.md, 'Overlays'): every seal from 1 to the last present, each batch's
+    /// number, run id, offset, digest, line boundary and previous seal, and that the batches cover the events file.
+    /// </summary>
+    private static List<(string Path, string Problem)> VerifyChain(string run)
+    {
+        var overlays = Path.Combine(run, "overlays");
+        var runId = (string)JsonNode.Parse(File.ReadAllText(Path.Combine(run, "run.json")))!["runId"]!;
+        var events = File.ReadAllBytes(Path.Combine(overlays, "events.ndjson"));
+        var last = Directory.GetFiles(overlays, "seal-*.json").Select(f => int.Parse(Path.GetFileNameWithoutExtension(f)[5..], System.Globalization.CultureInfo.InvariantCulture)).Max();
+        var problems = new List<(string, string)>();
+        var covered = new List<(long From, long To)>();
+        long expectedOffset = 0;
+        for (var n = 1; n <= last; n++)
+        {
+            var name = $"overlays/seal-{n:D4}.json";
+            var file = Path.Combine(overlays, $"seal-{n:D4}.json");
+            if (!File.Exists(file))
+            {
+                problems.Add((name, "missing"));
+                expectedOffset = -1;   // unknown until the next batch says where it starts
+                continue;
+            }
+
+            var statement = JsonNode.Parse(File.ReadAllText(file))!;
+            Assert.True(Reader.Value.IsValid("overlay-seal", statement, out var errors), $"{name}: {errors}");
+            var p = statement["predicate"]!;
+            long offset = (long)p["offset"]!, length = (long)p["length"]!;
+            if ((int)p["batch"]! != n) problems.Add((name, "batch-number"));
+            if ((string)p["runId"]! != runId) problems.Add((name, "run-id"));
+            if (expectedOffset >= 0 && offset != expectedOffset) problems.Add((name, "offset"));
+            // Coverage is what the batches claim; whether a claimed range still holds its bytes is batch-digest.
+            if (offset + length > events.Length || events[(int)(offset + length - 1)] != (byte)'\n' || (offset > 0 && events[(int)offset - 1] != (byte)'\n'))
+            {
+                problems.Add((name, "line-boundary"));
+            }
+            else
+            {
+                covered.Add((offset, offset + length));
+                if (Hex(SHA256.HashData(events.AsSpan((int)offset, (int)length).ToArray())) != (string)statement["subject"]![0]!["digest"]!["sha256"]!)
+                    problems.Add((name, "batch-digest"));
+            }
+
+            var previous = p["previous"];
+            var previousFile = Path.Combine(overlays, $"seal-{n - 1:D4}.json");
+            var previousOk = n == 1
+                ? previous is null
+                : previous is not null && (string)previous["path"]! == $"overlays/seal-{n - 1:D4}.json" && File.Exists(previousFile)
+                  && (string)previous["sha256"]! == Hex(SHA256.HashData(File.ReadAllBytes(previousFile)));
+            if (!previousOk) problems.Add((name, "previous"));
+            expectedOffset = offset + length;
+        }
+
+        long reach = 0;
+        foreach (var (from, to) in covered.OrderBy(c => c.From))
+        {
+            if (from != reach) break;
+            reach = to;
+        }
+
+        if (reach != events.Length)
+            problems.Add(("overlays/events.ndjson", "uncovered"));
+
+        return [.. problems.OrderBy(p => p.Item1, Utf8Order).ThenBy(p => p.Item2, StringComparer.Ordinal)];
+    }
+
+    // ------------------------------------------------------------------ profiles
 
     [Fact]
     public void TheRuntimeVerdictProfile_IsTheAevpSchemaTheLibraryShips()
@@ -327,6 +530,4 @@ public class AefV2ConformanceTests
     }
 
     private static string Hex(byte[] bytes) => Convert.ToHexString(bytes).ToLowerInvariant();
-
-    private static string Hex(ReadOnlySpan<byte> bytes) => Hex(bytes.ToArray());
 }

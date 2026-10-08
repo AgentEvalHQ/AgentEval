@@ -28,6 +28,7 @@
   ],
   "predicateType": "https://agenteval.dev/evidence/v2",
   "predicate": {
+    "schemaVersion": "2.0",
     "runId": "01928f3f-0000-7000-8000-000000000001",
     "runHash": "cceb139db7d179975afbcf1c5ea7a2732500f1258f33f55f93de167d3d9442be",
     "producer": {

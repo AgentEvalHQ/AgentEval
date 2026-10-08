@@ -5,30 +5,133 @@
   "description": "One piece of evidence a result cites: what it is, its digest, and where to find it.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "evidenceId", "kind", "digest", "link"],
+  "required": [
+    "schemaVersion",
+    "evidenceId",
+    "kind",
+    "digest",
+    "link"
+  ],
   "properties": {
-    "schemaVersion": { "$ref": "common.schema.json#/$defs/schemaVersion" },
-    "evidenceId": { "$ref": "common.schema.json#/$defs/evidenceId" },
-    "kind": { "enum": ["span", "tool_call", "judge_reasoning", "compliance_artifact", "document", "other"] },
-    "digest": { "$ref": "common.schema.json#/$defs/sha256Uri" },
+    "schemaVersion": {
+      "$ref": "common.schema.json#/$defs/schemaVersion"
+    },
+    "evidenceId": {
+      "$ref": "common.schema.json#/$defs/evidenceId"
+    },
+    "kind": {
+      "enum": [
+        "span",
+        "tool_call",
+        "judge_reasoning",
+        "compliance_artifact",
+        "document",
+        "other"
+      ]
+    },
+    "digest": {
+      "$ref": "common.schema.json#/$defs/sha256Uri"
+    },
     "link": {
       "description": "Exactly one of: a blob in this run, a span in traces.otlp.jsonl, or a URI outside the run.",
       "type": "object",
       "additionalProperties": false,
       "minProperties": 1,
       "properties": {
-        "blob": { "$ref": "common.schema.json#/$defs/sha256Uri" },
-        "traceId": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
-        "spanId": { "type": "string", "pattern": "^[0-9a-f]{16}$" },
-        "uri": { "type": "string", "format": "uri", "maxLength": 2048 }
+        "blob": {
+          "$ref": "common.schema.json#/$defs/sha256Uri"
+        },
+        "traceId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "maxLength": 32
+        },
+        "spanId": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{16}$",
+          "maxLength": 16
+        },
+        "uri": {
+          "$ref": "common.schema.json#/$defs/uri"
+        }
       },
       "oneOf": [
-        { "required": ["blob"], "not": { "anyOf": [ { "required": ["traceId"] }, { "required": ["uri"] } ] } },
-        { "required": ["traceId", "spanId"], "not": { "anyOf": [ { "required": ["blob"] }, { "required": ["uri"] } ] } },
-        { "required": ["uri"], "not": { "anyOf": [ { "required": ["blob"] }, { "required": ["traceId"] } ] } }
+        {
+          "required": [
+            "blob"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "traceId"
+                ]
+              },
+              {
+                "required": [
+                  "spanId"
+                ]
+              },
+              {
+                "required": [
+                  "uri"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "required": [
+            "traceId",
+            "spanId"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "blob"
+                ]
+              },
+              {
+                "required": [
+                  "uri"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "required": [
+            "uri"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "blob"
+                ]
+              },
+              {
+                "required": [
+                  "traceId"
+                ]
+              },
+              {
+                "required": [
+                  "spanId"
+                ]
+              }
+            ]
+          }
+        }
       ]
     },
-    "description": { "type": "string", "maxLength": 1024 },
-    "ext": { "$ref": "common.schema.json#/$defs/ext" }
+    "description": {
+      "type": "string",
+      "maxLength": 1024
+    },
+    "ext": {
+      "$ref": "common.schema.json#/$defs/ext"
+    }
   }
 }

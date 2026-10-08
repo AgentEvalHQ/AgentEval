@@ -1,0 +1,39 @@
+{
+  "schemaVersion": "2.0",
+  "metrics": [
+    {
+      "id": "triage",
+      "kind": "score",
+      "direction": "higher_better",
+      "scale": {
+        "min": 0,
+        "max": 1
+      }
+    },
+    {
+      "id": "policy",
+      "kind": "verdict",
+      "direction": "higher_better",
+      "scale": {
+        "min": 0,
+        "max": 1
+      }
+    },
+    {
+      "id": "helpfulness",
+      "kind": "score",
+      "direction": "higher_better",
+      "scale": {
+        "min": 0,
+        "max": 1
+      }
+    },
+    {
+      "id": "costUsd",
+      "kind": "cost",
+      "direction": "none",
+      "scale": "unbounded",
+      "unit": "USD"
+    }
+  ]
+}
