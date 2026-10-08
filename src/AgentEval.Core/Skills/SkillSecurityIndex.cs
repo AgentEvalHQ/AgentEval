@@ -34,8 +34,8 @@ public sealed record SkillSecurityIndexInputs(
 /// <param name="Score">The composite 0-100 score — the unweighted mean of the axes actually measured. <see langword="null"/> when NO axis was supplied (nothing to score).</param>
 /// <param name="AxesMeasured">How many of the 3 possible axes contributed (0-3).</param>
 /// <param name="ComplianceComponent">The 0-100 compliance component, or <see langword="null"/> if not supplied.</param>
-/// <param name="EfficiencyComponent">The 0-100 efficiency component, or <see langword="null"/> if not supplied.</param>
-/// <param name="SecurityComponent">The 0-100 security component, or <see langword="null"/> if not supplied.</param>
+/// <param name="EfficiencyComponent">The 0-100 efficiency component, or <see langword="null"/> if not supplied or supplied but not measured (a not-measured or non-finite metric).</param>
+/// <param name="SecurityComponent">The 0-100 security component, or <see langword="null"/> if not supplied or supplied with no data (no probe run and no drift finding).</param>
 /// <param name="Explanation">Human-readable summary — states plainly which axes were/weren't measured (never silently treats a missing axis as a perfect score).</param>
 public sealed record SkillSecurityIndexResult(
     double? Score, int AxesMeasured,
@@ -53,8 +53,9 @@ public sealed record SkillSecurityIndexResult(
 /// <remarks>
 /// <b>Honesty discipline:</b> a missing axis is NEVER treated as perfect (100) or silently dropped from
 /// the explanation — it is reported as un-measured, and the composite score is the mean of only the axes
-/// actually supplied (<see cref="SkillSecurityIndexResult.AxesMeasured"/>). Scoring zero axes returns a
-/// <see langword="null"/> score, not a fabricated number.
+/// actually measured (<see cref="SkillSecurityIndexResult.AxesMeasured"/>). An axis supplied without a measurement
+/// (a not-measured efficiency metric, a security outcome with no probe and no drift) counts as not measured, with
+/// its reason in the explanation. Scoring zero axes returns a <see langword="null"/> score, not a fabricated number.
 /// </remarks>
 public static class SkillSecurityIndex
 {
@@ -110,8 +111,11 @@ public static class SkillSecurityIndex
         (securityComponent is not null ? measuredAxes : missingAxes).Add(
             inputs.Security is not null && securityComponent is null ? "security (no probe run and no drift check finding)" : "security");
 
+        var suppliedUnmeasured = missingAxes.Where(a => a.Contains('(', StringComparison.Ordinal)).ToList();
         var explanation = components.Count == 0
-            ? "No axis was supplied — nothing to score. Run the Phase 2 scanner, the Phase 1 metric, and/or a Phase 3 red-team pass first."
+            ? suppliedUnmeasured.Count > 0
+                ? $"Nothing to score: no axis was measured. NOT measured: {string.Join(", ", missingAxes)}."
+                : "No axis was supplied — nothing to score. Run the Phase 2 scanner, the Phase 1 metric, and/or a Phase 3 red-team pass first."
             : $"Composite score {score:F0}/100 from {components.Count}/3 axes measured ({string.Join(", ", measuredAxes)})" +
               (missingAxes.Count > 0 ? $"; NOT measured: {string.Join(", ", missingAxes)} (excluded from the average, never assumed perfect)." : ".");
 

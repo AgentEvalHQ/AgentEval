@@ -33,10 +33,10 @@ public sealed class ResponseLengthEval(int minLength = 50, int maxLength = 500)
 {
     protected override EvalResult Evaluate(EvalInput input)
     {
-        // No response is not a short response: say it was not measured, never score it as a 0 fail.
+        // No response is not a short response: say nothing could be measured, never score it as a 0 fail.
         if (input.Response is null)
         {
-            return EvalResult.Skipped(this, "There is no response to measure.");
+            return NotApplicable("There is no response to measure.");
         }
 
         var length = input.Response.Length;
@@ -67,10 +67,10 @@ var runner = await new AgentEvalBuilder()
 
 - Scores are 0–1; `Build` sets the label (`pass` / `fail`), the severity (`none`, `low`, `medium`, `high`,
   `critical`) and per-dimension values.
-- An input the eval needs but did not get (a response, a context, tool calls) is **not measured**, not a fail:
-  return `EvalResult.Skipped(this, reason)`. When the eval cannot apply to this input at all, return
-  `NotApplicable(reason)`.
-- A model-judged eval derives from `AtomicLlmEval` instead, which records the judge model, tokens and cost.
+- When the eval cannot measure anything on this input (no response, no context, no tool data), return
+  `NotApplicable(reason)`: never `Passed`, and aggregates leave it out instead of counting it as a 0 fail.
+- A model-judged eval is an `AtomicLlmEval`, constructed with a judge (`IEvaluator`) and the criteria to grade; it
+  records the judge model, tokens and cost.
 - [Deterministic evals](deterministic-evals.md) is the full contract: the chance floor, what `EvalInput` holds
   for a real run (`null` tool calls versus an empty list), and the undecidable verdict.
 

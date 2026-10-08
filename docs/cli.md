@@ -447,7 +447,7 @@ the delta cannot be read against chance, and scenarios graded by a judge running
 | `--baseline <path>` | Required. The baseline run directory. |
 | `--candidate <path>` | Required. The candidate run directory. |
 | `--strict` | Also refuse when an axis was recorded by neither run. |
-| `--json` | Print the comparison as JSON on stdout instead of the report. `deltas` is `null` when the comparison is refused; when it is not, `recovered`, `regressed` and `regressedScenarios` (the ids) are included. |
+| `--json` | Print the comparison as JSON on stdout instead of the report. `deltas` is left out when the comparison is refused; when it is not, `recovered`, `regressed` and `regressedScenarios` (the ids) are included. |
 | `--fail-on-regression` | Exit `1` when the runs are comparable and a scenario the baseline passed fails in the candidate, and name those scenarios. For a CI step that must fail on a regression; without it, a comparable result exits `0` whatever it shows. |
 
 **Exit codes**
@@ -455,7 +455,7 @@ the delta cannot be read against chance, and scenarios graded by a judge running
 | Code | Meaning |
 |------|---------|
 | `0` | Comparable; the deltas are printed. |
-| `1` | With `--fail-on-regression`: comparable, and at least one scenario regressed (passed in the baseline, failed in the candidate). |
+| `1` | With `--fail-on-regression`: comparable, and at least one scenario regressed (passed in the baseline, did not pass in the candidate: failed, errored or not run). A scenario not measured in the baseline cannot regress, so it does not set this exit code even when the candidate fails it. |
 | `2` | A path is missing or not a directory, holds no scenario files, or holds a file that is not a readable scenario; or a run repeats a scenario id. |
 | `13` | Incomparable; the reasons are printed and no delta is. |
 
@@ -853,7 +853,7 @@ array of gates, named by the ids `agenteval gatekeeper list-gates` prints; `[]` 
 ```json
 [
   { "gate": "tool:forbidden-tool", "forbidden": ["send_email", "delete_db"] },
-  { "gate": "tool:argument-pattern", "pattern": "rm\s+-rf" },
+  { "gate": "tool:argument-pattern", "pattern": "rm\\s+-rf" },
   { "gate": "tool:domain-allowlist", "allowedDomains": ["docs.example.com"] }
 ]
 ```
@@ -861,7 +861,12 @@ array of gates, named by the ids `agenteval gatekeeper list-gates` prints; `[]` 
 Only these three gates, which read a call's own arguments, are replayed. A capture keeps the text of earlier
 messages but not tool results, so a gate that reads the conversation (`tool:referential-integrity`,
 `tool:taint-tracking`) would not decide here what it decided live; it is refused with that reason rather than
-replayed on half a history.
+replayed on half a history. Each gate is replayed with its default settings.
+
+`--capture-fixture` masks credential shapes (keys, tokens) in what it writes, so a call whose arguments were masked
+does not carry what the model sent. When either configuration has an argument gate (`tool:argument-pattern`,
+`tool:domain-allowlist`), such a call is marked "not measured" (`"measured": false` in `--json`) and left out of the
+counts: its verdict would be about the mask.
 
 **Options**
 

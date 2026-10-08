@@ -93,6 +93,14 @@ public sealed class SpaQueriesValidateTests : IClassFixture<SeededMissionControl
         Assert.True(
             doc.RootElement.TryGetProperty("data", out _),
             $"{page} {constant} was rejected by the server (HTTP {(int)response.StatusCode}): {body}");
+
+        // A document error (validation, a rule such as the cycle limit) has no path; an error from a resolver run on the
+        // placeholder variables has one. Only the first kind means the page's query is wrong.
+        if (doc.RootElement.TryGetProperty("errors", out var errors))
+        {
+            Assert.All(errors.EnumerateArray(), e => Assert.True(
+                e.TryGetProperty("path", out _), $"{page} {constant} has a document error: {e}"));
+        }
     }
 
     private static string Expand(string body, IReadOnlyDictionary<string, string> constants, int depth)

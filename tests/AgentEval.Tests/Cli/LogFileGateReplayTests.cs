@@ -115,7 +115,35 @@ public sealed class LogFileGateReplayTests : IDisposable
         Assert.Equal("sut", rows[0].GetProperty("label").GetString());
     }
 
+    [Fact]
+    public async Task ArgumentsMaskedAtCapture_AreNotMeasuredByAnArgumentGate_AndNotCounted()
+    {
+        // --capture-fixture masks credential shapes. An argument gate run on the mask would read "lets through 0" for a
+        // change that drops the protection: the masked call is not measured instead.
+        var capture = await CaptureAsync(Calls(
+            ("upload", new() { ["key"] = "AKIAIOSFODNN7EXAMPLE" }),
+            ("upload", new() { ["key"] = "plain value" })));
+        var withPattern = Gates("pattern.json", """[{"gate": "tool:argument-pattern", "pattern": "AKIA[0-9A-Z]{16}"}]""");
+        var none = Gates("none.json", "[]");
+
+        var (exit, json, _) = await RunAsync(capture, withPattern, none, json: true);
+        var (_, report, _) = await RunAsync(capture, withPattern, none);
+
+        Assert.Equal(ExitCodes.Success, exit);
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        Assert.Equal(1, root.GetProperty("notMeasured").GetInt32());
+        Assert.Equal(0, root.GetProperty("loosened").GetInt32());
+        var rows = root.GetProperty("rows").EnumerateArray().ToList();
+        Assert.False(rows[0].GetProperty("measured").GetBoolean());
+        Assert.True(rows[0].GetProperty("argumentsMasked").GetBoolean());
+        Assert.True(rows[1].GetProperty("measured").GetBoolean());
+        Assert.Contains("arguments masked at capture: not measured", report, StringComparison.Ordinal);
+        Assert.Contains("1 call(s) are not counted", report, StringComparison.Ordinal);
+    }
+
     [Theory]
+    [InlineData("""[{"gate": "tool:forbidden-tool", "forbidden": []}]""", "non-empty array")]
     [InlineData("""[{"gate": "tool:taint-tracking", "sourceTools": ["a"]}]""", "reads the conversation")]
     [InlineData("""[{"gate": "rendered-exfil"}]""", "is a chat gate")]
     [InlineData("""[{"gate": "tool:no-such-gate"}]""", "unknown gate")]

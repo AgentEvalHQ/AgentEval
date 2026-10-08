@@ -123,6 +123,8 @@ public class SkillSecurityIndexTests
 
         Assert.Null(result.EfficiencyComponent);
         Assert.Null(result.Score);   // NaN used to pass through Math.Clamp into the composite
+        Assert.DoesNotContain("No axis was supplied", result.Explanation);   // it was supplied; it was not measured
+        Assert.Contains("NOT measured: compliance, efficiency (supplied but not measured", result.Explanation);
     }
 
     [Fact]

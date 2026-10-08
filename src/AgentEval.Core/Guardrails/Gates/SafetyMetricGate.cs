@@ -52,7 +52,8 @@ public sealed class SafetyMetricGate : IChatGate
         // EvaluationContext.Input/Output are `required`; for a single piece of content set both to it.
         var context = new EvaluationContext { Input = text, Output = text };
         var result = await _metric.EvaluateAsync(context, cancellationToken).ConfigureAwait(false);
-        if (result.Passed)
+        // Passed alone is not enough: a metric that says Passed without having measured anything showed nothing safe.
+        if (result.Passed && result.Measured)
         {
             return GateVerdict.Allow(PolicyName);
         }

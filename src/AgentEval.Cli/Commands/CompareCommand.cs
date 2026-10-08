@@ -248,7 +248,7 @@ public static class CompareCommand
 
         if (failOnRegression && comparison.Regressed > 0)
         {
-            Console.WriteLine($"❌ REGRESSED — passed in the baseline, failed in the candidate (exit {ExitCodes.TestFailure}, --fail-on-regression):");
+            Console.WriteLine($"❌ REGRESSED — passed in the baseline, did not pass in the candidate (failed, errored or not run) (exit {ExitCodes.TestFailure}, --fail-on-regression):");
             foreach (string id in RegressedIds(comparison).Take(40))
                 Console.WriteLine($"   • {id}");
             if (comparison.Regressed > 40)

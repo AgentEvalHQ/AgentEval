@@ -82,7 +82,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--capture-fixture` capture, with no model and no network; it prints both verdicts per call, marks the divergences,
   and counts the calls the candidate newly blocks and newly lets through (`--json` too). It replays the three gates
   that read a call's own arguments; a capture holds no tool results, so a gate that reads the conversation is refused
-  with that reason rather than replayed on half a history.
+  with that reason rather than replayed on half a history. A capture masks credential shapes, so a call whose
+  arguments were masked is marked not measured under an argument gate and left out of the counts (a change that drops
+  a key-pattern gate would otherwise read "lets through 0").
 - **`skills scan` names where a skill came from.** When a project `skills-lock.json` (the file ChilliCream's `skills`
   CLI writes) is in the scanned directory or a parent up to the repository root, each finding carries a pointer such
   as `→ from chillicream/agent-skills@a1b2c3d` (console, Markdown and JSON), and `--write-baseline` stores the source
@@ -156,8 +158,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`SafetyMetricGate` refuses a metric it can never measure.** The gate gives its metric only the inspected text, so
   a metric that needs a retrieved context or a reference answer (`GroundednessMetric`) was never measured and the gate
   blocked every message, with "safety metric failed"-style reasons. Building the gate with such a metric now throws
-  `ArgumentException` saying why. A metric not measured at run time for another reason still blocks (fail-closed), and
-  the reason now says it was not measured.
+  `ArgumentException` saying why. **Behaviour change:** code that built the gate with such a metric used to start and
+  block every message (under the default `WarnOnly` policy, warn on every message); it now fails at startup. A metric
+  not measured at run time for another reason still blocks (fail-closed), and the reason now says it was not
+  measured; a result marked passed but not measured blocks too.
 - **The Skill Health & Security Index no longer scores what was not measured.** An efficiency `MetricResult` that was
   not measured carries a placeholder score of 0, and the index averaged it in: a clean compliance scan (100) read as
   50. A security outcome with no probe run and no drift finding scored a perfect 100, though the code said that axis

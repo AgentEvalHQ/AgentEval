@@ -107,7 +107,7 @@ internal static class SkillsLockFile
 
             if (dropped > 0)
             {
-                Console.Error.WriteLine($"  Warning: {dropped} entr(y/ies) in {path} hold control characters and were ignored.");
+                Console.Error.WriteLine($"  Warning: {dropped} entr(y/ies) in {path} hold control or formatting characters and were ignored.");
             }
         }
 
@@ -119,6 +119,8 @@ internal static class SkillsLockFile
             ? s
             : null;
 
+    // Format characters (bidi overrides such as U+202E, zero-width joiners) are not control characters but still
+    // rewrite what a terminal or a rendered report shows.
     private static bool HasControl(params string?[] values) =>
-        values.Any(v => v is not null && v.Any(char.IsControl));
+        values.Any(v => v is not null && v.Any(c => char.IsControl(c) || char.GetUnicodeCategory(c) == System.Globalization.UnicodeCategory.Format));
 }

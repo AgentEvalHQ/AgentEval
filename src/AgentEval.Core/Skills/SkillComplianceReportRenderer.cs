@@ -175,7 +175,8 @@ public static class SkillComplianceReportRenderer
             return string.Empty;
         }
 
-        return ProvenanceLabel(entry) ?? string.Empty;
+        // The label comes from a lock file the scanned repository supplies: a '|' in it would split the table row.
+        return ProvenanceLabel(entry)?.Replace("|", "\\|", StringComparison.Ordinal) ?? string.Empty;
     }
 
     private static string? ProvenanceLabel(SkillBaselineEntry entry)

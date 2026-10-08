@@ -47,6 +47,21 @@ public class SafetyMetricGateTests
     }
 
     [Fact]
+    public async Task AThirdPartyMetricSayingPassedButNotMeasured_StillBlocks()
+    {
+        // MetricResult's setters are public: a metric can return Passed with Measured false. That showed nothing safe.
+        var gate = new SafetyMetricGate(new Metric(new MetricResult
+        {
+            MetricName = "m", Score = 0, Passed = true, Measured = false, Explanation = "no classifier",
+        }));
+
+        var verdict = await gate.InspectAsync("some text");
+
+        Assert.Equal(GateAction.Block, verdict.Action);
+        Assert.Equal("not measured, so not shown safe: no classifier", verdict.Reason);
+    }
+
+    [Fact]
     public async Task AMeasuredFailure_KeepsTheMetricsOwnReason()
     {
         var gate = new SafetyMetricGate(new Metric(MetricResult.Fail("m", "toxic")));

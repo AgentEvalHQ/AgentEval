@@ -219,6 +219,7 @@ function Legend() {
       <LegendDot tone="bg-red-200" label="fail" />
       <LegendDot tone="bg-orange-200" label="error (did not complete)" />
       <LegendDot tone="bg-slate-300" label="skipped (not measured)" />
+      <LegendDot tone="bg-purple-100" label="? status not recognized (not a pass)" />
       <LegendDot tone="bg-slate-100" label="no evidence" />
       <span className="inline-flex items-center gap-1.5">
         <span

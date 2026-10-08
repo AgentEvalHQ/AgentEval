@@ -100,9 +100,39 @@ public sealed class SkillsLockFileTests : IDisposable
     {
         var scanned = Path.Combine(_root.FullName, "scanned");
         Directory.CreateDirectory(scanned);
-        Lock(_root.FullName, OneSkill);   // a parent, but with no .git above there is no project boundary to trust
+        var parentLock = Lock(_root.FullName, OneSkill);   // a parent, but with no .git above there is no project boundary to trust
 
-        Assert.Null(SkillsLockFile.Find(scanned));
+        // On a machine where an ancestor of the temp directory is a repository (a dotfiles repo in the home directory),
+        // that repository is the boundary and the parent lock is inside it: then it is found, and that is correct too.
+        var ancestorRepo = false;
+        for (var dir = _root.Parent; dir is not null && !ancestorRepo; dir = dir.Parent)
+        {
+            ancestorRepo = Directory.Exists(Path.Combine(dir.FullName, ".git")) || File.Exists(Path.Combine(dir.FullName, ".git"));
+        }
+
+        Assert.Equal(ancestorRepo ? parentLock : null, SkillsLockFile.Find(scanned));
+    }
+
+    [Fact]
+    public void Read_DropsAnEntryHoldingABidiOverride()
+    {
+        // U+202E is a format character, not a control character, and reverses what a terminal shows after it.
+        var path = Lock(_root.FullName, """{"skills": {"evil": {"source": "org/‮oper"}, "ok": {"source": "org/repo"}}}""");
+
+        Assert.Equal(["ok"], SkillsLockFile.Read(path).Keys);
+    }
+
+    [Fact]
+    public async Task Scan_Markdown_EscapesAPipeInTheProvenance()
+    {
+        Directory.CreateDirectory(Path.Combine(_root.FullName, ".git"));
+        Lock(_root.FullName, """{"skills": {"bad--hyphen": {"source": "org/a|b"}}}""");
+        var output = new FileInfo(Path.Combine(_root.FullName, "report.md"));
+
+        await SkillsScanCommand.ExecuteAsync(SkillsDir(), "markdown", output, failOnNoncompliant: false, ct: default);
+
+        var row = File.ReadAllLines(output.FullName).Single(l => l.StartsWith("| ", StringComparison.Ordinal) && l.Contains("bad--hyphen", StringComparison.Ordinal));
+        Assert.EndsWith("| org/a\\|b |", row, StringComparison.Ordinal);
     }
 
     [Theory]

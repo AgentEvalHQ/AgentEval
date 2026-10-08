@@ -21,10 +21,10 @@ public class ExtensibilityGuideEvalExampleTests
     {
         protected override EvalResult Evaluate(EvalInput input)
         {
-            // No response is not a short response: say it was not measured, never score it as a 0 fail.
+            // No response is not a short response: say nothing could be measured, never score it as a 0 fail.
             if (input.Response is null)
             {
-                return EvalResult.Skipped(this, "There is no response to measure.");
+                return NotApplicable("There is no response to measure.");
             }
 
             var length = input.Response.Length;
@@ -63,17 +63,52 @@ public class ExtensibilityGuideEvalExampleTests
     {
         var result = await new ResponseLengthEval().EvaluateAsync(new EvalInput("q"));
 
-        Assert.Equal("skipped", result.Score.Label);
+        Assert.Equal("inapplicable", result.Score.Label);
+        Assert.Equal(MeasurementState.NotApplicable, result.Score.Measurement);
         Assert.False(result.Score.Passed);
         Assert.Equal("There is no response to measure.", result.Details.Summary);
     }
 
     [Fact]
-    public void ItIsAdmittedWithTheFloorTheGuideShows()
+    public void TheGuide_ShowsExactlyTheClassCompiledHere()
     {
-        var builder = new AgentEvalBuilder()
-            .AddEval(new ResponseLengthEval(), ChanceFloor.NotDerivable("no draw model: any length can be written"));
+        // The example above is a copy; this keeps the copy and the page from drifting apart.
+        var root = RepoRoot();
+        const string NewLine = "\n";
+        var guide = File.ReadAllText(Path.Combine(root, "docs", "extensibility.md")).ReplaceLineEndings(NewLine);
+        var source = File.ReadAllText(Path.Combine(root, "tests", "AgentEval.Tests", "Evals", "ExtensibilityGuideEvalExampleTests.cs"))
+            .ReplaceLineEndings(NewLine);
 
-        Assert.NotNull(builder);
+        // The class block, from its summary to the closing brace after Build(...), with the class indentation removed.
+        var start = source.IndexOf("    /// <summary>Passes when the response length", StringComparison.Ordinal);
+        var classEnd = NewLine + "    }" + NewLine;
+        var end = source.IndexOf(classEnd, source.IndexOf("return Build(score", start, StringComparison.Ordinal), StringComparison.Ordinal)
+                  + classEnd.Length - 1;
+        var example = string.Join(NewLine, source[start..end].Split(NewLine).Select(line => line.Length >= 4 ? line[4..] : line.TrimStart()));
+
+        Assert.Contains(example, guide, StringComparison.Ordinal);
+    }
+
+    private static string RepoRoot()
+    {
+        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
+        {
+            if (File.Exists(Path.Combine(dir.FullName, "docs", "extensibility.md")))
+            {
+                return dir.FullName;
+            }
+        }
+
+        throw new DirectoryNotFoundException("docs/extensibility.md was not found above the test directory.");
+    }
+
+    [Fact]
+    public async Task ItIsAdmittedWithTheFloorTheGuideShows_AndTheRunnerBuilds()
+    {
+        var runner = await new AgentEvalBuilder()
+            .AddEval(new ResponseLengthEval(), ChanceFloor.NotDerivable("no draw model: any length can be written"))
+            .BuildAsync(CancellationToken.None);
+
+        Assert.NotNull(runner);
     }
 }

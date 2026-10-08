@@ -31,6 +31,9 @@ namespace AgentEval.Cli.Commands;
 /// </remarks>
 internal static class LogFileGateReplay
 {
+    /// <summary>What <c>ToolResultSecretGate.MaskSecrets</c> writes in place of each character of a masked secret.</summary>
+    private const char MaskCharacter = '\u2588';
+
     private static readonly JsonSerializerOptions OutputJsonOptions = new()
     {
         WriteIndented = true,
@@ -110,7 +113,7 @@ internal static class LogFileGateReplay
         }
 
         var entries = await LogFileCommand.LoadCapturedEntriesAsync(captured.FullName, ct).ConfigureAwait(false);
-        var (calls, sources) = ToolCallsOf(entries);
+        var (calls, sources, masked) = ToolCallsOf(entries);
         if (calls.Count == 0)
         {
             // A replay over no call measured nothing; say so rather than print an empty table that reads as "no difference".
@@ -120,25 +123,37 @@ internal static class LogFileGateReplay
         }
 
         var comparison = await GateReplayer.CompareAsync(calls, baselineGates, candidateGates, ct).ConfigureAwait(false);
-        var tightened = comparison.Rows.Count(r => r.Baseline.Action != ToolGateAction.Block && r.Candidate.Action == ToolGateAction.Block);
-        var loosened = comparison.Rows.Count(r => r.Baseline.Action == ToolGateAction.Block && r.Candidate.Action != ToolGateAction.Block);
+
+        // --capture-fixture masks credential shapes (keys, tokens) in what it writes, so a call whose arguments were
+        // masked does not carry what the model sent. A gate that reads arguments would judge the mask: such a row is not
+        // measured, and it stays out of the counts rather than reading as "no change".
+        var argumentGates = baselineGates.Concat(candidateGates).Any(g => g is ArgumentPatternGate or DomainAllowListGate);
+        bool Measured(int i) => !(argumentGates && masked[i]);
+        var rows = comparison.Rows.Select((row, i) => (Row: row, Index: i)).ToList();
+        var notMeasured = rows.Count(r => !Measured(r.Index));
+        var diverged = rows.Count(r => Measured(r.Index) && r.Row.Diverged);
+        var tightened = rows.Count(r => Measured(r.Index) && r.Row.Baseline.Action != ToolGateAction.Block && r.Row.Candidate.Action == ToolGateAction.Block);
+        var loosened = rows.Count(r => Measured(r.Index) && r.Row.Baseline.Action == ToolGateAction.Block && r.Row.Candidate.Action != ToolGateAction.Block);
 
         if (asJson)
         {
             Console.WriteLine(JsonSerializer.Serialize(new
             {
                 calls = comparison.Rows.Count,
-                diverged = comparison.Diverged.Count,
+                diverged,
                 tightened,
                 loosened,
-                rows = comparison.Rows.Select((row, i) => new
+                notMeasured,
+                rows = rows.Select(r => new
                 {
-                    round = sources[i].Index,
-                    label = sources[i].Label,
-                    tool = row.Call.FunctionName,
-                    baseline = Verdict(row.Baseline),
-                    candidate = Verdict(row.Candidate),
-                    diverged = row.Diverged,
+                    round = sources[r.Index].Index,
+                    label = sources[r.Index].Label,
+                    tool = r.Row.Call.FunctionName,
+                    baseline = Verdict(r.Row.Baseline),
+                    candidate = Verdict(r.Row.Candidate),
+                    diverged = r.Row.Diverged,
+                    argumentsMasked = masked[r.Index] ? true : (bool?)null,
+                    measured = Measured(r.Index),
                 }),
             }, OutputJsonOptions));
             return ExitCodes.Success;
@@ -149,21 +164,41 @@ internal static class LogFileGateReplay
         Console.WriteLine($"  baseline : {baseline.Name} ({baselineGates.Count} gate(s))");
         Console.WriteLine($"  candidate: {candidate.Name} ({candidateGates.Count} gate(s))");
         Console.WriteLine();
-        Console.Write(GateReplayRenderer.Render(comparison));
+        Console.WriteLine($"Gate replay — {comparison.Rows.Count} call(s), {diverged} diverged");
+        Console.WriteLine();
+        foreach (var (row, i) in rows)
+        {
+            var mark = !Measured(i) ? "  ? " : row.Diverged ? "  ✗ " : "  · ";
+            var tail = !Measured(i) ? "   ← arguments masked at capture: not measured" : row.Diverged ? "   ← DIVERGED" : "";
+            Console.WriteLine($"{mark}{row.Call.FunctionName}: baseline={Describe(row.Baseline)}  candidate={Describe(row.Candidate)}{tail}");
+        }
+
         Console.WriteLine();
         Console.WriteLine($"  The candidate blocks {tightened} call(s) the baseline let through, and lets through {loosened} the baseline blocked.");
+        if (notMeasured > 0)
+        {
+            Console.WriteLine($"  {notMeasured} call(s) are not counted: their arguments were masked at capture (--capture-fixture masks");
+            Console.WriteLine("  credential shapes), so an argument gate's verdict on them says nothing about what the model sent.");
+        }
+
         Console.WriteLine();
         return ExitCodes.Success;
+
+        static string Describe(ToolGateVerdict v) => v.Action is ToolGateAction.Allow ? "Allow" : $"{v.Action}({v.PolicyName})";
 
         static object Verdict(ToolGateVerdict v) => new { action = v.Action.ToString(), policy = v.PolicyName, reason = v.Reason };
     }
 
-    /// <summary>Every tool call in the capture's responses, in order, with the round-trip it came from.</summary>
-    internal static (IReadOnlyList<GatedToolCall> Calls, IReadOnlyList<(int Index, string? Label)> Sources) ToolCallsOf(
+    /// <summary>
+    /// Every tool call in the capture's responses, in order, with the round-trip it came from and whether its arguments
+    /// were masked at capture (the capture writer replaces credential shapes with █).
+    /// </summary>
+    internal static (IReadOnlyList<GatedToolCall> Calls, IReadOnlyList<(int Index, string? Label)> Sources, IReadOnlyList<bool> Masked) ToolCallsOf(
         IReadOnlyList<FixtureCaptureEntry> entries)
     {
         var calls = new List<GatedToolCall>();
         var sources = new List<(int, string?)>();
+        var masked = new List<bool>();
         foreach (var entry in entries)
         {
             if (entry.Kind != "response" || entry.Response?.ToolCalls is not { Count: > 0 } toolCalls)
@@ -178,13 +213,18 @@ internal static class LogFileGateReplay
                 var arguments = toolCalls[i].Arguments is { } args
                     ? new Dictionary<string, object?>(args)
                     : new Dictionary<string, object?>();
+                // The name is printed: no control or format character from the capture reaches the terminal.
+                var name = new string(toolCalls[i].Name
+                    .Select(c => char.IsControl(c) || char.GetUnicodeCategory(c) is System.Globalization.UnicodeCategory.Format ? '?' : c)
+                    .ToArray());
                 calls.Add(new GatedToolCall(
-                    toolCalls[i].Name, arguments, entry.Label, entry.Index, i, toolCalls.Count, IsStreaming: false, messages));
+                    name, arguments, entry.Label, entry.Index, i, toolCalls.Count, IsStreaming: false, messages));
                 sources.Add((entry.Index, entry.Label));
+                masked.Add(arguments.Values.Any(v => (v?.ToString() ?? "").Contains(MaskCharacter)));
             }
         }
 
-        return (calls, sources);
+        return (calls, sources, masked);
     }
 
     /// <summary>Reads a configuration file into live gates; prints the reason and returns null when it cannot.</summary>
@@ -253,7 +293,7 @@ internal static class LogFileGateReplay
 
                     if (!ReadParameter(id, prop.Value, flags))
                     {
-                        Fail($"{where} ('{id}'): \"{parameter}\" must be {(id == "tool:argument-pattern" ? "a string" : "an array of strings")}.");
+                        Fail($"{where} ('{id}'): \"{parameter}\" must be {(id == "tool:argument-pattern" ? "a string" : "a non-empty array of strings")}.");
                         return null;
                     }
                 }
@@ -312,7 +352,8 @@ internal static class LogFileGateReplay
             return true;
         }
 
-        if (value.ValueKind != JsonValueKind.Array || value.EnumerateArray().Any(v => v.ValueKind != JsonValueKind.String))
+        if (value.ValueKind != JsonValueKind.Array || value.GetArrayLength() == 0
+            || value.EnumerateArray().Any(v => v.ValueKind != JsonValueKind.String))
         {
             return false;
         }
