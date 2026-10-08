@@ -172,7 +172,7 @@
       "maxLength": 2048
     },
     "decisionInput": {
-      "description": "The decision function's input, recorded with its output so anyone can recompute it; its exceptions are recorded here, so the checkpoint's signature covers them (CKP-4, CKP-5, CKP-7).",
+      "description": "The decision function's input, recorded with its output so anyone can recompute it. Each lane's evidence is the set of its runs' run hashes, and each exception names only run hashes of its lane's runs; its exceptions are recorded here, so whoever signs the checkpoint vouches for them (CKP-4, CKP-5, CKP-7, CKP-9, DEC-1).",
       "$ref": "decision.schema.json#/$defs/input"
     }
   },
@@ -395,6 +395,14 @@
             "max": {
               "description": "The worst severity allowed among failures; a failure with no severity counts as critical (spec 05, LANE-3).",
               "type": "string"
+            },
+            "lane": {
+              "description": "Only result lines of this summary lane count (LANE-3, SUM-3).",
+              "$ref": "common.schema.json#/$defs/laneName"
+            },
+            "path": {
+              "description": "Only result lines at this path or below it count (LANE-3).",
+              "$ref": "common.schema.json#/$defs/text"
             },
             "suite": {
               "description": "Only runs of this suite are eligible: the same ref, and the same version and digest for those given (LANE-1).",

@@ -19,8 +19,10 @@ public static class CheckpointManifest
 
     /// <summary>
     /// The problems, in name order: <c>decision</c> (not what the recorded input gives), <c>evidence</c> (a lane has
-    /// runs but no result, or a result but no runs), <c>lanes</c> (the input does not decide exactly the manifest's
-    /// lanes), <c>outcome</c> (not the decision's), <c>version</c> (the input is for another version). Or only
+    /// runs but no result, or a result but no runs), <c>exception-evidence</c> (an exception names a run hash that is not
+    /// one of its lane's runs), <c>lane-evidence</c> (a lane's evidence in the input is not the set of its runs' run
+    /// hashes), <c>lanes</c> (the input does not decide exactly the manifest's lanes), <c>outcome</c> (not the
+    /// decision's), <c>version</c> (the input is for another version). Or only
     /// <c>unverifiable</c>: the manifest is in a state, or uses an outcome or status, this version does not know, or lacks
     /// the decision a newer version may make optional; a reader cannot recompute it, and that is not tampering. Empty
     /// for a manifest not yet decided, or aborted.
@@ -62,12 +64,34 @@ public static class CheckpointManifest
             problems.Add("lanes");
         }
 
+        // The run hashes of the runs a lane of the manifest names: the evidence its result and its exceptions may name.
+        HashSet<string> RunsOf(string? name) => lanes
+            .Where(l => (string?)l!["lane"] == name)
+            .SelectMany(l => l!["runs"]!.AsArray())
+            .Select(r => (string?)r!["runHash"] ?? "")
+            .ToHashSet(StringComparer.Ordinal);
+
         foreach (var lane in lanes)
         {
             var inputLane = inputLanes.FirstOrDefault(l => (string?)l!["lane"] == (string?)lane!["lane"]);
             if (inputLane is not null && (lane!["runs"]!.AsArray().Count == 0) != (inputLane["result"] is null))
             {
                 problems.Add("evidence");
+            }
+
+            // A lane's evidence in the input is the set of its runs' run hashes; none is the empty set.
+            if (inputLane is not null && !RunsOf((string?)lane!["lane"]).SetEquals(CheckpointDecisionJson.RunHashes(inputLane["evidence"]) ?? []))
+            {
+                problems.Add("lane-evidence");
+            }
+        }
+
+        // An exception names only run hashes of its lane's runs: it accepts evidence this checkpoint holds.
+        foreach (var grant in input["exceptions"]?.AsArray() ?? [])
+        {
+            if (!(CheckpointDecisionJson.RunHashes(grant?["evidence"]) ?? []).All(RunsOf((string?)grant?["lane"]).Contains))
+            {
+                problems.Add("exception-evidence");
             }
         }
 

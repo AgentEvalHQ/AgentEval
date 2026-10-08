@@ -3,7 +3,7 @@
 field with its type, whether it is required, its bounds, its allowed values and its description.
 
 The reference is informative and generated: edit the schemas' descriptions, not the pages. `--check` fails when the
-pages on disk are not what the schemas give (for CI).
+pages on disk are not what the schemas give (for a CI job or a pre-commit check).
 
 Usage: python contracts/aef/tools/gen_reference.py [--check]
 """

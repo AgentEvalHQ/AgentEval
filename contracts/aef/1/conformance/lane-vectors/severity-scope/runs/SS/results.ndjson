@@ -1,0 +1,5 @@
+{"schemaVersion":"1.0","resultId":"r_b42b8e73e0fd2aadc0db052def8af3bd","caseId":"c1","path":"tools","evaluator":{"id":"code:check"},"state":"passed","lane":"security"}
+{"schemaVersion":"1.0","resultId":"r_c7194fc7c6682622352ebcb83f1fa406","caseId":"c2","path":"tools/fetch","evaluator":{"id":"code:check"},"state":"failed","lane":"security","severity":"high"}
+{"schemaVersion":"1.0","resultId":"r_aa3abea28719fc3f5e81f786834a7783","caseId":"c3","path":"chat","evaluator":{"id":"code:check"},"state":"passed","lane":"security"}
+{"schemaVersion":"1.0","resultId":"r_603f7960e45640bb8c39d046359645ee","caseId":"c5","path":"toolsets","evaluator":{"id":"code:check"},"state":"failed","lane":"security","severity":"critical"}
+{"schemaVersion":"1.0","resultId":"r_bebd31adb012fa046a84482588b3c426","caseId":"c4","path":"chat","evaluator":{"id":"code:check"},"state":"failed","lane":"quality","severity":"critical"}

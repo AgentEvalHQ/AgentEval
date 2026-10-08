@@ -47,8 +47,8 @@ Commands (the JSON each prints):
       Schema verdicts for one document (NDJSON: every line) and the §7.3 readings of the values it holds:
       {"writer": ..., "reader": ..., "reads": {"field.path[i]": value as read, ...}}
   decide FILE
-      The decision function (§5.4, through aef_decide.py) on a decision input, or on a decision vector's "input":
-      {"output": {...}} or {"error": message}.
+      The decision function (§5.4, written here from DEC-1 to DEC-5) on a decision input, or on a decision vector's
+      "input": {"output": {...}} or {"error": message} when the function refuses the input.
   match PLAN RUNNER
       [PLAN-7] (through aef_stream.py). {"matches": true|false}
   stream EVENTS PLAN
@@ -57,6 +57,7 @@ Commands (the JSON each prints):
       [STRM-4], written here from spec 06 §6.4 (not through aef_stream.py): the runs the stream's job.sealed and
       job.failed events name, found in the folder RUNS, against the plan. {"problems": [[path, code], ...]}, at
       'run:<runId>' and 'job'. The policy authorizes redactions (OVL-10).
+      Plan durations and freshness follow ENC-9's one grammar (parse_duration).
 
 Times are RFC 3339 UTC strings (ENC-8). Exit status: 0 when the operation ran, 2 on a usage or input error.
 """
@@ -82,7 +83,6 @@ if str(TOOLS) not in sys.path:  # python -I leaves the script's own folder out o
     sys.path.insert(0, str(TOOLS))
 
 import aef_crypto  # noqa: E402
-import aef_decide  # noqa: E402
 import aef_schema  # noqa: E402
 import aef_stream  # noqa: E402
 
@@ -304,11 +304,32 @@ def sha256_hex(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+_TIME = re.compile(r"([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\.([0-9]{1,9}))?Z")
+
+
 def parse_time(text):
-    """(seconds, nanoseconds) of an RFC 3339 UTC time (ENC-8), exact; ValueError for anything else."""
-    if not isinstance(text, str):
-        raise ValueError("not a string")
-    return aef_decide.parse_time(text)
+    """(seconds since the epoch, nanoseconds) of an RFC 3339 UTC time (ENC-8): exact, never rounded; a date that does
+    not exist is refused, never rolled over. ValueError for anything else."""
+    m = _TIME.fullmatch(text) if isinstance(text, str) else None
+    if not m:
+        raise ValueError(f"{text!r} is not an RFC 3339 UTC time")
+    y, mo, d, h, mi, sec = (int(g) for g in m.groups()[:6])
+    moment = datetime.datetime(y, mo, d, h, mi, sec, tzinfo=datetime.timezone.utc)  # raises on 2026-02-31
+    return int(moment.timestamp()), int((m.group(7) or "").ljust(9, "0"))
+
+
+# ENC-9: P, an optional <n>D, then an optional T with <n>H, <n>M or both in that order; n is 1-5 digits; at least one
+# part, and no T without a part after it. Freshness and plan timeouts share it.
+DURATION = re.compile(r"P(?:[0-9]{1,5}D(?:T(?:[0-9]{1,5}H(?:[0-9]{1,5}M)?|[0-9]{1,5}M))?"
+                      r"|T(?:[0-9]{1,5}H(?:[0-9]{1,5}M)?|[0-9]{1,5}M))")
+_DURATION_PART = re.compile(r"([0-9]{1,5})([DHM])")
+
+
+def parse_duration(text):
+    """The seconds of an ENC-9 duration; ValueError for anything else. (M follows T in the grammar: minutes.)"""
+    if not isinstance(text, str) or not DURATION.fullmatch(text):
+        raise ValueError(f"{text!r} is not a duration")
+    return sum(int(n) * {"D": 86400, "H": 3600, "M": 60}[unit] for n, unit in _DURATION_PART.findall(text))
 
 
 def time_key(text):
@@ -437,7 +458,7 @@ READINGS = {
                ("trials.aggregation", _as_written),
                ("aggregation.strategy", _as_written), ("aggregation.rulePath", _as_written)],
     "run": [("execution.targetMode", read_target_mode),
-            ("execution.stimulus", _known({"suite", "generated", "imported", "other"}, "other")),
+            ("execution.stimulus", _known({"suite", "generated", "external", "other"}, "other")),
             ("contentCapture", read_content_capture), ("subject.kind", _known(_RUN_SUBJECT_KINDS, "other")),
             ("judges[*].mode", _known(_JUDGE_MODES, "other")),
             ("suite.executionPolicy.aggregation", _as_written), ("config.thresholds{*}.op", _as_written)],
@@ -1041,6 +1062,11 @@ class Run:
                     if off and _carries_content(span):
                         P.add((f"traces.otlp.jsonl:{n}", "content-capture"))  # SEC-6
 
+        if off and f.has("logs.otlp.jsonl"):
+            for n, request in self.objects("logs.otlp.jsonl"):
+                if any(_log_carries_content(record) for record in _otlp_log_records(request)):
+                    P.add((f"logs.otlp.jsonl:{n}", "content-capture"))  # SEC-6
+
         def span_known(trace_id, span_id):
             if spans is None:
                 return True
@@ -1134,16 +1160,21 @@ class Run:
                 P.add((where, "result-times"))
             if _inverted(get(o, "uncertainty", "ci")):
                 P.add((where, "interval"))
+            if get(o, "attack", "success") is True and o.get("state") == "passed":
+                P.add((where, "attack"))  # an attack that succeeded is not a pass for the subject
             link = o.get("traceLink")
             if isinstance(link, dict) and not span_known(link["traceId"], link.get("spanId")):
                 P.add((where, "trace-link"))
 
-        # blobs
+        # blobs, and files RUN-2 does not list
         for p in f.paths:
-            if p.startswith("blobs/"):
-                m = BLOB_PATH.fullmatch(p)
-                if not m or m.group(2)[:2] != m.group(1) or f.digest(p) != m.group(2):
-                    P.add((p, "blob-digest"))
+            if _is_blob_path(p) and f.digest(p) != p.rsplit("/", 1)[1]:
+                P.add((p, "blob-digest"))
+        seal_doc, seal_valid = self.seal_doc()
+        sealed = {s["name"] for s in seal_doc["subject"]} if seal_valid else set()
+        for p in f.paths:
+            if p in sealed and not _run2_lists(p):
+                P.add((p, "unexpected-file"))  # a producer seals only RUN-2's files
 
         # summary.json
         if isinstance(summary, dict):
@@ -1155,6 +1186,8 @@ class Run:
                 P.add(("summary.json", "summary"))
             if any(_inverted(e.get("ci")) for lane in summary.get("lanes", []) for e in lane.get("metrics", [])):
                 P.add(("summary.json", "interval"))
+            if _summary_duplicates(summary):
+                P.add(("summary.json", "summary-duplicate"))
 
         # gates.ndjson
         for n, g in gates:
@@ -1223,7 +1256,36 @@ def _uncovered(ranges, size):
 
 # SEC-6: the OpenTelemetry GenAI attributes that carry content (and the deprecated gen_ai.prompt / gen_ai.completion).
 CONTENT_ATTRIBUTES = {"gen_ai.input.messages", "gen_ai.output.messages", "gen_ai.system_instructions",
-                      "gen_ai.tool.call.arguments", "gen_ai.tool.call.result", "gen_ai.prompt", "gen_ai.completion"}
+                      "gen_ai.tool.call.arguments", "gen_ai.tool.call.result", "gen_ai.evaluation.explanation",
+                      "gen_ai.prompt", "gen_ai.completion"}
+_RUN2_FILES = {"run.json", "results.ndjson", "metrics.json", "summary.json", "evidence.ndjson", "gates.ndjson",
+               "traces.otlp.jsonl", "logs.otlp.jsonl", "seal.json", "attestation.dsse.json"}
+
+
+def _is_blob_path(p):
+    """blobs/sha256/<first two hex characters>/<64 hex characters> (EVD-3)."""
+    m = BLOB_PATH.fullmatch(p)
+    return bool(m) and m.group(2)[:2] == m.group(1)
+
+
+def _run2_lists(p):
+    """Whether RUN-2 lists this path (ext/ and overlays/ have their own rules)."""
+    return p in _RUN2_FILES or p.startswith(("ext/", "overlays/")) or _is_blob_path(p)
+
+
+def _otlp_log_records(request):
+    """The log records of an OTLP/JSON LogsData object."""
+    for resource in request.get("resourceLogs", []) if isinstance(request, dict) else []:
+        for scope in (resource.get("scopeLogs") or []) if isinstance(resource, dict) else []:
+            for record in scope.get("logRecords", []) if isinstance(scope, dict) else []:
+                if isinstance(record, dict):
+                    yield record
+
+
+def _log_carries_content(record):
+    """SEC-6: a log record with a content attribute, or with a body."""
+    attributes = record.get("attributes") if isinstance(record.get("attributes"), list) else []
+    return "body" in record or any(isinstance(a, dict) and a.get("key") in CONTENT_ATTRIBUTES for a in attributes)
 
 
 def _carries_content(span):
@@ -1272,9 +1334,15 @@ def _predicate_differs(pred, run):
     return (a != b) if a is not None and b is not None else closed != ended
 
 
-def _belongs(line, lane_name, single_lane):
-    """SUM-3: a line belongs to the lane its lane names; with a single summary lane, a line without lane too."""
-    return line.get("lane") == lane_name or ("lane" not in line and single_lane)
+def _belongs(line, lane_name, summary_lanes):
+    """SUM-3: a line belongs to the lane its lane names; a line without lane belongs to the summary's lane when the
+    summary has a single one. summary_lanes: the summary's lane names, in order."""
+    return line.get("lane") == lane_name or ("lane" not in line and list(summary_lanes) == [lane_name])
+
+
+def _summary_lanes(run):
+    summary = run.read()[0].get("summary.json")
+    return [l.get("lane") for l in summary.get("lanes", [])] if isinstance(summary, dict) else []
 
 
 def _line_value(line, metric_id, kind):
@@ -1291,10 +1359,29 @@ def _line_value(line, metric_id, kind):
     return values[0] if values else None
 
 
+def _median(values):
+    ordered = sorted(values)
+    middle = len(ordered) // 2
+    return ordered[middle] if len(ordered) % 2 else (ordered[middle - 1] + ordered[middle]) / 2
+
+
+AGGREGATES = {"median": _median, "min": min, "max": max}  # SUM-8: the methods AEF defines
+
+
+def _summary_duplicates(summary):
+    """SUM-9: two entries with one lane, metric and path, or two usage entries with one role and model (an absent
+    model a value of its own)."""
+    keys = [(lane.get("lane"), e.get("metric"), e.get("path"))
+            for lane in summary.get("lanes", []) for e in lane.get("metrics", [])]
+    usage = [(get(u, "role", default=_MISSING), get(u, "model", default=_MISSING))
+             for u in summary.get("usage") or [] if isinstance(u, dict)]
+    return len(keys) != len(set(keys)) or len(usage) != len(set(usage))
+
+
 def _summary_wrong(summary, results, metric):
     """SUM-3 to SUM-5: whether any entry's N, n, notMeasured, sum or value is not what results.ndjson gives."""
     lanes = summary.get("lanes", [])
-    single = len(lanes) == 1
+    names = [l.get("lane") for l in lanes]
     for lane in lanes:
         for e in lane.get("metrics", []):
             declaration = metric.get(e.get("metric"))
@@ -1303,7 +1390,7 @@ def _summary_wrong(summary, results, metric):
             kind = declaration["kind"]
             N, values = 0, []
             for _, o in results:
-                if "trial" in o or o.get("path") != e.get("path") or not _belongs(o, lane.get("lane"), single):
+                if "trial" in o or o.get("path") != e.get("path") or not _belongs(o, lane.get("lane"), names):
                     continue
                 if o.get("state") == "not_applicable":
                     continue
@@ -1318,9 +1405,13 @@ def _summary_wrong(summary, results, metric):
                 return True
             if "sum" in e and not close_enough(e["sum"], total):
                 return True
-            if "aggregate" in e:  # SUM-5: the producer's value (pass@k, F1, a median); only null when n is 0
-                if n == 0 and e.get("value") is not None:
-                    return True
+            if "aggregate" in e:  # SUM-8
+                method = get(e, "aggregate", "method")
+                if n == 0:
+                    if e.get("value") is not None:
+                        return True
+                elif method in AGGREGATES and not close_enough(e.get("value"), AGGREGATES[method](values)):
+                    return True  # median, min and max are recomputed; any other method is the producer's
             elif (e.get("value") is None) != (value is None) or (value is not None and not close_enough(e["value"], value)):
                 return True
     return False
@@ -1435,8 +1526,8 @@ def manifest_problems(m):
         return ["unverifiable"]
     problems = set()
     try:
-        recomputed = aef_decide.decide(given)
-    except Exception:  # the input cannot be decided
+        recomputed = decide(given)
+    except (ValueError, KeyError, TypeError):  # the input cannot be decided
         recomputed = None
     if recomputed is None or _decision_key(recomputed) != _decision_key(decision):
         problems.add("decision")
@@ -1450,6 +1541,15 @@ def manifest_problems(m):
         has_result = get(given_lanes.get(lane["lane"]), "result") is not None
         if bool(lane["runs"]) != has_result:
             problems.add("evidence")
+    runs_of = {}  # manifest lane -> the run hashes of its runs
+    for lane in m["lanes"]:
+        runs_of.setdefault(lane["lane"], {r.get("runHash") for r in lane.get("runs", []) if isinstance(r, dict)})
+    for l in given["lanes"]:
+        if l["lane"] in runs_of and set(l.get("evidence") or []) != runs_of[l["lane"]]:
+            problems.add("lane-evidence")  # none is the empty set
+    for x in given.get("exceptions") or []:
+        if any(h not in runs_of.get(x.get("lane"), set()) for h in x.get("evidence") or []):
+            problems.add("exception-evidence")
     if outcome != decision.get("outcome"):
         problems.add("outcome")
     if given.get("subjectVersion") != get(m, "subject", "version"):
@@ -1492,17 +1592,20 @@ class Store:
     seal's when seal.json is valid, else recomputed from the files)."""
 
     def __init__(self, root, policy=None):
-        self.index = {}
+        self.index = defaultdict(list)
         for d in run_folders(root):
             run = Run(d, policy)
             doc = run.run_doc
             if doc is not None and isinstance(doc.get("runId"), str):
-                self.index.setdefault((doc["runId"], run.claimed_run_hash()), run)
+                self.index[(doc["runId"], run.claimed_run_hash())].append(run)
 
     def find(self, ref):
+        """The run with this runId and run hash: an intact one when any folder holding it is intact (CKP-8: the
+        order folders are listed in never matters), else any."""
         if not isinstance(ref, dict):
             return None
-        return self.index.get((ref.get("runId"), ref.get("runHash")))
+        runs = self.index.get((ref.get("runId"), ref.get("runHash")), [])
+        return next((r for r in runs if r.intact), runs[0] if runs else None)
 
 
 def _eligible(run, binding, version_needed=True):
@@ -1563,7 +1666,8 @@ def _threshold(rule, runs):
     for run in runs:
         e = _summary_entry(run, rule.get("lane"), rule.get("metric"), rule.get("path"))
         if (e is None or e.get("n") == 0 or as_number(e.get("value")) is None or op is None
-                or as_number(rule.get("value")) is None or (minimum is not None and e.get("n") < minimum)):
+                or as_number(rule.get("value")) is None or (minimum is not None and e.get("n") < minimum)
+                or ("aggregate" in e and get(e, "aggregate", "method") not in AGGREGATES)):
             statuses.append("not_measured")
         else:
             statuses.append("passed" if op(float(e["value"]), float(rule["value"])) else "failed")
@@ -1577,10 +1681,16 @@ def _severity(rule, runs):
     if limit is None:
         return "not_measured"  # a max this version does not know (§7.3)
     undecided, decided = False, 0
+    lane, path = rule.get("lane"), rule.get("path")
     for run in runs:
+        names = _summary_lanes(run)
         for _, o in run.objects("results.ndjson"):
             if "trial" in o:
                 continue
+            if lane is not None and not _belongs(o, lane, names):
+                continue  # only lines of that summary lane (SUM-3)
+            if path is not None and not (o.get("path") == path or str(o.get("path", "")).startswith(path + "/")):
+                continue  # only lines at that path or below it
             state = o.get("state")
             if state in ("failed", "warn"):
                 decided += 1
@@ -1623,11 +1733,10 @@ def _axis_value(doc, axis):
 
 def _measured_values(run, lane, path, metric_id, kind):
     """LANE-7: {caseId: value} of the run's measured lines at path in lane (SUM-3, SUM-4), trial lines excluded."""
-    summary = run.read()[0].get("summary.json")
-    single = isinstance(summary, dict) and len(summary.get("lanes", [])) == 1
+    names = _summary_lanes(run)
     out = {}
     for _, o in run.objects("results.ndjson"):
-        if "trial" in o or o.get("path") != path or not _belongs(o, lane, single):
+        if "trial" in o or o.get("path") != path or not _belongs(o, lane, names):
             continue
         if o.get("state") == "not_applicable":
             continue
@@ -1953,11 +2062,90 @@ def op_document(schema, path):
     return verdict
 
 
+class Refused(ValueError):
+    """The decision function refuses an input rather than decide it (DEC-1)."""
+
+
+def decide(inp):
+    """Decide(input) -> output (§5.4, DEC-1 to DEC-5): pure, no clock. Refused for an input DEC-1 does not allow."""
+    if not isinstance(inp, dict) or not isinstance(inp.get("lanes"), list):
+        raise Refused("not a decision input")
+    names = [lane.get("lane") for lane in inp["lanes"]]
+    if not names:
+        raise Refused("no lanes")
+    if len(set(names)) != len(names):
+        raise Refused("a lane twice")
+    exceptions = inp.get("exceptions") or []
+    for x in exceptions:
+        if x.get("lane") not in names:
+            raise Refused("an exception for a lane the input does not have")
+        if not x.get("evidence"):
+            raise Refused("an exception with no run hash")
+        if not parse_time(x["expires"]) > parse_time(x["at"]):
+            raise Refused("an exception that expires before it is granted")
+    now, version = parse_time(inp["evaluatedAt"]), inp["subjectVersion"]
+
+    lanes, reasons = [], []
+    for lane in inp["lanes"]:
+        name, blocking, result = lane["lane"], lane["blocking"], lane.get("result")
+        after = []
+        if result is None:
+            status, code = "missing", "missing"
+        elif result["subjectVersion"] != version:
+            status, code = "missing", "wrong-version"
+        elif parse_time(result["oldestClosedAt"]) > now:
+            status, code = "missing", "future-evidence"
+        elif "freshness" in lane and _later(parse_time(result["oldestClosedAt"]), parse_duration(lane["freshness"])) < now:
+            status, code = "stale", "stale"
+        else:
+            status = result.get("status") if result.get("status") in INPUT_STATUSES else "not_measured"
+            code = {"passed": None, "failed": "failed" if blocking else "advisory-failed",
+                    "not_measured": "not-measured", "incomparable": "incomparable"}[status]
+            if status == "failed":
+                evidence = set(lane.get("evidence") or [])
+                own = [x for x in exceptions if x["lane"] == name]
+                same = [x for x in own if set(x["evidence"]) == evidence]
+                applying = [x for x in same if parse_time(x["at"]) <= now < parse_time(x["expires"])]
+                if applying:
+                    status, code = "waived", "waived"
+                else:
+                    if same:
+                        after.append("exception-expired")
+                    if any(set(x["evidence"]) != evidence for x in own):
+                        after.append("exception-other-evidence")
+        item = {"lane": name, "status": status, "blocking": blocking}
+        if status == "incomparable" and result.get("axes"):
+            item["axes"] = list(result["axes"])
+        lanes.append(item)
+        reasons += ([f"{code}:{name}"] if code else []) + [f"{c}:{name}" for c in after]
+
+    superseded = inp.get("supersededBy") is not None and inp["supersededBy"] != version
+    if superseded:
+        reasons.append(f"superseded:{inp['supersededBy']}")
+    statuses = [(l["status"], l["blocking"]) for l in lanes]
+    if superseded or any(s == "stale" for s, _ in statuses):
+        outcome = "expired"
+    elif any(s == "failed" and b for s, b in statuses):
+        outcome = "blocked"
+    elif any(s in ("missing", "not_measured", "incomparable") for s, _ in statuses):
+        outcome = "inconclusive"
+    elif any(s == "waived" for s, _ in statuses):
+        outcome = "approved_with_exceptions"
+    else:
+        outcome = "approved"
+    reasons.append(f"outcome:{outcome}")
+    return {"outcome": outcome, "lanes": lanes, "reasons": reasons}
+
+
+def _later(moment, seconds):
+    return moment[0] + seconds, moment[1]
+
+
 def op_decide(path):
     value = load_json_file(path)
     given = value["input"] if isinstance(value, dict) and "input" in value and "subjectVersion" not in value else value
     try:
-        return {"output": aef_decide.decide(given)}
+        return {"output": decide(given)}
     except (ValueError, KeyError, TypeError) as error:
         return {"error": str(error) or type(error).__name__}
 
@@ -2004,11 +2192,13 @@ def op_conform(events_path, plan_path, runs_dir, policy=None):
         except EncodingProblem as error:
             raise InputError(f"{events_path}:{number}: not an I-JSON object: {error}") from None
 
-    named, announced, accepted = [], {}, None
+    named, announced, accepted, terminal = [], {}, None, None
     for e in events:
         kind = e.get("kind")
         if kind == "job.accepted" and accepted is None:
             accepted = e
+        if kind in ("job.sealed", "job.failed", "job.cancelled", "job.refused") and terminal is None:
+            terminal = e
         elif kind == "evidence.produced" and isinstance(e.get("runId"), str):
             announced.setdefault(e["runId"], e.get("runHash"))  # the first announcement counts
         if kind in ("job.sealed", "job.failed"):
@@ -2035,7 +2225,9 @@ def op_conform(events_path, plan_path, runs_dir, policy=None):
             problems.add((where, "run-hash"))  # the run's only problem
             continue
         found.append(run)
-        problems.update((where, code) for code in _plan_problems(run.run_doc, plan, accepted))
+        problems.update((where, code) for code in _plan_problems(run.run_doc, plan, accepted, terminal))
+        if as_number(get(run.read()[0].get("summary.json"), "cost", "totalUsd")) is None:
+            problems.add((where, "no-cost"))  # the budget cannot be checked without it
         if as_number(get(run.read()[0].get("summary.json"), "cost", "totalUsd")) is None:
             problems.add((where, "no-cost"))  # STRM-4: the budget cannot be checked without it
 
@@ -2053,11 +2245,21 @@ def op_conform(events_path, plan_path, runs_dir, policy=None):
     return {"problems": sort_problems(problems)}
 
 
-def _plan_problems(doc, plan, accepted):
-    """STRM-4's codes for one run found."""
+def _plan_problems(doc, plan, accepted, terminal):
+    """STRM-4's codes for one run found (no-cost aside)."""
     codes = set()
     if read_content_capture(doc.get("contentCapture")) != plan.get("contentCapture"):
         codes.add("content-capture")
+    deployment, endpoint = get(plan, "subject", "deployment"), get(plan, "subject", "endpoint")
+    if (deployment is not None and get(doc, "deployment", "ref") != deployment) or (
+            endpoint is not None and get(doc, "deployment", "endpoint") != endpoint):
+        codes.add("deployment")  # an absent value is not it
+    started, ended = time_key(doc.get("startedAt")), time_key(doc.get("endedAt"))
+    accepted_at = time_key(accepted.get("at")) if accepted else None
+    terminal_at = time_key(terminal.get("at")) if terminal else None
+    if (started is not None and accepted_at is not None and started < accepted_at) or (
+            ended is not None and terminal_at is not None and ended > terminal_at):
+        codes.add("time")  # made by this job, between its acceptance and its end
 
     def judges(items):
         return [(get(j, "model", default=_MISSING), get(j, "rubricDigest", default=_MISSING))

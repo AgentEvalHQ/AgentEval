@@ -6,7 +6,8 @@
   "problems": [],
   "rules": [
     "STRM-4",
-    "PLAN-2"
+    "PLAN-2",
+    "ENC-8"
   ],
-  "why": "the job's cost ($2.00 + $1.00) equals maxUsd, which is within it; its cases are three, though five lines have no parent (a case's two trials and their rollup) and one line is a child"
+  "why": "the job's cost ($2.00 + $1.00) equals maxUsd, which is within it; its cases are three, though five lines have no parent (a case's two trials and their rollup) and one line is a child; R-1 starts as the job is accepted and R-2 ends as it ends, the same instants written otherwise"
 }

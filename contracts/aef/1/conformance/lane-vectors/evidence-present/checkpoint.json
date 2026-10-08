@@ -81,7 +81,11 @@
           "status": "passed",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-03T00:00:00Z"
-        }
+        },
+        "evidence": [
+          "06836f99f092f80c9e98a404b6b3a420b8f003fed125fd7d7ba62706532c30dd",
+          "2e1d087f8154354e67c1e979c77b37317244346cb606c44bbce76388579c726a"
+        ]
       },
       {
         "lane": "three-needed",
@@ -90,7 +94,11 @@
           "status": "not_measured",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-03T00:00:00Z"
-        }
+        },
+        "evidence": [
+          "06836f99f092f80c9e98a404b6b3a420b8f003fed125fd7d7ba62706532c30dd",
+          "2e1d087f8154354e67c1e979c77b37317244346cb606c44bbce76388579c726a"
+        ]
       },
       {
         "lane": "ineligible-run",
@@ -99,7 +107,11 @@
           "status": "not_measured",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-03T00:00:00Z"
-        }
+        },
+        "evidence": [
+          "2e1d087f8154354e67c1e979c77b37317244346cb606c44bbce76388579c726a",
+          "811cfb6a924c1503501e8805aa17d18ce28d11c99ffd7c4454d4e2bdb56ab8fa"
+        ]
       }
     ]
   },

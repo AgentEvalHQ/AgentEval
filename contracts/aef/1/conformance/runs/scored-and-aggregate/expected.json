@@ -6,6 +6,7 @@
   "rules": [
     "RES-1",
     "SUM-4",
-    "SUM-5"
+    "SUM-5",
+    "SUM-8"
   ]
 }

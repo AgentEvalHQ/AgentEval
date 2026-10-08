@@ -2,9 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using System.Globalization;
 using System.Text.Json.Nodes;
-using System.Text.RegularExpressions;
 
 namespace AgentEval.Results.Runner;
 
@@ -18,8 +16,6 @@ public static class RunnerEventStream
     private static readonly HashSet<string> Terminal = new(StringComparer.Ordinal) { "job.sealed", "job.failed", "job.cancelled", "job.refused" };
 
     private static readonly string[] Provenance = ["planId", "planDigest", "jobId", "runnerId"];
-
-    private static readonly Regex Timeout = new("^PT(?=[0-9])(?:([0-9]{1,5})H)?(?:([0-9]{1,5})M)?\\z", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
 
     /// <summary>
     /// A runner can take a plan when it carries every tag of the plan's runnerSelector, supports the plan's provider,
@@ -148,6 +144,7 @@ public static class RunnerEventStream
         ArgumentNullException.ThrowIfNull(intact);
 
         var accepted = events.FirstOrDefault(e => Text(e["kind"]) == "job.accepted");
+        var terminal = events.FirstOrDefault(e => Text(e["kind"]) is { } kind && Terminal.Contains(kind));
         var announced = new Dictionary<string, string>(StringComparer.Ordinal);
         var named = new List<string>();
         foreach (var e in events)
@@ -183,7 +180,7 @@ public static class RunnerEventStream
             }
             else
             {
-                found = Departures(run, plan, accepted);
+                found = Departures(run, plan, accepted, terminal);
                 if (run.Summary()?["cost"]?["totalUsd"] is null) found.Add("no-cost");   // the budget cannot be checked without it
                 checkedRuns.Add(run);
             }
@@ -203,8 +200,11 @@ public static class RunnerEventStream
         return [.. problems.OrderBy(p => p.Where, RunFolder.Utf8Order).ThenBy(p => p.Problem, StringComparer.Ordinal)];
     }
 
-    /// <summary>How an intact, announced run departs from the plan: [STRM-4]'s codes at <c>run:&lt;runId&gt;</c>.</summary>
-    private static List<string> Departures(RunFolder folder, JsonNode plan, JsonNode? accepted)
+    /// <summary>
+    /// How an intact, announced run departs from the plan: [STRM-4]'s codes at <c>run:&lt;runId&gt;</c>. accepted and
+    /// terminal are the stream's first job.accepted and first terminal event, or null.
+    /// </summary>
+    private static List<string> Departures(RunFolder folder, JsonNode plan, JsonNode? accepted, JsonNode? terminal)
     {
         var run = folder.Run;
         var found = new List<string>();
@@ -214,6 +214,16 @@ public static class RunnerEventStream
 
         if (Text(run["subject"]?["ref"]) != Text(plan["subject"]?["ref"]) || Text(run["subject"]?["version"]) != Text(plan["subject"]?["version"]))
             found.Add("subject");
+
+        // Where: the deployment and the endpoint the plan names (an absent value is not the plan's).
+        if ((plan["subject"]?["deployment"] is { } deployment && Text(run["deployment"]?["ref"]) != Text(deployment))
+            || (plan["subject"]?["endpoint"] is { } endpoint && Text(run["deployment"]?["endpoint"]) != Text(endpoint)))
+            found.Add("deployment");
+
+        // When: within the job, at full precision ([ENC-8]). A run that started before the job was accepted was adopted, not produced.
+        if ((accepted is not null && Text(run["startedAt"]) is { } started && AefTime.Parse(started) < AefTime.Parse((string)accepted["at"]!))
+            || (terminal is not null && Text(run["endedAt"]) is { } ended && AefTime.Parse(ended) > AefTime.Parse((string)terminal["at"]!)))
+            found.Add("time");
 
         // The plan's suite, version and, when the plan names one, content digest.
         var suite = run["suite"];
@@ -240,12 +250,7 @@ public static class RunnerEventStream
 
     private static string? Text(JsonNode? node) => node is JsonValue v && v.TryGetValue<string>(out var s) ? s : null;
 
-    private static long TimeoutSeconds(string text)
-    {
-        var m = Timeout.Match(text);
-        if (!m.Success) throw new FormatException($"'{text}' is not a timeout in hours and minutes.");
-        long hours = m.Groups[1].Success ? long.Parse(m.Groups[1].Value, CultureInfo.InvariantCulture) : 0;
-        long minutes = m.Groups[2].Success ? long.Parse(m.Groups[2].Value, CultureInfo.InvariantCulture) : 0;
-        return (hours * 3600) + (minutes * 60);
-    }
+    /// <summary>A plan's timeout in seconds: an AEF duration of days, hours and minutes ([ENC-9], <see cref="AefDuration"/>).</summary>
+    /// <exception cref="FormatException">Anything else.</exception>
+    public static long TimeoutSeconds(string text) => AefDuration.Seconds(text);
 }

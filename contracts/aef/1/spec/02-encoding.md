@@ -34,8 +34,11 @@ verifier reports it as `encoding` (§3.9) under the file's path.
 - **[ENC-8] Times** are RFC 3339 timestamps in UTC, ending in `Z`, with zero to nine fraction digits
   (`2026-10-08T12:00:00Z`, `2026-10-08T12:00:00.123456789Z`). A date that does not exist (`2026-02-31`) is invalid and
   is never rolled over. Times compare at the full precision written; an implementation **MUST NOT** round them.
-- **[ENC-9] Durations** are ISO 8601 durations of days and hours only, each at most five digits, and not empty:
-  `P14D`, `PT36H`, `P1DT12H`. Plan timeouts use hours and minutes (`PT2H`, `PT45M`, `PT1H30M`).
+- **[ENC-9] Durations** are ISO 8601 durations of days, hours and minutes: `P`, then optionally `<n>D`, then
+  optionally `T` followed by `<n>H`, `<n>M` or both in that order, each `<n>` one to five digits; at least one part,
+  and no `T` without one. `P14D`, `PT36H`, `PT90M`, `P1DT12H30M` are durations; `P`, `PT`, `P1DT`, `PT30S`, `P1W` and
+  `PT1M1H` are not. A checkpoint lane's freshness and a run plan's timeout are both durations (schema `common`,
+  `$defs/duration`).
 - **[ENC-10] Versions** of a subject, a suite or a producer are exact strings: printable ASCII without spaces
   (`[!-~]`), at most 128 characters, compared byte for byte. `latest` (in any case) is not a version: it is resolved
   before anything runs (§5.1).
@@ -84,7 +87,9 @@ String lengths and array sizes have their own bounds in the schemas.
 
 ## 2.7 The extension point
 
-- **[ENC-19]** Every document and every NDJSON line **MAY** carry `ext`, an object. Its members are the producer's;
+- **[ENC-19]** Every document and every NDJSON line a producer, host or runner writes **MAY** carry `ext`, an object,
+  except the in-toto statements (`seal.json`, batch seals), whose shape in-toto fixes, and the decision function's
+  input and output, which are computed. Its members are the producer's;
   their names **SHOULD** be reverse-DNS or prefixed by the producer's name (`agenteval.*`), and it **SHOULD** stay
   small (a few kilobytes): it is read with every document. A reader ignores what it
   does not know in `ext`, and nothing in this specification depends on it. `ext` **MUST NOT** carry a secret (§8.4).

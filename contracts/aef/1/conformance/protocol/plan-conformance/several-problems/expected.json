@@ -14,6 +14,10 @@
     ],
     [
       "run:R-1",
+      "deployment"
+    ],
+    [
+      "run:R-1",
       "judges"
     ],
     [
@@ -25,16 +29,21 @@
       "target-mode"
     ],
     [
+      "run:R-1",
+      "time"
+    ],
+    [
       "run:R-2",
       "provenance"
     ]
   ],
   "rules": [
     "STRM-4",
+    "PLAN-1",
     "PLAN-2",
     "RUN-7",
     "RUN-11",
     "RUN-12"
   ],
-  "why": "job.sealed names R-2 before R-1; the job cost $3.50; R-1 is another version, judged by another model, with content kept, replayed; R-2 has no provenance: ordered by path (job first), then by code"
+  "why": "job.sealed names R-2 before R-1; the job cost $3.50; R-1 is another version, in another deployment at another endpoint, judged by another model, with content kept, replayed, and a week before the job; R-2 has no provenance: ordered by path (job first), then by code"
 }

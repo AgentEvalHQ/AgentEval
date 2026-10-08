@@ -482,11 +482,11 @@
           ]
         },
         "stimulus": {
-          "description": "Where the inputs came from: a fixed suite, generated at run time, imported from another tool, or other.",
+          "description": "Where the cases' inputs came from: suite (a fixed suite), generated (at run time, for example by an attacker model), external (another tool's cases), or other (RUN-7). A run converted from another tool's output says so in imported (RUN-15), not here.",
           "enum": [
             "suite",
             "generated",
-            "imported",
+            "external",
             "other"
           ]
         }

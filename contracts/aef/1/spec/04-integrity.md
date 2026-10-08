@@ -117,8 +117,9 @@ What is added to a run after it closed: approvals, rejections, waivers, adjudica
 ## 4.3 The effective view
 
 An overlay never changes a sealed file. A reader that shows a run with its overlays shows the **effective view**,
-computed from the events of the **verified batches**: batch 1 and each following batch, up to the first batch with
-any problem of [OVL-5] (that batch and every later one have no effect, even if they verify on their own). Within
+computed from the events of the **verified batches**: batch 1 and each following batch, up to the first batch with a
+problem of [OVL-5] about the batch itself (any code but `event-invalid`, `event-id` and `target`, which concern
+single events): that batch and every later one have no effect, even if they verify on their own. Within
 them, an event reported as `event-invalid`, as `target`, or as `event-id` (the later of two events with one id) has
 no effect either. Events after the last verified batch are shown as unsealed and have no effect:
 

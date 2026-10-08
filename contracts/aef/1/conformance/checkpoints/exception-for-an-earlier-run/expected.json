@@ -1,0 +1,14 @@
+{
+  "kind": "checkpoint",
+  "schema": "checkpoint",
+  "writer": "valid",
+  "reader": "valid",
+  "rules": [
+    "CKP-7",
+    "DEC-2"
+  ],
+  "why": "a re-run failed again: the exception for the earlier runs is for other evidence, so the lane blocks, and the exception names run hashes the checkpoint does not hold",
+  "problems": [
+    "exception-evidence"
+  ]
+}

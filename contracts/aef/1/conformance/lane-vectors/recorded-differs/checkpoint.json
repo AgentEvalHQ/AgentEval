@@ -143,7 +143,10 @@
           "status": "passed",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-01T12:00:00Z"
-        }
+        },
+        "evidence": [
+          "7b777f4a95dae53fe170abd0131e0d6ea88ce1abfdc1d4424afa2f3cc74b7340"
+        ]
       },
       {
         "lane": "version-differs",
@@ -152,7 +155,10 @@
           "status": "passed",
           "subjectVersion": "v6",
           "oldestClosedAt": "2026-10-01T12:00:00Z"
-        }
+        },
+        "evidence": [
+          "c9371709ba68cac3e98d8113ac51d50dae8a8e282133584e7a365a6a42110d1b"
+        ]
       },
       {
         "lane": "oldest-differs",
@@ -161,7 +167,10 @@
           "status": "passed",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-01T12:00:01Z"
-        }
+        },
+        "evidence": [
+          "c9371709ba68cac3e98d8113ac51d50dae8a8e282133584e7a365a6a42110d1b"
+        ]
       },
       {
         "lane": "axes-differ",
@@ -173,7 +182,10 @@
           "axes": [
             "suite"
           ]
-        }
+        },
+        "evidence": [
+          "62187edf3d1d5209b4b741d0fc9f023612db20666ab2f71a0c76c58bd218a697"
+        ]
       },
       {
         "lane": "recorded-null",
@@ -187,7 +199,10 @@
           "status": "passed",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-01T12:00:00Z"
-        }
+        },
+        "evidence": [
+          "c9371709ba68cac3e98d8113ac51d50dae8a8e282133584e7a365a6a42110d1b"
+        ]
       }
     ]
   },

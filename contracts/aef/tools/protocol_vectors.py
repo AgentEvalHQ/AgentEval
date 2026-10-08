@@ -51,6 +51,7 @@ PLAN = {
     "runnerSelector": ["os:linux"],
 }
 SMALL = dict(PLAN, planId="plan-42", limits={"maxUsd": 3.0, "cases": 2, "timeout": "PT1M"})
+DAY = dict(PLAN, planId="plan-46", limits={"maxUsd": 3.0, "timeout": "P1D"})  # a timeout in days (ENC-9)
 
 RUNNER = {
     "schemaVersion": V, "runnerId": "runner-local-01", "identity": {"workloadId": "git:owner@example.com"},
@@ -80,16 +81,51 @@ def documents():
         ("plans", "credentials-in-endpoint", "run-plan",
          dict(PLAN, subject=dict(PLAN["subject"], endpoint="https://user:hunter2@api.example.com/v1")),
          "invalid", "invalid", ["PLAN-1", "PLAN-4"], "an endpoint never carries credentials"),
+        ("plans", "endpoint-with-query", "run-plan",
+         dict(PLAN, subject=dict(PLAN["subject"], endpoint="https://api.example.com/v1?api-key=sk-live-0123456789abcdef")),
+         "invalid", "invalid", ["PLAN-1", "PLAN-4", "RUN-10"],
+         "an endpoint is scheme, host and path only, as in run.json: a query string is where a key hides"),
+        ("plans", "endpoint-with-fragment", "run-plan",
+         dict(PLAN, subject=dict(PLAN["subject"], endpoint="https://api.example.com/v1#sk-live-0123456789abcdef")),
+         "invalid", "invalid", ["PLAN-1", "PLAN-4", "RUN-10"], "an endpoint has no fragment either"),
         ("plans", "unknown-provider", "run-plan", dict(PLAN, provider="podman"), "invalid", "valid", ["PLAN-7", "VER-8"],
          "a provider this version does not know: the writer refuses it, a reader takes it, and a runner refuses the plan"),
         ("plans", "no-budget", "run-plan", dict(PLAN, limits={"cases": 10}), "invalid", "invalid", ["PLAN-2"],
          "a plan always caps spend"),
+        ("plans", "valid-timeout-in-days", "run-plan", dict(PLAN, limits={"maxUsd": 3.0, "timeout": "P1D"}), "valid", "valid",
+         ["PLAN-2", "ENC-9"], "a timeout is a duration (ENC-9): days, hours and minutes, like a freshness"),
+        ("plans", "timeout-in-seconds", "run-plan", dict(PLAN, limits={"maxUsd": 3.0, "timeout": "PT30S"}), "invalid", "invalid",
+         ["PLAN-2", "ENC-9"], "a duration has no seconds"),
+        ("plans", "unknown-isolation", "run-plan", dict(PLAN, isolation="vm"), "invalid", "valid", ["PLAN-7", "VER-8"],
+         "an isolation this version does not know: the writer refuses it, a reader takes it, and a runner refuses the plan"),
+        ("plans", "unknown-credential-scheme", "run-plan",
+         dict(PLAN, credentialRefs=[dict(CREDENTIALS[0], scheme="hsm"), CREDENTIALS[1]]), "invalid", "valid",
+         ["PLAN-3", "PLAN-7", "VER-8"],
+         "a credential scheme this version does not know: a reader takes the plan, and a runner refuses it"),
+        ("plans", "unknown-credential-purpose", "run-plan",
+         dict(PLAN, credentialRefs=[CREDENTIALS[0], dict(CREDENTIALS[1], purpose="observer")]), "invalid", "valid",
+         ["PLAN-3", "PLAN-7", "VER-8"],
+         "a credential purpose this version does not know: a reader takes the plan, and a runner refuses it"),
         ("runners", "valid", "runner", RUNNER, "valid", "valid", ["PLAN-6"], "a local runner"),
         ("runners", "no-provider", "runner", dict(RUNNER, providers=[]), "invalid", "invalid", ["PLAN-6"],
          "a runner supports at least one provider"),
         ("runners", "unknown-os", "runner", dict(RUNNER, os="plan9"), "invalid", "valid", ["PLAN-6", "VER-8"],
          "an os this version does not know: the writer refuses it, a reader accepts it and shows it as written"),
+        ("runners", "unknown-kind", "runner", dict(RUNNER, kind="warehouse"), "invalid", "valid", ["PLAN-6", "VER-8"],
+         "a runner kind this version does not know: the writer refuses it, a reader accepts it and shows it as written"),
     ]
+
+
+# How a reader reads each value of §7.3 a document vector holds (VER-8), as tools/aef_verify.py's `document` command
+# reports it in "reads": a plan a runner must refuse reads as "refused"; a runner's kind and os are shown as written.
+READS = {
+    ("plans", "unknown-provider"): {"provider": "refused"},
+    ("plans", "unknown-isolation"): {"isolation": "refused"},
+    ("plans", "unknown-credential-scheme"): {"credentialRefs[0].scheme": "refused"},
+    ("plans", "unknown-credential-purpose"): {"credentialRefs[1].purpose": "refused"},
+    ("runners", "unknown-os"): {"os": "plan9"},
+    ("runners", "unknown-kind"): {"kind": "warehouse"},
+}
 
 
 def matching():
@@ -103,7 +139,15 @@ def matching():
          "a remote-zone plan runs only in its zone"),
         ("zone-matches", zone_plan, dict(RUNNER, kind="remote", providers=["k8s"], networkZone="eu-1"), True,
          "same zone, provider supported, tags carried"),
+        ("runner-kind-unknown", PLAN, dict(RUNNER, kind="warehouse"), True,
+         "a runner kind this version does not know takes no part in matching (VER-8): tags and provider decide"),
+        ("runner-os-unknown", PLAN, dict(RUNNER, os="plan9"), True,
+         "a runner os this version does not know takes no part in matching (VER-8): tags and provider decide"),
     ]
+
+
+# Matching vectors whose runner manifest only a reader accepts (a value a later minor may add), and their extra rules.
+MATCHING_READER_ONLY = {"runner-kind-unknown", "runner-os-unknown"}
 
 
 def ev(seq, kind, at, **fields):
@@ -140,16 +184,18 @@ STREAM_RULES = {
     "time-backwards-by-a-nanosecond": ["ENC-8", "STRM-3"],
     "over-cases": ["PLAN-2", "STRM-3"],
     "over-time": ["PLAN-2", "STRM-3"],
+    "over-time-in-days": ["PLAN-2", "STRM-3", "ENC-9"],
     "unknown-kind-mid-stream": ["STRM-1", "VER-8"],
 }
 UNFINISHED = {"last-line-without-lf"}  # its last line has no LF (STRM-2): it is still being written
 
 
-def streams(digest, small_digest):
+def streams(digest, small_digest, day_digest):
     """(name, plan file, events, problems as (where, problem) in reporting order, reader only). A vector in
     UNFINISHED is written without the LF after its last event."""
     accepted = ev(1, "job.accepted", T.format(0), planId="plan-41", planDigest=digest, runnerId="runner-local-01")
     small = ev(1, "job.accepted", T.format(0), planId="plan-42", planDigest=small_digest, runnerId="runner-local-01")
+    day = ev(1, "job.accepted", T.format(0), planId="plan-46", planDigest=day_digest, runnerId="runner-local-01")
     sealed = [
         accepted,
         ev(2, "plan.estimated", T.format(1), cases=2, usdLow=0.5, usdHigh=1.5, priceTable="2026-09-30"),
@@ -162,7 +208,7 @@ def streams(digest, small_digest):
         ev(9, "job.sealed", T.format(8), runs=["R-1"]),
     ]
     cancel = lambda n, at: ev(n, "job.cancelled", T.format(at), reason="Cancelled by the approver.")
-    p, s = "plan.json", "plan-small.json"
+    p, s, d = "plan.json", "plan-small.json", "plan-day.json"
     return [
         ("complete-sealed", p, sealed, [], False),
         ("refused", p, [ev(1, "job.refused", T.format(0), planId="plan-41", planDigest=digest, runnerId="runner-local-01",
@@ -207,6 +253,10 @@ def streams(digest, small_digest):
         ("over-time", s, [small, ev(2, "spend.updated", "2026-10-08T12:01:00Z", spentUsd=0.1),
                           ev(3, "spend.updated", "2026-10-08T12:01:01Z", spentUsd=0.2), ev(4, "job.cancelled", "2026-10-08T12:01:02Z", reason="x")],
          [("event:3", "over-time")], False),
+        ("over-time-in-days", d, [day, ev(2, "spend.updated", "2026-10-09T12:00:00Z", spentUsd=0.1),
+                                  ev(3, "spend.updated", "2026-10-09T12:00:00.000000001Z", spentUsd=0.2),
+                                  ev(4, "job.cancelled", "2026-10-09T12:00:01Z", reason="x")],
+         [("event:3", "over-time")], False),
         ("unknown-kind-mid-stream", p, [accepted, ev(2, "job.paused", T.format(1)), cancel(3, 2)], [], True),
     ]
 
@@ -216,7 +266,13 @@ def streams(digest, small_digest):
 TRIAGE = {"ref": "suite:support/triage-scenarios", "version": "4", "digest": "sha256:" + "4c" * 32}
 SECURITY = {"ref": "suite:owasp/llm-top10", "version": "2026.1"}
 # The plan of the STRM-4 vectors: the quality suite is frozen (named by its digest); maxUsd 3.0 and cases 3 for the job.
-CPLAN = dict(PLAN, planId="plan-43", suites=[dict(PLAN["suites"][0], digest=TRIAGE["digest"]), PLAN["suites"][1]],
+# Its jobs are accepted at ACCEPTED and end (their terminal event) at TERMINAL; a run starts and ends between them.
+ACCEPTED, TERMINAL = "2026-10-08T12:00:00Z", "2026-10-08T12:02:00Z"
+DEPLOYMENT = {"ref": "deployment:support/support-triage@dev", "endpoint": PLAN["subject"]["endpoint"]}
+STAGING = "deployment:support/support-triage@staging"
+# The plan of the STRM-4 vectors names the deployment and its endpoint (PLAN-1).
+CPLAN = dict(PLAN, planId="plan-43", subject=dict(PLAN["subject"], deployment=DEPLOYMENT["ref"]),
+             suites=[dict(PLAN["suites"][0], digest=TRIAGE["digest"]), PLAN["suites"][1]],
              limits={"maxUsd": 3.0, "cases": 3, "timeout": "PT2H"})
 NO_JUDGES = {k: v for k, v in dict(CPLAN, planId="plan-44").items() if k != "judges"}
 CAPTURED = dict(CPLAN, planId="plan-45", contentCapture="on")
@@ -260,9 +316,10 @@ def make_run(runs, folder, run_id, plan, digest, *, cases=TWO_CASES, lane="quali
     follows SUM-3..5 (data, so that the run is intact). Returns its run hash."""
     run_dir = runs / folder
     run = {"schemaVersion": V, "runId": run_id, "status": "completed", "producer": {"name": "agenteval-cli", "version": "1.0.0"},
-           "subject": {"ref": SUBJECT, "kind": "agent", "version": "git:3f2a1c"}, "suite": dict(TRIAGE),
+           "subject": {"ref": SUBJECT, "kind": "agent", "version": "git:3f2a1c"}, "deployment": dict(DEPLOYMENT),
+           "suite": dict(TRIAGE),
            "judges": [{"model": "gpt-5.1", "provider": "azure.ai.openai", "mode": "single", "rubricDigest": RUBRIC}],
-           "startedAt": "2026-10-08T12:00:00Z", "endedAt": "2026-10-08T12:00:05Z", "contentCapture": "off",
+           "startedAt": "2026-10-08T12:00:10Z", "endedAt": "2026-10-08T12:00:50Z", "contentCapture": "off",
            "execution": {"targetMode": "live", "stimulus": "suite"},
            "provenance": {"planId": plan["planId"], "planDigest": digest, "jobId": "job-7", "runnerId": "runner-local-01"}}
     run.update(over)
@@ -283,7 +340,7 @@ def make_run(runs, folder, run_id, plan, digest, *, cases=TWO_CASES, lane="quali
          "verdict": "passed" if total / len(values) >= 0.8 else "failed", "rule": "triage-score >= 0.8",
          "sum": total, "sumSq": sum(v * v for v in values)}]}],
         **({"cost": {"totalUsd": cost, "source": "provider-billing"}} if cost is not None else {})})
-    return seal(run_dir, run, "producer", sealed_at="2026-10-08T12:00:06Z") if sealed else run_hash(run_dir)
+    return seal(run_dir, run, "producer", sealed_at="2026-10-08T12:00:55Z") if sealed else run_hash(run_dir)
 
 
 def security_run(runs, run_id, plan, digest, *, cases=SECURITY_CASE, **kw):
@@ -309,16 +366,16 @@ def redact(run_dir, run_id, the_hash, blob):
 
 
 def job(plan, digest, announced, named, *, failed=False):
-    """The stream of a job that keeps STRM-3: accepted, one evidence.produced per announced (runId, runHash), and a
-    job.sealed (or a job.failed at maxUsd) naming the runs."""
-    events = [ev(1, "job.accepted", T.format(0), planId=plan["planId"], planDigest=digest, runnerId="runner-local-01")]
+    """The stream of a job that keeps STRM-3: accepted at ACCEPTED, one evidence.produced per announced (runId,
+    runHash), and a job.sealed (or a job.failed at maxUsd) naming the runs, at TERMINAL."""
+    events = [ev(1, "job.accepted", ACCEPTED, planId=plan["planId"], planDigest=digest, runnerId="runner-local-01")]
     for run_id, the_hash in announced:
-        events.append(ev(len(events) + 1, "evidence.produced", T.format(len(events)), runId=run_id, runHash=the_hash))
+        events.append(ev(len(events) + 1, "evidence.produced", f"2026-10-08T12:01:{len(events):02d}Z", runId=run_id, runHash=the_hash))
     n = len(events) + 1
     if failed:
-        events.append(ev(n, "job.failed", T.format(n - 1), reason="The next case would pass the $3.00 limit.", limit="maxUsd", runs=named))
+        events.append(ev(n, "job.failed", TERMINAL, reason="The next case would pass the $3.00 limit.", limit="maxUsd", runs=named))
     else:
-        events.append(ev(n, "job.sealed", T.format(n - 1), runs=named))
+        events.append(ev(n, "job.sealed", TERMINAL, runs=named))
     return events
 
 
@@ -379,11 +436,14 @@ def v_provenance(runs, plan, digest):
 def v_several(runs, plan, digest):
     h1 = make_run(runs, "R-1", "R-1", plan, digest, subject={"ref": SUBJECT, "kind": "agent", "version": V6},
                   judges=[{"model": "gpt-4o-mini", "provider": "openai", "mode": "single", "rubricDigest": RUBRIC}],
-                  contentCapture="on", execution={"targetMode": "replayed", "stimulus": "suite"}, cost=2.5)
+                  contentCapture="on", execution={"targetMode": "replayed", "stimulus": "suite"}, cost=2.5,
+                  deployment={"ref": STAGING, "endpoint": "http://localhost:5081/v1"},
+                  startedAt="2026-10-01T12:00:10Z", endedAt="2026-10-01T12:00:50Z")
     h2 = security_run(runs, "R-2", plan, digest, provenance=DROP)
     return job(plan, digest, [("R-1", h1), ("R-2", h2)], ["R-2", "R-1"]), [
         ("job", "over-budget"),
-        ("run:R-1", "content-capture"), ("run:R-1", "judges"), ("run:R-1", "subject"), ("run:R-1", "target-mode"),
+        ("run:R-1", "content-capture"), ("run:R-1", "deployment"), ("run:R-1", "judges"), ("run:R-1", "subject"),
+        ("run:R-1", "target-mode"), ("run:R-1", "time"),
         ("run:R-2", "provenance")]
 
 
@@ -405,10 +465,12 @@ def conformance():
         ("valid", CPLAN, two_runs([], dict(cases=ONE_CASE, cost=1.5), {}), None, ["STRM-4", "RUN-12"],
          "two runs, one per suite (the frozen one with the plan's digest), each the plan's subject, judges and capture, "
          "live; the job has 2 cases and cost $2.50"),
-        ("at-the-limits", CPLAN, two_runs([], dict(cases=ONE_CASE + (("case-19", "trials", 0.8),), cost=2.0), {}), None,
-         ["STRM-4", "PLAN-2"],
+        ("at-the-limits", CPLAN,
+         two_runs([], dict(cases=ONE_CASE + (("case-19", "trials", 0.8),), cost=2.0, startedAt="2026-10-08T12:00:00.000Z"),
+                  dict(endedAt="2026-10-08T12:02:00.000000000Z")), None, ["STRM-4", "PLAN-2", "ENC-8"],
          "the job's cost ($2.00 + $1.00) equals maxUsd, which is within it; its cases are three, though five lines have "
-         "no parent (a case's two trials and their rollup) and one line is a child"),
+         "no parent (a case's two trials and their rollup) and one line is a child; R-1 starts as the job is accepted "
+         "and R-2 ends as it ends, the same instants written otherwise"),
         ("plan-names-no-judges", NO_JUDGES, one_run([]), None, ["STRM-4"],
          "a plan without judges leaves the runner's judges unchecked"),
         ("run-missing", CPLAN, v_run_missing, None, ["STRM-4", "RUN-1"], "R-2 was announced and sealed, but no folder holds it"),
@@ -435,6 +497,17 @@ def conformance():
          "a suite version the plan does not name"),
         ("suite-digest", CPLAN, one_run([("run:R-1", "suite")], suite=dict(TRIAGE, digest="sha256:" + "5d" * 32)), None,
          ["STRM-4", "RUN-8"], "the plan's suite and version, with other content than the digest the plan names"),
+        ("deployment", CPLAN, one_run([("run:R-1", "deployment")], deployment=dict(DEPLOYMENT, ref=STAGING)), None,
+         ["STRM-4", "PLAN-1", "RUN-6"], "the run records another deployment than the plan's"),
+        ("deployment-endpoint", CPLAN,
+         one_run([("run:R-1", "deployment")], deployment=dict(DEPLOYMENT, endpoint="http://localhost:5081/v1")), None,
+         ["STRM-4", "PLAN-1", "RUN-6"], "the plan's deployment, reached at another endpoint than the plan's"),
+        ("started-before-acceptance", CPLAN, one_run([("run:R-1", "time")], startedAt="2026-10-08T11:59:59.999999999Z"),
+         None, ["STRM-4", "ENC-8"],
+         "the run started a nanosecond before the job was accepted: evidence the runner had before it was asked, adopted "
+         "and not produced"),
+        ("ended-after-terminal", CPLAN, one_run([("run:R-1", "time")], endedAt="2026-10-08T12:02:00.000000001Z"), None,
+         ["STRM-4", "ENC-8"], "the run ended a nanosecond after the job's terminal event"),
         ("judges", CPLAN, one_run([("run:R-1", "judges")], judges=judge(model="gpt-4o-mini")), None, ["STRM-4"],
          "another judge model, with the plan's rubric"),
         ("judges-rubric", CPLAN, one_run([("run:R-1", "judges")], judges=judge(rubricDigest=OTHER_RUBRIC)), None, ["STRM-4"],
@@ -456,9 +529,10 @@ def conformance():
          ["STRM-4", "PLAN-2"], "two runs of $2.00 each: each within the plan's $3.00, the job's $4.00 above it"),
         ("no-cost", CPLAN, one_run([("run:R-1", "no-cost")], cost=None), None, ["STRM-4", "PLAN-2", "SUM-7"],
          "R-1's summary states no cost: with a budget to keep, that is a problem, not $0"),
-        ("several-problems", CPLAN, v_several, None, ["STRM-4", "PLAN-2", "RUN-7", "RUN-11", "RUN-12"],
-         "job.sealed names R-2 before R-1; the job cost $3.50; R-1 is another version, judged by another model, with "
-         "content kept, replayed; R-2 has no provenance: ordered by path (job first), then by code"),
+        ("several-problems", CPLAN, v_several, None, ["STRM-4", "PLAN-1", "PLAN-2", "RUN-7", "RUN-11", "RUN-12"],
+         "job.sealed names R-2 before R-1; the job cost $3.50; R-1 is another version, in another deployment at another "
+         "endpoint, judged by another model, with content kept, replayed, and a week before the job; R-2 has no "
+         "provenance: ordered by path (job first), then by code"),
     ]
 
 
@@ -467,17 +541,25 @@ def main():
         shutil.rmtree(ROOT)
     for folder, name, schema, doc, writer, reader, rules, why in documents():
         write_json(ROOT / folder / name / "document.json", doc)
-        write_json(ROOT / folder / name / "expected.json", {"kind": "plan", "schema": schema, "writer": writer, "reader": reader,
-                                                            "rules": rules, "why": why})
+        expected = {"kind": "plan", "schema": schema, "writer": writer, "reader": reader}
+        if (folder, name) in READS:
+            expected["reads"] = READS[(folder, name)]
+        expected.update(rules=rules, why=why)
+        write_json(ROOT / folder / name / "expected.json", expected)
     for name, plan, runner, matches, why in matching():
         write_json(ROOT / "matching" / name / "plan.json", plan)
         write_json(ROOT / "matching" / name / "runner.json", runner)
-        write_json(ROOT / "matching" / name / "expected.json", {"kind": "matching", "matches": matches, "rules": ["PLAN-7"], "why": why})
+        expected = {"kind": "matching", "matches": matches}
+        if name in MATCHING_READER_ONLY:
+            expected["readerOnly"] = True
+        expected.update(rules=["PLAN-7", "VER-8"] if name in MATCHING_READER_ONLY else ["PLAN-7"], why=why)
+        write_json(ROOT / "matching" / name / "expected.json", expected)
     write_json(ROOT / "streams" / "plan.json", PLAN)
     write_json(ROOT / "streams" / "plan-small.json", SMALL)
+    write_json(ROOT / "streams" / "plan-day.json", DAY)
     digest = hashlib.sha256(dumps(PLAN)).hexdigest()
     small_digest = hashlib.sha256(dumps(SMALL)).hexdigest()
-    vectors = streams(digest, small_digest)
+    vectors = streams(digest, small_digest, hashlib.sha256(dumps(DAY)).hexdigest())
     assert sorted(STREAM_RULES) == sorted(name for name, *_ in vectors)
     for name, plan, events, problems, reader_only in vectors:
         write_ndjson(ROOT / "streams" / name / "events.ndjson", events)

@@ -56,7 +56,7 @@ Type: string. Bounds: pattern `^E-[A-Za-z0-9._-]{1,64}$`
 
 ### state
 
-A result's state. Only passed is a pass; not_measured, not_applicable, skipped, error and pending are typed absences, never a pass and never a 0 fail. scored: measured, with no pass/fail rule applied (a score only); it is never a pass (RES-1).
+A node's state (RES-1): passed (the only pass), failed, warn (a soft failure), inconclusive (measured, undecided), scored (measured, no pass/fail rule applied), and the typed absences not_measured, not_applicable, skipped, error and pending. Closed for major 1 (VER-9).
 
 Type: one of `"passed"`, `"failed"`, `"warn"`, `"inconclusive"`, `"scored"`, `"not_measured"`, `"not_applicable"`, `"skipped"`, `"error"`, `"pending"`
 
@@ -103,9 +103,9 @@ Type: [id](#id)
 
 ### duration
 
-An ISO 8601 duration in days and hours, each at most five digits: P14D, PT36H, P1DT12H.
+An ISO 8601 duration of days, hours and minutes (ENC-9): P, then optionally <n>D, then optionally T and <n>H, <n>M or both in that order; each n one to five digits; at least one part, and no T without one: P14D, PT36H, PT90M, P1DT12H30M.
 
-Type: string. Bounds: pattern `^P([0-9]{1,5}D(T[0-9]{1,5}H)?|T[0-9]{1,5}H)$`
+Type: string. Bounds: pattern `^P(?:[0-9]{1,5}D(?:T(?:[0-9]{1,5}H(?:[0-9]{1,5}M)?|[0-9]{1,5}M))?|T(?:[0-9]{1,5}H(?:[0-9]{1,5}M)?|[0-9]{1,5}M))$`
 
 ### runRef
 

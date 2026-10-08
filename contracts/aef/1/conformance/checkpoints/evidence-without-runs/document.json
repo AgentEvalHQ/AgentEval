@@ -95,6 +95,9 @@
       {
         "lane": "quality",
         "blocking": true,
+        "evidence": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
         "result": {
           "status": "passed",
           "subjectVersion": "git:3f2a1c",
@@ -105,6 +108,10 @@
         "lane": "security",
         "blocking": true,
         "freshness": "P14D",
+        "evidence": [
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        ],
         "result": {
           "status": "passed",
           "subjectVersion": "git:3f2a1c",

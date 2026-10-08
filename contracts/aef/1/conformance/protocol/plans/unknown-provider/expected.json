@@ -3,6 +3,9 @@
   "schema": "run-plan",
   "writer": "invalid",
   "reader": "valid",
+  "reads": {
+    "provider": "refused"
+  },
   "rules": [
     "PLAN-7",
     "VER-8"

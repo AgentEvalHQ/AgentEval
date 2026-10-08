@@ -30,7 +30,7 @@ public static class CheckpointDecisionJson
                     AefTime.Parse(Required(result, "oldestClosedAt")),
                     result["axes"] is JsonArray axes ? axes.Select(a => (string)a!).ToList() : null);
             return new LaneInput(Required(lane, "lane"), (bool?)lane["blocking"] ?? throw new FormatException("blocking is required."),
-                evidence, (string?)lane["freshness"]);
+                evidence, (string?)lane["freshness"], RunHashes(lane["evidence"]));
         }).ToList();
 
         var exceptions = (input["exceptions"] as JsonArray)?.Select(node =>
@@ -39,6 +39,7 @@ public static class CheckpointDecisionJson
             var by = grant["by"] ?? throw new FormatException("by is required.");
             return new ExceptionGrant(
                 Required(grant, "lane"),
+                RunHashes(grant["evidence"]) ?? [],   // none is no evidence, which the decision function refuses ([DEC-1])
                 Required(grant, "reason"),
                 new TrustedIdentity(Required(by, "identity"), Required(by, "assurance")),
                 AefTime.Parse(Required(grant, "at")),
@@ -107,6 +108,10 @@ public static class CheckpointDecisionJson
         null => throw new FormatException("status is required."),
         _ => LaneEvidenceStatus.NotMeasured,
     };
+
+    /// <summary>A list of run hashes (a lane's or an exception's evidence), or null when absent.</summary>
+    internal static List<string>? RunHashes(JsonNode? node) =>
+        node is JsonArray hashes ? hashes.Select(h => (string?)h ?? throw new FormatException("A run hash is null.")).ToList() : null;
 
     private static string Required(JsonNode node, string name) =>
         (string?)node[name] is { Length: > 0 } value ? value : throw new FormatException($"{name} is required.");

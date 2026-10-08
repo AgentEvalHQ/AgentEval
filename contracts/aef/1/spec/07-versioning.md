@@ -42,7 +42,7 @@ better evidence than it is (each has a reader-only corpus vector):
 | summary `verdict` | `inconclusive`: not a pass |
 | `trials.aggregation`, `executionPolicy.aggregation`, `config.thresholds[].op` | shown as written (descriptive) |
 | `metrics` `direction` | `none` |
-| `aggregation.strategy`, `aggregation.rulePath`, gate `rule.strategy` | shown as written (descriptive, [RES-6]) |
+| `aggregation.strategy`, `aggregation.rulePath` | shown as written (descriptive, [RES-6]) |
 | gate `outcome` | `inconclusive` |
 | gate `comparability` | `incomparable` |
 | overlay `kind` | an annotation: recorded, no effect on any state |

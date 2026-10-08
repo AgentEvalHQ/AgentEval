@@ -1,5 +1,5 @@
 {
-  "description": "A blocking failure with an exception in force is waived: approved_with_exceptions.",
+  "description": "A blocking failure with an exception for its exact evidence, in force: waived, approved_with_exceptions.",
   "rules": [
     "DEC-1",
     "DEC-2",
@@ -13,6 +13,9 @@
       {
         "lane": "quality",
         "blocking": true,
+        "evidence": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
         "result": {
           "status": "passed",
           "subjectVersion": "git:3f2a1c",
@@ -22,6 +25,9 @@
       {
         "lane": "security",
         "blocking": true,
+        "evidence": [
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        ],
         "result": {
           "status": "failed",
           "subjectVersion": "git:3f2a1c",
@@ -32,14 +38,17 @@
     "exceptions": [
       {
         "lane": "security",
+        "evidence": [
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        ],
         "requirement": "REQ-15",
         "reason": "The security failure is accepted until the fix ships; tracked in the release review.",
         "by": {
           "identity": "oidc:https://login.example.com/u-7f3a",
           "assurance": "authenticated"
         },
-        "at": "2026-10-06T09:00:00Z",
-        "expires": "2026-10-20T00:00:00Z"
+        "at": "2026-10-07T15:00:00Z",
+        "expires": "2026-10-21T00:00:00Z"
       }
     ]
   },

@@ -258,7 +258,10 @@
           "status": "passed",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-01T12:00:00Z"
-        }
+        },
+        "evidence": [
+          "2dc8e8322f809c1af1ec2e308f0bda4ebd24bc5c58a69701e0b02c551d312369"
+        ]
       },
       {
         "lane": "ge-boundary",
@@ -267,7 +270,10 @@
           "status": "passed",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-01T12:00:00Z"
-        }
+        },
+        "evidence": [
+          "2dc8e8322f809c1af1ec2e308f0bda4ebd24bc5c58a69701e0b02c551d312369"
+        ]
       },
       {
         "lane": "gt-boundary",
@@ -276,7 +282,10 @@
           "status": "failed",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-01T12:00:00Z"
-        }
+        },
+        "evidence": [
+          "2dc8e8322f809c1af1ec2e308f0bda4ebd24bc5c58a69701e0b02c551d312369"
+        ]
       },
       {
         "lane": "le",
@@ -285,7 +294,10 @@
           "status": "failed",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-01T12:00:00Z"
-        }
+        },
+        "evidence": [
+          "2dc8e8322f809c1af1ec2e308f0bda4ebd24bc5c58a69701e0b02c551d312369"
+        ]
       },
       {
         "lane": "lt",
@@ -294,7 +306,10 @@
           "status": "passed",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-01T12:00:00Z"
-        }
+        },
+        "evidence": [
+          "2dc8e8322f809c1af1ec2e308f0bda4ebd24bc5c58a69701e0b02c551d312369"
+        ]
       },
       {
         "lane": "no-entry",
@@ -303,7 +318,10 @@
           "status": "not_measured",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-01T12:00:00Z"
-        }
+        },
+        "evidence": [
+          "2dc8e8322f809c1af1ec2e308f0bda4ebd24bc5c58a69701e0b02c551d312369"
+        ]
       },
       {
         "lane": "other-summary-lane",
@@ -312,7 +330,10 @@
           "status": "not_measured",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-01T12:00:00Z"
-        }
+        },
+        "evidence": [
+          "2dc8e8322f809c1af1ec2e308f0bda4ebd24bc5c58a69701e0b02c551d312369"
+        ]
       },
       {
         "lane": "n-zero",
@@ -321,7 +342,10 @@
           "status": "not_measured",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-02T12:00:00Z"
-        }
+        },
+        "evidence": [
+          "c7b92b2e9ddc4cb416eb0722a199699cd8e2d650deaa5043b041de1625b3b059"
+        ]
       },
       {
         "lane": "one-fails",
@@ -330,7 +354,11 @@
           "status": "failed",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-09-28T08:30:00.5Z"
-        }
+        },
+        "evidence": [
+          "2dc8e8322f809c1af1ec2e308f0bda4ebd24bc5c58a69701e0b02c551d312369",
+          "bd7122abbd9935e19453f831069e6e9d1e40a4aec2060bc674d76b9945d27f95"
+        ]
       },
       {
         "lane": "failed-beats-unmeasured",
@@ -339,7 +367,11 @@
           "status": "failed",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-09-28T08:30:00.5Z"
-        }
+        },
+        "evidence": [
+          "bd7122abbd9935e19453f831069e6e9d1e40a4aec2060bc674d76b9945d27f95",
+          "c7b92b2e9ddc4cb416eb0722a199699cd8e2d650deaa5043b041de1625b3b059"
+        ]
       },
       {
         "lane": "unmeasured-beats-passed",
@@ -348,7 +380,11 @@
           "status": "not_measured",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-01T12:00:00Z"
-        }
+        },
+        "evidence": [
+          "2dc8e8322f809c1af1ec2e308f0bda4ebd24bc5c58a69701e0b02c551d312369",
+          "c7b92b2e9ddc4cb416eb0722a199699cd8e2d650deaa5043b041de1625b3b059"
+        ]
       },
       {
         "lane": "no-runs",

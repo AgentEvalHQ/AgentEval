@@ -50,22 +50,24 @@ GraderResult.
 | `suite.ref`, `suite.version` | `suite_id`, `suite_version` | exact |
 | `suite.digest` | `metadata` | none |
 | `startedAt`, `endedAt` | `started_at`, `completed_at` | exact |
-| `producer.name`, `producer.version` | `runner.name`, `runner.version` | exact |
+| `producer.name`, `producer.version`; for an imported run, `imported.from` ([RUN-15](../spec/03-run.md#32-runjson)) | `runner.name`, `runner.version`: the tool that ran the evaluation | exact |
 | `subject` | `provider.model` when `subject.kind` is `model`; otherwise `metadata` | lossy |
 | `deployment.endpoint` | `provider.api_base` | exact |
 | `status: aborted`, `abortReason` | `metadata.openeval.partial: true`, reason in `metadata` | lossy |
-| `execution`, `contentCapture`, `judges` | `metadata` | none |
+| `execution`, `contentCapture`, `judges`, `imported.asserted` | `metadata` | none |
 | a root line's `caseId` | `test_case_id` | exact |
 | `trial` | `attempt` = `trial` + 1 | exact |
 | a `trials` rollup line | none: EvalPort has attempts and no rollup | none |
 | root `state: passed` | `passed: true` | exact |
 | root `state` `failed`, `warn` | `passed: false`, with at least one scored grader | lossy: `warn` and `failed` look the same |
 | root `state: inconclusive` | `passed: false` | lossy |
+| root `state: scored` | `passed: false` | lossy: EvalPort has no outcome for "no rule applied", and `passed: false` beside a score reads as a verified failure (Rule 6) |
 | root `state: error` | `error` (`type: runner_error`, `message` = `reason`) | lossy: AEF records no error class |
 | a leaf's `path` | `grader_id` | exact |
 | a leaf's `annotator.kind` or `evaluator.id` | `type` (e.g. `aef_llm`) | lossy |
 | a measured leaf's `scores[0]` | `score` = `normalized`, or `value` when it is already in [0, 1] | exact; a value outside [0, 1] goes to `metadata.openeval.raw_score` |
-| a measured leaf's `state` | `passed` = (`state` is `passed`) | lossy for `warn`, `inconclusive` |
+| a measured leaf's `state` | `passed` = (`state` is `passed`) | lossy for `warn`, `inconclusive` and `scored` |
+| `scores[].label` | `metadata` | none |
 | a leaf in a typed absence | `score: null`, `passed: false`, `reason` | lossy: `not_measured`, `not_applicable`, `skipped`, `error` and `pending` all become one null |
 | `reason` | `reason` | exact |
 | `component.weight` | the grader's `weight` in the suite | exact |
@@ -74,9 +76,12 @@ GraderResult.
 | `aggregation.measured`, `total`, `unmeasured`, `rulePath`, `decisive` | `metadata` | none |
 | `severity`, `verdictRule`, `uncertainty`, `annotator` | `metadata` | none |
 | `durationMs` | `duration_ms` (an integer) | exact to the millisecond |
+| a root line's `endedAt` | `completed_at` of the Result | exact; `startedAt` has no field |
 | `traceLink.traceId` | `metadata.openeval.trace_id` | lossy: the span id is lost |
-| `usage` | `metadata.openeval.cost` | lossy: EvalPort does not fix that key's shape |
-| `evidence`, blobs | `metadata` | none |
+| `usage` entries | `metadata.openeval.cost` | lossy: EvalPort does not fix that key's shape |
+| evidence of kind `output` (capture `on`) | `actual_output` | exact when captured |
+| evidence of kind `input`, `expected` (capture `on`) | the test case's `input`, `expected_output` in an exported Suite | exact when captured |
+| other evidence, blobs | `metadata` | none |
 | `summary.json` | `summary` (`total`, `passed`, `failed`, `skipped`, `pass_rate`, `avg_score`, `by_grader`) | lossy: `N` against `n`, verdicts, intervals and lanes are lost |
 | `gates.ndjson`, overlays | none | none |
 | `seal.json`, `attestation.dsse.json` | a Sigstore bundle over the exported file is EvalPort's equivalent; it signs other bytes | none: the run hash can be kept in `metadata` |
@@ -87,10 +92,11 @@ GraderResult.
 |---|---|---|
 | `run_id` | `runId` when it matches the id pattern (letters, digits, `.`, `_`, `:`, `-`; at most 128); otherwise a hash, with the original in `ext` | exact or lossy |
 | `version` | `ext` | none |
-| `suite_id`, `suite_version` | `suite.ref` (`suite:<suite_id>`), `suite.version` | exact; `suite_version` is optional in EvalPort and required in AEF's `suite` ([I7](README.md#gaps-found-by-these-mappings)) |
+| `suite_id`, `suite_version` | `suite.ref` (`suite:<suite_id>`), `suite.version` | exact; when `suite_version` is absent, the converter computes one from the suite file's digest and lists `suite.version` in `imported.asserted` ([RUN-15](../spec/03-run.md#32-runjson)) |
 | `started_at`, `completed_at` | `startedAt`, `endedAt` in UTC | exact instant |
-| `runner` | `producer` | exact; AEF requires a producer and EvalPort does not ([I7](README.md#gaps-found-by-these-mappings)) |
-| `provider.model`, `api_base`, `temperature`, `max_tokens` | `subject` (`kind: model`), `deployment.endpoint`, `config` | lossy; `execution.targetMode` has no source ([I7](README.md#gaps-found-by-these-mappings)) |
+| `runner` | `imported.from`; `producer` is the converter (RUN-15) | exact |
+| `provider.model`, `api_base`, `temperature`, `max_tokens` | `subject` (`kind: model`), `deployment.endpoint`, `config` | lossy: a ResultSet names a model, which may be one part of the subject |
+| (EvalPort does not say how the target was driven) | `execution.targetMode`, listed in `imported.asserted` | the converter's claim |
 | `isolation`, `group` | `ext` | none |
 | `metadata.openeval.partial: true` | `status: aborted` with an `abortReason`, or `completed` with `skipped` lines for the missing cases | lossy |
 | `test_case_id` | `caseId` | exact |
@@ -106,25 +112,27 @@ GraderResult.
 | `reason` | `reason` | exact |
 | the grader's `weight` | `component.weight`; `required` is `true` for `all` | lossy |
 | `openeval.aggregation` | `aggregation.strategy`: `weighted` → `WeightedSum`, `majority` → `MajorityVote`, `all` → `Min`; `any` has no counterpart | lossy |
-| `actual_output`; a test case's `input`, `expected_output`, `context` | blobs with evidence (capture `on`) | lossy ([I2](README.md#gaps-found-by-these-mappings)) |
+| `actual_output`; a test case's `input`, `expected_output` | blobs cited by evidence of kind `output`, `input`, `expected` ([EVD-1](../spec/03-run.md#37-evidencendjson-and-blobs)), only with `contentCapture: on` ([RUN-11](../spec/03-run.md#32-runjson)) | exact when captured |
+| a test case's `context`, `retrieval_context` | blobs cited by evidence of kind `document` (capture `on`) | exact when captured |
 | `duration_ms` | `durationMs` | exact |
-| `Result.completed_at` | none | none ([I6](README.md#gaps-found-by-these-mappings)) |
+| `Result.completed_at` | `endedAt` on the root line | exact |
 | `metadata.openeval.trace_id` | `traceLink.traceId` | exact |
-| `metadata.openeval.cost` | `usage` | lossy |
-| `summary` | a recomputed `summary.json` ([SUM-5](../spec/03-run.md#36-summaryjson)); the entries' `verdict` has no source | lossy ([I1](README.md#gaps-found-by-these-mappings)) |
+| `metadata.openeval.cost` | `usage` entries | lossy: EvalPort does not fix the key's shape |
+| `summary` | a recomputed `summary.json` ([SUM-5](../spec/03-run.md#36-summaryjson)) | lossy: the entries' `verdict` has no source (see [Still open](#still-open)) |
 | proposed `verdict` (`passed`, `failed`, `unverified`) | root `state` `passed`, `failed`, `not_measured` (or `inconclusive` when graders scored) | exact |
 | a `.sigstore.json` bundle | outside the run; AEF accepts Sigstore as a trust-policy input ([SIG-4](../spec/04-integrity.md#44-signatures)) | lossy |
 
 ## What does not carry over
 
-**AEF → EvalPort.** Which typed absence a leaf was, and `warn` or `inconclusive` at the root, except in metadata.
-`component.required` and the aggregation's `rulePath`, `decisive` and measured share. Trial rollups and their
-agreement. Severity, verdict rules, thresholds and uncertainty. `N` against `n` in the summary. Evidence digests, gate
-decisions, the run's seal, overlays and signatures. `execution.targetMode` and judge calibration.
+**AEF → EvalPort.** Which typed absence a leaf was, and `warn`, `inconclusive` or `scored` at the root, except in
+metadata. A score's `label`. `component.required` and the aggregation's `rulePath`, `decisive` and measured share.
+Trial rollups and their agreement. Severity, verdict rules, thresholds and uncertainty. `N` against `n` in the summary.
+A result's start time, and the usage of each party. Evidence other than the case content, evidence digests, gate
+decisions, the run's seal, overlays and signatures. `execution.targetMode`, judge calibration and `imported`.
 
-**EvalPort → AEF.** `isolation` and `group`: AEF has no field for either, and no finding tracks them yet. Per-result
-times ([I6](README.md#gaps-found-by-these-mappings)). The case content without capture ([I2](README.md#gaps-found-by-these-mappings)). A summary
-verdict ([I1](README.md#gaps-found-by-these-mappings)). The kind of non-measurement behind a null score.
+**EvalPort → AEF.** `isolation` and `group`: AEF has no field for either. The kind of non-measurement behind a null
+score: skipped, pending or failed. The aggregation behind `passed`, when the producer did not declare it. The case
+content, when the converter writes `contentCapture: off`.
 
 ## Worked example
 
@@ -188,9 +196,10 @@ RES-4 then gives the same four ids as the corpus: `r_479d157f3423e95d566bcbfc0c6
 An importer that ignores `metadata.aef` reads the null score as `not_measured`, and gets `not_applicable` back only
 from metadata.
 
-## Open gaps
+## Still open
 
-- [I1](README.md#gaps-found-by-these-mappings): summary entries need a verdict that a ResultSet does not give.
-- [I2](README.md#gaps-found-by-these-mappings): `actual_output`, `input` and `expected_output` have a place only as captured blobs.
-- [I6](README.md#gaps-found-by-these-mappings): `Result.completed_at`.
-- [I7](README.md#gaps-found-by-these-mappings): the subject, target mode, producer and suite version an importer supplies.
+- **A summary entry for a pass rate with no run-level rule.** A `summary.json` entry needs a `verdict`, and none of its
+  values (`passed`, `failed`, `warn`, `inconclusive`, `not_measured`; [SUM-6](../spec/03-run.md#36-summaryjson))
+  means "no rule was applied". A ResultSet's `summary` has a pass rate and no rule for it.
+- **`isolation` and `group`.** AEF has no field for a ResultSet's trial isolation or for its membership in a group of
+  sibling runs.

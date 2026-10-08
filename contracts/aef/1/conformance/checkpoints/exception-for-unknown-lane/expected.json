@@ -7,8 +7,9 @@
     "CKP-7",
     "DEC-1"
   ],
-  "why": "an exception for a lane the input does not have: the recorded input cannot be decided",
+  "why": "an exception for a lane the input does not have: the recorded input cannot be decided, and its run hashes are no runs of that lane",
   "problems": [
-    "decision"
+    "decision",
+    "exception-evidence"
   ]
 }

@@ -13,6 +13,9 @@
       {
         "lane": "quality",
         "blocking": true,
+        "evidence": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
         "result": {
           "status": "passed",
           "subjectVersion": "git:3f2a1c",
@@ -28,13 +31,16 @@
     "exceptions": [
       {
         "lane": "memory",
+        "evidence": [
+          "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        ],
         "reason": "The memory failure is accepted until the fix ships; tracked in the release review.",
         "by": {
           "identity": "oidc:https://login.example.com/u-7f3a",
           "assurance": "authenticated"
         },
-        "at": "2026-10-06T09:00:00Z",
-        "expires": "2026-10-20T00:00:00Z"
+        "at": "2026-10-07T15:00:00Z",
+        "expires": "2026-10-21T00:00:00Z"
       }
     ]
   },

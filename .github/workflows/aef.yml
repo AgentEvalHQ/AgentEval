@@ -1,0 +1,77 @@
+name: AEF
+
+# The AEF specification's own checks (contracts/aef/GOVERNANCE.md, "Proposing a change"). Runs only when AEF changes:
+# plain Python, standard library (jsonschema only for aef_schema's comparison self-test).
+on:
+  push:
+    paths:
+      - "contracts/aef/**"
+      - ".github/workflows/aef.yml"
+  pull_request:
+    paths:
+      - "contracts/aef/**"
+      - ".github/workflows/aef.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  aef:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0   # the DCO check reads the commits
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Spec, schemas and corpus agree (every rule covered, nothing ignored by git)
+        run: python -X utf8 -I contracts/aef/tools/check_spec.py
+
+      - name: The corpus regenerates byte for byte
+        run: |
+          set -e
+          cd contracts/aef/tools
+          for tool in derive_reader build_conformance lane_vectors signature_vectors decision_vectors protocol_vectors build_index; do
+            python -X utf8 -I "$tool.py" > /dev/null
+          done
+          cd "$GITHUB_WORKSPACE"
+          git status --porcelain -- contracts/aef
+          test -z "$(git status --porcelain -- contracts/aef)"
+
+      - name: The reference verifier passes every vector, and the corpus catches every mutation
+        run: |
+          python -X utf8 -I contracts/aef/tools/aef_conformance.py --quiet
+          python -X utf8 -I contracts/aef/tools/aef_conformance.py --self-check
+
+      - name: Tool self-tests and checks
+        run: |
+          pip install --quiet jsonschema==4.26.0
+          python -X utf8 -I contracts/aef/tools/aef_crypto.py --self-test
+          python -X utf8 -I contracts/aef/tools/aef_schema.py --self-test
+          python -X utf8 -I contracts/aef/tools/schema_diff.py --self-test
+          python -X utf8 -I contracts/aef/tools/aef_decide.py --check
+          python -X utf8 -I contracts/aef/tools/aef_stream.py --check
+          python -X utf8 -I contracts/aef/tools/gen_reference.py --check
+
+      - name: Every commit that changes AEF carries a DCO sign-off
+        env:
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -e
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+            echo "No base to compare with (a new branch): checking the last commit only."
+            BASE="$HEAD~1"
+          fi
+          missing=0
+          for c in $(git rev-list "$BASE..$HEAD" -- contracts/aef); do
+            if ! git log -1 --format=%B "$c" | grep -q '^Signed-off-by: '; then
+              echo "::error::commit $(git log -1 --format='%h %s' "$c") changes contracts/aef without a Signed-off-by line (GOVERNANCE.md, Contributions)"
+              missing=1
+            fi
+          done
+          exit $missing

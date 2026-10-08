@@ -16,7 +16,7 @@
     {
       "name": "run.json",
       "digest": {
-        "sha256": "dbbc117fc696871424d526c6c490a4fe4e2826b3d7dcd493099ab17933955c16"
+        "sha256": "1e190dda4bb2c347f24a61b056f4fe5f9edc6689a0583b350ccbb48d04180384"
       }
     },
     {
@@ -30,7 +30,7 @@
   "predicate": {
     "schemaVersion": "1.0",
     "runId": "R-1",
-    "runHash": "ed1f5966d1593330aae1a222a1232af385ea4f710ce024802fd8053bfd6b8447",
+    "runHash": "e673eb2cdf3338d5c43be5c882444aa6ce5d4923ffa94aa73c590d2f85301669",
     "producer": {
       "name": "agenteval-cli",
       "version": "1.0.0"
@@ -39,7 +39,9 @@
       "ref": "agent:support/support-triage",
       "version": "git:3f2a1c"
     },
-    "deployment": null,
+    "deployment": {
+      "ref": "deployment:support/support-triage@dev"
+    },
     "suite": {
       "ref": "suite:support/triage-scenarios",
       "version": "4",
@@ -51,7 +53,7 @@
         "rubricDigest": "sha256:a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9"
       }
     ],
-    "closedAt": "2026-10-08T12:00:05Z",
+    "closedAt": "2026-10-08T12:00:50Z",
     "sealedAt": "2026-10-08T13:00:00Z",
     "sealedBy": "producer"
   }

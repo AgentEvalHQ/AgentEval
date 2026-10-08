@@ -30,6 +30,14 @@ NOT_FIELDS = {"ExportTraceServiceRequest", "signedBy", "LaneResult", "Measuremen
 
 
 # Rules no corpus vector can test, and why. Everything else needs a vector that names it (CONF-1).
+# Problem codes no vector can expect, with the reason.
+CODES_UNTESTED = {
+    "limit": "ENC-17 lets a reader refuse beyond a limit but never requires it, so no vector can expect the refusal",
+}
+# Backticked words in the rules that define codes in prose which are not codes: DSSE fields, manifest fields a code's
+# explanation names, a state value, literals.
+NOT_CODES = {"payload", "payloadType", "signatures", "keyid", "sig", "runs", "status", "axes", "s", "null", "aborted"}
+
 UNTESTED = {
     "ENC-12": "a reader must not fetch the $id names: behaviour, not a file property",
     "ENC-14": "a rule on the schemas themselves: checked here (no lookaround, no backreference)",
@@ -86,7 +94,8 @@ def main():
         for name, t in text.items():
             m = re.search(r"\*\*\[" + rid + r"\][\s\S]*?(?=\n- \*\*\[|\n## |\Z)", t)
             if m:
-                codes.update(re.findall(r"`([a-z]+(?:-[a-z]+)+|[a-z]+)`", m.group(0)))
+                codes.update(w for w in re.findall(r"`([a-z]+(?:-[a-z]+)+|[a-z]+)`", m.group(0))
+                             if w not in NOT_CODES)
 
     used_rules, used_codes = set(), set()
     conf = AEF / "conformance"
@@ -107,6 +116,10 @@ def main():
         problems.append(f"the corpus names rule {rid}, which the spec does not define")
     for code in sorted(used_codes - codes):
         problems.append(f"the corpus expects problem code '{code}', which no code table of the spec defines")
+    for code in sorted(codes - used_codes - set(CODES_UNTESTED)):
+        problems.append(f"problem code '{code}' is expected by no corpus vector (add one, or list it in CODES_UNTESTED)")
+    for code in sorted(set(CODES_UNTESTED) & used_codes):
+        problems.append(f"CODES_UNTESTED lists '{code}', but a vector expects it: take it off the list")
 
     props = schema_properties()
     for name, t in text.items():

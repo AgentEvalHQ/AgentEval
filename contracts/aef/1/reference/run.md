@@ -73,7 +73,7 @@ The header of one run folder. Identity lives here, not in the folder path.
 | `provenance.runnerId` | [id](common.md#id) | yes |  | The runner that produced the run (RUN-12). |
 | `execution` | object | yes |  | How the evaluated target was driven (spec 03, RUN-7). Only live evidence describes how the subject behaves. |
 | `execution.targetMode` | one of `"live"`, `"replayed"`, `"scripted"`, `"mocked"` | yes |  | live: the real subject at run time; replayed: its recorded answers played back; scripted: a scripted stand-in; mocked: a stand-in that is not the subject. |
-| `execution.stimulus` | one of `"suite"`, `"generated"`, `"imported"`, `"other"` |  |  | Where the inputs came from: a fixed suite, generated at run time, imported from another tool, or other. |
+| `execution.stimulus` | one of `"suite"`, `"generated"`, `"external"`, `"other"` |  |  | Where the cases' inputs came from: suite (a fixed suite), generated (at run time, for example by an attacker model), external (another tool's cases), or other (RUN-7). A run converted from another tool's output says so in imported (RUN-15), not here. |
 | `imported` | object |  |  | For a run converted from another tool's output: the tool, and every run.json field the converter supplied because the original did not record it (RUN-15). A reader shows those as the converter's claims. |
 | `imported.from` | string | yes | ≥ 1 chars; ≤ 256 chars | The original tool and its version, such as inspect_ai 0.3.277. |
 | `imported.asserted` | array of string | yes | ≤ 64 items; unique | The run.json fields the converter supplied, as dotted paths (subject.version, execution.targetMode). |

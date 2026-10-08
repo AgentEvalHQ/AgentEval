@@ -49,18 +49,13 @@
         },
         "deployment": {
           "$ref": "common.schema.json#/$defs/ref",
-          "description": "Where the subject is deployed, as a typed reference."
+          "description": "Where the subject is deployed, as a typed reference. Every run the runner produces records it as its deployment.ref (STRM-4)."
         },
         "endpoint": {
-          "description": "Where the subject answers. Never carries credentials (no user:password@).",
-          "allOf": [
-            {
-              "$ref": "common.schema.json#/$defs/uri"
-            }
-          ],
-          "not": {
-            "pattern": "^[a-z][a-z0-9+.-]*://[^/]*@"
-          }
+          "description": "Where the subject answers: scheme, host and path only, as run.json's deployment.endpoint. No user information, no query string and no fragment, where credentials hide (PLAN-1, PLAN-4, RUN-10). Every run the runner produces records it as its deployment.endpoint (STRM-4).",
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^[a-z][a-z0-9+.-]*://[!\"$-.0->A-~]+(/[!\"$->@-~]*)?$"
         },
         "repository": {
           "description": "Where the image is pulled from (registry/name), when it is.",
@@ -119,9 +114,8 @@
           "maximum": 9007199254740991
         },
         "timeout": {
-          "description": "ISO 8601 duration in hours and minutes (PT2H, PT30M).",
-          "type": "string",
-          "pattern": "^PT([0-9]{1,5}H([0-9]{1,5}M)?|[0-9]{1,5}M)$"
+          "$ref": "common.schema.json#/$defs/duration",
+          "description": "The longest the job may take, from its job.accepted, as a duration (ENC-9): PT2H, PT45M, P1D, P1DT2H30M (PLAN-2, STRM-3)."
         }
       }
     },

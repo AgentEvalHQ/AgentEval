@@ -208,7 +208,10 @@
           "status": "passed",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-03T00:00:00Z"
-        }
+        },
+        "evidence": [
+          "bb2639c18529299f8b7fff2f7d133c3448ef92f04b76bb2a6d00182d49394fc6"
+        ]
       },
       {
         "lane": "none-refuses-low",
@@ -217,7 +220,10 @@
           "status": "failed",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-03T00:00:00Z"
-        }
+        },
+        "evidence": [
+          "bb2639c18529299f8b7fff2f7d133c3448ef92f04b76bb2a6d00182d49394fc6"
+        ]
       },
       {
         "lane": "missing-is-critical",
@@ -226,7 +232,10 @@
           "status": "failed",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-03T00:00:00Z"
-        }
+        },
+        "evidence": [
+          "80e93eeca812a137a284925fa45b7bbdc8b942036403d6f9255721fe345797b7"
+        ]
       },
       {
         "lane": "unmeasured",
@@ -235,7 +244,10 @@
           "status": "not_measured",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-03T00:00:00Z"
-        }
+        },
+        "evidence": [
+          "e0f554f95847b0ae639c1c389d74d384544f4adab5af078856ce11802f0dda47"
+        ]
       },
       {
         "lane": "failure-beats-unmeasured",
@@ -244,7 +256,10 @@
           "status": "failed",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-03T00:00:00Z"
-        }
+        },
+        "evidence": [
+          "1f9b328fc2857d621d1dac125094c0182f2c66ddeb327a739e6685820f568b4e"
+        ]
       },
       {
         "lane": "two-runs",
@@ -253,7 +268,11 @@
           "status": "not_measured",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-03T00:00:00Z"
-        }
+        },
+        "evidence": [
+          "bb2639c18529299f8b7fff2f7d133c3448ef92f04b76bb2a6d00182d49394fc6",
+          "e0f554f95847b0ae639c1c389d74d384544f4adab5af078856ce11802f0dda47"
+        ]
       },
       {
         "lane": "warn-counts",
@@ -262,7 +281,10 @@
           "status": "failed",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-03T00:00:00Z"
-        }
+        },
+        "evidence": [
+          "96532fa8384bd637fd3a662e51bb15b3615c9a195848a2923d92cdbf82cf7946"
+        ]
       },
       {
         "lane": "all-inconclusive",
@@ -271,7 +293,10 @@
           "status": "not_measured",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-03T00:00:00Z"
-        }
+        },
+        "evidence": [
+          "7b48abcf3ec25012d60a496d4724724c6d40611ffd3d934f1b04706baf90fdc3"
+        ]
       },
       {
         "lane": "no-results",
@@ -280,7 +305,10 @@
           "status": "not_measured",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-03T00:00:00Z"
-        }
+        },
+        "evidence": [
+          "4423e93d676c8b4768d19c731e7771479a8871e36b3f0cc553361e2c0d3a0fc5"
+        ]
       },
       {
         "lane": "not-applicable-ignored",
@@ -289,7 +317,10 @@
           "status": "passed",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-03T00:00:00Z"
-        }
+        },
+        "evidence": [
+          "1a6d0dc8e675207ee2f750f0ad70e380881f7f713f25322440d07e229e04720e"
+        ]
       },
       {
         "lane": "minimum-not-met",
@@ -298,7 +329,10 @@
           "status": "not_measured",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-03T00:00:00Z"
-        }
+        },
+        "evidence": [
+          "c5d7f6ac7c1145879710982a695da3fec2b0c96b62effdcae00f7c42c19893ff"
+        ]
       },
       {
         "lane": "minimum-met",
@@ -307,7 +341,10 @@
           "status": "passed",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-03T00:00:00Z"
-        }
+        },
+        "evidence": [
+          "c5d7f6ac7c1145879710982a695da3fec2b0c96b62effdcae00f7c42c19893ff"
+        ]
       }
     ]
   },

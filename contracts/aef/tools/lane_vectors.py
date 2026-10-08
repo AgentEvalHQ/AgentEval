@@ -34,7 +34,7 @@ def summarize(lines, lane, entries, kinds):
     for metric, path in entries:
         values, total = [], 0
         for l in lines:
-            if l["path"] != path or "trial" in l or l["state"] == "not_applicable":
+            if l["path"] != path or l.get("lane", lane) != lane or "trial" in l or l["state"] == "not_applicable":
                 continue
             total += 1
             if l["state"] in TYPED_ABSENCE:
@@ -56,7 +56,8 @@ def summarize(lines, lane, entries, kinds):
 
 def make_run(folder, run_id, lines, *, lane="quality", metrics=(("m", "score", "higher_better"),), entries=(("m", "p"),),
              version=VERSION, mode="live", status="completed", ended="2026-10-01T12:00:00Z", judges=JUDGES,
-             sealed=True, tamper=False, break_summary=False, subject_ref=SUBJECT, deployment=None, suite=SUITE):
+             sealed=True, tamper=False, break_summary=False, subject_ref=SUBJECT, deployment=None, suite=SUITE,
+             aggregate=None, more_lanes=()):
     """A small run. lines: dicts with case, path, state and optionally scores, severity, trial, trials, reason.
     Returns (runId, runHash)."""
     run_dir = folder / run_id
@@ -74,7 +75,7 @@ def make_run(folder, run_id, lines, *, lane="quality", metrics=(("m", "score", "
     for l in lines:
         line = {"schemaVersion": V, "resultId": result_id(run_id, l["case"], l["path"], l.get("trial")), "caseId": l["case"],
                 "path": l["path"], "evaluator": {"id": "code:check"}, "state": l["state"]}
-        for k in ("trial", "trials", "severity", "scores", "reason"):
+        for k in ("lane", "trial", "trials", "severity", "scores", "reason"):
             if k in l:
                 line[k] = l[k]
         if l["state"] in TYPED_ABSENCE and "reason" not in line:
@@ -82,8 +83,12 @@ def make_run(folder, run_id, lines, *, lane="quality", metrics=(("m", "score", "
         full.append(line)
     kinds = {m: k for m, k, _ in metrics}
     summary = summarize(full, lane, entries, kinds)
+    for other, other_entries in more_lanes:
+        summary["lanes"] += summarize(full, other, other_entries, kinds)["lanes"]
     if break_summary:
         summary["lanes"][0]["metrics"][0]["value"] = 0.123
+    if aggregate is not None:  # (aggregate object, the producer's value)
+        summary["lanes"][0]["metrics"][0].update(aggregate=aggregate[0], value=aggregate[1])
     write_json(run_dir / "run.json", run)
     write_ndjson(run_dir / "results.ndjson", full)
     write_json(run_dir / "metrics.json", {"schemaVersion": V, "metrics": [
@@ -116,7 +121,9 @@ def checkpoint(folder, lanes, recorded, *, state="decided", deployment=None):
           "lanes": manifest_lanes, "state": state, "outcome": None}
     if state == "decided":
         inp = {"subjectVersion": VERSION, "evaluatedAt": EVALUATED_AT, "supersededBy": None,
-               "lanes": [{"lane": name, "blocking": blocking, "result": recorded[name]} for name, _, _, blocking in lanes]}
+               "lanes": [{"lane": name, "blocking": blocking, "result": recorded[name],
+                          **({"evidence": sorted({hh for _, hh in runs})} if recorded[name] is not None else {})}
+                         for name, _, runs, blocking in lanes]}
         out = aef_decide.decide(inp)
         cp.update(outcome=out["outcome"], decisionInput=inp, decision=out)
     write_json(folder / "checkpoint.json", cp)
@@ -232,6 +239,14 @@ def v_severity(runs):
     return lanes, results, [], ["LANE-3", "RES-9", "RES-2"], None
 
 
+def v_severity_max_unknown(runs):
+    """VER-8, §7.3: a severity level a later minor added (reader-valid only) gives not_measured, never a pass."""
+    s = make_run(runs, "SM", [dict(case="c1", path="a", state="passed")], metrics=(("ok", "rate", "higher_better"),),
+                 entries=(("ok", "a"),), lane="security", ended="2026-10-03T00:00:00Z")
+    lanes = [("max-unknown", {"kind": "severity", "max": "catastrophic"}, [s], True)]
+    return lanes, {"max-unknown": res("not_measured", "2026-10-03T00:00:00Z")}, [], ["LANE-3", "VER-8"], None
+
+
 def v_evidence_present(runs):
     line = [dict(case="c1", path="p", state="passed", scores=scores(m=1.0))]
     e1 = make_run(runs, "E1", line, ended="2026-10-03T00:00:00Z")
@@ -259,6 +274,9 @@ def v_eligibility(runs):
     unsealed = make_run(runs, "G-unsealed", good, ended=T, sealed=False)
     tampered = make_run(runs, "G-tampered", good, ended=T, tamper=True)
     bad_summary = make_run(runs, "G-bad-summary", good, ended=T, break_summary=True)
+    shutil.copytree(runs / "G-live", runs / "A-tampered-copy-of-G-live")  # sorts before the original
+    copy_results = runs / "A-tampered-copy-of-G-live" / "results.ndjson"
+    copy_results.write_bytes(copy_results.read_bytes().replace(b'"state":"failed"', b'"state":"passed"', 1))
     rule = threshold("quality", ">=", 0.5)
     lanes = [
         ("live", rule, [live], True),
@@ -275,6 +293,7 @@ def v_eligibility(runs):
         ("missing", rule, [("R-404", h("never written"))], True),
         ("wrong-hash", rule, [("G-live", "0" * 64)], True),
         ("one-missing", rule, [live, ("R-404", h("never written"))], True),
+        ("intact-copy-beside-a-tampered-one", rule, [live], True),
     ]
     results = {
         "live": res("passed", T), "scripted": res("not_measured", T), "replayed": res("not_measured", T),
@@ -283,6 +302,7 @@ def v_eligibility(runs):
         # A run changed after sealing is found by its seal's run hash (SEAL-4), and is not intact.
         "tampered": res("not_measured", T), "not-intact": res("not_measured", T), "missing": None, "wrong-hash": None,
         "one-missing": res("not_measured", T),
+        "intact-copy-beside-a-tampered-one": res("passed", T),
     }
     problems = [
         ["lanes/unsealed/runs/G-unsealed", "run-unverified"],
@@ -420,20 +440,63 @@ def v_binding(runs):
 
 
 def v_comparison_large(runs):
-    """m = 1,200 pairs: 2^1200 overflows binary64, so only exact arithmetic gets the answer (LANE-8). 630 regressed,
-    570 improved: p = sum C(1200, k), k = 630..1200, / 2^1200 = 0.044246 (computed exactly once, by hand, for this
-    vector): failed at 0.05, passed at 0.04."""
+    """m = 1,200 pairs (LANE-8, LANE-11). 630 regressed, 570 improved: p = 0.044246, failed at 0.05, passed at 0.04
+    (these two a careful floating-point implementation also gets right). The lanes one binary64 step either side of the
+    exact p for 629 regressions are the ones only exact arithmetic gets right."""
     M = (("recall", "score", "higher_better"),)
     E = (("recall", "mem"),)
     base = [dict(case=f"b{i:04d}", path="mem", state="passed", scores=scores(recall=0.5)) for i in range(1, 1201)]
     cand = [dict(case=f"b{i:04d}", path="mem", state="passed", scores=scores(recall=0.4 if i <= 630 else 0.6)) for i in range(1, 1201)]
     B = make_run(runs, "BL", base, lane="memory", metrics=M, entries=E, version="v6", ended="2026-09-20T00:00:00Z")
     C = make_run(runs, "CL", cand, lane="memory", metrics=M, entries=E, ended="2026-10-06T00:00:00Z")
+    # 629 regressed, 571 improved: p = 0.049918595773026... lies just above the binary64 value 0.04991859577302666 and
+    # nearer it than the next one, 0.04991859577302667 (both computed once, exactly, by hand). With the lower value as
+    # the significance, p > it: passed; but p in binary64, correctly rounded, equals it: a floating-point verifier says
+    # failed. With the upper value, p <= it: failed. A normal approximation is wrong by far more than one step.
+    cand629 = [dict(case=f"b{i:04d}", path="mem", state="passed", scores=scores(recall=0.4 if i <= 629 else 0.6)) for i in range(1, 1201)]
+    C629 = make_run(runs, "CL629", cand629, lane="memory", metrics=M, entries=E, ended="2026-10-06T00:00:00Z")
     T = "2026-10-06T00:00:00Z"
     lanes = [("large-at-005", cmp_rule(B, pairs=1000), [C], True),
-             ("large-at-004", cmp_rule(B, significance=0.04, pairs=1000), [C], True)]
-    results = {"large-at-005": res("failed", T), "large-at-004": res("passed", T)}
+             ("large-at-004", cmp_rule(B, significance=0.04, pairs=1000), [C], True),
+             ("one-step-below-p", cmp_rule(B, significance=0.04991859577302666, pairs=1000), [C629], True),
+             ("one-step-above-p", cmp_rule(B, significance=0.04991859577302667, pairs=1000), [C629], True)]
+    results = {"large-at-005": res("failed", T), "large-at-004": res("passed", T),
+               "one-step-below-p": res("passed", T), "one-step-above-p": res("failed", T)}
     return lanes, results, [], ["LANE-8", "LANE-11"], None
+
+
+def v_aggregates(runs):
+    """SUM-8 and LANE-2: a median (defined, recomputed) can decide a lane; pass@k (the producer's, unchecked) cannot."""
+    lines = [dict(case=f"c{i}", path="p", state="passed", scores=scores(m=v)) for i, v in ((1, 0.4), (2, 0.9), (3, 0.95))]
+    T = "2026-10-05T00:00:00Z"
+    med = make_run(runs, "AG-median", lines, ended=T, aggregate=({"method": "median"}, 0.9))
+    passk = make_run(runs, "AG-pass-at-k", lines, ended=T, aggregate=({"method": "pass@k", "k": 3}, 0.99))
+    rule = threshold("quality", ">=", 0.85)
+    lanes = [("median-decides", rule, [med], True), ("pass-at-k-cannot", rule, [passk], True)]
+    results = {"median-decides": res("passed", T), "pass-at-k-cannot": res("not_measured", T)}
+    return lanes, results, [], ["SUM-8", "LANE-2"], None
+
+
+def v_severity_scope(runs):
+    """LANE-3 with lane and path: only the lines of that summary lane, at that path or below it, count. "toolsets" is not
+    below "tools" (a prefix of the text, not of the path)."""
+    sec = lambda case, path, state, **kw: dict(case=case, path=path, state=state, lane="security", **kw)
+    run = make_run(runs, "SS", [sec("c1", "tools", "passed"), sec("c2", "tools/fetch", "failed", severity="high"),
+                                sec("c3", "chat", "passed"), sec("c5", "toolsets", "failed", severity="critical"),
+                                dict(case="c4", path="chat", state="failed", severity="critical", lane="quality")],
+                   metrics=(("ok", "rate", "higher_better"),), entries=(("ok", "tools"), ("ok", "chat")), lane="security",
+                   more_lanes=(("quality", (("ok", "chat"),)),), ended="2026-10-03T00:00:00Z")
+    T = "2026-10-03T00:00:00Z"
+    sev = lambda m, **scope: {"kind": "severity", "max": m, **scope}
+    lanes = [("lane-and-path", sev("low", lane="security", path="chat"), [run], True),    # c3 only
+             ("lane-only", sev("low", lane="security"), [run], True),                     # c2 high, c5 critical
+             ("path-below", sev("high", path="tools"), [run], True),                      # c1, c2; not toolsets
+             ("other-lane", sev("low", lane="quality"), [run], True),                     # c4 critical
+             ("path-with-no-lines", sev("none", path="nowhere"), [run], True),            # nothing decides
+             ("unscoped", sev("high"), [run], True)]                                      # c4, c5 critical
+    results = {"lane-and-path": res("passed", T), "lane-only": res("failed", T), "path-below": res("passed", T),
+               "other-lane": res("failed", T), "path-with-no-lines": res("not_measured", T), "unscoped": res("failed", T)}
+    return lanes, results, [], ["LANE-3"], None
 
 
 def v_comparison_unknown_axis(runs):
@@ -480,6 +543,9 @@ def main():
     vector("eligibility", v_eligibility)
     vector("comparison", v_comparison)
     vector("comparison-unknown-axis", v_comparison_unknown_axis)
+    vector("aggregates", v_aggregates)
+    vector("severity-scope", v_severity_scope)
+    vector("severity-max-unknown", v_severity_max_unknown)
     vector("comparison-large", v_comparison_large)
     vector("binding", v_binding, deployment="deployment:shop/assistant@prod")
     vector("recorded-differs", v_recorded_differs)

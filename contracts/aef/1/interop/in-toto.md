@@ -121,7 +121,7 @@ in-toto envelope rules: the generic in-toto payload type, and file names that en
 | `seal.json` | an in-toto Statement, as it is | exact |
 | `attestation.dsse.json` | a DSSE envelope, verifiable by any DSSE implementation that supports the key | exact |
 | overlay batch seals and their envelopes | in-toto Statements and DSSE envelopes | exact; a generic verifier must know that the subject digest covers a byte range (see the [overlay batch](#predicate-type-aef-overlay-batch) parsing rules) |
-| root result lines | a Test Result statement: `passed` → `passedTests`, `warn` → `warnedTests`, `failed` → `failedTests`, by `caseId` | lossy: `inconclusive` and the typed absences have no list, and scores, paths and the tree are lost |
+| root result lines | a Test Result statement: `passed` → `passedTests`, `warn` → `warnedTests`, `failed` → `failedTests`, by `caseId` | lossy: `inconclusive`, `scored` and the typed absences have no list, and scores, paths and the tree are lost |
 | a gate decision's `outcome` ([GATE-1](../spec/03-run.md#38-gatesndjson)) | Test Result `result`: `ship` → `PASSED`, `no_ship` → `FAILED`; `inconclusive` has no value | lossy |
 | `run.json`, `suite.digest` | Test Result `configuration` (resource descriptors with `sha256`) | exact |
 | a decided checkpoint ([§5](../spec/05-checkpoints.md#51-the-manifest)) | an SVR: `verifier.id`, `timeCreated` from `decisionInput.evaluatedAt`, `policies` = the manifest as a resource descriptor, `properties` such as `AEF_CHECKPOINT_APPROVED` | lossy: only the approved properties are listed, which keeps the policy monotonic; `approved_with_exceptions` gets its own property (`AEF_CHECKPOINT_APPROVED_WITH_EXCEPTIONS`), never the plain approved one |
@@ -134,13 +134,13 @@ in-toto envelope rules: the generic in-toto payload type, and file names that en
 |---|---|---|
 | another signer's DSSE envelope over the same `seal.json` bytes | another signature in `attestation.dsse.json`, or a second envelope kept beside the run | exact; a verifier checks each signature against its trust policy ([SIG-5](../spec/04-integrity.md#44-signatures)) |
 | a Sigstore bundle | a trust-policy input ([SIG-4](../spec/04-integrity.md#44-signatures)) | exact |
-| a Test Result statement | a run with one root line per listed test: `passed`, `warn` or `failed` | lossy: no scores, and no suite, subject or producer beyond what `configuration` names ([I7](README.md#gaps-found-by-these-mappings)) |
+| a Test Result statement | a run with one root line per listed test: `passed`, `warn` or `failed` | lossy: no scores. The converter supplies the subject, suite and target mode and lists them in `imported.asserted` ([RUN-15](../spec/03-run.md#32-runjson)) |
 | a Test Result's `url` | an evidence record with a URI link | exact |
 
 ## What does not carry over
 
 **AEF → in-toto.** Everything in the run's files beyond their digests: in-toto attests the files, and does not read
-them. In a Test Result: `inconclusive` and typed absences, scores, paths, the tree, severity. A link from the evidence
+them. In a Test Result: `inconclusive`, `scored` and typed absences, scores, paths, the tree, severity. A link from the evidence
 to the evaluated artifact by digest ([I8](README.md#gaps-found-by-these-mappings)).
 
 **in-toto → AEF.** In a Test Result: scores and the reasons for each test's outcome. Attestations about other
@@ -168,17 +168,38 @@ The subject is `seal.json` (2336 bytes, SHA-256 below). `run.json` names the eva
 ```json
 {
   "_type": "https://in-toto.io/Statement/v1",
-  "subject": [{"name": "seal.json", "digest": {"sha256": "d8f4b3aeff9233a1038c629f99478737ef07d559aae8518f2f0c479cb5853001"}}],
+  "subject": [
+    {
+      "name": "seal.json",
+      "digest": {
+        "sha256": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
+      }
+    }
+  ],
   "predicateType": "https://in-toto.io/attestation/test-result/v0.1",
   "predicate": {
     "result": "FAILED",
     "configuration": [
-      {"name": "run.json", "digest": {"sha256": "6833f5f2e31f266973749d72f60cf9656d8689145780a14670e35c07795c1f5c"}},
-      {"name": "suite:support/triage-scenarios@4", "digest": {"sha256": "f1b4f6f2c254e91b0c23b6c40c1554dd8a7b04715858206d4537698e34caaedd"}}
+      {
+        "name": "run.json",
+        "digest": {
+          "sha256": "6833f5f2e31f266973749d72f60cf9656d8689145780a14670e35c07795c1f5c"
+        }
+      },
+      {
+        "name": "suite:support/triage-scenarios@4",
+        "digest": {
+          "sha256": "f1b4f6f2c254e91b0c23b6c40c1554dd8a7b04715858206d4537698e34caaedd"
+        }
+      }
     ],
     "passedTests": [],
-    "warnedTests": ["case-18"],
-    "failedTests": ["case-17"]
+    "warnedTests": [
+      "case-18"
+    ],
+    "failedTests": [
+      "case-17"
+    ]
   }
 }
 ```
@@ -304,9 +325,9 @@ Predicate:
 | `runHash` | string, 64 hex | yes | The SHA-256 of the manifest (SEAL-3, SEAL-4) |
 | `producer` | object: `name`, `version` | yes | As `run.json` gives them |
 | `subject` | object: `ref`, optional `version` | yes | What was evaluated, as `run.json` gives it |
-| `deployment` | object with `ref`, or `null` | no | Where it ran |
-| `suite` | object: `ref`, `version`, optional `digest` (`sha256:<hex>`), or `null` | no | The cases that ran |
-| `judges` | array of objects: `model`, optional `rubricDigest` | no | The judges, in `run.json` order |
+| `deployment` | object with `ref`, or `null` | yes | Where it ran; `null` when `run.json` has no `deployment` |
+| `suite` | object: `ref`, `version`, optional `digest` (`sha256:<hex>`), or `null` | yes | The cases that ran; `null` when `run.json` has no `suite` |
+| `judges` | array of objects: `model`, optional `rubricDigest` | yes | The judges, in `run.json` order; `[]` when `run.json` has none |
 | `closedAt` | RFC 3339 time in `Z` | yes | `run.json`'s `endedAt` |
 | `sealedAt` | RFC 3339 time in `Z` | yes | When the seal was made |
 | `sealedBy` | `producer` or `ingest` | yes | Who sealed: the producer, or a host on taking custody |
@@ -321,24 +342,41 @@ one subject per line:
   "_type": "https://in-toto.io/Statement/v1",
   "subject": [
     {"name": "blobs/sha256/63/635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5", "digest": {"sha256": "635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5"}},
-    {"name": "evidence.ndjson", "digest": {"sha256": "886e3eba00a42495dd7b9c7e676ecf0013c29a9b135e410fee3f462beac68101"}},
+    {"name": "evidence.ndjson", "digest": {"sha256": "f76af41ebe790477719e419c60ab430ef5cc98263b8fd8dd5bb52988a03108b1"}},
     {"name": "gates.ndjson", "digest": {"sha256": "6db8527cfa0e3d60c242253e40f123eb56b4105f2b14a622af21370fd10b9c63"}},
     {"name": "metrics.json", "digest": {"sha256": "cd5980b59a1023260f2c7fa19d0a8075802dbb17e83485a547dc3b977649ef87"}},
-    {"name": "results.ndjson", "digest": {"sha256": "43f705c41d6ea827ac003400dbae60c4ee81a4bf6b61901e26a067c7db5b3a35"}},
+    {"name": "results.ndjson", "digest": {"sha256": "08719682aba1da613d9712bdc1ad15c838048a064843fe12f61a36f7b6936e5c"}},
     {"name": "run.json", "digest": {"sha256": "6833f5f2e31f266973749d72f60cf9656d8689145780a14670e35c07795c1f5c"}},
     {"name": "summary.json", "digest": {"sha256": "268eda205f131668d931d8804c9530cb7c99b2857d95e1ce1bc24fc3d6314679"}},
-    {"name": "traces.otlp.jsonl", "digest": {"sha256": "27f1bf4e348a9d70b613e831db04a980ba657b1df02293086b4354444cf25f96"}}
+    {"name": "traces.otlp.jsonl", "digest": {"sha256": "3c29fa780cb029dd541c36edb35614f49df76f459a1f7c3e3702960892398787"}}
   ],
   "predicateType": "https://agenteval.dev/aef/1/evidence",
   "predicate": {
     "schemaVersion": "1.0",
     "runId": "01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10",
-    "runHash": "efaf6fe97fb3e09a5ad5a8551773039021882475c54a65fc67d7aeca0ed0668f",
-    "producer": {"name": "agenteval-cli", "version": "1.0.0"},
-    "subject": {"ref": "agent:support/support-triage", "version": "git:3f2a1c"},
-    "deployment": {"ref": "deployment:support/support-triage@dev"},
-    "suite": {"ref": "suite:support/triage-scenarios", "version": "4", "digest": "sha256:f1b4f6f2c254e91b0c23b6c40c1554dd8a7b04715858206d4537698e34caaedd"},
-    "judges": [{"model": "gpt-5.1", "rubricDigest": "sha256:29fd018a9848938bc2b0e33fffa32bde2827e81388d0e03195919be5835c3605"}],
+    "runHash": "f16b6a74505a359810e44611732c4d53ff61d32852983b165414811eb6a6627b",
+    "producer": {
+      "name": "agenteval-cli",
+      "version": "1.0.0"
+    },
+    "subject": {
+      "ref": "agent:support/support-triage",
+      "version": "git:3f2a1c"
+    },
+    "deployment": {
+      "ref": "deployment:support/support-triage@dev"
+    },
+    "suite": {
+      "ref": "suite:support/triage-scenarios",
+      "version": "4",
+      "digest": "sha256:f1b4f6f2c254e91b0c23b6c40c1554dd8a7b04715858206d4537698e34caaedd"
+    },
+    "judges": [
+      {
+        "model": "gpt-5.1",
+        "rubricDigest": "sha256:29fd018a9848938bc2b0e33fffa32bde2827e81388d0e03195919be5835c3605"
+      }
+    ],
     "closedAt": "2026-10-02T14:06:23.004Z",
     "sealedAt": "2026-10-02T14:06:24Z",
     "sealedBy": "producer"
@@ -461,13 +499,13 @@ The second batch of the corpus run, `overlays/seal-0002.json`, as written:
   "predicate": {
     "schemaVersion": "1.0",
     "runId": "01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10",
-    "runHash": "efaf6fe97fb3e09a5ad5a8551773039021882475c54a65fc67d7aeca0ed0668f",
+    "runHash": "f16b6a74505a359810e44611732c4d53ff61d32852983b165414811eb6a6627b",
     "batch": 2,
     "offset": 343,
     "length": 316,
     "previous": {
       "path": "overlays/seal-0001.json",
-      "sha256": "1f04e7f39e369a37bffc1f934bbcdc69e5771ae3edc34a8b2f3d549a511c8bbe"
+      "sha256": "8f80b91ba250eacf6c8274d2882871784063f16b41398e08bc72892641d3cb15"
     }
   }
 }
@@ -507,7 +545,7 @@ to move it, and is no evidence by itself. A packed run that unpacks into a valid
 The package's own digest is not the run hash. A reader verifies the files after unpacking, or streams them into the
 manifest ([SEAL-3](../spec/04-integrity.md#41-sealing-a-run)).
 
-## Open gaps
+## Still open
 
 - [I8](README.md#gaps-found-by-these-mappings): no attestation names the evaluated artifact by digest, so in-toto and SLSA policies
   keyed on an artifact do not find AEF evidence; the media types above are unregistered.

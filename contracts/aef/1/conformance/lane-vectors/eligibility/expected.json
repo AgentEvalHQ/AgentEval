@@ -106,6 +106,14 @@
         "subjectVersion": "v7",
         "oldestClosedAt": "2026-10-05T00:00:00Z"
       }
+    },
+    {
+      "lane": "intact-copy-beside-a-tampered-one",
+      "result": {
+        "status": "passed",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-05T00:00:00Z"
+      }
     }
   ],
   "problems": [

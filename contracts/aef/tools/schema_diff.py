@@ -22,6 +22,9 @@ UPPER = {"maxLength", "maxItems", "maximum", "exclusiveMaximum", "maxProperties"
 LOWER = {"minLength", "minItems", "minimum", "exclusiveMinimum", "minProperties", "minContains"}
 WIDEN_WHEN_DROPPED = UPPER | LOWER | {"pattern", "uniqueItems"}
 VERSION = re.compile(r"^1\.([0-9]+)$")
+# Enums closed for major 1 (spec 07, VER-9): a minor version may not add a value to them.
+CLOSED = {"common.schema.json/$defs/state", "run.schema.json/properties/status",
+          "metrics.schema.json/properties/metrics/items/properties/kind"}
 
 
 def kind_of(branch):
@@ -62,6 +65,10 @@ def diff(old, new, where, out):
                 for value in a:
                     if value not in b:
                         out.append(f"{at}: value {json.dumps(value)} removed")
+                if where in CLOSED:
+                    for value in b:
+                        if value not in a:
+                            out.append(f"{at}: value {json.dumps(value)} added to an enum closed for major 1 (VER-9)")
             elif key == "type":
                 ta, tb = (a if isinstance(a, list) else [a]), (b if isinstance(b, list) else [b])
                 if not set(ta) <= set(tb):
@@ -154,12 +161,24 @@ def self_test():
         ("a conditional rule added", lambda s: s.update(allOf=[{"if": {"required": ["s"]}, "then": {"required": ["a"]}}]), False),
         ("additionalProperties opened", lambda s: s.update(additionalProperties=True), False),
     ]
+    closed_base = {"$defs": {"state": {"enum": ["passed", "failed"]}}}
+    closed_cases = [("a value added to a closed enum (VER-9)", lambda s: s["$defs"]["state"]["enum"].append("timed_out"), False),
+                    ("a description added to a closed enum", lambda s: s["$defs"]["state"].update(description="x"), True)]
     failures = 0
     for name, fn, allowed in cases:
         out = change(fn)
         ok = (not out) == allowed
         failures += not ok
         print(f"{'pass' if ok else 'FAIL'}  {name}: {'allowed' if not out else out[0]}")
+    for name, fn, allowed in closed_cases:
+        new = json.loads(json.dumps(closed_base))
+        fn(new)
+        out = []
+        diff(closed_base, new, "common.schema.json", out)
+        ok = (not out) == allowed
+        failures += not ok
+        print(f"{'pass' if ok else 'FAIL'}  {name}: {'allowed' if not out else out[0]}")
+    cases = cases + closed_cases
     print(f"{len(cases) - failures} of {len(cases)} checks pass")
     return 1 if failures else 0
 

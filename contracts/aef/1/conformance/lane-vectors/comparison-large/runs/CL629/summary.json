@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "CL629",
+  "lanes": [
+    {
+      "lane": "memory",
+      "metrics": [
+        {
+          "metric": "recall",
+          "path": "mem",
+          "n": 1200,
+          "N": 1200,
+          "notMeasured": 0,
+          "value": 0.4951666666666667,
+          "verdict": "passed",
+          "rule": "recorded by the producer",
+          "sum": 594.2,
+          "sumSq": 306.2
+        }
+      ]
+    }
+  ]
+}

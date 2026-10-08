@@ -1,0 +1,69 @@
+{
+  "description": "One exception applies and another is for other evidence: waived, and a waived lane adds no other reason.",
+  "rules": [
+    "DEC-1",
+    "DEC-2",
+    "DEC-3",
+    "DEC-4"
+  ],
+  "input": {
+    "subjectVersion": "git:3f2a1c",
+    "evaluatedAt": "2026-10-08T12:00:00Z",
+    "lanes": [
+      {
+        "lane": "security",
+        "blocking": true,
+        "evidence": [
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        ],
+        "result": {
+          "status": "failed",
+          "subjectVersion": "git:3f2a1c",
+          "oldestClosedAt": "2026-10-07T10:00:00Z"
+        }
+      }
+    ],
+    "exceptions": [
+      {
+        "lane": "security",
+        "evidence": [
+          "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        ],
+        "reason": "The security failure is accepted until the fix ships; tracked in the release review.",
+        "by": {
+          "identity": "oidc:https://login.example.com/u-7f3a",
+          "assurance": "authenticated"
+        },
+        "at": "2026-10-07T15:00:00Z",
+        "expires": "2026-10-21T00:00:00Z"
+      },
+      {
+        "lane": "security",
+        "evidence": [
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        ],
+        "reason": "The security failure is accepted until the fix ships; tracked in the release review.",
+        "by": {
+          "identity": "oidc:https://login.example.com/u-7f3a",
+          "assurance": "authenticated"
+        },
+        "at": "2026-10-07T15:00:00Z",
+        "expires": "2026-10-21T00:00:00Z"
+      }
+    ]
+  },
+  "expected": {
+    "outcome": "approved_with_exceptions",
+    "lanes": [
+      {
+        "lane": "security",
+        "status": "waived",
+        "blocking": true
+      }
+    ],
+    "reasons": [
+      "waived:security",
+      "outcome:approved_with_exceptions"
+    ]
+  }
+}

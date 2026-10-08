@@ -130,13 +130,14 @@
                   ]
                 },
                 "verdict": {
-                  "description": "The producer's verdict on this entry under its rule: passed, failed, warn, inconclusive, or not_measured, which it always is when n is 0 (SUM-6).",
+                  "description": "The producer's verdict on the entry under its rule (SUM-6): not_measured when n is 0, scored when the producer applied no rule.",
                   "enum": [
                     "passed",
                     "failed",
                     "warn",
                     "inconclusive",
-                    "not_measured"
+                    "not_measured",
+                    "scored"
                   ]
                 },
                 "rule": {
@@ -158,7 +159,7 @@
                   "$ref": "common.schema.json#/$defs/text"
                 },
                 "aggregate": {
-                  "description": "When value is not the mean (or, for a count, the sum) of the measured values: how the producer computed it. A verifier then recomputes N, n, notMeasured and sum, not value (SUM-5).",
+                  "description": "When value is not the mean (or, for a count, the sum) of the measured values: how it was computed (SUM-8). A verifier recomputes value for median, min and max; any other method is the producer's, shown as written, and no lane reads the entry (LANE-2).",
                   "type": "object",
                   "additionalProperties": false,
                   "required": [
@@ -166,7 +167,7 @@
                   ],
                   "properties": {
                     "method": {
-                      "description": "The method: pass@k, f1, median, or another name, shown as written.",
+                      "description": "median, min or max (defined by AEF and recomputed), or another name such as pass@k or f1 (the producer's, shown as written).",
                       "type": "string",
                       "minLength": 1,
                       "maxLength": 64,
@@ -232,6 +233,77 @@
           "type": "string",
           "maxLength": 256
         }
+      }
+    },
+    "usage": {
+      "description": "The run's total usage, one entry per party and model (SUM-7): no party and model twice.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "description": "What one party consumed over the whole run (SUM-7).",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "gen_ai.usage.input_tokens": {
+            "description": "Input tokens, as OpenTelemetry's gen_ai.usage.input_tokens (RES-10).",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "gen_ai.usage.output_tokens": {
+            "description": "Output tokens, as OpenTelemetry's gen_ai.usage.output_tokens (RES-10).",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "costUsd": {
+            "description": "The cost, in US dollars (RES-10).",
+            "type": "number",
+            "minimum": 0
+          },
+          "costSource": {
+            "description": "Where the cost figure came from, such as a price table.",
+            "type": "string",
+            "maxLength": 128
+          },
+          "role": {
+            "description": "Whose usage this is: agent (the subject), judge, attacker (an attacker model) or other.",
+            "enum": [
+              "agent",
+              "judge",
+              "attacker",
+              "other"
+            ]
+          },
+          "gen_ai.usage.cache_read.input_tokens": {
+            "description": "Input tokens served from a cache, as OpenTelemetry's gen_ai.usage.cache_read.input_tokens; included in input_tokens (RES-10).",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "gen_ai.usage.cache_write.input_tokens": {
+            "description": "Input tokens written to a cache, as OpenTelemetry's gen_ai.usage.cache_write.input_tokens; included in input_tokens (RES-10).",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "gen_ai.usage.reasoning.output_tokens": {
+            "description": "Reasoning tokens, as OpenTelemetry's gen_ai.usage.reasoning.output_tokens; included in output_tokens (RES-10).",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "model": {
+            "description": "The model this party used, when it used one.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "required": [
+          "role"
+        ]
       }
     }
   }

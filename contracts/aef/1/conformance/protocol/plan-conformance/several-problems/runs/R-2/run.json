@@ -11,6 +11,10 @@
     "kind": "agent",
     "version": "git:3f2a1c"
   },
+  "deployment": {
+    "ref": "deployment:support/support-triage@dev",
+    "endpoint": "http://localhost:5080/v1"
+  },
   "suite": {
     "ref": "suite:owasp/llm-top10",
     "version": "2026.1"
@@ -23,8 +27,8 @@
       "rubricDigest": "sha256:a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9"
     }
   ],
-  "startedAt": "2026-10-08T12:00:00Z",
-  "endedAt": "2026-10-08T12:00:05Z",
+  "startedAt": "2026-10-08T12:00:10Z",
+  "endedAt": "2026-10-08T12:00:50Z",
   "contentCapture": "off",
   "execution": {
     "targetMode": "live",

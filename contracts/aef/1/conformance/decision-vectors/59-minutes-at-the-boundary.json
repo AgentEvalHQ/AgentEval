@@ -1,0 +1,62 @@
+{
+  "description": "A freshness in minutes (ENC-9): evidence exactly 90 minutes old is fresh; evidence one nanosecond older than PT1H30M, the same 90 minutes written otherwise, is stale.",
+  "rules": [
+    "DEC-1",
+    "DEC-2",
+    "DEC-3",
+    "DEC-4",
+    "DEC-5",
+    "ENC-9"
+  ],
+  "input": {
+    "subjectVersion": "git:3f2a1c",
+    "evaluatedAt": "2026-10-08T12:00:00Z",
+    "lanes": [
+      {
+        "lane": "quality",
+        "blocking": true,
+        "freshness": "PT90M",
+        "evidence": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "result": {
+          "status": "passed",
+          "subjectVersion": "git:3f2a1c",
+          "oldestClosedAt": "2026-10-08T10:30:00Z"
+        }
+      },
+      {
+        "lane": "security",
+        "blocking": true,
+        "freshness": "PT1H30M",
+        "evidence": [
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        ],
+        "result": {
+          "status": "passed",
+          "subjectVersion": "git:3f2a1c",
+          "oldestClosedAt": "2026-10-08T10:29:59.999999999Z"
+        }
+      }
+    ]
+  },
+  "expected": {
+    "outcome": "expired",
+    "lanes": [
+      {
+        "lane": "quality",
+        "status": "passed",
+        "blocking": true
+      },
+      {
+        "lane": "security",
+        "status": "stale",
+        "blocking": true
+      }
+    ],
+    "reasons": [
+      "stale:security",
+      "outcome:expired"
+    ]
+  }
+}

@@ -13,6 +13,9 @@
       {
         "lane": "security",
         "blocking": true,
+        "evidence": [
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        ],
         "result": {
           "status": "failed",
           "subjectVersion": "git:3f2a1c",
@@ -23,6 +26,9 @@
     "exceptions": [
       {
         "lane": "security",
+        "evidence": [
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        ],
         "reason": "The security failure is accepted until the fix ships; tracked in the release review.",
         "by": {
           "identity": "oidc:https://login.example.com/u-7f3a",

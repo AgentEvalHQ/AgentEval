@@ -6,9 +6,10 @@
   "rules": [
     "CKP-4",
     "CKP-7",
+    "DEC-1",
     "DEC-2",
     "DEC-3"
   ],
-  "why": "a failed blocking lane waived by an exception in force, recorded in the decision input: approved_with_exceptions",
+  "why": "a failed blocking lane waived by an exception for its exact runs, in force, recorded in the decision input: approved_with_exceptions",
   "problems": []
 }

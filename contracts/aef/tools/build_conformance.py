@@ -520,6 +520,10 @@ def reader_only_cases():
          dict(BASE_RESULT, aggregation={"strategy": "Min", "threshold": 0.5, "score": 0.6, "rulePath": "quorum", "measured": 1,
                                         "total": 1, "unmeasured": {"not_measured": 0, "not_applicable": 0, "skipped": 0, "error": 0}, "decisive": []}),
          {"aggregation.rulePath": "quorum"}, ["VER-8", "RES-6"]),
+        ("runner-event-lane-status-unknown", "runner-event",
+         {"schemaVersion": V, "seq": 7, "kind": "lane.completed", "jobId": "job-7", "at": "2026-10-08T12:00:06Z", "lane": "quality",
+          "status": "partly"},
+         {"status": "not_measured"}, ["VER-8", "STRM-1"]),
         ("summary-verdict-unknown", "summary",
          {"schemaVersion": V, "runId": "r-1", "lanes": [{"lane": "main", "metrics": [
              {"metric": "m", "path": "p", "n": 1, "N": 1, "notMeasured": 0, "value": 1, "verdict": "borderline"}]}]},
@@ -662,7 +666,7 @@ def run_vectors():
     # A scored line (no verdict) beside decided ones, and a summary entry with a producer aggregate (the median).
     scored_line = {"schemaVersion": V, "resultId": result_id(SMALL_ID, "k3", "q"), "caseId": "k3", "path": "q",
                    "evaluator": {"id": "code:latency"}, "state": "scored", "scores": [{"metric": "m", "value": 0.7}]}
-    vec("scored-and-aggregate", [], ["RES-1", "SUM-4", "SUM-5"], outcome="intact",
+    vec("scored-and-aggregate", [], ["RES-1", "SUM-4", "SUM-5", "SUM-8"], outcome="intact",
         lines=lambda ls: ls + [scored_line],
         metrics=lambda m: dict(m, metrics=m["metrics"] + [{"id": "ok", "kind": "rate", "direction": "higher_better", "scale": {"min": 0, "max": 1}}]),
         # m at q: 0.4, 0.9, 0.7 all measured (a scored line has a score): n 3, sum 2.0, the median 0.7 as the value.
@@ -685,6 +689,46 @@ def run_vectors():
     vec("interval-inverted", [[L(1), "interval"], ["summary.json", "interval"]], ["RES-10", "SUM-5"],
         lines=set_line(0, uncertainty={"ci": {"low": 0.9, "high": 0.1, "level": 0.95}}),
         summary=lambda s: {**s, "lanes": [{"lane": "main", "metrics": [dict(s["lanes"][0]["metrics"][0], ci={"low": 0.9, "high": 0.1, "level": 0.95})]}]})
+    # SUM-9: two entries for one lane, metric and path.
+    vec("summary-duplicate", [["summary.json", "summary-duplicate"]], ["SUM-9"],
+        summary=lambda s: {**s, "lanes": [{"lane": "main", "metrics": [s["lanes"][0]["metrics"][0], dict(s["lanes"][0]["metrics"][0])]}]})
+    vec("summary-usage-duplicate", [["summary.json", "summary-duplicate"]], ["SUM-9", "SUM-7"],
+        summary=lambda s: {**s, "usage": [{"role": "judge", "model": "gpt-5.1", "gen_ai.usage.input_tokens": 900},
+                                          {"role": "agent", "model": "gpt-5.1", "gen_ai.usage.input_tokens": 400},
+                                          {"role": "judge", "model": "gpt-5.1", "gen_ai.usage.input_tokens": 100}]})
+    vec("summary-usage-per-party", [], ["SUM-7"], outcome="intact",
+        summary=lambda s: {**s, "usage": [{"role": "judge", "model": "gpt-5.1", "gen_ai.usage.input_tokens": 900},
+                                          {"role": "judge", "model": "o4-mini", "gen_ai.usage.input_tokens": 100},
+                                          {"role": "agent", "gen_ai.usage.input_tokens": 400}]})
+    # SUM-8: a median a verifier recomputes: 0.4 and 0.9 have the median 0.65, not 0.95.
+    vec("aggregate-median-wrong", [["summary.json", "summary"]], ["SUM-8"],
+        summary=lambda s: {**s, "lanes": [{"lane": "main", "metrics": [dict(s["lanes"][0]["metrics"][0], aggregate={"method": "median"}, value=0.95)]}]})
+    vec("aggregate-max-wrong", [["summary.json", "summary"]], ["SUM-8"],
+        summary=lambda s: {**s, "lanes": [{"lane": "main", "metrics": [dict(s["lanes"][0]["metrics"][0], aggregate={"method": "max"}, value=0.4)]}]})
+    vec("aggregate-producer-method-not-recomputed", [], ["SUM-8"], outcome="intact",
+        summary=lambda s: {**s, "lanes": [{"lane": "main", "metrics": [dict(s["lanes"][0]["metrics"][0], aggregate={"method": "pass@k", "k": 2}, value=1)]}]})
+    vec("summary-scored-entry", [], ["SUM-6"], outcome="intact",
+        summary=lambda s: {**s, "lanes": [{"lane": "main", "metrics": [
+            {k: v for k, v in dict(s["lanes"][0]["metrics"][0], verdict="scored").items() if k != "rule"}]}]})
+    vec("aggregate-median-right", [], ["SUM-8"], outcome="intact",
+        summary=lambda s: {**s, "lanes": [{"lane": "main", "metrics": [dict(s["lanes"][0]["metrics"][0], aggregate={"method": "median"}, value=0.65)]}]})
+    # SEC-6: a judge's reasoning and a prompt in the OTel logs file of a run that keeps no content.
+    vec("content-capture-off-logs", [["logs.otlp.jsonl:1", "content-capture"], ["logs.otlp.jsonl:2", "content-capture"]], ["SEC-6", "RUN-11"],
+        run={"contentCapture": "off"}, lines=lambda ls: [{k: v for k, v in l.items() if k not in ("reasoning", "evidence")} for l in ls],
+        evidence=lambda e: [], remove=["blobs/"],
+        extra={"logs.otlp.jsonl": ndjson_bytes([
+            {"resourceLogs": [{"resource": {"attributes": []}, "scopeLogs": [{"scope": {"name": "p"}, "logRecords": [
+                {"timeUnixNano": "1790812812000000000", "eventName": "gen_ai.evaluation.result",
+                 "attributes": [{"key": "gen_ai.evaluation.name", "value": {"stringValue": "m"}},
+                                {"key": "gen_ai.evaluation.explanation", "value": {"stringValue": "The card ending 4242 was refunded."}}]}]}]}]},
+            {"resourceLogs": [{"resource": {"attributes": []}, "scopeLogs": [{"scope": {"name": "p"}, "logRecords": [
+                {"timeUnixNano": "1790812812000000000", "body": {"stringValue": "Refund my order, card 4242"}}]}]}]}])})
+    # RUN-2: a sealed file the run folder may not hold (outside ext/).
+    vectors.append(("extra-root-file", {"extra": {"notes.txt": b"a file RUN-2 does not list\n"}}, [["notes.txt", "unexpected-file"]],
+                    "invalid", ["RUN-2"]))
+    # An attack that succeeded is not a pass for the subject.
+    vec("attack-succeeded-but-passed", [[L(4), "attack"]], ["RES-10"],
+        lines=set_line(3, attack={"technique": "prompt-injection", "taxonomy": [{"scheme": "owasp-llm", "id": "LLM01"}], "success": True}))
     vec("panel-agree-over-of", [[L(3), "annotator"]], ["RES-10"],
         lines=set_line(2, annotator={"kind": "LLM", "model": "gpt-5.1", "panel": {"agree": 4, "of": 3}}))
     vec("aggregation-pending-counts", [], ["RES-6"], outcome="unsealed", unsealed=True,
@@ -1146,12 +1190,22 @@ def overlay_view_vectors():
         [e(3, kind="approve", target={"run": rid})],
     ], dict(empty, results=[{"resultId": L3, "sealedState": "failed", "effectiveState": "passed", "event": "ov_0001"}],
             unsealedEvents=2), ["OVL-5", "OVL-7", "OVL-11"], tamper=(b"Panel of three", b"Panal of three"))
-    # The later of two events with one id has no effect.
+    # The later of two events with one id has no effect; the problem is the event's, not its batch's, so batch 3 counts.
     view_vector("duplicate-event-id", [
         [e(1, kind="override", target={"run": rid, "result": L3}, state="passed", reason="Re-graded by hand.")],
         [dict(e(2, kind="override", target={"run": rid, "result": L3}, state="failed", reason="Same id."), eventId="ov_0001")],
-    ], dict(empty, results=[{"resultId": L3, "sealedState": "failed", "effectiveState": "passed", "event": "ov_0001"}]),
-        ["OVL-5", "OVL-7"])
+        [e(3, kind="approve", target={"run": rid})],
+    ], dict(empty, results=[{"resultId": L3, "sealedState": "failed", "effectiveState": "passed", "event": "ov_0001"}],
+            reviews=[{"target": "run", "status": "approve", "event": "ov_0003"}]),
+        ["OVL-5", "OVL-7", "OVL-11"])
+    # An event that is not valid (an override without its state) has no effect; the batches after it still count.
+    view_vector("invalid-event-mid-chain", [
+        [e(1, kind="override", target={"run": rid, "result": L3}, state="passed", reason="Re-graded by hand.")],
+        [e(2, kind="override", target={"run": rid, "result": L3}, reason="No state given.")],
+        [e(3, kind="reject", target={"run": rid})],
+    ], dict(empty, results=[{"resultId": L3, "sealedState": "failed", "effectiveState": "passed", "event": "ov_0001"}],
+            reviews=[{"target": "run", "status": "reject", "event": "ov_0003"}]),
+        ["OVL-5", "OVL-7", "OVL-11"])
     # Events that target another run, or another run hash, have no effect.
     view_vector("target-elsewhere", [
         [e(1, kind="override", target={"run": "another-run", "result": L3}, state="passed", reason="Wrong run."),
@@ -1193,9 +1247,9 @@ def checkpoints():
     decision_input = {
         "subjectVersion": "git:3f2a1c", "evaluatedAt": "2026-10-02T14:30:00Z", "supersededBy": None,
         "lanes": [
-            {"lane": "quality", "blocking": True,
+            {"lane": "quality", "blocking": True, "evidence": [hh("a")],
              "result": {"status": "passed", "subjectVersion": "git:3f2a1c", "oldestClosedAt": "2026-10-02T13:10:00Z"}},
-            {"lane": "security", "blocking": True, "freshness": "P14D",
+            {"lane": "security", "blocking": True, "freshness": "P14D", "evidence": [hh("b"), hh("c")],
              "result": {"status": "passed", "subjectVersion": "git:3f2a1c", "oldestClosedAt": "2026-09-30T08:00:00Z"}},
             {"lane": "memory", "blocking": False, "result": None},
         ],
@@ -1220,10 +1274,11 @@ def checkpoints():
     other_input = dict(decision_input, lanes=[dict(decision_input["lanes"][0], result=dict(decision_input["lanes"][0]["result"], status="failed"))]
                        + decision_input["lanes"][1:])
     C7 = ["CKP-7"]
-    # An exception (DEC-1, DEC-2): the security lane failed, and a person accepted it until 2026-10-16. Decided by hand:
-    # quality passed; security is fresh (closed 2026-09-30T08:00Z + P14D is after 2026-10-02T14:30Z), failed, and the
-    # exception is in force (granted 14:00, before 14:30; expires 2026-10-16) -> waived; outcome approved_with_exceptions.
-    waiver = {"lane": "security", "requirement": "REQ-15",
+    # An exception (DEC-1, DEC-2): the security lane's two runs (R-921, R-930) failed, and a person accepted exactly that
+    # failure until 2026-10-16. Decided by hand: quality passed; security is fresh (closed 2026-09-30T08:00Z + P14D is
+    # after 2026-10-02T14:30Z) and failed; the exception is for the same set of run hashes (b..., c...) and in force
+    # (granted 14:00, before 14:30; expires 2026-10-16) -> waived; outcome approved_with_exceptions.
+    waiver = {"lane": "security", "evidence": [hh("b"), hh("c")], "requirement": "REQ-15",
               "reason": "A medium-severity prompt-injection finding is accepted until the 3.2.1 patch; tracked in the release review.",
               "by": {"identity": "oidc:https://login.example.com/u-7f3a", "assurance": "authenticated"},
               "at": "2026-10-02T14:00:00Z", "expires": "2026-10-16T00:00:00Z"}
@@ -1242,6 +1297,18 @@ def checkpoints():
                                        "lanes": [{"lane": "quality", "status": "passed", "blocking": True},
                                                  {"lane": "security", "status": "failed", "blocking": True}],
                                        "reasons": ["failed:security", "outcome:blocked"]})
+    # A re-run: R-944 (hash e..., closed 14:10) replaced the security lane's runs, and failed again. The exception is
+    # still the one granted at 14:00 for R-921 and R-930, so it is for other evidence: the decision (blocked, with
+    # exception-other-evidence) is right, and the exception names run hashes the checkpoint does not hold.
+    rerun_lanes = [lanes[0], dict(lanes[1], runs=[{"runId": "R-944", "runHash": hh("e"), "origin": "launched"}])]
+    rerun_security = dict(excepted_input["lanes"][1], evidence=[hh("e")],
+                          result=dict(excepted_input["lanes"][1]["result"], oldestClosedAt="2026-10-02T14:10:00Z"))
+    rerun = dict(excepted, lanes=rerun_lanes, outcome="blocked",
+                 decisionInput=dict(excepted_input, lanes=[excepted_input["lanes"][0], rerun_security]),
+                 decision={"outcome": "blocked",
+                           "lanes": [{"lane": "quality", "status": "passed", "blocking": True},
+                                     {"lane": "security", "status": "failed", "blocking": True}],
+                           "reasons": ["failed:security", "exception-other-evidence:security", "outcome:blocked"]})
     return [
         ("valid-decided", decided, "valid", "valid", [], ["CKP-3", "CKP-4", "CKP-7"], "a decided checkpoint, its decision recomputable from its input"),
         ("valid-planned", planned, "valid", "valid", [], ["CKP-4"], "a planned checkpoint has no outcome yet"),
@@ -1263,6 +1330,19 @@ def checkpoints():
          "a lane name is an id, so a reason code can carry it"),
         ("freshness-empty", dict(planned, lanes=[dict(lanes[1], freshness="P")]), "invalid", "invalid", None, ["ENC-9"],
          "a duration is not empty"),
+        # ENC-9: one grammar of days, hours and minutes, for a lane's freshness as for a plan's timeout.
+        ("freshness-in-minutes", dict(planned, lanes=[lanes[0], dict(lanes[1], freshness="PT90M"), lanes[2]]), "valid", "valid", [],
+         ["ENC-9", "CKP-3"], "a freshness in minutes"),
+        ("freshness-days-hours-minutes", dict(planned, lanes=[lanes[0], dict(lanes[1], freshness="P1DT2H30M"), lanes[2]]),
+         "valid", "valid", [], ["ENC-9", "CKP-3"], "days, hours and minutes, in that order"),
+        *((name, dict(planned, lanes=[dict(lanes[1], freshness=text)]), "invalid", "invalid", None, ["ENC-9"], why) for name, text, why in [
+            ("freshness-t-alone", "PT", "a T is followed by hours or minutes"),
+            ("freshness-t-without-part", "P1DT", "a T is followed by hours or minutes, also after days"),
+            ("freshness-seconds", "PT30S", "a duration has no seconds"),
+            ("freshness-weeks", "P1W", "a duration has no weeks"),
+            ("freshness-minutes-before-hours", "PT1M1H", "hours come before minutes"),
+            ("freshness-six-digits", "P123456D", "each part is at most five digits"),
+        ]),
         ("run-without-hash", dict(planned, lanes=[dict(lanes[0], runs=[{"runId": "Q-184", "origin": "launched"}])]), "invalid", "invalid", None,
          ["CKP-2"], "a lane's runs are frozen by their run hashes"),
         ("threshold-without-path", dict(planned, lanes=[dict(lanes[0], rule={"kind": "threshold", "lane": "quality", "metric": "m", "op": ">=", "value": 1})]),
@@ -1279,8 +1359,8 @@ def checkpoints():
          ["decision", "lanes"], C7, "the input decides exactly the manifest's lanes"),
         ("version-differs", dict(decided, decisionInput=dict(decision_input, subjectVersion="git:000000")), "valid", "valid",
          ["decision", "version"], C7, "the input is for the checkpoint's version"),
-        ("evidence-without-runs", dict(decided, lanes=[dict(lanes[0], runs=[])] + lanes[1:]), "valid", "valid", ["evidence"], C7,
-         "a lane with a result names the runs it came from"),
+        ("evidence-without-runs", dict(decided, lanes=[dict(lanes[0], runs=[])] + lanes[1:]), "valid", "valid", ["evidence", "lane-evidence"], C7,
+         "a lane with a result names the runs it came from (and the input's run hashes are then not the lane's runs')"),
         ("runs-without-evidence", dict(decided, decisionInput=dict(decision_input, lanes=decision_input["lanes"][:1] + [
             dict(decision_input["lanes"][1], result=None)] + decision_input["lanes"][2:])), "valid", "valid", ["decision", "evidence"], C7,
          "a lane with runs has a result (here the input drops it, so the recorded decision is not recomputed either)"),
@@ -1290,18 +1370,36 @@ def checkpoints():
         ("input-status-unknown", dict(decided, decisionInput=dict(decision_input, lanes=[dict(decision_input["lanes"][0], result=dict(
             decision_input["lanes"][0]["result"], status="flaky"))] + decision_input["lanes"][1:])), "invalid", "valid", ["unverifiable"], C7,
          "a lane status a later minor adds, in the recorded input: the decision cannot be recomputed"),
-        ("valid-decided-with-exceptions", excepted, "valid", "valid", [], ["CKP-4", "CKP-7", "DEC-2", "DEC-3"],
-         "a failed blocking lane waived by an exception in force, recorded in the decision input: approved_with_exceptions"),
+        ("valid-decided-with-exceptions", excepted, "valid", "valid", [], ["CKP-4", "CKP-7", "DEC-1", "DEC-2", "DEC-3"],
+         "a failed blocking lane waived by an exception for its exact runs, in force, recorded in the decision input: "
+         "approved_with_exceptions"),
         ("exception-ignored", exception_ignored, "valid", "valid", ["decision"], ["CKP-7", "DEC-2"],
          "the recorded decision ignores an exception in force in the recorded input: not what the input gives"),
         ("exception-for-unknown-lane", dict(excepted, decisionInput=dict(excepted_input, exceptions=[dict(waiver, lane="memory")])),
-         "valid", "valid", ["decision"], ["CKP-7", "DEC-1"],
-         "an exception for a lane the input does not have: the recorded input cannot be decided"),
+         "valid", "valid", ["decision", "exception-evidence"], ["CKP-7", "DEC-1"],
+         "an exception for a lane the input does not have: the recorded input cannot be decided, and its run hashes are no "
+         "runs of that lane"),
         ("approved-with-exceptions-without-input", {k: v for k, v in excepted.items() if k != "decisionInput"}, "invalid", "invalid",
          None, ["CKP-4"], "an approval with exceptions is the decision function's: its input, exceptions included, is recorded"),
         ("exception-without-expiry", dict(excepted, decisionInput=dict(excepted_input, exceptions=[
             {k: v for k, v in waiver.items() if k != "expires"}])), "invalid", "invalid", None, ["DEC-1"],
          "every exception expires"),
+        ("exception-without-evidence", dict(excepted, decisionInput=dict(excepted_input, exceptions=[dict(waiver, evidence=[])])),
+         "invalid", "invalid", None, ["DEC-1"], "every exception names the run hashes whose failure it accepts: it is not a policy"),
+        ("lane-result-without-evidence", dict(decided, decisionInput=dict(decision_input, lanes=[
+            {k: v for k, v in decision_input["lanes"][0].items() if k != "evidence"}] + decision_input["lanes"][1:])),
+         "invalid", "invalid", None, ["DEC-1"], "a lane with a result names the run hashes it came from"),
+        ("lane-evidence-differs", dict(decided, decisionInput=dict(decision_input, lanes=[
+            dict(decision_input["lanes"][0], evidence=[hh("f")])] + decision_input["lanes"][1:])),
+         "valid", "valid", ["lane-evidence"], ["CKP-7", "DEC-1"],
+         "the input's run hashes for a lane are not the run hashes of the lane's runs"),
+        ("exception-evidence-not-in-runs", dict(excepted, decisionInput=dict(excepted_input, exceptions=[
+            waiver, dict(waiver, evidence=[hh("b"), hh("f")])])),
+         "valid", "valid", ["exception-evidence"], ["CKP-7", "DEC-1"],
+         "an exception names a run hash that is not one of its lane's runs (the other exception still waives the lane)"),
+        ("exception-for-an-earlier-run", rerun, "valid", "valid", ["exception-evidence"], ["CKP-7", "DEC-2"],
+         "a re-run failed again: the exception for the earlier runs is for other evidence, so the lane blocks, and the "
+         "exception names run hashes the checkpoint does not hold"),
     ]
 
 

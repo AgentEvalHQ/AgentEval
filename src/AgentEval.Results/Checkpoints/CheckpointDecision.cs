@@ -2,9 +2,6 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using System.Globalization;
-using System.Text.RegularExpressions;
-
 namespace AgentEval.Results.Checkpoints;
 
 /// <summary>What a lane's rule gave on its evidence (computed from the lane's runs, outside the decision function).</summary>
@@ -74,8 +71,12 @@ public enum CheckpointOutcome
 public sealed record LaneEvidence(
     LaneEvidenceStatus Status, string SubjectVersion, AefTime OldestClosedAt, IReadOnlyList<string>? Axes = null);
 
-/// <summary>One lane of the decision's input. <paramref name="Freshness"/> is an ISO 8601 duration in days and hours.</summary>
-public sealed record LaneInput(string Lane, bool Blocking, LaneEvidence? Result, string? Freshness = null);
+/// <summary>
+/// One lane of the decision's input. <paramref name="Freshness"/> is an AEF duration of days, hours and minutes ([ENC-9]);
+/// <paramref name="Evidence"/> is the run hash of each of the lane's runs (required with a result; none is the empty set).
+/// </summary>
+public sealed record LaneInput(
+    string Lane, bool Blocking, LaneEvidence? Result, string? Freshness = null, IReadOnlyList<string>? Evidence = null);
 
 /// <summary>
 /// An identity and the assurance its writer claims for it (self-attested, signed or authenticated). A claim: a reader
@@ -84,15 +85,22 @@ public sealed record LaneInput(string Lane, bool Blocking, LaneEvidence? Result,
 public sealed record TrustedIdentity(string Identity, string Assurance);
 
 /// <summary>
-/// An exception: a person's decision to accept a lane's failure from <c>At</c> until <c>Expires</c>. In force at a time
-/// t when At &lt;= t &lt; Expires; it waives a failed lane, never missing, stale, not-measured or incomparable evidence.
-/// <c>Requirement</c>, <c>Reason</c> and <c>By</c> are for display and take no part in the decision.
+/// An exception: a person's decision to accept the failure of named, sealed evidence (<c>Evidence</c>: run hashes) from
+/// <c>At</c> until <c>Expires</c>. It waives a failed lane whose evidence is the same set of run hashes, while in force
+/// (At &lt;= t &lt; Expires); never missing, stale, not-measured or incomparable evidence, and never a re-run's.
+/// <c>Requirement</c>, <c>Reason</c> and <c>By</c> are for display and take no part in the decision; <c>By</c> is a
+/// claim, attributable only through the checkpoint's signature.
 /// </summary>
 public sealed record ExceptionGrant(
-    string Lane, string Reason, TrustedIdentity By, AefTime At, AefTime Expires, string? Requirement = null)
+    string Lane, IReadOnlyList<string> Evidence, string Reason, TrustedIdentity By, AefTime At, AefTime Expires,
+    string? Requirement = null)
 {
     /// <summary>Granted at or before <paramref name="time"/>, and expiring after it.</summary>
     public bool InForceAt(AefTime time) => At <= time && time < Expires;
+
+    /// <summary>For exactly this evidence: the same set of run hashes, compared byte for byte.</summary>
+    public bool IsFor(IReadOnlyList<string>? evidence) =>
+        Evidence.ToHashSet(StringComparer.Ordinal).SetEquals(evidence ?? []);
 }
 
 /// <summary>The decision function's input: the checkpoint's exact version, the evaluation time, its lanes, and any exceptions.</summary>
@@ -113,13 +121,10 @@ public sealed record CheckpointDecisionResult(CheckpointOutcome Outcome, IReadOn
 /// </summary>
 public static class CheckpointDecision
 {
-    private static readonly Regex Duration = new(
-        "^P(?=[0-9]|T[0-9])(?:([0-9]{1,5})D)?(?:T([0-9]{1,5})H)?\\z", RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
-
     /// <summary>Decides a checkpoint.</summary>
     /// <exception cref="ArgumentException">No lane, a lane listed twice, an exception for a lane the input does not
-    /// have, or an exception that expires at or before it is granted.</exception>
-    /// <exception cref="FormatException">A lane's freshness is not a duration in days and hours.</exception>
+    /// have, one that names no run hash, or one that expires at or before it is granted.</exception>
+    /// <exception cref="FormatException">A lane's freshness is not a duration ([ENC-9]).</exception>
     public static CheckpointDecisionResult Decide(CheckpointDecisionInput input)
     {
         ArgumentNullException.ThrowIfNull(input);
@@ -139,6 +144,11 @@ public static class CheckpointDecision
             if (!names.Contains(grant.Lane))
             {
                 throw new ArgumentException($"An exception names lane '{grant.Lane}', which is not a lane of the input.", nameof(input));
+            }
+
+            if (grant.Evidence is not { Count: > 0 })
+            {
+                throw new ArgumentException($"An exception for lane '{grant.Lane}' names no evidence: it would accept any failure.", nameof(input));
             }
 
             if (grant.Expires <= grant.At)
@@ -180,18 +190,20 @@ public static class CheckpointDecision
                 };
             }
 
-            // Only a failure is ever waived, by an exception in force at the evaluation time: never missing or unusable evidence.
-            var lapsed = false;
+            // Only a failure is ever waived, by an exception for exactly this evidence (the same set of run hashes) in force
+            // at the evaluation time: never missing or unusable evidence, never a re-run's.
+            var unapplied = new List<string>(2);   // why none applied, in [DEC-4] order
             if (status is LaneStatus.Failed
                 && input.Exceptions?.Where(e => string.Equals(e.Lane, lane.Lane, StringComparison.Ordinal)).ToList() is { Count: > 0 } grants)
             {
-                if (grants.Any(e => e.InForceAt(input.EvaluatedAt)))
+                if (grants.Any(e => e.IsFor(lane.Evidence) && e.InForceAt(input.EvaluatedAt)))
                 {
                     status = LaneStatus.Waived;
                 }
                 else
                 {
-                    lapsed = true;
+                    if (grants.Any(e => e.IsFor(lane.Evidence))) unapplied.Add("exception-expired");
+                    if (grants.Any(e => !e.IsFor(lane.Evidence))) unapplied.Add("exception-other-evidence");
                 }
             }
 
@@ -212,10 +224,7 @@ public static class CheckpointDecision
                 reasons.Add($"{code}:{lane.Lane}");
             }
 
-            if (lapsed)
-            {
-                reasons.Add($"exception-expired:{lane.Lane}");
-            }
+            reasons.AddRange(unapplied.Select(why => $"{why}:{lane.Lane}"));
         }
 
         var superseded = input.SupersededBy is { } newer && !string.Equals(newer, input.SubjectVersion, StringComparison.Ordinal);
@@ -234,19 +243,7 @@ public static class CheckpointDecision
         return new CheckpointDecisionResult(outcome, lanes, reasons);
     }
 
-    /// <summary>An ISO 8601 duration of days and hours (P14D, PT36H, P1DT12H), each at most five digits, in seconds.</summary>
+    /// <summary>A freshness in seconds: an AEF duration of days, hours and minutes ([ENC-9], <see cref="AefDuration"/>).</summary>
     /// <exception cref="FormatException">Anything else.</exception>
-    public static long DurationSeconds(string text)
-    {
-        ArgumentNullException.ThrowIfNull(text);
-        var match = Duration.Match(text);
-        if (!match.Success)
-        {
-            throw new FormatException($"'{text}' is not a duration in days and hours (P14D, PT36H, P1DT12H), each at most five digits.");
-        }
-
-        long days = match.Groups[1].Success ? long.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture) : 0;
-        long hours = match.Groups[2].Success ? long.Parse(match.Groups[2].Value, CultureInfo.InvariantCulture) : 0;
-        return (days * 86_400) + (hours * 3_600);
-    }
+    public static long DurationSeconds(string text) => AefDuration.Seconds(text);
 }

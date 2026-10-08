@@ -1,0 +1,29 @@
+{
+  "kind": "lane",
+  "checkpoint": "checkpoint.json",
+  "runs": "runs",
+  "lanes": [
+    {
+      "lane": "median-decides",
+      "result": {
+        "status": "passed",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-05T00:00:00Z"
+      }
+    },
+    {
+      "lane": "pass-at-k-cannot",
+      "result": {
+        "status": "not_measured",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-05T00:00:00Z"
+      }
+    }
+  ],
+  "problems": [],
+  "rules": [
+    "SUM-8",
+    "LANE-2",
+    "LANE-10"
+  ]
+}

@@ -45,11 +45,12 @@ run captured (prompts, responses, reasoning), which may be confidential or perso
   key id) rather than e-mail addresses: an overlay is append-only and cannot be erased.
 - **[SEC-5]** A captured blob holding personal data is erased with a `redact` overlay and by deleting the blob
   ([OVL-10]); the seal then reports it `withheld` and the rest of the run stays verifiable.
-- **[SEC-6]** Traces (`traces.otlp.jsonl`) follow OpenTelemetry's GenAI conventions, which may carry prompt and
-  completion text. In a run with `contentCapture: off`, no span or span event carries `gen_ai.input.messages`,
-  `gen_ai.output.messages`, `gen_ai.system_instructions`, `gen_ai.tool.call.arguments`, `gen_ai.tool.call.result`, or
-  the deprecated `gen_ai.prompt` and `gen_ai.completion`. A run verifier reports each such trace line as
-  `content-capture` (§3.9). Content in an attribute these conventions do not name cannot be detected: a producer
+- **[SEC-6]** Traces (`traces.otlp.jsonl`) and logs (`logs.otlp.jsonl`) follow OpenTelemetry's GenAI conventions,
+  which may carry prompt and completion text. In a run with `contentCapture: off`, no span, span event or log record
+  carries `gen_ai.input.messages`, `gen_ai.output.messages`, `gen_ai.system_instructions`,
+  `gen_ai.tool.call.arguments`, `gen_ai.tool.call.result`, `gen_ai.evaluation.explanation` (a judge's reasoning), or
+  the deprecated `gen_ai.prompt` and `gen_ai.completion`, and no log record has a `body` member, whatever its value. A run verifier reports each
+  such line as `content-capture` (§3.9). Content in an attribute these conventions do not name cannot be detected: a producer
   **MUST NOT** write it either.
 
 ## 8.5 Algorithms

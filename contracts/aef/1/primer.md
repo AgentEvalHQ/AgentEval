@@ -76,8 +76,8 @@ One line, shortened:
 
 Three ideas carry most of the format:
 
-- **Nine states, and absence is typed.** Besides `passed`, `failed`, `warn` and `inconclusive`, a result can be
-  `not_measured`, `not_applicable`, `skipped`, `error` or `pending`. Those five are *typed absences*: they carry a
+- **Ten states, and absence is typed.** Besides `passed`, `failed`, `warn`, `inconclusive` and `scored` (measured,
+  with no pass/fail rule), a result can be `not_measured`, `not_applicable`, `skipped`, `error` or `pending`. Those five are *typed absences*: they carry a
   `reason`, never a score, and they are never counted as a pass or as a zero ([RES-1], [RES-2]). A judge that timed
   out is an `error`, not a 0.
 - **Ids are computed, not invented.** `resultId` is a hash of the run id, case id, path and trial, so the same run read
@@ -157,9 +157,11 @@ A reader shows the **effective view**: the sealed states, plus what verified ove
 | `override`, `adjudicate` | the result's effective state (the sealed state is shown beside it) |
 | `approve`, `reject` | the review status of the run or a result |
 | `waive` | active from `at` until `expires`, then shown as expired |
-| `redact` | a blob is withheld: it may be deleted, and the seal reports it as `withheld`, not `missing` |
+| `redact` | a blob is withheld: it may be deleted, and the seal reports it as `withheld`, not `missing`, but only when the batch is signed by someone the verifier's trust policy allows to redact |
 
-Redaction is how personal data captured in a blob is erased without breaking the seal ([OVL-10]). Summaries, gate
+Redaction is how personal data captured in a blob is erased without breaking the seal ([OVL-10]). An unsigned or
+unauthorized redaction withholds nothing: the deleted blob is missing and the run fails, so no one can suppress
+evidence by appending an event. Summaries, gate
 decisions and lane results are never recomputed from overlays: they describe the sealed run.
 
 ## 4. Checkpoints: the decision follows from the evidence
@@ -181,7 +183,7 @@ flowchart TB
 ```
 
 1. **Each lane names its rule and its exact runs, by run hash** ([CKP-2]). A run changed after the checkpoint was made
-   is no longer found ([CKP-8]).
+   is still found by its seal's run hash, and reported as not intact, so its evidence no longer counts ([CKP-8]).
 2. **A lane's result is a function of its sealed runs** ([§5.3](spec/05-checkpoints.md)). A `threshold` reads a summary
    entry. A `severity` rule looks at every failure, and a failure without a severity counts as critical. An
    `evidence-present` rule counts eligible runs. A `comparison` runs an exact one-sided sign test against one baseline
@@ -209,8 +211,9 @@ against the plan: budget kept, limits kept, every announced run sealed ([§6](sp
 
 Producers write against the strict **writer** schemas. Readers use the **reader** schemas, derived from them, which
 accept what a later 1.x may add: unknown fields, and unknown enum values, each read as its safest known value (an
-unknown result state reads as `inconclusive`, an unknown target mode as `mocked`, an unknown gate outcome as
-`inconclusive`) ([§7.3](spec/07-versioning.md)). An unknown major version is refused.
+unknown target mode as `mocked`, an unknown gate outcome as `inconclusive`) ([§7.3](spec/07-versioning.md)). Three
+enums the checks compute with (a result's state, a run's status, a metric's kind) are closed for 1.x, so no later
+minor can surprise them ([VER-9]). An unknown major version is refused.
 
 ## 7. Trying it
 

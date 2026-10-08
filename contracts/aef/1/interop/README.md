@@ -1,6 +1,6 @@
 # AEF interoperability
 
-These pages map AEF 1.0 to five neighbouring formats. They are informative: nothing here changes a rule of the
+These pages map AEF 1.0 to six neighbouring formats. They are informative: nothing here changes a rule of the
 [specification](../spec/01-introduction.md). Each page names the version of the target it was written against.
 
 | Page | Target | Version read (2026-10-08) |
@@ -9,6 +9,7 @@ These pages map AEF 1.0 to five neighbouring formats. They are informative: noth
 | [Inspect AI](inspect.md) | Inspect eval logs (`.eval`, `.json`) | `inspect_ai` 0.3.277 |
 | [OpenAI Evals](openai-evals.md) | The open-source `evals` recording format, and the hosted Evals API | `openai/evals` at `8eac7a7d`; OpenAI OpenAPI spec 2.3.0 |
 | [EvalPort](evalport.md) | EvalPort suites and result sets | SPEC 1.0.0-rc.5 at `d0e90c48` |
+| [ASSERT](assert.md) | Microsoft ASSERT's suite and run artifacts, and its harm and over-refusal headline | `assert-ai` 0.3.0 (tag `v0.3.0`, `main` at `e03aa809`) |
 | [in-toto, DSSE, SLSA](in-toto.md) | in-toto Statements, DSSE envelopes, SLSA VSA, media types; the specifications of AEF's two predicate types | in-toto attestation spec v1.2; DSSE 1.0.2; SLSA 1.2 |
 
 ## What "maps" means
@@ -46,6 +47,7 @@ converts a target record into AEF. All examples were checked:
 - every JSON block parses;
 - every AEF line is valid against the writer schemas;
 - the EvalPort example is valid against EvalPort's `schema/resultset.json`;
+- the run converted from ASSERT's sample passes the reference verifier (`tools/aef_verify.py run`);
 - every result id was recomputed with RES-4 against the corpus.
 
 ## What survives a round trip
@@ -54,12 +56,13 @@ AEF → target → AEF, for one result line of the corpus run.
 
 | Through | Survives | Lost | Same `resultId` |
 |---|---|---|---|
-| [OpenTelemetry event](opentelemetry.md) | metric name, score, state (as the label), reason, span ids, case id (as `test.case.name`) | `runId`, `path`, the result tree, thresholds, uncertainty, severity, evaluator, annotator, metric declarations | no: the event carries neither the run id nor the path |
-| [Inspect sample score](inspect.md) | case, trial (as epoch − 1), path (as the score key), score value, explanation, usage | the kind of typed absence (Inspect has one unscored value, NaN), composite lineage, gates, seal, overlays | yes |
-| [EvalPort result](evalport.md) | case, trial (as attempt − 1), path (as `grader_id`), pass or fail, score in [0, 1], reason, duration | typed absence kinds, `warn` against `failed`, `inconclusive`, `component.required`, `rulePath`, trial rollups, the seal | yes, when the root's path is kept in metadata |
-| [OpenAI evals log](openai-evals.md) | case, pass or fail, score | typed absences, the result tree, judges, the seal | only with the path kept in the event's `data` |
+| [OpenTelemetry event](opentelemetry.md) | metric name, score, state (as the label, [RUN-14](../spec/03-run.md#310-traces)), reason, span ids, end time, case id (as `test.case.name`) | `runId`, `path`, a score's own `label`, the result tree, thresholds, uncertainty, severity, evaluator, annotator, metric declarations | no: the event carries neither the run id nor the path |
+| [Inspect sample score](inspect.md) | case, trial (as epoch − 1), path (as the score key), score value or label, explanation, usage per role with cache and reasoning tokens, case times, captured case content | the state (Inspect has no verdict, and one unscored value, NaN, for every typed absence), composite lineage, gates, seal, overlays | yes |
+| [EvalPort result](evalport.md) | case, trial (as attempt − 1), path (as `grader_id`), pass or fail, score in [0, 1], reason, duration, end time, captured output | typed absence kinds, `warn` against `failed`, `inconclusive`, `scored`, `component.required`, `rulePath`, trial rollups, the seal | yes, when the root's path is kept in metadata |
+| [OpenAI evals log](openai-evals.md) | case, pass or fail, score, end time | typed absences, the result tree, judges, the seal | only with the path kept in the event's `data` |
 | [Hosted OpenAI Evals](openai-evals.md) | nothing of AEF's grading: the hosted API grades runs itself and accepts no outside results | everything except the case content, which it can re-grade | no |
 | [in-toto](in-toto.md) | the seal, exactly: `seal.json` is an in-toto Statement | per-case results in a `test-result` statement keep only passed, warned and failed case ids | n/a |
+| [ASSERT judge-only run](assert.md) | the captured conversation, and the case id through AgentEval's case map; ASSERT's judge then grades it again | AEF's own verdicts, scores, tree and seal: ASSERT accepts no outside verdicts | yes, for the lines a converter writes from ASSERT's verdicts (`<type>:<test_case_id>` mapped back to the case id) |
 
 Values kept in the target's free-form metadata are not counted as surviving in this table, except where a row says so.
 
@@ -70,7 +73,7 @@ mapping still loses something.
 
 | Id | What was missing | In AEF 1.0 |
 |---|---|---|
-| I1 | A state for "measured, no pass/fail rule"; categorical results; aggregates other than the mean | The `scored` state ([RES-1](../spec/03-run.md#341-states)), a score's `label`, and a summary entry's `aggregate` (pass@k, F1, median; [SUM-5](../spec/03-run.md#36-summaryjson)) |
+| I1 | A state for "measured, no pass/fail rule"; categorical results; aggregates other than the mean | The `scored` state ([RES-1](../spec/03-run.md#341-states)) and summary verdict ([SUM-6](../spec/03-run.md#36-summaryjson)), a score's `label`, and a summary entry's `aggregate`: median, min and max recomputed, pass@k or F1 shown as the producer's ([SUM-8](../spec/03-run.md#36-summaryjson)) |
 | I2 | A typed place for case content | Evidence kinds `input`, `expected`, `output`, `transcript`, all content under [RUN-11](../spec/03-run.md#32-runjson) |
 | I3 | OpenTelemetry alignment | An optional `logs.otlp.jsonl` for OpenTelemetry events, `otel.schemaUrls`, and the label vocabulary: an exported event's label is the result's state name ([RUN-14](../spec/03-run.md#310-traces)) |
 | I4 | Usage detail | `usage` is one entry per party (agent, judge, attacker), with cache-read, cache-write and reasoning tokens in OpenTelemetry's names ([RES-10](../spec/03-run.md#345-facts-about-a-result)) |
@@ -78,3 +81,10 @@ mapping still loses something.
 | I6 | Times per result | `startedAt` and `endedAt` on a result line |
 | I7 | Facts a converter supplied | `imported` in `run.json`: the original tool and the fields the converter asserted ([RUN-15](../spec/03-run.md#32-runjson)) |
 | I8 | An attestation bound to the evaluated artifact; registered media types | **Open.** [in-toto.md](in-toto.md) gives the companion statement's shape and the proposed media type names; registering them is an external process. |
+
+Found while mapping the current format: a summary entry with no rule is now `scored`
+([SUM-6](../spec/03-run.md#36-summaryjson)), and `summary.json` has the run's usage per party and model
+([SUM-7](../spec/03-run.md#36-summaryjson)). Still open:
+
+- **EvalPort `isolation` and `group`.** AEF has no field for a run's trial isolation or for membership in a group of
+  sibling runs.

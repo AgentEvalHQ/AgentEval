@@ -11,6 +11,10 @@
     "kind": "agent",
     "version": "git:3f2a1c"
   },
+  "deployment": {
+    "ref": "deployment:support/support-triage@dev",
+    "endpoint": "http://localhost:5080/v1"
+  },
   "suite": {
     "ref": "suite:support/triage-scenarios",
     "version": "4",
@@ -24,8 +28,8 @@
       "rubricDigest": "sha256:a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9"
     }
   ],
-  "startedAt": "2026-10-08T12:00:00Z",
-  "endedAt": "2026-10-08T12:00:05Z",
+  "startedAt": "2026-10-08T12:00:10Z",
+  "endedAt": "2026-10-08T12:00:50Z",
   "contentCapture": "off",
   "execution": {
     "targetMode": "live",
@@ -33,7 +37,7 @@
   },
   "provenance": {
     "planId": "plan-44",
-    "planDigest": "60101e16932e5e74c68110d52d27e713924d9cc549c34f4c36292d2eabb30ccd",
+    "planDigest": "163731b5c72e4fe7607fc3b259df09093807964c17c9129a1a254bfcfa3fd377",
     "jobId": "job-7",
     "runnerId": "runner-local-01"
   }

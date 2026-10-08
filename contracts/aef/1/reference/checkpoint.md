@@ -34,7 +34,7 @@ A release decision over several evidence lanes for one exact subject version: th
 | `decision` | [decision](decision.md) |  |  | The decision function's output, recorded when the state became decided. |
 | `ext` | [ext](common.md#ext) |  |  | Producer extensions, named reverse-DNS or with the producer's prefix. A reader ignores what it does not know; never holds a secret (ENC-19). |
 | `abortReason` | string |  | ≥ 1 chars; ≤ 2048 chars | Why the checkpoint was abandoned. Required with the outcome aborted (CKP-4). |
-| `decisionInput` | [input](decision.md#input) |  |  | The decision function's input, recorded with its output so anyone can recompute it; its exceptions are recorded here, so the checkpoint's signature covers them (CKP-4, CKP-5, CKP-7). |
+| `decisionInput` | [input](decision.md#input) |  |  | The decision function's input, recorded with its output so anyone can recompute it. Each lane's evidence is the set of its runs' run hashes, and each exception names only run hashes of its lane's runs; its exceptions are recorded here, so whoever signs the checkpoint vouches for them (CKP-4, CKP-5, CKP-7, CKP-9, DEC-1). |
 
 - **Rule:** Decided by the decision function: its input and output are recorded.
 - **Rule:** Abandoned: it says why, and records no decision.

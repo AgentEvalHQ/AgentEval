@@ -13,6 +13,9 @@
       {
         "lane": "quality",
         "blocking": true,
+        "evidence": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
         "result": {
           "status": "passed",
           "subjectVersion": "git:3f2a1c",
@@ -23,6 +26,9 @@
         "lane": "performance",
         "blocking": false,
         "freshness": "P7D",
+        "evidence": [
+          "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        ],
         "result": {
           "status": "passed",
           "subjectVersion": "git:3f2a1c",

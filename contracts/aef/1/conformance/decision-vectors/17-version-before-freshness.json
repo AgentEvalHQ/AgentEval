@@ -15,6 +15,9 @@
         "lane": "security",
         "blocking": true,
         "freshness": "P14D",
+        "evidence": [
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        ],
         "result": {
           "status": "passed",
           "subjectVersion": "git:000000",

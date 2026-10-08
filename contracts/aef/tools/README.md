@@ -27,7 +27,7 @@ writes (a seal, a result id, a key id). Run them in this order; they rewrite the
 4. `signature_vectors.py`: envelopes, test keys and trust policies, and signed runs.
 5. `decision_vectors.py`, `protocol_vectors.py`: the decision function's and the runner protocol's vectors.
 6. `build_index.py`: `conformance/index.json`, last.
-7. `gen_reference.py`: the field reference from the schemas (`--check` in CI).
+7. `gen_reference.py`: the field reference from the schemas (`--check` fails when the pages are stale; no CI job runs it yet).
 
 ## Testing your implementation
 

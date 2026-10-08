@@ -3,6 +3,9 @@
   "schema": "runner",
   "writer": "invalid",
   "reader": "valid",
+  "reads": {
+    "os": "plan9"
+  },
   "rules": [
     "PLAN-6",
     "VER-8"

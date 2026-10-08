@@ -58,6 +58,11 @@ children). A format that defined one formula would be wrong for most tools, and 
 a scoring library. AEF records how the producer reached a composite's state, so a reader can show it, and forbids
 recomputing it ([RES-6]). What AEF does define exactly is the summary, because release decisions read it ([SUM-3]–[SUM-5]).
 
+The same line runs through summary aggregates. The mean, median, minimum and maximum are defined, so a verifier
+recomputes them. pass@k, F1 and the many other figures tools report are kept as the producer wrote them, so a reader
+sees them, but no lane reads them ([SUM-8], [LANE-2]). A release decision rests only on numbers anyone can recompute
+from the sealed lines.
+
 ### The target mode is required
 
 A run against a scripted stand-in looks exactly like a run against the real agent. If nothing in the format says

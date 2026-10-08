@@ -15,8 +15,11 @@ Usage:
 The vectors of conformance/protocol/ (spec 09 §9.2.1 defers to this list). Every expected.json has `kind` and
 `rules` (the rule ids the vector concerns):
   plans/<name>/, runners/<name>/   kind plan: document.json; `schema` (run-plan or runner), `writer` and `reader`
-                                   (valid or invalid), `why`
-  matching/<name>/                 kind matching: plan.json and runner.json; `matches` (true or false), `why`
+                                   (valid or invalid), optional `reads` (field path: the value a reader reads it as,
+                                   spec 07 §7.3, as for a reader-only vector), `why`
+  matching/<name>/                 kind matching: plan.json and runner.json; `matches` (true or false), `readerOnly`
+                                   when a document holds a value a later minor may add (only a reader accepts it),
+                                   `why`
   streams/<name>/                  kind stream: events.ndjson (read as STRM-2 says: a last line without LF is still
                                    being written, and not read); `plan` (the plan file, relative to the vector: the
                                    plans are shared, in streams/), `problems` (a list of {where, problem}, in
@@ -36,9 +39,12 @@ import sys
 from pathlib import Path
 
 TOOLS = Path(__file__).resolve().parent
+if str(TOOLS) not in sys.path:  # python -I leaves the script's own folder out of sys.path
+    sys.path.insert(0, str(TOOLS))
+from aef_decide import parse_duration  # noqa: E402  (ENC-9: the one duration grammar)
+
 TERMINAL = {"job.sealed", "job.failed", "job.cancelled", "job.refused"}
 TIME = re.compile(r"^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\.([0-9]{1,9}))?Z$")
-TIMEOUT = re.compile(r"^PT(?=[0-9])(?:([0-9]{1,5})H)?(?:([0-9]{1,5})M)?$")
 PROVENANCE = ("planId", "planDigest", "jobId", "runnerId")
 
 
@@ -69,8 +75,7 @@ def verify(events, plan=None, plan_digest=None):
     start = parse_time(first["at"]) if first else None
     limit = None
     if plan is not None and "timeout" in plan["limits"]:
-        h, m = TIMEOUT.fullmatch(plan["limits"]["timeout"]).groups()
-        limit = int(h or 0) * 3600 + int(m or 0) * 60
+        limit = parse_duration(plan["limits"]["timeout"])
     for i, e in enumerate(events, start=1):
         found, kind = [], e["kind"]
         if i == 1 and kind not in ("job.accepted", "job.refused"):
@@ -164,8 +169,9 @@ def ndjson(path):
     return [json.loads(line) for line in Path(path).read_bytes().decode("utf-8").split("\n") if line]
 
 
-def departures(doc, plan, accepted):
-    """The codes of STRM-4 an intact, announced run's run.json breaks (the job's limits apart)."""
+def departures(doc, plan, accepted, terminal):
+    """The codes of STRM-4 an intact, announced run's run.json breaks (the job's limits apart). accepted and terminal
+    are the stream's first job.accepted and first terminal event, or None."""
     found = []
     provenance = doc.get("provenance")
     if accepted is None or not isinstance(provenance, dict) or any(provenance.get(k) != accepted.get(k) for k in PROVENANCE):
@@ -173,6 +179,14 @@ def departures(doc, plan, accepted):
     subject = doc.get("subject") or {}
     if subject.get("ref") != plan["subject"]["ref"] or subject.get("version") != plan["subject"]["version"]:
         found.append("subject")
+    deployment = doc.get("deployment") or {}
+    if any(key in plan["subject"] and deployment.get(field) != plan["subject"][key]
+           for key, field in (("deployment", "ref"), ("endpoint", "endpoint"))):
+        found.append("deployment")
+    # Within the job, at full precision (ENC-8): a run that started before the job was accepted was adopted, not produced.
+    if ((accepted is not None and "startedAt" in doc and parse_time(doc["startedAt"]) < parse_time(accepted["at"]))
+            or (terminal is not None and "endedAt" in doc and parse_time(doc["endedAt"]) > parse_time(terminal["at"]))):
+        found.append("time")
     suite = doc.get("suite") or {}
     if not any(suite.get("ref") == s["ref"] and suite.get("version") == s["version"]
                and ("digest" not in s or suite.get("digest") == s["digest"]) for s in plan["suites"]):
@@ -194,6 +208,7 @@ def conform(events, plan, runs, policy=None, examine=examine):
     limits over those runs, at 'job'; ordered by path (UTF-8 bytes) and then by code. runs is the folder of the runs the
     job produced; policy the caller's trust policy (or None); examine(folder, policy) gives (run hash, intact)."""
     accepted = next((e for e in events if e.get("kind") == "job.accepted"), None)
+    terminal = next((e for e in events if e.get("kind") in TERMINAL), None)
     announced, named = {}, []
     for e in events:
         if e.get("kind") == "evidence.produced":
@@ -210,7 +225,7 @@ def conform(events, plan, runs, policy=None, examine=examine):
         elif run is None:
             found = ["run-hash"]
         else:
-            found = departures(run[1], plan, accepted)
+            found = departures(run[1], plan, accepted, terminal)
             summary_file = run[0] / "summary.json"
             summary = json.loads(summary_file.read_bytes()) if summary_file.is_file() else {}
             if not isinstance((summary.get("cost") or {}).get("totalUsd"), (int, float)):

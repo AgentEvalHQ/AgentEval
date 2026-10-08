@@ -15,7 +15,7 @@
   | `evidence.ndjson` | `evidence`, one line each | when a result cites evidence |
   | `gates.ndjson` | `gate-decision`, one line each | when the producer took a gate decision |
   | `blobs/sha256/<ab>/<hex>` | none: raw bytes | when a line references a blob |
-  | `traces.otlp.jsonl` | OTLP/JSON, one `ExportTraceServiceRequest` per line | optional |
+  | `traces.otlp.jsonl` | OTLP/JSON, one `TracesData` object per line | optional |
   | `logs.otlp.jsonl` | OTLP/JSON, one `LogsData` object per line | optional: OpenTelemetry events, such as `gen_ai.evaluation.result` |
   | `ext/…` | none: the producer's files | optional |
   | `seal.json` | `seal` | in a sealed run (§4.1) |
@@ -24,7 +24,8 @@
   | `overlays/seal-<nnnn>.json` | `overlay-seal` | one per batch of overlay events |
   | `overlays/seal-<nnnn>.dsse.json` | DSSE envelope | optional: a batch's signature |
 
-  A file not in this list (a `notes.txt` someone added) is reported as `not-sealed` (§4.1) or, under `overlays/`, as
+  A file not in this list (a `notes.txt` someone added) is reported as `not-sealed` (§4.1) when the seal does not list
+  it, as `unexpected-file` (§3.9) when it does (a producer seals only these files), and under `overlays/` as
   `unexpected-file` (§4.2); a hidden file a file manager added (`.DS_Store`) also breaks [RUN-3]. Tools that copy runs **MUST NOT** add files.
 - **[RUN-3] Paths.** Every path in a run folder is made of segments of ASCII letters, digits, `.`, `_` and `-`,
   separated by `/`, at most 255 bytes in all (a longer path is a `path` problem, not a `limit`). No segment starts or
@@ -59,7 +60,8 @@ was kept.
   Only `live` evidence describes how the subject behaves now. A reader **MUST** show a run's target mode wherever it
   shows its results, and **MUST NOT** compare a `live` run with one of another mode as if they measured the same thing
   (§5.3.4). `execution.stimulus` says where the inputs came from: `suite` (a fixed suite), `generated` (generated at run
-  time, for example by an attacker model), `imported` (another tool's cases), or `other`.
+  time, for example by an attacker model), `external` (another tool's cases), or `other`. (A run converted from another
+  tool's output is marked by `imported`, [RUN-15].)
 - **[RUN-8] The suite.** `suite` names the cases that ran: `ref`, exact `version`, and, when the content is frozen,
   its `digest`. `executionPolicy` says how many trials each case had.
 - **[RUN-9] Judges.** `judges` lists the models that graded results (`model`, `provider`, `mode`, `rubricDigest`).
@@ -207,11 +209,21 @@ evaluation (§5.3) reads it, so it is defined exactly.
     measured when it has none.
 - **[SUM-5]** Then: `N` is the number of lines not left out; `n` the measured ones; `notMeasured` = `N` − `n`; `sum`
   and `sumSq` are the sum and the sum of squares of the measured values; `value` is `sum` for a metric of kind `count`,
-  and `sum` / `n` otherwise, or `null` when `n` is 0. `stderr` and `ci` are the producer's, over the same values. An
-  entry with `aggregate` (pass@k, F1, a median) carries the producer's `value`, computed by that `method`; a verifier
-  recomputes its `N`, `n`, `notMeasured` and `sum` and not its `value`, which is still `null` when `n` is 0.
-- **[SUM-6]** `verdict` is the producer's verdict on the entry under its `rule`; when `n` is 0 it is `not_measured`.
-- **[SUM-7]** `cost`, when present, is the run's total cost in US dollars and where the figure came from.
+  and `sum` / `n` otherwise, or `null` when `n` is 0. `stderr` and `ci` are the producer's, over the same values.
+- **[SUM-8] Aggregates.** An entry with `aggregate` carries a `value` computed by its `method` instead of the mean:
+  - `median`, `min` and `max` are defined here, over the measured values of [SUM-4] (the median of an even count is
+    the mean of the two middle values). A verifier recomputes their `value` like any other.
+  - Any other `method` (pass@k, F1, a bootstrap figure) is the producer's, shown as written. A verifier recomputes the
+    entry's `N`, `n`, `notMeasured` and `sum`, never its `value`, and **no lane reads it** ([LANE-2]): a number nobody
+    can check never decides a release.
+  In every case `value` is `null` when `n` is 0.
+- **[SUM-9]** No two entries of a summary have the same `lane`, `metric` and `path`, so every rule that reads an entry
+  reads one, and no two `usage` entries have the same `role` and `model` (an absent `model` is a value of its own).
+  Reported as `summary-duplicate`.
+- **[SUM-6]** `verdict` is the producer's verdict on the entry under its `rule`; when `n` is 0 it is `not_measured`;
+  `scored` when the producer applied no rule to it (a measurement only).
+- **[SUM-7]** `cost`, when present, is the run's total cost in US dollars and where the figure came from. `usage`, when
+  present, is the run's total usage, one entry per party (`role`) and `model`.
 - A verifier recomputes `N`, `n`, `notMeasured`, `sum` and `value` from `results.ndjson` (§3.9); `value` and `sum`
   match when they differ by at most 1e-9 × max(1, |recomputed|).
 
@@ -266,11 +278,14 @@ an `encoding`, `limit` or `schema` problem: they would otherwise be checked agai
 | `reasoning-size` | `results.ndjson:<line>` | a `reasoning.bytes` that is not its blob's size |
 | `metric` | the citing line or file | a metric no entry of `metrics.json` declares; a line that scores one metric twice (the summary then counts that line as not measured for it); in `metrics.json`, a metric declared twice or a `scale` whose `min` exceeds its `max` |
 | `summary-run-id` | `summary.json` | [SUM-2] |
-| `summary` | `summary.json` | an entry whose `N`, `n`, `notMeasured`, `sum` or `value` is not what [SUM-3]–[SUM-5] give |
+| `summary` | `summary.json` | an entry whose `N`, `n`, `notMeasured`, `sum` or `value` is not what [SUM-3]–[SUM-5] and [SUM-8] give |
+| `summary-duplicate` | `summary.json` | two entries with the same `lane`, `metric` and `path`, or two `usage` entries with the same `role` and `model` ([SUM-9]) |
 | `gate` | `gates.ndjson:<line>` | a result a decision names that is no line of the run, or `ship` on an incomparable comparison |
 | `trace-link` | the citing line | a span link or `traceLink` that names no span of `traces.otlp.jsonl`, when that file is present (a `traceLink` without `spanId` names a trace: it resolves when any span has that `traceId`; ids compare without regard to letter case, and a writer writes lower case) |
-| `content-capture` | the citing line, or `traces.otlp.jsonl:<line>` | [RUN-11], [SEC-6] |
+| `content-capture` | the citing line, or `traces.otlp.jsonl:<line>` or `logs.otlp.jsonl:<line>` | [RUN-11], [SEC-6] |
 | `run-times` | `run.json` | [RUN-5] |
+| `unexpected-file` | the path | a file that [RUN-2] does not list (outside `ext/` and `overlays/`) and the seal lists |
+| `attack` | `results.ndjson:<line>` | an `attack` with `success: true` on a line in state `passed`: an attack that succeeded is not a pass for the subject |
 | `calibration` | `run.json` | a judge's calibration with `dangerousErrors` above `n`, or `measuredAt` after the run's `startedAt` ([RUN-9]: it was measured before the run) |
 | `execution-policy` | `run.json` | `requirePasses` above `trialsPerCase` |
 | `interval` | the line, or `summary.json` | an `uncertainty.ci` or a summary `ci` whose `low` exceeds its `high` |
@@ -286,5 +301,5 @@ external, and nothing verifies it.
   likewise holds OTLP/JSON `LogsData` objects, one per line: OpenTelemetry events such as `gen_ai.evaluation.result`.
   `run.json`'s `otel.schemaUrls` names the OpenTelemetry schema URLs both follow. When a producer writes a
   `gen_ai.evaluation.result` event for a result, its `gen_ai.evaluation.score.label` is the result's `state` name,
-  so the nine states survive the trip (interop/opentelemetry.md). Spans use the OpenTelemetry GenAI semantic conventions where
+  so the ten states survive the trip (interop/opentelemetry.md). Spans use the OpenTelemetry GenAI semantic conventions where
   they apply; `run.json`'s `otel` names the convention version.

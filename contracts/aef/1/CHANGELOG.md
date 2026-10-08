@@ -1,5 +1,40 @@
 # AEF 1.0 changelog
 
+## Unreleased (draft): rework after critic round 2
+
+Critic round 2 scored the rework 7.8 of 10, with one blocker: a lane could pass on a summary number nobody checks.
+Changes since:
+
+- **No lane on an unchecked number** ([SUM-8], [LANE-2]): AEF defines the aggregates `median`, `min` and `max`, and a
+  verifier recomputes their value; any other `aggregate` (pass@k, F1) is the producer's, shown as written, and a lane
+  over it is `not_measured`. Two summary entries for one lane, metric and path, or two usage entries for one party and
+  model, are `summary-duplicate` ([SUM-9]).
+- **Exceptions bound to evidence** ([DEC-1], [DEC-2], [CKP-7]): each decided lane records the run hashes it was decided
+  on, and each exception names the run hashes whose failure it accepts. A re-run has new run hashes, so accepting one
+  failure never accepts the next (reason `exception-other-evidence`; codes `lane-evidence`, `exception-evidence`).
+- **Runs are what the plan asked for, where and when** ([STRM-4]): codes `deployment` (the plan's deployment or
+  endpoint) and `time` (a run that started before the job was accepted or ended after it ended). The plan endpoint
+  takes `run.json`'s pattern, so a query string (`?api-key=`) or fragment is refused.
+- **Content capture covers logs** ([SEC-6]): with `contentCapture: off`, no log record in `logs.otlp.jsonl` carries
+  content or a body, and a judge's `gen_ai.evaluation.explanation` counts as content everywhere.
+- **Copies of a run** ([CKP-8]): when several folders hold one run, it is intact when any copy is, whatever the order
+  folders are listed in.
+- **One duration grammar** ([ENC-9]): a lane's freshness and a plan's timeout are both ISO 8601 durations of days, hours
+  and minutes (`P14D`, `PT90M`, `P1DT2H30M`), the common `duration`; a timeout may now be in days, a freshness in
+  minutes.
+- **Smaller rules**: `unexpected-file` for an extra file the seal lists; `attack` for a succeeded attack on a passed
+  line; severity rules scoped by `lane` and `path` ([LANE-3]); `minimumN`'s scope stated per rule; which overlay problems
+  end the verified prefix ([§4.3](spec/04-integrity.md)); where `ext` may appear ([ENC-19]).
+- **Interop**: the OpenTelemetry, Inspect and OpenAI Evals pages rewritten against 1.0; a new ASSERT mapping; a summary
+  entry with no rule is `scored` ([SUM-6]); `summary.json` carries the run's usage per party and model ([SUM-7]);
+  `execution.stimulus` `imported` is now `external`, so it cannot be read as an imported run ([RUN-15]).
+- **Gates**: `tools/schema_diff.py` refuses a new value in an enum closed by [VER-9]. A CI job runs every check on each
+  change to `contracts/aef/`, and every AEF commit carries a DCO sign-off.
+- **Corpus**: two lanes one binary64 step either side of the exact p of a 1,200-pair sign test, which only exact
+  arithmetic decides correctly; vectors for the §7.3 readings that had none; a tampered copy beside a genuine run.
+- **Drift fixed**: ten states, not nine; the primer's statements on found runs, unknown states and redaction; the
+  classes of §9.1 list every rule.
+
 ## Unreleased (draft): rework after critic round 1
 
 Critic round 1 scored the consolidation 7.2 of 10, with two blockers. Changes since:
@@ -32,8 +67,8 @@ Critic round 1 scored the consolidation 7.2 of 10, with two blockers. Changes si
 - **Invariants**: no query or fragment in an endpoint; codes `calibration`, `execution-policy`, `interval`,
   `result-times`, `annotator`; per-kind overlay targets.
 - **Corpus**: about 390 vectors; `tools/check_spec.py` fails on any rule no vector names unless it is listed, with the
-  reason, as untestable; a large comparison (1,200 pairs) that defeats floating point; six effective-view vectors;
-  a reader-only vector for every reading of §7.3; fixtures marked as such in `index.json`.
+  reason, as untestable; a large comparison (1,200 pairs; round 2 found it did not yet defeat floating point); six
+  effective-view vectors; reader-only vectors for most readings of §7.3; fixtures marked as such in `index.json`.
 - **Governance**: lead editor, an open second seat, 90-day succession, DCO sign-off, release criteria (a second
   implementation per class, or marked at risk), profiles; the Community Specification License 1.0 planned for the
   specification text, pending counsel, with `SCOPE.md` limiting the patent commitment to what the specification

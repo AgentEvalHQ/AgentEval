@@ -13,7 +13,8 @@ import sys
 from pathlib import Path
 
 TIME = re.compile(r"^([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\.([0-9]{1,9}))?Z$")
-DURATION = re.compile(r"^P(?=[0-9]|T[0-9])(?:([0-9]{1,5})D)?(?:T([0-9]{1,5})H)?$")
+# ENC-9: days, hours and minutes, in that order, each 1-5 digits; at least one part, and no T without one.
+DURATION = re.compile(r"^P(?=[0-9]|T[0-9])(?:([0-9]{1,5})D)?(?:T(?=[0-9])(?:([0-9]{1,5})H)?(?:([0-9]{1,5})M)?)?$")
 KNOWN = {"passed": "passed", "failed": "failed", "not_measured": "not_measured", "incomparable": "incomparable"}
 REASON = {"failed": "failed", "missing": "missing", "not_measured": "not-measured", "incomparable": "incomparable", "stale": "stale",
           "waived": "waived"}
@@ -33,9 +34,9 @@ def parse_time(text):
 def parse_duration(text):
     m = DURATION.fullmatch(text)
     if not m:
-        raise ValueError(f"{text!r} is not a duration in days and hours")
-    days, hours = m.groups()
-    return int(days or 0) * 86400 + int(hours or 0) * 3600
+        raise ValueError(f"{text!r} is not a duration in days, hours and minutes (ENC-9)")
+    days, hours, minutes = m.groups()
+    return int(days or 0) * 86400 + int(hours or 0) * 3600 + int(minutes or 0) * 60
 
 
 def decide(inp):
@@ -45,14 +46,18 @@ def decide(inp):
     if len(set(names)) != len(names):
         raise ValueError("a lane is listed twice")
     evaluated_at = parse_time(inp["evaluatedAt"])
-    exceptions = {}  # lane -> [(at, expires)]: DEC-1 refuses an exception for no lane, or one never in force
+    # lane -> [(evidence, at, expires)]. DEC-1 refuses an exception for no lane, for no evidence, or never in force.
+    exceptions = {}
     for exception in inp.get("exceptions") or []:
         if exception["lane"] not in names:
             raise ValueError(f"an exception names {exception['lane']!r}, which is not a lane of the input")
+        evidence = frozenset(exception.get("evidence") or ())
+        if not evidence:
+            raise ValueError(f"an exception for {exception['lane']!r} names no evidence: it would accept any failure")
         at, expires = parse_time(exception["at"]), parse_time(exception["expires"])
         if expires <= at:
             raise ValueError(f"an exception for {exception['lane']!r} expires at or before it is granted: it is never in force")
-        exceptions.setdefault(exception["lane"], []).append((at, expires))
+        exceptions.setdefault(exception["lane"], []).append((evidence, at, expires))
     lanes, reasons = [], []
     for lane in inp["lanes"]:
         result, code = lane["result"], None
@@ -67,13 +72,19 @@ def decide(inp):
         else:
             status = KNOWN.get(result["status"], "not_measured")  # an unknown status fails closed
 
-        # DEC-2 step 6: only a failure is ever waived, by an exception in force (at <= evaluatedAt < expires).
-        lapsed = False
+        # DEC-2 step 6: only a failure is ever waived, by an exception for exactly this evidence (the same set of run
+        # hashes) that is in force (at <= evaluatedAt < expires).
+        unapplied = []  # the reasons a failed lane's exceptions did not apply, in DEC-4 order
         if status == "failed" and lane["lane"] in exceptions:
-            if any(at <= evaluated_at < expires for at, expires in exceptions[lane["lane"]]):
+            own = frozenset(lane.get("evidence") or ())
+            grants = exceptions[lane["lane"]]
+            if any(ev == own and at <= evaluated_at < expires for ev, at, expires in grants):
                 status = "waived"
             else:
-                lapsed = True
+                if any(ev == own for ev, _, _ in grants):
+                    unapplied.append("exception-expired")
+                if any(ev != own for ev, _, _ in grants):
+                    unapplied.append("exception-other-evidence")
 
         item = {"lane": lane["lane"], "status": status, "blocking": lane["blocking"]}
         if status == "incomparable" and result.get("axes"):
@@ -84,8 +95,7 @@ def decide(inp):
             if code is None:
                 code = "advisory-failed" if status == "failed" and not lane["blocking"] else REASON[status]
             reasons.append(f"{code}:{lane['lane']}")
-        if lapsed:
-            reasons.append(f"exception-expired:{lane['lane']}")
+        reasons.extend(f"{why}:{lane['lane']}" for why in unapplied)
 
     superseded = inp.get("supersededBy") not in (None, inp["subjectVersion"])
     if superseded:

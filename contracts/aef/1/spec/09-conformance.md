@@ -7,12 +7,12 @@ that class. Requirements not listed for a class still apply to it where it does 
 
 | Class | Requirements | Vectors (§9.2 `kind`) |
 |---|---|---|
-| **Producer** | ENC-1–ENC-19, RUN-1–RUN-14, RES-1–RES-10, SUM-1–SUM-7, EVD-1–EVD-3, GATE-1–GATE-2, VER-1, VER-2, VER-6 | `document` (writer side), `run` (valid runs), `result-id`, `paths` |
+| **Producer** | ENC-1–ENC-19, RUN-1–RUN-15, RES-1–RES-11, SUM-1–SUM-9, EVD-1–EVD-3, GATE-1–GATE-2, VER-1, VER-2, VER-6, VER-9 | `document` (writer side), `run` (valid runs), `result-id`, `paths` |
 | **Sealer** | SEAL-1–SEAL-5, SIG-1–SIG-3 | `seal` (expected manifests), `signature` (signing side) |
-| **Reader** | ENC-1–ENC-19, VER-3, VER-4, VER-8 (the reading rules of §7.3) | `document` (reader side), `encoding`, `reader-only` |
-| **Run verifier** | Reader, plus §3.9, SEAL-6, SIG-5, SIG-7, and OVL-4, OVL-5, OVL-10 (to tell a withheld blob from a missing one) | `run`, `seal`, `encoding`, `paths`; at the *signed* level also `signature` |
+| **Reader** | ENC-1–ENC-19, VER-3, VER-4, VER-8 (the reading rules of §7.3), VER-9 | `document` (reader side), `encoding`, `reader-only` |
+| **Run verifier** | Reader, plus §3.9, SEAL-4, SEAL-6, SIG-4, SIG-5, SIG-7, and OVL-4, OVL-5, OVL-10 (to tell a withheld blob from a missing one) | `run`, `seal`, `encoding`, `paths`; at the *signed* level also `signature` |
 | **Overlay verifier** | OVL-1–OVL-11 | `chain`, `overlay-view` |
-| **Checkpoint verifier** | CKP-1–CKP-10, LANE-1–LANE-10, DEC-1–DEC-5, and Run verifier | `checkpoint`, `lane`, `decision` |
+| **Checkpoint verifier** | CKP-1–CKP-10, LANE-1–LANE-11, DEC-1–DEC-5, SIG-8, and Run verifier | `checkpoint`, `lane`, `decision` |
 | **Decision engine** | DEC-1–DEC-5 | `decision` |
 | **Runner** | PLAN-1–PLAN-7, STRM-1–STRM-2, RUN-12, and Producer and Sealer for the runs it produces | `plan`, `matching` |
 | **Stream verifier** | STRM-1–STRM-4 | `stream`, `plan-conformance` |

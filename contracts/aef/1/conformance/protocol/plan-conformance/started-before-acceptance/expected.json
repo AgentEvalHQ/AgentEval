@@ -1,0 +1,17 @@
+{
+  "kind": "plan-conformance",
+  "events": "events.ndjson",
+  "plan": "plan.json",
+  "runs": "runs",
+  "problems": [
+    [
+      "run:R-1",
+      "time"
+    ]
+  ],
+  "rules": [
+    "STRM-4",
+    "ENC-8"
+  ],
+  "why": "the run started a nanosecond before the job was accepted: evidence the runner had before it was asked, adopted and not produced"
+}

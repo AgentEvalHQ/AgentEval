@@ -1,0 +1,14 @@
+{
+  "kind": "checkpoint",
+  "schema": "checkpoint",
+  "writer": "valid",
+  "reader": "valid",
+  "rules": [
+    "CKP-7",
+    "DEC-1"
+  ],
+  "why": "an exception names a run hash that is not one of its lane's runs (the other exception still waives the lane)",
+  "problems": [
+    "exception-evidence"
+  ]
+}

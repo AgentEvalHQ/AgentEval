@@ -1,0 +1,10 @@
+{
+  "kind": "checkpoint",
+  "schema": "checkpoint",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "DEC-1"
+  ],
+  "why": "a lane with a result names the run hashes it came from"
+}

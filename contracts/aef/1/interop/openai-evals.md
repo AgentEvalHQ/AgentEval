@@ -50,7 +50,7 @@ A run has no status field, and a sample has no state beyond `match.correct`.
   - `per_model_usage` (`invocation_count`, `prompt_tokens`, `completion_tokens`, `cached_tokens`, …);
   - `per_testing_criteria_results` (`testing_criteria`, `passed`, `failed`).
 - An **output item** (`object: "eval.run.output_item"`) has:
-  - `datasource_item_id` (an integer), `datasource_item`, `status` (`pass` or `fail`);
+  - `datasource_item_id` (an integer), `datasource_item`, `status` (`pass` or `fail`), `created_at`;
   - `results[]`: per grader `name`, `type`, `score`, `passed`, and the grader's own `sample`;
   - `sample`: the generation's `input`, `output`, `usage`, `error`, `finish_reason`, `model`, `temperature`, `top_p`,
     `seed`, `max_completion_tokens`.
@@ -71,46 +71,54 @@ A run has no status field, and a sample has no state beyond `match.correct`.
 | `caseId` | `sample_id` | exact |
 | `state` `passed` / `failed` | a `match` event with `correct` `true` / `false` | exact |
 | `state` `warn`, `inconclusive` | `match` with `correct: false` | lossy: the state survives only in `data` |
+| `state: scored` | a `metrics` event, and no `match` event | exact |
 | typed absences | an `error` event (for `error`) or no event | lossy |
-| `scores[]` | a `metrics` event, metric id to value | exact |
+| `scores[]` | a `metrics` event, metric id to value | exact; `label` and `normalized` survive only in `data` |
+| `endedAt` of the line | the events' `created_at` | exact |
 | `path`, `resultId` | `data` of the event | none: no reader of the format looks there |
-| `reasoning` and other blobs (capture `on`) | `sampling` events | lossy |
-| `usage` | `sampling.data.usage` (`prompt_tokens`, `completion_tokens`) | exact |
-| `summary.json` | `final_report` | lossy: N, n, verdicts, intervals are lost |
-| the result tree, severity, judges, evidence, gates, seal, overlays | none | none |
+| evidence `input`, `output` (capture `on`) | a `sampling` event's `prompt` and `sampled` | exact when captured |
+| `usage` entry with `role: agent` | `sampling.data.usage` (`prompt_tokens`, `completion_tokens`) | lossy: cache and reasoning tokens, and other roles, have no field |
+| `summary.json` | `final_report` | lossy: N, n, verdicts and intervals are lost |
+| the result tree, severity, judges, other evidence, gates, seal, overlays | none | none |
 
 ## The open-source log → AEF
+
+The converted run names the converter in `producer` and the source in `imported` (`from: "openai/evals"`, with its
+version when the converter knows it), and lists in `imported.asserted` each `run.json` field it supplied
+([RUN-15](../spec/03-run.md#32-runjson)).
 
 | Open-source log | AEF | Fidelity |
 |---|---|---|
 | `spec.run_id` | `runId` | exact |
 | `spec.created_at` | `startedAt` (append `Z`, replace the space with `T`) | exact, since `utcnow` is UTC |
-| the last event's `created_at` | `endedAt` | lossy |
-| `spec.base_eval`, `spec.split`, `spec.eval_name` | `suite.ref` (`suite:openai-evals/<base_eval>`), `suite.version` (the rest of `eval_name`) | lossy: no digest of the samples file ([I7](README.md#gaps-found-by-these-mappings)) |
-| `spec.completion_fns` | `subject` (`kind: model`) | lossy: AEF has one subject ([I7](README.md#gaps-found-by-these-mappings)) |
+| the last event's `created_at` | `endedAt` | lossy: it is the time of the last record, and the log does not record the run's end |
+| `spec.base_eval`, `spec.split`, `spec.eval_name` | `suite.ref` (`suite:openai-evals/<base_eval>`), `suite.version` (the rest of `eval_name`) | lossy: no digest of the samples file |
+| `spec.completion_fns` | `subject` (`kind: model`), listed in `imported.asserted` | lossy: AEF has one subject |
+| (the log does not say how the target was driven) | `execution.targetMode`, listed in `imported.asserted` | the converter's claim |
 | `spec.run_config`, `created_by` | `config`, `ext` | exact as data |
-| (the log does not name the framework version) | `producer.version` | none: the importer supplies it ([I7](README.md#gaps-found-by-these-mappings)) |
 | `sample_id` | `caseId` | exact |
 | `match` | a line with `state` `passed` or `failed`, and a score of 1 or 0 | exact |
-| `match.expected`, `picked`, `sampled`; `sampling.prompt`, `sampled` | blobs with evidence, only with `contentCapture: on` | lossy ([I2](README.md#gaps-found-by-these-mappings)) |
-| `sampling.usage` | `usage` (`role: agent`) | lossy: cached tokens have no field ([I4](README.md#gaps-found-by-these-mappings)) |
-| `metrics` | `scores[]` | exact, but `state` has no source ([I1](README.md#gaps-found-by-these-mappings)) |
+| `metrics` | `scores[]`, `state: scored` ([RES-1](../spec/03-run.md#341-states)) | exact |
 | `error` | `state: error`, `reason` = `type: message` | exact |
-| `function_call` | evidence of kind `tool_call` (capture `on`) | lossy |
+| each event's `created_at` | `endedAt` of the line it becomes | exact |
+| `event_id` | none | none |
+| `sampling.prompt`, `sampling.sampled`; `match.expected` | blobs cited by evidence of kind `input`, `output`, `expected` ([EVD-1](../spec/03-run.md#37-evidencendjson-and-blobs)), only with `contentCapture: on` ([RUN-11](../spec/03-run.md#32-runjson)) | exact when captured |
+| `sampling.usage` | a `usage` entry with `role: agent` | exact for input and output tokens |
+| `function_call` | evidence of kind `tool_call` (capture `on`) | exact when captured |
 | `cond_logp`, `pick_option`, `embedding`, `raw_sample`, `extra` | `ext` | none |
-| `event_id`, each event's `created_at` | none | none ([I6](README.md#gaps-found-by-these-mappings)) |
 | `final_report.accuracy` | a summary entry for a metric of kind `rate`, which the verifier recomputes from the `match` lines ([SUM-5](../spec/03-run.md#36-summaryjson)) | exact |
-| `final_report.boostrap_std` | the entry's `stderr` | lossy: it is a bootstrap estimate under another name |
-| other `final_report` keys | `ext` | none ([I1](README.md#gaps-found-by-these-mappings)) |
+| `final_report.boostrap_std` | the entry's `stderr` | lossy: a bootstrap estimate under another name |
+| other `final_report` keys (`f1_score`) | a summary entry with `aggregate` (`method: f1`), whose value the verifier does not recompute | exact |
+| (no pass rule for a metric) | the summary entry's `verdict` | none: see [Still open](#still-open) |
 | (no run status) | `status: completed` when `final_report` is present, else `aborted` | lossy |
 
 ## AEF → the hosted API
 
-AEF results cannot be uploaded: the hosted API records only its own graders' results. What an exporter can do is
-create an eval with a `custom` data source and start a run whose `jsonl` items carry each case's content, so that
-OpenAI's graders grade AEF's recorded outputs again. That needs `contentCapture: on`
-([RUN-11](../spec/03-run.md#32-runjson)) and gives OpenAI's results. None of AEF's scores, states, typed absences,
-judges, tree or seal travels.
+AEF results cannot be uploaded: the hosted API records only its own graders' results. An exporter can create an eval
+with a `custom` data source and start a run whose `jsonl` items carry each case's content, from evidence of kind
+`input`, `expected` and `output`, so that OpenAI's graders grade AEF's recorded outputs again. That needs
+`contentCapture: on` ([RUN-11](../spec/03-run.md#32-runjson)) and gives OpenAI's results. None of AEF's scores,
+states, typed absences, judges, tree or seal travels.
 
 ## The hosted API → AEF
 
@@ -120,36 +128,35 @@ judges, tree or seal travels.
 | run `status` | `completed` → `completed`; `failed`, `canceled` → `aborted` (with `error.message` or "canceled" as `abortReason`); `queued`, `in_progress` → `running` | exact |
 | run `created_at` | `startedAt` | exact to the second; the run has no end time, so `endedAt` is inferred |
 | `eval_id`, the eval's `name` | `suite.ref` (`suite:openai/<eval_id>`) | exact |
-| (an eval has no version) | `suite.version` and `suite.digest`, computed from the eval's `testing_criteria` and `data_source_config` | lossy ([I7](README.md#gaps-found-by-these-mappings)) |
+| (an eval has no version) | `suite.version` and `suite.digest`, computed from the eval's `testing_criteria` and `data_source_config`, listed in `imported.asserted` | lossy |
 | run `model` | `subject` (`kind: model`, `ref: model:<model>`) | exact |
 | run `data_source.type` | `execution.targetMode`: `live` for `completions` and `responses`; `replayed` for `jsonl` items that carry a `sample` | exact |
-| `testing_criteria[]` | `metrics.json` entries (`scale` from `score_model.range`, else 0 to 1; `direction: higher_better`) and `config.thresholds` from `pass_threshold` | exact; `label_model` labels have no field ([I1](README.md#gaps-found-by-these-mappings)) |
+| `testing_criteria[]` | `metrics.json` entries (`scale` from `score_model.range`, else 0 to 1; `direction: higher_better`) and `config.thresholds` from `pass_threshold` | exact |
+| `label_model` labels | `scores[].label` | exact |
 | the graders' `model` | `judges[].model` | exact |
 | `report_url` | an evidence record with a URI link | exact |
-| `per_testing_criteria_results` | summary entries of kind `rate` | exact; the entry's `verdict` has no source ([I1](README.md#gaps-found-by-these-mappings)) |
+| `per_testing_criteria_results` | summary entries of kind `rate`, which the verifier recomputes from the child lines | exact for the counts; the entry's `verdict` has no source (see [Still open](#still-open)) |
 | `result_counts.errored` | lines in state `error` | exact |
-| `per_model_usage` | none | none ([I4](README.md#gaps-found-by-these-mappings)) |
+| `per_model_usage` | none | none: `summary.json` has no token totals |
 | output item `datasource_item_id` | `caseId` (as a string) | exact |
 | output item `status` `pass` / `fail`; `sample.error` set | a root line in `passed` / `failed`; `error` | exact |
+| output item `created_at` | `endedAt` of the root | lossy: the schema's description of this field is ambiguous |
 | `results[]` | one child line per grader: `path` = `output_item/<name>`, `evaluator.id` = `openai:<type>`, `scores[].value` = `score`, `state` from `passed` | exact |
-| (how item status follows from the graders) | `aggregation` on the root | lossy: OpenAI does not document the rule; the example below records `Min` |
-| `results[].sample` (the grader's own output) | a `reasoning` blob (capture `on`) | lossy ([I2](README.md#gaps-found-by-these-mappings)) |
-| `sample.input`, `sample.output`, `datasource_item` | blobs with evidence (capture `on`) | lossy ([I2](README.md#gaps-found-by-these-mappings)) |
-| `sample.usage` | `usage` on the root (`role: agent`) | lossy: `cached_tokens` has no field ([I4](README.md#gaps-found-by-these-mappings)) |
+| (how an item's status follows from its graders) | `aggregation` on the root | lossy: OpenAI does not document the rule; the example below records `Min` |
+| `results[].sample` (the grader's own output) | a `reasoning` blob (capture `on`) | exact when captured |
+| `sample.input`, `sample.output`, `datasource_item` | blobs cited by evidence of kind `input`, `output`, `expected` (capture `on`) | exact when captured |
+| `sample.usage` | a `usage` entry on the root: `prompt_tokens` → `gen_ai.usage.input_tokens`, `completion_tokens` → `output_tokens`, `cached_tokens` → `cache_read.input_tokens`, `role: agent` | exact |
 | `sample.temperature`, `top_p`, `seed`, `max_completion_tokens`, `finish_reason` | `ext` | none: `config` is run-level |
-| output item `created_at` | none | none ([I6](README.md#gaps-found-by-these-mappings)) |
 
 ## What does not carry over
 
 **AEF → OpenAI Evals.** In the open-source log: typed absences, `warn` and `inconclusive` as states, the result tree,
-severity, judges, evidence, gate decisions, the seal and overlays. In the hosted API: everything AEF graded, because
-the API grades itself.
+severity, judges, evidence other than the case content, gate decisions, the seal and overlays. In the hosted API:
+everything AEF graded, because the API grades runs itself.
 
-**OpenAI Evals → AEF.** A verdict for scores and metrics without a pass rule, and categorical labels
-([I1](README.md#gaps-found-by-these-mappings)). The case content without capture ([I2](README.md#gaps-found-by-these-mappings)). Cached tokens and run-level
-usage per model ([I4](README.md#gaps-found-by-these-mappings)). Per-event and per-item times ([I6](README.md#gaps-found-by-these-mappings)). A suite version
-and the framework's own version, which the importer has to supply ([I7](README.md#gaps-found-by-these-mappings)). Per-item sampling
-parameters.
+**OpenAI Evals → AEF.** Run-level usage per model (`per_model_usage`): `summary.json` has the run's cost and no token
+totals. Per-item sampling parameters. `event_id`. The open-source framework's own version, which its logs do not
+record. A pass rule for `final_report` keys other than accuracy.
 
 ## Worked examples
 
@@ -162,7 +169,7 @@ The corpus line for `case-18`. Its `resultId` recomputes with [RES-4](../spec/03
 ```
 
 It becomes two events. `warn` is not a pass, so `correct` is `false`; the state and the path survive only in `data`.
-A result line has no time, so both events carry `run.json` `endedAt` ([I6](README.md#gaps-found-by-these-mappings)):
+The line has no `endedAt`, so both events carry `run.json` `endedAt`:
 
 ```jsonl
 {"run_id":"01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10","event_id":0,"sample_id":"case-18","type":"match","data":{"correct":false,"expected":null,"picked":null,"aef":{"path":"triage","state":"warn","resultId":"r_3b156bcb57417545db27c39e78c955bd"}},"created_by":"agenteval-cli 1.0.0","created_at":"2026-10-02 14:06:23.004000+00:00"}
@@ -170,7 +177,7 @@ A result line has no time, so both events carry `run.json` `endedAt` ([I6](READM
 ```
 
 Read back with `data.aef.path`, the line gets the same id, `r_3b156bcb57417545db27c39e78c955bd`. An importer that
-ignores `data.aef` gets `state: failed` and has to choose a path itself.
+ignores `data.aef` gets `state: failed` from the `match` event and has to choose a path itself.
 
 ### A hosted output item in AEF
 
@@ -181,19 +188,20 @@ The output item in OpenAI's own OpenAPI example (`EvalRunOutputItem`):
 ```
 
 It becomes a root line and one child line in a run whose `runId` is the item's `run_id`. Both are valid against the
-writer schema, and both ids are RES-4 hashes of that run id, case `137` and the path. `Min` and the component's weight
-and `required` are the importer's reading, because OpenAI does not document how an item's status follows from its
-graders. `cached_tokens` and the sampling parameters are lost:
+writer schema, and both ids are RES-4 hashes of that run id, case `137` and the path. The usage, cached tokens
+included, becomes the root's `usage` entry. `Min`, the component's weight and `required` are the importer's reading,
+because OpenAI does not document how an item's status follows from its graders. The sampling parameters go to `ext`
+(not shown):
 
 ```jsonl
-{"schemaVersion":"1.0","resultId":"r_2df32507b8f62ab0e259c92d6fff6628","parentResultId":null,"caseId":"137","path":"output_item","evaluator":{"id":"openai:eval_67abd54d9b0081909a86353f6fb9317a"},"state":"passed","aggregation":{"strategy":"Min","rulePath":"threshold","measured":1,"total":1},"usage":[{"gen_ai.usage.input_tokens":519,"gen_ai.usage.output_tokens":2,"role":"agent"}]}
+{"schemaVersion":"1.0","resultId":"r_2df32507b8f62ab0e259c92d6fff6628","parentResultId":null,"caseId":"137","path":"output_item","evaluator":{"id":"openai:eval_67abd54d9b0081909a86353f6fb9317a"},"state":"passed","aggregation":{"strategy":"Min","rulePath":"threshold","measured":1,"total":1},"usage":[{"role":"agent","gen_ai.usage.input_tokens":519,"gen_ai.usage.output_tokens":2,"gen_ai.usage.cache_read.input_tokens":0}]}
 {"schemaVersion":"1.0","resultId":"r_38b7751f11a7b7e5e5bfad37e1a79f44","parentResultId":"r_2df32507b8f62ab0e259c92d6fff6628","caseId":"137","path":"output_item/String Check Grader","evaluator":{"id":"openai:string-check-grader"},"state":"passed","scores":[{"metric":"String Check Grader","value":1.0}],"annotator":{"kind":"CODE"},"component":{"weight":1,"required":true}}
 ```
 
-## Open gaps
+## Still open
 
-- [I1](README.md#gaps-found-by-these-mappings): `metrics` events and `final_report` keys without a pass rule; label graders.
-- [I2](README.md#gaps-found-by-these-mappings): prompts, outputs and data-source items have a place only as captured blobs.
-- [I4](README.md#gaps-found-by-these-mappings): cached tokens, `per_model_usage`.
-- [I6](README.md#gaps-found-by-these-mappings): event and item times.
-- [I7](README.md#gaps-found-by-these-mappings): the suite version, subject and framework version an importer supplies.
+- **A summary entry for a metric with no rule.** An F1 from `final_report`, or a hosted grader's pass rate, has no
+  run-level pass rule. A `summary.json` entry needs a `verdict`, and none of its values (`passed`,
+  `failed`, `warn`, `inconclusive`, `not_measured`; [SUM-6](../spec/03-run.md#36-summaryjson)) means "no rule was
+  applied". A converter can keep such a metric on the result lines (`scored`) and write no summary entry for it.
+- **Run-level token usage** (`per_model_usage`): `summary.json` has the run's cost and no token totals.

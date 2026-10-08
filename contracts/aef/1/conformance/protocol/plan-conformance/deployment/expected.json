@@ -1,0 +1,18 @@
+{
+  "kind": "plan-conformance",
+  "events": "events.ndjson",
+  "plan": "plan.json",
+  "runs": "runs",
+  "problems": [
+    [
+      "run:R-1",
+      "deployment"
+    ]
+  ],
+  "rules": [
+    "STRM-4",
+    "PLAN-1",
+    "RUN-6"
+  ],
+  "why": "the run records another deployment than the plan's"
+}

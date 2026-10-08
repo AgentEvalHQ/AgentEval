@@ -65,6 +65,66 @@
         }
       ],
       "blocking": true
+    },
+    {
+      "lane": "one-step-below-p",
+      "rule": {
+        "kind": "comparison",
+        "lane": "memory",
+        "metric": "recall",
+        "path": "mem",
+        "baseline": {
+          "runId": "BL",
+          "runHash": "7f955fd76b84b150923c28324143e8d0090b5c38f68f6f1a7b023a78ec5c4781"
+        },
+        "significance": 0.04991859577302666,
+        "minimumPairs": 1000,
+        "axes": [
+          "subject",
+          "suite",
+          "judges",
+          "rubrics",
+          "target-mode"
+        ]
+      },
+      "runs": [
+        {
+          "runId": "CL629",
+          "runHash": "9fd0207187206a70a54b0909f8bc5c0442001c61520279adf446226af2ed9438",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "one-step-above-p",
+      "rule": {
+        "kind": "comparison",
+        "lane": "memory",
+        "metric": "recall",
+        "path": "mem",
+        "baseline": {
+          "runId": "BL",
+          "runHash": "7f955fd76b84b150923c28324143e8d0090b5c38f68f6f1a7b023a78ec5c4781"
+        },
+        "significance": 0.04991859577302667,
+        "minimumPairs": 1000,
+        "axes": [
+          "subject",
+          "suite",
+          "judges",
+          "rubrics",
+          "target-mode"
+        ]
+      },
+      "runs": [
+        {
+          "runId": "CL629",
+          "runHash": "9fd0207187206a70a54b0909f8bc5c0442001c61520279adf446226af2ed9438",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
     }
   ],
   "state": "decided",
@@ -81,7 +141,10 @@
           "status": "failed",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-06T00:00:00Z"
-        }
+        },
+        "evidence": [
+          "acade308dbbb5e856c2d1651876fcb785139aed8c4589a999a6d362847bf7b4c"
+        ]
       },
       {
         "lane": "large-at-004",
@@ -90,7 +153,34 @@
           "status": "passed",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-06T00:00:00Z"
-        }
+        },
+        "evidence": [
+          "acade308dbbb5e856c2d1651876fcb785139aed8c4589a999a6d362847bf7b4c"
+        ]
+      },
+      {
+        "lane": "one-step-below-p",
+        "blocking": true,
+        "result": {
+          "status": "passed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-06T00:00:00Z"
+        },
+        "evidence": [
+          "9fd0207187206a70a54b0909f8bc5c0442001c61520279adf446226af2ed9438"
+        ]
+      },
+      {
+        "lane": "one-step-above-p",
+        "blocking": true,
+        "result": {
+          "status": "failed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-06T00:00:00Z"
+        },
+        "evidence": [
+          "9fd0207187206a70a54b0909f8bc5c0442001c61520279adf446226af2ed9438"
+        ]
       }
     ]
   },
@@ -106,10 +196,21 @@
         "lane": "large-at-004",
         "status": "passed",
         "blocking": true
+      },
+      {
+        "lane": "one-step-below-p",
+        "status": "passed",
+        "blocking": true
+      },
+      {
+        "lane": "one-step-above-p",
+        "status": "failed",
+        "blocking": true
       }
     ],
     "reasons": [
       "failed:large-at-005",
+      "failed:one-step-above-p",
       "outcome:blocked"
     ]
   }

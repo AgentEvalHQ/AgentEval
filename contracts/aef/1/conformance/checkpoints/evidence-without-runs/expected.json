@@ -6,8 +6,9 @@
   "rules": [
     "CKP-7"
   ],
-  "why": "a lane with a result names the runs it came from",
+  "why": "a lane with a result names the runs it came from (and the input's run hashes are then not the lane's runs')",
   "problems": [
-    "evidence"
+    "evidence",
+    "lane-evidence"
   ]
 }

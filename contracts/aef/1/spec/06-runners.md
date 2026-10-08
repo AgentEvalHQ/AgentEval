@@ -8,11 +8,12 @@ verifier can then check that the stream, and the runs it names, keep to the plan
 
 A run plan (schema `run-plan`) is what a runner is asked to evaluate:
 
-- **[PLAN-1]** the exact subject version ([CKP-1]); its endpoint, which **MUST NOT** carry credentials (no
-  `user:password@`); and for a container run the image as its OCI image manifest digest with the repository it is
-  pulled from;
+- **[PLAN-1]** the exact subject version ([CKP-1]); the deployment it answers in (`deployment`, a reference) and its
+  `endpoint`, which **MUST NOT** carry credentials: scheme, host and path only, as `run.json`'s `deployment.endpoint`
+  ([RUN-10]: no user information, no query string, no fragment); and for a container run the image as its OCI image
+  manifest digest with the repository it is pulled from;
 - the suites, each with an exact version and the lane it serves;
-- **[PLAN-2]** the limits the runner **MUST** stop at: `maxUsd` always; `cases` and `timeout` (hours and minutes) when
+- **[PLAN-2]** the limits the runner **MUST** stop at: `maxUsd` always; `cases` and `timeout` (a duration, [ENC-9]) when
   set;
 - the content capture (`contentCapture`: `off` or `on`, what text the runs keep, as in `run.json`, [RUN-11]), the
   isolation (`process`, `container`, `remote-zone` with its `zone`), and the provider (`local`, `docker`, `k8s`,
@@ -26,8 +27,8 @@ A run plan (schema `run-plan`) is what a runner is asked to evaluate:
   the value to the process the purpose names, as that environment variable; it **MUST NOT** write a value into any AEF
   file or event.
 - **[PLAN-4]** A plan **MUST NOT** hold a secret value. The schema refuses what is visibly not a reference (a bare
-  string, an endpoint with credentials), but it cannot see a secret written as a reference's `path` or put in `ext`:
-  a producer **MUST NOT** write one there.
+  string, an endpoint with user information, a query string or a fragment), but it cannot see a secret written as a
+  reference's `path` or put in `ext`: a producer **MUST NOT** write one there.
 - **[PLAN-5]** A plan is identified by its `planId` and its bytes: `planDigest` is the SHA-256 of the plan file's exact
   bytes. A runner that accepts a plan records both (§6.4, [RUN-12]).
 
@@ -94,7 +95,8 @@ output for a local runner, over its channel for a remote one.
   | `no-terminal` | at path `stream`, after every event's problems: a finished stream with no terminal event |
 - **[STRM-4] Plan conformance.** Given also the runs the job produced (a folder of runs, found by their `run.json`,
   [RUN-1]) and, optionally, a trust policy, a stream verifier checks that the runs the `job.sealed` and `job.failed`
-  events name are the runs the plan asked for. Each run is checked once, however often it is named. The run is the
+  events name are the runs the plan asked for: of what, where, how, within which limits, and made by this job, between
+  its acceptance and its end. Each run is checked once, however often it is named. The run is the
   run folder whose `run.json` has its `runId`, whose run hash ([SEAL-4]: its seal's, or, without a seal, recomputed
   from its files) is the one the first `evidence.produced` for that `runId` announced, and that is intact (§4.5; a
   blob withheld by a redaction the trust policy authorizes, [OVL-10], leaves it intact). When no folder has the
@@ -108,9 +110,10 @@ output for a local runner, over its channel for a remote one.
   | Code | When |
   |---|---|
   | `content-capture` | `contentCapture`, read as [RUN-11] and [VER-8] read it (absent or unknown is `on`), is not the plan's |
+  | `deployment` | the plan's `subject` names a `deployment` and the run's `deployment.ref` is not it, or names an `endpoint` and the run's `deployment.endpoint` is not it (an absent value is not it) |
   | `judges` | the plan's `judges` is not empty, and the run's is not the same list: each `model` and `rubricDigest`, in order (an absent value equals only an absent value) |
-  | `over-budget` | at `job`, once: the sum of `summary.json`'s `cost.totalUsd` over the runs found is above the plan's `maxUsd` (equal is within it) |
   | `no-cost` | at `run:<runId>`: a run found whose `summary.json` has no `cost.totalUsd`; the budget cannot be checked without it, so a runner cannot stay under it by leaving cost out |
+  | `over-budget` | at `job`, once: the sum of `summary.json`'s `cost.totalUsd` over the runs found is above the plan's `maxUsd` (equal is within it) |
   | `over-cases` | at `job`, once: the plan sets `cases`, and the runs found have more: the distinct `caseId`s of their result lines without `parentResultId`, whatever their state, counted across the whole job (a `caseId` in two runs counts once) |
   | `provenance` | `provenance` ([RUN-12]) is not the `planId`, `planDigest`, `jobId` and `runnerId` of the stream's first `job.accepted`, or the stream has none |
   | `run-hash` | folders have the `runId`, but none is intact with the run hash announced for it, or none was announced |
@@ -118,6 +121,7 @@ output for a local runner, over its channel for a remote one.
   | `subject` | `subject.ref` or `subject.version` is not the plan's |
   | `suite` | `suite` is none of the plan's suites: the same `ref` and `version`, and, when the plan's suite names a `digest`, that `digest` |
   | `target-mode` | `execution.targetMode` is not `live` ([RUN-7]) |
+  | `time` | `startedAt` is before the `at` of the stream's first `job.accepted`, or `endedAt` is after the `at` of its first terminal event, compared at full precision ([ENC-8]). A run that started before the job was accepted is evidence the runner had before it was asked: adopted, not produced, and a plan does not authorize adopting runs. Each half is checked only when both its times exist: a stream with no `job.accepted` is a `provenance` problem, and one with no terminal event is still open |
 
   [STRM-3] ties the stream to the plan's bytes and checks the spend and cases the job reported; [STRM-4] ties each run
   the stream names to the stream, and checks the runs themselves against the plan. A check of a job runs both.
@@ -127,6 +131,7 @@ output for a local runner, over its channel for a remote one.
   being written). Its `plan-conformance/` holds streams with their plan and the runs they name, with the problems of
   [STRM-4] and the same kind of cases (a run named twice, two folders with one `runId`, a run edited and sealed again,
   a run without a seal, a redacted run with and without the policy that authorizes it, the job's cost and cases
-  exactly at the limit, runs each within the limits whose sum is not, a case with a child line or repeated trials).
+  exactly at the limit, runs each within the limits whose sum is not, a case with a child line or repeated trials,
+  runs that start or end exactly at the job's edges, and runs a nanosecond outside them).
 - **Not in 1.0:** signed jobs a remote runner pulls from a queue (so it can check who sent a plan). A later minor adds
   them; until then a remote runner authenticates its channel by other means.

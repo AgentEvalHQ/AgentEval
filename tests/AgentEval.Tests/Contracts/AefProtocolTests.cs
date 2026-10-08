@@ -83,8 +83,14 @@ public class AefProtocolTests
     {
         JsonNode Load(string file) => JsonNode.Parse(File.ReadAllText(Path.Combine(Protocol, "matching", name, file)))!;
 
-        Assert.True(AefSchemaSet.Writer.Value.IsValid("run-plan", Load("plan.json"), out var p), $"{name} plan: {p}");
-        Assert.True(AefSchemaSet.Writer.Value.IsValid("runner", Load("runner.json"), out var r), $"{name} runner: {r}");
+        // A reader-only vector holds a value a later minor may add ([VER-8]): only the reader schemas accept it.
+        var readerOnly = (bool?)Load("expected.json")["readerOnly"] == true;
+        var schemas = readerOnly ? AefSchemaSet.Reader.Value : AefSchemaSet.Writer.Value;
+        Assert.True(schemas.IsValid("run-plan", Load("plan.json"), out var p), $"{name} plan: {p}");
+        Assert.True(schemas.IsValid("runner", Load("runner.json"), out var r), $"{name} runner: {r}");
+        if (readerOnly)
+            Assert.False(AefSchemaSet.Writer.Value.IsValid("run-plan", Load("plan.json"), out _)
+                         && AefSchemaSet.Writer.Value.IsValid("runner", Load("runner.json"), out _), $"{name}: a writer would write it");
         Assert.Equal((bool)Load("expected.json")["matches"]!, RunnerEventStream.Matches(Load("plan.json"), Load("runner.json")));
     }
 
@@ -205,8 +211,29 @@ public class AefProtocolTests
             .SelectMany(f => JsonNode.Parse(File.ReadAllText(f))!["problems"]!.AsArray().Select(p => (string)p![1]!))
             .Distinct().Order(StringComparer.Ordinal);
 
-        Assert.Equal(["content-capture", "judges", "no-cost", "over-budget", "over-cases", "provenance", "run-hash", "run-missing", "subject", "suite", "target-mode"],
+        Assert.Equal(["content-capture", "deployment", "judges", "no-cost", "over-budget", "over-cases", "provenance", "run-hash", "run-missing",
+                      "subject", "suite", "target-mode", "time"],
             problems);
+    }
+
+    [Theory]
+    [InlineData("https://api.example.com/v1?api-key=sk-live-0123456789abcdef", false)]
+    [InlineData("https://api.example.com/v1#sk-live-0123456789abcdef", false)]
+    [InlineData("https://user:hunter2@api.example.com/v1", false)]
+    [InlineData("http://localhost:5080/v1", true)]
+    public void APlansEndpoint_IsSchemeHostAndPathOnly_AsInRunJson(string endpoint, bool valid)
+    {
+        // [PLAN-1], [PLAN-4], [RUN-10]: the plan's subject.endpoint and run.json's deployment.endpoint accept the same values.
+        var plan = JsonNode.Parse(File.ReadAllText(Path.Combine(PlanConformance, "valid", "plan.json")))!;
+        plan["subject"]!["endpoint"] = endpoint;
+        var run = JsonNode.Parse(File.ReadAllText(Path.Combine(PlanConformance, "valid", "runs", "R-1", "run.json")))!;
+        run["deployment"]!["endpoint"] = endpoint;
+
+        foreach (var set in new[] { AefSchemaSet.Writer.Value, AefSchemaSet.Reader.Value })
+        {
+            Assert.Equal(valid, set.IsValid("run-plan", plan, out _));
+            Assert.Equal(valid, set.IsValid("run", run, out _));
+        }
     }
 
     [Fact]

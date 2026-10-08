@@ -5,7 +5,8 @@
   "subject": {
     "ref": "agent:support/support-triage",
     "version": "git:3f2a1c",
-    "endpoint": "http://localhost:5080/v1"
+    "endpoint": "http://localhost:5080/v1",
+    "deployment": "deployment:support/support-triage@dev"
   },
   "suites": [
     {

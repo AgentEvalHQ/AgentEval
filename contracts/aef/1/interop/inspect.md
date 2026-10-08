@@ -32,12 +32,15 @@ An unscored sample has `value` NaN, which metrics and reducers skip. Inspect wri
 is not valid JSON. Every edit to a score is appended to `history` with a `provenance` (`author`, `reason`,
 `timestamp`), and the edit rewrites the log file in place.
 
+A `ModelUsage` has `input_tokens`, `output_tokens`, `total_tokens`, `input_tokens_cache_read`,
+`input_tokens_cache_write`, `reasoning_tokens` and `total_cost`.
+
 Epoch reducers: `mode`, `majority`, `mean`, `median`, `max`, `at_least`, `pass_at`, `pass_k`, `collect`.
 
-**Files.** `.eval` has been the default since v0.3.46. It is a ZIP holding `header.json`, `samples/<id>_epoch_<n>.json`,
-`summaries.json`, `reductions.json` and a `_journal/` folder, and its entries are compressed with zstd. A ZIP reader
-without zstd support cannot open it. `.json` holds the same `EvalLog` as one JSON document. Inspect's documentation
-tells other languages to get JSON with `inspect log dump` or `inspect log convert`.
+**Files.** `.eval` has been the default since v0.3.46. It is a ZIP holding `header.json`,
+`samples/<id>_epoch_<n>.json`, `summaries.json`, `reductions.json` and a `_journal/` folder, and its entries are
+compressed with zstd, so a ZIP reader without zstd cannot open it. `.json` holds the same `EvalLog` as one JSON
+document. Inspect's documentation tells other languages to get JSON with `inspect log dump` or `inspect log convert`.
 
 ## AEF → Inspect
 
@@ -54,28 +57,37 @@ One AEF run gives one `EvalLog` in `.json` form. Writing `.eval` also needs zstd
 | `subject` | `eval.model` (a `provider/model` string) | lossy: an agent or workflow subject has no natural value |
 | `judges[].model` | `eval.model_roles` | exact for the model; `calibration` and `rubricDigest` go to `eval.metadata` |
 | `suite.executionPolicy.trialsPerCase` | `eval.config.epochs` | exact |
-| `execution`, `contentCapture`, `deployment` | `eval.metadata` | none |
+| `suite.executionPolicy.aggregation` | `eval.config.epochs_reducer`: `MajorityVote` → `majority`, `Mean` → `mean`, `Median` → `median`, `Max` → `max`, `PassAtK` → `pass_at_<k>`, `AnyPass` → `at_least_1`, `AllPass` → `at_least_<n>` | exact |
+| `execution`, `contentCapture`, `deployment`, `imported` | `eval.metadata` | none |
 | a result line's `caseId` | `samples[].id` | exact |
 | `trial` | `samples[].epoch` = `trial` + 1 | exact |
 | `path` | the key in `samples[].scores` | exact |
-| `scores[0].value` | `Score.value` | exact for one score; a second score on the same line has no place |
+| `scores[0].value` | `Score.value` | exact for one score; a second score on the same line goes in a map value |
+| `scores[].label` (e.g. `C`) | `Score.value` as that string | exact |
 | `state` | `Score.metadata` | none: Inspect has no verdict field |
 | `reason`, or the `reasoning` blob's text | `Score.explanation` | exact text |
-| typed absences (`not_measured`, `not_applicable`, `skipped`, `error`) | `Score.value` NaN, with the AEF state in `Score.reason` | lossy: one unscored value for four states, and NaN is not JSON |
+| typed absences (`not_measured`, `not_applicable`, `skipped`, `error`) | `Score.value` NaN, with the state name in `Score.reason` | lossy: one unscored value for four states, and NaN is not JSON |
 | `parentResultId`, `component`, `aggregation`, `verdictRule`, `severity`, `annotator` | `Score.metadata` | none |
-| `trials` rollup with `MajorityVote` | `reductions[]` with reducer `majority` | exact |
-| `usage` | `samples[].model_usage`, `samples[].role_usage` | exact for tokens and `costUsd` (`total_cost`) |
+| a `trials` rollup | `reductions[]` with the matching reducer | exact |
+| `usage` entries | `samples[].role_usage` keyed by `role`, tokens and `costUsd` (as `total_cost`) | exact for tokens and cost |
+| `annotator.model` with a judge's usage | `samples[].model_usage` keyed by model | exact |
+| `startedAt`, `endedAt` of a case's root line | `samples[].started_at`, `completed_at` | exact; per-score times have no field |
 | `durationMs` | `samples[].total_time` (seconds) | exact |
-| `summary.json` entries | `results.scores[].metrics` (`mean`, `stderr`) | exact for the value and standard error; `N`, `notMeasured`, `verdict`, `rule`, `ci` go to metadata |
-| `evidence`, blobs | none | none |
-| `traces.otlp.jsonl` | none: Inspect records its own events, which are not OTLP | none |
+| evidence `input`, `expected` | `samples[].input`, `target` (required) | exact when the run captured them; empty otherwise |
+| evidence `output`, `transcript` | `samples[].output`, `messages` | exact when captured |
+| other evidence, blobs | none | none |
+| `summary.json` entries | `results.scores[].metrics` (the value, `stderr`) | exact for the value and standard error; `N`, `notMeasured`, `verdict`, `rule`, `ci` go to metadata |
+| `traces.otlp.jsonl`, `logs.otlp.jsonl` | none: Inspect records its own events, which are not OTLP | none |
 | `gates.ndjson` | none | none |
 | overlays `override`, `adjudicate` ([OVL-1](../spec/04-integrity.md#42-overlays)) | `Score.history` entries with `provenance` (`author` from `by.identity`, `reason`, `timestamp` from `at`) | lossy: Inspect recomputes metrics after an edit; AEF's effective view does not recompute summaries ([OVL-7](../spec/04-integrity.md#43-the-effective-view)) |
 | overlays `approve`, `reject`, `waive`, `annotate` | `log_updates` | lossy |
 | `seal.json`, signatures, the overlay chain | none: an Inspect log is edited in place | none |
-| (case content) | `samples[].input`, `target` are required; AEF has them only as blobs | lossy ([I2](README.md#gaps-found-by-these-mappings)) |
 
 ## Inspect → AEF
+
+The converted run names the converter in `producer` and the source in `imported`
+(`from: "inspect_ai 0.3.277"`), and lists in `imported.asserted` each `run.json` field it had to supply
+([RUN-15](../spec/03-run.md#32-runjson)).
 
 | Inspect | AEF | Fidelity |
 |---|---|---|
@@ -83,51 +95,55 @@ One AEF run gives one `EvalLog` in `.json` form. Writing `.eval` also needs zstd
 | `eval.run_id`, `eval.eval_set_id` | `ext` | none |
 | `status` | `success` → `completed`; `error` → `aborted` with `abortReason` = `error.message`; `cancelled` → `aborted`; `started` → `running` | exact |
 | `eval.created`, `stats.started_at`, `stats.completed_at` (with an offset) | `startedAt`, `endedAt` in UTC | exact instant |
-| `eval.packages.inspect_ai` | `producer` (`name: inspect_ai`, `version`) | exact |
+| `eval.packages.inspect_ai` | `imported.from` | exact |
 | `eval.task`, `eval.task_version` | `suite.ref` (`suite:<task>`), `suite.version` | exact |
-| `eval.dataset` | `ext` | none: Inspect records no dataset digest, so `suite.digest` stays empty |
-| `eval.model`, `eval.solver`, `plan` | `subject` (`kind: model`, `ref: model:<provider/model>`) | lossy: an Inspect subject is a solver and a model; AEF has one `ref` ([I7](README.md#gaps-found-by-these-mappings)) |
+| `eval.dataset` | `ext`; `suite.digest` stays empty, since Inspect records no digest of the dataset | none |
+| `eval.model`, `eval.solver`, `plan` | `subject` (`kind: model`, `ref: model:<provider/model>`), listed in `imported.asserted` | lossy: an Inspect subject is a solver and a model; AEF has one `ref` |
+| (Inspect does not say how the target was driven) | `execution.targetMode`, listed in `imported.asserted` | the converter's claim |
 | `eval.model_roles` | `judges[]` (`model`) | exact |
 | `eval.config.epochs` | `suite.executionPolicy.trialsPerCase` | exact |
-| `eval.config.epochs_reducer` | `trials.aggregation` | lossy: only `majority` and `mode` have an AEF value (`MajorityVote`) ([I5](README.md#gaps-found-by-these-mappings)) |
+| `eval.config.epochs_reducer` | `trials.aggregation` and `executionPolicy.aggregation`: `majority` and `mode` → `MajorityVote`, `mean` → `Mean`, `median` → `Median`, `max` → `Max`, `pass_at_<k>` → `PassAtK` with `k`, `at_least_1` → `AnyPass`, `at_least_<n>` with n = epochs → `AllPass` | exact for these; `at_least_<k>` for another k, `pass_k` and `collect` have no value |
 | `samples[].id` | `caseId` (as a string) | exact |
 | `samples[].epoch` | `trial` = `epoch` − 1, when there is more than one epoch | exact |
 | a key of `samples[].scores` | `path`; the scorer's registry name to `evaluator.id` | exact |
-| `Score.value` as a number | `scores[].value` | exact, but `state` has no source: Inspect sets no pass threshold ([I1](README.md#gaps-found-by-these-mappings)) |
-| `Score.value` `C` / `I` | `state` `passed` / `failed`; `scores[].value` 1 / 0 | exact |
-| `Score.value` `P`, `N` | `state` `warn` or `failed`; value 0.5 or 0 | lossy: the letter has no field ([I1](README.md#gaps-found-by-these-mappings)) |
-| `Score.value` as a map | one `scores[]` entry per numeric member | lossy: string members have no field |
-| `Score.value` as a list, or another string | `ext` | none ([I1](README.md#gaps-found-by-these-mappings)) |
+| `Score.value` as a number | `scores[].value`, `state: scored` ([RES-1](../spec/03-run.md#341-states)) | exact: Inspect sets no pass threshold |
+| `Score.value` `C` / `I` | `state` `passed` / `failed`; `scores[]` with value 1 / 0 and `label` `C` / `I` | exact |
+| `Score.value` `P`, `N` | `scores[]` with value 0.5 or 0 and `label` `P` or `N`; `state` `warn` for `P`, `failed` for `N` | exact: the letter is kept |
+| `Score.value` as a map | one `scores[]` entry per member: numbers as `value`, strings as `label` beside a value the converter chooses | lossy for string members |
+| `Score.value` as a list | `ext` | none |
 | `Score.value` NaN with `reason` `grader_failed` or `scoring_failed` | `state` `error` or `not_measured`, with a `reason` ([RES-2](../spec/03-run.md#341-states)) | exact |
 | `Score.reason` `refusal`, `no_response`, `invalid_response_format` | `state: failed`, with the reason in `reason` | exact |
 | `Score.explanation` | `reason`, or a `reasoning` blob when `contentCapture` is `on` | exact |
 | `Score.answer`, `Score.metadata` | `ext` | none |
 | `Score.history` edits | overlay `override` events targeting the result, with `by.identity` = `author`, `reason`, `at` = `timestamp`; the sealed line holds the original score | lossy: summaries are not recomputed in AEF ([OVL-7](../spec/04-integrity.md#43-the-effective-view)) |
 | `samples[].error`, `samples[].limit` | `state: error` (or `not_measured` for a limit), with the message or limit in `reason` | exact |
-| `samples[].input`, `target`, `messages`, `output` | blobs with evidence records, only when `contentCapture` is `on` | lossy ([I2](README.md#gaps-found-by-these-mappings)) |
+| `samples[].input`, `target`, `output`, `messages` | blobs cited by evidence of kind `input`, `expected`, `output`, `transcript` ([EVD-1](../spec/03-run.md#37-evidencendjson-and-blobs)), only with `contentCapture: on` ([RUN-11](../spec/03-run.md#32-runjson)) | exact when captured |
 | `samples[].events` | none: Inspect's events are not OTLP spans | none |
-| `samples[].model_usage`, `role_usage` | `usage` (input and output tokens, `costUsd`, one `role`) | lossy: cache and reasoning tokens, and a second role, have no field ([I4](README.md#gaps-found-by-these-mappings)) |
+| `samples[].role_usage` | `usage`, one entry per role: `gen_ai.usage.input_tokens`, `output_tokens`, `cache_read.input_tokens`, `cache_write.input_tokens`, `reasoning.output_tokens`, `costUsd` ([RES-10](../spec/03-run.md#345-facts-about-a-result)) | lossy: Inspect's role names become `agent`, `judge`, `attacker` or `other` |
+| `samples[].model_usage` | `usage` entries, and `annotator.model` for a judge | lossy: AEF's usage entry has no model name |
+| `samples[].started_at`, `completed_at` | `startedAt`, `endedAt` on the case's lines | exact |
 | `samples[].total_time` | `durationMs` | exact |
-| `samples[].started_at`, `completed_at`, `working_time` | none | none ([I6](README.md#gaps-found-by-these-mappings)) |
+| `samples[].working_time` | none | none |
 | `samples[].invalidation`, `log_updates` | overlay `annotate` events | lossy: AEF has no "invalidated" state |
-| `results.scores[].metrics` that are the mean of the sample values (`accuracy`, `mean`) | a `summary.json` entry for a metric of kind `score`: `n` = `scored_samples`, `notMeasured` = `unscored_samples` | exact, because the verifier's recomputation ([SUM-5](../spec/03-run.md#36-summaryjson)) gives the same mean. A metric of kind `rate` would count `P` as 0, where Inspect counts 0.5. |
+| `results.scores[].metrics` that are the mean of the sample values (`accuracy`, `mean`) | a `summary.json` entry for a metric of kind `score`: `n` = `scored_samples`, `notMeasured` = `unscored_samples` | exact: the verifier's recomputation ([SUM-5](../spec/03-run.md#36-summaryjson)) gives the same mean. A metric of kind `rate` would count `P` as 0, where Inspect counts 0.5. |
 | `stderr` | the entry's `stderr` | exact |
-| other metrics (custom, grouped, bootstrap, `pass_at_k`), `headline` | `ext` | none ([I1](README.md#gaps-found-by-these-mappings)) |
-| (no verdict) | the summary entry's `verdict` has no source | none ([I1](README.md#gaps-found-by-these-mappings)) |
-| `stats.model_usage` | `summary.cost.totalUsd` from `total_cost` | lossy: run-level tokens have no field ([I4](README.md#gaps-found-by-these-mappings)) |
+| other metrics (`pass_at_k`, a median, a custom metric) | a summary entry with `aggregate` (`method`, `k`): a median, minimum or maximum is recomputed; `pass_at_k` or a custom metric is the producer's, shown as written, and no lane reads it ([SUM-8](../spec/03-run.md#36-summaryjson)) | exact |
+| (Inspect has no pass rule for a metric) | the summary entry's `verdict` | none: see [Still open](#still-open) |
+| `results.headline` | `ext` | none |
+| `stats.model_usage`, `role_usage` (run totals) | `summary.cost.totalUsd` from `total_cost` | lossy: run-level tokens have no field |
 
 ## What does not carry over
 
-**AEF → Inspect.** Which typed absence a result was: Inspect has one unscored value. `warn` and `inconclusive`. The
-result tree and its aggregation, except as metadata. Severity, verdict rules, thresholds and uncertainty. Evidence
-links and digests, traces, gate decisions. The seal, signatures and the overlay chain: an Inspect log is mutable.
-`execution.targetMode`, judge calibration. The case content, unless the run captured it.
+**AEF → Inspect.** Which typed absence a result was: Inspect has one unscored value. The states `warn`,
+`inconclusive` and `scored`, except as metadata. The result tree and its aggregation, severity, verdict rules,
+thresholds and uncertainty. Evidence links and digests, traces, gate decisions. The seal, signatures and the overlay
+chain: an Inspect log is mutable. `execution.targetMode`, judge calibration, `imported`. The case content, unless the
+run captured it.
 
-**Inspect → AEF.** A verdict for numeric scores, and categorical or list values ([I1](README.md#gaps-found-by-these-mappings)). Metrics
-that are not a mean of the sample values ([I1](README.md#gaps-found-by-these-mappings)). Reducers other than majority
-([I5](README.md#gaps-found-by-these-mappings)). Sample and run timing ([I6](README.md#gaps-found-by-these-mappings)). Cache and reasoning token counts and
-run-level usage ([I4](README.md#gaps-found-by-these-mappings)). The case content when the importer writes `contentCapture: off`
-([I2](README.md#gaps-found-by-these-mappings)). Inspect's event transcript. Groups of runs (`eval_set_id`).
+**Inspect → AEF.** List-valued scores. Reducers without an AEF value (`at_least` for a k other than 1 or all,
+`pass_k`, `collect`). `working_time`. Run-level token totals. Inspect's event transcript as structured events. Groups
+of runs (`eval_set_id`). Inspect's role names beyond the four AEF roles, and the model name of each usage entry. The case
+content, when the converter writes `contentCapture: off`.
 
 ## Worked example
 
@@ -140,9 +156,10 @@ The corpus line for `triage/policy` of `case-17`. Its `resultId` recomputes with
 
 It becomes the `triage/policy` score of the Inspect sample for `case-17`. The case's other scored lines, `triage`
 (`r_479d157f3423e95d566bcbfc0c6d2461`) and `triage/helpfulness` (`r_1264eeb36620c9cbe97b71ffdbcfd331`), go into the
-same sample. The run has one trial per case, so the sample is epoch 1. AEF keeps no input or target for the case, so
-those required fields are empty ([I2](README.md#gaps-found-by-these-mappings)). The AEF facts Inspect has no field for go under
-`metadata.aef`:
+same sample. The run has one trial per case, so the sample is epoch 1. The run kept no input or target for the case,
+so those required fields are empty. The `usage` entries of `triage/helpfulness` become `role_usage`, with cache and
+reasoning tokens, and the judge's entry is also `model_usage` under the judge's model. The AEF facts Inspect has no
+field for go under `metadata.aef`:
 
 ```json
 {
@@ -165,8 +182,11 @@ those required fields are empty ([I2](README.md#gaps-found-by-these-mappings)). 
       "metadata": {"aef": {"resultId": "r_1264eeb36620c9cbe97b71ffdbcfd331", "state": "failed", "evaluator": {"id": "llm:helpfulness", "version": "3"}, "parentResultId": "r_479d157f3423e95d566bcbfc0c6d2461", "severity": "medium", "component": {"weight": 0.5, "required": false}}}
     }
   },
-  "model_usage": {"gpt-5.1": {"input_tokens": 1747, "output_tokens": 488, "total_tokens": 2235, "total_cost": 0.012}},
-  "role_usage": {"judge": {"input_tokens": 1747, "output_tokens": 488, "total_tokens": 2235, "total_cost": 0.012}},
+  "model_usage": {"gpt-5.1": {"input_tokens": 1747, "output_tokens": 488, "total_tokens": 2235, "reasoning_tokens": 301, "total_cost": 0.012}},
+  "role_usage": {
+    "agent": {"input_tokens": 912, "output_tokens": 214, "total_tokens": 1126, "input_tokens_cache_read": 640},
+    "judge": {"input_tokens": 1747, "output_tokens": 488, "total_tokens": 2235, "reasoning_tokens": 301, "total_cost": 0.012}
+  },
   "total_time": 4.21
 }
 ```
@@ -180,13 +200,13 @@ NaN token, which is not JSON, so it is shown apart:
 
 Read back, `id` gives `caseId` `case-17`, each score key gives the `path`, and a single epoch gives no `trial`. RES-4
 then gives the same three ids as the corpus: `r_479d157f3423e95d566bcbfc0c6d2461`, `r_bb4438fbedb43552a9fe55695931d5e4`
-and `r_1264eeb36620c9cbe97b71ffdbcfd331`. The states come back only from `metadata.aef`.
+and `r_1264eeb36620c9cbe97b71ffdbcfd331`. The states come back only from `metadata.aef`. Without it, the three numeric
+values read as `scored`.
 
-## Open gaps
+## Still open
 
-- [I1](README.md#gaps-found-by-these-mappings): numeric scores without a pass rule, letters and maps, and metrics that are not means.
-- [I2](README.md#gaps-found-by-these-mappings): Inspect requires `input` and `target`; AEF has them only as captured blobs.
-- [I4](README.md#gaps-found-by-these-mappings): cache and reasoning tokens, usage of several roles, run-level usage.
-- [I5](README.md#gaps-found-by-these-mappings): Inspect's reducers other than majority.
-- [I6](README.md#gaps-found-by-these-mappings): sample start and end times.
-- [I7](README.md#gaps-found-by-these-mappings): the subject and target mode an importer supplies.
+- **A summary entry for a metric with no rule.** Inspect metrics have no pass threshold. A `summary.json` entry needs a
+  `verdict`, whose values are `passed`, `failed`, `warn`, `inconclusive` and `not_measured`
+  ([SUM-6](../spec/03-run.md#36-summaryjson)), and none of them means "no rule was applied". A converter can keep
+  such a metric on the result lines (`scored`) and write no summary entry for it.
+- **Run-level token usage.** `summary.json` has the run's cost (`cost.totalUsd`) and no token totals.

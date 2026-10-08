@@ -501,7 +501,10 @@
           "status": "failed",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-06T00:00:00Z"
-        }
+        },
+        "evidence": [
+          "da9d182a9741704c04c099f9c984998bcc01de1344889cec9f64cdaa789078f8"
+        ]
       },
       {
         "lane": "not-significant",
@@ -510,7 +513,10 @@
           "status": "passed",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-06T00:00:00Z"
-        }
+        },
+        "evidence": [
+          "1107815b3e87acf222e5b658b4f1d4fb1798e1c79b881cb3b976778c9990f12b"
+        ]
       },
       {
         "lane": "exact-not-normal",
@@ -519,7 +525,10 @@
           "status": "passed",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-06T00:00:00Z"
-        }
+        },
+        "evidence": [
+          "d67904b70449313687824a05de9a4f767eaf9181c8717eee0d8722d82ab538f3"
+        ]
       },
       {
         "lane": "one-sided",
@@ -528,7 +537,10 @@
           "status": "failed",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-06T00:00:00Z"
-        }
+        },
+        "evidence": [
+          "da9d182a9741704c04c099f9c984998bcc01de1344889cec9f64cdaa789078f8"
+        ]
       },
       {
         "lane": "boundary-equal",
@@ -537,7 +549,10 @@
           "status": "failed",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-06T00:00:00Z"
-        }
+        },
+        "evidence": [
+          "cd2c9a69291fc54662981d9dd2d28d396bcb15d07dbc3cc3d85faf5ba8f41266"
+        ]
       },
       {
         "lane": "boundary-below",
@@ -546,7 +561,10 @@
           "status": "passed",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-06T00:00:00Z"
-        }
+        },
+        "evidence": [
+          "cd2c9a69291fc54662981d9dd2d28d396bcb15d07dbc3cc3d85faf5ba8f41266"
+        ]
       },
       {
         "lane": "too-few-pairs",
@@ -555,7 +573,10 @@
           "status": "not_measured",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-06T00:00:00Z"
-        }
+        },
+        "evidence": [
+          "cb474830f43625a2d08a2fbc7b9cedbe07f45821191587333c563550d8ae64de"
+        ]
       },
       {
         "lane": "ties-dropped",
@@ -564,7 +585,10 @@
           "status": "not_measured",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-06T00:00:00Z"
-        }
+        },
+        "evidence": [
+          "cd2c9a69291fc54662981d9dd2d28d396bcb15d07dbc3cc3d85faf5ba8f41266"
+        ]
       },
       {
         "lane": "lower-better",
@@ -573,7 +597,10 @@
           "status": "failed",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-06T00:00:00Z"
-        }
+        },
+        "evidence": [
+          "da9d182a9741704c04c099f9c984998bcc01de1344889cec9f64cdaa789078f8"
+        ]
       },
       {
         "lane": "direction-none",
@@ -582,7 +609,10 @@
           "status": "not_measured",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-06T00:00:00Z"
-        }
+        },
+        "evidence": [
+          "da9d182a9741704c04c099f9c984998bcc01de1344889cec9f64cdaa789078f8"
+        ]
       },
       {
         "lane": "judges-differ",
@@ -594,7 +624,10 @@
           "axes": [
             "judges"
           ]
-        }
+        },
+        "evidence": [
+          "62187edf3d1d5209b4b741d0fc9f023612db20666ab2f71a0c76c58bd218a697"
+        ]
       },
       {
         "lane": "axes-in-rule-order",
@@ -607,7 +640,10 @@
             "rubrics",
             "judges"
           ]
-        }
+        },
+        "evidence": [
+          "62187edf3d1d5209b4b741d0fc9f023612db20666ab2f71a0c76c58bd218a697"
+        ]
       },
       {
         "lane": "candidate-scripted",
@@ -616,7 +652,10 @@
           "status": "not_measured",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-06T00:00:00Z"
-        }
+        },
+        "evidence": [
+          "374b1a04a1cb09fc66897a1903c83c0abb6a772bd53e101e6bd5e235cfa01bd0"
+        ]
       },
       {
         "lane": "baseline-scripted",
@@ -625,7 +664,10 @@
           "status": "not_measured",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-06T00:00:00Z"
-        }
+        },
+        "evidence": [
+          "1107815b3e87acf222e5b658b4f1d4fb1798e1c79b881cb3b976778c9990f12b"
+        ]
       },
       {
         "lane": "baseline-missing",
@@ -634,7 +676,10 @@
           "status": "not_measured",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-06T00:00:00Z"
-        }
+        },
+        "evidence": [
+          "1107815b3e87acf222e5b658b4f1d4fb1798e1c79b881cb3b976778c9990f12b"
+        ]
       },
       {
         "lane": "two-candidates",
@@ -643,7 +688,11 @@
           "status": "not_measured",
           "subjectVersion": "v7",
           "oldestClosedAt": "2026-10-06T00:00:00Z"
-        }
+        },
+        "evidence": [
+          "1107815b3e87acf222e5b658b4f1d4fb1798e1c79b881cb3b976778c9990f12b",
+          "da9d182a9741704c04c099f9c984998bcc01de1344889cec9f64cdaa789078f8"
+        ]
       }
     ]
   },
