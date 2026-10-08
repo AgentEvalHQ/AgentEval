@@ -39,7 +39,7 @@ Otherwise the folders are walked; a folder that does not exist is skipped with a
 
 Usage:
   python aef_conformance.py [--corpus DIR] [--index FILE | --no-index] [--command "CMD ..."] [--kind KIND ...]
-                            [--class NAME ...] [--quiet]
+                            [--class NAME ...] [--level intact|signed] [--quiet]
   python aef_conformance.py --self-check
       Runs the corpus once per mutation of the verifier (each switches one check off: the seal digest, the
       manifest's byte order, the I-JSON duplicate-member check, the $-at-end-of-input pattern rule, the summary
@@ -110,7 +110,7 @@ def read_json(path):
 KIND_CLASSES = {
     "document": ["Producer", "Reader"], "run": ["Producer", "Run verifier"], "result-id": ["Producer"],
     "paths": ["Producer", "Run verifier"], "seal": ["Sealer", "Run verifier"], "signature": ["Sealer", "Run verifier"],
-    "encoding": ["Reader", "Run verifier"], "reader-only": ["Reader"], "chain": ["Overlay verifier"],
+    "encoding": ["Run verifier"], "reader-only": ["Reader"], "chain": ["Overlay verifier"],
     "overlay-view": ["Overlay verifier"], "checkpoint": ["Checkpoint verifier"], "lane": ["Checkpoint verifier"],
     "decision": ["Checkpoint verifier", "Decision engine"], "plan": ["Runner"], "matching": ["Runner"],
     "stream": ["Stream verifier"], "plan-conformance": ["Stream verifier"],
@@ -239,6 +239,7 @@ def from_index(corpus, index_path):
             continue  # shared files, checked but not run (signature-vectors/keys, protocol/streams/shared)
         v = Vector(kind, vid, base, read_json(expected_file), classes=classes)
         v.guard = guard
+        v.level = entry.get("level")
         vectors.append(v)
     return vectors, refusals
 
@@ -294,7 +295,7 @@ def run_vector(engine, v, scratch):
         for field in ("results", "reviews", "waivers", "withheld", "unsealedEvents"):
             compare(diffs, f"view.{field}", out.get(field), e["view"].get(field))
     elif v.kind in ("document", "reader-only", "plan"):
-        out = engine.call(["document", e["schema"], d / "document.json"])
+        out = engine.call(["document", e["schema"], d / e.get("document", "document.json")])
         if "error" in out:
             return [out["error"]]
         for side in ("writer", "reader"):
@@ -329,6 +330,8 @@ def run_vector(engine, v, scratch):
         if "payloadType" in e:
             argv += ["--payload-type", e["payloadType"]]
         out = engine.call(argv)
+        if e.get("policyRefused"):  # SIG-3: a policy with a key that cannot be used is refused as a whole
+            return [] if "error" in out else [f"the policy was accepted: {json.dumps(out)}"]
         if "error" in out:
             return [out["error"]]
         want_envelope = e.get("envelopeResult", e.get("envelope") if e.get("envelope") in (None, "malformed", "payload-mismatch") else None)
@@ -459,6 +462,9 @@ def main(argv):
     parser.add_argument("--kind", action="append", help="run only vectors of this kind (repeatable)")
     parser.add_argument("--class", dest="classes", action="append", metavar="NAME",
                         help="run only vectors of this conformance class, e.g. 'Run verifier' (repeatable)")
+    parser.add_argument("--level", choices=("intact", "signed"), default="signed",
+                        help="a Run verifier's level (spec 09 §9.1): 'intact' leaves out the vectors index.json marks "
+                             "signed")
     parser.add_argument("--quiet", action="store_true", help="print failures only")
     parser.add_argument("--self-check", action="store_true")
     a = parser.parse_args(argv[1:])
@@ -485,6 +491,8 @@ def main(argv):
             parser.error(f"unknown class(es): {', '.join(sorted(wanted - known))}")
         vectors = [v for v in vectors if wanted & {c.lower() for c in v.classes}]
         refusals = [r for r in refusals if wanted & {c.lower() for c in (r[3] or KIND_CLASSES.get(r[0], []))}]
+    if a.level == "intact":
+        vectors = [v for v in vectors if getattr(v, "level", None) != "signed"]
     if a.self_check:
         if a.command:
             parser.error("--self-check mutates the in-process verifier; it does not take --command")

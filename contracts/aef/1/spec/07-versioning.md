@@ -29,7 +29,9 @@
 
 ## 7.3 Reading a value this version does not know
 
-**[VER-8]** A reader meets values a later minor added. It **MUST** read each as follows, and never as a pass or as
+**[VER-8]** A reader meets values a later minor added. A value is **known** when this version's writer schema accepts
+it at that field (a value of its enum, or one a pattern there allows, such as a plan's `ci:<name>` provider); any
+other value is unknown. It **MUST** read each unknown value as follows, and never as a pass or as
 better evidence than it is (each has a reader-only corpus vector):
 
 | Field | An unknown value reads as |
@@ -38,7 +40,7 @@ better evidence than it is (each has a reader-only corpus vector):
 | `run.json` `execution.targetMode` | `mocked`: not evidence about the live subject |
 | `run.json` `execution.stimulus` | `other` |
 | `run.json` `contentCapture` | `on`: content may be present (handle as private) |
-| `run.json` `subject.kind`, evidence `kind`, judges' `mode`, annotator `kind` (`OTHER`), `usage.role`, `attack.taxonomy[].scheme` | `other`, shown as written |
+| `run.json` `subject.kind`, evidence `kind`, judges' `mode`, annotator `kind` (`OTHER`), `usage[].role` (on result lines and in `summary.json`), `attack.taxonomy[].scheme` | `other`, shown as written |
 | summary `verdict` | `inconclusive`: not a pass |
 | `trials.aggregation`, `executionPolicy.aggregation`, `config.thresholds[].op` | shown as written (descriptive) |
 | `metrics` `direction` | `none` |
@@ -46,15 +48,18 @@ better evidence than it is (each has a reader-only corpus vector):
 | gate `outcome` | `inconclusive` |
 | gate `comparability` | `incomparable` |
 | overlay `kind` | an annotation: recorded, no effect on any state |
-| `by.assurance` | `self-attested` |
+| `by.assurance` and every `assurance` of a trusted identity (overlay events, a decision input's exceptions, a checkpoint's `budget.approvedBy`) | `self-attested`, whatever the value, known or not, until a signature verifies it ([OVL-3]) |
 | seal `predicate.sealedBy` | `ingest` |
 | checkpoint `state` or `outcome` | `unverifiable` ([CKP-7]) |
 | lane rule `kind` | the lane's result is `not_measured` |
 | a `severity` rule's `max` | the lane's result is `not_measured` |
 | comparison axis | the comparison is `incomparable` ([LANE-6]) |
-| decision lane `status` | `not_measured` ([DEC-2]) |
+| a decision input's `lanes[].result.status` | `not_measured` ([DEC-2]) |
+| a decision's `lanes[].status` or `outcome` | `unverifiable`: the decision cannot be recomputed ([CKP-7]) |
+| a `threshold` rule's `op` | the lane's result is `not_measured` |
+| runner event `job.failed` `limit` | shown as written |
 | runner event `kind` | skipped by the verifier ([STRM-1]) |
-| plan `provider` or `isolation`, credential `scheme` or `purpose` | the runner refuses the plan ([PLAN-7]) |
+| plan `provider`, `isolation` or `contentCapture`, credential `scheme` or `purpose` | the runner refuses the plan ([PLAN-7]) |
 | runner manifest `kind` or `os` | shown as written; it takes no part in matching ([PLAN-7]) |
 | runner event `lane.completed` `status` | `not_measured` |
 
@@ -71,10 +76,10 @@ evidence) is not AEF. Mapping it is the reader's choice, and informative here:
 
 | Store v1 | AEF 1.0 |
 |---|---|
-| run directory, `manifest.json` | a run folder, `run.json` (`producer` = AgentEval and its version; `execution.targetMode` from the run's provider: `mocked` when it ran a stand-in, else `live`) |
-| scenario results (`EvalResult` trees) | `results.ndjson`, one line per node; `resultId` per [RES-4] |
+| run directory, `manifest.json` | a run folder, `run.json`: `producer` is the tool that migrates it ([RUN-15]); `imported` names the store (`from`: "agenteval store v1" and the AgentEval version that wrote it) and lists in `asserted` every field the migration supplied rather than read; `execution.targetMode` from the run's provider (`mocked` when it ran a stand-in, else `live`) |
+| scenario results (a `ScenarioResult` per scenario, with its assertions) | `results.ndjson`: a root line per scenario and a child line per assertion; `resultId` per [RES-4] |
 | `MeasurementState` and labels | `state`: `pass` → `passed`, `fail` → `failed`, `warn` → `warn`, `error` → `error`, `skipped` → `skipped`, `inapplicable` → `not_applicable`, not measured → `not_measured` |
 | compliance evidence and its hash chain | `evidence.ndjson` and blobs; the store's chain is not an AEF seal: a migrated run is sealed anew with `sealedBy: ingest` |
 
-A migrated run is sealed by whoever migrates it (`ingest`) and says so: its seal shows the migration did not change
-it afterwards, not that the original store was unchanged before.
+A migrated run is an imported run ([RUN-15]): sealed by whoever migrates it (`ingest`), and it says so. Its seal shows
+the migration did not change it afterwards, not that the original store was unchanged before.

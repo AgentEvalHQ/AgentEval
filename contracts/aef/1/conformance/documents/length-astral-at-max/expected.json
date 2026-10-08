@@ -1,0 +1,9 @@
+{
+  "kind": "document",
+  "schema": "run",
+  "writer": "valid",
+  "reader": "valid",
+  "rules": [
+    "ENC-4"
+  ]
+}

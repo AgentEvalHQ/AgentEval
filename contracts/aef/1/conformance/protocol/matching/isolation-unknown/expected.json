@@ -1,0 +1,10 @@
+{
+  "kind": "matching",
+  "matches": false,
+  "readerOnly": true,
+  "rules": [
+    "PLAN-7",
+    "VER-8"
+  ],
+  "why": "a runner does not take a plan whose isolation it does not know, even when it could run it (PLAN-7)"
+}

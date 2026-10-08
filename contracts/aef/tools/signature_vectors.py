@@ -110,6 +110,158 @@ def res(keyid, result):
     return {"keyid": keyid, "result": result}
 
 
+def pem_of(der):
+    b64 = base64.b64encode(der).decode()
+    return "-----BEGIN PUBLIC KEY-----\n" + "\n".join(b64[i:i + 64] for i in range(0, len(b64), 64)) + "\n-----END PUBLIC KEY-----\n"
+
+
+def mixed_order_vectors(seal_bytes):
+    """SIG-2: A' = A + T, with T the point of order 2, so [k]A' = [k]A + T when k is odd. k is SHA-512(R || A' || M)
+    reduced mod L. Both vectors take a hash h with h // L odd, so the parity of h and of k = h mod L differ: an
+    implementation that does not reduce k gets each of them wrong, and one that checks the cofactored equation gets the
+    first wrong.
+      odd k:  [S]B = R + [k]A' fails (cofactorless, k reduced): invalid.
+      even k: it holds: verified."""
+    s, prefix = C._ed_expand(test_scalar("ed25519-a"))
+    T2 = (0, C.ED25519_P - 1, 1, 0)  # (x, y) = (0, -1): order 2
+    A2 = C._ed_add(C._ed_mul(s, C.ED25519_B), T2)
+    public = C._ed_encode(A2)
+    key = C.Ed25519PublicKey(public)
+    kid = C.keyid(key)
+    identity = "spiffe://example.com/ci/mixed-order"
+    pol = {"keys": [{"identity": identity, "publicKey": C.spki_pem(key)}]}
+    message = C.pae(INTOTO, seal_bytes)
+    for name, want_odd, result in (("ed25519-mixed-order-key-odd-k", True, "invalid"),
+                                   ("ed25519-mixed-order-key-even-k", False, "verified")):
+        counter = 0
+        while True:
+            r = C._ed_hash(prefix, message, name.encode(), counter.to_bytes(4, "big"))
+            R = C._ed_encode(C._ed_mul(r, C.ED25519_B))
+            h = int.from_bytes(hashlib.sha512(R + public + message).digest(), "little")
+            k = h % C.ED25519_L
+            if (h // C.ED25519_L) % 2 == 1 and (k % 2 == 1) == want_odd:
+                break
+            counter += 1
+        signature = R + ((r + k * s) % C.ED25519_L).to_bytes(32, "little")
+        assert C.ed25519_verify(public, message, signature) == (result == "verified")
+        unreduced = C._ed_equal(C._ed_mul(int.from_bytes(signature[32:], "little"), C.ED25519_B),
+                                C._ed_add(C._ed_decode(R), C._ed_mul(h, A2)))
+        assert unreduced == (result != "verified")  # without the reduction, the opposite answer
+        expected = {"keyid": kid, "result": "verified", "identity": identity} if result == "verified" else res(kid, "invalid")
+        vector(name, envelope(INTOTO, seal_bytes, [(kid, signature)]), "seal.json", seal_bytes, INTOTO, pol, None,
+               [expected], [identity] if result == "verified" else [], ["SIG-2"])
+
+
+def unusable_key_vectors(seal_bytes):
+    """SIG-2, SIG-3: a P-256 key that is compressed or off the curve cannot be used, so the policy is refused as a
+    whole (exit status 2 in the command-line contract), even though another key of it would verify."""
+    der = C.spki_der(KA.public_key)
+    x = der[-64:-32]
+    point = bytes([0x02 | (der[-1] & 1)]) + x
+    bits = b"\x03" + bytes([len(point) + 1]) + b"\x00" + point
+    algorithm = der[2:2 + 2 + der[3]]
+    compressed = b"\x30" + bytes([len(algorithm) + len(bits)]) + algorithm + bits
+    off_curve = der[:-1] + bytes([der[-1] ^ 0x01])
+    for name, bad in (("ecdsa-compressed-key-in-policy", compressed), ("ecdsa-key-off-curve-in-policy", off_curve)):
+        try:
+            C.load_spki_der(bad)
+            raise AssertionError(name + ": the key loaded")
+        except ValueError:
+            pass
+        d = OUT / name
+        write_json(d / "envelope.dsse.json", envelope(INTOTO, seal_bytes, [(ID["ecdsa-a"], sig(INTOTO, seal_bytes, KA))]))
+        write(d / "seal.json", seal_bytes)
+        write_json(d / "policy.json", {"keys": [{"identity": WHO["ecdsa-a"], "publicKey": PEM["ecdsa-a"]},
+                                                {"identity": "git:carol@example.com", "publicKey": pem_of(bad)}]})
+        write_json(d / "expected.json", {"kind": "signature", "envelope": "envelope.dsse.json", "file": "seal.json",
+                                         "payloadType": INTOTO, "policy": "policy.json", "policyRefused": True,
+                                         "rules": ["SIG-2", "SIG-3", "SIG-6"]})
+
+
+def refused(name, env, seal_bytes, pol, rules):
+    d = OUT / name
+    write_json(d / "envelope.dsse.json", env)
+    write(d / "seal.json", seal_bytes)
+    write_json(d / "policy.json", pol)
+    write_json(d / "expected.json", {"kind": "signature", "envelope": "envelope.dsse.json", "file": "seal.json",
+                                     "payloadType": INTOTO, "policy": "policy.json", "policyRefused": True,
+                                     "rules": rules + ["SIG-6"]})
+
+
+def policy_and_envelope_vectors(seal_bytes):
+    """SIG-1, SIG-2, SIG-3, SIG-4, SIG-5 as pinned after the .NET implementation compared itself with the reference."""
+    good_sig = sig(INTOTO, seal_bytes, KA)
+    good = envelope(INTOTO, seal_bytes, [(ID["ecdsa-a"], good_sig)])
+    alice = {"identity": WHO["ecdsa-a"], "publicKey": PEM["ecdsa-a"]}
+
+    # SIG-2, SIG-3: Ed25519 keys that cannot be used refuse the policy.
+    no_point = next(y for y in range(2, 100) if C._ed_point(y, 0) is None)
+    for name, raw in (("ed25519-key-no-point-in-policy", no_point.to_bytes(32, "little")),
+                      ("ed25519-small-order-key-in-policy", (1).to_bytes(32, "little"))):  # the neutral point
+        der = C._der(0x30, C._der(0x30, C.ID_ED25519) + C._der(0x03, b"\x00" + raw))
+        refused(name, good, seal_bytes, {"keys": [alice, {"identity": "git:carol@example.com", "publicKey": pem_of(der)}]},
+                ["SIG-2", "SIG-3"])
+
+    # SIG-2: an AlgorithmIdentifier other than the two exact ones is another algorithm.
+    point = C.spki_der(KA.public_key)[-65:]
+    for name, der in (("ec-key-without-named-curve", C._der(0x30, C._der(0x30, C.ID_EC_PUBLIC_KEY) + C._der(0x03, b"\x00" + point))),
+                      ("ed25519-key-with-parameters", C._der(0x30, C._der(0x30, C.ID_ED25519 + b"\x05\x00")
+                                                            + C._der(0x03, b"\x00" + ED.public_key.key)))):
+        kid = "sha256:" + hashlib.sha256(der).hexdigest()
+        pol = {"keys": [{"identity": "git:carol@example.com", "publicKey": pem_of(der)}, alice]}
+        vector(name, envelope(INTOTO, seal_bytes, [(kid, good_sig)]), "seal.json", seal_bytes, INTOTO, pol, None,
+               [res(kid, "unsupported-algorithm")], [], ["SIG-2"])
+
+    # SIG-3: a SubjectPublicKeyInfo is DER whatever its algorithm.
+    rsa = bytearray(base64.b64decode("".join(RSA_PEM.strip().splitlines()[1:-1])))
+    assert rsa[0] == 0x30 and rsa[1] == 0x82 and rsa[4] == 0x30 and rsa[19] == 0x03 and rsa[20] == 0x82 and rsa[23] == 0
+    unused = bytes(rsa[:23]) + b"\x01" + bytes(rsa[24:])
+    outer = int.from_bytes(rsa[2:4], "big") + 1
+    ber = b"\x30\x82" + outer.to_bytes(2, "big") + b"\x30\x81" + bytes([rsa[5]]) + bytes(rsa[6:])  # 13 in long form
+    for name, der in (("rsa-key-unused-bits-in-policy", unused), ("rsa-key-ber-in-policy", ber)):
+        refused(name, good, seal_bytes, {"keys": [alice, {"identity": WHO["rsa"], "publicKey": pem_of(der)}]}, ["SIG-3"])
+
+    # SIG-3: RFC 7468's strict PEM.
+    lines = PEM["ecdsa-a"].split("\n")
+    indented = "\n".join(lines[:1] + ["  " + lines[1]] + lines[2:])
+    refused("pem-indented-line-in-policy", good, seal_bytes, {"keys": [{"identity": WHO["ecdsa-a"], "publicKey": indented}]},
+            ["SIG-3"])
+
+    # SIG-3: a key id listed twice.
+    refused("key-listed-twice-in-policy", good, seal_bytes,
+            {"keys": [alice, {"identity": WHO["ecdsa-b"], "publicKey": PEM["ecdsa-a"]}]}, ["SIG-3", "SIG-4"])
+
+    # SIG-1: a null keyid reads as absent; members DSSE does not define are ignored; a duplicate member is not I-JSON.
+    vector("envelope-keyid-null", dict(good, signatures=[{"keyid": None, "sig": C.b64encode(good_sig)}]), "seal.json",
+           seal_bytes, INTOTO, policy("ecdsa-b", "ecdsa-a"), None, [ok("ecdsa-a")], [WHO["ecdsa-a"]], ["SIG-1", "SIG-5"])
+    vector("envelope-unknown-member", dict(good, comment="DSSE does not define this member: ignored"), "seal.json",
+           seal_bytes, INTOTO, policy("ecdsa-a"), None, [ok("ecdsa-a")], [WHO["ecdsa-a"]], ["SIG-1"])
+    vector("envelope-duplicate-payload", good, "seal.json", seal_bytes, INTOTO, policy("ecdsa-a"), "malformed", [], [],
+           ["SIG-1", "ENC-2"])
+    dup = OUT / "envelope-duplicate-payload" / "envelope.dsse.json"
+    raw = dup.read_bytes()
+    assert raw.count(b'  "payload": ') == 1
+    dup.write_bytes(raw.replace(b'  "payload": ', b'  "payload": "e30=",\n  "payload": ', 1))
+
+    # SIG-1: either alphabet, padded or not; padding, when present, is complete.
+    ed_sig = C.b64encode(sig(INTOTO, seal_bytes, ED))
+    assert ed_sig.endswith("==")
+    vector("sig-standard-alphabet-unpadded", dict(good, signatures=[{"keyid": ID["ed25519-a"], "sig": ed_sig.rstrip("=")}]),
+           "seal.json", seal_bytes, INTOTO, policy("ed25519-a"), None, [ok("ed25519-a")], [WHO["ed25519-a"]], ["SIG-1"])
+    vector("sig-incomplete-padding", dict(good, signatures=[{"keyid": ID["ed25519-a"], "sig": ed_sig[:-1]}]),
+           "seal.json", seal_bytes, INTOTO, policy("ed25519-a"), "malformed", [], [], ["SIG-1", "SIG-5"])
+
+    # SIG-5: a keyid-less signature is tried only against keys of P-256 or Ed25519.
+    vector("no-keyid-only-another-algorithm", envelope(INTOTO, seal_bytes, [(None, good_sig)]), "seal.json", seal_bytes,
+           INTOTO, policy("rsa"), None, [res("", "untrusted-key")], [], ["SIG-2", "SIG-5"])
+
+    # SIG-4, SIG-5: one identity with two keys; identities in the order of the first key that verified for each.
+    pol = {"keys": [alice | {"publicKey": PEM["ecdsa-b"]}, {"identity": WHO["ed25519-a"], "publicKey": PEM["ed25519-a"]}, alice]}
+    two = envelope(INTOTO, seal_bytes, [(ID["ecdsa-a"], good_sig), (ID["ed25519-a"], sig(INTOTO, seal_bytes, ED))])
+    vector("one-identity-two-keys", two, "seal.json", seal_bytes, INTOTO, pol, None, [ok("ecdsa-a"), ok("ed25519-a")],
+           [WHO["ed25519-a"], WHO["ecdsa-a"]], ["SIG-4", "SIG-5"])
+
+
 def main():
     if OUT.exists():
         shutil.rmtree(OUT)
@@ -184,6 +336,9 @@ def main():
            "checkpoint.json", cp_bytes, CHECKPOINT, policy("ecdsa-a"), None, [ok("ecdsa-a")], [WHO["ecdsa-a"]], S + ["CKP-5", "CKP-9"])
     vector("overlay-batch-envelope", envelope(INTOTO, batch_bytes, [(ID["ed25519-a"], sig(INTOTO, batch_bytes, ED))]),
            "seal-0001.json", batch_bytes, INTOTO, policy("ed25519-a"), None, [ok("ed25519-a")], [WHO["ed25519-a"]], S + ["OVL-3"])
+    mixed_order_vectors(seal_bytes)
+    unusable_key_vectors(seal_bytes)
+    policy_and_envelope_vectors(seal_bytes)
     signed_runs()
     redaction_vectors()
     print("signature vectors:", len([p for p in OUT.iterdir() if p.is_dir() and p.name != "keys"]))

@@ -1,0 +1,8 @@
+{
+  "keys": [
+    {
+      "identity": "spiffe://example.com/ci/mixed-order",
+      "publicKey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAXviPb3QfB1XnV+RL9t9xz/skBP5FYqbb5AFHUlTk+Vg=\n-----END PUBLIC KEY-----\n"
+    }
+  ]
+}

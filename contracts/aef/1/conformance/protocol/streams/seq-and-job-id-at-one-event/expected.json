@@ -1,0 +1,18 @@
+{
+  "kind": "stream",
+  "plan": "../plan.json",
+  "problems": [
+    {
+      "where": "event:2",
+      "problem": "job-id"
+    },
+    {
+      "where": "event:2",
+      "problem": "seq"
+    }
+  ],
+  "rules": [
+    "STRM-3",
+    "CONF-2"
+  ]
+}

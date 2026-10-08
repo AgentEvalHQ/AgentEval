@@ -1,0 +1,19 @@
+{
+  "kind": "signature",
+  "envelope": "envelope.dsse.json",
+  "file": "seal.json",
+  "payloadType": "application/vnd.in-toto+json",
+  "policy": "policy.json",
+  "envelopeResult": null,
+  "signatures": [
+    {
+      "keyid": "sha256:8c15de2d159728f5f07ff8ef40e89159b2e8ee3956806ed01c8fdc25b6995e7f",
+      "result": "unsupported-algorithm"
+    }
+  ],
+  "verifiesFor": [],
+  "rules": [
+    "SIG-2",
+    "SIG-6"
+  ]
+}

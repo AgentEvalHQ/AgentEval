@@ -134,7 +134,7 @@ flowchart LR
 ```
 
 - **Signed.** `attestation.dsse.json` is a [DSSE](https://github.com/secure-systems-lab/dsse) envelope over the exact
-  bytes of `seal.json`. Verifiers must support ECDSA P-256 and should support Ed25519 ([SIG-2]). Which keys to trust is
+  bytes of `seal.json`. Verifiers must support both ECDSA P-256 and Ed25519 ([SIG-2]). Which keys to trust is
   the verifier's input, never something the run says about itself ([SIG-4]).
 - **Anchored.** A signed checkpoint that lists this run with its run hash anchors it: someone cannot later substitute a
   different run with the same id ([SIG-8]).

@@ -1,0 +1,14 @@
+{
+  "kind": "reader-only",
+  "schema": "decision",
+  "writer": "invalid",
+  "reader": "valid",
+  "reads": {
+    "lanes[0].status": "unverifiable",
+    "outcome": "approved"
+  },
+  "rules": [
+    "VER-8",
+    "CKP-7"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "kind": "document",
+  "schema": "checkpoint",
+  "writer": "valid",
+  "reader": "valid",
+  "reads": {
+    "budget.approvedBy.assurance": "self-attested",
+    "lanes[0].rule.op": ">="
+  },
+  "rules": [
+    "VER-8",
+    "OVL-3"
+  ]
+}

@@ -1223,7 +1223,8 @@
     "run/seal.json": "03e7b8de38c46d2f4f27946e73ca7d60afab9eb2ffe75c36e75f3e5a102e7236",
     "run/summary.json": "fe9548e607cab4fc632706c94cefc75b67a9efde0c1c0c6bb604206386960a3c",
     "run/traces.otlp.jsonl": "7ed4f10a3ccf2cb1b5f6b44865f2b35896b891c7fd7d05d2ddba7b5ffd417921"
-   }
+   },
+   "level": "signed"
   },
   {
    "id": "runs/signed-run-no-policy-match",
@@ -1249,7 +1250,8 @@
     "run/seal.json": "03e7b8de38c46d2f4f27946e73ca7d60afab9eb2ffe75c36e75f3e5a102e7236",
     "run/summary.json": "fe9548e607cab4fc632706c94cefc75b67a9efde0c1c0c6bb604206386960a3c",
     "run/traces.otlp.jsonl": "7ed4f10a3ccf2cb1b5f6b44865f2b35896b891c7fd7d05d2ddba7b5ffd417921"
-   }
+   },
+   "level": "signed"
   },
   {
    "id": "runs/signed-run-untrusted-key",
@@ -1275,7 +1277,8 @@
     "run/seal.json": "03e7b8de38c46d2f4f27946e73ca7d60afab9eb2ffe75c36e75f3e5a102e7236",
     "run/summary.json": "fe9548e607cab4fc632706c94cefc75b67a9efde0c1c0c6bb604206386960a3c",
     "run/traces.otlp.jsonl": "7ed4f10a3ccf2cb1b5f6b44865f2b35896b891c7fd7d05d2ddba7b5ffd417921"
-   }
+   },
+   "level": "signed"
   },
   {
    "id": "runs/summary-counts",
@@ -1607,13 +1610,13 @@
     "run/seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84",
     "run/summary.json": "268eda205f131668d931d8804c9530cb7c99b2857d95e1ce1bc24fc3d6314679",
     "run/traces.otlp.jsonl": "3c29fa780cb029dd541c36edb35614f49df76f459a1f7c3e3702960892398787"
-   }
+   },
+   "level": "signed"
   },
   {
    "id": "encoding/blank-line",
    "kind": "encoding",
    "classes": [
-    "Reader",
     "Run verifier"
    ],
    "rules": [
@@ -1637,7 +1640,6 @@
    "id": "encoding/byte-order-mark",
    "kind": "encoding",
    "classes": [
-    "Reader",
     "Run verifier"
    ],
    "rules": [
@@ -1661,7 +1663,6 @@
    "id": "encoding/crlf-lines",
    "kind": "encoding",
    "classes": [
-    "Reader",
     "Run verifier"
    ],
    "rules": [
@@ -1685,7 +1686,6 @@
    "id": "encoding/duplicate-member",
    "kind": "encoding",
    "classes": [
-    "Reader",
     "Run verifier"
    ],
    "rules": [
@@ -1709,7 +1709,6 @@
    "id": "encoding/duplicate-member-in-line",
    "kind": "encoding",
    "classes": [
-    "Reader",
     "Run verifier"
    ],
    "rules": [
@@ -1758,7 +1757,6 @@
    "id": "encoding/integer-written-2e0-accepted",
    "kind": "encoding",
    "classes": [
-    "Reader",
     "Run verifier"
    ],
    "rules": [
@@ -1782,7 +1780,6 @@
    "id": "encoding/invalid-utf8",
    "kind": "encoding",
    "classes": [
-    "Reader",
     "Run verifier"
    ],
    "rules": [
@@ -1806,7 +1803,6 @@
    "id": "encoding/lone-surrogate",
    "kind": "encoding",
    "classes": [
-    "Reader",
     "Run verifier"
    ],
    "rules": [
@@ -1830,7 +1826,6 @@
    "id": "encoding/ndjson-byte-order-mark",
    "kind": "encoding",
    "classes": [
-    "Reader",
     "Run verifier"
    ],
    "rules": [
@@ -1854,7 +1849,6 @@
    "id": "encoding/no-final-newline",
    "kind": "encoding",
    "classes": [
-    "Reader",
     "Run verifier"
    ],
    "rules": [
@@ -1879,7 +1873,6 @@
    "id": "encoding/not-a-number",
    "kind": "encoding",
    "classes": [
-    "Reader",
     "Run verifier"
    ],
    "rules": [
@@ -1903,7 +1896,6 @@
    "id": "encoding/not-an-object",
    "kind": "encoding",
    "classes": [
-    "Reader",
     "Run verifier"
    ],
    "rules": [
@@ -1927,7 +1919,6 @@
    "id": "encoding/not-json-line",
    "kind": "encoding",
    "classes": [
-    "Reader",
     "Run verifier"
    ],
    "rules": [
@@ -1951,7 +1942,6 @@
    "id": "encoding/number-overflows",
    "kind": "encoding",
    "classes": [
-    "Reader",
     "Run verifier"
    ],
    "rules": [
@@ -1975,7 +1965,6 @@
    "id": "encoding/unpaired-surrogate-json",
    "kind": "encoding",
    "classes": [
-    "Reader",
     "Run verifier"
    ],
    "rules": [
@@ -2255,7 +2244,8 @@
     "run/seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84",
     "run/summary.json": "268eda205f131668d931d8804c9530cb7c99b2857d95e1ce1bc24fc3d6314679",
     "run/traces.otlp.jsonl": "3c29fa780cb029dd541c36edb35614f49df76f459a1f7c3e3702960892398787"
-   }
+   },
+   "level": "signed"
   },
   {
    "id": "seal-vectors/redact-envelope-other-batch",
@@ -2286,7 +2276,8 @@
     "run/seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84",
     "run/summary.json": "268eda205f131668d931d8804c9530cb7c99b2857d95e1ce1bc24fc3d6314679",
     "run/traces.otlp.jsonl": "3c29fa780cb029dd541c36edb35614f49df76f459a1f7c3e3702960892398787"
-   }
+   },
+   "level": "signed"
   },
   {
    "id": "seal-vectors/redact-no-policy",
@@ -2347,7 +2338,8 @@
     "run/seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84",
     "run/summary.json": "268eda205f131668d931d8804c9530cb7c99b2857d95e1ce1bc24fc3d6314679",
     "run/traces.otlp.jsonl": "3c29fa780cb029dd541c36edb35614f49df76f459a1f7c3e3702960892398787"
-   }
+   },
+   "level": "signed"
   },
   {
    "id": "seal-vectors/redact-signer-not-allowed",
@@ -2378,7 +2370,8 @@
     "run/seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84",
     "run/summary.json": "268eda205f131668d931d8804c9530cb7c99b2857d95e1ce1bc24fc3d6314679",
     "run/traces.otlp.jsonl": "3c29fa780cb029dd541c36edb35614f49df76f459a1f7c3e3702960892398787"
-   }
+   },
+   "level": "signed"
   },
   {
    "id": "seal-vectors/redact-unsigned",
@@ -2585,7 +2578,8 @@
     "run/seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84",
     "run/summary.json": "268eda205f131668d931d8804c9530cb7c99b2857d95e1ce1bc24fc3d6314679",
     "run/traces.otlp.jsonl": "3c29fa780cb029dd541c36edb35614f49df76f459a1f7c3e3702960892398787"
-   }
+   },
+   "level": "signed"
   },
   {
    "id": "seal-vectors/wrong-run-hash",
@@ -4136,6 +4130,54 @@
    }
   },
   {
+   "id": "reader-only/checkpoint-threshold-op-unknown",
+   "kind": "reader-only",
+   "classes": [
+    "Reader"
+   ],
+   "rules": [
+    "VER-8",
+    "LANE-2"
+   ],
+   "path": "reader-only/checkpoint-threshold-op-unknown",
+   "files": {
+    "document.json": "277dc3695dd5ad4d56a3e7639308f8aabf9543e4ab015ea78b88f987ee0a3b84",
+    "expected.json": "40d5495ecbf12833e73470b042c7d300832819633385aa5674aed9b70ac264be"
+   }
+  },
+  {
+   "id": "reader-only/decision-lane-status-unknown",
+   "kind": "reader-only",
+   "classes": [
+    "Reader"
+   ],
+   "rules": [
+    "VER-8",
+    "CKP-7"
+   ],
+   "path": "reader-only/decision-lane-status-unknown",
+   "files": {
+    "document.json": "62440788aa056e7228b5e852c3181b04637b2f195a59422bb1655c8b01a43a3a",
+    "expected.json": "b6c41838ee1a4c1c1157257752e923e3adadff022398dc5c5df25efd7d1d90ce"
+   }
+  },
+  {
+   "id": "reader-only/decision-outcome-unknown",
+   "kind": "reader-only",
+   "classes": [
+    "Reader"
+   ],
+   "rules": [
+    "VER-8",
+    "CKP-7"
+   ],
+   "path": "reader-only/decision-outcome-unknown",
+   "files": {
+    "document.json": "ce506a0be677ea80c924eb8ae27af89a848ca072eb365217c98d1f24fd5b9a9b",
+    "expected.json": "9ad2c57630265a1aed07b114a5ed6ceeb75aa5d38a85935a1ba232e87bd97074"
+   }
+  },
+  {
    "id": "reader-only/evidence-kind-unknown",
    "kind": "reader-only",
    "classes": [
@@ -4338,6 +4380,22 @@
    }
   },
   {
+   "id": "reader-only/runner-event-limit-unknown",
+   "kind": "reader-only",
+   "classes": [
+    "Reader"
+   ],
+   "rules": [
+    "VER-8",
+    "STRM-1"
+   ],
+   "path": "reader-only/runner-event-limit-unknown",
+   "files": {
+    "document.json": "10d0986486ddb7b8dd2b39ee8fb94ab32834cd9a1ac044aeb7db654b27fbc96b",
+    "expected.json": "fd79012b884ebb6c37ec93cc2af979f55ea5acc5db61a3bb11f5680f31d6869d"
+   }
+  },
+  {
    "id": "reader-only/seal-sealed-by-unknown",
    "kind": "reader-only",
    "classes": [
@@ -4442,6 +4500,566 @@
    "files": {
     "document.json": "df3d238869720162894f9c6ee208cefd00ddcadd41f968866296c55291249ce4",
     "expected.json": "901c161c46c004cfdcaf365f388decc01c964472b67d3562cf0dafcc0b5d4233"
+   }
+  },
+  {
+   "id": "documents/checkpoint-assurance-reads-self-attested",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader"
+   ],
+   "rules": [
+    "VER-8",
+    "OVL-3"
+   ],
+   "path": "documents/checkpoint-assurance-reads-self-attested",
+   "files": {
+    "document.json": "7b7fb990373853d2525bbd11ff3652f43ea4ab1b406c58f953de97073cfa7507",
+    "expected.json": "6162db942c3bd28f41ffa486beaf52366abfc8b2c0bf34ad5620d0c7adf36bab"
+   }
+  },
+  {
+   "id": "documents/checkpoint-valid",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader"
+   ],
+   "rules": [
+    "VER-1",
+    "VER-3"
+   ],
+   "path": "documents/checkpoint-valid",
+   "files": {
+    "document.json": "24da7348536a08a4f207403794a3b8d28589379749fe3b4fb6c470539d49da32",
+    "expected.json": "d4ddadfc862fd7b1a1536a63b4241c1fc4910817e2e855a7351aaaff622b81a6"
+   }
+  },
+  {
+   "id": "documents/encoding-blank-line",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader"
+   ],
+   "rules": [
+    "ENC-5",
+    "VER-3"
+   ],
+   "path": "documents/encoding-blank-line",
+   "files": {
+    "document.ndjson": "d662a23aa6c05047af7e26b4635f92af380e07c97d44e92db685c5e43b950222",
+    "expected.json": "6671b6e7be5a6b73b5ed24f52a99b038641691990ae30ab89d892dd3366e4924"
+   }
+  },
+  {
+   "id": "documents/encoding-byte-order-mark",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader"
+   ],
+   "rules": [
+    "ENC-1",
+    "VER-3"
+   ],
+   "path": "documents/encoding-byte-order-mark",
+   "files": {
+    "document.json": "d29287676863b4128092718d02753d9a91c7d9f1602946dfaf6b6dee42cdcf29",
+    "expected.json": "c0217332397986a65441bd772c38d691db3579c473a7e297ee87e14e95c423e6"
+   }
+  },
+  {
+   "id": "documents/encoding-crlf-lines",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader"
+   ],
+   "rules": [
+    "ENC-5",
+    "VER-3"
+   ],
+   "path": "documents/encoding-crlf-lines",
+   "files": {
+    "document.ndjson": "df299db6b4a01748da8b86d63e7af2c2738fd800761fe6b2183417ca6fc18e99",
+    "expected.json": "6671b6e7be5a6b73b5ed24f52a99b038641691990ae30ab89d892dd3366e4924"
+   }
+  },
+  {
+   "id": "documents/encoding-duplicate-member",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader"
+   ],
+   "rules": [
+    "ENC-2",
+    "VER-3"
+   ],
+   "path": "documents/encoding-duplicate-member",
+   "files": {
+    "document.json": "504cd66fbc5a6af30c3b2c598bde86641fe97de087663e3d2ea36839c1089228",
+    "expected.json": "16095536695a59b2d4ea8ec3ba3a80130155c035fa70ecec83c37da9a305c3b0"
+   }
+  },
+  {
+   "id": "documents/encoding-duplicate-member-in-line",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader"
+   ],
+   "rules": [
+    "ENC-2",
+    "VER-3"
+   ],
+   "path": "documents/encoding-duplicate-member-in-line",
+   "files": {
+    "document.ndjson": "3b4900f193a453b4ce888f2c5cdfde35cf54559f6efcf3a41810b4e594d92f28",
+    "expected.json": "787a8d3086f42166336f2eb4ddd4fc0fc3fb6c952f46585eb895ad9b16841fe2"
+   }
+  },
+  {
+   "id": "documents/encoding-empty-results-is-valid-framing",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader"
+   ],
+   "rules": [
+    "VER-3"
+   ],
+   "path": "documents/encoding-empty-results-is-valid-framing",
+   "files": {
+    "document.ndjson": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "expected.json": "c5e9c05f9ab3816a8799b67728a36b508e829797ca451956ed3006e1152454e3"
+   }
+  },
+  {
+   "id": "documents/encoding-integer-written-2e0-accepted",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader"
+   ],
+   "rules": [
+    "ENC-4",
+    "VER-3"
+   ],
+   "path": "documents/encoding-integer-written-2e0-accepted",
+   "files": {
+    "document.json": "042137e5f76c3ec3b8b33da491395345597ff0a4b666da13498b512395737f56",
+    "expected.json": "cfa8a41f0fb1dec2d91a360b2abf40c51c71ad5a167578638b4c826441bf3e86"
+   }
+  },
+  {
+   "id": "documents/encoding-invalid-utf8",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader"
+   ],
+   "rules": [
+    "ENC-1",
+    "VER-3"
+   ],
+   "path": "documents/encoding-invalid-utf8",
+   "files": {
+    "document.ndjson": "b838328a8055a016136c2d2d56dc434ea9c6e9024fd1a3774c9f8832ee239c70",
+    "expected.json": "bef245c7d17fb847cf8e32c8710caa189fb4c032e3aa34b63a7ec700d4ab62c9"
+   }
+  },
+  {
+   "id": "documents/encoding-lone-surrogate",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader"
+   ],
+   "rules": [
+    "ENC-2",
+    "VER-3"
+   ],
+   "path": "documents/encoding-lone-surrogate",
+   "files": {
+    "document.ndjson": "11ef0c3255026c0fd503c00e3e61bee9ba7d9a9bfc33a4935ba220317ee01291",
+    "expected.json": "787a8d3086f42166336f2eb4ddd4fc0fc3fb6c952f46585eb895ad9b16841fe2"
+   }
+  },
+  {
+   "id": "documents/encoding-ndjson-byte-order-mark",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader"
+   ],
+   "rules": [
+    "ENC-5",
+    "VER-3"
+   ],
+   "path": "documents/encoding-ndjson-byte-order-mark",
+   "files": {
+    "document.ndjson": "a5912777fb2a8ed89d6565aacd3d2a57a665708cfeb5fd587ac8ac9e933227eb",
+    "expected.json": "1f8540e88dd5f9f9715d4c8be07fbb69ab4729403b65dbf0ecee2dc8c8f38a34"
+   }
+  },
+  {
+   "id": "documents/encoding-no-final-newline",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader"
+   ],
+   "rules": [
+    "ENC-5",
+    "ENC-7",
+    "VER-3"
+   ],
+   "path": "documents/encoding-no-final-newline",
+   "files": {
+    "document.ndjson": "cab6c730136a15ea387c1d18093954286f731c7a2f7a4dbbde26ae0f44f03d27",
+    "expected.json": "4601809c53195c8f5cceaa0f6083be655a85b62993fa4785227699590a198677"
+   }
+  },
+  {
+   "id": "documents/encoding-not-a-number",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader"
+   ],
+   "rules": [
+    "ENC-3",
+    "VER-3"
+   ],
+   "path": "documents/encoding-not-a-number",
+   "files": {
+    "document.json": "3628b0251d5d4af2e47a2024cd0d33ca39f6355866a76daf603ceb7e611384a6",
+    "expected.json": "53d80684a8eb2bd1c045850394b95c0a5b19fc53324a1f62653ae40a5f465eca"
+   }
+  },
+  {
+   "id": "documents/encoding-not-an-object",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader"
+   ],
+   "rules": [
+    "ENC-5",
+    "VER-3"
+   ],
+   "path": "documents/encoding-not-an-object",
+   "files": {
+    "document.ndjson": "bc244d7b987485901d13cb9bbb87fe54b9ca9c5261cd966789313730516130ad",
+    "expected.json": "1f8540e88dd5f9f9715d4c8be07fbb69ab4729403b65dbf0ecee2dc8c8f38a34"
+   }
+  },
+  {
+   "id": "documents/encoding-not-json-line",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader"
+   ],
+   "rules": [
+    "ENC-7",
+    "VER-3"
+   ],
+   "path": "documents/encoding-not-json-line",
+   "files": {
+    "document.ndjson": "33c5cfc823739e10d2a5746a051a74a4cd0096562b7723f003271422934f7eec",
+    "expected.json": "44532e874918bb5dbb256e99f949e9d35c22f7d61cdba8c3f9da4a4596905eac"
+   }
+  },
+  {
+   "id": "documents/encoding-number-overflows",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader"
+   ],
+   "rules": [
+    "ENC-3",
+    "VER-3"
+   ],
+   "path": "documents/encoding-number-overflows",
+   "files": {
+    "document.json": "cf4ab92899ca614a5e287c6f4c3f0c05d0fd0af2fa4121e2d1b266fe82f42d5e",
+    "expected.json": "53d80684a8eb2bd1c045850394b95c0a5b19fc53324a1f62653ae40a5f465eca"
+   }
+  },
+  {
+   "id": "documents/encoding-unpaired-surrogate-json",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader"
+   ],
+   "rules": [
+    "ENC-2",
+    "VER-3"
+   ],
+   "path": "documents/encoding-unpaired-surrogate-json",
+   "files": {
+    "document.json": "09d7c0bb9059b5acf2ebc1dd8a447a54094ae2c3ccc3be40db445f7a832567d0",
+    "expected.json": "99bae13b322fc6e971e14dfb7c417afdc168d285d6c46a199790e7271ec8dbe4"
+   }
+  },
+  {
+   "id": "documents/evidence-kind-transcript-is-known",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader"
+   ],
+   "rules": [
+    "VER-8",
+    "EVD-1"
+   ],
+   "path": "documents/evidence-kind-transcript-is-known",
+   "files": {
+    "document.json": "960b59d0e3598611cc153db08963fa27a0b9ef0b52933c64fb69ea105eb22a9b",
+    "expected.json": "407daae4b5e537414960be006814a92345dceb68f5757089ed55ec3ed25ac572"
+   }
+  },
+  {
+   "id": "documents/gate-decision-valid",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader"
+   ],
+   "rules": [
+    "VER-1",
+    "VER-3"
+   ],
+   "path": "documents/gate-decision-valid",
+   "files": {
+    "document.ndjson": "6db8527cfa0e3d60c242253e40f123eb56b4105f2b14a622af21370fd10b9c63",
+    "expected.json": "11a0e09452309f40d11bd9a95c46aea3f50252909c3f12545508dad45a8d131a"
+   }
+  },
+  {
+   "id": "documents/length-astral-at-max",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader"
+   ],
+   "rules": [
+    "ENC-4"
+   ],
+   "path": "documents/length-astral-at-max",
+   "files": {
+    "document.json": "3a7233ecae11a052a53bc14b4ca8c0aaeb9e5debe20be0f667dfa856c95772ca",
+    "expected.json": "f9222448888baa7771b4312eb362a1f02e2589f64a5d60593bf9a5c734710259"
+   }
+  },
+  {
+   "id": "documents/length-combining-over-max",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader"
+   ],
+   "rules": [
+    "ENC-4"
+   ],
+   "path": "documents/length-combining-over-max",
+   "files": {
+    "document.json": "1b53640694ddb2f786eda72292430fae17ff95e380238a809666bf8539b7b54d",
+    "expected.json": "458ed8cdd250b988309524977189227eccbf399f563935cfd093f5d5637cc2d1"
+   }
+  },
+  {
+   "id": "documents/nesting-depth-64-accepted",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader"
+   ],
+   "rules": [
+    "ENC-17",
+    "ENC-18"
+   ],
+   "path": "documents/nesting-depth-64-accepted",
+   "files": {
+    "document.json": "bd2222b89a92727b82023ec2f3d46df816ff7d82a37b23b702153d1f6e3b6866",
+    "expected.json": "553c67499b14048d7e817605fae8bbd404688e9a0ebcc2b5b4dab971d667fec3"
+   }
+  },
+  {
+   "id": "documents/number-above-max-as-decimal-equal-as-binary64",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader"
+   ],
+   "rules": [
+    "ENC-4"
+   ],
+   "path": "documents/number-above-max-as-decimal-equal-as-binary64",
+   "files": {
+    "document.json": "d9daa80fe801f053b4814fec700c3bce7001136a195629544d9985cc791fa811",
+    "expected.json": "f9222448888baa7771b4312eb362a1f02e2589f64a5d60593bf9a5c734710259"
+   }
+  },
+  {
+   "id": "documents/number-underflow-reads-as-zero",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader"
+   ],
+   "rules": [
+    "ENC-3",
+    "ENC-4"
+   ],
+   "path": "documents/number-underflow-reads-as-zero",
+   "files": {
+    "document.json": "7e5382e21b9b64ae93d8fb636ef4dae82c41db36120d08d37b9461236b8edf02",
+    "expected.json": "e7f9b2217dc5da0997203011806684657c583bf03a98218f6ad37668b1e8e332"
+   }
+  },
+  {
+   "id": "documents/overlay-event-assurance-reads-self-attested",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader"
+   ],
+   "rules": [
+    "VER-8",
+    "OVL-3"
+   ],
+   "path": "documents/overlay-event-assurance-reads-self-attested",
+   "files": {
+    "document.json": "ae8e70eee1568ce21300e1db3ffc001065f1ce272c33156156f8402d66db95e0",
+    "expected.json": "01dad8c1e0c51a7a081aa81ab3e55dcf66b64cc2492fa4a700e7018936a1f84b"
+   }
+  },
+  {
+   "id": "documents/overlay-event-valid",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader"
+   ],
+   "rules": [
+    "VER-1",
+    "VER-3"
+   ],
+   "path": "documents/overlay-event-valid",
+   "files": {
+    "document.ndjson": "6fe14d001d245f03dcf39a84bd11bf20053b8eba906a4783167e0a9a764ec791",
+    "expected.json": "43921b0aeef6e248512f36e97574b2cc0aa142d0270fe7470586d803808a25a8"
+   }
+  },
+  {
+   "id": "documents/overlay-seal-valid",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader"
+   ],
+   "rules": [
+    "VER-1",
+    "VER-3"
+   ],
+   "path": "documents/overlay-seal-valid",
+   "files": {
+    "document.json": "8f80b91ba250eacf6c8274d2882871784063f16b41398e08bc72892641d3cb15",
+    "expected.json": "498caccf3140ff9df7e162eb9e852c5c544e8f225370d3acff282e4a8801c451"
+   }
+  },
+  {
+   "id": "documents/result-usage-role-attacker-is-known",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader"
+   ],
+   "rules": [
+    "VER-8",
+    "RES-10"
+   ],
+   "path": "documents/result-usage-role-attacker-is-known",
+   "files": {
+    "document.json": "a53eaabbdb7fe302449014b642cfe10353239a69950eabe39292bc8c3b74bbb6",
+    "expected.json": "7e98f7cd6dacc66964e62342c7ea1dcdafff82b27b39dc2b03fdbd54b6022c3e"
+   }
+  },
+  {
+   "id": "documents/run-stimulus-external-is-known",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader"
+   ],
+   "rules": [
+    "VER-8",
+    "RUN-7"
+   ],
+   "path": "documents/run-stimulus-external-is-known",
+   "files": {
+    "document.json": "3a51d6cf04e39b07226b2c5173f99486576b60c07a5a5fad1caaf228b8ea2183",
+    "expected.json": "d8679a78e05764b307c22f6e629506d645d9926c3993c407c186e040be3b00a2"
+   }
+  },
+  {
+   "id": "documents/runner-event-valid",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader"
+   ],
+   "rules": [
+    "VER-1",
+    "VER-8",
+    "STRM-1"
+   ],
+   "path": "documents/runner-event-valid",
+   "files": {
+    "document.json": "bfba71dd0f966179c2009fd28c500a3c217ccf4db16414fa67e9938c7e4ae10c",
+    "expected.json": "3f592156622fa887f9ff02b15c30d9f57100caabc81f74efc8b5888158388e3e"
+   }
+  },
+  {
+   "id": "documents/seal-valid",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader"
+   ],
+   "rules": [
+    "VER-1",
+    "VER-3"
+   ],
+   "path": "documents/seal-valid",
+   "files": {
+    "document.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84",
+    "expected.json": "2eb3f04b8271916e1195d6f34d0a1411e6cc96ee3d03e930e69016758c0ef527"
+   }
+  },
+  {
+   "id": "documents/summary-verdict-scored-is-known",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader"
+   ],
+   "rules": [
+    "VER-8",
+    "SUM-6",
+    "SUM-7"
+   ],
+   "path": "documents/summary-verdict-scored-is-known",
+   "files": {
+    "document.json": "61f289f3d2a1e188957c4f78f9e5455cfb9251f4355508d3fb0a597fd229caa2",
+    "expected.json": "3b2120e4d7926f2aecee4e1ff0e499c3a46e8bfd4874408bc91a36552dafde76"
    }
   },
   {
@@ -5739,7 +6357,76 @@
     "envelope.dsse.json": "b141a8c1a21a56f1360c6bbb9cb1a2373cb3785cea5b264d4099eb4ac9877e32",
     "expected.json": "13877ae56cece79ebb907c97ae2d4afbff8787d1db3ea183d1521b7af4652da9",
     "policy.json": "8318aa752a303206435584438e8b0c8bce861e391782c4e666d9be2f809ef3a6"
-   }
+   },
+   "level": "signed"
+  },
+  {
+   "id": "signature-vectors/ec-key-without-named-curve",
+   "kind": "signature",
+   "classes": [
+    "Sealer",
+    "Run verifier",
+    "Overlay verifier",
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "SIG-2",
+    "SIG-6"
+   ],
+   "path": "signature-vectors/ec-key-without-named-curve",
+   "files": {
+    "envelope.dsse.json": "74618b441af8e9979d625c1def9dc55cdab4d2dec44a3e6604e669b5e1aa1e31",
+    "expected.json": "80345d7c960c1dce50c906760b5b5f5601bf2670e94b8dc7a28582b61b8c9813",
+    "policy.json": "3fe7efd36a82cba54c8553d40b572317fdf6cb9675c290a0c986b607a62c8a99",
+    "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
+   },
+   "level": "signed"
+  },
+  {
+   "id": "signature-vectors/ecdsa-compressed-key-in-policy",
+   "kind": "signature",
+   "classes": [
+    "Sealer",
+    "Run verifier",
+    "Overlay verifier",
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "SIG-2",
+    "SIG-3",
+    "SIG-6"
+   ],
+   "path": "signature-vectors/ecdsa-compressed-key-in-policy",
+   "files": {
+    "envelope.dsse.json": "6eeaf635cea674b59f4dc71df23b6ad43cfb0add30c33ff28e40ae8e98df40ee",
+    "expected.json": "6d18a463530229c41a17443d80f3eddc4952067ef5b67f110a0e1d2a49a1e71e",
+    "policy.json": "0cac06ef7c2dcbc5e86a83a7abe2c9abe9f653d0945432c7fde9bbbbe881f767",
+    "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
+   },
+   "level": "signed"
+  },
+  {
+   "id": "signature-vectors/ecdsa-key-off-curve-in-policy",
+   "kind": "signature",
+   "classes": [
+    "Sealer",
+    "Run verifier",
+    "Overlay verifier",
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "SIG-2",
+    "SIG-3",
+    "SIG-6"
+   ],
+   "path": "signature-vectors/ecdsa-key-off-curve-in-policy",
+   "files": {
+    "envelope.dsse.json": "6eeaf635cea674b59f4dc71df23b6ad43cfb0add30c33ff28e40ae8e98df40ee",
+    "expected.json": "6d18a463530229c41a17443d80f3eddc4952067ef5b67f110a0e1d2a49a1e71e",
+    "policy.json": "ee4bc0e35bb67be12cccecaa036c797fe270c4fc1f3091ece2264c43e6e7f274",
+    "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
+   },
+   "level": "signed"
   },
   {
    "id": "signature-vectors/ecdsa-other-s",
@@ -5760,7 +6447,8 @@
     "expected.json": "435442a18e4e55ddd3bc3f6f9ed57548c95bfc33cc980f110b248cbfdbde7659",
     "policy.json": "8318aa752a303206435584438e8b0c8bce861e391782c4e666d9be2f809ef3a6",
     "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
-   }
+   },
+   "level": "signed"
   },
   {
    "id": "signature-vectors/ecdsa-raw-signature",
@@ -5781,7 +6469,8 @@
     "expected.json": "d4c330357ab40cca489e5881f0d0bf7449a8b8bd5e1f0521663ca4a6fd673d91",
     "policy.json": "8318aa752a303206435584438e8b0c8bce861e391782c4e666d9be2f809ef3a6",
     "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
-   }
+   },
+   "level": "signed"
   },
   {
    "id": "signature-vectors/ecdsa-valid",
@@ -5806,7 +6495,8 @@
     "expected.json": "5b4f53c95b3abfc92ba3476cbfc9317df4308c538f82c5d11913f9fe8b564b66",
     "policy.json": "8318aa752a303206435584438e8b0c8bce861e391782c4e666d9be2f809ef3a6",
     "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
-   }
+   },
+   "level": "signed"
   },
   {
    "id": "signature-vectors/ed25519-altered-signature",
@@ -5827,7 +6517,120 @@
     "expected.json": "bcdacb8d522c9ad42649cfb33a780f0cecf75f6ba2d9b492373df78548ccebaf",
     "policy.json": "dee0f4034410d17ed7506be3ec7009dded0b8c307cda873e72c7d379adfeb24d",
     "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
-   }
+   },
+   "level": "signed"
+  },
+  {
+   "id": "signature-vectors/ed25519-key-no-point-in-policy",
+   "kind": "signature",
+   "classes": [
+    "Sealer",
+    "Run verifier",
+    "Overlay verifier",
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "SIG-2",
+    "SIG-3",
+    "SIG-6"
+   ],
+   "path": "signature-vectors/ed25519-key-no-point-in-policy",
+   "files": {
+    "envelope.dsse.json": "6eeaf635cea674b59f4dc71df23b6ad43cfb0add30c33ff28e40ae8e98df40ee",
+    "expected.json": "6d18a463530229c41a17443d80f3eddc4952067ef5b67f110a0e1d2a49a1e71e",
+    "policy.json": "e9ae618ff36ac3c50e680179af50bff4be327030677bd1cce57416c6a57d2816",
+    "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
+   },
+   "level": "signed"
+  },
+  {
+   "id": "signature-vectors/ed25519-key-with-parameters",
+   "kind": "signature",
+   "classes": [
+    "Sealer",
+    "Run verifier",
+    "Overlay verifier",
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "SIG-2",
+    "SIG-6"
+   ],
+   "path": "signature-vectors/ed25519-key-with-parameters",
+   "files": {
+    "envelope.dsse.json": "4beacd30c11264f02b6161a23dd88ecaa79027f0aa15083326add9b24a37336b",
+    "expected.json": "375ae45c02120eac685a4ded57ee44964b1ac3374c2f14081eefa12401f99b08",
+    "policy.json": "daaa04720c98f3925e2675da81f8192947f9256564606670645dfe0b04c929d8",
+    "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
+   },
+   "level": "signed"
+  },
+  {
+   "id": "signature-vectors/ed25519-mixed-order-key-even-k",
+   "kind": "signature",
+   "classes": [
+    "Sealer",
+    "Run verifier",
+    "Overlay verifier",
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "SIG-2",
+    "SIG-6"
+   ],
+   "path": "signature-vectors/ed25519-mixed-order-key-even-k",
+   "files": {
+    "envelope.dsse.json": "936ca0b124918f20988300d48739c79024ae69f66c438c26247141b52f772822",
+    "expected.json": "346a3703c1f6b86c0fefa23d8c300d14ef4f5215bc8dbb7989155791e0ef93e5",
+    "policy.json": "b7aa398003a6c381fbfd3f5256c697992e19cd824f4bb8f63be020d6e796fb10",
+    "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
+   },
+   "level": "signed"
+  },
+  {
+   "id": "signature-vectors/ed25519-mixed-order-key-odd-k",
+   "kind": "signature",
+   "classes": [
+    "Sealer",
+    "Run verifier",
+    "Overlay verifier",
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "SIG-2",
+    "SIG-6"
+   ],
+   "path": "signature-vectors/ed25519-mixed-order-key-odd-k",
+   "files": {
+    "envelope.dsse.json": "374782a2e0cadd73b0437f27755057ccf01453728a5300ce88b8e3ca3b0ca80b",
+    "expected.json": "e30f1f850b517cde161438ea5f3901c3bd79d25f638d2cf6359b50cde42aff1a",
+    "policy.json": "b7aa398003a6c381fbfd3f5256c697992e19cd824f4bb8f63be020d6e796fb10",
+    "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
+   },
+   "level": "signed"
+  },
+  {
+   "id": "signature-vectors/ed25519-small-order-key-in-policy",
+   "kind": "signature",
+   "classes": [
+    "Sealer",
+    "Run verifier",
+    "Overlay verifier",
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "SIG-2",
+    "SIG-3",
+    "SIG-6"
+   ],
+   "path": "signature-vectors/ed25519-small-order-key-in-policy",
+   "files": {
+    "envelope.dsse.json": "6eeaf635cea674b59f4dc71df23b6ad43cfb0add30c33ff28e40ae8e98df40ee",
+    "expected.json": "6d18a463530229c41a17443d80f3eddc4952067ef5b67f110a0e1d2a49a1e71e",
+    "policy.json": "864c7f803449404bf1e76e15b2e5cfee5e1a19bda7d082880fee648c33d8204e",
+    "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
+   },
+   "level": "signed"
   },
   {
    "id": "signature-vectors/ed25519-valid",
@@ -5852,7 +6655,8 @@
     "expected.json": "f82f1bcb36a9ed2a3941a3534e84d59a5e0239cb4efa56fc92a33a94620e387b",
     "policy.json": "dee0f4034410d17ed7506be3ec7009dded0b8c307cda873e72c7d379adfeb24d",
     "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
-   }
+   },
+   "level": "signed"
   },
   {
    "id": "signature-vectors/empty-keyid-no-trusted-key",
@@ -5877,7 +6681,99 @@
     "expected.json": "001d027e725e398f6ae1881d616eb3d532859d73dfd7fde205e8e90c66581670",
     "policy.json": "8318aa752a303206435584438e8b0c8bce861e391782c4e666d9be2f809ef3a6",
     "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
-   }
+   },
+   "level": "signed"
+  },
+  {
+   "id": "signature-vectors/envelope-duplicate-payload",
+   "kind": "signature",
+   "classes": [
+    "Sealer",
+    "Run verifier",
+    "Overlay verifier",
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "SIG-1",
+    "ENC-2",
+    "SIG-6"
+   ],
+   "path": "signature-vectors/envelope-duplicate-payload",
+   "files": {
+    "envelope.dsse.json": "ac1fb72b4bdd538c50904019b7c7d76aabb75f343aae58e2c3c12ab9956799f2",
+    "expected.json": "79ea18d82c428686c1774a9e6a77de4f7adaf4120f347f97b6a480e670437211",
+    "policy.json": "8318aa752a303206435584438e8b0c8bce861e391782c4e666d9be2f809ef3a6",
+    "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
+   },
+   "level": "signed"
+  },
+  {
+   "id": "signature-vectors/envelope-keyid-null",
+   "kind": "signature",
+   "classes": [
+    "Sealer",
+    "Run verifier",
+    "Overlay verifier",
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "SIG-1",
+    "SIG-5",
+    "SIG-6"
+   ],
+   "path": "signature-vectors/envelope-keyid-null",
+   "files": {
+    "envelope.dsse.json": "a7217664909f7099806230b833c9f1937ac4343f18698338de619f8935cca35b",
+    "expected.json": "eb6f5773f8db68497a7750872eacbd98c767a5cc1db9baa349889d8080f93c37",
+    "policy.json": "cdaa883b9f5eb888393915b6d30d19da98deb7208e2a593afd3e3a1fa7157422",
+    "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
+   },
+   "level": "signed"
+  },
+  {
+   "id": "signature-vectors/envelope-unknown-member",
+   "kind": "signature",
+   "classes": [
+    "Sealer",
+    "Run verifier",
+    "Overlay verifier",
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "SIG-1",
+    "SIG-6"
+   ],
+   "path": "signature-vectors/envelope-unknown-member",
+   "files": {
+    "envelope.dsse.json": "0130f71a3c59193e37b187c1c55641bf6760f500562b7eb5b104a25f65d1c22f",
+    "expected.json": "81acbd610afbe7178d39c4f2fcaa9f508c55d7fbacac82c84ab6d92fbdc7f693",
+    "policy.json": "8318aa752a303206435584438e8b0c8bce861e391782c4e666d9be2f809ef3a6",
+    "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
+   },
+   "level": "signed"
+  },
+  {
+   "id": "signature-vectors/key-listed-twice-in-policy",
+   "kind": "signature",
+   "classes": [
+    "Sealer",
+    "Run verifier",
+    "Overlay verifier",
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "SIG-3",
+    "SIG-4",
+    "SIG-6"
+   ],
+   "path": "signature-vectors/key-listed-twice-in-policy",
+   "files": {
+    "envelope.dsse.json": "6eeaf635cea674b59f4dc71df23b6ad43cfb0add30c33ff28e40ae8e98df40ee",
+    "expected.json": "f8fdba85cc06cac7c68dc929db456aa5d2805a316c80c893b905777a6c72e9de",
+    "policy.json": "f79f0b65fffb16d1c7bd32847fa7b5a0567429bb7d72cdcdce280d3bd1d13db5",
+    "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
+   },
+   "level": "signed"
   },
   {
    "id": "signature-vectors/malformed-no-payload-type",
@@ -5899,7 +6795,8 @@
     "expected.json": "497b59ac4193e39d0e73cb136caa565b6504dd8aeea325834d311495a35da564",
     "policy.json": "8318aa752a303206435584438e8b0c8bce861e391782c4e666d9be2f809ef3a6",
     "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
-   }
+   },
+   "level": "signed"
   },
   {
    "id": "signature-vectors/malformed-no-signatures",
@@ -5921,7 +6818,8 @@
     "expected.json": "497b59ac4193e39d0e73cb136caa565b6504dd8aeea325834d311495a35da564",
     "policy.json": "8318aa752a303206435584438e8b0c8bce861e391782c4e666d9be2f809ef3a6",
     "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
-   }
+   },
+   "level": "signed"
   },
   {
    "id": "signature-vectors/malformed-signature-base64",
@@ -5943,7 +6841,31 @@
     "expected.json": "497b59ac4193e39d0e73cb136caa565b6504dd8aeea325834d311495a35da564",
     "policy.json": "8318aa752a303206435584438e8b0c8bce861e391782c4e666d9be2f809ef3a6",
     "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
-   }
+   },
+   "level": "signed"
+  },
+  {
+   "id": "signature-vectors/no-keyid-only-another-algorithm",
+   "kind": "signature",
+   "classes": [
+    "Sealer",
+    "Run verifier",
+    "Overlay verifier",
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "SIG-2",
+    "SIG-5",
+    "SIG-6"
+   ],
+   "path": "signature-vectors/no-keyid-only-another-algorithm",
+   "files": {
+    "envelope.dsse.json": "ec158afcaab02945c1b0e8832cbd02fd9f2297898ed4d3ff4fea0651c1df27e0",
+    "expected.json": "b99f587e2ebb94dac4687f711d54a324a7fdffbef1c4e53540916cf7370c0461",
+    "policy.json": "9cef421275beac2c31315e52c11d2dd88f43a762930518ec079cd3d2bea34ca3",
+    "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
+   },
+   "level": "signed"
   },
   {
    "id": "signature-vectors/no-keyid-tried-in-policy-order",
@@ -5968,7 +6890,31 @@
     "expected.json": "5b4f53c95b3abfc92ba3476cbfc9317df4308c538f82c5d11913f9fe8b564b66",
     "policy.json": "cdaa883b9f5eb888393915b6d30d19da98deb7208e2a593afd3e3a1fa7157422",
     "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
-   }
+   },
+   "level": "signed"
+  },
+  {
+   "id": "signature-vectors/one-identity-two-keys",
+   "kind": "signature",
+   "classes": [
+    "Sealer",
+    "Run verifier",
+    "Overlay verifier",
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "SIG-4",
+    "SIG-5",
+    "SIG-6"
+   ],
+   "path": "signature-vectors/one-identity-two-keys",
+   "files": {
+    "envelope.dsse.json": "e7fdf286a23743bda1da7a494f2a0f16e08925542a037982c4ad8a9534424960",
+    "expected.json": "3d374b2f6d02691524dc56e430145e810bab7a0f448589a5776bac1a7cb457d8",
+    "policy.json": "d1a1eb38bb72116cfc2b23d68bf78a8b3d3ad8ae50530c619f48059f08105344",
+    "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
+   },
+   "level": "signed"
   },
   {
    "id": "signature-vectors/other-key-under-trusted-keyid",
@@ -5993,7 +6939,8 @@
     "expected.json": "33c6f59380fb90a6f2a97104c749b6dfc1b873b72b5dd17c8b0ff7015c41e4ab",
     "policy.json": "cd7918e843a38fea9d3b4100816563e35effc79d159169e348cec99122103c06",
     "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
-   }
+   },
+   "level": "signed"
   },
   {
    "id": "signature-vectors/overlay-batch-envelope",
@@ -6019,7 +6966,8 @@
     "expected.json": "0869ef649961c48d4c6e0afa25380aff065fe13a2a9547a3bdadb30fe5661b59",
     "policy.json": "dee0f4034410d17ed7506be3ec7009dded0b8c307cda873e72c7d379adfeb24d",
     "seal-0001.json": "8f80b91ba250eacf6c8274d2882871784063f16b41398e08bc72892641d3cb15"
-   }
+   },
+   "level": "signed"
   },
   {
    "id": "signature-vectors/payload-not-the-file",
@@ -6041,7 +6989,119 @@
     "expected.json": "9632c93fea19d001e3563cc51a6c8ce35a30f58ec5e364194ca5c470bf9aab2f",
     "policy.json": "8318aa752a303206435584438e8b0c8bce861e391782c4e666d9be2f809ef3a6",
     "seal.json": "4606fb00bba518988e80048b9842491e7dbd5885b257144d24ccef403960c7b8"
-   }
+   },
+   "level": "signed"
+  },
+  {
+   "id": "signature-vectors/pem-indented-line-in-policy",
+   "kind": "signature",
+   "classes": [
+    "Sealer",
+    "Run verifier",
+    "Overlay verifier",
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "SIG-3",
+    "SIG-6"
+   ],
+   "path": "signature-vectors/pem-indented-line-in-policy",
+   "files": {
+    "envelope.dsse.json": "6eeaf635cea674b59f4dc71df23b6ad43cfb0add30c33ff28e40ae8e98df40ee",
+    "expected.json": "6fe81675a0a489fbf1be740968a710a9c2917054335d06542ba9d11f0470e0be",
+    "policy.json": "9912211d002434bf3de90ea0862ff5fa8dc5d9b2367f473bc4ad63176e4cf08d",
+    "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
+   },
+   "level": "signed"
+  },
+  {
+   "id": "signature-vectors/rsa-key-ber-in-policy",
+   "kind": "signature",
+   "classes": [
+    "Sealer",
+    "Run verifier",
+    "Overlay verifier",
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "SIG-3",
+    "SIG-6"
+   ],
+   "path": "signature-vectors/rsa-key-ber-in-policy",
+   "files": {
+    "envelope.dsse.json": "6eeaf635cea674b59f4dc71df23b6ad43cfb0add30c33ff28e40ae8e98df40ee",
+    "expected.json": "6fe81675a0a489fbf1be740968a710a9c2917054335d06542ba9d11f0470e0be",
+    "policy.json": "abcbde13a8adaba2cf49db7b781d65e4f359cf9d278dd9e4fa8bfa4dedd533fa",
+    "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
+   },
+   "level": "signed"
+  },
+  {
+   "id": "signature-vectors/rsa-key-unused-bits-in-policy",
+   "kind": "signature",
+   "classes": [
+    "Sealer",
+    "Run verifier",
+    "Overlay verifier",
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "SIG-3",
+    "SIG-6"
+   ],
+   "path": "signature-vectors/rsa-key-unused-bits-in-policy",
+   "files": {
+    "envelope.dsse.json": "6eeaf635cea674b59f4dc71df23b6ad43cfb0add30c33ff28e40ae8e98df40ee",
+    "expected.json": "6fe81675a0a489fbf1be740968a710a9c2917054335d06542ba9d11f0470e0be",
+    "policy.json": "47e0b55a65988aa97457634c180df7bf2521928eadc35fde7e1f6851edaa69a5",
+    "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
+   },
+   "level": "signed"
+  },
+  {
+   "id": "signature-vectors/sig-incomplete-padding",
+   "kind": "signature",
+   "classes": [
+    "Sealer",
+    "Run verifier",
+    "Overlay verifier",
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "SIG-1",
+    "SIG-5",
+    "SIG-6"
+   ],
+   "path": "signature-vectors/sig-incomplete-padding",
+   "files": {
+    "envelope.dsse.json": "072e1dc4573729a184dbb6582b7aaec3aea8d8301f0f2d20841ee937ffb314f3",
+    "expected.json": "497b59ac4193e39d0e73cb136caa565b6504dd8aeea325834d311495a35da564",
+    "policy.json": "dee0f4034410d17ed7506be3ec7009dded0b8c307cda873e72c7d379adfeb24d",
+    "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
+   },
+   "level": "signed"
+  },
+  {
+   "id": "signature-vectors/sig-standard-alphabet-unpadded",
+   "kind": "signature",
+   "classes": [
+    "Sealer",
+    "Run verifier",
+    "Overlay verifier",
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "SIG-1",
+    "SIG-6"
+   ],
+   "path": "signature-vectors/sig-standard-alphabet-unpadded",
+   "files": {
+    "envelope.dsse.json": "1cc6e1a02ebcf601113992d693b4dab7ee588e61d0f9172421be5b049e559c3b",
+    "expected.json": "7fbe48b8cf2f31fc9638f065d4c2eb83c84847f6638abcb09dc51aa7a98d7ca0",
+    "policy.json": "dee0f4034410d17ed7506be3ec7009dded0b8c307cda873e72c7d379adfeb24d",
+    "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
+   },
+   "level": "signed"
   },
   {
    "id": "signature-vectors/tampered-payload",
@@ -6066,7 +7126,8 @@
     "expected.json": "33c6f59380fb90a6f2a97104c749b6dfc1b873b72b5dd17c8b0ff7015c41e4ab",
     "policy.json": "8318aa752a303206435584438e8b0c8bce861e391782c4e666d9be2f809ef3a6",
     "seal.json": "6c31030af40946416db95b876315e54f842dcb0b4e9f6fdf98ee4f5141f987d4"
-   }
+   },
+   "level": "signed"
   },
   {
    "id": "signature-vectors/two-signatures-one-trusted",
@@ -6091,7 +7152,8 @@
     "expected.json": "a59cb8ea969adb789c1fcffb1521c66e01a2674b5136cf6d8869739e7e3558e5",
     "policy.json": "8318aa752a303206435584438e8b0c8bce861e391782c4e666d9be2f809ef3a6",
     "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
-   }
+   },
+   "level": "signed"
   },
   {
    "id": "signature-vectors/unsupported-algorithm",
@@ -6112,7 +7174,8 @@
     "expected.json": "92ffc36fab22ce429f59c8806211b27c8b72772bd2d9cc51f31493f35ba9515c",
     "policy.json": "16c20bc19b085e2f4e906a135264141e700316a422a893d9d21a0e53b060a31f",
     "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
-   }
+   },
+   "level": "signed"
   },
   {
    "id": "signature-vectors/untrusted-key",
@@ -6137,7 +7200,8 @@
     "expected.json": "027a2637ead95a2fafa5beb3eff75a0cfc82b721bae32f013c5bc62ae95894f1",
     "policy.json": "8318aa752a303206435584438e8b0c8bce861e391782c4e666d9be2f809ef3a6",
     "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
-   }
+   },
+   "level": "signed"
   },
   {
    "id": "signature-vectors/verifies-for-two",
@@ -6162,7 +7226,8 @@
     "expected.json": "54c5e613d070c38a488a683a5e7bf0f985def11b3caca5194c6614795e2f9ba8",
     "policy.json": "ed1b73ce089b6e69f8a13598ad6d06f7fb8dc021363109c00ca5933a372e10c2",
     "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
-   }
+   },
+   "level": "signed"
   },
   {
    "id": "signature-vectors/wrong-payload-type",
@@ -6184,7 +7249,8 @@
     "envelope.dsse.json": "ef852624db5796fabbf4dd6b9b251d8b8a9d633de62e4dd715df7db67fb059af",
     "expected.json": "a22be2acdfac92acb69b30b94037a8916d9fa8271d89db1e5dc7cf8a53acaeb7",
     "policy.json": "8318aa752a303206435584438e8b0c8bce861e391782c4e666d9be2f809ef3a6"
-   }
+   },
+   "level": "signed"
   },
   {
    "id": "signature-vectors/keys",
@@ -7299,6 +8365,21 @@
    }
   },
   {
+   "id": "decision-vectors/60-input-time-does-not-exist",
+   "kind": "decision",
+   "classes": [
+    "Decision engine",
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "DEC-1"
+   ],
+   "path": "decision-vectors/60-input-time-does-not-exist.json",
+   "files": {
+    "60-input-time-does-not-exist.json": "372de94262315e1ea5d2f8d90402fc3540e1b54581e8a7ae9d7d9c8bc759dff6"
+   }
+  },
+  {
    "id": "protocol/plans/container-without-image",
    "kind": "plan",
    "classes": [
@@ -7441,6 +8522,22 @@
    }
   },
   {
+   "id": "protocol/plans/unknown-content-capture",
+   "kind": "plan",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-7",
+    "VER-8"
+   ],
+   "path": "protocol/plans/unknown-content-capture",
+   "files": {
+    "document.json": "e49c64e46e795de8ed7deb328e57975b9836fc4ad180ea2d6311ed3782ba7efa",
+    "expected.json": "4d8e13834b40afe83ccfc25bd92639cb41f3eb1278c862b1085a161bb258c88e"
+   }
+  },
+  {
    "id": "protocol/plans/unknown-credential-purpose",
    "kind": "plan",
    "classes": [
@@ -7504,6 +8601,22 @@
    "files": {
     "document.json": "acc6d55c561428a9144392ae2d1671d241b38da3cc965ace90baff7fe395daf0",
     "expected.json": "c2e1803dd22dec3596a7432003c07abfa42340fe855f664d01fc64c428845c1d"
+   }
+  },
+  {
+   "id": "protocol/plans/valid-ci-provider",
+   "kind": "plan",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-1",
+    "VER-8"
+   ],
+   "path": "protocol/plans/valid-ci-provider",
+   "files": {
+    "document.json": "4a9745cc0eeb14a269788456038908f592fcfaf477313872dd33e918f7971b4a",
+    "expected.json": "07d4d084c92ff327ee7069bfe79a705d928fb4c072fd542c6af3e5680accb5f4"
    }
   },
   {
@@ -7617,6 +8730,23 @@
    }
   },
   {
+   "id": "protocol/matching/isolation-unknown",
+   "kind": "matching",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-7",
+    "VER-8"
+   ],
+   "path": "protocol/matching/isolation-unknown",
+   "files": {
+    "expected.json": "46483688aa6433a9493167ad0932562ebb10aee4c7aa7da29fd3695817c2297b",
+    "plan.json": "9835a025bf24e76336030a6f87c93df0084e7b49e8dbd45fce8f8621f810ee35",
+    "runner.json": "f4db73e1075ee8dea56e5ee907bc04240aa9f4c1febfb2cdda426e04f82bf3b1"
+   }
+  },
+  {
    "id": "protocol/matching/missing-tag",
    "kind": "matching",
    "classes": [
@@ -7646,6 +8776,23 @@
     "expected.json": "8958e353cfb930923ffb479d04f952a05fe74abb4b3c212e8643a1c089aa1bb1",
     "plan.json": "321394d2e28cf7bdb9fffbc227a3bf14752f49963f84c28757483e9c8129c638",
     "runner.json": "f4db73e1075ee8dea56e5ee907bc04240aa9f4c1febfb2cdda426e04f82bf3b1"
+   }
+  },
+  {
+   "id": "protocol/matching/provider-unknown-but-listed",
+   "kind": "matching",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-7",
+    "VER-8"
+   ],
+   "path": "protocol/matching/provider-unknown-but-listed",
+   "files": {
+    "expected.json": "4838e2b2f75177c5cce2584405a42e8482050ce2b28ee5d9d5bdf1da22e11490",
+    "plan.json": "acc6d55c561428a9144392ae2d1671d241b38da3cc965ace90baff7fe395daf0",
+    "runner.json": "c6783e9a0bf83f5dc66b88a3600105f95f531afa9ac2fb6fb134aa95f05c2d63"
    }
   },
   {
@@ -8012,6 +9159,22 @@
    "files": {
     "events.ndjson": "e7414e732ed0f7cfdf7056f2d6cf232f41f21455c8db46ae5b65c0dc15f4ed0a",
     "expected.json": "00414ff2868f173a03fe3d2e1897259ed33f756c97e7aab07bac8e7dc47dc1af"
+   }
+  },
+  {
+   "id": "protocol/streams/seq-and-job-id-at-one-event",
+   "kind": "stream",
+   "classes": [
+    "Stream verifier"
+   ],
+   "rules": [
+    "STRM-3",
+    "CONF-2"
+   ],
+   "path": "protocol/streams/seq-and-job-id-at-one-event",
+   "files": {
+    "events.ndjson": "ccd74d98175911bbe53dfb0d8fef2f4e650d316d9b229d42d16c166c3de71e1f",
+    "expected.json": "ec2c422f79c2d8bce73b5d8bd9509dbadad26cfd7549248c9c6e3596da41ccfc"
    }
   },
   {
@@ -8383,6 +9546,33 @@
     "runs/R-1/run.json": "67282a92981e7e9845599d939b7beb49e472a5794c1730a408a543993e110b19",
     "runs/R-1/seal.json": "a0294cb6e25cf7016b01f75ece8aacdc93cf045044d371155d2745e292875cb3",
     "runs/R-1/summary.json": "28d3d14e3acb023b4709cc93cb6e9756df1ad3c84d078e12e9eadfbba22da765"
+   }
+  },
+  {
+   "id": "protocol/plan-conformance/numeric-run-ids",
+   "kind": "plan-conformance",
+   "classes": [
+    "Stream verifier"
+   ],
+   "rules": [
+    "STRM-4",
+    "CONF-2"
+   ],
+   "path": "protocol/plan-conformance/numeric-run-ids",
+   "files": {
+    "events.ndjson": "ae9458c4b8b241628842c443ea945c4426b705cbbcca06a26eb45b030af3501b",
+    "expected.json": "c2754befd6c32e589257965693d85543d79c42769efe5b3edbe5bd96c3d1589b",
+    "plan.json": "a3a4de0f2d285cf6b1cb374c9e9a2a1c9a4172f1acbb76d7b82affd29aac66ec",
+    "runs/10/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
+    "runs/10/results.ndjson": "4d314b36f68a9f9571ec42bb5ce2f6b4ea4ec444b2c3dae69f20d25e8437b5ab",
+    "runs/10/run.json": "328e9dc2f974aeb935c925fac10b3acb060e48e87bd99e040d63aa0766bd0279",
+    "runs/10/seal.json": "5a9897a93da22fee2c4037ebffec7f966c665b27584bf12b0935e72457e3815d",
+    "runs/10/summary.json": "ab712e9992c86468904bbf656da18e50bec4b26e4ff2467f0e49a39386d9a617",
+    "runs/9/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
+    "runs/9/results.ndjson": "b1cf06b01266db5076deec8d80b496836dcca2dae1b5f3c98061fd0f2cebf5f2",
+    "runs/9/run.json": "6c4dea9243c820fbd3c90d25deec34a865d9adfe73ecc7fa8074394fa34f18af",
+    "runs/9/seal.json": "1a7c515edf88c765da693a4f1a18af57a73ba1e6eb8b02fa43ba40e81810f899",
+    "runs/9/summary.json": "81b59087abb2ce21b5cdb1d18e3a122f584d5b7bd91da8fcf8152d16464388e3"
    }
   },
   {

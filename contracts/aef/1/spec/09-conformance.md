@@ -9,7 +9,7 @@ that class. Requirements not listed for a class still apply to it where it does 
 |---|---|---|
 | **Producer** | ENC-1–ENC-19, RUN-1–RUN-15, RES-1–RES-11, SUM-1–SUM-9, EVD-1–EVD-3, GATE-1–GATE-2, VER-1, VER-2, VER-6, VER-9 | `document` (writer side), `run` (valid runs), `result-id`, `paths` |
 | **Sealer** | SEAL-1–SEAL-5, SIG-1–SIG-3 | `seal` (expected manifests), `signature` (signing side) |
-| **Reader** | ENC-1–ENC-19, VER-3, VER-4, VER-8 (the reading rules of §7.3), VER-9 | `document` (reader side), `encoding`, `reader-only` |
+| **Reader** | ENC-1–ENC-19, VER-3, VER-4, VER-8 (the reading rules of §7.3), VER-9 | `document` (reader side, including every encoding defect as a single document), `reader-only` |
 | **Run verifier** | Reader, plus §3.9, SEAL-4, SEAL-6, SIG-4, SIG-5, SIG-7, and OVL-4, OVL-5, OVL-10 (to tell a withheld blob from a missing one) | `run`, `seal`, `encoding`, `paths`; at the *signed* level also `signature` |
 | **Overlay verifier** | OVL-1–OVL-11 | `chain`, `overlay-view` |
 | **Checkpoint verifier** | CKP-1–CKP-10, LANE-1–LANE-11, DEC-1–DEC-5, SIG-8, and Run verifier | `checkpoint`, `lane`, `decision` |
@@ -18,6 +18,8 @@ that class. Requirements not listed for a class still apply to it where it does 
 | **Stream verifier** | STRM-1–STRM-4 | `stream`, `plan-conformance` |
 
 A Run verifier conforms at the **intact** level, or at the **signed** level when it also verifies signatures (§4.4).
+`index.json` marks the vectors only the signed level must pass (`"level": "signed"`: the signature vectors, and
+the runs and seals verified against a trust policy).
 
 ## 9.2 The corpus
 
@@ -44,7 +46,7 @@ and is cross-checked by a second, independent implementation.
 | `lane` | a checkpoint manifest and its runs | each lane's recomputed result (§5.3) and the problems of [CKP-8] |
 | `decision` | a decision input | the output, or `expectedError` |
 | `plan` | a run plan or runner manifest | schema validity |
-| `matching` | a plan and a runner manifest | whether the runner can take the plan |
+| `matching` | a plan and a runner manifest | whether the runner takes the plan ([PLAN-7]: it can take it and knows its values) |
 | `stream` | an event stream, its plan and the plan's digest | the problems of [STRM-3] |
 | `plan-conformance` | an event stream, its plan, the runs it produced, and optionally a trust policy | the problems of [STRM-4] |
 | `fixture` | files several vectors use (test keys, a stream's plans) | nothing to run: the runner checks their digests |
@@ -61,7 +63,8 @@ Each vector is a folder holding `expected.json` and its input; a run is always i
 | `kind` | Folder | `expected.json` (beyond `kind` and `rules`) |
 |---|---|---|
 | `document` | `invalid/<name>/document.json` | `schema` (a schema name), `writer` and `reader` (`valid` or `invalid`), `why` |
-| `reader-only` | `reader-only/<name>/document.json` | `schema`, `writer` (`invalid`), `reader` (`valid`), and `reads`: for each field path (dots and `[i]`), the known value a reader takes the unknown one as (§7.3) |
+| `reader-only` | `reader-only/<name>/document.json` | `schema`, `writer` (`invalid`), `reader` (`valid`), and `reads`: for each field path (`.name` for an object member, `[i]` for an array item; a member name holding `.`
+or `[` is written `["name"]`, a JSON string), the known value a reader takes the unknown one as (§7.3) |
 | `run` | `valid/<name>/run/`, `runs/<name>/run/` | `run` (`"run"`), optional inputs `policy` (a trust policy file beside `expected.json`) and `anchors` (a JSON list of trusted run hashes); `outcome` (`unsealed`, `intact` or `invalid`, §4.5), `problems`: the seal problems (§4.1) and the problems of §3.9 together, ordered; with `policy`, `signedBy` (identities, in policy order); with `anchors`, `anchored` (`true` or `false`) |
 | `encoding` | `encoding/<name>/run/` | as `run` |
 | `seal` | `seal-vectors/<name>/run/` | `run`, optionally `policy` (a trust policy, for redactions, [OVL-10]), `problems` (§4.1 only), and `manifest`: a file beside `expected.json` holding the expected manifest, when the run is sealable |
@@ -69,7 +72,7 @@ Each vector is a folder holding `expected.json` and its input; a run is always i
 | `overlay-view` | `overlay-views/<name>/run/` | `run`, `at` (the time the view is computed at), `view` (below) |
 | `checkpoint` | `checkpoints/<name>/document.json` | `schema`, `writer`, `reader`, `why`, and `problems` ([CKP-7] codes) when the reader accepts it |
 | `lane` | `lane-vectors/<name>/checkpoint.json` and `runs/<n>/` | `checkpoint`, `runs` (the folder of runs, found by their `run.json`), `lanes`: per lane in manifest order, `lane` and `result` (§5.3; `null` for none), and `problems` ([CKP-8]) |
-| `signature` | `signature-vectors/<name>/` (test keys in `signature-vectors/keys/`) | inputs: `envelope`, `file` (the signed file), `payloadType` (the type §4.4 gives that file), `policy` (a trust policy, below); expected: `envelopeResult` (`null`, `malformed` or `payload-mismatch`), `signatures` (per signature in envelope order: `keyid`, `result`, and `identity` when `verified`; empty when malformed), and `verifiesFor` (the identities the envelope verifies for, in policy order) |
+| `signature` | `signature-vectors/<name>/` (test keys in `signature-vectors/keys/`) | inputs: `envelope`, `file` (the signed file), `payloadType` (the type §4.4 gives that file), `policy` (a trust policy, below); expected: `envelopeResult` (`null`, `malformed` or `payload-mismatch`), `signatures` (per signature in envelope order: `keyid`, `result`, and `identity` when `verified`; empty when malformed), and `verifiesFor` (the identities the envelope verifies for, in policy order); or `policyRefused: true` when [SIG-3] refuses the trust policy (the operation exits 2) |
 | `result-id` | `result-ids.json`: a list | each item: `runId`, `caseId`, `path`, `trial` (or `null`), `resultId` |
 | `paths` | `paths.json`: a list | each item: `name`, `paths`, `problems` |
 | `decision` | `decision-vectors/<name>.json`: one file per vector | `input` (a decision input, §5.4), `description`, `rules`, and either `expected` (the output: `outcome`, `lanes`, `reasons`) or `expectedError` (the function refuses the input; the value names why, such as `no-lanes`, for people: an implementation's message need not match); `schemaInvalid: true` when the input is also invalid against the decision schema, `readerOnly: true` when only the reader schema accepts it |
@@ -96,9 +99,31 @@ id is computed from its public key ([SIG-3]), never read from the policy. `seal`
 - **[CONF-3]** A conformance runner reads `index.json`, selects the vectors of the classes it claims, performs for each
   the operation its `kind` names on the input, and compares the result with the expected one. It checks the SHA-256 of
   every file it reads against the index, so a modified corpus cannot pass.
-- `tools/aef_conformance.py` is such a runner for the reference implementation (`tools/aef_verify.py`); `tools/`
-  documents the command-line contract an implementation in another language follows to be driven by it: one command
-  per operation, input paths as arguments, the result as JSON on standard output.
+- `tools/aef_conformance.py` is such a runner for the reference implementation (`tools/aef_verify.py`). An
+  implementation in another language is driven by it through this command-line contract: one invocation per
+  operation, input paths as arguments, one JSON value (UTF-8, no BOM) on standard output, exit status 0 when the
+  operation ran and 2 with a message on standard error for a usage or input error. Problems are `[path, code]` pairs
+  in the order of §3.9, except a checkpoint's [CKP-7] codes, which are codes alone in code order. Times are RFC 3339
+  UTC strings ([ENC-8]).
+
+  | Vector kind | Operation | Output |
+  |---|---|---|
+  | `run`, `encoding` | `run DIR [--policy P] [--anchors A]` | `{"outcome", "problems"}`; `withheld` (a count) when not 0; `signedBy` (identities, in policy order) with `--policy`; `anchored` (true or false) with `--anchors`, a file holding a JSON list of run hashes |
+  | `seal` | `seal DIR [--policy P]` | `{"manifest": text, "runHash": hex, "problems"}` |
+  | `chain` | `chain DIR` | `{"problems"}` |
+  | `overlay-view` | `view DIR --at T [--policy P]` | the effective view of §9.2.1 |
+  | `document`, `reader-only`, `plan` | `document SCHEMA FILE` | `{"writer": "valid"/"invalid", "reader": …, "reads": {field path: value as read}}` (every line of an NDJSON file; `reads` is `{}` unless the reader accepts the file and it holds one document or one line) |
+  | `checkpoint` | `checkpoint FILE` | `{"writer", "reader", "problems": [code, …] or null when the reader refuses it}` |
+  | `lane` | `lanes CHECKPOINT --runs DIR [--at T] [--policy P]` | `{"lanes": [{"lane", "result"}], "problems"}` |
+  | `signature` | `signature ENVELOPE FILE POLICY --payload-type T` (the type [SIG-1] gives the file) | `{"envelopeResult": null or code, "signatures": [{"keyid", "result", "identity"?}], "verifiesFor": [identity]}` |
+  | `decision` | `decide FILE` | `{"output": decision}` or `{"error": message}` when the function refuses the input (exit 0) |
+  | `matching` | `match PLAN RUNNER` | `{"matches": true or false}` |
+  | `stream` | `stream EVENTS PLAN` | `{"problems": [[where, problem]]}` |
+  | `plan-conformance` | `conform EVENTS PLAN RUNS [--policy P]` | `{"problems"}` at `run:<runId>` and `job` |
+  | `paths` | `paths FILE` | `[{"name", "problems"}]` for the corpus file |
+  | `result-id` | `result-id RUNID CASEID PATH [TRIAL]` | `{"resultId"}` |
+
+  `--at` defaults to the time of the call; `--policy` names a trust policy file ([SIG-4]).
 
 ## 9.4 Claiming conformance
 

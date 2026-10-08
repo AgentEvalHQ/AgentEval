@@ -31,17 +31,10 @@ writes (a seal, a result id, a key id). Run them in this order; they rewrite the
 
 ## Testing your implementation
 
-`aef_conformance.py --command "<your program>"` drives any implementation that offers the same command line as
-`aef_verify.py`:
+`aef_conformance.py --command "<your program>"` drives any implementation that follows the command-line contract of
+[§9.3](../1/spec/09-conformance.md#93-running-the-corpus): its table gives every operation, its arguments and its
+output. `aef_verify.py` follows it, and its module docstring adds detail.
 
-- one command per operation: `run DIR [--policy P] [--anchors A]`, `seal DIR`, `chain DIR`, `view DIR --at TIME`,
-  `checkpoint FILE`, `lanes CHECKPOINT --runs DIR [--at TIME]`, `signature ENVELOPE FILE POLICY [--payload-type T]`,
-  `paths FILE`, `result-id RUNID CASEID PATH [TRIAL]`, `document SCHEMA FILE`, `decide FILE`, `match PLAN RUNNER`,
-  `stream EVENTS PLAN`;
-- input paths as arguments;
-- the result as one JSON value on standard output, in the shapes `aef_verify.py`'s module docstring gives;
-- exit status 0 when the operation ran (whatever the verdict), 2 on a usage or input error.
-
-Problems are `[path, code]` pairs in the order of spec 03 §3.9 (codes alone for [CKP-7]). The runner checks every
+The runner checks every
 corpus file against `index.json` first, so a modified corpus cannot pass. To claim conformance, run the vectors of
 the classes you claim and name the corpus version (the SHA-256 of `index.json`) in the claim ([CONF-4]).

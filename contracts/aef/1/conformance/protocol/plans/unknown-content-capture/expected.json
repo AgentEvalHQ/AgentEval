@@ -1,0 +1,14 @@
+{
+  "kind": "plan",
+  "schema": "run-plan",
+  "writer": "invalid",
+  "reader": "valid",
+  "reads": {
+    "contentCapture": "refused"
+  },
+  "rules": [
+    "PLAN-7",
+    "VER-8"
+  ],
+  "why": "a content capture this version does not know: a reader takes the plan, and a runner refuses it"
+}

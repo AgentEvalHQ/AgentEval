@@ -494,20 +494,21 @@ def b64encode(data: bytes) -> str:
 
 
 def b64decode(text: str) -> bytes:
-    """Standard base64 with padding, or URL-safe with or without it: a DSSE verifier must accept both. Only the
-    canonical encoding of its bytes: no whitespace, no set unused bits, one alphabet."""
+    """SIG-1: the standard or the URL-safe alphabet (DSSE accepts both), padded or not; padding, when present, is
+    complete. Only the canonical encoding of its bytes: no whitespace, no set unused bits, one alphabet."""
     if not isinstance(text, str):
         raise ValueError("not a string")
-    if _B64.fullmatch(text):
-        data = base64.b64decode(text)
-        again = b64encode(data)
-    elif _B64URL.fullmatch(text):
-        data = base64.urlsafe_b64decode(text + "=" * (-len(text) % 4))
-        again = base64.urlsafe_b64encode(data).decode("ascii")
-        again = again if text.endswith("=") else again.rstrip("=")
+    core = text.rstrip("=")
+    if len(core) % 4 == 1 or (text != core and len(text) != len(core) + (-len(core) % 4)):
+        raise ValueError("not base64 (a length no encoding has, or incomplete padding)")
+    if re.fullmatch(r"[A-Za-z0-9+/]*", core):
+        standard = core
+    elif re.fullmatch(r"[A-Za-z0-9_-]*", core):
+        standard = core.translate(str.maketrans("-_", "+/"))
     else:
-        raise ValueError("not base64")
-    if again != text:
+        raise ValueError("not base64, or a mix of the two alphabets")
+    data = base64.b64decode(standard + "=" * (-len(standard) % 4))
+    if base64.b64encode(data).decode("ascii").rstrip("=") != standard:
         raise ValueError("not the canonical base64 of its bytes (unused bits are set)")
     return data
 
@@ -851,6 +852,11 @@ def self_test():
     urlsafe = dict(envelope, payload=base64.urlsafe_b64encode(payload).decode().rstrip("="))
     check("parse_envelope: URL-safe base64 without padding is accepted (DSSE requires it)",
           lambda: payload_bytes(urlsafe) == payload)
+    unpadded = dict(envelope, payload=base64.b64encode(payload).decode().rstrip("="))
+    check("parse_envelope: standard base64 without padding is accepted (SIG-1)",
+          lambda: payload_bytes(unpadded) == payload)
+    check("b64decode: incomplete padding is refused (SIG-1)", lambda: _raises(ValueError, b64decode, "QQ="))
+    check("b64decode: complete padding in either alphabet", lambda: b64decode("QQ==") == b64decode("QQ") == b"A")
     minimal = {"payload": "", "payloadType": "t", "signatures": [{"keyid": None, "sig": ""}], "extra": 1}
     check("parse_envelope: unknown fields are ignored and a null keyid is unset",
           lambda: parse_envelope(minimal) == Envelope("t", b"", [("", b"")]))

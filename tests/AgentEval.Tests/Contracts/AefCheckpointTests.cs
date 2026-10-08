@@ -31,8 +31,10 @@ public class AefCheckpointTests
         var vector = Vector(name);
         if (vector["expectedError"] is not null)
         {
-            // Refused rather than decided: no lane, a lane twice, an exception for no lane, or one never in force.
-            Assert.Throws<ArgumentException>(() => CheckpointDecision.Decide(CheckpointDecisionJson.ReadInput(vector["input"]!)));
+            // Refused rather than decided: no lane, a lane twice, an exception for no lane, or one never in force
+            // (ArgumentException), or an input that does not read, such as a time that does not exist (FormatException).
+            var error = Record.Exception(() => CheckpointDecision.Decide(CheckpointDecisionJson.ReadInput(vector["input"]!)));
+            Assert.True(error is ArgumentException or FormatException, $"{name}: expected a refusal, got {error?.GetType().Name ?? "a decision"}");
             return;
         }
 
@@ -49,12 +51,37 @@ public class AefCheckpointTests
         var readerOnly = (bool?)vector["readerOnly"] == true;
         var schemaInvalid = (bool?)vector["schemaInvalid"] == true;
 
-        Assert.Equal(!readerOnly && !schemaInvalid, AefSchemaSet.Writer.Value.IsValid("decision#/$defs/input", vector["input"], out _));
-        Assert.Equal(!schemaInvalid, AefSchemaSet.Reader.Value.IsValid("decision#/$defs/input", vector["input"], out _));
+        // [ENC-8]: a timestamp the pattern allows (2026-02-31) but that is no time is refused by AEF's own check, which
+        // JSON Schema has no keyword for.
+        var timesExist = TimesExist(vector["input"]);
+        Assert.Equal(!readerOnly && !schemaInvalid, AefSchemaSet.Writer.Value.IsValid("decision#/$defs/input", vector["input"], out _) && timesExist);
+        Assert.Equal(!schemaInvalid, AefSchemaSet.Reader.Value.IsValid("decision#/$defs/input", vector["input"], out _) && timesExist);
         if (vector["expected"] is { } expected)
         {
             foreach (var set in new[] { AefSchemaSet.Writer.Value, AefSchemaSet.Reader.Value })
                 Assert.True(set.IsValid("decision", expected, out var outputErrors), $"{name} expected: {outputErrors}");
+        }
+    }
+
+    private static bool TimesExist(JsonNode? node) => node switch
+    {
+        JsonObject o => o.All(m => TimesExist(m.Value)),
+        JsonArray a => a.All(TimesExist),
+        JsonValue v when v.TryGetValue<string>(out var s) && s.Length > 10 && s[4] == '-' && s[7] == '-' && s[10] == 'T' =>
+            Parses(s),
+        _ => true,
+    };
+
+    private static bool Parses(string time)
+    {
+        try
+        {
+            AefTime.Parse(time);
+            return true;
+        }
+        catch (FormatException)
+        {
+            return false;
         }
     }
 

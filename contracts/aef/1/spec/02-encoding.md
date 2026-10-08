@@ -12,12 +12,15 @@ verifier reports it as `encoding` (§3.9) under the file's path.
   **MUST** refuse a document that breaks this, rather than keep the first or the last of two members: implementations
   disagree on which, and a sealed file that two readers read differently defeats the seal.
 - **[ENC-3]** Numbers are finite: no `NaN` or `Infinity`, and no literal whose value overflows binary64 (`1e400`);
-  such a file is reported as `encoding`.
+  such a file is reported as `encoding`. A literal too small for binary64 (`1e-400`) is not an overflow: it reads as
+  the nearest binary64 value (0) and is not refused.
 - **[ENC-4]** Every number is read as an IEEE 754 binary64 value, as JSON parsers read it, and compared as one
   (amounts such as `spentUsd` and `maxUsd` included). A field the schemas type as an integer holds an integral value
   of at most 2^53 − 1 (9,007,199,254,740,991) in magnitude, so every binary64 reader reads it exactly: `2`, `2.0`
   and `2e0` are the integer 2; a fractional value, or one beyond that range, is refused (the schemas bound every
-  integer field, so it is reported as `schema`). A writer writes integers in plain digits.
+  integer field, so it is reported as `schema`). A writer writes integers in plain digits. String lengths in the
+  schemas (`minLength`, `maxLength`) count Unicode code points, as JSON Schema defines them: not bytes, UTF-16 code
+  units or user-perceived characters.
 
 ## 2.2 NDJSON files
 
@@ -57,7 +60,9 @@ verifier reports it as `encoding` (§3.9) under the file's path.
 
 - **[ENC-14]** Patterns in the schemas are ECMA-262 regular expressions (the dialect JSON Schema names), written
   without lookaround, backreferences or possessive forms, so that every common engine compiles them (ECMA-262, RE2,
-  Python, .NET, Java).
+  Python, .NET, Java). They also use no `\d`, `\w`, `\s`, `\b` or unescaped `.`, no inline options and no named
+  groups: engines compile those alike but match them differently (non-ASCII digits and letters, line terminators),
+  so the ASCII classes are spelled out (`[0-9]`, `[A-Za-z0-9_]`).
 - **[ENC-15]** A pattern beginning with `^` and ending with `$` matches the **whole** string: `$` matches only at the
   end of the input, as in ECMA-262 and RE2. An implementation whose engine also lets `$` match before a final newline
   (Python's `re`, .NET) **MUST** compile patterns so that it does not (for example by replacing a final `$` with `\Z`
@@ -74,13 +79,17 @@ So that a reader can bound its work, and a hostile file cannot exhaust it:
   | Limit | Value |
   |---|---|
   | JSON nesting depth (objects and arrays) | 64 |
-  | Size of a JSON file or of one NDJSON line | 4 MiB |
+  | Size of a JSON file or of one NDJSON line, except the next row | 4 MiB |
+  | Size of `seal.json`, a batch seal, or a DSSE envelope (`*.dsse.json`): they list or hold every sealed file | 32 MiB |
   | Lines in one NDJSON file | 1,000,000 |
   | Files in one run folder | 100,000 |
   | Size of one blob | 1 GiB |
 
-- **[ENC-18]** A reader that refuses a file for a limit reports `limit` (§3.9) under its path (the run folder's, `.`,
-  for the number of files); it **MUST NOT** read a truncated part of it as the whole. A reader **MUST NOT** refuse
+  Depth counts the top-level value as 1 (`{}` is at depth 1, `{"a": []}` at depth 2). A line's size does not include
+  its LF.
+- **[ENC-18]** A reader that refuses something for a limit reports `limit` (§3.9) under its path: one NDJSON line over
+  the size or depth limit at `<file>:<line>` (the file's other lines are still read), a file over its size or line
+  count at the file, and the number of files at the run folder's path, `.`; it **MUST NOT** read a truncated part of it as the whole. A reader **MUST NOT** refuse
   anything within the limits.
 
 String lengths and array sizes have their own bounds in the schemas.

@@ -1,0 +1,8 @@
+{
+  "keys": [
+    {
+      "identity": "spiffe://example.com/ci/sealer",
+      "publicKey": "-----BEGIN PUBLIC KEY-----\nMCowBQYDK2VwAyEAjwdwkIvg+KoYqBu0CSCOMATb+wG6nVkkG/64rasbBqc=\n-----END PUBLIC KEY-----\n"
+    }
+  ]
+}

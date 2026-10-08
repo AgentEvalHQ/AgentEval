@@ -477,6 +477,101 @@ def invalid_cases():
     ]
 
 
+def documents_from_the_corpus():
+    """W1-8: a writer-valid document for every schema the run and checkpoint vectors do not cover as documents, copied
+    from the valid corpus; and the readings of a checkpoint (VER-8 rows a threshold op and an approver's assurance)."""
+    out = ROOT / "documents"
+    run = ROOT / "valid" / "completed-eval" / "run"
+    for name, schema, source in (("gate-decision-valid", "gate-decision", run / "gates.ndjson"),
+                                 ("seal-valid", "seal", run / "seal.json"),
+                                 ("overlay-event-valid", "overlay-event", run / "overlays" / "events.ndjson"),
+                                 ("overlay-seal-valid", "overlay-seal", run / "overlays" / "seal-0001.json"),
+                                 ("checkpoint-valid", "checkpoint", ROOT / "checkpoints" / "valid-decided" / "document.json")):
+        doc_name = "document" + source.suffix
+        write_bytes(out / name / doc_name, source.read_bytes())
+        write_json(out / name / "expected.json", {"kind": "document", "schema": schema, "document": doc_name,
+                                                  "writer": "valid", "reader": "valid", "rules": ["VER-1", "VER-3"]})
+    event = {"schemaVersion": V, "seq": 4, "kind": "job.failed", "jobId": "job-7", "at": "2026-10-08T12:00:03Z",
+             "reason": "The next case would pass the $3.00 limit.", "limit": "maxUsd", "runs": ["R-1"]}
+    write_json(out / "runner-event-valid" / "document.json", event)
+    write_json(out / "runner-event-valid" / "expected.json", {"kind": "document", "schema": "runner-event", "writer": "valid",
+                                                              "reader": "valid", "reads": {"limit": "maxUsd"},
+                                                              "rules": ["VER-1", "VER-8", "STRM-1"]})
+    planned = json.loads((ROOT / "checkpoints" / "valid-planned" / "document.json").read_bytes())
+    approved = json.loads(json.dumps(planned))
+    approved["budget"]["approvedBy"]["assurance"] = "authenticated"
+    write_json(out / "checkpoint-assurance-reads-self-attested" / "document.json", approved)
+    write_json(out / "checkpoint-assurance-reads-self-attested" / "expected.json", {
+        "kind": "document", "schema": "checkpoint", "writer": "valid", "reader": "valid",
+        "reads": {"budget.approvedBy.assurance": "self-attested", "lanes[0].rule.op": ">="}, "rules": ["VER-8", "OVL-3"]})
+    unknown_op = json.loads(json.dumps(planned))
+    unknown_op["lanes"][0]["rule"]["op"] = "~>"
+    write_json(ROOT / "reader-only" / "checkpoint-threshold-op-unknown" / "document.json", unknown_op)
+    write_json(ROOT / "reader-only" / "checkpoint-threshold-op-unknown" / "expected.json", {
+        "kind": "reader-only", "schema": "checkpoint", "writer": "invalid", "reader": "valid",
+        "reads": {"lanes[0].rule.op": "not_measured"}, "rules": ["VER-8", "LANE-2"]})
+    signed_event = dict(EVENT, by={"identity": "git:a@b", "assurance": "signed"})
+    write_json(out / "overlay-event-assurance-reads-self-attested" / "document.json", signed_event)
+    write_json(out / "overlay-event-assurance-reads-self-attested" / "expected.json", {
+        "kind": "document", "schema": "overlay-event", "writer": "valid", "reader": "valid",
+        "reads": {"by.assurance": "self-attested"}, "rules": ["VER-8", "OVL-3"]})
+
+
+def known_value_cases():
+    """(name, schema, document, reads, rules): a value this version's writer schema lists is known and read as written
+    (VER-8), including the values added last, which a hand-written list misses first."""
+    summary = {"schemaVersion": V, "runId": "r-1", "lanes": [{"lane": "main", "metrics": [
+        {"metric": "m", "path": "q", "n": 2, "N": 2, "notMeasured": 0, "value": 0.65, "verdict": "scored", "sum": 1.3, "sumSq": 0.97}]}],
+        "usage": [{"role": "attacker", "model": "gpt-5.1", "gen_ai.usage.input_tokens": 10}]}
+    evidence = {"schemaVersion": V, "evidenceId": "E-1", "kind": "transcript", "link": {"uri": "https://example.com/t/1"}}
+    return [
+        ("summary-verdict-scored-is-known", "summary", summary,
+         {"lanes[0].metrics[0].verdict": "scored", "usage[0].role": "attacker"}, ["VER-8", "SUM-6", "SUM-7"]),
+        ("run-stimulus-external-is-known", "run", base_run(execution={"targetMode": "live", "stimulus": "external"}),
+         {"execution.stimulus": "external"}, ["VER-8", "RUN-7"]),
+        ("evidence-kind-transcript-is-known", "evidence", evidence, {"kind": "transcript"}, ["VER-8", "EVD-1"]),
+        ("result-usage-role-attacker-is-known", "result",
+         dict(BASE_RESULT, usage=[{"role": "attacker", "gen_ai.usage.input_tokens": 5}]), {"usage[0].role": "attacker"},
+         ["VER-8", "RES-10"]),
+    ]
+
+
+def length_and_number_cases():
+    """(name, schema, document, writer, reader, rules): ENC-4. Lengths count code points (not UTF-16 units, bytes or
+    user-perceived characters); numbers compare as binary64 (not as decimals)."""
+    astral = "\U0001F600" * 128          # 128 code points, 256 UTF-16 units: at producer.name's maxLength
+    combining = "e\u0301" * 64 + "x"      # 129 code points, 65 user-perceived characters: over it
+    calibrated = {"model": "gpt-5.1", "calibration": {"labelSet": "labels:a/b@1", "n": 10, "dangerousErrors": 0,
+                                                      "measuredAt": "2026-09-01T00:00:00Z"}}
+    return [
+        ("length-astral-at-max", "run", base_run(producer={"name": astral, "version": "1"}), "valid", "valid", ["ENC-4"]),
+        ("length-combining-over-max", "run", base_run(producer={"name": combining, "version": "1"}), "invalid", "invalid", ["ENC-4"]),
+        ("number-underflow-reads-as-zero", "run",
+         base_run(judges=[dict(calibrated, calibration=dict(calibrated["calibration"], accuracy=RAW_TINY))]),
+         "valid", "valid", ["ENC-3", "ENC-4"]),
+        ("nesting-depth-64-accepted", "run", base_run(ext={"agenteval.deep": deep_object(61)}), "valid", "valid",
+         ["ENC-17", "ENC-18"]),
+        ("number-above-max-as-decimal-equal-as-binary64", "run",
+         base_run(judges=[dict(calibrated, calibration=dict(calibrated["calibration"], accuracy=RAW_ONE_PLUS))]),
+         "valid", "valid", ["ENC-4"]),
+    ]
+
+
+# A number just above 1 as a decimal that reads as exactly 1.0 in binary64: written into the file as these bytes.
+RAW_ONE_PLUS = "__RAW_1.00000000000000000001__"
+RAW_TINY = "__RAW_1e-400__"
+
+
+def deep_object(levels):
+    """An object nested `levels` deep below its top (ENC-17 counts the top-level value as depth 1)."""
+    deep, node = {}, None
+    node = deep
+    for _ in range(levels):
+        node["d"] = {}
+        node = node["d"]
+    return deep
+
+
 def reader_only_cases():
     """(name, schema, document, reads, rules): a value a later minor could write. The writer schema refuses it; a reader
     accepts it and MUST read it as §7.3 says (reads: field -> the value it reads as)."""
@@ -520,6 +615,15 @@ def reader_only_cases():
          dict(BASE_RESULT, aggregation={"strategy": "Min", "threshold": 0.5, "score": 0.6, "rulePath": "quorum", "measured": 1,
                                         "total": 1, "unmeasured": {"not_measured": 0, "not_applicable": 0, "skipped": 0, "error": 0}, "decisive": []}),
          {"aggregation.rulePath": "quorum"}, ["VER-8", "RES-6"]),
+        ("runner-event-limit-unknown", "runner-event",
+         {"schemaVersion": V, "seq": 4, "kind": "job.failed", "jobId": "job-7", "at": "2026-10-08T12:00:03Z",
+          "reason": "The runner ran out of memory.", "limit": "memory", "runs": []}, {"limit": "memory"}, ["VER-8", "STRM-1"]),
+        ("decision-lane-status-unknown", "decision",
+         {"outcome": "approved", "lanes": [{"lane": "quality", "status": "partly", "blocking": True}], "reasons": ["outcome:approved"]},
+         {"lanes[0].status": "unverifiable", "outcome": "approved"}, ["VER-8", "CKP-7"]),
+        ("decision-outcome-unknown", "decision",
+         {"outcome": "approved_by_quorum", "lanes": [{"lane": "quality", "status": "passed", "blocking": True}],
+          "reasons": ["outcome:approved"]}, {"outcome": "unverifiable"}, ["VER-8", "CKP-7"]),
         ("runner-event-lane-status-unknown", "runner-event",
          {"schemaVersion": V, "seq": 7, "kind": "lane.completed", "jobId": "job-7", "at": "2026-10-08T12:00:06Z", "lane": "quality",
           "status": "partly"},
@@ -833,6 +937,21 @@ def encoding_vectors():
     case("not-json-line", "gates.ndjson", lambda b: b + b'{"schemaVersion": "1.0",\n', "gates.ndjson:2", ["ENC-7"])
     case("invalid-utf8", "evidence.ndjson", lambda b: b.replace(b"judge_reasoning", b"judge_reas\xc3\x28ning", 1), "evidence.ndjson:1", ["ENC-1"])
     case("empty-results-is-valid-framing", "results.ndjson", lambda b: b"", None, [])
+    schema_of = {"run.json": "run", "metrics.json": "metrics", "summary.json": "summary", "results.ndjson": "result",
+                 "evidence.ndjson": "evidence", "gates.ndjson": "gate-decision"}
+    for name, rel, transform, path, rules in cases:
+        scratch = ROOT / "documents" / f"encoding-{name}"
+        run_dir = scratch / "scratch-run"
+        small_run(run_dir)
+        broken = transform((run_dir / rel).read_bytes())
+        shutil.rmtree(run_dir)
+        doc_name = "document" + Path(rel).suffix
+        write_bytes(scratch / doc_name, broken)
+        reads = name in ("integer-written-2e0-accepted", "empty-results-is-valid-framing")
+        write_json(scratch / "expected.json", {"kind": "document", "schema": schema_of[rel], "document": doc_name,
+                                               "writer": "valid" if reads else "invalid",
+                                               "reader": "valid" if reads else "invalid",
+                                               "rules": sorted(set(rules) | {"VER-3"})})
     for name, rel, transform, path, rules in cases:
         run_dir = out / name / "run"
         if name == "integer-written-2e0-accepted":
@@ -1408,7 +1527,8 @@ def checkpoints():
 def main():
     # What this script owns. decision-vectors/, protocol/, lane-vectors/, signature-vectors/ are written by their own
     # scripts.
-    owned = ("valid", "invalid", "reader-only", "runs", "encoding", "seal-vectors", "chain-vectors", "overlay-views", "checkpoints")
+    owned = ("valid", "invalid", "reader-only", "documents", "runs", "encoding", "seal-vectors", "chain-vectors", "overlay-views",
+             "checkpoints")
     for name in owned:
         if (ROOT / name).exists():
             shutil.rmtree(ROOT / name)
@@ -1442,6 +1562,19 @@ def main():
         write_json(ROOT / "reader-only" / name / "expected.json", {"kind": "reader-only", "schema": schema, "writer": "invalid",
                                                                    "reader": "valid", "reads": reads, "rules": rules})
 
+    for name, schema, doc, reads, rules in known_value_cases():
+        write_json(ROOT / "documents" / name / "document.json", doc)
+        write_json(ROOT / "documents" / name / "expected.json", {"kind": "document", "schema": schema, "writer": "valid",
+                                                                 "reader": "valid", "reads": reads, "rules": rules})
+    for name, schema, doc, writer, reader, rules in length_and_number_cases():
+        target = ROOT / "documents" / name / "document.json"
+        write_json(target, doc)
+        raw = target.read_bytes().replace(b'"' + RAW_ONE_PLUS.encode() + b'"', b"1.00000000000000000001")
+        raw = raw.replace(b'"' + RAW_TINY.encode() + b'"', b"1e-400")
+        target.write_bytes(raw)
+        write_json(ROOT / "documents" / name / "expected.json", {"kind": "document", "schema": schema, "writer": writer,
+                                                                 "reader": reader, "rules": rules})
+
     build_run_vectors()
     encoding_vectors()
     seal_vectors(valid)
@@ -1454,6 +1587,8 @@ def main():
         if problems is not None:
             expected["problems"] = problems
         write_json(ROOT / "checkpoints" / name / "expected.json", expected)
+
+    documents_from_the_corpus()
 
     vectors = [
         ("01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10", "case-17", "triage", None),

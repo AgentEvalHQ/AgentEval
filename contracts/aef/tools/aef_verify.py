@@ -126,31 +126,40 @@ def set_mutations(names):
 # ---------------------------------------------------------------------------- constants
 
 MAX_JSON = 4 * 1024 * 1024  # ENC-17: a JSON file or one NDJSON line
+MAX_SEALING = 32 * 1024 * 1024  # ENC-17: seal.json, a batch seal, a DSSE envelope (they list every sealed file)
 MAX_DEPTH = 64
 MAX_LINES = 1_000_000
 MAX_FILES = 100_000
 MAX_BLOB = 1 << 30
 MAX_PATH = 255
 
-STATES = {"passed", "failed", "warn", "inconclusive", "scored", "not_measured", "not_applicable", "skipped", "error",
-          "pending"}  # closed (VER-9)
+def _writer_enum(ref):
+    """The values the writer schema lists at ref ("file#/json/pointer" to an enum): what this version knows (§7.3,
+    [VER-8]). Read from the schema, so the sets a reader checks against can never drift from it."""
+    file, pointer = ref.split("#")
+    node = json.loads((AEF_ROOT / "schemas" / "writer" / file).read_bytes())
+    for step in pointer.strip("/").split("/"):
+        node = node[int(step)] if isinstance(node, list) else node[step.replace("~1", "/").replace("~0", "~")]
+    return frozenset(node)
+
+
+STATES = _writer_enum("common.schema.json#/$defs/state/enum")  # closed (VER-9)
 ABSENT_STATES = {"not_measured", "skipped", "error", "pending"}  # SUM-4: not measured (not_applicable is left out)
 SEVERITY_ORDER = {"none": 0, "low": 1, "medium": 2, "high": 3, "critical": 4}
-METRIC_KINDS = {"score", "rate", "count", "duration", "cost", "verdict"}
-DIRECTIONS = {"higher_better", "lower_better", "none"}
-RUN_STATUSES = {"running", "completed", "aborted"}
-TARGET_MODES = {"live", "replayed", "scripted", "mocked"}
-GATE_OUTCOMES = {"ship", "no_ship", "inconclusive"}
-COMPARABILITY = {"comparable", "incomparable", "not_applicable"}
-OVERLAY_KINDS = {"approve", "reject", "override", "adjudicate", "waive", "acknowledge", "accept_baseline",
-                 "annotate", "redact"}
-CHECKPOINT_STATES = {"draft", "planned", "approved_to_spend", "running", "evidence_complete", "decided"}
-CHECKPOINT_OUTCOMES = {"approved", "approved_with_exceptions", "blocked", "inconclusive", "expired", "aborted"}
-DECISION_OUTCOMES = {"approved", "approved_with_exceptions", "blocked", "inconclusive", "expired"}
-DECISION_LANE_STATUSES = {"passed", "failed", "waived", "missing", "not_measured", "incomparable", "stale"}
-INPUT_STATUSES = {"passed", "failed", "not_measured", "incomparable"}
+METRIC_KINDS = _writer_enum("metrics.schema.json#/properties/metrics/items/properties/kind/enum")
+DIRECTIONS = _writer_enum("metrics.schema.json#/properties/metrics/items/properties/direction/enum")
+RUN_STATUSES = _writer_enum("run.schema.json#/properties/status/enum")
+TARGET_MODES = _writer_enum("run.schema.json#/properties/execution/properties/targetMode/enum")
+GATE_OUTCOMES = _writer_enum("gate-decision.schema.json#/properties/outcome/enum")
+COMPARABILITY = _writer_enum("gate-decision.schema.json#/properties/comparability/enum")
+OVERLAY_KINDS = _writer_enum("overlay-event.schema.json#/properties/kind/enum")
+CHECKPOINT_STATES = _writer_enum("checkpoint.schema.json#/properties/state/enum")
+CHECKPOINT_OUTCOMES = _writer_enum("checkpoint.schema.json#/properties/outcome/anyOf/1/enum")
+DECISION_OUTCOMES = _writer_enum("decision.schema.json#/properties/outcome/enum")
+DECISION_LANE_STATUSES = _writer_enum("decision.schema.json#/$defs/laneStatus/enum")
+INPUT_STATUSES = _writer_enum("decision.schema.json#/$defs/input/properties/lanes/items/properties/result/anyOf/1/properties/status/enum")
 RULE_KINDS = {"threshold", "severity", "comparison", "evidence-present"}
-AXES = ("subject", "suite", "suite-content", "judges", "rubrics", "target-mode", "deployment", "producer")
+AXES = tuple(json.loads((AEF_ROOT / "schemas" / "writer" / "common.schema.json").read_bytes())["$defs"]["axis"]["enum"])  # in order
 IN_TOTO_TYPE = "application/vnd.in-toto+json"
 CHECKPOINT_TYPE = "application/vnd.agenteval.aef.checkpoint+json"
 
@@ -439,14 +448,22 @@ def _as_written(v):
     return v
 
 
-_RUN_SUBJECT_KINDS = {"agent", "workflow", "model", "endpoint", "mcp-server", "other"}
-_JUDGE_MODES = {"single", "panel", "primary", "shadow", "other"}
-_EVIDENCE_KINDS = {"span", "tool_call", "judge_reasoning", "compliance_artifact", "document", "input", "expected",
-                   "output", "transcript", "other"}
-_ANNOTATOR_KINDS = {"CODE", "LLM", "HUMAN", "HYBRID", "OTHER"}
-_USAGE_ROLES = {"agent", "judge", "attacker", "other"}
-_TAXONOMY_SCHEMES = {"owasp-llm", "owasp-agentic", "mitre-atlas", "nist-ai-rmf", "other"}
-_SUMMARY_VERDICTS = {"passed", "failed", "warn", "inconclusive", "not_measured"}
+_RUN_SUBJECT_KINDS = _writer_enum("run.schema.json#/properties/subject/properties/kind/enum")
+_JUDGE_MODES = _writer_enum("run.schema.json#/properties/judges/items/properties/mode/enum")
+_STIMULI = _writer_enum("run.schema.json#/properties/execution/properties/stimulus/enum")
+_EVIDENCE_KINDS = _writer_enum("evidence.schema.json#/properties/kind/enum")
+_ANNOTATOR_KINDS = _writer_enum("result.schema.json#/properties/annotator/properties/kind/enum")
+_USAGE_ROLES = _writer_enum("result.schema.json#/properties/usage/items/properties/role/enum")
+_SUMMARY_USAGE_ROLES = _writer_enum("summary.schema.json#/properties/usage/items/properties/role/enum")
+_TAXONOMY_SCHEMES = _writer_enum("result.schema.json#/properties/attack/properties/taxonomy/items/properties/scheme/enum")
+_SUMMARY_VERDICTS = _writer_enum("summary.schema.json#/properties/lanes/items/properties/metrics/items/properties/verdict/enum")
+_THRESHOLD_OPS = _writer_enum("checkpoint.schema.json#/$defs/laneRule/oneOf/0/properties/op/enum")
+_PLAN_CONTENT_CAPTURE = _writer_enum("run-plan.schema.json#/properties/contentCapture/enum")
+_SEVERITY_MAX = _writer_enum("checkpoint.schema.json#/$defs/laneRule/oneOf/1/properties/max/enum")
+_SEALED_BY = _writer_enum("seal.schema.json#/properties/predicate/properties/sealedBy/enum")
+_ISOLATIONS = _writer_enum("run-plan.schema.json#/properties/isolation/enum")
+_CREDENTIAL_SCHEMES = _writer_enum("run-plan.schema.json#/properties/credentialRefs/items/properties/scheme/enum")
+_CREDENTIAL_PURPOSES = _writer_enum("run-plan.schema.json#/properties/credentialRefs/items/properties/purpose/enum")
 
 # Per schema: (field path with [*] for every item of an array and {*} for every member of an object, how a reader
 # reads the value). Spec 07 §7.3 (VER-8).
@@ -458,34 +475,43 @@ READINGS = {
                ("trials.aggregation", _as_written),
                ("aggregation.strategy", _as_written), ("aggregation.rulePath", _as_written)],
     "run": [("execution.targetMode", read_target_mode),
-            ("execution.stimulus", _known({"suite", "generated", "external", "other"}, "other")),
+            ("execution.stimulus", _known(_STIMULI, "other")),
             ("contentCapture", read_content_capture), ("subject.kind", _known(_RUN_SUBJECT_KINDS, "other")),
             ("judges[*].mode", _known(_JUDGE_MODES, "other")),
             ("suite.executionPolicy.aggregation", _as_written), ("config.thresholds{*}.op", _as_written)],
-    "summary": [("lanes[*].metrics[*].verdict", _known(_SUMMARY_VERDICTS, "inconclusive"))],
+    "summary": [("lanes[*].metrics[*].verdict", _known(_SUMMARY_VERDICTS, "inconclusive")),
+                ("usage[*].role", _known(_SUMMARY_USAGE_ROLES, "other"))],
     "evidence": [("kind", _known(_EVIDENCE_KINDS, "other"))],
     "metrics": [("metrics[*].direction", read_direction)],
     "gate-decision": [("outcome", _known(GATE_OUTCOMES, "inconclusive")), ("comparability", read_comparability),
                       ("rule.strategy", _as_written)],
     # OVL-3: an assurance is shown only as far as it was verified; a document alone verifies nothing.
     "overlay-event": [("kind", read_overlay_kind), ("by.assurance", lambda v: "self-attested")],
-    "seal": [("predicate.sealedBy", _known({"producer", "ingest"}, "ingest"))],
+    "seal": [("predicate.sealedBy", _known(_SEALED_BY, "ingest"))],
     "checkpoint": [("state", _known(CHECKPOINT_STATES, "unverifiable")),
                    ("outcome", lambda v: v if v is None or v in CHECKPOINT_OUTCOMES else "unverifiable"),
                    ("lanes[*].rule.kind", lambda v: v if v in RULE_KINDS else "not_measured"),
-                   ("lanes[*].rule.max", lambda v: v if v in ("none", "low", "medium", "high") else "not_measured"),
+                   ("lanes[*].rule.max", lambda v: v if v in _SEVERITY_MAX else "not_measured"),
+                   ("lanes[*].rule.op", lambda v: v if v in _THRESHOLD_OPS else "not_measured"),
+                   ("budget.approvedBy.assurance", lambda v: "self-attested"),
+                   ("decisionInput.exceptions[*].by.assurance", lambda v: "self-attested"),
                    ("lanes[*].rule.axes[*]", lambda v: v if v in AXES else "incomparable")],
-    "decision": [("lanes[*].status", _known(DECISION_LANE_STATUSES, "not_measured"))],
+    # A decision document: its outcome and lane statuses ([CKP-7]); a decision input's results ([DEC-2]).
+    "decision": [("outcome", _known(DECISION_OUTCOMES, "unverifiable")),
+                 ("lanes[*].status", _known(DECISION_LANE_STATUSES, "unverifiable")),
+                 ("lanes[*].result.status", _known(INPUT_STATUSES, "not_measured")),
+                 ("exceptions[*].by.assurance", lambda v: "self-attested")],
     "run-plan": [("provider", lambda v: v if v in ("local", "docker", "k8s") or
                   (isinstance(v, str) and re.fullmatch(r"ci:[a-z0-9-]{1,64}", v)) else "refused"),
-                 ("isolation", _known({"process", "container", "remote-zone"}, "refused")),
-                 ("credentialRefs[*].scheme", _known({"env", "keychain", "vault"}, "refused")),
-                 ("credentialRefs[*].purpose", _known({"subject", "judge", "attacker", "evaluator", "other"},
-                                                      "refused"))],
+                 ("isolation", _known(_ISOLATIONS, "refused")),
+                 ("contentCapture", _known(_PLAN_CONTENT_CAPTURE, "refused")),
+                 ("credentialRefs[*].scheme", _known(_CREDENTIAL_SCHEMES, "refused")),
+                 ("credentialRefs[*].purpose", _known(_CREDENTIAL_PURPOSES, "refused"))],
     "runner-event": [("kind", _known({"job.accepted", "job.refused", "plan.estimated", "spend.updated",
                                       "case.completed", "lane.completed", "evidence.produced", "job.cancelled",
                                       "job.failed", "job.sealed"}, "skipped")),
-                     ("status", _known(INPUT_STATUSES, "not_measured"))],  # lane.completed's status
+                     ("status", _known(INPUT_STATUSES, "not_measured")),  # lane.completed's status
+                     ("limit", _as_written)],  # job.failed's limit
     "runner": [("kind", _as_written), ("os", _as_written)],
 }
 
@@ -711,7 +737,8 @@ class Run:
     def _json_file(self, rel, schema, problems):
         """The document (or None) of a JSON file of the run, adding its encoding, limit and schema problems."""
         f = self.folder
-        if f.size(rel) > MAX_JSON:
+        if f.size(rel) > (MAX_SEALING if rel == "seal.json" or rel.endswith(".dsse.json") or
+                          re.fullmatch(r"overlays/seal-[0-9]{4}\.json", rel) else MAX_JSON):
             problems.add((rel, "limit"))
             return None
         data = f.read(rel)
@@ -1895,7 +1922,8 @@ def op_lanes(checkpoint_path, runs_dir, at=None, policy=None):
 # ---------------------------------------------------------------------------- operations: signatures (§4.4)
 
 def _der_element(data, pos):
-    """(tag, content, end) of a DER element (lengths of up to four bytes); ValueError when it does not fit."""
+    """(tag, content, end) of a DER element (lengths of up to four bytes); ValueError when it does not fit or its
+    length is not DER's minimal one (SIG-3: a SubjectPublicKeyInfo is DER, whatever its algorithm)."""
     if pos + 2 > len(data):
         raise ValueError("truncated DER")
     tag, first, pos = data[pos], data[pos + 1], pos + 2
@@ -1903,7 +1931,11 @@ def _der_element(data, pos):
         length = first
     elif 0x81 <= first <= 0x84:
         count = first & 0x7F
+        if pos + count > len(data):
+            raise ValueError("truncated DER")
         length = int.from_bytes(data[pos:pos + count], "big")
+        if length < 0x80 or data[pos] == 0:
+            raise ValueError("a DER length that is not minimal (BER)")
         pos += count
     else:
         raise ValueError("unsupported DER length")
@@ -1913,9 +1945,16 @@ def _der_element(data, pos):
 
 
 def _pem_der(pem):
-    lines = [line.strip() for line in str(pem).strip().splitlines()]
+    """SIG-3: RFC 7468's strict form. The BEGIN line, lines of base64 and nothing else, the END line; LF or CRLF; no
+    text around the block, no blank line, no whitespace in a line."""
+    if not isinstance(pem, str):
+        raise ValueError("not a PEM string")
+    text = pem[:-1] if pem.endswith("\n") else pem
+    lines = [line[:-1] if line.endswith("\r") else line for line in text.split("\n")]
     if len(lines) < 3 or lines[0] != "-----BEGIN PUBLIC KEY-----" or lines[-1] != "-----END PUBLIC KEY-----":
-        raise ValueError("not a PEM PUBLIC KEY block")
+        raise ValueError("not a PEM PUBLIC KEY block, or text around it")
+    if any(not re.fullmatch(r"[A-Za-z0-9+/]+={0,2}", line) for line in lines[1:-1]):
+        raise ValueError("a PEM line that is not base64 alone (blank, or with whitespace)")
     return base64.b64decode("".join(lines[1:-1]), validate=True)
 
 
@@ -1925,13 +1964,22 @@ def _spki_algorithm(der):
     if tag != 0x30 or end != len(der):
         raise ValueError("not a SubjectPublicKeyInfo")
     tag, algorithm, pos = _der_element(body, 0)
-    bits_tag, _, end = _der_element(body, pos)
+    bits_tag, bits, end = _der_element(body, pos)
     if tag != 0x30 or bits_tag != 0x03 or end != len(body):
         raise ValueError("not a SubjectPublicKeyInfo")
+    if not bits or bits[0] != 0:
+        raise ValueError("the key BIT STRING has unused bits")
     oid_tag, oid, _ = _der_element(algorithm, 0)
     if oid_tag != 0x06:
         raise ValueError("not an AlgorithmIdentifier")
     return oid
+
+
+def _spki_algorithm_body(der):
+    """The content of a SubjectPublicKeyInfo's AlgorithmIdentifier (OID and parameters)."""
+    _, body, _ = _der_element(der, 0)
+    _, algorithm, _ = _der_element(body, 0)
+    return algorithm
 
 
 def policy_allows(policy, identity, action):
@@ -1958,8 +2006,17 @@ def load_policy(policy):
         try:
             key = aef_crypto.load_spki_der(der)
             kid = aef_crypto.keyid(key)
-        except ValueError:
+            if key.algorithm == aef_crypto.ED25519 and aef_crypto._ed_equal(
+                    aef_crypto._ed_mul(8, aef_crypto._ed_decode(key.key)), aef_crypto._ED_ZERO):
+                raise ValueError("an Ed25519 key of small order verifies forgeries")
+        except ValueError as error:
+            if _spki_algorithm_body(der) in (aef_crypto.ID_EC_PUBLIC_KEY + aef_crypto.PRIME256V1, aef_crypto.ID_ED25519):
+                # SIG-2, SIG-3: a P-256 or Ed25519 key that cannot be used (compressed, off the curve, not DER)
+                # refuses the whole policy; a verifier never verifies against part of one.
+                raise InputError(f"the policy key for {entry['identity']} cannot be used: {error}") from None
             key, kid = None, "sha256:" + sha256_hex(der)  # another algorithm (RSA, another curve): unsupported
+        if any(kid == k[1] for k in keys):
+            raise InputError(f"the policy lists the key {kid} twice: a verifier does not choose between them (SIG-3)")
         keys.append((entry["identity"], kid, key))
     return keys
 
@@ -2055,8 +2112,8 @@ def op_result_id(run_id, case_id, path, trial=None):
 def op_document(schema, path):
     verdict = document_verdicts(schema, path)
     docs = verdict.pop("documents")
-    reads = {}
-    if docs is not None and len(docs) == 1:
+    reads = {}  # §9.3: only for one document the reader accepts
+    if docs is not None and len(docs) == 1 and verdict["reader"] == "valid":
         reads = readings(schema, docs[0])
     verdict["reads"] = reads
     return verdict

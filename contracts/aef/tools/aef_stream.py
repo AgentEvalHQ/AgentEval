@@ -58,10 +58,32 @@ def parse_time(text):
     return calendar.timegm(moment.timetuple()), int((frac or "").ljust(9, "0"))
 
 
+def _plan_knowledge():
+    """The provider, isolation, content capture, credential schemes and purposes this version knows: what the writer
+    schemas accept there (VER-8)."""
+    writer = Path(__file__).resolve().parents[1] / "1" / "schemas" / "writer"
+    plan = json.loads((writer / "run-plan.schema.json").read_bytes())["properties"]
+    provider = json.loads((writer / "common.schema.json").read_bytes())["$defs"]["provider"]["anyOf"]
+    creds = plan["credentialRefs"]["items"]["properties"]
+    return (set(provider[0]["enum"]), re.compile(provider[1]["pattern"]), set(plan["isolation"]["enum"]),
+            set(plan["contentCapture"]["enum"]), set(creds["scheme"]["enum"]), set(creds["purpose"]["enum"]))
+
+
+def knows(plan):
+    """PLAN-7: whether a runner of this version knows every value of the plan it must know, or must refuse it."""
+    providers, provider_pattern, isolations, captures, schemes, purposes = _plan_knowledge()
+    p = plan.get("provider")
+    return ((p in providers or (isinstance(p, str) and provider_pattern.fullmatch(p) is not None))
+            and plan.get("isolation") in isolations
+            and plan.get("contentCapture", "off") in captures
+            and all(c.get("scheme") in schemes and c.get("purpose") in purposes for c in plan.get("credentialRefs", [])))
+
+
 def matches(plan, runner):
-    """A runner can take a plan when it carries every selector tag, supports the plan's provider, and, for a
-    remote-zone plan, is in the plan's zone."""
-    return (all(tag in runner.get("tags", []) for tag in plan.get("runnerSelector", []))
+    """PLAN-7: a runner takes a plan when it can take it (it carries every selector tag, supports the plan's provider,
+    and, for a remote-zone plan, is in the plan's zone) and knows its values (knows)."""
+    return (knows(plan)
+            and all(tag in runner.get("tags", []) for tag in plan.get("runnerSelector", []))
             and plan["provider"] in runner["providers"]
             and (plan["isolation"] != "remote-zone" or runner.get("networkZone") == plan.get("zone")))
 

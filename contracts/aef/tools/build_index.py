@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[1] / "1" / "conformance"
 CLASSES = {
     "document": ["Producer", "Reader"],
     "reader-only": ["Reader"],
-    "encoding": ["Reader", "Run verifier"],
+    "encoding": ["Run verifier"],
     "run": ["Run verifier"],
     "result-id": ["Producer"],
     "paths": ["Producer", "Run verifier"],
@@ -48,7 +48,7 @@ def entry(vid, kind, rules, path, files, classes=None):
 def main():
     vectors = []
     for group in ("valid", "runs", "encoding", "seal-vectors", "chain-vectors", "overlay-views", "invalid", "reader-only",
-                  "checkpoints", "lane-vectors", "signature-vectors"):
+                  "documents", "checkpoints", "lane-vectors", "signature-vectors"):
         folder = ROOT / group
         if not folder.exists():
             continue
@@ -57,7 +57,11 @@ def main():
             classes = None
             if group == "valid":
                 classes = ["Producer", "Run verifier"]
-            vectors.append(entry(f"{group}/{d.name}", exp["kind"], exp.get("rules", []), f"{group}/{d.name}", files_of(d), classes))
+            e = entry(f"{group}/{d.name}", exp["kind"], exp.get("rules", []), f"{group}/{d.name}", files_of(d), classes)
+            # Spec 09 §9.1: what only a Run verifier at the signed level must pass (signatures, a trust policy).
+            if "Run verifier" in e["classes"] and (exp["kind"] == "signature" or "policy" in exp):
+                e["level"] = "signed"
+            vectors.append(e)
     keys = ROOT / "signature-vectors" / "keys"
     if keys.exists():
         vectors.append(entry("signature-vectors/keys", "fixture", ["SIG-3"], "signature-vectors/keys", files_of(keys),

@@ -502,6 +502,11 @@ tools/ce/judge-agreement-results.json
 # Ignore the DIRECTORY, per the rule above. Note that `git check-ignore -v runs/` on the directory
 # can report a match against a BLANK line and tell you nothing; check a FILE inside it.
 runs/
+# ...except AEF source folders named Runs/ (a C# namespace, not run output). Git on Windows ignores case
+# (core.ignorecase), so runs/ above would silently drop them from every commit. contracts/aef/.gitignore
+# re-includes the corpus's runs/ folders the same way.
+!src/AgentEval.Results/Runs/
+!tests/AgentEval.Results.Tests/Runs/
 
 # Playwright MCP browser-session output (page snapshots, console logs, saved page text). It can
 # capture whatever page the browser had open, including third-party chat shares, so it must never

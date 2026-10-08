@@ -1,0 +1,1 @@
+{"schemaVersion":"1.0","resultId":"r_8a18be2b06143eb8f5722bdf061f5f4a","caseId":"LLM01-001","path":"triage","evaluator":{"id":"code:triage"},"state":"passed","scores":[{"metric":"triage-score","value":1.0}]}

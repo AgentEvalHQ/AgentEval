@@ -1,5 +1,33 @@
 # AEF 1.0 changelog
 
+## Unreleased (draft): what implementing it in .NET found
+
+AgentEval's own implementation (AgentEval.Results, TODO Q4-39) is written from the text alone, as the second
+implementation every class needs. Its design pass and its first two work packages found 39 places where the text was
+ambiguous, contradictory or silent; running both implementations on crafted inputs found three real disagreements.
+Each was ruled, written into the specification and pinned by a vector (488 vectors now):
+
+- **Signatures** ([SIG-1]–[SIG-5]): Ed25519 is required of verifiers, as P-256 is, since a signer may use either.
+  Pinned where libraries differ: Ed25519's k reduced mod L, the equation without the cofactor, small-order keys
+  refused; every key strict DER in a strict RFC 7468 PEM; a policy listing a key twice, or holding a key that cannot
+  be used, refused as a whole; the full list of malformed envelopes (a `null` keyid reads as absent, as DSSE says);
+  either base64 alphabet, padded or not.
+- **Limits** ([ENC-17], [ENC-18]): seals and envelopes may reach 32 MiB, so a run of 100,000 files can be sealed; depth
+  counts the top-level value as 1; a line over a limit is reported at its line.
+- **Reading** ([VER-8], §7.3): a value is known when the writer schema accepts it (so `ci:<name>` providers are
+  known); rows for every open enum (a threshold's `op`, a plan's `contentCapture`, `job.failed`'s `limit`, a
+  decision's outcome and statuses); every assurance reads as `self-attested` until a signature verifies it.
+- **Precision**: string lengths count code points and numbers compare as binary64 ([ENC-4]); underflow reads as 0
+  ([ENC-3]); patterns avoid constructs engines match differently ([ENC-14], enforced by `check_spec.py`); codes
+  order by their bytes and only NDJSON lines by number (§3.9); reserved Windows names ignore everything from the
+  first `.` ([RUN-3]); only regular files in a run folder.
+- **Conformance** (§9): the command-line contract is one normative table; the Reader class has its own vectors
+  (every encoding defect as a document); `index.json` marks what only a signed-level Run verifier must pass; a
+  `matching` vector asks whether a runner *takes* the plan; the decision function refuses what the reader schema
+  refuses; a migrated AgentEval store run is an imported run ([RUN-15], §7.5).
+- **Tools**: the reference verifier reads its known values from the writer schemas, so they cannot drift (it had read
+  a `scored` summary verdict as `inconclusive`); `check_spec.py` fails on a problem code no vector expects.
+
 ## Unreleased (draft): rework after critic round 2
 
 Critic round 2 scored the rework 7.8 of 10, with one blocker: a lane could pass on a summary number nobody checks.
@@ -84,7 +112,7 @@ blockers). Changes since:
 - **The specification** is nine numbered documents with BCP 14 keywords, an id on every rule, roles and conformance
   classes, a threat model (§8) and a conformance chapter (§9). The old one-page text is gone.
 - **Verification outcomes**: unsealed, intact, signed, anchored, or invalid. An intact run is never called authentic.
-- **Signatures**: DSSE v1; ECDSA P-256 required, Ed25519 recommended; `keyid` is the SHA-256 of the SPKI DER; the trust
+- **Signatures**: DSSE v1; ECDSA P-256 required, Ed25519 recommended (required since the round-2 rework); `keyid` is the SHA-256 of the SPKI DER; the trust
   policy is the verifier's input; an envelope needs at least one signature; no low-S rule.
 - **Lanes bound to evidence**: a checkpoint lane's result is a function of its sealed runs (`threshold`, `severity`,
   `evidence-present`, `comparison` with an exact one-sided sign test). Only intact, completed, live runs are eligible.

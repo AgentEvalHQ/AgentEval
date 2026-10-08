@@ -1,0 +1,29 @@
+{
+  "kind": "signature",
+  "envelope": "envelope.dsse.json",
+  "file": "seal.json",
+  "payloadType": "application/vnd.in-toto+json",
+  "policy": "policy.json",
+  "envelopeResult": null,
+  "signatures": [
+    {
+      "keyid": "sha256:b5465da5f72069887e490258fc60e5319c05344df17f2c9d91ad2c779d07734e",
+      "result": "verified",
+      "identity": "git:alice@example.com"
+    },
+    {
+      "keyid": "sha256:2986cef07918485086a97ba70ef87ea966b8c3634fb59bcafc4e8b6a9ea5d787",
+      "result": "verified",
+      "identity": "spiffe://example.com/ci/sealer"
+    }
+  ],
+  "verifiesFor": [
+    "spiffe://example.com/ci/sealer",
+    "git:alice@example.com"
+  ],
+  "rules": [
+    "SIG-4",
+    "SIG-5",
+    "SIG-6"
+  ]
+}

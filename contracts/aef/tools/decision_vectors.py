@@ -332,6 +332,8 @@ REFUSED = [
      {"lanes": [lane("security", True, "failed")],
       "exceptions": [exception("security", at="2026-10-07T15:00:00Z", expires="2026-10-07T12:00:00Z")]},
      "exception-never-in-force", False),
+    ("60-input-time-does-not-exist", "An evaluatedAt on 31 February: the reader schema refuses the input, so the function refuses it (DEC-1, ENC-8).",
+     {"evaluatedAt": "2026-02-31T00:00:00Z", "lanes": [lane("quality", True, "passed")]}, "input-invalid", True),
     ("58-exception-for-no-evidence", "An exception that names no run hash would accept any failure, a policy rather than an exception: refused (DEC-1). (The schema refuses it too.)",
      {"lanes": [lane("security", True, "failed")], "exceptions": [exception("security", evidence=[])]},
      "exception-no-evidence", True),

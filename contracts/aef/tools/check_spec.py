@@ -25,7 +25,7 @@ PREFIXES = "(?:ENC|RUN|RES|SUM|EVD|GATE|SEAL|OVL|SIG|CKP|LANE|DEC|PLAN|STRM|VER|
 # Backticked camelCase words in the prose that are not schema fields: placeholders, JSON Schema keywords, code.
 NOT_FIELDS = {"ExportTraceServiceRequest", "signedBy", "LaneResult", "MeasurementState", "additionalProperties", "allOf",
               "anyOf", "effectiveState", "endTimeUnixNano", "envelopeResult", "expectedError", "keyid", "maxItems",
-              "maxLength", "minItems", "oneOf", "payloadType", "publicKey", "readOnly", "sealedState",
+              "maxLength", "minItems", "minLength", "oneOf", "payloadType", "publicKey", "readOnly", "sealedState",
               "startTimeUnixNano", "uniqueItems", "unsealedEvents", "verifiesFor", "writeOnly"}
 
 
@@ -68,6 +68,29 @@ def schema_properties():
     for p in (AEF / "schemas" / "writer").glob("*.schema.json"):
         walk(json.loads(p.read_text(encoding="utf-8")))
     return names
+
+
+def unportable(pattern):
+    """ENC-14: a construct every engine compiles but not every engine matches alike, or None. Anywhere: \\d, \\w, \\s,
+    \\b and their capitals; outside a character class: an unescaped '.', an inline option or a named group."""
+    in_class, i = False, 0
+    while i < len(pattern):
+        c = pattern[i]
+        if c == "\\" and i + 1 < len(pattern):
+            if pattern[i + 1] in "dDwWsSbB":
+                return "\\" + pattern[i + 1]
+            i += 2
+            continue
+        if in_class:
+            in_class = c != "]"
+        elif c == "[":
+            in_class = True
+        elif c == ".":
+            return "an unescaped '.'"
+        elif c == "(" and pattern[i + 1:i + 2] == "?" and pattern[i + 2:i + 3] != ":":
+            return "an inline option or a named group"
+        i += 1
+    return None
 
 
 def main():
@@ -151,6 +174,9 @@ def main():
                 raw = json.loads('"' + pat + '"')
                 if any(s in raw for s in ("(?=", "(?!", "(?<=", "(?<!")) or re.search(r"\\[1-9]", raw):
                     problems.append(f"{kind}/{f.name}: pattern {raw!r} uses lookaround or a backreference (ENC-14)")
+                if unportable(raw):
+                    problems.append(f"{kind}/{f.name}: pattern {raw!r} uses {unportable(raw)}, which engines match "
+                                    "differently (ENC-14)")
 
     print(f"{len(defined)} rules defined, {len(cited)} cited; {len(used_rules)} named by the corpus; "
           f"{len(used_codes)} problem codes used, {len(codes)} defined")

@@ -43,8 +43,9 @@ A run plan (schema `run-plan`) is what a runner is asked to evaluate:
 
 - **[PLAN-7]** A runner **can take** a plan when it carries every tag of the plan's `runnerSelector`, supports the
   plan's provider, and, for a `remote-zone` plan, has the plan's zone as its `networkZone`. A runner **MUST** refuse
-  (`job.refused`) a plan it cannot take, or one with an isolation, a credential scheme or a purpose it does not
-  know.
+  (`job.refused`) a plan it cannot take, or one with a provider, an isolation, a content capture, a credential scheme
+  or a purpose it does not know. It **takes** a plan when it can take it and knows all of these; `matching` vectors
+  ask whether it takes the plan.
 - `conformance/protocol/matching/` holds plan and runner pairs with the expected answer.
 
 ## 6.4 The event stream
@@ -72,7 +73,7 @@ output for a local runner, over its channel for a remote one.
 - **[STRM-2]** A stream whose last line does not end in LF is still being written: it is not a finished stream
   ([ENC-7]).
 - **[STRM-3]** A stream verifier checks a finished stream, given its plan and the digest of the plan file's bytes, line
-  by line, and reports per event (`event:<n>`, the 1-based line), in event order and then by code:
+  by line, and reports per event (`event:<n>`, the 1-based line), in event order and then by code (its bytes):
 
   | Code | When |
   |---|---|
@@ -104,8 +105,8 @@ output for a local runner, over its channel for a remote one.
   announced the `runId`, it is `run-hash`. Either is the run's only problem: its other rules would be checked against
   files the runner did not announce. The other runs, the runs **found**, are each checked against the plan at
   `run:<runId>`, and together against the plan's limits at `job`: a runner cannot pass by splitting its work across
-  runs. Problems are ordered as §3.9 orders them: by path (its UTF-8 bytes, so `job` first), then by code, the order
-  of this table:
+  runs. Problems are ordered as §3.9 orders them: by path (its UTF-8 bytes, so `job` first), then by code (its
+  bytes):
 
   | Code | When |
   |---|---|

@@ -1,0 +1,13 @@
+{
+  "kind": "document",
+  "schema": "overlay-event",
+  "writer": "valid",
+  "reader": "valid",
+  "reads": {
+    "by.assurance": "self-attested"
+  },
+  "rules": [
+    "VER-8",
+    "OVL-3"
+  ]
+}

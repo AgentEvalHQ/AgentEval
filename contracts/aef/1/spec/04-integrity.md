@@ -143,10 +143,14 @@ no effect either. Events after the last verified batch are shown as unsealed and
 ## 4.4 Signatures
 
 - **[SIG-1] Envelopes.** A signature is a DSSE v1 envelope ([DSSE]): `payloadType`, `payload` (base64 of the signed
-  bytes), and `signatures` (at least one, each a `keyid` and a base64 `sig`; an envelope with none is `malformed`).
-  Base64 is written in the standard alphabet with padding; a reader also accepts the URL-safe alphabet, with or without
-  padding, as DSSE requires, and refuses whitespace, set unused bits and mixed alphabets. The signed message is the DSSE pre-authentication
-  encoding `PAE(payloadType, payload)`:
+  bytes), and `signatures` (at least one, each a `keyid` and a base64 `sig`). An envelope is `malformed` when it is not
+  an I-JSON object ([ENC-2]); when `payloadType` or `payload` is absent or not a string; when `payload` is not base64;
+  when `signatures` is absent, not an array or empty; or when an entry of it is not an object, has no `sig`, a `sig`
+  that is not a base64 string, or a `keyid` that is present but neither a string nor `null` (`null` reads as absent,
+  as DSSE's JSON mapping says). Members DSSE does not define are ignored. Base64 is written in the standard alphabet with padding. A reader accepts either alphabet, the
+  standard or the URL-safe one, padded or not; padding, when present, is complete; it refuses whitespace, set unused
+  bits and a mix of the two alphabets. The signed message is the DSSE pre-authentication encoding
+  `PAE(payloadType, payload)`:
 
   ```
   "DSSEv1" SP LEN(payloadType) SP payloadType SP LEN(payload) SP payload
@@ -163,26 +167,42 @@ no effect either. Events after the last verified batch are shown as unsealed and
   A verifier **MUST** check that the payload is byte for byte the file it signs, and that `payloadType` is the one this
   table gives for that file (`payload-mismatch` otherwise).
 - **[SIG-2] Algorithms.** A verifier **MUST** support ECDSA over NIST P-256 with SHA-256 ([FIPS 186-5]; the signature
-  is DER-encoded `SEQUENCE { r INTEGER, s INTEGER }`, strictly: a raw `r‖s` is not a signature), and **SHOULD** support
-  Ed25519 ([RFC 8032]). A signer uses one of these two. ECDSA has no low-S rule here: `s` and `n − s` are both valid,
-  as in DSSE and in-toto. A trusted key of any other algorithm gives `unsupported-algorithm` for a signature it would
-  check, which counts as not verified.
-- **[SIG-3] Key ids.** `keyid` is `sha256:` and the hex SHA-256 of the public key's DER-encoded SubjectPublicKeyInfo.
+  is DER-encoded `SEQUENCE { r INTEGER, s INTEGER }`, strictly: minimal integers, no trailing bytes; a raw `r‖s` is
+  not a signature) and Ed25519 ([RFC 8032], verified as its §5.1.7 gives: `R` and `A` decode as its §5.1.3 gives,
+  `S` < L, k = SHA-512(`R` ‖ `A` ‖ message) **reduced mod L**, and the group equation without the cofactor,
+  `[S]B = R + [k]A`). A signer uses one of these two, so a verifier that knew only one could not check what a signer
+  may write. ECDSA has no low-S rule here: `s` and `n − s` are both valid, as in DSSE and in-toto.
+
+  A key is **usable** when it is a P-256 key whose point is uncompressed and on the curve, or an Ed25519 key of 32
+  bytes that decode to a point (RFC 8032 §5.1.3) not of small order (eight times it is not the neutral point: such a
+  key would verify forged signatures). A key is of **another algorithm** when its AlgorithmIdentifier is neither
+  id-ecPublicKey with the named curve prime256v1 nor id-Ed25519 without parameters; a trusted key of another algorithm
+  gives `unsupported-algorithm` for a signature it would check, which counts as not verified.
+- **[SIG-3] Key ids.** `keyid` is `sha256:` and the hex SHA-256 of the public key's DER-encoded SubjectPublicKeyInfo,
+  the bytes the trust policy's PEM holds, as given (never re-encoded). The PEM is RFC 7468's strict form: the line
+  `-----BEGIN PUBLIC KEY-----`, lines of base64 (standard alphabet, with padding) and nothing else, the line
+  `-----END PUBLIC KEY-----`, lines ended by LF or CRLF, no text before or after the block, no blank line and no
+  whitespace inside a line. The SubjectPublicKeyInfo is DER, whatever its algorithm (minimal lengths, a key BIT STRING
+  with no unused bits, nothing after it). A trust policy is refused as a whole when a key is not such a PEM or such a
+  SubjectPublicKeyInfo, when a key of P-256 or Ed25519 is not usable ([SIG-2]), or when two of its keys have one key
+  id: a verifier does not verify against part of a policy.
 - **[SIG-4] Trust policy.** Which keys to trust is an **input** to verification, never something read from the run: a
   list of public keys, each with the identity it speaks for (for example `git:alice@example.com`, `spiffe://…`,
   `oidc:issuer/subject`) and, optionally, what that identity may do beyond signing: `"may": ["redact"]` allows it to
-  authorize redactions ([OVL-10]). A verifier **MUST NOT** trust a key because a run, an overlay or a runner manifest
-  names it.
+  authorize redactions ([OVL-10]). One identity may hold several keys (a rotation); what it may do is the union of the
+  `may` of its keys. A verifier **MUST NOT** trust a key because a run, an overlay or a runner manifest names it.
   Keyless signing (Sigstore: a short-lived certificate tied to an OIDC identity, logged in a transparency log) **MAY**
   be supported as a trust-policy input; its bundle is then given beside the envelope.
 - **[SIG-5] Results per signature**, in envelope order: `verified` (a trusted key, a valid signature: the identity is
   reported), `untrusted-key` (a valid signature by a key the policy does not list, or no key with that id), `invalid`
   (the signature does not verify), `unsupported-algorithm`, and, for the whole envelope, `malformed` (no per-signature
   results then) or `payload-mismatch`. A signature with a `keyid` is checked only against the trusted key with that
-  id; one without a `keyid` (absent or empty, as DSSE allows) is tried against every trusted key in policy order, and
-  its result names the first key that verifies it (or the empty `keyid` when none does: `untrusted-key`). An envelope
-  **verifies for an identity** when it is neither `malformed` nor `payload-mismatch` and at least one of its
-  signatures is `verified` for that identity.
+  id; one without a `keyid` (absent or empty, as DSSE allows) is tried against every trusted key of P-256 or Ed25519
+  in policy order (keys of another algorithm are skipped), and its result names the first key that verifies it (or
+  the empty `keyid` when none does: `untrusted-key`). An envelope **verifies for an identity** when it is neither
+  `malformed` nor `payload-mismatch` and at least one of its signatures is `verified` for that identity; the
+  identities it verifies for are listed in the order of the policy position of the first key that verified for
+  each.
 - **[SIG-6]** `conformance/signature-vectors/` holds test keys (marked as test keys: never trust them), trust policies,
   envelopes over runs, overlay batches and checkpoints, and the result of each: valid, wrong key, tampered payload,
   unknown key, malformed signature, payload that is not the file.

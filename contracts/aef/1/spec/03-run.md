@@ -29,11 +29,13 @@
   `unexpected-file` (§4.2); a hidden file a file manager added (`.DS_Store`) also breaks [RUN-3]. Tools that copy runs **MUST NOT** add files.
 - **[RUN-3] Paths.** Every path in a run folder is made of segments of ASCII letters, digits, `.`, `_` and `-`,
   separated by `/`, at most 255 bytes in all (a longer path is a `path` problem, not a `limit`). No segment starts or
-  ends with `.` (so `.`, `..` and hidden files such as `.DS_Store` are excluded), or is (ignoring case and any
-  extension) a name Windows reserves (`CON`, `PRN`, `AUX`, `NUL`, `COM1`–`COM9`, `LPT1`–`LPT9`). No two paths, and no
+  ends with `.` (so `.`, `..` and hidden files such as `.DS_Store` are excluded), or is (ignoring case and
+  everything from its first `.`) a name Windows reserves (`CON`, `PRN`, `AUX`, `NUL`, `COM1`–`COM9`, `LPT1`–`LPT9`). No two paths, and no
   two of their folders, differ only in letter case (`ext/Data/x` and `ext/data/y` clash: a case-insensitive file
   system merges the folders). So no file system re-encodes, re-orders or merges them. A path that breaks this is
-  reported as `path`; for a case clash, the later of the two paths in byte order.
+  reported as `path`; for a case clash, the later of the two paths in byte order. Every entry of a run folder is a
+  regular file or a folder: a symbolic link, device, pipe or socket is a `path` problem and is never followed or
+  read (a link can point outside the run; a pipe would block a reader).
 - **[RUN-4] A closed run never changes.** While `status` is `running` the producer may rewrite its files. When it
   closes the run (`completed` or `aborted`) it writes their final form; from then on nothing edits, adds or removes a
   file outside `overlays/`. Everything added later is an overlay (§4.2).
@@ -250,7 +252,10 @@ evaluation (§5.3) reads it, so it is defined exactly.
 ## 3.9 Rules across files
 
 A schema checks one document. A **run verifier** also checks these rules, and reports each problem as a path and a
-code, ordered by path and then by code. Paths are ordered by their UTF-8 bytes, except that `<file>:<line>` paths of one file are ordered by line number as a number (`results.ndjson:9` before `results.ndjson:10`). A run with any of these problems is invalid.
+code, ordered by path and then by code (its bytes). Paths are ordered by their UTF-8 bytes, except that the line paths of one file, `<file>:<line>` where `<file>` is an
+NDJSON or JSONL file (`results.ndjson`, `evidence.ndjson`, `gates.ndjson`, `traces.otlp.jsonl`, `logs.otlp.jsonl`,
+`overlays/events.ndjson`), are ordered by line number as a number (`results.ndjson:9` before `results.ndjson:10`).
+Any other path with a colon (`run:<runId>`, [STRM-4]) is ordered by its bytes like every other path. A run with any of these problems is invalid.
 
 A verifier reads each JSON file whole and each NDJSON file line by line (§2.2). An NDJSON file whose framing breaks
 [ENC-5] or [ENC-7] (a CR, a blank line, a missing final LF, a byte-order mark) is reported once, as `encoding` at the
@@ -261,7 +266,7 @@ an `encoding`, `limit` or `schema` problem: they would otherwise be checked agai
 | Code | Path | The rule |
 |---|---|---|
 | `encoding` | the file, or `<file>:<line>` for one line | §2.1, §2.2 (I-JSON, UTF-8, NDJSON) |
-| `limit` | the file | §2.6 |
+| `limit` | the file, `<file>:<line>` for one line, or `.` | [ENC-18] |
 | `schema` | the file (`results.ndjson:<line>` for a line) | the document or line is not valid against the reader schema, or holds a time that does not exist ([ENC-8]: a pattern cannot refuse `2026-02-31`); also a file [RUN-2] requires that is absent, at its path |
 | `path` | the path | [RUN-3]; for two paths that differ only in case, the later one in byte order |
 | `result-id` | `results.ndjson:<line>` | a `resultId` that is not the [RES-4] hash of the line, or one an earlier line already has |

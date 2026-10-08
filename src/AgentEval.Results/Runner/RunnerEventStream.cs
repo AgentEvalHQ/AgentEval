@@ -18,8 +18,10 @@ public static class RunnerEventStream
     private static readonly string[] Provenance = ["planId", "planDigest", "jobId", "runnerId"];
 
     /// <summary>
-    /// A runner can take a plan when it carries every tag of the plan's runnerSelector, supports the plan's provider,
-    /// and, for a remote-zone plan, is in the plan's zone.
+    /// [PLAN-7]: a runner takes a plan when it can take it (it carries every tag of the plan's runnerSelector, supports
+    /// the plan's provider, and, for a remote-zone plan, is in the plan's zone) and knows the plan's provider,
+    /// isolation, content capture and credential schemes and purposes: what this version's writer schema accepts there
+    /// ([VER-8]). A runner refuses a plan holding a value it does not know, even one its own manifest lists.
     /// </summary>
     public static bool Matches(JsonNode plan, JsonNode runner)
     {
@@ -27,9 +29,22 @@ public static class RunnerEventStream
         ArgumentNullException.ThrowIfNull(runner);
         var tags = (runner["tags"]?.AsArray() ?? []).Select(t => (string?)t).ToHashSet(StringComparer.Ordinal);
         var providers = (runner["providers"]?.AsArray() ?? []).Select(p => (string?)p).ToHashSet(StringComparer.Ordinal);
-        return (plan["runnerSelector"]?.AsArray() ?? []).All(t => tags.Contains((string?)t))
+        return Knows(plan)
+               && (plan["runnerSelector"]?.AsArray() ?? []).All(t => tags.Contains((string?)t))
                && providers.Contains((string?)plan["provider"])
                && ((string?)plan["isolation"] != "remote-zone" || (string?)runner["networkZone"] == (string?)plan["zone"]);
+    }
+
+    private static bool Knows(JsonNode plan)
+    {
+        static bool Known(string schema, JsonNode? value) => value is null || Schemas.AefSchemas.Writer.IsValid(schema, value);
+
+        return Known("run-plan#/properties/provider", plan["provider"])
+               && Known("run-plan#/properties/isolation", plan["isolation"])
+               && Known("run-plan#/properties/contentCapture", plan["contentCapture"])
+               && (plan["credentialRefs"]?.AsArray() ?? []).All(c =>
+                   Known("run-plan#/properties/credentialRefs/items/properties/scheme", c?["scheme"])
+                   && Known("run-plan#/properties/credentialRefs/items/properties/purpose", c?["purpose"]));
     }
 
     /// <summary>

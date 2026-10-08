@@ -106,6 +106,10 @@ def documents():
          dict(PLAN, credentialRefs=[CREDENTIALS[0], dict(CREDENTIALS[1], purpose="observer")]), "invalid", "valid",
          ["PLAN-3", "PLAN-7", "VER-8"],
          "a credential purpose this version does not know: a reader takes the plan, and a runner refuses it"),
+        ("plans", "valid-ci-provider", "run-plan", dict(PLAN, provider="ci:github"), "valid", "valid", ["PLAN-1", "VER-8"],
+         "a ci:<name> provider is known: the writer schema accepts it through its pattern, so a reader keeps it"),
+        ("plans", "unknown-content-capture", "run-plan", dict(PLAN, contentCapture="partial"), "invalid", "valid",
+         ["PLAN-7", "VER-8"], "a content capture this version does not know: a reader takes the plan, and a runner refuses it"),
         ("runners", "valid", "runner", RUNNER, "valid", "valid", ["PLAN-6"], "a local runner"),
         ("runners", "no-provider", "runner", dict(RUNNER, providers=[]), "invalid", "invalid", ["PLAN-6"],
          "a runner supports at least one provider"),
@@ -123,6 +127,8 @@ READS = {
     ("plans", "unknown-isolation"): {"isolation": "refused"},
     ("plans", "unknown-credential-scheme"): {"credentialRefs[0].scheme": "refused"},
     ("plans", "unknown-credential-purpose"): {"credentialRefs[1].purpose": "refused"},
+    ("plans", "valid-ci-provider"): {"provider": "ci:github"},
+    ("plans", "unknown-content-capture"): {"contentCapture": "refused"},
     ("runners", "unknown-os"): {"os": "plan9"},
     ("runners", "unknown-kind"): {"kind": "warehouse"},
 }
@@ -141,13 +147,17 @@ def matching():
          "same zone, provider supported, tags carried"),
         ("runner-kind-unknown", PLAN, dict(RUNNER, kind="warehouse"), True,
          "a runner kind this version does not know takes no part in matching (VER-8): tags and provider decide"),
+        ("isolation-unknown", dict(PLAN, isolation="microvm"), RUNNER, False,
+         "a runner does not take a plan whose isolation it does not know, even when it could run it (PLAN-7)"),
+        ("provider-unknown-but-listed", dict(PLAN, provider="podman"), dict(RUNNER, providers=["podman", "local"]), False,
+         "a runner of this version does not take a provider it does not know, even one its manifest lists (PLAN-7, VER-8)"),
         ("runner-os-unknown", PLAN, dict(RUNNER, os="plan9"), True,
          "a runner os this version does not know takes no part in matching (VER-8): tags and provider decide"),
     ]
 
 
 # Matching vectors whose runner manifest only a reader accepts (a value a later minor may add), and their extra rules.
-MATCHING_READER_ONLY = {"runner-kind-unknown", "runner-os-unknown"}
+MATCHING_READER_ONLY = {"runner-kind-unknown", "runner-os-unknown", "isolation-unknown", "provider-unknown-but-listed"}
 
 
 def ev(seq, kind, at, **fields):
@@ -176,6 +186,7 @@ STREAM_RULES = {
     "run-hash-changed": ["STRM-3"],
     "first-not-accepted": ["STRM-3"],
     "other-job": ["STRM-1", "STRM-3"],
+    "seq-and-job-id-at-one-event": ["STRM-3", "CONF-2"],
     "other-plan": ["PLAN-5", "STRM-3"],
     "plan-changed": ["PLAN-5", "STRM-3"],
     "accepted-twice": ["STRM-3"],
@@ -258,6 +269,8 @@ def streams(digest, small_digest, day_digest):
                                   ev(4, "job.cancelled", "2026-10-09T12:00:01Z", reason="x")],
          [("event:3", "over-time")], False),
         ("unknown-kind-mid-stream", p, [accepted, ev(2, "job.paused", T.format(1)), cancel(3, 2)], [], True),
+        ("seq-and-job-id-at-one-event", p, [accepted, dict(ev(3, "spend.updated", T.format(1), spentUsd=0.1), jobId="job-8"),
+                                            cancel(4, 2)], [("event:2", "job-id"), ("event:2", "seq")], False),
     ]
 
 
@@ -395,6 +408,14 @@ def two_runs(problems, first, second):
     return build
 
 
+def v_numeric_run_ids(runs, plan, digest):
+    """§3.9: 'run:10' and 'run:9' are not line paths, so they order by their bytes: run:10 first."""
+    wrong = {"subject": {"ref": SUBJECT, "kind": "agent", "version": V6}}
+    h10 = make_run(runs, "10", "10", plan, digest, **wrong)
+    h9 = security_run(runs, "9", plan, digest, **wrong)
+    return job(plan, digest, [("9", h9), ("10", h10)], ["9", "10"]), [("run:10", "subject"), ("run:9", "subject")]
+
+
 def v_run_missing(runs, plan, digest):
     h1 = make_run(runs, "R-1", "R-1", plan, digest)
     return job(plan, digest, [("R-1", h1), ("R-2", OTHER_HASH)], ["R-1", "R-2"]), [("run:R-2", "run-missing")]
@@ -474,6 +495,8 @@ def conformance():
         ("plan-names-no-judges", NO_JUDGES, one_run([]), None, ["STRM-4"],
          "a plan without judges leaves the runner's judges unchecked"),
         ("run-missing", CPLAN, v_run_missing, None, ["STRM-4", "RUN-1"], "R-2 was announced and sealed, but no folder holds it"),
+        ("numeric-run-ids", CPLAN, v_numeric_run_ids, None, ["STRM-4", "CONF-2"],
+         "runs 9 and 10 of another subject version: run:10 is reported first, by bytes, as it is not a line path"),
         ("run-hash-resealed", CPLAN, v_resealed, None, ["STRM-4", "SEAL-4"],
          "run.json was edited after sealing (to the plan's subject version) and sealed again: intact, but its seal has "
          "another run hash than the one announced; nothing else is checked, so its content capture is not reported"),

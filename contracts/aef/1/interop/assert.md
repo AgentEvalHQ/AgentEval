@@ -110,7 +110,7 @@ gives a root line at the path `assert_ai_verdict`, and two child lines that carr
 | `taxonomy.json` | `judges[].rubricDigest` and `annotator.rubricDigest`: the SHA-256 of the file | exact as a digest; the file itself goes under `ext/` or into a blob |
 | AgentEval's calibration of the judge (`agenteval assert-ai calibrate`) | `judges[].calibration`: `labelSet`, `n` (cases decided), `accuracy`, `kappa`, `dangerousErrors`, `measuredAt` ([RUN-9](../spec/03-run.md#32-runjson)) | exact; written only when it was measured on the same taxonomy |
 | `systematization.json`, `suite.json`, `config.yaml`, `metrics.json` | files under `ext/`, sealed with the run ([ENC-19](../spec/02-encoding.md#27-the-extension-point)) | none: nothing in AEF reads them |
-| `metrics.json` token usage | none | none: `summary.json` has no token totals |
+| `metrics.json` token usage | `summary.json` `usage`: one entry per party (`role`: `agent` for the target, `judge`, `attacker` for the tester) and `model` ([SUM-7](../spec/03-run.md#36-summaryjson)) | exact for the token counts ASSERT records |
 
 **Each case**
 
@@ -152,6 +152,7 @@ gives a root line at the path `assert_ai_verdict`, and two child lines that carr
 | a rate that is `null` | `value: null`, `verdict: not_measured` | exact |
 | AgentEval's 95% Wilson interval (ASSERT prints none) | the entry's `ci` (`method: wilson`, `level: 0.95`) | exact as the producer's |
 | a gate limit (`--max-harm-rate 0.05`) | the entry's `rule` (`harm <= 0.05`) and `verdict` | exact |
+| no gate limit | `verdict: scored` and no `rule`: measured, no rule applied ([SUM-6](../spec/03-run.md#36-summaryjson)) | exact |
 
 ## What does not carry over
 
@@ -161,7 +162,7 @@ run did not capture. A taxonomy, which AEF does not have and ASSERT requires.
 
 **ASSERT → AEF.** The confidence of each category's finding, outside the reasoning blob. The stratification levels of
 each case. The content of `systematization.json`, the taxonomy and the frozen configuration, which travel as files that
-nothing in AEF reads. Run-level token usage. A version for the suite or for ASSERT itself: neither is recorded, so the
+nothing in AEF reads. A version for the suite or for ASSERT itself: neither is recorded, so the
 converter supplies both.
 
 ## Worked example
@@ -218,10 +219,3 @@ The whole converted run was checked:
 - `run.json`, the 18 lines of `results.ndjson`, `metrics.json` (`harm`, `over_refusal`, `policy_violation`,
   `overrefusal`) and `summary.json` are valid against the writer schemas;
 - the reference verifier (`tools/aef_verify.py run`) reports no problems, with the outcome `unsealed` before sealing.
-
-## Still open
-
-- **A rate with no gate.** Without `--max-harm-rate` there is no rule. A `summary.json` entry needs a `verdict`, and
-  none of its values (`passed`, `failed`, `warn`, `inconclusive`, `not_measured`;
-  [SUM-6](../spec/03-run.md#36-summaryjson)) means "no rule was applied". ASSERT reports its rates without a pass rule.
-- **Run-level token usage** from `metrics.json`: `summary.json` has the run's cost and no token totals.

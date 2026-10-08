@@ -1,0 +1,13 @@
+{
+  "kind": "document",
+  "schema": "run",
+  "writer": "valid",
+  "reader": "valid",
+  "reads": {
+    "execution.stimulus": "external"
+  },
+  "rules": [
+    "VER-8",
+    "RUN-7"
+  ]
+}

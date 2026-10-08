@@ -158,7 +158,8 @@ evaluation time is an input.
   records its exceptions in its `decisionInput`, so whoever signs it vouches for them, and a reader shows `by` with the
   assurance of that signature (the trusted identity it verified for, or none). At least one lane, no lane twice, and
   every exception for a lane of the input, with at least one run hash and an `expires` later than its `at`: the
-  function refuses anything else rather than decide it.
+  function refuses anything else rather than decide it, and any input the reader schema `decision#/$defs/input`
+  refuses (a time that does not exist, a field of the wrong type).
 - **[DEC-2] Each lane's status**, in this order:
   1. `result` is `null` → `missing` (reason `missing:<lane>`).
   2. The result is for another version → `missing` (reason `wrong-version:<lane>`).

@@ -30,13 +30,15 @@ The seal is an in-toto Statement and the signature a DSSE envelope ([SEAL-5], [S
 (policy engines, transparency logs, Sigstore) already understands both. AEF adds two predicate types and reuses
 everything else.
 
-### ECDSA P-256 required, Ed25519 recommended
+### ECDSA P-256 and Ed25519, both required of verifiers
 
-A verifier must support at least one algorithm everyone can rely on. P-256 is in every mainstream crypto library
-(.NET, Java, Go, WebCrypto, OpenSSL), in FIPS 186-5, and in hardware keys. Ed25519 is better engineered but not
-built into every platform AEF expects verifiers on (.NET has no Ed25519 in its base library). So P-256 is a MUST and
-Ed25519 a SHOULD ([SIG-2]). There is no low-S rule, because DSSE, in-toto and Sigstore have none, and a verifier that
-added one would refuse valid signatures.
+A signer may use either: P-256 is in every mainstream crypto library (.NET, Java, Go, WebCrypto, OpenSSL), in FIPS
+186-5, and in hardware keys; Ed25519 is better engineered and common in signing tools. A verifier that knew only one
+could not check what a signer may write, so a verifier must support both ([SIG-2]). Ed25519 is not in every base
+library (.NET's has none), but verifying it takes about two hundred lines over big integers, as AgentEval's own
+implementation shows. The checks a verifier makes are pinned where libraries differ: k reduced mod L, the equation
+without the cofactor, keys of small order refused. There is no low-S rule, because DSSE, in-toto and Sigstore have
+none, and a verifier that added one would refuse valid signatures.
 
 ### The trust policy is an input
 
