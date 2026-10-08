@@ -11,10 +11,11 @@ namespace AgentEval.Interop.AssertAi;
 /// <param name="CaseId">AgentEval's case id.</param>
 /// <param name="Key">The ASSERT case.</param>
 /// <param name="Expected"><c>pass</c> or <c>fail</c>.</param>
-/// <param name="Actual">ASSERT's verdict as AgentEval reads it (<c>pass</c> or <c>fail</c>), or
-/// <see langword="null"/> when the judge decided nothing.</param>
+/// <param name="Actual">ASSERT's decision: <c>fail</c> when it flagged the case, <c>pass</c> when it did not (including when it
+/// found no category relevant, which ASSERT counts as not flagged), or <see langword="null"/> when it decided nothing.</param>
 /// <param name="NotMeasuredReason">Why the judge decided nothing.</param>
-public sealed record AssertAiCalibrationCase(string CaseId, AssertAiCaseKey Key, string Expected, string? Actual, string? NotMeasuredReason);
+/// <param name="NoRelevantCategory">True when the judge's <c>pass</c> came from finding no category relevant.</param>
+public sealed record AssertAiCalibrationCase(string CaseId, AssertAiCaseKey Key, string Expected, string? Actual, string? NotMeasuredReason, bool NoRelevantCategory = false);
 
 /// <summary>How far ASSERT's judge agreed with AgentEval's labels on one run.</summary>
 /// <param name="JudgeModels">The judge model(s) of the run's rows.</param>
@@ -28,6 +29,8 @@ public sealed record AssertAiCalibrationCase(string CaseId, AssertAiCaseKey Key,
 /// <param name="DangerousErrors">Labelled failures the judge passed.</param>
 /// <param name="FalseAlarms">Labelled passes the judge failed.</param>
 /// <param name="NotMeasured">Labelled cases the judge did not decide.</param>
+/// <param name="NoRelevantCategory">Decided cases where the judge found no category relevant (counted as not flagged).</param>
+/// <param name="TaxonomyFingerprint">The fingerprint of the taxonomy the judge graded against.</param>
 public sealed record AssertAiCalibrationReport(
     IReadOnlyList<string> JudgeModels,
     string LabelSet,
@@ -39,29 +42,43 @@ public sealed record AssertAiCalibrationReport(
     double? Kappa,
     int DangerousErrors,
     int FalseAlarms,
-    int NotMeasured)
+    int NotMeasured,
+    int NoRelevantCategory,
+    string? TaxonomyFingerprint)
 {
-    /// <summary>The summary to attach to imported results of the same judge.</summary>
+    /// <summary>The summary to attach to imported results of the same judge on the same taxonomy.</summary>
     public AssertAiJudgeCalibration ToCalibration() =>
-        new(string.Join(", ", JudgeModels), LabelSet, Decided, Accuracy, Kappa, DangerousErrors, NotMeasured);
+        new(string.Join(", ", JudgeModels), LabelSet, Decided, Accuracy, Kappa, DangerousErrors, NotMeasured, TaxonomyFingerprint);
 }
 
 /// <summary>
 /// Calibrates ASSERT's judge on AgentEval's labelled cases: export the cases with <see cref="AssertAiJudgeKit"/>, let
-/// ASSERT judge them, read the run back, and compare each verdict with its label. A case ASSERT's judge did not decide
-/// (judge failure, not judged, no score row, or no category found relevant) is counted as not measured, never as
-/// agreement.
+/// ASSERT judge them, read the run back, and compare each verdict with its label. A case where the judge found no
+/// category relevant is its decision not to flag the case (ASSERT leaves it out of every violation count), so a
+/// labelled failure judged that way is a dangerous error. A case the judge did not decide (judge failure, not judged,
+/// no score row) is counted as not measured, never as agreement.
 /// </summary>
 public static class AssertAiCalibration
 {
     /// <summary>Compares the run's verdicts with the case map's labels.</summary>
     /// <param name="run">The ASSERT run that judged the exported cases.</param>
     /// <param name="map">The case map written with them.</param>
-    /// <exception cref="ArgumentException">No case in the map carries a label.</exception>
+    /// <exception cref="ArgumentException">No case in the map is labelled pass or fail.</exception>
+    /// <exception cref="InvalidDataException">The run's transcripts are not the ones exported with the map.</exception>
     public static AssertAiCalibrationReport Measure(AssertAiRun run, AssertAiCaseMap map)
     {
         ArgumentNullException.ThrowIfNull(run);
         ArgumentNullException.ThrowIfNull(map);
+        if (map.InferenceSetSha256 is { } expected)
+        {
+            var actual = run.InferenceSetPath is { } path ? AssertAiCaseMap.Sha256(path) : null;
+            if (!string.Equals(actual, expected, StringComparison.Ordinal))
+            {
+                throw new InvalidDataException(
+                    $"The run's inference_set.jsonl ({actual ?? "missing"}) is not the one exported with this case map ({expected}): its verdicts belong to other cases. Export again and re-run ASSERT's judge.");
+            }
+        }
+
         var labelled = map.Cases.Where(c => c.ExpectedVerdict is "pass" or "fail").ToList();
         if (labelled.Count == 0)
         {
@@ -78,9 +95,10 @@ public static class AssertAiCalibration
                 continue;
             }
 
-            var actual = result.Score.Label is "pass" or "fail" ? result.Score.Label : null;
-            cases.Add(new(entry.CaseId, entry.Key, entry.ExpectedVerdict!, actual,
-                actual is null ? $"{result.Score.Label}: {result.Details.Summary}" : null));
+            var irrelevant = result.Score.Label == "inapplicable";
+            var decision = result.Score.Label is "pass" or "fail" ? result.Score.Label : irrelevant ? "pass" : null;
+            cases.Add(new(entry.CaseId, entry.Key, entry.ExpectedVerdict!, decision,
+                decision is null ? $"{result.Score.Label}: {result.Details.Summary}" : null, irrelevant));
         }
 
         var decided = cases.Where(c => c.Actual is not null).ToList();
@@ -103,6 +121,8 @@ public static class AssertAiCalibration
             kappa,
             decided.Count(c => c.Expected == "fail" && c.Actual == "pass"),
             decided.Count(c => c.Expected == "pass" && c.Actual == "fail"),
-            cases.Count - decided.Count);
+            cases.Count - decided.Count,
+            decided.Count(c => c.NoRelevantCategory),
+            run.Taxonomy?.Fingerprint);
     }
 }

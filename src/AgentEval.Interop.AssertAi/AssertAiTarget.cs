@@ -100,7 +100,8 @@ public sealed record AssertAiTargetResponse(string Response, IReadOnlyList<Asser
 /// <b>Tool calls.</b> ASSERT's judge sees a tool call only through a <c>tool_result</c> event: a <c>tool_call</c> event
 /// with no result adds an empty assistant message and nothing else. So every call is sent as a <c>tool_result</c>
 /// carrying its name and arguments, as ASSERT's own reference endpoint does, and a call that got no result (a client
-/// without automatic function invocation) is sent with empty content, so the judge still sees that it was made.
+/// without automatic function invocation) is sent in its place with the content <c>(no result: the call was not run)</c>,
+/// so the judge sees that it was made and does not read it as run.
 /// </para>
 /// <para>
 /// <b>Text.</b> The last assistant text is <c>response</c>; earlier assistant texts are <c>assistant</c> events.
@@ -182,7 +183,7 @@ public sealed class AssertAiTarget
     {
         ArgumentNullException.ThrowIfNull(produced);
         var calls = new Dictionary<string, FunctionCallContent>(StringComparer.Ordinal);
-        var answered = new HashSet<string>(StringComparer.Ordinal);
+        var answered = produced.SelectMany(m => m.Contents).OfType<FunctionResultContent>().Select(r => r.CallId).ToHashSet(StringComparer.Ordinal);
         var events = new List<AssertAiTargetEvent>();
         var texts = new List<(int EventIndex, string Text)>();
 
@@ -198,21 +199,18 @@ public sealed class AssertAiTarget
             {
                 switch (content)
                 {
+                    case FunctionCallContent call when !answered.Contains(call.CallId):
+                        events.Add(new AssertAiTargetEvent("tool_result", AssertAiJudgeKit.NoResult, call.Name, Arguments(call), call.CallId));
+                        break;
                     case FunctionCallContent call:
                         calls[call.CallId] = call;
                         break;
                     case FunctionResultContent result:
                         calls.TryGetValue(result.CallId, out var call2);
-                        answered.Add(result.CallId);
                         events.Add(new AssertAiTargetEvent("tool_result", ResultText(result), call2?.Name ?? "tool", Arguments(call2), result.CallId));
                         break;
                 }
             }
-        }
-
-        foreach (var (id, call) in calls.Where(c => !answered.Contains(c.Key)))
-        {
-            events.Add(new AssertAiTargetEvent("tool_result", string.Empty, call.Name, Arguments(call), id));
         }
 
         var response = texts.Count > 0 ? texts[^1].Text : string.Empty;

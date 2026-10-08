@@ -26,8 +26,9 @@ cd samples/AgentEval.Samples
 dotnet run -- 106 --live          # prints the endpoint, e.g. http://localhost:<port>/assert, and keeps serving
 ```
 
-`assert-eval-config.yaml` here is an ASSERT eval config for that endpoint (set the port it printed, and a judge and
-tester model ASSERT can reach). In another terminal:
+`assert-eval-config.yaml` here is an ASSERT eval config for that endpoint: set the port it printed, an absolute
+`artifacts_root`, and a model ASSERT can reach (it generates the taxonomy and the prompt cases, and judges). In
+another terminal:
 
 ```bash
 pip install "assert-ai==0.3.0"

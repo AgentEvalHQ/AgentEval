@@ -59,8 +59,13 @@ public sealed record AssertAiTranscript(string CaseId, IReadOnlyList<ChatMessage
 /// <summary>Which AgentEval case each ASSERT test case is, and its label (<c>agenteval-cases.json</c>).</summary>
 /// <param name="LabelSet">What the cases are (e.g. the golden files they came from).</param>
 /// <param name="Cases">One entry per case, in file order.</param>
-public sealed record AssertAiCaseMap(string LabelSet, IReadOnlyList<AssertAiCaseMapEntry> Cases)
+/// <param name="InferenceSetSha256">The SHA-256 of the <c>inference_set.jsonl</c> written with the map. ASSERT numbers
+/// cases by position, so verdicts on any other file would be matched to the wrong cases.</param>
+public sealed record AssertAiCaseMap(string LabelSet, IReadOnlyList<AssertAiCaseMapEntry> Cases, string? InferenceSetSha256 = null)
 {
+    /// <summary>The hex SHA-256 of a file's bytes.</summary>
+    public static string Sha256(string path) => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path))).ToLowerInvariant();
+
     /// <summary>The file name the judge kit writes.</summary>
     public const string FileName = "agenteval-cases.json";
 
@@ -86,7 +91,7 @@ public sealed record AssertAiCaseMap(string LabelSet, IReadOnlyList<AssertAiCase
                 AssertAiJson.Str(c["expectedVerdict"])));
         }
 
-        return new AssertAiCaseMap(AssertAiJson.Str(json["labelSet"]) ?? Path.GetFileName(path), cases);
+        return new AssertAiCaseMap(AssertAiJson.Str(json["labelSet"]) ?? Path.GetFileName(path), cases, AssertAiJson.Str(json["inferenceSetSha256"]));
     }
 
     /// <summary>Writes the file.</summary>
@@ -100,7 +105,7 @@ public sealed record AssertAiCaseMap(string LabelSet, IReadOnlyList<AssertAiCase
             cases.Add(item);
         }
 
-        AssertAiJson.WriteObject(path, new JsonObject { ["schemaVersion"] = 1, ["labelSet"] = LabelSet, ["cases"] = cases });
+        AssertAiJson.WriteObject(path, new JsonObject { ["schemaVersion"] = 1, ["labelSet"] = LabelSet, ["inferenceSetSha256"] = InferenceSetSha256, ["cases"] = cases });
     }
 }
 
@@ -129,7 +134,8 @@ public sealed record AssertAiJudgeKitOptions
     public string Target { get; init; } = "agenteval";
 
     /// <summary>The directory as ASSERT will see it, when it runs elsewhere (a container). Default: the output
-    /// directory. ASSERT resolves a relative <c>artifacts_root</c> against its own install, so it is written absolute.</summary>
+    /// directory. Must be absolute (<c>/…</c> or <c>C:\…</c>): ASSERT resolves a relative <c>artifacts_root</c> against its own
+    /// install.</summary>
     public string? AssertRoot { get; init; }
 }
 
@@ -138,7 +144,9 @@ public sealed record AssertAiJudgeKitOptions
 /// <c>results/&lt;suite&gt;/taxonomy.json</c>, <c>results/&lt;suite&gt;/&lt;run&gt;/inference_set.jsonl</c> and a
 /// judge-only config (<c>assert-judge-config.yaml</c>), plus <c>agenteval-cases.json</c> mapping ASSERT's positional
 /// ids back to AgentEval's. Run <c>assert-ai run --config assert-judge-config.yaml</c>, then read the run back with
-/// <see cref="AssertAiRun.Read"/> and <see cref="AssertAiCalibration.Measure"/>.
+/// <see cref="AssertAiRun.Read"/> and <see cref="AssertAiCalibration.Measure"/>. Writing again into the same directory
+/// removes what an earlier ASSERT run left in the run directory (its scores and bookkeeping), so old verdicts are never
+/// read against new cases.
 /// </summary>
 /// <remarks>
 /// Every row is a prompt row (no tester model): ASSERT splits its metrics on the tester model, and these
@@ -175,16 +183,31 @@ public static class AssertAiJudgeKit
             throw new ArgumentException("The taxonomy has no behavior_categories; ASSERT's judge cannot run without them.", nameof(options));
         }
 
-        var duplicate = taxonomy.Categories.GroupBy(c => c.Name, StringComparer.Ordinal).FirstOrDefault(g => g.Count() > 1);
+        // ASSERT skips categories without a name and refuses two with the same one (core/judge.py).
+        var duplicate = taxonomy.Categories.Where(c => c.Name.Length > 0).GroupBy(c => c.Name, StringComparer.Ordinal).FirstOrDefault(g => g.Count() > 1);
         if (duplicate is not null)
         {
             throw new ArgumentException($"The taxonomy names '{duplicate.Key}' twice; ASSERT's judge refuses that.", nameof(options));
+        }
+
+        if (options.AssertRoot is { } assertRootOption && !(assertRootOption.StartsWith('/') || Path.IsPathFullyQualified(assertRootOption)))
+        {
+            throw new ArgumentException($"AssertRoot must be an absolute path ('{assertRootOption}' is not): ASSERT resolves a relative artifacts_root against its own install.", nameof(options));
         }
 
         var root = Path.GetFullPath(outputDirectory);
         var suiteDir = Path.Combine(root, "results", options.Suite);
         var runDir = Path.Combine(suiteDir, options.Run);
         Directory.CreateDirectory(runDir);
+        foreach (var stale in new[] { "scores.jsonl", ".judge_config_hash", "manifest.json", "artifacts.json", "config.yaml", "metrics.json" })
+        {
+            File.Delete(Path.Combine(runDir, stale));
+        }
+
+        if (Directory.Exists(Path.Combine(runDir, ".viewer")))
+        {
+            Directory.Delete(Path.Combine(runDir, ".viewer"), recursive: true);
+        }
 
         var behavior = taxonomy.BehaviorName ?? "agenteval";
         var rows = new List<JsonNode>();
@@ -198,8 +221,9 @@ public static class AssertAiJudgeKit
         }
 
         AssertAiJson.WriteObject(Path.Combine(suiteDir, "taxonomy.json"), options.Taxonomy.DeepClone());
-        AssertAiJson.WriteJsonLines(Path.Combine(runDir, "inference_set.jsonl"), rows);
-        var map = new AssertAiCaseMap(options.LabelSet, cases);
+        var inferenceSet = Path.Combine(runDir, "inference_set.jsonl");
+        AssertAiJson.WriteJsonLines(inferenceSet, rows);
+        var map = new AssertAiCaseMap(options.LabelSet, cases, AssertAiCaseMap.Sha256(inferenceSet));
         map.Write(Path.Combine(root, AssertAiCaseMap.FileName));
 
         var assertRoot = (options.AssertRoot ?? root).Replace('\\', '/');
@@ -217,10 +241,14 @@ public static class AssertAiJudgeKit
     }
 
     /// <summary>One <c>inference_set.jsonl</c> row, in the shape ASSERT's inference stage writes for a prompt case.</summary>
+    /// <summary>The tool result written for a call that got none, so the judge sees the call without reading it as run.</summary>
+    public const string NoResult = "(no result: the call was not run)";
+
     internal static JsonObject InferenceRow(AssertAiCaseKey key, string behavior, string target, AssertAiTranscript transcript)
     {
         var events = new JsonArray();
         var calls = new Dictionary<string, FunctionCallContent>(StringComparer.Ordinal);
+        var answered = transcript.Messages.SelectMany(m => m.Contents).OfType<FunctionResultContent>().Select(r => r.CallId).ToHashSet(StringComparer.Ordinal);
         foreach (var message in transcript.Messages)
         {
             var text = string.Concat(message.Contents.OfType<TextContent>().Select(c => c.Text));
@@ -238,6 +266,9 @@ public static class AssertAiJudgeKit
             {
                 switch (content)
                 {
+                    case FunctionCallContent call when !answered.Contains(call.CallId):
+                        events.Add(ToolEvent(call.Name, call, NoResult));   // in place: the judge still sees it was made
+                        break;
                     case FunctionCallContent call:
                         calls[call.CallId] = call;
                         break;
@@ -255,11 +286,6 @@ public static class AssertAiJudgeKit
                 events.Add(Event(["target", "combined"], "target", new JsonObject { ["type"] = "add_message", ["message"] = payload },
                     role == "user" ? new JsonObject { ["message"] = payload.DeepClone() } : null));
             }
-        }
-
-        foreach (var call in calls.Values)
-        {
-            events.Add(ToolEvent(call.Name, call, string.Empty));   // a call that got no result: the judge still sees it
         }
 
         return new JsonObject

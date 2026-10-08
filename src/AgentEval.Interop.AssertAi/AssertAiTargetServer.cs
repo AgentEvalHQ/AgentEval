@@ -23,6 +23,12 @@ namespace AgentEval.Interop.AssertAi;
 /// ASSERT refuses a literal <c>127.0.0.1</c> endpoint unless <c>ASSERT_ALLOW_PRIVATE_ENDPOINTS=1</c> is set, but
 /// accepts the host name <c>localhost</c>, which is what this server listens on by default.
 /// </para>
+/// <para>
+/// <b>Host names.</b> The server answers only requests addressed to its host name: a request ASSERT sends from a
+/// container to <c>host.docker.internal</c> is refused before it reaches the server. Listen on <c>+</c> (every host
+/// name) for that. On Windows, a host other than <c>localhost</c> needs a URL reservation made once by an
+/// administrator (<c>netsh http add urlacl url=http://+:PORT/ user=Everyone</c>); Linux and macOS need none.
+/// </para>
 /// </remarks>
 public sealed class AssertAiTargetServer : IAsyncDisposable
 {
@@ -55,18 +61,29 @@ public sealed class AssertAiTargetServer : IAsyncDisposable
     /// <param name="target">The target.</param>
     /// <param name="port">The port.</param>
     /// <param name="path">The path, e.g. <c>/assert</c> (with or without a trailing slash); <c>/</c> answers every path.</param>
-    /// <param name="host">The host name to listen on; <c>localhost</c> by default.</param>
+    /// <param name="host">The host name to listen on; <c>localhost</c> by default, <c>+</c> or <c>*</c> for every host name.</param>
     /// <param name="log">Receives one line per request, when given.</param>
     public static AssertAiTargetServer Start(AssertAiTarget target, int port, string path = "/", string host = "localhost", TextWriter? log = null)
     {
         ArgumentNullException.ThrowIfNull(target);
         ArgumentOutOfRangeException.ThrowIfLessThan(port, 1);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(port, 65535);
+        ArgumentException.ThrowIfNullOrWhiteSpace(host);
         var normalized = "/" + (path ?? "/").Trim('/');
+        var wildcard = host is "+" or "*";
+        var endpoint = new Uri($"http://{(wildcard ? "localhost" : host)}:{port}{normalized}");   // checked before anything is opened
         var listener = new HttpListener();
-        listener.Prefixes.Add($"http://{host}:{port}/");   // the path is matched per request: a prefix would refuse it without its trailing slash
-        listener.Start();
-        return new AssertAiTargetServer(listener, target, new Uri($"http://{host}:{port}{normalized}"), normalized, log);
+        try
+        {
+            listener.Prefixes.Add($"http://{host}:{port}/");   // the path is matched per request: a prefix would refuse it without its trailing slash
+            listener.Start();
+            return new AssertAiTargetServer(listener, target, endpoint, normalized, log);
+        }
+        catch
+        {
+            listener.Close();
+            throw;
+        }
     }
 
     private async Task LoopAsync()

@@ -30,8 +30,10 @@ internal static class AssertAiJson
     };
 
     /// <summary>Reads a JSON Lines file. Blank lines are skipped, as ASSERT skips them; a line that is not a JSON
-    /// object is an error naming the file and line, never a silently dropped row.</summary>
-    public static IReadOnlyList<(int Line, JsonObject Row)> ReadJsonLines(string path)
+    /// object is an error naming the file and line, unless <paramref name="skipped"/> is given: then, as ASSERT's own
+    /// reader does (<c>core/io.py</c>), the line is skipped and described there, never dropped silently. A run stopped
+    /// mid-write leaves a truncated last line.</summary>
+    public static IReadOnlyList<(int Line, JsonObject Row)> ReadJsonLines(string path, List<string>? skipped = null)
     {
         var rows = new List<(int, JsonObject)>();
         var lineNumber = 0;
@@ -44,13 +46,20 @@ internal static class AssertAiJson
                 continue;
             }
 
-            var node = ParsePython(line, path, lineNumber);
-            if (node is not JsonObject row)
+            try
             {
-                throw new InvalidDataException($"{path}:{lineNumber}: expected a JSON object, found {Describe(node)}.");
-            }
+                var node = ParsePython(line, path, lineNumber);
+                if (node is not JsonObject row)
+                {
+                    throw new InvalidDataException($"{path}:{lineNumber}: expected a JSON object, found {Describe(node)}.");
+                }
 
-            rows.Add((lineNumber, row));
+                rows.Add((lineNumber, row));
+            }
+            catch (InvalidDataException bad) when (skipped is not null)
+            {
+                skipped.Add($"{bad.Message} The line was skipped, as ASSERT skips it.");
+            }
         }
 
         return rows;

@@ -180,7 +180,7 @@ public class AssertAiRunTests : IDisposable
 
         Assert.Equal(2, run.Missing.Count);
         Assert.Contains("content filter", run.Missing.Single(m => m.Key.TestCaseId == "test_case_000002").Reason, StringComparison.Ordinal);
-        Assert.Contains("was not run", run.Missing.Single(m => m.Key.TestCaseId == "test_case_000003").Reason, StringComparison.Ordinal);
+        Assert.Contains("has no transcript", run.Missing.Single(m => m.Key.TestCaseId == "test_case_000003").Reason, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -221,16 +221,52 @@ public class AssertAiRunTests : IDisposable
     }
 
     [Fact]
-    public void PythonsNonFiniteNumbers_ReadAsNull_AndOtherBadJson_NamesTheLine()
+    public void PythonsNonFiniteNumbers_ReadAsNull_AndABadLine_IsSkippedAsAssertSkipsIt_WithAWarning()
     {
         var dir = WriteRun(Taxonomy(("harm", false)).Raw, [Row("t1").Raw], inferenceSet: []);
         File.WriteAllText(Path.Combine(dir, "inference_set.jsonl"),
-            """{"type": "prompt", "test_case_id": "t1", "events": [{"edit": {"tool_args": {"x": NaN, "y": -Infinity, "s": "NaN stays"}}}]}""" + "\n");
-        Assert.Empty(AssertAiRun.Read(dir).Missing);
+            """{"type": "prompt", "test_case_id": "t1", "events": [{"edit": {"tool_args": {"x": NaN, "y": -Infinity, "s": "NaN stays"}}}]}""" + "\n"
+            + """{"type": "prompt", "test_case_id": "t2", "events": []}""" + "\n");
+        File.WriteAllText(Path.Combine(dir, "scores.jsonl"), Row("t1").Raw.ToJsonString() + "\n{\"type\": \"prompt\", \"test_case_id\": \"t2\", \"judge_st");   // stopped mid-write
 
-        File.WriteAllText(Path.Combine(dir, "scores.jsonl"), Row("t1").Raw.ToJsonString() + "\n{not json\n");
-        var error = Assert.Throws<InvalidDataException>(() => AssertAiRun.Read(dir));
-        Assert.Contains("scores.jsonl:2", error.Message, StringComparison.Ordinal);
+        var run = AssertAiRun.Read(dir);
+
+        Assert.Contains("scores.jsonl:2", Assert.Single(run.Warnings), StringComparison.Ordinal);
+        Assert.Equal("t2", Assert.Single(run.Missing).Key.TestCaseId);   // the truncated row's case is named, not lost
+    }
+
+    [Fact]
+    public void AScenarioWithNoTranscript_IsExplainedAsAWorkerFailure_NotAsAPromptTargetError()
+    {
+        var dir = WriteRun(Taxonomy(("harm", false)).Raw, [], inferenceSet: []);
+        File.WriteAllText(Path.Combine(Path.GetDirectoryName(dir)!, "test_set.jsonl"), """{"type": "scenario", "test_case_id": "test_case_000001"}""" + "\n");
+
+        Assert.Contains("worker failed", Assert.Single(AssertAiRun.Read(dir).Missing).Reason, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void AnOkRowWithAnIncompleteVerdict_SaysSo()
+    {
+        var row = Row("t1", Node(0, "harm", true, true)).Raw;
+        row["verdict"]!["dimensions"]!.AsObject().Remove("overrefusal");
+
+        var result = AssertAiResults.FromRow(AssertAiScoreRows.Parse(row), null, DateTimeOffset.UnixEpoch);
+
+        Assert.Equal("error", result.Score.Label);
+        Assert.Contains("lacks a dimension", result.Details.Summary, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ASTranscriptsOfARun_BecomeEvalInputs_WithWhatTheJudgeSaw()
+    {
+        var inputs = AssertAiTranscripts.Read(Path.Combine(AgentEval.Samples.Interop.AssertInteropRun.FindExampleRun(), "inference_set.jsonl"));
+
+        var first = inputs[0].Input;
+        Assert.Equal("prompt:test_case_000001", first.CaseId);
+        Assert.StartsWith("A billing notice", first.Query, StringComparison.Ordinal);
+        Assert.Equal("set_payout_destination", Assert.Single(first.ToolCalls!).Name);
+        Assert.StartsWith("Done.", first.Response, StringComparison.Ordinal);
+        Assert.Empty(inputs[2].Input.ToolCalls!);   // captured, and no call made: not "unknown"
     }
 
     [Fact]
@@ -283,17 +319,20 @@ public class AssertAiRunTests : IDisposable
     }
 
     [Fact]
-    public void AnUncalibratedJudge_IsSaidToBeUncalibrated_AndACalibratedOne_CarriesItsNumbers()
+    public void AJudge_IsCalibratedOnlyOnTheTaxonomyItWasMeasuredOn()
     {
         var run = AssertAiRun.Read(WriteRun(Taxonomy(("harm", false)).Raw, [Row("t1", Node(0, "harm", true, false)).Raw]));
-        var calibration = new AssertAiJudgeCalibration("azure/gpt-5.4", "golden-hate-unfairness", 20, 0.9, 0.8, 1, 2);
+        var here = new AssertAiJudgeCalibration("azure/gpt-5.4", "golden-hate-unfairness", 20, 0.9, 0.8, 1, 2, run.Taxonomy!.Fingerprint);
+        var elsewhere = here with { TaxonomyFingerprint = Taxonomy(("something else", false)).Fingerprint };
 
-        var plain = AssertAiResults.ToEvalResults(run)[0].Result;
-        var calibrated = AssertAiResults.ToEvalResults(run, calibration)[0].Result;
+        string Note(AssertAiJudgeCalibration? c) =>
+            AssertAiResults.ToEvalResults(run, c)[0].Result.Details.Evidence!.Single(e => e.Reference == "judge-calibration").Message;
 
-        Assert.Contains("is not calibrated", plain.Details.Evidence!.Single(e => e.Reference == "judge-calibration").Message, StringComparison.Ordinal);
-        Assert.Contains("κ 0.800", calibrated.Details.Evidence!.Single(e => e.Reference == "judge-calibration").Message, StringComparison.Ordinal);
-        Assert.Equal(calibration, AssertAiJudgeCalibration.FromJson(calibration.ToJson()));
+        Assert.Contains("is not calibrated", Note(null), StringComparison.Ordinal);
+        Assert.Contains("κ 0.800", Note(here), StringComparison.Ordinal);
+        Assert.Contains("measured on another taxonomy", Note(elsewhere), StringComparison.Ordinal);
+        Assert.Equal(here, AssertAiJudgeCalibration.FromJson(here.ToJson()));
+        Assert.Equal(Taxonomy(("harm", false)).Fingerprint, run.Taxonomy.Fingerprint);   // formatting does not matter, content does
     }
 
     [Fact]

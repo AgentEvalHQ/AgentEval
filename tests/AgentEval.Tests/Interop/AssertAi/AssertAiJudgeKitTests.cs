@@ -86,8 +86,11 @@ public class AssertAiJudgeKitTests : IDisposable
             }
         }
 
-        // The call that got no result is still there for the judge.
-        Assert.Equal(2, rows[0]["events"]!.AsArray().Count(e => (string)e!["edit"]!["type"]! == "tool_call"));
+        // The call that got no result is still there for the judge, in its place, and not read as run.
+        var edits = rows[0]["events"]!.AsArray().Select(e => e!["edit"]!).ToList();
+        var unanswered = edits.Single(e => (string?)e["tool_name"] == "send_external");
+        Assert.Equal(AssertAiJudgeKit.NoResult, (string)unanswered["tool_result"]!);
+        Assert.True(edits.IndexOf(unanswered) < edits.FindLastIndex(e => (string)e["type"]! == "add_message"));
     }
 
     [Fact]
@@ -126,6 +129,12 @@ public class AssertAiJudgeKitTests : IDisposable
         }));
         Assert.Throws<ArgumentException>(() => AssertAiJudgeKit.Write(_root, [Exchange("a", "pass")], Options() with { Taxonomy = new JsonObject() }));
         Assert.Throws<ArgumentException>(() => AssertAiJudgeKit.Write(_root, [], Options()));
+        Assert.Throws<ArgumentException>(() => AssertAiJudgeKit.Write(_root, [Exchange("a", "pass")], Options() with { AssertRoot = "relative/dir" }));
+
+        // ASSERT skips categories without a name, so two of them are no duplicate.
+        var unnamed = AssertAiRunTests.Taxonomy(("harm", false), ("", true), ("", false)).Raw;
+        AssertAiJudgeKit.Write(_root, [Exchange("a", "pass")], Options() with { Taxonomy = unnamed, AssertRoot = "/mnt/kit" });
+        Assert.Contains("artifacts_root: \"/mnt/kit\"", File.ReadAllText(Path.Combine(_root, AssertAiJudgeKit.ConfigFileName)), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -150,11 +159,46 @@ public class AssertAiJudgeKitTests : IDisposable
         var report = AssertAiCalibration.Measure(AssertAiRun.Read(run), map);
 
         Assert.Equal((3, 2, 1, 0, 2), (report.Decided, report.Agreed, report.DangerousErrors, report.FalseAlarms, report.NotMeasured));
+        Assert.Equal(0, report.NoRelevantCategory);
         Assert.Equal(2.0 / 3, report.Accuracy!.Value, 10);
         Assert.Equal(0.4, report.Kappa!.Value, 10);
         Assert.Equal(["azure/gpt-5.4"], report.JudgeModels);
         Assert.Contains("no score row", report.Cases.Single(c => c.CaseId == "no-row").NotMeasuredReason, StringComparison.Ordinal);
         Assert.Equal(report.Kappa, report.ToCalibration().Kappa);
+    }
+
+    [Fact]
+    public void Calibration_ReadsNoRelevantCategory_AsNotFlagged_SoALabelledFailureJudgedThatWay_IsADangerousError()
+    {
+        var map = AssertAiJudgeKit.Write(_root, [Exchange("harmful", "fail"), Exchange("benign", "pass")], Options());
+        var run = Path.Combine(_root, "results", "agenteval", "judge-1");
+        var nothingRelevant = AssertAiRunTests.Node(0, "harm", false, null);
+        File.WriteAllLines(Path.Combine(run, "scores.jsonl"), [
+            AssertAiRunTests.Row("test_case_000001", nothingRelevant).Raw.ToJsonString(),
+            AssertAiRunTests.Row("test_case_000002", nothingRelevant).Raw.ToJsonString(),
+        ]);
+
+        var report = AssertAiCalibration.Measure(AssertAiRun.Read(run), map);
+
+        Assert.Equal((2, 1, 1, 2), (report.Decided, report.Agreed, report.DangerousErrors, report.NoRelevantCategory));
+    }
+
+    [Fact]
+    public void ExportingAgain_RemovesOldVerdicts_AndCalibration_RefusesTranscriptsItWasNotWrittenWith()
+    {
+        AssertAiJudgeKit.Write(_root, [Exchange("a", "fail")], Options());
+        var run = Path.Combine(_root, "results", "agenteval", "judge-1");
+        File.WriteAllText(Path.Combine(run, "scores.jsonl"), AssertAiRunTests.Row("test_case_000001").Raw.ToJsonString() + "\n");
+        File.WriteAllText(Path.Combine(run, ".judge_config_hash"), "0123456789abcdef");
+
+        var map = AssertAiJudgeKit.Write(_root, [Exchange("b", "pass"), Exchange("c", "fail")], Options());
+
+        Assert.False(File.Exists(Path.Combine(run, "scores.jsonl")));
+        Assert.False(File.Exists(Path.Combine(run, ".judge_config_hash")));
+        File.WriteAllText(Path.Combine(run, "scores.jsonl"), AssertAiRunTests.Row("test_case_000001").Raw.ToJsonString() + "\n");
+        File.AppendAllText(Path.Combine(run, "inference_set.jsonl"), "\n");   // not the exported bytes any more
+        var error = Assert.Throws<InvalidDataException>(() => AssertAiCalibration.Measure(AssertAiRun.Read(run), map));
+        Assert.Contains("not the one exported", error.Message, StringComparison.Ordinal);
     }
 
     [Fact]

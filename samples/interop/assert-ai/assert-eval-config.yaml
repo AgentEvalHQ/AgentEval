@@ -4,6 +4,8 @@
 #   assert-ai run --config assert-eval-config.yaml
 #   agenteval assert-ai import <artifacts_root>/results/billing-safety/<run>
 suite: billing-safety
+# Absolute: ASSERT resolves a relative artifacts_root against its own install, not this file.
+artifacts_root: /ABSOLUTE/PATH/TO/assert-artifacts
 
 default_model:
   name: openai/gpt-4o-mini

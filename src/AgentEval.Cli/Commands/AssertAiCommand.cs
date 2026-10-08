@@ -48,12 +48,18 @@ internal static class AssertAiCommand
         var systemPrompt = new Option<string?>("--system-prompt") { Description = "The target's system prompt. ASSERT never sends one to an endpoint." };
         var port = new Option<int>("--port") { Description = "The port.", DefaultValueFactory = _ => 8765 };
         var path = new Option<string>("--path") { Description = "The path.", DefaultValueFactory = _ => "/assert" };
-        var host = new Option<string>("--host") { Description = "The host name to listen on. ASSERT accepts 'localhost' but refuses a literal 127.0.0.1 unless ASSERT_ALLOW_PRIVATE_ENDPOINTS=1.", DefaultValueFactory = _ => "localhost" };
+        var host = new Option<string>("--host") { Description = "The host name to listen on. ASSERT accepts 'localhost' but refuses a literal 127.0.0.1 unless ASSERT_ALLOW_PRIVATE_ENDPOINTS=1. '+' answers every host name (ASSERT in a container calling host.docker.internal); on Windows that needs a URL reservation (netsh http add urlacl).", DefaultValueFactory = _ => "localhost" };
 
         var cmd = new Command("serve", "Serve a model as an ASSERT HTTP endpoint target (POST {message, history} → {response, events}) until Ctrl+C.");
         foreach (var o in new Option[] { fromEnv, endpoint, model, apiKey, systemPrompt, port, path, host }) cmd.Add(o);
         cmd.SetAction(async (ParseResult p, CancellationToken ct) =>
         {
+            if (p.GetValue(port) is < 1 or > 65535)
+            {
+                Console.Error.WriteLine($"✖ --port must be between 1 and 65535, not {p.GetValue(port)}.");
+                return ExitCodes.UsageError;
+            }
+
             IChatClient client;
             string name;
             if (p.GetValue(fromEnv))
@@ -82,9 +88,15 @@ internal static class AssertAiCommand
             {
                 server = AssertAiTargetServer.Start(new AssertAiTarget(client, systemPrompt: p.GetValue(systemPrompt)), p.GetValue(port), p.GetValue(path)!, p.GetValue(host)!, Console.Out);
             }
+            catch (UriFormatException ex)
+            {
+                Console.Error.WriteLine($"✖ '{p.GetValue(host)}' is not a host name to listen on: {ex.Message}");
+                return ExitCodes.UsageError;
+            }
             catch (Exception ex) when (ex is System.Net.HttpListenerException or ArgumentException)
             {
-                Console.Error.WriteLine($"✖ Could not listen: {ex.Message}");
+                Console.Error.WriteLine($"✖ Could not listen: {ex.Message}"
+                    + (OperatingSystem.IsWindows() && p.GetValue(host) is not "localhost" ? " (a host other than localhost needs a URL reservation: netsh http add urlacl url=http://+:PORT/ user=Everyone, as administrator)" : ""));
                 return ExitCodes.RuntimeError;
             }
 
@@ -122,19 +134,20 @@ internal static class AssertAiCommand
         var output = new Option<string?>("-o", "--output") { Description = "Write the report to this file instead of the console." };
         var maxHarm = new Option<double?>("--max-harm-rate") { Description = "Exit 1 when a harm rate (not-permissible violation rate) is above this (0-1); exit 11 when none could be measured." };
         var maxOverRefusal = new Option<double?>("--max-over-refusal-rate") { Description = "Exit 1 when an over-refusal rate (permissible violation rate) is above this (0-1); exit 11 when none could be measured." };
+        var maxUnmeasured = new Option<double>("--max-unmeasured") { Description = "With a rate gate: the share of cases (0-1) that may go unmeasured (judge failed, not judged, no score row) before the gate cannot pass (exit 11). Default 0: a rate over fewer cases than ran is not a pass.", DefaultValueFactory = _ => 0.0 };
 
         var cmd = new Command("import", "Read an ASSERT run: its harm and over-refusal rates (as ASSERT computes them), every case's verdict, and the cases with no score row.");
         cmd.Add(runDir);
-        foreach (var o in new Option[] { taxonomy, testSet, calibration, format, output, maxHarm, maxOverRefusal }) cmd.Add(o);
+        foreach (var o in new Option[] { taxonomy, testSet, calibration, format, output, maxHarm, maxOverRefusal, maxUnmeasured }) cmd.Add(o);
         cmd.SetAction((ParseResult p, CancellationToken _) => Task.FromResult(RunImport(
             p.GetValue(runDir)!, p.GetValue(taxonomy), p.GetValue(testSet), p.GetValue(calibration), p.GetValue(format)!, p.GetValue(output),
-            p.GetValue(maxHarm), p.GetValue(maxOverRefusal), Console.Out, Console.Error)));
+            p.GetValue(maxHarm), p.GetValue(maxOverRefusal), Console.Out, Console.Error, p.GetValue(maxUnmeasured))));
         return cmd;
     }
 
     internal static int RunImport(
         string runDirectory, string? taxonomyPath, string? testSetPath, string? calibrationPath, string format, string? outputPath,
-        double? maxHarm, double? maxOverRefusal, TextWriter stdout, TextWriter stderr)
+        double? maxHarm, double? maxOverRefusal, TextWriter stdout, TextWriter stderr, double maxUnmeasured = 0.0)
     {
         if (format is not ("text" or "json" or "markdown"))
         {
@@ -142,7 +155,7 @@ internal static class AssertAiCommand
             return ExitCodes.UsageError;
         }
 
-        foreach (var (name, value) in new[] { ("--max-harm-rate", maxHarm), ("--max-over-refusal-rate", maxOverRefusal) })
+        foreach (var (name, value) in new[] { ("--max-harm-rate", maxHarm), ("--max-over-refusal-rate", maxOverRefusal), ("--max-unmeasured", (double?)maxUnmeasured) })
         {
             if (value is < 0 or > 1 || (value is { } v && !double.IsFinite(v)))
             {
@@ -158,10 +171,11 @@ internal static class AssertAiCommand
             run = AssertAiRun.Read(runDirectory, new AssertAiReadOptions { TaxonomyPath = taxonomyPath, TestSetPath = testSetPath });
             if (calibrationPath is not null)
             {
-                judgeCalibration = AssertAiJudgeCalibration.FromJson(JsonNode.Parse(File.ReadAllText(calibrationPath))!.AsObject());
+                judgeCalibration = AssertAiJudgeCalibration.FromJson(
+                    JsonNode.Parse(File.ReadAllText(calibrationPath)) as JsonObject ?? throw new InvalidDataException($"{calibrationPath} is not a calibration object."));
             }
         }
-        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or JsonException or InvalidOperationException)
+        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or JsonException or InvalidOperationException or ArgumentException)
         {
             stderr.WriteLine($"✖ {ex.Message}");
             return ExitCodes.UsageError;
@@ -190,7 +204,19 @@ internal static class AssertAiCommand
             stderr.WriteLine("⚠ No taxonomy was found, so the harm and over-refusal rates cannot be computed (pass --taxonomy).");
         }
 
+        foreach (var warning in run.Warnings)
+        {
+            stderr.WriteLine($"⚠ {warning}");
+        }
+
+        if (judgeCalibration is not null && !judgeCalibration.AppliesTo(run.Taxonomy))
+        {
+            stderr.WriteLine("⚠ The calibration was measured on another taxonomy than this run's, so it is not attached.");
+        }
+
         var exit = ExitCodes.Success;
+        var unmeasured = run.Rows.Count(r => r.Status != AssertAiJudgeStatus.Ok) + run.Missing.Count;
+        var total = run.Rows.Count + run.Missing.Count;
         foreach (var (limit, pick, label) in new (double?, Func<AssertAiHeadline, AssertAiRate?>, string)[]
                  {
                      (maxHarm, h => h.NotPermissible, "harm"),
@@ -216,6 +242,26 @@ internal static class AssertAiCommand
             {
                 stderr.WriteLine($"⚠ No {label} rate could be measured, so --max-{label}-rate cannot pass.");
                 exit = ExitCodes.GateIndeterminate;
+            }
+        }
+
+        // A rate over the cases that happened to be judged is not a pass for the cases that were not: ASSERT drops the
+        // ones its judge's content filter stopped, which are likely the most harmful.
+        if ((maxHarm is not null || maxOverRefusal is not null) && exit == ExitCodes.Success)
+        {
+            if (total > 0 && (double)unmeasured / total > maxUnmeasured)
+            {
+                stderr.WriteLine($"⚠ {unmeasured} of {total} case(s) were not measured (judge failed, not judged, or no score row), more than --max-unmeasured {Percent(maxUnmeasured)} allows, so the gate cannot pass.");
+                exit = ExitCodes.GateIndeterminate;
+            }
+            else if (run.ManifestStatus is { } status && !run.IsComplete)
+            {
+                stderr.WriteLine($"⚠ The run's manifest says '{status}', not 'completed': its scores may be partial, so the gate cannot pass.");
+                exit = ExitCodes.GateIndeterminate;
+            }
+            else if (run.ManifestStatus is null)
+            {
+                stderr.WriteLine("⚠ The run has no manifest.json, so it is not known to have finished.");
             }
         }
 
@@ -252,7 +298,9 @@ internal static class AssertAiCommand
     private static string ImportText(AssertAiRun run, IReadOnlyList<AssertAiHeadline> headlines, IReadOnlyList<(AssertAiCaseKey Key, Evals.EvalResult Result)> results, AssertAiJudgeCalibration? calibration)
     {
         var s = new StringBuilder();
-        s.AppendLine($"ASSERT run {run.SuiteName}/{run.RunName}{(run.ManifestStatus is { } st ? $" ({st})" : "")}");
+        s.AppendLine($"ASSERT run {run.SuiteName}/{run.RunName} ({run.ManifestStatus ?? "no manifest.json: not known to have finished"})");
+        var unmeasured = run.Rows.Count(r => r.Status != AssertAiJudgeStatus.Ok) + run.Missing.Count;
+        s.AppendLine($"  {unmeasured} of {run.Rows.Count + run.Missing.Count} case(s) not measured (judge failed, not judged, or no score row): no rate covers them.");
         s.AppendLine($"  Read as assert-ai 0.3 (ASSERT records no version in its files). Taxonomy: {run.TaxonomyPath ?? "none"}");
         s.AppendLine($"  {JudgeLine(run, calibration)}");
         foreach (var h in headlines)
@@ -325,6 +373,9 @@ internal static class AssertAiCommand
             ["suite"] = run.SuiteName,
             ["run"] = run.RunName,
             ["status"] = run.ManifestStatus,
+            ["unmeasured"] = run.Rows.Count(r => r.Status != AssertAiJudgeStatus.Ok) + run.Missing.Count,
+            ["caseCount"] = run.Rows.Count + run.Missing.Count,
+            ["warnings"] = new JsonArray(run.Warnings.Select(w => (JsonNode)w).ToArray()),
             ["taxonomy"] = run.TaxonomyPath,
             ["judgeModels"] = new JsonArray(run.Rows.Select(r => r.JudgeModel).Where(m => m.Length > 0).Distinct(StringComparer.Ordinal).Select(m => (JsonNode)m).ToArray()),
             ["judgeCalibration"] = calibration?.ToJson(),
@@ -437,6 +488,7 @@ internal static class AssertAiCommand
         var runDirectory = Path.Combine(Path.GetFullPath(outputDirectory), "results", suite, run);
         stdout.WriteLine($"✔ {transcripts.Count} case(s) written as an ASSERT run in {runDirectory}{(unlabelled > 0 ? $" ({unlabelled} without a pass/fail label)" : "")}.");
         stdout.WriteLine("  Context and RAG documents of a case are not sent: ASSERT's transcripts have no slot for them.");
+        stdout.WriteLine("  What an earlier ASSERT run left in that run directory was removed, so old verdicts cannot meet new cases.");
         stdout.WriteLine("  Next:");
         stdout.WriteLine($"    assert-ai run --config {Path.Combine(Path.GetFullPath(outputDirectory), AssertAiJudgeKit.ConfigFileName)}");
         stdout.WriteLine($"    agenteval assert-ai calibrate \"{runDirectory}\" --cases \"{Path.Combine(Path.GetFullPath(outputDirectory), AssertAiCaseMap.FileName)}\"");
@@ -489,6 +541,7 @@ internal static class AssertAiCommand
             var json = report.ToCalibration().ToJson();
             json["agreed"] = report.Agreed;
             json["falseAlarms"] = report.FalseAlarms;
+            json["noRelevantCategory"] = report.NoRelevantCategory;
             json["accuracyCi95"] = report.AccuracyInterval is { } ci ? new JsonArray(ci.Lower, ci.Upper) : null;
             json["cases"] = new JsonArray(report.Cases.Select(c => (JsonNode)new JsonObject
             {
@@ -501,7 +554,7 @@ internal static class AssertAiCommand
             stdout.WriteLine(report.ToCalibration().Describe());
             if (report.AccuracyInterval is { } ci)
             {
-                stdout.WriteLine($"  Accuracy 95% CI {Percent(ci.Lower)}–{Percent(ci.Upper)}; {report.FalseAlarms} false alarm(s) (a labelled pass failed).");
+                stdout.WriteLine($"  Accuracy 95% CI {Percent(ci.Lower)}–{Percent(ci.Upper)}; {report.FalseAlarms} false alarm(s) (a labelled pass failed); {report.NoRelevantCategory} case(s) the judge found no category relevant to, counted as not flagged.");
             }
 
             foreach (var c in report.Cases.Where(c => c.Actual is not null && c.Actual != c.Expected))

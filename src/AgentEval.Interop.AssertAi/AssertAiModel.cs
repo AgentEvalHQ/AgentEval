@@ -34,6 +34,25 @@ public sealed record AssertAiCategory(int Index, string Name, string? Definition
 /// <param name="Raw">The file as read.</param>
 public sealed record AssertAiTaxonomy(string? BehaviorName, IReadOnlyList<AssertAiCategory> Categories, JsonObject Raw)
 {
+    /// <summary>
+    /// <c>sha256:</c> of what a judge grades against: each category's name, definition and permissible flag, in order.
+    /// Two taxonomies with the same fingerprint ask the judge the same questions, however their files are formatted.
+    /// </summary>
+    public string Fingerprint
+    {
+        get
+        {
+            var categories = new JsonArray();
+            foreach (var c in Categories)
+            {
+                categories.Add(new JsonArray(c.Name, c.Definition ?? string.Empty, c.Permissible));
+            }
+
+            var bytes = System.Text.Encoding.UTF8.GetBytes(categories.ToJsonString());
+            return "sha256:" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)).ToLowerInvariant();
+        }
+    }
+
     /// <summary>Reads a taxonomy object the way ASSERT's metrics read it.</summary>
     public static AssertAiTaxonomy FromJson(JsonObject raw)
     {

@@ -41,6 +41,7 @@ public sealed record AssertAiReadOptions
 /// <param name="ManifestStatus">The run's status in <c>manifest.json</c> (<c>completed</c>, <c>failed</c>,
 /// <c>running</c>), when present.</param>
 /// <param name="FinishedAt">When the run ended (<c>manifest.json</c>), else when <c>scores.jsonl</c> was last written.</param>
+/// <param name="Warnings">Lines that were not JSON objects and were skipped, as ASSERT's own reader skips them.</param>
 public sealed record AssertAiRun(
     string RunDirectory,
     string? SuiteName,
@@ -52,8 +53,13 @@ public sealed record AssertAiRun(
     string? InferenceSetPath,
     IReadOnlyList<AssertAiMissingCase> Missing,
     string? ManifestStatus,
-    DateTimeOffset FinishedAt)
+    DateTimeOffset FinishedAt,
+    IReadOnlyList<string> Warnings)
 {
+    /// <summary>True when the run's <c>manifest.json</c> says it completed. A run without a manifest is not known to
+    /// have finished.</summary>
+    public bool IsComplete => ManifestStatus == "completed";
+
     /// <summary>Reads an ASSERT run directory.</summary>
     /// <param name="runDirectory">The directory holding <c>scores.jsonl</c>.</param>
     /// <param name="options">Where the taxonomy and test set are, when not in the default places.</param>
@@ -71,9 +77,10 @@ public sealed record AssertAiRun(
         }
 
         var suite = Path.GetDirectoryName(run);
+        var warnings = new List<string>();
         var rows = new List<AssertAiScoreRow>();
         var seen = new Dictionary<AssertAiCaseKey, int>();
-        foreach (var (line, json) in AssertAiJson.ReadJsonLines(scoresPath))
+        foreach (var (line, json) in AssertAiJson.ReadJsonLines(scoresPath, warnings))
         {
             var row = AssertAiScoreRows.Parse(json, line);
             if (seen.TryGetValue(row.Key, out var first))
@@ -107,7 +114,7 @@ public sealed record AssertAiRun(
         var planned = new List<AssertAiCaseKey>();
         if (testSetPath is not null && File.Exists(testSetPath))
         {
-            planned.AddRange(Keys(testSetPath));
+            planned.AddRange(Keys(testSetPath, warnings));
         }
         else
         {
@@ -123,7 +130,7 @@ public sealed record AssertAiRun(
         var inferred = new HashSet<AssertAiCaseKey>();
         if (File.Exists(inferencePath))
         {
-            inferred.UnionWith(Keys(inferencePath));
+            inferred.UnionWith(Keys(inferencePath, warnings));
         }
         else
         {
@@ -141,7 +148,9 @@ public sealed record AssertAiRun(
         {
             missing.Add(new AssertAiMissingCase(key, inferencePath is null
                 ? "The case is in the test set but has no score row (the run has no inference_set.jsonl to tell why)."
-                : "The case is in the test set but was not run: ASSERT writes no transcript when the target call of a prompt case fails."));
+                : key.Type == "scenario"
+                    ? "The case is in the test set but has no transcript: ASSERT records a scenario's target error as a row, so its worker failed (or the run stopped)."
+                    : "The case is in the test set but has no transcript: ASSERT writes none when the target call of a prompt case fails (or the run stopped)."));
         }
 
         var finishedAt = manifest?["ended_at"] is { } ended && DateTimeOffset.TryParse(AssertAiJson.Str(ended), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal, out var at)
@@ -159,7 +168,8 @@ public sealed record AssertAiRun(
             inferencePath,
             missing,
             manifest is null ? null : AssertAiJson.Str(manifest["status"]),
-            finishedAt);
+            finishedAt,
+            warnings);
     }
 
     private static string? ManifestTestSet(JsonObject? manifest, string? suite)
@@ -175,8 +185,8 @@ public sealed record AssertAiRun(
         return File.Exists(path) ? path : null;
     }
 
-    private static IEnumerable<AssertAiCaseKey> Keys(string path) =>
-        AssertAiJson.ReadJsonLines(path)
+    private static IEnumerable<AssertAiCaseKey> Keys(string path, List<string> warnings) =>
+        AssertAiJson.ReadJsonLines(path, warnings)
             .Select(r => new AssertAiCaseKey(AssertAiJson.Str(r.Row["type"]) ?? string.Empty, AssertAiJson.Str(r.Row["test_case_id"]) ?? string.Empty))
             .Where(k => k.TestCaseId.Length > 0);
 }

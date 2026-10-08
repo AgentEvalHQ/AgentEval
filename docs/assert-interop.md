@@ -48,7 +48,17 @@ var target2 = new AssertAiTarget(async (messages, ct) =>
 
 // Host it in your web app …
 app.MapPost("/assert", async (HttpRequest request) =>
-    Results.Content(await target.RespondJsonAsync(await new StreamReader(request.Body).ReadToEndAsync()), "application/json"));
+{
+    try
+    {
+        var body = await new StreamReader(request.Body).ReadToEndAsync();
+        return Results.Content(await target.RespondJsonAsync(body), "application/json");
+    }
+    catch (InvalidDataException bad)   // not ASSERT's request shape
+    {
+        return Results.BadRequest(new { error = bad.Message });
+    }
+});
 
 // … or with the built-in server.
 await using var server = AssertAiTargetServer.Start(target, port: 8765, path: "/assert");
@@ -60,11 +70,15 @@ What to know:
 
 - **Tool calls reach ASSERT's judge only as results.** ASSERT turns a `tool_call` event with no matching
   `tool_result` into an empty assistant message and nothing else. So every call is sent as a `tool_result` event
-  carrying its name and arguments (as ASSERT's own reference endpoint does), and a call that got no result is sent
-  with empty content, so the judge still sees that it was made.
+  carrying its name and arguments (as ASSERT's own reference endpoint does), and a call that got no result is sent in
+  its place with the content `(no result: the call was not run)`, so the judge sees that it was made and does not read
+  it as run.
 - **Use `localhost`, not `127.0.0.1`.** ASSERT refuses a literal private address unless
-  `ASSERT_ALLOW_PRIVATE_ENDPOINTS=1` is set; the host name `localhost` is allowed. A target ASSERT reaches from a
-  container (`host.docker.internal`) needs that variable.
+  `ASSERT_ALLOW_PRIVATE_ENDPOINTS=1` is set; the host name `localhost` is allowed.
+- **ASSERT in a container.** It reaches the host as `host.docker.internal`, a private address, so set
+  `ASSERT_ALLOW_PRIVATE_ENDPOINTS=1` in the container. The built-in server answers only requests addressed to its
+  host name, so start it on `+` (every host name: `agenteval assert-ai serve --host +`). On Windows that needs a URL
+  reservation made once by an administrator: `netsh http add urlacl url=http://+:8765/ user=Everyone`.
 - **Answer within ASSERT's timeout**: `pipeline.inference.tool_timeout_s`, 60 seconds when unset, with no retry.
   ASSERT runs up to `pipeline.inference.concurrency` cases at once (10 by default); the built-in server answers them
   concurrently.
@@ -88,7 +102,9 @@ agenteval assert-ai import artifacts/results/my-suite/20261008T100000 [--format 
 
 The reader takes the taxonomy from the suite directory (the one ASSERT's own metrics read) and the test set the run's
 `manifest.json` names. Test cases are keyed by type and id (`prompt:test_case_000001`): ASSERT numbers them by
-position, and a prompt case and a scenario case can share an id.
+position, and a prompt case and a scenario case can share an id. A line that is not a JSON object (a run stopped
+mid-write leaves a truncated last line) is skipped, as ASSERT skips it, and reported as a warning; its case then shows
+as having no score row.
 
 **How each case becomes a result.** ASSERT has some result shapes that read as good news when they are not; the
 reader maps them to what they mean:
@@ -100,7 +116,7 @@ reader maps them to what they mean:
 | Judged, another dimension flagged (a preset's `wrong_tool`, …) | `fail`, severity `medium` |
 | Judged, no violation | `pass` |
 | Judged, no category of the taxonomy relevant | `inapplicable`: ASSERT counts it in neither rate |
-| `judge_failed`, or `filter_skipped` (the judge refused the input) | `error`. ASSERT writes `0.0` scores for a failed judge; they are never read as "no violation" |
+| `judge_failed`, or `filter_skipped` (the judge refused the input) | `error`. The row carries no verdict (`{"error": "judge_failed"}`); it is never read as "no violation" |
 | `scoring_skipped` (the target or tester refused the input, or the target errored) | `skipped`, with ASSERT's reason |
 | A case in the test set or the transcripts with **no score row** | `skipped`, named. ASSERT writes no row when a judge call is stopped by a content filter or a prompt case's target call fails, so its own numbers leave these cases out without saying so |
 
@@ -135,8 +151,12 @@ foreach (var (_, input) in AssertAiTranscripts.Read(Path.Combine(run.RunDirector
   empty denominator is `null`.
 
 ASSERT prints its headline without a confidence interval; AgentEval adds a 95% Wilson interval, labelled as its own.
-`--max-harm-rate` and `--max-over-refusal-rate` turn a rate into a CI gate: exit 1 above the limit, 11 when no rate
-could be measured.
+
+`--max-harm-rate` and `--max-over-refusal-rate` turn a rate into a CI gate: exit 1 when a rate is above its limit.
+A rate covers only the cases ASSERT's judge decided, so the gate cannot pass (exit 11) when any case was not measured
+(judge failed, not judged, or no score row: ASSERT drops the cases its judge's content filter stopped, which are likely
+the most harmful), when the run's `manifest.json` says it did not complete, or when no rate could be measured.
+`--max-unmeasured <share>` allows a share of unmeasured cases.
 
 ## 4. Writing AgentEval's conversations for ASSERT's judge
 
@@ -155,8 +175,10 @@ from chat messages or `AssertAiTranscript.FromEvalInput`.
 ASSERT's judge cannot run without a taxonomy (`behavior_categories` with unique names and `permissible` flags), so
 `--taxonomy` is required: write one for what the cases test, or reuse one ASSERT generated. A case's retrieved context
 is not sent; ASSERT's transcripts have no place for it. `artifacts_root` is written as an absolute path because ASSERT
-resolves a relative one against its own install; `--assert-root` writes the path ASSERT will see when it runs
-elsewhere.
+resolves a relative one against its own install; `--assert-root` (absolute) writes the path ASSERT will see when it
+runs elsewhere. Exporting again into the same directory removes what an earlier ASSERT run left in the run directory,
+and the case map records the SHA-256 of the transcripts it was written with: `calibrate` refuses a run whose
+transcripts differ, since ASSERT's positional ids would match old verdicts to new cases.
 
 ## 5. Calibrating ASSERT's judge
 
@@ -169,9 +191,12 @@ agenteval assert-ai import <a run judged by the same model> --calibration calibr
 ```
 
 `calibrate` reports, over the cases ASSERT's judge decided: accuracy with a 95% Wilson interval, Cohen's κ, dangerous
-errors (a labelled failure the judge passed) and false alarms. A case the judge did not decide (failed, not judged, no
-score row, or no relevant category) is counted as not measured, never as agreement. Imported results of the same
-judge model then carry those numbers instead of "not calibrated".
+errors (a labelled failure the judge did not flag) and false alarms. A case where the judge found no category relevant
+counts as not flagged, as ASSERT counts it, so a labelled failure judged that way is a dangerous error; the report
+says how many decisions were of that kind. A case the judge did not decide (failed, not judged, no score row) is
+counted as not measured, never as agreement. Imported results of the same judge model on the same taxonomy then carry
+those numbers instead of "not calibrated"; a calibration measured on another taxonomy is not attached, since a judge's
+agreement on one set of questions says nothing about another.
 
 ## Not included
 

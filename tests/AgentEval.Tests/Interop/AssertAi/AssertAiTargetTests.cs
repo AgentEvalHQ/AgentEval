@@ -83,7 +83,7 @@ public class AssertAiTargetTests
         var reply = AssertAiTarget.ToResponse(produced).ToJson();
 
         var edit = Assert.Single(AssertPersists(reply, "u").ToolEdits);
-        Assert.Equal(("set_payout", ""), (edit.Name, edit.Result));
+        Assert.Equal(("set_payout", AssertAiJudgeKit.NoResult), (edit.Name, edit.Result));
         Assert.Equal("X-99", (string)edit.Args!["account"]!);
     }
 
@@ -127,6 +127,27 @@ public class AssertAiTargetTests
         Assert.Equal(HttpStatusCode.OK, slash.StatusCode);
         Assert.Equal(HttpStatusCode.NotFound, (await http.PostAsync(new Uri($"http://localhost:{port}/elsewhere"), new StringContent("{}"))).StatusCode);
     }
+
+    [Fact]
+    public async Task OnEveryHostName_TheServerAnswers_AndItsEndpointIsPrintable()
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            return;   // a wildcard needs a URL reservation on Windows (documented); Linux and macOS need none
+        }
+
+        var port = FreePort();
+        await using var server = AssertAiTargetServer.Start(new AssertAiTarget(new FixedClient("hello")), port, "/assert", host: "+");
+        using var http = new HttpClient();
+
+        Assert.Equal($"http://localhost:{port}/assert", server.Endpoint.ToString());
+        var reply = await http.PostAsync(server.Endpoint, new StringContent("""{"message": "hi", "history": [{"role": "user", "content": "hi"}]}""", Encoding.UTF8, "application/json"));
+        Assert.Equal(HttpStatusCode.OK, reply.StatusCode);
+    }
+
+    [Fact]
+    public void AHostThatIsNoHostName_IsRefusedBeforeAnythingListens() =>
+        Assert.Throws<UriFormatException>(() => AssertAiTargetServer.Start(new AssertAiTarget(new FixedClient("x")), FreePort(), "/", host: "bad host"));
 
     [Fact]
     public async Task AnAgentThatFails_Answers500_WhichAssertRecordsAsATargetError()

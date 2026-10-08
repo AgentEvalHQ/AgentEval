@@ -56,12 +56,40 @@ public class AssertAiCommandTests : IDisposable
     {
         var run = ConstructedRun();
         Assert.Equal(ExitCodes.TestFailure, Import(run, maxHarm: 0.5).Exit);
-        Assert.Equal(ExitCodes.Success, Import(run, maxHarm: 1.0).Exit);
+        Assert.Equal(ExitCodes.Success, Import(run, maxHarm: 1.0, maxUnmeasured: 1.0).Exit);
 
         File.Delete(Path.Combine(Path.GetDirectoryName(run)!, "taxonomy.json"));
         var (exit, _, stderr) = Import(run, maxHarm: 0.5);
         Assert.Equal(ExitCodes.GateIndeterminate, exit);
         Assert.Contains("No taxonomy", stderr, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Import_TheGateCannotPass_OnARateOverFewerCasesThanRan_OrOnAnUnfinishedRun()
+    {
+        // The constructed run: 1 judged case (harm), 3 not measured (not judged, judge failed twice).
+        var run = ConstructedRun();
+        var (exit, _, stderr) = Import(run, maxHarm: 1.0);
+        Assert.Equal(ExitCodes.GateIndeterminate, exit);
+        Assert.Contains("3 of 4 case(s) were not measured", stderr, StringComparison.Ordinal);
+        Assert.Equal(ExitCodes.GateIndeterminate, Import(run, maxHarm: 1.0, maxUnmeasured: 0.5).Exit);
+        Assert.Equal(ExitCodes.Success, Import(run, maxHarm: 1.0, maxUnmeasured: 0.75).Exit);
+
+        File.WriteAllText(Path.Combine(run, "manifest.json"), """{"status": "running"}""");
+        (exit, _, stderr) = Import(run, maxHarm: 1.0, maxUnmeasured: 1.0);
+        Assert.Equal(ExitCodes.GateIndeterminate, exit);
+        Assert.Contains("'running', not 'completed'", stderr, StringComparison.Ordinal);
+        Assert.Equal(ExitCodes.Success, Import(run).Exit);   // no gate: the report is still printed and exits 0
+    }
+
+    [Fact]
+    public void Import_RefusesABlankDirectoryAndANullCalibration_AsUsageErrors()
+    {
+        Assert.Equal(ExitCodes.UsageError, Import("  ").Exit);
+        var calibration = Path.Combine(_root, "null.json");
+        Directory.CreateDirectory(_root);
+        File.WriteAllText(calibration, "null");
+        Assert.Equal(ExitCodes.UsageError, Import(ConstructedRun(), calibration: calibration).Exit);
     }
 
     [Theory]
@@ -138,11 +166,11 @@ public class AssertAiCommandTests : IDisposable
         Assert.Equal(ExitCodes.GateIndeterminate, AssertAiCommand.RunCalibrate(runDir, Path.Combine(outDir, "agenteval-cases.json"), "text", null, TextWriter.Null, TextWriter.Null));
     }
 
-    private (int Exit, string Stdout, string Stderr) Import(string run, string format = "text", double? maxHarm = null, string? calibration = null)
+    private (int Exit, string Stdout, string Stderr) Import(string run, string format = "text", double? maxHarm = null, string? calibration = null, double maxUnmeasured = 0.0)
     {
         var stdout = new StringWriter();
         var stderr = new StringWriter();
-        var exit = AssertAiCommand.RunImport(run, null, null, calibration, format, null, maxHarm, null, stdout, stderr);
+        var exit = AssertAiCommand.RunImport(run, null, null, calibration, format, null, maxHarm, null, stdout, stderr, maxUnmeasured);
         return (exit, stdout.ToString(), stderr.ToString());
     }
 
