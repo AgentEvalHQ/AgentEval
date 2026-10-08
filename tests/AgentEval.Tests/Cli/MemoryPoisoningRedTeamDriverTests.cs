@@ -207,6 +207,7 @@ public sealed class MemoryPoisoningRedTeamDriverTests : IDisposable
     [InlineData("--judge-mode", "primary")]
     [InlineData("--intensity", "moderate")]
     [InlineData("--judge-api-key", "k")]
+    [InlineData("--endpoint", "http://localhost:1/v1")]
     public async Task CommandLine_AnOptionItDoesNotRead_IsRefusedEvenAtItsDefault(string option, string value)
     {
         var stderr = new StringWriter();

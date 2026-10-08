@@ -35,8 +35,8 @@ public static class McServeCommand
     /// <param name="port">The port to bind.</param>
     /// <param name="workspaceRoot">The workspace root, or null for the current directory.</param>
     /// <param name="stop">
-    /// Cancelled by the command line on SIGTERM (a service manager, <c>kill</c>, CI). The server child never receives
-    /// that signal, so it is stopped here; before, the launcher exited and the server kept the port.
+    /// Cancelled by the command line on Ctrl+C and on SIGTERM (a service manager, <c>kill</c>, CI). The server child
+    /// does not receive SIGTERM, so it is stopped here; before, the launcher exited and the server kept the port.
     /// </param>
     public static async Task<int> RunAsync(int port, string? workspaceRoot, CancellationToken stop = default)
     {

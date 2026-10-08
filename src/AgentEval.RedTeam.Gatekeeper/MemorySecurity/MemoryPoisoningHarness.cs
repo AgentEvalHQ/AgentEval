@@ -154,7 +154,9 @@ public sealed class MemoryPoisoningHarness
                     : null;
             foreach (var run in runs)
             {
-                outcomes.Add(why is not null && run.Silent && run.Outcome.PlantedBy == "model" && !run.Outcome.Observation.IsBenignControl
+                var alreadyNotMeasured = run.Outcome.Notes.Any(n => n.StartsWith("not measured", StringComparison.Ordinal));
+                outcomes.Add(why is not null && run.Silent && !alreadyNotMeasured
+                             && run.Outcome.PlantedBy == "model" && !run.Outcome.Observation.IsBenignControl
                     ? run.Outcome with
                     {
                         Observation = new MemorySecurityObservation(run.Outcome.ScenarioId, isBenignControl: false),

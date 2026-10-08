@@ -137,6 +137,20 @@ internal static class MemoryPoisoningRedTeamDriver
                    "model you name, behind AgentEval's default memory protection) and scores with the memory-security checks.";
         }
 
+        // Options that contradict each other are refused rather than one silently winning.
+        if (opts.ExplicitOptions is { } named)
+        {
+            var modelOptions = new[] { "--endpoint", "--model", "--api-key", "--azure", "--deployment-name" }.Where(named.Contains).ToList();
+            if (IsScripted(opts) && modelOptions.Count > 0)
+                return $"--scripted runs the scripted model; it does not take {string.Join(", ", modelOptions)}.";
+            if (opts.Azure && named.Contains("--model"))
+                return "--azure names its model with --deployment-name; it does not take --model.";
+            if (!opts.Azure && named.Contains("--deployment-name"))
+                return "--deployment-name applies with --azure only.";
+            if (named.Contains("--verbose") && named.Contains("--quiet"))
+                return "--verbose and --quiet contradict each other: pick one.";
+        }
+
         var notUsed = new List<string>();
         if (opts.Sut is not null) notUsed.Add("--sut");
         if (opts.Transform is not null) notUsed.Add("--transform");

@@ -11,11 +11,13 @@ const ids = JSON.parse(process.argv[3]);
 const pages = [
   { path: '/', expect: [ids.subjectName] },
   { path: '/subjects', expect: [ids.subjectName] },
-  { path: `/subjects/${ids.subjectKind}/${ids.subjectName}`, expect: [ids.subjectName, 'Score over time ('] },
+  // The heading renders with 0 runs too: the count must be at least 1.
+  { path: `/subjects/${ids.subjectKind}/${ids.subjectName}`, expect: [ids.subjectName], patterns: [/Score over time \([1-9][0-9]* runs?\)/] },
   { path: '/runs', expect: [ids.subjectName], links: [`/runs/${ids.runId}`] },
   { path: `/runs/${ids.runId}`, expect: ['Not measured', ids.runId], links: ['/scenarios/'], followScenario: true },
   { path: `/runs/${ids.runId}/trace`, expect: ['search-flights'] },
-  { path: '/compliance', expect: [ids.regulation] },
+  // The empty state names a regulation too ("agenteval bench gdpr"): the list must link to the regulation's matrix.
+  { path: '/compliance', expect: [ids.regulation], links: [`/compliance/${ids.regulation}`] },
   // Every matrix cell with evidence shows a known status glyph: a status the UI does not map renders blank or "?".
   { path: `/compliance/${ids.regulation}`, expect: [ids.evidenceName], cells: true },
   { path: `/compliance/${ids.regulation}/${ids.evidenceKind}/${ids.evidenceName}/${ids.evidenceTs}`, expect: [ids.evidenceName, 'art-5'] },
@@ -27,7 +29,8 @@ const pages = [
 // Error and empty states a page renders instead of its data.
 const badTexts = [
   'Failed to load', 'Something went wrong', 'not found', 'No run found', 'No subject found', 'No evidence found',
-  'No recursive', 'No trace data captured', 'No compliance data',
+  'No recursive', 'No trace data captured', 'No compliance data', 'No compliance evidence registered',
+  'No runs with scored results', 'No timeline data',
 ];
 
 const browser = await chromium.launch();
@@ -62,6 +65,9 @@ async function visit(path, page_) {
   for (const want of page_.expect ?? []) {
     if (!want || !main.toLowerCase().includes(String(want).toLowerCase())) problems.push(`does not show "${want}"`);
   }
+  for (const pattern of page_.patterns ?? []) {
+    if (!pattern.test(main)) problems.push(`does not match ${pattern}`);
+  }
   for (const link of page_.links ?? []) {
     if ((await page.locator(`main a[href*="${link}"]`).count()) === 0) problems.push(`no link to ${link}`);
   }
@@ -75,6 +81,8 @@ async function visit(path, page_) {
   const scenarioHref = page_.followScenario
     ? await page.locator('main a[href*="/scenarios/"]').first().getAttribute('href').catch(() => null)
     : null;
+  // Responses that arrived during the checks above are read too before the page closes.
+  await Promise.all(bodies);
   await page.close();
   return { problems, scenarioHref };
 }

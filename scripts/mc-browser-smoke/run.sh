@@ -79,14 +79,16 @@ fi
 node "$here/smoke.mjs" "http://localhost:$port" "$ids"
 
 # A service manager, `kill` or CI stops the tool with SIGTERM, which reaches the launcher only: the server child
-# must not outlive it and keep the port.
+# must not outlive it and keep the port. "Gone" is judged by the port accepting a connection at all, not by an answer:
+# a surviving server that is slow to answer must still fail this.
+listening() { (exec 3<>"/dev/tcp/127.0.0.1/$port") 2>/dev/null; }
 echo "== SIGTERM stops the server"
 kill -TERM "$server"
 for _ in $(seq 1 20); do
-  probe || break
+  listening || break
   sleep 0.5
 done
-if probe; then
+if listening; then
   echo "FAIL: mc serve was terminated, but the server still answers on port $port" >&2
   exit 1
 fi
