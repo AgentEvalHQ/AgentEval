@@ -1,6 +1,10 @@
 {
+  "kind": "checkpoint",
   "schema": "checkpoint",
   "writer": "invalid",
   "reader": "invalid",
-  "rule": "a lane's runs are frozen by their run hashes"
+  "rules": [
+    "CKP-2"
+  ],
+  "why": "a lane's runs are frozen by their run hashes"
 }

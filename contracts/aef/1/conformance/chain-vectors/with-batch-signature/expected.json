@@ -1,4 +1,8 @@
 {
-  "run": "chain-vectors/with-batch-signature/run",
-  "problems": []
+  "kind": "chain",
+  "run": "run",
+  "problems": [],
+  "rules": [
+    "OVL-5"
+  ]
 }

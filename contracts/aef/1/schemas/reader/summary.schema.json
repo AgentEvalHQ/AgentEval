@@ -11,12 +11,15 @@
   ],
   "properties": {
     "schemaVersion": {
-      "$ref": "common.schema.json#/$defs/schemaVersion"
+      "$ref": "common.schema.json#/$defs/schemaVersion",
+      "description": "The AEF version this document follows, MAJOR.MINOR: 1.0 for AEF 1.0 (VER-1)."
     },
     "runId": {
-      "$ref": "common.schema.json#/$defs/id"
+      "$ref": "common.schema.json#/$defs/id",
+      "description": "The runId of the run.json beside it (SUM-2)."
     },
     "lanes": {
+      "description": "One entry per lane: a named group of cases, such as a suite (SUM-3).",
       "type": "array",
       "maxItems": 64,
       "items": {
@@ -28,11 +31,10 @@
         "properties": {
           "lane": {
             "description": "quality, security, memory, performance, compliance, or a producer's own.",
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 64
+            "$ref": "common.schema.json#/$defs/laneName"
           },
           "metrics": {
+            "description": "The lane's entries, one per metric and result path (SUM-3).",
             "type": "array",
             "maxItems": 1024,
             "items": {
@@ -43,10 +45,12 @@
                 "N",
                 "notMeasured",
                 "value",
-                "verdict"
+                "verdict",
+                "path"
               ],
               "properties": {
                 "metric": {
+                  "description": "The metric summarised, by its id in metrics.json (SUM-1, SUM-3).",
                   "type": "string",
                   "minLength": 1,
                   "maxLength": 256
@@ -54,25 +58,30 @@
                 "n": {
                   "description": "Measured.",
                   "type": "integer",
-                  "minimum": 0
+                  "minimum": 0,
+                  "maximum": 9007199254740991
                 },
                 "N": {
-                  "description": "Asked for.",
+                  "description": "The lane's lines at this path, one per case, not counting not_applicable lines (SUM-4, SUM-5).",
                   "type": "integer",
-                  "minimum": 0
+                  "minimum": 0,
+                  "maximum": 9007199254740991
                 },
                 "notMeasured": {
+                  "description": "N minus n: the lines counted in N that were not measured (SUM-5).",
                   "type": "integer",
-                  "minimum": 0
+                  "minimum": 0,
+                  "maximum": 9007199254740991
                 },
                 "value": {
-                  "description": "The rate or mean over the n measured; null when n is 0.",
+                  "description": "sum for a metric of kind count, otherwise sum / n (the rate or mean of the measured values); null when n is 0 (SUM-5).",
                   "type": [
                     "number",
                     "null"
                   ]
                 },
                 "stderr": {
+                  "description": "The producer's standard error over the measured values, or null (SUM-5).",
                   "type": [
                     "number",
                     "null"
@@ -80,6 +89,7 @@
                   "minimum": 0
                 },
                 "ci": {
+                  "description": "The producer's interval over the measured values, or null (SUM-5).",
                   "anyOf": [
                     {
                       "type": "null"
@@ -93,17 +103,21 @@
                       ],
                       "properties": {
                         "low": {
+                          "description": "The interval's lower bound.",
                           "type": "number"
                         },
                         "high": {
+                          "description": "The interval's upper bound.",
                           "type": "number"
                         },
                         "level": {
+                          "description": "The confidence level, strictly between 0 and 1: 0.95 for a 95% interval.",
                           "type": "number",
                           "exclusiveMinimum": 0,
                           "exclusiveMaximum": 1
                         },
                         "method": {
+                          "description": "How the interval was computed, as the producer names it.",
                           "type": "string",
                           "maxLength": 64
                         }
@@ -112,18 +126,26 @@
                   ]
                 },
                 "verdict": {
+                  "description": "The producer's verdict on this entry under its rule: passed, failed, warn, inconclusive, or not_measured, which it always is when n is 0 (SUM-6).",
                   "type": "string"
                 },
                 "rule": {
+                  "description": "The rule the verdict applied, as text for display (SUM-6).",
                   "type": "string",
                   "maxLength": 1024
                 },
                 "sum": {
+                  "description": "The sum of the measured values (SUM-5).",
                   "type": "number"
                 },
                 "sumSq": {
+                  "description": "The sum of the squares of the measured values (SUM-5).",
                   "type": "number",
                   "minimum": 0
+                },
+                "path": {
+                  "description": "The result path this entry summarises, one line per case (spec 03, SUM-3).",
+                  "$ref": "common.schema.json#/$defs/text"
                 }
               },
               "allOf": [
@@ -131,6 +153,7 @@
                   "if": {
                     "properties": {
                       "n": {
+                        "description": "Applies when no line was measured (SUM-5).",
                         "const": 0
                       }
                     }
@@ -138,9 +161,11 @@
                   "then": {
                     "properties": {
                       "value": {
+                        "description": "With n at 0, value is null (SUM-5).",
                         "type": "null"
                       },
                       "verdict": {
+                        "description": "With n at 0, the verdict is not_measured (SUM-6).",
                         "const": "not_measured"
                       }
                     }
@@ -153,7 +178,27 @@
       }
     },
     "ext": {
-      "$ref": "common.schema.json#/$defs/ext"
+      "$ref": "common.schema.json#/$defs/ext",
+      "description": "Producer extensions, named reverse-DNS or with the producer's prefix. A reader ignores what it does not know; never holds a secret (ENC-19)."
+    },
+    "cost": {
+      "description": "The run's total cost (spec 03, SUM-7).",
+      "type": "object",
+      "required": [
+        "totalUsd"
+      ],
+      "properties": {
+        "totalUsd": {
+          "description": "The run's total cost, in US dollars (SUM-7).",
+          "type": "number",
+          "minimum": 0
+        },
+        "source": {
+          "description": "Where the figure came from (SUM-7).",
+          "type": "string",
+          "maxLength": 256
+        }
+      }
     }
   }
 }

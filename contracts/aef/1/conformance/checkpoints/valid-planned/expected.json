@@ -1,7 +1,11 @@
 {
+  "kind": "checkpoint",
   "schema": "checkpoint",
   "writer": "valid",
   "reader": "valid",
-  "rule": "a planned checkpoint has no outcome yet",
+  "rules": [
+    "CKP-4"
+  ],
+  "why": "a planned checkpoint has no outcome yet",
   "problems": []
 }

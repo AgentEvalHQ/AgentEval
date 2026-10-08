@@ -3,7 +3,7 @@
   "payload": "",
   "signatures": [
     {
-      "keyid": "test-key-not-verified",
+      "keyid": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
       "sig": "AAAA"
     }
   ]

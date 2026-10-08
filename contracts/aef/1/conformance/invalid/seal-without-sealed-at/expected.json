@@ -1,0 +1,10 @@
+{
+  "kind": "document",
+  "schema": "seal",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "SEAL-5"
+  ],
+  "why": "a seal says when it was made"
+}

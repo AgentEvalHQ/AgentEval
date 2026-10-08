@@ -1,6 +1,0 @@
-{
-  "schema": "run",
-  "writer": "invalid",
-  "reader": "valid",
-  "rule": "there is no 'sealed' status (sealed is a fact about seal.json); a reader takes an unknown status as other"
-}

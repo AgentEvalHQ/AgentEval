@@ -7,11 +7,12 @@ using System.Text.Json.Nodes;
 namespace AgentEval.Results.Checkpoints;
 
 /// <summary>
-/// Checks a decided checkpoint manifest against itself (contracts/aef/1/README.md, "Checkpoints"): the rules across
-/// its parts that a schema cannot express. The manifest must already be valid against the reader checkpoint schema.
+/// Checks a decided checkpoint manifest against itself (contracts/aef/1/spec/05-checkpoints.md, [CKP-7]): the rules
+/// across its parts that a schema cannot express. The manifest must already be valid against the reader checkpoint schema.
 /// </summary>
 public static class CheckpointManifest
 {
+    private static readonly HashSet<string> States = new(StringComparer.Ordinal) { "draft", "planned", "approved_to_spend", "running", "evidence_complete", "decided" };
     private static readonly HashSet<string> Outcomes = new(StringComparer.Ordinal) { "approved", "blocked", "inconclusive", "expired" };
     private static readonly HashSet<string> LaneStatuses = new(StringComparer.Ordinal) { "passed", "failed", "missing", "not_measured", "incomparable", "stale" };
     private static readonly HashSet<string> EvidenceStatuses = new(StringComparer.Ordinal) { "passed", "failed", "not_measured", "incomparable" };
@@ -20,16 +21,21 @@ public static class CheckpointManifest
     /// The problems, in name order: <c>decision</c> (not what the recorded input gives), <c>evidence</c> (a lane has
     /// runs but no result, or a result but no runs), <c>lanes</c> (the input does not decide exactly the manifest's
     /// lanes), <c>outcome</c> (not the decision's), <c>version</c> (the input is for another version). Or only
-    /// <c>unverifiable</c>: the manifest uses an outcome or status this version does not know, or lacks the decision a
-    /// newer version may make optional; a reader cannot recompute it, and that is not tampering. Empty for a manifest
-    /// not yet decided, or aborted.
+    /// <c>unverifiable</c>: the manifest is in a state, or uses an outcome or status, this version does not know, or lacks
+    /// the decision a newer version may make optional; a reader cannot recompute it, and that is not tampering. Empty
+    /// for a manifest not yet decided, or aborted.
     /// </summary>
     public static IReadOnlyList<string> Verify(JsonNode manifest)
     {
         ArgumentNullException.ThrowIfNull(manifest);
         var state = (string?)manifest["state"];
         var outcome = (string?)manifest["outcome"];
-        if (state is not ("decided" or "sealed") || outcome is null or "aborted")
+        if (state is null || !States.Contains(state))
+        {
+            return ["unverifiable"];
+        }
+
+        if (state != "decided" || outcome is null or "aborted")
         {
             return [];
         }

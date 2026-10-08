@@ -1,13 +1,17 @@
 {
-  "run": "chain-vectors/overlapping-batch/run",
+  "kind": "chain",
+  "run": "run",
   "problems": [
-    {
-      "path": "overlays/seal-0002.json",
-      "problem": "line-boundary"
-    },
-    {
-      "path": "overlays/seal-0002.json",
-      "problem": "offset"
-    }
+    [
+      "overlays/seal-0002.json",
+      "line-boundary"
+    ],
+    [
+      "overlays/seal-0002.json",
+      "offset"
+    ]
+  ],
+  "rules": [
+    "OVL-5"
   ]
 }

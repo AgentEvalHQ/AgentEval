@@ -1,0 +1,20 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "overlays/events.ndjson",
+      "digest": {
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    }
+  ],
+  "predicateType": "https://agenteval.dev/aef/1/overlay-batch",
+  "predicate": {
+    "schemaVersion": "1.0",
+    "runId": "r-1",
+    "batch": 1,
+    "offset": 0,
+    "length": 10,
+    "previous": null
+  }
+}

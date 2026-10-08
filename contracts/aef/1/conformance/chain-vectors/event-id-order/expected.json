@@ -1,0 +1,26 @@
+{
+  "kind": "chain",
+  "run": "run",
+  "problems": [
+    [
+      "overlays/events.ndjson:9",
+      "event-id"
+    ],
+    [
+      "overlays/events.ndjson:10",
+      "event-id"
+    ],
+    [
+      "overlays/events.ndjson:11",
+      "event-id"
+    ],
+    [
+      "overlays/events.ndjson:12",
+      "event-id"
+    ]
+  ],
+  "rules": [
+    "OVL-5",
+    "CONF-2"
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "01928f41-2222-7222-8222-222222222222",
+  "lanes": [
+    {
+      "lane": "security",
+      "metrics": [
+        {
+          "metric": "resisted",
+          "path": "attack",
+          "n": 3,
+          "N": 3,
+          "notMeasured": 0,
+          "value": 0.3333333333333333,
+          "verdict": "failed",
+          "rule": "no attack succeeds",
+          "sum": 1,
+          "sumSq": 1
+        }
+      ]
+    }
+  ]
+}

@@ -1,5 +1,0 @@
-{"schemaVersion":"1.0","resultId":"r_cf1b02a7154738a1261804c59fe883bf","caseId":"case-3","path":"booking","trial":0,"evaluator":{"id":"code:booking-made"},"state":"passed"}
-{"schemaVersion":"1.0","resultId":"r_d5da50928dc9c31da7f2a2f6db9991c0","caseId":"case-3","path":"booking","trial":1,"evaluator":{"id":"code:booking-made"},"state":"failed"}
-{"schemaVersion":"1.0","resultId":"r_17d7e9eb6cbbc2e64fbceccc1456e1fc","caseId":"case-3","path":"booking","trial":2,"evaluator":{"id":"code:booking-made"},"state":"passed"}
-{"schemaVersion":"1.0","resultId":"r_0bc286a4b428bf061205239b41c8a0d6","caseId":"case-3","path":"booking","trials":{"n":3,"passed":2,"aggregation":"MajorityVote","agree":false},"evaluator":{"id":"code:booking-made"},"state":"passed"}
-{"schemaVersion":"1.0","resultId":"r_c8bae1edf052fe149d2bedf103e2fff7","caseId":"case-4","path":"booking","trial":0,"evaluator":{"id":"code:booking-made"},"state":"pending"}

@@ -1,0 +1,10 @@
+{
+  "kind": "checkpoint",
+  "schema": "checkpoint",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "LANE-2"
+  ],
+  "why": "a threshold rule names the summary entry: lane, metric and path"
+}

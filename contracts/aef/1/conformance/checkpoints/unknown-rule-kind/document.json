@@ -33,19 +33,11 @@
       "blocking": true
     }
   ],
-  "comparability": {
-    "required": [
-      "judge.modelId",
-      "judge.rubricDigest",
-      "stimulus",
-      "executionPolicy"
-    ]
-  },
   "budget": {
     "approvedUsd": 10.0,
     "spentUsd": 6.4,
     "approvedBy": {
-      "identity": "git:owner@example.com",
+      "identity": "oidc:https://login.example.com/u-7f3a",
       "assurance": "self-attested"
     }
   },

@@ -1,0 +1,30 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "ext/./a",
+      "digest": {
+        "sha256": "0000000000000000000000000000000000000000000000000000000000000000"
+      }
+    }
+  ],
+  "predicateType": "https://agenteval.dev/aef/1/evidence",
+  "predicate": {
+    "schemaVersion": "1.0",
+    "runId": "r-1",
+    "runHash": "0000000000000000000000000000000000000000000000000000000000000000",
+    "producer": {
+      "name": "p",
+      "version": "1"
+    },
+    "subject": {
+      "ref": "agent:a/b"
+    },
+    "deployment": null,
+    "suite": null,
+    "judges": [],
+    "closedAt": "2026-10-01T00:00:00Z",
+    "sealedAt": "2026-10-01T00:00:00Z",
+    "sealedBy": "producer"
+  }
+}

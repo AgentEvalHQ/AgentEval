@@ -7,6 +7,7 @@
       "metrics": [
         {
           "metric": "m",
+          "path": "p",
           "n": 0,
           "N": 3,
           "notMeasured": 3,

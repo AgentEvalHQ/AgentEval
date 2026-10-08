@@ -1,6 +1,10 @@
 {
+  "kind": "document",
   "schema": "result",
   "writer": "invalid",
   "reader": "invalid",
-  "rule": "a typed absence (not_measured, not_applicable, skipped, error) says why"
+  "rules": [
+    "RES-2"
+  ],
+  "why": "a typed absence says why"
 }

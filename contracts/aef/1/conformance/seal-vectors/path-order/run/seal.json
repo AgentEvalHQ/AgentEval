@@ -40,7 +40,7 @@
     {
       "name": "run.json",
       "digest": {
-        "sha256": "1ec85bfa4306ab788f5ed8802143d1d285ee5f4aa6dd54d93e372b89a6314598"
+        "sha256": "daa1603de88114caf27e75545f907c421041cbf5a5a75a955666fac5b9f36f15"
       }
     },
     {
@@ -54,10 +54,10 @@
   "predicate": {
     "schemaVersion": "1.0",
     "runId": "01928f3f-0000-7000-8000-000000000001",
-    "runHash": "6098ad9546bc79bdffc457f917590b9a3c038d740776e50146ec1ce06a80fe38",
+    "runHash": "6e69b54e7c30775a13134b7f83220096e6c5019259aafc71006c1e50fd5fc8ca",
     "producer": {
       "name": "agenteval-cli",
-      "version": "0.44.0"
+      "version": "1.0.0"
     },
     "subject": {
       "ref": "agent:people/hr-bot"
@@ -66,6 +66,7 @@
     "suite": null,
     "judges": [],
     "closedAt": "2026-10-03T09:00:02Z",
+    "sealedAt": "2026-10-08T09:00:00Z",
     "sealedBy": "ingest"
   }
 }

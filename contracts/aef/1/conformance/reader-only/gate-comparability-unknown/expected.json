@@ -1,0 +1,12 @@
+{
+  "kind": "reader-only",
+  "schema": "gate-decision",
+  "writer": "invalid",
+  "reader": "valid",
+  "reads": {
+    "comparability": "incomparable"
+  },
+  "rules": [
+    "VER-3"
+  ]
+}

@@ -17,10 +17,12 @@
   ],
   "properties": {
     "schemaVersion": {
-      "$ref": "common.schema.json#/$defs/schemaVersion"
+      "$ref": "common.schema.json#/$defs/schemaVersion",
+      "description": "The AEF version this document follows, MAJOR.MINOR: 1.0 for AEF 1.0 (VER-1)."
     },
     "runnerId": {
-      "$ref": "common.schema.json#/$defs/id"
+      "$ref": "common.schema.json#/$defs/id",
+      "description": "The runner's id; the events and runs it produces name it (PLAN-6)."
     },
     "identity": {
       "description": "The runner's workload identity, and the id of the key it signs sealed evidence with, if any.",
@@ -31,11 +33,13 @@
       ],
       "properties": {
         "workloadId": {
+          "description": "The runner's workload identity (PLAN-6).",
           "type": "string",
           "minLength": 1,
           "maxLength": 256
         },
         "signingKeyId": {
+          "description": "The id of the key the runner signs sealed evidence with: a hint for a reader, never a reason to trust the key (PLAN-6, SIG-4).",
           "type": "string",
           "minLength": 1,
           "maxLength": 256
@@ -43,6 +47,7 @@
       }
     },
     "kind": {
+      "description": "What the runner is: local (a local process), remote (a remote service), ci (a CI job) or pool (a pool of runners) (PLAN-6).",
       "enum": [
         "local",
         "remote",
@@ -51,6 +56,7 @@
       ]
     },
     "os": {
+      "description": "The runner's operating system: linux, windows or macos (PLAN-6).",
       "enum": [
         "linux",
         "windows",
@@ -58,6 +64,7 @@
       ]
     },
     "runtime": {
+      "description": "The runtime the runner runs on (PLAN-6).",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -66,11 +73,13 @@
       ],
       "properties": {
         "name": {
+          "description": "The runtime's name.",
           "type": "string",
           "minLength": 1,
           "maxLength": 64
         },
         "version": {
+          "description": "The runtime's version.",
           "type": "string",
           "minLength": 1,
           "maxLength": 64
@@ -78,6 +87,7 @@
       }
     },
     "providers": {
+      "description": "The providers the runner supports. It refuses a plan whose provider is not among them (PLAN-7).",
       "type": "array",
       "minItems": 1,
       "maxItems": 16,
@@ -86,19 +96,22 @@
       }
     },
     "tags": {
+      "description": "The runner's tags. It can take a plan only when it carries every tag of the plan's runnerSelector (PLAN-7).",
       "type": "array",
       "maxItems": 64,
       "items": {
         "type": "string",
-        "pattern": "^[a-z0-9][a-z0-9._:-]{0,63}(?!\\n)$"
+        "pattern": "^[a-z0-9][a-z0-9._:-]{0,63}$"
       }
     },
     "gpu": {
+      "description": "Whether the runner has a GPU (PLAN-6).",
       "type": "boolean"
     },
     "networkZone": {
+      "description": "The network zone the runner runs in. A remote-zone plan needs it to be the plan's zone (PLAN-7).",
       "type": "string",
-      "pattern": "^[a-z0-9][a-z0-9._:-]{0,63}(?!\\n)$"
+      "pattern": "^[a-z0-9][a-z0-9._:-]{0,63}$"
     },
     "version": {
       "description": "The runner software's version.",
@@ -107,7 +120,8 @@
       "maxLength": 64
     },
     "ext": {
-      "$ref": "common.schema.json#/$defs/ext"
+      "$ref": "common.schema.json#/$defs/ext",
+      "description": "Producer extensions, named reverse-DNS or with the producer's prefix. A reader ignores what it does not know; never holds a secret (ENC-19)."
     }
   }
 }

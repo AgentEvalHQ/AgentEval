@@ -43,7 +43,7 @@ PLAN = {
     "contentPolicy": "off", "isolation": "process", "provider": "local",
     "judges": [{"model": "gpt-5.1", "provider": "azure.ai.openai", "rubricDigest": "sha256:" + "a9" * 32}],
     "baseline": {"policy": "latest-sealed-on-main"},
-    "comparability": {"required": ["judge.modelId", "judge.rubricDigest"]},
+    "comparability": {"required": ["judges", "rubrics"]},
     "credentialRefs": CREDENTIALS,
     "runnerSelector": ["os:linux"],
 }

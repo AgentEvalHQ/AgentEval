@@ -1,5 +1,12 @@
 {
-  "run": "valid/completed-eval",
-  "verdict": "match",
-  "mismatches": []
+  "kind": "seal",
+  "run": "run",
+  "problems": [],
+  "rules": [
+    "SEAL-1",
+    "SEAL-3",
+    "SEAL-4",
+    "SEAL-6"
+  ],
+  "manifest": "expected-manifest.txt"
 }

@@ -1,6 +1,10 @@
 {
+  "kind": "checkpoint",
   "schema": "checkpoint",
   "writer": "invalid",
   "reader": "invalid",
-  "rule": "'latest' (any case) is resolved to an exact version before anything runs"
+  "rules": [
+    "CKP-1"
+  ],
+  "why": "'latest' (any case) is resolved to an exact version before anything runs"
 }

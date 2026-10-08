@@ -1,0 +1,10 @@
+{
+  "kind": "document",
+  "schema": "evidence",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "EVD-2"
+  ],
+  "why": "a span link has no digest"
+}

@@ -11,8 +11,8 @@ namespace AgentEval.Tests.Contracts;
 
 /// <summary>
 /// AEF 1.0 checkpoints: the manifest schema, the checkpoint verifier and the decision function. The expected outputs and
-/// problems are written by hand from contracts/aef/1/README.md; the Python reference (tools/aef_decide.py) and the .NET
-/// implementation (AgentEval.Results) both have to reproduce them.
+/// problems are written by hand from contracts/aef/1/spec/05-checkpoints.md; the Python reference (tools/aef_decide.py)
+/// and the .NET implementation (AgentEval.Results) both have to reproduce them.
 /// </summary>
 public class AefCheckpointTests
 {
@@ -92,13 +92,28 @@ public class AefCheckpointTests
         var dir = Path.Combine(Conformance, "checkpoints", name);
         var expected = JsonNode.Parse(File.ReadAllText(Path.Combine(dir, "expected.json")))!;
         var document = JsonNode.Parse(File.ReadAllText(Path.Combine(dir, "document.json")))!;
+        var schema = (string)expected["schema"]!;
+        var readable = (string)expected["reader"]! == "valid";
 
-        Assert.Equal((string)expected["writer"]! == "valid", AefSchemaSet.Writer.Value.IsValid("checkpoint", document, out _));
-        Assert.Equal((string)expected["reader"]! == "valid", AefSchemaSet.Reader.Value.IsValid("checkpoint", document, out _));
+        Assert.Equal((string)expected["writer"]! == "valid", AefSchemaSet.Writer.Value.IsValid(schema, document, out _));
+        Assert.Equal(readable, AefSchemaSet.Reader.Value.IsValid(schema, document, out _));
+        // [CKP-7] codes, in code order, for a manifest the reader accepts; none for one it refuses (spec 09 §9.2.1).
+        Assert.Equal(readable, expected["problems"] is JsonArray);
         if (expected["problems"] is JsonArray problems)
         {
             Assert.Equal(problems.Select(p => (string)p!), CheckpointManifest.Verify(document));
         }
+    }
+
+    [Fact]
+    public void TheCheckpointVectors_CoverEveryManifestProblem()
+    {
+        var problems = Directory.GetFiles(Path.Combine(Conformance, "checkpoints"), "expected.json", SearchOption.AllDirectories)
+            .SelectMany(f => JsonNode.Parse(File.ReadAllText(f))!["problems"]?.AsArray() ?? [])
+            .Select(p => (string)p!).Distinct().Order(StringComparer.Ordinal);
+
+        // Every code of [CKP-7].
+        Assert.Equal(["decision", "evidence", "lanes", "outcome", "unverifiable", "version"], problems);
     }
 
     [Theory]

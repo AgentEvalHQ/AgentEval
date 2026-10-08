@@ -1,0 +1,105 @@
+{
+  "kind": "lane",
+  "checkpoint": "checkpoint.json",
+  "runs": "runs",
+  "lanes": [
+    {
+      "lane": "pass",
+      "result": {
+        "status": "passed",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-01T12:00:00Z"
+      }
+    },
+    {
+      "lane": "ge-boundary",
+      "result": {
+        "status": "passed",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-01T12:00:00Z"
+      }
+    },
+    {
+      "lane": "gt-boundary",
+      "result": {
+        "status": "failed",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-01T12:00:00Z"
+      }
+    },
+    {
+      "lane": "le",
+      "result": {
+        "status": "failed",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-01T12:00:00Z"
+      }
+    },
+    {
+      "lane": "lt",
+      "result": {
+        "status": "passed",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-01T12:00:00Z"
+      }
+    },
+    {
+      "lane": "no-entry",
+      "result": {
+        "status": "not_measured",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-01T12:00:00Z"
+      }
+    },
+    {
+      "lane": "other-summary-lane",
+      "result": {
+        "status": "not_measured",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-01T12:00:00Z"
+      }
+    },
+    {
+      "lane": "n-zero",
+      "result": {
+        "status": "not_measured",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-02T12:00:00Z"
+      }
+    },
+    {
+      "lane": "one-fails",
+      "result": {
+        "status": "failed",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-09-28T08:30:00.5Z"
+      }
+    },
+    {
+      "lane": "failed-beats-unmeasured",
+      "result": {
+        "status": "failed",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-09-28T08:30:00.5Z"
+      }
+    },
+    {
+      "lane": "unmeasured-beats-passed",
+      "result": {
+        "status": "not_measured",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-01T12:00:00Z"
+      }
+    },
+    {
+      "lane": "no-runs",
+      "result": null
+    }
+  ],
+  "problems": [],
+  "rules": [
+    "LANE-2",
+    "LANE-9",
+    "ENC-8"
+  ]
+}

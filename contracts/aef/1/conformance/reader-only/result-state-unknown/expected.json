@@ -1,0 +1,13 @@
+{
+  "kind": "reader-only",
+  "schema": "result",
+  "writer": "invalid",
+  "reader": "valid",
+  "reads": {
+    "state": "inconclusive"
+  },
+  "rules": [
+    "VER-3",
+    "RES-1"
+  ]
+}

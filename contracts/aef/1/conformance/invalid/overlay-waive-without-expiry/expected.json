@@ -1,6 +1,10 @@
 {
+  "kind": "document",
   "schema": "overlay-event",
   "writer": "invalid",
   "reader": "invalid",
-  "rule": "a waiver says until when"
+  "rules": [
+    "OVL-1"
+  ],
+  "why": "a waiver says until when"
 }

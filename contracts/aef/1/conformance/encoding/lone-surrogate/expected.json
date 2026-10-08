@@ -1,0 +1,14 @@
+{
+  "kind": "encoding",
+  "run": "run",
+  "outcome": "invalid",
+  "problems": [
+    [
+      "results.ndjson:4",
+      "encoding"
+    ]
+  ],
+  "rules": [
+    "ENC-2"
+  ]
+}

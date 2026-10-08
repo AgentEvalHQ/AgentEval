@@ -1,33 +1,43 @@
-# AEF: the Agent Evidence Format
+# AEF: the AgentEval Evidence Format
 
-AEF is an open format for the evidence an AI-agent evaluation produces: what was run against what, every result with
-its typed absences and lineage, the gate decisions taken on it, the human decisions added later, and a seal over the
-exact bytes, so any reader can recompute what it was told.
+AEF is an open file format for the evidence an AI-agent evaluation produces: what was run against what, every result
+with its typed absences, the gate and release decisions taken on it, the human decisions added later, and seals and
+signatures over the exact bytes, so anyone can check what they are told without trusting the tool that told them.
 
-**Status: draft, unreleased.** AEF 1.0 is being specified here. No AgentEval command writes it yet: the CLI still writes
-the v1 store (`.agenteval/`, `src/AgentEval.DataLoaders/Output/Schema/v1/`). The producers, the reader and the sealer
-in .NET come next; until a release says otherwise, any part of v2 can change.
+**Status: AEF 1.0 is a draft, unreleased.** It is planned to be released together with AgentEval 1.0, which will be
+its first producer. Until that release any part of it may change. AgentEval's current command line still writes its
+older output directory (`.agenteval/`, "AgentEval store v1", which predates AEF; [§7.5](1/spec/07-versioning.md)).
+
+## Where to start
+
+- [AEF 1.0](1/README.md): the specification, the schemas, the conformance corpus, the primer.
+- [Governance](GOVERNANCE.md): who decides, how to propose a change, how versions are released.
 
 ## Layout
 
 | Path | What |
 |---|---|
-| [`1/README.md`](1/README.md) | The normative specification: the run folder, every file, the rules, the seal |
-| `1/schemas/writer/` | JSON Schema 2020-12, strict: what a producer must write |
-| `1/schemas/reader/` | The same schemas made tolerant (unknown fields, unknown enum values, any 2.x minor), derived by `tools/derive_reader.py` |
-| `1/conformance/` | The corpus every writer, reader and verifier must pass: `valid/` and `invalid/` documents, `seal-vectors/`, `chain-vectors/`, `result-ids.json`, `checkpoints/`, `decision-vectors/`, `protocol/` (plans, runners, matching, streams) |
-| `1/CHANGELOG.md` | Changes to v2 |
-| `profiles/runtime-verdict/` | The evidence attached to runtime verdicts (AEVP 0.1) |
-| `tools/` | `build_conformance.py`, `decision_vectors.py`, `protocol_vectors.py` (write the corpus), `derive_reader.py` (writes the reader schemas), `aef_decide.py`, `aef_stream.py` (reference implementations; `--check` runs them on the corpus) |
+| `1/` | AEF major version 1: `spec/` (normative), `schemas/writer/` and `schemas/reader/`, `conformance/`, primer, reference, interop mappings |
+| `profiles/runtime-verdict/` | The evidence attached to runtime verdicts (AEVP 0.1), a profile on top of AEF |
+| `tools/` | Python 3 reference tools, standard library only: the corpus generators, `derive_reader.py`, the reference verifier `aef_verify.py`, the decision function `aef_decide.py`, the stream verifier `aef_stream.py`, the conformance runner `aef_conformance.py`, `schema_diff.py`, and `aef_crypto.py` (DSSE, ECDSA P-256, Ed25519) |
+| `GOVERNANCE.md`, `LICENSE`, `NOTICE` | How AEF is run, and its licence |
 
-Every expected result in the corpus is written down independently of the code that checks it: the seals and result
-ids by the Python generator, the decisions, stream problems, matching answers and verification problems by hand. The
-.NET tests (`tests/AgentEval.Tests/Contracts/`, with `src/AgentEval.Results`) check all of it; the Python references
-(`aef_decide.py`, `aef_stream.py`) check the decisions and the protocol too.
+## Two implementations
+
+Every expected result in the corpus is written down by hand, independently of the code that checks it, and checked
+by two implementations:
+
+- **The Python reference tools here** check all of it. `aef_verify.py` was written from the specification alone, by
+  someone who had not seen the corpus generators.
+- **AgentEval's .NET code** (`src/AgentEval.Results`, tested by `tests/AgentEval.Tests/Contracts/`) checks the schemas,
+  seals, overlay chains, checkpoint manifests, the decision function and the runner stream. Lane evaluation, signatures
+  and the rules across files are planned for AgentEval's dedicated AEF component.
+
+A third implementation, in any language, is welcome: [§9](1/spec/09-conformance.md) says how to run the corpus and
+claim conformance.
 
 ## Licence
 
-This folder is licensed under the Apache License 2.0 ([`LICENSE`](LICENSE)), unlike the rest of the repository (MIT),
-so that other tools can implement the format freely. It is kept self-contained so it can move to a neutral repository
-unchanged: its own `.gitattributes` keeps the corpus byte-exact. Two links point outside it until then: the AEVP
-specification (`docs/aevp/`) and the .NET tests.
+This folder is licensed under the Apache License 2.0 ([`LICENSE`](LICENSE), [`NOTICE`](NOTICE)), unlike the rest of
+the AgentEval repository (MIT), so other tools can implement the format freely. It is kept self-contained so it can
+move to a neutral home unchanged; its own `.gitattributes` keeps the corpus byte-exact.

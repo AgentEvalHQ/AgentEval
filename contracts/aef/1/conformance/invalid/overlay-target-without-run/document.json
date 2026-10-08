@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "1.0",
+  "eventId": "ov_1",
+  "kind": "annotate",
+  "target": {
+    "requirement": "REQ-1"
+  },
+  "by": {
+    "identity": "git:a@b",
+    "assurance": "self-attested"
+  },
+  "at": "2026-10-01T00:00:00Z"
+}

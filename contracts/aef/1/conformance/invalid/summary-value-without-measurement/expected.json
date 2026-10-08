@@ -1,6 +1,11 @@
 {
+  "kind": "document",
   "schema": "summary",
   "writer": "invalid",
   "reader": "invalid",
-  "rule": "nothing measured has no value and is not_measured, never a pass"
+  "rules": [
+    "SUM-5",
+    "SUM-6"
+  ],
+  "why": "nothing measured has no value and is not_measured, never a pass"
 }

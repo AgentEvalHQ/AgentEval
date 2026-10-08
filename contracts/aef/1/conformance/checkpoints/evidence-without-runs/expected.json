@@ -1,8 +1,12 @@
 {
+  "kind": "checkpoint",
   "schema": "checkpoint",
   "writer": "valid",
   "reader": "valid",
-  "rule": "a lane with a result names the runs it came from",
+  "rules": [
+    "CKP-7"
+  ],
+  "why": "a lane with a result names the runs it came from",
   "problems": [
     "evidence"
   ]

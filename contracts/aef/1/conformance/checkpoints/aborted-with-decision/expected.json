@@ -1,6 +1,10 @@
 {
+  "kind": "checkpoint",
   "schema": "checkpoint",
   "writer": "invalid",
   "reader": "invalid",
-  "rule": "the decision function never aborts: an aborted checkpoint has no decision"
+  "rules": [
+    "CKP-4"
+  ],
+  "why": "the decision function never aborts: an aborted checkpoint has no decision"
 }

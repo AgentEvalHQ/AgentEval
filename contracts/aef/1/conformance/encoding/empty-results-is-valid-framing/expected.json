@@ -1,0 +1,11 @@
+{
+  "kind": "run",
+  "run": "run",
+  "outcome": "intact",
+  "problems": [],
+  "rules": [
+    "ENC-5",
+    "SUM-5",
+    "SUM-6"
+  ]
+}

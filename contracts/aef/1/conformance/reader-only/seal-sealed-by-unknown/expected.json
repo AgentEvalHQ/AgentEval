@@ -1,0 +1,12 @@
+{
+  "kind": "reader-only",
+  "schema": "seal",
+  "writer": "invalid",
+  "reader": "valid",
+  "reads": {
+    "predicate.sealedBy": "ingest"
+  },
+  "rules": [
+    "VER-3"
+  ]
+}

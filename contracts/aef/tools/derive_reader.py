@@ -2,7 +2,7 @@
 """Derives the AEF 1.0 reader schemas (tolerant) from the writer schemas (strict).
 
 A reader accepts what a later minor version may add: unknown fields, enum values it does not know (it treats them as
-'other'), any 2.x schemaVersion, and a kind it does not know in a union discriminated by 'kind'. Everything else
+'other'), any 1.x schemaVersion, and a kind it does not know in a union discriminated by 'kind'. Everything else
 stays: required fields, types, patterns, consts and the conditional rules. The subtrees of 'if' and 'not' are copied
 unchanged: an 'if' selects a rule and a 'not' prohibits, so relaxing either would change what the rule means. The
 .NET conformance tests derive the same schemas independently and compare.
@@ -43,7 +43,7 @@ def derive(node, strict=False):
             out["type"] = node["type"] if isinstance(node.get("type"), list) else ["string", "null"] if None in value else "string"
         elif key == "const" and value == "1.0":
             out["type"] = "string"
-            out["pattern"] = "^1\\.[0-9]+(?!\\n)$"  # any minor of the known major
+            out["pattern"] = "^1[.][0-9]+$"  # any minor of the known major ($: end of input, ENC-15)
         elif key in ("if", "not"):
             out[key] = derive(value, True)
         elif key == "oneOf" and isinstance(value, list) and value and all(kind_of(b) for b in value):

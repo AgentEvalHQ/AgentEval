@@ -1,10 +1,13 @@
 {
-  "run": "seal-vectors/wrong-run-hash/run",
-  "verdict": "mismatch",
-  "mismatches": [
-    {
-      "path": "seal.json",
-      "problem": "run-hash"
-    }
+  "kind": "seal",
+  "run": "run",
+  "problems": [
+    [
+      "seal.json",
+      "run-hash"
+    ]
+  ],
+  "rules": [
+    "SEAL-6"
   ]
 }

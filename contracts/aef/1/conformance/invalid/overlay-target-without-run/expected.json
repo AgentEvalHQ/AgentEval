@@ -1,0 +1,10 @@
+{
+  "kind": "document",
+  "schema": "overlay-event",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "OVL-2"
+  ],
+  "why": "an event names its own run"
+}

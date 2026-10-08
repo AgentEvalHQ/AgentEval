@@ -1,6 +1,10 @@
 {
+  "kind": "checkpoint",
   "schema": "checkpoint",
   "writer": "invalid",
   "reader": "invalid",
-  "rule": "no outcome before the decision"
+  "rules": [
+    "CKP-4"
+  ],
+  "why": "no outcome before the decision"
 }

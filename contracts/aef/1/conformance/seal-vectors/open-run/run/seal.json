@@ -10,13 +10,13 @@
     {
       "name": "results.ndjson",
       "digest": {
-        "sha256": "50ada50e67567402e15c71d8d01a73c846afb3d6a12b535f6a09d995cbd4fb69"
+        "sha256": "11e070c0cd8254b9b83b41c73bc0284f3539916e5e503c1239ba8d64704d1d5b"
       }
     },
     {
       "name": "run.json",
       "digest": {
-        "sha256": "420fb951c42b0128d4f57f6fa306e412dd37feaa4aa39522d9e504ad51ffe5a6"
+        "sha256": "599cadb063d2ea872a5d47722800fc2940a7d142104e0531f1879ea5eb39ea6c"
       }
     }
   ],
@@ -24,7 +24,7 @@
   "predicate": {
     "schemaVersion": "1.0",
     "runId": "01928f40-1111-7111-8111-111111111111",
-    "runHash": "03d62dd849b86f2d6769b723fe7d7ca1c9922651546d2b1dcac2e585ffcc75c6",
+    "runHash": "8b8b83909da8190619f189dec87a002e6e2357a14b6b87d98a9bc72a206101c1",
     "producer": {
       "name": "agenteval-py",
       "version": "0.1.0a1"
@@ -39,6 +39,7 @@
     },
     "judges": [],
     "closedAt": "2026-10-04T10:05:00Z",
+    "sealedAt": "2026-10-08T09:00:00Z",
     "sealedBy": "producer"
   }
 }

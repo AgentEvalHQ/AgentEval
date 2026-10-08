@@ -13,9 +13,11 @@
   ],
   "properties": {
     "_type": {
+      "description": "The in-toto Statement type, v1 (OVL-4).",
       "const": "https://in-toto.io/Statement/v1"
     },
     "subject": {
+      "description": "One subject: the events file, with the SHA-256 of this batch's bytes (OVL-4).",
       "type": "array",
       "minItems": 1,
       "maxItems": 1,
@@ -28,9 +30,11 @@
         ],
         "properties": {
           "name": {
+            "description": "Always overlays/events.ndjson (OVL-4).",
             "const": "overlays/events.ndjson"
           },
           "digest": {
+            "description": "The batch's digest (OVL-4).",
             "type": "object",
             "additionalProperties": false,
             "required": [
@@ -47,9 +51,11 @@
       }
     },
     "predicateType": {
+      "description": "Marks the statement as an AEF overlay batch seal (OVL-4).",
       "const": "https://agenteval.dev/aef/1/overlay-batch"
     },
     "predicate": {
+      "description": "The batch: its number, the run and its run hash, the byte range, and the previous seal (OVL-4).",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -58,29 +64,35 @@
         "batch",
         "offset",
         "length",
-        "previous"
+        "previous",
+        "runHash"
       ],
       "properties": {
         "schemaVersion": {
-          "$ref": "common.schema.json#/$defs/schemaVersion"
+          "$ref": "common.schema.json#/$defs/schemaVersion",
+          "description": "The AEF version of this seal, MAJOR.MINOR: 1.0 for AEF 1.0. It sits in the predicate because in-toto fixes the statement's _type (VER-1)."
         },
         "runId": {
-          "$ref": "common.schema.json#/$defs/id"
+          "$ref": "common.schema.json#/$defs/id",
+          "description": "The runId of the run the events belong to (OVL-4)."
         },
         "batch": {
           "description": "1-based; seal-0001.json is batch 1.",
           "type": "integer",
-          "minimum": 1
+          "minimum": 1,
+          "maximum": 9007199254740991
         },
         "offset": {
           "description": "Where the batch starts in overlays/events.ndjson, in bytes.",
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 9007199254740991
         },
         "length": {
           "description": "The batch's length in bytes: whole lines, each ending in \\n.",
           "type": "integer",
-          "minimum": 1
+          "minimum": 1,
+          "maximum": 9007199254740991
         },
         "previous": {
           "description": "The previous batch's seal file and the SHA-256 of its bytes; null for batch 1.",
@@ -97,15 +109,21 @@
               ],
               "properties": {
                 "path": {
+                  "description": "The previous seal file: overlays/seal-<nnnn>.json (OVL-4).",
                   "type": "string",
-                  "pattern": "^overlays/seal-[0-9]{4}\\.json(?!\\n)$"
+                  "pattern": "^overlays/seal-[0-9]{4}\\.json$"
                 },
                 "sha256": {
-                  "$ref": "common.schema.json#/$defs/sha256Hex"
+                  "$ref": "common.schema.json#/$defs/sha256Hex",
+                  "description": "The SHA-256 of the previous seal file's bytes (OVL-4)."
                 }
               }
             }
           ]
+        },
+        "runHash": {
+          "description": "The run hash of the run the batch was appended to (spec 04, OVL-4).",
+          "$ref": "common.schema.json#/$defs/sha256Hex"
         }
       }
     }
@@ -115,8 +133,10 @@
       "if": {
         "properties": {
           "predicate": {
+            "description": "Applies to batch 1 (OVL-4).",
             "properties": {
               "batch": {
+                "description": "The first batch (OVL-4).",
                 "const": 1
               }
             }
@@ -126,8 +146,10 @@
       "then": {
         "properties": {
           "predicate": {
+            "description": "Batch 1's predicate (OVL-4).",
             "properties": {
               "previous": {
+                "description": "Batch 1 has no previous seal: null (OVL-4).",
                 "type": "null"
               }
             }
@@ -139,8 +161,10 @@
       "if": {
         "properties": {
           "predicate": {
+            "description": "Applies to batch 2 and later (OVL-4).",
             "properties": {
               "batch": {
+                "description": "Batch 2 or later (OVL-4).",
                 "minimum": 2
               }
             }
@@ -150,8 +174,10 @@
       "then": {
         "properties": {
           "predicate": {
+            "description": "A later batch's predicate (OVL-4).",
             "properties": {
               "previous": {
+                "description": "A later batch names the previous seal (OVL-4).",
                 "type": "object"
               }
             }

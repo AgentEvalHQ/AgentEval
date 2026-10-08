@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "1.0",
+  "gateId": "gate:a/b",
+  "decisionId": "D-1",
+  "rule": {
+    "strategy": "threshold"
+  },
+  "inputs": {},
+  "comparability": "comparable",
+  "outcome": "ship_with_warnings",
+  "decidedAt": "2026-10-01T00:00:00Z"
+}

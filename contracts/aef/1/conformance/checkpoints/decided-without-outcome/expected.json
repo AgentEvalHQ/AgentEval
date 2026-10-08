@@ -1,6 +1,10 @@
 {
+  "kind": "checkpoint",
   "schema": "checkpoint",
   "writer": "invalid",
   "reader": "invalid",
-  "rule": "a decided checkpoint has an outcome"
+  "rules": [
+    "CKP-4"
+  ],
+  "why": "a decided checkpoint has an outcome"
 }

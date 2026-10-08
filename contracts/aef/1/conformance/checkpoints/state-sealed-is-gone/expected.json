@@ -1,0 +1,14 @@
+{
+  "kind": "checkpoint",
+  "schema": "checkpoint",
+  "writer": "invalid",
+  "reader": "valid",
+  "rules": [
+    "CKP-4",
+    "VER-3"
+  ],
+  "why": "1.0 has no sealed state (a decided checkpoint's integrity is its signature); a reader takes it as unknown",
+  "problems": [
+    "unverifiable"
+  ]
+}

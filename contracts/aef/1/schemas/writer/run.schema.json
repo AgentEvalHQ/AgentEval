@@ -11,14 +11,17 @@
     "status",
     "producer",
     "subject",
-    "startedAt"
+    "startedAt",
+    "execution"
   ],
   "properties": {
     "schemaVersion": {
-      "$ref": "common.schema.json#/$defs/schemaVersion"
+      "$ref": "common.schema.json#/$defs/schemaVersion",
+      "description": "The AEF version this document follows, MAJOR.MINOR: 1.0 for AEF 1.0 (VER-1)."
     },
     "runId": {
-      "$ref": "common.schema.json#/$defs/id"
+      "$ref": "common.schema.json#/$defs/id",
+      "description": "The run's id. A producer never reuses it for a different run; identity lives here, never in the folder path (RUN-1, RUN-13)."
     },
     "status": {
       "description": "running while the producer writes; completed or aborted when it closes. There is no 'sealed' status: sealed is a fact about seal.json, never a field.",
@@ -29,11 +32,13 @@
       ]
     },
     "abortReason": {
+      "description": "Why the run was aborted. Required when status is aborted (RUN-5).",
       "type": "string",
       "minLength": 1,
       "maxLength": 2048
     },
     "producer": {
+      "description": "The tool that wrote the run: its name, its version and, optionally, the runtime it ran on.",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -42,16 +47,17 @@
       ],
       "properties": {
         "name": {
+          "description": "The producer's name. Part of the producer comparability axis (LANE-6).",
           "type": "string",
           "minLength": 1,
           "maxLength": 128
         },
         "version": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+          "description": "The producer's exact version, compared byte for byte. Part of the producer comparability axis (ENC-10, LANE-6).",
+          "$ref": "common.schema.json#/$defs/exactVersion"
         },
         "runtime": {
+          "description": "The runtime the producer ran on.",
           "type": "object",
           "additionalProperties": false,
           "required": [
@@ -59,11 +65,13 @@
           ],
           "properties": {
             "name": {
+              "description": "The runtime's name.",
               "type": "string",
               "minLength": 1,
               "maxLength": 64
             },
             "version": {
+              "description": "The runtime's version.",
               "type": "string",
               "maxLength": 64
             }
@@ -81,9 +89,11 @@
       ],
       "properties": {
         "ref": {
-          "$ref": "common.schema.json#/$defs/ref"
+          "$ref": "common.schema.json#/$defs/ref",
+          "description": "The evaluated subject, as a typed reference. Compared by the subject comparability axis (RUN-6, LANE-6)."
         },
         "kind": {
+          "description": "What the subject is: agent, workflow, model, endpoint, mcp-server (an MCP server) or other. A reader shows a kind it does not know as written and treats it as other (RUN-6, VER-3).",
           "enum": [
             "agent",
             "workflow",
@@ -94,13 +104,16 @@
           ]
         },
         "version": {
-          "$ref": "common.schema.json#/$defs/exactVersion"
+          "$ref": "common.schema.json#/$defs/exactVersion",
+          "description": "The subject's exact version. Required when the run serves a checkpoint: a run without it is not eligible for a lane (RUN-6, LANE-1)."
         },
         "environment": {
+          "description": "The environment the subject ran in, as the producer names it.",
           "type": "string",
           "maxLength": 64
         },
         "externalIds": {
+          "description": "The subject's ids in other systems, by system name; each value is a string or null.",
           "type": "object",
           "additionalProperties": {
             "type": [
@@ -116,10 +129,12 @@
           "additionalProperties": false,
           "properties": {
             "agentId": {
+              "description": "The subject's gen_ai.agent.id in its OpenTelemetry traces.",
               "type": "string",
               "maxLength": 256
             },
             "serviceName": {
+              "description": "The subject's service.name in its OpenTelemetry traces.",
               "type": "string",
               "maxLength": 256
             }
@@ -128,6 +143,7 @@
       }
     },
     "deployment": {
+      "description": "Where the subject ran (RUN-6).",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -135,17 +151,22 @@
       ],
       "properties": {
         "ref": {
-          "$ref": "common.schema.json#/$defs/ref"
+          "$ref": "common.schema.json#/$defs/ref",
+          "description": "The deployment, as a typed reference. Compared by the deployment comparability axis (LANE-6)."
         },
         "environment": {
+          "description": "The deployment's environment, as the producer names it.",
           "type": "string",
           "maxLength": 64
         },
         "endpoint": {
+          "description": "Where the subject was reached. Never with credentials: no user information before the host (spec 03, RUN-10).",
           "type": "string",
-          "maxLength": 2048
+          "maxLength": 2048,
+          "pattern": "^[a-z][a-z0-9+.-]*://[!-.0-?A-~]+(/[!-~]*)?$"
         },
         "externalIds": {
+          "description": "The deployment's ids in other systems, by system name; each value is a string or null.",
           "type": "object",
           "additionalProperties": {
             "type": [
@@ -167,18 +188,23 @@
       ],
       "properties": {
         "ref": {
-          "$ref": "common.schema.json#/$defs/ref"
+          "$ref": "common.schema.json#/$defs/ref",
+          "description": "The suite, as a typed reference. With version, compared by the suite comparability axis (RUN-8, LANE-6)."
         },
         "version": {
-          "$ref": "common.schema.json#/$defs/exactVersion"
+          "$ref": "common.schema.json#/$defs/exactVersion",
+          "description": "The suite's exact version (RUN-8)."
         },
         "digest": {
-          "$ref": "common.schema.json#/$defs/sha256Uri"
+          "$ref": "common.schema.json#/$defs/sha256Uri",
+          "description": "The SHA-256 of the suite's content, when the content is frozen. Compared by the suite-content comparability axis (RUN-8, LANE-6)."
         },
         "frozen": {
+          "description": "True when the suite's content is frozen, so that digest identifies it (RUN-8).",
           "type": "boolean"
         },
         "executionPolicy": {
+          "description": "How many trials each case had, and how they were combined (RUN-8).",
           "type": "object",
           "additionalProperties": false,
           "required": [
@@ -186,16 +212,19 @@
           ],
           "properties": {
             "trialsPerCase": {
+              "description": "Trials per case, from 1 to 1000. With more than one, each trial has its own lines and the case has a rollup line (RES-8).",
               "type": "integer",
               "minimum": 1,
               "maximum": 1000
             },
             "requirePasses": {
+              "description": "How many of a case's trials must pass for the case to pass, from 1 to 1000.",
               "type": "integer",
               "minimum": 1,
               "maximum": 1000
             },
             "aggregation": {
+              "description": "How a case's trials are combined: MajorityVote, the only value in this version.",
               "enum": [
                 "MajorityVote"
               ]
@@ -205,6 +234,7 @@
       }
     },
     "judges": {
+      "description": "The models that graded results, in order. The judges and rubrics comparability axes compare this list in order (RUN-9, LANE-6).",
       "type": "array",
       "maxItems": 64,
       "items": {
@@ -215,29 +245,79 @@
         ],
         "properties": {
           "model": {
+            "description": "The judge model, as its provider names it. Part of the judges comparability axis (RUN-9, LANE-6).",
             "type": "string",
             "minLength": 1,
             "maxLength": 256
           },
           "provider": {
+            "description": "Who serves the judge model (RUN-9).",
             "type": "string",
             "maxLength": 128
           },
           "mode": {
+            "description": "How the judge was used: single (alone), panel (one judge of a panel), primary (its grade counts) or shadow (it grades alongside, without counting). A reader shows a mode it does not know as written (RUN-9, VER-3).",
             "enum": [
               "single",
               "panel",
               "primary",
-              "shadow"
+              "shadow",
+              "other"
             ]
           },
           "panelSize": {
+            "description": "How many judges the panel had, when mode is panel.",
             "type": "integer",
             "minimum": 1,
             "maximum": 64
           },
           "rubricDigest": {
-            "$ref": "common.schema.json#/$defs/sha256Uri"
+            "$ref": "common.schema.json#/$defs/sha256Uri",
+            "description": "The SHA-256 of the rubric the judge graded with. Part of the rubrics comparability axis (RUN-9, LANE-6)."
+          },
+          "calibration": {
+            "description": "The producer's claim about how far this judge agreed with labelled cases before the run (spec 03, RUN-9).",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "labelSet",
+              "n",
+              "measuredAt"
+            ],
+            "properties": {
+              "labelSet": {
+                "description": "The labelled cases, as a typed reference.",
+                "$ref": "common.schema.json#/$defs/ref"
+              },
+              "n": {
+                "description": "Labelled cases the judge decided.",
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "accuracy": {
+                "description": "Share of decided cases where the judge agreed with the label.",
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "kappa": {
+                "description": "Cohen's kappa between the judge and the labels.",
+                "type": "number",
+                "minimum": -1,
+                "maximum": 1
+              },
+              "dangerousErrors": {
+                "description": "Labelled failures the judge passed.",
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "measuredAt": {
+                "$ref": "common.schema.json#/$defs/timestamp",
+                "description": "When the calibration was measured, before this run (RUN-9)."
+              }
+            }
           }
         }
       }
@@ -248,6 +328,7 @@
       "additionalProperties": true,
       "properties": {
         "thresholds": {
+          "description": "Per metric or result path, the rule the producer's verdict used, recorded for display.",
           "type": "object",
           "additionalProperties": {
             "type": "object",
@@ -258,6 +339,7 @@
             ],
             "properties": {
               "op": {
+                "description": "How the measured value is compared with value: >=, >, <=, < or ==.",
                 "enum": [
                   ">=",
                   ">",
@@ -267,6 +349,7 @@
                 ]
               },
               "value": {
+                "description": "The threshold the measured value is compared with.",
                 "type": "number"
               }
             }
@@ -275,27 +358,25 @@
       }
     },
     "startedAt": {
-      "$ref": "common.schema.json#/$defs/timestamp"
+      "$ref": "common.schema.json#/$defs/timestamp",
+      "description": "When the run started (RUN-5)."
     },
     "endedAt": {
-      "anyOf": [
-        {
-          "$ref": "common.schema.json#/$defs/timestamp"
-        },
-        {
-          "type": "null"
-        }
-      ]
+      "description": "When the run closed: required for a completed or aborted run, absent while it is running, and never earlier than startedAt (RUN-5).",
+      "$ref": "common.schema.json#/$defs/timestamp"
     },
     "otel": {
+      "description": "The OpenTelemetry conventions the run's traces follow (RUN-14).",
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "semconvVersion": {
+          "description": "The version of the OpenTelemetry semantic conventions the traces use, as MAJOR.MINOR or MAJOR.MINOR.PATCH (RUN-14).",
           "type": "string",
-          "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?(?!\\n)$"
+          "pattern": "^[0-9]+\\.[0-9]+(\\.[0-9]+)?$"
         },
         "dialects": {
+          "description": "The semantic-convention namespaces the traces use, such as gen_ai.",
           "type": "array",
           "maxItems": 16,
           "items": {
@@ -306,31 +387,35 @@
       }
     },
     "contentCapture": {
-      "description": "off: prompt and response text is not stored, only its size and SHA-256; on: content is stored (blobs/).",
+      "description": "What text the run keeps: on (prompts, responses, tool arguments and judge reasoning may be kept, in blobs) or off (none of it, and no digest of it). A producer SHOULD write it; a reader treats a run without it as on (RUN-11).",
       "enum": [
         "off",
         "on"
       ]
     },
     "costPolicy": {
+      "description": "The spending limit and the price table the producer used to estimate cost.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
         "maxUsd": {
+          "description": "The spending limit, in US dollars.",
           "type": "number",
           "minimum": 0
         },
         "priceTable": {
+          "description": "The price table the producer used to estimate cost, by name.",
           "type": "string",
           "maxLength": 64
         }
       }
     },
     "ext": {
-      "$ref": "common.schema.json#/$defs/ext"
+      "$ref": "common.schema.json#/$defs/ext",
+      "description": "Producer extensions, named reverse-DNS or with the producer's prefix. A reader ignores what it does not know; never holds a credential (ENC-19, RUN-10)."
     },
     "provenance": {
-      "description": "Written by a runner into every run it produces: the plan (by id and digest), the job and the runner. Sealed with run.json, it anchors a checkpoint's 'launched' runs.",
+      "description": "Written by a runner into every run it produces: the plan (by id and digest), the job and the runner. Sealed with run.json, it ties the run to the job that made it (RUN-12).",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -341,16 +426,48 @@
       ],
       "properties": {
         "planId": {
-          "$ref": "common.schema.json#/$defs/id"
+          "$ref": "common.schema.json#/$defs/id",
+          "description": "The id of the plan the run was produced for (RUN-12)."
         },
         "planDigest": {
-          "$ref": "common.schema.json#/$defs/sha256Hex"
+          "$ref": "common.schema.json#/$defs/sha256Hex",
+          "description": "The SHA-256 of the plan file's exact bytes (RUN-12, PLAN-5)."
         },
         "jobId": {
-          "$ref": "common.schema.json#/$defs/id"
+          "$ref": "common.schema.json#/$defs/id",
+          "description": "The job that produced the run (RUN-12)."
         },
         "runnerId": {
-          "$ref": "common.schema.json#/$defs/id"
+          "$ref": "common.schema.json#/$defs/id",
+          "description": "The runner that produced the run (RUN-12)."
+        }
+      }
+    },
+    "execution": {
+      "description": "How the evaluated target was driven (spec 03, RUN-7). Only live evidence describes how the subject behaves.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "targetMode"
+      ],
+      "properties": {
+        "targetMode": {
+          "description": "live: the real subject at run time; replayed: its recorded answers played back; scripted: a scripted stand-in; mocked: a stand-in that is not the subject.",
+          "enum": [
+            "live",
+            "replayed",
+            "scripted",
+            "mocked"
+          ]
+        },
+        "stimulus": {
+          "description": "Where the inputs came from: a fixed suite, generated at run time, imported from another tool, or other.",
+          "enum": [
+            "suite",
+            "generated",
+            "imported",
+            "other"
+          ]
         }
       }
     }
@@ -360,6 +477,7 @@
       "if": {
         "properties": {
           "status": {
+            "description": "Applies to an aborted run (RUN-5).",
             "const": "aborted"
           }
         },
@@ -374,7 +492,8 @@
         ],
         "properties": {
           "endedAt": {
-            "$ref": "common.schema.json#/$defs/timestamp"
+            "$ref": "common.schema.json#/$defs/timestamp",
+            "description": "An aborted run has an end time (RUN-5)."
           }
         }
       }
@@ -383,6 +502,7 @@
       "if": {
         "properties": {
           "status": {
+            "description": "Applies to a completed run (RUN-5).",
             "const": "completed"
           }
         },
@@ -396,8 +516,30 @@
         ],
         "properties": {
           "endedAt": {
-            "$ref": "common.schema.json#/$defs/timestamp"
+            "$ref": "common.schema.json#/$defs/timestamp",
+            "description": "A completed run has an end time (RUN-5)."
           }
+        }
+      }
+    },
+    {
+      "description": "An open run has not ended.",
+      "if": {
+        "properties": {
+          "status": {
+            "description": "Applies to a run that is still running (RUN-5).",
+            "const": "running"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "not": {
+          "required": [
+            "endedAt"
+          ]
         }
       }
     }

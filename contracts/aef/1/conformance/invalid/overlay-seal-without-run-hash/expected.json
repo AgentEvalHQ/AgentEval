@@ -1,0 +1,10 @@
+{
+  "kind": "document",
+  "schema": "overlay-seal",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "OVL-4"
+  ],
+  "why": "a batch is bound to the run hash it was appended to"
+}

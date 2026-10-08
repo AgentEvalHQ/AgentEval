@@ -1,0 +1,10 @@
+{
+  "kind": "document",
+  "schema": "summary",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "SUM-3"
+  ],
+  "why": "an entry names the result path it summarises"
+}

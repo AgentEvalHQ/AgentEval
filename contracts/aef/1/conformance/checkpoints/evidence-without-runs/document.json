@@ -18,7 +18,9 @@
       "lane": "quality",
       "rule": {
         "kind": "threshold",
-        "metric": "triage.passRate",
+        "lane": "quality",
+        "metric": "triage",
+        "path": "triage",
         "op": ">=",
         "value": 0.8
       },
@@ -56,26 +58,30 @@
       "lane": "memory",
       "rule": {
         "kind": "comparison",
-        "baseline": "policy:same-branch",
-        "significance": 0.05
+        "lane": "memory",
+        "metric": "recall",
+        "path": "recall",
+        "baseline": {
+          "runId": "M-77",
+          "runHash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        },
+        "significance": 0.05,
+        "minimumPairs": 20,
+        "axes": [
+          "suite",
+          "judges",
+          "target-mode"
+        ]
       },
       "runs": [],
       "blocking": false
     }
   ],
-  "comparability": {
-    "required": [
-      "judge.modelId",
-      "judge.rubricDigest",
-      "stimulus",
-      "executionPolicy"
-    ]
-  },
   "budget": {
     "approvedUsd": 10.0,
     "spentUsd": 6.4,
     "approvedBy": {
-      "identity": "git:owner@example.com",
+      "identity": "oidc:https://login.example.com/u-7f3a",
       "assurance": "self-attested"
     }
   },

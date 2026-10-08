@@ -10,9 +10,11 @@
   ],
   "properties": {
     "schemaVersion": {
-      "$ref": "common.schema.json#/$defs/schemaVersion"
+      "$ref": "common.schema.json#/$defs/schemaVersion",
+      "description": "The AEF version this document follows, MAJOR.MINOR: 1.0 for AEF 1.0 (VER-1)."
     },
     "metrics": {
+      "description": "Every metric a result or the summary names, each declared once (SUM-1).",
       "type": "array",
       "maxItems": 4096,
       "items": {
@@ -25,17 +27,21 @@
         ],
         "properties": {
           "id": {
+            "description": "The metric's id, unique in this file; results and the summary name metrics by it (SUM-1).",
             "type": "string",
             "minLength": 1,
             "maxLength": 256
           },
           "kind": {
+            "description": "score, rate, count, duration, cost or verdict. In the summary a rate or verdict line counts 1 when passed, else 0; a count is summed and every other kind averaged (SUM-1, SUM-4, SUM-5).",
             "type": "string"
           },
           "direction": {
+            "description": "Which way is better: higher_better, lower_better or none. A metric with none is never shown as better or worse, and cannot regress in a comparison (SUM-1, LANE-7).",
             "type": "string"
           },
           "scale": {
+            "description": "The metric's range: unbounded, or min and max with min not above max (SUM-1).",
             "anyOf": [
               {
                 "const": "unbounded"
@@ -48,9 +54,11 @@
                 ],
                 "properties": {
                   "min": {
+                    "description": "The lowest value on the scale; not above max (SUM-1).",
                     "type": "number"
                   },
                   "max": {
+                    "description": "The highest value on the scale; not below min (SUM-1).",
                     "type": "number"
                   }
                 }
@@ -58,10 +66,12 @@
             ]
           },
           "unit": {
+            "description": "The unit of the values, such as ms.",
             "type": "string",
             "maxLength": 32
           },
           "description": {
+            "description": "What the metric measures, for display.",
             "type": "string",
             "maxLength": 4096
           }
@@ -69,7 +79,8 @@
       }
     },
     "ext": {
-      "$ref": "common.schema.json#/$defs/ext"
+      "$ref": "common.schema.json#/$defs/ext",
+      "description": "Producer extensions, named reverse-DNS or with the producer's prefix. A reader ignores what it does not know; never holds a secret (ENC-19)."
     }
   }
 }

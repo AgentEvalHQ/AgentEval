@@ -1,0 +1,75 @@
+{
+  "schemaVersion": "1.0",
+  "checkpointId": "cp_c46dc2b5e652",
+  "subject": {
+    "ref": "agent:shop/assistant",
+    "version": "v7"
+  },
+  "lanes": [
+    {
+      "lane": "unknown-axis",
+      "rule": {
+        "kind": "comparison",
+        "lane": "memory",
+        "metric": "recall",
+        "path": "mem",
+        "baseline": {
+          "runId": "B",
+          "runHash": "5c480aeff60c7a9ecbc35d2b2d06e144fa90228881895128a48d749d40c0d3fd"
+        },
+        "significance": 0.05,
+        "minimumPairs": 20,
+        "axes": [
+          "suite",
+          "weather"
+        ]
+      },
+      "runs": [
+        {
+          "runId": "C13",
+          "runHash": "1107815b3e87acf222e5b658b4f1d4fb1798e1c79b881cb3b976778c9990f12b",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    }
+  ],
+  "state": "decided",
+  "outcome": "inconclusive",
+  "decisionInput": {
+    "subjectVersion": "v7",
+    "evaluatedAt": "2026-10-08T00:00:00Z",
+    "supersededBy": null,
+    "lanes": [
+      {
+        "lane": "unknown-axis",
+        "blocking": true,
+        "result": {
+          "status": "incomparable",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-06T00:00:00Z",
+          "axes": [
+            "weather"
+          ]
+        }
+      }
+    ]
+  },
+  "decision": {
+    "outcome": "inconclusive",
+    "lanes": [
+      {
+        "lane": "unknown-axis",
+        "status": "incomparable",
+        "blocking": true,
+        "axes": [
+          "weather"
+        ]
+      }
+    ],
+    "reasons": [
+      "incomparable:unknown-axis",
+      "outcome:inconclusive"
+    ]
+  }
+}

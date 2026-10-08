@@ -7,27 +7,47 @@
       "metrics": [
         {
           "metric": "triage",
-          "n": 1,
-          "N": 1,
-          "notMeasured": 0,
-          "value": 0.55,
-          "stderr": null,
+          "path": "triage",
+          "n": 2,
+          "N": 6,
+          "notMeasured": 4,
+          "value": 0.665,
+          "stderr": 0.115,
           "ci": null,
           "verdict": "failed",
           "rule": "triage >= 0.8",
-          "sum": 0.55,
-          "sumSq": 0.3025
+          "sum": 1.33,
+          "sumSq": 0.9109
+        },
+        {
+          "metric": "helpfulness",
+          "path": "triage/helpfulness",
+          "n": 1,
+          "N": 1,
+          "notMeasured": 0,
+          "value": 0.1,
+          "verdict": "failed",
+          "rule": "helpfulness >= 0.7",
+          "sum": 0.1,
+          "sumSq": 0.01
         },
         {
           "metric": "groundedness",
+          "path": "triage/groundedness",
           "n": 0,
-          "N": 1,
-          "notMeasured": 1,
+          "N": 0,
+          "notMeasured": 0,
           "value": null,
           "verdict": "not_measured",
-          "rule": "groundedness >= 0.7"
+          "rule": "groundedness >= 0.7",
+          "sum": 0,
+          "sumSq": 0
         }
       ]
     }
-  ]
+  ],
+  "cost": {
+    "totalUsd": 0.012,
+    "source": "price-table:2026-09-30"
+  }
 }

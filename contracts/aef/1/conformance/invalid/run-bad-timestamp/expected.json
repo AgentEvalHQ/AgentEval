@@ -1,6 +1,11 @@
 {
+  "kind": "document",
   "schema": "run",
   "writer": "invalid",
   "reader": "invalid",
-  "rule": "a time is RFC 3339 UTC by its pattern, whether or not a validator asserts format"
+  "rules": [
+    "ENC-8",
+    "ENC-16"
+  ],
+  "why": "a time is RFC 3339 UTC by its pattern, whether or not a validator asserts format"
 }

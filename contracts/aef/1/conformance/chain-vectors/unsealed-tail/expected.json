@@ -1,9 +1,13 @@
 {
-  "run": "chain-vectors/unsealed-tail/run",
+  "kind": "chain",
+  "run": "run",
   "problems": [
-    {
-      "path": "overlays/events.ndjson",
-      "problem": "uncovered"
-    }
+    [
+      "overlays/events.ndjson",
+      "uncovered"
+    ]
+  ],
+  "rules": [
+    "OVL-5"
   ]
 }

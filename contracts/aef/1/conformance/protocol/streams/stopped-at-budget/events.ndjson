@@ -1,4 +1,4 @@
-{"schemaVersion":"1.0","seq":1,"kind":"job.accepted","jobId":"job-7","at":"2026-10-08T12:00:00Z","planId":"plan-41","planDigest":"e74f39b744629b6f08e686ce947cead6d5c17d731b1d4522503af2308079b8e3","runnerId":"runner-local-01"}
+{"schemaVersion":"1.0","seq":1,"kind":"job.accepted","jobId":"job-7","at":"2026-10-08T12:00:00Z","planId":"plan-41","planDigest":"8fb42b6da3a4d83cb95b47a19e1e27fe46a97ffefe7d0b2d8a9419e04c02c25a","runnerId":"runner-local-01"}
 {"schemaVersion":"1.0","seq":2,"kind":"evidence.produced","jobId":"job-7","at":"2026-10-08T12:00:01Z","runId":"R-1","runHash":"5ad6d0d7e4dbb218bd5503ec4448bd88c8542f18740e0074c4abed6156484985"}
 {"schemaVersion":"1.0","seq":3,"kind":"spend.updated","jobId":"job-7","at":"2026-10-08T12:00:02Z","spentUsd":2.9}
 {"schemaVersion":"1.0","seq":4,"kind":"job.failed","jobId":"job-7","at":"2026-10-08T12:00:03Z","reason":"The next case would pass the $3.00 limit.","limit":"maxUsd","runs":["R-1"]}

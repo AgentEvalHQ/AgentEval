@@ -18,7 +18,9 @@
       "lane": "red team",
       "rule": {
         "kind": "threshold",
-        "metric": "triage.passRate",
+        "lane": "quality",
+        "metric": "triage",
+        "path": "triage",
         "op": ">=",
         "value": 0.8
       },
@@ -35,19 +37,11 @@
       "blocking": true
     }
   ],
-  "comparability": {
-    "required": [
-      "judge.modelId",
-      "judge.rubricDigest",
-      "stimulus",
-      "executionPolicy"
-    ]
-  },
   "budget": {
     "approvedUsd": 10.0,
     "spentUsd": 6.4,
     "approvedBy": {
-      "identity": "git:owner@example.com",
+      "identity": "oidc:https://login.example.com/u-7f3a",
       "assurance": "self-attested"
     }
   },

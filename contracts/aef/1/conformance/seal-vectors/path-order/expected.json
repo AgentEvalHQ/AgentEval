@@ -1,5 +1,9 @@
 {
-  "run": "seal-vectors/path-order/run",
-  "verdict": "match",
-  "mismatches": []
+  "kind": "seal",
+  "run": "run",
+  "problems": [],
+  "rules": [
+    "SEAL-3"
+  ],
+  "manifest": "expected-manifest.txt"
 }

@@ -1,6 +1,11 @@
 {
+  "kind": "document",
   "schema": "seal",
   "writer": "invalid",
   "reader": "invalid",
-  "rule": "a subject name is a path inside the run folder: no leading slash, no empty or . or .. segment"
+  "rules": [
+    "SEAL-5",
+    "RUN-3"
+  ],
+  "why": "a subject name is a path inside the run folder: no leading slash"
 }

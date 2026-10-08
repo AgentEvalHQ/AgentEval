@@ -16,15 +16,19 @@
   ],
   "properties": {
     "schemaVersion": {
-      "$ref": "common.schema.json#/$defs/schemaVersion"
+      "$ref": "common.schema.json#/$defs/schemaVersion",
+      "description": "The AEF version this line follows, MAJOR.MINOR: 1.0 for AEF 1.0 (VER-1)."
     },
     "gateId": {
-      "$ref": "common.schema.json#/$defs/ref"
+      "$ref": "common.schema.json#/$defs/ref",
+      "description": "The gate that decided, as a typed reference."
     },
     "decisionId": {
-      "$ref": "common.schema.json#/$defs/id"
+      "$ref": "common.schema.json#/$defs/id",
+      "description": "This decision's id."
     },
     "rule": {
+      "description": "The rule the gate applied (GATE-1).",
       "type": "object",
       "required": [
         "strategy"
@@ -33,9 +37,11 @@
         "strategy": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 128
+          "maxLength": 128,
+          "description": "The gate's strategy, for display."
         },
         "inputs": {
+          "description": "What the strategy read, by name, for display.",
           "type": "array",
           "maxItems": 64,
           "items": {
@@ -46,9 +52,11 @@
       }
     },
     "inputs": {
+      "description": "What the decision was taken on: results, requirements and a baseline run (GATE-1).",
       "type": "object",
       "properties": {
         "results": {
+          "description": "The results the decision read; each is a line of the run (GATE-1).",
           "type": "array",
           "maxItems": 4096,
           "items": {
@@ -56,6 +64,7 @@
           }
         },
         "requirements": {
+          "description": "The external requirement ids the decision answers (GATE-1).",
           "type": "array",
           "maxItems": 1024,
           "items": {
@@ -63,7 +72,8 @@
           }
         },
         "baselineRun": {
-          "$ref": "common.schema.json#/$defs/id"
+          "description": "The baseline run, exactly.",
+          "$ref": "common.schema.json#/$defs/runPointer"
         }
       }
     },
@@ -72,14 +82,17 @@
       "type": "string"
     },
     "outcome": {
+      "description": "ship, no_ship or inconclusive. Never ship when the comparison was incomparable (GATE-1, GATE-2).",
       "type": "string"
     },
     "exitCode": {
+      "description": "The exit code the gate ended with, from 0 to 255 (GATE-1).",
       "type": "integer",
       "minimum": 0,
       "maximum": 255
     },
     "decisive": {
+      "description": "The results that decided the outcome; each is a line of the run (GATE-1).",
       "type": "array",
       "maxItems": 1024,
       "items": {
@@ -87,10 +100,12 @@
       }
     },
     "decidedAt": {
-      "$ref": "common.schema.json#/$defs/timestamp"
+      "$ref": "common.schema.json#/$defs/timestamp",
+      "description": "When the decision was taken."
     },
     "ext": {
-      "$ref": "common.schema.json#/$defs/ext"
+      "$ref": "common.schema.json#/$defs/ext",
+      "description": "Producer extensions, named reverse-DNS or with the producer's prefix. A reader ignores what it does not know; never holds a secret (ENC-19)."
     }
   },
   "allOf": [
@@ -98,6 +113,7 @@
       "if": {
         "properties": {
           "comparability": {
+            "description": "Applies when the comparison was incomparable (GATE-2).",
             "const": "incomparable"
           }
         },
@@ -108,6 +124,7 @@
       "then": {
         "properties": {
           "outcome": {
+            "description": "The outcome is never ship (GATE-2).",
             "not": {
               "const": "ship"
             }

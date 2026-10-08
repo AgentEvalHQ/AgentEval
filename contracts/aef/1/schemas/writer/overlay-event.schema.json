@@ -15,13 +15,16 @@
   ],
   "properties": {
     "schemaVersion": {
-      "$ref": "common.schema.json#/$defs/schemaVersion"
+      "$ref": "common.schema.json#/$defs/schemaVersion",
+      "description": "The AEF version this line follows, MAJOR.MINOR: 1.0 for AEF 1.0 (VER-1)."
     },
     "eventId": {
+      "description": "The event's id, unique in the events file: ov_ and then 1-64 letters or digits (OVL-1).",
       "type": "string",
-      "pattern": "^ov_[A-Za-z0-9]{1,64}(?!\\n)$"
+      "pattern": "^ov_[A-Za-z0-9]{1,64}$"
     },
     "kind": {
+      "description": "What the event does: approve or reject sets a review status; override or adjudicate sets a result's effective state; waive waives until expires; redact withholds a blob; acknowledge, accept_baseline and annotate are recorded with no effect (OVL-1).",
       "enum": [
         "approve",
         "reject",
@@ -30,25 +33,37 @@
         "acknowledge",
         "accept_baseline",
         "waive",
-        "annotate"
+        "annotate",
+        "redact"
       ]
     },
     "target": {
+      "description": "What the event is about, always inside its own run (spec 04, OVL-2).",
       "type": "object",
       "additionalProperties": false,
-      "minProperties": 1,
+      "required": [
+        "run"
+      ],
       "properties": {
         "run": {
+          "description": "The run's own runId.",
           "$ref": "common.schema.json#/$defs/id"
+        },
+        "runHash": {
+          "description": "The run's run hash.",
+          "$ref": "common.schema.json#/$defs/sha256Hex"
         },
         "result": {
-          "$ref": "common.schema.json#/$defs/resultId"
+          "$ref": "common.schema.json#/$defs/resultId",
+          "description": "The result the event is about; it must be a result of the run (OVL-2)."
         },
         "requirement": {
-          "$ref": "common.schema.json#/$defs/id"
+          "$ref": "common.schema.json#/$defs/id",
+          "description": "The requirement the event is about, by its external id (OVL-1)."
         },
-        "checkpoint": {
-          "$ref": "common.schema.json#/$defs/id"
+        "blob": {
+          "description": "For redact: the SHA-256 of the blob withheld.",
+          "$ref": "common.schema.json#/$defs/sha256Hex"
         }
       }
     },
@@ -57,21 +72,26 @@
       "$ref": "common.schema.json#/$defs/state"
     },
     "reason": {
+      "description": "Why. Required for override, adjudicate, waive and redact (OVL-1).",
       "type": "string",
       "minLength": 1,
       "maxLength": 4096
     },
     "expires": {
-      "$ref": "common.schema.json#/$defs/timestamp"
+      "$ref": "common.schema.json#/$defs/timestamp",
+      "description": "When a waiver ends. Required for waive (OVL-9)."
     },
     "by": {
-      "$ref": "common.schema.json#/$defs/trustedIdentity"
+      "$ref": "common.schema.json#/$defs/trustedIdentity",
+      "description": "Who wrote the event, and the assurance the writer claims (OVL-1, OVL-3)."
     },
     "at": {
-      "$ref": "common.schema.json#/$defs/timestamp"
+      "$ref": "common.schema.json#/$defs/timestamp",
+      "description": "When the event was written. Shown, never used to reorder events (OVL-1, OVL-6)."
     },
     "ext": {
-      "$ref": "common.schema.json#/$defs/ext"
+      "$ref": "common.schema.json#/$defs/ext",
+      "description": "Producer extensions, named reverse-DNS or with the producer's prefix. A reader ignores what it does not know; never holds a secret (ENC-19)."
     }
   },
   "allOf": [
@@ -80,6 +100,7 @@
       "if": {
         "properties": {
           "kind": {
+            "description": "Applies to a waiver (OVL-1).",
             "const": "waive"
           }
         },
@@ -99,6 +120,7 @@
       "if": {
         "properties": {
           "kind": {
+            "description": "Applies to an override or an adjudication (OVL-1).",
             "enum": [
               "override",
               "adjudicate"
@@ -116,8 +138,36 @@
         ],
         "properties": {
           "target": {
+            "description": "The target names a result (OVL-1).",
             "required": [
               "result"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "description": "A redaction names the blob and says why.",
+      "if": {
+        "properties": {
+          "kind": {
+            "description": "Applies to a redaction (OVL-1).",
+            "const": "redact"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "target": {
+            "description": "The target names a blob (OVL-1).",
+            "required": [
+              "blob"
             ]
           }
         }

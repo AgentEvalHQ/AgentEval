@@ -3,12 +3,13 @@
   "eventId": "ov_1",
   "kind": "waive",
   "target": {
+    "run": "r-1",
     "requirement": "REQ-1"
   },
-  "reason": "later",
   "by": {
     "identity": "git:a@b",
     "assurance": "self-attested"
   },
-  "at": "2026-10-01T00:00:00Z"
+  "at": "2026-10-01T00:00:00Z",
+  "reason": "later"
 }

@@ -1,6 +1,10 @@
 {
+  "kind": "document",
   "schema": "run",
   "writer": "invalid",
   "reader": "invalid",
-  "rule": "a completed run has endedAt"
+  "rules": [
+    "RUN-5"
+  ],
+  "why": "a completed run has endedAt"
 }

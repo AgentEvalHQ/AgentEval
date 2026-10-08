@@ -4,7 +4,7 @@
   "status": "completed",
   "producer": {
     "name": "agenteval-cli",
-    "version": "0.44.0",
+    "version": "1.0.0",
     "runtime": {
       "name": "dotnet",
       "version": "10.0.4"
@@ -28,6 +28,10 @@
     "environment": "dev",
     "endpoint": "http://localhost:5080"
   },
+  "execution": {
+    "targetMode": "live",
+    "stimulus": "suite"
+  },
   "suite": {
     "ref": "suite:support/triage-scenarios",
     "version": "4",
@@ -42,7 +46,15 @@
       "model": "gpt-5.1",
       "provider": "azure.ai.openai",
       "mode": "single",
-      "rubricDigest": "sha256:29fd018a9848938bc2b0e33fffa32bde2827e81388d0e03195919be5835c3605"
+      "rubricDigest": "sha256:29fd018a9848938bc2b0e33fffa32bde2827e81388d0e03195919be5835c3605",
+      "calibration": {
+        "labelSet": "labels:support/triage-golden@2",
+        "n": 120,
+        "accuracy": 0.925,
+        "kappa": 0.81,
+        "dangerousErrors": 1,
+        "measuredAt": "2026-09-20T10:00:00Z"
+      }
     }
   ],
   "config": {
@@ -62,7 +74,7 @@
       "gen_ai"
     ]
   },
-  "contentCapture": "off",
+  "contentCapture": "on",
   "costPolicy": {
     "maxUsd": 3.0,
     "priceTable": "2026-09-30"

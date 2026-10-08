@@ -1,0 +1,14 @@
+{
+  "kind": "encoding",
+  "run": "run",
+  "outcome": "invalid",
+  "problems": [
+    [
+      "run.json",
+      "encoding"
+    ]
+  ],
+  "rules": [
+    "ENC-2"
+  ]
+}

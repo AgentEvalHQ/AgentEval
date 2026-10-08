@@ -11,8 +11,8 @@ namespace AgentEval.Tests.Contracts;
 
 /// <summary>
 /// AEF 1.0 run plans, runner capability manifests and runner event streams. The expected problems of each stream are
-/// written by hand from contracts/aef/1/README.md; the Python reference (tools/aef_stream.py) and the .NET verifier
-/// (AgentEval.Results) both have to reproduce them.
+/// written by hand from contracts/aef/1/spec/06-runners.md ([STRM-3]); the Python reference (tools/aef_stream.py) and
+/// the .NET verifier (AgentEval.Results) both have to reproduce them.
 /// </summary>
 public class AefProtocolTests
 {

@@ -1,9 +1,13 @@
 {
-  "run": "chain-vectors/altered-batch/run",
+  "kind": "chain",
+  "run": "run",
   "problems": [
-    {
-      "path": "overlays/seal-0001.json",
-      "problem": "batch-digest"
-    }
+    [
+      "overlays/seal-0001.json",
+      "batch-digest"
+    ]
+  ],
+  "rules": [
+    "OVL-5"
   ]
 }

@@ -1,6 +1,10 @@
 {
+  "kind": "document",
   "schema": "run",
   "writer": "invalid",
   "reader": "invalid",
-  "rule": "an aborted run says why"
+  "rules": [
+    "RUN-5"
+  ],
+  "why": "an aborted run says why"
 }

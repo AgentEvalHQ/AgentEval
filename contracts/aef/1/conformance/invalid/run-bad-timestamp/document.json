@@ -10,6 +10,9 @@
     "ref": "agent:a/b",
     "kind": "agent"
   },
+  "execution": {
+    "targetMode": "live"
+  },
   "startedAt": "yesterdayZ",
   "endedAt": "2026-10-01T00:01:00Z"
 }

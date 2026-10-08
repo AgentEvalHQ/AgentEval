@@ -1,10 +1,19 @@
 {
-  "run": "seal-vectors/open-run/run",
-  "verdict": "mismatch",
-  "mismatches": [
-    {
-      "path": "run.json",
-      "problem": "run-open"
-    }
+  "kind": "seal",
+  "run": "run",
+  "problems": [
+    [
+      "run.json",
+      "run-open"
+    ],
+    [
+      "seal.json",
+      "predicate"
+    ]
+  ],
+  "rules": [
+    "SEAL-6",
+    "SEAL-5",
+    "RUN-5"
   ]
 }

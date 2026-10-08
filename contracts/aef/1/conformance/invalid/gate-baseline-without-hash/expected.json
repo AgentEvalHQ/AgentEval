@@ -1,0 +1,10 @@
+{
+  "kind": "document",
+  "schema": "gate-decision",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "GATE-1"
+  ],
+  "why": "a baseline is one exact run: its id and its run hash"
+}

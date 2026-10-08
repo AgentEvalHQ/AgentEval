@@ -1,0 +1,11 @@
+{
+  "kind": "document",
+  "schema": "run",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "ENC-15",
+    "ENC-10"
+  ],
+  "why": "a version pattern's $ is the end of the input: only that refuses this value"
+}

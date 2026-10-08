@@ -37,8 +37,8 @@
   },
   "comparability": {
     "required": [
-      "judge.modelId",
-      "judge.rubricDigest"
+      "judges",
+      "rubrics"
     ]
   },
   "credentialRefs": [

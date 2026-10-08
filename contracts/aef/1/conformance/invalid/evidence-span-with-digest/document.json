@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "1.0",
+  "evidenceId": "E-1",
+  "kind": "span",
+  "digest": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+  "link": {
+    "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+    "spanId": "00f067aa0ba902b7"
+  }
+}

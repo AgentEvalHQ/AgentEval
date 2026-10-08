@@ -1,6 +1,10 @@
 {
+  "kind": "checkpoint",
   "schema": "checkpoint",
   "writer": "invalid",
   "reader": "invalid",
-  "rule": "a version has no whitespace"
+  "rules": [
+    "ENC-10"
+  ],
+  "why": "a version has no whitespace"
 }

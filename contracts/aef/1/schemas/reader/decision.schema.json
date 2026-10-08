@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://agenteval.dev/aef/1/reader/decision.schema.json",
   "title": "AEF 1.0: the checkpoint decision function's input and output",
-  "description": "READER (tolerant), derived from the writer schema by tools/derive_reader.py. Decide(input) -> output is pure: no I/O, no clock (the evaluation time is an input). Its vectors are in conformance/decision-vectors/. See 1/README.md, 'The decision function'. This schema is the output; $defs/input is the input.",
+  "description": "READER (tolerant), derived from the writer schema by tools/derive_reader.py. Decide(input) -> output is pure: no I/O, no clock (the evaluation time is an input). Its rules are DEC-1 to DEC-5 and its vectors are in conformance/decision-vectors/. This schema is the output; $defs/input is the input.",
   "type": "object",
   "required": [
     "outcome",
@@ -11,9 +11,11 @@
   ],
   "properties": {
     "outcome": {
+      "description": "approved; blocked (a blocking lane failed); inconclusive (a lane is missing, not_measured or incomparable); or expired (superseded, or a lane is stale) (DEC-3).",
       "type": "string"
     },
     "lanes": {
+      "description": "Each input lane's status, in the input's order (DEC-2).",
       "type": "array",
       "maxItems": 64,
       "items": {
@@ -25,12 +27,15 @@
         ],
         "properties": {
           "lane": {
-            "$ref": "common.schema.json#/$defs/laneName"
+            "$ref": "common.schema.json#/$defs/laneName",
+            "description": "The lane's name (DEC-2)."
           },
           "status": {
-            "$ref": "#/$defs/laneStatus"
+            "$ref": "#/$defs/laneStatus",
+            "description": "The lane's status under the decision rules (DEC-2)."
           },
           "blocking": {
+            "description": "Whether the lane blocks the release when it fails, as in the input (DEC-3).",
             "type": "boolean"
           },
           "axes": {
@@ -39,27 +44,29 @@
             "items": {
               "type": "string",
               "maxLength": 64
-            }
+            },
+            "maxItems": 16
           }
         }
       }
     },
     "reasons": {
-      "description": "Why, one line per lane that kept the outcome from approved (in the input's lane order), then the rule that set the outcome. Codes, not prose, so every implementation produces the same list.",
+      "description": "Reason codes, so every implementation produces the same list: one per lane that did not pass, advisory-failed included, in the input's lane order; then superseded:<version> when it applies; then outcome:<outcome> (DEC-4).",
       "type": "array",
       "maxItems": 256,
       "items": {
         "type": "string",
-        "pattern": "^[a-z][a-z0-9-]*(:[!-~]{1,128})?(?!\\n)$"
+        "pattern": "^[a-z][a-z0-9-]*(:[!-~]{1,128})?$"
       }
     }
   },
   "$defs": {
     "laneStatus": {
-      "description": "passed / failed: the lane's rule held or did not on its evidence. missing: no evidence for this exact version. not_measured: the evidence exists but measured nothing the rule reads. incomparable: a comparison's runs differ on a required axis. stale: older than the lane's freshness at the evaluation time.",
+      "description": "passed / failed: the lane's rule held or did not on its evidence. missing: no evidence for this exact version at the evaluation time (none, another version's, or evidence that did not exist yet). not_measured: the rule could not decide on the evidence, for example nothing was measured or a run is not eligible. incomparable: a comparison's runs differ on a required axis. stale: older than the lane's freshness at the evaluation time (DEC-2, LANE-1).",
       "type": "string"
     },
     "input": {
+      "description": "The decision function's input: the exact version, the evaluation time, an optional newer version, and each lane's result. At least one lane and no lane twice (DEC-1).",
       "type": "object",
       "required": [
         "subjectVersion",
@@ -72,10 +79,11 @@
           "$ref": "common.schema.json#/$defs/exactVersion"
         },
         "evaluatedAt": {
-          "$ref": "common.schema.json#/$defs/timestamp"
+          "$ref": "common.schema.json#/$defs/timestamp",
+          "description": "The time the decision is made for. Freshness and future evidence are judged against it (DEC-1, DEC-2)."
         },
         "supersededBy": {
-          "description": "A newer subject version known at the evaluation time, if any: the checkpoint expires.",
+          "description": "A newer subject version known at the evaluation time, if any. When set and different from subjectVersion, the outcome is expired (DEC-3).",
           "anyOf": [
             {
               "type": "null"
@@ -86,6 +94,7 @@
           ]
         },
         "lanes": {
+          "description": "The lanes, at least one and none twice; the reasons follow this order (DEC-1, DEC-4).",
           "type": "array",
           "minItems": 1,
           "maxItems": 64,
@@ -98,13 +107,16 @@
             ],
             "properties": {
               "lane": {
-                "$ref": "common.schema.json#/$defs/laneName"
+                "$ref": "common.schema.json#/$defs/laneName",
+                "description": "The lane's name (DEC-1)."
               },
               "blocking": {
+                "description": "Whether a failure of this lane blocks the release (DEC-3).",
                 "type": "boolean"
               },
               "freshness": {
-                "$ref": "common.schema.json#/$defs/duration"
+                "$ref": "common.schema.json#/$defs/duration",
+                "description": "How old the lane's evidence may be. Without it, the lane never goes stale (DEC-2)."
               },
               "result": {
                 "description": "What the lane's rule gave on its evidence (computed from the runs, outside this function), or null when there is no evidence.",
@@ -121,6 +133,7 @@
                     ],
                     "properties": {
                       "status": {
+                        "description": "What the lane's rule gave: passed, failed, not_measured or incomparable. A status this version does not know reads as not_measured (DEC-2).",
                         "type": "string"
                       },
                       "subjectVersion": {
@@ -132,11 +145,13 @@
                         "$ref": "common.schema.json#/$defs/timestamp"
                       },
                       "axes": {
+                        "description": "For incomparable: the axes that differ, in the order the rule lists them (LANE-6).",
                         "type": "array",
                         "items": {
                           "type": "string",
                           "maxLength": 64
-                        }
+                        },
+                        "maxItems": 16
                       }
                     }
                   }

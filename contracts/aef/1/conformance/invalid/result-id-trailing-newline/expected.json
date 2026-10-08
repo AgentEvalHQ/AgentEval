@@ -1,6 +1,10 @@
 {
+  "kind": "document",
   "schema": "result",
   "writer": "invalid",
   "reader": "invalid",
-  "rule": "a pattern's end is the end of the string: '$' alone also matches before a final newline"
+  "rules": [
+    "RES-4"
+  ],
+  "why": "a result id is exactly r_ and 32 hex characters (refused by its length too)"
 }

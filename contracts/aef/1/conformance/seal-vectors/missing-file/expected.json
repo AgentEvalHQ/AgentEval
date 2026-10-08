@@ -1,10 +1,13 @@
 {
-  "run": "seal-vectors/missing-file/run",
-  "verdict": "mismatch",
-  "mismatches": [
-    {
-      "path": "metrics.json",
-      "problem": "missing"
-    }
+  "kind": "seal",
+  "run": "run",
+  "problems": [
+    [
+      "metrics.json",
+      "missing"
+    ]
+  ],
+  "rules": [
+    "SEAL-6"
   ]
 }

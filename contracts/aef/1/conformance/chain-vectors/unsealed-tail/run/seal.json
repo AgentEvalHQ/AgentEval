@@ -10,7 +10,7 @@
     {
       "name": "evidence.ndjson",
       "digest": {
-        "sha256": "a65f06a7086a9c234ebbd7111f4c60d93f8ff35c3c5f65e39826110fba46e71e"
+        "sha256": "f76af41ebe790477719e419c60ab430ef5cc98263b8fd8dd5bb52988a03108b1"
       }
     },
     {
@@ -22,25 +22,31 @@
     {
       "name": "metrics.json",
       "digest": {
-        "sha256": "d2ad6bdb1283f670e80aa829e4bdedaac26bfa4974369b56c37d8fd42b30ebdf"
+        "sha256": "cd5980b59a1023260f2c7fa19d0a8075802dbb17e83485a547dc3b977649ef87"
       }
     },
     {
       "name": "results.ndjson",
       "digest": {
-        "sha256": "ca197cef70ad1f741c0afd8e0476ec3476f4149c226805ef1319cfc352dfba87"
+        "sha256": "43f705c41d6ea827ac003400dbae60c4ee81a4bf6b61901e26a067c7db5b3a35"
       }
     },
     {
       "name": "run.json",
       "digest": {
-        "sha256": "0bfed9633a76b990d146326738d6dc969240c15b93cc04298eae27d297be1f02"
+        "sha256": "6833f5f2e31f266973749d72f60cf9656d8689145780a14670e35c07795c1f5c"
       }
     },
     {
       "name": "summary.json",
       "digest": {
-        "sha256": "8fbb58b3ef865a957d3504a0805392da62cb0483c3e47bcb486f2c9cd74a447a"
+        "sha256": "268eda205f131668d931d8804c9530cb7c99b2857d95e1ce1bc24fc3d6314679"
+      }
+    },
+    {
+      "name": "traces.otlp.jsonl",
+      "digest": {
+        "sha256": "3c29fa780cb029dd541c36edb35614f49df76f459a1f7c3e3702960892398787"
       }
     }
   ],
@@ -48,10 +54,10 @@
   "predicate": {
     "schemaVersion": "1.0",
     "runId": "01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10",
-    "runHash": "3fcbb76cbb88eed5479be274ee359bbd641900a3e19e83a8837c0c4f7e5bc49b",
+    "runHash": "ad754a2739fabe07318b54b4f32e8ad8ea3ae6fa5ef16df3c8170fca11174781",
     "producer": {
       "name": "agenteval-cli",
-      "version": "0.44.0"
+      "version": "1.0.0"
     },
     "subject": {
       "ref": "agent:support/support-triage",
@@ -72,6 +78,7 @@
       }
     ],
     "closedAt": "2026-10-02T14:06:23.004Z",
+    "sealedAt": "2026-10-02T14:06:24Z",
     "sealedBy": "producer"
   }
 }

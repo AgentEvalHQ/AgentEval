@@ -1,0 +1,758 @@
+{
+  "schemaVersion": "1.0",
+  "checkpointId": "cp_c271f2bb9318",
+  "subject": {
+    "ref": "agent:shop/assistant",
+    "version": "v7"
+  },
+  "lanes": [
+    {
+      "lane": "regressed",
+      "rule": {
+        "kind": "comparison",
+        "lane": "memory",
+        "metric": "recall",
+        "path": "mem",
+        "baseline": {
+          "runId": "B",
+          "runHash": "5c480aeff60c7a9ecbc35d2b2d06e144fa90228881895128a48d749d40c0d3fd"
+        },
+        "significance": 0.05,
+        "minimumPairs": 20,
+        "axes": [
+          "subject",
+          "suite",
+          "judges",
+          "rubrics",
+          "target-mode"
+        ]
+      },
+      "runs": [
+        {
+          "runId": "C15",
+          "runHash": "da9d182a9741704c04c099f9c984998bcc01de1344889cec9f64cdaa789078f8",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "not-significant",
+      "rule": {
+        "kind": "comparison",
+        "lane": "memory",
+        "metric": "recall",
+        "path": "mem",
+        "baseline": {
+          "runId": "B",
+          "runHash": "5c480aeff60c7a9ecbc35d2b2d06e144fa90228881895128a48d749d40c0d3fd"
+        },
+        "significance": 0.05,
+        "minimumPairs": 20,
+        "axes": [
+          "subject",
+          "suite",
+          "judges",
+          "rubrics",
+          "target-mode"
+        ]
+      },
+      "runs": [
+        {
+          "runId": "C13",
+          "runHash": "1107815b3e87acf222e5b658b4f1d4fb1798e1c79b881cb3b976778c9990f12b",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "exact-not-normal",
+      "rule": {
+        "kind": "comparison",
+        "lane": "memory",
+        "metric": "recall",
+        "path": "mem",
+        "baseline": {
+          "runId": "B",
+          "runHash": "5c480aeff60c7a9ecbc35d2b2d06e144fa90228881895128a48d749d40c0d3fd"
+        },
+        "significance": 0.05,
+        "minimumPairs": 20,
+        "axes": [
+          "subject",
+          "suite",
+          "judges",
+          "rubrics",
+          "target-mode"
+        ]
+      },
+      "runs": [
+        {
+          "runId": "C14",
+          "runHash": "d67904b70449313687824a05de9a4f767eaf9181c8717eee0d8722d82ab538f3",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "one-sided",
+      "rule": {
+        "kind": "comparison",
+        "lane": "memory",
+        "metric": "recall",
+        "path": "mem",
+        "baseline": {
+          "runId": "B",
+          "runHash": "5c480aeff60c7a9ecbc35d2b2d06e144fa90228881895128a48d749d40c0d3fd"
+        },
+        "significance": 0.03,
+        "minimumPairs": 20,
+        "axes": [
+          "subject",
+          "suite",
+          "judges",
+          "rubrics",
+          "target-mode"
+        ]
+      },
+      "runs": [
+        {
+          "runId": "C15",
+          "runHash": "da9d182a9741704c04c099f9c984998bcc01de1344889cec9f64cdaa789078f8",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "boundary-equal",
+      "rule": {
+        "kind": "comparison",
+        "lane": "memory",
+        "metric": "recall",
+        "path": "mem",
+        "baseline": {
+          "runId": "B",
+          "runHash": "5c480aeff60c7a9ecbc35d2b2d06e144fa90228881895128a48d749d40c0d3fd"
+        },
+        "significance": 0.0107421875,
+        "minimumPairs": 10,
+        "axes": [
+          "subject",
+          "suite",
+          "judges",
+          "rubrics",
+          "target-mode"
+        ]
+      },
+      "runs": [
+        {
+          "runId": "C9",
+          "runHash": "cd2c9a69291fc54662981d9dd2d28d396bcb15d07dbc3cc3d85faf5ba8f41266",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "boundary-below",
+      "rule": {
+        "kind": "comparison",
+        "lane": "memory",
+        "metric": "recall",
+        "path": "mem",
+        "baseline": {
+          "runId": "B",
+          "runHash": "5c480aeff60c7a9ecbc35d2b2d06e144fa90228881895128a48d749d40c0d3fd"
+        },
+        "significance": 0.0107421874,
+        "minimumPairs": 10,
+        "axes": [
+          "subject",
+          "suite",
+          "judges",
+          "rubrics",
+          "target-mode"
+        ]
+      },
+      "runs": [
+        {
+          "runId": "C9",
+          "runHash": "cd2c9a69291fc54662981d9dd2d28d396bcb15d07dbc3cc3d85faf5ba8f41266",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "too-few-pairs",
+      "rule": {
+        "kind": "comparison",
+        "lane": "memory",
+        "metric": "recall",
+        "path": "mem",
+        "baseline": {
+          "runId": "B",
+          "runHash": "5c480aeff60c7a9ecbc35d2b2d06e144fa90228881895128a48d749d40c0d3fd"
+        },
+        "significance": 0.05,
+        "minimumPairs": 20,
+        "axes": [
+          "subject",
+          "suite",
+          "judges",
+          "rubrics",
+          "target-mode"
+        ]
+      },
+      "runs": [
+        {
+          "runId": "CFEW",
+          "runHash": "cb474830f43625a2d08a2fbc7b9cedbe07f45821191587333c563550d8ae64de",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "ties-dropped",
+      "rule": {
+        "kind": "comparison",
+        "lane": "memory",
+        "metric": "recall",
+        "path": "mem",
+        "baseline": {
+          "runId": "B",
+          "runHash": "5c480aeff60c7a9ecbc35d2b2d06e144fa90228881895128a48d749d40c0d3fd"
+        },
+        "significance": 0.05,
+        "minimumPairs": 11,
+        "axes": [
+          "subject",
+          "suite",
+          "judges",
+          "rubrics",
+          "target-mode"
+        ]
+      },
+      "runs": [
+        {
+          "runId": "C9",
+          "runHash": "cd2c9a69291fc54662981d9dd2d28d396bcb15d07dbc3cc3d85faf5ba8f41266",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "lower-better",
+      "rule": {
+        "kind": "comparison",
+        "lane": "memory",
+        "metric": "latency",
+        "path": "mem",
+        "baseline": {
+          "runId": "B",
+          "runHash": "5c480aeff60c7a9ecbc35d2b2d06e144fa90228881895128a48d749d40c0d3fd"
+        },
+        "significance": 0.05,
+        "minimumPairs": 20,
+        "axes": [
+          "subject",
+          "suite",
+          "judges",
+          "rubrics",
+          "target-mode"
+        ]
+      },
+      "runs": [
+        {
+          "runId": "C15",
+          "runHash": "da9d182a9741704c04c099f9c984998bcc01de1344889cec9f64cdaa789078f8",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "direction-none",
+      "rule": {
+        "kind": "comparison",
+        "lane": "memory",
+        "metric": "tokens",
+        "path": "mem",
+        "baseline": {
+          "runId": "B",
+          "runHash": "5c480aeff60c7a9ecbc35d2b2d06e144fa90228881895128a48d749d40c0d3fd"
+        },
+        "significance": 0.05,
+        "minimumPairs": 20,
+        "axes": [
+          "subject",
+          "suite",
+          "judges",
+          "rubrics",
+          "target-mode"
+        ]
+      },
+      "runs": [
+        {
+          "runId": "C15",
+          "runHash": "da9d182a9741704c04c099f9c984998bcc01de1344889cec9f64cdaa789078f8",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "judges-differ",
+      "rule": {
+        "kind": "comparison",
+        "lane": "memory",
+        "metric": "recall",
+        "path": "mem",
+        "baseline": {
+          "runId": "B",
+          "runHash": "5c480aeff60c7a9ecbc35d2b2d06e144fa90228881895128a48d749d40c0d3fd"
+        },
+        "significance": 0.05,
+        "minimumPairs": 20,
+        "axes": [
+          "suite",
+          "judges"
+        ]
+      },
+      "runs": [
+        {
+          "runId": "CJ",
+          "runHash": "62187edf3d1d5209b4b741d0fc9f023612db20666ab2f71a0c76c58bd218a697",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "axes-in-rule-order",
+      "rule": {
+        "kind": "comparison",
+        "lane": "memory",
+        "metric": "recall",
+        "path": "mem",
+        "baseline": {
+          "runId": "B",
+          "runHash": "5c480aeff60c7a9ecbc35d2b2d06e144fa90228881895128a48d749d40c0d3fd"
+        },
+        "significance": 0.05,
+        "minimumPairs": 20,
+        "axes": [
+          "rubrics",
+          "target-mode",
+          "judges"
+        ]
+      },
+      "runs": [
+        {
+          "runId": "CJ",
+          "runHash": "62187edf3d1d5209b4b741d0fc9f023612db20666ab2f71a0c76c58bd218a697",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "candidate-scripted",
+      "rule": {
+        "kind": "comparison",
+        "lane": "memory",
+        "metric": "recall",
+        "path": "mem",
+        "baseline": {
+          "runId": "B",
+          "runHash": "5c480aeff60c7a9ecbc35d2b2d06e144fa90228881895128a48d749d40c0d3fd"
+        },
+        "significance": 0.05,
+        "minimumPairs": 20,
+        "axes": [
+          "subject",
+          "suite",
+          "judges",
+          "rubrics",
+          "target-mode"
+        ]
+      },
+      "runs": [
+        {
+          "runId": "CS",
+          "runHash": "374b1a04a1cb09fc66897a1903c83c0abb6a772bd53e101e6bd5e235cfa01bd0",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "baseline-scripted",
+      "rule": {
+        "kind": "comparison",
+        "lane": "memory",
+        "metric": "recall",
+        "path": "mem",
+        "baseline": {
+          "runId": "BS",
+          "runHash": "a1e9a501f729d97c6ac679c2f42b3b4e6ffb5fc7e76a8dad984f1a33ba685b6f"
+        },
+        "significance": 0.05,
+        "minimumPairs": 20,
+        "axes": [
+          "subject",
+          "suite",
+          "judges",
+          "rubrics",
+          "target-mode"
+        ]
+      },
+      "runs": [
+        {
+          "runId": "C13",
+          "runHash": "1107815b3e87acf222e5b658b4f1d4fb1798e1c79b881cb3b976778c9990f12b",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "baseline-missing",
+      "rule": {
+        "kind": "comparison",
+        "lane": "memory",
+        "metric": "recall",
+        "path": "mem",
+        "baseline": {
+          "runId": "B",
+          "runHash": "0000000000000000000000000000000000000000000000000000000000000000"
+        },
+        "significance": 0.05,
+        "minimumPairs": 20,
+        "axes": [
+          "subject",
+          "suite",
+          "judges",
+          "rubrics",
+          "target-mode"
+        ]
+      },
+      "runs": [
+        {
+          "runId": "C13",
+          "runHash": "1107815b3e87acf222e5b658b4f1d4fb1798e1c79b881cb3b976778c9990f12b",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "two-candidates",
+      "rule": {
+        "kind": "comparison",
+        "lane": "memory",
+        "metric": "recall",
+        "path": "mem",
+        "baseline": {
+          "runId": "B",
+          "runHash": "5c480aeff60c7a9ecbc35d2b2d06e144fa90228881895128a48d749d40c0d3fd"
+        },
+        "significance": 0.05,
+        "minimumPairs": 20,
+        "axes": [
+          "subject",
+          "suite",
+          "judges",
+          "rubrics",
+          "target-mode"
+        ]
+      },
+      "runs": [
+        {
+          "runId": "C13",
+          "runHash": "1107815b3e87acf222e5b658b4f1d4fb1798e1c79b881cb3b976778c9990f12b",
+          "origin": "launched"
+        },
+        {
+          "runId": "C15",
+          "runHash": "da9d182a9741704c04c099f9c984998bcc01de1344889cec9f64cdaa789078f8",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    }
+  ],
+  "state": "decided",
+  "outcome": "blocked",
+  "decisionInput": {
+    "subjectVersion": "v7",
+    "evaluatedAt": "2026-10-08T00:00:00Z",
+    "supersededBy": null,
+    "lanes": [
+      {
+        "lane": "regressed",
+        "blocking": true,
+        "result": {
+          "status": "failed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-06T00:00:00Z"
+        }
+      },
+      {
+        "lane": "not-significant",
+        "blocking": true,
+        "result": {
+          "status": "passed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-06T00:00:00Z"
+        }
+      },
+      {
+        "lane": "exact-not-normal",
+        "blocking": true,
+        "result": {
+          "status": "passed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-06T00:00:00Z"
+        }
+      },
+      {
+        "lane": "one-sided",
+        "blocking": true,
+        "result": {
+          "status": "failed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-06T00:00:00Z"
+        }
+      },
+      {
+        "lane": "boundary-equal",
+        "blocking": true,
+        "result": {
+          "status": "failed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-06T00:00:00Z"
+        }
+      },
+      {
+        "lane": "boundary-below",
+        "blocking": true,
+        "result": {
+          "status": "passed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-06T00:00:00Z"
+        }
+      },
+      {
+        "lane": "too-few-pairs",
+        "blocking": true,
+        "result": {
+          "status": "not_measured",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-06T00:00:00Z"
+        }
+      },
+      {
+        "lane": "ties-dropped",
+        "blocking": true,
+        "result": {
+          "status": "not_measured",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-06T00:00:00Z"
+        }
+      },
+      {
+        "lane": "lower-better",
+        "blocking": true,
+        "result": {
+          "status": "failed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-06T00:00:00Z"
+        }
+      },
+      {
+        "lane": "direction-none",
+        "blocking": true,
+        "result": {
+          "status": "not_measured",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-06T00:00:00Z"
+        }
+      },
+      {
+        "lane": "judges-differ",
+        "blocking": true,
+        "result": {
+          "status": "incomparable",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-06T00:00:00Z",
+          "axes": [
+            "judges"
+          ]
+        }
+      },
+      {
+        "lane": "axes-in-rule-order",
+        "blocking": true,
+        "result": {
+          "status": "incomparable",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-06T00:00:00Z",
+          "axes": [
+            "rubrics",
+            "judges"
+          ]
+        }
+      },
+      {
+        "lane": "candidate-scripted",
+        "blocking": true,
+        "result": {
+          "status": "not_measured",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-06T00:00:00Z"
+        }
+      },
+      {
+        "lane": "baseline-scripted",
+        "blocking": true,
+        "result": {
+          "status": "not_measured",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-06T00:00:00Z"
+        }
+      },
+      {
+        "lane": "baseline-missing",
+        "blocking": true,
+        "result": {
+          "status": "not_measured",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-06T00:00:00Z"
+        }
+      },
+      {
+        "lane": "two-candidates",
+        "blocking": true,
+        "result": {
+          "status": "not_measured",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-06T00:00:00Z"
+        }
+      }
+    ]
+  },
+  "decision": {
+    "outcome": "blocked",
+    "lanes": [
+      {
+        "lane": "regressed",
+        "status": "failed",
+        "blocking": true
+      },
+      {
+        "lane": "not-significant",
+        "status": "passed",
+        "blocking": true
+      },
+      {
+        "lane": "exact-not-normal",
+        "status": "passed",
+        "blocking": true
+      },
+      {
+        "lane": "one-sided",
+        "status": "failed",
+        "blocking": true
+      },
+      {
+        "lane": "boundary-equal",
+        "status": "failed",
+        "blocking": true
+      },
+      {
+        "lane": "boundary-below",
+        "status": "passed",
+        "blocking": true
+      },
+      {
+        "lane": "too-few-pairs",
+        "status": "not_measured",
+        "blocking": true
+      },
+      {
+        "lane": "ties-dropped",
+        "status": "not_measured",
+        "blocking": true
+      },
+      {
+        "lane": "lower-better",
+        "status": "failed",
+        "blocking": true
+      },
+      {
+        "lane": "direction-none",
+        "status": "not_measured",
+        "blocking": true
+      },
+      {
+        "lane": "judges-differ",
+        "status": "incomparable",
+        "blocking": true,
+        "axes": [
+          "judges"
+        ]
+      },
+      {
+        "lane": "axes-in-rule-order",
+        "status": "incomparable",
+        "blocking": true,
+        "axes": [
+          "rubrics",
+          "judges"
+        ]
+      },
+      {
+        "lane": "candidate-scripted",
+        "status": "not_measured",
+        "blocking": true
+      },
+      {
+        "lane": "baseline-scripted",
+        "status": "not_measured",
+        "blocking": true
+      },
+      {
+        "lane": "baseline-missing",
+        "status": "not_measured",
+        "blocking": true
+      },
+      {
+        "lane": "two-candidates",
+        "status": "not_measured",
+        "blocking": true
+      }
+    ],
+    "reasons": [
+      "failed:regressed",
+      "failed:one-sided",
+      "failed:boundary-equal",
+      "not-measured:too-few-pairs",
+      "not-measured:ties-dropped",
+      "failed:lower-better",
+      "not-measured:direction-none",
+      "incomparable:judges-differ",
+      "incomparable:axes-in-rule-order",
+      "not-measured:candidate-scripted",
+      "not-measured:baseline-scripted",
+      "not-measured:baseline-missing",
+      "not-measured:two-candidates",
+      "outcome:blocked"
+    ]
+  }
+}

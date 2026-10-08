@@ -1,6 +1,10 @@
 {
+  "kind": "document",
   "schema": "overlay-event",
   "writer": "invalid",
   "reader": "invalid",
-  "rule": "an override names the result it changes"
+  "rules": [
+    "OVL-1"
+  ],
+  "why": "an override names the result it changes"
 }

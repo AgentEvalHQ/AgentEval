@@ -1,10 +1,13 @@
 {
-  "run": "seal-vectors/tampered/run",
-  "verdict": "mismatch",
-  "mismatches": [
-    {
-      "path": "results.ndjson",
-      "problem": "digest"
-    }
+  "kind": "seal",
+  "run": "run",
+  "problems": [
+    [
+      "results.ndjson",
+      "digest"
+    ]
+  ],
+  "rules": [
+    "SEAL-6"
   ]
 }

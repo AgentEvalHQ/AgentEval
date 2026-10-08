@@ -1,6 +1,10 @@
 {
+  "kind": "document",
   "schema": "run",
   "writer": "invalid",
   "reader": "invalid",
-  "rule": "an unknown major version is refused"
+  "rules": [
+    "VER-4"
+  ],
+  "why": "an unknown major version is refused"
 }

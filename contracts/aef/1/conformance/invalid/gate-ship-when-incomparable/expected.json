@@ -1,6 +1,10 @@
 {
+  "kind": "document",
   "schema": "gate-decision",
   "writer": "invalid",
   "reader": "invalid",
-  "rule": "an incomparable comparison never yields ship"
+  "rules": [
+    "GATE-2"
+  ],
+  "why": "an incomparable comparison never yields ship"
 }

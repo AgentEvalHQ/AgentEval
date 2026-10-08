@@ -11,40 +11,41 @@
     "id": {
       "description": "An identifier: 1-128 characters, letters, digits and . _ : -",
       "type": "string",
-      "pattern": "^[A-Za-z0-9._:-]{1,128}(?!\\n)$"
+      "pattern": "^[A-Za-z0-9._:-]{1,128}$"
     },
     "ref": {
       "description": "A typed reference, kind:name (for example agent:support/support-triage, suite:support/triage-scenarios).",
       "type": "string",
-      "pattern": "^[a-z][a-z0-9-]*:[!-~]{1,256}(?!\\n)$"
+      "pattern": "^[a-z][a-z0-9-]*:[!-~]{1,256}$"
     },
     "sha256Hex": {
       "description": "A SHA-256 digest: 64 lower-case hex characters (the in-toto digest form).",
       "type": "string",
-      "pattern": "^[0-9a-f]{64}(?!\\n)$",
+      "pattern": "^[0-9a-f]{64}$",
       "maxLength": 64
     },
     "sha256Uri": {
       "description": "A SHA-256 digest with its algorithm: sha256:<64 lower-case hex>.",
       "type": "string",
-      "pattern": "^sha256:[0-9a-f]{64}(?!\\n)$",
+      "pattern": "^sha256:[0-9a-f]{64}$",
       "maxLength": 71
     },
     "timestamp": {
       "description": "An RFC 3339 date-time in UTC, ending in Z, with up to nine fraction digits. The pattern is the rule; format is an annotation.",
       "type": "string",
       "format": "date-time",
-      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]{1,9})?Z(?!\\n)$"
+      "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\\.[0-9]{1,9})?Z$"
     },
     "resultId": {
-      "description": "r_ + the first 32 lower-case hex characters of SHA-256 over runId, caseId, path and trial joined by U+001F (an absent trial is the empty string). See 1/README.md, 'Result ids'.",
+      "description": "r_ + the first 32 lower-case hex characters of SHA-256 over runId, caseId, path and trial joined by U+001F, where an absent trial is the empty string (RES-4).",
       "type": "string",
-      "pattern": "^r_[0-9a-f]{32}(?!\\n)$",
+      "pattern": "^r_[0-9a-f]{32}$",
       "maxLength": 34
     },
     "evidenceId": {
+      "description": "The id of an evidence record, unique in its run: E- and then 1-64 letters, digits, '.', '_' or '-' (EVD-1).",
       "type": "string",
-      "pattern": "^E-[A-Za-z0-9._-]{1,64}(?!\\n)$"
+      "pattern": "^E-[A-Za-z0-9._-]{1,64}$"
     },
     "state": {
       "description": "A result's state. Only passed is a pass; not_measured, not_applicable, skipped, error and pending are typed absences, never a pass and never a 0 fail.",
@@ -61,6 +62,7 @@
       ]
     },
     "trustedIdentity": {
+      "description": "An identity and the assurance its writer claims for it, as in an overlay event's by. A reader shows the assurance only as far as it verified it (OVL-3).",
       "type": "object",
       "additionalProperties": false,
       "required": [
@@ -71,14 +73,11 @@
         "identity": {
           "type": "string",
           "minLength": 1,
-          "maxLength": 256
-        },
-        "os": {
-          "type": "string",
-          "maxLength": 128
+          "maxLength": 256,
+          "description": "Who: a stable opaque identity is recommended (an OIDC subject, a SPIFFE id, a key id) rather than an e-mail address (spec 08, SEC-4)."
         },
         "assurance": {
-          "description": "How the identity is vouched for: self-attested (a local identity), signed (a DSSE signature verifies against a trusted key), authenticated (a server authenticated it).",
+          "description": "What the writer claims: self-attested, signed (a batch signature verifies for this identity) or authenticated (a host authenticated it). A reader shows it only as far as it verified it (spec 04, OVL-3).",
           "enum": [
             "self-attested",
             "signed",
@@ -94,19 +93,20 @@
     "text": {
       "description": "A name with no control character (C0, DEL, C1): caseId and path, which a result id joins with U+001F.",
       "type": "string",
-      "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+(?!\\n)$"
+      "pattern": "^[^\\u0000-\\u001f\\u007f-\\u009f]+$"
     },
     "uri": {
+      "description": "A URI: a lower-case scheme, a colon, then printable ASCII without spaces; at most 2048 characters.",
       "type": "string",
       "maxLength": 2048,
-      "pattern": "^[a-z][a-z0-9+.-]*:[!-~]+(?!\\n)$"
+      "pattern": "^[a-z][a-z0-9+.-]*:[!-~]+$"
     },
     "exactVersion": {
       "description": "An exact version: printable ASCII without spaces, at most 128 characters, compared byte for byte. 'latest' (any case) is never a version: it is resolved before anything runs.",
       "type": "string",
-      "pattern": "^[!-~]{1,128}(?!\\n)$",
+      "pattern": "^[!-~]{1,128}$",
       "not": {
-        "pattern": "^[Ll][Aa][Tt][Ee][Ss][Tt](?!\\n)$"
+        "pattern": "^[Ll][Aa][Tt][Ee][Ss][Tt]$"
       }
     },
     "laneName": {
@@ -116,7 +116,7 @@
     "duration": {
       "description": "An ISO 8601 duration in days and hours, each at most five digits: P14D, PT36H, P1DT12H.",
       "type": "string",
-      "pattern": "^P(?=[0-9]|T[0-9])([0-9]{1,5}D)?(T[0-9]{1,5}H)?(?!\\n)$"
+      "pattern": "^P([0-9]{1,5}D(T[0-9]{1,5}H)?|T[0-9]{1,5}H)$"
     },
     "runRef": {
       "description": "A sealed run a checkpoint lane used: its id, its run hash (frozen evidence), and where it came from.",
@@ -129,26 +129,28 @@
       ],
       "properties": {
         "runId": {
-          "$ref": "#/$defs/id"
+          "$ref": "#/$defs/id",
+          "description": "The run's runId, as its run.json gives it (CKP-2)."
         },
         "runHash": {
-          "$ref": "#/$defs/sha256Hex"
+          "$ref": "#/$defs/sha256Hex",
+          "description": "The run's run hash, which freezes the exact sealed files the lane relied on (CKP-2)."
         },
         "origin": {
           "description": "launched: run for this checkpoint; adopted:<source>: an existing sealed run that matched the exact version and the comparability requirements.",
           "type": "string",
-          "pattern": "^(launched|adopted:[A-Za-z0-9._:-]{1,64})(?!\\n)$"
+          "pattern": "^(launched|adopted:[A-Za-z0-9._:-]{1,64})$"
         }
       }
     },
     "relativePath": {
-      "description": "A path inside a folder: ASCII segments separated by single slashes, no leading slash, no . or .. segment.",
+      "description": "A path inside a run folder: segments of ASCII letters, digits, '.', '_' and '-' separated by single slashes; no leading slash; no segment that starts or ends with '.' (so no '.' or '..'); at most 255 bytes. Case clashes and Windows reserved names are a rule across files (spec 03, RUN-3).",
       "type": "string",
-      "maxLength": 1024,
-      "pattern": "^(?!\\.{1,2}(/|$))(?!.*/\\.{1,2}(/|$))[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*(?!\\n)$"
+      "maxLength": 255,
+      "pattern": "^[A-Za-z0-9_-]([A-Za-z0-9._-]*[A-Za-z0-9_-])?(/[A-Za-z0-9_-]([A-Za-z0-9._-]*[A-Za-z0-9_-])?)*$"
     },
     "provider": {
-      "description": "Where a run executes. A provider a later minor adds is read as other.",
+      "description": "Where a run executes: local, docker, k8s, or ci:<name> for a CI system. A runner refuses a plan whose provider it does not know or support (PLAN-7).",
       "anyOf": [
         {
           "enum": [
@@ -159,13 +161,57 @@
         },
         {
           "type": "string",
-          "pattern": "^ci:[a-z0-9-]{1,64}(?!\\n)$"
+          "pattern": "^ci:[a-z0-9-]{1,64}$"
         }
       ]
     },
     "integer": {
       "description": "Written as plain digits; a reader takes an integral number such as 2.0 as 2.",
-      "type": "integer"
+      "type": "integer",
+      "maximum": 9007199254740991,
+      "minimum": -9007199254740991
+    },
+    "severity": {
+      "description": "How bad a failure is, from none to critical (spec 03, RES-9). Where a rule needs the severity of a failure that has none, it is critical.",
+      "enum": [
+        "none",
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ]
+    },
+    "runPointer": {
+      "description": "One sealed run, exactly: its id and its run hash (spec 04, SEAL-4).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runId",
+        "runHash"
+      ],
+      "properties": {
+        "runId": {
+          "$ref": "#/$defs/id",
+          "description": "The run's runId, as its run.json gives it."
+        },
+        "runHash": {
+          "$ref": "#/$defs/sha256Hex",
+          "description": "The run's run hash: the SHA-256 of its seal manifest, which identifies its exact content (SEAL-4)."
+        }
+      }
+    },
+    "axis": {
+      "description": "A comparability axis: a part of run.json two runs must agree on to be compared (spec 05, LANE-6).",
+      "enum": [
+        "subject",
+        "suite",
+        "suite-content",
+        "judges",
+        "rubrics",
+        "target-mode",
+        "deployment",
+        "producer"
+      ]
     }
   }
 }

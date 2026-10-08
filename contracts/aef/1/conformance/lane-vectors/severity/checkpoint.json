@@ -1,0 +1,241 @@
+{
+  "schemaVersion": "1.0",
+  "checkpointId": "cp_c98f54e5559a",
+  "subject": {
+    "ref": "agent:shop/assistant",
+    "version": "v7"
+  },
+  "lanes": [
+    {
+      "lane": "low-allows-low",
+      "rule": {
+        "kind": "severity",
+        "max": "low"
+      },
+      "runs": [
+        {
+          "runId": "S1",
+          "runHash": "bb2639c18529299f8b7fff2f7d133c3448ef92f04b76bb2a6d00182d49394fc6",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "none-refuses-low",
+      "rule": {
+        "kind": "severity",
+        "max": "none"
+      },
+      "runs": [
+        {
+          "runId": "S1",
+          "runHash": "bb2639c18529299f8b7fff2f7d133c3448ef92f04b76bb2a6d00182d49394fc6",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "missing-is-critical",
+      "rule": {
+        "kind": "severity",
+        "max": "high"
+      },
+      "runs": [
+        {
+          "runId": "S2",
+          "runHash": "80e93eeca812a137a284925fa45b7bbdc8b942036403d6f9255721fe345797b7",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "unmeasured",
+      "rule": {
+        "kind": "severity",
+        "max": "high"
+      },
+      "runs": [
+        {
+          "runId": "S3",
+          "runHash": "e0f554f95847b0ae639c1c389d74d384544f4adab5af078856ce11802f0dda47",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "failure-beats-unmeasured",
+      "rule": {
+        "kind": "severity",
+        "max": "low"
+      },
+      "runs": [
+        {
+          "runId": "S4",
+          "runHash": "1f9b328fc2857d621d1dac125094c0182f2c66ddeb327a739e6685820f568b4e",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "two-runs",
+      "rule": {
+        "kind": "severity",
+        "max": "medium"
+      },
+      "runs": [
+        {
+          "runId": "S1",
+          "runHash": "bb2639c18529299f8b7fff2f7d133c3448ef92f04b76bb2a6d00182d49394fc6",
+          "origin": "launched"
+        },
+        {
+          "runId": "S3",
+          "runHash": "e0f554f95847b0ae639c1c389d74d384544f4adab5af078856ce11802f0dda47",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "warn-counts",
+      "rule": {
+        "kind": "severity",
+        "max": "medium"
+      },
+      "runs": [
+        {
+          "runId": "S5",
+          "runHash": "96532fa8384bd637fd3a662e51bb15b3615c9a195848a2923d92cdbf82cf7946",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    }
+  ],
+  "state": "decided",
+  "outcome": "blocked",
+  "decisionInput": {
+    "subjectVersion": "v7",
+    "evaluatedAt": "2026-10-08T00:00:00Z",
+    "supersededBy": null,
+    "lanes": [
+      {
+        "lane": "low-allows-low",
+        "blocking": true,
+        "result": {
+          "status": "passed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-03T00:00:00Z"
+        }
+      },
+      {
+        "lane": "none-refuses-low",
+        "blocking": true,
+        "result": {
+          "status": "failed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-03T00:00:00Z"
+        }
+      },
+      {
+        "lane": "missing-is-critical",
+        "blocking": true,
+        "result": {
+          "status": "failed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-03T00:00:00Z"
+        }
+      },
+      {
+        "lane": "unmeasured",
+        "blocking": true,
+        "result": {
+          "status": "not_measured",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-03T00:00:00Z"
+        }
+      },
+      {
+        "lane": "failure-beats-unmeasured",
+        "blocking": true,
+        "result": {
+          "status": "failed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-03T00:00:00Z"
+        }
+      },
+      {
+        "lane": "two-runs",
+        "blocking": true,
+        "result": {
+          "status": "not_measured",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-03T00:00:00Z"
+        }
+      },
+      {
+        "lane": "warn-counts",
+        "blocking": true,
+        "result": {
+          "status": "failed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-03T00:00:00Z"
+        }
+      }
+    ]
+  },
+  "decision": {
+    "outcome": "blocked",
+    "lanes": [
+      {
+        "lane": "low-allows-low",
+        "status": "passed",
+        "blocking": true
+      },
+      {
+        "lane": "none-refuses-low",
+        "status": "failed",
+        "blocking": true
+      },
+      {
+        "lane": "missing-is-critical",
+        "status": "failed",
+        "blocking": true
+      },
+      {
+        "lane": "unmeasured",
+        "status": "not_measured",
+        "blocking": true
+      },
+      {
+        "lane": "failure-beats-unmeasured",
+        "status": "failed",
+        "blocking": true
+      },
+      {
+        "lane": "two-runs",
+        "status": "not_measured",
+        "blocking": true
+      },
+      {
+        "lane": "warn-counts",
+        "status": "failed",
+        "blocking": true
+      }
+    ],
+    "reasons": [
+      "failed:none-refuses-low",
+      "failed:missing-is-critical",
+      "not-measured:unmeasured",
+      "failed:failure-beats-unmeasured",
+      "not-measured:two-runs",
+      "failed:warn-counts",
+      "outcome:blocked"
+    ]
+  }
+}
