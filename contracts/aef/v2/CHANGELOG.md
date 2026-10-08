@@ -15,6 +15,13 @@
   ASCII and byte-ordered; NDJSON is LF-only; trials are integer digits; seal predicates carry `schemaVersion`;
   `contentCapture` is `off` or `on`; `unmeasured` uses the v2 state names; rules across files; every result state, a
   U+2028 inside a string, chain vectors and more seal vectors in the corpus.
+- Review of the protocol: credentials are references with a name, scheme, path and purpose, delivered as environment
+  variables, never in an endpoint; job.accepted binds the plan's bytes (planDigest) and runs carry provenance; a
+  runner may refuse a plan (job.refused); more stream rules (plan digest, accepted twice, estimate, case and time
+  limits, run hash changed, unsealed run) and vectors that catch plausible wrong implementations; plan-to-runner
+  matching; plans carry judges, baseline, comparability, zone and the image's repository; providers and credential
+  schemes extensible; the checkpoint verifier reports 'unverifiable' for what a later minor adds; impossible dates and
+  integral numbers read the same in every implementation; [!-~] instead of \s; seal subjects cannot leave the folder.
 - Review of checkpoints: the manifest records the decision's input beside its output and each run's hash and origin;
   rules across the manifest with a verifier; aborted modelled; freshness from the oldest run, resolved from the
   requirements; expiry at read time; future evidence is missing; unknown statuses fail closed; no lanes or a lane

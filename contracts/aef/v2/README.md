@@ -54,6 +54,14 @@ statements (`seal.json`, `overlays/seal-<nnnn>.json`), whose `_type` is fixed by
   types, patterns, lengths, conditional rules, prohibitions) holds for both.
 - **A minor version only adds** optional fields, enum values and union kinds. Changing a bound, a pattern or what is
   required is a new major version.
+- **Values read the same everywhere.** An integer is written as plain digits; a reader takes an integral number written
+  another way (`2.0`) as that integer. A date that does not exist (February 31) is invalid, never rolled over. Amounts
+  (`spentUsd`, `maxUsd`) are compared as IEEE 754 binary64 numbers, as JSON parsers read them. Versions, references and
+  URIs are printable ASCII without spaces (`[!-~]`), because `\s` matches different characters in different regex
+  engines.
+- **The URIs are names, not locations.** The schemas' `$id`s and the statements' `predicateType`s
+  (`https://agenteval.dev/aef/v2/…`, `https://agenteval.dev/evidence/v2`) identify this version of the format; they
+  stay the same when this folder moves to another repository.
 - **Patterns are the rule; `format` is an annotation.** Times, URIs and ids are checked by their patterns, whether or
   not a validator asserts `format`. A pattern's end is the end of the string: the schemas write `(?!\n)$` or a
   `maxLength`, because `$` alone also matches before a final newline in Python and .NET.
@@ -70,6 +78,9 @@ content in `blobs/`) and the cost policy.
   (present and verified), never a field.
 - A `completed` run has an `endedAt` time. An `aborted` run has an `endedAt` time and an `abortReason`.
 - Times are RFC 3339 in UTC, ending in `Z`, with up to nine fraction digits.
+- `provenance` is written by a runner into every run it produces: the plan (`planId` and the SHA-256 of the plan's
+  bytes, `planDigest`), the `jobId` and the `runnerId`. Sealed with `run.json`, it is what a checkpoint's `launched`
+  runs are anchored to.
 - `ext` is the extension point on every document: readers ignore what they do not know there, and nothing in the
   contract depends on it.
 
@@ -217,7 +228,8 @@ text and a CRLF inside a sealed blob to prove it.
 
 4. **The run hash** is the SHA-256 of the manifest's UTF-8 bytes.
 5. **`seal.json`** is an in-toto Statement v1: `_type` `https://in-toto.io/Statement/v1`; one `subject` per sealed file
-   (`name` = its path, `digest.sha256` = its digest); `predicateType` `https://agenteval.dev/evidence/v2`; and a
+   (`name` = its path: no leading slash, no empty, `.` or `..` segment, so no subject names a file outside the folder;
+   `digest.sha256` = its digest); `predicateType` `https://agenteval.dev/evidence/v2`; and a
    `predicate` with the `runId`, the `runHash`, the producer, subject, deployment, suite and judges from `run.json`,
    `closedAt`, and `sealedBy`: `producer` when the producer sealed the run, `ingest` when a host sealed it on taking
    custody of an unsealed run.
@@ -265,16 +277,21 @@ before anything runs, and the manifest records what was asked (`resolvedFrom`) a
 - `state` moves `draft` → `planned` → `approved_to_spend` → `running` → `evidence_complete` → `decided` → `sealed`.
   `outcome` is `null` before `decided`. From `decided` on it is set: either the decision function's outcome, with its
   input recorded (`decisionInput`) beside its output (`decision`) so anyone can recompute it, or `aborted` when the
-  checkpoint was abandoned (spend not approved, runs failed), with an `abortReason` and no decision.
+  checkpoint was abandoned (spend not approved, runs failed), with an `abortReason` and no decision. A checkpoint is
+  abandoned from any earlier state by moving to `decided` with the outcome `aborted`. Until the checkpoint seal is
+  specified (§13), `sealed` records an intent that a reader cannot verify.
 - `budget.approvedBy`, like an overlay's `by`, is a claim: a reader shows its assurance only as far as it verified it
   (§7).
 
 **Rules across the manifest** that a schema cannot express, for a checkpoint decided by the decision function. A
-verifier reports them in name order: `outcome` (the outcome is not the decision's), `decision` (the decision is not what
-the decision function gives on the recorded input), `lanes` (the input does not decide exactly the manifest's lanes,
-with the same names, blocking and freshness, in the same order), `version` (the input is for another version),
-`evidence` (a lane has runs but no result in the input, or a result but no runs). `conformance/checkpoints/` holds
-manifests that break each, with the expected problems.
+verifier reports them in name order: `decision` (the decision is not what the decision function gives on the
+recorded input, or the input cannot be decided at all), `evidence` (a lane has runs but no result in the input, or a
+result but no runs), `lanes` (the input does not decide exactly the manifest's lanes, with the same names, blocking and
+freshness, in the same order), `outcome` (the outcome is not the decision's), `version` (the input is for another
+version). Only the fields this version defines are compared, so a field a later minor adds is not a difference. A
+manifest with an outcome or a status this version does not know, or without the decision a later minor may make
+optional, is reported only as `unverifiable`: a reader cannot recompute it, which is not the same as finding it wrong.
+`conformance/checkpoints/` holds manifests for each case, with the expected problems.
 
 **Expiry at read time.** A decided or sealed checkpoint is never rewritten. A reader that shows it later evaluates the
 decision function again with the time of reading (and any newer version it knows of as `supersededBy`): when that gives
@@ -323,17 +340,31 @@ implementation `tools/aef_decide.py` and the .NET one (`AgentEval.Results`) repr
 
 ## 11. Run plans and runners
 
-A **run plan** (schema `run-plan`) is what a runner is asked to evaluate: the exact subject version (never "latest", in
-any spelling; a container run also names the image by digest), the suites and the lanes they serve, the limits it must
-stop at (`maxUsd` always; `cases` and `timeout` when set), the content policy, the isolation (`process`, `container`,
-`remote-zone`), the provider (`local`, `docker`, `k8s`, `ci:<name>`), the tags a runner must carry, and the credentials
-it needs **as references only** (`env:<NAME>`, `keychain:<entry>`, `vault:<path>`): the runner resolves them where it
-runs, and a plan never holds a secret value.
+A **run plan** (schema `run-plan`) is what a runner is asked to evaluate:
+
+- the exact subject version (§9), its endpoint (never with credentials in it: no `user:password@`), and for a
+  container run the image as its **OCI image manifest digest**, with the repository it is pulled from;
+- the suites, each with an exact version and the lane it serves;
+- the limits the runner must stop at: `maxUsd` always, `cases` and `timeout` (hours and minutes) when set;
+- the content policy, the isolation (`process`, `container`, `remote-zone` with its `zone`), the provider (`local`,
+  `docker`, `k8s`, `ci:<name>`; a provider a later minor adds is read as other);
+- the judges (model, provider, rubric digest), the baseline a comparison lane uses (a policy, or one sealed run by id
+  and run hash) and the comparability axes, so a runner cannot pick them;
+- the tags a runner must carry (`runnerSelector`);
+- the credentials it needs, **as references**: each has the environment variable it is given as (`name`), where its
+  value lives (`scheme`: `env`, `keychain`, `vault`; a later minor may add one) and under what (`path`), and what it is
+  for (`purpose`: `subject`, `judge`, `attacker`, `evaluator`, `other`). The runner resolves each where it runs and
+  gives the value to the process the purpose names as that environment variable; it never writes a value into any AEF
+  file or event.
+
+A plan **must not hold a secret value**. The schema refuses what is visibly not a reference (a bare string, an endpoint
+with credentials), but it cannot see a secret written as a reference's `path`, or put in `ext`: a producer must not.
 
 A **runner capability manifest** (schema `runner`) says what a runner is: its id and workload identity (and the id of
 the key it signs sealed evidence with, if any), its kind (`local`, `remote`, `ci`, `pool`), OS, runtime, the providers
-it supports, its tags, GPU and network zone, and its version. A plan's `runnerSelector` matches when the runner carries
-every tag in it.
+it supports, its tags, GPU and network zone, and its version. **A runner can take a plan** when it carries every tag of
+the plan's `runnerSelector`, supports the plan's provider, and, for a `remote-zone` plan, has the plan's zone as its
+`networkZone`. `conformance/protocol/matching/` holds plan and runner pairs with the expected answer.
 
 ## 12. The event stream
 
@@ -342,25 +373,46 @@ event per line (schema `runner-event`, a union on `kind`):
 
 | `kind` | Carries |
 |---|---|
-| `job.accepted` | the `planId` and the `runnerId` |
+| `job.accepted` | the `planId`, the SHA-256 of the plan's bytes (`planDigest`), the `runnerId` |
+| `job.refused` | the same, and the `reason`: the runner will not run this plan |
 | `plan.estimated` | the cases and the cost range (`usdLow`, `usdHigh`) with the price table |
 | `spend.updated` | `spentUsd`: the total so far |
 | `case.completed` | the `caseId` and its `state` |
 | `lane.completed` | the `lane` and its `status` |
 | `evidence.produced` | a sealed run: its `runId` and `runHash` |
 | `job.cancelled` | the `reason` |
-| `job.failed` | the `reason`, and the `limit` (`maxUsd`, `cases`, `timeout`) when the runner stopped at one |
+| `job.failed` | the `reason`, the `limit` (`maxUsd`, `cases`, `timeout`) when the runner stopped at one, and the `runs` it had sealed |
 | `job.sealed` | every run the job produced (`runs`) |
 
-Every event has `seq`, `jobId` and `at`. A verifier checks a finished stream line by line and reports, per event
-(`event:<n>`, the 1-based line): the first event is not `job.accepted` (`first`); a `seq` that is not the previous plus
-one (`seq`, starting at 1); another `jobId` than the first event's (`job-id`); an `at` earlier than the previous one
-(`time`); an event after `job.sealed`, `job.failed` or `job.cancelled` (`after-terminal`); a `job.accepted` for another
-plan than the one given (`plan-id`); a `spentUsd` below the previous one (`spend-decreased`) or above the plan's
-`maxUsd` (`over-budget`); a `job.sealed` naming a run no `evidence.produced` announced (`unannounced-run`). Problems
-come in event order and then by name; a stream with no terminal event ends with (`stream`, `no-terminal`).
+Every event has `seq`, `jobId`, `at` and may carry `ext`. `job.sealed`, `job.failed`, `job.cancelled` and `job.refused`
+are terminal; a later minor may add other kinds, but never a terminal one, and a verifier skips the rules of a kind it
+does not know. A runner that stops at a limit ends with `job.failed` naming the limit and the runs it sealed before
+stopping. A stream whose last line does not end in LF is still being written: it is not a finished stream.
 
-`conformance/protocol/` holds valid and invalid plans and manifests, and streams with the problems written by hand;
+A verifier checks a finished stream line by line and reports, per event (`event:<n>`, the 1-based line):
+
+| Problem | When |
+|---|---|
+| `first` | the first event is not `job.accepted` or `job.refused` |
+| `seq` | `seq` is not the previous event's plus one (the first is 1); a gap is reported once, and the count goes on from the value written |
+| `job-id` | the `jobId` is not the first event's |
+| `time` | `at` is earlier than the previous event's, compared at full precision |
+| `over-time` | the first event later than the first event's `at` plus the plan's `timeout` (reported once) |
+| `after-terminal` | an event after a terminal one |
+| `accepted-twice` | a second `job.accepted` |
+| `plan-id`, `plan-digest` | `job.accepted` or `job.refused` for another plan id, or other plan bytes, than the plan given |
+| `estimate` | `usdLow` above `usdHigh` |
+| `spend-decreased` | `spentUsd` below the previous `spend.updated` (spend is cumulative: the previous value, not the highest) |
+| `over-budget` | `spentUsd` above the plan's `maxUsd` (equal is within it) |
+| `over-cases` | the first `case.completed` past the plan's `cases` |
+| `run-hash-changed` | `evidence.produced` for a run already announced, with another run hash |
+| `unannounced-run` | `job.sealed` or `job.failed` naming a run no `evidence.produced` announced |
+| `unsealed-run` | `job.sealed` or `job.failed` not naming a run that was announced |
+
+Problems come in event order and then by name; a stream with no terminal event ends with (`stream`, `no-terminal`).
+`conformance/protocol/` holds valid and invalid plans and manifests, matching pairs, and streams with the problems
+written by hand (including the cases a plausible wrong implementation gets wrong: a gap followed by more events, times a
+nanosecond apart, spend equal to the budget, a decrease followed by a rise, an unknown kind mid-stream).
 `tools/aef_stream.py` and the .NET verifier (`AgentEval.Results`) reproduce them.
 
 ## 13. Not yet in this draft
@@ -369,6 +421,7 @@ These are specified in the design and will be added to v2 before it is released,
 
 - the checkpoint seal (`checkpoint.seal.json`, an in-toto statement over the manifest and its runs' hashes) and its
   vectors;
+- signed jobs for remote runners (a job a runner pulls, signed so it can check who sent it);
 - DSSE vectors (valid, wrong key, tampered payload) with test keys, for the run and for overlay batches;
 - `tools/schema-diff`, which fails a schema change that removes, narrows or adds a required field without a new major;
 - generated types for Python, TypeScript and Go, each with a conformance runner;
@@ -391,5 +444,8 @@ A writer or reader in any language conforms when it passes `conformance/`:
 - every checkpoint in `checkpoints/` is accepted or refused by the writer and the reader schemas as its `expected.json`
   says, and a schema-valid one verifies with exactly its expected problems;
 - every vector in `decision-vectors/` reproduces exactly;
-- every plan and runner manifest in `protocol/` is accepted or refused as its `expected.json` says, every event of
-  every stream in `protocol/streams/` is valid, and each stream's verification reports exactly its expected problems.
+- every plan and runner manifest in `protocol/` is accepted or refused as its `expected.json` says; every pair in
+  `protocol/matching/` matches or not as it says; every event of every stream in `protocol/streams/` is valid (against
+  the reader schema; against the writer schema too unless the stream is reader-only), and each stream's verification,
+  given its plan and the digest of the plan file's bytes, reports exactly its expected problems;
+- the decision function refuses the inputs `decision-vectors/` marks with `expectedError`.

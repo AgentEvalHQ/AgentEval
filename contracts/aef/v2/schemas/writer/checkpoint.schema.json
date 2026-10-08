@@ -31,9 +31,7 @@
           "$ref": "common.schema.json#/$defs/ref"
         },
         "version": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+          "$ref": "common.schema.json#/$defs/exactVersion"
         }
       }
     },

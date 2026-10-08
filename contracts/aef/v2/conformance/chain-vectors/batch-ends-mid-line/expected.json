@@ -1,0 +1,21 @@
+{
+  "run": "chain-vectors/batch-ends-mid-line/run",
+  "problems": [
+    {
+      "path": "overlays/events.ndjson",
+      "problem": "uncovered"
+    },
+    {
+      "path": "overlays/seal-0001.json",
+      "problem": "line-boundary"
+    },
+    {
+      "path": "overlays/seal-0002.json",
+      "problem": "offset"
+    },
+    {
+      "path": "overlays/seal-0002.json",
+      "problem": "previous"
+    }
+  ]
+}

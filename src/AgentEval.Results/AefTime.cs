@@ -30,7 +30,17 @@ public readonly record struct AefTime(long Seconds, int Nanoseconds) : IComparab
         }
 
         int Part(int group) => int.Parse(m.Groups[group].Value, CultureInfo.InvariantCulture);
-        var whole = new DateTimeOffset(Part(1), Part(2), Part(3), Part(4), Part(5), Part(6), TimeSpan.Zero);
+        DateTimeOffset whole;
+        try
+        {
+            whole = new DateTimeOffset(Part(1), Part(2), Part(3), Part(4), Part(5), Part(6), TimeSpan.Zero);
+        }
+        catch (ArgumentOutOfRangeException)
+        {
+            // The pattern allows day 31 in any month: an impossible date is refused, never rolled over.
+            throw new FormatException($"'{text}' is not a date that exists.");
+        }
+
         var nanos = m.Groups[7].Success ? int.Parse(m.Groups[7].Value.PadRight(9, '0'), CultureInfo.InvariantCulture) : 0;
         return new AefTime(whole.ToUnixTimeSeconds(), nanos);
     }

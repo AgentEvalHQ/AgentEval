@@ -1,0 +1,9 @@
+{
+  "schema": "checkpoint",
+  "writer": "invalid",
+  "reader": "valid",
+  "rule": "an outcome a later minor adds: a reader cannot recompute it, and says so rather than call it tampering",
+  "problems": [
+    "unverifiable"
+  ]
+}

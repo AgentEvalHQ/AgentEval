@@ -70,8 +70,7 @@
       "minItems": 1,
       "maxItems": 16,
       "items": {
-        "type": "string",
-        "pattern": "^(local|docker|k8s|ci:[a-z0-9-]{1,64})(?!\\n)$"
+        "$ref": "common.schema.json#/$defs/provider"
       }
     },
     "tags": {
@@ -87,7 +86,7 @@
     },
     "networkZone": {
       "type": "string",
-      "maxLength": 128
+      "pattern": "^[a-z0-9][a-z0-9._:-]{0,63}(?!\\n)$"
     },
     "version": {
       "description": "The runner software's version.",

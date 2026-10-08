@@ -2,5 +2,5 @@
   "schema": "run-plan",
   "writer": "invalid",
   "reader": "invalid",
-  "rule": "'latest' is resolved before the plan exists, in any spelling"
+  "rule": "'latest' in any case is resolved before the plan exists"
 }

@@ -311,6 +311,12 @@ def invalid_cases():
         ("evidence-blob-and-span-id", "evidence",
          {"schemaVersion": V, "evidenceId": "E-1", "kind": "document", "digest": "sha256:" + "0" * 64,
           "link": {"blob": "sha256:" + "0" * 64, "spanId": "00f067aa0ba902b7"}}, "invalid", "a link is exactly one of blob, span or uri"),
+        ("seal-absolute-path", "seal",
+         {"_type": "https://in-toto.io/Statement/v1", "subject": [{"name": "/etc/passwd", "digest": {"sha256": "0" * 64}}],
+          "predicateType": "https://agenteval.dev/evidence/v2",
+          "predicate": {"schemaVersion": V, "runId": "r-1", "runHash": "0" * 64, "producer": {"name": "p", "version": "1"},
+                        "subject": {"ref": "agent:a/b"}, "closedAt": "2026-10-01T00:00:00Z", "sealedBy": "producer"}},
+         "invalid", "a subject name is a path inside the run folder: no leading slash, no empty or . or .. segment"),
         ("seal-wrong-predicate-type", "seal",
          {"_type": "https://in-toto.io/Statement/v1", "subject": [{"name": "run.json", "digest": {"sha256": "0" * 64}}],
           "predicateType": "https://slsa.dev/provenance/v1",
@@ -385,7 +391,7 @@ def checkpoints():
          "a lane's runs are frozen by their run hashes"),
         ("threshold-without-value", dict(planned, lanes=[dict(lanes[0], rule={"kind": "threshold", "metric": "m", "op": ">="})]),
          "invalid", "invalid", None, "a threshold rule names its value"),
-        ("unknown-rule-kind", unknown_kind, "invalid", "valid", None,
+        ("unknown-rule-kind", unknown_kind, "invalid", "valid", [],
          "a rule kind this version does not know: the writer refuses it, a reader accepts it as other"),
         ("planned-with-outcome", dict(planned, outcome="approved"), "invalid", "invalid", None, "no outcome before the decision"),
         ("outcome-differs", dict(decided, outcome="approved"), "valid", "valid", ["outcome"],
@@ -397,7 +403,13 @@ def checkpoints():
         ("version-differs", dict(decided, decisionInput=dict(decision_input, subjectVersion="git:000000")), "valid", "valid",
          ["decision", "version"], "the input is for the checkpoint's version"),
         ("evidence-without-runs", dict(decided, lanes=[dict(lanes[0], runs=[])] + lanes[1:]), "valid", "valid", ["evidence"],
-         "a lane with a result names the runs it came from, and a lane with runs has a result"),
+         "a lane with a result names the runs it came from"),
+        ("runs-without-evidence", dict(decided, decisionInput=dict(decision_input, lanes=decision_input["lanes"][:1] + [
+            dict(decision_input["lanes"][1], result=None)] + decision_input["lanes"][2:])), "valid", "valid", ["decision", "evidence"],
+         "a lane with runs has a result (here the input drops it, so the recorded decision is not recomputed either)"),
+        ("newer-outcome", {k: v for k, v in dict(decided, outcome="waived").items() if k not in ("decision", "decisionInput")},
+         "invalid", "valid", ["unverifiable"],
+         "an outcome a later minor adds: a reader cannot recompute it, and says so rather than call it tampering"),
     ]
 
 
@@ -521,6 +533,41 @@ def seal_vectors_more(valid):
     chain_expect("missing-seal", [{"path": "overlays/events.ndjson", "problem": "uncovered"},
                                   {"path": "overlays/seal-0001.json", "problem": "missing"},
                                   {"path": "overlays/seal-0002.json", "problem": "previous"}])
+
+    def rewrite_seal(run, n, offset, length):
+        """Re-states batch n's range and digest over the current events file, as a writer that got it wrong would."""
+        path = run / "overlays" / f"seal-{n:04d}.json"
+        statement = json.loads(path.read_text(encoding="utf-8"))
+        events = (run / "overlays" / "events.ndjson").read_bytes()
+        statement["predicate"]["offset"], statement["predicate"]["length"] = offset, length
+        statement["subject"][0]["digest"]["sha256"] = hashlib.sha256(events[offset:offset + length]).hexdigest()
+        write_json(path, statement)
+        return statement
+
+    # A batch signature beside its seal is not a batch.
+    run = chain_copy("with-batch-signature")
+    write_json(run / "overlays" / "seal-0001.dsse.json", {"payloadType": "application/vnd.in-toto+json", "payload": "",
+                                                           "signatures": [{"keyid": "test-key-not-verified", "sig": "AAAA"}]})
+    chain_expect("with-batch-signature", [])
+
+    # Batch 2 re-claims the last ten bytes of batch 1 and runs to the end: it starts mid-line and does not continue batch 1.
+    run = chain_copy("overlapping-batch")
+    first = json.loads((run / "overlays" / "seal-0001.json").read_text(encoding="utf-8"))["predicate"]
+    total = len((run / "overlays" / "events.ndjson").read_bytes())
+    start = first["offset"] + first["length"] - 10
+    rewrite_seal(run, 2, start, total - start)
+    chain_expect("overlapping-batch", [{"path": "overlays/seal-0002.json", "problem": "line-boundary"},
+                                       {"path": "overlays/seal-0002.json", "problem": "offset"}])
+
+    # Batch 1 ends one byte early, before its newline: batch 2 no longer continues it, nor names its seal's bytes, and one
+    # byte is claimed by no batch.
+    run = chain_copy("batch-ends-mid-line")
+    first = json.loads((run / "overlays" / "seal-0001.json").read_text(encoding="utf-8"))["predicate"]
+    rewrite_seal(run, 1, 0, first["length"] - 1)
+    chain_expect("batch-ends-mid-line", [{"path": "overlays/events.ndjson", "problem": "uncovered"},
+                                         {"path": "overlays/seal-0001.json", "problem": "line-boundary"},
+                                         {"path": "overlays/seal-0002.json", "problem": "offset"},
+                                         {"path": "overlays/seal-0002.json", "problem": "previous"}])
 
     run = chain_copy("unsealed-tail")
     events = run / "overlays" / "events.ndjson"

@@ -16,7 +16,7 @@
     "ref": {
       "description": "A typed reference, kind:name (for example agent:support/support-triage, suite:support/triage-scenarios).",
       "type": "string",
-      "pattern": "^[a-z][a-z0-9-]*:[^\\s]{1,256}(?!\\n)$"
+      "pattern": "^[a-z][a-z0-9-]*:[!-~]{1,256}(?!\\n)$"
     },
     "sha256Hex": {
       "description": "A SHA-256 digest: 64 lower-case hex characters (the in-toto digest form).",
@@ -99,12 +99,12 @@
     "uri": {
       "type": "string",
       "maxLength": 2048,
-      "pattern": "^[a-z][a-z0-9+.-]*:[^\\s]+(?!\\n)$"
+      "pattern": "^[a-z][a-z0-9+.-]*:[!-~]+(?!\\n)$"
     },
     "exactVersion": {
-      "description": "An exact version: no whitespace, at most 128 characters, compared byte for byte. 'latest' (any case) is never a version: it is resolved before anything runs.",
+      "description": "An exact version: printable ASCII without spaces, at most 128 characters, compared byte for byte. 'latest' (any case) is never a version: it is resolved before anything runs.",
       "type": "string",
-      "pattern": "^[^\\s]{1,128}(?!\\n)$",
+      "pattern": "^[!-~]{1,128}(?!\\n)$",
       "not": {
         "pattern": "^[Ll][Aa][Tt][Ee][Ss][Tt](?!\\n)$"
       }
@@ -140,6 +140,32 @@
           "pattern": "^(launched|adopted:[A-Za-z0-9._:-]{1,64})(?!\\n)$"
         }
       }
+    },
+    "relativePath": {
+      "description": "A path inside a folder: ASCII segments separated by single slashes, no leading slash, no . or .. segment.",
+      "type": "string",
+      "maxLength": 1024,
+      "pattern": "^(?!\\.{1,2}(/|$))(?!.*/\\.{1,2}(/|$))[A-Za-z0-9._-]+(/[A-Za-z0-9._-]+)*(?!\\n)$"
+    },
+    "provider": {
+      "description": "Where a run executes. A provider a later minor adds is read as other.",
+      "anyOf": [
+        {
+          "enum": [
+            "local",
+            "docker",
+            "k8s"
+          ]
+        },
+        {
+          "type": "string",
+          "pattern": "^ci:[a-z0-9-]{1,64}(?!\\n)$"
+        }
+      ]
+    },
+    "integer": {
+      "description": "Written as plain digits; a reader takes an integral number such as 2.0 as 2.",
+      "type": "integer"
     }
   }
 }

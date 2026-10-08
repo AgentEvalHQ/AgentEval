@@ -79,8 +79,7 @@
           "type": "string"
         },
         "version": {
-          "type": "string",
-          "maxLength": 256
+          "$ref": "common.schema.json#/$defs/exactVersion"
         },
         "environment": {
           "type": "string",
@@ -153,9 +152,7 @@
           "$ref": "common.schema.json#/$defs/ref"
         },
         "version": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 64
+          "$ref": "common.schema.json#/$defs/exactVersion"
         },
         "digest": {
           "$ref": "common.schema.json#/$defs/sha256Uri"
@@ -292,6 +289,30 @@
     },
     "ext": {
       "$ref": "common.schema.json#/$defs/ext"
+    },
+    "provenance": {
+      "description": "Written by a runner into every run it produces: the plan (by id and digest), the job and the runner. Sealed with run.json, it anchors a checkpoint's 'launched' runs.",
+      "type": "object",
+      "required": [
+        "planId",
+        "planDigest",
+        "jobId",
+        "runnerId"
+      ],
+      "properties": {
+        "planId": {
+          "$ref": "common.schema.json#/$defs/id"
+        },
+        "planDigest": {
+          "$ref": "common.schema.json#/$defs/sha256Hex"
+        },
+        "jobId": {
+          "$ref": "common.schema.json#/$defs/id"
+        },
+        "runnerId": {
+          "$ref": "common.schema.json#/$defs/id"
+        }
+      }
     }
   },
   "allOf": [

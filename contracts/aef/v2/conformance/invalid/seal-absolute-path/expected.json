@@ -1,0 +1,6 @@
+{
+  "schema": "seal",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rule": "a subject name is a path inside the run folder: no leading slash, no empty or . or .. segment"
+}

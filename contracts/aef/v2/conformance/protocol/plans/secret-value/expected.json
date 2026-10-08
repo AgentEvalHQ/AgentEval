@@ -2,5 +2,5 @@
   "schema": "run-plan",
   "writer": "invalid",
   "reader": "invalid",
-  "rule": "a plan holds credential references, never a secret value"
+  "rule": "a credential is a reference with a name and a purpose, never a bare value"
 }

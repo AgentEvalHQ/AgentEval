@@ -15,13 +15,15 @@ in .NET come next; until a release says otherwise, any part of v2 can change.
 | [`v2/README.md`](v2/README.md) | The normative specification: the run folder, every file, the rules, the seal |
 | `v2/schemas/writer/` | JSON Schema 2020-12, strict: what a producer must write |
 | `v2/schemas/reader/` | The same schemas made tolerant (unknown fields, unknown enum values, any 2.x minor), derived by `tools/derive_reader.py` |
-| `v2/conformance/` | The corpus every writer and reader must pass: valid runs, invalid documents, seal vectors, result-id vectors |
+| `v2/conformance/` | The corpus every writer, reader and verifier must pass: `valid/` and `invalid/` documents, `seal-vectors/`, `chain-vectors/`, `result-ids.json`, `checkpoints/`, `decision-vectors/`, `protocol/` (plans, runners, matching, streams) |
 | `v2/CHANGELOG.md` | Changes to v2 |
 | `profiles/runtime-verdict/` | The evidence attached to runtime verdicts (AEVP 0.1) |
 | `tools/` | `build_conformance.py`, `decision_vectors.py`, `protocol_vectors.py` (write the corpus), `derive_reader.py` (writes the reader schemas), `aef_decide.py`, `aef_stream.py` (reference implementations; `--check` runs them on the corpus) |
 
-The .NET conformance tests (`tests/AgentEval.Tests/Contracts/AefV2ConformanceTests.cs`) recompute every value in the
-corpus with a second implementation of the rules.
+Every expected result in the corpus is written down independently of the code that checks it: the seals and result
+ids by the Python generator, the decisions, stream problems, matching answers and verification problems by hand. The
+.NET tests (`tests/AgentEval.Tests/Contracts/`, with `src/AgentEval.Results`) check all of it; the Python references
+(`aef_decide.py`, `aef_stream.py`) check the decisions and the protocol too.
 
 ## Licence
 

@@ -1,0 +1,10 @@
+{
+  "description": "No lane: deciding nothing would approve nothing. (The schema refuses it too.)",
+  "input": {
+    "subjectVersion": "git:3f2a1c",
+    "evaluatedAt": "2026-10-08T12:00:00Z",
+    "lanes": []
+  },
+  "expectedError": "no-lanes",
+  "schemaInvalid": true
+}

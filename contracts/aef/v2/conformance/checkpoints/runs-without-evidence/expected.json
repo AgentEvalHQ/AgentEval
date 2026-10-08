@@ -1,0 +1,10 @@
+{
+  "schema": "checkpoint",
+  "writer": "valid",
+  "reader": "valid",
+  "rule": "a lane with runs has a result (here the input drops it, so the recorded decision is not recomputed either)",
+  "problems": [
+    "decision",
+    "evidence"
+  ]
+}

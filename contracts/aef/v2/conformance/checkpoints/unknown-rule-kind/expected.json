@@ -2,5 +2,6 @@
   "schema": "checkpoint",
   "writer": "invalid",
   "reader": "valid",
-  "rule": "a rule kind this version does not know: the writer refuses it, a reader accepts it as other"
+  "rule": "a rule kind this version does not know: the writer refuses it, a reader accepts it as other",
+  "problems": []
 }

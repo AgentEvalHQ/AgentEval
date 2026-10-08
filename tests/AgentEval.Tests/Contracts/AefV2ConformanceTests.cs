@@ -561,7 +561,9 @@ public class AefV2ConformanceTests
         {
             foreach (var pattern in Patterns(JsonNode.Parse(File.ReadAllText(file))))
             {
-                Assert.True(pattern.EndsWith("(?!\\n)$", StringComparison.Ordinal), $"{Path.GetFileName(file)}: {pattern}");
+                // A pattern anchored at its end carries the guard; an unanchored one (a search inside a 'not') has no end to guard.
+                Assert.True(!pattern.EndsWith('$') || pattern.EndsWith("(?!\\n)$", StringComparison.Ordinal), $"{Path.GetFileName(file)}: {pattern}");
+                Assert.DoesNotContain("\\s", pattern, StringComparison.Ordinal);   // \s differs between regex engines: [!-~] instead
                 Assert.DoesNotContain("\\d", pattern, StringComparison.Ordinal);   // \d matches other scripts' digits in .NET and Python
             }
         }

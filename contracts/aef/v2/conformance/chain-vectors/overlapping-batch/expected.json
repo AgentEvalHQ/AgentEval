@@ -1,0 +1,13 @@
+{
+  "run": "chain-vectors/overlapping-batch/run",
+  "problems": [
+    {
+      "path": "overlays/seal-0002.json",
+      "problem": "line-boundary"
+    },
+    {
+      "path": "overlays/seal-0002.json",
+      "problem": "offset"
+    }
+  ]
+}

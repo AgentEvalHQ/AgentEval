@@ -29,6 +29,12 @@ public class AefV2CheckpointTests
     public void TheDecisionFunction_ReproducesEveryVector(string name)
     {
         var vector = Vector(name);
+        if (vector["expectedError"] is not null)
+        {
+            // Refused rather than decided: no lane, or a lane twice.
+            Assert.Throws<ArgumentException>(() => CheckpointDecision.Decide(CheckpointDecisionJson.ReadInput(vector["input"]!)));
+            return;
+        }
 
         var actual = CheckpointDecisionJson.Write(CheckpointDecision.Decide(CheckpointDecisionJson.ReadInput(vector["input"]!)));
 
@@ -41,18 +47,22 @@ public class AefV2CheckpointTests
     {
         var vector = Vector(name);
         var readerOnly = (bool?)vector["readerOnly"] == true;
+        var schemaInvalid = (bool?)vector["schemaInvalid"] == true;
 
-        Assert.Equal(!readerOnly, AefSchemaSet.Writer.Value.IsValid("decision#/$defs/input", vector["input"], out _));
-        Assert.True(AefSchemaSet.Reader.Value.IsValid("decision#/$defs/input", vector["input"], out var inputErrors), $"{name} input: {inputErrors}");
-        foreach (var set in new[] { AefSchemaSet.Writer.Value, AefSchemaSet.Reader.Value })
-            Assert.True(set.IsValid("decision", vector["expected"], out var outputErrors), $"{name} expected: {outputErrors}");
+        Assert.Equal(!readerOnly && !schemaInvalid, AefSchemaSet.Writer.Value.IsValid("decision#/$defs/input", vector["input"], out _));
+        Assert.Equal(!schemaInvalid, AefSchemaSet.Reader.Value.IsValid("decision#/$defs/input", vector["input"], out _));
+        if (vector["expected"] is { } expected)
+        {
+            foreach (var set in new[] { AefSchemaSet.Writer.Value, AefSchemaSet.Reader.Value })
+                Assert.True(set.IsValid("decision", expected, out var outputErrors), $"{name} expected: {outputErrors}");
+        }
     }
 
     [Fact]
     public void TheVectorsCoverEveryOutcome_EveryLaneStatus_AndEveryReason()
     {
         var expected = Directory.GetFiles(Path.Combine(Conformance, "decision-vectors"), "*.json")
-            .Select(f => JsonNode.Parse(File.ReadAllText(f))!["expected"]!).ToList();
+            .Select(f => JsonNode.Parse(File.ReadAllText(f))!["expected"]).OfType<JsonNode>().ToList();
 
         Assert.Equal(["approved", "blocked", "expired", "inconclusive"],
             expected.Select(e => (string)e["outcome"]!).Distinct().Order(StringComparer.Ordinal));
@@ -123,6 +133,7 @@ public class AefV2CheckpointTests
     [InlineData("2026-10-08 12:00:00Z")]
     [InlineData("2026-10-08T12:00:00.0000000001Z")]
     [InlineData("2026-10-08T12:00:00Z\n")]
+    [InlineData("2026-02-31T00:00:00Z")]   // the pattern allows day 31 in any month: an impossible date is refused, never rolled over
     public void ATimeThatIsNotRfc3339Utc_IsRefused(string text) =>
         Assert.Throws<FormatException>(() => AefTime.Parse(text));
 }

@@ -1,0 +1,6 @@
+{
+  "schema": "run-plan",
+  "writer": "invalid",
+  "reader": "valid",
+  "rule": "a provider this version does not know: the writer refuses it, a reader takes it as other"
+}

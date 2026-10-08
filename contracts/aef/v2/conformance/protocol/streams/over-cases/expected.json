@@ -1,0 +1,9 @@
+{
+  "plan": "../plan-small.json",
+  "problems": [
+    {
+      "where": "event:4",
+      "problem": "over-cases"
+    }
+  ]
+}

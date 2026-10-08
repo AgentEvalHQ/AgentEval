@@ -49,25 +49,46 @@ public class AefV2ProtocolTests
 
     [Theory]
     [MemberData(nameof(Streams))]
-    public void EveryEvent_IsValidAgainstTheWriterAndReaderSchemas(string name)
+    public void EveryEvent_IsValidAgainstTheReaderSchema_AndTheWriterUnlessReaderOnly(string name)
     {
+        var readerOnly = (bool?)Expected(name)["readerOnly"] == true;
+        var writerValid = Events(name).All(e => AefSchemaSet.Writer.Value.IsValid("runner-event", e, out _));
+
+        Assert.Equal(!readerOnly, writerValid);
         foreach (var (e, i) in Events(name).Select((e, i) => (e, i + 1)))
-        {
-            Assert.True(AefSchemaSet.Writer.Value.IsValid("runner-event", e, out var w), $"{name} event {i} (writer): {w}");
             Assert.True(AefSchemaSet.Reader.Value.IsValid("runner-event", e, out var r), $"{name} event {i} (reader): {r}");
-        }
     }
 
     [Theory]
     [MemberData(nameof(Streams))]
     public void TheVerifier_ReportsExactlyTheExpectedProblems(string name)
     {
-        var plan = JsonNode.Parse(File.ReadAllText(Path.Combine(Protocol, "streams", "plan.json")));
-        var expected = JsonNode.Parse(File.ReadAllText(Path.Combine(Protocol, "streams", name, "expected.json")))!["problems"]!.AsArray()
-            .Select(p => ((string)p!["where"]!, (string)p["problem"]!));
+        var expected = Expected(name);
+        var planFile = Path.GetFullPath(Path.Combine(Protocol, "streams", name, (string)expected["plan"]!));
+        var plan = JsonNode.Parse(File.ReadAllText(planFile));
+        var digest = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(planFile))).ToLowerInvariant();
 
-        Assert.Equal(expected, RunnerEventStream.Verify(Events(name), plan));
+        Assert.Equal(
+            expected["problems"]!.AsArray().Select(p => ((string)p!["where"]!, (string)p["problem"]!)),
+            RunnerEventStream.Verify(Events(name), plan, digest));
     }
+
+    public static TheoryData<string> Matching() =>
+        new(Directory.GetDirectories(Path.Combine(Protocol, "matching")).Select(Path.GetFileName)!);
+
+    [Theory]
+    [MemberData(nameof(Matching))]
+    public void ARunnerMatchesAPlan_AsTheVectorSays(string name)
+    {
+        JsonNode Load(string file) => JsonNode.Parse(File.ReadAllText(Path.Combine(Protocol, "matching", name, file)))!;
+
+        Assert.True(AefSchemaSet.Writer.Value.IsValid("run-plan", Load("plan.json"), out var p), $"{name} plan: {p}");
+        Assert.True(AefSchemaSet.Writer.Value.IsValid("runner", Load("runner.json"), out var r), $"{name} runner: {r}");
+        Assert.Equal((bool)Load("expected.json")["matches"]!, RunnerEventStream.Matches(Load("plan.json"), Load("runner.json")));
+    }
+
+    private static JsonNode Expected(string name) =>
+        JsonNode.Parse(File.ReadAllText(Path.Combine(Protocol, "streams", name, "expected.json")))!;
 
     [Fact]
     public void TheStreamVectors_CoverEveryProblem()
@@ -76,7 +97,8 @@ public class AefV2ProtocolTests
             .SelectMany(f => JsonNode.Parse(File.ReadAllText(f))!["problems"]!.AsArray().Select(p => (string)p!["problem"]!))
             .Distinct().Order(StringComparer.Ordinal);
 
-        Assert.Equal(["after-terminal", "first", "job-id", "no-terminal", "over-budget", "plan-id", "seq", "spend-decreased", "time", "unannounced-run"],
+        Assert.Equal(["accepted-twice", "after-terminal", "estimate", "first", "job-id", "no-terminal", "over-budget", "over-cases", "over-time",
+                      "plan-digest", "plan-id", "run-hash-changed", "seq", "spend-decreased", "time", "unannounced-run", "unsealed-run"],
             problems);
     }
 

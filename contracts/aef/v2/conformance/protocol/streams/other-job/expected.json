@@ -4,6 +4,10 @@
     {
       "where": "event:2",
       "problem": "job-id"
+    },
+    {
+      "where": "event:3",
+      "problem": "job-id"
     }
   ]
 }

@@ -6,6 +6,7 @@ fraction digits), never rounded. `python aef_decide.py --check` runs it against 
 exits 1 on any difference.
 """
 import calendar
+import datetime
 import json
 import re
 import sys
@@ -23,7 +24,8 @@ def parse_time(text):
     if not m:
         raise ValueError(f"{text!r} is not an RFC 3339 UTC time")
     y, mo, d, h, mi, s, frac = m.groups()
-    seconds = calendar.timegm((int(y), int(mo), int(d), int(h), int(mi), int(s), 0, 0, 0))
+    moment = datetime.datetime(int(y), int(mo), int(d), int(h), int(mi), int(s))  # raises on an impossible date
+    seconds = calendar.timegm(moment.timetuple())
     return seconds, int((frac or "").ljust(9, "0"))
 
 
@@ -88,19 +90,18 @@ def check():
     failed = 0
     for path in vectors:
         vector = json.loads(path.read_text(encoding="utf-8"))
+        if "expectedError" in vector:
+            try:
+                decide(vector["input"])
+                failed += 1
+                print(f"FAIL {path.name}: decided what it must refuse")
+            except ValueError:
+                pass
+            continue
         actual = decide(vector["input"])
         if actual != vector["expected"]:
             failed += 1
             print(f"FAIL {path.name}\n  expected {vector['expected']}\n  actual   {actual}")
-    for bad, why in (({"subjectVersion": "v", "evaluatedAt": "2026-01-01T00:00:00Z", "lanes": []}, "no lanes"),
-                     ({"subjectVersion": "v", "evaluatedAt": "2026-01-01T00:00:00Z",
-                       "lanes": [{"lane": "q", "blocking": True, "result": None}] * 2}, "a lane twice")):
-        try:
-            decide(bad)
-            failed += 1
-            print(f"FAIL {why}: accepted")
-        except ValueError:
-            pass
     print(f"{len(vectors) - failed} of {len(vectors)} decision vectors pass")
     return 1 if failed or not vectors else 0
 

@@ -27,9 +27,35 @@
   "contentPolicy": "off",
   "isolation": "process",
   "provider": "local",
+  "judges": [
+    {
+      "model": "gpt-5.1",
+      "provider": "azure.ai.openai",
+      "rubricDigest": "sha256:a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9"
+    }
+  ],
+  "baseline": {
+    "policy": "latest-sealed-on-main"
+  },
+  "comparability": {
+    "required": [
+      "judge.modelId",
+      "judge.rubricDigest"
+    ]
+  },
   "credentialRefs": [
-    "env:AZURE_OPENAI_API_KEY",
-    "keychain:agenteval/support-dev"
+    {
+      "name": "AZURE_OPENAI_API_KEY",
+      "scheme": "env",
+      "path": "AZURE_OPENAI_API_KEY",
+      "purpose": "judge"
+    },
+    {
+      "name": "SUPPORT_API_KEY",
+      "scheme": "keychain",
+      "path": "agenteval/support-dev",
+      "purpose": "subject"
+    }
   ],
   "runnerSelector": [
     "os:linux"

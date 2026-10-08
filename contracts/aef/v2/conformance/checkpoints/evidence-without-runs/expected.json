@@ -2,7 +2,7 @@
   "schema": "checkpoint",
   "writer": "valid",
   "reader": "valid",
-  "rule": "a lane with a result names the runs it came from, and a lane with runs has a result",
+  "rule": "a lane with a result names the runs it came from",
   "problems": [
     "evidence"
   ]

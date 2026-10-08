@@ -133,6 +133,14 @@ VECTORS = [
 # Vectors whose input only a reader accepts (a value a later minor may add).
 READER_ONLY = {"25-unknown-status-fails-closed"}
 
+# Inputs the function refuses rather than decide: (name, description, input, error). Schema-invalid inputs say so.
+REFUSED = [
+    ("26-no-lanes", "No lane: deciding nothing would approve nothing. (The schema refuses it too.)",
+     {"lanes": []}, "no-lanes", True),
+    ("27-a-lane-twice", "A lane listed twice is ambiguous: refused.",
+     {"lanes": [lane("quality", True, "passed"), lane("quality", True, "failed")]}, "duplicate-lane", False),
+]
+
 
 def main():
     OUT.mkdir(parents=True, exist_ok=True)
@@ -144,6 +152,11 @@ def main():
                "expected": expected}
         if name in READER_ONLY:
             doc["readerOnly"] = True
+        (OUT / f"{name}.json").write_bytes((json.dumps(doc, indent=2, ensure_ascii=False) + "\n").encode("utf-8"))
+    for name, description, partial, error, schema_invalid in REFUSED:
+        doc = {"description": description, "input": {"subjectVersion": V, "evaluatedAt": AT, **partial}, "expectedError": error}
+        if schema_invalid:
+            doc["schemaInvalid"] = True
         (OUT / f"{name}.json").write_bytes((json.dumps(doc, indent=2, ensure_ascii=False) + "\n").encode("utf-8"))
 
 
