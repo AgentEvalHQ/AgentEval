@@ -850,6 +850,10 @@ def seal_vectors(valid):
         {"schemaVersion": V, "eventId": "ov_0003", "kind": "redact", "target": {"run": COMPLETED_ID, "blob": blob_hex},
          "reason": "The judge's reasoning quoted a customer's address.", "by": by(), "at": "2026-10-03T09:00:00Z"}]], the_hash)
     (run / blob_rel).unlink()
+    for folder in (run / blob_rel).parents:  # no empty folders left behind: git would not keep them
+        if folder == run or any(folder.iterdir()):
+            break
+        folder.rmdir()
     expect("withheld-blob", [[blob_rel, "withheld"]], ["SEAL-6", "OVL-10"])
     shutil.copytree(run, ROOT / "runs" / "withheld-blob" / "run")
     write_json(ROOT / "runs" / "withheld-blob" / "expected.json", {
