@@ -35,6 +35,7 @@ public sealed partial class AefRunFolder
         PathProblems = listing.Problems;
         OverFileLimit = listing.Problems.Any(p => p is { Path: ".", Code: "limit" });
         OverlaysOverLimit = listing.OverlaysOverLimit;
+        OverlayIrregular = listing.OverlayIrregular ?? [];
         _present = new HashSet<string>(Files, StringComparer.Ordinal);
         SealedFiles = [.. Files.Where(IsSealed)];
     }
@@ -46,10 +47,18 @@ public sealed partial class AefRunFolder
     public IReadOnlyList<string> Files { get; }
 
     /// <summary>
-    /// The <c>path</c> problems of [RUN-3] (a bad name, a case clash, a link, pipe, socket or device), or the one
-    /// <c>limit</c> problem at <c>.</c> when the folder holds more files than [ENC-17] allows.
+    /// The <c>path</c> problems of [RUN-3] (a bad name, a case clash, a link, pipe, socket or device) outside
+    /// <c>overlays/</c>, which the rule does not check, or the one <c>limit</c> problem at <c>.</c> when the folder holds
+    /// more files than [ENC-17] allows.
     /// </summary>
     public IReadOnlyList<AefProblem> PathProblems { get; }
+
+    /// <summary>
+    /// The entries under <c>overlays/</c> that are neither regular files nor folders (links, pipes, sockets, devices):
+    /// never followed or read, and never a problem of the run; the overlay verifier reports each as
+    /// <c>unexpected-file</c>, whatever its name ([OVL-5]).
+    /// </summary>
+    public IReadOnlyList<string> OverlayIrregular { get; }
 
     /// <summary>
     /// The folder holds more than 100,000 files ([ENC-17]): <see cref="Files"/> is only part of it, and nothing more is
@@ -58,8 +67,9 @@ public sealed partial class AefRunFolder
     public bool OverFileLimit { get; }
 
     /// <summary>
-    /// <c>overlays/</c> holds more than 19,999 files ([ENC-17]: one events file and two per batch): the overlay chain is
-    /// not checked ([OVL-5]: <c>limit</c> at <c>overlays</c>). The files are listed in <see cref="Files"/> all the same.
+    /// <c>overlays/</c> holds more than 19,999 files ([ENC-17]: one events file and two per batch): the overlay verifier
+    /// reports <c>limit</c> at <c>overlays</c> once, and checks the chain as usual from the files it names ([OVL-5]). The
+    /// files are listed in <see cref="Files"/> all the same.
     /// </summary>
     public bool OverlaysOverLimit { get; }
 

@@ -20,7 +20,7 @@ Python 3.12 (tested on Windows and Linux), standard library only. Run each as `p
 
 | Tool | Does | Self-check |
 |---|---|---|
-| `aef_interop.py` | Reference converters for two of the [interop mappings](../1/interop/README.md), written from their pages alone: `to-otel` (a run as OpenTelemetry `gen_ai.evaluation.result` events, OTLP/JSON logs), `from-otel` (OTLP/JSON logs as an imported run, sealed as `ingest`) and `to-inspect` (a run as an Inspect eval log). It follows the rules and refusals the pages state beyond their tables (OT-1 to OT-6, IN-1 to IN-5), and a refusal names its rule. | through `check_interop.py` |
+| `aef_interop.py` | Reference converters for two of the [interop mappings](../1/interop/README.md), written from their pages alone: `to-otel` (a run as OpenTelemetry `gen_ai.evaluation.result` events, OTLP/JSON logs), `from-otel` (OTLP/JSON logs as an imported run, sealed as `ingest`), `to-inspect` (a run as an Inspect eval log) and `from-inspect` (an Inspect eval log as an imported run, sealed as `ingest` when closed). It follows the rules and refusals the pages state beyond their tables (OT-1 to OT-6, IN-1 to IN-10), and a refusal names its rule. | through `check_interop.py` |
 | `check_interop.py` | Runs the checked examples in `1/interop/examples/`: reruns each conversion and compares the output byte for byte, checks the refusals, verifies every run with `aef_verify.py run`, checks a round trip's losses field by field against the page's "What does not carry over" list, and checks that the pages' worked-example blocks equal the examples' data. Not conformance vectors. `--update` rewrites the expected outputs. | runs on the files |
 
 ## Building the corpus and the derived files

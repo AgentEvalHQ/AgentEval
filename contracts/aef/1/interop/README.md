@@ -55,7 +55,7 @@ converts a target record into AEF. All examples were checked:
 - every result id was recomputed with RES-4 against the corpus.
 
 **Checked examples.** For OpenTelemetry and Inspect, [`examples/`](examples/) holds checked examples (round trips
-through OpenTelemetry, exports to Inspect), and the worked examples of [opentelemetry.md](opentelemetry.md) and
+through OpenTelemetry and Inspect, imports from both), and the worked examples of [opentelemetry.md](opentelemetry.md) and
 [inspect.md](inspect.md) are their data.
 `tools/aef_interop.py` is a reference converter written from those two pages alone; `tools/check_interop.py` reruns it
 on every example and fails on any difference. Each folder holds the input (a corpus run, copied, or a hand-written
@@ -66,12 +66,13 @@ OTLP/JSON file), the output and an `expected.json` naming the direction and the 
 | [`aef-otel-aef`](examples/aef-otel-aef/) | `completed-eval` (a composite, typed absences, scores, a reasoning blob, a trace link) to events and back. What the trip keeps and loses is checked field by field: it loses exactly the page's "What does not carry over" list |
 | [`aef-otel-aef-redteam`](examples/aef-otel-aef-redteam/) | `redteam-campaign` (`contentCapture: off`, attacks, a `scored` line, no times) to events and back, checked the same way |
 | [`otel-aef`](examples/otel-aef/) | a hand-written OTLP file, the registry's own example included, as an imported run; one refused input for each event the page does not place |
-| [`aef-inspect`](examples/aef-inspect/) | `completed-eval` as an Inspect eval log |
-| [`aef-inspect-trials`](examples/aef-inspect-trials/) | `running-trials`: trials as epochs, a rollup as a reduction, a running run as `started` |
+| [`aef-inspect`](examples/aef-inspect/) | `completed-eval` to an Inspect eval log and back, with the same result ids; what the trip keeps and loses is checked field by field against the page's list |
+| [`aef-inspect-trials`](examples/aef-inspect-trials/) | `running-trials` to Inspect and back: trials as epochs and back, a rollup as a reduction and back, a running run as `started` and back, unsealed |
+| [`inspect-aef`](examples/inspect-aef/) | a hand-written Inspect log (two epochs, letters, a map, NaN, a refusal, a sample that failed, case content) as an imported run, with content kept and not; one refused input for each case the page refuses |
 
 The examples are informative, like these pages: they are not conformance vectors, and nothing in the corpus depends on
 them. Every run they hold passes `tools/aef_verify.py run`. Writing the converter found what the two pages left
-undecided (OT-1 to OT-6, IN-1 to IN-5); settled on 10-09, each is now a rule or a stated refusal under the page's table
+undecided (OT-1 to OT-6, IN-1 to IN-10); settled on 10-09, each is now a rule or a stated refusal under the page's table
 for its direction.
 
 ## What survives a round trip
@@ -81,7 +82,7 @@ AEF → target → AEF, for one result line of the corpus run.
 | Through | Survives | Lost | Same `resultId` |
 |---|---|---|---|
 | [OpenTelemetry event](opentelemetry.md) | metric name, score, state (as the label, [RUN-14](../spec/03-run.md#310-traces)), reason (or the reasoning's text), span ids, end time, case id (as `test.case.name`), service name; checked by [`examples/aef-otel-aef`](examples/aef-otel-aef/) | `runId`, `path`, a score's own `label`, the result tree, thresholds, uncertainty, severity, evaluator, annotator, usage, metric declarations, the run header | no: the event carries neither the run id nor the path |
-| [Inspect sample score](inspect.md) | case, trial (as epoch − 1), path (as the score key), score value or label, explanation, usage per role with cache and reasoning tokens, case times, captured case content; the export checked by [`examples/aef-inspect`](examples/aef-inspect/) | the state (Inspect has no verdict, and one unscored value, NaN, for every typed absence), composite lineage, gates, seal, overlays | yes |
+| [Inspect sample score](inspect.md) | case, trial (as epoch − 1), path (as the score key), score value or label, explanation, usage per role with cache and reasoning tokens, case times, captured case content; checked by [`examples/aef-inspect`](examples/aef-inspect/) | the state (Inspect has no verdict, and one unscored value, NaN, for every typed absence), composite lineage, evaluator and metric names, which line of a case held a usage entry, trace links, gates, seal, overlays | yes |
 | [EvalPort result](evalport.md) | case, trial (as attempt − 1), path (as `grader_id`), pass or fail, score in [0, 1], reason, duration, end time, captured output | typed absence kinds, `warn` against `failed`, `inconclusive`, `scored`, `component.required`, `rulePath`, trial rollups, the seal | yes, when the root's path is kept in metadata |
 | [OpenAI evals log](openai-evals.md) | case, pass or fail, score, end time | typed absences, the result tree, judges, the seal | only with the path kept in the event's `data` |
 | [Hosted OpenAI Evals](openai-evals.md) | nothing of AEF's grading: the hosted API grades runs itself and accepts no outside results | everything except the case content, which it can re-grade | no |

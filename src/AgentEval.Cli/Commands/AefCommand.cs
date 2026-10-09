@@ -282,7 +282,7 @@ internal static class AefCommand
             {
                 At = time,
                 Policy = policy,
-                Envelope = envelopeUsed is not null && File.Exists(envelopeUsed) ? File.ReadAllBytes(envelopeUsed) : null,
+                EnvelopeFile = envelopeUsed is not null && File.Exists(envelopeUsed) ? envelopeUsed : null,   // not read beyond 56 MiB (SIG-1)
             });
             if (envelopeUsed is not null && !File.Exists(envelopeUsed))
             {

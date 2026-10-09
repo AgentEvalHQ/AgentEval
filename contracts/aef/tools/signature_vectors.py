@@ -249,6 +249,10 @@ def policy_and_envelope_vectors(seal_bytes):
                         ("policy-unknown-member", dict(alice, notAfter="2026-01-01T00:00:00Z"))):
         refused(name, good, seal_bytes, {"keys": [entry]}, ["SIG-4"])
     refused("policy-unknown-top-member", good, seal_bytes, {"keys": [alice], "revoked": []}, ["SIG-4"])
+    # SIG-4 (R5-6): a policy may say it is 1.0; one that declares a later version is refused, as a closed schema says.
+    refused("policy-later-version", good, seal_bytes, {"schemaVersion": "1.1", "keys": [alice]}, ["SIG-4", "VER-1"])
+    vector("policy-with-version", good, "seal.json", seal_bytes, INTOTO, {"schemaVersion": "1.0", "keys": [alice]}, None,
+           [ok("ecdsa-a")], [WHO["ecdsa-a"]], ["SIG-4", "SIG-5"])
 
     # SIG-1: a null keyid reads as absent; members DSSE does not define are ignored; a duplicate member is not I-JSON.
     vector("envelope-keyid-null", dict(good, signatures=[{"keyid": None, "sig": C.b64encode(good_sig)}]), "seal.json",
@@ -483,6 +487,69 @@ def redaction_vectors():
                                              "problems": [["overlays/events.ndjson:3", "event-invalid"]],
                                              "rules": ["OVL-5", "ENC-5"]})
 
+    # R5-1: nothing under overlays/ is a problem of the run: badly named files, or more of them than the limit, are
+    # the chain's to report, and the redaction stands.
+    junk = [{"write": ["run/overlays/.DS_Store", [["x", 1]]]}, {"write": ["run/overlays/notes 1.txt", [["x", 1]]]},
+            {"write": ["run/overlays/events.ndjson.bak", [["{}\n", 1]]]}]  # no case variant: Windows would merge it
+    for name, steps, chain_problems in (
+            ("withheld-blob-overlay-junk-names", junk,
+             [["overlays/.DS_Store", "unexpected-file"], ["overlays/events.ndjson.bak", "unexpected-file"],
+              ["overlays/notes 1.txt", "unexpected-file"]]),
+            ("withheld-blob-overlay-junk-many", [{"files": ["run/overlays/junk", 19_997]}], [["overlays", "limit"]])):
+        for kind in ("run", "chain"):
+            d = CONF / ("runs" if kind == "run" else "chain-vectors") / name
+            if d.exists():
+                shutil.rmtree(d)
+            expected = {"kind": kind, "run": "run", "generate": [{"copy": ["runs/withheld-blob/run", "run"]}] + steps}
+            if kind == "run":
+                write_json(d / "policy.json", policy("ecdsa-a", may=("ecdsa-a",)))
+                expected |= {"policy": "policy.json", "outcome": "intact", "problems": [[blob_rel, "withheld"]],
+                             "withheld": 1, "signedBy": [], "rules": ["RUN-3", "OVL-5", "OVL-10"]}
+            else:
+                expected |= {"problems": chain_problems, "rules": ["OVL-5", "ENC-17"]}
+            write_json(d / "expected.json", expected)
+
+    # R5-2, W3-21: a DSSE envelope at 56 MiB is read; one byte more is malformed and verifies for no one, and is never a
+    # problem of the run: the attestation then signs for no one, a batch signature authorizes nothing, an orphan
+    # envelope changes nothing.
+    limit = 56 * 1024 * 1024
+    seal_bytes = (CONF / "valid" / "completed-eval" / "run" / "seal.json").read_bytes()
+    att = json.dumps(envelope(INTOTO, seal_bytes, [(ID["ecdsa-a"], sig(INTOTO, seal_bytes, KA))]), indent=2,
+                     ensure_ascii=False)
+    for name, size, signed in (("attestation-at-56-mib", limit, [WHO["ecdsa-a"]]),
+                               ("attestation-beyond-56-mib", limit + 1, [])):
+        d = CONF / "runs" / name
+        if d.exists():
+            shutil.rmtree(d)
+        write_json(d / "policy.json", policy("ecdsa-a"))
+        write_json(d / "expected.json", {
+            "kind": "run", "run": "run", "policy": "policy.json",
+            "generate": [{"copy": ["valid/completed-eval/run", "run"]},
+                         {"write": ["run/attestation.dsse.json", [[att, 1], [" ", size - len(att) - 1], ["\n", 1]]]}],
+            "outcome": "intact", "problems": [], "signedBy": signed, "rules": ["SIG-1", "ENC-17", "ENC-18"]})
+    batch_3 = (CONF / "runs" / "withheld-blob" / "run" / "overlays" / "seal-0003.json").read_bytes()
+    env_3 = json.dumps(envelope(INTOTO, batch_3, [(ID["ecdsa-a"], sig(INTOTO, batch_3, KA))]), indent=2,
+                       ensure_ascii=False)
+    d = CONF / "seal-vectors" / "redact-envelope-beyond-limit"
+    if d.exists():
+        shutil.rmtree(d)
+    write_json(d / "policy.json", policy("ecdsa-a", may=("ecdsa-a",)))
+    write_json(d / "expected.json", {
+        "kind": "seal", "run": "run", "policy": "policy.json",
+        "generate": [{"copy": ["runs/withheld-blob/run", "run"]},
+                     {"write": ["run/overlays/seal-0003.dsse.json", [[env_3, 1], [" ", limit - len(env_3)], ["\n", 1]]]}],
+        "problems": [[blob_rel, "missing"]], "rules": ["SIG-1", "OVL-10", "ENC-17"]})
+    d = CONF / "runs" / "withheld-blob-orphan-envelope-beyond-limit"
+    if d.exists():
+        shutil.rmtree(d)
+    write_json(d / "policy.json", policy("ecdsa-a", may=("ecdsa-a",)))
+    write_json(d / "expected.json", {
+        "kind": "run", "run": "run", "policy": "policy.json",
+        "generate": [{"copy": ["runs/withheld-blob/run", "run"]},
+                     {"write": ["run/overlays/seal-0004.dsse.json", [["x", limit + 1]]]}],
+        "outcome": "intact", "problems": [[blob_rel, "withheld"]], "withheld": 1, "signedBy": [],
+        "rules": ["SIG-1", "OVL-5", "ENC-17"]})
+
     # The effective view of the redacted run, given the policy: the blob is withheld.
     d = CONF / "overlay-views" / "authorized-redaction"
     if d.exists():
@@ -496,6 +563,18 @@ def redaction_vectors():
         "waivers": [{"target": {"requirement": events[1]["target"]["requirement"]}, "expires": events[1]["expires"],
                      "active": True, "event": events[1]["eventId"]}],
         "withheld": [blob_rel.rsplit("/", 1)[1]], "unsealedEvents": 0}})
+    lines_now = len((d / "run" / "overlays" / "events.ndjson").read_bytes().splitlines())
+    view = read_json(d / "expected.json")["view"]
+    e = CONF / "overlay-views" / "unfinished-line-after-a-million"
+    if e.exists():
+        shutil.rmtree(e)
+    write_json(e / "policy.json", policy("ecdsa-a", may=("ecdsa-a",)))
+    write_json(e / "expected.json", {
+        "kind": "overlay-view", "run": "run", "policy": "policy.json", "at": "2026-10-08T12:00:00Z",
+        "generate": [{"copy": ["overlay-views/authorized-redaction/run", "run"]},
+                     {"append": ["run/overlays/events.ndjson",
+                                 [["\n", 1_000_000 - lines_now], ['{"schemaVersion":"1.0","eventId":"ov_00', 1]]]}],
+        "view": dict(view, unsealedEvents=1_000_000 - lines_now), "rules": ["OVL-5", "ENC-17"]})
 
     # A checkpoint over the redacted run still finds it (by its seal's run hash) and counts it, given the policy.
     run_hash = read_json(CONF / "valid" / "completed-eval" / "run" / "seal.json")["predicate"]["runHash"]

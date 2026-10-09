@@ -6,7 +6,6 @@ using System.Collections.Concurrent;
 using System.Globalization;
 using System.Reflection;
 using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json.Nodes;
 
 namespace AgentEval.Results.Writing;
@@ -43,20 +42,12 @@ internal static class AefWire
 
     /// <summary>
     /// A time as AEF writes it ([ENC-8]): UTC, <c>yyyy-MM-ddTHH:mm:ss</c>, the fraction of the second only when it is not
-    /// zero and without trailing zeros (at most seven digits: <see cref="DateTimeOffset"/> keeps 100 ns), then <c>Z</c>.
+    /// zero and without trailing zeros (up to nine digits, at the full precision given: n2-d), then <c>Z</c>.
     /// </summary>
-    public static string Time(DateTimeOffset time)
-    {
-        var utc = time.ToUniversalTime();
-        var text = new StringBuilder(utc.ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture));
-        var ticks = utc.Ticks % TimeSpan.TicksPerSecond;
-        if (ticks != 0)
-        {
-            text.Append('.').Append(ticks.ToString("D7", CultureInfo.InvariantCulture).TrimEnd('0'));
-        }
-
-        return text.Append('Z').ToString();
-    }
+    /// <exception cref="ArgumentException">Not an [ENC-8] time: nanoseconds beyond 0 to 999,999,999, or a year beyond 0001 to 9999.</exception>
+    public static string Time(AefTime time) => time.IsValid
+        ? time.ToString()
+        : throw new ArgumentException($"{time} is not an AEF time: nanoseconds 0 to 999,999,999, in the years 0001 to 9999 ([ENC-8]).", nameof(time));
 
     /// <summary>A number as AEF writes it: finite ([ENC-3]).</summary>
     /// <exception cref="ArgumentException">NaN or an infinity.</exception>

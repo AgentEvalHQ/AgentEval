@@ -4,9 +4,9 @@
 the ingest seal) and aef_schema.py (the writer schemas a converted run is checked against before it is written).
 
 The pages are informative, and so is this tool: nothing in the specification depends on it. Beyond their tables, the
-pages state rules and refusals of their own (OT-1 to OT-6 and IN-1 to IN-5, settled 10-09); the converter follows
-them, and a refusal exits with status 2 naming its rule. It never fills a gap the pages leave. The checked examples under
-1/interop/examples/ run it (tools/check_interop.py).
+pages state rules and refusals of their own (OT-1 to OT-6 and IN-1 to IN-10, settled 10-09); the converter follows
+them, and a refusal exits with status 2 naming its rule. It never fills a gap the pages leave. The checked examples
+under 1/interop/examples/ run it (tools/check_interop.py).
 
 The command line follows aef_produce.py's contract: input paths as arguments, one JSON value on standard output
 (UTF-8, sorted keys, no ASCII escaping), exit status 0 when the conversion ran, and 2 with a message on standard
@@ -30,11 +30,20 @@ Commands (the JSON each prints):
       inspect.md, "AEF -> Inspect": writes OUT, the run as one Inspect EvalLog in its .json form (log format 2).
       An unscored value is the bare token NaN, as Inspect writes it (not JSON). Refused: the cases of IN-1, IN-3,
       IN-4 and IN-5; a run with overlay events unless --ignore-overlays leaves them out (IN-4).
+  from-inspect LOG OUT --target-mode MODE [--content-capture on|off] [--at TIME]
+      inspect.md, "Inspect -> AEF": writes the run folder OUT (which must not exist yet, or be empty) from the Inspect
+      eval log LOG in its .json form (Inspect's NaN token read as an unscored value): run.json with `imported`
+      (IN-6), a line per sample score and a rollup per reduced score (IN-7, IN-8), metrics.json, summary.json
+      recomputed from the lines and compared with Inspect's results (IN-9), the case content as blobs and evidence
+      when content is kept (default on), and the seal (`sealedBy: ingest`) at TIME (default now), unless the log is
+      still `started`: a running run is not sealed. Prints {"results": n, "runHash": hex or null}. Refused: the cases
+      of IN-6 to IN-10.
 """
 from __future__ import annotations
 
 import argparse
 import datetime
+import hashlib
 import json
 import math
 import re
@@ -780,6 +789,544 @@ def to_inspect(run_dir, out, ignore_overlays=False):
     return {"samples": len(samples), "reductions": len(rollups)}
 
 
+# ---------------------------------------------------------------------------- Inspect -> AEF
+
+LETTERS = {"C": 1, "I": 0, "P": 0.5, "N": 0}  # Inspect's letters, as its metrics read them
+LETTER_STATES = {"C": "passed", "I": "failed", "P": "warn", "N": "failed"}
+MODEL_BLAMED = ("refusal", "no_response", "invalid_response_format")  # state failed, whatever the value
+INSTRUMENT_BLAMED = ("grader_failed", "scoring_failed")  # with NaN: state error (IN-7)
+FROM_REDUCER = {"majority": "MajorityVote", "mode": "MajorityVote", "mean": "Mean", "median": "Median", "max": "Max"}
+MEAN_METRICS = ("accuracy", "mean")  # a summary entry's mean (SUM-5)
+NO_VALUE_REASON = "Inspect recorded no value (NaN) and no reason"  # IN-7
+_INSPECT_TIME = re.compile(r"([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\.([0-9]{1,9}))?"
+                           r"(Z|[+-][0-9]{2}:[0-9]{2})")
+_AEF_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
+_METHOD = re.compile(r"[a-z][a-z0-9@._-]{0,63}")
+
+
+def _read_inspect_log(path):
+    """An Inspect log in its .json form: one JSON object, with Inspect's bare NaN token read as NaN (an unscored
+    value); Infinity, a member named twice, a byte-order mark or bytes that are not UTF-8 are refused."""
+    try:
+        data = Path(path).read_bytes()
+    except OSError as error:
+        raise InputError(f"{path}: {error}") from None
+    text = aef_produce._decode(data, "the Inspect log")
+
+    def members(pairs):
+        obj = {}
+        for key, value in pairs:
+            if key in obj:
+                raise InputError(f"the Inspect log: the member {key!r} appears twice")
+            obj[key] = value
+        return obj
+
+    def constant(name):
+        if name == "NaN":
+            return math.nan
+        raise InputError(f"the Inspect log: {name} is no value AEF can hold ([ENC-3])")
+
+    try:
+        log = json.loads(text, object_pairs_hook=members, parse_constant=constant)
+    except ValueError as error:
+        raise InputError(f"the Inspect log is not JSON: {error}") from None
+    if not isinstance(log, dict) or not isinstance(log.get("eval"), dict):
+        raise InputError("the Inspect log is not an EvalLog (an object with eval)")
+    return log
+
+
+def _inspect_nanos(text, where):
+    """An Inspect time (ISO 8601 with an offset) as nanoseconds since the Unix epoch, in UTC (the instant is kept)."""
+    m = _INSPECT_TIME.fullmatch(text) if isinstance(text, str) else None
+    if m is None:
+        raise InputError(f"{where}: {text!r} is not a time with an offset (inspect.md, Inspect -> AEF, IN-6)")
+    try:
+        moment = datetime.datetime(*(int(g) for g in m.groups()[:6]), tzinfo=datetime.timezone.utc)
+    except ValueError:
+        raise InputError(f"{where}: {text!r} names a date that does not exist") from None
+    offset = 0 if m.group(8) == "Z" else (int(m.group(8)[1:3]) * 60 + int(m.group(8)[4:6])) * \
+        (1 if m.group(8)[0] == "+" else -1)
+    seconds = int(moment.timestamp()) - offset * 60
+    return seconds * 10 ** 9 + int((m.group(7) or "").ljust(9, "0"))
+
+
+def _ref(kind, name):
+    """A typed reference whose name comes from free text, encoded as [ENC-13] says."""
+    data = name.encode("utf-8")
+    text = "".join(chr(b) if 0x21 <= b <= 0x7E and b != 0x25 else f"%{b:02X}" for b in data)
+    text = "-" if text == "" else "%2D" if text == "-" else text
+    if len(text) > 256:
+        text = text[:239] + "~" + hashlib.sha256(data).hexdigest()[:16]
+    return f"{kind}:{text}"
+
+
+def _in(where, what, item):
+    raise InputError(f"{where}: {what}: refused (inspect.md, Inspect -> AEF, {item})")
+
+
+def _from_reducer(reducer, epochs, where):
+    """Inspect's epochs reducer as AEF's trial aggregation and k (inspect.md, `eval.config.epochs_reducer`), or None
+    for a reducer without an AEF value."""
+    if reducer in FROM_REDUCER:
+        return FROM_REDUCER[reducer], None
+    m = re.fullmatch(r"(pass_at|at_least)_([1-9][0-9]*)", reducer) if isinstance(reducer, str) else None
+    if m and m.group(1) == "pass_at":
+        return "PassAtK", int(m.group(2))
+    if m and m.group(2) == "1":
+        return "AnyPass", None
+    if m and int(m.group(2)) == epochs:
+        return "AllPass", None
+    return None
+
+
+def _aef_role(name, model_roles):
+    """IN-8: an Inspect role name as an AEF usage role: agent, judge and attacker as they are, a role of
+    eval.model_roles (a judge of judges[]) as judge, any other as other."""
+    if name in ("agent", "judge", "attacker"):
+        return name
+    return "judge" if name in model_roles else "other"
+
+
+def _usage_entry(role, model, usage, where):
+    """A usage entry from an Inspect ModelUsage: tokens under OpenTelemetry's names, total_cost as costUsd; Inspect's
+    total_tokens is left out (it is input and output)."""
+    if not isinstance(usage, dict):
+        raise InputError(f"{where}: a usage is not an object")
+    entry = {"role": role}
+    if model is not None:
+        entry["model"] = model
+    for aef, inspect in USAGE_FIELDS:
+        value = usage.get(inspect)
+        if value is None:
+            continue
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise InputError(f"{where}: {inspect} is not a count of tokens")
+        entry[aef] = value
+    cost = usage.get("total_cost")
+    if cost is not None:
+        if isinstance(cost, bool) or not isinstance(cost, (int, float)) or not cost >= 0:
+            raise InputError(f"{where}: total_cost is not a cost")
+        entry["costUsd"] = cost
+    return entry
+
+
+def _merged(entries):
+    """Usage entries with one entry per role and model ([RES-10], [SUM-9]): two that meet are added together."""
+    out = {}
+    for entry in entries:
+        key = (entry["role"], entry.get("model"))
+        if key not in out:
+            out[key] = dict(entry)
+            continue
+        kept = out[key]
+        for field, value in entry.items():
+            if field in ("role", "model"):
+                continue
+            if field == "costUsd":
+                kept[field] = float(Fraction(kept.get(field, 0)) + Fraction(value))
+            else:
+                kept[field] = kept.get(field, 0) + value
+    return list(out.values())
+
+
+def _text_bytes(value):
+    """The bytes of a case's content: a string as its UTF-8 text, anything else as compact JSON."""
+    return value.encode("utf-8") if isinstance(value, str) else _compact(value).encode("utf-8")
+
+
+class _Blobs:
+    """The blobs and evidence records a converted run writes ([EVD-1]-[EVD-3]): one record per kind and content."""
+
+    def __init__(self):
+        self.blobs, self.records, self._ids = {}, [], {}
+
+    def blob(self, data):
+        digest = hashlib.sha256(data).hexdigest()
+        self.blobs[digest] = data
+        return digest
+
+    def evidence(self, kind, data, description):
+        digest = self.blob(data)
+        if (kind, digest) not in self._ids:
+            evidence_id = f"E-{len(self.records) + 1}"
+            self._ids[(kind, digest)] = evidence_id
+            self.records.append({"schemaVersion": AEF_VERSION, "evidenceId": evidence_id, "kind": kind,
+                                 "digest": f"sha256:{digest}", "link": {"blob": f"sha256:{digest}"},
+                                 "description": description})
+        return self._ids[(kind, digest)]
+
+
+def inspect_line(run_id, case_id, path, trial, score, evaluator_id, capture, blobs, where):
+    """The result line of one Inspect Score (IN-7)."""
+    if not isinstance(score, dict):
+        raise InputError(f"{where}: a score is not an object")
+    if score.get("history"):
+        _in(where, "a score with history edits: the reference converter writes no overlays", "IN-10")
+    value, reason_name, explanation = score.get("value"), score.get("reason"), score.get("explanation")
+    if reason_name is not None and (not isinstance(reason_name, str) or not reason_name):
+        raise InputError(f"{where}: Score.reason is not a name")
+    scores, extra = [], {}
+
+    def measured(member, metric):
+        if isinstance(member, bool):
+            _in(where, f"the boolean value {member}: no row gives it a state or a number", "IN-7")
+        if isinstance(member, (int, float)) and not (isinstance(member, float) and math.isnan(member)):
+            return {"metric": metric, "value": member}
+        if isinstance(member, str) and member in LETTERS:
+            return {"metric": metric, "value": LETTERS[member], "label": member}
+        _in(where, f"the value {member!r}, which is no number and no letter C, I, P or N", "IN-7")
+
+    if isinstance(value, float) and math.isnan(value):  # unscored
+        state = "error" if reason_name in INSTRUMENT_BLAMED else "failed" if reason_name in MODEL_BLAMED \
+            else "not_measured"
+    elif isinstance(value, dict):  # a map: one score per member, scored
+        scores = [measured(v, k) for k, v in value.items()]
+        state = "scored"
+    elif isinstance(value, list):  # a list: kept in ext, no score
+        extra["value"], state = value, "scored"
+    else:
+        scores = [measured(value, path)]
+        state = LETTER_STATES.get(value, "scored") if isinstance(value, str) else "scored"
+    if reason_name in MODEL_BLAMED:  # the model under test is blamed: failed, the reason in reason
+        state = "failed"
+    if state in TYPED_ABSENCES:
+        scores = []  # RES-2
+    reason = reason_name
+    if reason is None and state in TYPED_ABSENCES:
+        reason = NO_VALUE_REASON
+    line = {"schemaVersion": AEF_VERSION, "resultId": result_id(run_id, case_id, path, trial), "caseId": case_id,
+            "path": path}
+    if trial is not None:
+        line["trial"] = trial
+    line["evaluator"], line["state"] = {"id": evaluator_id}, state
+    if explanation is not None and not isinstance(explanation, str):
+        raise InputError(f"{where}: Score.explanation is not text")
+    if reason is not None:
+        line["reason"] = reason
+    if scores:
+        line["scores"] = scores
+    # IN-7: the explanation is a reasoning blob when contentCapture is on. A run that keeps no content keeps no judge
+    # reasoning and no response, in reason or ext either (RUN-11): with off, the explanation and the answer are left out.
+    if explanation and capture == "on":
+        data = explanation.encode("utf-8")
+        line["reasoning"] = {"blob": "sha256:" + blobs.blob(data), "bytes": len(data)}
+    for field in ("answer", "metadata") if capture == "on" else ("metadata",):
+        if score.get(field) is not None:
+            extra[field] = score[field]
+    if extra:
+        line["ext"] = {"inspect_ai": extra}
+    return line
+
+
+def _sample_content(sample, capture, blobs):
+    """The evidence ids of a sample's input, target, output and messages, kept only with contentCapture on (IN-8)."""
+    if capture != "on":
+        return []
+    ids = []
+    output = sample.get("output")
+    for field, kind, value in (("input", "input", sample.get("input")), ("target", "expected", sample.get("target")),
+                               ("output", "output", output if isinstance(output, dict) and output.get("choices")
+                                else None),
+                               ("messages", "transcript", sample.get("messages"))):
+        if value in (None, "", [], {}):
+            continue
+        ids.append(blobs.evidence(kind, _text_bytes(value), f"Inspect samples[].{field}"))
+    return list(dict.fromkeys(ids))
+
+
+def from_inspect(log_path, out, target_mode, capture, at):
+    """Writes the run folder OUT from an Inspect eval log (inspect.md, Inspect -> AEF, and IN-6 to IN-10)."""
+    out = Path(out)
+    if out.exists() and not (out.is_dir() and not any(out.iterdir())):
+        raise InputError(f"{out}: OUT is a folder that does not exist yet, or an empty one")
+    if capture not in ("on", "off"):
+        raise InputError("--content-capture is on or off ([RUN-11])")
+    log = _read_inspect_log(log_path)
+    spec, stats, results = log["eval"], log.get("stats") or {}, log.get("results") or {}
+    if log.get("log_updates"):
+        _in("log_updates", "post-run edits: the reference converter writes no overlays", "IN-10")
+
+    # IN-6: the run header
+    run_id = spec.get("eval_id") or spec.get("run_id")
+    if not isinstance(run_id, str) or not _AEF_ID.fullmatch(run_id):
+        _in("eval.eval_id", f"{run_id!r} is not an AEF id (1 to 128 letters, digits, '.', '_', ':', '-')", "IN-6")
+    status = {"success": "completed", "error": "aborted", "cancelled": "aborted", "started": "running"}.get(
+        log.get("status"))
+    if status is None:
+        raise InputError(f"status {log.get('status')!r} is not one Inspect writes")
+    closed = status != "running"
+    run = {"schemaVersion": AEF_VERSION, "runId": run_id, "status": status}
+    if log.get("status") == "error":
+        message = (log.get("error") or {}).get("message")
+        if not isinstance(message, str) or not message:
+            _in("error.message", "an error log without a message: an aborted run has an abortReason", "IN-6")
+        run["abortReason"] = message[:2048]
+    elif log.get("status") == "cancelled":
+        run["abortReason"] = "cancelled"
+    run["producer"] = dict(PRODUCER)
+    model, task = spec.get("model"), spec.get("task")
+    if not isinstance(model, str) or not isinstance(task, str):
+        raise InputError("eval.model and eval.task are strings in an Inspect log")
+    run["subject"] = {"ref": _ref("model", model), "kind": "model"}
+    run["execution"] = {"targetMode": target_mode}
+    version = spec.get("task_version", 0)
+    if isinstance(version, bool) or not isinstance(version, (int, str)) or \
+            not re.fullmatch("[!-~]{1,128}", str(version)) or str(version).lower() == "latest":
+        _in("eval.task_version", f"{version!r} is not an exact version ([ENC-10])", "IN-6")
+    suite = {"ref": _ref("suite", task), "version": str(version)}
+    config = spec.get("config") or {}
+    epochs = config.get("epochs") or 1
+    if isinstance(epochs, bool) or not isinstance(epochs, int) or not 1 <= epochs <= 1000:
+        raise InputError(f"eval.config.epochs {epochs!r} is not a count of trials from 1 to 1000")
+    reducers = config.get("epochs_reducer") or []
+    if len(reducers) > 1:
+        _in("eval.config.epochs_reducer", f"{len(reducers)} reducers: a trial aggregation is one", "IN-8")
+    if "epochs" in config:
+        policy = {"trialsPerCase": epochs}
+        mapped = _from_reducer(reducers[0], epochs, "eval.config.epochs_reducer") if reducers else None
+        if mapped:
+            policy["aggregation"] = mapped[0]
+            if mapped[1] is not None:
+                policy["k"] = mapped[1]
+        suite["executionPolicy"] = policy
+    run["suite"] = suite
+    model_roles = spec.get("model_roles") or {}
+    if model_roles:
+        run["judges"] = [{"model": role.get("model")} for role in model_roles.values()]  # eval.model_roles -> judges
+    asserted = ["subject.ref", "subject.kind", "execution.targetMode", "contentCapture"]
+    if stats.get("started_at"):
+        started = _inspect_nanos(stats["started_at"], "stats.started_at")
+    else:
+        started = _inspect_nanos(spec.get("created"), "eval.created")  # the creation time stands for the start
+        asserted.append("startedAt")
+    run["startedAt"] = _timestamp(started, "the start")
+    ended = None
+    if closed:
+        if not stats.get("completed_at"):
+            _in("stats.completed_at", "a closed log without its end time: a closed run has endedAt", "IN-6")
+        ended = _inspect_nanos(stats["completed_at"], "stats.completed_at")
+        if ended < started:
+            _in("stats.completed_at", "an end before the start ([RUN-5])", "IN-6")
+        run["endedAt"] = _timestamp(ended, "the end")
+    run["contentCapture"] = capture
+    packages = spec.get("packages") or {}
+    source = f"inspect_ai {packages['inspect_ai']}" if isinstance(packages.get("inspect_ai"), str) else "inspect_ai"
+    run["imported"] = {"from": source, "asserted": asserted}
+    ext = {k: spec[k] for k in ("run_id", "eval_set_id", "dataset") if spec.get(k) is not None}
+    if results.get("headline") is not None:
+        ext["headline"] = results["headline"]
+    if ext:
+        run["ext"] = {"inspect_ai": ext}
+
+    # IN-7, IN-8: the samples' lines, then the rollups
+    scorer_of = {s.get("name"): s.get("scorer") for s in results.get("scores") or [] if isinstance(s, dict)}
+    blobs, lines, seen, trial_lines = _Blobs(), [], set(), {}
+    for n, sample in enumerate(log.get("samples") or []):
+        where = f"samples[{n}]"
+        if not isinstance(sample, dict) or isinstance(sample.get("id"), bool) or \
+                not isinstance(sample.get("id"), (int, str)):
+            raise InputError(f"{where}: a sample has an id, a number or a string")
+        case_id = _text(str(sample["id"]), "caseId", 256, where)
+        epoch = sample.get("epoch", 1)
+        if isinstance(epoch, bool) or not isinstance(epoch, int) or not 1 <= epoch <= epochs:
+            _in(where, f"epoch {epoch!r}, beyond eval.config.epochs {epochs}", "IN-8")
+        trial = epoch - 1 if epochs > 1 else None  # trial = epoch - 1, when there is more than one epoch
+        if sample.get("invalidation"):
+            _in(where, "an invalidated sample: the reference converter writes no overlays", "IN-10")
+        scores = sample.get("scores") or {}
+        failure, limit = sample.get("error"), sample.get("limit")
+        if not scores and (failure or limit):  # stopped before it was scored: a line per scorer the log names
+            scores = {s.get("name"): {"value": math.nan} for s in spec.get("scorers") or []
+                      if isinstance(s, dict) and isinstance(s.get("name"), str)}
+        if not isinstance(scores, dict) or not scores:
+            _in(where, "a sample without scores (and, for one that stopped, a log naming no scorer): its case would "
+                       "have no line", "IN-8")
+        evidence = _sample_content(sample, capture, blobs)
+        sample_lines = []
+        for path, score in scores.items():
+            _text(path, "path", 1024, f"{where}.scores")
+            evaluator = scorer_of.get(path) if isinstance(scorer_of.get(path), str) else path
+            line = inspect_line(run_id, case_id, path, trial, score, evaluator, capture, blobs,
+                                f"{where}.scores[{path!r}]")
+            key = (case_id, path, trial)
+            if key in seen:
+                _in(where, f"a second score of case {case_id!r} at {path!r}, epoch {epoch}", "IN-8")
+            seen.add(key)
+            sample_lines.append(line)
+        if failure or limit:  # samples[].error, limit -> error (not_measured for a limit), the message in reason
+            message = (failure.get("message") if isinstance(failure, dict) else failure) if failure else \
+                "limit: " + _compact(limit)
+            for line in sample_lines:
+                line["state"] = "error" if failure else "not_measured"
+                line["reason"] = str(message)[:REASON_MAX] or NO_VALUE_REASON
+                line.pop("scores", None)
+        for field, source_field in (("startedAt", "started_at"), ("endedAt", "completed_at")):
+            if sample.get(source_field):  # on the case's lines
+                stamp = _timestamp(_inspect_nanos(sample[source_field], f"{where}.{source_field}"), where)
+                for line in sample_lines:
+                    line[field] = stamp
+        first = sample_lines[0]
+        if sample.get("total_time") is not None:  # durationMs, on the sample's first line
+            seconds = sample["total_time"]
+            if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) or not seconds >= 0:
+                raise InputError(f"{where}: total_time is not a duration")
+            ms = float(Fraction(seconds) * 1000)  # rounded once
+            first["durationMs"] = int(ms) if ms.is_integer() else ms
+        model_usage = sample.get("model_usage") or {}
+        entries = []
+        for role, usage in (sample.get("role_usage") or {}).items():  # one entry per role
+            aef_role = _aef_role(role, model_roles)
+            role_model = (model_roles.get(role) or {}).get("model") if role in model_roles else \
+                model if aef_role == "agent" else None
+            entries.append(_usage_entry(aef_role, role_model if role_model in model_usage else None, usage,
+                                        f"{where}.role_usage[{role!r}]"))
+        if model in model_usage and not any(e["role"] == "agent" for e in entries):
+            entries.append(_usage_entry("agent", model, model_usage[model], f"{where}.model_usage"))
+        if entries:
+            first["usage"] = _merged(entries)
+        for line in sample_lines:
+            if evidence:
+                line["evidence"] = evidence
+            lines.append(line)
+            if trial is not None:
+                trial_lines.setdefault((case_id, line["path"]), []).append(line)
+    if epochs > 1:
+        rolled = set()
+        for i, reduction in enumerate(log.get("reductions") or []):
+            where = f"reductions[{i}]"
+            scorer = reduction.get("scorer") if isinstance(reduction, dict) else None
+            mapped = _from_reducer(reduction.get("reducer"), epochs, where) if isinstance(scorer, str) else None
+            if not mapped:
+                _in(where, f"the reducer {reduction.get('reducer') if isinstance(reduction, dict) else None!r}, "
+                           "which has no AEF trial aggregation", "IN-8")
+            for j, reduced in enumerate(reduction.get("samples") or []):
+                case_id = str(reduced.get("sample_id"))
+                trials = trial_lines.get((case_id, scorer))
+                if not trials or (case_id, scorer) in rolled:
+                    _in(f"{where}.samples[{j}]", f"a reduction of case {case_id!r} at {scorer!r} with no epochs, "
+                                                 "or a second one", "IN-8")
+                rolled.add((case_id, scorer))
+                line = inspect_line(run_id, case_id, scorer, None, reduced, trials[0]["evaluator"]["id"], capture,
+                                    blobs, f"{where}.samples[{j}]")
+                states = [t["state"] for t in trials]
+                rollup = {"n": len(trials), "passed": states.count("passed"), "aggregation": mapped[0],
+                          "agree": len(set(states)) == 1}
+                if mapped[1] is not None:
+                    rollup["k"] = mapped[1]
+                line = {**{k: v for k, v in line.items() if k in ("schemaVersion", "resultId", "caseId", "path")},
+                        "trials": rollup, **{k: v for k, v in line.items()
+                                             if k not in ("schemaVersion", "resultId", "caseId", "path")}}
+                lines.append(line)
+        if closed:
+            missing = sorted(set(trial_lines) - rolled)
+            if missing:
+                _in("reductions", f"no reduction for case {missing[0][0]!r} at {missing[0][1]!r}: every case's path "
+                                  "has a rollup in a closed run ([RES-8])", "IN-8")
+
+    # IN-9: metrics.json and summary.json
+    request, inspect_values, summary_ext = [], {}, {}
+    for i, es in enumerate(results.get("scores") or [] if closed else []):
+        where = f"results.scores[{i}]"
+        name, measures = es.get("name"), es.get("metrics") or {}
+        if not isinstance(name, str) or not isinstance(measures, dict):
+            raise InputError(f"{where}: an EvalScore has a name and metrics")
+        means = [m for m in measures if m in MEAN_METRICS]
+        others = [m for m in measures if m not in MEAN_METRICS and m != "stderr"]
+        if len(means) > 1:
+            _in(where, "both accuracy and mean: one summary entry per lane, metric and path ([SUM-9])", "IN-9")
+        entry = {"metric": name, "path": name}
+        if means:
+            chosen = means[0]
+            if others:
+                summary_ext[name] = {m: (measures[m] or {}).get("value") for m in others}
+        elif len(others) == 1:
+            chosen = others[0]
+            if not _METHOD.fullmatch(chosen):
+                _in(where, f"the metric {chosen!r} cannot be an aggregate method", "IN-9")
+            aggregate = {"method": chosen}
+            k = ((measures[chosen] or {}).get("params") or {}).get("k")
+            if isinstance(k, int) and not isinstance(k, bool) and k >= 1:
+                aggregate["k"] = k
+            entry["aggregate"] = aggregate
+            given = (measures[chosen] or {}).get("value")
+            if chosen not in aef_produce.DEFINED_AGGREGATES and isinstance(given, (int, float)) and \
+                    not isinstance(given, bool) and math.isfinite(given):
+                entry["value"] = given  # the producer's figure (SUM-8)
+        else:
+            _in(where, "no mean and not exactly one other metric", "IN-9")
+        inspect_values[name] = ((measures[chosen] or {}).get("value"), (measures.get("stderr") or {}).get("value"))
+        request.append(entry)
+    names = []
+    for line in lines:
+        names += [s["metric"] for s in line.get("scores", [])]
+    names += [e["metric"] for e in request]
+    metrics = {"schemaVersion": AEF_VERSION, "metrics": [{"id": m, "kind": "score", "direction": "none",
+                                                          "scale": "unbounded"} for m in dict.fromkeys(names)]}
+    summary = None
+    if closed:
+        summary = aef_produce.summary_of(run, metrics, lines, {"lanes": [{"lane": "main", "metrics": request}]})
+        for entry in summary["lanes"][0]["metrics"]:
+            given, stderr = inspect_values[entry["path"]]
+            given = None if isinstance(given, float) and math.isnan(given) else given
+            mine = entry["value"]
+            if (given is None) != (mine is None) or (mine is not None and (
+                    not isinstance(given, (int, float)) or abs(mine - given) > 1e-9 * max(1, abs(mine)))):
+                _in(f"results.scores {entry['path']!r}", f"Inspect gives {given!r}, the lines give {mine!r}: the "
+                                                         "summary is recomputed from the lines ([SUM-5])", "IN-9")
+            if isinstance(stderr, (int, float)) and not isinstance(stderr, bool) and math.isfinite(stderr) \
+                    and stderr >= 0:
+                entry["stderr"] = stderr
+        if not summary["lanes"][0]["metrics"]:
+            summary["lanes"] = []
+        usage = []
+        for used, totals in (stats.get("model_usage") or {}).items():  # one entry per role and model
+            role = next((_aef_role(r, model_roles) for r, c in model_roles.items() if c.get("model") == used),
+                        "agent" if used == model else "other")
+            usage.append(_usage_entry(role, used, totals, f"stats.model_usage[{used!r}]"))
+        if usage:
+            summary["usage"] = _merged(usage)
+        costs = [u["costUsd"] for u in usage if "costUsd" in u]
+        if costs:
+            summary["cost"] = {"totalUsd": float(sum((Fraction(c) for c in costs), Fraction(0)))}
+        if summary_ext:
+            summary["ext"] = {"inspect_ai": {"metrics": summary_ext}}
+
+    _check_schema("run", run, "run.json")
+    _check_schema("metrics", metrics, "metrics.json")
+    if summary is not None:
+        _check_schema("summary", summary, "summary.json")
+    for n, line in enumerate(lines, start=1):
+        _check_schema("result", line, f"results.ndjson:{n}")
+    for n, record in enumerate(blobs.records, start=1):
+        _check_schema("evidence", record, f"evidence.ndjson:{n}")
+    sealed_at = _nanos(at, "--at")
+    if closed and sealed_at < ended:
+        raise InputError("--at is before the run's end: the run is sealed after it closes ([SEAL-1])")
+
+    created = not out.exists()
+    out.mkdir(parents=True, exist_ok=True)
+    try:
+        _write_text(out / "run.json", json.dumps(run, indent=2, ensure_ascii=False) + "\n")
+        _write_text(out / "results.ndjson", "".join(_compact(line) + "\n" for line in lines))
+        _write_text(out / "metrics.json", json.dumps(metrics, indent=2, ensure_ascii=False) + "\n")
+        if summary is not None:
+            _write_text(out / "summary.json", json.dumps(summary, indent=2, ensure_ascii=False) + "\n")
+        if blobs.records:
+            _write_text(out / "evidence.ndjson", "".join(_compact(r) + "\n" for r in blobs.records))
+        for digest, data in blobs.blobs.items():
+            (out / "blobs" / "sha256" / digest[:2]).mkdir(parents=True, exist_ok=True)
+            (out / "blobs" / "sha256" / digest[:2] / digest).write_bytes(data)
+        sealed = aef_produce.seal_write(out, "ingest", _timestamp(sealed_at, "--at"))["runHash"] if closed else None
+    except BaseException:
+        if created:
+            shutil.rmtree(out, ignore_errors=True)
+        else:
+            for child in list(out.iterdir()):
+                shutil.rmtree(child) if child.is_dir() else child.unlink()
+        raise
+    return {"results": len(lines), "runHash": sealed}
+
+
 # ---------------------------------------------------------------------------- command line
 
 def dispatch(argv):
@@ -805,12 +1352,20 @@ def dispatch(argv):
     p.add_argument("run")
     p.add_argument("out")
     p.add_argument("--ignore-overlays", action="store_true", help="leave the overlays out (IN-4)")
+    p = sub.add_parser("from-inspect")
+    p.add_argument("log")
+    p.add_argument("out")
+    p.add_argument("--target-mode", required=True, help="execution.targetMode, which the log does not give")
+    p.add_argument("--content-capture", default="on", help="contentCapture: on (default) or off (IN-6)")
+    p.add_argument("--at", help="the time of the conversion (RFC 3339 UTC; default now): sealedAt")
     a = parser.parse_args(argv)
+    at = getattr(a, "at", None) or datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     if a.command == "to-otel":
         return to_otel(a.run, a.out)
     if a.command == "from-otel":
-        at = a.at or datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         return from_otel(a.logs, a.out, a.run_id, a.source, a.subject, a.subject_kind, a.target_mode, at)
+    if a.command == "from-inspect":
+        return from_inspect(a.log, a.out, a.target_mode, a.content_capture, at)
     return to_inspect(a.run, a.out, a.ignore_overlays)
 
 

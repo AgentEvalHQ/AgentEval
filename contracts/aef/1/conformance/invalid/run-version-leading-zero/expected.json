@@ -1,0 +1,11 @@
+{
+  "kind": "document",
+  "schema": "run",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "VER-1",
+    "VER-3"
+  ],
+  "why": "a minor is written without a leading zero, so a reader compares it as a number (1.00 is no version)"
+}

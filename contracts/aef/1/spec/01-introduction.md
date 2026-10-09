@@ -101,7 +101,7 @@ each; a claim names the classes, the AEF version and the corpus version it passe
 | **Overlay verifier** | Verifies the overlay chain and computes the effective view | 4.2, 4.3 |
 | **Checkpoint verifier** | Checks a checkpoint manifest, recomputes each lane's result from its sealed runs, and recomputes the decision | 5 |
 | **Decision engine** | Implements the decision function alone | 5.4 |
-| **Runner** | Accepts plans and writes event streams and sealed runs | 6 |
+| **Runner** | Accepts plans and writes event streams and sealed runs (*at risk* in 1.0, [§9.1](09-conformance.md#91-classes)) | 6 |
 | **Stream verifier** | Checks a runner's event stream against its plan | 6.4 |
 
 ## 1.8 Documents

@@ -39,7 +39,8 @@ CLASSES = {
 
 
 # Spec 09 §9.1: the classes whose requirements include others.
-INCLUDES = {"Checkpoint verifier": ["Run verifier"], "Stream verifier": ["Run verifier"], "Runner": ["Producer", "Sealer"]}
+INCLUDES = {"Run verifier": ["Reader"], "Checkpoint verifier": ["Run verifier"], "Stream verifier": ["Run verifier"],
+            "Runner": ["Producer", "Sealer"]}
 
 
 def sha(path):
@@ -112,9 +113,13 @@ def main():
 
     # Spec 09 §9.1: a class whose requirements include another class passes that class's vectors too.
     for v in vectors:
-        for outer, inner in INCLUDES.items():
-            if outer not in v["classes"] and any(c in v["classes"] for c in inner):
-                v["classes"] = v["classes"] + [outer]
+        changed = True
+        while changed:  # transitively: a Checkpoint verifier includes the Run verifier, which includes the Reader
+            changed = False
+            for outer, inner in INCLUDES.items():
+                if outer not in v["classes"] and any(c in v["classes"] for c in inner):
+                    v["classes"] = v["classes"] + [outer]
+                    changed = True
 
     ids = [v["id"] for v in vectors]
     assert len(ids) == len(set(ids)), "duplicate vector id"

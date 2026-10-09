@@ -183,8 +183,8 @@ public class WriteSideTests
         // §9.3: the four files and no other; run.json and metrics.json the scenario's, as given.
         var scenario = JsonNode.Parse(File.ReadAllBytes(scenarioFile))!;
         Assert.Equal(["metrics.json", "results.ndjson", "run.json", "summary.json"], Files(output.Dir).Keys.Order(StringComparer.Ordinal));
-        Assert.True(Same(output.Json("run.json"), scenario["run"]), output.Json("run.json").ToJsonString());
-        Assert.True(Same(output.Json("metrics.json"), scenario["metrics"]), output.Json("metrics.json").ToJsonString());
+        Assert.True(Same(RunAsWritten(output.Json("run.json")), RunAsWritten(scenario["run"]!.AsObject())), output.Json("run.json").ToJsonString());
+        Assert.True(Same(WithoutNulls(output.Json("metrics.json")), WithoutNulls(scenario["metrics"]!.AsObject())), output.Json("metrics.json").ToJsonString());
 
         // The lines, as a set: matched by case, path and trial, member by member, each valid against the writer schema.
         var lines = output.Lines("results.ndjson");
@@ -343,18 +343,24 @@ public class WriteSideTests
         Assert.Equal(["keep.txt"], Directory.GetFileSystemEntries(output.Dir).Select(Path.GetFileName));
     }
 
-    [Fact]
-    public void Produce_RefusesATimeTheWriterCannotHold_RatherThanRoundIt()
+    [Theory]
+    [InlineData("2026-10-01T00:01:00.000000001Z")]   // nine fraction digits: finer than a DateTimeOffset holds
+    [InlineData("2026-10-01T00:01:00.123456789Z")]
+    [InlineData("2026-10-01T00:01:00.0000001Z")]
+    public void Produce_WritesATimeAsGiven_AtFullPrecision(string endedAt)
     {
-        // The writer's model holds times as DateTimeOffset (100 ns): a finer [ENC-8] time would be written as another time.
+        // n2-d: [ENC-8] allows nine fraction digits, and the writer's model holds AefTime, so a scenario's time is
+        // written exactly (round 4 refused one finer than 100 ns rather than round it).
         var scenario = Scenario();
-        scenario["run"]!["endedAt"] = "2026-10-01T00:01:00.000000001Z";
+        scenario["run"]!["endedAt"] = endedAt;
+        scenario["run"]!["startedAt"] = "2026-10-01T00:00:00.999999999Z";
         using var output = new WriterRun();
 
-        Assert.Equal(2, Produce(scenario, output).Code);
-        scenario["run"]!["endedAt"] = "2026-10-01T00:01:00.0000001Z";
-        Assert.Equal(0, Produce(scenario, output).Code);
-        Assert.Equal("2026-10-01T00:01:00.0000001Z", output.Json("run.json")["endedAt"]!.GetValue<string>());
+        var (code, _, error) = Produce(scenario, output);
+
+        Assert.True(code == 0, error);
+        Assert.Equal(endedAt, output.Json("run.json")["endedAt"]!.GetValue<string>());
+        Assert.Equal("2026-10-01T00:00:00.999999999Z", output.Json("run.json")["startedAt"]!.GetValue<string>());
     }
 
     [Fact]
@@ -583,6 +589,8 @@ public class WriteSideTests
 
     // Two JSON values are the same member by member, numbers under §3.6's rule, a boolean only a boolean (as the
     // conformance runner compares a produce vector's documents and lines).
+    // §9.3's judge: numbers under §3.6's rule, times as times ([ENC-8]: two strings that are both AEF times compare as
+    // instants, at full precision), everything else as written.
     private static bool Same(JsonNode? actual, JsonNode? expected) => (actual, expected) switch
     {
         (null, null) => true,
@@ -590,19 +598,65 @@ public class WriteSideTests
         (JsonArray a, JsonArray e) => a.Count == e.Count && a.Zip(e).All(p => Same(p.First, p.Second)),
         (JsonValue a, JsonValue e) when e.GetValueKind() == System.Text.Json.JsonValueKind.Number =>
             a.GetValueKind() == System.Text.Json.JsonValueKind.Number && AefSummaryCalculator.Matches(a.GetValue<double>(), e.GetValue<double>()),
+        (JsonValue a, JsonValue e) when AsTime(a) is { } at && AsTime(e) is { } et => at == et,
         (JsonValue a, JsonValue e) => JsonNode.DeepEquals(a, e),
         _ => false,
     };
+
+    private static AefTime? AsTime(JsonValue value)
+    {
+        if (value.GetValueKind() != System.Text.Json.JsonValueKind.String)
+        {
+            return null;
+        }
+
+        try
+        {
+            return AefTime.Parse(value.GetValue<string>());
+        }
+        catch (FormatException)
+        {
+            return null;
+        }
+    }
+
+    // §9.3: a null member and none compare equal ([ENC-2]), at any depth.
+    private static JsonNode? WithoutNulls(JsonNode? node)
+    {
+        switch (node)
+        {
+            case JsonObject o:
+                var copy = new JsonObject();
+                foreach (var (name, value) in o.Where(m => m.Value is not null))
+                {
+                    copy[name] = WithoutNulls(value);
+                }
+
+                return copy;
+            case JsonArray a:
+                return new JsonArray([.. a.Select(WithoutNulls)]);
+            default:
+                return node?.DeepClone();
+        }
+    }
+
+    // run.json as §9.3 judges it: null members dropped, and a contentCapture of on is none ([RUN-11], round 5).
+    private static JsonObject RunAsWritten(JsonObject run)
+    {
+        var copy = (JsonObject)WithoutNulls(run)!;
+        if (copy["contentCapture"] is JsonValue capture && capture.GetValueKind() == System.Text.Json.JsonValueKind.String && capture.GetValue<string>() == "on")
+        {
+            copy.Remove("contentCapture");
+        }
+
+        return copy;
+    }
 
     // A result line with each absence §9.3 equates with a value written as the absence: a null parentResultId, a null
     // threshold or score, an unmeasured count of 0, an empty decisive list; decisive in any order.
     private static JsonObject AsWritten(JsonObject line)
     {
-        var copy = line.DeepClone().AsObject();
-        if (copy.ContainsKey("parentResultId") && copy["parentResultId"] is null)
-        {
-            copy.Remove("parentResultId");
-        }
+        var copy = (JsonObject)WithoutNulls(line)!;   // §9.3: a null member and none compare equal ([ENC-2])
 
         if (copy["aggregation"] is JsonObject aggregation)
         {

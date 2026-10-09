@@ -46,8 +46,6 @@ internal static class SignatureOps
             throw new UsageException(Usage);
         }
 
-        var envelope = DriverIO.Bytes(paths[0]);
-        var file = DriverIO.Bytes(paths[1]);
         TrustPolicy policy;
         try
         {
@@ -58,7 +56,9 @@ internal static class SignatureOps
             throw new UsageException($"{paths[2]}: {e.Message}");
         }
 
-        var result = DsseVerifier.Verify(envelope, file, payloadType, policy);
+        // [SIG-1]: an envelope beyond 56 MiB is malformed without being read.
+        var file = DriverIO.Bytes(paths[1]);
+        var result = DriverIO.Guard(() => DsseVerifier.VerifyFile(paths[0], file, payloadType, policy), paths[0]);
         var signatures = new JsonArray();
         foreach (var check in result.Signatures)
         {

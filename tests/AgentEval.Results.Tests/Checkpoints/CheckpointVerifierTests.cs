@@ -45,6 +45,29 @@ public sealed class CheckpointVerifierTests : IDisposable
     }
 
     [Fact]
+    public void AnEnvelopeFile_IsVerified_AndOneBeyond56Mebibytes_IsMalformedWithoutBeingRead_AndAnchorsNothing()
+    {
+        // [SIG-1] (round 5), [CKP-9]: an envelope given as a file; beyond its limit it verifies for no one.
+        var (manifest, hashes) = Decided();
+        using var signer = EcdsaP256Signer.Generate();
+        var policy = new TrustPolicy([new TrustedKey("git:alice@example.com", signer.PublicKey, null)]);
+        var envelope = DsseEnvelope.Create(Dsse.CheckpointPayloadType, manifest, signer).ToJson();
+        var file = Path.Combine(_root, "release.dsse.json");
+        File.WriteAllBytes(file, envelope);
+
+        var signed = CheckpointVerifier.Verify(manifest, AefRunStore.Open(_root), new CheckpointVerifyOptions { At = At, Policy = policy, EnvelopeFile = file });
+        Assert.Equal(["git:alice@example.com"], signed.SignedBy);
+        Assert.Equal(hashes.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal), signed.Anchors);
+
+        File.WriteAllBytes(file, [.. envelope, .. Enumerable.Repeat((byte)' ', AefLimits.MaxEnvelopeBytes + 1 - envelope.Length)]);
+        var oversized = CheckpointVerifier.Verify(manifest, AefRunStore.Open(_root), new CheckpointVerifyOptions { At = At, Policy = policy, EnvelopeFile = file });
+        Assert.Equal(DsseEnvelopeResult.Malformed, oversized.Signature!.EnvelopeResult);
+        Assert.Empty(oversized.SignedBy);
+        Assert.Empty(oversized.Anchors);
+        Assert.Empty(oversized.Problems);
+    }
+
+    [Fact]
     public void ACheckpointWithAProblem_OrSignedByNoTrustedKey_AnchorsNothing()
     {
         var (manifest, _) = Decided();
@@ -106,54 +129,79 @@ public sealed class CheckpointVerifierTests : IDisposable
     }
 
     [Theory]
-    [InlineData("le", "op", "=>")]
-    [InlineData("lt", "kind", "bayesian")]
-    public void ALaneWhoseRuleHoldsAValueThisVersionDoesNotKnow_IsUnverifiable_NotCompared(string lane, string field, string value)
+    [InlineData("le", "op", "=>", "1.1", "unverifiable")]
+    [InlineData("lt", "kind", "bayesian", "1.1", "unverifiable")]
+    [InlineData("le", "op", "=>", "1.0", "lane-result")]          // a 1.0 checkpoint cannot escape lane-result (round 5)
+    [InlineData("lt", "kind", "bayesian", "1.0", "lane-result")]
+    public void ALaneWhoseRuleHoldsAValueThisVersionDoesNotKnow_IsUnverifiable_OnlyInACheckpointOfALaterMinor(
+        string lane, string field, string value, string declared, string expected)
     {
-        // R3-2: a later minor recorded a result this version cannot recompute; the lane's result is still read (§7.3).
+        // R3-2, [CKP-8] (round 5): a later minor recorded a result this version cannot recompute; the lane's result is
+        // still read (§7.3). Only a checkpoint that declares a later minor can make the lane unverifiable: one that
+        // declares 1.0 is read as §7.3 says (the lane is not_measured) and compared as usual.
         var manifest = Corpus("threshold");
+        manifest["schemaVersion"] = declared;
         manifest["lanes"]!.AsArray().Single(l => (string?)l!["lane"] == lane)!["rule"]![field] = value;
         Lane(manifest, lane)["result"]!["status"] = "passed";
 
         var (lanes, problems) = CheckpointVerifier.Lanes(manifest, AefRunStore.Open(CorpusRuns("threshold")), At);
 
-        Assert.Equal([new AefProblem($"lanes/{lane}", "unverifiable")], problems);
+        Assert.Equal([new AefProblem($"lanes/{lane}", expected)], problems);
         Assert.Equal(LaneEvidenceStatus.NotMeasured, lanes.Single(l => l.Lane == lane).Result!.Status);
     }
 
     [Theory]
-    [InlineData("minimumShare", 0.9)]   // a member a later minor added
-    [InlineData("minimumN", 0.5)]       // a value the writer schema refuses (an integer field)
-    public void ALaneWhoseRuleIsNotValidAgainstTheWriterSchema_IsUnverifiable(string member, double value)
+    [InlineData("minimumShare", 0.9, "1.1", true)]    // a member a later minor added
+    [InlineData("minimumN", 0.5, "1.1", true)]        // a value the writer schema refuses (an integer field)
+    [InlineData("minimumShare", 0.9, "1.12", true)]
+    [InlineData("minimumShare", 0.9, "1.0", false)]   // in a 1.0 checkpoint the member is ignored (§7.3), and the lane compared
+    [InlineData("minimumN", 0.5, "1.0", false)]
+    [InlineData("minimumShare", 0.9, "1.10", true)]   // minor 10, compared as a number ([VER-1], R5N-4)
+    public void ALaneWhoseRuleIsNotValidAgainstTheWriterSchema_IsUnverifiable_OnlyInACheckpointOfALaterMinor(
+        string member, double value, string declared, bool unverifiable)
     {
-        // [CKP-8] (round 4): any rule this version's writer schema refuses, not only four fields of it.
+        // [CKP-8] (round 4): any rule this version's writer schema refuses, not only four fields of it; (round 5) in a
+        // checkpoint that declares a later minor. The corpus checkpoint's recorded results are the recomputed ones.
         var manifest = Corpus("threshold");
+        manifest["schemaVersion"] = declared;
         manifest["lanes"]!.AsArray().Single(l => (string?)l!["lane"] == "pass")!["rule"]![member] = value;
 
         var (_, problems) = CheckpointVerifier.Lanes(manifest, AefRunStore.Open(CorpusRuns("threshold")), At);
 
-        Assert.Equal([new AefProblem("lanes/pass", "unverifiable")], problems);
+        Assert.Equal(unverifiable ? [new AefProblem("lanes/pass", "unverifiable")] : [], problems);
     }
 
     [Theory]
-    [InlineData("target-mode")]           // an unknown execution.targetMode in a run of the lane
-    [InlineData("severity")]              // an unknown severity on a severity lane's line
-    [InlineData("severity-passed")]       // on a line of any state: the text names its lines, not its failures
-    [InlineData("severity-trial")]        // trial lines included
-    [InlineData("direction")]             // an unknown direction of the compared metric, in the candidate
-    [InlineData("baseline-direction")]    // or in the baseline, a found run the lane reads
-    [InlineData("baseline-target-mode")]
-    public void ALaneThatReadsAValueThisVersionDoesNotKnowInARun_IsUnverifiable_NotCompared(string what)
+    [InlineData("target-mode", "1.1", "unverifiable")]           // an unknown execution.targetMode in a run of the lane
+    [InlineData("severity", "1.1", "unverifiable")]              // an unknown severity on a severity lane's line
+    [InlineData("severity-passed", "1.1", "unverifiable")]       // on a line of any state: the text names its lines, not its failures
+    [InlineData("severity-trial", "1.1", "unverifiable")]        // trial lines included
+    [InlineData("direction", "1.1", "unverifiable")]             // an unknown direction of the compared metric, in the candidate
+    [InlineData("baseline-direction", "1.1", "unverifiable")]    // or in the baseline, a found run the lane reads
+    [InlineData("baseline-target-mode", "1.1", "unverifiable")]
+    [InlineData("target-mode", "1.0", "lane-result")]            // round 5: in a 1.0 document, read as §7.3 says: mocked, so not eligible
+    [InlineData("severity", "1.0", "lane-result")]               // critical, above the rule's max: failed
+    [InlineData("severity-passed", "1.0", null)]                 // a passed line's severity is not read: passed, as recorded
+    [InlineData("severity-trial", "1.0", "lane-result")]
+    [InlineData("direction", "1.0", "lane-result")]              // none: not measured
+    [InlineData("baseline-direction", "1.0", null)]              // the baseline's direction is not read: passed, as recorded
+    [InlineData("baseline-target-mode", "1.0", "lane-result")]   // a baseline that is not live: not measured
+    public void ALaneThatReadsAValueThisVersionDoesNotKnowInARun_IsUnverifiable_OnlyWhenTheDocumentHoldingItDeclaresALaterMinor(
+        string what, string declared, string? expected)
     {
         // [CKP-8] (round 4): recomputing the lane reads something this version does not know; whatever was recorded,
-        // the lane is unverifiable, never lane-result.
+        // the lane is unverifiable, never lane-result. (Round 5) only when the document holding the value (run.json, the
+        // result line, metrics.json) declares a later minor; one that declares 1.0 is read as §7.3 says and compared as
+        // usual, so a lie gives lane-result. The checkpoint itself declares 1.0 here.
         var run = new LaneRunBuilder("R");
         JsonObject rule = Threshold();
         var lane = (Runs: new List<string> { "R" }, Baseline: (LaneRunBuilder?)null);
         switch (what)
         {
             case "target-mode":
-                run.Score("c1", 0.9).Entry("quality", "m", "p").Run["execution"]!["targetMode"] = "live-shadow";
+                run.Score("c1", 0.9).Entry("quality", "m", "p");
+                run.Run["execution"]!["targetMode"] = "live-shadow";
+                run.Run["schemaVersion"] = declared;
                 break;
             case "severity" or "severity-passed" or "severity-trial":
                 rule = new JsonObject { ["kind"] = "severity", ["max"] = "low", ["path"] = "a" };
@@ -166,6 +214,7 @@ public sealed class CheckpointVerifierTests : IDisposable
                     run.Line("c1", "a", what == "severity" ? "failed" : "passed", severity: "info");
                 }
 
+                run.Results.First(l => (string?)l["severity"] == "info")["schemaVersion"] = declared;
                 break;
             default:
                 var baseline = new LaneRunBuilder("B", "v6");
@@ -179,10 +228,12 @@ public sealed class CheckpointVerifierTests : IDisposable
                 if (what.EndsWith("direction", StringComparison.Ordinal))
                 {
                     unknown.Metrics["metrics"]![0]!["direction"] = "target_band";
+                    unknown.Metrics["schemaVersion"] = declared;
                 }
                 else
                 {
                     unknown.Run["execution"]!["targetMode"] = "live-shadow";
+                    unknown.Run["schemaVersion"] = declared;
                 }
 
                 lane.Baseline = baseline;
@@ -200,11 +251,28 @@ public sealed class CheckpointVerifierTests : IDisposable
             };
         }
 
-        var manifest = DecidedOneLane(rule, ("R", hash), new JsonObject { ["status"] = "passed", ["subjectVersion"] = "v7", ["oldestClosedAt"] = At });
+        var recorded = new JsonObject { ["status"] = "passed", ["subjectVersion"] = "v7", ["oldestClosedAt"] = "2026-10-05T00:00:00Z" };
+        var manifest = DecidedOneLane(rule, ("R", hash), recorded);
 
         var (_, problems) = CheckpointVerifier.Lanes(manifest, AefRunStore.Open(_root), At);
 
-        Assert.Equal([new AefProblem("lanes/l", "unverifiable")], problems);
+        Assert.Equal(expected is null ? [] : [new AefProblem("lanes/l", expected)], problems);
+    }
+
+    [Fact]
+    public void ALaterMinorCheckpoint_DoesNotMakeAnUnknownRunSideValueInA10RunUnverifiable()
+    {
+        // [CKP-8] (round 5): each value is judged by the document that holds it. A checkpoint of 1.1 over a run.json of
+        // 1.0 holding an unknown target mode: the run is read as §7.3 says (mocked: not eligible), and the lane compared.
+        var run = new LaneRunBuilder("R").Score("c1", 0.9).Entry("quality", "m", "p");
+        run.Run["execution"]!["targetMode"] = "live-shadow";
+        var hash = LaneRunBuilder.RunHashOf(run.Write(_root));
+        var manifest = DecidedOneLane(Threshold(), ("R", hash), new JsonObject { ["status"] = "passed", ["subjectVersion"] = "v7", ["oldestClosedAt"] = "2026-10-05T00:00:00Z" });
+        manifest["schemaVersion"] = "1.1";
+
+        var (_, problems) = CheckpointVerifier.Lanes(manifest, AefRunStore.Open(_root), At);
+
+        Assert.Equal([new AefProblem("lanes/l", "lane-result")], problems);
     }
 
     [Fact]

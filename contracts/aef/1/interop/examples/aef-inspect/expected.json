@@ -1,18 +1,59 @@
 {
-  "direction": "AEF → Inspect",
+  "direction": "AEF → Inspect → AEF",
   "page": "inspect.md",
-  "sections": ["AEF → Inspect", "What does not carry over", "Worked example"],
-  "description": "The corpus run conformance/valid/completed-eval (copied to input/), the run of the OpenTelemetry round trip, as one Inspect EvalLog in .json form (inspect.json). Six samples, one per case, epoch 1; each line's score under its path, the typed absences and the inconclusive line without a score as NaN with the state in reason (IN-2); the AEF facts the table sends to Score.metadata under metadata.aef; usage per role and per model; the summary as results.scores (IN-3); the eval header Inspect requires (IN-1). Its overlays are left out (--ignore-overlays): the page refuses overlays (IN-4), and without the flag the converter refuses the run.",
+  "sections": ["AEF → Inspect", "Inspect → AEF", "What does not carry over", "Worked example"],
+  "description": "The corpus run conformance/valid/completed-eval (copied to input/), the run of the OpenTelemetry round trip, as one Inspect EvalLog in .json form (inspect.json), and back as a new run (run/), sealed as ingest. Six samples, one per case, epoch 1; each line's score under its path, the typed absences and the inconclusive line without a score as NaN with the state in reason (IN-2); the AEF facts the table sends to Score.metadata under metadata.aef; usage per role and per model; the summary as results.scores (IN-3); the eval header Inspect requires (IN-1). Its overlays are left out (--ignore-overlays): the page refuses overlays (IN-4), and without the flag the converter refuses the run. The trip keeps the result ids, the case, the path, each score's value, the reasoning blob, the root's duration, and the run's id, status, times, suite and trials per case; it loses exactly the page's AEF → Inspect list.",
   "steps": [
-    {"args": ["to-inspect", "input", "{out}", "--ignore-overlays"], "expected": "inspect.json"}
+    {"args": ["to-inspect", "input", "{out}", "--ignore-overlays"], "expected": "inspect.json"},
+    {"args": ["from-inspect", "inspect.json", "{out}", "--target-mode", "live", "--at", "2026-10-09T00:00:00Z"], "expected": "run"}
   ],
   "refusals": [
     {"args": ["to-inspect", "input", "{out}"], "says": "IN-4"}
   ],
-  "runs": {"input": "intact"},
+  "runs": {"input": "intact", "run": "intact"},
+  "roundTrip": {
+    "original": "input",
+    "result": "run",
+    "match": "resultId",
+    "listsCovered": ["AEF → Inspect"],
+    "kept": [
+      {"fields": ["results:resultId"], "page": "RES-4 then gives the same three ids as the corpus"},
+      {"fields": ["results:caseId"], "page": "| a result line's `caseId` | `samples[].id` | exact |"},
+      {"fields": ["results:path"], "page": "| `path` | the key in `samples[].scores` | exact |"},
+      {"fields": ["results:scores[].value"], "page": "| `scores[0].value` | `Score.value` | exact for one score"},
+      {"fields": ["results:durationMs"], "page": "| `durationMs` | `samples[].total_time` (seconds) | exact |"},
+      {"fields": ["run.json:runId"], "page": "| `runId` | `eval.eval_id` and `eval.run_id` | exact |"},
+      {"fields": ["run.json:status"], "page": "| `status` | `completed` → `success`"},
+      {"fields": ["run.json:startedAt", "run.json:endedAt"], "page": "| `startedAt`, `endedAt` | `eval.created`, `stats.started_at`, `stats.completed_at` | exact |"},
+      {"fields": ["run.json:suite.ref", "run.json:suite.version"], "page": "| `suite.ref`, `suite.version` | `eval.task`, `eval.task_version` | exact |"},
+      {"fields": ["run.json:suite.executionPolicy.trialsPerCase"], "page": "| `suite.executionPolicy.trialsPerCase` | `eval.config.epochs` | exact |"}
+    ],
+    "lost": [
+      {"list": "AEF → Inspect", "item": "The state:", "fields": ["results:state"]},
+      {"list": "AEF → Inspect", "item": "A typed absence's reason", "fields": ["results:reason"]},
+      {"list": "AEF → Inspect", "item": "The result tree", "fields": ["results:parentResultId", "results:component", "results:aggregation", "results:severity", "results:verdictRule", "run.json:config.thresholds"], "absent": ["results:uncertainty"]},
+      {"list": "AEF → Inspect", "item": "Evaluator and annotator identity", "fields": ["results:evaluator", "results:annotator"]},
+      {"list": "AEF → Inspect", "item": "A score's metric and `normalized` value", "fields": ["results:scores[].metric", "results:scores[].normalized"], "absent": ["results:scores[].label"]},
+      {"list": "AEF → Inspect", "item": "A line's `turns`, `attack` and `lane`.", "fields": ["results:turns"], "absent": ["results:attack", "results:lane"]},
+      {"list": "AEF → Inspect", "item": "Which line of a case a `usage` entry was on", "fields": ["results:usage"]},
+      {"list": "AEF → Inspect", "item": "The times and duration of a line that is not the case's root.", "fields": ["results:startedAt", "results:endedAt"]},
+      {"list": "AEF → Inspect", "item": "A rollup's `n`, `passed` and `agree`", "absent": ["results:trials", "results:trial"]},
+      {"list": "AEF → Inspect", "item": "Evidence links and digests", "fields": ["results:evidence", "results:traceLink", "file:evidence.ndjson", "file:blobs", "file:traces.otlp.jsonl", "file:gates.ndjson"]},
+      {"list": "AEF → Inspect", "item": "The seal, signatures and the overlay chain", "fields": ["file:seal.json", "file:overlays"], "absent": ["file:attestation.dsse.json"]},
+      {"list": "AEF → Inspect", "item": "The summary (its lanes,", "fields": ["file:summary.json", "file:metrics.json"]},
+      {"list": "AEF → Inspect", "item": "The rest of `run.json`", "fields": ["run.json"]}
+    ],
+    "added": [
+      {"fields": ["results:reasoning"], "page": "| `Score.explanation` | `reason`, or a `reasoning` blob when `contentCapture` is `on` | exact |"},
+      {"fields": ["results:ext"], "page": "| `Score.answer`, `Score.metadata` | `ext` | none |"},
+      {"fields": ["run.json:imported"], "page": "names the converter in `producer` and the source in `imported`"},
+      {"fields": ["run.json:ext.inspect_ai"], "page": "| `eval.run_id`, `eval.eval_set_id` | `ext` | none |"}
+    ]
+  },
   "pageBlocks": [
     {"page": "inspect.md", "section": "Worked example", "block": 1, "equals": {"file": "input/results.ndjson", "line": 2}},
     {"page": "inspect.md", "section": "Worked example", "block": 2, "equals": {"file": "inspect.json", "pointer": "/samples/0", "drop": ["/scores/triage~1groundedness"]}},
-    {"page": "inspect.md", "section": "Worked example", "block": 3, "equals": {"file": "inspect.json", "pointer": "/samples/0/scores/triage~1groundedness", "member": "triage/groundedness"}}
+    {"page": "inspect.md", "section": "Worked example", "block": 3, "equals": {"file": "inspect.json", "pointer": "/samples/0/scores/triage~1groundedness", "member": "triage/groundedness"}},
+    {"page": "inspect.md", "section": "Worked example", "block": 4, "equals": {"file": "run/results.ndjson", "line": 2}}
   ]
 }

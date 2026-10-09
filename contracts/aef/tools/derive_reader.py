@@ -55,7 +55,7 @@ def derive(node, strict=False, file="", pointer=""):
             out["type"] = node["type"] if isinstance(node.get("type"), list) else ["string", "null"] if None in value else "string"
         elif key == "const" and value == "1.0":
             out["type"] = "string"
-            out["pattern"] = "^1[.][0-9]+$"  # any minor of the known major ($: end of input, ENC-15)
+            out["pattern"] = "^1[.](0|[1-9][0-9]*)$"  # any minor of the known major, no leading zero (VER-1)
         elif key in ("if", "not"):
             out[key] = derive(value, True, file, f"{pointer}/{key}")
         elif key == "oneOf" and isinstance(value, list) and value and all(kind_of(b) for b in value):

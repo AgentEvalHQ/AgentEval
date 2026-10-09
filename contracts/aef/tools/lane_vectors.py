@@ -57,14 +57,14 @@ def summarize(lines, lane, entries, kinds):
 def make_run(folder, run_id, lines, *, lane="quality", metrics=(("m", "score", "higher_better"),), entries=(("m", "p"),),
              version=VERSION, mode="live", status="completed", ended="2026-10-01T12:00:00Z", judges=JUDGES,
              sealed=True, tamper=False, break_summary=False, subject_ref=SUBJECT, deployment=None, suite=SUITE,
-             aggregate=None, more_lanes=()):
+             aggregate=None, more_lanes=(), schema_version=V):
     """A small run. lines: dicts with case, path, state and optionally scores, severity, trial, trials, reason.
     Returns (runId, runHash)."""
     run_dir = folder / run_id
     subject = {"ref": subject_ref, "kind": "agent"}
     if version is not None:
         subject["version"] = version
-    run = {"schemaVersion": V, "runId": run_id, "status": status, "producer": {"name": "agenteval-cli", "version": "1.0.0"},
+    run = {"schemaVersion": schema_version, "runId": run_id, "status": status, "producer": {"name": "agenteval-cli", "version": "1.0.0"},
            "subject": subject, "execution": {"targetMode": mode}, "suite": suite, "judges": judges,
            "startedAt": "2026-09-01T00:00:00Z", "endedAt": ended}
     if deployment is not None:
@@ -73,7 +73,7 @@ def make_run(folder, run_id, lines, *, lane="quality", metrics=(("m", "score", "
         run["abortReason"] = "Stopped by the operator."
     full = []
     for l in lines:
-        line = {"schemaVersion": V, "resultId": result_id(run_id, l["case"], l["path"], l.get("trial")), "caseId": l["case"],
+        line = {"schemaVersion": schema_version, "resultId": result_id(run_id, l["case"], l["path"], l.get("trial")), "caseId": l["case"],
                 "path": l["path"], "evaluator": {"id": "code:check"}, "state": l["state"]}
         for k in ("lane", "trial", "trials", "severity", "scores", "reason"):
             if k in l:
@@ -91,10 +91,10 @@ def make_run(folder, run_id, lines, *, lane="quality", metrics=(("m", "score", "
         summary["lanes"][0]["metrics"][0].update(aggregate=aggregate[0], value=aggregate[1])
     write_json(run_dir / "run.json", run)
     write_ndjson(run_dir / "results.ndjson", full)
-    write_json(run_dir / "metrics.json", {"schemaVersion": V, "metrics": [
+    write_json(run_dir / "metrics.json", {"schemaVersion": schema_version, "metrics": [
         {"id": m, "kind": k, "direction": d, "scale": "unbounded" if k in ("duration", "count") else {"min": 0, "max": 1},
          **({"unit": "ms"} if k == "duration" else {})} for m, k, d in metrics]})
-    write_json(run_dir / "summary.json", {"schemaVersion": V, "runId": run_id, **summary})
+    write_json(run_dir / "summary.json", {"schemaVersion": schema_version, "runId": run_id, **summary})
     the_hash = run_hash(run_dir)
     if sealed:
         assert seal(run_dir, run, "producer", sealed_at="2026-10-07T00:00:00Z") == the_hash
@@ -111,12 +111,12 @@ def scores(**kv):
 
 # ---------------------------------------------------------------------------- checkpoints
 
-def checkpoint(folder, lanes, recorded, *, state="decided", deployment=None):
+def checkpoint(folder, lanes, recorded, *, state="decided", deployment=None, version=V):
     """lanes: (name, rule, [(runId, runHash)], blocking). recorded: lane -> the result the manifest's decisionInput
     records for it (None for no evidence)."""
     manifest_lanes = [{"lane": name, "rule": rule, "runs": [{"runId": r, "runHash": hh, "origin": "launched"} for r, hh in runs],
                        "blocking": blocking} for name, rule, runs, blocking in lanes]
-    cp = {"schemaVersion": V, "checkpointId": "cp_" + hashlib.sha256(str(folder.name).encode()).hexdigest()[:12],
+    cp = {"schemaVersion": version, "checkpointId": "cp_" + hashlib.sha256(str(folder.name).encode()).hexdigest()[:12],
           "subject": {"ref": SUBJECT, "version": VERSION, **({"deployment": deployment} if deployment else {})},
           "lanes": manifest_lanes, "state": state, "outcome": None}
     if state == "decided":
@@ -143,11 +143,11 @@ def res(status, oldest, version=VERSION, axes=None):
     return r
 
 
-def vector(name, build, deployment=None):
+def vector(name, build, deployment=None, version=V):
     folder = OUT / name
     runs = folder / "runs"
     lanes, results, problems, rules, recorded = build(runs)
-    checkpoint(folder, lanes, recorded if recorded is not None else results, deployment=deployment)
+    checkpoint(folder, lanes, recorded if recorded is not None else results, deployment=deployment, version=version)
     expect(folder, lanes, results, problems, rules)
 
 
@@ -518,9 +518,10 @@ def v_reads_unknown(runs):
     T = "2026-10-03T00:00:00Z"
     ok = dict(metrics=(("ok", "rate", "higher_better"),), entries=(("ok", "a"),), lane="security", ended=T)
     severity = make_run(runs, "RU-severity", [dict(case="c1", path="a", state="passed"),
-                                              dict(case="c2", path="a", state="failed", severity="info")], **ok)
+                                              dict(case="c2", path="a", state="failed", severity="info")], **ok,
+                        schema_version="1.1")
     mode = make_run(runs, "RU-mode", [dict(case="c1", path="p", state="passed", scores=scores(m=1.0))], mode="live-shadow",
-                    ended=T)
+                    ended=T, schema_version="1.1")
     plain = make_run(runs, "RU-plain", [dict(case="c1", path="p", state="passed", scores=scores(m=1.0))], ended=T)
     base = comparison_runs(runs)["B"]
     direction = make_run(runs, "RU-direction",
@@ -528,7 +529,8 @@ def v_reads_unknown(runs):
                           for i in range(1, 24)],
                          lane="memory", metrics=(("recall", "score", "target_band"), ("latency", "duration", "lower_better"),
                                                  ("tokens", "count", "none")),
-                         entries=(("recall", "mem"), ("latency", "mem"), ("tokens", "mem")), ended="2026-10-06T00:00:00Z")
+                         entries=(("recall", "mem"), ("latency", "mem"), ("tokens", "mem")), ended="2026-10-06T00:00:00Z",
+                         schema_version="1.1")
     lanes = [("severity-unknown", {"kind": "severity", "max": "low"}, [severity], True),       # info: below low in 1.1
              ("target-mode-unknown", threshold("quality", ">=", 0.5), [mode], True),            # live-shadow: live in 1.1
              ("rule-member-unknown", dict(threshold("quality", ">=", 0.5), minimumShare=0.9), [plain], True),
@@ -541,6 +543,16 @@ def v_reads_unknown(runs):
                "rule-member-unknown": res("passed", T), "direction-unknown": res("not_measured", "2026-10-06T00:00:00Z")}
     problems = [[f"lanes/{name}", "unverifiable"] for name in recorded]
     return lanes, results, problems, ["CKP-8", "VER-8"], recorded
+
+
+def v_declared_version(runs):
+    """CKP-8, VER-6 (R5-4): a checkpoint that declares 1.0 cannot claim unverifiable with a member nobody defined: it is
+    read as 1.0 reads it, the member ignored, and its false recorded result is lane-result."""
+    T = "2026-10-03T00:00:00Z"
+    plain = make_run(runs, "DV-plain", [dict(case="c1", path="p", state="passed", scores=scores(m=1.0))], ended=T)
+    lanes = [("junk-member", dict(threshold("quality", ">=", 0.5), minimumShare=0.9), [plain], True)]
+    return (lanes, {"junk-member": res("passed", T)}, [["lanes/junk-member", "lane-result"]], ["CKP-8", "VER-6"],
+            {"junk-member": res("failed", T)})
 
 
 def v_comparison_unknown_axis(runs):
@@ -586,11 +598,12 @@ def main():
     vector("evidence-present", v_evidence_present)
     vector("eligibility", v_eligibility)
     vector("comparison", v_comparison)
-    vector("comparison-unknown-axis", v_comparison_unknown_axis)
+    vector("comparison-unknown-axis", v_comparison_unknown_axis, version="1.1")
     vector("aggregates", v_aggregates)
     vector("severity-scope", v_severity_scope)
-    vector("severity-max-unknown", v_severity_max_unknown)
-    vector("reads-unknown", v_reads_unknown)
+    vector("severity-max-unknown", v_severity_max_unknown, version="1.1")
+    vector("reads-unknown", v_reads_unknown, version="1.1")
+    vector("declared-version", v_declared_version)
     vector("comparison-large", v_comparison_large)
     vector("binding", v_binding, deployment="deployment:shop/assistant@prod")
     vector("recorded-differs", v_recorded_differs)

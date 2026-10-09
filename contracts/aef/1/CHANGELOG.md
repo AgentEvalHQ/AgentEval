@@ -1,5 +1,44 @@
 # AEF 1.0 changelog
 
+## Unreleased (draft): rework after critic round 5
+
+Critic round 5 scored 8.8 of 10 (from 8.6). Changes since:
+
+- **Nothing under `overlays/` is a problem of the run** ([RUN-3], [OVL-5], §4.5): a badly named file there (a
+  `.DS_Store`, a name with a space) is the chain's `unexpected-file`, never a `path` problem that invalidates the
+  run; more than 19,999 files is `limit` once, and the chain is still checked from the files it names, so no number of
+  junk files voids a signed redaction.
+- **An oversized envelope is malformed, never a problem of the run** ([SIG-1], [ENC-18], §4.5): beyond 56 MiB an
+  envelope verifies for no one; an attestation then signs for no one, a batch signature authorizes nothing, an
+  orphan one changes nothing. The two implementations had split on it (W3-21).
+- **Only a later minor can claim `unverifiable`** ([CKP-8], [VER-6]): a document that declares 1.0 is read as 1.0
+  reads it, so a member nobody defined cannot turn a false recorded result from `lane-result` into `unverifiable`.
+- **The rollup tree follows the trial trees** ([RES-8]): a rollup's parent is the rollup at its trial lines' parents'
+  path; a path's spelling decides nothing (`q/x` may be a root of its own).
+- **The trust policy has a version** ([SIG-4]): an optional `schemaVersion` `1.0`; a later one is refused. Keyless
+  signing is left to a later minor.
+- **Smaller**: a ref's name that is exactly `-` is `%2D`, and a ref's kind is at most 32 characters ([ENC-13]); the
+  Runner class is marked *at risk* in §1.7 too; the Run verifier includes the Reader's vectors (§9.1); a generated
+  vector's paths are relative and stay inside (§9.2.1); OVL-5 no longer says a crash line always reads as
+  `event-invalid`; the producer guide writes the summary before closing the run ([RUN-4]); the `produce` judge takes
+  an absent `contentCapture` as `on` ([RUN-11]).
+- **Interop** (informative): the Inspect → AEF direction is now built and checked (R5-9).
+  - `tools/aef_interop.py from-inspect` converts an Inspect eval log into an imported run, sealed as `ingest`, with
+    what it supplies in `imported.asserted`. Writing it from `inspect.md` alone settled what the table left open, as
+    rules and stated refusals of the page (IN-6 to IN-10, settled 10-09): the run header; values the table does not
+    place (a map, NaN without a reason, a list); samples (epochs as trials, reductions as rollups, a sample that
+    failed before it was scored, usage and case content); the summary, recomputed from the lines and compared with
+    Inspect's; and overlays, which the converter does not write.
+  - New checked examples: a hand-written Inspect log (`interop/examples/inspect-aef/`, with content kept and not, and
+    nine refused inputs), and AEF → Inspect → AEF on `completed-eval` and `running-trials`. The first trip keeps the
+    result ids and is checked field by field against the page's loss list, now bullets, which gained trace links;
+    the worked example shows the way back.
+- **Vectors**: at their values, a 40 MiB seal, a 4 MiB results line and a 56 MiB envelope; one byte beyond, an
+  envelope, an attestation, a batch signature and an orphan one; junk files under `overlays/`, by name and by number;
+  a batch beyond what a reader reads (R4N-2); 1,000,000 lines and an unfinished one (R4N-3); a 1.0 checkpoint with a
+  member nobody defined; independent roots in trials; a versioned and a later-versioned trust policy; a `produce`
+  run without `contentCapture`, and one with times to the nanosecond.
+
 ## Unreleased (draft): rework after critic round 4
 
 Critic round 4 scored 8.6 of 10 (from 8.4), with no blocker: every round-3 finding but the patent commitment
@@ -81,7 +120,7 @@ Written into the text in the round-3 rework, listed here for the record:
 - **Runs** ([RES-6], §3.9, [OVL-2]): `total` counts distinct child ids; a second rollup for one case and path is
   `trials` at the later rollup only; a `results.ndjson` with only schema problems still gets the overlay `target`
   check; the `document` operation takes the limit of its schema's file; a file beyond a limit is `limit` whatever
-  else is wrong with it; an envelope beyond 56 MiB is `limit`.
+  else is wrong with it; an envelope beyond 56 MiB is `limit` (changed in round 5: it is `malformed`, [SIG-1]).
 - **Streams and plans** ([STRM-3], [STRM-4]): a stream line beyond the limits is `event-invalid`; a job's costs are
   summed exactly, rounded once, then compared with `maxUsd`.
 - **Checkpoints and lanes** ([CKP-7], [CKP-8], [LANE-1]–[LANE-9], [LANE-6]): a lane on one side of the decision input

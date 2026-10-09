@@ -167,22 +167,105 @@ The converted run names the converter in `producer` and the source in `imported`
 | `results.headline` | `ext` | none |
 | `stats.model_usage`, `role_usage` (run totals) | `summary.json` `usage`: one entry per role and model, tokens named as on the result lines and `total_cost` as `costUsd` ([SUM-7](../spec/03-run.md#36-summaryjson)); the role from `eval.model_roles`, `agent` for `eval.model`; `cost.totalUsd`, the sum of `total_cost` | lossy: Inspect's role names become `agent`, `judge`, `attacker` or `other`; two roles that become one AEF role with the same model are added together ([SUM-9](../spec/03-run.md#36-summaryjson)) |
 
+The reference converter, `tools/aef_interop.py from-inspect`, follows the table and these rules (settled 10-09):
+
+- **The run header** (IN-6). `runId` is `eval.eval_id` (or `eval.run_id`). `startedAt` is `stats.started_at`, or
+  `eval.created` when the log has none (then listed in `imported.asserted`); `endedAt` is `stats.completed_at`.
+  `abortReason` is `error.message`. `imported.from` is `inspect_ai` and the version `eval.packages` gives, or
+  `inspect_ai` alone. The names of `suite.ref` and `subject.ref` are encoded as
+  [ENC-13](../spec/02-encoding.md#24-identifiers-and-names) says, and `suite.version` is `eval.task_version` as text
+  (Inspect's default is 0). `execution.targetMode` and `contentCapture` come from the person converting (`on` unless
+  asked otherwise); both are listed in `imported.asserted`, with `subject.ref` and `subject.kind`. `eval.run_id`,
+  `eval.eval_set_id`, `eval.dataset` and `results.headline` go to `run.json`'s `ext."inspect_ai"`. A `started` log
+  gives a running run, which is not sealed: only a closed run is ([SEAL-1](../spec/04-integrity.md#41-sealing-a-run)).
+- **Scores** (IN-7). A score's metric is its key; a map member's metric is the member's key, a letter `C`, `I`, `P`
+  or `N` in a map is the value its row gives with the letter as label, and a map's line is `scored`. NaN with
+  `grader_failed` or `scoring_failed` is `error`; NaN with any other reason, or none, is `not_measured`; the three
+  reasons that blame the model make the line `failed` whatever its value. A line's `reason` is the `Score.reason`
+  name, or "Inspect recorded no value (NaN) and no reason" for an unscored value without one. A list value goes to
+  the line's `ext`, and the line is `scored` without a score. `Score.answer` and `Score.metadata` go to the line's
+  `ext."inspect_ai"`, so the `metadata.aef` of an AEF export comes back as data, not as the line's state.
+  `evaluator.id` is the `scorer` of the `results.scores` entry named like the key, or the key itself. With
+  `contentCapture: off`, the explanation and `Score.answer` are left out: a run that keeps no content keeps no judge
+  reasoning and no response, in `reason` or `ext` either ([RUN-11](../spec/03-run.md#32-runjson)), and the
+  `Score.explanation` row yields to it.
+- **Samples** (IN-8). `trial` is `epoch` − 1 when `eval.config.epochs` is above 1. A sample's times go on each of its
+  lines; its `total_time` (as `durationMs`) and its usage go on its first line. The usage is one entry per
+  `role_usage` role (`agent`, `judge` and `attacker` as they are, a role of `eval.model_roles` as `judge`, any other
+  as `other`), with the role's model when the sample's `model_usage` has it; and an `agent` entry from `model_usage`
+  under `eval.model` when no role is the agent. A sample with `error` or `limit` puts each of its lines in `error`
+  (`not_measured` for a limit), without scores, with the message in `reason`; one that stopped before it was scored
+  gets a line per scorer of `eval.scorers`. With `contentCapture: on`, `input`, `target`, `output` (when it has
+  choices) and `messages` are blobs, as written when they are text and as compact JSON otherwise, cited by every line
+  of the sample, one evidence record per kind and content. With more than one epoch, each reduction gives the case's
+  rollup at its scorer: the reduced score read as a sample's is, `trials.aggregation` and `k` from its reducer.
+- **The summary** (IN-9). One lane, `main`. Each `results.scores` entry gives one summary entry at its name for the
+  metric of that name: its `accuracy` or `mean` is the entry's mean, and any other metric beside it goes to
+  `summary.json`'s `ext."inspect_ai"`; without a mean, its one other metric is the entry's `aggregate`. `N`, `n`,
+  `notMeasured`, `sum` and the value are computed from the lines ([SUM-5](../spec/03-run.md#36-summaryjson)), and
+  `stderr` is Inspect's. Every metric a line or the summary names is declared with kind `score`, direction `none`
+  and scale `unbounded`.
+
+**Refused** (IN-6 to IN-10; settled 10-09). The converter refuses these, naming the rule, and writes nothing:
+
+- an `eval_id` that is not an AEF id; a time without an offset; a closed log without `stats.completed_at`, or one
+  that ends before it starts; an `error` log without a message (IN-6);
+- a value that is a boolean, or a string other than `C`, `I`, `P` and `N` (IN-7);
+- more than one epochs reducer; an epoch beyond `eval.config.epochs`; a sample without scores (or, for one that
+  stopped, in a log that names no scorer); two scores of one case, path and epoch; a reducer without an AEF value, a
+  reduction with no epoch lines, and, in a closed log, a case's path with epoch lines and no reduction
+  ([RES-8](../spec/03-run.md#344-repeated-trials)) (IN-8);
+- a `results.scores` entry with both `accuracy` and `mean`, or with no mean and more than one other metric, or whose
+  metric cannot be an `aggregate` method; and a mean, median, minimum or maximum Inspect gives that the lines do
+  not (IN-9);
+- `Score.history` edits, `samples[].invalidation` and `log_updates`: the table makes them overlay events, and the
+  reference converter writes no overlays (IN-10).
+
+[`examples/inspect-aef/`](examples/inspect-aef/) imports a hand-written log, and holds refused inputs for each item of
+this list.
+
 ## What does not carry over
 
-**AEF → Inspect.** Which typed absence a result was: Inspect has one unscored value. The states `warn`,
-`inconclusive` and `scored`, except as metadata. The result tree and its aggregation, severity, verdict rules,
-thresholds and uncertainty. Evidence links and digests, traces, gate decisions. The seal, signatures and the overlay
-chain: an Inspect log is mutable. `execution.targetMode`, judge calibration, `imported`. The case content, unless the
-run captured it. What no row of the table routes, found by the reference converter: a line's `turns`, `attack` and
-`lane`, a score's `normalized` value, a usage entry's `costSource`, a rollup's `n`, `passed` and
-`agree`, and the times and duration of a line that is not the case's root; the summary's `sum`, `sumSq` and `cost`;
-in `run.json`, the subject's version, environment and telemetry, `producer.runtime`, the judges' `provider` and
-`mode`, `suite.frozen`, `requirePasses`, `config`, `otel`, `costPolicy`, `provenance` and `ext`.
+[`examples/aef-inspect/`](examples/aef-inspect/) takes a corpus run to Inspect and back, and `tools/check_interop.py`
+checks, field by field, that what the trip loses is what the first list says.
 
-**Inspect → AEF.** List-valued scores. Reducers without an AEF value (`at_least` for a k other than 1 or all,
-`pass_k`, `collect`). `working_time`. Inspect's event transcript as structured events. Groups of runs (`eval_set_id`:
-AEF has no field for a group of sibling runs, [Gaps](README.md#gaps-found-by-these-mappings)). Inspect's role names
-beyond the four AEF roles. The case content, when the converter writes `contentCapture: off`.
+**AEF → Inspect.**
+
+- The state: Inspect has no verdict, and one unscored value, NaN, for every typed absence. The table keeps the state
+  in `Score.metadata`, which comes back as `ext` (IN-7): a number comes back `scored`, NaN `not_measured`, `error` or
+  `failed`.
+- A typed absence's reason: it travels as the explanation, and comes back as a `reasoning` blob (not at all with
+  `contentCapture: off`), with the state's name as `reason`.
+- The result tree and its aggregation, severity, verdict rules, thresholds and uncertainty.
+- Evaluator and annotator identity: an evaluator comes back as its scorer (IN-7).
+- A score's metric and `normalized` value: a single score's metric comes back as its key, the path (IN-7).
+- A line's `turns`, `attack` and `lane`.
+- Which line of a case a `usage` entry was on, and its `costSource`: Inspect keeps a sample's usage per role and per
+  model, and it comes back on the sample's first line (IN-8).
+- The times and duration of a line that is not the case's root.
+- A rollup's `n`, `passed` and `agree`: they come back counted from the epochs' lines.
+- Evidence links and digests, and the case content unless the run captured it; traces and trace links; gate
+  decisions.
+- The seal, signatures and the overlay chain: an Inspect log is mutable.
+- The summary (its lanes, `sum`, `sumSq`, verdicts, rules and `cost`) and the metric declarations: they come back
+  recomputed from the lines, in one lane `main`, with every metric of kind `score` (IN-9).
+- The rest of `run.json`: the subject but its ref (which comes back as `model:<ref>`, IN-6), the producer, the
+  deployment, `execution`, the judges but their models, `imported`, the suite's digest and `frozen`, `requirePasses`,
+  `config`, `otel`, `costPolicy`, `provenance`, `contentCapture` and `ext`.
+
+**Inspect → AEF.**
+
+- List-valued scores, kept in `ext` (IN-7).
+- Reducers without an AEF value (`at_least` for a k other than 1 or all, `pass_k`, `collect`): refused with more than
+  one epoch (IN-8).
+- `working_time`.
+- Inspect's event transcript as structured events.
+- Groups of runs (`eval_set_id`, kept in `ext`: AEF has no field for a group of sibling runs,
+  [Gaps](README.md#gaps-found-by-these-mappings)).
+- Inspect's role names beyond the four AEF roles.
+- The case content, when the converter writes `contentCapture: off`.
+- A sample's `metadata`, `eval.metadata`, the plan and the solver.
+- `Score.explanation` and `Score.answer`, when the converter writes `contentCapture: off` (IN-7).
 
 ## Worked example
 
@@ -241,8 +324,14 @@ NaN token, which is not JSON, so it is shown apart:
 
 Read back, `id` gives `caseId` `case-17`, each score key gives the `path`, and a single epoch gives no `trial`. RES-4
 then gives the same three ids as the corpus: `r_479d157f3423e95d566bcbfc0c6d2461`, `r_bb4438fbedb43552a9fe55695931d5e4`
-and `r_1264eeb36620c9cbe97b71ffdbcfd331`. The states come back only from `metadata.aef`. Without it, the three numeric
-values read as `scored`.
+and `r_1264eeb36620c9cbe97b71ffdbcfd331`. The converter reads `Score.metadata` as `ext` (IN-7), so the three numeric
+values come back `scored`, with the AEF facts kept beside them as data. Converted back with
+`tools/aef_interop.py from-inspect` (the second line of
+[`examples/aef-inspect/run/results.ndjson`](examples/aef-inspect/run/results.ndjson)), the `triage/policy` score is:
+
+```json
+{"schemaVersion":"1.0","resultId":"r_bb4438fbedb43552a9fe55695931d5e4","caseId":"case-17","path":"triage/policy","evaluator":{"id":"triage/policy"},"state":"scored","scores":[{"metric":"triage/policy","value":1.0}],"ext":{"inspect_ai":{"metadata":{"aef":{"resultId":"r_bb4438fbedb43552a9fe55695931d5e4","state":"passed","evaluator":{"id":"code:refund-escalation","version":"1"},"parentResultId":"r_479d157f3423e95d566bcbfc0c6d2461","annotator":{"kind":"CODE"},"component":{"weight":0.5,"required":true}}}}}}
+```
 
 [`examples/aef-inspect-trials/`](examples/aef-inspect-trials/) converts a running run in three trials per case: each
 trial is a sample at epoch `trial` + 1, and the rollup a reduction with the reducer `majority`.

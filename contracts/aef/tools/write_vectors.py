@@ -712,6 +712,24 @@ def produce_vectors():
         run=scenario_run("produce-aborted-run", "aborted",
                          abortReason="The endpoint refused every request after k2 (HTTP 401)."))
 
+    # n2-c: a run without contentCapture (a reader takes it as on, RUN-11); n2-d: times to the nanosecond (ENC-8).
+    for name, run, why in (
+            ("run-without-content-capture",
+             {k: v for k, v in scenario_run("produce-run-without-content-capture").items() if k != "contentCapture"},
+             "run.json has no contentCapture, which a reader takes as on (RUN-11): a Producer writes it as given, and "
+             "writing contentCapture on instead means the same (spec 09 §9.3)."),
+            ("times-to-the-nanosecond",
+             scenario_run("produce-times-to-the-nanosecond", startedAt="2026-10-01T00:00:00.000000001Z",
+                          endedAt="2026-10-01T00:01:00.123456789Z"),
+             "run.json's times carry nine fraction digits, which ENC-8 allows: a Producer writes them as given, to the "
+             "nanosecond, never rounded.")):
+        produce_vector(
+            name, why, ["RUN-11", "ENC-8"],
+            [case("k1", node("q", "passed", quality=0.9))], [H("k1", "q")],
+            [("quality", [E("quality", "q", N=1, measured=[0.9], sum="0.9", sumSq="0.81", value="0.9"),
+                          E("pass_rate", "q", N=1, measured=[1], sum="1", sumSq="1", value="1")])],
+            run=run)
+
     produce_vector(
         "aborted-before-any-result",
         "A run aborted before its first result: results.ndjson is written all the same, empty (RUN-2), and the "

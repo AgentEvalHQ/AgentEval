@@ -27,9 +27,16 @@ public sealed class CheckpointVerifyOptions
 
     /// <summary>
     /// The bytes of the envelope beside the manifest (<c>&lt;name&gt;.dsse.json</c>, <c>&lt;name&gt;</c> the manifest's file
-    /// name without <c>.json</c>, §4.4), or null.
+    /// name without <c>.json</c>, §4.4), or null. For a file, <see cref="EnvelopeFile"/> does not read one beyond the
+    /// limit.
     /// </summary>
     public byte[]? Envelope { get; init; }
+
+    /// <summary>
+    /// The path of the envelope file, used when <see cref="Envelope"/> is null: a file beyond the 56 MiB [ENC-17] allows
+    /// an envelope is <c>malformed</c> without being read, and verifies for no one ([SIG-1]).
+    /// </summary>
+    public string? EnvelopeFile { get; init; }
 }
 
 /// <summary>A checkpoint verifier's report (§5.5).</summary>
@@ -88,9 +95,16 @@ public static class CheckpointVerifier
         var manifestProblems = CheckpointManifest.Verify(document);
 
         DsseVerification? signature = null;
-        if (options.Envelope is { } envelope && options.Policy is { } policy)
+        if (options.Policy is { } policy)
         {
-            signature = DsseVerifier.Verify(envelope, manifest, Dsse.CheckpointPayloadType, policy);
+            if (options.Envelope is { } envelope)
+            {
+                signature = DsseVerifier.Verify(envelope, manifest, Dsse.CheckpointPayloadType, policy);
+            }
+            else if (options.EnvelopeFile is { } envelopeFile)
+            {
+                signature = DsseVerifier.VerifyFile(envelopeFile, manifest, Dsse.CheckpointPayloadType, policy);
+            }
         }
 
         // [CKP-9], [SIG-8]: the run hashes of its lanes' runs and comparison baselines, each once, in byte order.
@@ -112,8 +126,8 @@ public static class CheckpointVerifier
     /// against the runs (<c>run-missing</c>, <c>run-unverified</c> at <c>lanes/&lt;lane&gt;/runs/&lt;runId&gt;</c>;
     /// for a decided checkpoint, <c>lane-result</c>, <c>lane-version</c> and <c>oldest-closed</c> at
     /// <c>lanes/&lt;lane&gt;</c>, or only <c>unverifiable</c> there for a lane whose recomputation reads something this
-    /// version does not know: a rule not valid against its writer schema, or an unknown value a run gives it), ordered
-    /// as §3.9 orders problems.
+    /// version does not know in a document that declares a later minor: a rule not valid against its writer schema in such
+    /// a checkpoint, or an unknown value in such a run.json, result line or metrics.json), ordered as §3.9 orders problems.
     /// </summary>
     /// <param name="manifest">The manifest, valid against the reader checkpoint schema.</param>
     /// <param name="runs">Where the runs are found.</param>
@@ -133,14 +147,16 @@ public static class CheckpointVerifier
         var problems = new HashSet<AefProblem>();
         foreach (var lane in AefNode.Objects(manifest["lanes"]))
         {
-            var evaluation = LaneEvaluator.Evaluate(lane, subject, runs, fallback);
+            var evaluation = LaneEvaluator.Evaluate(lane, subject, runs, fallback, AefNode.String(manifest["schemaVersion"]));
             lanes.Add(evaluation);
             problems.UnionWith(evaluation.Problems);
 
             // A decided checkpoint: the recorded input's result for this lane, compared with the one recomputed, unless
-            // recomputing it read something this version does not know (a later minor recorded what it cannot
-            // recompute): its rule is not valid against the writer schema, or a run it reads holds an unknown value it
-            // computes with (LaneEvaluator.ReadsUnknown). That lane is unverifiable, never lane-result.
+            // recomputing it read something this version does not know in a document that declares a later minor (a later
+            // minor recorded what it cannot recompute): its rule is not valid against the writer schema in a checkpoint
+            // that does, or a run it reads holds an unknown value it computes with in a document that does
+            // (LaneEvaluator.ReadsUnknown). That lane is unverifiable, never lane-result. In a document that declares this
+            // version, such a value is read as §7.3 says and compared as usual (round 5).
             if (AefNode.String(manifest["state"]) == "decided" && input is not null
                 && AefNode.Objects(input["lanes"]).FirstOrDefault(l => AefNode.String(l["lane"]) == evaluation.Lane) is { } recorded)
             {

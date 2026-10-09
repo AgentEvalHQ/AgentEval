@@ -17,7 +17,9 @@ namespace AgentEval.Results.Signatures;
 /// <remarks>
 /// The file format is spec 09 §9.2.1's: <c>{"keys": [{"identity": …, "publicKey": &lt;SPKI PEM&gt;, "may": ["redact"]?}]}</c>,
 /// valid against <c>trust-policy.schema.json</c>, whose reader schema is its writer schema ([SIG-4], [VER-9]): a policy
-/// is closed, and one holding a member this version does not know is refused as a whole, as [SIG-3] refuses one. A
+/// is closed, and one holding a member this version does not know is refused as a whole, as [SIG-3] refuses one. It may
+/// carry <c>schemaVersion</c> <c>1.0</c>; one that declares a later version is refused the same way, and so is one that
+/// uses keyless signing, which is not part of 1.0's policy ([SIG-4], round 5). A
 /// key's id is computed from its public key ([SIG-3]), never read from the policy, and no two keys of a policy have one
 /// key id. One identity may hold several keys (a rotation); what it may do is the union of their <c>may</c> ([SIG-4]),
 /// matched by exact value: a value this version does not know grants nothing. The order of <see cref="Keys"/> is the

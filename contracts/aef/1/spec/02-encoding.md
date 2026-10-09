@@ -63,13 +63,13 @@ verifier reports it as `encoding` (§3.9) under the file's path.
 - **[ENC-13]** Ids defined by AEF (`runId`, `resultId`, evidence ids, gate ids, event ids, checkpoint ids) are
   printable ASCII without spaces, at most the length their schema allows, and compared byte for byte. So is a
   **typed reference** (`ref`, schema `common`, `$defs/ref`: a subject, a deployment, a suite, a label set, a gate, a
-  template): a kind (a lower-case letter, then lower-case letters, digits and `-`), a colon, and a name of 1 to 256
+  template): a kind (a lower-case letter, then lower-case letters, digits and `-`, 32 characters at most), a colon, and a name of 1 to 256
   printable ASCII characters without spaces (`agent:support/support-triage`). `subject.ref` is a comparability axis
   ([LANE-6]), so two writers that derive a ref from the same free-text name ("Support Agent") must write the same
   bytes. A writer that derives a ref's name from free text **SHOULD** encode it so:
   - take the name's UTF-8 bytes; keep each byte from `!` to `~` (0x21–0x7E) except `%`, and write every other byte,
     and `%`, as `%` and two upper-case hex digits (a space is `%20`, `é` is `%C3%A9`): `agent:Support%20Agent`;
-  - an empty name is `-`;
+  - an empty name is `-`, and a name that is exactly `-` is `%2D`, so the two stay apart;
   - when the result is longer than 256 characters, keep its first 239 and add `~` and the first 16 lower-case hex
     characters of the SHA-256 of the name's UTF-8 bytes (256 in all), so two long names stay apart.
 
@@ -111,7 +111,8 @@ So that a reader can bound its work, and a hostile file cannot exhaust it:
 
   Depth counts the top-level value as 1 (`{}` is at depth 1, `{"a": []}` at depth 2). A line's size does not include
   its LF.
-- **[ENC-18]** A reader that refuses something for a limit reports `limit` (§3.9) under its path: one NDJSON line over
+- **[ENC-18]** A reader that refuses something for a limit reports `limit` (§3.9) under its path (a DSSE envelope
+  beyond its limit is `malformed` instead, [SIG-1]): one NDJSON line over
   the size or depth limit at `<file>:<line>` (the file's other lines are still read), a file over its size or line
   count at the file, the number of files at the run folder's path, `.`, and the number of files under `overlays/` at
   `overlays`; it **MUST NOT** read a truncated part of it as the whole. A reader **MUST NOT** refuse

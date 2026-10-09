@@ -57,6 +57,41 @@ public sealed class AefFolderTests : IDisposable
     }
 
     [Fact]
+    public void UnderOverlays_NothingIsAPathProblem_AndLinksAreListedForTheChain()
+    {
+        // [RUN-3] (round 5): overlays/ is not checked by the rule; whatever it holds is the overlay chain's to report
+        // ([OVL-5]). Its files are listed (the chain reads them); its links, pipes, sockets and devices are set apart.
+        Directory.CreateDirectory(Path.Combine(_run, "overlays", ".hidden"));
+        File.WriteAllText(Path.Combine(_run, "overlays", ".DS_Store"), "");
+        File.WriteAllText(Path.Combine(_run, "overlays", ".hidden", "a b"), "");
+        File.WriteAllText(Path.Combine(_run, "overlays", "events.ndjson"), "");
+        var links = TryLink(Path.Combine(_run, "overlays", "seal-0001.json"), Path.Combine(_outside, "secret.txt"));
+
+        var listing = AefFolder.List(_run);
+
+        Assert.Empty(listing.Problems);
+        Assert.Contains("overlays/.DS_Store", listing.Files);
+        Assert.Contains("overlays/.hidden/a b", listing.Files);
+        Assert.Equal(links ? ["overlays/seal-0001.json"] : [], listing.OverlayIrregular);
+        Assert.DoesNotContain("overlays/seal-0001.json", listing.Files);
+        Assert.False(listing.OverlaysOverLimit);
+    }
+
+    // A symbolic link, where the operating system lets this process make one.
+    private static bool TryLink(string path, string target)
+    {
+        try
+        {
+            File.CreateSymbolicLink(path, target);
+            return true;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
+        {
+            return false;
+        }
+    }
+
+    [Fact]
     public void AFolderBreaksTheRules_OnlyThroughTheFilesInIt_AndACaseClashReportsTheFilesUnderTheLaterFolder()
     {
         Directory.CreateDirectory(Path.Combine(_run, "ext", "Data"));

@@ -78,9 +78,16 @@ internal static class CheckpointOps
         }
 
         var policy = Policy(options);
-        var envelope = options.TryGetValue("--envelope", out var envelopePath) ? DriverIO.Bytes(envelopePath) : null;
+
+        // [SIG-1]: an envelope beyond 56 MiB is malformed without being read, so it is given as a file.
+        var envelope = options.TryGetValue("--envelope", out var envelopePath) ? envelopePath : null;
+        if (envelope is not null && !File.Exists(envelope))
+        {
+            throw new UsageException($"{envelope}: no such file");
+        }
+
         var verification = Guard(() => CheckpointVerifier.Verify(
-            manifest, AefRunStore.Open(runs, policy), new CheckpointVerifyOptions { At = at, Policy = policy, Envelope = envelope }));
+            manifest, AefRunStore.Open(runs, policy), new CheckpointVerifyOptions { At = at, Policy = policy, EnvelopeFile = envelope }));
         return DriverIO.Print(stdout, new JsonObject
         {
             ["lanes"] = new JsonArray([.. verification.Lanes.Select(l => (JsonNode?)new JsonObject { ["lane"] = l.Lane, ["result"] = l.Result?.ToJson() })]),

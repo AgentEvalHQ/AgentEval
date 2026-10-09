@@ -37,6 +37,19 @@ internal static class DriverIO
         }
     }
 
+    /// <summary>Runs an operation that reads <paramref name="path"/>; a file that cannot be read is an input error.</summary>
+    public static T Guard<T>(Func<T> operation, string path)
+    {
+        try
+        {
+            return operation();
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            throw new UsageException($"{path}: {e.Message}");
+        }
+    }
+
     /// <summary>A JSON document (an I-JSON object, [ENC-1]).</summary>
     public static JsonObject Document(string path) => Document(Bytes(path), path);
 

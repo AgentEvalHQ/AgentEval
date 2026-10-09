@@ -110,18 +110,22 @@ public sealed partial class OverlayChain
         ArgumentNullException.ThrowIfNull(folder);
         ArgumentNullException.ThrowIfNull(runHash);
 
-        // [ENC-17], [ENC-18]: more files under overlays/ than one events file and two per batch is limit at overlays, and
-        // the chain is not checked further: no file of it is read.
-        if (folder.OverlaysOverLimit)
-        {
-            return new OverlayChain([new AefProblem(OverlaysPath, "limit")], [], 0, []);
-        }
-
         var problems = new HashSet<AefProblem>();
 
-        // The files under overlays/: the events file, batch seals and batch signatures; anything else is unexpected.
+        // The files under overlays/: the events file, batch seals and batch signatures, each a regular file named as one;
+        // anything else is unexpected-file, whatever its name ([OVL-5]: [RUN-3] does not apply there), a link, pipe,
+        // socket or device included (never followed or read: a link named seal-0001.json is no batch seal). More files
+        // than one events file and two per batch ([ENC-17]: 19,999) is limit at overlays, reported once ([ENC-18]): the
+        // other files are then not reported one by one, and the chain is checked as usual from the files it names, so no
+        // number of other files voids a batch (round 5).
+        if (folder.OverlaysOverLimit)
+        {
+            problems.Add(new AefProblem(OverlaysPath, "limit"));
+        }
+
         var seals = new SortedDictionary<int, string>();
-        foreach (var path in folder.Files.Where(p => p.StartsWith("overlays/", StringComparison.Ordinal) && p != EventsPath))
+        var unexpected = new List<string>(folder.OverlayIrregular);
+        foreach (var path in folder.Files.Where(p => AefFolder.IsUnderOverlays(p) && p != EventsPath))
         {
             if (BatchSealName().Match(path) is { Success: true } m)
             {
@@ -129,8 +133,13 @@ public sealed partial class OverlayChain
             }
             else if (!BatchSignatureName().IsMatch(path))
             {
-                problems.Add(new AefProblem(path, "unexpected-file"));
+                unexpected.Add(path);
             }
+        }
+
+        if (!folder.OverlaysOverLimit)
+        {
+            problems.UnionWith(unexpected.Select(p => new AefProblem(p, "unexpected-file")));
         }
 
         // [OVL-5]: the events file is read as far as [ENC-17] allows; one that holds more is limit at the file, once.
@@ -214,7 +223,7 @@ public sealed partial class OverlayChain
         return new OverlayChain(AefProblemOrder.Sort(problems), batches, verifiedEnd, lines);
     }
 
-    /// <summary>The path of the overlays folder, where too many files under it are reported ([ENC-18]).</summary>
+    /// <summary>The path of the overlays folder, where too many files under it are reported, once ([ENC-18], [OVL-5]).</summary>
     public const string OverlaysPath = "overlays";
 
     /// <summary>

@@ -1,0 +1,43 @@
+{
+  "kind": "produce",
+  "rules": [
+    "RUN-11",
+    "ENC-8"
+  ],
+  "scenario": "scenario.json",
+  "results": "expected-results.ndjson",
+  "summary": {
+    "schemaVersion": "1.0",
+    "runId": "produce-run-without-content-capture",
+    "lanes": [
+      {
+        "lane": "quality",
+        "metrics": [
+          {
+            "metric": "quality",
+            "path": "q",
+            "N": 1,
+            "n": 1,
+            "notMeasured": 0,
+            "sum": 0.9,
+            "sumSq": 0.81,
+            "value": 0.9,
+            "verdict": "scored"
+          },
+          {
+            "metric": "pass_rate",
+            "path": "q",
+            "N": 1,
+            "n": 1,
+            "notMeasured": 0,
+            "sum": 1,
+            "sumSq": 1,
+            "value": 1,
+            "verdict": "scored"
+          }
+        ]
+      }
+    ]
+  },
+  "why": "run.json has no contentCapture, which a reader takes as on (RUN-11): a Producer writes it as given, and writing contentCapture on instead means the same (spec 09 §9.3)."
+}

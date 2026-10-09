@@ -939,9 +939,118 @@ public class AefRunWriterTests
         writer.AddResult(WriterRun.Leaf("k1") with { Trials = new AefTrials(1, 1, AefTrialAggregation.AllPass, true) });
         writer.AddResult(WriterRun.Leaf("k1", "q/a") with { Trials = new AefTrials(1, 1, AefTrialAggregation.AllPass, true) });   // a root
 
-        // §3.9 trials (round 4, W5a-23): refused before anything is written.
+        // §3.9 trials (round 4, W5a-23; round 5: q/a's trial lines have their parents at q): refused before anything is written.
         var refused = Assert.Throws<InvalidOperationException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1)));
         Assert.Contains("its rollup at q/a is not a child of its rollup at q", refused.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void ACaseWithRootsAtQAndQx_RunInTrials_HasBothRollupsAsRoots_Res8()
+    {
+        // [RES-8] (round 5): the rollups form the case's tree as its trial lines do, and a path's spelling decides nothing:
+        // the case's root at q/x has root trial lines, so its rollup there is a root, beside the rollup at q. Round 4's
+        // writer refused this run (it read the tree from the paths).
+        using var run = new WriterRun();
+        var writer = run.Create();
+        writer.AddResult(WriterRun.Leaf("k1", trial: 0));
+        writer.AddResult(WriterRun.Leaf("k1", "q/x", AefState.Failed, m: 0.2, trial: 0));
+        writer.AddResult(WriterRun.Leaf("k1") with { Trials = new AefTrials(1, 1, AefTrialAggregation.AllPass, true) });
+        writer.AddResult(WriterRun.Leaf("k1", "q/x", AefState.Failed, m: 0.2) with { Trials = new AefTrials(1, 0, AefTrialAggregation.AllPass, true) });
+
+        writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1));
+
+        Assert.Empty(run.Problems());
+        Assert.All(run.Lines("results.ndjson"), l => Assert.Null(l["parentResultId"]));
+    }
+
+    [Fact]
+    public void ARollupThatIsAChild_WhereItsTrialLinesAreRoots_IsRefusedAtClose_Res8()
+    {
+        // [RES-8] (round 5): a rollup is a root when its trial lines are roots.
+        using var run = new WriterRun();
+        var writer = run.Create();
+        writer.AddResult(WriterRun.Leaf("k1", trial: 0));
+        writer.AddResult(WriterRun.Leaf("k1", "q/x", trial: 0));
+        var rollup = writer.AddResult(WriterRun.Leaf("k1") with
+        {
+            Trials = new AefTrials(1, 1, AefTrialAggregation.AllPass, true),
+            Aggregation = new AefAggregation { Strategy = AefAggregationStrategy.Min, RulePath = AefRulePath.Threshold, Measured = 1, Total = 1 },
+        });
+        rollup.AddChild(WriterRun.Leaf("k1", "q/x") with { Trials = new AefTrials(1, 1, AefTrialAggregation.AllPass, true), Component = new AefComponent(1, true) });
+
+        var refused = Assert.Throws<InvalidOperationException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1)));
+        Assert.Contains("its trial lines at q/x are roots, and its rollup there is not", refused.Message, StringComparison.Ordinal);
+        Assert.Equal(AefRunStatus.Running, writer.Status);
+    }
+
+    [Fact]
+    public void TrialLinesAtOnePath_WhoseParentsAreRootsAndNot_AreRefusedAtClose_Res8()
+    {
+        // [RES-8] (round 5): trial lines at one path whose parents are not all at one path, or not all roots, are trials.
+        using var run = new WriterRun();
+        var writer = run.Create();
+        var first = writer.AddResult(WriterRun.Leaf("k1", trial: 0) with
+        {
+            Aggregation = new AefAggregation { Strategy = AefAggregationStrategy.Min, RulePath = AefRulePath.Threshold, Measured = 1, Total = 1 },
+        });
+        first.AddChild(WriterRun.Leaf("k1", "q/x", trial: 0) with { Component = new AefComponent(1, true) });
+        writer.AddResult(WriterRun.Leaf("k1", "q/x", trial: 1));   // a root
+        writer.AddResult(WriterRun.Leaf("k1") with { Trials = new AefTrials(1, 1, AefTrialAggregation.AllPass, true) });
+        writer.AddResult(WriterRun.Leaf("k1", "q/x") with { Trials = new AefTrials(2, 2, AefTrialAggregation.AllPass, true) });
+
+        var refused = Assert.Throws<InvalidOperationException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1)));
+        Assert.Contains("its trial lines at q/x have parents at several paths, or some are roots and some not", refused.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TimesGivenWithNineFractionDigits_AreWrittenExactly_N2d()
+    {
+        // [ENC-8] allows nine fraction digits; the writer's model holds AefTime, so a time is written at the precision
+        // given (n2-d): run.json's startedAt and endedAt, a calibration's measuredAt, a result's times, a gate's decidedAt.
+        var started = AefTime.Parse("2026-10-01T10:00:00.123456789Z");
+        var measured = AefTime.Parse("2026-09-30T23:59:59.000000001Z");
+        using var run = new WriterRun();
+        var writer = AefRunWriter.Create(run.Dir, WriterRun.Header() with
+        {
+            StartedAt = started,
+            Judges = [new AefJudge { Model = "m-1", Calibration = new AefCalibration { LabelSet = "labels:x", N = 10, MeasuredAt = measured } }],
+        });
+        writer.SetMetrics([WriterRun.Metric()]);
+        writer.AddResult(WriterRun.Leaf("k1") with { StartedAt = AefTime.Parse("2026-10-01T10:00:01.5Z"), EndedAt = AefTime.Parse("2026-10-01T10:00:01.500000002Z") });
+
+        writer.Close(AefRunStatus.Completed, AefTime.Parse("2026-10-01T10:05:00.999999999Z"));
+
+        var header = run.Json("run.json");
+        Assert.Equal("2026-10-01T10:00:00.123456789Z", (string)header["startedAt"]!);
+        Assert.Equal("2026-10-01T10:05:00.999999999Z", (string)header["endedAt"]!);
+        Assert.Equal("2026-09-30T23:59:59.000000001Z", (string)header["judges"]![0]!["calibration"]!["measuredAt"]!);
+        var line = run.Lines("results.ndjson").Single();
+        Assert.Equal("2026-10-01T10:00:01.5Z", (string)line["startedAt"]!);
+        Assert.Equal("2026-10-01T10:00:01.500000002Z", (string)line["endedAt"]!);
+        Assert.Empty(run.Problems());
+    }
+
+    [Fact]
+    public void AnEndOneNanosecondBeforeTheStart_IsRefused_AndADateTimeOffsetStillConverts_N2d()
+    {
+        using var run = new WriterRun();
+        var writer = AefRunWriter.Create(run.Dir, WriterRun.Header() with { StartedAt = AefTime.Parse("2026-10-01T10:00:00.000000002Z") });
+        writer.SetMetrics([WriterRun.Metric()]);
+
+        Assert.Throws<ArgumentException>(() => writer.Close(AefRunStatus.Completed, AefTime.Parse("2026-10-01T10:00:00.000000001Z")));
+        Assert.Throws<ArgumentException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start));   // 10:00:00Z, a DateTimeOffset
+        writer.Close(AefRunStatus.Completed, WriterRun.Start.AddTicks(1));                               // 10:00:00.0000001Z
+
+        Assert.Equal("2026-10-01T10:00:00.0000001Z", (string)run.Json("run.json")["endedAt"]!);
+    }
+
+    [Fact]
+    public void ATimeThatIsNotAnAefTime_IsRefused_N2d()
+    {
+        using var run = new WriterRun();
+        Assert.Throws<ArgumentException>(() => AefRunWriter.Create(run.Dir, WriterRun.Header() with { StartedAt = new AefTime(0, 1_000_000_000) }));
+        Assert.Throws<ArgumentException>(() => AefRunWriter.Create(run.Dir, WriterRun.Header() with { StartedAt = new AefTime(-62_135_596_801, 0) }));   // the year 0000
+        Assert.False(Directory.Exists(run.Dir));
     }
 
     [Theory]

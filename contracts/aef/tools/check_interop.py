@@ -12,8 +12,9 @@ expected.json naming the direction, the page and its sections, and what the chec
   "runs"       {folder: outcome}: every AEF run of the example, input or output, verifies with
                `aef_verify.py run` with that outcome ("unsealed" or "intact") and no problem. A run a step writes is
                verified too, before it is compared.
-  "roundTrip"  for AEF -> OpenTelemetry -> AEF: the original run, the events between, the run that came back, and
-               what the page says is kept, lost and added. The check computes, field by field, what the trip kept and
+  "roundTrip"  for AEF -> OpenTelemetry -> AEF or AEF -> Inspect -> AEF: the original run, the run that came back,
+               how their lines match ("match": "resultId", for a trip that keeps result ids; otherwise the events
+               between, "through", one logs line per result line), and what the page says is kept, lost and added. The check computes, field by field, what the trip kept and
                lost, and fails unless every field is accounted for by exactly the declared entry; every lost entry
                cites a bullet of the page's "What does not carry over" list, and every bullet of that list for this
                direction is cited, exercised by the run or declared absent from it (and then absent).
@@ -304,9 +305,19 @@ def trip_outcomes(folder, rt):
     """{field: 'kept' | 'lost' | 'added'} over the whole trip (a field lost on any line is lost)."""
     run, lines, files = read_run(folder / rt["original"])
     back_run, back_lines, back_files = read_run(folder / rt["result"])
-    through = aef_produce.read_ndjson(folder / rt["through"])
-    if len(through) != len(lines):
-        raise Failure(f"{rt['through']} has {len(through)} lines for {len(lines)} result lines (OT-2: one per line)")
+    if rt.get("match") == "resultId":  # a trip that keeps result ids (through Inspect): a line comes back as one
+        by_id = {line["resultId"]: line for line in back_lines}
+        counterparts = [[by_id[line["resultId"]]] if line["resultId"] in by_id else [] for line in lines]
+    else:  # through OpenTelemetry: the k-th logs line holds the events of the k-th result line (OT-2), in order
+        through = aef_produce.read_ndjson(folder / rt["through"])
+        if len(through) != len(lines):
+            raise Failure(f"{rt['through']} has {len(through)} lines for {len(lines)} result lines (OT-2)")
+        counts = [sum(1 for r in request["resourceLogs"] for s in r["scopeLogs"] for e in s["logRecords"]
+                      if e.get("eventName") == "gen_ai.evaluation.result") for request in through]
+        starts = [sum(counts[:i]) for i in range(len(counts))]
+        counterparts = [back_lines[s:s + c] for s, c in zip(starts, counts)]
+        if sum(counts) != len(back_lines):
+            raise Failure(f"{rt['result']} has {len(back_lines)} result lines, the events give {sum(counts)}")
     seen = {}
 
     def mark(field, kept):
@@ -314,11 +325,10 @@ def trip_outcomes(folder, rt):
         outcomes = {seen.get(field), kept if isinstance(kept, str) else "kept" if kept else "lost"}
         seen[field] = next(o for o in ("lost", "added", "kept") if o in outcomes)
 
-    k = 0
-    for line, request in zip(lines, through):
-        count = sum(1 for r in request["resourceLogs"] for s in r["scopeLogs"] for e in s["logRecords"]
-                    if e.get("eventName") == "gen_ai.evaluation.result")
-        back, k = back_lines[k:k + count], k + count
+    for line, back in zip(lines, counterparts):
+        if not back:
+            mark("results:(the line itself)", False)
+            continue
         accounted = {"schemaVersion"}
         for field, value in line.items():
             if field == "schemaVersion":
@@ -332,8 +342,10 @@ def trip_outcomes(folder, rt):
                         mark(f"results:scores[].{sub}", same(v, there.get(sub)))
                 accounted.add("scores")
             elif field == "reasoning":
-                mark("results:reasoning", all("reasoning" in b and same(value, b["reasoning"]) for b in back))
-                if "reason" not in line:
+                kept = all("reasoning" in b and same(value, b["reasoning"]) for b in back)
+                mark("results:reasoning", kept)
+                accounted.add("reasoning")
+                if not kept and "reason" not in line:  # the blob's text may come back as the reason
                     blob = value["blob"].split(":", 1)[1]
                     text = (folder / rt["original"] / "blobs" / "sha256" / blob[:2] / blob).read_bytes().decode()
                     mark("results:reasoning (its text, as reason)", all(b.get("reason") == text[:4096] for b in back))
@@ -352,8 +364,9 @@ def trip_outcomes(folder, rt):
             for field in b:
                 if field not in accounted and field not in line:
                     mark(f"results:{field}", "added")
-    if k != len(back_lines):
-        raise Failure(f"{rt['result']} has {len(back_lines)} result lines, the events give {k}")
+    matched = {id(b) for back in counterparts for b in back}
+    if any(id(b) not in matched for b in back_lines):
+        mark("results:(a line of its own)", "added")
 
     asserted = back_run.get("imported", {}).get("asserted", [])
     mine, theirs = flatten(run), flatten(back_run)
@@ -361,7 +374,9 @@ def trip_outcomes(folder, rt):
         if path == "schemaVersion":
             continue
         supplied = any(path == a or path.startswith(a + ".") for a in asserted)
-        mark(f"run.json:{path}", not supplied and path in theirs and same(value, theirs[path]))
+        equal_here = path in theirs and (instant(value) == instant(theirs[path]) if path in ("startedAt", "endedAt")
+                                         else same(value, theirs[path]))  # times compare as instants ([ENC-8])
+        mark(f"run.json:{path}", not supplied and equal_here)
     for path in theirs:
         if path not in mine:
             mark(f"run.json:{path}", "added")

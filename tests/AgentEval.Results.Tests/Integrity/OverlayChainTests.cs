@@ -469,41 +469,105 @@ public class OverlayChainTests
     }
 
     [Fact]
-    public void Limit_MoreThan19999FilesUnderOverlays_IsReportedAtOverlays_AndTheChainIsNotChecked()
+    public void Limit_MoreThan19999FilesUnderOverlays_IsReportedOnceAtOverlays_AndTheChainIsStillChecked()
     {
-        // [ENC-17], [ENC-18], [OVL-5]: one events file and two per batch at most. The corpus has no vector of its own
-        // (too many files); here 19,999 files, and then 20,000.
+        // [ENC-17], [ENC-18], [OVL-5] (round 5): one events file and two per batch at most. Beyond, limit at overlays,
+        // reported once: the other files are then not reported one by one, and the chain is checked as usual from the
+        // files it names, so no number of other files voids a batch. Here 19,999 files, and then 20,000.
         using var run = Sealed();
         run.AppendBatch([Annotate("ov_1")]);
+        run.AppendBatch([Annotate("ov_2")], edit: p => p["runId"] = "another-run");   // a batch problem is still found
         var overlays = Path.Combine(run.Dir, "overlays");
-        for (var i = 3; i <= AefLimits.MaxOverlayFiles; i++)
+        for (var i = 4; i <= AefLimits.MaxOverlayFiles; i++)
         {
             File.WriteAllBytes(Path.Combine(overlays, $"x{i}"), []);
         }
 
         var atTheLimit = run.Chain();
-        Assert.Equal(AefLimits.MaxOverlayFiles - 2, atTheLimit.Problems.Count(p => p.Code == "unexpected-file"));
+        Assert.Equal(AefLimits.MaxOverlayFiles - 3, atTheLimit.Problems.Count(p => p.Code == "unexpected-file"));
         Assert.DoesNotContain(atTheLimit.Problems, p => p.Code == "limit");
-        Assert.Single(atTheLimit.VerifiedEvents);
+        Assert.Equal(["ov_1"], atTheLimit.VerifiedEvents.Select(e => (string)e.Event!["eventId"]!));
 
         Directory.CreateDirectory(Path.Combine(overlays, "deeper"));
         File.WriteAllBytes(Path.Combine(overlays, "deeper", "one-more"), []);   // a file in a folder under overlays/ counts too
         var folder = AgentEval.Results.Runs.AefRunFolder.Open(run.Dir);
         var over = OverlayChain.Verify(folder, AgentEval.Results.Runs.AefRunDocuments.Read(folder));
 
-        Assert.Equal(["overlays limit"], Strings(over));
-        Assert.Empty(over.VerifiedEvents);
-        Assert.Equal(0, over.UnsealedEvents);
         Assert.True(folder.OverlaysOverLimit);
+        Assert.Equal(["overlays limit", "overlays/seal-0002.json run-id"], Strings(over));
+        Assert.Equal(["ov_1"], over.VerifiedEvents.Select(e => (string)e.Event!["eventId"]!));
+        Assert.Equal(1, over.UnsealedEvents);
         Assert.Equal(AefOutcome.Intact, run.Verify().Outcome);   // an overlay problem never changes the run's outcome
+        Assert.Empty(run.Problems());                             // nor is anything under overlays/ a problem of the run
 
-        // The run verifier still lists them, and checks their paths ([RUN-3], R4N-8): a link among them is a path problem.
+        // A link among them is neither a path problem of the run ([RUN-3] does not check overlays/) nor reported one by
+        // one beyond the limit ([OVL-5]).
         if (!OperatingSystem.IsWindows())
         {
             File.CreateSymbolicLink(Path.Combine(overlays, "link"), "../run.json");
-            Assert.Equal(["overlays/link path"], run.Problems());
-            Assert.Equal(["overlays limit"], run.ChainProblems());
+            Assert.Empty(run.Problems());
+            Assert.Equal(["overlays limit", "overlays/seal-0002.json run-id"], run.ChainProblems());
         }
+    }
+
+    [Fact]
+    public void AnythingUnderOverlays_IsNeverAProblemOfTheRun_OnlyUnexpectedFileOfTheChain()
+    {
+        // [RUN-3] (round 5): overlays/ is not checked by the rule; whatever it holds is the overlay chain's to report
+        // ([OVL-5]): a file not named as the events file, a batch seal or a batch signature is unexpected-file, whatever
+        // its name: a hidden file, a reserved name, a name [RUN-3] refuses, a case clash.
+        using var run = Sealed();
+        run.AppendBatch([Annotate("ov_1")]);
+        run.WriteText("overlays/.DS_Store", "x");
+        run.WriteText("overlays/sub/a b.txt", "x");
+        run.WriteText("overlays/seal-0001.json.bak", "x");
+        if (!OperatingSystem.IsWindows())
+        {
+            run.WriteText("overlays/Seal-0001.json", "{}");   // a case clash with seal-0001.json, on a case-sensitive file system
+        }
+
+        var expected = new List<string> { "overlays/.DS_Store unexpected-file" };
+        if (!OperatingSystem.IsWindows())
+        {
+            expected.Add("overlays/Seal-0001.json unexpected-file");
+        }
+
+        expected.AddRange(["overlays/seal-0001.json.bak unexpected-file", "overlays/sub/a b.txt unexpected-file"]);
+        Assert.Equal(expected, run.ChainProblems());
+        Assert.Empty(run.Problems());
+        Assert.Equal(AefOutcome.Intact, run.Verify().Outcome);
+        Assert.Single(run.Chain().VerifiedEvents);
+    }
+
+    [Fact]
+    public void ALinkUnderOverlays_IsUnexpectedFile_WhateverItsName_AndNeverFollowed()
+    {
+        // [OVL-5] (round 5): a file under overlays/ that is not a regular file named as one of the three is
+        // unexpected-file: a link named seal-0002.json is no batch seal (so no seal 2 is present), and a link named
+        // events.ndjson is no events file. Neither is a problem of the run.
+        if (OperatingSystem.IsWindows())
+        {
+            return;   // creating a symbolic link needs a privilege there
+        }
+
+        using var run = Sealed();
+        run.AppendBatch([Annotate("ov_1")]);
+        File.CreateSymbolicLink(Path.Combine(run.Dir, "overlays", "seal-0002.json"), "seal-0001.json");
+        File.CreateSymbolicLink(Path.Combine(run.Dir, "overlays", "seal-0002.dsse.json"), "../run.json");
+
+        var chain = run.Chain();
+
+        Assert.Equal(["overlays/seal-0002.dsse.json unexpected-file", "overlays/seal-0002.json unexpected-file"], Strings(chain));
+        Assert.Single(chain.Batches);
+        Assert.Empty(run.Problems());
+
+        // The events file itself as a link: unexpected-file, and there is no events file (batch 1's range runs past it).
+        var events = Path.Combine(run.Dir, "overlays", "events.ndjson");
+        File.Move(events, Path.Combine(run.Dir, "events.moved"));
+        File.CreateSymbolicLink(events, "../events.moved");
+        Assert.Contains("overlays/events.ndjson unexpected-file", run.ChainProblems());
+        Assert.Contains("overlays/seal-0001.json batch-digest", run.ChainProblems());
+        Assert.DoesNotContain(run.Problems(), p => p.StartsWith("overlays", StringComparison.Ordinal));
     }
 
     [Fact]

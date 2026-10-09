@@ -20,9 +20,9 @@ Type: string. Bounds: pattern `^[A-Za-z0-9._:-]{1,128}$`
 
 ### ref
 
-A typed reference, kind:name (for example agent:support/support-triage, suite:support/triage-scenarios).
+A typed reference, kind:name: a kind of 1 to 32 characters (for example agent:support/support-triage, suite:support/triage-scenarios).
 
-Type: string. Bounds: pattern `^[a-z][a-z0-9-]*:[!-~]{1,256}$`
+Type: string. Bounds: pattern `^[a-z][a-z0-9-]{0,31}:[!-~]{1,256}$`
 
 ### sha256Hex
 

@@ -1,0 +1,55 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "metrics.json",
+      "digest": {
+        "sha256": "d8798fb9d5859873804f6a9ee3b06212cca8da305b0b89e05157c42383b7f939"
+      }
+    },
+    {
+      "name": "results.ndjson",
+      "digest": {
+        "sha256": "bde456215d7803822e87deb63558ef3955436c454cd1afbf00484672e81e0aaa"
+      }
+    },
+    {
+      "name": "run.json",
+      "digest": {
+        "sha256": "fbf3e6f2a0523c1b494689bdcb94e5daa9fcb2e6e6d5dfbf85e9685cf6b0095c"
+      }
+    },
+    {
+      "name": "summary.json",
+      "digest": {
+        "sha256": "366d522c356b31d6d5b759f4b3a69a6ed32f240b516037ed777065f6ac030fe5"
+      }
+    }
+  ],
+  "predicateType": "https://agenteval.dev/aef/1/evidence",
+  "predicate": {
+    "schemaVersion": "1.0",
+    "runId": "kE7rQx2mVt9uJ3pL8sNw4a",
+    "runHash": "e8b94414e424e9eb740bd1a455b91c720f540798f32b592a638682b2ba5fd8e8",
+    "producer": {
+      "name": "aef_interop.py",
+      "version": "1.0"
+    },
+    "subject": {
+      "ref": "model:openai/gpt-5.1-mini"
+    },
+    "deployment": null,
+    "suite": {
+      "ref": "suite:refund_policy",
+      "version": "3"
+    },
+    "judges": [
+      {
+        "model": "openai/gpt-5.1"
+      }
+    ],
+    "closedAt": "2026-10-06T10:04:30Z",
+    "sealedAt": "2026-10-09T00:00:00Z",
+    "sealedBy": "ingest"
+  }
+}

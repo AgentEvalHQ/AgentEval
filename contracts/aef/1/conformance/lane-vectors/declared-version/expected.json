@@ -1,0 +1,26 @@
+{
+  "kind": "lane",
+  "checkpoint": "checkpoint.json",
+  "runs": "runs",
+  "lanes": [
+    {
+      "lane": "junk-member",
+      "result": {
+        "status": "passed",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-03T00:00:00Z"
+      }
+    }
+  ],
+  "problems": [
+    [
+      "lanes/junk-member",
+      "lane-result"
+    ]
+  ],
+  "rules": [
+    "CKP-8",
+    "VER-6",
+    "LANE-10"
+  ]
+}

@@ -109,9 +109,13 @@ public static class LaneEvaluator
     /// The age of a lane none of whose runs found counts for it ([LANE-9]): the checkpoint's
     /// <c>decisionInput.evaluatedAt</c>, or for an undecided checkpoint the evaluation time the verifier is given.
     /// </param>
+    /// <param name="checkpointVersion">
+    /// The checkpoint's <c>schemaVersion</c>, or null for this version: only a checkpoint that declares a later minor can
+    /// make the lane <c>unverifiable</c> for its rule ([CKP-8]).
+    /// </param>
     /// <exception cref="FormatException">The lane's rule is not one the reader schema accepts.</exception>
     /// <exception cref="IOException">A run's file cannot be read.</exception>
-    public static LaneEvaluation Evaluate(JsonObject lane, CheckpointSubject subject, AefRunStore store, string fallbackTime)
+    public static LaneEvaluation Evaluate(JsonObject lane, CheckpointSubject subject, AefRunStore store, string fallbackTime, string? checkpointVersion = null)
     {
         ArgumentNullException.ThrowIfNull(lane);
         ArgumentNullException.ThrowIfNull(subject);
@@ -143,7 +147,10 @@ public static class LaneEvaluator
             .ToList();
         var runs = refs.Select(r => Locate(r.RunId, r.RunHash)).ToList();
         var baseline = rule is ComparisonRule comparison ? Locate(comparison.Baseline.RunId, comparison.Baseline.RunHash) : null;
-        var readsUnknown = !AefSchemas.Writer.IsValid(RuleSchema, lane["rule"])
+        // [CKP-8] (round 5): only a document that declares a later minor can make the lane unverifiable: the checkpoint
+        // for its rule, a run's document for a run-side value. One that declares this version is read as §7.3 says and
+        // compared as usual.
+        var readsUnknown = (AefVersion.DeclaresLaterMinor(checkpointVersion) && !AefSchemas.Writer.IsValid(RuleSchema, lane["rule"]))
                            || runs.Append(baseline).OfType<AefStoredRun>().Any(run => ReadsUnknown(rule, run));
 
         return new LaneEvaluation(name, rule, Result(rule, runs, baseline, subject, fallbackTime), ByBytes(problems), readsUnknown);
@@ -154,18 +161,22 @@ public static class LaneEvaluator
 
     /// <summary>
     /// [CKP-8], [VER-8]: whether recomputing a lane reads, in <paramref name="run"/> (a found run of the lane, or its
-    /// comparison's baseline, intact or not), a value this version does not know, one its writer schema does not accept
-    /// at that field: an <c>execution.targetMode</c>; for a <c>severity</c> rule, a <c>severity</c> on one of the rule's
-    /// lines (its summary lane and path, trial lines included, whatever their state); for a <c>comparison</c> rule, the
-    /// <c>direction</c> of the compared metric in the run's metrics.json. A rule not valid against the writer schema is
-    /// the other case ([CKP-8]); <see cref="Evaluate"/> checks both.
+    /// comparison's baseline, intact or not), a value this version does not know (one its writer schema does not accept
+    /// at that field) in a document that declares a later minor than this version ([VER-6]): an
+    /// <c>execution.targetMode</c> in a run.json that does; for a <c>severity</c> rule, a <c>severity</c> on one of the
+    /// rule's lines (its summary lane and path, trial lines included, whatever their state) that does; for a
+    /// <c>comparison</c> rule, the <c>direction</c> of the compared metric in a metrics.json that does. A value in a
+    /// document that declares this version is read as §7.3 says, and makes nothing unverifiable (round 5). A rule not valid
+    /// against the writer schema, in a checkpoint that declares a later minor, is the other case ([CKP-8]);
+    /// <see cref="Evaluate"/> checks both.
     /// </summary>
     /// <exception cref="IOException">A run's file cannot be read.</exception>
     public static bool ReadsUnknown(LaneRule rule, AefStoredRun run)
     {
         ArgumentNullException.ThrowIfNull(rule);
         ArgumentNullException.ThrowIfNull(run);
-        if (AefNode.At(run.Run, "execution", "targetMode") is { } mode && !AefSchemas.Writer.IsValid(TargetModeSchema, mode))
+        if (AefVersion.DeclaresLaterMinor(run.Run["schemaVersion"])
+            && AefNode.At(run.Run, "execution", "targetMode") is { } mode && !AefSchemas.Writer.IsValid(TargetModeSchema, mode))
         {
             return true;
         }
@@ -175,11 +186,13 @@ public static class LaneEvaluator
             case SeverityRule severity:
                 var lanes = SummaryLanes(run.Documents.Summary);
                 return run.Documents.Results.Objects.Any(l =>
-                    (severity.Lane is not { } lane || AefSummaryCalculator.Belongs(l.Value, lane, lanes))
+                    AefVersion.DeclaresLaterMinor(l.Value["schemaVersion"])
+                    && (severity.Lane is not { } lane || AefSummaryCalculator.Belongs(l.Value, lane, lanes))
                     && severity.InScope(AefNode.String(l.Value["path"]))
                     && l.Value["severity"] is { } value && !AefSchemas.Writer.IsValid(SeveritySchema, value));
             case ComparisonRule comparison:
-                return Metric(run.Documents.Metrics, comparison.Metric)?["direction"] is { } direction
+                return AefVersion.DeclaresLaterMinor(run.Documents.Metrics?["schemaVersion"])
+                       && Metric(run.Documents.Metrics, comparison.Metric)?["direction"] is { } direction
                        && !AefSchemas.Writer.IsValid(DirectionSchema, direction);
             default:
                 return false;

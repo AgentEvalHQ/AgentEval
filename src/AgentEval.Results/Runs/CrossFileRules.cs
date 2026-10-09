@@ -241,6 +241,33 @@ public static class CrossFileRules
                 }
             }
 
+            // [RES-8] (round 5): the rollups form the case's tree as its trial lines do. Where the trial lines at each case
+            // and path have their parents: at one path, all roots, or at several places (then the rollup there is trials,
+            // R5N-2). A parent that names no line is the parent problem's, and takes no part.
+            var trialParents = new Dictionary<(string, string), ParentPlace>();
+            foreach (var (key, lines) in trialLines)
+            {
+                var places = new HashSet<string?>();   // null: a root (string equality is ordinal)
+                foreach (var trialLine in lines)
+                {
+                    if (AefNode.String(trialLine["parentResultId"]) is not { } parent)
+                    {
+                        places.Add(null);
+                    }
+                    else if (byId.TryGetValue(parent, out var parentLine))
+                    {
+                        places.Add(AefNode.String(parentLine["path"]) ?? "");
+                    }
+                }
+
+                trialParents[key] = places.Count switch
+                {
+                    0 => ParentPlace.Unknown,
+                    1 => places.Single() is { } path ? ParentPlace.At(path) : ParentPlace.Root,
+                    _ => ParentPlace.Several,
+                };
+            }
+
             var seen = new HashSet<string>(StringComparer.Ordinal);
             foreach (var (number, line) in _documents.Results.Objects)
             {
@@ -294,14 +321,25 @@ public static class CrossFileRules
                     Add(where, "trials");
                 }
 
-                // [RES-8]: the rollups of a composite case run in trials form the case's own tree. A rollup at a child path
-                // has as its parent its case's rollup at the parent path (the path without its last '/' segment), when the
-                // case has one there.
-                if (line.ContainsKey("trials") && CaseAndPath(line) is var (rollupCase, rollupPath) && rollupPath.LastIndexOf('/') is var slash and >= 0
-                    && rollupIds.TryGetValue((rollupCase, rollupPath[..slash]), out var parentRollup)
-                    && !string.Equals(AefNode.String(line["parentResultId"]), parentRollup, StringComparison.Ordinal))
+                // [RES-8] (round 5): the rollups form the case's tree as its trial lines do. A rollup's parent is its case's
+                // rollup at the path of its trial lines' parents when the case has one there (a running case may not have it
+                // yet, R5N-3), and it is a root when they are roots; a path's spelling decides nothing (q/x may be a root).
+                // A rollup whose trial lines' parents are at several paths, or some roots and some not, is trials itself
+                // (R5N-2: reported once, at the rollup, never at the trial lines).
+                if (line.ContainsKey("trials") && CaseAndPath(line) is var (rollupCase, _) && trialParents.TryGetValue(CaseAndPath(line), out var place))
                 {
-                    Add(where, "trials");
+                    var parentHolds = place.Kind switch
+                    {
+                        ParentKind.Several => false,
+                        ParentKind.Root => !line.ContainsKey("parentResultId") || line["parentResultId"] is null,
+                        ParentKind.Path => !rollupIds.TryGetValue((rollupCase, place.Path!), out var above)
+                                           || string.Equals(AefNode.String(line["parentResultId"]), above, StringComparison.Ordinal),
+                        _ => true,   // no parent known: the parent problem's
+                    };
+                    if (!parentHolds)
+                    {
+                        Add(where, "trials");
+                    }
                 }
 
                 // [RES-8]: in a closed run every trial line's case and path has a rollup (a running run's case may not yet).
@@ -614,6 +652,27 @@ public static class CrossFileRules
         // A line's case and path, as written.
         private static (string, string) CaseAndPath(JsonObject line) =>
             (AefNode.String(line["caseId"]) ?? "", AefNode.String(line["path"]) ?? "");
+
+        private enum ParentKind
+        {
+            Unknown,
+            Root,
+            Path,
+            Several,
+        }
+
+        // [RES-8]: where the trial lines at one case and path have their parents: all roots, all at one path, at several
+        // places (a trials problem), or nowhere known (every parent names no line).
+        private readonly record struct ParentPlace(ParentKind Kind, string? Path)
+        {
+            public static ParentPlace Unknown => new(ParentKind.Unknown, null);
+
+            public static ParentPlace Root => new(ParentKind.Root, null);
+
+            public static ParentPlace Several => new(ParentKind.Several, null);
+
+            public static ParentPlace At(string path) => new(ParentKind.Path, path);
+        }
 
         private static List<T> GetOrAdd<T>(Dictionary<(string, string), List<T>> map, (string, string) key)
         {

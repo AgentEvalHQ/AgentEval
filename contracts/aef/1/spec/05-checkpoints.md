@@ -237,7 +237,11 @@ policy. It reports problems as a path and a code, ordered by path and code.
   reverse), `lane-version` (another `subjectVersion`), `oldest-closed` (another `oldestClosedAt`). A lane the recorded
   input decides is not compared when what its recomputation depends on holds something this version does not know
   ([VER-8]), since a later minor may have recorded a result this version cannot recompute: it is `unverifiable` (that
-  lane cannot be checked here), never `lane-result`. Exactly these make a lane `unverifiable`: its rule is not valid
+  lane cannot be checked here), never `lane-result`. Only a document that declares a later minor than this version
+  ([VER-6]) can make a lane `unverifiable`; one that declares this version, or an earlier one, and holds such a value
+  is read as §7.3 says and compared as usual, so a 1.0 checkpoint cannot escape `lane-result` with a member nobody
+  defined. Exactly these make a lane `unverifiable`, each in a document that declares a later minor (the checkpoint
+  for its rule; the `run.json`, result line or `metrics.json` that holds a run-side value): its rule is not valid
   against this version's writer schema (a
   kind, a member or a value a later minor added, such as a severity maximum, a threshold operator or a comparison
   axis), or when a run it reads (a found run of the lane or its baseline) holds an unknown `execution.targetMode`,

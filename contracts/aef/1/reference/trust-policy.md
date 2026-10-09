@@ -6,6 +6,7 @@ SIG-4: the public keys a verifier trusts, each with the identity it speaks for a
 
 | Field | Type | Required | Bounds | Description |
 |---|---|---|---|---|
+| `schemaVersion` | `"1.0"` |  |  | The AEF version the policy is written for (SIG-4); a verifier refuses a later one. |
 | `keys` | array of [key](#key) | yes | ≤ 10000 items |  |
 
 ## Definitions

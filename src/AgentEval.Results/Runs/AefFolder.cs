@@ -28,12 +28,23 @@ public enum AefEntryKind
 /// later folder are reported; an empty folder is ignored), and every symbolic link, pipe, socket or device. When the
 /// folder holds more files than [ENC-17] allows (not counting <c>seal.json</c>, <c>attestation.dsse.json</c> and
 /// <c>overlays/</c>), the walk stops: <see cref="Problems"/> is the one <c>limit</c> problem
-/// at <c>.</c> ([ENC-18]) and <see cref="Files"/> is not the whole folder. When <c>overlays/</c> holds more files than
-/// one events file and two per batch ([ENC-17]: 19,999), <see cref="OverlaysOverLimit"/> is set: the overlay verifier
-/// reports <c>limit</c> at <c>overlays</c> and checks the chain no further ([OVL-5]). Those files are still listed, and
-/// their paths checked ([RUN-3]): nothing in the text stops a run verifier there (R4N-8).
+/// at <c>.</c> ([ENC-18]) and <see cref="Files"/> is not the whole folder.
 /// </summary>
-public sealed record AefFolderListing(IReadOnlyList<string> Files, IReadOnlyList<AefProblem> Problems, bool OverlaysOverLimit = false);
+/// <remarks>
+/// <c>overlays/</c> is not checked by [RUN-3] (round 5): it grows after the run is sealed, so whatever it holds is the
+/// overlay chain's to report ([OVL-5]), never a problem of the run. Its regular files are in <see cref="Files"/> (the
+/// chain reads them) but take no part in <see cref="Problems"/>, not even in a case clash; its links, pipes, sockets and
+/// devices are in <see cref="OverlayIrregular"/>, for the overlay verifier to report as <c>unexpected-file</c>. When it
+/// holds more files than one events file and two per batch ([ENC-17]: 19,999), <see cref="OverlaysOverLimit"/> is set:
+/// the overlay verifier reports <c>limit</c> at <c>overlays</c> once and still checks the chain from the files it names
+/// ([OVL-5]). Every file is listed all the same (R4N-8: the listing a count needs is not bounded).
+/// </remarks>
+/// <param name="Files">The regular files, by path, in byte order.</param>
+/// <param name="Problems">The <c>path</c> problems of [RUN-3] outside <c>overlays/</c>, or the one <c>limit</c> at <c>.</c>.</param>
+/// <param name="OverlaysOverLimit">More than 19,999 files under <c>overlays/</c>.</param>
+/// <param name="OverlayIrregular">The entries under <c>overlays/</c> that are not regular files nor folders, in byte order.</param>
+public sealed record AefFolderListing(
+    IReadOnlyList<string> Files, IReadOnlyList<AefProblem> Problems, bool OverlaysOverLimit = false, IReadOnlyList<string>? OverlayIrregular = null);
 
 /// <summary>
 /// Lists a run folder as [RUN-3] (contracts/aef/1/spec/03-run.md) allows it: every entry is a regular file or a
@@ -129,14 +140,24 @@ public static class AefFolder
         }
 
         // [RUN-3]'s rules are on the paths of files; a link, pipe, socket or device is a path problem whatever its name.
-        // Files under overlays/ are listed and checked whatever their number (R4N-8): only the overlay verifier stops
-        // at its limit.
-        var problems = AefPaths.Check(files.Concat(irregular)).Concat(irregular.Select(p => new AefProblem(p, "path"))).Distinct();
+        // overlays/ is not checked by them (round 5): whatever it holds is the overlay chain's to report ([OVL-5]). Its
+        // files are still listed whatever their number (R4N-8), for the chain to read.
+        var runFiles = files.Concat(irregular).Where(p => !IsUnderOverlays(p));
+        var runIrregular = irregular.Where(p => !IsUnderOverlays(p));
+        var problems = AefPaths.Check(runFiles).Concat(runIrregular.Select(p => new AefProblem(p, "path"))).Distinct();
         return new AefFolderListing(
-            [.. files.Order(AefProblemOrder.Utf8)], AefProblemOrder.Sort(problems), overlayEntries > AefLimits.MaxOverlayFiles);
+            [.. files.Order(AefProblemOrder.Utf8)],
+            AefProblemOrder.Sort(problems),
+            overlayEntries > AefLimits.MaxOverlayFiles,
+            [.. irregular.Where(IsUnderOverlays).Order(AefProblemOrder.Utf8)]);
     }
 
-    private static bool IsUnderOverlays(string path) => path.StartsWith("overlays/", StringComparison.Ordinal);
+    /// <summary>Whether <paramref name="path"/> is under <c>overlays/</c>, which [RUN-3] does not check ([OVL-5] does).</summary>
+    public static bool IsUnderOverlays(string path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        return path.StartsWith("overlays/", StringComparison.Ordinal);
+    }
 
     /// <summary>
     /// Whether a file counts toward the 100,000 of [ENC-17]: every file but <c>seal.json</c>, <c>attestation.dsse.json</c>

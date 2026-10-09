@@ -77,6 +77,10 @@ internal static partial class AefConverter
     [GeneratedRegex(@"^sha256:[0-9a-f]{64}\z")]
     private static partial Regex Sha256UriPattern();
 
+    // common#/$defs/ref's kind ([ENC-13]): a lower-case letter, then lower-case letters, digits and '-', 32 at most.
+    [GeneratedRegex(@"^[a-z][a-z0-9-]{0,31}\z")]
+    private static partial Regex RefKindPattern();
+
     // run.schema.json deployment.endpoint: scheme, host and path only (RUN-10).
     [GeneratedRegex(@"^[a-z][a-z0-9+.-]*://[!""$-.0->A-~]+(/[!""$->@-~]*)?\z")]
     private static partial Regex EndpointPattern();
@@ -110,12 +114,21 @@ internal static partial class AefConverter
     public static string Sha256Of(ReadOnlySpan<byte> bytes) => "sha256:" + Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
 
     /// <summary>
-    /// A typed reference <c>kind:name</c> (common#/$defs/ref: printable ASCII without spaces, at most 256 characters
-    /// after the kind). A character outside that range, and <c>%</c>, is percent-encoded (UTF-8); a name still longer
-    /// is cut and ends with <c>~</c> and 16 hex characters of its SHA-256, so two long names stay apart.
+    /// A typed reference <c>kind:name</c> (common#/$defs/ref: a kind of 1 to 32 characters, then printable ASCII without
+    /// spaces, at most 256 characters after the kind), its name derived from free text as [ENC-13] says: a byte outside
+    /// <c>!</c>–<c>~</c>, and <c>%</c>, is percent-encoded (UTF-8, upper-case hex); an empty name is <c>-</c>, and a name
+    /// that is exactly <c>-</c> is <c>%2D</c>, so the two stay apart; a name still longer than 256 is cut to its first 239
+    /// characters and ends with <c>~</c> and 16 hex characters of the SHA-256 of its UTF-8 bytes, so two long names stay
+    /// apart.
     /// </summary>
+    /// <exception cref="ArgumentException">The kind is not a lower-case letter and then at most 31 lower-case letters, digits and <c>-</c>.</exception>
     public static string TypedRef(string kind, string name)
     {
+        if (!RefKindPattern().IsMatch(kind))
+        {
+            throw new ArgumentException($"'{kind}' is not a ref's kind: a lower-case letter, then lower-case letters, digits and '-', 32 characters at most ([ENC-13]).", nameof(kind));
+        }
+
         var text = new StringBuilder(name.Length);
         foreach (var b in Encoding.UTF8.GetBytes(name))
         {
@@ -129,7 +142,12 @@ internal static partial class AefConverter
             }
         }
 
-        var encoded = text.Length == 0 ? "-" : text.ToString();
+        var encoded = text.ToString() switch
+        {
+            "" => "-",
+            "-" => "%2D",   // [ENC-13]: so a name of "-" and an empty name stay apart
+            var written => written,
+        };
         if (encoded.Length > 256)
         {
             var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(name)), 0, 8).ToLowerInvariant();

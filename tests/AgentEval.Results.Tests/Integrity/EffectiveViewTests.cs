@@ -118,6 +118,28 @@ public class EffectiveViewTests
     }
 
     [Fact]
+    public void Withheld_NoNumberOfOtherFilesUnderOverlays_VoidsAnAuthorizedRedaction()
+    {
+        // [OVL-5] (round 5): more than 19,999 files under overlays/ is limit at overlays, reported once, and the chain is
+        // still checked from the files it names: no number of junk files voids the batch, so none voids its redaction. Nor
+        // is the limit, or a junk file, a problem of the run ([RUN-3], §4.5).
+        using var alice = EcdsaP256Signer.Generate();
+        using var run = Redacted(alice, by: TestRun.Alice);
+        for (var i = 0; i < AefLimits.MaxOverlayFiles; i++)
+        {
+            File.WriteAllBytes(Path.Combine(run.Dir, "overlays", $".junk-{i}"), []);
+        }
+
+        var policy = TestRun.Policy(alice, redact: true);
+
+        Assert.Equal(["overlays limit"], run.ChainProblems());
+        Assert.Equal([TestRun.ReasoningSha], View(run, policy).Withheld);
+        var verification = run.Verify(policy);
+        Assert.Equal((AefOutcome.Intact, 1), (verification.Outcome, verification.Withheld));
+        Assert.Equal([$"{TestRun.ReasoningPath} withheld"], verification.Problems.Select(p => $"{p.Path} {p.Code}"));
+    }
+
+    [Fact]
     public void Missing_AnUnsignedRedaction()
     {
         using var run = new TestRun().Write().Seal();

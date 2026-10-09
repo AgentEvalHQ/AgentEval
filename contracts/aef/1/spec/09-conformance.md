@@ -10,7 +10,7 @@ that class. Requirements not listed for a class still apply to it where it does 
 | **Producer** | ENC-1–ENC-19, RUN-1–RUN-15, RES-1–RES-11, SUM-1–SUM-9, EVD-1–EVD-3, GATE-1–GATE-2, VER-1, VER-2, VER-6, VER-9 | `document` (writer side), `run` (valid runs), `result-id`, `paths`, and the write-side `summarize` and `produce` |
 | **Sealer** | SEAL-1–SEAL-5, SIG-1–SIG-3; signs with at least one of [SIG-2]'s algorithms | `seal` (expected manifests), `signature` (signing side), and the write-side `seal-write`, and `sign` for the algorithms it claims |
 | **Reader** | ENC-1–ENC-19, VER-3, VER-4, VER-8 (the reading rules of §7.3), VER-9 | `document` (reader side, including every encoding defect as a single document), `reader-only` |
-| **Run verifier** | Reader, plus §3.9, SEAL-4, SEAL-6, SIG-4, SIG-5, SIG-7, and OVL-4, OVL-5, OVL-10 (to tell a withheld blob from a missing one) | `run`, `seal`, `encoding`, `paths`; at the *signed* level also `signature` |
+| **Run verifier** | Reader, plus §3.9, SEAL-4, SEAL-6, SIG-4, SIG-5, SIG-7, and OVL-4, OVL-5, OVL-10 (to tell a withheld blob from a missing one) | `run`, `seal`, `encoding`, `paths`; at the *signed* level also `signature`; and the Reader's |
 | **Overlay verifier** | OVL-1–OVL-11, SIG-4, SIG-5 (batch signatures and redaction authority, [OVL-3], [OVL-10]) | `chain`, `overlay-view`, `signature` |
 | **Checkpoint verifier** | CKP-1–CKP-10, LANE-1–LANE-11, DEC-1–DEC-5, SIG-8, and Run verifier | `checkpoint`, `lane`, `decision`, `signature` ([CKP-9]), and the Run verifier's |
 | **Decision engine** | DEC-1–DEC-5 | `decision` |
@@ -33,7 +33,9 @@ implementation computes or writes something, and the conformance runner judges i
 verifier (§9.3), so a correct validator over a broken writer does not pass. `produce` gives a Producer the facts of a
 run as a producer has them when it writes one (the header, the metrics, each case's states and its own decisions)
 and judges the run it writes: what [RES-4]–[RES-8] derive from those facts (result ids, parents, trial numbers,
-rollups, aggregation counts) and the summary. A Runner has no write-side vector of its own: what it writes is a job
+rollups, aggregation counts) and the summary. A Producer's evidence, gate decisions and blobs are not yet written
+under test: the run vectors check them only as a reader would (a gap 1.1 may close). A Runner has no write-side
+vector of its own: what it writes is a job
 over a live subject, which a corpus cannot hold. It is tested by `plan` and `matching`, and by the Producer and Sealer
 vectors, which it passes for the runs it produces; the event stream it writes is checked against [STRM-3] and
 [STRM-4] whenever someone verifies it (a Stream verifier).
@@ -221,8 +223,8 @@ each limit of [ENC-17] at its value or one beyond.
     `result` schema, and the lines are the expected ones in any order: matched by `caseId`, `path` and `trial`,
     member by member, with no line missing, added or written twice. Everywhere, numbers compare under §3.6's rule and
     times as times ([ENC-8]), and a value and the absence that means the same compare equal: a null member and none
-    ([ENC-2]), an `unmeasured` count of 0 and none ([RES-6]), an empty `decisive` and none; `decisive` is compared as a
-    set.
+    ([ENC-2]), an `unmeasured` count of 0 and none ([RES-6]), an empty `decisive` and none, a `contentCapture` of `on`
+    and none ([RUN-11]); `decisive` is compared as a set.
     `summary.json` is judged as `summarize`'s output is, and the run verifies `unsealed` with no problems.
   - `seal-write`: the runner seals a fresh copy of the run, never the corpus's. The `seal.json` written is valid
     against the writer `seal` schema; its subjects are the expected manifest's paths and digests, in its order; its

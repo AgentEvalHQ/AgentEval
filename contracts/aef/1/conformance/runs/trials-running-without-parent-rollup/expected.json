@@ -1,0 +1,9 @@
+{
+  "kind": "run",
+  "run": "run",
+  "outcome": "unsealed",
+  "problems": [],
+  "rules": [
+    "RES-8"
+  ]
+}

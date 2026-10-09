@@ -453,8 +453,8 @@ public sealed record AefRunHeader
     /// <summary>The run's configuration as the producer applied it.</summary>
     public AefRunConfig? Config { get; init; }
 
-    /// <summary>When the run started ([RUN-5]).</summary>
-    public required DateTimeOffset StartedAt { get; init; }
+    /// <summary>When the run started ([RUN-5]), at the precision given ([ENC-8]: up to nanoseconds; a <see cref="DateTimeOffset"/> converts).</summary>
+    public required AefTime StartedAt { get; init; }
 
     /// <summary>The OpenTelemetry conventions the run's traces follow ([RUN-14]).</summary>
     public AefOtel? Otel { get; init; }
@@ -741,8 +741,8 @@ public sealed record AefCalibration
     /// <summary>Labelled failures the judge passed; never above <see cref="N"/> (§3.9 <c>calibration</c>).</summary>
     public long? DangerousErrors { get; init; }
 
-    /// <summary>When it was measured: not after the run's start (§3.9 <c>calibration</c>).</summary>
-    public required DateTimeOffset MeasuredAt { get; init; }
+    /// <summary>When it was measured: not after the run's start (§3.9 <c>calibration</c>), at the precision given ([ENC-8]).</summary>
+    public required AefTime MeasuredAt { get; init; }
 
     internal JsonObject ToJson()
     {
@@ -967,11 +967,11 @@ public sealed record AefResult
     /// <summary>For an adversarial case ([RES-10]).</summary>
     public AefAttack? Attack { get; init; }
 
-    /// <summary>When work on the node started.</summary>
-    public DateTimeOffset? StartedAt { get; init; }
+    /// <summary>When work on the node started, at the precision given ([ENC-8]).</summary>
+    public AefTime? StartedAt { get; init; }
 
-    /// <summary>When it ended: not before <see cref="StartedAt"/> (§3.9 <c>result-times</c>).</summary>
-    public DateTimeOffset? EndedAt { get; init; }
+    /// <summary>When it ended: not before <see cref="StartedAt"/> (§3.9 <c>result-times</c>), at the precision given ([ENC-8]).</summary>
+    public AefTime? EndedAt { get; init; }
 
     /// <summary>The line, in the schema's member order.</summary>
     internal JsonObject ToJson(string resultId, string? parentResultId)
@@ -1489,8 +1489,8 @@ public sealed record AefGateDecision
     /// <summary>The result ids that decided it: lines of this run (§3.9 <c>gate</c>).</summary>
     public IReadOnlyList<string>? Decisive { get; init; }
 
-    /// <summary>When it was decided.</summary>
-    public required DateTimeOffset DecidedAt { get; init; }
+    /// <summary>When it was decided, at the precision given ([ENC-8]).</summary>
+    public required AefTime DecidedAt { get; init; }
 
     /// <summary>Producer extensions ([ENC-19]).</summary>
     public JsonObject? Ext { get; init; }

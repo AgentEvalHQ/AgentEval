@@ -705,10 +705,80 @@ public class CrossFileRulesTests
     }
 
     [Fact]
+    public void Trials_APathsSpellingDecidesNothing_ACasesRootAtUxRunInTrials_HasItsRollupThereAsARoot()
+    {
+        // [RES-8] (round 5): the rollups form the case's tree as its trial lines do. A case with two roots, u and u/x,
+        // each run in trials: the trial lines at u/x are roots, so the rollup at u/x is a root, though the case has a
+        // rollup at u. Round 4 read the tree from the paths and reported it.
+        using var run = new TestRun();
+        run.Results.Add(Trial("k3", "u", 0, "passed"));
+        run.Results.Add(Trial("k3", "u/x", 0, "failed"));
+        run.Results.Add(Rollup("k3", "u", n: 1, passed: 1));
+        run.Results.Add(Rollup("k3", "u/x", n: 1, passed: 0));
+        Assert.Empty(Problems(run));
+
+        // Made a child of the rollup at u, the rollup at u/x is not where its trial lines are: trials.
+        using var wrong = new TestRun();
+        var u = Rollup("k3", "u", n: 1, passed: 1);
+        u["aggregation"] = TestRun.Obj("""{"strategy": "Min", "rulePath": "threshold", "measured": 1, "total": 1}""");
+        wrong.Results.AddRange([Trial("k3", "u", 0, "passed"), Trial("k3", "u/x", 0, "failed"), u, Child(Rollup("k3", "u/x", n: 1, passed: 0), u)]);
+        Assert.Equal(["results.ndjson:8 trials"], Problems(wrong));
+    }
+
+    [Fact]
+    public void Trials_ARollupWhoseTrialLinesParentsAreRootsAndNot_OrAtSeveralPaths_IsTrials_OnceAtTheRollup()
+    {
+        // [RES-8], §3.9 trials (round 5, R5N-2): a rollup whose trial lines' parents are at several paths, or some roots
+        // and some not, is trials, reported once at the rollup and never at the trial lines.
+        JsonObject Composite(JsonObject line)
+        {
+            line["aggregation"] = TestRun.Obj("""{"strategy": "Min", "rulePath": "threshold", "measured": 1, "total": 1}""");
+            return line;
+        }
+
+        using var rootsAndNot = new TestRun();
+        var t0 = Composite(Trial("k3", "t", 0, "passed"));
+        rootsAndNot.Results.AddRange([
+            t0, Child(Trial("k3", "t/x", 0, "passed"), t0),   // lines 5, 6: under the trial line at t
+            Trial("k3", "t/x", 1, "passed"),                  // line 7: a root
+            Rollup("k3", "t", n: 1, passed: 1), Rollup("k3", "t/x", n: 2, passed: 2)]);   // lines 8, 9
+        Assert.Equal(["results.ndjson:9 trials"], Problems(rootsAndNot));
+
+        using var twoPaths = new TestRun();
+        var (a0, b1) = (Composite(Trial("k3", "a", 0, "passed")), Composite(Trial("k3", "b", 1, "passed")));
+        twoPaths.Results.AddRange([
+            a0, Child(Trial("k3", "a/x", 0, "passed"), a0),   // lines 5, 6: a/x under a
+            b1, Child(Trial("k3", "a/x", 1, "passed"), b1),   // lines 7, 8: a/x under b
+            Rollup("k3", "a", n: 1, passed: 1), Rollup("k3", "b", n: 1, passed: 1), Rollup("k3", "a/x", n: 2, passed: 2)]);   // lines 9-11
+        Assert.Equal(["results.ndjson:11 trials"], Problems(twoPaths));
+
+        // In a running run whose case has no rollup at that path yet, nothing reports it: there is no rollup to report.
+        using var running = new TestRun();
+        var r0 = Composite(Trial("k3", "t", 0, "passed"));
+        running.Results.AddRange([r0, Child(Trial("k3", "t/x", 0, "passed"), r0), Trial("k3", "t/x", 1, "passed")]);
+        running.Run["status"] = "running";
+        running.Run.Remove("endedAt");
+        running.Summary = null;
+        Assert.Empty(Problems(running));
+    }
+
+    [Fact]
+    public void Trials_ARollupWhoseTrialLinesAreRoots_IsARoot()
+    {
+        // [RES-8] (round 5): "and is a root when they are roots".
+        using var run = new TestRun();
+        var other = Rollup("k3", "s", n: 1, passed: 1);
+        other["aggregation"] = TestRun.Obj("""{"strategy": "Min", "rulePath": "threshold", "measured": 1, "total": 1}""");
+        run.Results.AddRange([Trial("k3", "s", 0, "passed"), Trial("k3", "t", 0, "passed"), other, Child(Rollup("k3", "t", n: 1, passed: 1), other)]);
+
+        Assert.Equal(["results.ndjson:8 trials"], Problems(run));
+    }
+
+    [Fact]
     public void Trials_TheRollupsOfACompositeCase_FormItsOwnTree()
     {
-        // [RES-8] (round 4, W5a-23): a rollup at a child path has its case's rollup at the parent path (the path without
-        // its last '/' segment) as its parent, when the case has one there.
+        // [RES-8] (round 4, W5a-23; round 5): a rollup's parent is its case's rollup at the path of its trial lines'
+        // parents (here t, for the trial lines at t/x under the trial lines at t).
         JsonObject[] Case(string caseId, bool asTree)
         {
             var (first, second) = (Trial(caseId, "t", 0, "passed"), Trial(caseId, "t", 1, "passed"));
@@ -736,11 +806,20 @@ public class CrossFileRulesTests
         root.Results.AddRange(Case("k3", asTree: false));
         Assert.Equal(["results.ndjson:10 trials"], Problems(root));
 
-        // A case with no rollup at the parent path: its rollup at the child path may be a root.
+        // A case whose trial lines at u/x are roots: its rollup there is a root.
         using var alone = new TestRun();
         alone.Results.Add(Trial("k4", "u/x", 0, "passed"));
         alone.Results.Add(Rollup("k4", "u/x", n: 1, passed: 1));
         Assert.Empty(Problems(alone));
+
+        // A running case with no rollup yet at its trial lines' parents' path (t): its rollup at t/x is not checked
+        // against one (R5N-3), so a root there is no problem.
+        using var running = new TestRun();
+        running.Results.AddRange(Case("k3", asTree: false).Where(l => !((string)l["path"]! == "t" && l.ContainsKey("trials"))));
+        running.Run["status"] = "running";
+        running.Run.Remove("endedAt");
+        running.Summary = null;
+        Assert.Empty(Problems(running));
 
         // Another case's rollup at the parent path is not this case's.
         using var other = new TestRun();

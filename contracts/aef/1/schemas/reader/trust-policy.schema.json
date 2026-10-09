@@ -9,6 +9,10 @@
     "keys"
   ],
   "properties": {
+    "schemaVersion": {
+      "description": "The AEF version the policy is written for (SIG-4); a verifier refuses a later one.",
+      "const": "1.0"
+    },
     "keys": {
       "type": "array",
       "maxItems": 10000,

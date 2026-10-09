@@ -1,0 +1,13 @@
+{
+  "kind": "signature",
+  "envelope": "envelope.dsse.json",
+  "file": "seal.json",
+  "payloadType": "application/vnd.in-toto+json",
+  "policy": "policy.json",
+  "policyRefused": true,
+  "rules": [
+    "SIG-4",
+    "VER-1",
+    "SIG-6"
+  ]
+}

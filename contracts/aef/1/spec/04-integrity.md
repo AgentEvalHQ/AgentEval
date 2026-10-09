@@ -99,14 +99,19 @@ What is added to a run after it closed: approvals, rejections, waivers, adjudica
   and never stops the chain. A blank line, a line holding a CR, or one that begins with a byte-order mark breaks
   [ENC-5] for that line alone: it is `event-invalid` at its line. A last line without LF is still being written: it
   is no event, neither shown nor reported as one (its bytes are `uncovered` until a batch claims them). A writer that
-  appends after such a line first ends it with an LF, so the line reads as `event-invalid` and the next batch can
-  claim it: a crash costs one line, never the chain.
+  appends after such a line first ends it with an LF, so the next batch can claim it: the line then reads as what it
+  holds (half an event is `event-invalid`; a whole event that only lacked its LF is that event): a crash costs at
+  most one line, never the chain.
 
   A reader reads the events file as far as [ENC-17] allows: up to its last LF within the first 1 GiB and the first
   1,000,000 lines (an unfinished last line is no line). If the file holds more, it is reported once as `limit` at
   `overlays/events.ndjson`; a batch whose range ends beyond what was read is `limit` at its seal, which ends the
-  verified prefix; and no line after the verified batches is read. More than 19,999 files under `overlays/` (one events file and two per batch, [ENC-17]) is
-  `limit` at `overlays`, and the chain is not checked further.
+  verified prefix; and no line after the verified batches is read. More than 19,999 files under `overlays/` (one
+  events file and two per batch, [ENC-17]) is
+  `limit` at `overlays`, reported once: the files that are neither the events file, a batch seal nor a batch signature
+  are then not reported one by one, and the chain is checked as usual from the files it names, so no number of other
+  files voids a batch. A file under `overlays/` that is not a regular file named as one of those three is
+  `unexpected-file`, whatever its name ([RUN-3] does not apply there).
 
   A line reported as `event-invalid` is not checked for `event-id` or `target`, and its id is not recorded.
 
@@ -165,7 +170,8 @@ no effect either. Events after the last verified batch are shown as unsealed and
 
 - **[SIG-1] Envelopes.** A signature is a DSSE v1 envelope ([DSSE]): `payloadType`, `payload` (base64 of the signed
   bytes), and `signatures` (at least one, each a `keyid` and a base64 `sig`). An envelope is `malformed` when it is not
-  an I-JSON object within the limits of [ENC-17] (56 MiB); when `payloadType` or `payload` is absent or not a string; when `payload` is not base64;
+  an I-JSON object within the limits of [ENC-17] (56 MiB: beyond it, it is `malformed` without being read, and it
+  verifies for no one); when `payloadType` or `payload` is absent or not a string; when `payload` is not base64;
   when `signatures` is absent, not an array or empty; or when an entry of it is not an object, has no `sig`, a `sig`
   that is not a base64 string, or a `keyid` that is present but neither a string nor `null` (`null` reads as absent,
   as DSSE's JSON mapping says). Members DSSE does not define are ignored. Base64 is written in the standard alphabet with padding. A reader accepts either alphabet, the
@@ -215,9 +221,11 @@ no effect either. Events after the last verified batch are shown as unsealed and
   `may` of its keys. A trust policy is a JSON document within [ENC-17]'s limits for a JSON file, valid against
   `trust-policy.schema.json`, whose reader schema is its writer schema ([VER-9]): a verifier refuses as a whole, as
   [SIG-3] does, a policy that is not, including one holding a member it does not know. `may` is matched by exact value, and a value the verifier does not know grants nothing.
-  A verifier **MUST NOT** trust a key because a run, an overlay or a runner manifest names it.
-  Keyless signing (Sigstore: a short-lived certificate tied to an OIDC identity, logged in a transparency log) **MAY**
-  be supported as a trust-policy input; its bundle is then given beside the envelope.
+  A policy may carry `schemaVersion` (`1.0`); one that declares a later version is refused, as one with a member it
+  does not know is. A verifier **MUST NOT** trust a key because a run, an overlay or a runner manifest names it.
+  Keyless signing (Sigstore: a short-lived certificate tied to an OIDC identity, logged in a transparency log) is not
+  part of 1.0's trust policy: a later minor may add it to the policy, and a 1.0 verifier refuses a policy that uses
+  it.
 - **[SIG-5] Results per signature**, in envelope order: `verified` (a trusted key, a valid signature: the identity is
   reported), `untrusted-key` (a valid signature by a key the policy does not list, or no key with that id), `invalid`
   (the signature does not verify), `unsupported-algorithm`, and, for the whole envelope, `malformed` (no per-signature
@@ -238,7 +246,10 @@ A run verifier reports the run's **outcome**, every problem found, and, when its
 stronger levels:
 
 - the outcome is **invalid** when there is any problem of §3.9, or of §4.1 other than `withheld`; otherwise
-  **unsealed** when there is no `seal.json`, and otherwise **intact**;
+  **unsealed** when there is no `seal.json`, and otherwise **intact**. Neither a signature nor anything under
+  `overlays/` is a problem of the run: an envelope that is `malformed` (an oversized one included, [SIG-1]) only
+  leaves the run signed by no one, and overlays change a run's outcome only through an authorized redaction
+  ([OVL-10]);
 - **signed by** the identities `attestation.dsse.json` verifies for under a trust policy the caller gives (§4.4),
   for an intact run;
 - **anchored** when the caller gives a list of trusted run hashes (taken from verified checkpoints, a transparency

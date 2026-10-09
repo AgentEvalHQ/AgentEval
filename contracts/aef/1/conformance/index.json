@@ -428,6 +428,46 @@
    }
   },
   {
+   "id": "runs/attestation-at-56-mib",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "SIG-1",
+    "ENC-17",
+    "ENC-18"
+   ],
+   "path": "runs/attestation-at-56-mib",
+   "files": {
+    "expected.json": "2c65cfe05366d672414fda0dd6df96994c57a77f8bae126489fc8fb710de5404",
+    "policy.json": "8318aa752a303206435584438e8b0c8bce861e391782c4e666d9be2f809ef3a6"
+   },
+   "level": "signed"
+  },
+  {
+   "id": "runs/attestation-beyond-56-mib",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "SIG-1",
+    "ENC-17",
+    "ENC-18"
+   ],
+   "path": "runs/attestation-beyond-56-mib",
+   "files": {
+    "expected.json": "c868fbebede1ecf5a4bac81e5ec2d28fac11ffed03964f002c1de77040bad914",
+    "policy.json": "8318aa752a303206435584438e8b0c8bce861e391782c4e666d9be2f809ef3a6"
+   },
+   "level": "signed"
+  },
+  {
    "id": "runs/blob-digest",
    "kind": "run",
    "classes": [
@@ -2046,6 +2086,56 @@
    }
   },
   {
+   "id": "runs/trials-independent-roots",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "RES-8"
+   ],
+   "path": "runs/trials-independent-roots",
+   "files": {
+    "expected.json": "25d13137f3383fa18a076174fa9782ecfdafc9f364511cabff9311906bcfcc0d",
+    "run/blobs/sha256/47/474400071c193b3faf9f2c7f82e28fea484a7b59a07fc0a247282870d6441e99": "474400071c193b3faf9f2c7f82e28fea484a7b59a07fc0a247282870d6441e99",
+    "run/evidence.ndjson": "0cb5efa41e591fed8fc988a7e2063ba7285b4faebe8ddbac0d7782643ceb8642",
+    "run/gates.ndjson": "a7015f35139336ec94132638061773933c7e118c718e81dea171768d1377b26e",
+    "run/metrics.json": "81ac87c69d20ca49d69e0a5541b062fe1f8fcc4529117c6d6f29eac1403b3d6c",
+    "run/results.ndjson": "4a9b429532a8d25834b44272c82646cbdd7c9f5c620bb39a135e27e77ee88414",
+    "run/run.json": "69f20a0f63a1ff1fa9521dee737a44ccdba294b7a16a38b1fbe34cac5a1e3890",
+    "run/seal.json": "3f78231b0e46f838b1016493f923c3ad3e8f4ac97249d6b424e4cc00ab795544",
+    "run/summary.json": "fe9548e607cab4fc632706c94cefc75b67a9efde0c1c0c6bb604206386960a3c",
+    "run/traces.otlp.jsonl": "7ed4f10a3ccf2cb1b5f6b44865f2b35896b891c7fd7d05d2ddba7b5ffd417921"
+   }
+  },
+  {
+   "id": "runs/trials-mixed-parents",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "RES-8"
+   ],
+   "path": "runs/trials-mixed-parents",
+   "files": {
+    "expected.json": "b4fb2436c3bf90edac4c3cf776762b4534d46e9dd947d9364e57e41ada5a161b",
+    "run/blobs/sha256/47/474400071c193b3faf9f2c7f82e28fea484a7b59a07fc0a247282870d6441e99": "474400071c193b3faf9f2c7f82e28fea484a7b59a07fc0a247282870d6441e99",
+    "run/evidence.ndjson": "0cb5efa41e591fed8fc988a7e2063ba7285b4faebe8ddbac0d7782643ceb8642",
+    "run/gates.ndjson": "a7015f35139336ec94132638061773933c7e118c718e81dea171768d1377b26e",
+    "run/metrics.json": "81ac87c69d20ca49d69e0a5541b062fe1f8fcc4529117c6d6f29eac1403b3d6c",
+    "run/results.ndjson": "140ed1d0b1ca9ab0b6b24db4a5bc9dff834f1b18e7dc4f8f930b39de88a545d7",
+    "run/run.json": "69f20a0f63a1ff1fa9521dee737a44ccdba294b7a16a38b1fbe34cac5a1e3890",
+    "run/seal.json": "eb0491da6ebb817857f01d5106062e4a95c139a6cc31f810038275e5bb610f1e",
+    "run/summary.json": "fe9548e607cab4fc632706c94cefc75b67a9efde0c1c0c6bb604206386960a3c",
+    "run/traces.otlp.jsonl": "7ed4f10a3ccf2cb1b5f6b44865f2b35896b891c7fd7d05d2ddba7b5ffd417921"
+   }
+  },
+  {
    "id": "runs/trials-passed-over-n",
    "kind": "run",
    "classes": [
@@ -2167,6 +2257,30 @@
     "run/results.ndjson": "7582a36edc74f4bf1f33aa61065a29fbed12fee586d9d32eaeac95b7b959f053",
     "run/run.json": "69f20a0f63a1ff1fa9521dee737a44ccdba294b7a16a38b1fbe34cac5a1e3890",
     "run/seal.json": "02a681414d72c8cc5dc8923a5f43351ad7ff5f44fca098943058a2c17bad7113",
+    "run/summary.json": "fe9548e607cab4fc632706c94cefc75b67a9efde0c1c0c6bb604206386960a3c",
+    "run/traces.otlp.jsonl": "7ed4f10a3ccf2cb1b5f6b44865f2b35896b891c7fd7d05d2ddba7b5ffd417921"
+   }
+  },
+  {
+   "id": "runs/trials-running-without-parent-rollup",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "RES-8"
+   ],
+   "path": "runs/trials-running-without-parent-rollup",
+   "files": {
+    "expected.json": "1601d606258539270bc5d2bd742e73960ac7ee637cf15c4f8c0abe186ec855db",
+    "run/blobs/sha256/47/474400071c193b3faf9f2c7f82e28fea484a7b59a07fc0a247282870d6441e99": "474400071c193b3faf9f2c7f82e28fea484a7b59a07fc0a247282870d6441e99",
+    "run/evidence.ndjson": "0cb5efa41e591fed8fc988a7e2063ba7285b4faebe8ddbac0d7782643ceb8642",
+    "run/gates.ndjson": "a7015f35139336ec94132638061773933c7e118c718e81dea171768d1377b26e",
+    "run/metrics.json": "81ac87c69d20ca49d69e0a5541b062fe1f8fcc4529117c6d6f29eac1403b3d6c",
+    "run/results.ndjson": "3a4632da85adc0b85dc43663124d7c587e2365749202583627542fbe61874151",
+    "run/run.json": "7cbd91e41f011d10f59822c7a3d0a99b1ad14ce55ab0ec548673f0570eafabd1",
     "run/summary.json": "fe9548e607cab4fc632706c94cefc75b67a9efde0c1c0c6bb604206386960a3c",
     "run/traces.otlp.jsonl": "7ed4f10a3ccf2cb1b5f6b44865f2b35896b891c7fd7d05d2ddba7b5ffd417921"
    }
@@ -2335,6 +2449,66 @@
     "run/seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84",
     "run/summary.json": "268eda205f131668d931d8804c9530cb7c99b2857d95e1ce1bc24fc3d6314679",
     "run/traces.otlp.jsonl": "3c29fa780cb029dd541c36edb35614f49df76f459a1f7c3e3702960892398787"
+   },
+   "level": "signed"
+  },
+  {
+   "id": "runs/withheld-blob-orphan-envelope-beyond-limit",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "SIG-1",
+    "OVL-5",
+    "ENC-17"
+   ],
+   "path": "runs/withheld-blob-orphan-envelope-beyond-limit",
+   "files": {
+    "expected.json": "b52b680fdef437fc7fe9d3befae3e4e18ac0bef48d41c4491e17a4e2f9db10a9",
+    "policy.json": "9fbb1dc59dded854b7a9f069dea437f46b51ff219eaccda8d077a119ab22b463"
+   },
+   "level": "signed"
+  },
+  {
+   "id": "runs/withheld-blob-overlay-junk-many",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "RUN-3",
+    "OVL-5",
+    "OVL-10"
+   ],
+   "path": "runs/withheld-blob-overlay-junk-many",
+   "files": {
+    "expected.json": "45eb6e76cc9e8c38f16368f6a968cbc9f5c80b5591e560e185ddf346988f510d",
+    "policy.json": "9fbb1dc59dded854b7a9f069dea437f46b51ff219eaccda8d077a119ab22b463"
+   },
+   "level": "signed"
+  },
+  {
+   "id": "runs/withheld-blob-overlay-junk-names",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "RUN-3",
+    "OVL-5",
+    "OVL-10"
+   ],
+   "path": "runs/withheld-blob-overlay-junk-names",
+   "files": {
+    "expected.json": "f1226619def11de50d569b28ab0c70647baf89e255173e856db66e3be6e7b973",
+    "policy.json": "9fbb1dc59dded854b7a9f069dea437f46b51ff219eaccda8d077a119ab22b463"
    },
    "level": "signed"
   },
@@ -3201,6 +3375,28 @@
     "run/seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84",
     "run/summary.json": "268eda205f131668d931d8804c9530cb7c99b2857d95e1ce1bc24fc3d6314679",
     "run/traces.otlp.jsonl": "3c29fa780cb029dd541c36edb35614f49df76f459a1f7c3e3702960892398787"
+   },
+   "level": "signed"
+  },
+  {
+   "id": "seal-vectors/redact-envelope-beyond-limit",
+   "kind": "seal",
+   "classes": [
+    "Sealer",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
+   ],
+   "rules": [
+    "SIG-1",
+    "OVL-10",
+    "ENC-17"
+   ],
+   "path": "seal-vectors/redact-envelope-beyond-limit",
+   "files": {
+    "expected.json": "10c0cc93758a21d8ddb997947c1533524e6719919d8abc72a7e86121bdaab949",
+    "policy.json": "9fbb1dc59dded854b7a9f069dea437f46b51ff219eaccda8d077a119ab22b463"
    },
    "level": "signed"
   },
@@ -4424,6 +4620,36 @@
    }
   },
   {
+   "id": "chain-vectors/withheld-blob-overlay-junk-many",
+   "kind": "chain",
+   "classes": [
+    "Overlay verifier"
+   ],
+   "rules": [
+    "OVL-5",
+    "ENC-17"
+   ],
+   "path": "chain-vectors/withheld-blob-overlay-junk-many",
+   "files": {
+    "expected.json": "0a46885b297770e7d688afb8bf212b30608a51f4681998cb570c7802771df233"
+   }
+  },
+  {
+   "id": "chain-vectors/withheld-blob-overlay-junk-names",
+   "kind": "chain",
+   "classes": [
+    "Overlay verifier"
+   ],
+   "rules": [
+    "OVL-5",
+    "ENC-17"
+   ],
+   "path": "chain-vectors/withheld-blob-overlay-junk-names",
+   "files": {
+    "expected.json": "efa6b310e9f02a9981125ab1d4828aa1d7853d9c92e6f04a2b4dd774d84a9a11"
+   }
+  },
+  {
    "id": "overlay-views/assurance-shown",
    "kind": "overlay-view",
    "classes": [
@@ -4666,6 +4892,22 @@
    }
   },
   {
+   "id": "overlay-views/unfinished-line-after-a-million",
+   "kind": "overlay-view",
+   "classes": [
+    "Overlay verifier"
+   ],
+   "rules": [
+    "OVL-5",
+    "ENC-17"
+   ],
+   "path": "overlay-views/unfinished-line-after-a-million",
+   "files": {
+    "expected.json": "1e4820b4b54723f983429948dfa5cc6ef91f202447d1c839481d00a2d5cdcb82",
+    "policy.json": "9fbb1dc59dded854b7a9f069dea437f46b51ff219eaccda8d077a119ab22b463"
+   }
+  },
+  {
    "id": "overlay-views/waiver-boundaries",
    "kind": "overlay-view",
    "classes": [
@@ -4697,6 +4939,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -4714,6 +4959,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -4731,6 +4979,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -4748,6 +4999,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -4765,6 +5019,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -4782,6 +5039,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -4799,6 +5059,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -4817,6 +5080,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -4834,6 +5100,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -4851,6 +5120,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -4869,6 +5141,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -4886,6 +5161,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -4903,6 +5181,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -4920,6 +5201,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -4937,6 +5221,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -4954,6 +5241,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -4971,6 +5261,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -4988,6 +5281,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5005,6 +5301,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5022,6 +5321,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5039,6 +5341,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5056,6 +5361,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5073,6 +5381,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5090,6 +5401,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5108,6 +5422,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5125,6 +5442,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5142,6 +5462,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5159,6 +5482,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5177,6 +5503,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5194,6 +5523,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5211,6 +5543,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5228,6 +5563,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5246,6 +5584,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5263,6 +5604,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5281,6 +5625,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5298,6 +5645,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5316,6 +5666,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5328,11 +5681,35 @@
    }
   },
   {
+   "id": "invalid/run-version-leading-zero",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
+   ],
+   "rules": [
+    "VER-1",
+    "VER-3"
+   ],
+   "path": "invalid/run-version-leading-zero",
+   "files": {
+    "document.json": "04b690730836b0bc628a469e800c73f88e6e389cba9da4f12f976587035b0c51",
+    "expected.json": "549a1b39c6f57eb0f9b80d611bbb5dceb23e61ae268946d90798f66513a92dbc"
+   }
+  },
+  {
    "id": "invalid/run-without-execution",
    "kind": "document",
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5350,6 +5727,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5367,6 +5747,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5385,6 +5768,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5402,6 +5788,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5419,6 +5808,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5436,6 +5828,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5453,6 +5848,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5470,6 +5868,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5488,6 +5889,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5504,7 +5908,10 @@
    "id": "reader-only/aggregation-rule-path-unknown",
    "kind": "reader-only",
    "classes": [
-    "Reader"
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "VER-8",
@@ -5520,7 +5927,10 @@
    "id": "reader-only/aggregation-strategy-unknown",
    "kind": "reader-only",
    "classes": [
-    "Reader"
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "VER-8",
@@ -5536,7 +5946,10 @@
    "id": "reader-only/annotator-kind-unknown",
    "kind": "reader-only",
    "classes": [
-    "Reader"
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "VER-8"
@@ -5551,7 +5964,10 @@
    "id": "reader-only/checkpoint-threshold-op-unknown",
    "kind": "reader-only",
    "classes": [
-    "Reader"
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "VER-8",
@@ -5567,7 +5983,10 @@
    "id": "reader-only/decision-lane-status-unknown",
    "kind": "reader-only",
    "classes": [
-    "Reader"
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "VER-8",
@@ -5583,7 +6002,10 @@
    "id": "reader-only/decision-outcome-unknown",
    "kind": "reader-only",
    "classes": [
-    "Reader"
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "VER-8",
@@ -5599,7 +6021,10 @@
    "id": "reader-only/evidence-kind-unknown",
    "kind": "reader-only",
    "classes": [
-    "Reader"
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "VER-8"
@@ -5614,7 +6039,10 @@
    "id": "reader-only/execution-policy-aggregation-unknown",
    "kind": "reader-only",
    "classes": [
-    "Reader"
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "VER-8",
@@ -5630,7 +6058,10 @@
    "id": "reader-only/gate-comparability-unknown",
    "kind": "reader-only",
    "classes": [
-    "Reader"
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "VER-3"
@@ -5645,7 +6076,10 @@
    "id": "reader-only/gate-outcome-unknown",
    "kind": "reader-only",
    "classes": [
-    "Reader"
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "VER-3"
@@ -5660,7 +6094,10 @@
    "id": "reader-only/judge-mode-unknown",
    "kind": "reader-only",
    "classes": [
-    "Reader"
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "VER-8"
@@ -5675,7 +6112,10 @@
    "id": "reader-only/metrics-direction-unknown",
    "kind": "reader-only",
    "classes": [
-    "Reader"
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "VER-3"
@@ -5690,7 +6130,10 @@
    "id": "reader-only/overlay-assurance-unknown",
    "kind": "reader-only",
    "classes": [
-    "Reader"
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "VER-3",
@@ -5706,7 +6149,10 @@
    "id": "reader-only/overlay-kind-unknown",
    "kind": "reader-only",
    "classes": [
-    "Reader"
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "VER-3",
@@ -5722,7 +6168,10 @@
    "id": "reader-only/result-severity-unknown",
    "kind": "reader-only",
    "classes": [
-    "Reader"
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "VER-3",
@@ -5738,7 +6187,10 @@
    "id": "reader-only/run-content-capture-unknown",
    "kind": "reader-only",
    "classes": [
-    "Reader"
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "VER-3",
@@ -5754,7 +6206,10 @@
    "id": "reader-only/run-stimulus-unknown",
    "kind": "reader-only",
    "classes": [
-    "Reader"
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "VER-3"
@@ -5769,7 +6224,10 @@
    "id": "reader-only/run-target-mode-unknown",
    "kind": "reader-only",
    "classes": [
-    "Reader"
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "VER-3",
@@ -5785,7 +6243,10 @@
    "id": "reader-only/runner-event-lane-status-unknown",
    "kind": "reader-only",
    "classes": [
-    "Reader"
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "VER-8",
@@ -5801,7 +6262,10 @@
    "id": "reader-only/runner-event-limit-unknown",
    "kind": "reader-only",
    "classes": [
-    "Reader"
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "VER-8",
@@ -5817,7 +6281,10 @@
    "id": "reader-only/seal-sealed-by-unknown",
    "kind": "reader-only",
    "classes": [
-    "Reader"
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "VER-3"
@@ -5832,7 +6299,10 @@
    "id": "reader-only/subject-kind-unknown",
    "kind": "reader-only",
    "classes": [
-    "Reader"
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "VER-8"
@@ -5847,7 +6317,10 @@
    "id": "reader-only/summary-verdict-unknown",
    "kind": "reader-only",
    "classes": [
-    "Reader"
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "VER-8",
@@ -5863,7 +6336,10 @@
    "id": "reader-only/taxonomy-scheme-unknown",
    "kind": "reader-only",
    "classes": [
-    "Reader"
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "VER-8"
@@ -5878,7 +6354,10 @@
    "id": "reader-only/threshold-op-unknown",
    "kind": "reader-only",
    "classes": [
-    "Reader"
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "VER-8"
@@ -5893,7 +6372,10 @@
    "id": "reader-only/trials-aggregation-unknown",
    "kind": "reader-only",
    "classes": [
-    "Reader"
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "VER-8",
@@ -5909,7 +6391,10 @@
    "id": "reader-only/usage-role-unknown",
    "kind": "reader-only",
    "classes": [
-    "Reader"
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "VER-8"
@@ -5926,6 +6411,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5944,6 +6432,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5962,6 +6453,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5980,6 +6474,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -5998,6 +6495,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -6016,6 +6516,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -6034,6 +6537,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -6052,6 +6558,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -6070,6 +6579,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -6087,6 +6599,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -6105,6 +6620,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -6123,6 +6641,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -6141,6 +6662,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -6159,6 +6683,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -6178,6 +6705,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -6196,6 +6726,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -6214,6 +6747,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -6232,6 +6768,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -6250,6 +6789,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -6268,6 +6810,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -6286,6 +6831,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -6304,6 +6852,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -6321,6 +6872,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -6338,6 +6892,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -6356,6 +6913,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -6373,6 +6933,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -6391,6 +6954,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -6409,6 +6975,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -6427,6 +6996,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -6445,6 +7017,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -6463,6 +7038,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -6481,6 +7059,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -6500,6 +7081,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -6518,6 +7102,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -7471,7 +8058,7 @@
    ],
    "path": "lane-vectors/comparison-unknown-axis",
    "files": {
-    "checkpoint.json": "887f33751f54859ebb3717ddac0d436d7918fb9e62fa61ed569a1dfa99e7b5f4",
+    "checkpoint.json": "1592e2e10d103d2ff299cda14c2bfa4a98455094ac40859f1e8867d4328fedeb",
     "expected.json": "e4bc5991bc604bb54e126123a2cb001689a4f4df572b0c95498deeff64a6199e",
     "runs/B/metrics.json": "f82b2f218a638efa196d95b6cbd9589a3c0f127ab840033d2faa4e2dd47e17b9",
     "runs/B/results.ndjson": "40b8067c2ed57d13e5def665273f21403d9c3c2f786ec795450a50b9647dab1c",
@@ -7518,6 +8105,28 @@
     "runs/CS/run.json": "2ea520d2da9c3673a4870de31e5311d99c76056634cccace25b60181d78f2ad5",
     "runs/CS/seal.json": "207deb2392d17e2b5a2b1df6ec75a8843f8191e4a89f3c8716e726bb91b67a8f",
     "runs/CS/summary.json": "86e88c46668e778647fd336348ac075075ca7d2ead351279983500610064991f"
+   }
+  },
+  {
+   "id": "lane-vectors/declared-version",
+   "kind": "lane",
+   "classes": [
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "CKP-8",
+    "VER-6",
+    "LANE-10"
+   ],
+   "path": "lane-vectors/declared-version",
+   "files": {
+    "checkpoint.json": "3da74ae191d926c1d027161f11771c0f1df14b47d4217e28af87344bf830d05b",
+    "expected.json": "d76190b1b59460489445bfcbe9ecead2ee36e3bf35b799a74c78aef0cb4d76cb",
+    "runs/DV-plain/metrics.json": "81ac87c69d20ca49d69e0a5541b062fe1f8fcc4529117c6d6f29eac1403b3d6c",
+    "runs/DV-plain/results.ndjson": "c3ea2bbb521a8a150f097ef2b2a818839895dbe13fb9877e5b5b5c1ce24d5beb",
+    "runs/DV-plain/run.json": "4343e06e2f4c9625d938d84ed6450fce4b6edebd8cf55249cc022305ab4d4a2d",
+    "runs/DV-plain/seal.json": "e0af92cc3532217c6010c16e4d198be38be94988f2288888a37a2668883f784d",
+    "runs/DV-plain/summary.json": "4eef6fe7f417ff369e29db4a12e9004e80d1a81c3da8b920e310971ba43fcd91"
    }
   },
   {
@@ -7638,7 +8247,7 @@
    ],
    "path": "lane-vectors/reads-unknown",
    "files": {
-    "checkpoint.json": "fd4233fd306da99b1b99b4696c461fd9c69e177b7c16110c882a2031f34ee8c6",
+    "checkpoint.json": "74141ea1a8b63f7b28803add46d0cd3c8602811284f506c74988201d3ca0d9be",
     "expected.json": "b7c2b36fb8eca132d903b3336a2c70ba523a02552ed6fc373352eba18d9a0272",
     "runs/B/metrics.json": "f82b2f218a638efa196d95b6cbd9589a3c0f127ab840033d2faa4e2dd47e17b9",
     "runs/B/results.ndjson": "40b8067c2ed57d13e5def665273f21403d9c3c2f786ec795450a50b9647dab1c",
@@ -7685,26 +8294,26 @@
     "runs/CS/run.json": "2ea520d2da9c3673a4870de31e5311d99c76056634cccace25b60181d78f2ad5",
     "runs/CS/seal.json": "207deb2392d17e2b5a2b1df6ec75a8843f8191e4a89f3c8716e726bb91b67a8f",
     "runs/CS/summary.json": "86e88c46668e778647fd336348ac075075ca7d2ead351279983500610064991f",
-    "runs/RU-direction/metrics.json": "06eeeaf3b75f1b0b88291cbf7138e22949a5a5acd98ff91309dcbd595645024d",
-    "runs/RU-direction/results.ndjson": "d49d480e11f791a7af70e60ed4ee5a4fbecfafc8adf89bb81e11b769c1b14749",
-    "runs/RU-direction/run.json": "539ff26f293f70cd333529e7b086379db579743f34a8c9338fbae8e402a2b78c",
-    "runs/RU-direction/seal.json": "252a70a53134ebb46b22b816bdf79657e440ffa4507902b71602e10c0f54f129",
-    "runs/RU-direction/summary.json": "3dfb2ebb1189c56c3c15d6c7dd33b2adf1e4f1334d9b12e4f520992c14403f14",
-    "runs/RU-mode/metrics.json": "81ac87c69d20ca49d69e0a5541b062fe1f8fcc4529117c6d6f29eac1403b3d6c",
-    "runs/RU-mode/results.ndjson": "798ce4d05d4a0dbf5097d423c84e6dcdd5c61563cd98e084f4a6188a2660dbfa",
-    "runs/RU-mode/run.json": "a7b25949017d2d1270126bd5e877ca76af1911fff4a8e9cf0fd79b84aaa17f1c",
-    "runs/RU-mode/seal.json": "62b3ac32c2ee03089fa1da8dbb34cb9b65d36fca75c0d7d2bfff0b1b776ae6ed",
-    "runs/RU-mode/summary.json": "2c8318283269c1d86e7ae069e2a492bfe8a89862f873576881bac67540569d3b",
+    "runs/RU-direction/metrics.json": "ece57dec1fa703466dc15918463bb17e55606f51bab8e033b7bff68ddfb47aa2",
+    "runs/RU-direction/results.ndjson": "8f5834d85bb751c58930175de1e1e6b6e538b420a9f756aa93dbbf06b8a99326",
+    "runs/RU-direction/run.json": "f9ff8c175e83668cf30a52b23e9888c2d49edaaab5ea444564a82cc7c084319a",
+    "runs/RU-direction/seal.json": "8c69933bf70a592e1a9f66ccd257be980903ff0b0ca99525c788090653aa1533",
+    "runs/RU-direction/summary.json": "40b5013a6f6ccb784762b5f3d98eb16c1b8089f1a2a75ad5cd28a7355ae14fca",
+    "runs/RU-mode/metrics.json": "0b8e55d8024164ce4ed64c3556aa97fb1d2c260dceadca80d878308aa001301c",
+    "runs/RU-mode/results.ndjson": "8c5420e2d0369a83aba510619b77f2e50a23788366751d4af2f2e4cb6cd29667",
+    "runs/RU-mode/run.json": "8e7a3bcfa9d3cf9dbd490ae7ff3fc6955d29aa580788df24e5606063121000da",
+    "runs/RU-mode/seal.json": "494e12bc90f5838e0de5b632e250bc15c13bd52c031c20aaabce2a2caff6cd4a",
+    "runs/RU-mode/summary.json": "2a47037724dc66a9874a1737401cddf0c4584de854b53eedb1058f92831b3c76",
     "runs/RU-plain/metrics.json": "81ac87c69d20ca49d69e0a5541b062fe1f8fcc4529117c6d6f29eac1403b3d6c",
     "runs/RU-plain/results.ndjson": "2c93925d42943f2f12e25c112a7085e74d5e4a7ce24d2208e595824d73940e3d",
     "runs/RU-plain/run.json": "e16a9ad36ccbeab55e67f17480dea3b3248dbc30919d5f25f42a9b3388e22717",
     "runs/RU-plain/seal.json": "ad07f1bf00ecbba2944b67ab306c546ebc8cdef2aded49e9dd916448a00afbda",
     "runs/RU-plain/summary.json": "a1af1df823cef80379cd411f827a9e439349895e247f89e982566d8e08aa79b8",
-    "runs/RU-severity/metrics.json": "7be4c9b8d0eeb24dbfe42bf235bf78e7c16f8e634bc029873d7ab272de7b4bd7",
-    "runs/RU-severity/results.ndjson": "897aeb62c3f3c75a45552ff96f655c013bfc4a08f6a2b8b97146bb94ea89681c",
-    "runs/RU-severity/run.json": "903412fef68c04ead716ddbb635aece847d0f1bd1758c6cd698215de1331a4bf",
-    "runs/RU-severity/seal.json": "428c415d08a5ae22a50a01eafd9b3ed77ed8dced63cb9e0ac694bf484c4acbb5",
-    "runs/RU-severity/summary.json": "0519c01400a6e50d55d1a4106750497c274efdb3b6364e1b06ec03f0c46fd819"
+    "runs/RU-severity/metrics.json": "a9a94756b16152a527af7610525e7a25a525cfbf32a9dd932826e2a1967ad92b",
+    "runs/RU-severity/results.ndjson": "2622489f3ab2753044502692e50640dbb325ed6953c5cfacaeec8defe2deec49",
+    "runs/RU-severity/run.json": "46060bce3f56e324e098f9b961e98efefd98167f2b56b0a2e1a00bf58423265f",
+    "runs/RU-severity/seal.json": "2ceb1e4294b4fd749ead4003d0622c16041e06379986fcf5480882e880b9c7bf",
+    "runs/RU-severity/summary.json": "afcc99fb09fbfa3eba2ceac9796e24e477ebeb17cb571623276b9f21d20f0fd1"
    }
   },
   {
@@ -7922,7 +8531,7 @@
    ],
    "path": "lane-vectors/severity-max-unknown",
    "files": {
-    "checkpoint.json": "5b671ca9cd7de0762b0e5fdcac0651fcc9c2db5c8edf09bbab2a318afa87cb80",
+    "checkpoint.json": "a033dc4ac0d84984eec8498253d24879faf16771bea9dd10debc5af8ed418f1d",
     "expected.json": "a2fe416d72b3a103139b3eef6574a50975882197d92b1929c80f6ff1d4d1220f",
     "runs/SM/metrics.json": "7be4c9b8d0eeb24dbfe42bf235bf78e7c16f8e634bc029873d7ab272de7b4bd7",
     "runs/SM/results.ndjson": "9bdc33cc20100a2854f6e831c7370ef5c78ac8173c4377238b1534c90b4615fb",
@@ -8774,6 +9383,31 @@
    "level": "signed"
   },
   {
+   "id": "signature-vectors/policy-later-version",
+   "kind": "signature",
+   "classes": [
+    "Sealer",
+    "Run verifier",
+    "Overlay verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
+   ],
+   "rules": [
+    "SIG-4",
+    "VER-1",
+    "SIG-6"
+   ],
+   "path": "signature-vectors/policy-later-version",
+   "files": {
+    "envelope.dsse.json": "6eeaf635cea674b59f4dc71df23b6ad43cfb0add30c33ff28e40ae8e98df40ee",
+    "expected.json": "1664e9de0f65401d05bacff3a093233d67f41582ad7a9bfe772fcbaad8bf40cb",
+    "policy.json": "58d934a370c98bc19d6a962e47711339fb49084838d13c6510a6eb0db108bbde",
+    "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
+   },
+   "level": "signed"
+  },
+  {
    "id": "signature-vectors/policy-may-as-string",
    "kind": "signature",
    "classes": [
@@ -8865,6 +9499,31 @@
     "envelope.dsse.json": "6eeaf635cea674b59f4dc71df23b6ad43cfb0add30c33ff28e40ae8e98df40ee",
     "expected.json": "5fa6bb9955a14e5e27fc9474307cbd76939aa2a3b135d9346651a961eeb31981",
     "policy.json": "1349b18d031cd1fcd3d59ad7ef62afa6e2266f837f9c3d556194027a0b0a4c40",
+    "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
+   },
+   "level": "signed"
+  },
+  {
+   "id": "signature-vectors/policy-with-version",
+   "kind": "signature",
+   "classes": [
+    "Sealer",
+    "Run verifier",
+    "Overlay verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
+   ],
+   "rules": [
+    "SIG-4",
+    "SIG-5",
+    "SIG-6"
+   ],
+   "path": "signature-vectors/policy-with-version",
+   "files": {
+    "envelope.dsse.json": "6eeaf635cea674b59f4dc71df23b6ad43cfb0add30c33ff28e40ae8e98df40ee",
+    "expected.json": "36a48d9fd9fa269a9db063f52f13e56020b65a765e133089149177f69fd63d93",
+    "policy.json": "af3c99a92bfbe33258a8aa15f644c127fa5c73b466a217210a2ce3f446147e83",
     "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
    },
    "level": "signed"
@@ -9240,6 +9899,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -9257,6 +9919,9 @@
    "classes": [
     "Producer",
     "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
     "Runner"
    ],
    "rules": [
@@ -9422,6 +10087,22 @@
    }
   },
   {
+   "id": "limits/batch-beyond-what-is-read",
+   "kind": "chain",
+   "classes": [
+    "Overlay verifier"
+   ],
+   "rules": [
+    "OVL-5",
+    "ENC-17",
+    "ENC-18"
+   ],
+   "path": "limits/batch-beyond-what-is-read",
+   "files": {
+    "expected.json": "6847e6bb823c240d39e29163752e27028b76639d5f6074abf225cf8b1c3dc861"
+   }
+  },
+  {
    "id": "limits/overlays-files-beyond-limit",
    "kind": "chain",
    "classes": [
@@ -9435,6 +10116,23 @@
    "path": "limits/overlays-files-beyond-limit",
    "files": {
     "expected.json": "f7b76c835f8aa0f3f999a8bb562a2a394f1ead698d62ae903052c1d50d2a1d9c"
+   }
+  },
+  {
+   "id": "limits/results-line-at-4-mib",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "ENC-17",
+    "ENC-18"
+   ],
+   "path": "limits/results-line-at-4-mib",
+   "files": {
+    "expected.json": "9bb4db826fd2374b5e069e9ba0c19eb1c99010ac8efaf66555279dc658245f4f"
    }
   },
   {
@@ -9503,6 +10201,23 @@
    "path": "limits/run-files-beyond-limit",
    "files": {
     "expected.json": "192932f5c9529584aef95ed84bacc4e15de4ca636ebfe4ff1dedca981f08aa7a"
+   }
+  },
+  {
+   "id": "limits/seal-at-40-mib",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "ENC-17",
+    "ENC-18"
+   ],
+   "path": "limits/seal-at-40-mib",
+   "files": {
+    "expected.json": "ab74c236bb0ee0102c494ef3b54742b6f8fc3e3edaca66142e056e7cea814be3"
    }
   },
   {
@@ -13044,6 +13759,42 @@
    "files": {
     "expected.json": "e0116719ec465f3e07f4e6606faea046b5087ccfda0dab02362b91ca7789c3e5",
     "scenario.json": "1e50348ed439d67aa14a2048762bc8ee98e5127c75b493eceaef59b2388473da"
+   }
+  },
+  {
+   "id": "write-vectors/produce/run-without-content-capture",
+   "kind": "produce",
+   "classes": [
+    "Producer",
+    "Runner"
+   ],
+   "rules": [
+    "RUN-11",
+    "ENC-8"
+   ],
+   "path": "write-vectors/produce/run-without-content-capture",
+   "files": {
+    "expected-results.ndjson": "e4ecbd6aa30f72dbe953b8f2d7864c76d5237d891e5a4a5e12a75189911c318c",
+    "expected.json": "6102a349721f0f5675a7315a54e6d70c9da208763443980dc40e0f2f68c02f06",
+    "scenario.json": "8cdd2c24f382aa76783eef91023990f66fc8865a435112cb1bf00411f1d8aa39"
+   }
+  },
+  {
+   "id": "write-vectors/produce/times-to-the-nanosecond",
+   "kind": "produce",
+   "classes": [
+    "Producer",
+    "Runner"
+   ],
+   "rules": [
+    "RUN-11",
+    "ENC-8"
+   ],
+   "path": "write-vectors/produce/times-to-the-nanosecond",
+   "files": {
+    "expected-results.ndjson": "615bf93cca78c3eb933583a1f01f262c8f891b5da0291d338c1474a3a4506919",
+    "expected.json": "1507f38c667fb6bcfb97ebcbe2c081166f4b04652f53a0737b7495e6c80d74bd",
+    "scenario.json": "4f8f6cc2cb5cb3d71f416cf9c029af1c9b3c05b39701aa0a18d17c335ff2d2bb"
    }
   },
   {

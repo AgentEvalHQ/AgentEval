@@ -88,6 +88,44 @@ public class TrustPolicyTests
     }
 
     [Theory]
+    [InlineData("\"1.0\"", true)]     // this version
+    [InlineData("\"1.1\"", false)]    // a later minor: refused, as a member this version does not know is
+    [InlineData("\"2.0\"", false)]
+    [InlineData("\"1\"", false)]
+    [InlineData("\"1.00\"", false)]   // the schema's const is the string 1.0
+    [InlineData("1.0", false)]        // a number
+    [InlineData("null", false)]
+    public void ADeclaredSchemaVersion_IsAcceptedOnlyWhenItIs10(string schemaVersion, bool accepted)
+    {
+        // [SIG-4] (round 5): a policy may carry schemaVersion 1.0; one that declares a later version is refused.
+        var json = $$"""{"schemaVersion":{{schemaVersion}},"keys":[{"identity":"x","publicKey":{{JsonValue.Create(PemA).ToJsonString()}}}]}""";
+        if (accepted)
+        {
+            Assert.Equal(SignatureCorpus.EcdsaA, Assert.Single(TrustPolicy.Parse(Encoding.UTF8.GetBytes(json)).Keys).KeyId);
+        }
+        else
+        {
+            Assert.Throws<TrustPolicyException>(() => TrustPolicy.Parse(Encoding.UTF8.GetBytes(json)));
+        }
+    }
+
+    [Fact]
+    public void KeylessSigning_IsNotPartOf10sPolicy_AndAPolicyUsingItIsRefused()
+    {
+        // [SIG-4] (round 5): a later minor may add keyless signing (Sigstore) to the policy; a 1.0 verifier refuses a policy
+        // that uses it, at the top level or on a key.
+        var pem = JsonValue.Create(PemA).ToJsonString();
+        foreach (var json in new[]
+                 {
+                     $$"""{"schemaVersion":"1.0","keys":[{"identity":"x","publicKey":{{pem}}}],"keyless":[{"issuer":"https://token.actions.githubusercontent.com","subject":"repo:o/r"}]}""",
+                     $$"""{"keys":[{"identity":"oidc:issuer/subject","certificateIdentity":{"issuer":"i","subject":"s"},"publicKey":{{pem}}}]}""",
+                 })
+        {
+            Assert.Throws<TrustPolicyException>(() => TrustPolicy.Parse(Encoding.UTF8.GetBytes(json)));
+        }
+    }
+
+    [Theory]
     [InlineData("""["redact","redact"]""")]   // a value twice
     [InlineData("""[""]""")]                   // an empty value
     public void AMayTheSchemaRefuses_RefusesThePolicy(string may)

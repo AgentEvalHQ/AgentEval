@@ -109,13 +109,13 @@ public sealed record AefOverlayEvent
     public string? Reason { get; init; }
 
     /// <summary>When a <c>waive</c> expires.</summary>
-    public DateTimeOffset? Expires { get; init; }
+    public AefTime? Expires { get; init; }
 
     /// <summary>Who, and the assurance claimed ([OVL-3]).</summary>
     public required AefIdentity By { get; init; }
 
     /// <summary>When ([OVL-6]: shown, never used to reorder).</summary>
-    public required DateTimeOffset At { get; init; }
+    public required AefTime At { get; init; }
 
     /// <summary>Producer extensions ([ENC-19]).</summary>
     public JsonObject? Ext { get; init; }

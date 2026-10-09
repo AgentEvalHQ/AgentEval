@@ -1,13 +1,45 @@
 {
-  "direction": "AEF → Inspect",
+  "direction": "AEF → Inspect → AEF",
   "page": "inspect.md",
-  "sections": ["AEF → Inspect"],
-  "description": "The corpus run conformance/valid/running-trials (copied to input/): a running run (status started, no results) with three trials per case aggregated by MajorityVote (epochs 3, epochs_reducer majority). Each trial is a sample at epoch trial + 1; the rollup line is a reduction with the matching reducer; the pending line is NaN with reason pending. Its lines carry no scores, so every value is NaN with the state in reason (IN-2). The run has no summary, so to-otel cannot name its lines without scores and refuses it (OT-1).",
+  "sections": [
+    "AEF → Inspect",
+    "Inspect → AEF"
+  ],
+  "description": "The corpus run conformance/valid/running-trials (copied to input/): a running run (status started, no results) with three trials per case aggregated by MajorityVote (epochs 3, epochs_reducer majority). Each trial is a sample at epoch trial + 1; the rollup line is a reduction with the matching reducer; the pending line is NaN with reason pending. Its lines carry no scores, so every value is NaN with the state in reason (IN-2). from-inspect reads the log back (run/): a started log is a running run, not sealed (IN-6); each epoch is a trial line and each reduction a rollup counted from them (IN-8); every NaN comes back not_measured with the old state as its reason (IN-7). The run has no summary, so to-otel cannot name its lines without scores and refuses it (OT-1).",
   "steps": [
-    {"args": ["to-inspect", "input", "{out}"], "expected": "inspect.json"}
+    {
+      "args": [
+        "to-inspect",
+        "input",
+        "{out}"
+      ],
+      "expected": "inspect.json"
+    },
+    {
+      "args": [
+        "from-inspect",
+        "inspect.json",
+        "{out}",
+        "--target-mode",
+        "live",
+        "--at",
+        "2026-10-09T00:00:00Z"
+      ],
+      "expected": "run"
+    }
   ],
   "refusals": [
-    {"args": ["to-otel", "input", "{out}"], "says": "OT-1"}
+    {
+      "args": [
+        "to-otel",
+        "input",
+        "{out}"
+      ],
+      "says": "OT-1"
+    }
   ],
-  "runs": {"input": "unsealed"}
+  "runs": {
+    "input": "unsealed",
+    "run": "unsealed"
+  }
 }

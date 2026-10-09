@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "1.0",
+  "metrics": [
+    {
+      "id": "triage",
+      "kind": "score",
+      "direction": "none",
+      "scale": "unbounded"
+    },
+    {
+      "id": "triage/policy",
+      "kind": "score",
+      "direction": "none",
+      "scale": "unbounded"
+    },
+    {
+      "id": "triage/helpfulness",
+      "kind": "score",
+      "direction": "none",
+      "scale": "unbounded"
+    },
+    {
+      "id": "triage/groundedness",
+      "kind": "score",
+      "direction": "none",
+      "scale": "unbounded"
+    }
+  ]
+}

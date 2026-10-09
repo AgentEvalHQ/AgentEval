@@ -522,23 +522,31 @@ public sealed class AefRunWriter
     /// <paramref name="status"/> and <paramref name="endedAt"/>, and verifies the folder. From then on nothing changes.
     /// </summary>
     /// <param name="status"><see cref="AefRunStatus.Completed"/> or <see cref="AefRunStatus.Aborted"/>.</param>
-    /// <param name="endedAt">When the run ended: not before its start.</param>
+    /// <param name="endedAt">
+    /// When the run ended: not before its start, written at the precision given ([ENC-8]: up to nanoseconds; a
+    /// <see cref="DateTimeOffset"/> converts exactly).
+    /// </param>
     /// <param name="abortReason">Why it was aborted: required for an aborted run, and only for one.</param>
     /// <returns>The run verifier's report: <c>unsealed</c>, no problem.</returns>
-    /// <exception cref="ArgumentException">A status that is not a closed one, an end before the start, or an abort reason missing or out of place ([RUN-5]).</exception>
+    /// <exception cref="ArgumentException">
+    /// A status that is not a closed one, an end before the start, an abort reason missing or out of place ([RUN-5]), or
+    /// an end that is not an AEF time ([ENC-8]).
+    /// </exception>
     /// <exception cref="InvalidOperationException">
     /// The run is already closed, or a rule that needs the whole run is broken: a <c>pending</c> line ([RES-3]: the
     /// producer updates it to <c>skipped</c> or <c>error</c>); a node with children and no aggregation ([RES-5]); a
     /// <c>total</c> that is not the number of children, or a <c>decisive</c> id that is not a child ([RES-6]); a case
     /// run in trials with no rollup line, a rollup whose <c>n</c> and <c>passed</c> are not what its trial lines
-    /// give, or a rollup at a child path that is not a child of its case's rollup at the parent path ([RES-8]); a cited
+    /// give, trial lines at one path whose parents are at several paths (or some roots and some not), or a rollup whose
+    /// parent is not its case's rollup at the path of its trial lines' parents when the case has one there, or that is not
+    /// a root when they are ([RES-8]); a cited
     /// evidence id that was not added; a
     /// metric no declaration names; a gate decision naming a result that is no line; a trace link that names no span
     /// of traces.otlp.jsonl; a summary entry whose aggregate is the producer's but has no value. Nothing was written:
     /// the run is still running.
     /// </exception>
     /// <exception cref="AefWriteException">The verifier found a problem; the run is left running, as before the call.</exception>
-    public AefRunVerification Close(AefRunStatus status, DateTimeOffset endedAt, string? abortReason = null)
+    public AefRunVerification Close(AefRunStatus status, AefTime endedAt, string? abortReason = null)
     {
         EnsureRunning();
         if (status is not (AefRunStatus.Completed or AefRunStatus.Aborted))
@@ -682,6 +690,7 @@ public sealed class AefRunWriter
         var trialStates = new Dictionary<(string Case, string Path), HashSet<string>>();
         var rollups = new Dictionary<(string Case, string Path), (double N, double Passed, bool Agree)>();
         var rollupLines = new Dictionary<(string Case, string Path), (string Id, string? Parent)>();
+        var trialParents = new Dictionary<(string Case, string Path), HashSet<string?>>();
         foreach (var line in _results)
         {
             var id = AefNode.String(line["resultId"])!;
@@ -733,6 +742,14 @@ public sealed class AefRunWriter
                 }
 
                 states.Add(AefNode.String(line["state"]) ?? "");
+
+                // Where its parent is: the parent's path, or null for a root (a parent is always a line of the run here).
+                if (!trialParents.TryGetValue(key, out var places))
+                {
+                    trialParents[key] = places = [];
+                }
+
+                places.Add(AefNode.String(line["parentResultId"]) is { } parentId ? _handles[parentId].Path : null);
             }
             else if (line["trials"] is JsonObject trials)
             {
@@ -741,14 +758,35 @@ public sealed class AefRunWriter
             }
         }
 
-        // [RES-8]: the rollups of a composite case run in trials form the case's own tree: the rollup at a child path has
-        // its case's rollup at the parent path (the path without its last '/' segment) as its parent, when there is one.
+        // [RES-8] (round 5): the rollups form the case's tree as its trial lines do. Trial lines at one path have their
+        // parents at one path, or are all roots; a rollup's parent is its case's rollup at that path when the case has one
+        // there (R5N-3), and it is a root when they are. A path's spelling decides nothing: a case's root at q/x has its
+        // rollup at q/x as a root.
+        foreach (var ((caseId, path), places) in trialParents)
+        {
+            if (places.Count > 1)
+            {
+                problems.Add($"case {caseId}: its trial lines at {path} have parents at several paths, or some are roots and some not ([RES-8], §3.9 trials)");
+            }
+        }
+
         foreach (var ((caseId, path), (_, parent)) in rollupLines)
         {
-            if (path.LastIndexOf('/') is var slash and >= 0 && rollupLines.TryGetValue((caseId, path[..slash]), out var above)
-                && !string.Equals(parent, above.Id, StringComparison.Ordinal))
+            if (!trialParents.TryGetValue((caseId, path), out var places) || places.Count != 1)
             {
-                problems.Add($"case {caseId}: its rollup at {path} is not a child of its rollup at {path[..slash]} ([RES-8], §3.9 trials)");
+                continue;
+            }
+
+            if (places.Single() is not { } above)
+            {
+                if (parent is not null)
+                {
+                    problems.Add($"case {caseId}: its trial lines at {path} are roots, and its rollup there is not ([RES-8], §3.9 trials)");
+                }
+            }
+            else if (rollupLines.TryGetValue((caseId, above), out var aboveRollup) && !string.Equals(parent, aboveRollup.Id, StringComparison.Ordinal))
+            {
+                problems.Add($"case {caseId}: its rollup at {path} is not a child of its rollup at {above}, where its trial lines' parents are ([RES-8], §3.9 trials)");
             }
         }
 

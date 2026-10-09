@@ -327,6 +327,10 @@ def _generated(v):
     corpus = v.path.parent.parent
     for step in v.expected["generate"]:
         (op, arg), = step.items()
+        for rel in (arg if op == "copy" else [arg] if op == "remove" else [arg[0]]):
+            # §9.2.1: relative, `/`-separated, no `..`: a recipe never reaches outside the corpus or the vector
+            if not isinstance(rel, str) or rel.startswith("/") or "\\" in rel or ":" in rel or ".." in rel.split("/"):
+                raise ValueError(f"{v.id}: a generate path that is not relative and inside: {rel!r}")
         if op == "copy":
             source, target = corpus / arg[0], folder / arg[1]
             if v.guard is not None:
@@ -595,6 +599,14 @@ def _same(actual, expected):
     return type(actual) is type(expected) and actual == expected
 
 
+def _as_given(run):
+    """run.json as compared with the scenario's run (spec 09 §9.3): an absent contentCapture is `on` ([RUN-11])."""
+    run = _without_nulls(run)
+    if isinstance(run, dict) and "contentCapture" not in run:
+        run = dict(run, contentCapture="on")
+    return run
+
+
 def _without_nulls(value):
     """The JSON value with every null-valued member left out, at every depth ([ENC-2])."""
     if isinstance(value, dict):
@@ -691,7 +703,8 @@ def _judge_produce(engine, v, scratch, diffs):
                 diffs.append(f"{name} is not an I-JSON document: {error}")
     for name, member in (("run.json", "run"), ("metrics.json", "metrics")):
         # ENC-2: on an optional field, null and absence mean the same (neither file gives null a meaning of its own)
-        if name in documents and not _same(_without_nulls(documents[name]), _without_nulls(scenario[member])):
+        normal = _as_given if name == "run.json" else _without_nulls
+        if name in documents and not _same(normal(documents[name]), normal(scenario[member])):
             diffs.append(f"{name}: not the scenario's {member}, as given: got {json.dumps(documents[name])}")
 
     want = {}
@@ -852,6 +865,15 @@ def summary(tally, show=print):
     return total_bad
 
 
+def _heavy(v):
+    """A generated vector that creates more than 20,000 files or writes more than 8 MiB."""
+    steps = v.expected.get("generate", []) if isinstance(v.expected, dict) else []
+    files = sum(arg[1] for step in steps for op, arg in step.items() if op == "files")
+    size = sum(len(text.encode("utf-8")) * n for step in steps for op, arg in step.items() if op in ("write", "append")
+               for text, n in arg[1])
+    return files > 20_000 or size > 8 * 1024 * 1024
+
+
 def _load(corpus, index):
     """The vectors and refusals of a corpus, from its index when one is given."""
     return from_index(corpus, index) if index is not None else (walk(corpus, []), [])
@@ -878,9 +900,9 @@ def self_check(vectors, refusals, corpus, index):
     caught_all = True
     print("self-check: each mutation switches one check of aef_verify.py off, or breaks one writer of aef_produce.py; "
           "the corpus must notice")
-    # The generated limit vectors are left out: "limits" is caught by the stored ones, and a run of 100,000 files per
-    # mutation would make the self-check take an hour.
-    ids = {v.id for v in vectors if not (isinstance(v.expected, dict) and "generate" in v.expected)}
+    # The heavy generated vectors (a run of 100,000 files, a 40 MiB seal) are left out: run once per mutation they
+    # would make the self-check take an hour, and "limits" is caught by the light ones.
+    ids = {v.id for v in vectors if not _heavy(v)}
     ids |= {r[1] for r in refusals}
     mutations = [(module, name, what) for module in (aef_verify, aef_produce)
                  for name, what in module.KNOWN_MUTATIONS.items()]

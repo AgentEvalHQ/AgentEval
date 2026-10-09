@@ -4,25 +4,25 @@
     {
       "name": "metrics.json",
       "digest": {
-        "sha256": "81ac87c69d20ca49d69e0a5541b062fe1f8fcc4529117c6d6f29eac1403b3d6c"
+        "sha256": "0b8e55d8024164ce4ed64c3556aa97fb1d2c260dceadca80d878308aa001301c"
       }
     },
     {
       "name": "results.ndjson",
       "digest": {
-        "sha256": "798ce4d05d4a0dbf5097d423c84e6dcdd5c61563cd98e084f4a6188a2660dbfa"
+        "sha256": "8c5420e2d0369a83aba510619b77f2e50a23788366751d4af2f2e4cb6cd29667"
       }
     },
     {
       "name": "run.json",
       "digest": {
-        "sha256": "a7b25949017d2d1270126bd5e877ca76af1911fff4a8e9cf0fd79b84aaa17f1c"
+        "sha256": "8e7a3bcfa9d3cf9dbd490ae7ff3fc6955d29aa580788df24e5606063121000da"
       }
     },
     {
       "name": "summary.json",
       "digest": {
-        "sha256": "2c8318283269c1d86e7ae069e2a492bfe8a89862f873576881bac67540569d3b"
+        "sha256": "2a47037724dc66a9874a1737401cddf0c4584de854b53eedb1058f92831b3c76"
       }
     }
   ],
@@ -30,7 +30,7 @@
   "predicate": {
     "schemaVersion": "1.0",
     "runId": "RU-mode",
-    "runHash": "9710d76081328b924e242c31e6fc0cc77ca6f1634b02e0cb658ea2871b9808c4",
+    "runHash": "b93ac73b0c6b5cafaf9ef1114e725bd1634153e79daa97c1cee7591037a45c34",
     "producer": {
       "name": "agenteval-cli",
       "version": "1.0.0"

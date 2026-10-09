@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10",
+  "status": "completed",
+  "producer": {
+    "name": "aef_interop.py",
+    "version": "1.0"
+  },
+  "subject": {
+    "ref": "model:agent:support/support-triage",
+    "kind": "model"
+  },
+  "execution": {
+    "targetMode": "live"
+  },
+  "suite": {
+    "ref": "suite:support/triage-scenarios",
+    "version": "4",
+    "executionPolicy": {
+      "trialsPerCase": 1
+    }
+  },
+  "judges": [
+    {
+      "model": "gpt-5.1"
+    }
+  ],
+  "startedAt": "2026-10-02T14:02:11.12Z",
+  "endedAt": "2026-10-02T14:06:23.004Z",
+  "contentCapture": "on",
+  "imported": {
+    "from": "inspect_ai",
+    "asserted": [
+      "subject.ref",
+      "subject.kind",
+      "execution.targetMode",
+      "contentCapture"
+    ]
+  },
+  "ext": {
+    "inspect_ai": {
+      "run_id": "01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10",
+      "dataset": {
+        "samples": 6,
+        "sample_ids": [
+          "case-17",
+          "case-18",
+          "case-19",
+          "case-20",
+          "case-21",
+          "case-22"
+        ]
+      }
+    }
+  }
+}

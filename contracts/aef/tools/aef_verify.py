@@ -126,6 +126,8 @@ KNOWN_MUTATIONS = {
     "rollup-tree": "a composite case's rollups need not form its tree (RES-8, R4-8b)",
     "events-whole-file": "the events file's framing is judged as a file, not line by line (OVL-5, R4-2, R4N-9)",
     "policy-loose": "a trust policy is not checked against its schema, and `may` is matched as a substring (SIG-4, R4-3)",
+    "overlay-files-stop": "too many files under overlays/ stop the chain, so junk files void a redaction (OVL-5, R5-1)",
+    "declared-version": "a document that declares 1.0 can make a lane unverifiable (CKP-8, R5-4)",
     "otlp-names": "spans under the pre-1.0 name instrumentationLibrarySpans are read too",
 }
 _ORIGINAL_COMPILE = aef_schema.compile_pattern
@@ -901,7 +903,7 @@ class Run:
         if self._chain is not None:
             return self._chain
         f, problems = self.folder, set()
-        seals = {}
+        seals, others = {}, set()
         for p in f.paths:
             if not p.startswith("overlays/") or p == EVENTS:
                 continue
@@ -909,11 +911,17 @@ class Run:
             if m:
                 seals[int(m.group(1))] = p
             elif not BATCH_SIGNATURE.fullmatch(p):
-                problems.add((p, "unexpected-file"))
-        if "limits" not in MUTATIONS and sum(1 for p in f.paths if p.startswith("overlays/")) > MAX_OVERLAY_FILES:
-            # ENC-17, ENC-18: refused at the folder's path and not checked further: no batch verifies, no event counts.
+                others.add((p, "unexpected-file"))
+        others |= {(p, "unexpected-file") for p in f.special if p.startswith("overlays/")}  # links, pipes: never read
+        count = sum(1 for p in f.paths if p.startswith("overlays/")) + sum(1 for p in f.special if p.startswith("overlays/"))
+        if "limits" not in MUTATIONS and count > MAX_OVERLAY_FILES and "overlay-files-stop" not in MUTATIONS:
+            # ENC-17, OVL-5 (R5-1): limit once, the other files not listed, and the chain checked as usual.
+            problems.add(("overlays", "limit"))
+        elif "overlay-files-stop" in MUTATIONS and count > MAX_OVERLAY_FILES:
             self._chain = {"problems": {("overlays", "limit")}, "verified_end": 0, "lines": [], "batches": []}
             return self._chain
+        else:
+            problems |= others
         events = f.read(EVENTS) if f.has(EVENTS) else b""
         # OVL-5: a reader reads the events file as far as ENC-17 allows; a longer file is `limit`, once, and the rest
         # is not read. A batch reaching past what was read is refused like a batch seal beyond the limits.
@@ -1272,11 +1280,20 @@ class Run:
                 P.add((where, "trials"))  # RES-8: a trial's tree carries its trial
             trials = o.get("trials")
             path = o.get("path")
-            if (isinstance(trials, dict) and isinstance(path, str) and "/" in path
-                    and not MUTATIONS & {"trial-rollups", "rollup-tree"}):
-                above = rollup_ids.get((o.get("caseId"), path.rsplit("/", 1)[0]))
-                if above is not None and o.get("parentResultId") != above:
-                    P.add((where, "trials"))  # RES-8: the rollups form the case's own tree
+            if isinstance(trials, dict) and not MUTATIONS & {"trial-rollups", "rollup-tree"}:
+                # RES-8 (R5-5): the rollups form the case's tree as its trial lines do, whatever the paths' spelling.
+                parent_paths = set()
+                for t in trial_lines.get((o.get("caseId"), path), []):
+                    up = by_id.get(t.get("parentResultId")) if t.get("parentResultId") is not None else None
+                    parent_paths.add(up.get("path") if up is not None else None)
+                if len(parent_paths) > 1:
+                    P.add((where, "trials"))  # trial lines whose parents are at several paths, or roots and not
+                elif parent_paths:
+                    (up_path,) = parent_paths
+                    above = rollup_ids.get((o.get("caseId"), up_path)) if up_path is not None else None
+                    # R5N-3: checked when the case has a rollup there (a running case may not have it yet)
+                    if (up_path is None or above is not None) and o.get("parentResultId") != above:
+                        P.add((where, "trials"))
             if isinstance(trials, dict):
                 own = trial_lines.get((o.get("caseId"), o.get("path")), [])
                 if "trial-rollups" in MUTATIONS:
@@ -1384,8 +1401,11 @@ class Run:
 
     def _verify(self):
         _, _, reading = self.read()
-        problems = (set(reading) | path_problems(self.folder.paths) | {(p, "path") for p in self.folder.special}
-                    | {(p, "limit") for p in self.folder.paths if p.endswith(".dsse.json") and _beyond_limits(self.folder, p)}
+        # RUN-3, §4.5 (R5-1, R5-2): overlays/ is the chain's to report, and an envelope beyond its limit is only a
+        # malformed signature (SIG-1): neither is a problem of the run.
+        own = [p for p in self.folder.paths if not p.startswith("overlays/")]
+        problems = (set(reading) | path_problems(own)
+                    | {(p, "path") for p in self.folder.special if not p.startswith("overlays/")}
                     | self.seal())
         if not reading:
             problems |= self.cross_file()
@@ -1896,11 +1916,19 @@ def _threshold(rule, runs):
     return "failed" if "failed" in statuses else "not_measured" if "not_measured" in statuses else "passed"
 
 
-def _rule_unknown(rule):
+def _later_minor(document):
+    """VER-6 (R5-4): whether a document declares a later minor of major 1 than this version (1.0)."""
+    version = document.get("schemaVersion") if isinstance(document, dict) else None
+    if "declared-version" in MUTATIONS:
+        return True
+    return isinstance(version, str) and re.fullmatch(r"1[.][0-9]+", version) is not None and version != "1.0"
+
+
+def _rule_unknown(rule, checkpoint=None):
     """CKP-8: whether a lane rule holds anything this version does not know (VER-8): it is not valid against this
     version's writer schema (a kind, a member or a value a later minor added: a severity max, a threshold op, a
-    comparison axis, a new rule member)."""
-    if "rule-unknown" in MUTATIONS:
+    comparison axis, a new rule member), in a checkpoint that declares a later minor (R5-4)."""
+    if "rule-unknown" in MUTATIONS or not _later_minor(checkpoint):
         return False
     return not schema_valid("writer", "checkpoint#/$defs/laneRule", rule)
 
@@ -1916,7 +1944,7 @@ def _reads_unknown(rule, runs):
         if run is None:
             continue
         mode = get(run.run_doc or {}, "execution", "targetMode")
-        if mode is not None and mode not in TARGET_MODES:
+        if mode is not None and mode not in TARGET_MODES and _later_minor(run.run_doc):
             return True
         if kind == "severity":
             names = _summary_lanes(run)
@@ -1925,12 +1953,13 @@ def _reads_unknown(rule, runs):
                     continue
                 if path is not None and not (o.get("path") == path or str(o.get("path", "")).startswith(path + "/")):
                     continue
-                if "severity" in o and o["severity"] not in SEVERITY_ORDER:
+                if "severity" in o and o["severity"] not in SEVERITY_ORDER and _later_minor(o):
                     return True
         if kind == "comparison":
-            for m in (run.read()[0].get("metrics.json") or {}).get("metrics", []):
+            metrics = run.read()[0].get("metrics.json") or {}
+            for m in metrics.get("metrics", []):
                 if (isinstance(m, dict) and m.get("id") == rule.get("metric") and "direction" in m
-                        and m["direction"] not in DIRECTIONS):
+                        and m["direction"] not in DIRECTIONS and _later_minor(metrics)):
                     return True
     return False
 
@@ -2150,7 +2179,7 @@ def op_lanes(checkpoint_path, runs_dir, at=None, policy=None, envelope=None):
                    rule.get("suite") if isinstance(rule.get("suite"), dict) else None)
         result = lane_result(rule, runs, baseline, version, fallback, binding)
         lanes.append({"lane": name, "result": result})
-        if given is not None and name in recorded and (_rule_unknown(rule) or _reads_unknown(rule, runs + [baseline])):
+        if given is not None and name in recorded and (_rule_unknown(rule, m) or _reads_unknown(rule, runs + [baseline])):
             problems.add((f"lanes/{name}", "unverifiable"))  # CKP-8: a later minor's rule is not compared
         elif given is not None and name in recorded:
             before = recorded[name].get("result")

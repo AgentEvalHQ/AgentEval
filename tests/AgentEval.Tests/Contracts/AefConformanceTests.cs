@@ -105,7 +105,7 @@ public class AefConformanceTests
                     {
                         // Any minor of the known major ('$' is the end of the input, [ENC-15]).
                         result["type"] = "string";
-                        result["pattern"] = "^1[.][0-9]+$";
+                        result["pattern"] = "^1[.](0|[1-9][0-9]*)$";
                     }
                     else if (key is "if" or "not")
                     {
@@ -260,7 +260,7 @@ public class AefConformanceTests
         // vectors that are intact or unsealed.
         var lines = Directory.GetDirectories(Path.Combine(Conformance, "valid"))
             .Concat(Directory.GetDirectories(Path.Combine(Conformance, "runs")))
-            .Where(d => (string?)ReadJson(Path.Combine(d, "expected.json"))["outcome"] is "intact" or "unsealed")
+            .Where(d => Stored(d) && (string?)ReadJson(Path.Combine(d, "expected.json"))["outcome"] is "intact" or "unsealed")
             .SelectMany(d => NdjsonLines(Path.Combine(d, "run", "results.ndjson"))).ToList();
         var states = ReadJson(Path.Combine(Root, "schemas", "writer", "common.schema.json"))["$defs"]!["state"]!["enum"]!.AsArray();
 
@@ -349,6 +349,10 @@ public class AefConformanceTests
     private static string BlobPath(string hex) => $"blobs/sha256/{hex[..2]}/{hex}";
 
     private static JsonNode ReadJson(string file) => JsonNode.Parse(File.ReadAllText(file))!;
+
+    // A vector stored whole: not a generated one (spec 09 §9.2.1), whose input exists only once the conformance runner has
+    // generated it (AgentEval.Results.Tests and the runner judge those).
+    private static bool Stored(string vectorDir) => ReadJson(Path.Combine(vectorDir, "expected.json"))["generate"] is null;
 
     /// <summary>
     /// An integer field read as [ENC-4] says: as a binary64 value, so <c>2</c>, <c>2.0</c> and <c>2e0</c> are all 2. The
@@ -505,7 +509,7 @@ public class AefConformanceTests
     // ------------------------------------------------------------------ the seal
 
     public static TheoryData<string> SealVectors() =>
-        new(Directory.GetDirectories(Path.Combine(Conformance, "seal-vectors")).Select(Path.GetFileName)!);
+        new(Directory.GetDirectories(Path.Combine(Conformance, "seal-vectors")).Where(Stored).Select(Path.GetFileName)!);
 
     [Theory]
     [MemberData(nameof(SealVectors))]
@@ -754,7 +758,7 @@ public class AefConformanceTests
         Assert.Empty(VerifyChain(ValidRun("completed-eval")).Problems);
 
     public static TheoryData<string> ChainVectors() =>
-        new(Directory.GetDirectories(Path.Combine(Conformance, "chain-vectors")).Select(Path.GetFileName)!);
+        new(Directory.GetDirectories(Path.Combine(Conformance, "chain-vectors")).Where(Stored).Select(Path.GetFileName)!);
 
     [Theory]
     [MemberData(nameof(ChainVectors))]

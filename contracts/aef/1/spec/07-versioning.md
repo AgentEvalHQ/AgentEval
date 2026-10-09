@@ -2,7 +2,8 @@
 
 ## 7.1 Writers are strict, readers are tolerant
 
-- **[VER-1]** Every JSON file and every NDJSON line carries `schemaVersion`, `MAJOR.MINOR` (this version: `1.0`),
+- **[VER-1]** Every JSON file and every NDJSON line carries `schemaVersion`, `MAJOR.MINOR` in decimal without
+  leading zeros (this version: `1.0`; never `1.00`, so a minor is compared as the number it reads),
   except the in-toto statements (`seal.json`, `overlays/seal-<nnnn>.json`), whose `_type` in-toto fixes: they carry it
   in `predicate.schemaVersion`.
 - **[VER-2]** A **writer** produces documents valid against `schemas/writer/`: only known fields, only known enum

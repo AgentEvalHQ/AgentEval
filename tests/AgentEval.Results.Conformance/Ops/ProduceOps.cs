@@ -115,7 +115,7 @@ internal static class ProduceOps
 
         public required AefRunStatus Status { get; init; }
 
-        public required DateTimeOffset EndedAt { get; init; }
+        public required AefTime EndedAt { get; init; }
 
         public string? AbortReason { get; init; }
 
@@ -383,7 +383,7 @@ internal static class ProduceOps
 
     // ------------------------------------------------------------------ run.json and metrics.json
 
-    private sealed record ClosedRun(AefRunHeader Header, AefRunStatus Status, DateTimeOffset EndedAt, string? AbortReason);
+    private sealed record ClosedRun(AefRunHeader Header, AefRunStatus Status, AefTime EndedAt, string? AbortReason);
 
     // run.json as the writer's header, and what Close takes: a closed status, the end and the abort reason ([RUN-5]).
     private static ClosedRun RunOf(Facts run)
@@ -619,25 +619,11 @@ internal static class ProduceOps
             where T : struct, System.Enum => OptText(name) is not { } text ? null
             : AefNames.TryParse<T>(text, out var value) ? value : throw Wrong(name, "a name the writer schema lists ([VER-2])");
 
-        // An [ENC-8] time, as the writer's model holds it (DateTimeOffset, to 100 ns): one finer than that is refused,
-        // never rounded.
-        public DateTimeOffset Time(string name) => OptTime(name) ?? throw Missing(name, "a time");
+        // An [ENC-8] time at its full precision (nine fraction digits included), as the writer's model holds it (AefTime):
+        // written as given (n2-d), compared as a time by the judge.
+        public AefTime Time(string name) => OptTime(name) ?? throw Missing(name, "a time");
 
-        public DateTimeOffset? OptTime(string name)
-        {
-            if (OptText(name) is not { } text)
-            {
-                return null;
-            }
-
-            var time = AefTime.Parse(text);
-            if (time.Nanoseconds % 100 != 0)
-            {
-                throw new FormatException($"{where}: {name} is {text}: the writer keeps a time to 100 ns");
-            }
-
-            return DateTimeOffset.FromUnixTimeSeconds(time.Seconds).AddTicks(time.Nanoseconds / 100);
-        }
+        public AefTime? OptTime(string name) => OptText(name) is { } text ? AefTime.Parse(text) : null;
 
         public Facts Object(string name) => OptObject(name) ?? throw Missing(name, "an object");
 

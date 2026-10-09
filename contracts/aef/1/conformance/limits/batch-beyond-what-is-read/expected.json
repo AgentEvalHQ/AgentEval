@@ -1,0 +1,53 @@
+{
+  "kind": "chain",
+  "run": "run",
+  "generate": [
+    {
+      "copy": [
+        "valid/completed-eval/run",
+        "run"
+      ]
+    },
+    {
+      "append": [
+        "run/overlays/events.ndjson",
+        [
+          [
+            "\n",
+            1000000
+          ]
+        ]
+      ]
+    },
+    {
+      "write": [
+        "run/overlays/seal-0003.json",
+        [
+          [
+            "{\n  \"_type\": \"https://in-toto.io/Statement/v1\",\n  \"subject\": [\n    {\n      \"name\": \"overlays/events.ndjson\",\n      \"digest\": {\n        \"sha256\": \"39b2fdfb2e0724db2e3efedeff34bc3f6513d3a2ad28c64f84d07386c300edfd\"\n      }\n    }\n  ],\n  \"predicateType\": \"https://agenteval.dev/aef/1/overlay-batch\",\n  \"predicate\": {\n    \"schemaVersion\": \"1.0\",\n    \"runId\": \"01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10\",\n    \"runHash\": \"f16b6a74505a359810e44611732c4d53ff61d32852983b165414811eb6a6627b\",\n    \"batch\": 3,\n    \"offset\": 659,\n    \"length\": 1000000,\n    \"previous\": {\n      \"path\": \"overlays/seal-0002.json\",\n      \"sha256\": \"da28c56b467a871175478413f27ee01973bf9d964b676bffae38ce2ed7b9b606\"\n    }\n  }\n}\n",
+            1
+          ]
+        ]
+      ]
+    }
+  ],
+  "problems": [
+    [
+      "overlays/events.ndjson",
+      "limit"
+    ],
+    [
+      "overlays/events.ndjson",
+      "uncovered"
+    ],
+    [
+      "overlays/seal-0003.json",
+      "limit"
+    ]
+  ],
+  "rules": [
+    "OVL-5",
+    "ENC-17",
+    "ENC-18"
+  ]
+}

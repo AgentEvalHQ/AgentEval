@@ -86,16 +86,71 @@ public static class DsseVerifier
     /// <summary>
     /// Verifies an envelope given as its JSON bytes. <paramref name="file"/> is the exact bytes of the file it signs
     /// and <paramref name="payloadType"/> the type [SIG-1] gives that file (<see cref="Dsse.InTotoPayloadType"/> or
-    /// <see cref="Dsse.CheckpointPayloadType"/>); <paramref name="policy"/> is the caller's ([SIG-4]).
+    /// <see cref="Dsse.CheckpointPayloadType"/>); <paramref name="policy"/> is the caller's ([SIG-4]). An envelope beyond
+    /// the 56 MiB [ENC-17] allows is <c>malformed</c>, and verifies for no one ([SIG-1]); a caller that holds a file
+    /// rather than its bytes uses <see cref="VerifyFile"/>, which does not read such a file.
     /// </summary>
     public static DsseVerification Verify(ReadOnlySpan<byte> envelope, ReadOnlySpan<byte> file, string payloadType, TrustPolicy policy)
     {
         ArgumentNullException.ThrowIfNull(payloadType);
         ArgumentNullException.ThrowIfNull(policy);
+        if (envelope.Length > AefLimits.MaxEnvelopeBytes)
+        {
+            return Oversized();
+        }
+
         return DsseEnvelope.TryParse(envelope, out var parsed, out var malformed)
             ? Verify(parsed, file, payloadType, policy)
             : new DsseVerification(DsseEnvelopeResult.Malformed, malformed, [], []);
     }
+
+    /// <summary>
+    /// Verifies the envelope in the file at <paramref name="envelopePath"/> (see
+    /// <see cref="Verify(ReadOnlySpan{byte}, ReadOnlySpan{byte}, string, TrustPolicy)"/>). A file beyond the 56 MiB
+    /// [ENC-17] allows an envelope is <c>malformed</c> without being read, and verifies for no one ([SIG-1]).
+    /// </summary>
+    /// <exception cref="IOException">The file cannot be read.</exception>
+    public static DsseVerification VerifyFile(string envelopePath, ReadOnlySpan<byte> file, string payloadType, TrustPolicy policy)
+    {
+        ArgumentNullException.ThrowIfNull(envelopePath);
+        ArgumentNullException.ThrowIfNull(payloadType);
+        ArgumentNullException.ThrowIfNull(policy);
+        return ReadEnvelopeFile(envelopePath) is { } envelope
+            ? Verify(envelope, file, payloadType, policy)
+            : Oversized();
+    }
+
+    /// <summary>
+    /// The bytes of the envelope file at <paramref name="path"/>, or null when it is beyond the 56 MiB [ENC-17] allows an
+    /// envelope: such a file is not read ([SIG-1]: <c>malformed</c> without being read, see <see cref="Oversized"/>).
+    /// </summary>
+    /// <exception cref="IOException">The file cannot be read, or grew beyond the limit while it was read.</exception>
+    public static byte[]? ReadEnvelopeFile(string path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 1, FileOptions.SequentialScan);
+        if (stream.Length > AefLimits.MaxEnvelopeBytes)
+        {
+            return null;
+        }
+
+        // Never more than the limit plus one byte, whatever the file does while it is read.
+        var buffer = new byte[(int)stream.Length];
+        stream.ReadExactly(buffer);
+        if (stream.ReadByte() >= 0)
+        {
+            throw new IOException($"{path}: the file grew while it was read.");
+        }
+
+        return buffer;
+    }
+
+    /// <summary>
+    /// The verification of an envelope beyond the 56 MiB [ENC-17] allows one: <c>malformed</c>, not read, no
+    /// per-signature results, and it verifies for no one ([SIG-1], [SIG-5]).
+    /// </summary>
+    public static DsseVerification Oversized() =>
+        new(DsseEnvelopeResult.Malformed, $"beyond the {AefLimits.MaxEnvelopeBytes} bytes [ENC-17] allows a DSSE envelope: not read ([SIG-1])", [], []);
 
     /// <summary>
     /// Verifies a parsed envelope ([SIG-5]). Each signature is checked over the envelope's own pre-authentication

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "1.0",
+  "schemaVersion": "1.1",
   "checkpointId": "cp_6921a76a2379",
   "subject": {
     "ref": "agent:shop/assistant",
@@ -15,7 +15,7 @@
       "runs": [
         {
           "runId": "RU-severity",
-          "runHash": "44b14d44710d8cbaabd77137706fee67555c8bdfacf718876a9c12ab72749ab6",
+          "runHash": "90f12f98b5f5a8a1b76fee49023ac5cb94cd50d673ea753169e2544a29d6ddb3",
           "origin": "launched"
         }
       ],
@@ -34,7 +34,7 @@
       "runs": [
         {
           "runId": "RU-mode",
-          "runHash": "9710d76081328b924e242c31e6fc0cc77ca6f1634b02e0cb658ea2871b9808c4",
+          "runHash": "b93ac73b0c6b5cafaf9ef1114e725bd1634153e79daa97c1cee7591037a45c34",
           "origin": "launched"
         }
       ],
@@ -84,7 +84,7 @@
       "runs": [
         {
           "runId": "RU-direction",
-          "runHash": "09f644202d956c497926fe7b3ac811606f43762cc1167e4084c0b8353beb95f2",
+          "runHash": "59b85f1b8b8d3dea2b8c0487b674b8ac600114e870727cd06c831c65fe9008f3",
           "origin": "launched"
         }
       ],
@@ -107,7 +107,7 @@
           "oldestClosedAt": "2026-10-03T00:00:00Z"
         },
         "evidence": [
-          "44b14d44710d8cbaabd77137706fee67555c8bdfacf718876a9c12ab72749ab6"
+          "90f12f98b5f5a8a1b76fee49023ac5cb94cd50d673ea753169e2544a29d6ddb3"
         ]
       },
       {
@@ -119,7 +119,7 @@
           "oldestClosedAt": "2026-10-03T00:00:00Z"
         },
         "evidence": [
-          "9710d76081328b924e242c31e6fc0cc77ca6f1634b02e0cb658ea2871b9808c4"
+          "b93ac73b0c6b5cafaf9ef1114e725bd1634153e79daa97c1cee7591037a45c34"
         ]
       },
       {
@@ -144,7 +144,7 @@
           "axes": []
         },
         "evidence": [
-          "09f644202d956c497926fe7b3ac811606f43762cc1167e4084c0b8353beb95f2"
+          "59b85f1b8b8d3dea2b8c0487b674b8ac600114e870727cd06c831c65fe9008f3"
         ]
       }
     ]

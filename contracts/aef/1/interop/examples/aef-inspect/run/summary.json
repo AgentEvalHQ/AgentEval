@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10",
+  "lanes": [
+    {
+      "lane": "main",
+      "metrics": [
+        {
+          "metric": "triage",
+          "path": "triage",
+          "N": 6,
+          "n": 2,
+          "notMeasured": 4,
+          "sum": 1.33,
+          "sumSq": 0.9109,
+          "value": 0.665,
+          "verdict": "scored",
+          "stderr": 0.115
+        },
+        {
+          "metric": "triage/helpfulness",
+          "path": "triage/helpfulness",
+          "N": 1,
+          "n": 1,
+          "notMeasured": 0,
+          "sum": 0.1,
+          "sumSq": 0.010000000000000002,
+          "value": 0.1,
+          "verdict": "scored"
+        },
+        {
+          "metric": "triage/groundedness",
+          "path": "triage/groundedness",
+          "N": 1,
+          "n": 0,
+          "notMeasured": 1,
+          "sum": 0,
+          "sumSq": 0,
+          "value": null,
+          "verdict": "not_measured"
+        }
+      ]
+    }
+  ]
+}

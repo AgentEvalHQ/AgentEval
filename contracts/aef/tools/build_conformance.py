@@ -379,6 +379,8 @@ def invalid_cases():
     return [
         ("run-unknown-major", "run", base_run(schemaVersion="3.0"), "invalid", ["VER-4"], "an unknown major version is refused"),
         ("run-without-schema-version", "run", base_run(schemaVersion=DROP), "invalid", ["VER-1"], "every document carries schemaVersion"),
+        ("run-version-leading-zero", "run", base_run(schemaVersion="1.00"), "invalid", ["VER-1", "VER-3"],
+         "a minor is written without a leading zero, so a reader compares it as a number (1.00 is no version)"),
         ("run-completed-with-abort-reason", "run", base_run(abortReason="It was not aborted."), "invalid", ["RUN-5"],
          "only an aborted run has an abortReason"),
         ("result-state-closed", "result", dict(BASE_RESULT, state="flaky"), "invalid", ["VER-9", "RES-1"],
@@ -857,6 +859,40 @@ def run_vectors():
             return out + [rollup(trials), child]
         return out + [rollup(trials, aggregation=agg1), dict(child, parentResultId=result_id(SMALL_ID, "k3", "t"), component=comp)]
     vec("trials-rollup-tree", [], ["RES-8", "RES-5"], outcome="intact", lines=lambda ls: ls + tree_lines(False))
+
+    def independent_roots():  # R5-5: t and t/x are two root trees of one case, both run in trials: two root rollups
+        out = []
+        for trial in (0, 1):
+            out += [TL(trial, "passed"),
+                    {"schemaVersion": V, "resultId": result_id(SMALL_ID, "k3", "t/x", trial), "caseId": "k3",
+                     "path": "t/x", "trial": trial, "evaluator": {"id": "code:x"}, "state": "passed"}]
+        trials = {"n": 2, "passed": 2, "aggregation": "AllPass", "agree": True}
+        return out + [rollup(trials), {"schemaVersion": V, "resultId": result_id(SMALL_ID, "k3", "t/x"), "caseId": "k3",
+                                       "path": "t/x", "evaluator": {"id": "code:x"}, "state": "passed", "trials": trials}]
+    vec("trials-independent-roots", [], ["RES-8"], outcome="intact", lines=lambda ls: ls + independent_roots())
+
+    def mixed_parents():  # R5N-2: t/x is a child in trial 0 and a root in trial 1: trials at the rollup at t/x
+        x = lambda trial, **kw: dict({"schemaVersion": V, "resultId": result_id(SMALL_ID, "k3", "t/x", trial), "caseId": "k3",
+                                      "path": "t/x", "trial": trial, "evaluator": {"id": "code:x"}, "state": "passed"}, **kw)
+        trials = {"n": 2, "passed": 2, "aggregation": "AllPass", "agree": True}
+        return [TL(0, "passed", aggregation=agg1), x(0, parentResultId=result_id(SMALL_ID, "k3", "t", 0), component=comp),
+                TL(1, "passed"), x(1), rollup(trials),
+                {"schemaVersion": V, "resultId": result_id(SMALL_ID, "k3", "t/x"), "caseId": "k3", "path": "t/x",
+                 "evaluator": {"id": "code:x"}, "state": "passed", "trials": trials}]
+    vec("trials-mixed-parents", [[L(10), "trials"]], ["RES-8"], lines=lambda ls: ls + mixed_parents())
+
+    def running_without_parent_rollup():  # R5N-3: a running case may not have its rollup at t yet: nothing to check
+        out = []
+        for trial in (0, 1):
+            out += [TL(trial, "passed", aggregation=agg1),
+                    {"schemaVersion": V, "resultId": result_id(SMALL_ID, "k3", "t/x", trial),
+                     "parentResultId": result_id(SMALL_ID, "k3", "t", trial), "caseId": "k3", "path": "t/x", "trial": trial,
+                     "evaluator": {"id": "code:x"}, "state": "passed", "component": comp}]
+        return out + [{"schemaVersion": V, "resultId": result_id(SMALL_ID, "k3", "t/x"), "caseId": "k3", "path": "t/x",
+                       "evaluator": {"id": "code:x"}, "state": "passed",
+                       "trials": {"n": 2, "passed": 2, "aggregation": "AllPass", "agree": True}}]
+    vec("trials-running-without-parent-rollup", [], ["RES-8"], outcome="unsealed", unsealed=True,
+        run={"status": "running", "endedAt": DROP}, lines=lambda ls: ls + running_without_parent_rollup())
     vec("trials-child-rollup-as-root", [[L(10), "trials"]], ["RES-8"], lines=lambda ls: ls + tree_lines(True))
     # SUM-8 (W5a-13): a producer's aggregate gives a value whenever n is not 0.
     vec("aggregate-producer-value-null", [["summary.json", "summary"]], ["SUM-8"],
@@ -1235,6 +1271,27 @@ def limit_vectors():
     (spec 09 §9.2): a run of 100,000 files or a 40 MiB seal does not belong in the corpus."""
     out = ROOT / "limits"
     base = "valid/completed-eval/run"
+    base_dir = ROOT / base
+    seal_text = (base_dir / "seal.json").read_text(encoding="utf-8")
+    # A results line padded to exactly 4 MiB with an ext member: the file's other lines as they are.
+    lines = (base_dir / "results.ndjson").read_text(encoding="utf-8").split("\n")[:-1]  # LF only (ENC-6)
+    first = json.loads(lines[0])
+    head = json.dumps(dict(first, ext={"agenteval.pad": ""}), ensure_ascii=False, separators=(",", ":"))
+    cut = head.rindex('""}') + 1  # inside the pad's string
+    width = 4 * 1024 * 1024 - len(head.encode("utf-8"))
+    padded_results = [[head[:cut], 1], ["a", width], [head[cut:] + "\n" + "\n".join(lines[1:]) + "\n", 1]]
+    # R4N-2: a third batch over a million blank lines, chained to batch 2 as a writer would chain it.
+    seal_2 = base_dir / "overlays" / "seal-0002.json"
+    pred_2 = read_json(seal_2)["predicate"]
+    start_3 = pred_2["offset"] + pred_2["length"]
+    seal_3 = json.dumps({
+        "_type": "https://in-toto.io/Statement/v1",
+        "subject": [{"name": "overlays/events.ndjson", "digest": {"sha256": hashlib.sha256(b"\n" * 1_000_000).hexdigest()}}],
+        "predicateType": "https://agenteval.dev/aef/1/overlay-batch",
+        "predicate": {"schemaVersion": V, "runId": pred_2["runId"], "runHash": pred_2["runHash"], "batch": 3,
+                      "offset": start_3, "length": 1_000_000,
+                      "previous": {"path": "overlays/seal-0002.json", "sha256": hashlib.sha256(seal_2.read_bytes()).hexdigest()}},
+    }, indent=2, ensure_ascii=False) + "\n"
     counted = 8  # the base run's files that count toward ENC-17's file limit (not seal.json, attestation, overlays/)
     unsealed = [{"copy": [base, "run"]}, {"remove": "run/seal.json"}, {"remove": "run/overlays"}]
     pad = lambda size, head='{"pad":"', tail='"}': [[head, 1], ["a", size - len(head) - len(tail)], [tail, 1]]
@@ -1251,6 +1308,19 @@ def limit_vectors():
          {"outcome": "invalid", "problems": [["seal.json", "limit"]]}, ["ENC-17", "ENC-18"]),
         ("overlays-files-beyond-limit", "chain", [{"copy": [base, "run"]}, {"files": ["run/overlays/many", 19_997]}],
          {"problems": [["overlays", "limit"]]}, ["ENC-17", "ENC-18", "OVL-5"]),
+        # At their values (R5-7): a 40 MiB seal and a 4 MiB line are read.
+        ("seal-at-40-mib", "run", [{"copy": [base, "run"]},
+                                   {"write": ["run/seal.json", [[seal_text[:-1], 1], [" ", 40 * 1024 * 1024 - len(seal_text)], ["\n", 1]]]}],
+         {"outcome": "intact", "problems": []}, ["ENC-17", "ENC-18"]),
+        ("results-line-at-4-mib", "run", unsealed + [{"write": ["run/results.ndjson", padded_results]}],
+         {"outcome": "unsealed", "problems": []}, ["ENC-17", "ENC-18"]),
+        # R4N-2: a batch whose range ends beyond what a reader reads (1,000,000 lines) is limit at its seal, and claims
+        # no bytes.
+        ("batch-beyond-what-is-read", "chain", [{"copy": [base, "run"]},
+                                                {"append": ["run/overlays/events.ndjson", [["\n", 1_000_000]]]},
+                                                {"write": ["run/overlays/seal-0003.json", [[seal_3, 1]]]}],
+         {"problems": [["overlays/events.ndjson", "limit"], ["overlays/events.ndjson", "uncovered"],
+                       ["overlays/seal-0003.json", "limit"]]}, ["OVL-5", "ENC-17", "ENC-18"]),
     ]
     for name, kind, steps, expect, rules in cases:
         write_json(out / name / "expected.json", {"kind": kind, "run": "run", "generate": steps, **expect, "rules": rules})

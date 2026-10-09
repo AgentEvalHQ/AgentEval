@@ -39,7 +39,8 @@
   regular file or a folder: a symbolic link, device, pipe or socket is a `path` problem and is never followed or
   read (a link can point outside the run; a pipe would block a reader). The rules above are on the paths of files: a
   folder breaks them only through the files in it (for a case clash, the files under the later folder are
-  reported), and an empty folder is ignored.
+  reported), and an empty folder is ignored. `overlays/` is not checked by this rule: it grows after the run is
+  sealed, so whatever it holds is the overlay chain's to report ([OVL-5]), never a problem of the run.
 - **[RUN-4] A closed run never changes.** While `status` is `running` the producer may rewrite its files. When it
   closes the run (`completed` or `aborted`) it writes their final form; from then on nothing edits, adds or removes a
   file outside `overlays/`. Everything added later is an overlay (§4.2).
@@ -186,9 +187,10 @@ One line per node of the run's result tree.
   at that path carries `trials`, whose `n` is the number of those trial lines, `passed` the number of them in state
   `passed`, and `agree` `true` exactly when they are all in one state (in a running run, a case still running may
   have no rollup yet): a failing trial cannot vanish behind its rollup, nor a case behind a missing one. A composite
-  case run in trials therefore has a rollup at each path its trials have: the rollups form the case's own tree (the
-  rollup at a child path has the rollup at its parent path, the path up to its last `/`, as parent), and that tree
-  is what [SUM-3] counts.
+  case run in trials therefore has a rollup at each path its trials have: the rollups form the case's own tree as
+  its trial lines do (the rollup at a path has, as parent, the rollup at the path of its trial lines' parents when
+  the case has one there, and is a root when they are roots; a rollup whose trial lines' parents are not all at one
+  path, or not all roots, is `trials`), and that tree is what [SUM-3] counts. A path's spelling decides nothing: `q/x` may be a root.
 
 ### 3.4.5 Facts about a result
 
@@ -302,7 +304,7 @@ an `encoding`, `limit` or `schema` problem: they would otherwise be checked agai
 | `component` | `results.ndjson:<line>` | a child (a line with `parentResultId`) without `component` ([RES-5]) |
 | `aggregation` | `results.ndjson:<line>` | [RES-5], [RES-6]: a node with children and no `aggregation`, a `total` that is not the number of children, counts that do not add up (an absent `unmeasured` or count is 0), or a `decisive` id that is not a child |
 | `annotator` | `results.ndjson:<line>` | a panel whose `agree` exceeds `of` ([RES-10]) |
-| `trials` | `results.ndjson:<line>` | a rollup whose `passed` exceeds `n`, or whose `n`, `passed` and `agree` are not what its trial lines give; a second rollup for one case and path (at the later one); or, at each trial line of a closed run, a trial line whose case and path have no rollup; or a line whose parent carries `trial` and that does not carry the same one; or a rollup at a child path whose parent is not its case's rollup at the parent path, when that case has one ([RES-8]) |
+| `trials` | `results.ndjson:<line>` | a rollup whose `passed` exceeds `n`, or whose `n`, `passed` and `agree` are not what its trial lines give; a second rollup for one case and path (at the later one); or, at each trial line of a closed run, a trial line whose case and path have no rollup; or a line whose parent carries `trial` and that does not carry the same one; or a rollup whose parent is not the rollup at its trial lines' parents' path, when the case has one there (none when they are roots), or whose trial lines' parents are at several paths, or roots and not ([RES-8]) |
 | `pending` | `results.ndjson:<line>` | a `pending` line in a closed run ([RES-3]) |
 | `evidence` | `results.ndjson:<line>` | an evidence id no record of `evidence.ndjson` has |
 | `evidence-id` | `evidence.ndjson:<line>` | an `evidenceId` an earlier line already has |
