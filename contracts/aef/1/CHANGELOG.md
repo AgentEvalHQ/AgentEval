@@ -1,5 +1,96 @@
 # AEF 1.0 changelog
 
+## Unreleased (draft): rework after critic round 4
+
+Critic round 4 scored 8.6 of 10 (from 8.4), with no blocker: every round-3 finding but the patent commitment
+addressed, and a second implementation passing every vector kind, writers included. Changes since:
+
+- **Nothing appended changes a sealed run, and a crash never stops the chain** ([OVL-5], §8.1): the events file is
+  judged line by line, inside the batches and after them: a blank line, a CR or a leading byte-order mark is
+  `event-invalid` at its line and nothing more; a last line without LF is still being written; a writer appending
+  after one ends it with an LF first, so the next batch claims it. The events file is read within [ENC-17]'s limits
+  (an unfinished line is no line); a longer one is `limit` once, and its verified batches still stand. More than
+  19,999 files under `overlays/` is `limit` at `overlays`. Before, one blank line appended by a crashed writer voided
+  an authorized redaction, and a million appended lines split two verifiers; a first fix (the verified batches
+  judged as a file) still let one crash line stop the chain for good, which implementing it found (R4N-9). A new
+  adversary in §8.1: the appender.
+- **1.0 verifiers never call a 1.1 lane wrong** ([CKP-8], [VER-5]): a lane is `unverifiable` when recomputing it
+  reads anything this version does not know: a rule not valid against the writer schema (any new member, kind or
+  value), or, in its runs, an unknown `execution.targetMode`, a severity lane's unknown `severity`, a comparison's
+  unknown metric `direction`. A minor version changes how a lane computes only through its rule.
+- **The trust policy has a schema** ([SIG-4], [VER-9]): `trust-policy.schema.json`, closed for readers too (a verifier
+  cannot honour a restriction it does not know); `may` is matched exactly, and a value a verifier does not know
+  grants nothing. Before, the reference granted redaction to `"may": "never-redact"`.
+- **Every ruling born of a disagreement is pinned** (§9.2): `conformance/rulings/` holds a vector for each ruling
+  made where the two implementations disagreed (W3-17 to W3-19, W4-1 to W4-3, W4-5, W4-6, W4-10, and LANE-3's
+  trial lines); undoing any of them in the reference fails its vector, and `--self-check` now proves it with a
+  mutation for each, and for each of this round's rules.
+- **Limits tested at their values** (§9.2): generated vectors (`limits/`) that the conformance runner builds from a
+  recipe: a run folder of exactly 100,000 files and one of 100,001, 1,000,001 lines, a 4 MiB line, a 40 MiB seal,
+  20,000 files under `overlays/`. The corpus stays small.
+- **Writers**: five more `summarize` refusals, one per input error §9.3 lists. A Producer is now tested as the writer
+  of `results.ndjson` (R4-6): the write-side kind `produce` (§9.2.1, §9.3) gives it a scenario, the facts of a closed
+  run (its `run.json` and `metrics.json`, each case's result tree and trial trees as facts, a summary request), and
+  judges the run it writes: the lines as a set, matched by case, path and trial, with their result ids, parents,
+  trial numbers, rollups (`n`, `passed`, `agree`) and aggregation counts, then the summary and the reference
+  verifier: seven scenarios to write, nine to refuse (each contradicts itself). `agree` is now defined: `true`
+  exactly when the trial lines at the path are all in one state ([RES-8]). The Runner class is released *at risk*: neither
+  implementation is a runner (§9.1, GOVERNANCE.md).
+- **Smaller rules**:
+  - times are years 0001 to 9999 ([ENC-8]);
+  - only `sum` must be exact; `sumSq` is binary64 within §3.6 ([SUM-5]);
+  - a producer SHOULD write `sum`, and an overlay writer `target.runHash` ([SUM-5], [OVL-2]);
+  - a writer SHOULD omit a null optional field, and writing `null` is valid ([ENC-2]);
+  - LANE-3's steps 2 and 3 never read trial lines ([LANE-3]);
+  - a composite case's trial rollups form its tree, checked as `trials` ([RES-8]);
+  - a new aggregation strategy `Own`: a node's own verdict, its children recorded beside it ([RES-6]);
+  - the `document` operation applies the limits of the file its schema names (§9.3);
+  - trace and log lines are split under 4 MiB (§3.1).
+- **Conversions** (§7.5, interop): what building the store v1 exporter and the ASSERT importer found (W5b-1 to
+  W5b-18): fixed paths and evaluator ids so two migrators give the same result ids, how every unmapped field is
+  carried, converted runs sealed as `ingest`, one encoding for a ref made from a name, and the ASSERT example's
+  digests computed from the sample's LF bytes (now pinned by `.gitattributes`).
+- **What a reader shows, and what a checkpoint anchors, are tested** ([OVL-3], [CKP-9], [SIG-8]): the effective view
+  gives the assurance shown for each event (`signed` only for a signature verified for the event's own identity);
+  the `lanes` operation takes the checkpoint's signature and gives the runs it anchors. A rollup's `agree` is checked
+  against its trial lines, as `n` and `passed` are ([RES-8]). Stream vectors give problems as `[where, problem]`
+  pairs, like every other kind.
+- **A guide for producers** ([producers.md](producers.md)): the four files, saying what was not measured, the
+  optional fields that make a run more checkable, privacy, the encoding traps implementations fell into, overlays,
+  and testing a writer.
+- **Conformance and documents**: §9.1 lists every kind each class's vectors hold, and a class that includes another
+  passes its vectors (`check_spec.py` compares §9.1 with `index.json`); the README, rationale and interop pages
+  brought in line; `aef_stream.py` sums a job's costs exactly, as [STRM-4] says.
+  - **Checked interop examples** (interop, informative): `interop/examples/` holds round trips the critic asked for,
+    AEF → OpenTelemetry events → AEF on two corpus runs, OTLP/JSON → AEF from a hand-written file (the registry's own
+    example included), and AEF → Inspect on two corpus runs. `tools/aef_interop.py` is a reference converter written
+    from `opentelemetry.md` and `inspect.md` alone, and `tools/check_interop.py` (in the AEF workflow) reruns it on
+    every example, verifies every run, checks field by field that a round trip loses exactly the page's "What does not
+    carry over" list, and fails when a page's worked example differs from an example's data. Writing it found what
+    the two pages left undecided (OT-1 to OT-6, IN-1 to IN-5): the name of an event for a line without scores, the
+    header of an imported run, the shape of Inspect's `results`, overlays, among others. Each was settled on 10-09
+    and written into the page's mapping as a rule or a stated refusal; the converter follows them, and names the rule
+    when it refuses. The OpenTelemetry page's loss list is now
+    complete (severity, `durationMs`, `turns`, `attack`, `lane`, `normalized`, usage, start times were missing), and
+    its worked example's claim that every `usage` entry sits on a span is corrected.
+
+### Rulings from implementing the run, checkpoint and stream verifiers (W3-16 to W3-21, W4-1 to W4-14)
+
+Written into the text in the round-3 rework, listed here for the record:
+
+- **Runs** ([RES-6], §3.9, [OVL-2]): `total` counts distinct child ids; a second rollup for one case and path is
+  `trials` at the later rollup only; a `results.ndjson` with only schema problems still gets the overlay `target`
+  check; the `document` operation takes the limit of its schema's file; a file beyond a limit is `limit` whatever
+  else is wrong with it; an envelope beyond 56 MiB is `limit`.
+- **Streams and plans** ([STRM-3], [STRM-4]): a stream line beyond the limits is `event-invalid`; a job's costs are
+  summed exactly, rounded once, then compared with `maxUsd`.
+- **Checkpoints and lanes** ([CKP-7], [CKP-8], [LANE-1]–[LANE-9], [LANE-6]): a lane on one side of the decision input
+  only is `evidence`; only intact runs of the checkpoint's subject, deployment and suite give a lane its version and
+  its age, so neither a copy's folder name nor a run of something else changes them; a run a lane names twice counts
+  once; a run without `judges` equals one with `[]`; a baseline needs no `subject.version`; a folder holding run.json
+  is one run, never searched for others; line paths order by number only for the run's own NDJSON files; a
+  checkpoint anchors its comparison baselines too; a lane the decision input leaves out is not compared.
+
 ## Unreleased (draft): rework after critic round 3
 
 Critic round 3 scored 8.4 of 10, with no blocker: every round-2 finding addressed, and AgentEval's own implementation

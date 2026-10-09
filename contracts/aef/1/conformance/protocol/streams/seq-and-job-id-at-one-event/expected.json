@@ -2,14 +2,14 @@
   "kind": "stream",
   "plan": "../plan.json",
   "problems": [
-    {
-      "where": "event:2",
-      "problem": "job-id"
-    },
-    {
-      "where": "event:2",
-      "problem": "seq"
-    }
+    [
+      "event:2",
+      "job-id"
+    ],
+    [
+      "event:2",
+      "seq"
+    ]
   ],
   "rules": [
     "STRM-3",

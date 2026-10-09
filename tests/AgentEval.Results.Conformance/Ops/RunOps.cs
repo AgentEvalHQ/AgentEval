@@ -92,7 +92,7 @@ internal static class RunOps
 
     /// <summary>
     /// <c>view DIR --at T [--policy P]</c>: the effective view of spec 09 §9.2.1, <c>{"results", "reviews", "waivers",
-    /// "withheld", "unsealedEvents"}</c>. <c>--at</c> defaults to the time of the call (§9.3).
+    /// "withheld", "unsealedEvents", "assurance"}</c>. <c>--at</c> defaults to the time of the call (§9.3).
     /// </summary>
     public static int View(string[] args, TextWriter stdout)
     {
@@ -141,6 +141,11 @@ internal static class RunOps
             })]),
             ["withheld"] = new JsonArray([.. view.Withheld.Select(b => (JsonNode?)b)]),
             ["unsealedEvents"] = view.UnsealedEvents,
+            ["assurance"] = new JsonArray([.. view.Assurance.Select(a => (JsonNode?)new JsonObject
+            {
+                ["event"] = a.Event,
+                ["shown"] = a.Shown,
+            })]),
         });
     }
 

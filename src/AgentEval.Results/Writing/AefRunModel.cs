@@ -226,6 +226,9 @@ public enum AefAggregationStrategy
 
     /// <summary><c>MajorityVote</c>.</summary>
     [AefName("MajorityVote")] MajorityVote,
+
+    /// <summary><c>Own</c>: the node's own verdict; its children are recorded beside it, with weight 0.</summary>
+    [AefName("Own")] Own,
 }
 
 /// <summary>Which branch of the producer's verdict rules decided a composite's state ([RES-6], for display).</summary>

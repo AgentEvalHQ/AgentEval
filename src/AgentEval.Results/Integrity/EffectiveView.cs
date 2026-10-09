@@ -29,6 +29,16 @@ public sealed record EffectiveReview(string Target, string Status, string Event)
 public sealed record EffectiveWaiver(JsonObject Target, string? Expires, bool Active, string Event);
 
 /// <summary>
+/// The assurance a reader shows for an event ([OVL-3]): <c>signed</c> when the batch holding it carries a signature that
+/// verifies, under the trust policy, for the event's own <c>by.identity</c>, whatever the event claims; otherwise
+/// <c>self-attested</c>. A reader of files never shows <c>authenticated</c>: that is for an event received from a host it
+/// trusts.
+/// </summary>
+/// <param name="Event">The event's <c>eventId</c>.</param>
+/// <param name="Shown"><c>signed</c> or <c>self-attested</c>.</param>
+public sealed record EffectiveAssurance(string Event, string Shown);
+
+/// <summary>
 /// The effective view of a run with its overlays (contracts/aef/1/spec/04-integrity.md, §4.3; the shape of spec 09
 /// §9.2.1), computed from the events of the verified batches (<see cref="OverlayChain.VerifiedEvents"/>), in file order
 /// ([OVL-6]: <c>at</c> is shown, never used to reorder). Parents, summaries, gate decisions and lanes are not
@@ -41,13 +51,15 @@ public sealed class EffectiveView
         IReadOnlyList<EffectiveReview> reviews,
         IReadOnlyList<EffectiveWaiver> waivers,
         IReadOnlyList<string> withheld,
-        int unsealedEvents)
+        int unsealedEvents,
+        IReadOnlyList<EffectiveAssurance> assurance)
     {
         Results = results;
         Reviews = reviews;
         Waivers = waivers;
         Withheld = withheld;
         UnsealedEvents = unsealedEvents;
+        Assurance = assurance;
     }
 
     /// <summary>One entry per result a verified <c>override</c> or <c>adjudicate</c> targets, in results.ndjson order.</summary>
@@ -65,8 +77,17 @@ public sealed class EffectiveView
     /// </summary>
     public IReadOnlyList<string> Withheld { get; }
 
-    /// <summary>The number of events after the last verified batch: shown as unsealed, with no effect.</summary>
+    /// <summary>
+    /// The number of lines after the last verified batch that a reader reads, whatever they hold (an unfinished last line
+    /// is none; of a file beyond its limits, none is read): shown as unsealed, with no effect (spec 09 §9.2.1).
+    /// </summary>
     public int UnsealedEvents { get; }
+
+    /// <summary>
+    /// The assurance shown for each event that takes part in the view, in file order ([OVL-3]): <c>signed</c> only when
+    /// its batch's signature verifies for its own identity under the trust policy (none without a policy).
+    /// </summary>
+    public IReadOnlyList<EffectiveAssurance> Assurance { get; }
 
     /// <summary>Computes the effective view of the run in <paramref name="directory"/> at <paramref name="at"/>.</summary>
     /// <param name="directory">The run folder.</param>
@@ -151,7 +172,42 @@ public sealed class EffectiveView
                 r.Key, AefNode.String(r.Value["kind"]) ?? "", AefNode.String(r.Value["eventId"]) ?? ""))],
             waivers,
             AuthorizedRedactions(folder, chain, policy),
-            chain.UnsealedEvents);
+            chain.UnsealedEvents,
+            ShownAssurance(folder, chain, policy));
+    }
+
+    /// <summary>
+    /// [OVL-3]: the assurance a reader shows for each event that takes part in the effective view, in file order:
+    /// <c>signed</c> when the batch holding it carries a signature (<c>overlays/seal-&lt;nnnn&gt;.dsse.json</c>) that
+    /// verifies under <paramref name="policy"/> for the event's own <c>by.identity</c>, whatever <c>by.assurance</c>
+    /// claims; otherwise <c>self-attested</c>. Without a policy no signature verifies, so every event is self-attested.
+    /// </summary>
+    /// <exception cref="IOException">A file cannot be read.</exception>
+    public static IReadOnlyList<EffectiveAssurance> ShownAssurance(AefRunFolder folder, OverlayChain chain, TrustPolicy? policy)
+    {
+        ArgumentNullException.ThrowIfNull(folder);
+        ArgumentNullException.ThrowIfNull(chain);
+        var signers = new Dictionary<int, IReadOnlyList<string>>();
+        var shown = new List<EffectiveAssurance>();
+        foreach (var line in chain.VerifiedEvents)
+        {
+            var e = line.Event!;
+            var batch = line.Batch!.Value;
+            var signed = false;
+            if (policy is not null && AefNode.String(AefNode.At(e, "by", "identity")) is { } identity)
+            {
+                if (!signers.TryGetValue(batch, out var identities))
+                {
+                    signers[batch] = identities = BatchSigners(folder, batch, policy);
+                }
+
+                signed = identities.Contains(identity, StringComparer.Ordinal);
+            }
+
+            shown.Add(new EffectiveAssurance(AefNode.String(e["eventId"]) ?? "", signed ? "signed" : "self-attested"));
+        }
+
+        return shown;
     }
 
     /// <summary>

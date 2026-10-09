@@ -1,0 +1,17 @@
+{
+  "lanes": [
+    {
+      "lane": "quality",
+      "metrics": [
+        {
+          "metric": "quality",
+          "path": "q",
+          "aggregate": {
+            "method": "pass@k",
+            "k": 2
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -134,7 +134,11 @@ public static class AefSummaryWriter
         json["verdict"] = AefWire.Node(verdict);
         json.Put("rule", entry.Rule);
         json["sum"] = AefWire.Number(figures.Sum, "sum");
-        json["sumSq"] = AefWire.Number(figures.SumOfSquares, "sumSq");
+        if (double.IsFinite(figures.SumOfSquares))
+        {
+            // [SUM-5]: optional; the squares of values beyond about 1.34e154 overflow binary64, and JSON has no infinity.
+            json["sumSq"] = AefWire.Number(figures.SumOfSquares, "sumSq");
+        }
         json["path"] = entry.Path;
         if (entry.Aggregate is { } aggregate)
         {

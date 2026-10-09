@@ -213,6 +213,7 @@ public static class CrossFileRules
             // [RES-8], per case and path: the trial lines, and the rollup lines (those carrying trials) by line number.
             var trialLines = new Dictionary<(string, string), List<JsonObject>>();
             var rollups = new Dictionary<(string, string), List<int>>();
+            var rollupIds = new Dictionary<(string, string), string>();   // the resultId of each case and path's first rollup
             var byId = new Dictionary<string, JsonObject>(StringComparer.Ordinal);   // the first line of each id
             foreach (var (number, line) in _documents.Results.Objects)
             {
@@ -236,6 +237,7 @@ public static class CrossFileRules
                 if (line.ContainsKey("trials"))
                 {
                     GetOrAdd(rollups, key).Add(number);
+                    rollupIds.TryAdd(key, AefNode.String(line["resultId"]) ?? "");
                 }
             }
 
@@ -288,6 +290,16 @@ public static class CrossFileRules
                 }
 
                 if (line["trials"] is JsonObject trials && !RollupHolds(trials, number, rollups[CaseAndPath(line)], trialLines.GetValueOrDefault(CaseAndPath(line))))
+                {
+                    Add(where, "trials");
+                }
+
+                // [RES-8]: the rollups of a composite case run in trials form the case's own tree. A rollup at a child path
+                // has as its parent its case's rollup at the parent path (the path without its last '/' segment), when the
+                // case has one there.
+                if (line.ContainsKey("trials") && CaseAndPath(line) is var (rollupCase, rollupPath) && rollupPath.LastIndexOf('/') is var slash and >= 0
+                    && rollupIds.TryGetValue((rollupCase, rollupPath[..slash]), out var parentRollup)
+                    && !string.Equals(AefNode.String(line["parentResultId"]), parentRollup, StringComparison.Ordinal))
                 {
                     Add(where, "trials");
                 }
@@ -584,8 +596,19 @@ public static class CrossFileRules
                 return false;
             }
 
-            return trialsHere is not { Count: > 0 }
-                   || (n == trialsHere.Count && passed == trialsHere.Count(t => AefNode.String(t["state"]) == "passed"));
+            // [RES-8]: n is the number of the trial lines, passed the number of them passed, and agree true exactly when
+            // they are all in one state (an agree that is not a boolean is the schema's problem).
+            if (trialsHere is not { Count: > 0 })
+            {
+                return true;
+            }
+
+            var oneState = trialsHere.Select(t => AefNode.String(t["state"])).Distinct(StringComparer.Ordinal).Count() == 1;
+            var agree = trials["agree"] is JsonValue written && written.GetValueKind() is System.Text.Json.JsonValueKind.True or System.Text.Json.JsonValueKind.False
+                ? AefNode.IsTrue(written)
+                : (bool?)null;
+            return n == trialsHere.Count && passed == trialsHere.Count(t => AefNode.String(t["state"]) == "passed")
+                   && (agree is null || agree == oneState);
         }
 
         // A line's case and path, as written.
@@ -638,7 +661,7 @@ public static class CrossFileRules
         private static bool Inverted(JsonNode? interval) =>
             AefNode.Number(AefNode.Get(interval, "low")) is { } low && AefNode.Number(AefNode.Get(interval, "high")) is { } high && low > high;
 
-        // §3.6: N, n and notMeasured equal; sum (when written) and value within 1e-9 × max(1, |recomputed|); value
+        // §3.6: N, n and notMeasured equal; sum and sumSq (when written) and value within 1e-9 × max(1, |recomputed|); value
         // compared only where AEF defines it ([SUM-8]), and always null when n is 0.
         private static bool EntryMatches(JsonObject entry, AefSummaryFigures figures)
         {
@@ -649,6 +672,13 @@ public static class CrossFileRules
             }
 
             if (entry.ContainsKey("sum") && !(AefNode.Number(entry["sum"]) is { } sum && AefSummaryCalculator.Matches(sum, figures.Sum)))
+            {
+                return false;
+            }
+
+            // [SUM-5]: sumSq, when written, is the sum of the squares in binary64 (summed in any order), compared within
+            // §3.6 like sum ("so do sumSq and its recomputed value").
+            if (entry.ContainsKey("sumSq") && !(AefNode.Number(entry["sumSq"]) is { } sumSq && AefSummaryCalculator.Matches(sumSq, figures.SumOfSquares)))
             {
                 return false;
             }

@@ -1,0 +1,10 @@
+{
+  "kind": "produce",
+  "rules": [
+    "RES-5",
+    "RES-6"
+  ],
+  "scenario": "scenario.json",
+  "refused": true,
+  "why": "decisive names answer/style, which is no child of answer: a decisive id is a child's (RES-6). The Producer refuses the scenario."
+}

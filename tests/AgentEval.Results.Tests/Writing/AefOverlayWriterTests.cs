@@ -174,6 +174,34 @@ public class AefOverlayWriterTests
         Assert.Contains(refused.Problems, p => p is { Path: "overlays/seal-0001.json", Code: "batch-digest" });
     }
 
+    [Theory]
+    [InlineData("{\"schemaVersion\":\"1.", 0)]   // an unfinished last line: a writer still writing it, or one that crashed
+    [InlineData("\n", 1)]                          // a blank line
+    [InlineData("{}\r\n", 1)]                      // a CR
+    public void BytesAfterTheLastBatch_AreSealedWithTheNextEvent_AndCostOneLine(string appended, int unsealed)
+    {
+        // [OVL-5] (R4N-9): the events file is judged line by line, inside the batches too, so the next batch seals these
+        // bytes and still verifies: they are event-invalid at their line, and nothing else. An unfinished last line is
+        // ended with an LF first, so it is never joined to the next event.
+        using var run = SealedRun(out var k1, out _);
+        var overlay = AefOverlayWriter.Open(run.Dir);
+        overlay.Append(Event(AefOverlayKind.Annotate, new AefOverlayTarget { Result = k1 }, reason: "r", id: "ov_1"));
+        overlay.SealBatch();
+        File.AppendAllText(run.Full("overlays/events.ndjson"), appended);
+
+        var next = AefOverlayWriter.Open(run.Dir);
+        Assert.Equal(unsealed, next.UnsealedAtOpen);
+        next.Append(Event(AefOverlayKind.Annotate, new AefOverlayTarget { Result = k1 }, reason: "after", id: "ov_2"));
+        var batch = next.SealBatch();
+
+        var chain = Chain(run);
+        Assert.Equal(["overlays/events.ndjson:2 event-invalid"], chain.Problems.Select(p => $"{p.Path} {p.Code}"));
+        Assert.All(chain.Batches, b => Assert.True(b.Verified));
+        Assert.Equal(["ov_1", "ov_2"], chain.VerifiedEvents.Select(e => (string)e.Event!["eventId"]!));
+        Assert.Equal(2, batch.Events);
+        Assert.Equal(3, File.ReadAllBytes(run.Full("overlays/events.ndjson")).Count(b => b == (byte)'\n'));
+    }
+
     [Fact]
     public void SealBatch_RefusesNothingToSeal_AndAFileChangedBehindItsBack()
     {

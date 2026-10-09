@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using AgentEval.Results.Integrity;
 using AgentEval.Results.Runs;
+using AgentEval.Results.Schemas;
 using AgentEval.Results.Signatures;
 using AgentEval.Results.Writing;
 
@@ -108,6 +109,30 @@ public class AefRunWriterTests
         Assert.Contains("\"durationMs\":1500,", text, StringComparison.Ordinal);
         Assert.Contains("\"caseId\":\"kü\"", text, StringComparison.Ordinal);   // UTF-8, not \u escapes
         Assert.Contains("\"N\": 1,\n", Encoding.UTF8.GetString(run.Read("summary.json")), StringComparison.Ordinal);   // indented by two spaces, LF
+    }
+
+    [Fact]
+    public void AnOwnComposite_IsWrittenAndVerifies_AndAReaderTakesAStrategyItDoesNotKnow()
+    {
+        // [RES-6] (W5b-3): Own, the node's own verdict with its children recorded beside it at weight 0. The strategy is
+        // descriptive: a reader takes any string there (an open value), a writer only the ones its schema lists.
+        using var run = new WriterRun();
+        var writer = run.Create();
+        var scenario = writer.AddResult(WriterRun.Leaf("k1", "scenario", AefState.Failed, m: 0.6) with
+        {
+            Aggregation = new AefAggregation { Strategy = AefAggregationStrategy.Own, RulePath = AefRulePath.Threshold, Threshold = 0.8, Score = 0.6, Measured = 2, Total = 2 },
+        });
+        scenario.AddChild(WriterRun.Leaf("k1", "scenario/assertions/1", m: null) with { Component = new AefComponent(0, false) });
+        scenario.AddChild(WriterRun.Leaf("k1", "scenario/assertions/2", AefState.Failed, m: null) with { Component = new AefComponent(0, false) });
+
+        var verification = writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1));
+
+        Assert.Empty(verification.Problems);
+        var line = run.Lines("results.ndjson")[0];
+        Assert.Equal("Own", line["aggregation"]!["strategy"]!.GetValue<string>());
+        line["aggregation"]!["strategy"] = "SomeLaterStrategy";
+        Assert.True(AefSchemas.Reader.IsValid("result", line));
+        Assert.False(AefSchemas.Writer.IsValid("result", line));
     }
 
     [Fact]
@@ -868,14 +893,55 @@ public class AefRunWriterTests
         Assert.Throws<ArgumentException>(() => trial.AddChild(WriterRun.Leaf("k1", "q/a") with { Component = new AefComponent(1, true) }));
         Assert.Throws<ArgumentException>(() => trial.AddChild(WriterRun.Leaf("k1", "q/a", trial: 1) with { Component = new AefComponent(1, true) }));
         trial.AddChild(WriterRun.Leaf("k1", "q/a", trial: 0) with { Component = new AefComponent(1, true) });
-        writer.AddResult(WriterRun.Leaf("k1") with { Trials = new AefTrials(1, 1, AefTrialAggregation.AllPass, true) });
+        var rollup = writer.AddResult(WriterRun.Leaf("k1") with
+        {
+            Trials = new AefTrials(1, 1, AefTrialAggregation.AllPass, true),
+            Aggregation = new AefAggregation { Strategy = AefAggregationStrategy.Min, RulePath = AefRulePath.Threshold, Measured = 1, Total = 1 },
+        });
 
-        // The child is a trial line at q/a: its case and path have a rollup too (both verifiers read RES-8 so; W5a-23).
+        // The child is a trial line at q/a: its case and path have a rollup too (both verifiers read RES-8 so; W5a-23),
+        // and that rollup is a child of the case's rollup at q: the rollups form the case's own tree (round 4).
         var refused = Assert.Throws<InvalidOperationException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1)));
         Assert.Contains("at q/a and has no rollup line", refused.Message, StringComparison.Ordinal);
-        writer.AddResult(WriterRun.Leaf("k1", "q/a") with { Trials = new AefTrials(1, 1, AefTrialAggregation.AllPass, true) });
+        rollup.AddChild(WriterRun.Leaf("k1", "q/a") with { Trials = new AefTrials(1, 1, AefTrialAggregation.AllPass, true), Component = new AefComponent(1, true) });
         writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1));
         Assert.Empty(run.Problems());
+    }
+
+    [Fact]
+    public void ARollupsAgree_IsWhatItsTrialLinesGive_Res8()
+    {
+        using var run = new WriterRun();
+        var writer = run.Create();
+        writer.AddResult(WriterRun.Leaf("k1", trial: 0));
+        writer.AddResult(WriterRun.Leaf("k1", m: 0.1, state: AefState.Failed, trial: 1));
+        var rollup = writer.AddResult(WriterRun.Leaf("k1", m: 0.5, state: AefState.Failed) with { Trials = new AefTrials(2, 1, AefTrialAggregation.AllPass, true) });
+
+        // Two states: the trials disagreed (round 4).
+        var refused = Assert.Throws<InvalidOperationException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1)));
+        Assert.Contains("agree is true exactly when they are all in one", refused.Message, StringComparison.Ordinal);
+
+        writer.UpdateResult(rollup, WriterRun.Leaf("k1", m: 0.5, state: AefState.Failed) with { Trials = new AefTrials(2, 1, AefTrialAggregation.AllPass, false) });
+        writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1));
+        Assert.Empty(run.Problems());
+    }
+
+    [Fact]
+    public void ARollupAtAChildPath_IsAChildOfItsCasesRollupAtTheParentPath_Res8()
+    {
+        using var run = new WriterRun();
+        var writer = run.Create();
+        var trial = writer.AddResult(WriterRun.Leaf("k1", trial: 0) with
+        {
+            Aggregation = new AefAggregation { Strategy = AefAggregationStrategy.Min, RulePath = AefRulePath.Threshold, Measured = 1, Total = 1 },
+        });
+        trial.AddChild(WriterRun.Leaf("k1", "q/a", trial: 0) with { Component = new AefComponent(1, true) });
+        writer.AddResult(WriterRun.Leaf("k1") with { Trials = new AefTrials(1, 1, AefTrialAggregation.AllPass, true) });
+        writer.AddResult(WriterRun.Leaf("k1", "q/a") with { Trials = new AefTrials(1, 1, AefTrialAggregation.AllPass, true) });   // a root
+
+        // §3.9 trials (round 4, W5a-23): refused before anything is written.
+        var refused = Assert.Throws<InvalidOperationException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1)));
+        Assert.Contains("its rollup at q/a is not a child of its rollup at q", refused.Message, StringComparison.Ordinal);
     }
 
     [Theory]

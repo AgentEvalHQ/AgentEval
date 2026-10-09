@@ -29,6 +29,8 @@ public static class Program
         ["checkpoint"] = Ops.CheckpointOps.Checkpoint, ["lanes"] = Ops.CheckpointOps.Lanes, ["conform"] = Ops.CheckpointOps.Conform,
         // WP5a: summarize, seal-write, sign (the write side); write-samples (not a spec 09 operation: writer-crosscheck.sh)
         ["summarize"] = Ops.WriteSideOps.Summarize, ["seal-write"] = Ops.WriteSideOps.SealWrite, ["sign"] = Ops.WriteSideOps.Sign, ["write-samples"] = Ops.WriterOps.WriteSamples,
+        // Round 4: produce (a Producer writes the run a scenario describes)
+        ["produce"] = Ops.ProduceOps.Produce,
     };
 
     public static int Main(string[] args)

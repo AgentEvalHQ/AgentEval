@@ -10,6 +10,8 @@ on:
   pull_request:
     paths:
       - "contracts/aef/**"
+      - "src/AgentEval.Results/**"
+      - "tests/AgentEval.Results.Conformance/**"
       - ".github/workflows/aef.yml"
 
 permissions:
@@ -18,7 +20,7 @@ permissions:
 jobs:
   aef:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 25  # the generated limit vectors and the self-check's 40-odd corpus passes (in parallel)
     steps:
       - uses: actions/checkout@v7
         with:
@@ -35,7 +37,7 @@ jobs:
         run: |
           set -e
           cd contracts/aef/tools
-          for tool in derive_reader build_conformance lane_vectors signature_vectors decision_vectors protocol_vectors write_vectors build_index; do
+          for tool in derive_reader build_conformance lane_vectors signature_vectors decision_vectors protocol_vectors write_vectors pin_vectors build_index; do
             python -X utf8 -I "$tool.py" > /dev/null
           done
           cd "$GITHUB_WORKSPACE"
@@ -56,6 +58,7 @@ jobs:
           python -X utf8 -I contracts/aef/tools/aef_decide.py --check
           python -X utf8 -I contracts/aef/tools/aef_stream.py --check
           python -X utf8 -I contracts/aef/tools/gen_reference.py --check
+          python -X utf8 -I contracts/aef/tools/check_interop.py --quiet
 
       - name: Every commit that changes AEF carries a DCO sign-off
         env:
@@ -75,3 +78,23 @@ jobs:
             fi
           done
           exit $missing
+
+  # Merge criterion 2 (GOVERNANCE.md): AgentEval's own implementation passes the vectors of every class it claims.
+  # Pull requests only, net10.0 only: a .NET build and one process per vector cost minutes a push need not spend.
+  aef-dotnet:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: AgentEval.Results through the conformance runner (every class but Runner; Ed25519 signing is optional)
+        run: bash tests/AgentEval.Results.Conformance/run-corpus.sh net10.0 --quiet --sign-algorithms ecdsa-p256

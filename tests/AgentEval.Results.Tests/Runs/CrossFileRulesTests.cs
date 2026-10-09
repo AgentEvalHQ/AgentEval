@@ -634,6 +634,27 @@ public class CrossFileRulesTests
         Assert.Equal(["results.ndjson:7 trials"], Problems(run));
     }
 
+    [Theory]
+    [InlineData("failed", "passed", true, false)]    // the trials disagreed: agree is false
+    [InlineData("failed", "passed", false, true)]
+    [InlineData("failed", "warn", true, false)]      // two states, none passed: still a disagreement
+    [InlineData("failed", "warn", false, true)]
+    [InlineData("failed", "failed", true, true)]
+    [InlineData("failed", "failed", false, false)]
+    public void Trials_ARollupsAgree_IsTrueExactlyWhenItsTrialsAreAllInOneState(string first, string second, bool agree, bool holds)
+    {
+        // [RES-8], §3.9 trials (round 4).
+        using var run = new TestRun();
+        run.Results.Add(Trial("k3", "t", 0, first));
+        run.Results.Add(Trial("k3", "t", 1, second));
+        var rollup = Rollup("k3", "t", n: 2, passed: new[] { first, second }.Count(s => s == "passed"));
+        rollup["trials"]!["agree"] = agree;
+        run.Results.Add(rollup);
+        string[] expected = holds ? [] : ["results.ndjson:7 trials"];
+
+        Assert.Equal(expected, Problems(run));
+    }
+
     [Fact]
     public void Trials_ASecondRollupForOneCaseAndPath_IsReportedAtTheSecond()
     {
@@ -675,10 +696,58 @@ public class CrossFileRulesTests
         run.Results.Add(parent);
         run.Results.Add(Child(Trial("k3", "t/a", 0, "passed"), parent));       // the same trial
         run.Results.Add(Child(Line("k3", "t/b", "passed"), parent));           // none: counted as the case's by SUM-3
-        run.Results.Add(Rollup("k3", "t", n: 1, passed: 1));
-        run.Results.Add(Rollup("k3", "t/a", n: 1, passed: 1));
+        var rollup = Rollup("k3", "t", n: 1, passed: 1);
+        rollup["aggregation"] = TestRun.Obj("""{"strategy": "Min", "rulePath": "threshold", "measured": 1, "total": 1}""");
+        run.Results.Add(rollup);
+        run.Results.Add(Child(Rollup("k3", "t/a", n: 1, passed: 1), rollup));
 
         Assert.Equal(["results.ndjson:7 trials"], Problems(run));
+    }
+
+    [Fact]
+    public void Trials_TheRollupsOfACompositeCase_FormItsOwnTree()
+    {
+        // [RES-8] (round 4, W5a-23): a rollup at a child path has its case's rollup at the parent path (the path without
+        // its last '/' segment) as its parent, when the case has one there.
+        JsonObject[] Case(string caseId, bool asTree)
+        {
+            var (first, second) = (Trial(caseId, "t", 0, "passed"), Trial(caseId, "t", 1, "passed"));
+            foreach (var trial in new[] { first, second })
+            {
+                trial["aggregation"] = TestRun.Obj("""{"strategy": "Min", "rulePath": "threshold", "measured": 1, "total": 1}""");
+            }
+
+            var rollup = Rollup(caseId, "t", n: 2, passed: 2);
+            var child = Rollup(caseId, "t/x", n: 2, passed: 2);
+            if (asTree)
+            {
+                rollup["aggregation"] = TestRun.Obj("""{"strategy": "Min", "rulePath": "threshold", "measured": 1, "total": 1}""");
+                child = Child(child, rollup);
+            }
+
+            return [first, Child(Trial(caseId, "t/x", 0, "passed"), first), second, Child(Trial(caseId, "t/x", 1, "passed"), second), rollup, child];
+        }
+
+        using var tree = new TestRun();
+        tree.Results.AddRange(Case("k3", asTree: true));
+        Assert.Empty(Problems(tree));
+
+        using var root = new TestRun();
+        root.Results.AddRange(Case("k3", asTree: false));
+        Assert.Equal(["results.ndjson:10 trials"], Problems(root));
+
+        // A case with no rollup at the parent path: its rollup at the child path may be a root.
+        using var alone = new TestRun();
+        alone.Results.Add(Trial("k4", "u/x", 0, "passed"));
+        alone.Results.Add(Rollup("k4", "u/x", n: 1, passed: 1));
+        Assert.Empty(Problems(alone));
+
+        // Another case's rollup at the parent path is not this case's.
+        using var other = new TestRun();
+        other.Results.AddRange(Case("k3", asTree: true));
+        other.Results.Add(Trial("k4", "t/x", 0, "passed"));
+        other.Results.Add(Rollup("k4", "t/x", n: 1, passed: 1));
+        Assert.Empty(Problems(other));
     }
 
     [Fact]
@@ -689,6 +758,21 @@ public class CrossFileRulesTests
         run.Results[2]["usage"] = JsonNode.Parse("""[{"role": "judge", "model": "a"}, {"role": "judge", "model": "a"}]""");
 
         Assert.Equal(["results.ndjson:3 result-times"], Problems(run));
+    }
+
+    [Theory]
+    [InlineData(0.97, true)]              // 0.4² + 0.9²
+    [InlineData(0.4 * 0.4 + 0.9 * 0.9, true)]   // summed in order in binary64: within §3.6
+    [InlineData(0.97 + 1e-12, true)]
+    [InlineData(0.98, false)]
+    public void Summary_ASumOfSquaresWritten_IsComparedWithinTheTolerance(double sumSq, bool matches)
+    {
+        // [SUM-5] (round 4): only sum is exact; sumSq is binary64, compared within §3.6 like sum.
+        using var run = new TestRun();
+        run.Summary!["lanes"]![0]!["metrics"]![0]!["sumSq"] = sumSq;
+        string[] expected = matches ? [] : ["summary.json summary"];
+
+        Assert.Equal(expected, Problems(run));
     }
 
     [Fact]

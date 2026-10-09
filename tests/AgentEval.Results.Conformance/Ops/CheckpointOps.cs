@@ -50,25 +50,27 @@ internal static class CheckpointOps
     }
 
     /// <summary>
-    /// <c>lanes CHECKPOINT --runs DIR [--at T] [--policy P]</c>: <c>{"lanes": [{"lane", "result"}], "problems"}</c>, each
-    /// lane's recomputed result (§5.3; <c>null</c> for none) in manifest order, and the problems of [CKP-8] as
-    /// <c>[path, code]</c> pairs. <c>--at</c> (the evaluation time for a checkpoint with no recorded input, [LANE-9])
-    /// defaults to the time of the call.
+    /// <c>lanes CHECKPOINT --runs DIR [--at T] [--policy P] [--envelope E]</c>: <c>{"lanes": [{"lane", "result"}],
+    /// "problems", "anchors"}</c>, each lane's recomputed result (§5.3; <c>null</c> for none) in manifest order, the
+    /// problems of [CKP-8] as <c>[path, code]</c> pairs, and the run hashes the checkpoint anchors ([CKP-9], [SIG-8]: its
+    /// lanes' runs and comparison baselines, in byte order) when it has no problem of [CKP-7] or [CKP-8] and E holds a
+    /// signature verified for an identity of P, otherwise none. <c>--at</c> (the evaluation time for a checkpoint with no
+    /// recorded input, [LANE-9]) defaults to the time of the call.
     /// </summary>
     public static int Lanes(string[] args, TextWriter stdout)
     {
-        const string usage = "lanes CHECKPOINT --runs DIR [--at T] [--policy P]";
-        var (paths, options) = Parse(args, usage, 1, "--runs", "--at", "--policy");
+        const string usage = "lanes CHECKPOINT --runs DIR [--at T] [--policy P] [--envelope E]";
+        var (paths, options) = Parse(args, usage, 1, "--runs", "--at", "--policy", "--envelope");
         if (!options.TryGetValue("--runs", out var runs))
         {
             throw new UsageException($"usage: {usage}");
         }
 
         var at = options.TryGetValue("--at", out var given) ? Time(given) : Now();
-        JsonObject manifest;
+        var manifest = DriverIO.Bytes(paths[0]);
         try
         {
-            manifest = CheckpointVerifier.Read(DriverIO.Bytes(paths[0]));
+            CheckpointVerifier.Read(manifest);
         }
         catch (FormatException e)
         {
@@ -76,11 +78,14 @@ internal static class CheckpointOps
         }
 
         var policy = Policy(options);
-        var (lanes, problems) = Guard(() => CheckpointVerifier.Lanes(manifest, AefRunStore.Open(runs, policy), at));
+        var envelope = options.TryGetValue("--envelope", out var envelopePath) ? DriverIO.Bytes(envelopePath) : null;
+        var verification = Guard(() => CheckpointVerifier.Verify(
+            manifest, AefRunStore.Open(runs, policy), new CheckpointVerifyOptions { At = at, Policy = policy, Envelope = envelope }));
         return DriverIO.Print(stdout, new JsonObject
         {
-            ["lanes"] = new JsonArray([.. lanes.Select(l => (JsonNode?)new JsonObject { ["lane"] = l.Lane, ["result"] = l.Result?.ToJson() })]),
-            ["problems"] = DriverIO.Pairs(problems.Select(p => (p.Path, p.Code))),
+            ["lanes"] = new JsonArray([.. verification.Lanes.Select(l => (JsonNode?)new JsonObject { ["lane"] = l.Lane, ["result"] = l.Result?.ToJson() })]),
+            ["problems"] = DriverIO.Pairs(verification.Problems.Select(p => (p.Path, p.Code))),
+            ["anchors"] = new JsonArray([.. verification.Anchors.Select(a => (JsonNode?)a)]),
         });
     }
 

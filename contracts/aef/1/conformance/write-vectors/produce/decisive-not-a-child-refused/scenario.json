@@ -1,0 +1,81 @@
+{
+  "run": {
+    "schemaVersion": "1.0",
+    "runId": "produce-decisive-not-a-child-refused",
+    "status": "completed",
+    "producer": {
+      "name": "p",
+      "version": "1"
+    },
+    "subject": {
+      "ref": "agent:a/b",
+      "kind": "agent",
+      "version": "v1"
+    },
+    "execution": {
+      "targetMode": "live"
+    },
+    "startedAt": "2026-10-01T00:00:00Z",
+    "contentCapture": "on",
+    "endedAt": "2026-10-01T00:01:00Z"
+  },
+  "metrics": {
+    "schemaVersion": "1.0",
+    "metrics": [
+      {
+        "id": "pass_rate",
+        "kind": "rate",
+        "direction": "higher_better",
+        "scale": {
+          "min": 0,
+          "max": 1
+        }
+      }
+    ]
+  },
+  "cases": [
+    {
+      "caseId": "k1",
+      "path": "answer",
+      "evaluator": {
+        "id": "composite:answer"
+      },
+      "state": "passed",
+      "aggregation": {
+        "strategy": "Min",
+        "threshold": 0.5,
+        "score": 1,
+        "rulePath": "threshold",
+        "decisive": [
+          "answer/style"
+        ]
+      },
+      "children": [
+        {
+          "path": "answer/grounded",
+          "evaluator": {
+            "id": "code:answer/grounded"
+          },
+          "state": "passed",
+          "component": {
+            "weight": 1,
+            "required": true
+          }
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "lanes": [
+      {
+        "lane": "quality",
+        "metrics": [
+          {
+            "metric": "pass_rate",
+            "path": "q"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "logs.otlp.jsonl",
+      "digest": {
+        "sha256": "7673fb0abe19bf354e8a900405bfcb6fa2515f1d3b853dc672ea2e7f8e921a56"
+      }
+    },
+    {
+      "name": "metrics.json",
+      "digest": {
+        "sha256": "eadd46b0cbf826ee0b4954eb70ed7cceb402648b0c24fe083a689fbc6d0b187f"
+      }
+    },
+    {
+      "name": "results.ndjson",
+      "digest": {
+        "sha256": "120ffbf67dae63b88413d193e413eedd5eb56b45b60b5106dbcea888b81b4937"
+      }
+    },
+    {
+      "name": "run.json",
+      "digest": {
+        "sha256": "7329b2afdf8123f677e74d3d73dd0277cfe6057424b8e564844de780f7aa3099"
+      }
+    },
+    {
+      "name": "summary.json",
+      "digest": {
+        "sha256": "f1113b419f6abe01d39093f257582c90926c647181ad590a66cccbc599459471"
+      }
+    }
+  ],
+  "predicateType": "https://agenteval.dev/aef/1/evidence",
+  "predicate": {
+    "schemaVersion": "1.0",
+    "runId": "otel-import-0001",
+    "runHash": "0f7200e0c37615deb394e1890d25a429b0faab9b26e5d84d32a0e4b8d9cbc8c7",
+    "producer": {
+      "name": "aef_interop.py",
+      "version": "1.0"
+    },
+    "subject": {
+      "ref": "agent:support/support-triage"
+    },
+    "deployment": null,
+    "suite": null,
+    "judges": [],
+    "closedAt": "2026-10-02T14:06:44.25Z",
+    "sealedAt": "2026-10-09T00:00:00Z",
+    "sealedBy": "ingest"
+  }
+}

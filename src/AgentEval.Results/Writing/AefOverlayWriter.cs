@@ -211,11 +211,14 @@ public sealed class AefOverlayWriter
 
     /// <summary>
     /// Opens a closed run for overlays. Its overlay chain, if any, must verify up to its last batch (events after it,
-    /// unsealed, are allowed, and so are problems of single events, which have no effect, §4.3).
+    /// unsealed, are allowed, and so are problems of single events, which have no effect, §4.3: a blank line, a CR or a
+    /// byte-order mark is a problem of its line alone, [OVL-5]). An unfinished last line (a writer still writing it, or
+    /// one that crashed) is ended with an LF by the first <see cref="Append"/>, so it reads as one invalid event of the
+    /// next batch rather than joining the next event ([OVL-5]: a crash costs one line, never the chain).
     /// </summary>
     /// <exception cref="InvalidOperationException">
-    /// The folder has no run.json that reads, the run is running (overlays are what is added after close, §4.2), or
-    /// its chain has a problem about a batch or the events file.
+    /// The folder has no run.json that reads, the run is running (overlays are what is added after close, §4.2), or its
+    /// chain has a problem about a batch or the events file.
     /// </exception>
     /// <exception cref="IOException">The folder cannot be read.</exception>
     public static AefOverlayWriter Open(string directory)
@@ -250,7 +253,8 @@ public sealed class AefOverlayWriter
 
     /// <summary>
     /// Appends one event to <c>overlays/events.ndjson</c> ([OVL-1]), targeting this run and its run hash ([OVL-2]). It
-    /// has no effect until a batch seals it (§4.3).
+    /// has no effect until a batch seals it (§4.3). When the file ends in an unfinished line, that line is ended with an LF
+    /// first ([OVL-5]): it then reads as an invalid event, which the next batch seals with this one.
     /// </summary>
     /// <returns>The event's id.</returns>
     /// <exception cref="ArgumentException">
@@ -284,8 +288,16 @@ public sealed class AefOverlayWriter
             throw new ArgumentException($"The event {eventId} is not valid against the writer overlay-event schema ([VER-2]): {failure}.", nameof(overlayEvent));
         }
 
+        // [OVL-5]: an unfinished last line (a writer still writing it, or one that crashed) is ended with an LF first, so it
+        // reads as one invalid event and the next batch can claim it; it is never joined to this event.
+        var unfinished = _tail.Length > 0 && _tail.GetBuffer()[_tail.Length - 1] != (byte)'\n';
         var line = AefJsonWriter.Line(json);
-        if (_lines >= AefLimits.MaxLines)
+        if (unfinished)
+        {
+            line = [(byte)'\n', .. line];
+        }
+
+        if (_lines + (unfinished ? 2 : 1) > AefLimits.MaxLines)
         {
             throw new InvalidOperationException($"{OverlayChain.EventsPath} holds {AefLimits.MaxLines} lines, the most [ENC-17] allows.");
         }
@@ -303,7 +315,7 @@ public sealed class AefOverlayWriter
         }
 
         _tail.Write(line);
-        _lines++;
+        _lines += unfinished ? 2 : 1;
         _eventIds.Add(eventId);
         return eventId;
     }

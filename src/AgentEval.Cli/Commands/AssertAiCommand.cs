@@ -531,14 +531,16 @@ internal static class AssertAiCommand
             return ExitCodes.UsageError;
         }
 
+        // When it was measured travels with it: an AEF import records a judge's calibration only with that time (RUN-9).
+        var calibration = report.ToCalibration() with { MeasuredAt = DateTimeOffset.UtcNow };
         if (outputPath is not null)
         {
-            File.WriteAllText(outputPath, report.ToCalibration().ToJson().ToJsonString(s_json));
+            File.WriteAllText(outputPath, calibration.ToJson().ToJsonString(s_json));
         }
 
         if (format == "json")
         {
-            var json = report.ToCalibration().ToJson();
+            var json = calibration.ToJson();
             json["agreed"] = report.Agreed;
             json["falseAlarms"] = report.FalseAlarms;
             json["noRelevantCategory"] = report.NoRelevantCategory;

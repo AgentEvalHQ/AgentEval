@@ -109,6 +109,14 @@ public sealed partial class OverlayChain
     {
         ArgumentNullException.ThrowIfNull(folder);
         ArgumentNullException.ThrowIfNull(runHash);
+
+        // [ENC-17], [ENC-18]: more files under overlays/ than one events file and two per batch is limit at overlays, and
+        // the chain is not checked further: no file of it is read.
+        if (folder.OverlaysOverLimit)
+        {
+            return new OverlayChain([new AefProblem(OverlaysPath, "limit")], [], 0, []);
+        }
+
         var problems = new HashSet<AefProblem>();
 
         // The files under overlays/: the events file, batch seals and batch signatures; anything else is unexpected.
@@ -125,12 +133,11 @@ public sealed partial class OverlayChain
             }
         }
 
-        var events = ReadEvents(folder, problems, out var parsed);
-        if (parsed is null)
+        // [OVL-5]: the events file is read as far as [ENC-17] allows; one that holds more is limit at the file, once.
+        var events = EventsFile.Open(folder);
+        if (events.OverLimit)
         {
-            // [OVL-5]: framing that breaks [ENC-5] or [ENC-7] (or a file beyond a limit) is reported once, and the chain
-            // is not checked further: no batch verifies, no event takes part in the effective view.
-            return new OverlayChain(AefProblemOrder.Sort(problems), [], 0, [.. LineRanges(events).Select(r => new OverlayEventLine(r.Number, r.Offset, r.End, null, false, null))]);
+            problems.Add(new AefProblem(EventsPath, "limit"));
         }
 
         if (seals.ContainsKey(0))
@@ -164,11 +171,24 @@ public sealed partial class OverlayChain
                 continue;
             }
 
-            var own = BatchProblems(folder, seal, k, runId, runHash, previous, events);
             var predicate = seal["predicate"]!;
             var offset = (long)AefNode.Number(predicate["offset"])!.Value;
             var length = (long)AefNode.Number(predicate["length"])!.Value;
-            covered.Add((Math.Min(offset, events.Length), Math.Min(offset + length, events.Length)));
+            if (events.OverLimit && offset + length > events.Read)
+            {
+                // [OVL-5]: of an events file holding more than [ENC-17] lets a reader read, a batch whose range ends beyond
+                // what was read is limit at its seal, which ends the verified prefix. The table of [OVL-5] defines limit
+                // at a seal as a seal refused: like batch-invalid, it is not checked further, it claims no bytes (for
+                // uncovered), and the next batch's offset is not checked (R4N-2).
+                problems.Add(new AefProblem(path, "limit"));
+                batches.Add(new OverlayBatch(k, path, true, offset, length, false));
+                prefixIntact = false;
+                previous = (0, false);
+                continue;
+            }
+
+            var own = BatchProblems(folder, seal, k, runId, runHash, previous, events);
+            covered.Add((Math.Min(offset, events.Size), Math.Min(offset + length, events.Size)));
             problems.UnionWith(own.Select(code => new AefProblem(path, code)));
 
             prefixIntact &= own.Count == 0;
@@ -181,50 +201,65 @@ public sealed partial class OverlayChain
             previous = (offset + length, true);
         }
 
-        if (!Covers(covered, events.Length))
+        // Bytes claimed by no batch, the file's whole size counted: an unfinished last line too, and what lies beyond what
+        // a reader reads of a file over its limits.
+        if (!Covers(covered, events.Size))
         {
             problems.Add(new AefProblem(EventsPath, "uncovered"));
         }
 
-        var lines = CheckEvents(parsed, runId, runHash, resultIds, batches, problems);
+        // [OVL-5]: the events file is judged line by line, inside the batches and after them: a blank line, a CR or a
+        // leading byte-order mark is a problem of its line alone, and never changes which batches verify (R4N-9).
+        var lines = CheckEvents(events, verifiedEnd, runId, runHash, resultIds, batches, problems);
         return new OverlayChain(AefProblemOrder.Sort(problems), batches, verifiedEnd, lines);
     }
 
-    // The events file's bytes (none when it is absent) and its lines, read once; the lines are null when the file is not
-    // read: its framing breaks [ENC-5] or [ENC-7], or it is beyond a limit (the problem is added).
-    private static byte[] ReadEvents(AefRunFolder folder, HashSet<AefProblem> problems, out AefNdjsonFile? parsed)
+    /// <summary>The path of the overlays folder, where too many files under it are reported ([ENC-18]).</summary>
+    public const string OverlaysPath = "overlays";
+
+    /// <summary>
+    /// The events file as [OVL-5] reads it: its bytes (all of them when it is within 1 GiB; of a larger file, only the
+    /// complete lines a reader reads); its size as listed; how far a reader reads it (<see cref="Read"/>: up to its last
+    /// LF within the first 1 GiB and the first 1,000,000 lines, [ENC-17]); and whether it holds more than that
+    /// (<see cref="OverLimit"/>). Only the bytes as listed are read: what a concurrent writer appends afterwards is not
+    /// seen.
+    /// </summary>
+    private sealed record EventsFile(byte[] Bytes, long Size, int Read, bool OverLimit)
     {
-        parsed = null;
-        if (!folder.Has(EventsPath))
+        public static EventsFile Open(AefRunFolder folder)
         {
-            parsed = AefNdjson.Read([]);
-            return [];
-        }
+            if (!folder.Has(EventsPath))
+            {
+                return new EventsFile([], 0, 0, false);
+            }
 
-        byte[] bytes;
-        try
-        {
-            bytes = folder.Read(EventsPath, AefLimits.MaxNdjsonBytes);   // [ENC-17]: 1 GiB
-        }
-        catch (AefLimitException)
-        {
-            problems.Add(new AefProblem(EventsPath, "limit"));
-            return [];
-        }
+            var size = folder.Size(EventsPath);
+            if (size > AefLimits.MaxNdjsonBytes)
+            {
+                // Beyond 1 GiB, nothing past what a reader reads is needed: a batch ending there is limit, unread.
+                var end = (int)folder.CompleteLinesEnd(EventsPath, AefLimits.MaxNdjsonBytes, AefLimits.MaxLines);
+                return new EventsFile(folder.ReadPrefix(EventsPath, end), size, end, true);
+            }
 
-        var file = AefNdjson.Read(bytes);
-        if (file.Problem is { } whole)
-        {
-            // Broken framing (encoding), or more lines than [ENC-17] allows (limit, at the file, [ENC-18]): the chain is
-            // not checked further. A single line beyond a limit is a problem of that line (CheckEvents).
-            problems.Add(new AefProblem(EventsPath, whole.Code));
-        }
-        else
-        {
-            parsed = file;
-        }
+            var bytes = folder.ReadPrefix(EventsPath, (int)size);
+            var span = bytes.AsSpan();
+            var lfs = span.Count((byte)'\n');
+            int read;
+            if (lfs > AefLimits.MaxLines)
+            {
+                read = 0;   // after the 1,000,000th LF
+                for (var line = 0; line < AefLimits.MaxLines; line++)
+                {
+                    read += span[read..].IndexOf((byte)'\n') + 1;
+                }
+            }
+            else
+            {
+                read = span.LastIndexOf((byte)'\n') + 1;
+            }
 
-        return bytes;
+            return new EventsFile(bytes, size, read, lfs > AefLimits.MaxLines);
+        }
     }
 
     // A batch seal as an I-JSON document valid against the reader overlay-seal schema, or null with the code to report:
@@ -247,7 +282,7 @@ public sealed partial class OverlayChain
 
     // The problems of one valid batch seal about the batch itself ([OVL-5]).
     private static List<string> BatchProblems(
-        AefRunFolder folder, JsonObject seal, int number, string? runId, string runHash, (long End, bool Known) previous, byte[] events)
+        AefRunFolder folder, JsonObject seal, int number, string? runId, string runHash, (long End, bool Known) previous, EventsFile file)
     {
         var own = new List<string>();
         var predicate = seal["predicate"]!;
@@ -276,6 +311,9 @@ public sealed partial class OverlayChain
             own.Add("offset");
         }
 
+        // Within the limits the whole file is read (a range past its end is both line-boundary and batch-digest); over
+        // them, a range here ends within what was read (one beyond it was refused before this).
+        var events = file.Bytes;
         var inside = end <= events.Length;
         var startsOnLine = offset == 0 || (offset <= events.Length && events[offset - 1] == (byte)'\n');
         var endsOnLine = inside && events[end - 1] == (byte)'\n';
@@ -305,24 +343,48 @@ public sealed partial class OverlayChain
         return own;
     }
 
-    // [OVL-5] event-invalid, event-id and target, per line; and which verified batch each line is in.
+    // [OVL-5] event-invalid, event-id and target, per line; and which verified batch each line is in. Every line a reader
+    // reads is judged on its own, inside the verified batches and after them: a blank line, a line holding a CR, or one
+    // that begins with a byte-order mark is event-invalid (U+FEFF inside a string is content), and its batch still
+    // verifies; a last line without LF is still being written and is neither shown nor reported. Of a file holding more
+    // than [ENC-17] lets a reader read, no line after the verified batches is read.
     private static List<OverlayEventLine> CheckEvents(
-        AefNdjsonFile file, string? runId, string runHash, IReadOnlySet<string>? resultIds, List<OverlayBatch> batches, HashSet<AefProblem> problems)
+        EventsFile file, long verifiedEnd, string? runId, string runHash, IReadOnlySet<string>? resultIds, List<OverlayBatch> batches, HashSet<AefProblem> problems)
     {
         var lines = new List<OverlayEventLine>();
         var ids = new HashSet<string>(StringComparer.Ordinal);
-        foreach (var line in file.Lines)
+        var verified = batches.Where(b => b.Verified).ToList();   // contiguous from offset 0, in order
+        var next = 0;
+        foreach (var (number, start, end) in LineRanges(file.Bytes, file.OverLimit ? (int)verifiedEnd : file.Read))
         {
-            var (start, end) = ((long)line.Offset, (long)line.Offset + line.Length + 1);
-            var where = $"{EventsPath}:{line.Number}";
-            var batch = batches.FirstOrDefault(b => b.Verified && b.Offset <= start && end <= b.End)?.Number;
-            if (line.Value is not { } value || !AefSchemas.Reader.IsValid("overlay-event", value))
+            var where = $"{EventsPath}:{number}";
+            while (next < verified.Count && verified[next].End < end)
+            {
+                next++;
+            }
+
+            var batch = next < verified.Count && verified[next].Offset <= start ? verified[next].Number : (int?)null;
+            var content = file.Bytes.AsSpan((int)start, (int)(end - start - 1));   // without its LF
+            JsonObject? value = null;
+            AefReadException? problem = null;
+            try
+            {
+                value = AefJsonReader.ParseDocument(content);
+            }
+            catch (AefReadException e)
+            {
+                problem = e;
+            }
+
+            // A JSON reader takes a CR between tokens for whitespace; a blank line, and a line that begins with a byte-order
+            // mark, it refuses itself ([ENC-1]); U+FEFF inside a string it reads as text.
+            if (value is null || content.Contains((byte)'\r') || !AefSchemas.Reader.IsValid("overlay-event", value))
             {
                 // Not checked for event-id or target, and its id is not recorded. A line beyond the size or depth limit
-                // is reported as limit at the line ([ENC-18]), and is as unusable as an invalid one; like event-invalid,
-                // it concerns one event and does not end the verified prefix.
-                problems.Add(new AefProblem(where, line.Problem is AefLimitException ? "limit" : "event-invalid"));
-                lines.Add(new OverlayEventLine(line.Number, start, end, null, false, batch));
+                // is reported as limit at the line ([ENC-18], whatever else is wrong with it), and is as unusable as an
+                // invalid one; like event-invalid, it concerns one event and does not end the verified prefix.
+                problems.Add(new AefProblem(where, problem is AefLimitException ? "limit" : "event-invalid"));
+                lines.Add(new OverlayEventLine(number, start, end, null, false, batch));
                 continue;
             }
 
@@ -344,7 +406,7 @@ public sealed partial class OverlayChain
                 usable = false;
             }
 
-            lines.Add(new OverlayEventLine(line.Number, start, end, value, usable, batch));
+            lines.Add(new OverlayEventLine(number, start, end, value, usable, batch));
         }
 
         return lines;
@@ -367,11 +429,12 @@ public sealed partial class OverlayChain
         return reached >= size;
     }
 
-    // Every LF-ended line of a file whose events are not read (for the count of unsealed events).
-    private static IEnumerable<(int Number, long Offset, long End)> LineRanges(byte[] bytes)
+    // Every LF-ended line of the first `length` bytes (which end in an LF, or are none): its number, where it starts and
+    // where it ends, its LF included.
+    private static IEnumerable<(int Number, long Offset, long End)> LineRanges(byte[] bytes, int length)
     {
         var (number, start) = (0, 0);
-        while (start < bytes.Length && Array.IndexOf(bytes, (byte)'\n', start) is var lf and >= 0)
+        while (start < length && Array.IndexOf(bytes, (byte)'\n', start, length - start) is var lf and >= 0)
         {
             yield return (++number, start, lf + 1L);
             start = lf + 1;

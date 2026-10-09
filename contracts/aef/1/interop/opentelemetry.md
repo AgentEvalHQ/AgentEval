@@ -64,7 +64,7 @@ OpenTelemetry's file exporter writes one JSON object per line and one signal per
 | `otel.semconvVersion`, `otel.dialects` | RUN-14 | the core convention version and the namespaces used |
 | `traceLink` on a result | [RES-10](../spec/03-run.md#345-facts-about-a-result) | the span of the operation the result evaluates (or its trace, with `traceId` only): the span OpenTelemetry parents an evaluation event to; checked against `traces.otlp.jsonl` (`trace-link`, [§3.9](../spec/03-run.md#39-rules-across-files)) |
 | evidence with a span link | [EVD-1, EVD-2](../spec/03-run.md#37-evidencendjson-and-blobs) | any other span, such as a judge's own call; a span link has no digest |
-| `usage` on a result | RES-10 | one entry per party (`role`: `agent`, `judge`, `attacker`, `other`), in OpenTelemetry's names: `gen_ai.usage.input_tokens`, `output_tokens`, `cache_read.input_tokens`, `cache_write.input_tokens`, `reasoning.output_tokens`; and `costUsd`, `costSource` |
+| `usage` on a result | RES-10 | one entry per role and model (`role`: `agent`, `judge`, `attacker`, `other`), in OpenTelemetry's names: `gen_ai.usage.input_tokens`, `output_tokens`, `cache_read.input_tokens`, `cache_write.input_tokens`, `reasoning.output_tokens`; and `costUsd`, `costSource` |
 | `subject.telemetry` in `run.json` | [RUN-6](../spec/03-run.md#32-runjson) | `agentId` and `serviceName`, which join the subject to `gen_ai.agent.id` and `service.name` |
 | `contentCapture: off` | [RUN-11](../spec/03-run.md#32-runjson), [§8.4](../spec/08-security.md#84-privacy) | traces carry none of the content attributes listed above (checked as `content-capture`) |
 
@@ -81,7 +81,8 @@ evidence `E-1`.
 
 An exporter writes one event per score of a result line, and one event without `gen_ai.evaluation.score.value` for a
 line without scores. The events go to an OTLP logs endpoint, or into the run's own `logs.otlp.jsonl` when the producer
-writes them before the run closes.
+writes them before the run closes. The rules below the table cover what the table does not; the reference converter,
+`tools/aef_interop.py to-otel`, follows both.
 
 | AEF | OpenTelemetry | Fidelity |
 |---|---|---|
@@ -112,6 +113,21 @@ writes them before the run closes.
 | `run.json` `subject.telemetry.serviceName` | resource attribute `service.name` | exact |
 | `traces.otlp.jsonl`, `logs.otlp.jsonl` | OTLP traces and logs, sent as they are | exact |
 
+**Beyond the table** (settled 10-09; the ids are those of the former "Still open" items):
+
+- **The event of a line without scores** (OT-1). `gen_ai.evaluation.name` is Required, and no field of a line without
+  scores names a metric (a typed absence carries no scores, [RES-2](../spec/03-run.md#341-states)). The converter
+  names the event after the metric of the summary entries at the line's path, in the lanes the line belongs to
+  ([SUM-3](../spec/03-run.md#36-summaryjson)). It refuses a line for which they name no metric or more than one (a run
+  with no `summary.json`, such as a running one).
+- **The envelope** (OT-2). The converter writes one `LogsData` line per result line, holding that line's events, under
+  the instrumentation scope `agenteval`, with `service.name` as the only resource attribute and no resource when
+  `run.json` names no service. The event of a line with neither `endedAt` nor `startedAt` has no `timeUnixNano`, which
+  OTLP reads as unknown.
+- **A run with `contentCapture: off`** (OT-3). The converter writes no `gen_ai.evaluation.explanation` for such a run,
+  wherever the events go: [SEC-6](../spec/08-security.md#84-privacy) forbids the attribute in that run's own
+  `logs.otlp.jsonl`, and the `reason` row of the table yields to it.
+
 ## OpenTelemetry → AEF
 
 | OpenTelemetry | AEF | Fidelity |
@@ -134,30 +150,82 @@ writes them before the run closes.
 | the source's schema URL | `otel.schemaUrls` | exact |
 
 A run built from events alone is an imported run: its `run.json` names the source in `imported` and lists what the
-converter supplied, such as `subject.ref` and `execution.targetMode` ([RUN-15](../spec/03-run.md#32-runjson)).
+converter supplied, such as `subject.ref` and `execution.targetMode` ([RUN-15](../spec/03-run.md#32-runjson)). Like
+every conversion, it is sealed with `sealedBy: ingest` ([README](README.md#what-maps-means)). The reference
+converter, `tools/aef_interop.py from-otel`, follows the table and these rules (settled 10-09):
+
+- **The run header** (OT-4). The converter takes the run id, `imported.from`, the subject's `ref` and `kind` and the
+  target mode from the person converting; writes `status: completed`; takes `startedAt` and `endedAt` from the
+  earliest and latest event time (the conversion time when no event has one); and lists each of these in
+  `imported.asserted`. It writes no `contentCapture` (a reader then treats the run as `on`,
+  [RUN-11](../spec/03-run.md#32-runjson): an explanation may hold a judge's reasoning), a `summary.json` without lanes
+  (the events carry no summary), and a metric declaration only for a metric some line scores. It seals the run at the
+  conversion time, which is not before the last event. It reads no traces, so it imports neither `gen_ai.agent.id` nor
+  the parent spans.
+- **An event with both `error.type` and an explanation** (OT-5). Both rows write `reason`: the converter keeps the
+  explanation, and the type is lost. An `error.type` alone becomes the `reason`.
+
+**Refused** (OT-4, OT-6; settled 10-09). The converter refuses these, naming the rule, and writes nothing:
+
+- events whose resources name more than one `service.name`: a run has one subject (OT-4);
+- an event with neither `test.case.name` nor `gen_ai.response.id`: a result needs a `caseId` (OT-6);
+- a second event of one case with the same name (a composite and its child scored on one metric, a case's trials, a
+  line's two exports): the path comes from the name, so their lines would have one result id (OT-6);
+- a label that is not a state name, without a score value: `scores[].value` is required (OT-6);
+- a typed-absence label with a score value, or without an explanation: a typed absence has no scores and has a
+  `reason` (OT-6);
+- the label `pending`: a converted run is closed ([RES-3](../spec/03-run.md#341-states)) (OT-6);
+- a label other than `error` beside `error.type` (OT-6);
+- an event with no label, no value and no `error.type` (OT-6).
+
+[`examples/otel-aef/refusals/`](examples/otel-aef/refusals/) holds one input for each.
 
 ## What does not carry over
 
-**AEF → OpenTelemetry.** The run id and the result path. The result tree (`parentResultId`, `component`,
-`aggregation`). A score's own `label`, because the event's label holds the state. Trials and their rollups.
-Thresholds, verdict rules and uncertainty. Evaluator and annotator identity, until PR #359 lands. Metric declarations,
-the summary and gate decisions. The run header: producer, suite and its digest, judges and their calibration,
-`execution.targetMode`. Evidence digests, the seal, overlays and signatures.
+[`examples/aef-otel-aef/`](examples/aef-otel-aef/) and
+[`examples/aef-otel-aef-redteam/`](examples/aef-otel-aef-redteam/) take two corpus runs to events and back, and
+`tools/check_interop.py` checks that what the trip loses is what these lists say, field by field.
 
-**OpenTelemetry → AEF.** The run and the result path: the event has no attribute for either, so an importer builds
-`runId` and `path` itself, and the result id differs from the original's. The metric's kind, direction and range. The
-evaluated operation's start time, when only the event's time is known.
+**AEF → OpenTelemetry.**
+
+- The run id and the result path.
+- The result tree: `parentResultId`, `component` and `aggregation`.
+- A score's own `label`, because the event's label holds the state; and its `normalized` value.
+- Several scores of one line as one result: each is an event of its own, and comes back as a line of its own.
+- Trials and their rollups.
+- Thresholds, verdict rules and uncertainty.
+- Evaluator and annotator identity, until PR #359 lands.
+- `severity`, `durationMs`, `turns`, `attack` and `lane`.
+- The reasoning blob: its text survives as the explanation, its digest does not.
+- A line's start time, when it also has an end time: the event has one time.
+- The traces and the `usage` on their spans, unless `traces.otlp.jsonl` is sent beside the events (the last rows of the
+  table); even then, no row of "OpenTelemetry → AEF" puts `usage` back on a result line.
+- Metric declarations, the summary and gate decisions.
+- The run header, except the subject's `service.name`: the producer, the rest of the subject, the deployment, the suite
+  and its digest, the judges and their calibration, `execution.targetMode`, the run's status and times, its
+  configuration, `otel` and content capture.
+- Evidence (its records, blobs and digests), the seal, overlays and signatures.
+
+**OpenTelemetry → AEF.**
+
+- The run and the result path: the event has no attribute for either, so an importer builds `runId` and `path`
+  itself, and the result id differs from the original's.
+- The metric's kind, direction and range.
+- The evaluated operation's start time, when only the event's time is known.
+- `error.type`, when the event also has an explanation (OT-5).
 
 ## Worked example
 
-The corpus line for `triage/helpfulness` of `case-17` (run `01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10`). Its `resultId`
+Every block below is data of a checked example: `tools/check_interop.py` fails when a block differs from it. The
+corpus line for `triage/helpfulness` of `case-17` (run `01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10`). Its `resultId`
 recomputes with [RES-4](../spec/03-run.md#342-result-ids):
 
 ```json
 {"schemaVersion":"1.0","resultId":"r_1264eeb36620c9cbe97b71ffdbcfd331","parentResultId":"r_479d157f3423e95d566bcbfc0c6d2461","caseId":"case-17","path":"triage/helpfulness","evaluator":{"id":"llm:helpfulness","version":"3"},"state":"failed","severity":"medium","scores":[{"metric":"helpfulness","value":0.1,"normalized":0.1}],"verdictRule":{"expr":"helpfulness >= threshold","threshold":0.7,"source":"suite"},"annotator":{"kind":"LLM","model":"gpt-5.1","promptHash":"sha256:cf07194ee232eb531e15f690000d19846dea69cf05504782658afcfacb9228a2","rubricDigest":"sha256:29fd018a9848938bc2b0e33fffa32bde2827e81388d0e03195919be5835c3605"},"reasoning":{"blob":"sha256:635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5","bytes":122},"usage":[{"role":"agent","gen_ai.usage.input_tokens":912,"gen_ai.usage.output_tokens":214,"gen_ai.usage.cache_read.input_tokens":640},{"role":"judge","gen_ai.usage.input_tokens":1747,"gen_ai.usage.output_tokens":488,"gen_ai.usage.reasoning.output_tokens":301,"costUsd":0.012,"costSource":"price-table:2026-09-30"}],"startedAt":"2026-10-02T14:02:11.120Z","endedAt":"2026-10-02T14:02:15Z","traceLink":{"traceId":"4bf92f3577b34da6a3ce929d0e0e4736","spanId":"00f067aa0ba902b7"},"component":{"weight":0.5,"required":false},"evidence":["E-2"]}
 ```
 
-Exported as one OTLP/JSON logs line:
+Exported as one OTLP/JSON logs line (the third line of
+[`examples/aef-otel-aef/otel.jsonl`](examples/aef-otel-aef/otel.jsonl), which exports the whole run):
 
 - the parent is the evaluated operation, `invoke_agent support-triage`, from `traceLink`;
 - the time is the line's `endedAt`;
@@ -169,25 +237,32 @@ Exported as one OTLP/JSON logs line:
 ```
 
 Lost on the way: the run id, the path `triage/helpfulness`, the parent, the weight 0.5 and `required: false`, the
-threshold 0.7, the severity, the evaluator id and version, and the judge's model and digests. The `usage` entries
-already sit on the spans in `traces.otlp.jsonl`.
+threshold 0.7, the severity, the evaluator id and version, the judge's model and digests, the line's start time, the
+reasoning blob's digest and the evidence `E-2`. The `usage` entries are not on the event: of them, only the judge's
+input and output tokens are also on a span, its `chat gpt-5.1` span in `traces.otlp.jsonl`.
 
-Imported back into a new run `otel-import-0001`, the event gives the line below, valid against the writer schema. The
-label `failed` is a state name, so the state comes back. The run id is new and the path is the metric name, so the
-result id changes from `r_1264eeb36620c9cbe97b71ffdbcfd331` to `r_66dbca71f5b161285e50f3acef16a88d`:
+Imported into a new run `otel-import-0001`, the event gives the line below, valid against the writer schema (the first
+line of [`examples/otel-aef/run/results.ndjson`](examples/otel-aef/run/results.ndjson), which imports this event, the
+registry's below, and five more from a hand-written file). The label `failed` is a state name, so the state comes back.
+The run id is new and the path is the metric name, so the result id changes from `r_1264eeb36620c9cbe97b71ffdbcfd331`
+to `r_66dbca71f5b161285e50f3acef16a88d`:
 
 ```json
-{"schemaVersion":"1.0","resultId":"r_66dbca71f5b161285e50f3acef16a88d","parentResultId":null,"caseId":"case-17","path":"helpfulness","evaluator":{"id":"helpfulness"},"state":"failed","reason":"The answer escalated the refund — as policy §4 requires · « correct » ✓ 👍 مرحبا\r\nSecond line (CRLF kept).\n","scores":[{"metric":"helpfulness","value":0.1}],"endedAt":"2026-10-02T14:02:15Z","traceLink":{"traceId":"4bf92f3577b34da6a3ce929d0e0e4736","spanId":"00f067aa0ba902b7"}}
+{"schemaVersion":"1.0","resultId":"r_66dbca71f5b161285e50f3acef16a88d","caseId":"case-17","path":"helpfulness","evaluator":{"id":"helpfulness"},"state":"failed","reason":"The answer escalated the refund — as policy §4 requires · « correct » ✓ 👍 مرحبا\r\nSecond line (CRLF kept).\n","scores":[{"metric":"helpfulness","value":0.1}],"endedAt":"2026-10-02T14:02:15Z","traceLink":{"traceId":"4bf92f3577b34da6a3ce929d0e0e4736","spanId":"00f067aa0ba902b7"}}
 ```
 
 The event in the OpenTelemetry registry's own example, with `Relevance` 4.0 and the label `relevant` for the
-completion `chatcmpl-123`, imports as a `scored` line with the label kept:
+completion `chatcmpl-123`, imports into the same run as a `scored` line with the label kept:
 
 ```json
-{"schemaVersion":"1.0","resultId":"r_a9592acc5b239e713eb867a36a4d5734","parentResultId":null,"caseId":"chatcmpl-123","path":"Relevance","evaluator":{"id":"Relevance"},"state":"scored","scores":[{"metric":"Relevance","value":4.0,"label":"relevant"}]}
+{"schemaVersion":"1.0","resultId":"r_a9592acc5b239e713eb867a36a4d5734","caseId":"chatcmpl-123","path":"Relevance","evaluator":{"id":"Relevance"},"state":"scored","scores":[{"metric":"Relevance","value":4.0,"label":"relevant"}]}
 ```
 
 ## Still open
 
 Nothing on this page waits on an AEF change. The losses above come from attributes OpenTelemetry has not defined yet:
 a run id, a test case id, evaluator identity, a score range and an interval.
+
+Settled 10-09: the cases writing the reference converter found undecided (OT-1 to OT-6) are now rules of this page.
+OT-1 to OT-3 are under [AEF → OpenTelemetry](#aef--opentelemetry); OT-4 and OT-5, and the refusals of OT-4 and OT-6,
+are under [OpenTelemetry → AEF](#opentelemetry--aef).

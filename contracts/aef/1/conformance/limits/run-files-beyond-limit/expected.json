@@ -1,0 +1,35 @@
+{
+  "kind": "run",
+  "run": "run",
+  "generate": [
+    {
+      "copy": [
+        "valid/completed-eval/run",
+        "run"
+      ]
+    },
+    {
+      "remove": "run/seal.json"
+    },
+    {
+      "remove": "run/overlays"
+    },
+    {
+      "files": [
+        "run/ext/many",
+        99993
+      ]
+    }
+  ],
+  "outcome": "invalid",
+  "problems": [
+    [
+      ".",
+      "limit"
+    ]
+  ],
+  "rules": [
+    "ENC-17",
+    "ENC-18"
+  ]
+}

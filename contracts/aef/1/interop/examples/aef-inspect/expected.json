@@ -1,0 +1,18 @@
+{
+  "direction": "AEF → Inspect",
+  "page": "inspect.md",
+  "sections": ["AEF → Inspect", "What does not carry over", "Worked example"],
+  "description": "The corpus run conformance/valid/completed-eval (copied to input/), the run of the OpenTelemetry round trip, as one Inspect EvalLog in .json form (inspect.json). Six samples, one per case, epoch 1; each line's score under its path, the typed absences and the inconclusive line without a score as NaN with the state in reason (IN-2); the AEF facts the table sends to Score.metadata under metadata.aef; usage per role and per model; the summary as results.scores (IN-3); the eval header Inspect requires (IN-1). Its overlays are left out (--ignore-overlays): the page refuses overlays (IN-4), and without the flag the converter refuses the run.",
+  "steps": [
+    {"args": ["to-inspect", "input", "{out}", "--ignore-overlays"], "expected": "inspect.json"}
+  ],
+  "refusals": [
+    {"args": ["to-inspect", "input", "{out}"], "says": "IN-4"}
+  ],
+  "runs": {"input": "intact"},
+  "pageBlocks": [
+    {"page": "inspect.md", "section": "Worked example", "block": 1, "equals": {"file": "input/results.ndjson", "line": 2}},
+    {"page": "inspect.md", "section": "Worked example", "block": 2, "equals": {"file": "inspect.json", "pointer": "/samples/0", "drop": ["/scores/triage~1groundedness"]}},
+    {"page": "inspect.md", "section": "Worked example", "block": 3, "equals": {"file": "inspect.json", "pointer": "/samples/0/scores/triage~1groundedness", "member": "triage/groundedness"}}
+  ]
+}

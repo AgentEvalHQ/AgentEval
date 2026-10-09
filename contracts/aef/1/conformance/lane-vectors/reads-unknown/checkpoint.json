@@ -1,0 +1,181 @@
+{
+  "schemaVersion": "1.0",
+  "checkpointId": "cp_6921a76a2379",
+  "subject": {
+    "ref": "agent:shop/assistant",
+    "version": "v7"
+  },
+  "lanes": [
+    {
+      "lane": "severity-unknown",
+      "rule": {
+        "kind": "severity",
+        "max": "low"
+      },
+      "runs": [
+        {
+          "runId": "RU-severity",
+          "runHash": "44b14d44710d8cbaabd77137706fee67555c8bdfacf718876a9c12ab72749ab6",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "target-mode-unknown",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "p",
+        "op": ">=",
+        "value": 0.5
+      },
+      "runs": [
+        {
+          "runId": "RU-mode",
+          "runHash": "9710d76081328b924e242c31e6fc0cc77ca6f1634b02e0cb658ea2871b9808c4",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "rule-member-unknown",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "p",
+        "op": ">=",
+        "value": 0.5,
+        "minimumShare": 0.9
+      },
+      "runs": [
+        {
+          "runId": "RU-plain",
+          "runHash": "4ce23f9d7b6fce9f651c2cd66f732d1e3140fa1f7918994572d4afe3b0dc8f95",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "direction-unknown",
+      "rule": {
+        "kind": "comparison",
+        "lane": "memory",
+        "metric": "recall",
+        "path": "mem",
+        "baseline": {
+          "runId": "B",
+          "runHash": "5c480aeff60c7a9ecbc35d2b2d06e144fa90228881895128a48d749d40c0d3fd"
+        },
+        "significance": 0.05,
+        "minimumPairs": 20,
+        "axes": [
+          "subject",
+          "suite",
+          "judges",
+          "rubrics",
+          "target-mode"
+        ]
+      },
+      "runs": [
+        {
+          "runId": "RU-direction",
+          "runHash": "09f644202d956c497926fe7b3ac811606f43762cc1167e4084c0b8353beb95f2",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    }
+  ],
+  "state": "decided",
+  "outcome": "blocked",
+  "decisionInput": {
+    "subjectVersion": "v7",
+    "evaluatedAt": "2026-10-08T00:00:00Z",
+    "supersededBy": null,
+    "lanes": [
+      {
+        "lane": "severity-unknown",
+        "blocking": true,
+        "result": {
+          "status": "passed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-03T00:00:00Z"
+        },
+        "evidence": [
+          "44b14d44710d8cbaabd77137706fee67555c8bdfacf718876a9c12ab72749ab6"
+        ]
+      },
+      {
+        "lane": "target-mode-unknown",
+        "blocking": true,
+        "result": {
+          "status": "passed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-03T00:00:00Z"
+        },
+        "evidence": [
+          "9710d76081328b924e242c31e6fc0cc77ca6f1634b02e0cb658ea2871b9808c4"
+        ]
+      },
+      {
+        "lane": "rule-member-unknown",
+        "blocking": true,
+        "result": {
+          "status": "failed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-03T00:00:00Z"
+        },
+        "evidence": [
+          "4ce23f9d7b6fce9f651c2cd66f732d1e3140fa1f7918994572d4afe3b0dc8f95"
+        ]
+      },
+      {
+        "lane": "direction-unknown",
+        "blocking": true,
+        "result": {
+          "status": "passed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-09-20T00:00:00Z",
+          "axes": []
+        },
+        "evidence": [
+          "09f644202d956c497926fe7b3ac811606f43762cc1167e4084c0b8353beb95f2"
+        ]
+      }
+    ]
+  },
+  "decision": {
+    "outcome": "blocked",
+    "lanes": [
+      {
+        "lane": "severity-unknown",
+        "status": "passed",
+        "blocking": true
+      },
+      {
+        "lane": "target-mode-unknown",
+        "status": "passed",
+        "blocking": true
+      },
+      {
+        "lane": "rule-member-unknown",
+        "status": "failed",
+        "blocking": true
+      },
+      {
+        "lane": "direction-unknown",
+        "status": "passed",
+        "blocking": true
+      }
+    ],
+    "reasons": [
+      "failed:rule-member-unknown",
+      "outcome:blocked"
+    ]
+  }
+}

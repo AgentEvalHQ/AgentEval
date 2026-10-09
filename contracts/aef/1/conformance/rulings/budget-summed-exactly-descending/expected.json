@@ -1,0 +1,13 @@
+{
+  "kind": "plan-conformance",
+  "events": "events.ndjson",
+  "plan": "plan.json",
+  "runs": "runs",
+  "problems": [],
+  "rules": [
+    "STRM-4",
+    "PLAN-2",
+    "SUM-5"
+  ],
+  "why": "W4-2: the same three runs named in the other order: within the budget all the same (in binary64, in this order, 0.3 + 0.2 + 0.1 is 0.6)."
+}

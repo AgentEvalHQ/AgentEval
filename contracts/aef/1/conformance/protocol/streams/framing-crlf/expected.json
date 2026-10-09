@@ -2,10 +2,10 @@
   "kind": "stream",
   "plan": "../plan.json",
   "problems": [
-    {
-      "where": "stream",
-      "problem": "encoding"
-    }
+    [
+      "stream",
+      "encoding"
+    ]
   ],
   "rules": [
     "STRM-3",

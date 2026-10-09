@@ -301,6 +301,13 @@ public sealed record AssertAiJudgeCalibration(
     public bool AppliesTo(AssertAiTaxonomy? taxonomy) =>
         taxonomy is not null && TaxonomyFingerprint is not null && string.Equals(TaxonomyFingerprint, taxonomy.Fingerprint, StringComparison.Ordinal);
 
+    /// <summary>
+    /// When the calibration was measured, when known (<c>agenteval assert-ai calibrate -o</c> records it; an older file
+    /// has none). An AEF run carries a judge's calibration only with this time, and only when it is not after the run's
+    /// start (RUN-9).
+    /// </summary>
+    public DateTimeOffset? MeasuredAt { get; init; }
+
     /// <summary>One line for a report.</summary>
     public string Describe() => string.Create(CultureInfo.InvariantCulture,
         $"ASSERT's judge ({JudgeModel}) measured on {LabelSet}: {Decided} decided cases, accuracy {(Accuracy is { } a ? (a * 100).ToString("0.0", CultureInfo.InvariantCulture) + "%" : "n/a")}, κ {(Kappa is { } k ? k.ToString("0.000", CultureInfo.InvariantCulture) : "n/a")}, {DangerousErrors} dangerous error(s) (a labelled failure passed), {NotMeasured} not measured.");
@@ -317,19 +324,34 @@ public sealed record AssertAiJudgeCalibration(
             json["kappa"]?.GetValue<double>(),
             (int)(AssertAiJson.Int(json["dangerousErrors"]) ?? 0),
             (int)(AssertAiJson.Int(json["notMeasured"]) ?? 0),
-            AssertAiJson.Str(json["taxonomyFingerprint"]));
+            AssertAiJson.Str(json["taxonomyFingerprint"]))
+        {
+            MeasuredAt = AssertAiJson.Str(json["measuredAt"]) is { } at
+                && DateTimeOffset.TryParse(at, CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out var measured)
+                    ? measured
+                    : null,
+        };
     }
 
     /// <summary>The calibration as JSON, for <c>agenteval assert-ai import --calibration</c>.</summary>
-    public JsonObject ToJson() => new()
+    public JsonObject ToJson()
     {
-        ["judgeModel"] = JudgeModel,
-        ["labelSet"] = LabelSet,
-        ["decided"] = Decided,
-        ["accuracy"] = Accuracy,
-        ["kappa"] = Kappa,
-        ["dangerousErrors"] = DangerousErrors,
-        ["notMeasured"] = NotMeasured,
-        ["taxonomyFingerprint"] = TaxonomyFingerprint,
-    };
+        var json = new JsonObject
+        {
+            ["judgeModel"] = JudgeModel,
+            ["labelSet"] = LabelSet,
+            ["decided"] = Decided,
+            ["accuracy"] = Accuracy,
+            ["kappa"] = Kappa,
+            ["dangerousErrors"] = DangerousErrors,
+            ["notMeasured"] = NotMeasured,
+            ["taxonomyFingerprint"] = TaxonomyFingerprint,
+        };
+        if (MeasuredAt is { } at)
+        {
+            json["measuredAt"] = at.ToUniversalTime().ToString("O", CultureInfo.InvariantCulture);
+        }
+
+        return json;
+    }
 }

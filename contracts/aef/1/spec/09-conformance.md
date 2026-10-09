@@ -7,26 +7,36 @@ that class. Requirements not listed for a class still apply to it where it does 
 
 | Class | Requirements | Vectors (§9.2 `kind`) |
 |---|---|---|
-| **Producer** | ENC-1–ENC-19, RUN-1–RUN-15, RES-1–RES-11, SUM-1–SUM-9, EVD-1–EVD-3, GATE-1–GATE-2, VER-1, VER-2, VER-6, VER-9 | `document` (writer side), `run` (valid runs), `result-id`, `paths`, and the write-side `summarize` |
+| **Producer** | ENC-1–ENC-19, RUN-1–RUN-15, RES-1–RES-11, SUM-1–SUM-9, EVD-1–EVD-3, GATE-1–GATE-2, VER-1, VER-2, VER-6, VER-9 | `document` (writer side), `run` (valid runs), `result-id`, `paths`, and the write-side `summarize` and `produce` |
 | **Sealer** | SEAL-1–SEAL-5, SIG-1–SIG-3; signs with at least one of [SIG-2]'s algorithms | `seal` (expected manifests), `signature` (signing side), and the write-side `seal-write`, and `sign` for the algorithms it claims |
 | **Reader** | ENC-1–ENC-19, VER-3, VER-4, VER-8 (the reading rules of §7.3), VER-9 | `document` (reader side, including every encoding defect as a single document), `reader-only` |
 | **Run verifier** | Reader, plus §3.9, SEAL-4, SEAL-6, SIG-4, SIG-5, SIG-7, and OVL-4, OVL-5, OVL-10 (to tell a withheld blob from a missing one) | `run`, `seal`, `encoding`, `paths`; at the *signed* level also `signature` |
-| **Overlay verifier** | OVL-1–OVL-11 | `chain`, `overlay-view` |
-| **Checkpoint verifier** | CKP-1–CKP-10, LANE-1–LANE-11, DEC-1–DEC-5, SIG-8, and Run verifier | `checkpoint`, `lane`, `decision` |
+| **Overlay verifier** | OVL-1–OVL-11, SIG-4, SIG-5 (batch signatures and redaction authority, [OVL-3], [OVL-10]) | `chain`, `overlay-view`, `signature` |
+| **Checkpoint verifier** | CKP-1–CKP-10, LANE-1–LANE-11, DEC-1–DEC-5, SIG-8, and Run verifier | `checkpoint`, `lane`, `decision`, `signature` ([CKP-9]), and the Run verifier's |
 | **Decision engine** | DEC-1–DEC-5 | `decision` |
-| **Runner** | PLAN-1–PLAN-7, STRM-1–STRM-2, RUN-12, and Producer and Sealer for the runs it produces | `plan`, `matching`, and the Producer and Sealer vectors (below) |
-| **Stream verifier** | STRM-1–STRM-4 | `stream`, `plan-conformance` |
+| **Runner** (*at risk* in 1.0, below) | PLAN-1–PLAN-7, STRM-1–STRM-2, RUN-12, and Producer and Sealer for the runs it produces | `plan`, `matching`, and the Producer's and the Sealer's |
+| **Stream verifier** | STRM-1–STRM-4, and Run verifier ([STRM-4] verifies the runs a stream reports) | `stream`, `plan-conformance`, and the Run verifier's |
+
+A class whose requirements include another class passes that class's vectors too; `index.json` lists each vector
+under every class that must pass it, so a runner selects a class's vectors by its name alone.
+
+**The Runner class is released *at risk* in AEF 1.0** (GOVERNANCE.md, release criteria): neither implementation that
+passes the corpus is a runner, so its requirements have not been tested by a second implementation, and they may
+change in 1.1 more than a minor version normally allows.
 
 A Run verifier conforms at the **intact** level, or at the **signed** level when it also verifies signatures (§4.4).
 `index.json` marks the vectors only the signed level must pass (`"level": "signed"`: the signature vectors, and
 the runs and seals verified against a trust policy).
 
-The **write-side** vectors (`summarize`, `seal-write`, `sign`) test a Producer and a Sealer as writers: the
+The **write-side** vectors (`summarize`, `produce`, `seal-write`, `sign`) test a Producer and a Sealer as writers: the
 implementation computes or writes something, and the conformance runner judges it, partly through the reference
-verifier (§9.3), so a correct validator over a broken writer does not pass. A Runner has no write-side vector of its
-own: what it writes is a job over a live subject, which a corpus cannot hold. It is tested by `plan` and `matching`,
-and by the Producer and Sealer vectors, which it passes for the runs it produces; the event stream it writes is
-checked against [STRM-3] and [STRM-4] whenever someone verifies it (a Stream verifier).
+verifier (§9.3), so a correct validator over a broken writer does not pass. `produce` gives a Producer the facts of a
+run as a producer has them when it writes one (the header, the metrics, each case's states and its own decisions)
+and judges the run it writes: what [RES-4]–[RES-8] derive from those facts (result ids, parents, trial numbers,
+rollups, aggregation counts) and the summary. A Runner has no write-side vector of its own: what it writes is a job
+over a live subject, which a corpus cannot hold. It is tested by `plan` and `matching`, and by the Producer and Sealer
+vectors, which it passes for the runs it produces; the event stream it writes is checked against [STRM-3] and
+[STRM-4] whenever someone verifies it (a Stream verifier).
 
 A Sealer signs with at least one of [SIG-2]'s algorithms (a verifier supports both; a signer uses one), and passes
 the `sign` vectors of those it claims: `index.json` gives each `sign` vector's `algorithm`, `ecdsa-p256` or
@@ -63,6 +73,7 @@ and is cross-checked by a second, independent implementation.
 | `fixture` | files several vectors use (test keys, a stream's plans) | nothing to run: the runner checks their digests |
 | `paths` | a list of paths in a run folder | the problems of [RUN-3] |
 | `summarize` | a run without its `summary.json`, and the entries to compute (lane, metric, path; optionally `aggregate`, `rule`, `verdict`) | the `summary.json` [SUM-2]–[SUM-9] give; or that it refuses the request |
+| `produce` | a scenario: the facts of a closed run (§9.2.1) | the lines of its `results.ndjson` ([RES-4]–[RES-8]), as a set, and its `summary.json`; or that it refuses the scenario |
 | `seal-write` | an unsealed run, `sealedBy` and `sealedAt` | the subjects and predicate of the `seal.json` it writes ([SEAL-1]–[SEAL-5]), and the outcome `intact`; or that it refuses the run (open, a `sealedAt` before it closed, or sealed on custody with a path or file that is not valid) |
 | `sign` | a file, its payload type, a test private key of one algorithm | an envelope that verifies for that key's identity ([SIG-1]–[SIG-3]); for Ed25519 the signature itself |
 
@@ -85,7 +96,7 @@ or `[` is written `["name"]`, a JSON string), the known value a reader takes the
 | `chain` | `chain-vectors/<name>/run/` | `run`, `problems` (§4.2 only) |
 | `overlay-view` | `overlay-views/<name>/run/` | `run`, `at` (the time the view is computed at), `view` (below) |
 | `checkpoint` | `checkpoints/<name>/document.json` | `schema`, `writer`, `reader`, `why`, and `problems` ([CKP-7] codes) when the reader accepts it |
-| `lane` | `lane-vectors/<name>/checkpoint.json` and `runs/<n>/` | `checkpoint`, `runs` (the folder of runs, found by their `run.json`), `lanes`: per lane in manifest order, `lane` and `result` (§5.3; `null` for none), and `problems` ([CKP-8]) |
+| `lane` | `lane-vectors/<name>/checkpoint.json` and `runs/<n>/` | `checkpoint`, `runs` (the folder of runs, found by their `run.json`), `lanes`: per lane in manifest order, `lane` and `result` (§5.3; `null` for none), and `problems` ([CKP-8]); optionally `envelope` (the checkpoint's signature) and `anchors` (compared when stated) |
 | `signature` | `signature-vectors/<name>/` (test keys in `signature-vectors/keys/`) | inputs: `envelope`, `file` (the signed file), `payloadType` (the type §4.4 gives that file), `policy` (a trust policy, below); expected: `envelopeResult` (`null`, `malformed` or `payload-mismatch`), `signatures` (per signature in envelope order: `keyid`, `result`, and `identity` when `verified`; empty when malformed), and `verifiesFor` (the identities the envelope verifies for, in policy order); or `policyRefused: true` when [SIG-3] refuses the trust policy (the operation exits 2) |
 | `result-id` | `result-ids.json`: a list | each item: `runId`, `caseId`, `path`, `trial` (or `null`), `resultId` |
 | `paths` | `paths.json`: a list | each item: `name`, `paths`, `problems` |
@@ -93,6 +104,7 @@ or `[` is written `["name"]`, a JSON string), the known value a reader takes the
 | `plan`, `matching`, `stream` | `protocol/` | as `tools/aef_stream.py` documents |
 | `plan-conformance` | `protocol/plan-conformance/<name>/`: `events.ndjson`, `plan.json`, and the runs in `runs/` (found by their `run.json`) | `events`, `plan` and `runs` (those inputs, beside `expected.json`), optionally `policy` (a trust policy, for runs with authorized redactions), `problems`: the problems of [STRM-4] as `[path, code]` pairs, ordered, and `why` |
 | `summarize` | `write-vectors/summarize/<name>/`: the run in `run/` (`run.json`, `results.ndjson`, `metrics.json`; no `summary.json`) and `request.json` | `run`, `request` (the request file: `{"lanes": [{"lane", "metrics": [{"metric", "path", "aggregate"?, "rule"?, "verdict"?, "value"?}]}]}`, the entries to compute in order; `verdict` is the producer's under its `rule`, and `value` its figure for an `aggregate` method AEF does not define, [SUM-8]), and either `summary` (the expected `summary.json`) or `refused: true` (an input error of §9.3); `why` |
+| `produce` | `write-vectors/produce/<name>/scenario.json` | `scenario` (the scenario file, below), and either `results` (a file beside `expected.json` holding the expected lines of `results.ndjson`, in no particular order) and `summary` (the expected `summary.json`), or `refused: true` (a scenario that contradicts itself: an input error of §9.3); `why` |
 | `seal-write` | `write-vectors/seal-write/<name>/run/` | `run`, `sealedBy`, `sealedAt`, and either `manifest` (a file beside `expected.json` holding the expected manifest) and `predicate` (the expected predicate), or `refused: true` (the run is open; `sealedAt` is before its `endedAt`; or, sealed by `ingest`, a path breaks [RUN-3] or a file is not valid against its reader schema: [SEAL-1]); `why` |
 | `sign` | `write-vectors/sign/<name>/` (private test keys in `signature-vectors/keys/`) | `algorithm` (`ecdsa-p256` or `ed25519`: what a Sealer needs to run it, also in `index.json`), `file`, `payloadType`, `key` (an unencrypted PKCS#8 PEM private key, P-256 or Ed25519, as a path from the vector's folder), `policy` (a trust policy holding its public key), `keyid`, `identity`, `why`, and for Ed25519 `sig` (the expected signature, base64) |
 
@@ -105,11 +117,59 @@ or `[` is written `["name"]`, a JSON string), the known value a reader takes the
   `expires`, `active` (`at` ≤ the view time < `expires`), `event`;
 - `withheld`: the blobs authorized `redact` events name (redacted, whether or not they are gone yet) ([OVL-10]; a vector that has some carries the `policy`
   that authorizes them), in file order;
-- `unsealedEvents`: the number of events after the last verified batch.
+- `unsealedEvents`: the number of lines after the last verified batch that a reader reads (an unfinished last line
+  is none; in a file beyond its limits, no line after the verified batches is read, [OVL-5]);
+- `assurance`: for each event of the verified batches that takes part in the view, in file order, `event` (its
+  `eventId`) and `shown`: the assurance a reader shows for it ([OVL-3]): `signed` when the batch holding it carries a
+  signature that verifies, under the trust policy, for the event's own `by.identity`, whatever the event claims, and
+  otherwise `self-attested` (a reader of files never shows `authenticated`). A vector that states it is compared.
 
-**A trust policy** is a JSON object `{"keys": [{"identity": …, "publicKey": <SPKI PEM>, "may": ["redact"]?}]}`. A key's
-id is computed from its public key ([SIG-3]), never read from the policy. `seal`, `run` and `lane` vectors may carry a
+**A trust policy** is a JSON object `{"keys": [{"identity": …, "publicKey": <SPKI PEM>, "may": ["redact"]?}]}`, valid
+against `schemas/writer/trust-policy.schema.json` ([SIG-4]). A key's id is computed from its public key ([SIG-3]),
+never read from the policy. `seal`, `run` and `lane` vectors may carry a
 `policy` file beside `expected.json`; `run` vectors with withheld blobs also expect `withheld` (a count).
+
+**A scenario** (the input of `produce`) is a JSON object holding the facts a producer has when it writes a run, and
+nothing it must derive:
+- `run`: the `run.json` it writes, closed (`status` `completed` or `aborted`);
+- `metrics`: the `metrics.json` it writes;
+- `cases`: the result trees, one per case and root path, each a node (below) with its case's `caseId`;
+- `summary`: the entries to compute, as a `summarize` request.
+
+A node holds the facts of one line: `path`, `evaluator` and `state`, and optionally `scores`, `severity`, `reason` and
+`lane`, all written as given; `component` (`weight`, `required`), on every child and only there; on every node with
+children, `aggregation`: the producer's `strategy` and `rulePath`, and optionally `threshold`, `score` and `decisive`
+(the paths of the children that decided it); and `children`, the nodes one level down (a child's `path` is its
+parent's, then `/` and a name without `/`, as [RES-8] reads a parent path). A case run in trials also has `trials`:
+the `aggregation` its rollups carry (and `k`, for `PassAtK`), and `trees`, one node per trial in trial order, each at
+the case's `path`. The case's own node and its children are then its rollups, with a node at each path its trial
+trees have and at no other.
+
+The producer writes one line per node, with `schemaVersion` and its case's `caseId`, and derives the rest:
+- `resultId` ([RES-4]), and `trial` on every line of a trial's tree (0 for the first);
+- `parentResultId`: the id of its parent's line in the same tree (a case's own node and a trial's root have none);
+- on a rollup, `trials`: `n`, `passed` and `agree` over the trial lines at its path ([RES-8]), and the case's
+  `aggregation` (and `k`);
+- on a node with children, `aggregation`: its facts, `total` (its children), `measured` (those in a measured state,
+  [RES-1]), `unmeasured` (the others, counted by state) and `decisive` (the children's ids) ([RES-5], [RES-6]);
+- `summary.json`, from those lines, as `summarize` computes it ([SUM-2]–[SUM-9]).
+
+§3.4 orders no line of `results.ndjson`, so neither does a `produce` vector: its lines are compared as a set.
+
+**Generated vectors.** A vector whose input would be too large for the corpus (a run of 100,000 files, a 40 MiB seal)
+holds only `expected.json`, with `generate`: a list of steps the conformance runner applies, in order, to a copy of the
+vector's folder before it runs the vector. Each step is an object with one member:
+
+| Step | Does |
+|---|---|
+| `{"copy": [SOURCE, TARGET]}` | copies the corpus file or folder `SOURCE` (relative to `conformance/`) to `TARGET` |
+| `{"remove": PATH}` | removes a file or a folder |
+| `{"files": [FOLDER, N]}` | creates `N` empty files in `FOLDER`, named `0` to `N`−1 |
+| `{"write": [PATH, PARTS]}`, `{"append": [PATH, PARTS]}` | writes or appends a file of `PARTS`: `[text, count]` pairs, each text in UTF-8 repeated `count` times |
+
+Paths are relative to the vector's folder, `/`-separated. The implementation is given the generated folder as it
+would be given a stored one: generating is the runner's job, never the implementation's. `limits/` holds these vectors,
+each limit of [ENC-17] at its value or one beyond.
 
 ## 9.3 Running the corpus
 
@@ -130,9 +190,9 @@ id is computed from its public key ([SIG-3]), never read from the policy. `seal`
   | `seal` | `seal DIR [--policy P]` | `{"manifest": text, "runHash": hex, "problems"}` |
   | `chain` | `chain DIR` | `{"problems"}` |
   | `overlay-view` | `view DIR --at T [--policy P]` (`--at` is always given) | the effective view of §9.2.1 |
-  | `document`, `reader-only`, `plan` | `document SCHEMA FILE` | `{"writer": "valid"/"invalid", "reader": …, "reads": {field path: value as read}}` (every line of an NDJSON file; `reads` is `{}` unless the reader accepts the file and it holds one document or one line) |
+  | `document`, `reader-only`, `plan` | `document SCHEMA FILE` | `{"writer": "valid"/"invalid", "reader": …, "reads": {field path: value as read}}` (every line of an NDJSON file; `reads` is `{}` unless the reader accepts the file and it holds one document or one line). `valid` means the file reads ([ENC-1]–[ENC-7], within the limits [ENC-17] sets for the file the schema names: 40 MiB for `seal`, 4 MiB per JSON document or NDJSON line otherwise) and every document is valid against that side's schema |
   | `checkpoint` | `checkpoint FILE` | `{"writer", "reader", "problems": [code, …] or null when the reader refuses it}` |
-  | `lane` | `lanes CHECKPOINT --runs DIR [--at T] [--policy P]` | `{"lanes": [{"lane", "result"}], "problems"}` |
+  | `lane` | `lanes CHECKPOINT --runs DIR [--at T] [--policy P] [--envelope E]` | `{"lanes": [{"lane", "result"}], "problems", "anchors"}`: `anchors` the run hashes the checkpoint anchors ([CKP-9], [SIG-8]: those of its lanes' runs and comparison baselines, in byte order) when it has no problem of [CKP-7] or [CKP-8] and `E` holds a signature verified for an identity of `P`; otherwise `[]` |
   | `signature` | `signature ENVELOPE FILE POLICY --payload-type T` (the type [SIG-1] gives the file) | `{"envelopeResult": null or code, "signatures": [{"keyid", "result", "identity"?}], "verifiesFor": [identity]}` |
   | `decision` | `decide FILE` | `{"output": decision}` or `{"error": message}` when the function refuses the input (exit 0) |
   | `matching` | `match PLAN RUNNER` | `{"matches": true or false}` |
@@ -141,6 +201,7 @@ id is computed from its public key ([SIG-3]), never read from the policy. `seal`
   | `paths` | `paths FILE` | `[{"name", "problems"}]` for the corpus file |
   | `result-id` | `result-id RUNID CASEID PATH [TRIAL]` | `{"resultId"}` |
   | `summarize` | `summarize DIR REQUEST` | the `summary.json` document of the run in `DIR` for the entries of `REQUEST`: `schemaVersion`, the run's `runId` ([SUM-2]), and per lane and entry, in request order, `metric`, `path`, `N`, `n`, `notMeasured`, `sum`, `sumSq`, `value`, `verdict` (`not_measured` when `n` is 0, [SUM-6]; otherwise the request's, or `scored` when it gives none), and `rule` and `aggregate` as requested. Input errors (exit 2): a metric `metrics.json` does not declare; a lane named twice, or one lane, metric and path twice ([SUM-9]); an `aggregate` method AEF does not define without a `value`; a `value` for an entry AEF computes (the mean or sum, or `median`, `min` or `max`), which would contradict it; results or metrics that do not read |
+  | `produce` | `produce SCENARIO OUT` | writes the run the `SCENARIO` file describes (§9.2.1) in the folder `OUT`, which does not exist yet or is empty: `run.json` and `metrics.json` as given, `results.ndjson` and `summary.json`, and nothing else; `{"results": the number of lines}`. Input errors (exit 2), with nothing written: a scenario not of that shape; a run that is not closed; a `pending` node ([RES-3]); a child whose `path` is not its parent's and one more level; a `decisive` path that is no child's ([RES-6]); a node with children and no `aggregation`, or a child without `component` ([RES-5]); a trial tree rooted elsewhere than its case, or a path the case's tree and its trial trees do not both have ([RES-8]); two lines of one case at one path and trial (they would have one `resultId`, [RES-4]); and the input errors of `summarize` |
   | `seal-write` | `seal-write DIR --sealed-by B --sealed-at T` | writes `DIR/seal.json` ([SEAL-5]) and changes nothing else; `{"runHash": hex}`. Input errors (exit 2), with nothing written: an open run; a `T` before the run's `endedAt`; with `--sealed-by ingest`, a run with a path that breaks [RUN-3] or a file that is missing, does not read, or is not valid against its reader schema ([SEAL-1], [ENC-16]) |
   | `sign` | `sign FILE KEY --payload-type T` (`KEY`: an unencrypted PKCS#8 PEM private key, P-256 or Ed25519) | the DSSE envelope over `FILE`'s bytes ([SIG-1]): `payloadType`, `payload`, and one signature with the key's `keyid` ([SIG-3]). Input errors (exit 2): a key of an algorithm the implementation does not sign with, a key that is not an unencrypted PKCS#8 PEM, or an EC key on a curve other than P-256 |
 
@@ -148,13 +209,21 @@ id is computed from its public key ([SIG-3]), never read from the policy. `seal`
   (exit 2); `--policy` names a trust policy file ([SIG-4]).
 
   The write operations are judged rather than compared byte for byte: JSON formatting is free, so two conforming
-  writers may write different bytes for one `summary.json` or `seal.json`, and an ECDSA signature need not be
-  deterministic. The runner judges what was written with the reference verifier, whichever implementation is under
-  test:
+  writers may write different bytes for one `summary.json`, `results.ndjson` or `seal.json`, and an ECDSA signature
+  need not be deterministic. The runner judges what was written with the reference verifier, whichever
+  implementation is under test:
   - `summarize`: the output is valid against the writer `summary` schema; `runId`, the lanes and entries in request
     order, `N`, `n`, `notMeasured`, `verdict`, `rule` and `aggregate` are as expected; `sum`, `sumSq` and `value` match
     the expected values (the exact computation, rounded once) under §3.6's rule, within 1e-9 × max(1, |expected|);
     and the run, with the output added as its `summary.json`, verifies `unsealed` with no problems.
+  - `produce`: the runner gives a fresh `OUT`. It then holds the four files and no other; `run.json` and
+    `metrics.json` are the scenario's `run` and `metrics`; every line of `results.ndjson` is valid against the writer
+    `result` schema, and the lines are the expected ones in any order: matched by `caseId`, `path` and `trial`,
+    member by member, with no line missing, added or written twice. Everywhere, numbers compare under §3.6's rule and
+    times as times ([ENC-8]), and a value and the absence that means the same compare equal: a null member and none
+    ([ENC-2]), an `unmeasured` count of 0 and none ([RES-6]), an empty `decisive` and none; `decisive` is compared as a
+    set.
+    `summary.json` is judged as `summarize`'s output is, and the run verifies `unsealed` with no problems.
   - `seal-write`: the runner seals a fresh copy of the run, never the corpus's. The `seal.json` written is valid
     against the writer `seal` schema; its subjects are the expected manifest's paths and digests, in its order; its
     predicate equals the expected one (`closedAt` and `sealedAt` compared as times, [ENC-8], at full precision); the
@@ -165,7 +234,7 @@ id is computed from its public key ([SIG-3]), never read from the policy. `seal`
     signature `verified` for the vector's identity, and `verifiesFor` that identity. For Ed25519, whose signatures are
     deterministic ([RFC 8032]), `sig` must also be the expected one; an ECDSA signature is not compared.
   - A vector with `refused: true` passes when the operation is an input error (exit 2); for `seal-write`, the run's
-    folder must also be unchanged.
+    folder must also be unchanged, and for `produce`, `OUT` must hold no file.
 
 ## 9.4 Claiming conformance
 

@@ -1,0 +1,13 @@
+{
+  "direction": "AEF → Inspect",
+  "page": "inspect.md",
+  "sections": ["AEF → Inspect"],
+  "description": "The corpus run conformance/valid/running-trials (copied to input/): a running run (status started, no results) with three trials per case aggregated by MajorityVote (epochs 3, epochs_reducer majority). Each trial is a sample at epoch trial + 1; the rollup line is a reduction with the matching reducer; the pending line is NaN with reason pending. Its lines carry no scores, so every value is NaN with the state in reason (IN-2). The run has no summary, so to-otel cannot name its lines without scores and refuses it (OT-1).",
+  "steps": [
+    {"args": ["to-inspect", "input", "{out}"], "expected": "inspect.json"}
+  ],
+  "refusals": [
+    {"args": ["to-otel", "input", "{out}"], "says": "OT-1"}
+  ],
+  "runs": {"input": "unsealed"}
+}

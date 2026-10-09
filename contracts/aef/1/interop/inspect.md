@@ -44,7 +44,8 @@ document. Inspect's documentation tells other languages to get JSON with `inspec
 
 ## AEF → Inspect
 
-One AEF run gives one `EvalLog` in `.json` form. Writing `.eval` also needs zstd.
+One AEF run gives one `EvalLog` in `.json` form. Writing `.eval` also needs zstd. The rules and refusals below the
+table cover what the table does not; the reference converter, `tools/aef_interop.py to-inspect`, follows both.
 
 | AEF | Inspect | Fidelity |
 |---|---|---|
@@ -83,6 +84,38 @@ One AEF run gives one `EvalLog` in `.json` form. Writing `.eval` also needs zstd
 | overlays `override`, `adjudicate` ([OVL-1](../spec/04-integrity.md#42-overlays)) | `Score.history` entries with `provenance` (`author` from `by.identity`, `reason`, `timestamp` from `at`) | lossy: Inspect recomputes metrics after an edit; AEF's effective view does not recompute summaries ([OVL-7](../spec/04-integrity.md#43-the-effective-view)) |
 | overlays `approve`, `reject`, `waive`, `annotate` | `log_updates` | lossy |
 | `seal.json`, signatures, the overlay chain | none: an Inspect log is edited in place | none |
+
+**Beyond the table** (settled 10-09; the ids are those of the former "Still open" items):
+
+- **The eval header Inspect requires** (IN-1). `eval.task` is the suite's ref without `suite:`. `eval.model` is a
+  model subject's ref without `model:`, and for any other subject (an agent, a workflow) the subject's `ref` as
+  written. The converter writes `eval.dataset` with the number of cases and their ids, and `eval.model_roles` with the
+  run's judge under the role `judge`, the name AEF's `usage` gives it.
+- **A measured line without a score** (IN-2). A `passed`, `failed`, `warn`, `inconclusive` or `scored` line without
+  `scores` (a code check's verdict, a split panel) is `Score.value` NaN with the state name in `Score.reason`, as a
+  typed absence is.
+- **The shape of `results`** (IN-3). The converter writes one `EvalScore` per summary entry: `name` and `scorer` the
+  entry's path, `scored_samples` its `n`, `unscored_samples` its `notMeasured`, `metrics` its value under `mean` (or
+  under its `aggregate`'s method, with the aggregate's other members as `params`; NaN when the value is null) and its
+  `stderr`; the entry's lane, metric, `N`, `notMeasured`, `verdict`, `rule` and `ci` under `metadata.aef`.
+  `total_samples` and `completed_samples` are the number of samples.
+- **A sample's usage** (IN-5) is the sum of its lines' entries, per role and per model, as Inspect keeps it.
+
+**Refused** (IN-1, IN-3 to IN-5; settled 10-09). The converter refuses these, naming the rule, and writes nothing:
+
+- a run without a `suite`, or whose suite ref is not `suite:<task>`: `eval.task` is required (IN-1);
+- a run with more than one judge: a role of `eval.model_roles` holds one model (IN-1);
+- two summary entries at one path, since Inspect has one `EvalScore` per scorer; and an entry for a metric of kind
+  `count`, whose value is a sum, not a mean (IN-3);
+- a run with overlay events: the table sends `override` and `adjudicate` to `Score.history` and the other kinds to
+  `log_updates`, but not the shape of either entry. Asked to leave them out (`--ignore-overlays`), as
+  [`examples/aef-inspect/`](examples/aef-inspect/) does, the converter converts the rest (IN-4);
+- `output` or `transcript` evidence: `samples[].output` is a `ModelOutput` and `messages` a list of `ChatMessage`, and
+  the table does not say how a blob's text becomes either (IN-5);
+- `input` or `expected` evidence that is not a blob of the run, or two such records with different text for one
+  sample (IN-5);
+- a sample whose root lines carry two `startedAt`, `endedAt` or `durationMs`: the table takes them from "a case's
+  root line", and a case can have several roots (IN-5).
 
 ## Inspect → AEF
 
@@ -140,7 +173,11 @@ The converted run names the converter in `producer` and the source in `imported`
 `inconclusive` and `scored`, except as metadata. The result tree and its aggregation, severity, verdict rules,
 thresholds and uncertainty. Evidence links and digests, traces, gate decisions. The seal, signatures and the overlay
 chain: an Inspect log is mutable. `execution.targetMode`, judge calibration, `imported`. The case content, unless the
-run captured it.
+run captured it. What no row of the table routes, found by the reference converter: a line's `turns`, `attack` and
+`lane`, a score's `normalized` value, a usage entry's `costSource`, a rollup's `n`, `passed` and
+`agree`, and the times and duration of a line that is not the case's root; the summary's `sum`, `sumSq` and `cost`;
+in `run.json`, the subject's version, environment and telemetry, `producer.runtime`, the judges' `provider` and
+`mode`, `suite.frozen`, `requirePasses`, `config`, `otel`, `costPolicy`, `provenance` and `ext`.
 
 **Inspect → AEF.** List-valued scores. Reducers without an AEF value (`at_least` for a k other than 1 or all,
 `pass_k`, `collect`). `working_time`. Inspect's event transcript as structured events. Groups of runs (`eval_set_id`:
@@ -160,8 +197,10 @@ It becomes the `triage/policy` score of the Inspect sample for `case-17`. The ca
 (`r_479d157f3423e95d566bcbfc0c6d2461`) and `triage/helpfulness` (`r_1264eeb36620c9cbe97b71ffdbcfd331`), go into the
 same sample. The run has one trial per case, so the sample is epoch 1. The run kept no input or target for the case,
 so those required fields are empty. The `usage` entries of `triage/helpfulness` become `role_usage`, with cache and
-reasoning tokens, and the judge's entry is also `model_usage` under the judge's model. The AEF facts Inspect has no
-field for go under `metadata.aef`:
+reasoning tokens, and the judge's entry is also `model_usage` under the judge's model. What the table sends to
+`Score.metadata` goes under `metadata.aef`, with the line's `resultId`, `state` and `evaluator`. The sample is the
+first of [`examples/aef-inspect/inspect.json`](examples/aef-inspect/inspect.json), which converts the whole run, and
+`tools/check_interop.py` fails when this block differs from it:
 
 ```json
 {
@@ -172,16 +211,16 @@ field for go under `metadata.aef`:
   "scores": {
     "triage": {
       "value": 0.55,
-      "metadata": {"aef": {"resultId": "r_479d157f3423e95d566bcbfc0c6d2461", "state": "failed", "evaluator": {"id": "composite:triage", "version": "2"}, "severity": "medium"}}
+      "metadata": {"aef": {"resultId": "r_479d157f3423e95d566bcbfc0c6d2461", "state": "failed", "evaluator": {"id": "composite:triage", "version": "2"}, "severity": "medium", "verdictRule": {"expr": "triage >= threshold", "threshold": 0.8, "source": "run.config.thresholds.triage"}, "aggregation": {"strategy": "WeightedSum", "threshold": 0.8, "score": 0.55, "rulePath": "threshold", "measured": 2, "total": 3, "minimumMeasuredShare": 0.5, "unmeasured": {"not_measured": 0, "not_applicable": 1, "skipped": 0, "error": 0}, "decisive": ["r_1264eeb36620c9cbe97b71ffdbcfd331"]}}}
     },
     "triage/policy": {
       "value": 1.0,
-      "metadata": {"aef": {"resultId": "r_bb4438fbedb43552a9fe55695931d5e4", "state": "passed", "evaluator": {"id": "code:refund-escalation", "version": "1"}, "parentResultId": "r_479d157f3423e95d566bcbfc0c6d2461", "component": {"weight": 0.5, "required": true}}}
+      "metadata": {"aef": {"resultId": "r_bb4438fbedb43552a9fe55695931d5e4", "state": "passed", "evaluator": {"id": "code:refund-escalation", "version": "1"}, "parentResultId": "r_479d157f3423e95d566bcbfc0c6d2461", "annotator": {"kind": "CODE"}, "component": {"weight": 0.5, "required": true}}}
     },
     "triage/helpfulness": {
       "value": 0.1,
       "explanation": "The answer escalated the refund — as policy §4 requires · « correct » ✓ 👍 مرحبا\r\nSecond line (CRLF kept).\n",
-      "metadata": {"aef": {"resultId": "r_1264eeb36620c9cbe97b71ffdbcfd331", "state": "failed", "evaluator": {"id": "llm:helpfulness", "version": "3"}, "parentResultId": "r_479d157f3423e95d566bcbfc0c6d2461", "severity": "medium", "component": {"weight": 0.5, "required": false}}}
+      "metadata": {"aef": {"resultId": "r_1264eeb36620c9cbe97b71ffdbcfd331", "state": "failed", "evaluator": {"id": "llm:helpfulness", "version": "3"}, "parentResultId": "r_479d157f3423e95d566bcbfc0c6d2461", "severity": "medium", "verdictRule": {"expr": "helpfulness >= threshold", "threshold": 0.7, "source": "suite"}, "annotator": {"kind": "LLM", "model": "gpt-5.1", "promptHash": "sha256:cf07194ee232eb531e15f690000d19846dea69cf05504782658afcfacb9228a2", "rubricDigest": "sha256:29fd018a9848938bc2b0e33fffa32bde2827e81388d0e03195919be5835c3605"}, "component": {"weight": 0.5, "required": false}}}
     }
   },
   "model_usage": {"gpt-5.1": {"input_tokens": 1747, "output_tokens": 488, "total_tokens": 2235, "reasoning_tokens": 301, "total_cost": 0.012}},
@@ -197,10 +236,13 @@ The fourth line of the case, `triage/groundedness` (`not_applicable`), has no sc
 NaN token, which is not JSON, so it is shown apart:
 
 ```text
-"triage/groundedness": {"value": NaN, "reason": "not_applicable", "explanation": "No retrieved context was recorded for this case: nothing to ground against."}
+"triage/groundedness": {"value": NaN, "reason": "not_applicable", "explanation": "No retrieved context was recorded for this case: nothing to ground against.", "metadata": {"aef": {"resultId": "r_306364ba4d940f649ea348dadfbe17de", "state": "not_applicable", "evaluator": {"id": "llm:groundedness", "version": "1"}, "parentResultId": "r_479d157f3423e95d566bcbfc0c6d2461", "component": {"weight": 0.0, "required": false}}}}
 ```
 
 Read back, `id` gives `caseId` `case-17`, each score key gives the `path`, and a single epoch gives no `trial`. RES-4
 then gives the same three ids as the corpus: `r_479d157f3423e95d566bcbfc0c6d2461`, `r_bb4438fbedb43552a9fe55695931d5e4`
 and `r_1264eeb36620c9cbe97b71ffdbcfd331`. The states come back only from `metadata.aef`. Without it, the three numeric
 values read as `scored`.
+
+[`examples/aef-inspect-trials/`](examples/aef-inspect-trials/) converts a running run in three trials per case: each
+trial is a sample at epoch `trial` + 1, and the rollup a reduction with the reducer `majority`.

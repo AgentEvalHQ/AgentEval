@@ -1,0 +1,10 @@
+{
+  "kind": "produce",
+  "rules": [
+    "RES-5",
+    "RES-8"
+  ],
+  "scenario": "scenario.json",
+  "refused": true,
+  "why": "The child tone is not one level under its parent answer (answer/tone would be): a child's path is its parent's, / and one more level, as RES-8's rollup tree reads it. The Producer refuses the scenario."
+}

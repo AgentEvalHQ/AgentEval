@@ -2,10 +2,10 @@
   "kind": "stream",
   "plan": "../plan.json",
   "problems": [
-    {
-      "where": "event:2",
-      "problem": "over-budget"
-    }
+    [
+      "event:2",
+      "over-budget"
+    ]
   ],
   "rules": [
     "PLAN-2",

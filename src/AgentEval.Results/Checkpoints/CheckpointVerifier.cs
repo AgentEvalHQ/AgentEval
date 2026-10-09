@@ -25,7 +25,10 @@ public sealed class CheckpointVerifyOptions
     /// </summary>
     public TrustPolicy? Policy { get; init; }
 
-    /// <summary>The bytes of the envelope beside the manifest (<c>&lt;checkpoint&gt;.dsse.json</c>, §4.4), or null.</summary>
+    /// <summary>
+    /// The bytes of the envelope beside the manifest (<c>&lt;name&gt;.dsse.json</c>, <c>&lt;name&gt;</c> the manifest's file
+    /// name without <c>.json</c>, §4.4), or null.
+    /// </summary>
     public byte[]? Envelope { get; init; }
 }
 
@@ -60,8 +63,8 @@ public sealed class CheckpointVerification
 
     /// <summary>
     /// The run hashes the checkpoint anchors ([CKP-9], [SIG-8]): those of the runs its lanes name and of their baselines,
-    /// when it verifies with no problem (of [CKP-7] or [CKP-8]) and its signature verifies for a trusted identity; none
-    /// otherwise.
+    /// each once, in byte order, when it verifies with no problem (of [CKP-7] or [CKP-8]) and its signature verifies for a
+    /// trusted identity; none otherwise.
     /// </summary>
     public IReadOnlyList<string> Anchors { get; }
 }
@@ -90,13 +93,15 @@ public static class CheckpointVerifier
             signature = DsseVerifier.Verify(envelope, manifest, Dsse.CheckpointPayloadType, policy);
         }
 
+        // [CKP-9], [SIG-8]: the run hashes of its lanes' runs and comparison baselines, each once, in byte order.
         IReadOnlyList<string> anchors = [];
         if (manifestProblems.Count == 0 && problems.Count == 0 && signature?.VerifiesFor.Count > 0)
         {
             anchors = [.. AefNode.Objects(document["lanes"])
                 .SelectMany(l => AefNode.Objects(l["runs"]).Append(AefNode.Get(l["rule"], "baseline") as JsonObject).OfType<JsonObject>())
                 .Select(r => AefNode.String(r["runHash"])).OfType<string>()
-                .Distinct(StringComparer.Ordinal)];
+                .Distinct(StringComparer.Ordinal)
+                .Order(StringComparer.Ordinal)];
         }
 
         return new CheckpointVerification(manifestProblems, lanes, problems, signature, anchors);
@@ -106,8 +111,9 @@ public static class CheckpointVerifier
     /// [CKP-8] and §5.3 for a manifest already read: each lane's recomputed result, in manifest order, and the problems
     /// against the runs (<c>run-missing</c>, <c>run-unverified</c> at <c>lanes/&lt;lane&gt;/runs/&lt;runId&gt;</c>;
     /// for a decided checkpoint, <c>lane-result</c>, <c>lane-version</c> and <c>oldest-closed</c> at
-    /// <c>lanes/&lt;lane&gt;</c>, or only <c>unverifiable</c> there for a lane whose rule holds a value this version does
-    /// not know), ordered as §3.9 orders problems.
+    /// <c>lanes/&lt;lane&gt;</c>, or only <c>unverifiable</c> there for a lane whose recomputation reads something this
+    /// version does not know: a rule not valid against its writer schema, or an unknown value a run gives it), ordered
+    /// as §3.9 orders problems.
     /// </summary>
     /// <param name="manifest">The manifest, valid against the reader checkpoint schema.</param>
     /// <param name="runs">Where the runs are found.</param>
@@ -132,11 +138,13 @@ public static class CheckpointVerifier
             problems.UnionWith(evaluation.Problems);
 
             // A decided checkpoint: the recorded input's result for this lane, compared with the one recomputed, unless
-            // the rule holds a value this version does not know (a later minor recorded what it cannot recompute).
+            // recomputing it read something this version does not know (a later minor recorded what it cannot
+            // recompute): its rule is not valid against the writer schema, or a run it reads holds an unknown value it
+            // computes with (LaneEvaluator.ReadsUnknown). That lane is unverifiable, never lane-result.
             if (AefNode.String(manifest["state"]) == "decided" && input is not null
                 && AefNode.Objects(input["lanes"]).FirstOrDefault(l => AefNode.String(l["lane"]) == evaluation.Lane) is { } recorded)
             {
-                IReadOnlyList<string> codes = evaluation.Rule.HoldsUnknownValue ? ["unverifiable"] : Differences(recorded["result"] as JsonObject, evaluation.Result);
+                IReadOnlyList<string> codes = evaluation.ReadsUnknown ? ["unverifiable"] : Differences(recorded["result"] as JsonObject, evaluation.Result);
                 foreach (var code in codes)
                 {
                     problems.Add(new AefProblem($"lanes/{evaluation.Lane}", code));

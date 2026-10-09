@@ -1,0 +1,45 @@
+{
+  "kind": "produce",
+  "rules": [
+    "RUN-5",
+    "RES-2",
+    "RES-3",
+    "SUM-4"
+  ],
+  "scenario": "scenario.json",
+  "results": "expected-results.ndjson",
+  "summary": {
+    "schemaVersion": "1.0",
+    "runId": "produce-aborted-run",
+    "lanes": [
+      {
+        "lane": "quality",
+        "metrics": [
+          {
+            "metric": "quality",
+            "path": "q",
+            "N": 3,
+            "n": 1,
+            "notMeasured": 2,
+            "sum": 0.8,
+            "sumSq": 0.6400000000000001,
+            "value": 0.8,
+            "verdict": "scored"
+          },
+          {
+            "metric": "pass_rate",
+            "path": "q",
+            "N": 3,
+            "n": 1,
+            "notMeasured": 2,
+            "sum": 1,
+            "sumSq": 1,
+            "value": 1,
+            "verdict": "scored"
+          }
+        ]
+      }
+    ]
+  },
+  "why": "An aborted run is closed: run.json as given, with its abortReason; the case it was running is error and the one it never started skipped, each with its reason (RES-3)."
+}

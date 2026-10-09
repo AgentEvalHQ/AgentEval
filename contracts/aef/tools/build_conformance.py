@@ -7,7 +7,7 @@ specification (contracts/aef/1/spec/), never computed by an implementation. Two 
 of it: tools/aef_verify.py and the .NET tests. Re-running the script rewrites the corpus byte for byte.
 
 Usage: python contracts/aef/tools/build_conformance.py   (after derive_reader.py; then lane_vectors.py,
-signature_vectors.py, decision_vectors.py, protocol_vectors.py, write_vectors.py, and build_index.py last: the order
+signature_vectors.py, decision_vectors.py, protocol_vectors.py, write_vectors.py, pin_vectors.py, and build_index.py last: the order
 of tools/README.md and the AEF CI job)
 """
 import base64
@@ -758,6 +758,8 @@ def run_vectors():
     vec("summary-run-id", [["summary.json", "summary-run-id"]], ["SUM-2"], summary=lambda s: dict(s, runId="another-run"))
     vec("summary-counts", [["summary.json", "summary"]], ["SUM-5"],
         summary=lambda s: {**s, "lanes": [{"lane": "main", "metrics": [dict(s["lanes"][0]["metrics"][0], n=1, notMeasured=1)]}]})
+    vec("summary-sum-of-squares", [["summary.json", "summary"]], ["SUM-5"],  # R4N-7: sumSq is compared too
+        summary=lambda s: {**s, "lanes": [{"lane": "main", "metrics": [dict(s["lanes"][0]["metrics"][0], sumSq=9.5)]}]})
     vec("summary-value", [["summary.json", "summary"]], ["SUM-5"],
         summary=lambda s: {**s, "lanes": [{"lane": "main", "metrics": [dict(s["lanes"][0]["metrics"][0], value=0.7)]}]})
     vec("gate-unknown-result", [["gates.ndjson:1", "gate"]], ["GATE-1"],
@@ -807,6 +809,9 @@ def run_vectors():
     vec("trials-rollup-contradicts-its-trials", [[L(7), "trials"]], ["RES-8"],
         lines=lambda ls: ls + [TL(0, "failed", severity="critical"), TL(1, "passed"),
                                rollup({"n": 5, "passed": 5, "aggregation": "AllPass", "agree": True})])
+    vec("trials-rollup-agree-wrong", [[L(7), "trials"]], ["RES-8"],  # the trials disagree; the rollup says they agree
+        lines=lambda ls: ls + [TL(0, "failed", severity="low"), TL(1, "passed"),
+                               rollup({"n": 2, "passed": 1, "aggregation": "AnyPass", "agree": True})])
     vec("trial-lines-without-rollup", [[L(5), "trials"], [L(6), "trials"]], ["RES-8"],
         lines=lambda ls: ls + [TL(0, "failed", severity="critical"), TL(1, "passed")])
     vec("trials-rollup-matches", [], ["RES-8"], outcome="intact",
@@ -833,6 +838,26 @@ def run_vectors():
         {"schemaVersion": V, "resultId": result_id(SMALL_ID, "k3", "t/x"), "parentResultId": result_id(SMALL_ID, "k3", "t", 0),
          "caseId": "k3", "path": "t/x", "evaluator": {"id": "code:x"}, "state": "passed", "component": {"weight": 1, "required": True}},
         rollup({"n": 1, "passed": 1, "aggregation": "AllPass", "agree": True})])
+    # RES-8 (R4-8b, W5a-23): a composite case in two trials has a rollup at each path, and the rollups form its tree.
+    agg1 = {"strategy": "Min", "threshold": 0.5, "score": 1.0, "rulePath": "threshold", "measured": 1, "total": 1,
+            "unmeasured": {"not_measured": 0, "not_applicable": 0, "skipped": 0, "error": 0}, "decisive": []}
+    comp = {"weight": 1, "required": True}
+
+    def tree_lines(child_rollup_as_root):
+        out = []
+        for trial in (0, 1):
+            out += [TL(trial, "passed", aggregation=agg1),
+                    {"schemaVersion": V, "resultId": result_id(SMALL_ID, "k3", "t/x", trial),
+                     "parentResultId": result_id(SMALL_ID, "k3", "t", trial), "caseId": "k3", "path": "t/x", "trial": trial,
+                     "evaluator": {"id": "code:x"}, "state": "passed", "component": comp}]
+        trials = {"n": 2, "passed": 2, "aggregation": "AllPass", "agree": True}
+        child = {"schemaVersion": V, "resultId": result_id(SMALL_ID, "k3", "t/x"), "caseId": "k3", "path": "t/x",
+                 "evaluator": {"id": "code:x"}, "state": "passed", "trials": trials}
+        if child_rollup_as_root:
+            return out + [rollup(trials), child]
+        return out + [rollup(trials, aggregation=agg1), dict(child, parentResultId=result_id(SMALL_ID, "k3", "t"), component=comp)]
+    vec("trials-rollup-tree", [], ["RES-8", "RES-5"], outcome="intact", lines=lambda ls: ls + tree_lines(False))
+    vec("trials-child-rollup-as-root", [[L(10), "trials"]], ["RES-8"], lines=lambda ls: ls + tree_lines(True))
     # SUM-8 (W5a-13): a producer's aggregate gives a value whenever n is not 0.
     vec("aggregate-producer-value-null", [["summary.json", "summary"]], ["SUM-8"],
         summary=lambda s: {**s, "lanes": [{"lane": "main", "metrics": [dict(s["lanes"][0]["metrics"][0], aggregate={"method": "pass@k", "k": 2}, value=None)]}]})
@@ -914,6 +939,7 @@ def run_vectors():
     vec("run-times", [["run.json", "run-times"]], ["RUN-5"], run={"endedAt": "2025-12-31T23:59:59Z"})
     vec("schema-invalid-line", [[L(4), "schema"]], ["VER-3"], lines=set_line(3, evaluator=DROP))
     vec("time-does-not-exist", [["run.json", "schema"]], ["ENC-8"], run={"startedAt": "2026-02-31T00:00:00Z"})
+    vec("time-year-zero", [["run.json", "schema"]], ["ENC-8"], run={"startedAt": "0000-01-01T00:00:00Z"})
     vec("time-leap-day-exists", [], ["ENC-8"], outcome="intact", run={"startedAt": "2024-02-29T23:59:59.999999999Z", "endedAt": "2024-03-01T00:00:00Z"})  # sealed after it ended
     # A blob whose bytes do not hash to its name (EVD-3): unreferenced, so only blob-digest is wrong.
     wrong_name = h("the name of other bytes")
@@ -1202,6 +1228,34 @@ def seal_vectors(valid):
         "rules": ["OVL-10", "SEAL-6", "EVD-3"]})
 
 
+# ---------------------------------------------------------------------------- generated limit vectors
+
+def limit_vectors():
+    """ENC-17, ENC-18 (R4-7): each limit at its value and one beyond, as recipes the conformance runner generates
+    (spec 09 §9.2): a run of 100,000 files or a 40 MiB seal does not belong in the corpus."""
+    out = ROOT / "limits"
+    base = "valid/completed-eval/run"
+    counted = 8  # the base run's files that count toward ENC-17's file limit (not seal.json, attestation, overlays/)
+    unsealed = [{"copy": [base, "run"]}, {"remove": "run/seal.json"}, {"remove": "run/overlays"}]
+    pad = lambda size, head='{"pad":"', tail='"}': [[head, 1], ["a", size - len(head) - len(tail)], [tail, 1]]
+    cases = [
+        ("run-files-at-limit", "run", unsealed + [{"files": ["run/ext/many", 100_000 - counted]}],
+         {"outcome": "unsealed", "problems": []}, ["ENC-17", "ENC-18"]),
+        ("run-files-beyond-limit", "run", unsealed + [{"files": ["run/ext/many", 100_001 - counted]}],
+         {"outcome": "invalid", "problems": [[".", "limit"]]}, ["ENC-17", "ENC-18"]),
+        ("results-lines-beyond-limit", "run", unsealed + [{"write": ["run/results.ndjson", [["{}\n", 1_000_001]]]}],
+         {"outcome": "invalid", "problems": [["results.ndjson", "limit"]]}, ["ENC-17", "ENC-18"]),
+        ("results-line-beyond-4-mib", "run", unsealed + [{"append": ["run/results.ndjson", pad(4 * 1024 * 1024 + 1) + [["\n", 1]]]}],
+         {"outcome": "invalid", "problems": [["results.ndjson:10", "limit"]]}, ["ENC-17", "ENC-18"]),
+        ("seal-beyond-40-mib", "run", [{"copy": [base, "run"]}, {"write": ["run/seal.json", pad(40 * 1024 * 1024 + 1)]}],
+         {"outcome": "invalid", "problems": [["seal.json", "limit"]]}, ["ENC-17", "ENC-18"]),
+        ("overlays-files-beyond-limit", "chain", [{"copy": [base, "run"]}, {"files": ["run/overlays/many", 19_997]}],
+         {"problems": [["overlays", "limit"]]}, ["ENC-17", "ENC-18", "OVL-5"]),
+    ]
+    for name, kind, steps, expect, rules in cases:
+        write_json(out / name / "expected.json", {"kind": kind, "run": "run", "generate": steps, **expect, "rules": rules})
+
+
 # ---------------------------------------------------------------------------- chain vectors
 
 def chain_vectors(valid):
@@ -1280,10 +1334,39 @@ def chain_vectors(valid):
     expect("batch-ends-mid-line", [["overlays/events.ndjson", "uncovered"], ["overlays/seal-0001.json", "line-boundary"],
                                    ["overlays/seal-0002.json", "offset"], ["overlays/seal-0002.json", "previous"]], ["OVL-5"])
 
-    run = copy("events-framing")
+    # OVL-5 (R4-2): framing is judged as a file only inside the verified batches; after them, line by line, so an
+    # append, a crash or a concurrent writer never changes which batches verify.
+    run = copy("events-truncated")
     events = run / "overlays" / "events.ndjson"
-    events.write_bytes(events.read_bytes()[:-1])  # the last line lost its LF: not a finished file (ENC-7)
-    expect("events-framing", [["overlays/events.ndjson", "encoding"]], ["OVL-5", "ENC-5", "ENC-7"])
+    events.write_bytes(events.read_bytes()[:-1])  # the last sealed line lost its LF: batch 2 no longer verifies
+    expect("events-truncated", [["overlays/seal-0002.json", "batch-digest"], ["overlays/seal-0002.json", "line-boundary"]],
+           ["OVL-5", "ENC-7"])
+    run = copy("events-blank-line-in-a-batch")  # R4N-9: a line breaking ENC-5 is that line's problem, not the chain's
+    shutil.rmtree(run / "overlays")
+    overlay_batches(run, COMPLETED_ID, [base_events[:1], base_events[1:]], the_hash)
+    events = run / "overlays" / "events.ndjson"
+    first = read_json(run / "overlays" / "seal-0001.json")["predicate"]["length"]
+    raw = events.read_bytes()
+    events.write_bytes(raw[:first] + b"\n" + raw[first:])  # a blank line, sealed into batch 2 by its writer
+    rewrite_range(run, 2, first, len(raw) - first + 1)
+    expect("events-blank-line-in-a-batch", [["overlays/events.ndjson:2", "event-invalid"]], ["OVL-5", "ENC-5"])
+    for name, tail, problems in [
+        ("tail-blank-line", b"\n", [["overlays/events.ndjson:3", "event-invalid"]]),
+        ("tail-cr-line", ndjson_bytes([dict(base_events[0], eventId="ov_0009")])[:-1] + b"\r\n",
+         [["overlays/events.ndjson:3", "event-invalid"]]),
+        ("tail-unfinished-line", b'{"schemaVersion":"1.0","eventId":"ov_00', []),  # still being written: not a line
+    ]:
+        run = copy(name)
+        events = run / "overlays" / "events.ndjson"
+        events.write_bytes(events.read_bytes() + tail)
+        expect(name, sorted([["overlays/events.ndjson", "uncovered"]] + problems), ["OVL-5", "ENC-5", "ENC-7"])
+    # ENC-17: a reader reads the verified batches, and nothing after them. Generated by the runner (§9.2.1).
+    write_json(chain / "events-too-many-lines" / "expected.json", {
+        "kind": "chain", "run": "run",
+        "generate": [{"copy": ["valid/completed-eval/run", "run"]},
+                     {"append": ["run/overlays/events.ndjson", [["\n", 1_000_000]]]}],
+        "problems": [["overlays/events.ndjson", "limit"], ["overlays/events.ndjson", "uncovered"]],
+        "rules": ["OVL-5", "ENC-17", "ENC-18"]})
 
     run = copy("unsealed-tail")
     events = run / "overlays" / "events.ndjson"
@@ -1620,7 +1703,7 @@ def main():
     # What this script owns. decision-vectors/, protocol/, lane-vectors/, signature-vectors/ are written by their own
     # scripts.
     owned = ("valid", "invalid", "reader-only", "documents", "runs", "encoding", "seal-vectors", "chain-vectors", "overlay-views",
-             "checkpoints")
+             "checkpoints", "limits")
     for name in owned:
         if (ROOT / name).exists():
             shutil.rmtree(ROOT / name)
@@ -1671,6 +1754,7 @@ def main():
     encoding_vectors()
     seal_vectors(valid)
     chain_vectors(valid)
+    limit_vectors()
     overlay_view_vectors()
 
     for name, doc, writer, reader, problems, rules, why in checkpoints():

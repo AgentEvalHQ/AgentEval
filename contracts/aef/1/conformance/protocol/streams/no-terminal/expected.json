@@ -2,10 +2,10 @@
   "kind": "stream",
   "plan": "../plan.json",
   "problems": [
-    {
-      "where": "stream",
-      "problem": "no-terminal"
-    }
+    [
+      "stream",
+      "no-terminal"
+    ]
   ],
   "rules": [
     "STRM-1",

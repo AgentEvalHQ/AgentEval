@@ -38,9 +38,9 @@ Type: string. Bounds: ≤ 71 chars; pattern `^sha256:[0-9a-f]{64}$`
 
 ### timestamp
 
-An RFC 3339 date-time in UTC, ending in Z, with up to nine fraction digits. The pattern is the rule; format is an annotation.
+An RFC 3339 date-time in UTC, ending in Z, with up to nine fraction digits, in the years 0001 to 9999. The pattern is the rule; format is an annotation.
 
-Type: string. Bounds: pattern `^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\.[0-9]{1,9})?Z$`
+Type: string. Bounds: pattern `^([0-9]{3}[1-9]|[0-9]{2}[1-9][0-9]|[0-9][1-9][0-9]{2}|[1-9][0-9]{3})-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\.[0-9]{1,9})?Z$`
 
 ### resultId
 

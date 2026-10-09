@@ -74,13 +74,58 @@ public class TrustPolicyTests
     }
 
     [Fact]
-    public void MembersTheFormatDoesNotDefine_AreIgnored_AndAnEmptyPolicyTrustsNothing()
+    public void AMemberThisVersionDoesNotKnow_RefusesThePolicyAsAWhole_AndAnEmptyPolicyTrustsNothing()
     {
-        var policy = TrustPolicy.Parse(Encoding.UTF8.GetBytes(
-            new JsonObject { ["keys"] = new JsonArray(new JsonObject { ["identity"] = "x", ["publicKey"] = PemA, ["keyid"] = "sha256:00" }), ["note"] = 1 }.ToJsonString()));
-        Assert.Equal(SignatureCorpus.EcdsaA, Assert.Single(policy.Keys).KeyId);   // the key id is computed, never read
+        // [SIG-4], [VER-9] (round 4): a trust policy is closed for readers too: a verifier cannot honour a restriction it
+        // does not know. A key id is computed from the key, never read, so a policy that writes one is refused too.
+        Assert.Throws<TrustPolicyException>(() => TrustPolicy.Parse(Encoding.UTF8.GetBytes(
+            new JsonObject { ["keys"] = new JsonArray(new JsonObject { ["identity"] = "x", ["publicKey"] = PemA, ["keyid"] = "sha256:00" }) }.ToJsonString())));
+        Assert.Throws<TrustPolicyException>(() => TrustPolicy.Parse(Encoding.UTF8.GetBytes(
+            new JsonObject { ["keys"] = new JsonArray(new JsonObject { ["identity"] = "x", ["publicKey"] = PemA }), ["note"] = 1 }.ToJsonString())));
+        Assert.Equal(SignatureCorpus.EcdsaA, Assert.Single(TrustPolicy.Parse(Policy(new JsonObject { ["identity"] = "x", ["publicKey"] = PemA })).Keys).KeyId);
         Assert.Empty(TrustPolicy.Parse("""{"keys":[]}"""u8).Keys);
         Assert.Empty(TrustPolicy.Empty.Keys);
+    }
+
+    [Theory]
+    [InlineData("""["redact","redact"]""")]   // a value twice
+    [InlineData("""[""]""")]                   // an empty value
+    public void AMayTheSchemaRefuses_RefusesThePolicy(string may)
+    {
+        var json = $$"""{"keys":[{"identity":"x","publicKey":{{JsonValue.Create(PemA).ToJsonString()}},"may":{{may}}}]}""";
+        Assert.Throws<TrustPolicyException>(() => TrustPolicy.Parse(Encoding.UTF8.GetBytes(json)));
+    }
+
+    [Fact]
+    public void AnEmptyIdentity_RefusesThePolicy()
+    {
+        Assert.Throws<TrustPolicyException>(() => TrustPolicy.Parse(Policy(new JsonObject { ["identity"] = "", ["publicKey"] = PemA })));
+    }
+
+    [Fact]
+    public void AMayValueThisVersionDoesNotKnow_GrantsNothing_AndIsMatchedByExactValue()
+    {
+        // [SIG-4] (round 4): an unknown value is kept, and grants nothing; "redact" is matched exactly, never by case or prefix.
+        var policy = TrustPolicy.Parse(Policy(
+            new JsonObject { ["identity"] = "git:alice@example.com", ["publicKey"] = PemA, ["may"] = new JsonArray("never-redact", "Redact", "redact ") },
+            new JsonObject { ["identity"] = "git:bob@example.com", ["publicKey"] = PemB, ["may"] = new JsonArray("approve-releases", "redact") }));
+
+        Assert.False(policy.Allows("git:alice@example.com", TrustPolicy.Redact));
+        Assert.Equal(["never-redact", "Redact", "redact "], policy.Keys[0].May);
+        Assert.True(policy.Allows("git:bob@example.com", TrustPolicy.Redact));
+        Assert.False(policy.Allows("git:bob@example.com", "approve"));
+    }
+
+    [Fact]
+    public void APolicyBuiltInCode_IsHeldToTheSchemaToo()
+    {
+        var key = SignatureCorpus.Key("ecdsa-a");
+        Assert.Throws<ArgumentException>(() => new TrustPolicy([new TrustedKey("", key)]));
+        Assert.Throws<ArgumentException>(() => new TrustPolicy([new TrustedKey("a", key, ["redact", "redact"])]));
+        Assert.Throws<ArgumentException>(() => new TrustPolicy([new TrustedKey("a", key, [""])]));
+
+        var policy = new TrustPolicy([new TrustedKey("a", key, [TrustPolicy.Redact])]);
+        Assert.Equal(policy.Keys[0].KeyId, TrustPolicy.Parse(Encoding.UTF8.GetBytes(policy.ToJson().ToJsonString())).Keys[0].KeyId);
     }
 
     public static TheoryData<string> NotPolicies() => new()
@@ -102,6 +147,22 @@ public class TrustPolicyTests
     public void ABrokenPolicy_IsATrustPolicyException(string json)
     {
         Assert.Throws<TrustPolicyException>(() => TrustPolicy.Parse(Encoding.UTF8.GetBytes(json)));
+    }
+
+    [Fact]
+    public void APolicyBeyondTheLimitsOfAJsonFile_IsRefusedAsAWhole()
+    {
+        // [SIG-4] (R4N-10): a trust policy is a JSON document within [ENC-17]'s limits for a JSON file: 4 MiB, 64 deep. A
+        // valid policy padded with whitespace to exactly 4 MiB is read; one byte more refuses it as a whole.
+        var policy = Policy(new JsonObject { ["identity"] = "git:alice@example.com", ["publicKey"] = PemA });
+        byte[] AtSize(int size) => [.. policy, .. Enumerable.Repeat((byte)' ', size - policy.Length)];
+
+        Assert.Single(TrustPolicy.Parse(AtSize(AefLimits.MaxJsonBytes)).Keys);
+        var e = Assert.Throws<TrustPolicyException>(() => TrustPolicy.Parse(AtSize(AefLimits.MaxJsonBytes + 1)));
+        Assert.Contains("limit", e.Message, StringComparison.Ordinal);
+
+        var deep = $$"""{"keys":[{"identity":"x","publicKey":{{JsonValue.Create(PemA).ToJsonString()}}}],"x":{{new string('[', 64)}}{{new string(']', 64)}}}""";
+        Assert.Contains("limit", Assert.Throws<TrustPolicyException>(() => TrustPolicy.Parse(Encoding.UTF8.GetBytes(deep))).Message, StringComparison.Ordinal);
     }
 
     [Theory]

@@ -28,6 +28,8 @@ public class WriteSideTests
 
     public static TheoryData<string> SignVectors() => Names("sign");
 
+    public static TheoryData<string> ProduceVectors() => Names("produce");
+
     // ------------------------------------------------------------------ the corpus, in process
 
     [Theory]
@@ -158,7 +160,202 @@ public class WriteSideTests
         Assert.Equal([expected["identity"]!.GetValue<string>()], verification.VerifiesFor);
     }
 
-    // ------------------------------------------------------------------ the driver's refusals
+    [Theory]
+    [MemberData(nameof(ProduceVectors))]
+    public void Produce_WritesTheExpectedLinesAndSummary_OrRefusesAndWritesNothing(string name)
+    {
+        var folder = Path.Combine(Vectors, "produce", name);
+        var expected = JsonNode.Parse(File.ReadAllBytes(Path.Combine(folder, "expected.json")))!;
+        var scenarioFile = Path.Combine(folder, expected["scenario"]!.GetValue<string>());
+        using var output = new WriterRun();
+
+        var (code, stdout, error) = Dispatch("produce", scenarioFile, output.Dir);
+
+        if (expected["refused"] is not null)
+        {
+            Assert.True(code == 2, $"a scenario the Producer must refuse was written: {stdout}");   // §9.3: an input error
+            Assert.False(Directory.Exists(output.Dir) && Directory.EnumerateFileSystemEntries(output.Dir).Any(), "files were written although it refused");
+            return;
+        }
+
+        Assert.True(code == 0, error);
+
+        // §9.3: the four files and no other; run.json and metrics.json the scenario's, as given.
+        var scenario = JsonNode.Parse(File.ReadAllBytes(scenarioFile))!;
+        Assert.Equal(["metrics.json", "results.ndjson", "run.json", "summary.json"], Files(output.Dir).Keys.Order(StringComparer.Ordinal));
+        Assert.True(Same(output.Json("run.json"), scenario["run"]), output.Json("run.json").ToJsonString());
+        Assert.True(Same(output.Json("metrics.json"), scenario["metrics"]), output.Json("metrics.json").ToJsonString());
+
+        // The lines, as a set: matched by case, path and trial, member by member, each valid against the writer schema.
+        var lines = output.Lines("results.ndjson");
+        Assert.Equal(lines.Count, JsonNode.Parse(stdout)!["results"]!.GetValue<int>());
+        Assert.All(lines, l => Assert.True(AefSchemas.Writer.IsValid("result", l), l.ToJsonString()));
+        var have = lines.ToDictionary(Key, AsWritten);
+        var want = File.ReadAllLines(Path.Combine(folder, expected["results"]!.GetValue<string>()))
+            .Select(l => JsonNode.Parse(l)!.AsObject()).ToDictionary(Key, AsWritten);
+        Assert.Equal(want.Keys.Order(StringComparer.Ordinal), have.Keys.Order(StringComparer.Ordinal));
+        foreach (var (key, line) in want)
+        {
+            Assert.True(Same(have[key], line), $"{key}: expected {line.ToJsonString()}, got {have[key].ToJsonString()}");
+        }
+
+        // summary.json as summarize's output is judged, and the run verifies unsealed with no problem.
+        var summary = output.Json("summary.json");
+        Assert.True(AefSchemas.Writer.IsValid("summary", summary));
+        Assert.True(Same(summary, expected["summary"]), $"expected {expected["summary"]!.ToJsonString()}, got {summary.ToJsonString()}");
+        var verification = AefRunVerifier.Verify(output.Dir);
+        Assert.Equal(AefOutcome.Unsealed, verification.Outcome);
+        Assert.Empty(verification.Problems);
+
+        // A line's place in the run (§9.3 matches lines by case, path and trial).
+        static string Key(JsonObject line) => $"{line["caseId"]}@{line["path"]}#{line["trial"]?.ToJsonString() ?? "-"}";
+    }
+
+    [Fact]
+    public void Produce_KeepsEveryMemberOfRunJsonAndMetricsJson_AsGiven()
+    {
+        // The writer's header holds every member of the writer run schema; a scenario's run.json goes through it whole.
+        var scenario = Scenario();
+        scenario["run"] = JsonNode.Parse("""
+            {"schemaVersion":"1.0","runId":"produce-everything","status":"completed",
+             "producer":{"name":"p","version":"1.2.3","runtime":{"name":"dotnet","version":"10.0"}},
+             "subject":{"ref":"agent:a/b","kind":"agent","version":"v1","environment":"staging","externalIds":{"foundry":"x-1","jira":null},"telemetry":{"agentId":"a-1","serviceName":"svc"}},
+             "deployment":{"ref":"deployment:eu","environment":"eu","endpoint":"https://example.com/agent","externalIds":{"azure":"sub-1"}},
+             "suite":{"ref":"suite:golden","version":"2.0.0","digest":"sha256:0000000000000000000000000000000000000000000000000000000000000000","frozen":true,
+                      "executionPolicy":{"trialsPerCase":3,"requirePasses":2,"aggregation":"PassAtK","k":3}},
+             "judges":[{"model":"judge-1","provider":"lab","mode":"panel","panelSize":3,"rubricDigest":"sha256:1111111111111111111111111111111111111111111111111111111111111111",
+                        "calibration":{"labelSet":"labels:gold","n":100,"accuracy":0.9,"kappa":0.75,"dangerousErrors":2,"measuredAt":"2026-09-30T12:00:00.5Z"}}],
+             "config":{"thresholds":{"quality":{"op":">=","value":0.8}},"temperature":0,"seed":"abc"},
+             "startedAt":"2026-10-01T00:00:00Z","endedAt":"2026-10-01T00:01:00.25Z",
+             "otel":{"semconvVersion":"1.37","dialects":["gen_ai"],"schemaUrls":["https://opentelemetry.io/schemas/1.37.0"]},
+             "contentCapture":"off","costPolicy":{"maxUsd":12.5,"priceTable":"list-2026"},"ext":{"vendor.x":{"a":[1,2]}},
+             "provenance":{"planId":"plan-1","planDigest":"2222222222222222222222222222222222222222222222222222222222222222","jobId":"job-1","runnerId":"runner-1"},
+             "execution":{"targetMode":"replayed","stimulus":"suite"},
+             "imported":{"from":"tool 1.0","asserted":["subject.version"]}}
+            """);
+        scenario["metrics"] = JsonNode.Parse("""
+            {"schemaVersion":"1.0","metrics":[{"id":"quality","kind":"score","direction":"higher_better","scale":"unbounded","unit":"points","description":"How good."},
+                                              {"id":"pass_rate","kind":"rate","direction":"higher_better","scale":{"min":0,"max":1}}],"ext":{"vendor.y":true}}
+            """);
+        using var output = new WriterRun();
+
+        var (code, _, error) = Produce(scenario, output);
+
+        Assert.True(code == 0, error);
+        Assert.True(Same(output.Json("run.json"), scenario["run"]), output.Json("run.json").ToJsonString());
+        Assert.True(Same(output.Json("metrics.json"), scenario["metrics"]), output.Json("metrics.json").ToJsonString());
+    }
+
+    [Fact]
+    public void Produce_DerivesTrialsRollupsAndAggregation_FromTheFacts()
+    {
+        // A composite case in two trials, the second without the tools child: §9.2.1 derives each trial's lines, the
+        // rollups' n, passed and agree per path, the counts and the decisive ids of each tree's own children.
+        var scenario = Scenario();
+        scenario["cases"] = JsonNode.Parse("""
+            [{"caseId":"k1","path":"plan","evaluator":{"id":"c"},"state":"failed","severity":"high",
+              "aggregation":{"strategy":"Min","rulePath":"threshold","decisive":["plan/steps"]},
+              "children":[{"path":"plan/steps","evaluator":{"id":"s"},"state":"failed","severity":"high","component":{"weight":1,"required":true}},
+                          {"path":"plan/tools","evaluator":{"id":"t"},"state":"not_measured","reason":"r","component":{"weight":1,"required":false}}],
+              "trials":{"aggregation":"AllPass","trees":[
+                {"path":"plan","evaluator":{"id":"c"},"state":"passed","aggregation":{"strategy":"Min","rulePath":"threshold"},
+                 "children":[{"path":"plan/steps","evaluator":{"id":"s"},"state":"passed","component":{"weight":1,"required":true}},
+                             {"path":"plan/tools","evaluator":{"id":"t"},"state":"not_measured","reason":"r","component":{"weight":1,"required":false}}]},
+                {"path":"plan","evaluator":{"id":"c"},"state":"failed","severity":"high","aggregation":{"strategy":"Min","rulePath":"threshold","decisive":["plan/steps"]},
+                 "children":[{"path":"plan/steps","evaluator":{"id":"s"},"state":"failed","severity":"high","component":{"weight":1,"required":true}}]}]}}]
+            """);
+        using var output = new WriterRun();
+
+        var (code, _, error) = Produce(scenario, output);
+
+        Assert.True(code == 0, error);
+        var lines = output.Lines("results.ndjson").ToDictionary(l => $"{l["path"]}#{l["trial"]?.ToJsonString() ?? "-"}", StringComparer.Ordinal);
+        Assert.Equal(8, lines.Count);
+        string Id(string path, int? trial = null) => AefResultId.Compute("produce-unit", "k1", path, trial);
+
+        var rollup = lines["plan#-"];
+        Assert.Equal("""{"n":2,"passed":1,"aggregation":"AllPass","agree":false}""", rollup["trials"]!.ToJsonString());
+        Assert.Equal("""{"strategy":"Min","rulePath":"threshold","measured":1,"total":2,"unmeasured":{"not_measured":1},"decisive":["{{0}}"]}""".Replace("{{0}}", Id("plan/steps"), StringComparison.Ordinal),
+            rollup["aggregation"]!.ToJsonString());
+        Assert.Equal("""{"n":2,"passed":1,"aggregation":"AllPass","agree":false}""", lines["plan/steps#-"]["trials"]!.ToJsonString());
+        Assert.Equal("""{"n":1,"passed":0,"aggregation":"AllPass","agree":true}""", lines["plan/tools#-"]["trials"]!.ToJsonString());
+        Assert.Equal(Id("plan"), lines["plan/tools#-"]["parentResultId"]!.GetValue<string>());
+
+        Assert.Equal(Id("plan", 1), lines["plan/steps#1"]["parentResultId"]!.GetValue<string>());
+        Assert.Equal(1, lines["plan/steps#1"]["trial"]!.GetValue<int>());
+        Assert.Equal([Id("plan/steps", 1)], lines["plan#1"]["aggregation"]!["decisive"]!.AsArray().Select(d => d!.GetValue<string>()));
+        Assert.Equal("""{"strategy":"Min","rulePath":"threshold","measured":1,"total":2,"unmeasured":{"not_measured":1}}""", lines["plan#0"]["aggregation"]!.ToJsonString());
+        Assert.False(lines["plan#0"].ContainsKey("parentResultId"));
+    }
+
+    public static TheoryData<string, string> NotScenarios() => new()
+    {
+        { "a member a node does not have", """[{"caseId":"k1","path":"q","evaluator":{"id":"e"},"state":"passed","annotator":{"kind":"CODE"}}]""" },
+        { "component on a root", """[{"caseId":"k1","path":"q","evaluator":{"id":"e"},"state":"passed","component":{"weight":1,"required":true}}]""" },
+        { "caseId on a child", """[{"caseId":"k1","path":"q","evaluator":{"id":"e"},"state":"passed","aggregation":{"strategy":"Min","rulePath":"threshold"},"children":[{"caseId":"k1","path":"q/a","evaluator":{"id":"e"},"state":"passed","component":{"weight":1,"required":true}}]}]""" },
+        { "a state the schema does not list", """[{"caseId":"k1","path":"q","evaluator":{"id":"e"},"state":"great"}]""" },
+        { "no trial tree", """[{"caseId":"k1","path":"q","evaluator":{"id":"e"},"state":"passed","trials":{"aggregation":"AllPass","trees":[]}}]""" },
+        { "a rollup where no trial has a line", """[{"caseId":"k1","path":"q","evaluator":{"id":"e"},"state":"passed","aggregation":{"strategy":"Min","rulePath":"threshold"},"children":[{"path":"q/a","evaluator":{"id":"e"},"state":"passed","component":{"weight":1,"required":true}}],"trials":{"aggregation":"AllPass","trees":[{"path":"q","evaluator":{"id":"e"},"state":"passed"}]}}]""" },
+        { "two siblings at one path", """[{"caseId":"k1","path":"q","evaluator":{"id":"e"},"state":"passed","aggregation":{"strategy":"Min","rulePath":"threshold"},"children":[{"path":"q/a","evaluator":{"id":"e"},"state":"passed","component":{"weight":1,"required":true}},{"path":"q/a","evaluator":{"id":"e"},"state":"failed","component":{"weight":1,"required":true}}]}]""" },
+        { "a member a component does not have", """[{"caseId":"k1","path":"q","evaluator":{"id":"e"},"state":"passed","aggregation":{"strategy":"Min","rulePath":"threshold"},"children":[{"path":"q/a","evaluator":{"id":"e"},"state":"passed","component":{"weight":1,"required":true,"note":"x"}}]}]""" },
+        { "a grandchild two levels down", """[{"caseId":"k1","path":"q","evaluator":{"id":"e"},"state":"passed","aggregation":{"strategy":"Min","rulePath":"threshold"},"children":[{"path":"q/a/b","evaluator":{"id":"e"},"state":"passed","component":{"weight":1,"required":true}}]}]""" },
+    };
+
+    [Theory]
+    [MemberData(nameof(NotScenarios))]
+    public void Produce_RefusesAScenarioNotOfItsShape_AndWritesNothing(string what, string cases)
+    {
+        var scenario = Scenario();
+        scenario["cases"] = JsonNode.Parse(cases);
+        using var output = new WriterRun();
+
+        var (code, _, error) = Produce(scenario, output);
+
+        Assert.True(code == 2, what);
+        Assert.False(Directory.Exists(output.Dir), $"{what}: {error}");
+    }
+
+    [Fact]
+    public void Produce_WhatTheWriterRefuses_LeavesOutAsItWas()
+    {
+        // The writer refuses at close (a summary entry naming an undeclared metric, [SUM-1]) after it wrote the run's
+        // first files: they are removed, and OUT is as it was, absent or empty.
+        var scenario = Scenario();
+        scenario["summary"] = JsonNode.Parse("""{"lanes":[{"lane":"quality","metrics":[{"metric":"undeclared","path":"q"}]}]}""");
+        using var output = new WriterRun();
+
+        Assert.Equal(2, Produce(scenario, output).Code);
+        Assert.False(Directory.Exists(output.Dir));
+
+        Directory.CreateDirectory(output.Dir);
+        Assert.Equal(2, Produce(scenario, output).Code);
+        Assert.Empty(Directory.EnumerateFileSystemEntries(output.Dir));
+
+        // A reason the schema requires on a typed absence, missing: refused when the line is added.
+        scenario = Scenario();
+        scenario["cases"] = JsonNode.Parse("""[{"caseId":"k1","path":"q","evaluator":{"id":"e"},"state":"skipped"}]""");
+        Assert.Equal(2, Produce(scenario, output).Code);
+        Assert.Empty(Directory.EnumerateFileSystemEntries(output.Dir));
+
+        // OUT must not hold files already, nor be a file.
+        File.WriteAllText(Path.Combine(output.Dir, "keep.txt"), "x");
+        Assert.Equal(2, Produce(Scenario(), output).Code);
+        Assert.Equal(["keep.txt"], Directory.GetFileSystemEntries(output.Dir).Select(Path.GetFileName));
+    }
+
+    [Fact]
+    public void Produce_RefusesATimeTheWriterCannotHold_RatherThanRoundIt()
+    {
+        // The writer's model holds times as DateTimeOffset (100 ns): a finer [ENC-8] time would be written as another time.
+        var scenario = Scenario();
+        scenario["run"]!["endedAt"] = "2026-10-01T00:01:00.000000001Z";
+        using var output = new WriterRun();
+
+        Assert.Equal(2, Produce(scenario, output).Code);
+        scenario["run"]!["endedAt"] = "2026-10-01T00:01:00.0000001Z";
+        Assert.Equal(0, Produce(scenario, output).Code);
+        Assert.Equal("2026-10-01T00:01:00.0000001Z", output.Json("run.json")["endedAt"]!.GetValue<string>());
+    }
 
     [Fact]
     public void Summarize_RefusesAnUndeclaredMetric_ADuplicate_AndAProducersMethodWithoutItsValue()
@@ -257,6 +454,17 @@ public class WriteSideTests
     }
 
     [Fact]
+    public void ASumOfSquaresBeyondBinary64_IsLeftOut_Sum5()
+    {
+        // sumSq is optional, and (1e200)² has no binary64 value: the summary is still written, without it.
+        var summary = AefSummaryWriter.Build("r", [Line("k1", 1e200), Line("k2", 1)], Kinds(), Request(new AefSummaryEntry { Metric = "m", Path = "q" }));
+
+        var entry = summary["lanes"]![0]!["metrics"]![0]!.AsObject();
+        Assert.False(entry.ContainsKey("sumSq"));
+        Assert.Equal(1e200, entry["sum"]!.GetValue<double>());
+    }
+
+    [Fact]
     public void AProducersMethod_WithNothingMeasured_NeedsNoValue_AndAnAefMethod_TakesNone()
     {
         var results = new List<JsonObject> { Line("k1", null, "skipped") };
@@ -352,6 +560,83 @@ public class WriteSideTests
     }
 
     private static Dictionary<string, AefMetricKind> Kinds() => new(StringComparer.Ordinal) { ["m"] = AefMetricKind.Score };
+
+    // A small closed scenario (spec 09 §9.2.1): one flat case, two metrics, one summary entry.
+    private static JsonObject Scenario() => JsonNode.Parse("""
+        {"run":{"schemaVersion":"1.0","runId":"produce-unit","status":"completed","producer":{"name":"p","version":"1"},
+                "subject":{"ref":"agent:a/b","kind":"agent","version":"v1"},"execution":{"targetMode":"live"},
+                "startedAt":"2026-10-01T00:00:00Z","contentCapture":"on","endedAt":"2026-10-01T00:01:00Z"},
+         "metrics":{"schemaVersion":"1.0","metrics":[{"id":"quality","kind":"score","direction":"higher_better","scale":{"min":0,"max":1}},
+                                                     {"id":"pass_rate","kind":"rate","direction":"higher_better","scale":{"min":0,"max":1}}]},
+         "cases":[{"caseId":"k1","path":"q","evaluator":{"id":"code:q"},"state":"passed","scores":[{"metric":"quality","value":0.9}]}],
+         "summary":{"lanes":[{"lane":"quality","metrics":[{"metric":"pass_rate","path":"q"}]}]}}
+        """)!.AsObject();
+
+    // produce, the scenario written beside OUT (the run's folder, which does not exist yet unless a test made it).
+    private static (int Code, string Output, string Error) Produce(JsonObject scenario, WriterRun output)
+    {
+        Directory.CreateDirectory(output.Root);
+        var file = Path.Combine(output.Root, "scenario.json");
+        File.WriteAllText(file, scenario.ToJsonString());
+        return Dispatch("produce", file, output.Dir);
+    }
+
+    // Two JSON values are the same member by member, numbers under §3.6's rule, a boolean only a boolean (as the
+    // conformance runner compares a produce vector's documents and lines).
+    private static bool Same(JsonNode? actual, JsonNode? expected) => (actual, expected) switch
+    {
+        (null, null) => true,
+        (JsonObject a, JsonObject e) => a.Count == e.Count && e.All(m => a.ContainsKey(m.Key) && Same(a[m.Key], m.Value)),
+        (JsonArray a, JsonArray e) => a.Count == e.Count && a.Zip(e).All(p => Same(p.First, p.Second)),
+        (JsonValue a, JsonValue e) when e.GetValueKind() == System.Text.Json.JsonValueKind.Number =>
+            a.GetValueKind() == System.Text.Json.JsonValueKind.Number && AefSummaryCalculator.Matches(a.GetValue<double>(), e.GetValue<double>()),
+        (JsonValue a, JsonValue e) => JsonNode.DeepEquals(a, e),
+        _ => false,
+    };
+
+    // A result line with each absence §9.3 equates with a value written as the absence: a null parentResultId, a null
+    // threshold or score, an unmeasured count of 0, an empty decisive list; decisive in any order.
+    private static JsonObject AsWritten(JsonObject line)
+    {
+        var copy = line.DeepClone().AsObject();
+        if (copy.ContainsKey("parentResultId") && copy["parentResultId"] is null)
+        {
+            copy.Remove("parentResultId");
+        }
+
+        if (copy["aggregation"] is JsonObject aggregation)
+        {
+            foreach (var name in new[] { "threshold", "score" }.Where(n => aggregation.ContainsKey(n) && aggregation[n] is null))
+            {
+                aggregation.Remove(name);
+            }
+
+            if (aggregation["unmeasured"] is JsonObject unmeasured)
+            {
+                foreach (var zero in unmeasured.Where(m => AefNode.Number(m.Value) == 0).Select(m => m.Key).ToList())
+                {
+                    unmeasured.Remove(zero);
+                }
+
+                if (unmeasured.Count == 0)
+                {
+                    aggregation.Remove("unmeasured");
+                }
+            }
+
+            if (aggregation["decisive"] is JsonArray decisive)
+            {
+                var ids = decisive.Select(d => d!.GetValue<string>()).Order(StringComparer.Ordinal).ToList();
+                aggregation.Remove("decisive");
+                if (ids.Count > 0)
+                {
+                    aggregation["decisive"] = new JsonArray([.. ids.Select(i => (JsonNode?)i)]);
+                }
+            }
+        }
+
+        return copy;
+    }
 
     private static AefSummary Request(AefSummaryEntry entry) => new() { Lanes = [new AefSummaryLane("main", [entry])] };
 }

@@ -1,0 +1,33 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "otel-roundtrip-0001",
+  "status": "completed",
+  "producer": {
+    "name": "aef_interop.py",
+    "version": "1.0"
+  },
+  "subject": {
+    "ref": "agent:support-api",
+    "kind": "agent",
+    "telemetry": {
+      "serviceName": "support-api"
+    }
+  },
+  "execution": {
+    "targetMode": "live"
+  },
+  "startedAt": "2026-10-02T14:02:15Z",
+  "endedAt": "2026-10-02T14:02:15Z",
+  "imported": {
+    "from": "aef_interop.py 1.0 (to-otel)",
+    "asserted": [
+      "runId",
+      "status",
+      "subject.ref",
+      "subject.kind",
+      "execution.targetMode",
+      "startedAt",
+      "endedAt"
+    ]
+  }
+}

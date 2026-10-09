@@ -16,7 +16,7 @@ WRITER = AEF / "schemas" / "writer"
 OUT = AEF / "reference"
 
 ORDER = ["run", "result", "metrics", "summary", "evidence", "gate-decision", "seal", "overlay-event", "overlay-seal",
-         "checkpoint", "decision", "run-plan", "runner", "runner-event", "common"]
+         "checkpoint", "decision", "run-plan", "runner", "runner-event", "trust-policy", "common"]
 
 
 def load_all():

@@ -32,9 +32,14 @@ CLASSES = {
     "plan-conformance": ["Stream verifier"],
     # The write-side vectors (spec 09 §9.2): the implementation computes or writes, the runner judges.
     "summarize": ["Producer"],
+    "produce": ["Producer"],
     "seal-write": ["Sealer"],
     "sign": ["Sealer"],
 }
+
+
+# Spec 09 §9.1: the classes whose requirements include others.
+INCLUDES = {"Checkpoint verifier": ["Run verifier"], "Stream verifier": ["Run verifier"], "Runner": ["Producer", "Sealer"]}
 
 
 def sha(path):
@@ -51,8 +56,9 @@ def entry(vid, kind, rules, path, files, classes=None):
 
 def main():
     vectors = []
+    # rulings/ (pin_vectors.py) holds vectors of several kinds: each is indexed with the kind its expected.json names.
     for group in ("valid", "runs", "encoding", "seal-vectors", "chain-vectors", "overlay-views", "invalid", "reader-only",
-                  "documents", "checkpoints", "lane-vectors", "signature-vectors"):
+                  "documents", "checkpoints", "lane-vectors", "signature-vectors", "rulings", "limits"):
         folder = ROOT / group
         if not folder.exists():
             continue
@@ -88,9 +94,9 @@ def main():
         shared = {p.name: sha(p) for p in sorted(folder.glob("*.json"), key=lambda p: p.name.encode())}
         if shared:  # files several vectors of the folder use (the stream vectors' plans): checked, never run
             vectors.append(entry(f"protocol/{sub}/shared", "fixture", rules, f"protocol/{sub}", shared, CLASSES[kind]))
-    # write-vectors/<kind>/<name>/: summarize (Producer), seal-write and sign (Sealer). A sign vector's private key
-    # is in signature-vectors/keys/, the fixture above.
-    for kind in ("summarize", "seal-write", "sign"):
+    # write-vectors/<kind>/<name>/: summarize and produce (Producer), seal-write and sign (Sealer). A sign vector's
+    # private key is in signature-vectors/keys/, the fixture above.
+    for kind in ("summarize", "produce", "seal-write", "sign"):
         folder = ROOT / "write-vectors" / kind
         if not folder.exists():
             continue
@@ -103,6 +109,12 @@ def main():
                 assert exp.get("algorithm") in ("ecdsa-p256", "ed25519"), f"{d}: no signing algorithm"
                 e["algorithm"] = exp["algorithm"]
             vectors.append(e)
+
+    # Spec 09 §9.1: a class whose requirements include another class passes that class's vectors too.
+    for v in vectors:
+        for outer, inner in INCLUDES.items():
+            if outer not in v["classes"] and any(c in v["classes"] for c in inner):
+                v["classes"] = v["classes"] + [outer]
 
     ids = [v["id"] for v in vectors]
     assert len(ids) == len(set(ids)), "duplicate vector id"

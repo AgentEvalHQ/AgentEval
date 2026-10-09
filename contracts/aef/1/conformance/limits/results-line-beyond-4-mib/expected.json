@@ -1,0 +1,52 @@
+{
+  "kind": "run",
+  "run": "run",
+  "generate": [
+    {
+      "copy": [
+        "valid/completed-eval/run",
+        "run"
+      ]
+    },
+    {
+      "remove": "run/seal.json"
+    },
+    {
+      "remove": "run/overlays"
+    },
+    {
+      "append": [
+        "run/results.ndjson",
+        [
+          [
+            "{\"pad\":\"",
+            1
+          ],
+          [
+            "a",
+            4194295
+          ],
+          [
+            "\"}",
+            1
+          ],
+          [
+            "\n",
+            1
+          ]
+        ]
+      ]
+    }
+  ],
+  "outcome": "invalid",
+  "problems": [
+    [
+      "results.ndjson:10",
+      "limit"
+    ]
+  ],
+  "rules": [
+    "ENC-17",
+    "ENC-18"
+  ]
+}

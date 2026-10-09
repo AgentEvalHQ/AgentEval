@@ -1,0 +1,34 @@
+{
+  "kind": "produce",
+  "rules": [
+    "RUN-2",
+    "RUN-5",
+    "SUM-5",
+    "SUM-6"
+  ],
+  "scenario": "scenario.json",
+  "results": "expected-results.ndjson",
+  "summary": {
+    "schemaVersion": "1.0",
+    "runId": "produce-aborted-before-any-result",
+    "lanes": [
+      {
+        "lane": "quality",
+        "metrics": [
+          {
+            "metric": "pass_rate",
+            "path": "q",
+            "N": 0,
+            "n": 0,
+            "notMeasured": 0,
+            "sum": 0,
+            "sumSq": 0,
+            "value": null,
+            "verdict": "not_measured"
+          }
+        ]
+      }
+    ]
+  },
+  "why": "A run aborted before its first result: results.ndjson is written all the same, empty (RUN-2), and the summary's entry has N 0, a null value and the verdict not_measured."
+}

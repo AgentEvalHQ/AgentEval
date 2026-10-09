@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "1.0",
+  "metrics": [
+    {
+      "id": "helpfulness",
+      "kind": "score",
+      "direction": "none",
+      "scale": "unbounded"
+    },
+    {
+      "id": "Relevance",
+      "kind": "score",
+      "direction": "none",
+      "scale": "unbounded"
+    },
+    {
+      "id": "Coherence",
+      "kind": "score",
+      "direction": "none",
+      "scale": "unbounded"
+    },
+    {
+      "id": "policy",
+      "kind": "score",
+      "direction": "none",
+      "scale": "unbounded"
+    }
+  ]
+}

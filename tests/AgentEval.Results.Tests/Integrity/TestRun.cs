@@ -192,12 +192,15 @@ internal sealed class TestRun : IDisposable
     /// Appends a batch of events and its seal (offset, length, digest, previous, the run's run hash), signed by
     /// <paramref name="signer"/> when one is given; <paramref name="edit"/> may change the seal's predicate. Returns the batch number.
     /// </summary>
-    public int AppendBatch(IEnumerable<JsonObject> events, IAefSigner? signer = null, Action<JsonObject>? edit = null)
+    public int AppendBatch(IEnumerable<JsonObject> events, IAefSigner? signer = null, Action<JsonObject>? edit = null) =>
+        AppendBatch(events.SelectMany(e => AefJsonWriter.Line(e)).ToArray(), signer, edit);
+
+    /// <summary>Appends these bytes to the events file as they are, and seals them as the next batch (as above).</summary>
+    public int AppendBatch(byte[] added, IAefSigner? signer = null, Action<JsonObject>? edit = null)
     {
         var path = Full(OverlayChain.EventsPath);
         Directory.CreateDirectory(Path.GetDirectoryName(path)!);
         var before = File.Exists(path) ? File.ReadAllBytes(path) : [];
-        var added = events.SelectMany(e => AefJsonWriter.Line(e)).ToArray();
         File.WriteAllBytes(path, [.. before, .. added]);
 
         var number = 1;   // the next number after the batch seals present

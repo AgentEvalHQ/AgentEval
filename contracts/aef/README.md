@@ -4,9 +4,12 @@ AEF is an open file format for the evidence an AI-agent evaluation produces: wha
 with its typed absences, the gate and release decisions taken on it, the human decisions added later, and seals and
 signatures over the exact bytes, so anyone can check what they are told without trusting the tool that told them.
 
-**Status: AEF 1.0 is a draft, unreleased.** It is planned to be released together with AgentEval 1.0, which will be
-its first producer. Until that release any part of it may change. AgentEval's current command line still writes its
-older output directory (`.agenteval/`, "AgentEval store v1", which predates AEF; [§7.5](1/spec/07-versioning.md)).
+**Status: AEF 1.0 is a release candidate, unreleased.** It is AgentEval's evidence format (AgentEval
+[ADR-035](../../docs/adr/035-aef-is-the-evidence-format.md)) and becomes final at the `aef-1.0` tag, released together
+with AgentEval 1.0, its first producer. Until then it changes wherever implementation and independent review find a
+gap, each change with its vectors ([changelog](1/CHANGELOG.md)). AgentEval's command line still writes its older
+output directory (`.agenteval/`, "AgentEval store v1", which predates AEF; [§7.5](1/spec/07-versioning.md)), and
+`agenteval aef export` converts such a run into an imported AEF run.
 
 ## Where to start
 
@@ -19,7 +22,7 @@ older output directory (`.agenteval/`, "AgentEval store v1", which predates AEF;
 |---|---|
 | `1/` | AEF major version 1: `spec/` (normative), `schemas/writer/` and `schemas/reader/`, `conformance/`, primer, reference, interop mappings |
 | `profiles/runtime-verdict/` | The evidence attached to runtime verdicts (AEVP 0.1), a profile on top of AEF |
-| `tools/` | Python 3 reference tools, standard library only: the corpus generators, `derive_reader.py`, the reference verifier `aef_verify.py`, the decision function `aef_decide.py`, the stream verifier `aef_stream.py`, the conformance runner `aef_conformance.py`, `schema_diff.py`, and `aef_crypto.py` (DSSE, ECDSA P-256, Ed25519) |
+| `tools/` | Python 3 reference tools, standard library only: the corpus generators, `derive_reader.py`, the reference verifier `aef_verify.py`, the reference writer `aef_produce.py`, the decision function `aef_decide.py`, the stream verifier `aef_stream.py`, the conformance runner `aef_conformance.py`, the schema validator `aef_schema.py`, `schema_diff.py`, and `aef_crypto.py` (DSSE, ECDSA P-256, Ed25519); [tools/README.md](tools/README.md) lists them all |
 | `GOVERNANCE.md`, `LICENSE`, `NOTICE` | How AEF is run, and its licence |
 
 ## Two implementations
@@ -38,9 +41,10 @@ each other, pass every vector kind through the command-line contract of
   plans, matching, streams and plan conformance. Where the two implementations disagreed, the text was ruled and a
   vector added ([changelog](1/CHANGELOG.md)).
 
-Every operation of the contract checks what it is given; none writes. AgentEval's run writer, sealer and overlay
-writer are checked outside the contract, by the reference verifier reading what they write
-(`tests/AgentEval.Results.Conformance/writer-crosscheck.sh`).
+Most operations of the contract check what they are given. The write-side operations (`summarize`, `produce`,
+`seal-write`, `sign`) write, and the runner judges what they wrote with the reference verifier, so a Producer and a
+Sealer are tested as writers. AgentEval's run and overlay writers are also checked by the reference verifier reading what they
+write (`tests/AgentEval.Results.Conformance/writer-crosscheck.sh`).
 
 A third implementation, in any language, is welcome: [§9](1/spec/09-conformance.md) says how to run the corpus and
 claim conformance.

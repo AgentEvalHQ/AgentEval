@@ -302,6 +302,7 @@ every rule a file can show broken (`tools/check_spec.py` lists the few rules no 
 ## Where next
 
 - [The specification](spec/01-introduction.md), starting with the conformance classes in §1.7.
+- [Writing runs](producers.md): a guide for producers.
 - [Rationale and FAQ](rationale.md): why AEF made the choices it did.
 - [Interoperability](interop/): how AEF maps to OpenTelemetry, Inspect, OpenAI Evals, EvalPort and ASSERT, and how
   its seals relate to in-toto, DSSE and SLSA.

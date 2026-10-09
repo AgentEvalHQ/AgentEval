@@ -68,7 +68,8 @@ compare it.
 path or below it (`path` itself, or starting with `path/`).
 
 - **[LANE-3]** Over the result lines of every run (trial lines count for step 1, so a failing trial beyond `max`
-  fails the lane, as a red team expects; they take no part in the counts of step 2, where a case is its rollup):
+  fails the lane, as a red team expects; steps 2 and 3 read rollups and other lines, never trial lines, so an
+  undecided trial under a decided rollup leaves the case decided):
   1. `failed` when a line in state `failed` or `warn` has a severity worse than `max` (order `none` < `low` <
      `medium` < `high` < `critical`; a missing severity counts as `critical`);
   2. otherwise `not_measured` when any line is `inconclusive`, `not_measured`, `skipped`, `error` or `pending`, or
@@ -233,10 +234,15 @@ policy. It reports problems as a path and a code, ordered by path and code.
   not a problem). The verifier takes the trust policy (for authorized redactions) and the evaluation time as inputs. Then, for a
   decided checkpoint, each lane's result recomputed with §5.3 is compared with the recorded input (path
   `lanes/<lane>`): `lane-result` (another `status` or other `axes`, or a result where `null` was recorded or the
-  reverse), `lane-version` (another `subjectVersion`), `oldest-closed` (another `oldestClosedAt`). A lane whose rule
-  the recorded input decides and that holds a value this version does not know (a rule kind, a severity maximum, a threshold operator or a comparison
-  axis, §7.3) is not compared, since a later minor recorded a result this version cannot recompute: it is
-  `unverifiable` (that lane cannot be checked here), never `lane-result`.
+  reverse), `lane-version` (another `subjectVersion`), `oldest-closed` (another `oldestClosedAt`). A lane the recorded
+  input decides is not compared when what its recomputation depends on holds something this version does not know
+  ([VER-8]), since a later minor may have recorded a result this version cannot recompute: it is `unverifiable` (that
+  lane cannot be checked here), never `lane-result`. Exactly these make a lane `unverifiable`: its rule is not valid
+  against this version's writer schema (a
+  kind, a member or a value a later minor added, such as a severity maximum, a threshold operator or a comparison
+  axis), or when a run it reads (a found run of the lane or its baseline) holds an unknown `execution.targetMode`,
+  an unknown `severity` on one of a `severity` lane's lines (its lane and path, trial lines included), or an unknown
+  `direction` for a `comparison` lane's metric.
 - **[CKP-9] The signature**, when an envelope is present and a trust policy given: the per-signature results of §4.4.
   A checkpoint that verifies with no problems and a signature verified for a trusted identity **anchors** its runs,
   its comparison baselines included (§4.5).

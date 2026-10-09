@@ -1,0 +1,10 @@
+{
+  "kind": "summarize",
+  "rules": [
+    "ENC-2"
+  ],
+  "run": "run",
+  "request": "request.json",
+  "refused": true,
+  "why": "results.ndjson does not read: its second line names the member state twice, which I-JSON forbids ([ENC-2]). A reader that keeps the last value would count a passed line; the Producer refuses the run instead (exit status 2)."
+}

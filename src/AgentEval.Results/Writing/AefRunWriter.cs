@@ -530,8 +530,9 @@ public sealed class AefRunWriter
     /// The run is already closed, or a rule that needs the whole run is broken: a <c>pending</c> line ([RES-3]: the
     /// producer updates it to <c>skipped</c> or <c>error</c>); a node with children and no aggregation ([RES-5]); a
     /// <c>total</c> that is not the number of children, or a <c>decisive</c> id that is not a child ([RES-6]); a case
-    /// run in trials with no rollup line, or a rollup whose <c>n</c> and <c>passed</c> are not what its trial lines
-    /// give ([RES-8]); a cited evidence id that was not added; a
+    /// run in trials with no rollup line, a rollup whose <c>n</c> and <c>passed</c> are not what its trial lines
+    /// give, or a rollup at a child path that is not a child of its case's rollup at the parent path ([RES-8]); a cited
+    /// evidence id that was not added; a
     /// metric no declaration names; a gate decision naming a result that is no line; a trace link that names no span
     /// of traces.otlp.jsonl; a summary entry whose aggregate is the producer's but has no value. Nothing was written:
     /// the run is still running.
@@ -678,7 +679,9 @@ public sealed class AefRunWriter
         var problems = new List<string>();
         var metrics = _metrics;
         var trialCases = new Dictionary<(string Case, string Path), (int Count, int Passed)>();
-        var rollups = new Dictionary<(string Case, string Path), (double N, double Passed)>();
+        var trialStates = new Dictionary<(string Case, string Path), HashSet<string>>();
+        var rollups = new Dictionary<(string Case, string Path), (double N, double Passed, bool Agree)>();
+        var rollupLines = new Dictionary<(string Case, string Path), (string Id, string? Parent)>();
         foreach (var line in _results)
         {
             var id = AefNode.String(line["resultId"])!;
@@ -724,10 +727,28 @@ public sealed class AefRunWriter
             {
                 var (count, passed) = trialCases.GetValueOrDefault(key);
                 trialCases[key] = (count + 1, passed + (AefNode.String(line["state"]) == "passed" ? 1 : 0));
+                if (!trialStates.TryGetValue(key, out var states))
+                {
+                    trialStates[key] = states = new HashSet<string>(StringComparer.Ordinal);
+                }
+
+                states.Add(AefNode.String(line["state"]) ?? "");
             }
             else if (line["trials"] is JsonObject trials)
             {
-                rollups[key] = (AefNode.Number(trials["n"]) ?? 0, AefNode.Number(trials["passed"]) ?? 0);
+                rollups[key] = (AefNode.Number(trials["n"]) ?? 0, AefNode.Number(trials["passed"]) ?? 0, AefNode.IsTrue(trials["agree"]));
+                rollupLines.TryAdd(key, (id, AefNode.String(line["parentResultId"])));
+            }
+        }
+
+        // [RES-8]: the rollups of a composite case run in trials form the case's own tree: the rollup at a child path has
+        // its case's rollup at the parent path (the path without its last '/' segment) as its parent, when there is one.
+        foreach (var ((caseId, path), (_, parent)) in rollupLines)
+        {
+            if (path.LastIndexOf('/') is var slash and >= 0 && rollupLines.TryGetValue((caseId, path[..slash]), out var above)
+                && !string.Equals(parent, above.Id, StringComparison.Ordinal))
+            {
+                problems.Add($"case {caseId}: its rollup at {path} is not a child of its rollup at {path[..slash]} ([RES-8], §3.9 trials)");
             }
         }
 
@@ -740,6 +761,10 @@ public sealed class AefRunWriter
             else if (rollup.N != count || rollup.Passed != passed)
             {
                 problems.Add($"case {caseId} at {path}: its rollup says {rollup.N} trials, {rollup.Passed} passed; its trial lines give {count}, {passed} passed ([RES-8], §3.9 trials)");
+            }
+            else if (rollup.Agree != (trialStates[(caseId, path)].Count == 1))
+            {
+                problems.Add($"case {caseId} at {path}: its rollup says agree {(rollup.Agree ? "true" : "false")}; its trial lines are in {trialStates[(caseId, path)].Count} states (agree is true exactly when they are all in one, [RES-8], §3.9 trials)");
             }
         }
 

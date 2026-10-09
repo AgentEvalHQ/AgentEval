@@ -8,7 +8,7 @@ namespace AgentEval.Results;
 /// The limits of [ENC-17] (contracts/aef/1/spec/02-encoding.md, §2.6): a writer never exceeds them, and a reader refuses
 /// anything beyond them, so that two readers never disagree on a file; it reports what it refused as <c>limit</c>
 /// ([ENC-18]: a file at its path, one NDJSON line at <c>&lt;file&gt;:&lt;line&gt;</c>, the number of files at
-/// <c>.</c>), and never refuses anything within them. Each is checked on the bytes before the content is trusted: a
+/// <c>.</c>, the number of files under <c>overlays/</c> at <c>overlays</c>), and never refuses anything within them. Each is checked on the bytes before the content is trusted: a
 /// size, a count of LFs, a depth scan. Path length is [RUN-3]'s, a <c>path</c> problem rather than a limit.
 /// </summary>
 public static class AefLimits
@@ -45,6 +45,15 @@ public static class AefLimits
 
     /// <summary>The number of files in one run folder.</summary>
     public const int MaxFiles = 100_000;
+
+    /// <summary>The number of overlay batches ([OVL-4]: <c>seal-0001.json</c> to <c>seal-9999.json</c>).</summary>
+    public const int MaxOverlayBatches = 9_999;
+
+    /// <summary>
+    /// The number of files under <c>overlays/</c>: one events file and two per batch (its seal and its signature),
+    /// 19,999. More is <c>limit</c> at <c>overlays</c>, and the chain is not checked further ([ENC-18], [OVL-5]).
+    /// </summary>
+    public const int MaxOverlayFiles = 1 + (2 * MaxOverlayBatches);
 
     /// <summary>The size of one blob, in bytes: 1 GiB.</summary>
     public const long MaxBlobBytes = 1L << 30;

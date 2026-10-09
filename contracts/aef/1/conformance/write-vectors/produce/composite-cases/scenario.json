@@ -1,0 +1,188 @@
+{
+  "run": {
+    "schemaVersion": "1.0",
+    "runId": "produce-composite-cases",
+    "status": "completed",
+    "producer": {
+      "name": "p",
+      "version": "1"
+    },
+    "subject": {
+      "ref": "agent:a/b",
+      "kind": "agent",
+      "version": "v1"
+    },
+    "execution": {
+      "targetMode": "live"
+    },
+    "startedAt": "2026-10-01T00:00:00Z",
+    "contentCapture": "on",
+    "endedAt": "2026-10-01T00:01:00Z"
+  },
+  "metrics": {
+    "schemaVersion": "1.0",
+    "metrics": [
+      {
+        "id": "quality",
+        "kind": "score",
+        "direction": "higher_better",
+        "scale": {
+          "min": 0,
+          "max": 1
+        }
+      },
+      {
+        "id": "pass_rate",
+        "kind": "rate",
+        "direction": "higher_better",
+        "scale": {
+          "min": 0,
+          "max": 1
+        }
+      }
+    ]
+  },
+  "cases": [
+    {
+      "caseId": "k1",
+      "path": "answer",
+      "evaluator": {
+        "id": "composite:answer"
+      },
+      "state": "passed",
+      "scores": [
+        {
+          "metric": "quality",
+          "value": 0.85
+        }
+      ],
+      "aggregation": {
+        "strategy": "WeightedSum",
+        "threshold": 0.7,
+        "score": 0.85,
+        "rulePath": "threshold",
+        "decisive": [
+          "answer/grounded"
+        ]
+      },
+      "children": [
+        {
+          "path": "answer/grounded",
+          "evaluator": {
+            "id": "code:answer/grounded"
+          },
+          "state": "passed",
+          "scores": [
+            {
+              "metric": "quality",
+              "value": 0.85
+            }
+          ],
+          "component": {
+            "weight": 2,
+            "required": true
+          }
+        },
+        {
+          "path": "answer/tone",
+          "evaluator": {
+            "id": "code:answer/tone"
+          },
+          "state": "not_measured",
+          "component": {
+            "weight": 1,
+            "required": false
+          },
+          "reason": "No tone rubric for this locale."
+        },
+        {
+          "path": "answer/citations",
+          "evaluator": {
+            "id": "code:answer/citations"
+          },
+          "state": "not_applicable",
+          "component": {
+            "weight": 1,
+            "required": false
+          },
+          "reason": "The answer cites nothing."
+        }
+      ]
+    },
+    {
+      "caseId": "k2",
+      "path": "scenario",
+      "evaluator": {
+        "id": "agenteval:scenario"
+      },
+      "state": "failed",
+      "scores": [
+        {
+          "metric": "quality",
+          "value": 0.6
+        }
+      ],
+      "severity": "medium",
+      "aggregation": {
+        "strategy": "Own",
+        "threshold": 0.8,
+        "score": 0.6,
+        "rulePath": "threshold"
+      },
+      "children": [
+        {
+          "path": "scenario/assertion-1",
+          "evaluator": {
+            "id": "code:scenario/assertion-1"
+          },
+          "state": "passed",
+          "component": {
+            "weight": 0,
+            "required": false
+          }
+        },
+        {
+          "path": "scenario/assertion-2",
+          "evaluator": {
+            "id": "code:scenario/assertion-2"
+          },
+          "state": "failed",
+          "component": {
+            "weight": 0,
+            "required": false
+          },
+          "severity": "low"
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "lanes": [
+      {
+        "lane": "quality",
+        "metrics": [
+          {
+            "metric": "pass_rate",
+            "path": "answer"
+          },
+          {
+            "metric": "quality",
+            "path": "answer"
+          },
+          {
+            "metric": "pass_rate",
+            "path": "answer/tone"
+          },
+          {
+            "metric": "pass_rate",
+            "path": "answer/citations"
+          },
+          {
+            "metric": "pass_rate",
+            "path": "scenario"
+          }
+        ]
+      }
+    ]
+  }
+}

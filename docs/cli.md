@@ -976,6 +976,48 @@ false alarms; a case the judge did not decide is counted as not measured. It ref
 the ones exported with the case map. `-o` writes the result for `import --calibration`, which attaches it only to runs
 of the same judge on the same taxonomy. Exit `11` when the judge decided no case.
 
+### `agenteval aef`
+
+Work with AEF 1.0 runs, the AgentEval Evidence Format (a release candidate). The guide is
+[AEF Evidence Format](aef.md).
+
+**Synopsis**
+
+```
+agenteval aef verify <run-dir> [--policy <trust-policy.json>] [--anchors <run-hashes.json>] [--json]
+agenteval aef seal <run-dir> [--key <pkcs8.pem>] [--sealed-by producer|ingest] [--json]
+agenteval aef view <run-dir> [--at <time>] [--policy <trust-policy.json>] [--json]
+agenteval aef checkpoint <manifest.json> --runs <dir> [--policy <trust-policy.json>] [--at <time>] [--envelope <file>] [--json]
+agenteval aef export <store-dir> <out-dir> [--run <run-id>] [--target-mode live|replayed|scripted|mocked] [--content-capture on|off] [--no-seal] [--key <pkcs8.pem>] [--json]
+agenteval aef import assert-ai <assert-run-dir> <out-dir> [--taxonomy <file>] [--test-set <file>] [--calibration <file>] [--max-harm-rate <0-1>] [--max-over-refusal-rate <0-1>] [--content-capture on|off] [--no-seal] [--key <pkcs8.pem>] [--json]
+```
+
+**`verify`** reports a run as `intact`, `unsealed` or `invalid`, with every problem. With `--policy`, it also says
+which trusted identities signed it, and lets authorized redactions withhold blobs; with `--anchors`, whether one of
+the run hashes you trust is the run's. Exit `1` when the run is invalid.
+
+**`seal`** writes `seal.json` for a closed run, and `attestation.dsse.json` when `--key` gives a signing key (ECDSA
+P-256). `--sealed-by producer` (the default) is for the run's own producer, which may seal only a run with no
+problem; `ingest` is for a host taking custody of a run. Exit `1` when the run cannot be sealed.
+
+**`view`** shows the run as its overlays leave it at `--at` (default: now): overridden results, reviews, waivers in
+force, withheld blobs. The sealed files never change.
+
+**`checkpoint`** checks a checkpoint manifest alone, against the runs it names (found under `--runs` by their
+`run.json`), each lane's recomputed result and its decision, and its signature (`<name>.dsse.json` beside the
+manifest, or `--envelope`). Exit `1` on any problem.
+
+**`export`** converts a run of AgentEval's `.agenteval/` store (store v1) into an AEF run marked as imported. Give a
+run folder, or the workspace with `--run`. Store v1 does not record how the target was driven, so `--target-mode`
+defaults to `mocked`: an exported run is never passed off as live evidence unless you say it was. The run is sealed
+as `ingest` unless `--no-seal`.
+
+**`import assert-ai`** converts an [ASSERT](assert-interop.md) run into an AEF run: a root line and harm and
+over-refusal lines per case, ASSERT's rates in `summary.json`, with optional gate limits. With `--content-capture
+off`, no prompt, response, transcript or judge reasoning is kept.
+
+Every verb takes `--json` and then prints one JSON value. Exit `2` is a usage or input error.
+
 ---
 
 ## Exit codes

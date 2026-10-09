@@ -37,13 +37,6 @@ public abstract record LaneRule(string Kind, SuiteBinding? Suite)
     /// <summary>The kinds this version defines.</summary>
     public static IReadOnlyList<string> KnownKinds { get; } = ["threshold", "severity", "comparison", "evidence-present"];
 
-    /// <summary>
-    /// Whether the rule holds a value this version does not know: its kind, a severity rule's <c>max</c>, a threshold's
-    /// <c>op</c> or a comparison axis (§7.3). A later minor recorded a result for it that this version cannot recompute,
-    /// so [CKP-8] does not compare it: the lane is <c>unverifiable</c>.
-    /// </summary>
-    public virtual bool HoldsUnknownValue => false;
-
     /// <summary>Reads a lane's <c>rule</c>.</summary>
     /// <exception cref="FormatException">A field the reader schema requires is absent or of another type.</exception>
     public static LaneRule Read(JsonNode? rule)
@@ -91,9 +84,6 @@ public sealed record ThresholdRule(string Lane, string Metric, string Path, stri
     /// <summary>The operators this version defines.</summary>
     public static IReadOnlyList<string> KnownOps { get; } = [">=", ">", "<=", "<"];
 
-    /// <inheritdoc />
-    public override bool HoldsUnknownValue => !KnownOps.Contains(Op, StringComparer.Ordinal);
-
     /// <summary>Whether <paramref name="value"/> holds against the rule (null for an operator this version does not know).</summary>
     public bool? Holds(double value) => Op switch
     {
@@ -116,9 +106,6 @@ public sealed record SeverityRule(string Max, string? Lane, string? Path, long? 
     /// <summary>The values of <c>max</c> this version defines.</summary>
     public static IReadOnlyList<string> KnownMax { get; } = ["none", "low", "medium", "high"];
 
-    /// <inheritdoc />
-    public override bool HoldsUnknownValue => !KnownMax.Contains(Max, StringComparer.Ordinal);
-
     /// <summary>Whether a line at <paramref name="linePath"/> is in scope: the rule's path itself, or below it (<c>path/…</c>).</summary>
     public bool InScope(string? linePath) =>
         Path is null || (linePath is not null && (linePath == Path || linePath.StartsWith(Path + "/", StringComparison.Ordinal)));
@@ -137,17 +124,10 @@ public sealed record ComparisonRule(
     /// <summary>The comparability axes this version names ([LANE-6]); another counts as differing.</summary>
     public static IReadOnlyList<string> KnownAxes { get; } =
         ["subject", "suite", "suite-content", "judges", "rubrics", "target-mode", "deployment", "producer"];
-
-    /// <inheritdoc />
-    public override bool HoldsUnknownValue => Axes.Any(a => !KnownAxes.Contains(a, StringComparer.Ordinal));
 }
 
 /// <summary><c>evidence-present</c> ([LANE-4]): at least <paramref name="Runs"/> runs, every one eligible.</summary>
 public sealed record EvidencePresentRule(long Runs, SuiteBinding? Suite) : LaneRule("evidence-present", Suite);
 
 /// <summary>A rule kind this version does not know: the lane's result is <c>not_measured</c> ([VER-3], §7.3).</summary>
-public sealed record UnknownLaneRule(string Name) : LaneRule(Name, null)
-{
-    /// <inheritdoc />
-    public override bool HoldsUnknownValue => true;
-}
+public sealed record UnknownLaneRule(string Name) : LaneRule(Name, null);

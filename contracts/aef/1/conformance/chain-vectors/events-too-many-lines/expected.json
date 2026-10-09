@@ -1,0 +1,38 @@
+{
+  "kind": "chain",
+  "run": "run",
+  "generate": [
+    {
+      "copy": [
+        "valid/completed-eval/run",
+        "run"
+      ]
+    },
+    {
+      "append": [
+        "run/overlays/events.ndjson",
+        [
+          [
+            "\n",
+            1000000
+          ]
+        ]
+      ]
+    }
+  ],
+  "problems": [
+    [
+      "overlays/events.ndjson",
+      "limit"
+    ],
+    [
+      "overlays/events.ndjson",
+      "uncovered"
+    ]
+  ],
+  "rules": [
+    "OVL-5",
+    "ENC-17",
+    "ENC-18"
+  ]
+}

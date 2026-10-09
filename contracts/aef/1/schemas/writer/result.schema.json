@@ -419,7 +419,8 @@
             "Min",
             "WeightedMedian",
             "CapByWorst",
-            "MajorityVote"
+            "MajorityVote",
+            "Own"
           ],
           "description": "The strategy the producer used, for display: aggregation is descriptive (spec 03, RES-6)."
         },

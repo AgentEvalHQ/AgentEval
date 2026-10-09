@@ -28,6 +28,8 @@ CLOSED_POINTERS = {
     ("common.schema.json", "/$defs/state"),
     ("run.schema.json", "/properties/status"),
     ("metrics.schema.json", "/properties/metrics/items/properties/kind"),
+    # A trust policy is an input to verification (SIG-4): a verifier cannot honour a restriction it does not know.
+    ("trust-policy.schema.json", ""),
 }
 
 

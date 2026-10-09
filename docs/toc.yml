@@ -207,6 +207,8 @@
   items:
   - name: Export Formats
     href: export.md
+  - name: AEF Evidence Format
+    href: aef.md
   - name: Rich Evaluation Output
     href: rich-evaluation-output-guide.md
   - name: Security Scanning

@@ -28,6 +28,7 @@ specification.
 | | |
 |---|---|
 | [Primer](primer.md) | AEF in one walk-through: a run from start to verified checkpoint |
+| [Writing runs](producers.md) | A guide for producers: what to write, the optional fields that make a run more checkable, the traps |
 | [Field reference](reference/) | Every field of every schema, generated from the schemas |
 | [Interoperability](interop/) | Mappings to OpenTelemetry GenAI evaluation events, Inspect, OpenAI Evals, EvalPort and ASSERT; the in-toto predicate types and media types |
 | [Rationale and FAQ](rationale.md) | Why AEF is the way it is |

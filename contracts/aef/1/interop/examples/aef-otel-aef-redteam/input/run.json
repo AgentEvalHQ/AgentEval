@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "01928f41-2222-7222-8222-222222222222",
+  "status": "completed",
+  "producer": {
+    "name": "agenteval-cli",
+    "version": "1.0.0"
+  },
+  "subject": {
+    "ref": "agent:support/support-triage",
+    "kind": "agent",
+    "version": "git:3f2a1c"
+  },
+  "execution": {
+    "targetMode": "scripted",
+    "stimulus": "generated"
+  },
+  "startedAt": "2026-10-05T08:00:00Z",
+  "endedAt": "2026-10-05T08:03:00Z",
+  "contentCapture": "off"
+}

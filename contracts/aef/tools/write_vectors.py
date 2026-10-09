@@ -4,6 +4,10 @@ writes something and the conformance runner judges the result:
 
 - summarize/<name>/: a run without its summary.json (run/), the entries to compute (request.json) and the expected
   summary.json ([SUM-2]-[SUM-9]); or a request the Producer refuses;
+- produce/<name>/: a scenario (scenario.json: a closed run's run.json and metrics.json, each case's result tree and
+  trial trees as facts, a summary request), the expected lines of results.ndjson (expected-results.ndjson, compared as
+  a set: [RES-4]-[RES-8]) and the expected summary.json; or a scenario that contradicts itself, which the Producer
+  refuses;
 - seal-write/<name>/: an unsealed closed run, sealedBy and sealedAt, the expected manifest and predicate
   ([SEAL-1]-[SEAL-5]); or a run the sealer refuses (an open run, a seal dated before the run closed, a run sealed on
   custody whose paths or files are not valid);
@@ -14,10 +18,12 @@ writes something and the conformance runner judges the result:
 Every expected value is written by hand below. For a summary, the generator also derives each entry from the lines
 with its own reading of [SUM-3] and [SUM-4] and stops unless it agrees with the hand-written N and measured values;
 it then computes sum, sumSq and value exactly (fractions.Fraction over the binary64 values, rounded once) and stops
-unless they agree with the hand-written decimals. For a seal, it stops unless the byte order of the paths is the
-hand-written order. It implements only what it writes: result ids (build_conformance.result_id), manifests and run
-hashes, key ids and Ed25519 signatures (aef_crypto, checked against RFC 8032 by its self-test). It never calls
-tools/aef_produce.py, the reference implementation of the three operations.
+unless they agree with the hand-written decimals. For a produce scenario, it builds the expected lines with its own
+reading of [RES-4]-[RES-8] and stops unless each line's derived fields (its parent, a rollup's n, passed and agree, a
+composite's measured, total and unmeasured) are the hand-written ones. For a seal, it stops unless the byte order of
+the paths is the hand-written order. It implements only what it writes: result ids (build_conformance.result_id),
+manifests and run hashes, key ids and Ed25519 signatures (aef_crypto, checked against RFC 8032 by its self-test). It
+never calls tools/aef_produce.py, the reference implementation of the four operations.
 
 Usage: python contracts/aef/tools/write_vectors.py   (after build_conformance.py and signature_vectors.py, whose
 files the sign vectors copy; then build_index.py)
@@ -142,10 +148,14 @@ def summarize_run(d, run_id, metrics, specs, status="completed"):
     return lines
 
 
-def summarize_refused(name, why, rules, metrics, specs, request):
-    """A request the Producer refuses (exit status 2): it contradicts what the Producer must compute."""
+def summarize_refused(name, why, rules, metrics, specs, request, results=None):
+    """A request the Producer refuses (exit status 2): an input error of §9.3. results, when given, rewrites the bytes
+    of results.ndjson (a file that does not read)."""
     d = OUT / "summarize" / name
     summarize_run(d, "summarize-" + name, metrics, specs)
+    if results is not None:
+        path = d / "run" / "results.ndjson"
+        path.write_bytes(results(path.read_bytes()))
     write_json(d / "request.json", request)
     write_json(d / "expected.json", {"kind": "summarize", "rules": rules, "run": "run", "request": "request.json",
                                      "refused": True, "why": why})
@@ -155,6 +165,15 @@ def summarize_vector(name, why, rules, metrics, specs, lanes, status="completed"
     run_id = "summarize-" + name
     d = OUT / "summarize" / name
     lines = summarize_run(d, run_id, metrics, specs, status)
+    request, summary = expected_summary(name, run_id, metrics, lines, lanes)
+    write_json(d / "request.json", request)
+    write_json(d / "expected.json", {"kind": "summarize", "rules": rules, "run": "run", "request": "request.json",
+                                     "summary": summary, "why": why})
+
+
+def expected_summary(name, run_id, metrics, lines, lanes):
+    """(the request, the expected summary.json) for the hand-written entries of each lane, checked against the
+    lines: N and the measured values by derive(), then sum, sumSq and value exactly."""
     kinds = {m["id"]: m["kind"] for m in metrics}
     names = [lane for lane, _ in lanes]
     request, expected = [], []
@@ -201,9 +220,7 @@ def summarize_vector(name, why, rules, metrics, specs, lanes, status="completed"
             want.append(entry)
         request.append({"lane": lane, "metrics": asked})
         expected.append({"lane": lane, "metrics": want})
-    write_json(d / "request.json", {"lanes": request})
-    write_json(d / "expected.json", {"kind": "summarize", "rules": rules, "run": "run", "request": "request.json",
-                                     "summary": {"schemaVersion": V, "runId": run_id, "lanes": expected}, "why": why})
+    return {"lanes": request}, {"schemaVersion": V, "runId": run_id, "lanes": expected}
 
 
 def summarize_vectors():
@@ -410,10 +427,357 @@ def summarize_vectors():
         {"lanes": [{"lane": "performance", "metrics": [{"metric": "latency", "path": "q",
                                                          "aggregate": {"method": "median"}, "value": 300}]}]})
 
+    # The other input errors §9.3 lists for summarize (R4-6): each a request the Producer refuses, never a summary.
+    two = [L("k1", "passed", {"quality": 0.9}), L("k2", "failed", {"quality": 0.4})]
+    summarize_refused(
+        "undeclared-metric-refused",
+        "The request asks for helpfulness, which metrics.json does not declare: a summary entry names a declared "
+        "metric ([SUM-1]), so the request is an input error (exit status 2).",
+        ["SUM-1"], [quality], two,
+        {"lanes": [{"lane": "quality", "metrics": [{"metric": "helpfulness", "path": "q"}]}]})
+    summarize_refused(
+        "lane-named-twice-refused",
+        "The request names the lane quality twice (once per entry): a summary names each lane once ([SUM-9]), so the "
+        "request is an input error (exit status 2), not two lanes of one name.",
+        ["SUM-9"], [quality, pass_rate], two,
+        {"lanes": [{"lane": "quality", "metrics": [{"metric": "quality", "path": "q"}]},
+                   {"lane": "quality", "metrics": [{"metric": "pass_rate", "path": "q"}]}]})
+    summarize_refused(
+        "entry-twice-refused",
+        "The request asks twice for lane quality, metric quality and path q (the second time with a rule): one lane "
+        "has one entry per metric and path ([SUM-9]), so the request is an input error (exit status 2).",
+        ["SUM-9"], [quality], two,
+        {"lanes": [{"lane": "quality", "metrics": [{"metric": "quality", "path": "q"},
+                                                   {"metric": "quality", "path": "q", "rule": "quality >= 0.5",
+                                                    "verdict": "passed"}]}]})
+    summarize_refused(
+        "producer-method-without-value-refused",
+        "The request gives the aggregate method pass@k, which AEF does not define, and no value: the value of such an "
+        "entry is the producer's figure ([SUM-8]), and with n = 2 it is a number, so there is nothing to write: an "
+        "input error (exit status 2), never a null value.",
+        ["SUM-8"], [quality], two,
+        {"lanes": [{"lane": "quality", "metrics": [{"metric": "quality", "path": "q",
+                                                    "aggregate": {"method": "pass@k", "k": 2}}]}]})
+    summarize_refused(
+        "results-do-not-read-refused",
+        "results.ndjson does not read: its second line names the member state twice, which I-JSON forbids ([ENC-2]). "
+        "A reader that keeps the last value would count a passed line; the Producer refuses the run instead (exit "
+        "status 2).",
+        ["ENC-2"], [quality], two,
+        {"lanes": [{"lane": "quality", "metrics": [{"metric": "quality", "path": "q"}]}]},
+        results=lambda b: b.replace(b'"state":"failed"', b'"state":"failed","state":"passed"', 1))
+
+
+# ---------------------------------------------------------------------------- produce
+
+MEASURED = {"passed", "failed", "warn", "inconclusive", "scored"}  # RES-1
+
+
+def node(path, state, evaluator=None, quality=None, **facts):
+    """A node of a scenario: the facts of one line (the evaluator code:<path> unless given; a quality score)."""
+    out = {"path": path, "evaluator": {"id": evaluator or "code:" + path}, "state": state}
+    if quality is not None:
+        out["scores"] = [{"metric": "quality", "value": quality}]
+    return out | facts
+
+
+def child(path, state, weight=1, required=True, **facts):
+    return node(path, state, component={"weight": weight, "required": required}, **facts)
+
+
+def H(case, path, trial=None, parent=None, trials=None, counts=None):
+    """A hand-written line of the expected results.ndjson, by what is derived: its parent ((path, trial) of the parent's
+    line, or None), a rollup's (n, passed, agree), a composite's (measured, total, {state: count, the non-zero ones})."""
+    return (case, path, trial), {"parent": parent, "trials": trials, "counts": counts}
+
+
+def scenario_run(run_id, status="completed", **extra):
+    run = {"schemaVersion": V, "runId": run_id, "status": status, "producer": {"name": "p", "version": "1"},
+           "subject": {"ref": "agent:a/b", "kind": "agent", "version": "v1"}, "execution": {"targetMode": "live"},
+           "startedAt": "2026-10-01T00:00:00Z", "contentCapture": "on"}
+    if status != "running":
+        run["endedAt"] = "2026-10-01T00:01:00Z"
+    return run | extra
+
+
+def tree_lines(run_id, case_id, n, trial, parent, out, rollup=None):
+    """The generator's own reading of RES-4 to RES-8, independent of tools/aef_produce.py: one line per node, the
+    node's first; parent is the (path, trial) of its parent's line; rollup the trial lines of the case, when the
+    lines are its rollups."""
+    line = {"schemaVersion": V, "resultId": result_id(run_id, case_id, n["path"], trial), "caseId": case_id,
+            "path": n["path"]}
+    if parent is not None:
+        line["parentResultId"] = result_id(run_id, case_id, *parent)
+        line["component"] = n["component"]
+    if trial is not None:
+        line["trial"] = trial
+    line |= {"evaluator": n["evaluator"], "state": n["state"]}
+    line |= {f: n[f] for f in ("scores", "severity", "reason", "lane") if f in n}
+    if rollup is not None:
+        states = [t["state"] for t in rollup["lines"] if t["path"] == n["path"]]
+        line["trials"] = {"n": len(states), "passed": states.count("passed"), "aggregation": rollup["aggregation"],
+                          "agree": len(set(states)) == 1} | ({"k": rollup["k"]} if "k" in rollup else {})
+    out.append(line)
+    kids = n.get("children", [])
+    for c in kids:
+        tree_lines(run_id, case_id, c, trial, (n["path"], trial), out, rollup)
+    if "aggregation" in n:
+        facts, states = n["aggregation"], [c["state"] for c in kids]
+        line["aggregation"] = {"strategy": facts["strategy"]} | {f: facts[f] for f in ("threshold", "score") if f in facts} | {
+            "rulePath": facts["rulePath"], "measured": sum(s in MEASURED for s in states), "total": len(states),
+            "unmeasured": {s: states.count(s) for s in ("not_measured", "not_applicable", "skipped", "error")}}
+        if "decisive" in facts:
+            line["aggregation"]["decisive"] = [result_id(run_id, case_id, p, trial) for p in facts["decisive"]]
+
+
+def case_lines(run_id, case):
+    out = []
+    if "trials" not in case:
+        tree_lines(run_id, case["caseId"], case, None, None, out)
+        return out
+    for t, tree in enumerate(case["trials"]["trees"]):
+        tree_lines(run_id, case["caseId"], tree, t, None, out)
+    rollup = {"lines": list(out)} | {k: v for k, v in case["trials"].items() if k != "trees"}
+    tree_lines(run_id, case["caseId"], case, None, None, out, rollup)
+    return out
+
+
+def checked_against_hand(name, lines, hand):
+    """Stops unless the lines' derived fields are the hand-written ones, line for line."""
+    by_id = {l["resultId"]: l for l in lines}
+    got = {}
+    for l in lines:
+        parent = by_id[l["parentResultId"]] if "parentResultId" in l else None
+        agg = l.get("aggregation")
+        got[(l["caseId"], l["path"], l.get("trial"))] = {
+            "parent": None if parent is None else (parent["path"], parent.get("trial")),
+            "trials": None if "trials" not in l else (l["trials"]["n"], l["trials"]["passed"], l["trials"]["agree"]),
+            "counts": None if agg is None else (agg["measured"], agg["total"],
+                                                {s: c for s, c in agg["unmeasured"].items() if c})}
+    assert len(got) == len(lines), f"{name}: two lines of one case, path and trial"
+    want = dict(hand)
+    assert set(got) == set(want), f"{name}: lines {sorted(map(str, set(got) ^ set(want)))} differ from the hand list"
+    for key in want:
+        assert got[key] == want[key], f"{name} {key}: derived {got[key]}, by hand {want[key]}"
+
+
+def produce_vector(name, why, rules, cases, hand, lanes, metrics=None, run=None):
+    """A scenario the Producer writes, the expected lines (in the generator's order: the judge compares them as a
+    set) and the expected summary."""
+    d = OUT / "produce" / name
+    run_id = "produce-" + name
+    run = run or scenario_run(run_id)
+    metrics = metrics or [metric("quality", "score"), metric("pass_rate", "rate")]
+    lines = [l for case in cases for l in case_lines(run_id, case)]
+    checked_against_hand(name, lines, hand)
+    request, summary = expected_summary(name, run_id, metrics, lines, lanes)
+    write_json(d / "scenario.json", {"run": run, "metrics": {"schemaVersion": V, "metrics": metrics}, "cases": cases,
+                                     "summary": request})
+    write_ndjson(d / "expected-results.ndjson", lines)
+    write_json(d / "expected.json", {"kind": "produce", "rules": rules, "scenario": "scenario.json",
+                                     "results": "expected-results.ndjson", "summary": summary, "why": why})
+
+
+def produce_refused(name, why, rules, cases, run=None):
+    """A scenario that contradicts itself: the Producer refuses it (exit status 2) and writes nothing."""
+    d = OUT / "produce" / name
+    run_id = "produce-" + name
+    write_json(d / "scenario.json", {
+        "run": run or scenario_run(run_id), "metrics": {"schemaVersion": V, "metrics": [metric("pass_rate", "rate")]},
+        "cases": cases, "summary": {"lanes": [{"lane": "quality", "metrics": [{"metric": "pass_rate", "path": "q"}]}]}})
+    write_json(d / "expected.json", {"kind": "produce", "rules": rules, "scenario": "scenario.json", "refused": True,
+                                     "why": why})
+
+
+def produce_vectors():
+    case = lambda case_id, n, **trials: {"caseId": case_id} | n | ({"trials": trials} if trials else {})
+    produce_vector(
+        "flat-run-typed-absences",
+        "A flat run: one line per case, a root with its RES-4 id and the facts as given (a typed absence keeps its "
+        "reason and carries no scores). The summary leaves the not_applicable case out and counts the other absences "
+        "as not measured.",
+        ["RES-1", "RES-2", "RES-4", "SUM-3", "SUM-4", "SUM-5"],
+        [case("k1", node("q", "passed", quality=0.9)),
+         case("k2", node("q", "failed", quality=0.3, severity="high")),
+         case("k3", node("q", "not_measured", reason="The reference answer was missing.")),
+         case("k4", node("q", "error", reason="The judge returned HTTP 429 three times.")),
+         case("k5", node("q", "not_applicable", reason="The case asks for no answer."))],
+        [H("k1", "q"), H("k2", "q"), H("k3", "q"), H("k4", "q"), H("k5", "q")],
+        # 0.9 + 0.3 = 1.2; squares 0.81 + 0.09 = 0.9; 1.2 / 2 = 0.6. pass_rate: 1 + 0, over 2.
+        [("quality", [E("quality", "q", N=4, measured=[0.9, 0.3], sum="1.2", sumSq="0.9", value="0.6"),
+                      E("pass_rate", "q", N=4, measured=[1, 0], sum="1", sumSq="1", value="0.5",
+                        rule="pass_rate >= 0.8", verdict="failed")])])
+
+    answer = node("answer", "passed", "composite:answer", quality=0.85, aggregation={
+        "strategy": "WeightedSum", "threshold": 0.7, "score": 0.85, "rulePath": "threshold",
+        "decisive": ["answer/grounded"]}, children=[
+        child("answer/grounded", "passed", weight=2, quality=0.85),
+        child("answer/tone", "not_measured", required=False, reason="No tone rubric for this locale."),
+        child("answer/citations", "not_applicable", required=False, reason="The answer cites nothing.")])
+    scenario = node("scenario", "failed", "agenteval:scenario", quality=0.6, severity="medium", aggregation={
+        "strategy": "Own", "threshold": 0.8, "score": 0.6, "rulePath": "threshold"}, children=[
+        child("scenario/assertion-1", "passed", weight=0, required=False),
+        child("scenario/assertion-2", "failed", weight=0, required=False, severity="low")])
+    produce_vector(
+        "composite-cases",
+        "Two composite cases. answer (WeightedSum) has three children: total 3 and measured 1, the not_measured and "
+        "the not_applicable child counted in unmeasured (a composite counts every child, unlike SUM-4's N), decisive "
+        "the grounded child's id. scenario (Own) has two assertions of weight 0, each with its component all the "
+        "same. Every child has its parent's id and its component; the summary reads each path's lines.",
+        ["RES-4", "RES-5", "RES-6", "SUM-3", "SUM-4"],
+        [case("k1", answer), case("k2", scenario)],
+        [H("k1", "answer", counts=(1, 3, {"not_measured": 1, "not_applicable": 1})),
+         H("k1", "answer/grounded", parent=("answer", None)), H("k1", "answer/tone", parent=("answer", None)),
+         H("k1", "answer/citations", parent=("answer", None)),
+         H("k2", "scenario", counts=(2, 2, {})), H("k2", "scenario/assertion-1", parent=("scenario", None)),
+         H("k2", "scenario/assertion-2", parent=("scenario", None))],
+        [("quality", [E("pass_rate", "answer", N=1, measured=[1], sum="1", sumSq="1", value="1"),
+                      E("quality", "answer", N=1, measured=[0.85], sum="0.85", sumSq="0.7225", value="0.85"),
+                      E("pass_rate", "answer/tone", N=1, measured=[], sum="0", sumSq="0", value=None),
+                      E("pass_rate", "answer/citations", N=0, measured=[], sum="0", sumSq="0", value=None),
+                      E("pass_rate", "scenario", N=1, measured=[0], sum="0", sumSq="0", value="0")])])
+
+    produce_vector(
+        "case-in-three-trials",
+        "A case run three times, one trial failing: each trial's line carries its trial (0, 1, 2) and an id hashed "
+        "with it; one rollup line at the case's path has n 3, passed 2 and agree false, and the given aggregation; no "
+        "line is another's parent. The summary counts the rollup, never a trial.",
+        ["RES-4", "RES-8", "SUM-3"],
+        [case("k1", node("q", "passed", quality=0.8), aggregation="MajorityVote",
+              trees=[node("q", "passed", quality=0.9), node("q", "failed", quality=0.2, severity="high"),
+                     node("q", "passed", quality=0.8)]),
+         case("k2", node("q", "passed", quality=0.7))],
+        [H("k1", "q", 0), H("k1", "q", 1), H("k1", "q", 2), H("k1", "q", trials=(3, 2, False)), H("k2", "q")],
+        # the rollup's 0.8 and k2's 0.7: 1.5; squares 0.64 + 0.49 = 1.13; 0.75.
+        [("quality", [E("quality", "q", N=2, measured=[0.8, 0.7], sum="1.5", sumSq="1.13", value="0.75"),
+                      E("pass_rate", "q", N=2, measured=[1, 1], sum="2", sumSq="2", value="1")])])
+
+    produce_vector(
+        "trials-agreement",
+        "agree is true exactly when a path's trial lines are all in one state (RES-8): two warn trials agree though "
+        "neither passed; a failed and an error trial do not, though neither passed; a single trial agrees with itself. "
+        "passed counts the passed trials only. PassAtK's k is carried beside the aggregation.",
+        ["RES-8", "SUM-3", "SUM-4"],
+        [case("k1", node("q", "warn", severity="low"), aggregation="AllPass",
+              trees=[node("q", "warn", severity="low"), node("q", "warn", severity="low")]),
+         case("k2", node("q", "failed", severity="medium"), aggregation="MajorityVote",
+              trees=[node("q", "failed", severity="medium"), node("q", "error", reason="The judge timed out.")]),
+         case("k3", node("q", "passed"), aggregation="PassAtK", k=3,
+              trees=[node("q", "failed", severity="low"), node("q", "passed"), node("q", "failed", severity="low")]),
+         case("k4", node("q", "passed"), aggregation="AllPass", trees=[node("q", "passed")])],
+        [H("k1", "q", 0), H("k1", "q", 1), H("k1", "q", trials=(2, 0, True)),
+         H("k2", "q", 0), H("k2", "q", 1), H("k2", "q", trials=(2, 0, False)),
+         H("k3", "q", 0), H("k3", "q", 1), H("k3", "q", 2), H("k3", "q", trials=(3, 1, False)),
+         H("k4", "q", 0), H("k4", "q", trials=(1, 1, True))],
+        [("quality", [E("pass_rate", "q", N=4, measured=[0, 0, 1, 1], sum="2", sumSq="2", value="0.5")])])
+
+    minimum = lambda score, decisive: {"strategy": "Min", "threshold": 0.5, "score": score, "rulePath": "threshold",
+                                       "decisive": decisive}
+    produce_vector(
+        "composite-in-two-trials",
+        "A composite case in two trials; the second stopped before its tools step. Each trial's tree is its own: its "
+        "lines carry its trial, its children's parent is that trial's root, its decisive ids are that trial's. The "
+        "rollups form the case's tree: one at each path the trials have, the children's under the root's, with their "
+        "component; n and passed are counted per path (plan/tools has one trial line: n 1, agree true). The summary "
+        "counts the rollup at each path.",
+        ["RES-4", "RES-5", "RES-6", "RES-8", "SUM-3"],
+        [case("k1", node("plan", "failed", "composite:plan", severity="high", aggregation=minimum(0.1, ["plan/steps"]),
+                         children=[child("plan/steps", "failed", severity="high"), child("plan/tools", "passed")]),
+              aggregation="AllPass", trees=[
+                  node("plan", "passed", "composite:plan", aggregation=minimum(0.9, []),
+                       children=[child("plan/steps", "passed"), child("plan/tools", "passed")]),
+                  node("plan", "failed", "composite:plan", severity="high", aggregation=minimum(0.1, ["plan/steps"]),
+                       children=[child("plan/steps", "failed", severity="high")])])],
+        [H("k1", "plan", 0, counts=(2, 2, {})), H("k1", "plan/steps", 0, parent=("plan", 0)),
+         H("k1", "plan/tools", 0, parent=("plan", 0)),
+         H("k1", "plan", 1, counts=(1, 1, {})), H("k1", "plan/steps", 1, parent=("plan", 1)),
+         H("k1", "plan", trials=(2, 1, False), counts=(2, 2, {})),
+         H("k1", "plan/steps", parent=("plan", None), trials=(2, 1, False)),
+         H("k1", "plan/tools", parent=("plan", None), trials=(1, 1, True))],
+        [("quality", [E("pass_rate", "plan", N=1, measured=[0], sum="0", sumSq="0", value="0"),
+                      E("pass_rate", "plan/steps", N=1, measured=[0], sum="0", sumSq="0", value="0"),
+                      E("pass_rate", "plan/tools", N=1, measured=[1], sum="1", sumSq="1", value="1")])])
+
+    produce_vector(
+        "aborted-run",
+        "An aborted run is closed: run.json as given, with its abortReason; the case it was running is error and the "
+        "one it never started skipped, each with its reason (RES-3).",
+        ["RUN-5", "RES-2", "RES-3", "SUM-4"],
+        [case("k1", node("q", "passed", quality=0.8)),
+         case("k2", node("q", "error", reason="The run was aborted while the case ran.")),
+         case("k3", node("q", "skipped", reason="Not run: the run was aborted."))],
+        [H("k1", "q"), H("k2", "q"), H("k3", "q")],
+        [("quality", [E("quality", "q", N=3, measured=[0.8], sum="0.8", sumSq="0.64", value="0.8"),
+                      E("pass_rate", "q", N=3, measured=[1], sum="1", sumSq="1", value="1")])],
+        run=scenario_run("produce-aborted-run", "aborted",
+                         abortReason="The endpoint refused every request after k2 (HTTP 401)."))
+
+    produce_vector(
+        "aborted-before-any-result",
+        "A run aborted before its first result: results.ndjson is written all the same, empty (RUN-2), and the "
+        "summary's entry has N 0, a null value and the verdict not_measured.",
+        ["RUN-2", "RUN-5", "SUM-5", "SUM-6"],
+        [], [],
+        [("quality", [E("pass_rate", "q", N=0, measured=[], sum="0", sumSq="0", value=None)])],
+        run=scenario_run("produce-aborted-before-any-result", "aborted",
+                         abortReason="The endpoint refused the first request (HTTP 401)."))
+
+    # The scenarios that contradict themselves (spec 09 §9.3): refused, nothing written.
+    root = lambda *children, **facts: node("answer", "passed", "composite:answer", aggregation={
+        "strategy": "Min", "threshold": 0.5, "score": 1, "rulePath": "threshold"} | facts, children=list(children))
+    produce_refused(
+        "child-path-not-under-parent-refused",
+        "The child tone is not one level under its parent answer (answer/tone would be): a child's path is its "
+        "parent's, / and one more level, as RES-8's rollup tree reads it. The Producer refuses the scenario.",
+        ["RES-5", "RES-8"], [case("k1", root(child("tone", "passed")))])
+    produce_refused(
+        "decisive-not-a-child-refused",
+        "decisive names answer/style, which is no child of answer: a decisive id is a child's (RES-6). The Producer "
+        "refuses the scenario.",
+        ["RES-5", "RES-6"], [case("k1", root(child("answer/grounded", "passed"), decisive=["answer/style"]))])
+    produce_refused(
+        "trial-root-elsewhere-refused",
+        "The second trial's tree is rooted at q2, not at the case's path q: a trial's lines are the case's at its own "
+        "paths, and its rollup is at the same path (RES-8). The Producer refuses the scenario.",
+        ["RES-8"], [case("k1", node("q", "passed"), aggregation="AnyPass",
+                         trees=[node("q", "passed"), node("q2", "failed", severity="low")])])
+    produce_refused(
+        "trial-path-without-rollup-refused",
+        "A trial's tree has the child q/x, but the case's tree (its rollups) has no node at q/x: a case run in trials "
+        "has a rollup at each path its trials have (RES-8). The Producer refuses the scenario.",
+        ["RES-8"], [case("k1", node("q", "passed"), aggregation="AllPass", trees=[
+            node("q", "passed", aggregation={"strategy": "Min", "rulePath": "threshold"},
+                 children=[child("q/x", "passed")])])])
+    produce_refused(
+        "pending-in-closed-run-refused",
+        "The run is completed, and case k2 is still pending: a closed run has no pending line; it becomes skipped or "
+        "error, with a reason (RES-3), which only the producer can say. The Producer refuses the scenario.",
+        ["RES-3"], [case("k1", node("q", "passed")), case("k2", node("q", "pending", reason="Still running."))])
+    produce_refused(
+        "open-run-refused",
+        "run.json says running: produce writes a closed run, with its summary (RUN-2, RUN-5). The Producer refuses "
+        "the scenario.",
+        ["RUN-2", "RUN-5"], [case("k1", node("q", "passed"))], run=scenario_run("produce-open-run-refused", "running"))
+    produce_refused(
+        "case-and-path-twice-refused",
+        "Two trees of case k1 are rooted at q: their lines would have one resultId (RES-4). The Producer refuses the "
+        "scenario.",
+        ["RES-4"], [case("k1", node("q", "passed")), case("k1", node("q", "failed", severity="low"))])
+    produce_refused(
+        "child-without-component-refused",
+        "The child answer/grounded has no component facts: every child carries its weight and whether it is required "
+        "(RES-5), which only the producer knows. The Producer refuses the scenario.",
+        ["RES-5"], [case("k1", root(node("answer/grounded", "passed")))])
+    produce_refused(
+        "children-without-aggregation-refused",
+        "answer has a child and no aggregation facts: a node with children carries aggregation (RES-5), whose strategy "
+        "and rulePath only the producer knows. The Producer refuses the scenario.",
+        ["RES-5"], [case("k1", node("answer", "passed", children=[child("answer/grounded", "passed")]))])
+
 
 # ---------------------------------------------------------------------------- seal-write
 
-TRACE, SPAN = "4bf92f3577b34da6a3ce929d0e0e4736", "00f067aa0ba902b7"
+TRACE, SPAN ="4bf92f3577b34da6a3ce929d0e0e4736", "00f067aa0ba902b7"
 
 
 def seal_write_vector(name, why, rules, build, order, sealed_by, sealed_at, predicate):
@@ -691,9 +1055,10 @@ def main():
     if OUT.exists():
         shutil.rmtree(OUT)
     summarize_vectors()
+    produce_vectors()
     seal_write_vectors()
     sign_vectors()
-    counts = {k: len([p for p in (OUT / k).iterdir() if p.is_dir()]) for k in ("summarize", "seal-write", "sign")}
+    counts = {k: len([p for p in (OUT / k).iterdir() if p.is_dir()]) for k in ("summarize", "produce", "seal-write", "sign")}
     print("write vectors:", ", ".join(f"{k} {n}" for k, n in counts.items()))
 
 

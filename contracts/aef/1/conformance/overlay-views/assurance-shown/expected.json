@@ -1,0 +1,39 @@
+{
+  "kind": "overlay-view",
+  "run": "run",
+  "at": "2026-10-08T12:00:00Z",
+  "rules": [
+    "OVL-3",
+    "SIG-4"
+  ],
+  "view": {
+    "results": [],
+    "reviews": [],
+    "waivers": [],
+    "withheld": [],
+    "unsealedEvents": 0,
+    "assurance": [
+      {
+        "event": "ov_0001",
+        "shown": "signed"
+      },
+      {
+        "event": "ov_0002",
+        "shown": "self-attested"
+      },
+      {
+        "event": "ov_0003",
+        "shown": "self-attested"
+      },
+      {
+        "event": "ov_0004",
+        "shown": "signed"
+      },
+      {
+        "event": "ov_0005",
+        "shown": "self-attested"
+      }
+    ]
+  },
+  "policy": "policy.json"
+}

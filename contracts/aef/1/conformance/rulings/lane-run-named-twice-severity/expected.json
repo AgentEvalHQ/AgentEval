@@ -1,0 +1,29 @@
+{
+  "kind": "lane",
+  "checkpoint": "checkpoint.json",
+  "runs": "runs",
+  "lanes": [
+    {
+      "lane": "minimum-4-one-run-named-twice",
+      "result": {
+        "status": "not_measured",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-03T00:00:00Z"
+      }
+    },
+    {
+      "lane": "minimum-2-one-run-named-twice",
+      "result": {
+        "status": "passed",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-03T00:00:00Z"
+      }
+    }
+  ],
+  "problems": [],
+  "rules": [
+    "LANE-3",
+    "LANE-4"
+  ],
+  "why": "W4-5: S-two-passed (two passed lines) named twice is one run: two decided lines, so minimumN 4 is not_measured, and minimumN 2 passed (its lines count once, not never)."
+}

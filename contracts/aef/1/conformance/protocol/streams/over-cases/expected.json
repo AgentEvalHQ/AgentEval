@@ -2,10 +2,10 @@
   "kind": "stream",
   "plan": "../plan-small.json",
   "problems": [
-    {
-      "where": "event:4",
-      "problem": "over-cases"
-    }
+    [
+      "event:4",
+      "over-cases"
+    ]
   ],
   "rules": [
     "PLAN-2",

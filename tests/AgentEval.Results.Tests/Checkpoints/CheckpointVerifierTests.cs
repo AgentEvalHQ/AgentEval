@@ -40,7 +40,7 @@ public sealed class CheckpointVerifierTests : IDisposable
         Assert.Empty(verification.ManifestProblems);
         Assert.Empty(verification.Problems);
         Assert.Equal(["git:alice@example.com"], verification.SignedBy);
-        Assert.Equal(hashes.Order(StringComparer.Ordinal), verification.Anchors.Order(StringComparer.Ordinal));
+        Assert.Equal(hashes.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal), verification.Anchors);   // each once, in byte order (spec 09 §9.3)
         Assert.Equal(["quality", "regression"], verification.Lanes.Select(l => l.Lane));
     }
 
@@ -120,6 +120,121 @@ public sealed class CheckpointVerifierTests : IDisposable
         Assert.Equal([new AefProblem($"lanes/{lane}", "unverifiable")], problems);
         Assert.Equal(LaneEvidenceStatus.NotMeasured, lanes.Single(l => l.Lane == lane).Result!.Status);
     }
+
+    [Theory]
+    [InlineData("minimumShare", 0.9)]   // a member a later minor added
+    [InlineData("minimumN", 0.5)]       // a value the writer schema refuses (an integer field)
+    public void ALaneWhoseRuleIsNotValidAgainstTheWriterSchema_IsUnverifiable(string member, double value)
+    {
+        // [CKP-8] (round 4): any rule this version's writer schema refuses, not only four fields of it.
+        var manifest = Corpus("threshold");
+        manifest["lanes"]!.AsArray().Single(l => (string?)l!["lane"] == "pass")!["rule"]![member] = value;
+
+        var (_, problems) = CheckpointVerifier.Lanes(manifest, AefRunStore.Open(CorpusRuns("threshold")), At);
+
+        Assert.Equal([new AefProblem("lanes/pass", "unverifiable")], problems);
+    }
+
+    [Theory]
+    [InlineData("target-mode")]           // an unknown execution.targetMode in a run of the lane
+    [InlineData("severity")]              // an unknown severity on a severity lane's line
+    [InlineData("severity-passed")]       // on a line of any state: the text names its lines, not its failures
+    [InlineData("severity-trial")]        // trial lines included
+    [InlineData("direction")]             // an unknown direction of the compared metric, in the candidate
+    [InlineData("baseline-direction")]    // or in the baseline, a found run the lane reads
+    [InlineData("baseline-target-mode")]
+    public void ALaneThatReadsAValueThisVersionDoesNotKnowInARun_IsUnverifiable_NotCompared(string what)
+    {
+        // [CKP-8] (round 4): recomputing the lane reads something this version does not know; whatever was recorded,
+        // the lane is unverifiable, never lane-result.
+        var run = new LaneRunBuilder("R");
+        JsonObject rule = Threshold();
+        var lane = (Runs: new List<string> { "R" }, Baseline: (LaneRunBuilder?)null);
+        switch (what)
+        {
+            case "target-mode":
+                run.Score("c1", 0.9).Entry("quality", "m", "p").Run["execution"]!["targetMode"] = "live-shadow";
+                break;
+            case "severity" or "severity-passed" or "severity-trial":
+                rule = new JsonObject { ["kind"] = "severity", ["max"] = "low", ["path"] = "a" };
+                if (what == "severity-trial")
+                {
+                    run.Line("c1", "a", "failed", severity: "info", trial: 0).Line("c1", "a", "failed", severity: "low", rollup: (1, 0));
+                }
+                else
+                {
+                    run.Line("c1", "a", what == "severity" ? "failed" : "passed", severity: "info");
+                }
+
+                break;
+            default:
+                var baseline = new LaneRunBuilder("B", "v6");
+                for (var i = 0; i < 20; i++)
+                {
+                    baseline.Score($"k{i}", 0.5, path: "mem");
+                    run.Score($"k{i}", 0.6, path: "mem");
+                }
+
+                var unknown = what.StartsWith("baseline", StringComparison.Ordinal) ? baseline : run;
+                if (what.EndsWith("direction", StringComparison.Ordinal))
+                {
+                    unknown.Metrics["metrics"]![0]!["direction"] = "target_band";
+                }
+                else
+                {
+                    unknown.Run["execution"]!["targetMode"] = "live-shadow";
+                }
+
+                lane.Baseline = baseline;
+                break;
+        }
+
+        var hash = LaneRunBuilder.RunHashOf(run.Write(_root));
+        if (lane.Baseline is { } b)
+        {
+            rule = new JsonObject
+            {
+                ["kind"] = "comparison", ["lane"] = "quality", ["metric"] = "m", ["path"] = "mem",
+                ["baseline"] = new JsonObject { ["runId"] = "B", ["runHash"] = LaneRunBuilder.RunHashOf(b.Write(_root)) },
+                ["significance"] = 0.05, ["minimumPairs"] = 10, ["axes"] = new JsonArray("subject"),
+            };
+        }
+
+        var manifest = DecidedOneLane(rule, ("R", hash), new JsonObject { ["status"] = "passed", ["subjectVersion"] = "v7", ["oldestClosedAt"] = At });
+
+        var (_, problems) = CheckpointVerifier.Lanes(manifest, AefRunStore.Open(_root), At);
+
+        Assert.Equal([new AefProblem("lanes/l", "unverifiable")], problems);
+    }
+
+    [Fact]
+    public void AnUnknownSeverityOutsideASeverityLanesScope_OrInAnotherKindOfLane_IsNotRead()
+    {
+        // [CKP-8]: only the lane's lines (its summary lane and path) are read for their severity, and only by a severity lane.
+        var run = new LaneRunBuilder("R").Line("c1", "a", "passed").Line("c2", "b", "failed", severity: "info").Score("c3", 0.9).Entry("quality", "m", "p");
+        var hash = LaneRunBuilder.RunHashOf(run.Write(_root));
+        var recorded = new JsonObject { ["status"] = "passed", ["subjectVersion"] = "v7", ["oldestClosedAt"] = "2026-10-05T00:00:00Z" };
+
+        var severity = DecidedOneLane(new JsonObject { ["kind"] = "severity", ["max"] = "low", ["path"] = "a" }, ("R", hash), recorded);
+        Assert.Empty(CheckpointVerifier.Lanes(severity, AefRunStore.Open(_root), At).Problems);
+
+        var threshold = DecidedOneLane(Threshold(), ("R", hash), recorded.DeepClone().AsObject());
+        Assert.Empty(CheckpointVerifier.Lanes(threshold, AefRunStore.Open(_root), At).Problems);
+    }
+
+    // A decided checkpoint of one lane "l" over one run, with this recorded result (the decision is not recomputed here).
+    private static JsonObject DecidedOneLane(JsonObject rule, (string RunId, string RunHash) run, JsonObject recorded) => new()
+    {
+        ["schemaVersion"] = "1.0", ["checkpointId"] = "cp_1",
+        ["subject"] = new JsonObject { ["ref"] = LaneRunBuilder.Subject, ["version"] = "v7" },
+        ["lanes"] = new JsonArray(Lane("l", rule, run)),
+        ["state"] = "decided", ["outcome"] = "approved",
+        ["decisionInput"] = new JsonObject
+        {
+            ["subjectVersion"] = "v7", ["evaluatedAt"] = At,
+            ["lanes"] = new JsonArray(new JsonObject { ["lane"] = "l", ["blocking"] = true, ["result"] = recorded, ["evidence"] = new JsonArray(run.RunHash) }),
+        },
+    };
 
     [Fact]
     public void AnUndecidedCheckpoint_IsNotComparedWithARecordedInput_AndTakesTheGivenTimeForItsAge()

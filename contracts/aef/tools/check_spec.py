@@ -34,7 +34,8 @@ NOT_FIELDS = {"ExportTraceServiceRequest", "signedBy", "LaneResult", "Measuremen
 CODES_UNTESTED = {}
 # Backticked words in the rules that define codes in prose which are not codes: DSSE fields, manifest fields a code's
 # explanation names, a state value, literals.
-NOT_CODES = {"payload", "payloadType", "signatures", "keyid", "sig", "runs", "status", "axes", "s", "null", "aborted"}
+NOT_CODES = {"payload", "payloadType", "signatures", "keyid", "sig", "runs", "status", "axes", "s", "null", "aborted",
+             "severity", "direction", "comparison"}  # CKP-8 names the fields a lane reads
 
 UNTESTED = {
     "ENC-12": "a reader must not fetch the $id names: behaviour, not a file property",
@@ -141,6 +142,29 @@ def main():
         problems.append(f"problem code '{code}' is expected by no corpus vector (add one, or list it in CODES_UNTESTED)")
     for code in sorted(set(CODES_UNTESTED) & used_codes):
         problems.append(f"CODES_UNTESTED lists '{code}', but a vector expects it: take it off the list")
+
+    # §9.1 against index.json: the vector kinds each class names (with the classes it includes) are the kinds the
+    # index lists under it.
+    names = r"Producer|Sealer|Reader|Run verifier|Overlay verifier|Checkpoint verifier|Decision engine|Runner|Stream verifier"
+    table = re.search(r"\| Class \| Requirements \| Vectors[^\n]*\n\|[-|]+\n((?:\|[^\n]*\n)+)", text["09-conformance.md"])
+    named, includes = {}, {}
+    for row in table.group(1).splitlines():
+        cells = [c.strip() for c in row.strip("|").split("|")]
+        cls = re.match(r"\*\*(" + names + r")\*\*", cells[0]).group(1)
+        named[cls] = set(re.findall(r"`([a-z-]+)`", cells[-1]))
+        includes[cls] = set(re.findall(r"(" + names + r")'s", cells[-1]))
+    for cls in named:
+        for inner in includes[cls]:
+            named[cls] |= named[inner]
+    indexed = {}
+    for v in json.loads((conf / "index.json").read_text(encoding="utf-8"))["vectors"]:
+        if v["kind"] != "fixture":
+            for cls in v["classes"]:
+                indexed.setdefault(cls, set()).add(v["kind"])
+    for cls in sorted(set(named) | set(indexed)):
+        if named.get(cls, set()) != indexed.get(cls, set()):
+            problems.append(f"§9.1 names the vector kinds {sorted(named.get(cls, set()))} for {cls}; index.json lists "
+                            f"{sorted(indexed.get(cls, set()))}")
 
     props = schema_properties()
     for name, t in text.items():

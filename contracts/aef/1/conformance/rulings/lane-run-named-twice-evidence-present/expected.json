@@ -1,0 +1,28 @@
+{
+  "kind": "lane",
+  "checkpoint": "checkpoint.json",
+  "runs": "runs",
+  "lanes": [
+    {
+      "lane": "two-runs-one-named-twice",
+      "result": {
+        "status": "not_measured",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-03T00:00:00Z"
+      }
+    },
+    {
+      "lane": "one-run-named-twice",
+      "result": {
+        "status": "passed",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-03T00:00:00Z"
+      }
+    }
+  ],
+  "problems": [],
+  "rules": [
+    "LANE-4"
+  ],
+  "why": "W4-5: a lane's runs are its distinct pairs of runId and runHash (LANE-4): E1 named twice is one run, so evidence-present with runs 2 is not_measured (and with runs 1 passed: once, not never)."
+}

@@ -1,0 +1,12 @@
+{"schemaVersion":"1.0","resultId":"r_21cb61131be32e77acf204f6231d3781","caseId":"k1","path":"q","trial":0,"evaluator":{"id":"code:q"},"state":"warn","severity":"low"}
+{"schemaVersion":"1.0","resultId":"r_6c0cbbce38bf0ec091471eab50775c9a","caseId":"k1","path":"q","trial":1,"evaluator":{"id":"code:q"},"state":"warn","severity":"low"}
+{"schemaVersion":"1.0","resultId":"r_11d0a049358c414173a53630107e4709","caseId":"k1","path":"q","evaluator":{"id":"code:q"},"state":"warn","severity":"low","trials":{"n":2,"passed":0,"aggregation":"AllPass","agree":true}}
+{"schemaVersion":"1.0","resultId":"r_236569ae65d102945e79f3aea7e264d9","caseId":"k2","path":"q","trial":0,"evaluator":{"id":"code:q"},"state":"failed","severity":"medium"}
+{"schemaVersion":"1.0","resultId":"r_127b384b574dd54037941574dde05927","caseId":"k2","path":"q","trial":1,"evaluator":{"id":"code:q"},"state":"error","reason":"The judge timed out."}
+{"schemaVersion":"1.0","resultId":"r_23d97a7accac9bcfcb6a44ec59540ed2","caseId":"k2","path":"q","evaluator":{"id":"code:q"},"state":"failed","severity":"medium","trials":{"n":2,"passed":0,"aggregation":"MajorityVote","agree":false}}
+{"schemaVersion":"1.0","resultId":"r_339512bb2440371504f7f236a96478ea","caseId":"k3","path":"q","trial":0,"evaluator":{"id":"code:q"},"state":"failed","severity":"low"}
+{"schemaVersion":"1.0","resultId":"r_34ce364ed956852ae0b17b2a4d3e3317","caseId":"k3","path":"q","trial":1,"evaluator":{"id":"code:q"},"state":"passed"}
+{"schemaVersion":"1.0","resultId":"r_efe31274d40a6af08bf3534e01e1eb71","caseId":"k3","path":"q","trial":2,"evaluator":{"id":"code:q"},"state":"failed","severity":"low"}
+{"schemaVersion":"1.0","resultId":"r_31fc6c54002ea414bbbd81267570fc2d","caseId":"k3","path":"q","evaluator":{"id":"code:q"},"state":"passed","trials":{"n":3,"passed":1,"aggregation":"PassAtK","agree":false,"k":3}}
+{"schemaVersion":"1.0","resultId":"r_bf4ad1a376dce5739e574e34231b3c38","caseId":"k4","path":"q","trial":0,"evaluator":{"id":"code:q"},"state":"passed"}
+{"schemaVersion":"1.0","resultId":"r_8f08dcfc3ec5cbe41b20d6f1ad575310","caseId":"k4","path":"q","evaluator":{"id":"code:q"},"state":"passed","trials":{"n":1,"passed":1,"aggregation":"AllPass","agree":true}}

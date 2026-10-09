@@ -112,7 +112,20 @@ KNOWN_MUTATIONS = {
     "summary-duplicates": "SUM-9 duplicate entries, lane names and usage entries are accepted",
     "limits": "nothing beyond ENC-17's limits is refused",
     "trial-rollups": "a rollup is not compared with its trial lines, and a trial line needs no rollup (RES-8)",
-    "rule-unknown": "a lane whose rule holds an unknown value is compared like any other (CKP-8)",
+    "rule-unknown": "a lane whose rule or runs hold a value this version does not know is compared like any other (CKP-8)",
+    # The rulings made where two implementations disagreed (R4-4), and round 4's rules: each pinned by a vector.
+    "rollup-later": "a second rollup for one case and path makes every rollup of it `trials`, the first included (W3-17)",
+    "target-on-schema": "any results.ndjson problem, a schema one included, skips the overlay target check (W3-18)",
+    "stream-limits": "a stream line beyond ENC-17's limits is read as an event (W4-1)",
+    "budget-in-order": "a job's costs are added in binary64 in the order its runs are named (W4-2)",
+    "input-only-lane": "a decision input's result for a lane the manifest does not have is not `evidence` (W4-3)",
+    "run-named-twice": "a run a lane names twice counts twice (W4-5)",
+    "judges-absent": "a run without judges is not the same as one with an empty list (W4-6)",
+    "line-path-any": "any path ending in an NDJSON file name and :<n> orders as a line path (W4-10)",
+    "trial-undecided": "an undecided trial line makes a severity lane not_measured in LANE-3 step 2 (R4-8a)",
+    "rollup-tree": "a composite case's rollups need not form its tree (RES-8, R4-8b)",
+    "events-whole-file": "the events file's framing is judged as a file, not line by line (OVL-5, R4-2, R4N-9)",
+    "policy-loose": "a trust policy is not checked against its schema, and `may` is matched as a substring (SIG-4, R4-3)",
     "otlp-names": "spans under the pre-1.0 name instrumentationLibrarySpans are read too",
 }
 _ORIGINAL_COMPILE = aef_schema.compile_pattern
@@ -141,6 +154,7 @@ MAX_ENVELOPE = 56 * 1024 * 1024  # ENC-17: a DSSE envelope, the base64 of a seal
 MAX_DEPTH = 64
 MAX_LINES = 1_000_000
 MAX_FILES = 100_000
+MAX_OVERLAY_FILES = 1 + 2 * 9999  # ENC-17: the events file, and a seal and a signature for each of 9,999 batches
 MAX_BLOB = 1 << 30
 MAX_NDJSON = 1 << 30  # ENC-17: one NDJSON file
 MAX_PATH = 255
@@ -301,9 +315,13 @@ def load_json_bytes(data: bytes, object_only=True):
 def load_json_file(path) -> object:
     """A JSON input file of a command (a policy, a checkpoint, a list of paths); InputError when it cannot be read."""
     try:
-        return load_json_bytes(Path(path).read_bytes(), object_only=False)
+        data = Path(path).read_bytes()
     except OSError as error:
         raise InputError(f"{path}: {error}") from None
+    if len(data) > MAX_JSON or nesting_depth(data) > MAX_DEPTH:  # ENC-17: a JSON file (a trust policy, SIG-4)
+        raise InputError(f"{path}: beyond ENC-17's limits for a JSON file")
+    try:
+        return load_json_bytes(data, object_only=False)
     except EncodingProblem as error:
         raise InputError(f"{path}: not an I-JSON document: {error}") from None
 
@@ -389,11 +407,14 @@ _LINE_PATH = re.compile(r"(results\.ndjson|evidence\.ndjson|gates\.ndjson|traces
                         r"|overlays/events\.ndjson):([0-9]+)")  # §3.9: the run's own NDJSON files, nothing else
 
 
+_ANY_LINE_PATH = re.compile(r"(.*\.(?:ndjson|jsonl)):([0-9]+)")  # the "line-path-any" mutation (W4-10)
+
+
 def path_key(path: str):
     """§3.9's order of paths: by their UTF-8 bytes, except that the '<file>:<line>' paths of one file go by line
     number as a number (results.ndjson:9 before results.ndjson:10). A run's paths hold no ':' (RUN-3), so a line path
     sorts exactly where its bytes would put it among every other path."""
-    m = _LINE_PATH.fullmatch(path)
+    m = (_ANY_LINE_PATH if "line-path-any" in MUTATIONS else _LINE_PATH).fullmatch(path)
     if m and "line-order" not in MUTATIONS:
         return utf8_key(m.group(1) + ":"), int(m.group(2))
     return utf8_key(path), -1
@@ -889,13 +910,20 @@ class Run:
                 seals[int(m.group(1))] = p
             elif not BATCH_SIGNATURE.fullmatch(p):
                 problems.add((p, "unexpected-file"))
-        events = f.read(EVENTS) if f.has(EVENTS) else b""
-        if f.has(EVENTS) and ndjson_framing(events):
-            # OVL-5: reported once, and the chain is not checked further: no batch verifies, no event has effect.
-            problems.add((EVENTS, "encoding"))
-            lines = [(n, s, s + len(raw) + 1, None, False) for n, s, raw in ndjson_lines(events)]
-            self._chain = {"problems": problems, "verified_end": 0, "lines": lines, "batches": []}
+        if "limits" not in MUTATIONS and sum(1 for p in f.paths if p.startswith("overlays/")) > MAX_OVERLAY_FILES:
+            # ENC-17, ENC-18: refused at the folder's path and not checked further: no batch verifies, no event counts.
+            self._chain = {"problems": {("overlays", "limit")}, "verified_end": 0, "lines": [], "batches": []}
             return self._chain
+        events = f.read(EVENTS) if f.has(EVENTS) else b""
+        # OVL-5: a reader reads the events file as far as ENC-17 allows; a longer file is `limit`, once, and the rest
+        # is not read. A batch reaching past what was read is refused like a batch seal beyond the limits.
+        cut = events if "limits" in MUTATIONS else _within_limits(events)
+        # More than ENC-17 allows: over 1 GiB, or more than 1,000,000 lines (an unfinished last line is no line).
+        over = len(cut) < len(events) and (len(events) > MAX_NDJSON or b"\n" in events[len(cut):])
+        readable = cut if over else events
+        if over:
+            problems.add((EVENTS, "limit"))
+        before_chain = set(problems)
         run = self.run_doc
         run_id = run.get("runId") if run else None
         run_hash = self.claimed_run_hash()
@@ -932,6 +960,10 @@ class Run:
                 own.add("run-hash")
             offset, length = int(pred["offset"]), int(pred["length"])
             end = offset + length
+            if len(readable) < end <= len(events):  # OVL-5: beyond what a reader reads; it ends the verified prefix
+                problems.add((path, "limit"))
+                verified, previous_ok = False, False
+                continue
             expected_offset = 0 if k == 1 else (previous_end if previous_ok else None)
             if expected_offset is not None and offset != expected_offset:
                 own.add("offset")
@@ -957,20 +989,27 @@ class Run:
             previous_end, previous_ok = end, True
         if _uncovered(covered, len(events)):
             problems.add((EVENTS, "uncovered"))
-        lines = self._events(events, run_id, run_hash, problems) if f.has(EVENTS) else []
+        if f.has(EVENTS) and "events-whole-file" in MUTATIONS and ndjson_framing(readable):
+            # The mutation: the whole file's framing is judged, as before R4-2 and R4N-9 (OVL-5 now judges lines).
+            lines = [(n, s, s + len(raw) + 1, None, False) for n, s, raw in ndjson_lines(readable)]
+            self._chain = {"problems": before_chain | {(EVENTS, "encoding")}, "verified_end": 0, "lines": lines,
+                           "batches": []}
+            return self._chain
+        # OVL-5: every line is judged by itself, inside the batches and after them; a last line without LF is still
+        # being written. Over its limits, only the verified batches are read: nothing after them is.
+        lines = self._events(readable[:verified_end] if over else readable, verified_end,
+                             run_id, run_hash, problems) if f.has(EVENTS) else []
         self._chain = {"problems": problems, "verified_end": verified_end, "lines": lines, "batches": batches}
         return self._chain
 
-    def _events(self, data, run_id, run_hash, problems):
-        """The lines of overlays/events.ndjson: (number, start, end, object or None, usable), with the event-invalid,
-        event-id and target problems. A file whose NDJSON framing is broken (ENC-5, ENC-7) is reported once as
-        encoding at its path (spec 02: OVL-5 names no code for it), and none of its events is usable."""
-        if ndjson_framing(data):
-            problems.add((EVENTS, "encoding"))
-            return [(n, s, s + len(raw) + 1, None, False) for n, s, raw in ndjson_lines(data)]
+    def _events(self, data, verified_end, run_id, run_hash, problems):
+        """The LF-terminated lines of overlays/events.ndjson: (number, start, end, object or None, usable), with the
+        event-invalid, event-id and target problems. A blank line, a CR or a leading byte-order mark makes that line
+        event-invalid, wherever it is (OVL-5)."""
         result_ids = {o.get("resultId") for _, o in self.objects("results.ndjson")}
         results_read = "results.ndjson" in self.read()[1] and not any(  # OVL-2: "does not read"
-            (p[0] == "results.ndjson" or p[0].startswith("results.ndjson:")) and p[1] in ("encoding", "limit")
+            (p[0] == "results.ndjson" or p[0].startswith("results.ndjson:"))
+            and (p[1] in ("encoding", "limit") or "target-on-schema" in MUTATIONS)
             for p in self.read()[2])
         seen, out = set(), []
         for number, start, raw in ndjson_lines(data):
@@ -981,6 +1020,8 @@ class Run:
                 out.append((number, start, end, None, False))
                 continue
             try:
+                if b"\r" in raw or raw.startswith(b"\xef\xbb\xbf"):
+                    raise EncodingProblem("OVL-5: the line breaks ENC-5")
                 event = load_json_bytes(raw)
             except EncodingProblem:
                 problems.add((where, "event-invalid"))
@@ -1195,6 +1236,10 @@ class Run:
                 rollups[(o.get("caseId"), o.get("path"))] += 1
             if "trial" in o:
                 trial_lines[(o.get("caseId"), o.get("path"))].append(o)
+        rollup_ids = {}  # RES-8: the resultId of the first rollup of each (caseId, path)
+        for _, o in results:
+            if "trials" in o:
+                rollup_ids.setdefault((o.get("caseId"), o.get("path")), o["resultId"])
         seen = set()
         rollup_first = {}  # RES-8: the first rollup line of each (caseId, path)
         for n, o in results:
@@ -1226,13 +1271,22 @@ class Run:
             if parent is not None and "trial" in parent and o.get("trial") != parent["trial"]:
                 P.add((where, "trials"))  # RES-8: a trial's tree carries its trial
             trials = o.get("trials")
+            path = o.get("path")
+            if (isinstance(trials, dict) and isinstance(path, str) and "/" in path
+                    and not MUTATIONS & {"trial-rollups", "rollup-tree"}):
+                above = rollup_ids.get((o.get("caseId"), path.rsplit("/", 1)[0]))
+                if above is not None and o.get("parentResultId") != above:
+                    P.add((where, "trials"))  # RES-8: the rollups form the case's own tree
             if isinstance(trials, dict):
                 own = trial_lines.get((o.get("caseId"), o.get("path")), [])
                 if "trial-rollups" in MUTATIONS:
                     own = []
                 second = rollup_first.setdefault((o.get("caseId"), o.get("path")), n) != n
+                if "rollup-later" in MUTATIONS:
+                    second = rollups[(o.get("caseId"), o.get("path"))] > 1
                 if trials["passed"] > trials["n"] or (second and "trial-rollups" not in MUTATIONS) or (own and (
-                        trials["n"] != len(own) or trials["passed"] != sum(1 for t in own if t.get("state") == "passed"))):
+                        trials["n"] != len(own) or trials["passed"] != sum(1 for t in own if t.get("state") == "passed")
+                        or trials.get("agree") != (len({t.get("state") for t in own}) == 1))):
                     P.add((where, "trials"))  # RES-8
             if closed and "trial" in o and rollups[(o.get("caseId"), o.get("path"))] == 0 and "trial-rollups" not in MUTATIONS:
                 P.add((where, "trials"))  # RES-8: a trial line whose case and path have no rollup
@@ -1352,6 +1406,20 @@ def _inverted(interval):
     """An interval whose low exceeds its high (§3.9 interval)."""
     return (isinstance(interval, dict) and as_number(interval.get("low")) is not None
             and as_number(interval.get("high")) is not None and interval["low"] > interval["high"])
+
+
+def _within_limits(events):
+    """OVL-5, ENC-17: what a reader reads of the events file: up to its last LF within the first 1 GiB and the first
+    1,000,000 lines."""
+    part = events[:MAX_NDJSON]
+    part = part[:part.rfind(b"\n") + 1] if len(part) < len(events) else part
+    lf, count = -1, 0
+    while count < MAX_LINES:
+        lf = part.find(b"\n", lf + 1)
+        if lf < 0:
+            return part
+        count += 1
+    return part[:lf + 1]
 
 
 def _uncovered(ranges, size):
@@ -1536,6 +1604,12 @@ def _summary_wrong(summary, results, metric):
                 return True
             if "sum" in e and not close_enough(e["sum"], total):
                 return True
+            if "sumSq" in e:  # §3.6: binary64, compared within 1e-9; a sum of squares that overflows matches nothing
+                squares = 0.0
+                for x in values:
+                    squares += x * x
+                if not math.isfinite(squares) or not close_enough(e["sumSq"], squares):
+                    return True
             if "aggregate" in e:  # SUM-8
                 method = get(e, "aggregate", "method")
                 if (n == 0) != (e.get("value") is None):  # null exactly when n is 0
@@ -1610,6 +1684,12 @@ def op_view(directory, at, policy=None):
                             "expires": e["expires"], "active": active, "event": e["eventId"]})
     withheld = run.withheld_blobs()  # authorized redactions only (OVL-10)
     chain = run.chain()
+    # OVL-3: signed only when the event's batch has a signature that verifies, under the policy, for its identity; a
+    # file reader never received an event from a host, so it never shows authenticated.
+    assurance = [{"event": ev["eventId"],
+                  "shown": "signed" if batch is not None and get(ev, "by", "identity") in run.batch_signers(batch)
+                  else "self-attested"}
+                 for ev, batch in run.verified_events(with_batch=True)]
     return {
         "results": [{"resultId": r, "sealedState": sealed[r], "effectiveState": e["state"], "event": e["eventId"]}
                     for r, e in sorted(effective.items(), key=lambda item: order[item[0]])],
@@ -1618,6 +1698,7 @@ def op_view(directory, at, policy=None):
         "waivers": waivers,
         "withheld": withheld,
         "unsealedEvents": sum(1 for _, start, _, _, _ in chain["lines"] if start >= chain["verified_end"]),
+        "assurance": assurance,
     }
 
 
@@ -1681,7 +1762,8 @@ def manifest_problems(m):
         if bool(lane["runs"]) != has_result:
             problems.add("evidence")
     manifest_names = {lane["lane"] for lane in m["lanes"]}
-    if any(l["lane"] not in manifest_names and l.get("result") is not None for l in given["lanes"]):
+    if any(l["lane"] not in manifest_names and l.get("result") is not None for l in given["lanes"]) and (
+            "input-only-lane" not in MUTATIONS):
         problems.add("evidence")  # a result for a lane the manifest does not have: a result but no runs
     runs_of = {}  # manifest lane -> the run hashes of its runs
     for lane in m["lanes"]:
@@ -1815,18 +1897,42 @@ def _threshold(rule, runs):
 
 
 def _rule_unknown(rule):
-    """CKP-8: whether a lane rule holds a value this version does not know (§7.3): a kind, a severity max, a threshold
-    op, a comparison axis."""
+    """CKP-8: whether a lane rule holds anything this version does not know (VER-8): it is not valid against this
+    version's writer schema (a kind, a member or a value a later minor added: a severity max, a threshold op, a
+    comparison axis, a new rule member)."""
     if "rule-unknown" in MUTATIONS:
         return False
-    kind = rule.get("kind")
-    if kind not in RULE_KINDS:
-        return True
-    if kind == "severity" and rule.get("max") not in _SEVERITY_MAX:
-        return True
-    if kind == "threshold" and rule.get("op") not in _THRESHOLD_OPS:
-        return True
-    return kind == "comparison" and any(a not in AXES for a in rule.get("axes") or [])
+    return not schema_valid("writer", "checkpoint#/$defs/laneRule", rule)
+
+
+def _reads_unknown(rule, runs):
+    """CKP-8 (R4-1): whether the lane's recomputation reads a value this version does not know in the runs it reads
+    (found ones: its runs and its baseline): an execution.targetMode; for a severity lane, a severity on one of its
+    lines (its lane and path, trial lines included); for a comparison lane, the compared metric's direction."""
+    if "rule-unknown" in MUTATIONS:
+        return False
+    kind, lane, path = rule.get("kind"), rule.get("lane"), rule.get("path")
+    for run in runs:
+        if run is None:
+            continue
+        mode = get(run.run_doc or {}, "execution", "targetMode")
+        if mode is not None and mode not in TARGET_MODES:
+            return True
+        if kind == "severity":
+            names = _summary_lanes(run)
+            for _, o in run.objects("results.ndjson"):
+                if lane is not None and not _belongs(o, lane, names):
+                    continue
+                if path is not None and not (o.get("path") == path or str(o.get("path", "")).startswith(path + "/")):
+                    continue
+                if "severity" in o and o["severity"] not in SEVERITY_ORDER:
+                    return True
+        if kind == "comparison":
+            for m in (run.read()[0].get("metrics.json") or {}).get("metrics", []):
+                if (isinstance(m, dict) and m.get("id") == rule.get("metric") and "direction" in m
+                        and m["direction"] not in DIRECTIONS):
+                    return True
+    return False
 
 
 def _severity(rule, runs):
@@ -1848,6 +1954,8 @@ def _severity(rule, runs):
             if "trial" in o:  # LANE-3: a failing trial counts for step 1, and takes no part in the counts
                 if state in ("failed", "warn") and SEVERITY_ORDER[read_severity(o.get("severity"))] > limit:
                     return "failed"
+                if "trial-undecided" in MUTATIONS and state in ("inconclusive", "not_measured", "skipped", "error", "pending"):
+                    undecided = True
                 continue
             if state in ("failed", "warn"):
                 decided += 1
@@ -1875,6 +1983,8 @@ def _axis_value(doc, axis):
         return v("suite", "digest")
     if axis in ("judges", "rubrics"):
         judges = doc.get("judges", [])  # LANE-6: no judges is the empty list
+        if "judges-absent" in MUTATIONS and "judges" not in doc:
+            judges = None
         if not isinstance(judges, list):
             return judges
         field = "model" if axis == "judges" else "rubricDigest"
@@ -2001,9 +2111,9 @@ def lane_result(rule, runs, baseline, version, fallback_time, binding):
     return result
 
 
-def op_lanes(checkpoint_path, runs_dir, at=None, policy=None):
+def op_lanes(checkpoint_path, runs_dir, at=None, policy=None, envelope=None):
     """§5.3 and CKP-8. at: the evaluation time of an undecided checkpoint (LANE-9); policy: the caller's trust policy
-    (authorized redactions, CKP-8)."""
+    (authorized redactions, CKP-8; the checkpoint's signature, CKP-9); envelope: the checkpoint's signature."""
     m = load_json_file(checkpoint_path)
     if not isinstance(m, dict) or not isinstance(m.get("lanes"), list):
         raise InputError(f"{checkpoint_path}: not a checkpoint manifest")
@@ -2031,7 +2141,7 @@ def op_lanes(checkpoint_path, runs_dir, at=None, policy=None):
         distinct, refs = set(), []  # LANE-4: a run named twice counts once
         for ref in lane.get("runs", []):
             key = (get(ref, "runId"), get(ref, "runHash"))
-            if key not in distinct:
+            if key not in distinct or "run-named-twice" in MUTATIONS:
                 distinct.add(key)
                 refs.append(ref)
         runs = [look(ref) for ref in refs]
@@ -2040,7 +2150,7 @@ def op_lanes(checkpoint_path, runs_dir, at=None, policy=None):
                    rule.get("suite") if isinstance(rule.get("suite"), dict) else None)
         result = lane_result(rule, runs, baseline, version, fallback, binding)
         lanes.append({"lane": name, "result": result})
-        if given is not None and name in recorded and _rule_unknown(rule):
+        if given is not None and name in recorded and (_rule_unknown(rule) or _reads_unknown(rule, runs + [baseline])):
             problems.add((f"lanes/{name}", "unverifiable"))  # CKP-8: a later minor's rule is not compared
         elif given is not None and name in recorded:
             before = recorded[name].get("result")
@@ -2055,7 +2165,18 @@ def op_lanes(checkpoint_path, runs_dir, at=None, policy=None):
                 a, b = time_key(before.get("oldestClosedAt")), time_key(result["oldestClosedAt"])
                 if (a != b) if a is not None and b is not None else before.get("oldestClosedAt") != result["oldestClosedAt"]:
                     problems.add((where, "oldest-closed"))
-    return {"lanes": lanes, "problems": sort_problems(problems)}
+    # CKP-9, SIG-8: a checkpoint with no problem of CKP-7 or CKP-8 and a signature verified for a trusted identity
+    # anchors the runs its lanes name, their comparison baselines included.
+    anchors = []
+    if envelope is not None and policy is not None and not problems and op_checkpoint(checkpoint_path)["problems"] == []:
+        signed = verify_signature(Path(envelope).read_bytes(), Path(checkpoint_path).read_bytes(), CHECKPOINT_TYPE,
+                                  policy)["verifiesFor"]
+        if signed:
+            named = {get(ref, "runHash") for lane in m["lanes"] for ref in lane.get("runs", [])}
+            named |= {get(lane.get("rule"), "baseline", "runHash") for lane in m["lanes"]
+                      if get(lane.get("rule"), "kind") == "comparison"}
+            anchors = sorted((h for h in named if isinstance(h, str)), key=utf8_key)
+    return {"lanes": lanes, "problems": sort_problems(problems), "anchors": anchors}
 
 
 # ---------------------------------------------------------------------------- operations: signatures (§4.4)
@@ -2124,17 +2245,22 @@ def _spki_algorithm_body(der):
 
 
 def policy_allows(policy, identity, action):
-    """SIG-4: whether the trust policy lets this identity do this beyond signing ("may": ["redact"])."""
+    """SIG-4: whether the trust policy lets this identity do this beyond signing ("may": ["redact"]): an exact value
+    of a key's `may` array; values this version does not know grant nothing."""
     keys = policy.get("keys") if isinstance(policy, dict) else None
-    return any(isinstance(k, dict) and k.get("identity") == identity and action in (k.get("may") or [])
-               for k in keys or [])
+    if "policy-loose" in MUTATIONS:
+        return any(isinstance(k, dict) and k.get("identity") == identity and action in (k.get("may") or [])
+                   for k in keys if isinstance(keys, list))
+    return any(isinstance(k, dict) and k.get("identity") == identity and isinstance(k.get("may"), list)
+               and action in k["may"] for k in keys if isinstance(keys, list))
 
 
 def load_policy(policy):
     """[(identity, keyid, public key or None when its algorithm is not supported)], in policy order (SIG-4). The key
     id is computed from the key (SIG-3), never read from the policy."""
-    if not isinstance(policy, dict) or not isinstance(policy.get("keys"), list):
-        raise InputError("a trust policy is {\"keys\": [{\"identity\": ..., \"publicKey\": <SPKI PEM>}]}")
+    if "policy-loose" not in MUTATIONS and not document_ok("reader", "trust-policy", policy):  # SIG-4: refused whole
+        raise InputError("a trust policy is {\"keys\": [{\"identity\": ..., \"publicKey\": <SPKI PEM>, \"may\": [...]?}]}, "
+                         "valid against trust-policy.schema.json")
     keys = []
     for entry in policy["keys"]:
         if not isinstance(entry, dict) or not isinstance(entry.get("identity"), str):
@@ -2357,7 +2483,7 @@ def op_match(plan_path, runner_path):
 def _stream_event(raw):
     """A stream line's event, or None when it is not an I-JSON object valid against the reader schema (STRM-3
     event-invalid)."""
-    if len(raw) > MAX_JSON or nesting_depth(raw) > MAX_DEPTH:
+    if (len(raw) > MAX_JSON or nesting_depth(raw) > MAX_DEPTH) and "stream-limits" not in MUTATIONS:
         return None  # beyond ENC-17's limits: not read
     try:
         event = load_json_bytes(raw)
@@ -2445,7 +2571,9 @@ def op_conform(events_path, plan_path, runs_dir, policy=None):
     limits = plan.get("limits") if isinstance(plan.get("limits"), dict) else {}
     costs = [get(r.read()[0].get("summary.json"), "cost", "totalUsd") for r in found]
     max_usd = as_number(limits.get("maxUsd"))
-    if max_usd is not None and math.fsum(c for c in costs if as_number(c) is not None) > max_usd:
+    known = [c for c in costs if as_number(c) is not None]
+    total = functools.reduce(lambda a, b: a + b, known, 0.0) if "budget-in-order" in MUTATIONS else math.fsum(known)
+    if max_usd is not None and total > max_usd:
         problems.add(("job", "over-budget"))
     max_cases = as_number(limits.get("cases"))
     if max_cases is not None:
@@ -2509,7 +2637,7 @@ def dispatch(argv):
     p = sub.add_parser("view"); p.add_argument("dir"); p.add_argument("--at", required=True); p.add_argument("--policy")
     p = sub.add_parser("checkpoint"); p.add_argument("file")
     p = sub.add_parser("lanes"); p.add_argument("checkpoint"); p.add_argument("--runs", required=True); p.add_argument("--at")
-    p.add_argument("--policy")
+    p.add_argument("--policy"); p.add_argument("--envelope")
     p = sub.add_parser("signature"); p.add_argument("envelope"); p.add_argument("file"); p.add_argument("policy")
     p.add_argument("--payload-type")
     p = sub.add_parser("paths"); p.add_argument("file")
@@ -2539,7 +2667,7 @@ def dispatch(argv):
     if a.command == "checkpoint":
         return op_checkpoint(a.file)
     if a.command == "lanes":
-        return op_lanes(a.checkpoint, a.runs, a.at, policy)
+        return op_lanes(a.checkpoint, a.runs, a.at, policy, a.envelope)
     if a.command == "signature":
         return op_signature(a.envelope, a.file, a.policy, a.payload_type)
     if a.command == "paths":

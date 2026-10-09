@@ -206,6 +206,34 @@ public class EffectiveViewTests
         Assert.Equal((AefOutcome.Intact, 0), (verification.Outcome, verification.Withheld));   // nothing is gone
     }
 
+    [Fact]
+    public void Assurance_IsSignedOnlyWhenItsBatchsSignatureVerifiesForItsOwnIdentity_WhateverItClaims()
+    {
+        // [OVL-3], spec 09 §9.2.1: per event of the view, in file order. Batch 1 is signed by alice: her event is signed
+        // (it claims self-attested), bob's is not (his claim of signed is not verified). Batch 2 is unsigned: alice's
+        // claim of authenticated is shown as self-attested. An event with a problem of its own, and one after the
+        // verified batches, take no part in the view and are not listed.
+        using var alice = EcdsaP256Signer.Generate();
+        using var bob = EcdsaP256Signer.Generate();
+        using var run = Sealed();
+        JsonObject Claiming(string id, string by, string assurance) =>
+            TestRun.Event(id, "annotate", new JsonObject(), by, edit: e => { e["reason"] = "r"; e["by"]!["assurance"] = assurance; });
+        run.AppendBatch([Claiming("ov_1", TestRun.Alice, "self-attested"), Claiming("ov_2", TestRun.Bob, "signed"), Claiming("ov_1", TestRun.Alice, "signed")], alice);
+        run.AppendBatch([Claiming("ov_3", TestRun.Alice, "authenticated")]);
+        using (var tail = new FileStream(Path.Combine(run.Dir, "overlays", "events.ndjson"), FileMode.Append))
+        {
+            tail.Write(AgentEval.Results.Json.AefJsonWriter.Line(Claiming("ov_4", TestRun.Alice, "signed")));
+        }
+
+        var policy = new TrustPolicy([new TrustedKey(TestRun.Alice, alice.PublicKey), new TrustedKey(TestRun.Bob, bob.PublicKey)]);
+
+        Assert.Equal(
+            [new EffectiveAssurance("ov_1", "signed"), new EffectiveAssurance("ov_2", "self-attested"), new EffectiveAssurance("ov_3", "self-attested")],
+            View(run, policy).Assurance);
+        Assert.All(View(run).Assurance, a => Assert.Equal("self-attested", a.Shown));   // without a policy, nothing is verified
+        Assert.Equal(3, View(run).Assurance.Count);
+    }
+
     private static TestRun Sealed() => new TestRun().Write().Seal();
 
     private static EffectiveView View(TestRun run, TrustPolicy? policy = null) => EffectiveView.Compute(run.Dir, Now, policy);

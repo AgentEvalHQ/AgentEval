@@ -62,6 +62,10 @@
     <ProjectReference Include="..\AgentEval.RedTeam\AgentEval.RedTeam.csproj" />
     <ProjectReference Include="..\AgentEval.RedTeam.Gatekeeper\AgentEval.RedTeam.Gatekeeper.csproj" />
     <ProjectReference Include="..\AgentEval.Interop.AssertAi\AgentEval.Interop.AssertAi.csproj" />
+    <!-- `agenteval aef` (TODO Q4-39): AEF 1.0 verification, sealing, export of store v1 and import of ASSERT runs. The CLI
+         is the only shipped project that references AgentEval.Results (through the adapters), and a tool package
+         carries its dependencies; the umbrella AgentEval package references neither. -->
+    <ProjectReference Include="..\AgentEval.Results.Adapters\AgentEval.Results.Adapters.csproj" />
     <!-- Phase 8 (v0.10.0-beta): CLI needs direct refs to Performance and Memory for
          BenchPerfCommand and to anchor their module initializers so registry entries
          appear in bench list / per-family help. -->

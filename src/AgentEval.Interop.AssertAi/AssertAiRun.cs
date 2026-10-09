@@ -60,6 +60,18 @@ public sealed record AssertAiRun(
     /// have finished.</summary>
     public bool IsComplete => ManifestStatus == "completed";
 
+    /// <summary>The run's <c>manifest.json</c> as read, when it has one (its stages, the suite files' versions).</summary>
+    public JsonObject? Manifest { get; init; }
+
+    /// <summary>When the run started (<c>manifest.json</c> <c>started_at</c>), when the manifest says so.</summary>
+    public DateTimeOffset? StartedAt { get; init; }
+
+    /// <summary>
+    /// When the run ended (<c>manifest.json</c> <c>ended_at</c>), when the manifest says so. <see cref="FinishedAt"/> falls
+    /// back to when <c>scores.jsonl</c> was last written; this does not.
+    /// </summary>
+    public DateTimeOffset? EndedAt { get; init; }
+
     /// <summary>Reads an ASSERT run directory.</summary>
     /// <param name="runDirectory">The directory holding <c>scores.jsonl</c>.</param>
     /// <param name="options">Where the taxonomy and test set are, when not in the default places.</param>
@@ -153,9 +165,8 @@ public sealed record AssertAiRun(
                     : "The case is in the test set but has no transcript: ASSERT writes none when the target call of a prompt case fails (or the run stopped)."));
         }
 
-        var finishedAt = manifest?["ended_at"] is { } ended && DateTimeOffset.TryParse(AssertAiJson.Str(ended), System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal, out var at)
-            ? at
-            : new DateTimeOffset(File.GetLastWriteTimeUtc(scoresPath), TimeSpan.Zero);
+        var endedAt = ManifestTime(manifest, "ended_at");
+        var finishedAt = endedAt ?? new DateTimeOffset(File.GetLastWriteTimeUtc(scoresPath), TimeSpan.Zero);
 
         return new AssertAiRun(
             run,
@@ -169,8 +180,20 @@ public sealed record AssertAiRun(
             missing,
             manifest is null ? null : AssertAiJson.Str(manifest["status"]),
             finishedAt,
-            warnings);
+            warnings)
+        {
+            Manifest = manifest,
+            StartedAt = ManifestTime(manifest, "started_at"),
+            EndedAt = endedAt,
+        };
     }
+
+    // A time of manifest.json (Python's isoformat; a time without an offset is read as UTC), or null.
+    private static DateTimeOffset? ManifestTime(JsonObject? manifest, string name) =>
+        AssertAiJson.Str(manifest?[name]) is { } text
+        && DateTimeOffset.TryParse(text, System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.AssumeUniversal, out var at)
+            ? at
+            : null;
 
     private static string? ManifestTestSet(JsonObject? manifest, string? suite)
     {

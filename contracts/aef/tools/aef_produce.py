@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The AEF 1.0 reference writer: the three operations of the write-side conformance vectors (spec 09 §9.3), in which
+"""The AEF 1.0 reference writer: the four operations of the write-side conformance vectors (spec 09 §9.3), in which
 an implementation computes or writes something and the conformance runner judges it. Written from the specification
 (1/spec/) alone; standard library, plus aef_crypto.py for signing and aef_schema.py (the JSON Schema validator) for
 the ingest check of [SEAL-1].
@@ -23,6 +23,16 @@ Commands (the JSON each prints):
       Input errors: an undeclared metric; a lane twice, or a lane, metric and path twice; a method AEF does not
       define without `value`; a `value` for an entry AEF computes (no aggregate, or median, min or max); results
       or metrics that do not read.
+  produce SCENARIO OUT
+      [RES-4]-[RES-8], [SUM-2]-[SUM-9]: writes the closed, unsealed run the SCENARIO file describes (spec 09
+      §9.2.1: the run.json and metrics.json to write, each case's result tree as facts, and a summarize request)
+      in the folder OUT, which must not exist yet or be empty: run.json and metrics.json as given, results.ndjson
+      (one line per node, with what the producer derives: result ids, parents, trial numbers, the rollups' trials,
+      the aggregation counts and decisive ids) and summary.json (as summarize computes it from those lines).
+      Prints {"results": the number of lines}. Input errors, with nothing written: a scenario not of that shape; a
+      run that is not closed; a pending node; a child whose path is not its parent's and one more level; a decisive
+      path that is no child's; a node with children and no aggregation, or a child without component; a trial tree
+      whose paths are not the case's; two lines with one case, path and trial; and the input errors of summarize.
   seal-write DIR --sealed-by producer|ingest --sealed-at TIME
       [SEAL-1]-[SEAL-5]: writes DIR/seal.json for the closed run in DIR and changes nothing else. Prints
       {"runHash": hex}. Input errors, with nothing written: an open run; a TIME before run.json's endedAt; a run that
@@ -60,7 +70,7 @@ import aef_crypto  # noqa: E402
 import aef_schema  # noqa: E402  (the JSON Schema validator, standard library only: for the ingest check of SEAL-1)
 
 AEF_VERSION = "1.0"
-OPERATIONS = ("summarize", "seal-write", "sign")
+OPERATIONS = ("summarize", "produce", "seal-write", "sign")
 
 # ---------------------------------------------------------------------------- mutations (for --self-check)
 # Each name breaks one writer the way a plausible implementation would, so the conformance runner can show that the
@@ -71,6 +81,16 @@ KNOWN_MUTATIONS = {
     "summary-binary64": "sum and sumSq are added up in binary64 in file order, not exactly",
     "summary-trials": "trial lines are counted in the summary beside their rollup",
     "summary-value-ignored": "a value the request gives for median, min or max is ignored instead of refused",
+    "produce-ids": "result ids are hashed without the trial, so a trial's lines take its rollup's ids",
+    "produce-parent": "a parent is looked up by case and parent path, finding the first line written there (in a case "
+                      "run in trials, trial 0's), not the line of the node's own tree",
+    "produce-trial-children": "only a trial tree's root carries the trial; the lines under it carry none",
+    "produce-rollup-n": "a rollup's n is the case's number of trials at every path, though a trial has no line there",
+    "produce-rollup-passed": "a rollup's passed counts every trial not failed (warn, inconclusive and absences pass)",
+    "produce-agree": "a rollup's agree is computed from passed (0 or n), not from the trials' states",
+    "produce-aggregation-counts": "a not_applicable child is left out of total and unmeasured, as SUM-4 leaves it out",
+    "produce-component": "a child's component is left out when its weight is 0 (an Own composite's children)",
+    "produce-unchecked": "a scenario that contradicts itself is written instead of refused",
     "seal-omits-file": "the seal leaves the last sealed file out of its subjects and its manifest",
     "seal-ingest-unchecked": "a host seals on custody (ingest) without checking paths and reader schemas",
     "seal-path-order": "the subjects are ordered segment by segment (as a path sort does), not by UTF-8 bytes",
@@ -290,6 +310,11 @@ def summarize(run_dir, request):
     run = read_json(run_dir / "run.json", "run.json")
     metrics = read_json(run_dir / "metrics.json", "metrics.json")
     lines = read_ndjson(run_dir / "results.ndjson", "results.ndjson")
+    return summary_of(run, metrics, lines, request)
+
+
+def summary_of(run, metrics, lines, request):
+    """The summary.json document of a run read into memory: its run.json, metrics.json and result lines."""
     if not isinstance(run.get("runId"), str):
         raise InputError("run.json has no runId")
     kinds = {}
@@ -308,6 +333,227 @@ def summarize(run_dir, request):
     return {"schemaVersion": AEF_VERSION, "runId": run["runId"],  # SUM-2
             "lanes": [{"lane": l["lane"], "metrics": [_entry(e, l["lane"], names, kinds, lines) for e in l["metrics"]]}
                       for l in lanes]}
+
+
+# ---------------------------------------------------------------------------- produce (spec 03 §3.4, spec 09 §9.2.1)
+# A scenario holds the facts a producer has when it writes a run, and nothing it must derive:
+#   {"run": run.json, "metrics": metrics.json, "cases": [CASE, ...], "summary": a summarize request}
+#   NODE: {"path", "evaluator", "state", "scores"?, "severity"?, "reason"?, "lane"?, "component"? (on a child),
+#          "aggregation"?: {"strategy", "rulePath", "threshold"?, "score"?, "decisive"?: [child paths]},
+#          "children"?: [NODE, ...]}
+#   CASE: a NODE with "caseId", and for a case run in trials "trials": {"aggregation", "k"?, "trees": [NODE, ...]}:
+#         one tree per trial; the case's own node and its children are then the rollups.
+
+CLOSED_STATUSES = ("completed", "aborted")  # RUN-5
+TYPED_ABSENCES = ("not_measured", "not_applicable", "skipped", "error", "pending")  # RES-1
+LINE_FACTS = ("scores", "severity", "reason", "lane")  # copied to the line as given
+NODE_MEMBERS = {"path", "evaluator", "state", "component", "aggregation", "children", *LINE_FACTS}
+CASE_MEMBERS = {"caseId", "trials"}  # beside a node's, on a case
+AGGREGATION_FACTS = {"strategy", "rulePath", "threshold", "score", "decisive"}  # RES-5: the producer's own
+TRIALS_FACTS = {"aggregation", "k", "trees"}
+
+
+def result_id(run_id, case_id, path, trial=None):
+    """RES-4: "r_" and the first 32 hex characters of the SHA-256 of runId, caseId, path and trial, joined by U+001F;
+    the trial in plain integer digits, or empty on a line without one."""
+    text = "\x1f".join((run_id, case_id, path, "" if trial is None else str(trial)))
+    return "r_" + hashlib.sha256(text.encode("utf-8")).hexdigest()[:32]
+
+
+def _checked():
+    return "produce-unchecked" not in MUTATIONS
+
+
+def _shape(ok, what):
+    if not ok:
+        raise InputError(f"the scenario: {what} (spec 09 §9.2.1)")
+
+
+def _node_lines(run_id, case_id, node, trial, parent, where, own=frozenset(), rollup=None):
+    """The lines of one node and the nodes under it, the node's own line first. trial: the trial of the tree the node
+    is in (None in a case's own tree); parent: the line of its parent (None at a root); rollup: for a case run in
+    trials, {"states": the states of the trial lines by path, "trials": the scenario's trials}: the lines are then
+    the case's rollups."""
+    _shape(isinstance(node, dict), f"{where} is not an object")
+    unknown = set(node) - NODE_MEMBERS - own
+    _shape(not unknown, f"{where} has members a node does not: {', '.join(sorted(unknown))}")
+    path, state = node.get("path"), node.get("state")
+    _shape(isinstance(path, str) and isinstance(state, str) and isinstance(node.get("evaluator"), dict),
+           f"{where} has no path, state or evaluator")
+    _shape(isinstance(node.get("scores", []), list) and all(isinstance(node.get(f, ""), str) for f in LINE_FACTS[1:]),
+           f"{where}: scores is a list, and severity, reason and lane are strings")
+    if state == "pending" and _checked():
+        raise InputError(f"{where} is pending in a closed run ([RES-3]): it is skipped or error, with a reason")
+    line = {"schemaVersion": AEF_VERSION, "resultId": result_id(run_id, case_id, path, trial),  # RES-4
+            "caseId": case_id, "path": path}
+    if parent is not None:
+        name = path[len(parent["path"]) + 1:] if path.startswith(parent["path"] + "/") else ""
+        if (not name or "/" in name) and _checked():
+            raise InputError(f"{where}: the path {path!r} is not its parent's ({parent['path']!r}) and one more level")
+        line["parentResultId"] = parent["resultId"]  # the parent's line, in the same tree
+        component = node.get("component")
+        if component is None and _checked():
+            raise InputError(f"{where}: a child without component ([RES-5])")
+        if component is not None:
+            _shape(isinstance(component, dict) and isinstance(component.get("required"), bool)
+                   and isinstance(component.get("weight"), (int, float))
+                   and not isinstance(component.get("weight"), bool), f"{where}.component is not {{weight, required}}")
+            if not ("produce-component" in MUTATIONS and component.get("weight") == 0):
+                line["component"] = component
+    elif "component" in node and _checked():
+        raise InputError(f"{where}: component on a node that is no child ([RES-5])")
+    if trial is not None:
+        line["trial"] = trial  # RES-8: every line of a trial's tree carries its trial
+    line["evaluator"], line["state"] = node["evaluator"], state
+    for fact in LINE_FACTS:
+        if fact in node:
+            line[fact] = node[fact]
+    if rollup is not None:  # RES-8: n and passed over the trial lines at this path; agree when they are in one state
+        states, given = rollup["states"].get(path, []), rollup["trials"]
+        n, passed = len(states), sum(1 for s in states if s == "passed")
+        if "produce-rollup-n" in MUTATIONS:
+            n = len(given["trees"])
+        if "produce-rollup-passed" in MUTATIONS:
+            passed = sum(1 for s in states if s != "failed")
+        agree = passed in (0, n) if "produce-agree" in MUTATIONS else len(set(states)) == 1
+        line["trials"] = {"n": n, "passed": passed, "aggregation": given["aggregation"], "agree": agree}
+        if "k" in given:
+            line["trials"]["k"] = int(given["k"])  # ENC-4: an integer is written in plain digits
+
+    children = node.get("children", [])
+    _shape(isinstance(children, list), f"{where}.children is not a list")
+    lines, kids = [line], []
+    for i, child in enumerate(children):
+        below = _node_lines(run_id, case_id, child, trial, line, f"{where}.children[{i}]", rollup=rollup)
+        kids.append(below[0])
+        lines += below
+    facts = node.get("aggregation")
+    if kids and facts is None and _checked():
+        raise InputError(f"{where}: a node with children and no aggregation ([RES-5])")
+    if facts is not None:
+        _shape(isinstance(facts, dict) and not set(facts) - AGGREGATION_FACTS and isinstance(facts.get("strategy"), str)
+               and isinstance(facts.get("rulePath"), str), f"{where}.aggregation is not the producer's facts "
+               "(strategy, rulePath, and optionally threshold, score and decisive)")
+        counted = kids
+        if "produce-aggregation-counts" in MUTATIONS:
+            counted = [k for k in kids if k["state"] != "not_applicable"]
+        aggregation = {"strategy": facts["strategy"]}
+        aggregation.update({f: facts[f] for f in ("threshold", "score") if f in facts})
+        # RES-5, RES-6: total is the children; measured those in a measured state (RES-1); unmeasured the others, by
+        # state (pending only when there is one: an absent count is 0).
+        aggregation.update(rulePath=facts["rulePath"], measured=sum(1 for k in counted if k["state"] in MEASURED_STATES),
+                           total=len(counted), unmeasured={s: sum(1 for k in counted if k["state"] == s)
+                                                           for s in TYPED_ABSENCES if s != "pending"})
+        pending = sum(1 for k in counted if k["state"] == "pending")
+        if pending:
+            aggregation["unmeasured"]["pending"] = pending
+        if "decisive" in facts:
+            _shape(isinstance(facts["decisive"], list) and all(isinstance(p, str) for p in facts["decisive"]),
+                   f"{where}.aggregation.decisive is not a list of paths")
+            ids = {k["path"]: k["resultId"] for k in reversed(kids)}
+            for p in facts["decisive"]:
+                if p not in ids and _checked():
+                    raise InputError(f"{where}: the decisive path {p!r} is no child's ([RES-6])")
+            aggregation["decisive"] = [ids[p] for p in facts["decisive"] if p in ids]
+        line["aggregation"] = aggregation
+    return lines
+
+
+def _case_lines(run_id, case, where):
+    """The lines of one case: its tree's, or, for a case run in trials, each trial's tree and then the rollups."""
+    _shape(isinstance(case, dict) and isinstance(case.get("caseId"), str), f"{where} has no caseId")
+    case_id, trials = case["caseId"], case.get("trials")
+    if trials is None:
+        return _node_lines(run_id, case_id, case, None, None, where, own=CASE_MEMBERS)
+    _shape(isinstance(trials, dict) and not set(trials) - TRIALS_FACTS and isinstance(trials.get("aggregation"), str)
+           and isinstance(trials.get("trees"), list) and trials["trees"]
+           and (type(trials.get("k", 1)) is int or isinstance(trials.get("k"), float) and trials["k"].is_integer()),
+           f"{where}.trials is not {{aggregation, k?, trees}} with a tree per trial")
+    lines, states = [], {}
+    for t, tree in enumerate(trials["trees"]):
+        if isinstance(tree, dict) and tree.get("path") != case.get("path") and _checked():
+            raise InputError(f"{where}.trials.trees[{t}]: its root is at {tree.get('path')!r}, not at the case's "
+                             f"path {case.get('path')!r} ([RES-8])")
+        for line in _node_lines(run_id, case_id, tree, t, None, f"{where}.trials.trees[{t}]"):
+            lines.append(line)
+            states.setdefault(line["path"], []).append(line["state"])
+    rollups = _node_lines(run_id, case_id, case, None, None, where, own=CASE_MEMBERS,
+                          rollup={"states": states, "trials": trials})
+    if {r["path"] for r in rollups} != set(states) and _checked():
+        raise InputError(f"{where}: the case's tree and its trial trees do not have the same paths: a rollup at each "
+                         "path its trials have, and at no other ([RES-8])")
+    return lines + rollups
+
+
+def _renamed(lines, new_id):
+    """The lines with every result id replaced by new_id(line), and the parents and decisive ids that cite them."""
+    ids = {line["resultId"]: new_id(line) for line in lines}
+    for line in lines:
+        line["resultId"] = ids[line["resultId"]]
+        if line.get("parentResultId") in ids:
+            line["parentResultId"] = ids[line["parentResultId"]]
+        if "decisive" in line.get("aggregation", {}):
+            line["aggregation"]["decisive"] = [ids.get(d, d) for d in line["aggregation"]["decisive"]]
+    return lines
+
+
+def _mutated(run_id, lines):
+    """The writers --self-check breaks after the lines are derived (aef_conformance.py)."""
+    if "produce-ids" in MUTATIONS:
+        _renamed(lines, lambda l: result_id(run_id, l["caseId"], l["path"]))
+    if "produce-trial-children" in MUTATIONS:
+        for line in lines:
+            if "parentResultId" in line:
+                line.pop("trial", None)
+        _renamed(lines, lambda l: result_id(run_id, l["caseId"], l["path"], l.get("trial")))
+    if "produce-parent" in MUTATIONS:
+        first = {}
+        for line in lines:
+            first.setdefault((line["caseId"], line["path"]), line["resultId"])
+        for line in lines:
+            if "parentResultId" in line:
+                line["parentResultId"] = first[(line["caseId"], line["path"].rsplit("/", 1)[0])]
+    return lines
+
+
+def _document_bytes(value):
+    return (json.dumps(value, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+
+
+def produce(scenario, out_dir):
+    """Writes the closed, unsealed run the scenario describes in out_dir: run.json and metrics.json as given,
+    results.ndjson with what [RES-4]-[RES-8] derive, and summary.json ([SUM-2]-[SUM-9]). Nothing is written when the
+    scenario is an input error. Returns {"results": the number of lines}."""
+    out = Path(out_dir)
+    if out.exists() and not (out.is_dir() and not any(out.iterdir())):
+        raise InputError(f"{out_dir}: OUT is a folder that does not exist yet, or an empty one")
+    _shape(isinstance(scenario, dict) and not set(scenario) ^ {"run", "metrics", "cases", "summary"},
+           "a scenario is {run, metrics, cases, summary}")
+    run, metrics, cases = scenario["run"], scenario["metrics"], scenario["cases"]
+    _shape(isinstance(run, dict) and isinstance(run.get("runId"), str), "run is no run.json with a runId")
+    _shape(isinstance(metrics, dict), "metrics is no metrics.json")
+    _shape(isinstance(cases, list), "cases is not a list")
+    if run.get("status") not in CLOSED_STATUSES and _checked():
+        raise InputError(f"the run is not closed (status {run.get('status')!r}): produce writes a closed run")
+    lines = []
+    for i, case in enumerate(cases):
+        lines += _case_lines(run["runId"], case, f"cases[{i}]")
+    seen = set()
+    for line in lines:
+        key = (line["caseId"], line["path"], line.get("trial"))
+        if key in seen and _checked():
+            raise InputError(f"two lines of case {key[0]!r} at {key[1]!r}" + ("" if key[2] is None else f", trial {key[2]}")
+                             + ": they would have one resultId ([RES-4])")
+        seen.add(key)
+    lines = _mutated(run["runId"], lines)
+    summary = summary_of(run, metrics, lines, scenario["summary"])
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "run.json").write_bytes(_document_bytes(run))
+    (out / "results.ndjson").write_bytes("".join(json.dumps(line, ensure_ascii=False, separators=(",", ":")) + "\n"
+                                                 for line in lines).encode("utf-8"))
+    (out / "metrics.json").write_bytes(_document_bytes(metrics))
+    (out / "summary.json").write_bytes(_document_bytes(summary))
+    return {"results": len(lines)}
 
 
 # ---------------------------------------------------------------------------- seal-write (spec 04 §4.1)
@@ -642,6 +888,9 @@ def dispatch(argv):
     p = sub.add_parser("summarize")
     p.add_argument("dir")
     p.add_argument("request")
+    p = sub.add_parser("produce")
+    p.add_argument("scenario")
+    p.add_argument("out")
     p = sub.add_parser("seal-write")
     p.add_argument("dir")
     p.add_argument("--sealed-by", required=True)
@@ -653,6 +902,8 @@ def dispatch(argv):
     a = parser.parse_args(argv)
     if a.command == "summarize":
         return summarize(a.dir, read_json(a.request, "the request"))
+    if a.command == "produce":
+        return produce(read_json(a.scenario, "the scenario"), a.out)
     if a.command == "seal-write":
         if not Path(a.dir).is_dir():
             raise InputError(f"{a.dir}: not a folder")

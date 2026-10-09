@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "BS",
+  "lanes": [
+    {
+      "lane": "memory",
+      "metrics": [
+        {
+          "metric": "recall",
+          "path": "mem",
+          "n": 23,
+          "N": 23,
+          "notMeasured": 0,
+          "value": 0.5,
+          "verdict": "passed",
+          "rule": "recorded by the producer",
+          "sum": 11.5,
+          "sumSq": 5.75
+        },
+        {
+          "metric": "latency",
+          "path": "mem",
+          "n": 23,
+          "N": 23,
+          "notMeasured": 0,
+          "value": 100.0,
+          "verdict": "passed",
+          "rule": "recorded by the producer",
+          "sum": 2300,
+          "sumSq": 230000
+        },
+        {
+          "metric": "tokens",
+          "path": "mem",
+          "n": 23,
+          "N": 23,
+          "notMeasured": 0,
+          "value": 230,
+          "verdict": "passed",
+          "rule": "recorded by the producer",
+          "sum": 230,
+          "sumSq": 2300
+        }
+      ]
+    }
+  ]
+}

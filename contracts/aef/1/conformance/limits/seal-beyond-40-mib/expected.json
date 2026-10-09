@@ -1,0 +1,42 @@
+{
+  "kind": "run",
+  "run": "run",
+  "generate": [
+    {
+      "copy": [
+        "valid/completed-eval/run",
+        "run"
+      ]
+    },
+    {
+      "write": [
+        "run/seal.json",
+        [
+          [
+            "{\"pad\":\"",
+            1
+          ],
+          [
+            "a",
+            41943031
+          ],
+          [
+            "\"}",
+            1
+          ]
+        ]
+      ]
+    }
+  ],
+  "outcome": "invalid",
+  "problems": [
+    [
+      "seal.json",
+      "limit"
+    ]
+  ],
+  "rules": [
+    "ENC-17",
+    "ENC-18"
+  ]
+}

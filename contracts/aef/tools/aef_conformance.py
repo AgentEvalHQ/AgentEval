@@ -34,7 +34,14 @@ one JSON value on standard output), given with --command. Each vector's `kind` n
                                                                              the summary.json written: writer schema,
                                                                              each entry (sums under §3.6's tolerance),
                                                                              and the run verifier on the run with it
-  seal-write    write-vectors/seal-write/                 seal-write COPY --sealed-by B --sealed-at T
+  produce       write-vectors/produce/                    produce SCENARIO OUT
+                                                                             the run written in a fresh OUT: its four
+                                                                             files; run.json and metrics.json as given;
+                                                                             the lines as a set, matched by case, path
+                                                                             and trial, member by member; summary.json
+                                                                             as summarize's; and the run verifier:
+                                                                             unsealed, no problems
+  seal-write    write-vectors/seal-write/                seal-write COPY --sealed-by B --sealed-at T
                                                                              on a fresh copy of the run: writer schema,
                                                                              subjects, predicate, nothing else changed,
                                                                              and the run verifier: intact
@@ -44,8 +51,8 @@ one JSON value on standard output), given with --command. Each vector's `kind` n
                                                                              identity by the signature operation; for
                                                                              Ed25519 the signature bytes
 
-The write operations (summarize, seal-write, sign) are judged by the reference verifier, in-process, whichever
-implementation is under test: aef_verify.py checks what the implementation wrote.
+The write operations (summarize, produce, seal-write, sign) are judged by the reference verifier, in-process,
+whichever implementation is under test: aef_verify.py checks what the implementation wrote.
 
 When conformance/index.json exists (CONF-1), the vectors are read from it and every file's SHA-256 is checked
 against it first: a vector with a file that does not match, or an extra file, fails without being run (CONF-3). An
@@ -64,14 +71,18 @@ Usage:
       manifest's byte order, the I-JSON duplicate-member check, the $-at-end-of-input pattern rule, the summary
       recomputation, the overlay runHash check, the numeric order of line numbers, the anchor list, the trust
       policy's key list), and once per break of a writer in aef_produce.py (typed absences left out of N, sums in
-      binary64, trial lines counted, a file left out of the seal, paths in segment order, another signing key,
+      binary64, trial lines counted, result ids without the trial, parents found by path, trial children without
+      their trial, rollup counts and agreement, aggregation counts, a weight-0 child without component, a
+      contradictory scenario written, a file left out of the seal, paths in segment order, another signing key,
       unpadded base64). Each mutation must make some vector fail that passes unmutated.
 Exit status: 0 when every vector passes (and, with --self-check, every mutation is caught), else 1.
 """
 from __future__ import annotations
 
 import argparse
+import atexit
 import base64
+import concurrent.futures
 import hashlib
 import json
 import os
@@ -142,9 +153,9 @@ KIND_CLASSES = {
     "overlay-view": ["Overlay verifier"], "checkpoint": ["Checkpoint verifier"], "lane": ["Checkpoint verifier"],
     "decision": ["Checkpoint verifier", "Decision engine"], "plan": ["Runner"], "matching": ["Runner"],
     "stream": ["Stream verifier"], "plan-conformance": ["Stream verifier"],
-    "summarize": ["Producer"], "seal-write": ["Sealer"], "sign": ["Sealer"],
+    "summarize": ["Producer"], "produce": ["Producer"], "seal-write": ["Sealer"], "sign": ["Sealer"],
 }
-WRITE_KINDS = ("summarize", "seal-write", "sign")  # write-vectors/<kind>/<name>/ (spec 09 §9.2.1)
+WRITE_KINDS = ("summarize", "produce", "seal-write", "sign")  # write-vectors/<kind>/<name>/ (spec 09 §9.2.1)
 SIGN_ALGORITHMS = ("ecdsa-p256", "ed25519")  # SIG-2: a signer uses one of these; a sign vector names the one it needs
 
 
@@ -161,6 +172,8 @@ FOLDER_KINDS = [  # (folder, default kind when expected.json has none)
     ("chain-vectors", "chain"), ("overlay-views", "overlay-view"), ("invalid", "document"),
     ("reader-only", "reader-only"), ("checkpoints", "checkpoint"), ("lane-vectors", "lane"),
     ("signature-vectors", "signature"),
+    ("rulings", "run"),  # pin_vectors.py: vectors of several kinds, each named in its expected.json
+    ("limits", "run"),  # generated by the runner from the recipe in expected.json (spec 09 §9.2)
 ]
 
 
@@ -296,9 +309,52 @@ def compare(diffs, label, actual, expected):
                      f"got {json.dumps(actual, ensure_ascii=False)}")
 
 
+_GENERATED = {}  # vector id -> the folder generated for it, once per process (implementations only read it)
+
+
+def _generated(v):
+    """Spec 09 §9.2: the folder a vector's `generate` recipe gives. The vector's own files are copied, then each step
+    is applied in order: copy (a corpus file or folder into the vector), remove, files (that many empty files, named
+    0 to N-1), write and append (a file of text parts, each repeated)."""
+    if v.id in _GENERATED:
+        return _GENERATED[v.id]
+    if not _GENERATED:
+        root = Path(tempfile.mkdtemp(prefix="aef-generated-"))
+        atexit.register(shutil.rmtree, root, True)
+        _GENERATED[None] = root
+    folder = _GENERATED[None] / f"v{len(_GENERATED)}"
+    shutil.copytree(v.path, folder)
+    corpus = v.path.parent.parent
+    for step in v.expected["generate"]:
+        (op, arg), = step.items()
+        if op == "copy":
+            source, target = corpus / arg[0], folder / arg[1]
+            if v.guard is not None:
+                for f in ([source] if source.is_file() else sorted(p for p in source.rglob("*") if p.is_file())):
+                    v.guard.check(f)
+            (shutil.copytree if source.is_dir() else shutil.copyfile)(source, target)
+        elif op == "remove":
+            target = folder / arg
+            shutil.rmtree(target) if target.is_dir() else target.unlink()
+        elif op == "files":
+            (folder / arg[0]).mkdir(parents=True, exist_ok=True)
+            for i in range(arg[1]):
+                (folder / arg[0] / str(i)).write_bytes(b"")
+        elif op in ("write", "append"):
+            with open(folder / arg[0], "wb" if op == "write" else "ab") as out:
+                for text, repeat in arg[1]:
+                    out.write(text.encode("utf-8") * repeat)
+        else:
+            raise ValueError(f"{v.id}: a generate step this runner does not know: {op}")
+    _GENERATED[v.id] = folder
+    return folder
+
+
 def run_vector(engine, v, scratch):
     """The list of differences (empty when the vector passes)."""
     e, d, diffs = v.expected, v.path, []
+    if isinstance(e, dict) and "generate" in e:
+        d = _generated(v)
     if v.kind in ("run", "encoding"):
         argv = ["run", d / e.get("run", "run")]
         if "policy" in e:
@@ -334,6 +390,8 @@ def run_vector(engine, v, scratch):
             return [out["error"]]
         for field in ("results", "reviews", "waivers", "withheld", "unsealedEvents"):
             compare(diffs, f"view.{field}", out.get(field), e["view"].get(field))
+        if "assurance" in e["view"]:  # OVL-3, in the vectors that state it
+            compare(diffs, "view.assurance", out.get("assurance"), e["view"]["assurance"])
     elif v.kind in ("document", "reader-only", "plan"):
         out = engine.call(["document", e["schema"], d / e.get("document", "document.json")])
         if "error" in out:
@@ -352,7 +410,8 @@ def run_vector(engine, v, scratch):
             compare(diffs, "problems", out.get("problems"), e["problems"])
     elif v.kind == "lane":
         out = engine.call(["lanes", d / e.get("checkpoint", "checkpoint.json"), "--runs", d / e.get("runs", "runs")]
-                          + (["--at", e["at"]] if "at" in e else []) + _policy(e, d))  # LANE-9's evaluation time
+                          + (["--at", e["at"]] if "at" in e else []) + _policy(e, d)  # LANE-9's evaluation time
+                          + (["--envelope", d / e["envelope"]] if "envelope" in e else []))  # CKP-9
         if "error" in out:
             return [out["error"]]
         got = out.get("lanes") or []
@@ -365,6 +424,8 @@ def run_vector(engine, v, scratch):
         if len(got) != len(e["lanes"]):
             diffs.append(f"lanes: expected {len(e['lanes'])}, got {len(got)}")
         compare(diffs, "problems", _problems(out.get("problems")), _problems(e["problems"]))
+        if "anchors" in e:  # CKP-9, SIG-8, in the vectors that state it
+            compare(diffs, "anchors", out.get("anchors"), e["anchors"])
     elif v.kind == "signature":
         argv = ["signature", d / e["envelope"], d / e["file"], d / e["policy"]]
         if "payloadType" in e:
@@ -403,8 +464,7 @@ def run_vector(engine, v, scratch):
         out = engine.call(["stream", d / "events.ndjson", d / e["plan"]])
         if "error" in out:
             return [out["error"]]
-        want = [[p["where"], p["problem"]] for p in e["problems"]]
-        compare(diffs, "problems", _problems(out.get("problems")), want)
+        compare(diffs, "problems", _problems(out.get("problems")), _problems(e["problems"]))
     elif v.kind == "plan-conformance":
         out = engine.call(["conform", d / e["events"], d / e["plan"], d / e["runs"]] + _policy(e, d))
         if "error" in out:
@@ -484,6 +544,8 @@ def judge_write(engine, v, scratch, diffs):
         verdict = aef_verify.op_run(work)
         compare(diffs, "the run verifier on the run with this summary.json", [verdict["outcome"],
                 _problems(verdict["problems"])], [e.get("outcome", "unsealed"), []])
+    elif v.kind == "produce":
+        _judge_produce(engine, v, scratch, diffs)
     elif v.kind == "seal-write":
         _judge_seal_write(engine, v, scratch, diffs)
     elif v.kind == "sign":
@@ -509,6 +571,161 @@ def _judge_summary(diffs, out, want):
                 if not _close(got.get(field, "<absent>"), x[field]):
                     diffs.append(f"{label} {field}: expected {json.dumps(x[field])} (within 1e-9 x max(1, |x|)), "
                                  f"got {json.dumps(got.get(field, '<absent>'))}")
+
+
+PRODUCED = ("metrics.json", "results.ndjson", "run.json", "summary.json")  # spec 09 §9.3: produce writes these
+_ABSENT = "<absent>"
+
+
+def _same(actual, expected):
+    """Two JSON values are equal member by member, numbers under §3.6's rule (within 1e-9 x max(1, |expected|)), a
+    boolean only to a boolean, two times as times ([ENC-8]: `...00Z` and `...00.000Z` are one instant)."""
+    if isinstance(actual, bool) or isinstance(expected, bool):
+        return type(actual) is type(expected) and actual == expected
+    if isinstance(actual, str) and isinstance(expected, str) and actual != expected:
+        a, b = aef_verify.time_key(actual), aef_verify.time_key(expected)
+        return a is not None and a == b
+    if isinstance(expected, (int, float)):
+        return _close(actual, expected)
+    if isinstance(expected, dict):
+        return isinstance(actual, dict) and actual.keys() == expected.keys() and all(
+            _same(actual[k], expected[k]) for k in expected)
+    if isinstance(expected, list):
+        return isinstance(actual, list) and len(actual) == len(expected) and all(map(_same, actual, expected))
+    return type(actual) is type(expected) and actual == expected
+
+
+def _without_nulls(value):
+    """The JSON value with every null-valued member left out, at every depth ([ENC-2])."""
+    if isinstance(value, dict):
+        return {k: _without_nulls(v) for k, v in value.items() if v is not None}
+    if isinstance(value, list):
+        return [_without_nulls(v) for v in value]
+    return value
+
+
+def _as_written(line):
+    """A result line with each absence the spec gives a value written as that value's absence, so two writers that
+    choose differently compare equal: a null parentResultId (a root, [RES-5]), a null threshold or score, an
+    unmeasured count of 0 ([RES-6]), an empty decisive list; and decisive in any order, since none is given."""
+    if not isinstance(line, dict):
+        return line
+    line = _without_nulls(line)  # ENC-2: null and absence mean the same on a result line's optional fields
+    aggregation = line.get("aggregation")
+    if isinstance(aggregation, dict):
+        aggregation = {k: v for k, v in aggregation.items() if not (k in ("threshold", "score") and v is None)}
+        unmeasured = aggregation.get("unmeasured")
+        if isinstance(unmeasured, dict):
+            unmeasured = {k: v for k, v in unmeasured.items() if not (_same(v, 0) and not isinstance(v, bool))}
+            if unmeasured:
+                aggregation["unmeasured"] = unmeasured
+            else:
+                del aggregation["unmeasured"]
+        decisive = aggregation.get("decisive")
+        if decisive == []:
+            del aggregation["decisive"]
+        elif isinstance(decisive, list) and all(isinstance(d, str) for d in decisive):
+            aggregation["decisive"] = sorted(decisive)
+        line["aggregation"] = aggregation
+    return line
+
+
+def _node_key(line):
+    """A line's place in the run: its case, path and trial (spec 09 §9.3 matches lines by them)."""
+    return (line.get("caseId"), line.get("path"), line.get("trial")) if isinstance(line, dict) else None
+
+
+def _label(key):
+    case, path, trial = key
+    return f"{case}@{path}" + ("" if trial is None else f"#{trial}")
+
+
+def _read_lines(data, where, diffs):
+    """The objects of an NDJSON file (None, with a difference, when it does not read)."""
+    lines = []
+    try:
+        text = data.decode("utf-8")
+    except UnicodeDecodeError as error:
+        diffs.append(f"{where} is not UTF-8: {error}")
+        return None
+    if text and ("\r" in text or not text.endswith("\n") or "\n\n" in text or text.startswith("\n")):
+        diffs.append(f"{where} is not NDJSON (a CR, a blank line or an unended last line, [ENC-5])")
+        return None
+    for i, raw in enumerate(text.split("\n")[:-1] if text else [], start=1):
+        try:
+            lines.append(aef_verify.load_json_bytes(raw.encode("utf-8")))
+        except aef_verify.EncodingProblem as error:
+            diffs.append(f"{where}:{i} is not an I-JSON object: {error}")
+            return None
+    return lines
+
+
+def _judge_produce(engine, v, scratch, diffs):
+    """[RES-4]-[RES-8], [SUM-2]-[SUM-9]: the run written from the scenario in a fresh folder holds exactly the four
+    files; run.json and metrics.json are the scenario's, as given; the lines are the expected ones as a set (matched
+    by case, path and trial, member by member, numbers under §3.6's rule), each valid against the writer result
+    schema; summary.json is judged as summarize's output is; and the run verifies unsealed with no problems. A
+    refused scenario writes nothing."""
+    e, d = v.expected, v.path
+    scenario_file = d / e["scenario"]
+    out_dir = Path(tempfile.mkdtemp(dir=scratch)) / "run"  # does not exist yet: the operation creates it
+    out = engine.call(["produce", scenario_file, out_dir])
+    written = _files(out_dir) if out_dir.is_dir() else {}
+    if e.get("refused"):  # a scenario that contradicts itself: an input error (exit 2), and nothing written
+        if not (isinstance(out, dict) and "error" in out):
+            diffs.append(f"wrote a run for a scenario it must refuse: {json.dumps(out)}")
+        if written:
+            diffs.append(f"wrote files although it refused: {', '.join(sorted(written))}")
+        return
+    if not isinstance(out, dict) or "error" in out:
+        diffs.append(out.get("error") if isinstance(out, dict) else f"not a JSON object: {json.dumps(out)}")
+        return
+    scenario = read_json(scenario_file)
+    compare(diffs, "the files written", sorted(written), list(PRODUCED))
+    documents = {}
+    for name in ("run.json", "metrics.json", "summary.json"):
+        if name in written:
+            try:
+                documents[name] = aef_verify.load_json_bytes(written[name])
+            except aef_verify.EncodingProblem as error:
+                diffs.append(f"{name} is not an I-JSON document: {error}")
+    for name, member in (("run.json", "run"), ("metrics.json", "metrics")):
+        # ENC-2: on an optional field, null and absence mean the same (neither file gives null a meaning of its own)
+        if name in documents and not _same(_without_nulls(documents[name]), _without_nulls(scenario[member])):
+            diffs.append(f"{name}: not the scenario's {member}, as given: got {json.dumps(documents[name])}")
+
+    want = {}
+    for line in (d / e["results"]).read_bytes().decode("utf-8").splitlines():
+        line = json.loads(line)
+        want[_node_key(line)] = _as_written(line)
+    lines = _read_lines(written["results.ndjson"], "results.ndjson", diffs) if "results.ndjson" in written else None
+    if lines is not None:
+        compare(diffs, "results (the operation's output)", out.get("results"), len(lines))
+        have = {}
+        for i, line in enumerate(lines, start=1):
+            if not aef_verify.document_ok("writer", "result", line):
+                diffs.append(f"results.ndjson:{i} is not valid against the writer result schema")
+            key = _node_key(line)
+            if key in have:
+                diffs.append(f"results.ndjson:{i}: a second line for case, path and trial {_label(key)}")
+            have.setdefault(key, _as_written(line))
+        for key in sorted(set(want) - set(have), key=str):
+            diffs.append(f"no line for case, path and trial {_label(key)}")
+        for key in sorted(set(have) - set(want), key=str):
+            diffs.append(f"a line for case, path and trial {_label(key)}, which the scenario has not")
+        for key in sorted(set(want) & set(have), key=str):
+            got, expected = have[key], want[key]
+            for member in sorted(set(got) | set(expected)):
+                if not _same(got.get(member, _ABSENT), expected.get(member, _ABSENT)):
+                    diffs.append(f"{_label(key)} {member}: expected {json.dumps(expected.get(member, _ABSENT))}, "
+                                 f"got {json.dumps(got.get(member, _ABSENT))}")
+    if "summary.json" in documents:
+        _judge_summary(diffs, documents["summary.json"], e["summary"])
+        if not aef_verify.document_ok("writer", "summary", documents["summary.json"]):
+            diffs.append("summary.json is not valid against the writer summary schema")
+    verdict = aef_verify.op_run(out_dir)
+    compare(diffs, "the run verifier on the run written", [verdict["outcome"], _problems(verdict["problems"])],
+            ["unsealed", []])
 
 
 def _judge_seal_write(engine, v, scratch, diffs):
@@ -635,23 +852,45 @@ def summary(tally, show=print):
     return total_bad
 
 
-def self_check(vectors, refusals):
-    """Runs the corpus under each mutation; every one must make a vector fail."""
-    engine = InProcess()
+def _load(corpus, index):
+    """The vectors and refusals of a corpus, from its index when one is given."""
+    return from_index(corpus, index) if index is not None else (walk(corpus, []), [])
+
+
+def _mutation_failures(job):
+    """The ids of the vectors that fail with one mutation switched on (None: unmutated), in a process of its own."""
+    corpus, index, ids, module_name, name = job
+    vectors, refusals = _load(corpus, index)
+    vectors = [v for v in vectors if v.id in ids]
+    refusals = [r for r in refusals if r[1] in ids]
+    # A pool worker runs several jobs: switch off whatever the previous one switched on, in both modules, so that each
+    # job runs exactly one mutation (or none).
+    aef_verify.set_mutations(set())
+    aef_produce.set_mutations(set())
+    if name is not None:
+        {"aef_verify": aef_verify, "aef_produce": aef_produce}[module_name].set_mutations({name})
+    _, failing = run_all(InProcess(), vectors, refusals, quiet=True, show=lambda *a: None)
+    return failing
+
+
+def self_check(vectors, refusals, corpus, index):
+    """Runs the corpus under each mutation, in parallel processes; every mutation must make a vector fail."""
     caught_all = True
     print("self-check: each mutation switches one check of aef_verify.py off, or breaks one writer of aef_produce.py; "
           "the corpus must notice")
-    _, baseline = run_all(engine, vectors, refusals, quiet=True, show=lambda *a: None)
-    print(f"  unmutated: {len(baseline)} vector(s) fail{': ' + ', '.join(baseline) if baseline else ''}"
-          + (" (a mutation is caught only by a vector that passes unmutated)" if baseline else ""))
+    # The generated limit vectors are left out: "limits" is caught by the stored ones, and a run of 100,000 files per
+    # mutation would make the self-check take an hour.
+    ids = {v.id for v in vectors if not (isinstance(v.expected, dict) and "generate" in v.expected)}
+    ids |= {r[1] for r in refusals}
     mutations = [(module, name, what) for module in (aef_verify, aef_produce)
                  for name, what in module.KNOWN_MUTATIONS.items()]
-    for module, name, what in mutations:
-        module.set_mutations({name})
-        try:
-            _, failing = run_all(engine, vectors, refusals, quiet=True, show=lambda *a: None)
-        finally:
-            module.set_mutations(set())
+    jobs = [(corpus, index, ids, None, None)] + [(corpus, index, ids, m.__name__, name) for m, name, _ in mutations]
+    with concurrent.futures.ProcessPoolExecutor(max_workers=min(len(jobs), os.cpu_count() or 1)) as pool:
+        results = list(pool.map(_mutation_failures, jobs))
+    baseline = results[0]
+    print(f"  unmutated: {len(baseline)} vector(s) fail{': ' + ', '.join(baseline) if baseline else ''}"
+          + (" (a mutation is caught only by a vector that passes unmutated)" if baseline else ""))
+    for (module, name, what), failing in zip(mutations, results[1:]):
         new = [vid for vid in failing if vid not in baseline]
         caught_all &= bool(new)
         sample = ", ".join(new[:4]) + (f" and {len(new) - 4} more" if len(new) > 4 else "")
@@ -717,7 +956,8 @@ def main(argv):
     if a.self_check:
         if a.command:
             parser.error("--self-check mutates the in-process verifier; it does not take --command")
-        return 0 if self_check(vectors, refusals) else 1
+        use_index = index.is_file() and not a.no_index
+        return 0 if self_check(vectors, refusals, corpus, index if use_index else None) else 1
     engine = External(a.command) if a.command else InProcess()
     print(f"implementation: {engine.name}")
     tally, _ = run_all(engine, vectors, refusals, quiet=a.quiet, skipped=skipped)

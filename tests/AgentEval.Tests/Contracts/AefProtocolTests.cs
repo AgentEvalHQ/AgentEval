@@ -58,7 +58,7 @@ public class AefProtocolTests
         // A line the vector expects as event-invalid ([STRM-3]) is not a valid event; a stream expected as one encoding
         // problem has finished lines no reader reads one by one.
         var expected = Expected(name);
-        var problems = expected["problems"]!.AsArray().Select(p => ((string)p!["where"]!, (string)p["problem"]!)).ToList();
+        var problems = expected["problems"]!.AsArray().Select(p => ((string)p![0]!, (string)p[1]!)).ToList();
         if (problems.Contains(("stream", "encoding")))
         {
             return;
@@ -115,7 +115,7 @@ public class AefProtocolTests
         var stream = RunnerEventStream.Read(File.ReadAllBytes(Path.Combine(Protocol, "streams", name, "events.ndjson")));
 
         Assert.Equal(
-            expected["problems"]!.AsArray().Select(p => ((string)p!["where"]!, (string)p["problem"]!)),
+            expected["problems"]!.AsArray().Select(p => ((string)p![0]!, (string)p[1]!)),
             RunnerEventStream.Verify(stream, plan, digest));
     }
 
@@ -146,7 +146,7 @@ public class AefProtocolTests
     public void TheStreamVectors_CoverEveryProblem()
     {
         var problems = Directory.GetFiles(Path.Combine(Protocol, "streams"), "expected.json", SearchOption.AllDirectories)
-            .SelectMany(f => JsonNode.Parse(File.ReadAllText(f))!["problems"]!.AsArray().Select(p => (string)p!["problem"]!))
+            .SelectMany(f => JsonNode.Parse(File.ReadAllText(f))!["problems"]!.AsArray().Select(p => (string)p![1]!))
             .Distinct().Order(StringComparer.Ordinal);
 
         Assert.Equal(["accepted-twice", "after-terminal", "encoding", "estimate", "event-invalid", "first", "job-id", "no-terminal", "over-budget",

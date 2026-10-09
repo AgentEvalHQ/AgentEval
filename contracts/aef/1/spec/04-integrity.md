@@ -72,7 +72,8 @@ What is added to a run after it closed: approvals, rejections, waivers, adjudica
   | `redact` | a blob of the run (its SHA-256), with a `reason` | the blob is withheld (§4.3) |
 
 - **[OVL-2]** An event's `target.run` is the run's own `runId`, and its `target.runHash`, when present, is the run's
-  run hash. An overlay never targets anything outside its run. When `run.json` or `results.ndjson` does not read (it is missing, or is not an I-JSON document within the
+  run hash; a writer **SHOULD** give it, so the event cannot be replayed onto another run with the same `runId`. An
+  overlay never targets anything outside its run. When `run.json` or `results.ndjson` does not read (it is missing, or is not an I-JSON document within the
   limits: an `encoding` or `limit` problem), the
   checks that need it (`run-id`, `predicate`, `run-open`, `target`) are not made: the run is invalid anyway.
 - **[OVL-3]** `by.assurance` is what the writer **claims**: `self-attested`, `signed` or `authenticated`. Anyone who can
@@ -90,12 +91,24 @@ What is added to a run after it closed: approvals, rejections, waivers, adjudica
 - **[OVL-5] Verifying the chain.** A verifier checks the seals from `seal-0001.json` to the highest-numbered one present
   and reports, per path, in the order of §3.9. "The run's run hash" is the `runHash` of the run's `seal.json` when it
   is valid against the reader seal schema, and otherwise the run hash recomputed from the files ([SEAL-4]): with a
-  withheld blob, only the sealed value can be known. An events file whose framing breaks [ENC-5] or [ENC-7] (a CR, a
-  blank line, a missing final LF) is reported once as `encoding` at `overlays/events.ndjson`, and the chain is not
-  checked further: no batch of it verifies, and no event of it takes part in the effective view. A line reported as
-  `event-invalid` is not checked for `event-id`
-  or `target`, and its id is not recorded. A batch whose range runs past the end of the file is reported as both
-  `line-boundary` and `batch-digest`.
+  withheld blob, only the sealed value can be known. A batch whose range runs past the end of the file is reported as
+  both `line-boundary` and `batch-digest`.
+
+  The events file is judged **line by line**, inside the batches and after them, so that no line decides more than
+  its own event: an append, a crash or a concurrent writer leaving half a line never changes which batches verify,
+  and never stops the chain. A blank line, a line holding a CR, or one that begins with a byte-order mark breaks
+  [ENC-5] for that line alone: it is `event-invalid` at its line. A last line without LF is still being written: it
+  is no event, neither shown nor reported as one (its bytes are `uncovered` until a batch claims them). A writer that
+  appends after such a line first ends it with an LF, so the line reads as `event-invalid` and the next batch can
+  claim it: a crash costs one line, never the chain.
+
+  A reader reads the events file as far as [ENC-17] allows: up to its last LF within the first 1 GiB and the first
+  1,000,000 lines (an unfinished last line is no line). If the file holds more, it is reported once as `limit` at
+  `overlays/events.ndjson`; a batch whose range ends beyond what was read is `limit` at its seal, which ends the
+  verified prefix; and no line after the verified batches is read. More than 19,999 files under `overlays/` (one events file and two per batch, [ENC-17]) is
+  `limit` at `overlays`, and the chain is not checked further.
+
+  A line reported as `event-invalid` is not checked for `event-id` or `target`, and its id is not recorded.
 
   | Code | When |
   |---|---|
@@ -105,7 +118,7 @@ What is added to a run after it closed: approvals, rejections, waivers, adjudica
   | `run-id` | another `runId` |
   | `run-hash` | a `runHash` that is not the run's run hash |
   | `offset` | an `offset` that does not continue the previous batch (not checked after a missing or invalid seal) |
-  | `limit` | a batch seal, or (at `overlays/events.ndjson:<line>`) an events line, beyond the limits of [ENC-17], refused. A refused batch seal ends the verified prefix; a refused line is a single event's problem |
+  | `limit` | a batch seal, or (at `overlays/events.ndjson:<line>`) an events line, beyond the limits of [ENC-17], refused; an events file holding more than a reader reads (at `overlays/events.ndjson`); too many files under `overlays/` (at `overlays`). A refused batch seal ends the verified prefix; a refused line is a single event's problem |
   | `line-boundary` | a range that does not start and end on a line boundary inside the file |
   | `batch-digest` | bytes that no longer match the batch digest |
   | `previous` | a `previous` that does not name the previous seal file and the SHA-256 of its bytes, including when that file is missing |
@@ -170,7 +183,7 @@ no effect either. Events after the last verified batch are shown as unsealed and
   |---|---|---|
   | `attestation.dsse.json` | `seal.json` | `application/vnd.in-toto+json` |
   | `overlays/seal-<nnnn>.dsse.json` | `overlays/seal-<nnnn>.json` | `application/vnd.in-toto+json` |
-  | `<checkpoint>.dsse.json`, beside a checkpoint manifest | the manifest | `application/vnd.agenteval.aef.checkpoint+json` |
+  | `<name>.dsse.json`, beside a checkpoint manifest, `<name>` being the manifest's file name without `.json` (`release.json` → `release.dsse.json`) | the manifest | `application/vnd.agenteval.aef.checkpoint+json` |
 
   A verifier **MUST** check that the payload is byte for byte the file it signs, and that `payloadType` is the one this
   table gives for that file (`payload-mismatch` otherwise).
@@ -199,7 +212,10 @@ no effect either. Events after the last verified batch are shown as unsealed and
   list of public keys, each with the identity it speaks for (for example `git:alice@example.com`, `spiffe://…`,
   `oidc:issuer/subject`) and, optionally, what that identity may do beyond signing: `"may": ["redact"]` allows it to
   authorize redactions ([OVL-10]). One identity may hold several keys (a rotation); what it may do is the union of the
-  `may` of its keys. A verifier **MUST NOT** trust a key because a run, an overlay or a runner manifest names it.
+  `may` of its keys. A trust policy is a JSON document within [ENC-17]'s limits for a JSON file, valid against
+  `trust-policy.schema.json`, whose reader schema is its writer schema ([VER-9]): a verifier refuses as a whole, as
+  [SIG-3] does, a policy that is not, including one holding a member it does not know. `may` is matched by exact value, and a value the verifier does not know grants nothing.
+  A verifier **MUST NOT** trust a key because a run, an overlay or a runner manifest names it.
   Keyless signing (Sigstore: a short-lived certificate tied to an OIDC identity, logged in a transparency log) **MAY**
   be supported as a trust-policy input; its bundle is then given beside the envelope.
 - **[SIG-5] Results per signature**, in envelope order: `verified` (a trusted key, a valid signature: the identity is

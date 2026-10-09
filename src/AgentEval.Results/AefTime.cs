@@ -8,9 +8,9 @@ using System.Text.RegularExpressions;
 namespace AgentEval.Results;
 
 /// <summary>
-/// An AEF time (RFC 3339 in UTC, ending in Z, up to nine fraction digits) at its full precision: seconds since the Unix
-/// epoch and nanoseconds. DateTimeOffset keeps 100 ns, so 12:00:00.000000001Z would round to 12:00:00Z; comparisons the
-/// format defines (freshness) need the exact value.
+/// An AEF time (RFC 3339 in UTC, ending in Z, up to nine fraction digits, in the years 0001 to 9999, [ENC-8]) at its
+/// full precision: seconds since the Unix epoch and nanoseconds. DateTimeOffset keeps 100 ns, so 12:00:00.000000001Z
+/// would round to 12:00:00Z; comparisons the format defines (freshness) need the exact value.
 /// </summary>
 public readonly record struct AefTime(long Seconds, int Nanoseconds) : IComparable<AefTime>
 {
@@ -30,6 +30,12 @@ public readonly record struct AefTime(long Seconds, int Nanoseconds) : IComparab
         }
 
         int Part(int group) => int.Parse(m.Groups[group].Value, CultureInfo.InvariantCulture);
+        if (Part(1) == 0)
+        {
+            // [ENC-8]: the years 0001 to 9999 (RFC 3339 allows 0000, which date libraries disagree on).
+            throw new FormatException($"'{text}' is in the year 0000: AEF times are in the years 0001 to 9999.");
+        }
+
         DateTimeOffset whole;
         try
         {

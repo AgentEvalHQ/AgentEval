@@ -8,6 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`agenteval aef`: AEF 1.0 runs from the command line.** AEF, the AgentEval Evidence Format, is AgentEval's
+  evidence format from 1.0 on ([ADR-035](docs/adr/035-aef-is-the-evidence-format.md); a release candidate until the
+  `aef-1.0` tag). `aef verify` reports a run as intact, unsealed or invalid with every problem, and who signed it under
+  your trust policy; `aef seal` seals a closed run and signs it with `--key`; `aef view` shows it as its reviews,
+  overrides and waivers leave it; `aef checkpoint` checks a release checkpoint against its runs and recomputes its
+  decision; `aef export` converts a run of the `.agenteval/` store into an AEF run (store v1 does not record how the
+  target was driven, so it is marked `mocked` unless `--target-mode` says otherwise); `aef import assert-ai` converts
+  an ASSERT run, rates included. Every verb takes `--json`. The format, its schemas, a conformance corpus of over 600
+  vectors and Python reference tools are in `contracts/aef/` (Apache-2.0); the guide is `docs/aef.md`.
+- **`assert-ai calibrate -o` records when the calibration was measured** (`measuredAt`), so an AEF import can tell a
+  calibration that applies to a run from one measured after it.
 - **Releases open Mission Control in a browser before publishing.** `scripts/mc-browser-smoke/run.sh` installs the
   packed tool the way a user does, serves a workspace with stored runs, and opens every page in headless Chromium. A
   page fails on a console, request or GraphQL error, an error or empty state ("Failed to load", "No … found"), a main

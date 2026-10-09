@@ -17,8 +17,8 @@
   | `evidence.ndjson` | `evidence`, one line each | when a result cites evidence |
   | `gates.ndjson` | `gate-decision`, one line each | when the producer took a gate decision |
   | `blobs/sha256/<ab>/<hex>` | none: raw bytes | when a line references a blob |
-  | `traces.otlp.jsonl` | OTLP/JSON, one `TracesData` object per line | optional |
-  | `logs.otlp.jsonl` | OTLP/JSON, one `LogsData` object per line | optional: OpenTelemetry events, such as `gen_ai.evaluation.result` |
+  | `traces.otlp.jsonl` | OTLP/JSON, one `TracesData` object per line, each within [ENC-17]'s 4 MiB (a producer splits a larger export batch into several `TracesData`, by resource and scope, then by spans) | optional |
+  | `logs.otlp.jsonl` | OTLP/JSON, one `LogsData` object per line, split the same way | optional: OpenTelemetry events, such as `gen_ai.evaluation.result` |
   | `ext/…` | none: the producer's files | optional |
   | `seal.json` | `seal` | in a sealed run (§4.1) |
   | `attestation.dsse.json` | DSSE envelope (§4.4) | optional |
@@ -84,12 +84,15 @@ was kept.
   - `off`: they are not kept, **and neither is any digest of them**: a SHA-256 of a short prompt is reversed by trying
     candidates. In a run with `off`, no result carries `reasoning` or an `annotator.promptHash`, and no evidence
     record of a content kind (`judge_reasoning`, `tool_call`, `document`, `input`, `expected`, `output`,
-    `transcript`) is written. Reported as `content-capture` (§3.9).
+    `transcript`) is written. Reported as `content-capture` (§3.9). `reason` and `ext` **SHOULD** hold no prompt,
+    response or judge reasoning either, and no digest of one: they are free text, so no check can tell.
   A producer **SHOULD** write `contentCapture`; a reader treats a run without it as `on` (content may be present).
 - **[RUN-15] Imported runs.** A run converted from another tool's output carries `imported`: the tool (`from`) and
   every `run.json` field the converter supplied because the original did not record it (`asserted`, dotted paths). A
-  reader **MUST** show those fields as the converter's claims, not the original producer's. The producer named in
-  `producer` is the converter.
+  field is supplied rather than read when its value is a constant the converter writes, a default it falls back on,
+  or its interpretation of a recorded value (a URL read as the subject); a value copied from the original, or computed
+  exactly from it (a file's digest), is read. A reader **MUST** show the listed fields as the converter's claims, not
+  the original producer's. The producer named in `producer` is the converter.
 - **[RUN-12]** `provenance` is written by a runner into every run it produces: the plan (`planId`, and `planDigest`,
   the SHA-256 of the plan's bytes), the `jobId` and the `runnerId` (§6). Sealed with `run.json`, it ties the run to
   the job that made it.
@@ -168,6 +171,7 @@ One line per node of the run's result tree.
   | `WeightedMedian` | the weighted median of the children's scores (typically a panel of judges) |
   | `CapByWorst` | a weighted average, capped by the severity of the worst failing child |
   | `MajorityVote` | the verdict most children reached (a tie goes to the more severe); the score is their mean |
+  | `Own` | nothing: the state is the node's own verdict (its score against its threshold), and its children are recorded beside it, each with `component.weight` 0 (an AgentEval scenario and its assertions, [§7.5](07-versioning.md#75-agenteval-store-v1)) |
 
 - **[RES-7]** `verdictRule.expr` is a human-readable description of the rule a leaf applied; a reader **MUST NOT**
   evaluate it.
@@ -175,15 +179,16 @@ One line per node of the run's result tree.
 ### 3.4.4 Repeated trials
 
 - **[RES-8]** When a case runs several times, each trial's lines carry `trial` (0-based), and one rollup line per case
-  and path carries `trials`: `n`, `passed` (≤ `n`), the `aggregation` and `agree` (`false` when the trials disagreed:
-  the case is flaky). The case's result at that path is the rollup line, never one trial. A line carries `trial` or
-  `trials`, never both. Every line under a trial's line carries the same `trial` (so SUM-3 never counts a trial's
-  children as the case's). When a case has trial lines at a path, exactly one rollup line at that path carries
-  `trials`, whose `n` is the number of those trial lines and `passed` the number of them in state `passed` (in a
-  running run, a case still running may have no rollup yet): a failing trial cannot vanish behind its rollup, nor a
-  case behind a missing one. A composite case run in trials therefore has a rollup at each path its trials have:
-  the rollups form the case's own tree (the rollup at a child path has the rollup at its parent path as parent),
-  and that tree is what [SUM-3] counts.
+  and path carries `trials`: `n`, `passed` (≤ `n`), the `aggregation` and `agree` (`false` when the trials disagreed,
+  ending in different states: the case is flaky). The case's result at that path is the rollup line, never one
+  trial. A line carries `trial` or `trials`, never both. Every line under a trial's line carries the same `trial` (so
+  SUM-3 never counts a trial's children as the case's). When a case has trial lines at a path, exactly one rollup line
+  at that path carries `trials`, whose `n` is the number of those trial lines, `passed` the number of them in state
+  `passed`, and `agree` `true` exactly when they are all in one state (in a running run, a case still running may
+  have no rollup yet): a failing trial cannot vanish behind its rollup, nor a case behind a missing one. A composite
+  case run in trials therefore has a rollup at each path its trials have: the rollups form the case's own tree (the
+  rollup at a child path has the rollup at its parent path, the path up to its last `/`, as parent), and that tree
+  is what [SUM-3] counts.
 
 ### 3.4.5 Facts about a result
 
@@ -226,9 +231,12 @@ evaluation (§5.3) reads it, so it is defined exactly.
   - for any other kind, is measured when it has a score for the metric, with that score's `value`, and is not
     measured when it has none.
 - **[SUM-5]** Then: `N` is the number of lines not left out; `n` the measured ones; `notMeasured` = `N` − `n`; `sum`
-  and `sumSq` are the sum and the sum of squares of the measured values, computed exactly and rounded once to
-  binary64 (summing in order can lose a value to cancellation: `1e20 + 1 − 1e20`); `value` is `sum` for a metric of kind `count`,
-  and `sum` / `n` otherwise, or `null` when `n` is 0. `stderr` and `ci` are the producer's, over the same values.
+  is the sum of the measured values computed exactly and rounded once to binary64 (summing in order can lose a value
+  to cancellation: `1e20 + 1 − 1e20`); `sumSq` is the sum of their squares in binary64 (its terms are never negative,
+  so summing in order stays within §3.6), and a producer omits it when it is not finite; `value` is `sum` for a metric of kind `count`, and `sum` / `n` otherwise,
+  or `null` when `n` is 0. A verifier compares each within §3.6. `stderr` and `ci` are the producer's, over the same
+  values. `sum` and `sumSq` are optional in the schema; a producer **SHOULD** write `sum`, so a reader can check the
+  mean without the results.
 - **[SUM-8] Aggregates.** An entry with `aggregate` carries a `value` computed by its `method` instead of the mean:
   - `median`, `min` and `max` are defined here, over the measured values of [SUM-4] (the median of an even count is
     the mean of the two middle values). A verifier recomputes their `value` like any other. This set is fixed for
@@ -246,7 +254,8 @@ evaluation (§5.3) reads it, so it is defined exactly.
 - **[SUM-7]** `cost`, when present, is the run's total cost in US dollars and where the figure came from. `usage`, when
   present, is the run's total usage, one entry per party (`role`) and `model`.
 - A verifier recomputes `N`, `n`, `notMeasured`, `sum` and `value` from `results.ndjson` (§3.9); `value` and `sum`
-  match when they differ by at most 1e-9 × max(1, |recomputed|); so do `sumSq` and its recomputed value.
+  match when they differ by at most 1e-9 × max(1, |recomputed|); so do `sumSq`, when present, and its recomputed
+  value (a `sumSq` whose recomputed value is not finite matches nothing).
 
 ## 3.7 `evidence.ndjson` and blobs
 
@@ -284,7 +293,7 @@ an `encoding`, `limit` or `schema` problem: they would otherwise be checked agai
 
 | Code | Path | The rule |
 |---|---|---|
-| `encoding` | the file, or `<file>:<line>` for one line | §2.1, §2.2 (I-JSON, UTF-8, NDJSON) |
+| `encoding` | the file, or `<file>:<line>` for one line | §2.1, §2.2 (I-JSON, UTF-8, NDJSON); not for `overlays/events.ndjson`, whose lines [OVL-5] judges one by one |
 | `limit` | the file, `<file>:<line>` for one line, or `.` | [ENC-18] |
 | `schema` | the file (`results.ndjson:<line>` for a line) | the document or line is not valid against the reader schema, or holds a time that does not exist ([ENC-8]: a pattern cannot refuse `2026-02-31`); also a file [RUN-2] requires that is absent, at its path |
 | `path` | the path | [RUN-3]; for two paths that differ only in case, the later one in byte order |
@@ -293,7 +302,7 @@ an `encoding`, `limit` or `schema` problem: they would otherwise be checked agai
 | `component` | `results.ndjson:<line>` | a child (a line with `parentResultId`) without `component` ([RES-5]) |
 | `aggregation` | `results.ndjson:<line>` | [RES-5], [RES-6]: a node with children and no `aggregation`, a `total` that is not the number of children, counts that do not add up (an absent `unmeasured` or count is 0), or a `decisive` id that is not a child |
 | `annotator` | `results.ndjson:<line>` | a panel whose `agree` exceeds `of` ([RES-10]) |
-| `trials` | `results.ndjson:<line>` | a rollup whose `passed` exceeds `n`, or whose `n` and `passed` are not what its trial lines give; a second rollup for one case and path (at the later one); or, at each trial line of a closed run, a trial line whose case and path have no rollup; or a line whose parent carries `trial` and that does not carry the same one ([RES-8]) |
+| `trials` | `results.ndjson:<line>` | a rollup whose `passed` exceeds `n`, or whose `n`, `passed` and `agree` are not what its trial lines give; a second rollup for one case and path (at the later one); or, at each trial line of a closed run, a trial line whose case and path have no rollup; or a line whose parent carries `trial` and that does not carry the same one; or a rollup at a child path whose parent is not its case's rollup at the parent path, when that case has one ([RES-8]) |
 | `pending` | `results.ndjson:<line>` | a `pending` line in a closed run ([RES-3]) |
 | `evidence` | `results.ndjson:<line>` | an evidence id no record of `evidence.ndjson` has |
 | `evidence-id` | `evidence.ndjson:<line>` | an `evidenceId` an earlier line already has |

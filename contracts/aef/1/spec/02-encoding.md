@@ -13,7 +13,8 @@ verifier reports it as `encoding` (§3.9) under the file's path.
   disagree on which, and a sealed file that two readers read differently defeats the seal. Member order and
   whitespace are free, and a reader never depends on them (a writer may follow the schema's `properties` order).
   On an optional field, `null` and absence mean the same, except where a schema gives `null` its own meaning
-  (a summary entry's `value` when `n` is 0); a writer omits the field.
+  (a summary entry's `value` when `n` is 0, a checkpoint's `outcome` before `decided`); a writer **SHOULD** omit the
+  field, and writing `null` is valid wherever the schema allows it.
 - **[ENC-3]** Numbers are finite: no `NaN` or `Infinity`, and no literal whose value overflows binary64 (`1e400`);
   such a file is reported as `encoding`. A literal too small for binary64 (`1e-400`) is not an overflow: it reads as
   the nearest binary64 value (0) and is not refused.
@@ -35,13 +36,14 @@ verifier reports it as `encoding` (§3.9) under the file's path.
 - **[ENC-6]** A reader splits on LF alone. U+2028 and U+2029 inside a JSON string are text, not line breaks.
 - **[ENC-7]** Each line is a JSON text under §2.1. A file whose last line does not end in LF is incomplete: a reader
   **MUST NOT** treat it as a finished file (for a closed run it is invalid; for an event stream it is still being
-  written, §6.4).
+  written, §6.4). `overlays/events.ndjson` is judged line by line instead of as a file ([OVL-5]): it grows after the
+  run is sealed, and a crash in it must cost one line, never the chain.
 
 ## 2.3 Values
 
-- **[ENC-8] Times** are RFC 3339 timestamps in UTC, ending in `Z`, with zero to nine fraction digits
-  (`2026-10-08T12:00:00Z`, `2026-10-08T12:00:00.123456789Z`). A date that does not exist (`2026-02-31`) is invalid and
-  is never rolled over. Times compare at the full precision written; an implementation **MUST NOT** round them.
+- **[ENC-8] Times** are RFC 3339 timestamps in UTC, ending in `Z`, with zero to nine fraction digits, in the years
+  0001 to 9999 (`2026-10-08T12:00:00Z`, `2026-10-08T12:00:00.123456789Z`; RFC 3339 allows year 0000, which date
+  libraries disagree on). A date that does not exist (`2026-02-31`) is invalid and is never rolled over. Times compare at the full precision written; an implementation **MUST NOT** round them.
 - **[ENC-9] Durations** are ISO 8601 durations of days, hours and minutes: `P`, then optionally `<n>D`, then
   optionally `T` followed by `<n>H`, `<n>M` or both in that order, each `<n>` one to five digits; at least one part,
   and no `T` without one. `P14D`, `PT36H`, `PT90M`, `P1DT12H30M` are durations; `P`, `PT`, `P1DT`, `PT30S`, `P1W` and
@@ -59,7 +61,17 @@ verifier reports it as `encoding` (§3.9) under the file's path.
   (`https://agenteval.dev/aef/1/evidence`, `https://agenteval.dev/aef/1/overlay-batch`) are **names**, not locations:
   they identify AEF major version 1 and do not change when the files move. A reader **MUST NOT** fetch them.
 - **[ENC-13]** Ids defined by AEF (`runId`, `resultId`, evidence ids, gate ids, event ids, checkpoint ids) are
-  printable ASCII without spaces, at most the length their schema allows, and compared byte for byte.
+  printable ASCII without spaces, at most the length their schema allows, and compared byte for byte. So is a
+  **typed reference** (`ref`, schema `common`, `$defs/ref`: a subject, a deployment, a suite, a label set, a gate, a
+  template): a kind (a lower-case letter, then lower-case letters, digits and `-`), a colon, and a name of 1 to 256
+  printable ASCII characters without spaces (`agent:support/support-triage`). `subject.ref` is a comparability axis
+  ([LANE-6]), so two writers that derive a ref from the same free-text name ("Support Agent") must write the same
+  bytes. A writer that derives a ref's name from free text **SHOULD** encode it so:
+  - take the name's UTF-8 bytes; keep each byte from `!` to `~` (0x21–0x7E) except `%`, and write every other byte,
+    and `%`, as `%` and two upper-case hex digits (a space is `%20`, `é` is `%C3%A9`): `agent:Support%20Agent`;
+  - an empty name is `-`;
+  - when the result is longer than 256 characters, keep its first 239 and add `~` and the first 16 lower-case hex
+    characters of the SHA-256 of the name's UTF-8 bytes (256 in all), so two long names stay apart.
 
 ## 2.5 Patterns
 
@@ -101,7 +113,8 @@ So that a reader can bound its work, and a hostile file cannot exhaust it:
   its LF.
 - **[ENC-18]** A reader that refuses something for a limit reports `limit` (§3.9) under its path: one NDJSON line over
   the size or depth limit at `<file>:<line>` (the file's other lines are still read), a file over its size or line
-  count at the file, and the number of files at the run folder's path, `.`; it **MUST NOT** read a truncated part of it as the whole. A reader **MUST NOT** refuse
+  count at the file, the number of files at the run folder's path, `.`, and the number of files under `overlays/` at
+  `overlays`; it **MUST NOT** read a truncated part of it as the whole. A reader **MUST NOT** refuse
   anything within the limits.
 
 String lengths and array sizes have their own bounds in the schemas.

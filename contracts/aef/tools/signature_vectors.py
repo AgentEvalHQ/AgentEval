@@ -73,6 +73,11 @@ def policy(*names, may=()):
     return {"keys": [{"identity": WHO[n], "publicKey": PEM[n], **({"may": ["redact"]} if n in may else {})} for n in names]}
 
 
+def policy_may(name, may):
+    """A trust policy of one key whose identity may do what `may` lists (SIG-4)."""
+    return {"keys": [{"identity": WHO[name], "publicKey": PEM[name], "may": may}]}
+
+
 def write(path, data):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(data)
@@ -237,6 +242,14 @@ def policy_and_envelope_vectors(seal_bytes):
     refused("key-listed-twice-in-policy", good, seal_bytes,
             {"keys": [alice, {"identity": WHO["ecdsa-b"], "publicKey": PEM["ecdsa-a"]}]}, ["SIG-3", "SIG-4"])
 
+    # SIG-4 (R4-3): a policy valid against trust-policy.schema.json, closed for readers too, or refused as a whole.
+    for name, entry in (("policy-may-as-string", dict(alice, may="never-redact")),
+                        ("policy-may-twice", dict(alice, may=["redact", "redact"])),
+                        ("policy-empty-identity", dict(alice, identity="")),
+                        ("policy-unknown-member", dict(alice, notAfter="2026-01-01T00:00:00Z"))):
+        refused(name, good, seal_bytes, {"keys": [entry]}, ["SIG-4"])
+    refused("policy-unknown-top-member", good, seal_bytes, {"keys": [alice], "revoked": []}, ["SIG-4"])
+
     # SIG-1: a null keyid reads as absent; members DSSE does not define are ignored; a duplicate member is not I-JSON.
     vector("envelope-keyid-null", dict(good, signatures=[{"keyid": None, "sig": C.b64encode(good_sig)}]), "seal.json",
            seal_bytes, INTOTO, policy("ecdsa-b", "ecdsa-a"), None, [ok("ecdsa-a")], [WHO["ecdsa-a"]], ["SIG-1", "SIG-5"])
@@ -348,10 +361,12 @@ def main():
     policy_and_envelope_vectors(seal_bytes)
     signed_runs()
     redaction_vectors()
+    assurance_vectors()
+    anchor_vectors()
     print("signature vectors:", len([p for p in OUT.iterdir() if p.is_dir() and p.name != "keys"]))
 
 
-def redacted_copy(dst, signer, signer_name, event_identity, spoil=None):
+def redacted_copy(dst, signer, signer_name, event_identity, spoil=None, crashed_line=None):
     """The corpus's completed-eval run with a third overlay batch holding a redact event, that batch signed by `signer`,
     and the redacted blob deleted. Returns the blob's path."""
     shutil.copytree(CONF / "valid" / "completed-eval" / "run", dst)
@@ -364,6 +379,16 @@ def redacted_copy(dst, signer, signer_name, event_identity, spoil=None):
               "reason": "The judge's reasoning quoted a customer's address.",
               "by": {"identity": event_identity, "assurance": "signed"}, "at": "2026-10-03T09:00:00Z"}
     overlay_batches(dst, COMPLETED_ID, [events[:1], events[1:], [redact]], the_hash)
+    if crashed_line is not None:  # a half line a crashed writer left, ended with an LF and claimed by batch 3 (OVL-5)
+        ev_file, seal3 = dst / "overlays" / "events.ndjson", dst / "overlays" / "seal-0003.json"
+        statement = read_json(seal3)
+        offset = statement["predicate"]["offset"]
+        data = ev_file.read_bytes()
+        data = data[:offset] + crashed_line + b"\n" + data[offset:]
+        ev_file.write_bytes(data)
+        statement["predicate"]["length"] = len(data) - offset
+        statement["subject"][0]["digest"]["sha256"] = hashlib.sha256(data[offset:]).hexdigest()
+        write_json(seal3, statement)
     batch = (dst / "overlays" / "seal-0003.json").read_bytes()
     signed = batch if spoil != "other-batch" else (dst / "overlays" / "seal-0002.json").read_bytes()
     signature = sig(INTOTO, signed, signer)
@@ -390,6 +415,10 @@ def redaction_vectors():
         # The allowed key, but a signature that does not verify, or an envelope over another batch's seal.
         ("redact-bad-signature", KA, "ecdsa-a", alice, policy("ecdsa-a", may=("ecdsa-a",)), "missing", "bad-signature"),
         ("redact-envelope-other-batch", KA, "ecdsa-a", alice, policy("ecdsa-a", may=("ecdsa-a",)), "missing", "other-batch"),
+        # SIG-4 (R4-3): `may` is matched exactly, and a value this version does not know grants nothing.
+        ("redact-unknown-capability", KA, "ecdsa-a", alice, policy_may("ecdsa-a", ["never-redact"]), "missing"),
+        ("redact-beside-unknown-capability", KA, "ecdsa-a", alice, policy_may("ecdsa-a", ["approve-releases", "redact"]),
+         "withheld"),
     ]
     for name, key, key_name, who, pol, code, *spoil in seal_cases:
         d = CONF / "seal-vectors" / name
@@ -410,6 +439,49 @@ def redaction_vectors():
     write_json(d / "expected.json", {"kind": "run", "run": "run", "policy": "policy.json", "outcome": "intact",
                                      "problems": [[blob_rel, "withheld"]], "withheld": 1, "signedBy": [],
                                      "rules": ["OVL-10", "SEAL-6", "SEAL-4", "SEC-5"]})
+
+    # OVL-5 (R4-2): what an appender, a crash or a concurrent writer leaves after the sealed batches never voids an
+    # authorized redaction: a blank line, an unfinished line, a file past ENC-17's line count.
+    for name, tail in [("withheld-blob-tail-blank-line", b"\n"),
+                       ("withheld-blob-tail-unfinished-line", b'{"schemaVersion":"1.0","eventId":"ov_00')]:
+        d = CONF / "runs" / name
+        if d.exists():
+            shutil.rmtree(d)
+        blob_rel = redacted_copy(d / "run", KA, "ecdsa-a", alice)
+        events = d / "run" / "overlays" / "events.ndjson"
+        events.write_bytes(events.read_bytes() + tail)
+        write_json(d / "policy.json", policy("ecdsa-a", may=("ecdsa-a",)))
+        write_json(d / "expected.json", {"kind": "run", "run": "run", "policy": "policy.json", "outcome": "intact",
+                                         "problems": [[blob_rel, "withheld"]], "withheld": 1, "signedBy": [],
+                                         "rules": ["OVL-5", "OVL-10", "ENC-17"]})
+
+    # The same past ENC-17's line count: generated by the runner (§9.2.1) from runs/withheld-blob.
+    d = CONF / "runs" / "withheld-blob-tail-too-many-lines"
+    if d.exists():
+        shutil.rmtree(d)
+    write_json(d / "policy.json", policy("ecdsa-a", may=("ecdsa-a",)))
+    write_json(d / "expected.json", {"kind": "run", "run": "run", "policy": "policy.json",
+                                     "generate": [{"copy": ["runs/withheld-blob/run", "run"]},
+                                                  {"append": ["run/overlays/events.ndjson", [["\n", 1_000_000]]]}],
+                                     "outcome": "intact", "problems": [[blob_rel, "withheld"]], "withheld": 1,
+                                     "signedBy": [], "rules": ["OVL-5", "OVL-10", "ENC-17"]})
+
+    # OVL-5 (R4N-9): a writer crashed half way through a line; the next one ended that line with an LF and sealed it in
+    # its batch with a signed redaction. The half line is one event-invalid line; the chain, and the redaction, stand.
+    for kind, name in (("run", "withheld-blob-after-a-crashed-line"), ("chain", "crashed-line-claimed-by-the-next-batch")):
+        d = CONF / ("runs" if kind == "run" else "chain-vectors") / name
+        if d.exists():
+            shutil.rmtree(d)
+        blob_rel = redacted_copy(d / "run", KA, "ecdsa-a", alice, crashed_line=b'{"schemaVersion":"1.0","eventId":"ov_00')
+        if kind == "run":
+            write_json(d / "policy.json", policy("ecdsa-a", may=("ecdsa-a",)))
+            write_json(d / "expected.json", {"kind": "run", "run": "run", "policy": "policy.json", "outcome": "intact",
+                                             "problems": [[blob_rel, "withheld"]], "withheld": 1, "signedBy": [],
+                                             "rules": ["OVL-5", "OVL-10"]})
+        else:
+            write_json(d / "expected.json", {"kind": "chain", "run": "run",
+                                             "problems": [["overlays/events.ndjson:3", "event-invalid"]],
+                                             "rules": ["OVL-5", "ENC-5"]})
 
     # The effective view of the redacted run, given the policy: the blob is withheld.
     d = CONF / "overlay-views" / "authorized-redaction"
@@ -450,6 +522,79 @@ def redaction_vectors():
             write_json(d / "policy.json", pol)
             expected["policy"] = "policy.json"
         write_json(d / "expected.json", expected)
+
+
+def assurance_vectors():
+    """OVL-3 (Q4-46 b): the assurance a reader shows for each event of the verified batches: signed only when the
+    event's batch carries a signature that verifies, under the policy, for the event's own identity; never
+    authenticated from a file. What the event claims changes nothing."""
+    alice, bob = WHO["ecdsa-a"], WHO["ecdsa-b"]
+    source = CONF / "valid" / "completed-eval" / "run"
+    the_hash = read_json(source / "seal.json")["predicate"]["runHash"]
+
+    def event(n, who, claim):
+        return {"schemaVersion": "1.0", "eventId": f"ov_{n:04d}", "kind": "annotate", "target": {"run": COMPLETED_ID},
+                "reason": "Reviewed.", "by": {"identity": who, "assurance": claim}, "at": "2026-10-03T09:00:00Z"}
+    batches = [[event(1, alice, "signed")],          # signed by alice's key: signed
+               [event(2, alice, "signed")],          # no signature: the claim alone is self-attested
+               [event(3, bob, "signed")],            # signed by alice's key, for bob: self-attested
+               [event(4, alice, "self-attested")],   # signed by alice's key: signed, whatever it claims
+               [event(5, alice, "authenticated")]]   # no signature: self-attested
+    signed_batches = (1, 3, 4)
+    for name, pol, shown in (("assurance-shown", policy("ecdsa-a", "ecdsa-b"),
+                              ["signed", "self-attested", "self-attested", "signed", "self-attested"]),
+                             ("assurance-without-policy", None, ["self-attested"] * 5)):
+        d = CONF / "overlay-views" / name
+        if d.exists():
+            shutil.rmtree(d)
+        shutil.copytree(source, d / "run")
+        shutil.rmtree(d / "run" / "overlays")
+        overlay_batches(d / "run", COMPLETED_ID, batches, the_hash)
+        for k in signed_batches:
+            batch = (d / "run" / "overlays" / f"seal-{k:04d}.json").read_bytes()
+            write_json(d / "run" / "overlays" / f"seal-{k:04d}.dsse.json",
+                       envelope(INTOTO, batch, [(ID["ecdsa-a"], sig(INTOTO, batch, KA))]))
+        expected = {"kind": "overlay-view", "run": "run", "at": "2026-10-08T12:00:00Z", "rules": ["OVL-3", "SIG-4"],
+                    "view": {"results": [], "reviews": [], "waivers": [], "withheld": [], "unsealedEvents": 0,
+                             "assurance": [{"event": f"ov_{n:04d}", "shown": s} for n, s in enumerate(shown, start=1)]}}
+        if pol is not None:
+            write_json(d / "policy.json", pol)
+            expected["policy"] = "policy.json"
+        write_json(d / "expected.json", expected)
+
+
+def anchor_vectors():
+    """CKP-9, SIG-8 (Q4-46 c): a checkpoint with no problem of CKP-7 or CKP-8 and a signature verified for a trusted
+    identity anchors the runs its lanes name; signed by a key the policy does not trust, or with a problem, none."""
+    run_hash = read_json(CONF / "valid" / "completed-eval" / "run" / "seal.json")["predicate"]["runHash"]
+    rule = {"kind": "threshold", "lane": "quality", "metric": "triage", "path": "triage", "op": ">=", "value": 0.6}
+    passed = {"status": "passed", "subjectVersion": "git:3f2a1c", "oldestClosedAt": "2026-10-02T14:06:23.004Z"}
+    missing = "f" * 64
+    for name, key, key_name, extra_lane, problems, anchors in (
+            ("anchors-signed-checkpoint", KA, "ecdsa-a", False, [], [run_hash]),
+            ("anchors-untrusted-signer", KB, "ecdsa-b", False, [], []),
+            ("anchors-with-a-problem", KA, "ecdsa-a", True, [[f"lanes/safety/runs/{COMPLETED_ID}", "run-missing"]], [])):
+        d = CONF / "lane-vectors" / name
+        if d.exists():
+            shutil.rmtree(d)
+        shutil.copytree(CONF / "valid" / "completed-eval" / "run", d / "runs" / COMPLETED_ID)
+        lanes = [{"lane": "quality", "rule": rule, "runs": [{"runId": COMPLETED_ID, "runHash": run_hash, "origin": "launched"}],
+                  "blocking": True}]
+        results = [{"lane": "quality", "result": passed}]
+        if extra_lane:
+            lanes.append({"lane": "safety", "rule": dict(rule, lane="quality"),
+                          "runs": [{"runId": COMPLETED_ID, "runHash": missing, "origin": "launched"}], "blocking": True})
+            results.append({"lane": "safety", "result": None})
+        write_json(d / "checkpoint.json", {"schemaVersion": "1.0", "checkpointId": "cp_" + name,
+                                           "subject": {"ref": "agent:support/support-triage", "version": "git:3f2a1c"},
+                                           "lanes": lanes, "state": "running", "outcome": None})
+        cp = (d / "checkpoint.json").read_bytes()
+        write_json(d / "checkpoint.dsse.json", envelope(CHECKPOINT, cp, [(ID[key_name], sig(CHECKPOINT, cp, key))]))
+        write_json(d / "policy.json", policy("ecdsa-a"))
+        write_json(d / "expected.json", {"kind": "lane", "checkpoint": "checkpoint.json", "runs": "runs",
+                                         "at": "2026-10-08T00:00:00Z", "policy": "policy.json",
+                                         "envelope": "checkpoint.dsse.json", "lanes": results, "problems": problems,
+                                         "anchors": anchors, "rules": ["CKP-9", "SIG-8", "CKP-8"]})
 
 
 def signed_runs():

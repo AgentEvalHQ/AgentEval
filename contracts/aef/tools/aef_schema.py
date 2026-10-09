@@ -885,6 +885,36 @@ def _corpus(root):
     return docs, unmapped, unreadable
 
 
+def _depth(value):
+    if isinstance(value, dict):
+        return 1 + max((_depth(v) for v in value.values()), default=0)
+    if isinstance(value, list):
+        return 1 + max((_depth(v) for v in value), default=0)
+    return 0
+
+
+def _outside_schema(label, side, schema, instance):
+    """Why a document the corpus calls invalid is valid against its schema: a rule a schema cannot state (ENC-3,
+    ENC-8, ENC-17), or None."""
+    import math
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    import aef_verify  # the reference verifier, for ENC-8's dates
+    if aef_verify.impossible_times(side, schema, instance):
+        return "a date that does not exist (ENC-8)"
+    if _depth(instance) > 64:
+        return "nested deeper than 64 (ENC-17)"
+    stack = [instance]
+    while stack:
+        v = stack.pop()
+        if isinstance(v, float) and not math.isfinite(v):
+            return "a number that overflows binary64 (ENC-3)"
+        stack.extend(v.values() if isinstance(v, dict) else v if isinstance(v, list) else ())
+    path = AEF / "conformance" / label.split("#")[0]
+    if path.is_file() and path.stat().st_size > 4 * 1024 * 1024:
+        return "beyond 4 MiB (ENC-17)"
+    return None
+
+
 def self_test():
     try:
         import jsonschema
@@ -944,7 +974,7 @@ def self_test():
     print(f"keywords the schemas use ({len(used)}, every one implemented): {' '.join(used)}")
 
     docs, unmapped, unreadable = _corpus(AEF / "conformance")
-    agree, explained, unexplained, contradicted, located = 0, [], [], [], []
+    agree, explained, unexplained, contradicted, located, outside = 0, [], [], [], [], []
     for label, schema, instance, expect in docs:
         for side in ("writer", "reader"):
             what = f"{side} {label} ({schema})"
@@ -968,7 +998,11 @@ def self_test():
             if _locations(errors) != _their_locations(ecma_errors):  # same pattern semantics: the same places
                 located.append(f"{what}: aef_schema at {sorted(_locations(errors))}, jsonschema at {sorted(_their_locations(ecma_errors))}")
             if expected is not None and expected != verdict:
-                contradicted.append(f"{what}: expected {expected}, aef_schema {verdict}{'' if mine else f': {errors[0]}'}")
+                reason = _outside_schema(label, side, schema, instance) if expected == "invalid" else None
+                if reason:
+                    outside.append(f"{what}: {reason}")
+                else:
+                    contradicted.append(f"{what}: expected {expected}, aef_schema {verdict}{'' if mine else f': {errors[0]}'}")
 
     folders = {}
     for label, *_ in docs:
@@ -990,11 +1024,15 @@ def self_test():
         print(f"  unreadable ({len(unreadable)}): " + "; ".join(unreadable))
     if unmapped:
         print(f"  not mapped to a schema ({len(unmapped)}): {', '.join(unmapped)}")
+    print(f"  invalid for a reason outside any schema, as expected.json says ({len(outside)}): limits, encoding, dates")
+    for line in outside:
+        print(f"    {line}")
     if contradicted:
         print(f"corpus verdicts the validators contradict ({len(contradicted)}; the schemas or the corpus are out of step,"
               " not a validator mismatch):")
         for line in contradicted:
             print(f"    {line}")
+    failed += len(contradicted)
     print("PASS" if not failed else f"FAIL: {failed} unexplained")
     return 1 if failed or not docs else 0
 

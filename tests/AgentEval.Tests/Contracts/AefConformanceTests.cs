@@ -32,7 +32,7 @@ public class AefConformanceTests
     {
         var files = Directory.GetFiles(Path.Combine(Root, "schemas", "writer"), "*.schema.json");
 
-        Assert.Equal(15, files.Length);
+        Assert.Equal(16, files.Length);
         Assert.All(files, f =>
         {
             var node = JsonNode.Parse(File.ReadAllText(f))!;
@@ -56,12 +56,14 @@ public class AefConformanceTests
         }
     }
 
-    // The enums [VER-9] closes for major 1: the rules across files compute with them, so a reader keeps them closed.
+    // What [VER-9] closes for major 1, so a reader keeps it as the writer has it: three enums the rules across files
+    // compute with, and the trust policy as a whole (its root, ""), an input whose restrictions a verifier must know.
     private static readonly HashSet<(string File, string Pointer)> ClosedEnums =
     [
         ("common.schema.json", "/$defs/state"),
         ("run.schema.json", "/properties/status"),
         ("metrics.schema.json", "/properties/metrics/items/properties/kind"),
+        ("trust-policy.schema.json", ""),
     ];
 
     private static JsonNode? Derive(JsonNode? node, bool inCondition, string file, string pointer)
@@ -650,6 +652,9 @@ public class AefConformanceTests
     private const int MaxSealBytes = 40 * 1024 * 1024;   // [ENC-17]: seal.json and a batch seal
     private const int MaxJsonBytes = 4 * 1024 * 1024;    // [ENC-17]: a JSON file or an NDJSON line
     private const int MaxDepth = 64;                     // [ENC-17]: the top-level value is at depth 1
+    private const int MaxLines = 1_000_000;              // [ENC-17]: lines in one NDJSON file
+    private const long MaxNdjsonBytes = 1L << 30;        // [ENC-17]: one NDJSON file
+    private const int MaxOverlayFiles = 19_999;          // [ENC-17]: one events file and two per batch, under overlays/
 
     /// <summary>[ENC-17], checked on the bytes before the content is trusted: a size, and a depth scan.</summary>
     private static bool WithinLimits(ReadOnlySpan<byte> bytes, int maxBytes) => bytes.Length <= maxBytes && Depth(bytes) <= MaxDepth;
@@ -768,8 +773,8 @@ public class AefConformanceTests
             .SelectMany(f => Problems(ReadJson(f)).Select(p => p.Problem))
             .Distinct().Order(StringComparer.Ordinal);
 
-        // Every code of [OVL-5], and encoding for an events file whose framing breaks.
-        Assert.Equal(["batch-digest", "batch-invalid", "batch-number", "encoding", "event-id", "event-invalid", "limit", "line-boundary", "missing", "offset",
+        // Every code of [OVL-5]. No encoding: the events file is judged line by line, inside the batches too (R4N-9).
+        Assert.Equal(["batch-digest", "batch-invalid", "batch-number", "event-id", "event-invalid", "limit", "line-boundary", "missing", "offset",
                       "previous", "run-hash", "run-id", "target", "uncovered", "unexpected-file"], problems);
     }
 
@@ -778,7 +783,8 @@ public class AefConformanceTests
     /// present, with its number, run id, run hash, offset, line boundaries, digest and previous seal; that the batches
     /// cover the events file; and each event's validity, id and target. Also returns the events the effective view is
     /// computed from (§4.3), each with its batch: the lines of the batches that verify, from batch 1 up to the first that
-    /// does not, less any line with a problem of its own.
+    /// does not, less any line with a problem of its own. The events file is judged line by line, inside the batches and
+    /// after them (round 4, R4N-9).
     /// </summary>
     private static (List<(string Path, string Problem)> Problems, List<(JsonNode Event, int Batch)> Verified) VerifyChain(string run)
     {
@@ -788,21 +794,25 @@ public class AefConformanceTests
         var events = File.Exists(Path.Combine(overlays, "events.ndjson")) ? File.ReadAllBytes(Path.Combine(overlays, "events.ndjson")) : [];
         var problems = new List<(string, string)>();
 
-        foreach (var rel in Directory.GetFiles(overlays, "*", SearchOption.AllDirectories).Select(f => "overlays/" + Path.GetRelativePath(overlays, f).Replace('\\', '/')))
+        // [ENC-17]: one events file and two per batch at most; more is limit at overlays, and the chain is not checked further.
+        var listed = Directory.GetFiles(overlays, "*", SearchOption.AllDirectories);
+        if (listed.Length > MaxOverlayFiles)
+            return ([("overlays", "limit")], []);
+
+        foreach (var rel in listed.Select(f => "overlays/" + Path.GetRelativePath(overlays, f).Replace('\\', '/')))
         {
             // The events file, a batch seal, or a batch's signature (seal-<nnnn>.dsse.json, [SIG-1]).
             if (rel != "overlays/events.ndjson" && !Regex.IsMatch(rel, "^overlays/seal-[0-9]{4}(\\.dsse)?\\.json\\z"))
                 problems.Add((rel, "unexpected-file"));
         }
 
-        // An events file whose framing breaks [ENC-5] or [ENC-7] (a byte-order mark, a CR, a blank line, no final LF) is
-        // reported once, and the chain is not checked further: no batch of it verifies, no event of it has an effect.
-        if (events.Length > 0 && (events is [0xEF, 0xBB, 0xBF, ..] || events.AsSpan().IndexOf((byte)'\r') >= 0 || events[^1] != (byte)'\n'
-                                  || events[0] == (byte)'\n' || events.AsSpan().IndexOf("\n\n"u8) >= 0))
-        {
-            problems.Add(("overlays/events.ndjson", "encoding"));
-            return (Ordered(problems), []);
-        }
+        // The events file is read as far as [ENC-17] allows: up to its last LF within the first 1 GiB and the first
+        // 1,000,000 lines. A file holding more is limit, once (the corpus's files are far below 1 GiB).
+        var lfs = events.Select((b, i) => (b, i)).Where(x => x.b == (byte)'\n').Select(x => x.i).ToList();
+        var overLimit = events.LongLength > MaxNdjsonBytes || lfs.Count > MaxLines;
+        var read = lfs.Count == 0 ? 0 : lfs[Math.Min(lfs.Count, MaxLines) - 1] + 1;
+        if (overLimit)
+            problems.Add(("overlays/events.ndjson", "limit"));
 
         var last = BatchSeals(overlays).Select(f => int.Parse(Path.GetFileName(f)[5..9], System.Globalization.CultureInfo.InvariantCulture)).DefaultIfEmpty(0).Max();
         if (File.Exists(Path.Combine(overlays, "seal-0000.json")))
@@ -835,6 +845,16 @@ public class AefConformanceTests
 
             var p = statement["predicate"]!;
             long offset = Integer(p["offset"]), length = Integer(p["length"]);
+            if (overLimit && offset + length > read)
+            {
+                // [OVL-5]: its range ends beyond what was read: limit at its seal, refused as the table says (not checked
+                // further, claiming no bytes), and it ends the verified prefix.
+                problems.Add((name, "limit"));
+                expectedOffset = -1;
+                verifying = false;
+                continue;
+            }
+
             if (Integer(p["batch"]) != n) problems.Add((name, "batch-number"));
             if ((string)p["runId"]! != runId) problems.Add((name, "run-id"));
             if ((string)p["runHash"]! != runHash) problems.Add((name, "run-hash"));
@@ -871,16 +891,21 @@ public class AefConformanceTests
             problems.Add(("overlays/events.ndjson", "uncovered"));
 
         // Each event: an I-JSON object valid against the reader schema (or it is not checked further), an id no earlier
-        // line has ([OVL-1]), and a target inside its own run ([OVL-2]).
+        // line has ([OVL-1]), and a target inside its own run ([OVL-2]). Every line is judged on its own, inside the
+        // batches and after them (a blank line, a CR or a leading byte-order mark is event-invalid at its line, and its
+        // batch still verifies), and a last line without LF is still being written: it is neither shown nor reported. Of
+        // a file holding more than is read, no line after the verified batches is read.
+        var verifiedEnd = verifiedBatches.Count > 0 ? (int)verifiedBatches[^1].To : 0;
         var resultIds = File.ReadAllText(Path.Combine(run, "results.ndjson")).Split('\n', StringSplitOptions.RemoveEmptyEntries)
             .Select(l => (string?)JsonNode.Parse(l)!["resultId"]).ToHashSet(StringComparer.Ordinal);
         var eventIds = new HashSet<string>(StringComparer.Ordinal);
         var verified = new List<(JsonNode Event, int Batch)>();
+        var end = overLimit ? verifiedEnd : read;
         var at = 0;
-        for (var line = 1; at < events.Length; line++)
+        for (var line = 1; at < end; line++)
         {
             var start = at;
-            var next = Array.IndexOf(events, (byte)'\n', at) is var lf and >= 0 ? lf + 1 : events.Length;
+            var next = Array.IndexOf(events, (byte)'\n', at) + 1;
             var where = $"overlays/events.ndjson:{line}";
             var raw = events.AsSpan(at, next - at - 1);   // without its LF
             if (!WithinLimits(raw, MaxJsonBytes))
@@ -890,7 +915,7 @@ public class AefConformanceTests
                 continue;
             }
 
-            var e = ReadIJson(events.AsSpan(at, next - at));
+            var e = raw.IndexOf((byte)'\r') >= 0 ? null : ReadIJson(raw);   // a JSON reader would take a CR for whitespace
             at = next;
             if (e is null || !Reader.Value.IsValid("overlay-event", e, out _))
             {

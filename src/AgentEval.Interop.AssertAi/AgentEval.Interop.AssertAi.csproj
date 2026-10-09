@@ -11,6 +11,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="AgentEval.Tests" />
+    <!-- AEF import (AssertAiImporter) reads ASSERT's files with the same Python-compatible reader (AssertAiJson). -->
+    <InternalsVisibleTo Include="AgentEval.Results.Adapters" />
   </ItemGroup>
 
   <ItemGroup>

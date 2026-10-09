@@ -1,0 +1,5 @@
+{"schemaVersion":"1.0","eventId":"ov_0001","kind":"annotate","target":{"run":"01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10"},"reason":"Reviewed.","by":{"identity":"git:alice@example.com","assurance":"signed"},"at":"2026-10-03T09:00:00Z"}
+{"schemaVersion":"1.0","eventId":"ov_0002","kind":"annotate","target":{"run":"01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10"},"reason":"Reviewed.","by":{"identity":"git:alice@example.com","assurance":"signed"},"at":"2026-10-03T09:00:00Z"}
+{"schemaVersion":"1.0","eventId":"ov_0003","kind":"annotate","target":{"run":"01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10"},"reason":"Reviewed.","by":{"identity":"git:bob@example.com","assurance":"signed"},"at":"2026-10-03T09:00:00Z"}
+{"schemaVersion":"1.0","eventId":"ov_0004","kind":"annotate","target":{"run":"01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10"},"reason":"Reviewed.","by":{"identity":"git:alice@example.com","assurance":"self-attested"},"at":"2026-10-03T09:00:00Z"}
+{"schemaVersion":"1.0","eventId":"ov_0005","kind":"annotate","target":{"run":"01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10"},"reason":"Reviewed.","by":{"identity":"git:alice@example.com","assurance":"authenticated"},"at":"2026-10-03T09:00:00Z"}

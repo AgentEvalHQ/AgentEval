@@ -4,6 +4,7 @@
 
 using System.Text.Json.Nodes;
 using AgentEval.Results.Runs;
+using AgentEval.Results.Schemas;
 
 namespace AgentEval.Results.Checkpoints;
 
@@ -66,10 +67,12 @@ public sealed record LaneResult(LaneEvidenceStatus Status, string SubjectVersion
 
 /// <summary>
 /// One lane of a checkpoint evaluated against its runs: its rule as read, its recomputed result (null when it has no
-/// evidence) and the problems of [CKP-8] about the runs it names (<c>run-missing</c>, <c>run-unverified</c> at
-/// <c>lanes/&lt;lane&gt;/runs/&lt;runId&gt;</c>).
+/// evidence), the problems of [CKP-8] about the runs it names (<c>run-missing</c>, <c>run-unverified</c> at
+/// <c>lanes/&lt;lane&gt;/runs/&lt;runId&gt;</c>), and whether recomputing it read something this version does not know
+/// (<paramref name="ReadsUnknown"/>, <see cref="LaneEvaluator.ReadsUnknown"/>): then a recorded result is not compared
+/// with it, and the lane is <c>unverifiable</c>.
 /// </summary>
-public sealed record LaneEvaluation(string Lane, LaneRule Rule, LaneResult? Result, IReadOnlyList<AefProblem> Problems);
+public sealed record LaneEvaluation(string Lane, LaneRule Rule, LaneResult? Result, IReadOnlyList<AefProblem> Problems, bool ReadsUnknown = false);
 
 /// <summary>
 /// Lane evaluation (contracts/aef/1/spec/05-checkpoints.md, §5.2, §5.3): <c>LaneResult(rule, runs, baseline?)</c> turns
@@ -140,9 +143,52 @@ public static class LaneEvaluator
             .ToList();
         var runs = refs.Select(r => Locate(r.RunId, r.RunHash)).ToList();
         var baseline = rule is ComparisonRule comparison ? Locate(comparison.Baseline.RunId, comparison.Baseline.RunHash) : null;
+        var readsUnknown = !AefSchemas.Writer.IsValid(RuleSchema, lane["rule"])
+                           || runs.Append(baseline).OfType<AefStoredRun>().Any(run => ReadsUnknown(rule, run));
 
-        return new LaneEvaluation(name, rule, Result(rule, runs, baseline, subject, fallbackTime), ByBytes(problems));
+        return new LaneEvaluation(name, rule, Result(rule, runs, baseline, subject, fallbackTime), ByBytes(problems), readsUnknown);
     }
+
+    /// <summary>The writer subschema a lane's rule is valid against when this version knows everything in it ([CKP-8]).</summary>
+    public const string RuleSchema = "checkpoint#/$defs/laneRule";
+
+    /// <summary>
+    /// [CKP-8], [VER-8]: whether recomputing a lane reads, in <paramref name="run"/> (a found run of the lane, or its
+    /// comparison's baseline, intact or not), a value this version does not know, one its writer schema does not accept
+    /// at that field: an <c>execution.targetMode</c>; for a <c>severity</c> rule, a <c>severity</c> on one of the rule's
+    /// lines (its summary lane and path, trial lines included, whatever their state); for a <c>comparison</c> rule, the
+    /// <c>direction</c> of the compared metric in the run's metrics.json. A rule not valid against the writer schema is
+    /// the other case ([CKP-8]); <see cref="Evaluate"/> checks both.
+    /// </summary>
+    /// <exception cref="IOException">A run's file cannot be read.</exception>
+    public static bool ReadsUnknown(LaneRule rule, AefStoredRun run)
+    {
+        ArgumentNullException.ThrowIfNull(rule);
+        ArgumentNullException.ThrowIfNull(run);
+        if (AefNode.At(run.Run, "execution", "targetMode") is { } mode && !AefSchemas.Writer.IsValid(TargetModeSchema, mode))
+        {
+            return true;
+        }
+
+        switch (rule)
+        {
+            case SeverityRule severity:
+                var lanes = SummaryLanes(run.Documents.Summary);
+                return run.Documents.Results.Objects.Any(l =>
+                    (severity.Lane is not { } lane || AefSummaryCalculator.Belongs(l.Value, lane, lanes))
+                    && severity.InScope(AefNode.String(l.Value["path"]))
+                    && l.Value["severity"] is { } value && !AefSchemas.Writer.IsValid(SeveritySchema, value));
+            case ComparisonRule comparison:
+                return Metric(run.Documents.Metrics, comparison.Metric)?["direction"] is { } direction
+                       && !AefSchemas.Writer.IsValid(DirectionSchema, direction);
+            default:
+                return false;
+        }
+    }
+
+    private const string TargetModeSchema = "run#/properties/execution/properties/targetMode";
+    private const string SeveritySchema = "result#/properties/severity";
+    private const string DirectionSchema = "metrics#/properties/metrics/items/properties/direction";
 
     /// <summary>
     /// <c>LaneResult(rule, runs, baseline?)</c> (§5.3): null when <paramref name="runs"/> holds none found.

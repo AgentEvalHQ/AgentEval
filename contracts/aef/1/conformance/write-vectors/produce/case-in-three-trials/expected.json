@@ -1,0 +1,44 @@
+{
+  "kind": "produce",
+  "rules": [
+    "RES-4",
+    "RES-8",
+    "SUM-3"
+  ],
+  "scenario": "scenario.json",
+  "results": "expected-results.ndjson",
+  "summary": {
+    "schemaVersion": "1.0",
+    "runId": "produce-case-in-three-trials",
+    "lanes": [
+      {
+        "lane": "quality",
+        "metrics": [
+          {
+            "metric": "quality",
+            "path": "q",
+            "N": 2,
+            "n": 2,
+            "notMeasured": 0,
+            "sum": 1.5,
+            "sumSq": 1.1300000000000001,
+            "value": 0.75,
+            "verdict": "scored"
+          },
+          {
+            "metric": "pass_rate",
+            "path": "q",
+            "N": 2,
+            "n": 2,
+            "notMeasured": 0,
+            "sum": 2,
+            "sumSq": 2,
+            "value": 1,
+            "verdict": "scored"
+          }
+        ]
+      }
+    ]
+  },
+  "why": "A case run three times, one trial failing: each trial's line carries its trial (0, 1, 2) and an id hashed with it; one rollup line at the case's path has n 3, passed 2 and agree false, and the given aggregation; no line is another's parent. The summary counts the rollup, never a trial."
+}

@@ -100,7 +100,7 @@ public class CorpusTheories
         var result = Run("stream", Path.Combine(folder, "events.ndjson"), Path.Combine(folder, (string)expected["plan"]!));
 
         Assert.Equal(
-            expected["problems"]!.AsArray().Select(p => $"{(string)p!["where"]!} {(string)p["problem"]!}"),
+            expected["problems"]!.AsArray().Select(p => $"{(string)p![0]!} {(string)p[1]!}"),
             result["problems"]!.AsArray().Select(p => $"{(string)p![0]!} {(string)p[1]!}"));
     }
 
@@ -224,6 +224,13 @@ public class CorpusTheories
             Assert.True(JsonNode.DeepEquals(expected["view"]![field], result[field]),
                 $"view.{field}: expected {expected["view"]![field]?.ToJsonString()}, got {result[field]?.ToJsonString()}");
         }
+
+        // [OVL-3]: the assurance shown, in the vectors that state it.
+        if (expected["view"]!.AsObject().ContainsKey("assurance"))
+        {
+            Assert.True(JsonNode.DeepEquals(expected["view"]!["assurance"], result["assurance"]),
+                $"view.assurance: expected {expected["view"]!["assurance"]?.ToJsonString()}, got {result["assurance"]?.ToJsonString()}");
+        }
     }
 
     [Theory]
@@ -260,11 +267,22 @@ public class CorpusTheories
             args = [.. args, "--policy", Path.Combine(folder, policy)];
         }
 
+        if ((string?)expected["envelope"] is { } envelope)
+        {
+            args = [.. args, "--envelope", Path.Combine(folder, envelope)];   // the checkpoint's signature ([CKP-9])
+        }
+
         var result = Run(args);
 
         Assert.True(JsonNode.DeepEquals(expected["lanes"], result["lanes"]),
             $"lanes: expected {expected["lanes"]!.ToJsonString()}, got {result["lanes"]!.ToJsonString()}");
         AssertProblems(expected["problems"], result["problems"]);
+        if (expected.AsObject().ContainsKey("anchors"))
+        {
+            // [CKP-9], [SIG-8]: the run hashes the checkpoint anchors, in byte order, in the vectors that state them.
+            Assert.True(JsonNode.DeepEquals(expected["anchors"], result["anchors"]),
+                $"anchors: expected {expected["anchors"]!.ToJsonString()}, got {result["anchors"]?.ToJsonString()}");
+        }
     }
 
     [Theory]
@@ -285,7 +303,7 @@ public class CorpusTheories
     [Fact]
     public void EveryKindThisComponentCovers_HasVectors()
     {
-        foreach (var kind in new[] { "decision", "document", "reader-only", "plan", "matching", "stream", "result-id", "paths", "run", "encoding", "seal", "chain", "overlay-view", "checkpoint", "lane", "plan-conformance" })
+        foreach (var kind in new[] { "decision", "document", "reader-only", "plan", "matching", "stream", "result-id", "paths", "run", "encoding", "seal", "chain", "overlay-view", "checkpoint", "lane", "plan-conformance", "produce" })
         {
             Assert.Contains(Index, v => (string?)v!["kind"] == kind);
         }
@@ -297,9 +315,15 @@ public class CorpusTheories
             expected!.AsArray().Select(p => $"{(string)p![0]!} {(string)p[1]!}"),
             actual!.AsArray().Select(p => $"{(string)p![0]!} {(string)p[1]!}"));
 
-    // A vector's folder (or file, for a decision vector), from index.json.
-    private static string Folder(string id) =>
-        Path.Combine(AefCorpus.Conformance, (string)Index.Single(v => (string?)v!["id"] == id)!["path"]!);
+    // A vector's folder (or file, for a decision vector), from index.json; for a generated vector (spec 09 §9.2), the
+    // folder its recipe gives, made once per test run.
+    private static string Folder(string id)
+    {
+        var folder = Path.Combine(AefCorpus.Conformance, (string)Index.Single(v => (string?)v!["id"] == id)!["path"]!);
+        return Directory.Exists(folder) && Expected(folder)["generate"] is JsonArray steps
+            ? GeneratedVectors.Of(id, folder, steps)
+            : folder;
+    }
 
     private static JsonNode Expected(string folder) => JsonNode.Parse(File.ReadAllBytes(Path.Combine(folder, "expected.json")))!;
 

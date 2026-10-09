@@ -32,13 +32,17 @@ where the value can be kept.
 says which target fields hold them.
 
 **A converted run is a new run.** A run built from another format must meet the writer schemas and the rules across
-files ([§3.9](../spec/03-run.md#39-rules-across-files)) like any other run. Its seal
-([SEAL-5](../spec/04-integrity.md#41-sealing-a-run)) shows that the converted files did not change after the
-conversion. It says nothing about the original record. [§7.5](../spec/07-versioning.md#75-agenteval-store-v1) treats a
-run migrated from AgentEval's older store the same way, sealed with `sealedBy: ingest`. Some facts AEF requires are
-missing from most sources: the subject, `execution.targetMode`, a suite version. A converter has to supply them, and
-lists each one in `run.json`'s `imported.asserted` ([RUN-15](../spec/03-run.md#32-runjson)), so a reader shows them as
-the converter's claims.
+files ([§3.9](../spec/03-run.md#39-rules-across-files)) like any other run. Every "→ AEF" conversion on these pages
+seals its run with `sealedBy: ingest` ([SEAL-5](../spec/04-integrity.md#41-sealing-a-run)), as
+[§7.5](../spec/07-versioning.md#75-agenteval-store-v1) seals a run migrated from AgentEval's older store: the converter
+is the run's `producer` ([RUN-15](../spec/03-run.md#32-runjson)), but it takes custody of what another tool wrote. The
+seal shows that the converted files did not change after the conversion. It says nothing about the original record.
+
+Some facts AEF requires are missing from most sources: the subject, `execution.targetMode`, a suite version. A
+converter has to supply them, and lists each one in `run.json`'s `imported.asserted`
+([RUN-15](../spec/03-run.md#32-runjson)), so a reader shows them as the converter's claims. "Supplied rather than read"
+covers a constant the converter writes, a default it falls back on, and its interpretation of a recorded value (a
+target URL read as the subject).
 
 **Worked examples.** Every target page converts lines of
 [`conformance/valid/completed-eval/run/results.ndjson`](../conformance/valid/completed-eval/run/results.ndjson), or
@@ -50,14 +54,34 @@ converts a target record into AEF. All examples were checked:
 - the run converted from ASSERT's sample passes the reference verifier (`tools/aef_verify.py run`);
 - every result id was recomputed with RES-4 against the corpus.
 
+**Checked examples.** For OpenTelemetry and Inspect, [`examples/`](examples/) holds checked examples (round trips
+through OpenTelemetry, exports to Inspect), and the worked examples of [opentelemetry.md](opentelemetry.md) and
+[inspect.md](inspect.md) are their data.
+`tools/aef_interop.py` is a reference converter written from those two pages alone; `tools/check_interop.py` reruns it
+on every example and fails on any difference. Each folder holds the input (a corpus run, copied, or a hand-written
+OTLP/JSON file), the output and an `expected.json` naming the direction and the sections it exercises:
+
+| Example | Shows |
+|---|---|
+| [`aef-otel-aef`](examples/aef-otel-aef/) | `completed-eval` (a composite, typed absences, scores, a reasoning blob, a trace link) to events and back. What the trip keeps and loses is checked field by field: it loses exactly the page's "What does not carry over" list |
+| [`aef-otel-aef-redteam`](examples/aef-otel-aef-redteam/) | `redteam-campaign` (`contentCapture: off`, attacks, a `scored` line, no times) to events and back, checked the same way |
+| [`otel-aef`](examples/otel-aef/) | a hand-written OTLP file, the registry's own example included, as an imported run; one refused input for each event the page does not place |
+| [`aef-inspect`](examples/aef-inspect/) | `completed-eval` as an Inspect eval log |
+| [`aef-inspect-trials`](examples/aef-inspect-trials/) | `running-trials`: trials as epochs, a rollup as a reduction, a running run as `started` |
+
+The examples are informative, like these pages: they are not conformance vectors, and nothing in the corpus depends on
+them. Every run they hold passes `tools/aef_verify.py run`. Writing the converter found what the two pages left
+undecided (OT-1 to OT-6, IN-1 to IN-5); settled on 10-09, each is now a rule or a stated refusal under the page's table
+for its direction.
+
 ## What survives a round trip
 
 AEF → target → AEF, for one result line of the corpus run.
 
 | Through | Survives | Lost | Same `resultId` |
 |---|---|---|---|
-| [OpenTelemetry event](opentelemetry.md) | metric name, score, state (as the label, [RUN-14](../spec/03-run.md#310-traces)), reason, span ids, end time, case id (as `test.case.name`) | `runId`, `path`, a score's own `label`, the result tree, thresholds, uncertainty, severity, evaluator, annotator, metric declarations | no: the event carries neither the run id nor the path |
-| [Inspect sample score](inspect.md) | case, trial (as epoch − 1), path (as the score key), score value or label, explanation, usage per role with cache and reasoning tokens, case times, captured case content | the state (Inspect has no verdict, and one unscored value, NaN, for every typed absence), composite lineage, gates, seal, overlays | yes |
+| [OpenTelemetry event](opentelemetry.md) | metric name, score, state (as the label, [RUN-14](../spec/03-run.md#310-traces)), reason (or the reasoning's text), span ids, end time, case id (as `test.case.name`), service name; checked by [`examples/aef-otel-aef`](examples/aef-otel-aef/) | `runId`, `path`, a score's own `label`, the result tree, thresholds, uncertainty, severity, evaluator, annotator, usage, metric declarations, the run header | no: the event carries neither the run id nor the path |
+| [Inspect sample score](inspect.md) | case, trial (as epoch − 1), path (as the score key), score value or label, explanation, usage per role with cache and reasoning tokens, case times, captured case content; the export checked by [`examples/aef-inspect`](examples/aef-inspect/) | the state (Inspect has no verdict, and one unscored value, NaN, for every typed absence), composite lineage, gates, seal, overlays | yes |
 | [EvalPort result](evalport.md) | case, trial (as attempt − 1), path (as `grader_id`), pass or fail, score in [0, 1], reason, duration, end time, captured output | typed absence kinds, `warn` against `failed`, `inconclusive`, `scored`, `component.required`, `rulePath`, trial rollups, the seal | yes, when the root's path is kept in metadata |
 | [OpenAI evals log](openai-evals.md) | case, pass or fail, score, end time | typed absences, the result tree, judges, the seal | only with the path kept in the event's `data` |
 | [Hosted OpenAI Evals](openai-evals.md) | nothing of AEF's grading: the hosted API grades runs itself and accepts no outside results | everything except the case content, which it can re-grade | no |
@@ -76,7 +100,7 @@ mapping still loses something.
 | I1 | A state for "measured, no pass/fail rule"; categorical results; aggregates other than the mean | The `scored` state ([RES-1](../spec/03-run.md#341-states)) and summary verdict ([SUM-6](../spec/03-run.md#36-summaryjson)), a score's `label`, and a summary entry's `aggregate`: median, min and max recomputed, pass@k or F1 shown as the producer's ([SUM-8](../spec/03-run.md#36-summaryjson)) |
 | I2 | A typed place for case content | Evidence kinds `input`, `expected`, `output`, `transcript`, all content under [RUN-11](../spec/03-run.md#32-runjson) |
 | I3 | OpenTelemetry alignment | An optional `logs.otlp.jsonl` for OpenTelemetry events, `otel.schemaUrls`, and the label vocabulary: an exported event's label is the result's state name ([RUN-14](../spec/03-run.md#310-traces)) |
-| I4 | Usage detail | `usage` is one entry per party (agent, judge, attacker), with cache-read, cache-write and reasoning tokens in OpenTelemetry's names ([RES-10](../spec/03-run.md#345-facts-about-a-result)) |
+| I4 | Usage detail | `usage` is one entry per role and model (agent, judge, attacker), with cache-read, cache-write and reasoning tokens in OpenTelemetry's names ([RES-10](../spec/03-run.md#345-facts-about-a-result)) |
 | I5 | Trial aggregations beyond `MajorityVote` | `AllPass`, `AnyPass`, `Mean`, `Median`, `Max`, `PassAtK` (with `k`) |
 | I6 | Times per result | `startedAt` and `endedAt` on a result line |
 | I7 | Facts a converter supplied | `imported` in `run.json`: the original tool and the fields the converter asserted ([RUN-15](../spec/03-run.md#32-runjson)) |

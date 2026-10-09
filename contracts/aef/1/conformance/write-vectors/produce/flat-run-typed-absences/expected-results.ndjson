@@ -1,0 +1,5 @@
+{"schemaVersion":"1.0","resultId":"r_4e9a98bdc4a1d8f1de94daad0f061849","caseId":"k1","path":"q","evaluator":{"id":"code:q"},"state":"passed","scores":[{"metric":"quality","value":0.9}]}
+{"schemaVersion":"1.0","resultId":"r_ebcf39250486f53866b635771c4bee19","caseId":"k2","path":"q","evaluator":{"id":"code:q"},"state":"failed","scores":[{"metric":"quality","value":0.3}],"severity":"high"}
+{"schemaVersion":"1.0","resultId":"r_d8ee53961fc6f9f99bd289f310fdceb1","caseId":"k3","path":"q","evaluator":{"id":"code:q"},"state":"not_measured","reason":"The reference answer was missing."}
+{"schemaVersion":"1.0","resultId":"r_09c75e77819fcf4efb8a056381b622b6","caseId":"k4","path":"q","evaluator":{"id":"code:q"},"state":"error","reason":"The judge returned HTTP 429 three times."}
+{"schemaVersion":"1.0","resultId":"r_0aed236baf29bc1d8843c2e78f02e9b3","caseId":"k5","path":"q","evaluator":{"id":"code:q"},"state":"not_applicable","reason":"The case asks for no answer."}

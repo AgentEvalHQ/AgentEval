@@ -16,7 +16,7 @@ public class AefSchemasTests
         var files = Directory.GetFiles(dir, "*.schema.json").Select(Path.GetFileName).Order(StringComparer.Ordinal).ToList();
         var embedded = AefSchemas.EmbeddedFiles(side);
 
-        Assert.Equal(15, files.Count);
+        Assert.Equal(16, files.Count);
         Assert.Equal(files, embedded.Select(e => e.Key).Order(StringComparer.Ordinal));
         foreach (var (name, bytes) in embedded)
         {
@@ -27,7 +27,7 @@ public class AefSchemasTests
     [Fact]
     public void BothSets_Compile_WithTheSameNames()
     {
-        Assert.Equal(15, AefSchemas.Writer.Names.Count);
+        Assert.Equal(16, AefSchemas.Writer.Names.Count);
         Assert.Equal(AefSchemas.Writer.Names, AefSchemas.Reader.Names);
         Assert.Contains("run", AefSchemas.Names);
         Assert.True(AefSchemas.Writer.Has(AefSchemaValidator.TimestampDefinition.Replace(".schema.json", "", StringComparison.Ordinal)));
@@ -44,6 +44,28 @@ public class AefSchemasTests
 
         Assert.Equal(writer, AefSchemas.Writer.IsValid("common#/$defs/schemaVersion", node));
         Assert.Equal(reader, AefSchemas.Reader.IsValid("common#/$defs/schemaVersion", node));
+    }
+
+    [Fact]
+    public void TheTrustPolicy_IsClosedForTheReaderToo()
+    {
+        // [SIG-4], [VER-9] (round 4): its reader schema is its writer schema; a member this version does not know refuses it.
+        var unknown = JsonNode.Parse("""{"keys": [], "note": 1}""");
+        Assert.False(AefSchemas.Writer.IsValid("trust-policy", unknown));
+        Assert.False(AefSchemas.Reader.IsValid("trust-policy", unknown));
+        Assert.True(AefSchemas.Reader.IsValid("trust-policy", JsonNode.Parse("""{"keys": []}""")));
+    }
+
+    [Theory]
+    [InlineData("0001-01-01T00:00:00Z", true)]
+    [InlineData("9999-12-31T23:59:59.999999999Z", true)]
+    [InlineData("0000-01-01T00:00:00Z", false)]   // RFC 3339 allows it; AEF does not ([ENC-8], round 4)
+    [InlineData("0000-12-31T23:59:59Z", false)]
+    public void ATime_IsInTheYears0001To9999(string time, bool valid)
+    {
+        Assert.Equal(valid, AefSchemas.Writer.IsValid("common#/$defs/timestamp", JsonValue.Create(time)));
+        Assert.Equal(valid, AefSchemas.Reader.IsValid("common#/$defs/timestamp", JsonValue.Create(time)));
+        Assert.Equal(valid, Record.Exception(() => AefTime.Parse(time)) is null);
     }
 
     [Fact]

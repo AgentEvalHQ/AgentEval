@@ -7,7 +7,10 @@
    "kind": "run",
    "classes": [
     "Producer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "RUN-1",
@@ -31,7 +34,10 @@
    "kind": "run",
    "classes": [
     "Producer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "RUN-1",
@@ -71,7 +77,10 @@
    "kind": "run",
    "classes": [
     "Producer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "RUN-1",
@@ -97,7 +106,10 @@
    "kind": "run",
    "classes": [
     "Producer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "RUN-1",
@@ -119,7 +131,9 @@
    "id": "runs/aggregate-max-wrong",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "SUM-8"
@@ -142,7 +156,9 @@
    "id": "runs/aggregate-median-right",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "SUM-8"
@@ -165,7 +181,9 @@
    "id": "runs/aggregate-median-wrong",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "SUM-8"
@@ -188,7 +206,9 @@
    "id": "runs/aggregate-producer-method-not-recomputed",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "SUM-8"
@@ -211,7 +231,9 @@
    "id": "runs/aggregate-producer-value-null",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "SUM-8"
@@ -234,7 +256,9 @@
    "id": "runs/aggregation-counts",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RES-6"
@@ -257,7 +281,9 @@
    "id": "runs/aggregation-pending-counts",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RES-6"
@@ -279,7 +305,9 @@
    "id": "runs/aggregation-total-not-children",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RES-6"
@@ -302,7 +330,9 @@
    "id": "runs/aggregation-without-unmeasured",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RES-6"
@@ -325,7 +355,9 @@
    "id": "runs/aggregation-without-unmeasured-all-measured",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RES-6"
@@ -348,7 +380,9 @@
    "id": "runs/anchored",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "SIG-8"
@@ -372,7 +406,9 @@
    "id": "runs/attack-succeeded-but-passed",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RES-10"
@@ -395,7 +431,9 @@
    "id": "runs/blob-digest",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "EVD-3"
@@ -419,7 +457,9 @@
    "id": "runs/blob-missing",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "EVD-3"
@@ -442,7 +482,9 @@
    "id": "runs/calibration-after-the-run",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RUN-9"
@@ -465,7 +507,9 @@
    "id": "runs/calibration-impossible",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RUN-9"
@@ -488,7 +532,9 @@
    "id": "runs/child-without-component",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RES-5"
@@ -511,7 +557,9 @@
    "id": "runs/composite-without-aggregation",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RES-5"
@@ -534,7 +582,9 @@
    "id": "runs/content-capture-off",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RUN-11",
@@ -558,7 +608,9 @@
    "id": "runs/content-capture-off-logs",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "SEC-6",
@@ -582,7 +634,9 @@
    "id": "runs/content-capture-off-resource",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "SEC-6",
@@ -605,7 +659,9 @@
    "id": "runs/content-capture-off-trace",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "SEC-6",
@@ -628,7 +684,9 @@
    "id": "runs/decisive-not-child",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RES-6"
@@ -651,7 +709,9 @@
    "id": "runs/evidence-digest",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "EVD-2"
@@ -674,7 +734,9 @@
    "id": "runs/evidence-id-duplicate",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "EVD-1"
@@ -697,7 +759,9 @@
    "id": "runs/evidence-missing",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "EVD-1"
@@ -720,7 +784,9 @@
    "id": "runs/extra-root-file",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RUN-2"
@@ -744,7 +810,9 @@
    "id": "runs/gate-ship-on-unknown-comparability",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "GATE-2",
@@ -768,7 +836,9 @@
    "id": "runs/gate-unknown-result",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "GATE-1"
@@ -791,7 +861,9 @@
    "id": "runs/imported",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RUN-15"
@@ -814,7 +886,9 @@
    "id": "runs/interval-inverted",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RES-10",
@@ -838,7 +912,9 @@
    "id": "runs/manifest-byte-order",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "SEAL-3"
@@ -868,7 +944,9 @@
    "id": "runs/metric-declared-twice",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "SUM-1"
@@ -891,7 +969,9 @@
    "id": "runs/metric-scale-inverted",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "SUM-1"
@@ -914,7 +994,9 @@
    "id": "runs/metric-scored-twice",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "SUM-1",
@@ -938,7 +1020,9 @@
    "id": "runs/metric-undeclared",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "SUM-1"
@@ -961,7 +1045,9 @@
    "id": "runs/mixed-minors",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "VER-6",
@@ -985,7 +1071,9 @@
    "id": "runs/nesting-depth-64-accepted",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "ENC-17",
@@ -1010,7 +1098,9 @@
    "id": "runs/not-anchored",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "SIG-8"
@@ -1034,7 +1124,9 @@
    "id": "runs/panel-agree-over-of",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RES-10"
@@ -1057,7 +1149,9 @@
    "id": "runs/parent-dangling",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RES-5",
@@ -1081,7 +1175,9 @@
    "id": "runs/pending-in-closed-run",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RES-3"
@@ -1104,7 +1200,9 @@
    "id": "runs/problem-order-by-line-number",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RES-3",
@@ -1128,7 +1226,9 @@
    "id": "runs/reasoning-size",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "EVD-3"
@@ -1151,7 +1251,9 @@
    "id": "runs/redact-unsigned",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "OVL-10",
@@ -1179,7 +1281,9 @@
    "id": "runs/required-file-missing",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RUN-2"
@@ -1201,7 +1305,9 @@
    "id": "runs/requires-more-passes-than-trials",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RES-8"
@@ -1224,7 +1330,9 @@
    "id": "runs/result-id-duplicate",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RES-4"
@@ -1247,7 +1355,9 @@
    "id": "runs/result-id-mismatch",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RES-4"
@@ -1270,7 +1380,9 @@
    "id": "runs/result-times",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RES-10"
@@ -1293,7 +1405,9 @@
    "id": "runs/results-line-depth-65",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "ENC-17",
@@ -1317,7 +1431,9 @@
    "id": "runs/run-json-depth-65",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "ENC-17",
@@ -1341,7 +1457,9 @@
    "id": "runs/run-times",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RUN-5"
@@ -1364,7 +1482,9 @@
    "id": "runs/schema-invalid-line",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "VER-3"
@@ -1387,7 +1507,9 @@
    "id": "runs/scored-and-aggregate",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RES-1",
@@ -1413,7 +1535,9 @@
    "id": "runs/signed-run",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "SIG-5",
@@ -1440,7 +1564,9 @@
    "id": "runs/signed-run-no-policy-match",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "SIG-5",
@@ -1467,7 +1593,9 @@
    "id": "runs/signed-run-untrusted-key",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "SIG-5",
@@ -1494,7 +1622,9 @@
    "id": "runs/summary-counts",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "SUM-5"
@@ -1517,7 +1647,9 @@
    "id": "runs/summary-duplicate",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "SUM-9"
@@ -1540,7 +1672,9 @@
    "id": "runs/summary-lane-twice",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "SUM-9",
@@ -1564,7 +1698,9 @@
    "id": "runs/summary-run-id",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "SUM-2"
@@ -1587,7 +1723,9 @@
    "id": "runs/summary-scored-entry",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "SUM-6"
@@ -1607,10 +1745,37 @@
    }
   },
   {
+   "id": "runs/summary-sum-of-squares",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "SUM-5"
+   ],
+   "path": "runs/summary-sum-of-squares",
+   "files": {
+    "expected.json": "9ab15c3ec5006d87bc506c64e3b7c28aa3ad3d600940ec57e55baee435ebcce6",
+    "run/blobs/sha256/47/474400071c193b3faf9f2c7f82e28fea484a7b59a07fc0a247282870d6441e99": "474400071c193b3faf9f2c7f82e28fea484a7b59a07fc0a247282870d6441e99",
+    "run/evidence.ndjson": "0cb5efa41e591fed8fc988a7e2063ba7285b4faebe8ddbac0d7782643ceb8642",
+    "run/gates.ndjson": "a7015f35139336ec94132638061773933c7e118c718e81dea171768d1377b26e",
+    "run/metrics.json": "81ac87c69d20ca49d69e0a5541b062fe1f8fcc4529117c6d6f29eac1403b3d6c",
+    "run/results.ndjson": "86590893e81c0f70fb80c1895493c1da3af645cd79ca7a284550469074d70764",
+    "run/run.json": "69f20a0f63a1ff1fa9521dee737a44ccdba294b7a16a38b1fbe34cac5a1e3890",
+    "run/seal.json": "6e22ccaa99b21ebd0206bc4ca35adb36e86b1c98508cf9735bd6e1de839f0e02",
+    "run/summary.json": "518421164b1ac31ef6cada73bc903b9279f5287c092ed59a5b7d4682b236a52c",
+    "run/traces.otlp.jsonl": "7ed4f10a3ccf2cb1b5f6b44865f2b35896b891c7fd7d05d2ddba7b5ffd417921"
+   }
+  },
+  {
    "id": "runs/summary-usage-duplicate",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "SUM-9",
@@ -1634,7 +1799,9 @@
    "id": "runs/summary-usage-per-party",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "SUM-7"
@@ -1657,7 +1824,9 @@
    "id": "runs/summary-value",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "SUM-5"
@@ -1680,7 +1849,9 @@
    "id": "runs/time-does-not-exist",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "ENC-8"
@@ -1703,7 +1874,9 @@
    "id": "runs/time-leap-day-exists",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "ENC-8"
@@ -1723,10 +1896,37 @@
    }
   },
   {
+   "id": "runs/time-year-zero",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "ENC-8"
+   ],
+   "path": "runs/time-year-zero",
+   "files": {
+    "expected.json": "4d2dec71ddd5b224081558c4654afd86d35afd68beb5165cfa60f3dccd07eac3",
+    "run/blobs/sha256/47/474400071c193b3faf9f2c7f82e28fea484a7b59a07fc0a247282870d6441e99": "474400071c193b3faf9f2c7f82e28fea484a7b59a07fc0a247282870d6441e99",
+    "run/evidence.ndjson": "0cb5efa41e591fed8fc988a7e2063ba7285b4faebe8ddbac0d7782643ceb8642",
+    "run/gates.ndjson": "a7015f35139336ec94132638061773933c7e118c718e81dea171768d1377b26e",
+    "run/metrics.json": "81ac87c69d20ca49d69e0a5541b062fe1f8fcc4529117c6d6f29eac1403b3d6c",
+    "run/results.ndjson": "86590893e81c0f70fb80c1895493c1da3af645cd79ca7a284550469074d70764",
+    "run/run.json": "bf68ca474afa27b72d765a755f643d2b32586ec196696928b322a9c087b1a1f3",
+    "run/seal.json": "f60e95c559589ae657cfa7d729b4676c6d662aa17256f16628ddf45c929b2668",
+    "run/summary.json": "fe9548e607cab4fc632706c94cefc75b67a9efde0c1c0c6bb604206386960a3c",
+    "run/traces.otlp.jsonl": "7ed4f10a3ccf2cb1b5f6b44865f2b35896b891c7fd7d05d2ddba7b5ffd417921"
+   }
+  },
+  {
    "id": "runs/trace-link-unresolved",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RUN-14"
@@ -1749,7 +1949,9 @@
    "id": "runs/traces-pre-otlp-1-names",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RUN-14"
@@ -1772,7 +1974,9 @@
    "id": "runs/trial-child-without-trial",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RES-8"
@@ -1795,7 +1999,9 @@
    "id": "runs/trial-lines-without-rollup",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RES-8"
@@ -1815,10 +2021,37 @@
    }
   },
   {
+   "id": "runs/trials-child-rollup-as-root",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "RES-8"
+   ],
+   "path": "runs/trials-child-rollup-as-root",
+   "files": {
+    "expected.json": "b4fb2436c3bf90edac4c3cf776762b4534d46e9dd947d9364e57e41ada5a161b",
+    "run/blobs/sha256/47/474400071c193b3faf9f2c7f82e28fea484a7b59a07fc0a247282870d6441e99": "474400071c193b3faf9f2c7f82e28fea484a7b59a07fc0a247282870d6441e99",
+    "run/evidence.ndjson": "0cb5efa41e591fed8fc988a7e2063ba7285b4faebe8ddbac0d7782643ceb8642",
+    "run/gates.ndjson": "a7015f35139336ec94132638061773933c7e118c718e81dea171768d1377b26e",
+    "run/metrics.json": "81ac87c69d20ca49d69e0a5541b062fe1f8fcc4529117c6d6f29eac1403b3d6c",
+    "run/results.ndjson": "8dbe001de8c3ba253eb3c2a2632d15a642fc5315b2539a8a2443fc47a86f3a62",
+    "run/run.json": "69f20a0f63a1ff1fa9521dee737a44ccdba294b7a16a38b1fbe34cac5a1e3890",
+    "run/seal.json": "78cfe944dad306c4782b7bb35c3cfbf992fc783c1e4e0e76f1ffc81bc2d49bd0",
+    "run/summary.json": "fe9548e607cab4fc632706c94cefc75b67a9efde0c1c0c6bb604206386960a3c",
+    "run/traces.otlp.jsonl": "7ed4f10a3ccf2cb1b5f6b44865f2b35896b891c7fd7d05d2ddba7b5ffd417921"
+   }
+  },
+  {
    "id": "runs/trials-passed-over-n",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RES-8"
@@ -1838,10 +2071,37 @@
    }
   },
   {
+   "id": "runs/trials-rollup-agree-wrong",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "RES-8"
+   ],
+   "path": "runs/trials-rollup-agree-wrong",
+   "files": {
+    "expected.json": "ec00e12b0d4942b4399f512776ec2c030f6bd6bd9037a0ee6f387358d95941a6",
+    "run/blobs/sha256/47/474400071c193b3faf9f2c7f82e28fea484a7b59a07fc0a247282870d6441e99": "474400071c193b3faf9f2c7f82e28fea484a7b59a07fc0a247282870d6441e99",
+    "run/evidence.ndjson": "0cb5efa41e591fed8fc988a7e2063ba7285b4faebe8ddbac0d7782643ceb8642",
+    "run/gates.ndjson": "a7015f35139336ec94132638061773933c7e118c718e81dea171768d1377b26e",
+    "run/metrics.json": "81ac87c69d20ca49d69e0a5541b062fe1f8fcc4529117c6d6f29eac1403b3d6c",
+    "run/results.ndjson": "063a307fefc98239e645ab1ebee9996419f81ba14a3259ae28ff86d6a39e09e9",
+    "run/run.json": "69f20a0f63a1ff1fa9521dee737a44ccdba294b7a16a38b1fbe34cac5a1e3890",
+    "run/seal.json": "1a640009d6c0d273c63b8c53aedc20581babeb96a445598593f3c7c115c8fe23",
+    "run/summary.json": "fe9548e607cab4fc632706c94cefc75b67a9efde0c1c0c6bb604206386960a3c",
+    "run/traces.otlp.jsonl": "7ed4f10a3ccf2cb1b5f6b44865f2b35896b891c7fd7d05d2ddba7b5ffd417921"
+   }
+  },
+  {
    "id": "runs/trials-rollup-contradicts-its-trials",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RES-8"
@@ -1864,7 +2124,9 @@
    "id": "runs/trials-rollup-matches",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RES-8"
@@ -1884,10 +2146,38 @@
    }
   },
   {
+   "id": "runs/trials-rollup-tree",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "RES-8",
+    "RES-5"
+   ],
+   "path": "runs/trials-rollup-tree",
+   "files": {
+    "expected.json": "d52ca54056fedd4af0c45b5f7b5d5751a0c22069ff16e24d33d87249293edb33",
+    "run/blobs/sha256/47/474400071c193b3faf9f2c7f82e28fea484a7b59a07fc0a247282870d6441e99": "474400071c193b3faf9f2c7f82e28fea484a7b59a07fc0a247282870d6441e99",
+    "run/evidence.ndjson": "0cb5efa41e591fed8fc988a7e2063ba7285b4faebe8ddbac0d7782643ceb8642",
+    "run/gates.ndjson": "a7015f35139336ec94132638061773933c7e118c718e81dea171768d1377b26e",
+    "run/metrics.json": "81ac87c69d20ca49d69e0a5541b062fe1f8fcc4529117c6d6f29eac1403b3d6c",
+    "run/results.ndjson": "7582a36edc74f4bf1f33aa61065a29fbed12fee586d9d32eaeac95b7b959f053",
+    "run/run.json": "69f20a0f63a1ff1fa9521dee737a44ccdba294b7a16a38b1fbe34cac5a1e3890",
+    "run/seal.json": "02a681414d72c8cc5dc8923a5f43351ad7ff5f44fca098943058a2c17bad7113",
+    "run/summary.json": "fe9548e607cab4fc632706c94cefc75b67a9efde0c1c0c6bb604206386960a3c",
+    "run/traces.otlp.jsonl": "7ed4f10a3ccf2cb1b5f6b44865f2b35896b891c7fd7d05d2ddba7b5ffd417921"
+   }
+  },
+  {
    "id": "runs/usage-role-and-model-twice",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RES-10"
@@ -1910,7 +2200,9 @@
    "id": "runs/usage-two-judge-models",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RES-10"
@@ -1933,7 +2225,9 @@
    "id": "runs/valid-small",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RUN-1",
@@ -1957,7 +2251,9 @@
    "id": "runs/verdict-rule-not-evaluated",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "RES-7"
@@ -1980,7 +2276,9 @@
    "id": "runs/withheld-blob",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "OVL-10",
@@ -2009,10 +2307,130 @@
    "level": "signed"
   },
   {
+   "id": "runs/withheld-blob-after-a-crashed-line",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "OVL-5",
+    "OVL-10"
+   ],
+   "path": "runs/withheld-blob-after-a-crashed-line",
+   "files": {
+    "expected.json": "575b0a146a2e2406c50c521bd5ffb82dfc6d7f25f03e458bcea6208017312a5d",
+    "policy.json": "9fbb1dc59dded854b7a9f069dea437f46b51ff219eaccda8d077a119ab22b463",
+    "run/evidence.ndjson": "f76af41ebe790477719e419c60ab430ef5cc98263b8fd8dd5bb52988a03108b1",
+    "run/gates.ndjson": "6db8527cfa0e3d60c242253e40f123eb56b4105f2b14a622af21370fd10b9c63",
+    "run/metrics.json": "cd5980b59a1023260f2c7fa19d0a8075802dbb17e83485a547dc3b977649ef87",
+    "run/overlays/events.ndjson": "cfe2e612e3750541ab89d99e887456add65bd559939fdd1abce1d12036202afa",
+    "run/overlays/seal-0001.json": "8f80b91ba250eacf6c8274d2882871784063f16b41398e08bc72892641d3cb15",
+    "run/overlays/seal-0002.json": "da28c56b467a871175478413f27ee01973bf9d964b676bffae38ce2ed7b9b606",
+    "run/overlays/seal-0003.dsse.json": "61aa5077d8585e5bac90eb2215a6ef3a079c7bc1796dfdd7f61e7e6ae2517c7a",
+    "run/overlays/seal-0003.json": "aa6036061dabf19a83d6cc205db324424aba815b18ea7d84bdc0924745bf5b08",
+    "run/results.ndjson": "08719682aba1da613d9712bdc1ad15c838048a064843fe12f61a36f7b6936e5c",
+    "run/run.json": "6833f5f2e31f266973749d72f60cf9656d8689145780a14670e35c07795c1f5c",
+    "run/seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84",
+    "run/summary.json": "268eda205f131668d931d8804c9530cb7c99b2857d95e1ce1bc24fc3d6314679",
+    "run/traces.otlp.jsonl": "3c29fa780cb029dd541c36edb35614f49df76f459a1f7c3e3702960892398787"
+   },
+   "level": "signed"
+  },
+  {
+   "id": "runs/withheld-blob-tail-blank-line",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "OVL-5",
+    "OVL-10",
+    "ENC-17"
+   ],
+   "path": "runs/withheld-blob-tail-blank-line",
+   "files": {
+    "expected.json": "bf553d3476869173eb69ef7f196751df206fe9189fa42fea3bcbd3b16798a1a0",
+    "policy.json": "9fbb1dc59dded854b7a9f069dea437f46b51ff219eaccda8d077a119ab22b463",
+    "run/evidence.ndjson": "f76af41ebe790477719e419c60ab430ef5cc98263b8fd8dd5bb52988a03108b1",
+    "run/gates.ndjson": "6db8527cfa0e3d60c242253e40f123eb56b4105f2b14a622af21370fd10b9c63",
+    "run/metrics.json": "cd5980b59a1023260f2c7fa19d0a8075802dbb17e83485a547dc3b977649ef87",
+    "run/overlays/events.ndjson": "58b1e2deab971441c9a609a690836b0b3edf37e6a9868ef5aabc7b3178c5276a",
+    "run/overlays/seal-0001.json": "8f80b91ba250eacf6c8274d2882871784063f16b41398e08bc72892641d3cb15",
+    "run/overlays/seal-0002.json": "da28c56b467a871175478413f27ee01973bf9d964b676bffae38ce2ed7b9b606",
+    "run/overlays/seal-0003.dsse.json": "b9afa8e8757baa1f12ec81a84d7bb5eb994c9de6f192e906ee1d21b74fcf6063",
+    "run/overlays/seal-0003.json": "b785af945eee72e25b1c740dc95fb6ae9d489acb773af83f415717bfea341062",
+    "run/results.ndjson": "08719682aba1da613d9712bdc1ad15c838048a064843fe12f61a36f7b6936e5c",
+    "run/run.json": "6833f5f2e31f266973749d72f60cf9656d8689145780a14670e35c07795c1f5c",
+    "run/seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84",
+    "run/summary.json": "268eda205f131668d931d8804c9530cb7c99b2857d95e1ce1bc24fc3d6314679",
+    "run/traces.otlp.jsonl": "3c29fa780cb029dd541c36edb35614f49df76f459a1f7c3e3702960892398787"
+   },
+   "level": "signed"
+  },
+  {
+   "id": "runs/withheld-blob-tail-too-many-lines",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "OVL-5",
+    "OVL-10",
+    "ENC-17"
+   ],
+   "path": "runs/withheld-blob-tail-too-many-lines",
+   "files": {
+    "expected.json": "6a0e31f75fe91dddc33b0373d73b8cf59d61def6cf3ac6ccef5e4c08d7ff83f9",
+    "policy.json": "9fbb1dc59dded854b7a9f069dea437f46b51ff219eaccda8d077a119ab22b463"
+   },
+   "level": "signed"
+  },
+  {
+   "id": "runs/withheld-blob-tail-unfinished-line",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "OVL-5",
+    "OVL-10",
+    "ENC-17"
+   ],
+   "path": "runs/withheld-blob-tail-unfinished-line",
+   "files": {
+    "expected.json": "bf553d3476869173eb69ef7f196751df206fe9189fa42fea3bcbd3b16798a1a0",
+    "policy.json": "9fbb1dc59dded854b7a9f069dea437f46b51ff219eaccda8d077a119ab22b463",
+    "run/evidence.ndjson": "f76af41ebe790477719e419c60ab430ef5cc98263b8fd8dd5bb52988a03108b1",
+    "run/gates.ndjson": "6db8527cfa0e3d60c242253e40f123eb56b4105f2b14a622af21370fd10b9c63",
+    "run/metrics.json": "cd5980b59a1023260f2c7fa19d0a8075802dbb17e83485a547dc3b977649ef87",
+    "run/overlays/events.ndjson": "65682f5b8ad7ed566536c0604e65b012a4697ed34b057bc0f504e4c915846a0d",
+    "run/overlays/seal-0001.json": "8f80b91ba250eacf6c8274d2882871784063f16b41398e08bc72892641d3cb15",
+    "run/overlays/seal-0002.json": "da28c56b467a871175478413f27ee01973bf9d964b676bffae38ce2ed7b9b606",
+    "run/overlays/seal-0003.dsse.json": "b9afa8e8757baa1f12ec81a84d7bb5eb994c9de6f192e906ee1d21b74fcf6063",
+    "run/overlays/seal-0003.json": "b785af945eee72e25b1c740dc95fb6ae9d489acb773af83f415717bfea341062",
+    "run/results.ndjson": "08719682aba1da613d9712bdc1ad15c838048a064843fe12f61a36f7b6936e5c",
+    "run/run.json": "6833f5f2e31f266973749d72f60cf9656d8689145780a14670e35c07795c1f5c",
+    "run/seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84",
+    "run/summary.json": "268eda205f131668d931d8804c9530cb7c99b2857d95e1ce1bc24fc3d6314679",
+    "run/traces.otlp.jsonl": "3c29fa780cb029dd541c36edb35614f49df76f459a1f7c3e3702960892398787"
+   },
+   "level": "signed"
+  },
+  {
    "id": "encoding/blank-line",
    "kind": "encoding",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "ENC-5"
@@ -2035,7 +2453,9 @@
    "id": "encoding/byte-order-mark",
    "kind": "encoding",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "ENC-1"
@@ -2058,7 +2478,9 @@
    "id": "encoding/crlf-lines",
    "kind": "encoding",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "ENC-5"
@@ -2081,7 +2503,9 @@
    "id": "encoding/duplicate-member",
    "kind": "encoding",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "ENC-2"
@@ -2104,7 +2528,9 @@
    "id": "encoding/duplicate-member-in-line",
    "kind": "encoding",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "ENC-2"
@@ -2127,7 +2553,9 @@
    "id": "encoding/empty-results-is-valid-framing",
    "kind": "run",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "ENC-5",
@@ -2152,7 +2580,9 @@
    "id": "encoding/integer-written-2e0-accepted",
    "kind": "encoding",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "ENC-4"
@@ -2175,7 +2605,9 @@
    "id": "encoding/invalid-utf8",
    "kind": "encoding",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "ENC-1"
@@ -2198,7 +2630,9 @@
    "id": "encoding/lone-surrogate",
    "kind": "encoding",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "ENC-2"
@@ -2221,7 +2655,9 @@
    "id": "encoding/ndjson-byte-order-mark",
    "kind": "encoding",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "ENC-5"
@@ -2244,7 +2680,9 @@
    "id": "encoding/no-final-newline",
    "kind": "encoding",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "ENC-5",
@@ -2268,7 +2706,9 @@
    "id": "encoding/not-a-number",
    "kind": "encoding",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "ENC-3"
@@ -2291,7 +2731,9 @@
    "id": "encoding/not-an-object",
    "kind": "encoding",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "ENC-5"
@@ -2314,7 +2756,9 @@
    "id": "encoding/not-json-line",
    "kind": "encoding",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "ENC-7"
@@ -2337,7 +2781,9 @@
    "id": "encoding/number-overflows",
    "kind": "encoding",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "ENC-3"
@@ -2360,7 +2806,9 @@
    "id": "encoding/unpaired-surrogate-json",
    "kind": "encoding",
    "classes": [
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
    ],
    "rules": [
     "ENC-2"
@@ -2384,7 +2832,10 @@
    "kind": "seal",
    "classes": [
     "Sealer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SEAL-1",
@@ -2408,7 +2859,10 @@
    "kind": "seal",
    "classes": [
     "Sealer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SEAL-6",
@@ -2430,7 +2884,10 @@
    "kind": "seal",
    "classes": [
     "Sealer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SEAL-6",
@@ -2451,7 +2908,10 @@
    "kind": "seal",
    "classes": [
     "Sealer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SEAL-1",
@@ -2482,7 +2942,10 @@
    "kind": "seal",
    "classes": [
     "Sealer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SEAL-6"
@@ -2502,7 +2965,10 @@
    "kind": "seal",
    "classes": [
     "Sealer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SEAL-6"
@@ -2522,7 +2988,10 @@
    "kind": "seal",
    "classes": [
     "Sealer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SEAL-6"
@@ -2542,7 +3011,10 @@
    "kind": "seal",
    "classes": [
     "Sealer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SEAL-6"
@@ -2561,7 +3033,10 @@
    "kind": "seal",
    "classes": [
     "Sealer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SEAL-6",
@@ -2582,7 +3057,10 @@
    "kind": "seal",
    "classes": [
     "Sealer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SEAL-6"
@@ -2602,7 +3080,10 @@
    "kind": "seal",
    "classes": [
     "Sealer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SEAL-3"
@@ -2628,7 +3109,10 @@
    "kind": "seal",
    "classes": [
     "Sealer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SEAL-6"
@@ -2655,7 +3139,10 @@
    "kind": "seal",
    "classes": [
     "Sealer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "OVL-10",
@@ -2683,11 +3170,49 @@
    "level": "signed"
   },
   {
+   "id": "seal-vectors/redact-beside-unknown-capability",
+   "kind": "seal",
+   "classes": [
+    "Sealer",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
+   ],
+   "rules": [
+    "OVL-10",
+    "SEAL-6",
+    "SIG-4"
+   ],
+   "path": "seal-vectors/redact-beside-unknown-capability",
+   "files": {
+    "expected.json": "30e598c6b0cfa0c8f969ea1d16076a60a72c6f171b20737973daec8b6cc0daf3",
+    "policy.json": "d8b65607209919718d75f3e3bddefcd0b4023ee0bd77bbbc96de0630a8e65ddd",
+    "run/evidence.ndjson": "f76af41ebe790477719e419c60ab430ef5cc98263b8fd8dd5bb52988a03108b1",
+    "run/gates.ndjson": "6db8527cfa0e3d60c242253e40f123eb56b4105f2b14a622af21370fd10b9c63",
+    "run/metrics.json": "cd5980b59a1023260f2c7fa19d0a8075802dbb17e83485a547dc3b977649ef87",
+    "run/overlays/events.ndjson": "49250afb7e79e639eb040a963aae45c715d0dd4fdc5babc6645a52016d460954",
+    "run/overlays/seal-0001.json": "8f80b91ba250eacf6c8274d2882871784063f16b41398e08bc72892641d3cb15",
+    "run/overlays/seal-0002.json": "da28c56b467a871175478413f27ee01973bf9d964b676bffae38ce2ed7b9b606",
+    "run/overlays/seal-0003.dsse.json": "b9afa8e8757baa1f12ec81a84d7bb5eb994c9de6f192e906ee1d21b74fcf6063",
+    "run/overlays/seal-0003.json": "b785af945eee72e25b1c740dc95fb6ae9d489acb773af83f415717bfea341062",
+    "run/results.ndjson": "08719682aba1da613d9712bdc1ad15c838048a064843fe12f61a36f7b6936e5c",
+    "run/run.json": "6833f5f2e31f266973749d72f60cf9656d8689145780a14670e35c07795c1f5c",
+    "run/seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84",
+    "run/summary.json": "268eda205f131668d931d8804c9530cb7c99b2857d95e1ce1bc24fc3d6314679",
+    "run/traces.otlp.jsonl": "3c29fa780cb029dd541c36edb35614f49df76f459a1f7c3e3702960892398787"
+   },
+   "level": "signed"
+  },
+  {
    "id": "seal-vectors/redact-envelope-other-batch",
    "kind": "seal",
    "classes": [
     "Sealer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "OVL-10",
@@ -2719,7 +3244,10 @@
    "kind": "seal",
    "classes": [
     "Sealer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "OVL-10",
@@ -2749,7 +3277,10 @@
    "kind": "seal",
    "classes": [
     "Sealer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "OVL-10",
@@ -2781,7 +3312,10 @@
    "kind": "seal",
    "classes": [
     "Sealer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "OVL-10",
@@ -2809,11 +3343,49 @@
    "level": "signed"
   },
   {
+   "id": "seal-vectors/redact-unknown-capability",
+   "kind": "seal",
+   "classes": [
+    "Sealer",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
+   ],
+   "rules": [
+    "OVL-10",
+    "SEAL-6",
+    "SIG-4"
+   ],
+   "path": "seal-vectors/redact-unknown-capability",
+   "files": {
+    "expected.json": "d862af32070557f4ea9a2addd87f804e4ac0e4e0548fbabba97155cfcf62b97e",
+    "policy.json": "7fe0ec0fcfa7411b33412dd1045b64d19e212e9ec87fc5d2ebab6cac9089069d",
+    "run/evidence.ndjson": "f76af41ebe790477719e419c60ab430ef5cc98263b8fd8dd5bb52988a03108b1",
+    "run/gates.ndjson": "6db8527cfa0e3d60c242253e40f123eb56b4105f2b14a622af21370fd10b9c63",
+    "run/metrics.json": "cd5980b59a1023260f2c7fa19d0a8075802dbb17e83485a547dc3b977649ef87",
+    "run/overlays/events.ndjson": "49250afb7e79e639eb040a963aae45c715d0dd4fdc5babc6645a52016d460954",
+    "run/overlays/seal-0001.json": "8f80b91ba250eacf6c8274d2882871784063f16b41398e08bc72892641d3cb15",
+    "run/overlays/seal-0002.json": "da28c56b467a871175478413f27ee01973bf9d964b676bffae38ce2ed7b9b606",
+    "run/overlays/seal-0003.dsse.json": "b9afa8e8757baa1f12ec81a84d7bb5eb994c9de6f192e906ee1d21b74fcf6063",
+    "run/overlays/seal-0003.json": "b785af945eee72e25b1c740dc95fb6ae9d489acb773af83f415717bfea341062",
+    "run/results.ndjson": "08719682aba1da613d9712bdc1ad15c838048a064843fe12f61a36f7b6936e5c",
+    "run/run.json": "6833f5f2e31f266973749d72f60cf9656d8689145780a14670e35c07795c1f5c",
+    "run/seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84",
+    "run/summary.json": "268eda205f131668d931d8804c9530cb7c99b2857d95e1ce1bc24fc3d6314679",
+    "run/traces.otlp.jsonl": "3c29fa780cb029dd541c36edb35614f49df76f459a1f7c3e3702960892398787"
+   },
+   "level": "signed"
+  },
+  {
    "id": "seal-vectors/redact-unsigned",
    "kind": "seal",
    "classes": [
     "Sealer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SEAL-6",
@@ -2841,7 +3413,10 @@
    "kind": "seal",
    "classes": [
     "Sealer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SEAL-1",
@@ -2865,7 +3440,10 @@
    "kind": "seal",
    "classes": [
     "Sealer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "ENC-17",
@@ -2886,7 +3464,10 @@
    "kind": "seal",
    "classes": [
     "Sealer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SEAL-6",
@@ -2907,7 +3488,10 @@
    "kind": "seal",
    "classes": [
     "Sealer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SEAL-6"
@@ -2927,7 +3511,10 @@
    "kind": "seal",
    "classes": [
     "Sealer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SEAL-6",
@@ -2948,7 +3535,10 @@
    "kind": "seal",
    "classes": [
     "Sealer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SEAL-6"
@@ -2975,7 +3565,10 @@
    "kind": "seal",
    "classes": [
     "Sealer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SEAL-6",
@@ -3004,7 +3597,10 @@
    "kind": "seal",
    "classes": [
     "Sealer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SEAL-6"
@@ -3031,7 +3627,10 @@
    "kind": "seal",
    "classes": [
     "Sealer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "OVL-10",
@@ -3063,7 +3662,10 @@
    "kind": "seal",
    "classes": [
     "Sealer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SEAL-6"
@@ -3210,6 +3812,34 @@
    }
   },
   {
+   "id": "chain-vectors/crashed-line-claimed-by-the-next-batch",
+   "kind": "chain",
+   "classes": [
+    "Overlay verifier"
+   ],
+   "rules": [
+    "OVL-5",
+    "ENC-5"
+   ],
+   "path": "chain-vectors/crashed-line-claimed-by-the-next-batch",
+   "files": {
+    "expected.json": "742711dce0170225ad6b551d0377a12e76c58c2ab2b1638e95fc263889eac00e",
+    "run/evidence.ndjson": "f76af41ebe790477719e419c60ab430ef5cc98263b8fd8dd5bb52988a03108b1",
+    "run/gates.ndjson": "6db8527cfa0e3d60c242253e40f123eb56b4105f2b14a622af21370fd10b9c63",
+    "run/metrics.json": "cd5980b59a1023260f2c7fa19d0a8075802dbb17e83485a547dc3b977649ef87",
+    "run/overlays/events.ndjson": "cfe2e612e3750541ab89d99e887456add65bd559939fdd1abce1d12036202afa",
+    "run/overlays/seal-0001.json": "8f80b91ba250eacf6c8274d2882871784063f16b41398e08bc72892641d3cb15",
+    "run/overlays/seal-0002.json": "da28c56b467a871175478413f27ee01973bf9d964b676bffae38ce2ed7b9b606",
+    "run/overlays/seal-0003.dsse.json": "61aa5077d8585e5bac90eb2215a6ef3a079c7bc1796dfdd7f61e7e6ae2517c7a",
+    "run/overlays/seal-0003.json": "aa6036061dabf19a83d6cc205db324424aba815b18ea7d84bdc0924745bf5b08",
+    "run/results.ndjson": "08719682aba1da613d9712bdc1ad15c838048a064843fe12f61a36f7b6936e5c",
+    "run/run.json": "6833f5f2e31f266973749d72f60cf9656d8689145780a14670e35c07795c1f5c",
+    "run/seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84",
+    "run/summary.json": "268eda205f131668d931d8804c9530cb7c99b2857d95e1ce1bc24fc3d6314679",
+    "run/traces.otlp.jsonl": "3c29fa780cb029dd541c36edb35614f49df76f459a1f7c3e3702960892398787"
+   }
+  },
+  {
    "id": "chain-vectors/event-id-order",
    "kind": "chain",
    "classes": [
@@ -3291,26 +3921,25 @@
    }
   },
   {
-   "id": "chain-vectors/events-framing",
+   "id": "chain-vectors/events-blank-line-in-a-batch",
    "kind": "chain",
    "classes": [
     "Overlay verifier"
    ],
    "rules": [
     "OVL-5",
-    "ENC-5",
-    "ENC-7"
+    "ENC-5"
    ],
-   "path": "chain-vectors/events-framing",
+   "path": "chain-vectors/events-blank-line-in-a-batch",
    "files": {
-    "expected.json": "dd2d22680f9ac33611a2bb716c6672b396352cc147176559464d6809b66ce808",
+    "expected.json": "e6929a25dd6687aa68b724ef58fa25fa9e0dbdff4f794259efc124f69649b519",
     "run/blobs/sha256/63/635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5": "635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5",
     "run/evidence.ndjson": "f76af41ebe790477719e419c60ab430ef5cc98263b8fd8dd5bb52988a03108b1",
     "run/gates.ndjson": "6db8527cfa0e3d60c242253e40f123eb56b4105f2b14a622af21370fd10b9c63",
     "run/metrics.json": "cd5980b59a1023260f2c7fa19d0a8075802dbb17e83485a547dc3b977649ef87",
-    "run/overlays/events.ndjson": "ed6965da2ae1c88f2bcee9e97d6e24ed990528f60f61d9827998ecb0a7e14a5a",
+    "run/overlays/events.ndjson": "46ec79860e67ad5508da78d912b2aece6a5de75d8aebce1fefd00fdcf800c089",
     "run/overlays/seal-0001.json": "8f80b91ba250eacf6c8274d2882871784063f16b41398e08bc72892641d3cb15",
-    "run/overlays/seal-0002.json": "da28c56b467a871175478413f27ee01973bf9d964b676bffae38ce2ed7b9b606",
+    "run/overlays/seal-0002.json": "9614333147a5c59c80939b32bcab4e07520f1d6dcf99173a2bcfe77cfca18449",
     "run/results.ndjson": "08719682aba1da613d9712bdc1ad15c838048a064843fe12f61a36f7b6936e5c",
     "run/run.json": "6833f5f2e31f266973749d72f60cf9656d8689145780a14670e35c07795c1f5c",
     "run/seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84",
@@ -3337,6 +3966,49 @@
     "run/gates.ndjson": "6db8527cfa0e3d60c242253e40f123eb56b4105f2b14a622af21370fd10b9c63",
     "run/metrics.json": "cd5980b59a1023260f2c7fa19d0a8075802dbb17e83485a547dc3b977649ef87",
     "run/overlays/events.ndjson": "e85542b3b5e728b372bf3ad31de20dd0ac62e2c294b5ca2f989337db84087de3",
+    "run/overlays/seal-0001.json": "8f80b91ba250eacf6c8274d2882871784063f16b41398e08bc72892641d3cb15",
+    "run/overlays/seal-0002.json": "da28c56b467a871175478413f27ee01973bf9d964b676bffae38ce2ed7b9b606",
+    "run/results.ndjson": "08719682aba1da613d9712bdc1ad15c838048a064843fe12f61a36f7b6936e5c",
+    "run/run.json": "6833f5f2e31f266973749d72f60cf9656d8689145780a14670e35c07795c1f5c",
+    "run/seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84",
+    "run/summary.json": "268eda205f131668d931d8804c9530cb7c99b2857d95e1ce1bc24fc3d6314679",
+    "run/traces.otlp.jsonl": "3c29fa780cb029dd541c36edb35614f49df76f459a1f7c3e3702960892398787"
+   }
+  },
+  {
+   "id": "chain-vectors/events-too-many-lines",
+   "kind": "chain",
+   "classes": [
+    "Overlay verifier"
+   ],
+   "rules": [
+    "OVL-5",
+    "ENC-17",
+    "ENC-18"
+   ],
+   "path": "chain-vectors/events-too-many-lines",
+   "files": {
+    "expected.json": "9aa1bca5752cd816f3c5952b5fd6454c60c4ec154a9d654012c8d66b4247f49b"
+   }
+  },
+  {
+   "id": "chain-vectors/events-truncated",
+   "kind": "chain",
+   "classes": [
+    "Overlay verifier"
+   ],
+   "rules": [
+    "OVL-5",
+    "ENC-7"
+   ],
+   "path": "chain-vectors/events-truncated",
+   "files": {
+    "expected.json": "7091371eba4d2483eb4ce1d9c733cb550c6b9c5bf321bbd2ce3db096807b9e03",
+    "run/blobs/sha256/63/635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5": "635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5",
+    "run/evidence.ndjson": "f76af41ebe790477719e419c60ab430ef5cc98263b8fd8dd5bb52988a03108b1",
+    "run/gates.ndjson": "6db8527cfa0e3d60c242253e40f123eb56b4105f2b14a622af21370fd10b9c63",
+    "run/metrics.json": "cd5980b59a1023260f2c7fa19d0a8075802dbb17e83485a547dc3b977649ef87",
+    "run/overlays/events.ndjson": "ed6965da2ae1c88f2bcee9e97d6e24ed990528f60f61d9827998ecb0a7e14a5a",
     "run/overlays/seal-0001.json": "8f80b91ba250eacf6c8274d2882871784063f16b41398e08bc72892641d3cb15",
     "run/overlays/seal-0002.json": "da28c56b467a871175478413f27ee01973bf9d964b676bffae38ce2ed7b9b606",
     "run/results.ndjson": "08719682aba1da613d9712bdc1ad15c838048a064843fe12f61a36f7b6936e5c",
@@ -3533,6 +4205,90 @@
    }
   },
   {
+   "id": "chain-vectors/tail-blank-line",
+   "kind": "chain",
+   "classes": [
+    "Overlay verifier"
+   ],
+   "rules": [
+    "OVL-5",
+    "ENC-5",
+    "ENC-7"
+   ],
+   "path": "chain-vectors/tail-blank-line",
+   "files": {
+    "expected.json": "d2c7f534079a56f76371dfa7e82088a3ede410260fd400e0d8eec65a2cac3fc7",
+    "run/blobs/sha256/63/635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5": "635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5",
+    "run/evidence.ndjson": "f76af41ebe790477719e419c60ab430ef5cc98263b8fd8dd5bb52988a03108b1",
+    "run/gates.ndjson": "6db8527cfa0e3d60c242253e40f123eb56b4105f2b14a622af21370fd10b9c63",
+    "run/metrics.json": "cd5980b59a1023260f2c7fa19d0a8075802dbb17e83485a547dc3b977649ef87",
+    "run/overlays/events.ndjson": "517f3972a7c2779c81d1244f46d3a4e2c393a50226c5b4506eede799aa7c5d22",
+    "run/overlays/seal-0001.json": "8f80b91ba250eacf6c8274d2882871784063f16b41398e08bc72892641d3cb15",
+    "run/overlays/seal-0002.json": "da28c56b467a871175478413f27ee01973bf9d964b676bffae38ce2ed7b9b606",
+    "run/results.ndjson": "08719682aba1da613d9712bdc1ad15c838048a064843fe12f61a36f7b6936e5c",
+    "run/run.json": "6833f5f2e31f266973749d72f60cf9656d8689145780a14670e35c07795c1f5c",
+    "run/seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84",
+    "run/summary.json": "268eda205f131668d931d8804c9530cb7c99b2857d95e1ce1bc24fc3d6314679",
+    "run/traces.otlp.jsonl": "3c29fa780cb029dd541c36edb35614f49df76f459a1f7c3e3702960892398787"
+   }
+  },
+  {
+   "id": "chain-vectors/tail-cr-line",
+   "kind": "chain",
+   "classes": [
+    "Overlay verifier"
+   ],
+   "rules": [
+    "OVL-5",
+    "ENC-5",
+    "ENC-7"
+   ],
+   "path": "chain-vectors/tail-cr-line",
+   "files": {
+    "expected.json": "d2c7f534079a56f76371dfa7e82088a3ede410260fd400e0d8eec65a2cac3fc7",
+    "run/blobs/sha256/63/635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5": "635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5",
+    "run/evidence.ndjson": "f76af41ebe790477719e419c60ab430ef5cc98263b8fd8dd5bb52988a03108b1",
+    "run/gates.ndjson": "6db8527cfa0e3d60c242253e40f123eb56b4105f2b14a622af21370fd10b9c63",
+    "run/metrics.json": "cd5980b59a1023260f2c7fa19d0a8075802dbb17e83485a547dc3b977649ef87",
+    "run/overlays/events.ndjson": "2e8e3cacea9125cbb3ea8225010ee46111f6f3de81e1ac607e96ea02692eb706",
+    "run/overlays/seal-0001.json": "8f80b91ba250eacf6c8274d2882871784063f16b41398e08bc72892641d3cb15",
+    "run/overlays/seal-0002.json": "da28c56b467a871175478413f27ee01973bf9d964b676bffae38ce2ed7b9b606",
+    "run/results.ndjson": "08719682aba1da613d9712bdc1ad15c838048a064843fe12f61a36f7b6936e5c",
+    "run/run.json": "6833f5f2e31f266973749d72f60cf9656d8689145780a14670e35c07795c1f5c",
+    "run/seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84",
+    "run/summary.json": "268eda205f131668d931d8804c9530cb7c99b2857d95e1ce1bc24fc3d6314679",
+    "run/traces.otlp.jsonl": "3c29fa780cb029dd541c36edb35614f49df76f459a1f7c3e3702960892398787"
+   }
+  },
+  {
+   "id": "chain-vectors/tail-unfinished-line",
+   "kind": "chain",
+   "classes": [
+    "Overlay verifier"
+   ],
+   "rules": [
+    "OVL-5",
+    "ENC-5",
+    "ENC-7"
+   ],
+   "path": "chain-vectors/tail-unfinished-line",
+   "files": {
+    "expected.json": "66e3798cc4a566c3215c24e6dea902436360c47a9f876c01f861d0da8ecc5016",
+    "run/blobs/sha256/63/635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5": "635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5",
+    "run/evidence.ndjson": "f76af41ebe790477719e419c60ab430ef5cc98263b8fd8dd5bb52988a03108b1",
+    "run/gates.ndjson": "6db8527cfa0e3d60c242253e40f123eb56b4105f2b14a622af21370fd10b9c63",
+    "run/metrics.json": "cd5980b59a1023260f2c7fa19d0a8075802dbb17e83485a547dc3b977649ef87",
+    "run/overlays/events.ndjson": "614b4fbc9cba32b7d7252e13a7b095a8f871cf262177bf08680f90ad0217807e",
+    "run/overlays/seal-0001.json": "8f80b91ba250eacf6c8274d2882871784063f16b41398e08bc72892641d3cb15",
+    "run/overlays/seal-0002.json": "da28c56b467a871175478413f27ee01973bf9d964b676bffae38ce2ed7b9b606",
+    "run/results.ndjson": "08719682aba1da613d9712bdc1ad15c838048a064843fe12f61a36f7b6936e5c",
+    "run/run.json": "6833f5f2e31f266973749d72f60cf9656d8689145780a14670e35c07795c1f5c",
+    "run/seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84",
+    "run/summary.json": "268eda205f131668d931d8804c9530cb7c99b2857d95e1ce1bc24fc3d6314679",
+    "run/traces.otlp.jsonl": "3c29fa780cb029dd541c36edb35614f49df76f459a1f7c3e3702960892398787"
+   }
+  },
+  {
    "id": "chain-vectors/target-other-run",
    "kind": "chain",
    "classes": [
@@ -3660,6 +4416,73 @@
     "run/overlays/seal-0001.dsse.json": "9574d15ac8915ea9e7b9b659743a03aaebd40906f4c555fa78ab6dba1392cf92",
     "run/overlays/seal-0001.json": "8f80b91ba250eacf6c8274d2882871784063f16b41398e08bc72892641d3cb15",
     "run/overlays/seal-0002.json": "da28c56b467a871175478413f27ee01973bf9d964b676bffae38ce2ed7b9b606",
+    "run/results.ndjson": "08719682aba1da613d9712bdc1ad15c838048a064843fe12f61a36f7b6936e5c",
+    "run/run.json": "6833f5f2e31f266973749d72f60cf9656d8689145780a14670e35c07795c1f5c",
+    "run/seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84",
+    "run/summary.json": "268eda205f131668d931d8804c9530cb7c99b2857d95e1ce1bc24fc3d6314679",
+    "run/traces.otlp.jsonl": "3c29fa780cb029dd541c36edb35614f49df76f459a1f7c3e3702960892398787"
+   }
+  },
+  {
+   "id": "overlay-views/assurance-shown",
+   "kind": "overlay-view",
+   "classes": [
+    "Overlay verifier"
+   ],
+   "rules": [
+    "OVL-3",
+    "SIG-4"
+   ],
+   "path": "overlay-views/assurance-shown",
+   "files": {
+    "expected.json": "511a191204878a47fe59dfd095c63803754dbed99d389fa2bd9dd05c29de3138",
+    "policy.json": "cd7918e843a38fea9d3b4100816563e35effc79d159169e348cec99122103c06",
+    "run/blobs/sha256/63/635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5": "635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5",
+    "run/evidence.ndjson": "f76af41ebe790477719e419c60ab430ef5cc98263b8fd8dd5bb52988a03108b1",
+    "run/gates.ndjson": "6db8527cfa0e3d60c242253e40f123eb56b4105f2b14a622af21370fd10b9c63",
+    "run/metrics.json": "cd5980b59a1023260f2c7fa19d0a8075802dbb17e83485a547dc3b977649ef87",
+    "run/overlays/events.ndjson": "ea52b234314b0ac9f7e5c47c3bb8ee474cb64101a3115afc044931c7505e0a82",
+    "run/overlays/seal-0001.dsse.json": "cb2a43c08d2ea909c55439a7769fb1299dcdae9ddf4fa82d5377e944ade5216a",
+    "run/overlays/seal-0001.json": "af901cc518e030feb9dd05d4f940ab41433e2d37dafe8b42b080969493e84471",
+    "run/overlays/seal-0002.json": "9bf0a4d0b4e3c2d7685270957cc2e709279d7c69e9917081534922643fb26f0a",
+    "run/overlays/seal-0003.dsse.json": "6c12c7ad227c9e0fa5f48c87737f05329ad4bdbac1ec288466939a0caf9278b5",
+    "run/overlays/seal-0003.json": "61b16a0645a196ba1807f4f59665b4946a70f7be5cf31f23a8506d875f81a56d",
+    "run/overlays/seal-0004.dsse.json": "d9bfb89ba4f113c84c19adffd4cc52838e83d9f30313c0a519239e231cdd816e",
+    "run/overlays/seal-0004.json": "2539fac6690655ea74d315af1a2e5924dc7bf2eaa4f83a6136640a41a2390d8d",
+    "run/overlays/seal-0005.json": "135780484be4972f492e787b039dcf0789f1088974c01751c281253e8c634766",
+    "run/results.ndjson": "08719682aba1da613d9712bdc1ad15c838048a064843fe12f61a36f7b6936e5c",
+    "run/run.json": "6833f5f2e31f266973749d72f60cf9656d8689145780a14670e35c07795c1f5c",
+    "run/seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84",
+    "run/summary.json": "268eda205f131668d931d8804c9530cb7c99b2857d95e1ce1bc24fc3d6314679",
+    "run/traces.otlp.jsonl": "3c29fa780cb029dd541c36edb35614f49df76f459a1f7c3e3702960892398787"
+   }
+  },
+  {
+   "id": "overlay-views/assurance-without-policy",
+   "kind": "overlay-view",
+   "classes": [
+    "Overlay verifier"
+   ],
+   "rules": [
+    "OVL-3",
+    "SIG-4"
+   ],
+   "path": "overlay-views/assurance-without-policy",
+   "files": {
+    "expected.json": "d5f2aa1c1ca043773f017755786c43b44caba2816e1e707ddba2e8086b3ab306",
+    "run/blobs/sha256/63/635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5": "635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5",
+    "run/evidence.ndjson": "f76af41ebe790477719e419c60ab430ef5cc98263b8fd8dd5bb52988a03108b1",
+    "run/gates.ndjson": "6db8527cfa0e3d60c242253e40f123eb56b4105f2b14a622af21370fd10b9c63",
+    "run/metrics.json": "cd5980b59a1023260f2c7fa19d0a8075802dbb17e83485a547dc3b977649ef87",
+    "run/overlays/events.ndjson": "ea52b234314b0ac9f7e5c47c3bb8ee474cb64101a3115afc044931c7505e0a82",
+    "run/overlays/seal-0001.dsse.json": "cb2a43c08d2ea909c55439a7769fb1299dcdae9ddf4fa82d5377e944ade5216a",
+    "run/overlays/seal-0001.json": "af901cc518e030feb9dd05d4f940ab41433e2d37dafe8b42b080969493e84471",
+    "run/overlays/seal-0002.json": "9bf0a4d0b4e3c2d7685270957cc2e709279d7c69e9917081534922643fb26f0a",
+    "run/overlays/seal-0003.dsse.json": "6c12c7ad227c9e0fa5f48c87737f05329ad4bdbac1ec288466939a0caf9278b5",
+    "run/overlays/seal-0003.json": "61b16a0645a196ba1807f4f59665b4946a70f7be5cf31f23a8506d875f81a56d",
+    "run/overlays/seal-0004.dsse.json": "d9bfb89ba4f113c84c19adffd4cc52838e83d9f30313c0a519239e231cdd816e",
+    "run/overlays/seal-0004.json": "2539fac6690655ea74d315af1a2e5924dc7bf2eaa4f83a6136640a41a2390d8d",
+    "run/overlays/seal-0005.json": "135780484be4972f492e787b039dcf0789f1088974c01751c281253e8c634766",
     "run/results.ndjson": "08719682aba1da613d9712bdc1ad15c838048a064843fe12f61a36f7b6936e5c",
     "run/run.json": "6833f5f2e31f266973749d72f60cf9656d8689145780a14670e35c07795c1f5c",
     "run/seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84",
@@ -3873,7 +4696,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "EVD-1"
@@ -3889,7 +4713,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "EVD-2"
@@ -3905,7 +4730,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "EVD-2"
@@ -3921,7 +4747,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "EVD-1"
@@ -3937,7 +4764,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "GATE-1"
@@ -3953,7 +4781,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "GATE-2"
@@ -3969,7 +4798,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "VER-9",
@@ -3986,7 +4816,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "OVL-1"
@@ -4002,7 +4833,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "ENC-15"
@@ -4018,7 +4850,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "OVL-1",
@@ -4035,7 +4868,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "OVL-1"
@@ -4051,7 +4885,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "OVL-1"
@@ -4067,7 +4902,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "OVL-1"
@@ -4083,7 +4919,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "OVL-4"
@@ -4099,7 +4936,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "OVL-2"
@@ -4115,7 +4953,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "OVL-1"
@@ -4131,7 +4970,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "OVL-1"
@@ -4147,7 +4987,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "RES-2"
@@ -4163,7 +5004,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "RES-2"
@@ -4179,7 +5021,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "RES-4"
@@ -4195,7 +5038,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "RES-4"
@@ -4211,7 +5055,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "RES-4"
@@ -4227,7 +5072,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "RES-2"
@@ -4243,7 +5089,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "VER-9",
@@ -4260,7 +5107,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "RES-8"
@@ -4276,7 +5124,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "RUN-5"
@@ -4292,7 +5141,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "RUN-5"
@@ -4308,7 +5158,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "ENC-8",
@@ -4325,7 +5176,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "RUN-5"
@@ -4341,7 +5193,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "RUN-5"
@@ -4357,7 +5210,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "RUN-10"
@@ -4373,7 +5227,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "RUN-10",
@@ -4390,7 +5245,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "ENC-15"
@@ -4406,7 +5262,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "VER-3",
@@ -4423,7 +5280,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "RUN-5"
@@ -4439,7 +5297,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "VER-9",
@@ -4456,7 +5315,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "VER-4"
@@ -4472,7 +5332,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "RUN-7"
@@ -4488,7 +5349,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "VER-1"
@@ -4504,7 +5366,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "SEAL-5",
@@ -4521,7 +5384,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "RUN-3"
@@ -4537,7 +5401,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "RUN-3"
@@ -4553,7 +5418,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "SEAL-5"
@@ -4569,7 +5435,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "SEAL-5"
@@ -4585,7 +5452,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "SUM-3"
@@ -4601,7 +5469,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "SUM-5",
@@ -4618,7 +5487,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "ENC-15",
@@ -5055,7 +5925,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "VER-8",
@@ -5072,7 +5943,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "VER-1",
@@ -5089,7 +5961,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "ENC-17",
@@ -5106,7 +5979,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "ENC-5",
@@ -5123,7 +5997,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "ENC-1",
@@ -5140,7 +6015,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "ENC-5",
@@ -5157,7 +6033,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "ENC-2",
@@ -5174,7 +6051,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "ENC-2",
@@ -5191,7 +6069,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "VER-3"
@@ -5207,7 +6086,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "ENC-4",
@@ -5224,7 +6104,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "ENC-1",
@@ -5241,7 +6122,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "ENC-2",
@@ -5258,7 +6140,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "ENC-5",
@@ -5275,7 +6158,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "ENC-5",
@@ -5293,7 +6177,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "ENC-3",
@@ -5310,7 +6195,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "ENC-5",
@@ -5327,7 +6213,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "ENC-7",
@@ -5344,7 +6231,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "ENC-3",
@@ -5361,7 +6249,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "ENC-2",
@@ -5378,7 +6267,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "VER-8",
@@ -5395,7 +6285,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "VER-1",
@@ -5412,7 +6303,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "ENC-4"
@@ -5428,7 +6320,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "ENC-4"
@@ -5444,7 +6337,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "ENC-17",
@@ -5461,7 +6355,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "ENC-4"
@@ -5477,7 +6372,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "ENC-3",
@@ -5494,7 +6390,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "VER-8",
@@ -5511,7 +6408,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "VER-1",
@@ -5528,7 +6426,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "VER-1",
@@ -5545,7 +6444,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "VER-8",
@@ -5562,7 +6462,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "VER-8",
@@ -5579,7 +6480,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "VER-1",
@@ -5597,7 +6499,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "VER-1",
@@ -5614,7 +6517,8 @@
    "kind": "document",
    "classes": [
     "Producer",
-    "Reader"
+    "Reader",
+    "Runner"
    ],
    "rules": [
     "VER-8",
@@ -6315,6 +7219,99 @@
    }
   },
   {
+   "id": "lane-vectors/anchors-signed-checkpoint",
+   "kind": "lane",
+   "classes": [
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "CKP-9",
+    "SIG-8",
+    "CKP-8"
+   ],
+   "path": "lane-vectors/anchors-signed-checkpoint",
+   "files": {
+    "checkpoint.dsse.json": "38c0a3d597790f89f64864ff7f8548c388911d475dbdc4c4d832a0ad539aa8c3",
+    "checkpoint.json": "6955c1110df6f262f9c9f943a5c36b8f4f97e77e795579aff3f6c07a75292ead",
+    "expected.json": "dba9c83de1088546894d8c6a61589236a59f586170bc9ed6c53119f4fd564cf6",
+    "policy.json": "8318aa752a303206435584438e8b0c8bce861e391782c4e666d9be2f809ef3a6",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/blobs/sha256/63/635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5": "635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/evidence.ndjson": "f76af41ebe790477719e419c60ab430ef5cc98263b8fd8dd5bb52988a03108b1",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/gates.ndjson": "6db8527cfa0e3d60c242253e40f123eb56b4105f2b14a622af21370fd10b9c63",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/metrics.json": "cd5980b59a1023260f2c7fa19d0a8075802dbb17e83485a547dc3b977649ef87",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/overlays/events.ndjson": "6fe14d001d245f03dcf39a84bd11bf20053b8eba906a4783167e0a9a764ec791",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/overlays/seal-0001.json": "8f80b91ba250eacf6c8274d2882871784063f16b41398e08bc72892641d3cb15",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/overlays/seal-0002.json": "da28c56b467a871175478413f27ee01973bf9d964b676bffae38ce2ed7b9b606",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/results.ndjson": "08719682aba1da613d9712bdc1ad15c838048a064843fe12f61a36f7b6936e5c",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/run.json": "6833f5f2e31f266973749d72f60cf9656d8689145780a14670e35c07795c1f5c",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/summary.json": "268eda205f131668d931d8804c9530cb7c99b2857d95e1ce1bc24fc3d6314679",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/traces.otlp.jsonl": "3c29fa780cb029dd541c36edb35614f49df76f459a1f7c3e3702960892398787"
+   }
+  },
+  {
+   "id": "lane-vectors/anchors-untrusted-signer",
+   "kind": "lane",
+   "classes": [
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "CKP-9",
+    "SIG-8",
+    "CKP-8"
+   ],
+   "path": "lane-vectors/anchors-untrusted-signer",
+   "files": {
+    "checkpoint.dsse.json": "83893f2abd01c65307327bf04ca112072c0c7e3832f5206c252fc111b28aead4",
+    "checkpoint.json": "c375a3a4b5f5d0c09e802689980e7378c90cd3588f8e7bd4ed03725aaa73fffa",
+    "expected.json": "ce5edfc599e6e0ea38fb4fc3e02b8f89c3498baecbfd7b692afaea6f2f6732b4",
+    "policy.json": "8318aa752a303206435584438e8b0c8bce861e391782c4e666d9be2f809ef3a6",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/blobs/sha256/63/635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5": "635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/evidence.ndjson": "f76af41ebe790477719e419c60ab430ef5cc98263b8fd8dd5bb52988a03108b1",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/gates.ndjson": "6db8527cfa0e3d60c242253e40f123eb56b4105f2b14a622af21370fd10b9c63",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/metrics.json": "cd5980b59a1023260f2c7fa19d0a8075802dbb17e83485a547dc3b977649ef87",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/overlays/events.ndjson": "6fe14d001d245f03dcf39a84bd11bf20053b8eba906a4783167e0a9a764ec791",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/overlays/seal-0001.json": "8f80b91ba250eacf6c8274d2882871784063f16b41398e08bc72892641d3cb15",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/overlays/seal-0002.json": "da28c56b467a871175478413f27ee01973bf9d964b676bffae38ce2ed7b9b606",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/results.ndjson": "08719682aba1da613d9712bdc1ad15c838048a064843fe12f61a36f7b6936e5c",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/run.json": "6833f5f2e31f266973749d72f60cf9656d8689145780a14670e35c07795c1f5c",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/summary.json": "268eda205f131668d931d8804c9530cb7c99b2857d95e1ce1bc24fc3d6314679",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/traces.otlp.jsonl": "3c29fa780cb029dd541c36edb35614f49df76f459a1f7c3e3702960892398787"
+   }
+  },
+  {
+   "id": "lane-vectors/anchors-with-a-problem",
+   "kind": "lane",
+   "classes": [
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "CKP-9",
+    "SIG-8",
+    "CKP-8"
+   ],
+   "path": "lane-vectors/anchors-with-a-problem",
+   "files": {
+    "checkpoint.dsse.json": "9c5d1a9f5a0b124d52efda2b07ba77809ea56e9ea89a066ceccb452d153d5cb2",
+    "checkpoint.json": "1f85389c9395ad8253cdb7ec6304a3061cc2fa4b4a8a918ed2e9cf503cd36354",
+    "expected.json": "77618808835f3730b87cbe4fe40cb6705ad48707dd9ddcabbc5d3495848f595b",
+    "policy.json": "8318aa752a303206435584438e8b0c8bce861e391782c4e666d9be2f809ef3a6",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/blobs/sha256/63/635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5": "635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/evidence.ndjson": "f76af41ebe790477719e419c60ab430ef5cc98263b8fd8dd5bb52988a03108b1",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/gates.ndjson": "6db8527cfa0e3d60c242253e40f123eb56b4105f2b14a622af21370fd10b9c63",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/metrics.json": "cd5980b59a1023260f2c7fa19d0a8075802dbb17e83485a547dc3b977649ef87",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/overlays/events.ndjson": "6fe14d001d245f03dcf39a84bd11bf20053b8eba906a4783167e0a9a764ec791",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/overlays/seal-0001.json": "8f80b91ba250eacf6c8274d2882871784063f16b41398e08bc72892641d3cb15",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/overlays/seal-0002.json": "da28c56b467a871175478413f27ee01973bf9d964b676bffae38ce2ed7b9b606",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/results.ndjson": "08719682aba1da613d9712bdc1ad15c838048a064843fe12f61a36f7b6936e5c",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/run.json": "6833f5f2e31f266973749d72f60cf9656d8689145780a14670e35c07795c1f5c",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/summary.json": "268eda205f131668d931d8804c9530cb7c99b2857d95e1ce1bc24fc3d6314679",
+    "runs/01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10/traces.otlp.jsonl": "3c29fa780cb029dd541c36edb35614f49df76f459a1f7c3e3702960892398787"
+   }
+  },
+  {
    "id": "lane-vectors/binding",
    "kind": "lane",
    "classes": [
@@ -6629,6 +7626,88 @@
    }
   },
   {
+   "id": "lane-vectors/reads-unknown",
+   "kind": "lane",
+   "classes": [
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "CKP-8",
+    "VER-8",
+    "LANE-10"
+   ],
+   "path": "lane-vectors/reads-unknown",
+   "files": {
+    "checkpoint.json": "fd4233fd306da99b1b99b4696c461fd9c69e177b7c16110c882a2031f34ee8c6",
+    "expected.json": "b7c2b36fb8eca132d903b3336a2c70ba523a02552ed6fc373352eba18d9a0272",
+    "runs/B/metrics.json": "f82b2f218a638efa196d95b6cbd9589a3c0f127ab840033d2faa4e2dd47e17b9",
+    "runs/B/results.ndjson": "40b8067c2ed57d13e5def665273f21403d9c3c2f786ec795450a50b9647dab1c",
+    "runs/B/run.json": "925d5da69fc55669f641353169bcfb8abc5033179dcd581bc529deddcc84b51b",
+    "runs/B/seal.json": "ae8d009bd7528a559e724fd043d713b60df26174d739c26a9611bc1930d17df6",
+    "runs/B/summary.json": "a7d28cef0a41501cada978dd91c985b639a500ecdec7f22b8f196c21c214e6db",
+    "runs/BS/metrics.json": "f82b2f218a638efa196d95b6cbd9589a3c0f127ab840033d2faa4e2dd47e17b9",
+    "runs/BS/results.ndjson": "33e5c5756dcc8baeca099a324ce162c058deb5639f7ad8d74ced1821ecb8ed61",
+    "runs/BS/run.json": "c679a3f9cd27e32dce61f39f15d572252bd1d628d7d35cb8cd8e4a2677c7aec5",
+    "runs/BS/seal.json": "2619926d430e8c9cd5d0354bf43be7c2186f53e74bd0a8c12b849ee85a48dd01",
+    "runs/BS/summary.json": "7d3606e27186ea44021a3cc6768549690893ff2614a5a497320f133d60f18779",
+    "runs/C13/metrics.json": "f82b2f218a638efa196d95b6cbd9589a3c0f127ab840033d2faa4e2dd47e17b9",
+    "runs/C13/results.ndjson": "846cce412c5c3605accb814165e5c6aa85fb1bed61e3a2db5af5b5e70ba9e906",
+    "runs/C13/run.json": "885e372eb32b1222807890c8013dae12c367962a1819bbbc8a3ede8e08a2fe54",
+    "runs/C13/seal.json": "db81def877a1b94f4e33650e39ca7e7152cda9e43b2e9b723c5b6aeb97d5a9ef",
+    "runs/C13/summary.json": "b8315d1a88de268855425426098e75985be46af204beb396a6070744ddb31423",
+    "runs/C14/metrics.json": "f82b2f218a638efa196d95b6cbd9589a3c0f127ab840033d2faa4e2dd47e17b9",
+    "runs/C14/results.ndjson": "cba66cc96e47237526d25dad9466a75f95a713d3b9aa013e77ae4a30f1005bf9",
+    "runs/C14/run.json": "fc032a0256cf723d4880745d56d8be24889065bd89c5ed6c5c2a61fd23f82764",
+    "runs/C14/seal.json": "937e746a3932c1fd7ad289bfc14a1b4f87cbd4eb928ad9a7097b2a4255494902",
+    "runs/C14/summary.json": "854a34cf79a01aeefcfb14487ade0b5a069c76c48ce38996b2b083ee94ff71e2",
+    "runs/C15/metrics.json": "f82b2f218a638efa196d95b6cbd9589a3c0f127ab840033d2faa4e2dd47e17b9",
+    "runs/C15/results.ndjson": "cb7fbe201254ba517fd31fb3c68390f4377743c977e53c8d6d709cd0511e6d89",
+    "runs/C15/run.json": "c134fbbc6829029c4c95afab8d9c34622e92d734645f3d3498424393c3759976",
+    "runs/C15/seal.json": "146b04219fc2ab527de69e9e1971d034451e2003c6033cfd39a2f7a872abca17",
+    "runs/C15/summary.json": "c9bc4cad88801033d15cf255de5bd101f3306cd7beb0c00b51928168e995e79e",
+    "runs/C9/metrics.json": "f82b2f218a638efa196d95b6cbd9589a3c0f127ab840033d2faa4e2dd47e17b9",
+    "runs/C9/results.ndjson": "7db90c0ca57771e74751bb35417839081d6afc2e5f35685aace316ca0643c43b",
+    "runs/C9/run.json": "73c7a653dfee363d51ebb43c773497794e5aadec4ba8c2f4c5d9e4f8f494ae91",
+    "runs/C9/seal.json": "0e3f5a9aa24bf764346b2c1b5691389750492ff90764c8718fa5a86ba1b8041f",
+    "runs/C9/summary.json": "6e5a1f475f1a87b5720ca439bc95b1e5fedd2e4f411f450d822fc725c8ea5981",
+    "runs/CFEW/metrics.json": "f82b2f218a638efa196d95b6cbd9589a3c0f127ab840033d2faa4e2dd47e17b9",
+    "runs/CFEW/results.ndjson": "d26ff1992e33f1edf8d9e53457e0ce69fe8cffdc3755a52a42a827431c47a3e1",
+    "runs/CFEW/run.json": "949f56ccb06ff89386b139223c41060571bf2cf5eac8b9412f20fa1cad5d44f2",
+    "runs/CFEW/seal.json": "a373d4d1057f919376f37b6f3b9780733af4d3772b405015837e01d7805aaade",
+    "runs/CFEW/summary.json": "9cc7af564d6ff033ef786f93844c3ee602ef824a5f3e268c2d486ffe38f8ae55",
+    "runs/CJ/metrics.json": "f82b2f218a638efa196d95b6cbd9589a3c0f127ab840033d2faa4e2dd47e17b9",
+    "runs/CJ/results.ndjson": "dd9c3497e939717b1c4c044b494958ca7b2bb187031e90e4b0231711c4f62371",
+    "runs/CJ/run.json": "8f18a1c7b700dc09dbbbf59984c03ef6434d2d2bf2f28dd08d8b3ed7777b8b20",
+    "runs/CJ/seal.json": "cb604d2f08fbc0b8c81f66b68cddef724a3593dffd1cb2c4bb073b00dfc03d73",
+    "runs/CJ/summary.json": "3cce64d2881345ff93924a908f08cedeb0c0f752c696066ce2619726bf42d476",
+    "runs/CS/metrics.json": "f82b2f218a638efa196d95b6cbd9589a3c0f127ab840033d2faa4e2dd47e17b9",
+    "runs/CS/results.ndjson": "9fd3d463cb233a99c5c0a70a21d69804d32352a9f8a60596f09aacfafffaccd6",
+    "runs/CS/run.json": "2ea520d2da9c3673a4870de31e5311d99c76056634cccace25b60181d78f2ad5",
+    "runs/CS/seal.json": "207deb2392d17e2b5a2b1df6ec75a8843f8191e4a89f3c8716e726bb91b67a8f",
+    "runs/CS/summary.json": "86e88c46668e778647fd336348ac075075ca7d2ead351279983500610064991f",
+    "runs/RU-direction/metrics.json": "06eeeaf3b75f1b0b88291cbf7138e22949a5a5acd98ff91309dcbd595645024d",
+    "runs/RU-direction/results.ndjson": "d49d480e11f791a7af70e60ed4ee5a4fbecfafc8adf89bb81e11b769c1b14749",
+    "runs/RU-direction/run.json": "539ff26f293f70cd333529e7b086379db579743f34a8c9338fbae8e402a2b78c",
+    "runs/RU-direction/seal.json": "252a70a53134ebb46b22b816bdf79657e440ffa4507902b71602e10c0f54f129",
+    "runs/RU-direction/summary.json": "3dfb2ebb1189c56c3c15d6c7dd33b2adf1e4f1334d9b12e4f520992c14403f14",
+    "runs/RU-mode/metrics.json": "81ac87c69d20ca49d69e0a5541b062fe1f8fcc4529117c6d6f29eac1403b3d6c",
+    "runs/RU-mode/results.ndjson": "798ce4d05d4a0dbf5097d423c84e6dcdd5c61563cd98e084f4a6188a2660dbfa",
+    "runs/RU-mode/run.json": "a7b25949017d2d1270126bd5e877ca76af1911fff4a8e9cf0fd79b84aaa17f1c",
+    "runs/RU-mode/seal.json": "62b3ac32c2ee03089fa1da8dbb34cb9b65d36fca75c0d7d2bfff0b1b776ae6ed",
+    "runs/RU-mode/summary.json": "2c8318283269c1d86e7ae069e2a492bfe8a89862f873576881bac67540569d3b",
+    "runs/RU-plain/metrics.json": "81ac87c69d20ca49d69e0a5541b062fe1f8fcc4529117c6d6f29eac1403b3d6c",
+    "runs/RU-plain/results.ndjson": "2c93925d42943f2f12e25c112a7085e74d5e4a7ce24d2208e595824d73940e3d",
+    "runs/RU-plain/run.json": "e16a9ad36ccbeab55e67f17480dea3b3248dbc30919d5f25f42a9b3388e22717",
+    "runs/RU-plain/seal.json": "ad07f1bf00ecbba2944b67ab306c546ebc8cdef2aded49e9dd916448a00afbda",
+    "runs/RU-plain/summary.json": "a1af1df823cef80379cd411f827a9e439349895e247f89e982566d8e08aa79b8",
+    "runs/RU-severity/metrics.json": "7be4c9b8d0eeb24dbfe42bf235bf78e7c16f8e634bc029873d7ab272de7b4bd7",
+    "runs/RU-severity/results.ndjson": "897aeb62c3f3c75a45552ff96f655c013bfc4a08f6a2b8b97146bb94ea89681c",
+    "runs/RU-severity/run.json": "903412fef68c04ead716ddbb635aece847d0f1bd1758c6cd698215de1331a4bf",
+    "runs/RU-severity/seal.json": "428c415d08a5ae22a50a01eafd9b3ed77ed8dced63cb9e0ac694bf484c4acbb5",
+    "runs/RU-severity/summary.json": "0519c01400a6e50d55d1a4106750497c274efdb3b6364e1b06ec03f0c46fd819"
+   }
+  },
+  {
    "id": "lane-vectors/recorded-differs",
    "kind": "lane",
    "classes": [
@@ -6913,7 +7992,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-1",
@@ -6941,7 +8022,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-2",
@@ -6963,7 +8046,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-2",
@@ -6986,7 +8071,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-2",
@@ -7009,7 +8096,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-2",
@@ -7031,7 +8120,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-2",
@@ -7053,7 +8144,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-1",
@@ -7079,7 +8172,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-2",
@@ -7101,7 +8196,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-2",
@@ -7124,7 +8221,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-2",
@@ -7146,7 +8245,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-2",
@@ -7168,7 +8269,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-2",
@@ -7190,7 +8293,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-2",
@@ -7213,7 +8318,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-1",
@@ -7239,7 +8346,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-1",
@@ -7265,7 +8374,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-1",
@@ -7288,7 +8399,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-1",
@@ -7311,7 +8424,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-1",
@@ -7333,7 +8448,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-3",
@@ -7356,7 +8473,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-1",
@@ -7379,7 +8498,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-1",
@@ -7402,7 +8523,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-1",
@@ -7425,7 +8548,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-2",
@@ -7448,7 +8573,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-1",
@@ -7474,7 +8601,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-4",
@@ -7497,7 +8626,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-1",
@@ -7523,7 +8654,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-1",
@@ -7550,7 +8683,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-1",
@@ -7573,7 +8708,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-3",
@@ -7595,7 +8732,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-3",
@@ -7611,13 +8750,135 @@
    "level": "signed"
   },
   {
+   "id": "signature-vectors/policy-empty-identity",
+   "kind": "signature",
+   "classes": [
+    "Sealer",
+    "Run verifier",
+    "Overlay verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
+   ],
+   "rules": [
+    "SIG-4",
+    "SIG-6"
+   ],
+   "path": "signature-vectors/policy-empty-identity",
+   "files": {
+    "envelope.dsse.json": "6eeaf635cea674b59f4dc71df23b6ad43cfb0add30c33ff28e40ae8e98df40ee",
+    "expected.json": "5fa6bb9955a14e5e27fc9474307cbd76939aa2a3b135d9346651a961eeb31981",
+    "policy.json": "007f77a77b0b0b1f935ed77034a5faf0cfb2ac399e27ba7a83fee7e66d28835b",
+    "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
+   },
+   "level": "signed"
+  },
+  {
+   "id": "signature-vectors/policy-may-as-string",
+   "kind": "signature",
+   "classes": [
+    "Sealer",
+    "Run verifier",
+    "Overlay verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
+   ],
+   "rules": [
+    "SIG-4",
+    "SIG-6"
+   ],
+   "path": "signature-vectors/policy-may-as-string",
+   "files": {
+    "envelope.dsse.json": "6eeaf635cea674b59f4dc71df23b6ad43cfb0add30c33ff28e40ae8e98df40ee",
+    "expected.json": "5fa6bb9955a14e5e27fc9474307cbd76939aa2a3b135d9346651a961eeb31981",
+    "policy.json": "50104a9ed941a2636b3295d30ab6a8049ef3cf00940f549e7e05f8af7485e594",
+    "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
+   },
+   "level": "signed"
+  },
+  {
+   "id": "signature-vectors/policy-may-twice",
+   "kind": "signature",
+   "classes": [
+    "Sealer",
+    "Run verifier",
+    "Overlay verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
+   ],
+   "rules": [
+    "SIG-4",
+    "SIG-6"
+   ],
+   "path": "signature-vectors/policy-may-twice",
+   "files": {
+    "envelope.dsse.json": "6eeaf635cea674b59f4dc71df23b6ad43cfb0add30c33ff28e40ae8e98df40ee",
+    "expected.json": "5fa6bb9955a14e5e27fc9474307cbd76939aa2a3b135d9346651a961eeb31981",
+    "policy.json": "936ad9ff9db84e8f0f196dbd315d6d757ace16a1e958f6361e123ec4c7acf3c7",
+    "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
+   },
+   "level": "signed"
+  },
+  {
+   "id": "signature-vectors/policy-unknown-member",
+   "kind": "signature",
+   "classes": [
+    "Sealer",
+    "Run verifier",
+    "Overlay verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
+   ],
+   "rules": [
+    "SIG-4",
+    "SIG-6"
+   ],
+   "path": "signature-vectors/policy-unknown-member",
+   "files": {
+    "envelope.dsse.json": "6eeaf635cea674b59f4dc71df23b6ad43cfb0add30c33ff28e40ae8e98df40ee",
+    "expected.json": "5fa6bb9955a14e5e27fc9474307cbd76939aa2a3b135d9346651a961eeb31981",
+    "policy.json": "ce34b3d3b0a315b3dc65c33e904627e23f6af46ee4aeeddb59b422271d2686c3",
+    "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
+   },
+   "level": "signed"
+  },
+  {
+   "id": "signature-vectors/policy-unknown-top-member",
+   "kind": "signature",
+   "classes": [
+    "Sealer",
+    "Run verifier",
+    "Overlay verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
+   ],
+   "rules": [
+    "SIG-4",
+    "SIG-6"
+   ],
+   "path": "signature-vectors/policy-unknown-top-member",
+   "files": {
+    "envelope.dsse.json": "6eeaf635cea674b59f4dc71df23b6ad43cfb0add30c33ff28e40ae8e98df40ee",
+    "expected.json": "5fa6bb9955a14e5e27fc9474307cbd76939aa2a3b135d9346651a961eeb31981",
+    "policy.json": "1349b18d031cd1fcd3d59ad7ef62afa6e2266f837f9c3d556194027a0b0a4c40",
+    "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
+   },
+   "level": "signed"
+  },
+  {
    "id": "signature-vectors/rsa-key-ber-in-policy",
    "kind": "signature",
    "classes": [
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-3",
@@ -7639,7 +8900,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-3",
@@ -7661,7 +8924,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-1",
@@ -7684,7 +8949,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-1",
@@ -7706,7 +8973,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-1",
@@ -7732,7 +9001,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-1",
@@ -7758,7 +9029,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-2",
@@ -7780,7 +9053,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-1",
@@ -7806,7 +9081,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-1",
@@ -7832,7 +9109,9 @@
     "Sealer",
     "Run verifier",
     "Overlay verifier",
-    "Checkpoint verifier"
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-1",
@@ -7849,11 +9128,409 @@
    "level": "signed"
   },
   {
+   "id": "rulings/budget-summed-exactly-ascending",
+   "kind": "plan-conformance",
+   "classes": [
+    "Stream verifier"
+   ],
+   "rules": [
+    "STRM-4",
+    "PLAN-2",
+    "SUM-5"
+   ],
+   "path": "rulings/budget-summed-exactly-ascending",
+   "files": {
+    "events.ndjson": "04e3b88efb38590b44a7570d077e6ba08887f6a51621ac3776831b0a331056be",
+    "expected.json": "3a6b3afe36a930bdef43c52bb86fd1b9049699cbf87adb973b1d4359e9902e8a",
+    "plan.json": "d19ba07448f8c00c2d450e63186418edd2e1adc938f84894db4a019cde6add32",
+    "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
+    "runs/R-1/results.ndjson": "2572cc41c5abbc0a2d1df009a2979e298727f2f3f8ffff2fba42b591fa7ba1c4",
+    "runs/R-1/run.json": "a0fdcd86bd7c2f4359d2c1b699832ffb6432cc2855ca01c2df5543db02994444",
+    "runs/R-1/seal.json": "7f1176abe6926e883eb29159c31f84a62774077ae2c7dc303d2d2c0c03f56354",
+    "runs/R-1/summary.json": "e9e7ef834edd6864c8187155283d56ab12e807527b46c433b89a52abf9d5b73e",
+    "runs/R-2/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
+    "runs/R-2/results.ndjson": "6b7bb0c4567de6f60c7c5a89f38287e4b48f0f79195157e84058a7c84dda5b4a",
+    "runs/R-2/run.json": "b9f000fca7a357450e3079c163af67238641e2af9611831112d0a1af6739acd7",
+    "runs/R-2/seal.json": "b6b345800066e2b94a35999fa551ae636a7599fb92c374caa794df3cdaa83749",
+    "runs/R-2/summary.json": "13228453f6a60aa8e1dcd00a8c992148e3066890cb3ba4722219725b78293e37",
+    "runs/R-3/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
+    "runs/R-3/results.ndjson": "1b9ac53004a1cbddf3fc64ce15f9ad6721c3d3b44421cbf3850e85a33046c3b2",
+    "runs/R-3/run.json": "0c75e69bb6f21cd85ecaa977bfe6548aac799094f20ba3bcfeea775d91037653",
+    "runs/R-3/seal.json": "96574f58deeedc3a51c004883451e7c1c79095d5c806dfe8573177c2c3eac699",
+    "runs/R-3/summary.json": "97950a5fcbbe5fad1833ca80af0d2caf49c3311e0da9628a941f647ca3156f95"
+   }
+  },
+  {
+   "id": "rulings/budget-summed-exactly-descending",
+   "kind": "plan-conformance",
+   "classes": [
+    "Stream verifier"
+   ],
+   "rules": [
+    "STRM-4",
+    "PLAN-2",
+    "SUM-5"
+   ],
+   "path": "rulings/budget-summed-exactly-descending",
+   "files": {
+    "events.ndjson": "ffa12862ea242e8c51d9efdae203089f1cf319e0340cf1d4ac4479ded0acf2ad",
+    "expected.json": "689d0a5dbcaf38c5952a5c9a50085d8c3aba19cf8ded08df9a62685db0e7489b",
+    "plan.json": "d19ba07448f8c00c2d450e63186418edd2e1adc938f84894db4a019cde6add32",
+    "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
+    "runs/R-1/results.ndjson": "2572cc41c5abbc0a2d1df009a2979e298727f2f3f8ffff2fba42b591fa7ba1c4",
+    "runs/R-1/run.json": "a0fdcd86bd7c2f4359d2c1b699832ffb6432cc2855ca01c2df5543db02994444",
+    "runs/R-1/seal.json": "7f1176abe6926e883eb29159c31f84a62774077ae2c7dc303d2d2c0c03f56354",
+    "runs/R-1/summary.json": "e9e7ef834edd6864c8187155283d56ab12e807527b46c433b89a52abf9d5b73e",
+    "runs/R-2/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
+    "runs/R-2/results.ndjson": "6b7bb0c4567de6f60c7c5a89f38287e4b48f0f79195157e84058a7c84dda5b4a",
+    "runs/R-2/run.json": "b9f000fca7a357450e3079c163af67238641e2af9611831112d0a1af6739acd7",
+    "runs/R-2/seal.json": "b6b345800066e2b94a35999fa551ae636a7599fb92c374caa794df3cdaa83749",
+    "runs/R-2/summary.json": "13228453f6a60aa8e1dcd00a8c992148e3066890cb3ba4722219725b78293e37",
+    "runs/R-3/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
+    "runs/R-3/results.ndjson": "1b9ac53004a1cbddf3fc64ce15f9ad6721c3d3b44421cbf3850e85a33046c3b2",
+    "runs/R-3/run.json": "0c75e69bb6f21cd85ecaa977bfe6548aac799094f20ba3bcfeea775d91037653",
+    "runs/R-3/seal.json": "96574f58deeedc3a51c004883451e7c1c79095d5c806dfe8573177c2c3eac699",
+    "runs/R-3/summary.json": "97950a5fcbbe5fad1833ca80af0d2caf49c3311e0da9628a941f647ca3156f95"
+   }
+  },
+  {
+   "id": "rulings/checkpoint-input-only-lane",
+   "kind": "checkpoint",
+   "classes": [
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "CKP-7"
+   ],
+   "path": "rulings/checkpoint-input-only-lane",
+   "files": {
+    "document.json": "7e20678598865c1b698bfe40fd205d808a3ae51dd028796d60ab6dc857daa303",
+    "expected.json": "3a131ccbe976a6c03e0795cd9ed99453a3362ecf1ee8fc2c8bbfdff7178cc89d"
+   }
+  },
+  {
+   "id": "rulings/comparison-judges-absent-equals-empty",
+   "kind": "lane",
+   "classes": [
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "LANE-6",
+    "LANE-8"
+   ],
+   "path": "rulings/comparison-judges-absent-equals-empty",
+   "files": {
+    "checkpoint.json": "6da88291519f9cb099be490b6c069e5dacf3470912edaa837448a2cd787bf52e",
+    "expected.json": "b1d26a4b0c29b2523eb216e9c552f7ce379ce9754c2d9d6448ff9a74b9dc020e",
+    "runs/B-judges-empty/metrics.json": "f82b2f218a638efa196d95b6cbd9589a3c0f127ab840033d2faa4e2dd47e17b9",
+    "runs/B-judges-empty/results.ndjson": "3e997c2e3e5fc46f86b7eb5729b01f24ca21322edcca1abda312e36c4570d6ca",
+    "runs/B-judges-empty/run.json": "abbeda59ab430427ad3758ea0ab0535463db7097dec79f5748b4803c13bc11dd",
+    "runs/B-judges-empty/seal.json": "eee0900f36947111c05a584f2205ef1c6a50e8b394bd58eedf149e3810090720",
+    "runs/B-judges-empty/summary.json": "71b1d44281d4b9d1b29591aa8a9cea935cfc4fd09f838c38acc85b554222c4eb",
+    "runs/C15-no-judges/metrics.json": "f82b2f218a638efa196d95b6cbd9589a3c0f127ab840033d2faa4e2dd47e17b9",
+    "runs/C15-no-judges/results.ndjson": "f79d6b0ccb2a10082781c361bb0d1a68099fca22b43f914483737dbd28250014",
+    "runs/C15-no-judges/run.json": "7cd41b128c74e338e228f5ed2c5c4056d00d8434d99ddc633fd6d122b443f93f",
+    "runs/C15-no-judges/seal.json": "caaff1ee9daace06d03f22c2f6bbc3bf3545cb338e378d55d634ecc9128e2848",
+    "runs/C15-no-judges/summary.json": "b6f6163ddd1cf21a5e55c830a19054a292afc3a291ad33a0aeae45b4786991b4"
+   }
+  },
+  {
+   "id": "rulings/document-run-over-4-mib",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader",
+    "Runner"
+   ],
+   "rules": [
+    "ENC-17",
+    "ENC-18"
+   ],
+   "path": "rulings/document-run-over-4-mib",
+   "files": {
+    "expected.json": "e6b4f35098e49aba750e644bb6a719361f82185675bec94d18735c097cfd8410"
+   }
+  },
+  {
+   "id": "rulings/document-seal-over-4-mib-valid",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader",
+    "Runner"
+   ],
+   "rules": [
+    "ENC-17",
+    "ENC-18"
+   ],
+   "path": "rulings/document-seal-over-4-mib-valid",
+   "files": {
+    "expected.json": "384c189a8a79ac71bc7d21294c4c5884ddb4228416b507dea18c6b7721e70c73"
+   }
+  },
+  {
+   "id": "rulings/lane-missing-runs-ordered-by-bytes",
+   "kind": "lane",
+   "classes": [
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "CKP-8",
+    "CONF-2"
+   ],
+   "path": "rulings/lane-missing-runs-ordered-by-bytes",
+   "files": {
+    "checkpoint.json": "f9091e8b463e9413953b58e7faeb84becf1a24732c10fd165937137223554c8e",
+    "expected.json": "81e53192d18b92ccacb9a1b43513b9295e6a8b11d4ec841efaceec0ed485714a",
+    "runs/Q1/metrics.json": "81ac87c69d20ca49d69e0a5541b062fe1f8fcc4529117c6d6f29eac1403b3d6c",
+    "runs/Q1/results.ndjson": "79cd14e559b4736cd09272cc797423ad31b14c033c85c15493497de28ce2695d",
+    "runs/Q1/run.json": "81fdba3f34f44206f0f6cb394ff46ca203905cb4f6c2ec06773382de2514b6dd",
+    "runs/Q1/seal.json": "767cf7077eee144a6e7bcb3c25f7709ea5719edb9358b9e9412f0e11d51299e7",
+    "runs/Q1/summary.json": "9c6c9098e2553f7ddb1f46a1195fbe6903298ae0dc95b7240addb2ff492c66e9"
+   }
+  },
+  {
+   "id": "rulings/lane-run-named-twice-evidence-present",
+   "kind": "lane",
+   "classes": [
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "LANE-4"
+   ],
+   "path": "rulings/lane-run-named-twice-evidence-present",
+   "files": {
+    "checkpoint.json": "089a4ae751b3e4481d43a51eee99689495214f05809866d32fc47ded990646d8",
+    "expected.json": "4dbaf8743e679fa2db4b2e480e6ce231425ceec6366e7f5be21f12a60dbc935a",
+    "runs/E1/metrics.json": "81ac87c69d20ca49d69e0a5541b062fe1f8fcc4529117c6d6f29eac1403b3d6c",
+    "runs/E1/results.ndjson": "9f5a56810ab45c6fba768095d8469d372edbe4ef189f6e6a06771b20ca27fd15",
+    "runs/E1/run.json": "fe8d04e126730c9ae9c8142be7a39fd4e37bb2f62af55f1fde2f67bc653e1ce6",
+    "runs/E1/seal.json": "42a6bcc1cf4c14df329cb9b01d8cb64906e1ebc0095c9c94d80f3f6248399bc4",
+    "runs/E1/summary.json": "111348726019777e82fdfa83ae731418e8aeec8cc5050771fc39756bc42dcf74"
+   }
+  },
+  {
+   "id": "rulings/lane-run-named-twice-severity",
+   "kind": "lane",
+   "classes": [
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "LANE-3",
+    "LANE-4"
+   ],
+   "path": "rulings/lane-run-named-twice-severity",
+   "files": {
+    "checkpoint.json": "f59128f726d9892b80368b4da306f726f57ffdd9859f17a16305d6582a0df2c8",
+    "expected.json": "068f8565045027c1fc4c395febf308dcf066b759d0725a1a28c04685d84c6236",
+    "runs/S-two-passed/metrics.json": "7be4c9b8d0eeb24dbfe42bf235bf78e7c16f8e634bc029873d7ab272de7b4bd7",
+    "runs/S-two-passed/results.ndjson": "fd59b58e936591b0b68b22a242b9620e5967e1ff95f4edc12455f56af1af2c9c",
+    "runs/S-two-passed/run.json": "c593f6bf3ee49efdb0eebd30a524e03850ad06607421cdea884d6abf9f5a4704",
+    "runs/S-two-passed/seal.json": "c68217e25500f7950ffbf81dae780a8cd0bb2a29e36f8a3bfe3e98c56c3454cc",
+    "runs/S-two-passed/summary.json": "692f917b6d19b017d282567b0269fb7945ed4a46288aa18ea8bc0f0c612b6bae"
+   }
+  },
+  {
+   "id": "rulings/overlay-target-checked-despite-a-results-schema-problem",
+   "kind": "chain",
+   "classes": [
+    "Overlay verifier"
+   ],
+   "rules": [
+    "OVL-2",
+    "OVL-5"
+   ],
+   "path": "rulings/overlay-target-checked-despite-a-results-schema-problem",
+   "files": {
+    "expected.json": "f1b577fee19b0a8c428cdd2002a52a4d590eb8ff919d4f370416113db6ccad23",
+    "run/blobs/sha256/63/635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5": "635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5",
+    "run/evidence.ndjson": "f76af41ebe790477719e419c60ab430ef5cc98263b8fd8dd5bb52988a03108b1",
+    "run/gates.ndjson": "6db8527cfa0e3d60c242253e40f123eb56b4105f2b14a622af21370fd10b9c63",
+    "run/metrics.json": "cd5980b59a1023260f2c7fa19d0a8075802dbb17e83485a547dc3b977649ef87",
+    "run/overlays/events.ndjson": "9a89cd337d2124520a397b5b322f209371fab95a1045473b4da3ecaa712e2127",
+    "run/overlays/seal-0001.json": "741d1fb6380b7af3b63813cee607f6b7d5bb7339e558b83ecfe7898d44cd3dab",
+    "run/overlays/seal-0002.json": "ca137fa7fa1aa0dd5a78aa10ca8e30bbe514daeab510a6e41d9e51c909904530",
+    "run/results.ndjson": "6a9d514c30f559995841b72656866a5ea969d2378e7cdce50e23353a87c9e84b",
+    "run/run.json": "6833f5f2e31f266973749d72f60cf9656d8689145780a14670e35c07795c1f5c",
+    "run/seal.json": "02ae29520f23cd980400f3d296eccac131baf06b56a9c94ebdeb7b27f431084e",
+    "run/summary.json": "268eda205f131668d931d8804c9530cb7c99b2857d95e1ce1bc24fc3d6314679",
+    "run/traces.otlp.jsonl": "3c29fa780cb029dd541c36edb35614f49df76f459a1f7c3e3702960892398787"
+   }
+  },
+  {
+   "id": "rulings/severity-undecided-trial-under-decided-rollup",
+   "kind": "lane",
+   "classes": [
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "LANE-3",
+    "RES-8"
+   ],
+   "path": "rulings/severity-undecided-trial-under-decided-rollup",
+   "files": {
+    "checkpoint.json": "e98dc7f643e4a7ad074ab8c37a04c5251d5f7882e268746c6b225c5f10ce5311",
+    "expected.json": "ed8b28a3d92b9edcea2daca8b19e18e1e712bd36e2a2d5a3d673ddd3e01ff183",
+    "runs/S-inconclusive-trial/metrics.json": "7be4c9b8d0eeb24dbfe42bf235bf78e7c16f8e634bc029873d7ab272de7b4bd7",
+    "runs/S-inconclusive-trial/results.ndjson": "d9b0bce92078cf45922dd5970ae87c89dd5bf84042d1beca09a1015174c8c467",
+    "runs/S-inconclusive-trial/run.json": "5bd8e048bb5a9ccbc81551eb744a83cfae4a6c562770e747440f121b4f4cc9b7",
+    "runs/S-inconclusive-trial/seal.json": "2b500875e974ff62c54a3c9e9c1186eaa1ce6bc943848af4231a54aae5399607",
+    "runs/S-inconclusive-trial/summary.json": "085eb421ad503c45f1fe9321cc66ccc8cea4b972a7ea16dfaeba02c07b973997"
+   }
+  },
+  {
+   "id": "rulings/stream-line-depth-65",
+   "kind": "stream",
+   "classes": [
+    "Stream verifier"
+   ],
+   "rules": [
+    "STRM-3",
+    "ENC-17"
+   ],
+   "path": "rulings/stream-line-depth-65",
+   "files": {
+    "events.ndjson": "8c42b7ef0d37140dafd49a325e833ea59181f38ec8a853de49d20ca2aa119ae8",
+    "expected.json": "7ad4be418d9756e382982e493d431fd3c4e06c41c3c98b29f5bc7bf805d72458",
+    "plan.json": "187f26d366ef3d7c58464707660c0e05be722ffce3406cbe4f0eae9250e22ad9"
+   }
+  },
+  {
+   "id": "rulings/trials-second-rollup-at-the-later-one",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "RES-8",
+    "RES-4"
+   ],
+   "path": "rulings/trials-second-rollup-at-the-later-one",
+   "files": {
+    "expected.json": "909ea34dbc396fc59729d643d5772577b8005f13d5baf5eca8a2fc7a8903a091",
+    "run/blobs/sha256/47/474400071c193b3faf9f2c7f82e28fea484a7b59a07fc0a247282870d6441e99": "474400071c193b3faf9f2c7f82e28fea484a7b59a07fc0a247282870d6441e99",
+    "run/evidence.ndjson": "0cb5efa41e591fed8fc988a7e2063ba7285b4faebe8ddbac0d7782643ceb8642",
+    "run/gates.ndjson": "a7015f35139336ec94132638061773933c7e118c718e81dea171768d1377b26e",
+    "run/metrics.json": "81ac87c69d20ca49d69e0a5541b062fe1f8fcc4529117c6d6f29eac1403b3d6c",
+    "run/results.ndjson": "b5c1febd414158fb26dc0a1a3a45b1f9344f04f7228b57255a4b457f649c6122",
+    "run/run.json": "69f20a0f63a1ff1fa9521dee737a44ccdba294b7a16a38b1fbe34cac5a1e3890",
+    "run/seal.json": "6c9d9e99e45f304bae56ad3cdc91b97bae37e8ad0b2ce2ec5e15bba009d5ede4",
+    "run/summary.json": "fe9548e607cab4fc632706c94cefc75b67a9efde0c1c0c6bb604206386960a3c",
+    "run/traces.otlp.jsonl": "7ed4f10a3ccf2cb1b5f6b44865f2b35896b891c7fd7d05d2ddba7b5ffd417921"
+   }
+  },
+  {
+   "id": "limits/overlays-files-beyond-limit",
+   "kind": "chain",
+   "classes": [
+    "Overlay verifier"
+   ],
+   "rules": [
+    "ENC-17",
+    "ENC-18",
+    "OVL-5"
+   ],
+   "path": "limits/overlays-files-beyond-limit",
+   "files": {
+    "expected.json": "f7b76c835f8aa0f3f999a8bb562a2a394f1ead698d62ae903052c1d50d2a1d9c"
+   }
+  },
+  {
+   "id": "limits/results-line-beyond-4-mib",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "ENC-17",
+    "ENC-18"
+   ],
+   "path": "limits/results-line-beyond-4-mib",
+   "files": {
+    "expected.json": "4ce3a618a82ab7ac5210e30ff6249bf22fca57da957dd89765cac33fba50bbfe"
+   }
+  },
+  {
+   "id": "limits/results-lines-beyond-limit",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "ENC-17",
+    "ENC-18"
+   ],
+   "path": "limits/results-lines-beyond-limit",
+   "files": {
+    "expected.json": "9a7328b4750c9132af1fda502b963f11162c9d810dc5d25e35f577a04d8fafa9"
+   }
+  },
+  {
+   "id": "limits/run-files-at-limit",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "ENC-17",
+    "ENC-18"
+   ],
+   "path": "limits/run-files-at-limit",
+   "files": {
+    "expected.json": "9013001c239db1a9d5397acb6635130d447600e9d8d406dbeb3299fc4a2eeebc"
+   }
+  },
+  {
+   "id": "limits/run-files-beyond-limit",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "ENC-17",
+    "ENC-18"
+   ],
+   "path": "limits/run-files-beyond-limit",
+   "files": {
+    "expected.json": "192932f5c9529584aef95ed84bacc4e15de4ca636ebfe4ff1dedca981f08aa7a"
+   }
+  },
+  {
+   "id": "limits/seal-beyond-40-mib",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "ENC-17",
+    "ENC-18"
+   ],
+   "path": "limits/seal-beyond-40-mib",
+   "files": {
+    "expected.json": "d0c2518a5c208ee09511b5831f41338ea244f89a967543939f0ec52b7e6b334e"
+   }
+  },
+  {
    "id": "signature-vectors/keys",
    "kind": "fixture",
    "classes": [
     "Sealer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "SIG-3"
@@ -7874,7 +9551,8 @@
    "id": "result-ids",
    "kind": "result-id",
    "classes": [
-    "Producer"
+    "Producer",
+    "Runner"
    ],
    "rules": [
     "RES-4"
@@ -7889,7 +9567,10 @@
    "kind": "paths",
    "classes": [
     "Producer",
-    "Run verifier"
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
    ],
    "rules": [
     "RUN-3"
@@ -9488,7 +11169,7 @@
    "path": "protocol/streams/accepted-twice",
    "files": {
     "events.ndjson": "3a827f112a0f7e37d6a1794c46c93ca962398bae51ac9b1a476799f53a57be8a",
-    "expected.json": "7154ad41f4186e8c6df321728ff9d656e672395c6b0553df0cc0e5d20c102ee8"
+    "expected.json": "de377f9e6306e26c1f05ac10bc25255589fd968708ec3273d204b9ddc00aa869"
    }
   },
   {
@@ -9504,7 +11185,7 @@
    "path": "protocol/streams/after-terminal",
    "files": {
     "events.ndjson": "822053dc803255e8008a7267c204fb01f3fad2ca530f34bb512fc3ea2d2074ad",
-    "expected.json": "6e261e880a231da1e8e144931857cdbccdeea4898fb9ec7038b449f80186b702"
+    "expected.json": "42035098e8ec66ca882a7f2eb0ca40ddfd1853fae6f98b3d918181da711e3a74"
    }
   },
   {
@@ -9519,7 +11200,7 @@
    "path": "protocol/streams/announced-not-sealed",
    "files": {
     "events.ndjson": "2631eac3b06e89ec2ab0584158d64a6c8f4b0e354726bd7309fa764b64fe84e4",
-    "expected.json": "c0674789965b74eeef6a04bcdc325d394f01607d5216917143c1a2400c3ce734"
+    "expected.json": "80cdf4ffd47598aeacfd6b71cbc24cd58ef4bff19d7199acab856c85c2b2dfea"
    }
   },
   {
@@ -9566,7 +11247,7 @@
    "path": "protocol/streams/estimate-inverted",
    "files": {
     "events.ndjson": "8806039507bdc18326989b42c0f2aebe81332a335a6197e8b388d08e6b5a9475",
-    "expected.json": "bfb3b91c5baf11cc9d9dff4607026f7e354a3a8349286500b529d0471d27ffe1"
+    "expected.json": "628adf0670dfc64bff53964088b8706af6ab80db77df9fe061fa4d0a8b2691c2"
    }
   },
   {
@@ -9582,7 +11263,7 @@
    "path": "protocol/streams/event-duplicate-member",
    "files": {
     "events.ndjson": "5b4f7a8d85475f782ce544dbab8d5741747d1653c341637c743dba5d09225a0c",
-    "expected.json": "a346f26330f865b958e20ecd8fd19de3f630cb393b1f32ccb0507ea2b0a42ae5"
+    "expected.json": "fe73b1866b7588c4ebeeef8db06932eda427e4150b1e5c3681d48024e5adb816"
    }
   },
   {
@@ -9597,7 +11278,7 @@
    "path": "protocol/streams/event-invalid-mid-stream",
    "files": {
     "events.ndjson": "69532e3bd14f265aa7502349e8e41910d03c3b5540c6b6edd27380256220d788",
-    "expected.json": "eb66b9246945b21f1ed2c788a9d030b17279c3f8b01334316135708d1d8348e7"
+    "expected.json": "0eed2b77e90cf0dbfb30008cfe7bf5bded1e61f68ae0af6b0402bd280e310878"
    }
   },
   {
@@ -9613,7 +11294,7 @@
    "path": "protocol/streams/event-not-json",
    "files": {
     "events.ndjson": "278a449cd56d61f62693e2ff8b73df8a49ead3dabe8084af38484cfd881f035f",
-    "expected.json": "a346f26330f865b958e20ecd8fd19de3f630cb393b1f32ccb0507ea2b0a42ae5"
+    "expected.json": "fe73b1866b7588c4ebeeef8db06932eda427e4150b1e5c3681d48024e5adb816"
    }
   },
   {
@@ -9628,7 +11309,7 @@
    "path": "protocol/streams/first-line-invalid",
    "files": {
     "events.ndjson": "978453a4751fd290e62fd76da09dc82d68f909535c8268baf059cc40b60daed3",
-    "expected.json": "09dc3f6cb2eb1ca744639c4ebfc449779d31c1b8008a6995e3ab42691bcaaac9"
+    "expected.json": "7d5a7f2a97de76b57b1f6c1e7c0a1f740163ff41e89a32fb8d52292b347821d3"
    }
   },
   {
@@ -9643,7 +11324,7 @@
    "path": "protocol/streams/first-not-accepted",
    "files": {
     "events.ndjson": "45640ce7f0aec4ac835a06c90b05ae40f9d4396ee76af0578862eaff487b4d05",
-    "expected.json": "37e05d9eadc155baf46074c3c31f9ebfde9eec2e674f0c4dba28d76102b649f9"
+    "expected.json": "83f11c481e8aeb95b4228094905e16b52f32b16a7a6f96c81ac22458225e146f"
    }
   },
   {
@@ -9659,7 +11340,7 @@
    "path": "protocol/streams/framing-crlf",
    "files": {
     "events.ndjson": "7571dc7b515d2b0fe8f28f7a182d6f9200ac96b21ae5a21b917c838277a99459",
-    "expected.json": "a28c12be1cb112ebc96034380b3d16c5533c511f435efe834845ae8e5c2b2c5e"
+    "expected.json": "992995c1a07e8b5a7eedd7739f4dc1bd15f0beacf2f8fde5d280e29126be8a82"
    }
   },
   {
@@ -9675,7 +11356,7 @@
    "path": "protocol/streams/last-line-without-lf",
    "files": {
     "events.ndjson": "f06aba8c82374e05c9465f40962bee3ef1381d8f2e00371596bd48426070f241",
-    "expected.json": "22716bb30f2973a84665cf7f9170eaf94a2e774573a808bb5e763f4e0518ca8b"
+    "expected.json": "ce21b7c4b7c72f5f48e4c9938c87d6357a602b6e84535b4db99f1e77e2ba9d47"
    }
   },
   {
@@ -9691,7 +11372,7 @@
    "path": "protocol/streams/no-terminal",
    "files": {
     "events.ndjson": "b88f40997e0028f360636a67f4f8e51b60b4fabda62c24aafbbb3778a60435a1",
-    "expected.json": "73f7879cd9dbff1f3b94fc04622ea0fec3bf22e56a4b8bfdc49601d4d7175e6f"
+    "expected.json": "f50421ee4b1b4b6f995ab1a926b28397ef968d18eb1ec30ae66ea1b4edaf56b0"
    }
   },
   {
@@ -9707,7 +11388,7 @@
    "path": "protocol/streams/other-job",
    "files": {
     "events.ndjson": "e54239c9e96f8eff5c3755b615acba1c2185e87f1dd21ce55e1963810303bb47",
-    "expected.json": "c197c09b5037c84b89ff8c51b081f706bf8b502d36a4fa5905e6fba06072f7d6"
+    "expected.json": "3a882e14d3cee4036555fa508da017d6b99d87a5e50ff3d753422e049143014d"
    }
   },
   {
@@ -9723,7 +11404,7 @@
    "path": "protocol/streams/other-plan",
    "files": {
     "events.ndjson": "faeebb29612df3009290b87dc5c4d0e2c38aacbfba5d7f322fecb8f13b1ff2e3",
-    "expected.json": "2d96948e10e85612d417d4272250b0183401eca39f35b9b3dcae549cffebb62e"
+    "expected.json": "def70c2ee688e4d8e36a187d645bdfba1d8a602f01e2718d470c5fa42230a33e"
    }
   },
   {
@@ -9739,7 +11420,7 @@
    "path": "protocol/streams/over-budget",
    "files": {
     "events.ndjson": "ab0372ba22f52130e387e0dc806c2498f74b2361888dd677cdd095ccd90bc421",
-    "expected.json": "b5d3fead4e31e3c01657c47348e2b08318d1779d995a4081110a85f84ccffea7"
+    "expected.json": "9d8a462662aa5c8d4ae685b2050ad06379c28bcbac2d8fb8a831d54162b1ff2b"
    }
   },
   {
@@ -9755,7 +11436,7 @@
    "path": "protocol/streams/over-cases",
    "files": {
     "events.ndjson": "a9dce97b105436e386fce62875a594f8a8015a6ac9dbe74bb1904cc673d7c5e1",
-    "expected.json": "4d5e0db75b6e8a3c6698248241336e3783c17a60b3695d332374931703ec0bdb"
+    "expected.json": "53dd319cb97c98c96fd9c690ed6cf21bff8fb8e759b3c9f808f349bd81ac2886"
    }
   },
   {
@@ -9771,7 +11452,7 @@
    "path": "protocol/streams/over-time",
    "files": {
     "events.ndjson": "e12b77d3f00ee38798ce69574ae53849e7e96d34705d02ba1e162a8b04756742",
-    "expected.json": "b941a75fce55771173f886d751e82ce0d0b632aae9f6aa0f2446f4216bdb2df8"
+    "expected.json": "26afc4f18af25dc946cdabe8055f8fd5b06f2ee580d4b511a4950740bff7d82b"
    }
   },
   {
@@ -9788,7 +11469,7 @@
    "path": "protocol/streams/over-time-in-days",
    "files": {
     "events.ndjson": "d484d638168104220265e08e8b4a27b639daffc04618ba53afd05c55b6f4e9b7",
-    "expected.json": "deb9d5bae2de59352029665b806832e17e0f20c81b5b883c3175d826a254819b"
+    "expected.json": "7313515da7b8beacbad0e4ab8c7c03979d61d12477e4d0730982910f431554fd"
    }
   },
   {
@@ -9804,7 +11485,7 @@
    "path": "protocol/streams/plan-changed",
    "files": {
     "events.ndjson": "b39a731109c7814a7b04e91e6eb8a767612f29c1107b5056aefddaba4bcc269f",
-    "expected.json": "e6ebca12ba112b64c85e4326a0bae068db59870dabfbb4ed39eca6aff264ee18"
+    "expected.json": "832451c6b7f244dc317f3efb75d1ee67134510251bda3219765bb71299080c81"
    }
   },
   {
@@ -9835,7 +11516,7 @@
    "path": "protocol/streams/run-hash-changed",
    "files": {
     "events.ndjson": "e7414e732ed0f7cfdf7056f2d6cf232f41f21455c8db46ae5b65c0dc15f4ed0a",
-    "expected.json": "00414ff2868f173a03fe3d2e1897259ed33f756c97e7aab07bac8e7dc47dc1af"
+    "expected.json": "931f01bfec323f2d53db56c6d1e1fc5f6081362b8ea8e721b4e6fc09b9c8c27e"
    }
   },
   {
@@ -9851,7 +11532,7 @@
    "path": "protocol/streams/seq-and-job-id-at-one-event",
    "files": {
     "events.ndjson": "ccd74d98175911bbe53dfb0d8fef2f4e650d316d9b229d42d16c166c3de71e1f",
-    "expected.json": "ec2c422f79c2d8bce73b5d8bd9509dbadad26cfd7549248c9c6e3596da41ccfc"
+    "expected.json": "92894fbd1b9af2c738f7cbb9e9995106bca7ed9fdd79f285a28362763cac5820"
    }
   },
   {
@@ -9867,7 +11548,7 @@
    "path": "protocol/streams/sequence-gap-then-on",
    "files": {
     "events.ndjson": "3197b0d18d3b6d18ab265dfe37a9a81c026f502217bae8c4dd5779f767043862",
-    "expected.json": "66d420840521197dadabc8261577d0b372f8d24be0da44a37f35be89a414f1e8"
+    "expected.json": "c05464043bfaa240bb9c3cf165064a1ae9146b78c18cc16ec39b6fefd42237e3"
    }
   },
   {
@@ -9898,7 +11579,7 @@
    "path": "protocol/streams/spend-decreased-once",
    "files": {
     "events.ndjson": "95073d1eaa40f75dc32d23ba9c7d00c4eef5a4ad727a2dc47c2b4082b417672e",
-    "expected.json": "f4c64fc522a4cc279375547f408885544c86e35e7f206e6a53fe1a3fa52d905c"
+    "expected.json": "0beb6be95566b572e07a010c24cbace935088180c8f54d246fe02f03473ef83b"
    }
   },
   {
@@ -9930,7 +11611,7 @@
    "path": "protocol/streams/time-backwards",
    "files": {
     "events.ndjson": "cc1d01a0212a20723db4488187f4733a58de6da63fef5dd5b472ce1d341ecbef",
-    "expected.json": "fa64a5cd288b8e97b1013e87c9053ef93ef5e663fed7694fd14aa07a424126cb"
+    "expected.json": "8787a8d36ad4d4d6e1a2710a18d97ca16f18944379d2a95032e08bc3873d55d5"
    }
   },
   {
@@ -9946,7 +11627,7 @@
    "path": "protocol/streams/time-backwards-by-a-nanosecond",
    "files": {
     "events.ndjson": "004ca286ec3e5639059112742e7273742b8165f8a1aa9785ac1c5715819e9127",
-    "expected.json": "e983c9752ea7010ac8b4da411a604db0695d64358797ecb764709588fd1a477d"
+    "expected.json": "1ad9c04e089e1bcfb8f01d82916843e50a44b690d79192df49bf0ef6222e5fd4"
    }
   },
   {
@@ -9961,7 +11642,7 @@
    "path": "protocol/streams/unannounced-run",
    "files": {
     "events.ndjson": "43332dd5d4ec2e492b36145b37579e03ec3545bc6e58fe03edbf7dae553b887b",
-    "expected.json": "08533282e5126667ec279c0439922ba69b9d39aa53e45ab16ff02592853e966c"
+    "expected.json": "c82d47783e9c188ea831f3ec6f7d423cf9b7371743b84f0fa7e7981ad90f0356"
    }
   },
   {
@@ -10710,7 +12391,8 @@
    "id": "write-vectors/summarize/aggregate-of-the-producer",
    "kind": "summarize",
    "classes": [
-    "Producer"
+    "Producer",
+    "Runner"
    ],
    "rules": [
     "SUM-8",
@@ -10729,7 +12411,8 @@
    "id": "write-vectors/summarize/count-is-summed",
    "kind": "summarize",
    "classes": [
-    "Producer"
+    "Producer",
+    "Runner"
    ],
    "rules": [
     "SUM-4",
@@ -10745,10 +12428,30 @@
    }
   },
   {
+   "id": "write-vectors/summarize/entry-twice-refused",
+   "kind": "summarize",
+   "classes": [
+    "Producer",
+    "Runner"
+   ],
+   "rules": [
+    "SUM-9"
+   ],
+   "path": "write-vectors/summarize/entry-twice-refused",
+   "files": {
+    "expected.json": "10028dc066a4f82b14fa3d5ebebd0e102a409b2671dd6f63a796361e4f378298",
+    "request.json": "af34e80ee0f62e3374caf119a013e17c1b1a048ed5525a7ccba24f14732bee4a",
+    "run/metrics.json": "9ebefaa44c8e2a2b426ce1fe030c8bf7fca1030f713e7795d4a083546338cd50",
+    "run/results.ndjson": "e33dac9410728146123e56bcbc2057e90c193c3fd355321b61f1bc385171c587",
+    "run/run.json": "aef25700395c111d1e95f85a4cc1b5da19e8bd1fa53a9e432f28e1606ce16732"
+   }
+  },
+  {
    "id": "write-vectors/summarize/exact-sum-cancellation",
    "kind": "summarize",
    "classes": [
-    "Producer"
+    "Producer",
+    "Runner"
    ],
    "rules": [
     "SUM-5"
@@ -10763,10 +12466,30 @@
    }
   },
   {
+   "id": "write-vectors/summarize/lane-named-twice-refused",
+   "kind": "summarize",
+   "classes": [
+    "Producer",
+    "Runner"
+   ],
+   "rules": [
+    "SUM-9"
+   ],
+   "path": "write-vectors/summarize/lane-named-twice-refused",
+   "files": {
+    "expected.json": "8dc1b0a76937ecbd6334e75328d6be2721278835ebfb17c58b102f79035ccf66",
+    "request.json": "4ece8fb09cdeef127be603b4f7a64ba933509ac9d968a4788f94ba81fdffaf40",
+    "run/metrics.json": "f75c79e430666e54cb4362ed95935cee71988bb971af1f77e1236221f8cb096a",
+    "run/results.ndjson": "66af7c311f922a201019773689fe24ee6557b9e60a0fccc9cd9de5fba207551c",
+    "run/run.json": "7aca2df2d6f7a6d5dafd479e346265a09416a91b19e9d5fbfdff4c79301e52e7"
+   }
+  },
+  {
    "id": "write-vectors/summarize/mean-of-scores",
    "kind": "summarize",
    "classes": [
-    "Producer"
+    "Producer",
+    "Runner"
    ],
    "rules": [
     "SUM-2",
@@ -10788,7 +12511,8 @@
    "id": "write-vectors/summarize/median-even-count",
    "kind": "summarize",
    "classes": [
-    "Producer"
+    "Producer",
+    "Runner"
    ],
    "rules": [
     "SUM-8",
@@ -10807,7 +12531,8 @@
    "id": "write-vectors/summarize/min-max-and-a-median-count",
    "kind": "summarize",
    "classes": [
-    "Producer"
+    "Producer",
+    "Runner"
    ],
    "rules": [
     "SUM-8",
@@ -10826,7 +12551,8 @@
    "id": "write-vectors/summarize/not-applicable-left-out",
    "kind": "summarize",
    "classes": [
-    "Producer"
+    "Producer",
+    "Runner"
    ],
    "rules": [
     "SUM-4",
@@ -10846,7 +12572,8 @@
    "id": "write-vectors/summarize/nothing-measured",
    "kind": "summarize",
    "classes": [
-    "Producer"
+    "Producer",
+    "Runner"
    ],
    "rules": [
     "SUM-5",
@@ -10866,7 +12593,8 @@
    "id": "write-vectors/summarize/one-lane-takes-unlaned-lines",
    "kind": "summarize",
    "classes": [
-    "Producer"
+    "Producer",
+    "Runner"
    ],
    "rules": [
     "SUM-3"
@@ -10884,7 +12612,8 @@
    "id": "write-vectors/summarize/open-run-pending",
    "kind": "summarize",
    "classes": [
-    "Producer"
+    "Producer",
+    "Runner"
    ],
    "rules": [
     "SUM-4",
@@ -10900,10 +12629,30 @@
    }
   },
   {
+   "id": "write-vectors/summarize/producer-method-without-value-refused",
+   "kind": "summarize",
+   "classes": [
+    "Producer",
+    "Runner"
+   ],
+   "rules": [
+    "SUM-8"
+   ],
+   "path": "write-vectors/summarize/producer-method-without-value-refused",
+   "files": {
+    "expected.json": "462b81f084243bdf06164cb597b8bbcc2acbc5db1377fc57dbbf528842921d03",
+    "request.json": "b6c60e7ae25e9aa92905652a733bfa40413c6cbd35b13ec97811bcad5ec3081d",
+    "run/metrics.json": "9ebefaa44c8e2a2b426ce1fe030c8bf7fca1030f713e7795d4a083546338cd50",
+    "run/results.ndjson": "cb14f4d8d37aa6625b33fe824a19bfa17e6d5fa927b3106d1a3ab69fa3d164c1",
+    "run/run.json": "72ad603593af8938ef84b0d3613aa55ac0c35481ca8c2bc2e564040f14418de0"
+   }
+  },
+  {
    "id": "write-vectors/summarize/rate-and-verdict",
    "kind": "summarize",
    "classes": [
-    "Producer"
+    "Producer",
+    "Runner"
    ],
    "rules": [
     "SUM-1",
@@ -10921,10 +12670,30 @@
    }
   },
   {
+   "id": "write-vectors/summarize/results-do-not-read-refused",
+   "kind": "summarize",
+   "classes": [
+    "Producer",
+    "Runner"
+   ],
+   "rules": [
+    "ENC-2"
+   ],
+   "path": "write-vectors/summarize/results-do-not-read-refused",
+   "files": {
+    "expected.json": "775249e7f4a0a9399dda477213a5e5a0694ab530fd89da4c78007f56f5c2a854",
+    "request.json": "9c3389c211ed83f2a3ac07059fbb052dba650a589ee327f94b09eb9c908926d2",
+    "run/metrics.json": "9ebefaa44c8e2a2b426ce1fe030c8bf7fca1030f713e7795d4a083546338cd50",
+    "run/results.ndjson": "1f640794ac703f85724ce3573b26207e24523677cfd2cc3b65bcd3bfcaceb833",
+    "run/run.json": "bbee5c1f4dd585eefbc7e4be578e4445c46ec40d3238dd7fe1630dc78c48360f"
+   }
+  },
+  {
    "id": "write-vectors/summarize/scored-lines",
    "kind": "summarize",
    "classes": [
-    "Producer"
+    "Producer",
+    "Runner"
    ],
    "rules": [
     "SUM-4",
@@ -10943,7 +12712,8 @@
    "id": "write-vectors/summarize/trial-lines",
    "kind": "summarize",
    "classes": [
-    "Producer"
+    "Producer",
+    "Runner"
    ],
    "rules": [
     "SUM-3",
@@ -10962,7 +12732,8 @@
    "id": "write-vectors/summarize/two-lanes",
    "kind": "summarize",
    "classes": [
-    "Producer"
+    "Producer",
+    "Runner"
    ],
    "rules": [
     "SUM-3",
@@ -10981,7 +12752,8 @@
    "id": "write-vectors/summarize/typed-absences",
    "kind": "summarize",
    "classes": [
-    "Producer"
+    "Producer",
+    "Runner"
    ],
    "rules": [
     "SUM-4",
@@ -10999,10 +12771,30 @@
    }
   },
   {
+   "id": "write-vectors/summarize/undeclared-metric-refused",
+   "kind": "summarize",
+   "classes": [
+    "Producer",
+    "Runner"
+   ],
+   "rules": [
+    "SUM-1"
+   ],
+   "path": "write-vectors/summarize/undeclared-metric-refused",
+   "files": {
+    "expected.json": "5524a52a5a37046439e20bfb8f0f1df2856aa32a4e6512618cac951e56a141ab",
+    "request.json": "4246fb2ab737328bd7718ca1ce504fde3bdd2cf6d589ad097159cd387e8ac305",
+    "run/metrics.json": "9ebefaa44c8e2a2b426ce1fe030c8bf7fca1030f713e7795d4a083546338cd50",
+    "run/results.ndjson": "b628aa2d54e1e121053dcf296a15d10bb03c82a869f5b5acb4349f507b06ca1f",
+    "run/run.json": "d4bdb220dd1572be68d9a67a2f8280f5fb854586b4e1121933fdd647c37c8d91"
+   }
+  },
+  {
    "id": "write-vectors/summarize/value-for-a-defined-method-refused",
    "kind": "summarize",
    "classes": [
-    "Producer"
+    "Producer",
+    "Runner"
    ],
    "rules": [
     "SUM-8"
@@ -11017,10 +12809,300 @@
    }
   },
   {
+   "id": "write-vectors/produce/aborted-before-any-result",
+   "kind": "produce",
+   "classes": [
+    "Producer",
+    "Runner"
+   ],
+   "rules": [
+    "RUN-2",
+    "RUN-5",
+    "SUM-5",
+    "SUM-6"
+   ],
+   "path": "write-vectors/produce/aborted-before-any-result",
+   "files": {
+    "expected-results.ndjson": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "expected.json": "0510aec9d14c60178a50582a92682d733e2f45fe5fd17d67c4b253317dbdb3ad",
+    "scenario.json": "ad5eee0bccad0b74f759aed7dfd2dd596e09d3c478a8ad32e903faf2a43a68f6"
+   }
+  },
+  {
+   "id": "write-vectors/produce/aborted-run",
+   "kind": "produce",
+   "classes": [
+    "Producer",
+    "Runner"
+   ],
+   "rules": [
+    "RUN-5",
+    "RES-2",
+    "RES-3",
+    "SUM-4"
+   ],
+   "path": "write-vectors/produce/aborted-run",
+   "files": {
+    "expected-results.ndjson": "020e1b716b633c6c885a3ecbfb476eceb354c25a3540ed32e1b429225570bfcc",
+    "expected.json": "6cde4f1ec92d55a6d0ebc54f52f6d2c579d11ad61cfe32c03c76b61b21bdd054",
+    "scenario.json": "9d9194c5196fff343dc1d299df15e01a46b5839c2f4dbe4b8b9df701fb40bb3a"
+   }
+  },
+  {
+   "id": "write-vectors/produce/case-and-path-twice-refused",
+   "kind": "produce",
+   "classes": [
+    "Producer",
+    "Runner"
+   ],
+   "rules": [
+    "RES-4"
+   ],
+   "path": "write-vectors/produce/case-and-path-twice-refused",
+   "files": {
+    "expected.json": "1d92c89cebee381927a458422360d0460243fc0d16a8d8cc3d35a6e546fde0f2",
+    "scenario.json": "55a70c9aa6c30708183220387938306eaac6bc6f3f693dec5e20f593769a824a"
+   }
+  },
+  {
+   "id": "write-vectors/produce/case-in-three-trials",
+   "kind": "produce",
+   "classes": [
+    "Producer",
+    "Runner"
+   ],
+   "rules": [
+    "RES-4",
+    "RES-8",
+    "SUM-3"
+   ],
+   "path": "write-vectors/produce/case-in-three-trials",
+   "files": {
+    "expected-results.ndjson": "c8cf5f1a96bd24aa261ac527b73240eab52557a6e765d9faa913f17580234e1a",
+    "expected.json": "bb916d7847b2a8e0532b6821a431a58865c3b562df07406cf667c83a0c0a50a1",
+    "scenario.json": "44d20612ad6a92aea8f32cf3137e42b5c2379af82b2555d0766a5d4de374f8d4"
+   }
+  },
+  {
+   "id": "write-vectors/produce/child-path-not-under-parent-refused",
+   "kind": "produce",
+   "classes": [
+    "Producer",
+    "Runner"
+   ],
+   "rules": [
+    "RES-5",
+    "RES-8"
+   ],
+   "path": "write-vectors/produce/child-path-not-under-parent-refused",
+   "files": {
+    "expected.json": "300756f97dc547b4fcbc473e85970c0bfa6d51ec541040c1fa0938f80c8d6ef2",
+    "scenario.json": "459db02fca3f8cc6dc6a82c0497d4b478089f61ac25c5d1328ff0d423989e299"
+   }
+  },
+  {
+   "id": "write-vectors/produce/child-without-component-refused",
+   "kind": "produce",
+   "classes": [
+    "Producer",
+    "Runner"
+   ],
+   "rules": [
+    "RES-5"
+   ],
+   "path": "write-vectors/produce/child-without-component-refused",
+   "files": {
+    "expected.json": "b0605df7d412d19609ce6d57a5614c1b1ad3731d3af7ea58f2ffdb43598dc909",
+    "scenario.json": "5b14a91954ca64e63f3a6174cbf9875010ddf8a21766471e0e3f5ada47c675aa"
+   }
+  },
+  {
+   "id": "write-vectors/produce/children-without-aggregation-refused",
+   "kind": "produce",
+   "classes": [
+    "Producer",
+    "Runner"
+   ],
+   "rules": [
+    "RES-5"
+   ],
+   "path": "write-vectors/produce/children-without-aggregation-refused",
+   "files": {
+    "expected.json": "5e818f0b11a8a56a94fa90760fdc39f4345e94a1fe3e1a43530f7d3bc8592946",
+    "scenario.json": "d75387261a70702b98d2df2825e5177ff6f9ed782918d02275857583a138fcd1"
+   }
+  },
+  {
+   "id": "write-vectors/produce/composite-cases",
+   "kind": "produce",
+   "classes": [
+    "Producer",
+    "Runner"
+   ],
+   "rules": [
+    "RES-4",
+    "RES-5",
+    "RES-6",
+    "SUM-3",
+    "SUM-4"
+   ],
+   "path": "write-vectors/produce/composite-cases",
+   "files": {
+    "expected-results.ndjson": "abf814147e987b02288a94139ae414b51393a5cae1d473c286108a6aa0d89303",
+    "expected.json": "4abde7253b18cf063f820d462a5c1272444f464d278fa4af3e77fc2beb75d97a",
+    "scenario.json": "c6f056650dd82d5c30fb3efc92ca78dd2e25829fc9e848921f4dcba4bebc2eec"
+   }
+  },
+  {
+   "id": "write-vectors/produce/composite-in-two-trials",
+   "kind": "produce",
+   "classes": [
+    "Producer",
+    "Runner"
+   ],
+   "rules": [
+    "RES-4",
+    "RES-5",
+    "RES-6",
+    "RES-8",
+    "SUM-3"
+   ],
+   "path": "write-vectors/produce/composite-in-two-trials",
+   "files": {
+    "expected-results.ndjson": "52f68cb1b7b4fc73509980cca6fa77f385ddce25eb2e13338971fcf667c6a8ad",
+    "expected.json": "f0e950305f3da00be849f4b1399ecc62d33e1b3cc36a10d412803f7e335f8bd2",
+    "scenario.json": "c851435f842730ab8770318457c02f0fa6a165483da70b317a2b64de063c69f6"
+   }
+  },
+  {
+   "id": "write-vectors/produce/decisive-not-a-child-refused",
+   "kind": "produce",
+   "classes": [
+    "Producer",
+    "Runner"
+   ],
+   "rules": [
+    "RES-5",
+    "RES-6"
+   ],
+   "path": "write-vectors/produce/decisive-not-a-child-refused",
+   "files": {
+    "expected.json": "9d946486ee3ac10846d45fc13b4008895e00e64be6cd1e1e5bd668e4ca2da0be",
+    "scenario.json": "74e2e63f7d14d672595e09da963551635fac954c6160aec60d02e280ea8f2610"
+   }
+  },
+  {
+   "id": "write-vectors/produce/flat-run-typed-absences",
+   "kind": "produce",
+   "classes": [
+    "Producer",
+    "Runner"
+   ],
+   "rules": [
+    "RES-1",
+    "RES-2",
+    "RES-4",
+    "SUM-3",
+    "SUM-4",
+    "SUM-5"
+   ],
+   "path": "write-vectors/produce/flat-run-typed-absences",
+   "files": {
+    "expected-results.ndjson": "b5fb15fd2fa8537c22c6e6911c7156ac7034361a35bf2f962303d35a02c01e68",
+    "expected.json": "2b7e74569a6b3c169027bb7b594fca17cdebfcb38a4be5d2373ef09f41f61867",
+    "scenario.json": "72296884faccac6381e59fe2ff94b855b68b8c99be70172d6516c5c61d87983f"
+   }
+  },
+  {
+   "id": "write-vectors/produce/open-run-refused",
+   "kind": "produce",
+   "classes": [
+    "Producer",
+    "Runner"
+   ],
+   "rules": [
+    "RUN-2",
+    "RUN-5"
+   ],
+   "path": "write-vectors/produce/open-run-refused",
+   "files": {
+    "expected.json": "e2a49517ebe7d929215b4ed5e68f7d0fbd77a1f7b86c19c1b461de27a0ddaaa5",
+    "scenario.json": "48bff09c4a70af77bc4675a4d3e10ef39722d46a55e319bc1d5fb3849e19a08c"
+   }
+  },
+  {
+   "id": "write-vectors/produce/pending-in-closed-run-refused",
+   "kind": "produce",
+   "classes": [
+    "Producer",
+    "Runner"
+   ],
+   "rules": [
+    "RES-3"
+   ],
+   "path": "write-vectors/produce/pending-in-closed-run-refused",
+   "files": {
+    "expected.json": "e0116719ec465f3e07f4e6606faea046b5087ccfda0dab02362b91ca7789c3e5",
+    "scenario.json": "1e50348ed439d67aa14a2048762bc8ee98e5127c75b493eceaef59b2388473da"
+   }
+  },
+  {
+   "id": "write-vectors/produce/trial-path-without-rollup-refused",
+   "kind": "produce",
+   "classes": [
+    "Producer",
+    "Runner"
+   ],
+   "rules": [
+    "RES-8"
+   ],
+   "path": "write-vectors/produce/trial-path-without-rollup-refused",
+   "files": {
+    "expected.json": "ab1a8c674a22365c0d0135f2cddb0a4e0a23cd108174ace2dbee471d6c38becb",
+    "scenario.json": "acdaa7ed8a899727e796113cde3869a5b6f9d713f98b64fbb999ca807670df27"
+   }
+  },
+  {
+   "id": "write-vectors/produce/trial-root-elsewhere-refused",
+   "kind": "produce",
+   "classes": [
+    "Producer",
+    "Runner"
+   ],
+   "rules": [
+    "RES-8"
+   ],
+   "path": "write-vectors/produce/trial-root-elsewhere-refused",
+   "files": {
+    "expected.json": "c5a5f85634ab70697e54530ed24a294a55861edf98f26ae3d51cf0ff929a26c9",
+    "scenario.json": "fbaaedcb42c33e7cdba742ed2a4265ed76aeedc32989bbf5cf1a02ef30b810d7"
+   }
+  },
+  {
+   "id": "write-vectors/produce/trials-agreement",
+   "kind": "produce",
+   "classes": [
+    "Producer",
+    "Runner"
+   ],
+   "rules": [
+    "RES-8",
+    "SUM-3",
+    "SUM-4"
+   ],
+   "path": "write-vectors/produce/trials-agreement",
+   "files": {
+    "expected-results.ndjson": "70e67f1f0b3985aeb0d6d0d2d842716620f9e1570c989646e8970a2d442f86bf",
+    "expected.json": "fa91500ebf646d6b9bbf321f1bc853b984d876c42af639b7729974deec7cc7b2",
+    "scenario.json": "02ed86aed241c037847b1bbc8ef85cc5a792ad4e698c8d8371676dbada420ea6"
+   }
+  },
+  {
    "id": "write-vectors/seal-write/aborted-without-optional-fields",
    "kind": "seal-write",
    "classes": [
-    "Sealer"
+    "Sealer",
+    "Runner"
    ],
    "rules": [
     "SEAL-1",
@@ -11041,7 +13123,8 @@
    "id": "write-vectors/seal-write/byte-order-of-paths",
    "kind": "seal-write",
    "classes": [
-    "Sealer"
+    "Sealer",
+    "Runner"
    ],
    "rules": [
     "SEAL-3",
@@ -11067,7 +13150,8 @@
    "id": "write-vectors/seal-write/full-run",
    "kind": "seal-write",
    "classes": [
-    "Sealer"
+    "Sealer",
+    "Runner"
    ],
    "rules": [
     "SEAL-1",
@@ -11096,7 +13180,8 @@
    "id": "write-vectors/seal-write/ingest-path-problem-refused",
    "kind": "seal-write",
    "classes": [
-    "Sealer"
+    "Sealer",
+    "Runner"
    ],
    "rules": [
     "SEAL-1",
@@ -11116,7 +13201,8 @@
    "id": "write-vectors/seal-write/ingest-schema-invalid-refused",
    "kind": "seal-write",
    "classes": [
-    "Sealer"
+    "Sealer",
+    "Runner"
    ],
    "rules": [
     "SEAL-1",
@@ -11136,7 +13222,8 @@
    "id": "write-vectors/seal-write/open-run-refused",
    "kind": "seal-write",
    "classes": [
-    "Sealer"
+    "Sealer",
+    "Runner"
    ],
    "rules": [
     "SEAL-1"
@@ -11153,7 +13240,8 @@
    "id": "write-vectors/seal-write/overlays-not-sealed",
    "kind": "seal-write",
    "classes": [
-    "Sealer"
+    "Sealer",
+    "Runner"
    ],
    "rules": [
     "SEAL-1"
@@ -11174,7 +13262,8 @@
    "id": "write-vectors/seal-write/sealed-before-close-refused",
    "kind": "seal-write",
    "classes": [
-    "Sealer"
+    "Sealer",
+    "Runner"
    ],
    "rules": [
     "SEAL-1",
@@ -11194,7 +13283,8 @@
    "id": "write-vectors/seal-write/times-at-full-precision",
    "kind": "seal-write",
    "classes": [
-    "Sealer"
+    "Sealer",
+    "Runner"
    ],
    "rules": [
     "SEAL-5",
@@ -11214,7 +13304,8 @@
    "id": "write-vectors/sign/ecdsa-p256-checkpoint",
    "kind": "sign",
    "classes": [
-    "Sealer"
+    "Sealer",
+    "Runner"
    ],
    "rules": [
     "SIG-1",
@@ -11234,7 +13325,8 @@
    "id": "write-vectors/sign/ecdsa-p256-seal",
    "kind": "sign",
    "classes": [
-    "Sealer"
+    "Sealer",
+    "Runner"
    ],
    "rules": [
     "SIG-1",
@@ -11253,7 +13345,8 @@
    "id": "write-vectors/sign/ed25519-checkpoint-non-ascii",
    "kind": "sign",
    "classes": [
-    "Sealer"
+    "Sealer",
+    "Runner"
    ],
    "rules": [
     "SIG-1",
@@ -11273,7 +13366,8 @@
    "id": "write-vectors/sign/ed25519-overlay-batch",
    "kind": "sign",
    "classes": [
-    "Sealer"
+    "Sealer",
+    "Runner"
    ],
    "rules": [
     "SIG-1",
@@ -11292,7 +13386,8 @@
    "id": "write-vectors/sign/ed25519-seal",
    "kind": "sign",
    "classes": [
-    "Sealer"
+    "Sealer",
+    "Runner"
    ],
    "rules": [
     "SIG-1",

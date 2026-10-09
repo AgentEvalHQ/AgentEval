@@ -1,0 +1,10 @@
+{
+  "kind": "summarize",
+  "rules": [
+    "SUM-9"
+  ],
+  "run": "run",
+  "request": "request.json",
+  "refused": true,
+  "why": "The request names the lane quality twice (once per entry): a summary names each lane once ([SUM-9]), so the request is an input error (exit status 2), not two lanes of one name."
+}

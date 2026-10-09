@@ -28,9 +28,12 @@ public enum AefEntryKind
 /// later folder are reported; an empty folder is ignored), and every symbolic link, pipe, socket or device. When the
 /// folder holds more files than [ENC-17] allows (not counting <c>seal.json</c>, <c>attestation.dsse.json</c> and
 /// <c>overlays/</c>), the walk stops: <see cref="Problems"/> is the one <c>limit</c> problem
-/// at <c>.</c> ([ENC-18]) and <see cref="Files"/> is not the whole folder.
+/// at <c>.</c> ([ENC-18]) and <see cref="Files"/> is not the whole folder. When <c>overlays/</c> holds more files than
+/// one events file and two per batch ([ENC-17]: 19,999), <see cref="OverlaysOverLimit"/> is set: the overlay verifier
+/// reports <c>limit</c> at <c>overlays</c> and checks the chain no further ([OVL-5]). Those files are still listed, and
+/// their paths checked ([RUN-3]): nothing in the text stops a run verifier there (R4N-8).
 /// </summary>
-public sealed record AefFolderListing(IReadOnlyList<string> Files, IReadOnlyList<AefProblem> Problems);
+public sealed record AefFolderListing(IReadOnlyList<string> Files, IReadOnlyList<AefProblem> Problems, bool OverlaysOverLimit = false);
 
 /// <summary>
 /// Lists a run folder as [RUN-3] (contracts/aef/1/spec/03-run.md) allows it: every entry is a regular file or a
@@ -98,7 +101,8 @@ public static class AefFolder
 
         var files = new List<string>();
         var irregular = new List<string>();
-        var counted = 0;   // [ENC-17]: the files that count toward the limit
+        var counted = 0;          // [ENC-17]: the files that count toward the limit
+        var overlayEntries = 0;   // [ENC-17]: the files under overlays/, one events file and two per batch at most
         var pending = new Stack<(string Full, string Relative)>();
         pending.Push((folder, ""));
         while (pending.TryPop(out var current))
@@ -107,21 +111,16 @@ public static class AefFolder
             {
                 var name = Path.GetFileName(full);
                 var relative = current.Relative.Length == 0 ? name : $"{current.Relative}/{name}";
-                switch (KindOf(full))
+                var kind = KindOf(full);
+                if (kind == AefEntryKind.Folder)
                 {
-                    case AefEntryKind.Folder:
-                        pending.Push((full, relative));
-                        break;
-                    case AefEntryKind.File:
-                        files.Add(relative);
-                        counted += CountsTowardTheLimit(relative) ? 1 : 0;
-                        break;
-                    default:
-                        irregular.Add(relative);
-                        counted += CountsTowardTheLimit(relative) ? 1 : 0;
-                        break;
+                    pending.Push((full, relative));
+                    continue;
                 }
 
+                (kind == AefEntryKind.File ? files : irregular).Add(relative);
+                overlayEntries += IsUnderOverlays(relative) ? 1 : 0;
+                counted += CountsTowardTheLimit(relative) ? 1 : 0;
                 if (counted > AefLimits.MaxFiles)
                 {
                     return new AefFolderListing([.. files.Order(AefProblemOrder.Utf8)], [new AefProblem(".", "limit")]);
@@ -130,9 +129,14 @@ public static class AefFolder
         }
 
         // [RUN-3]'s rules are on the paths of files; a link, pipe, socket or device is a path problem whatever its name.
+        // Files under overlays/ are listed and checked whatever their number (R4N-8): only the overlay verifier stops
+        // at its limit.
         var problems = AefPaths.Check(files.Concat(irregular)).Concat(irregular.Select(p => new AefProblem(p, "path"))).Distinct();
-        return new AefFolderListing([.. files.Order(AefProblemOrder.Utf8)], AefProblemOrder.Sort(problems));
+        return new AefFolderListing(
+            [.. files.Order(AefProblemOrder.Utf8)], AefProblemOrder.Sort(problems), overlayEntries > AefLimits.MaxOverlayFiles);
     }
+
+    private static bool IsUnderOverlays(string path) => path.StartsWith("overlays/", StringComparison.Ordinal);
 
     /// <summary>
     /// Whether a file counts toward the 100,000 of [ENC-17]: every file but <c>seal.json</c>, <c>attestation.dsse.json</c>

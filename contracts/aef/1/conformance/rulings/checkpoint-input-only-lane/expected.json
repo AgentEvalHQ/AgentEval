@@ -1,0 +1,14 @@
+{
+  "kind": "checkpoint",
+  "schema": "checkpoint",
+  "writer": "valid",
+  "reader": "valid",
+  "problems": [
+    "evidence",
+    "lanes"
+  ],
+  "rules": [
+    "CKP-7"
+  ],
+  "why": "W4-3: valid-decided, its input given a lane phantom (a copy of the quality lane, with its result) that the manifest does not have, and the decision recomputed from that input. phantom has a result but no runs: evidence, as for a lane on both sides; and lanes."
+}

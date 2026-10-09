@@ -150,8 +150,9 @@ internal static class WriteSideOps
     }
 
     // The request (spec 09 §9.2.1) as what the summary reports: the producer's verdict and, for its own aggregate
-    // method, its value; null when it gives neither (the verdict is then scored, [SUM-6]).
-    private static AefSummary Request(JsonObject request)
+    // method, its value; null when it gives neither (the verdict is then scored, [SUM-6]). Also a produce scenario's
+    // summary (ProduceOps).
+    internal static AefSummary Request(JsonObject request)
     {
         const string shape = "the request is {\"lanes\": [{\"lane\": name, \"metrics\": [{\"metric\", \"path\", \"aggregate\"?, \"rule\"?, \"verdict\"?, \"value\"?}]}]}";
         if (request["lanes"] is not JsonArray lanes)

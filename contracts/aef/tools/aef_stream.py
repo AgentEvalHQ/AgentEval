@@ -22,7 +22,7 @@ The vectors of conformance/protocol/ (spec 09 §9.2.1 defers to this list). Ever
                                    `why`
   streams/<name>/                  kind stream: events.ndjson (read as STRM-2 says: a last line without LF is still
                                    being written, and not read); `plan` (the plan file, relative to the vector: the
-                                   plans are shared, in streams/), `problems` (a list of {where, problem}, in
+                                   plans are shared, in streams/), `problems` ([where, problem] pairs, in
                                    order), and `readerOnly` when a writer could not write the stream (an unknown kind)
   plan-conformance/<name>/         kind plan-conformance: `events`, `plan` and `runs` (the stream, its plan and the
                                    folder of the runs it produced, beside expected.json), optional `policy` (a trust
@@ -33,6 +33,7 @@ import calendar
 import datetime
 import hashlib
 import json
+import math
 import os
 import re
 import sys
@@ -263,13 +264,13 @@ def conform(events, plan, runs, policy=None, examine=examine):
         problems.extend((f"run:{run_id}", p) for p in found)
 
     # The job's limits, over the runs found, each once: a runner cannot pass by splitting its work across runs.
-    limits, cost, cases = plan["limits"], 0, set()
+    limits, costs, cases = plan["limits"], [], set()
     for folder in chosen:
         summary = json.loads((folder / "summary.json").read_bytes()) if (folder / "summary.json").is_file() else {}
-        cost += (summary.get("cost") or {}).get("totalUsd", 0)
+        costs.append((summary.get("cost") or {}).get("totalUsd", 0))
         lines = ndjson(folder / "results.ndjson") if (folder / "results.ndjson").is_file() else []
         cases |= {line["caseId"] for line in lines if line.get("parentResultId") is None}
-    if cost > limits["maxUsd"]:
+    if math.fsum(costs) > limits["maxUsd"]:  # STRM-4 (W4-2): summed exactly, rounded once, then compared
         problems.append(("job", "over-budget"))
     if "cases" in limits and len(cases) > limits["cases"]:
         problems.append(("job", "over-cases"))
@@ -312,7 +313,7 @@ def check():
         plan_path = (d / expected_doc["plan"]).resolve()
         plan = json.loads(plan_path.read_text(encoding="utf-8"))
         events = read_stream_lines(d / "events.ndjson")
-        expected = [(p["where"], p["problem"]) for p in expected_doc["problems"]]
+        expected = [(p[0], p[1]) for p in expected_doc["problems"]]
         actual = ([("stream", "encoding")] if events is None
                   else verify(events, plan, hashlib.sha256(plan_path.read_bytes()).hexdigest()))
         if actual != expected:

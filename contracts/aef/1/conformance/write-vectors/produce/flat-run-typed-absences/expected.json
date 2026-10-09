@@ -1,0 +1,48 @@
+{
+  "kind": "produce",
+  "rules": [
+    "RES-1",
+    "RES-2",
+    "RES-4",
+    "SUM-3",
+    "SUM-4",
+    "SUM-5"
+  ],
+  "scenario": "scenario.json",
+  "results": "expected-results.ndjson",
+  "summary": {
+    "schemaVersion": "1.0",
+    "runId": "produce-flat-run-typed-absences",
+    "lanes": [
+      {
+        "lane": "quality",
+        "metrics": [
+          {
+            "metric": "quality",
+            "path": "q",
+            "N": 4,
+            "n": 2,
+            "notMeasured": 2,
+            "sum": 1.2,
+            "sumSq": 0.9,
+            "value": 0.6,
+            "verdict": "scored"
+          },
+          {
+            "metric": "pass_rate",
+            "path": "q",
+            "N": 4,
+            "n": 2,
+            "notMeasured": 2,
+            "sum": 1,
+            "sumSq": 1,
+            "value": 0.5,
+            "verdict": "failed",
+            "rule": "pass_rate >= 0.8"
+          }
+        ]
+      }
+    ]
+  },
+  "why": "A flat run: one line per case, a root with its RES-4 id and the facts as given (a typed absence keeps its reason and carries no scores). The summary leaves the not_applicable case out and counts the other absences as not measured."
+}

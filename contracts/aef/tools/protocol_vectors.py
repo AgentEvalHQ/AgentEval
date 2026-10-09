@@ -618,7 +618,7 @@ def main():
         if name in UNFINISHED:  # the job.cancelled is still being written: a verifier does not read it
             path = ROOT / "streams" / name / "events.ndjson"
             path.write_bytes(path.read_bytes()[:-1])
-        expected = {"kind": "stream", "plan": f"../{plan}", "problems": [{"where": w, "problem": p} for w, p in problems]}
+        expected = {"kind": "stream", "plan": f"../{plan}", "problems": [[w, p] for w, p in problems]}
         if reader_only:
             expected["readerOnly"] = True
         expected["rules"] = STREAM_RULES[name]

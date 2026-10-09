@@ -2,10 +2,10 @@
   "kind": "stream",
   "plan": "../plan.json",
   "problems": [
-    {
-      "where": "event:3",
-      "problem": "spend-decreased"
-    }
+    [
+      "event:3",
+      "spend-decreased"
+    ]
   ],
   "rules": [
     "STRM-3"

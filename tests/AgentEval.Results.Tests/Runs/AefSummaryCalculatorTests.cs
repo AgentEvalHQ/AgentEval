@@ -159,6 +159,7 @@ public class AefSummaryCalculatorTests
     [InlineData(1e12, 1e12 + 900, true)]   // relative to |recomputed| beyond 1
     [InlineData(1e12, 1e12 + 1100, false)]
     [InlineData(0.0, 9e-10, true)]          // absolute below 1
+    [InlineData(1.7e308, double.PositiveInfinity, false)]   // a sum that overflows: no written number is it
     public void WrittenAndRecomputed_MatchWithin1e9TimesMaxOf1AndTheRecomputed(double written, double recomputed, bool matches) =>
         Assert.Equal(matches, AefSummaryCalculator.Matches(written, recomputed));
 

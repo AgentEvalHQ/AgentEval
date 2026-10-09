@@ -34,6 +34,7 @@ public sealed partial class AefRunFolder
         Files = listing.Files;
         PathProblems = listing.Problems;
         OverFileLimit = listing.Problems.Any(p => p is { Path: ".", Code: "limit" });
+        OverlaysOverLimit = listing.OverlaysOverLimit;
         _present = new HashSet<string>(Files, StringComparer.Ordinal);
         SealedFiles = [.. Files.Where(IsSealed)];
     }
@@ -55,6 +56,12 @@ public sealed partial class AefRunFolder
     /// checked ([ENC-18]: a part is never read as the whole).
     /// </summary>
     public bool OverFileLimit { get; }
+
+    /// <summary>
+    /// <c>overlays/</c> holds more than 19,999 files ([ENC-17]: one events file and two per batch): the overlay chain is
+    /// not checked ([OVL-5]: <c>limit</c> at <c>overlays</c>). The files are listed in <see cref="Files"/> all the same.
+    /// </summary>
+    public bool OverlaysOverLimit { get; }
 
     /// <summary>[SEAL-1]: every file except <c>seal.json</c>, <c>attestation.dsse.json</c> and those under <c>overlays/</c>, in byte order.</summary>
     public IReadOnlyList<string> SealedFiles { get; }
@@ -148,6 +155,58 @@ public sealed partial class AefRunFolder
 
         _digests.TryAdd(path, (Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant(), size));
         return bytes;
+    }
+
+    /// <summary>
+    /// The first <paramref name="count"/> bytes of the file (all of them when it has fewer), for a file a reader reads
+    /// only as far as [ENC-17] allows (the overlay events file, [OVL-5]). The digest is not kept: it is not the file's.
+    /// </summary>
+    /// <exception cref="FileNotFoundException">No such file in the run.</exception>
+    /// <exception cref="IOException">The file cannot be read, or shrank while it was read.</exception>
+    public byte[] ReadPrefix(string path, int count)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(count);
+        var bytes = new byte[(int)Math.Min(Size(path), count)];
+        using var stream = OpenRead(path);
+        stream.ReadExactly(bytes);
+        return bytes;
+    }
+
+    /// <summary>
+    /// Where the complete lines of the file a reader reads end, scanned as a stream: after its last LF within its first
+    /// <paramref name="maxBytes"/> bytes and its first <paramref name="maxLines"/> lines, or 0 when there is none
+    /// ([ENC-17]; the overlay events file is read that far, [OVL-5]).
+    /// </summary>
+    /// <exception cref="FileNotFoundException">No such file in the run.</exception>
+    /// <exception cref="IOException">The file cannot be read, or shrank while it was read.</exception>
+    public long CompleteLinesEnd(string path, long maxBytes, int maxLines)
+    {
+        var limit = Math.Min(Size(path), maxBytes);
+        var buffer = new byte[(int)Math.Min(BufferBytes, Math.Max(limit, 1))];
+        long position = 0, end = 0;
+        var lines = 0;
+        using var stream = OpenRead(path);
+        while (position < limit && lines < maxLines)
+        {
+            var read = stream.Read(buffer, 0, (int)Math.Min(buffer.Length, limit - position));
+            if (read == 0)
+            {
+                throw new IOException($"{path}: the file shrank while it was read.");
+            }
+
+            var span = buffer.AsSpan(0, read);
+            var at = 0;
+            while (lines < maxLines && span[at..].IndexOf((byte)'\n') is var lf and >= 0)
+            {
+                at += lf + 1;
+                lines++;
+                end = position + at;
+            }
+
+            position += read;
+        }
+
+        return end;
     }
 
     /// <summary>The SHA-256 of the file's exact bytes ([SEAL-2]), lower-case hex, hashed as a stream.</summary>

@@ -2,10 +2,10 @@
   "kind": "stream",
   "plan": "../plan.json",
   "problems": [
-    {
-      "where": "event:2",
-      "problem": "accepted-twice"
-    }
+    [
+      "event:2",
+      "accepted-twice"
+    ]
   ],
   "rules": [
     "STRM-3"

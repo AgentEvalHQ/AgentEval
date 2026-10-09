@@ -1,0 +1,9 @@
+{
+  "kind": "produce",
+  "rules": [
+    "RES-5"
+  ],
+  "scenario": "scenario.json",
+  "refused": true,
+  "why": "answer has a child and no aggregation facts: a node with children carries aggregation (RES-5), whose strategy and rulePath only the producer knows. The Producer refuses the scenario."
+}

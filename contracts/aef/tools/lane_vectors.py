@@ -512,6 +512,37 @@ def v_severity_scope(runs):
     return lanes, results, [], ["LANE-3"], None
 
 
+def v_reads_unknown(runs):
+    """CKP-8 (R4-1): a lane whose recomputation reads a value a later minor added, in its rule (a member) or in its runs
+    (a target mode, a severity, a direction), is unverifiable, never lane-result. Each is recorded as 1.1 computes it."""
+    T = "2026-10-03T00:00:00Z"
+    ok = dict(metrics=(("ok", "rate", "higher_better"),), entries=(("ok", "a"),), lane="security", ended=T)
+    severity = make_run(runs, "RU-severity", [dict(case="c1", path="a", state="passed"),
+                                              dict(case="c2", path="a", state="failed", severity="info")], **ok)
+    mode = make_run(runs, "RU-mode", [dict(case="c1", path="p", state="passed", scores=scores(m=1.0))], mode="live-shadow",
+                    ended=T)
+    plain = make_run(runs, "RU-plain", [dict(case="c1", path="p", state="passed", scores=scores(m=1.0))], ended=T)
+    base = comparison_runs(runs)["B"]
+    direction = make_run(runs, "RU-direction",
+                         [dict(case=f"b{i:02d}", path="mem", state="passed", scores=scores(recall=0.6, latency=80, tokens=10))
+                          for i in range(1, 24)],
+                         lane="memory", metrics=(("recall", "score", "target_band"), ("latency", "duration", "lower_better"),
+                                                 ("tokens", "count", "none")),
+                         entries=(("recall", "mem"), ("latency", "mem"), ("tokens", "mem")), ended="2026-10-06T00:00:00Z")
+    lanes = [("severity-unknown", {"kind": "severity", "max": "low"}, [severity], True),       # info: below low in 1.1
+             ("target-mode-unknown", threshold("quality", ">=", 0.5), [mode], True),            # live-shadow: live in 1.1
+             ("rule-member-unknown", dict(threshold("quality", ">=", 0.5), minimumShare=0.9), [plain], True),
+             ("direction-unknown", cmp_rule(base), [direction], True)]
+    recorded = {"severity-unknown": res("passed", T), "target-mode-unknown": res("passed", T),
+                "rule-member-unknown": res("failed", T), "direction-unknown": res("passed", "2026-09-20T00:00:00Z", axes=[])}
+    # What this version computes: info reads as critical, live-shadow as mocked, the member is not read, the direction
+    # reads as none (§7.3). Not compared: a later minor recorded what this version cannot recompute.
+    results = {"severity-unknown": res("failed", T), "target-mode-unknown": res("not_measured", T),
+               "rule-member-unknown": res("passed", T), "direction-unknown": res("not_measured", "2026-10-06T00:00:00Z")}
+    problems = [[f"lanes/{name}", "unverifiable"] for name in recorded]
+    return lanes, results, problems, ["CKP-8", "VER-8"], recorded
+
+
 def v_comparison_unknown_axis(runs):
     r = comparison_runs(runs)
     lanes = [("unknown-axis", cmp_rule(r["B"], axes=("suite", "weather")), [r["C13"]], True)]
@@ -559,6 +590,7 @@ def main():
     vector("aggregates", v_aggregates)
     vector("severity-scope", v_severity_scope)
     vector("severity-max-unknown", v_severity_max_unknown)
+    vector("reads-unknown", v_reads_unknown)
     vector("comparison-large", v_comparison_large)
     vector("binding", v_binding, deployment="deployment:shop/assistant@prod")
     vector("recorded-differs", v_recorded_differs)

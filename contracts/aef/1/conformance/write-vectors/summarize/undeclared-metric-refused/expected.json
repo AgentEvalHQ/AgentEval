@@ -1,0 +1,10 @@
+{
+  "kind": "summarize",
+  "rules": [
+    "SUM-1"
+  ],
+  "run": "run",
+  "request": "request.json",
+  "refused": true,
+  "why": "The request asks for helpfulness, which metrics.json does not declare: a summary entry names a declared metric ([SUM-1]), so the request is an input error (exit status 2)."
+}

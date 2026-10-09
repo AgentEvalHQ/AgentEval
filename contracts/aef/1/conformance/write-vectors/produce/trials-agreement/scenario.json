@@ -1,0 +1,177 @@
+{
+  "run": {
+    "schemaVersion": "1.0",
+    "runId": "produce-trials-agreement",
+    "status": "completed",
+    "producer": {
+      "name": "p",
+      "version": "1"
+    },
+    "subject": {
+      "ref": "agent:a/b",
+      "kind": "agent",
+      "version": "v1"
+    },
+    "execution": {
+      "targetMode": "live"
+    },
+    "startedAt": "2026-10-01T00:00:00Z",
+    "contentCapture": "on",
+    "endedAt": "2026-10-01T00:01:00Z"
+  },
+  "metrics": {
+    "schemaVersion": "1.0",
+    "metrics": [
+      {
+        "id": "quality",
+        "kind": "score",
+        "direction": "higher_better",
+        "scale": {
+          "min": 0,
+          "max": 1
+        }
+      },
+      {
+        "id": "pass_rate",
+        "kind": "rate",
+        "direction": "higher_better",
+        "scale": {
+          "min": 0,
+          "max": 1
+        }
+      }
+    ]
+  },
+  "cases": [
+    {
+      "caseId": "k1",
+      "path": "q",
+      "evaluator": {
+        "id": "code:q"
+      },
+      "state": "warn",
+      "severity": "low",
+      "trials": {
+        "aggregation": "AllPass",
+        "trees": [
+          {
+            "path": "q",
+            "evaluator": {
+              "id": "code:q"
+            },
+            "state": "warn",
+            "severity": "low"
+          },
+          {
+            "path": "q",
+            "evaluator": {
+              "id": "code:q"
+            },
+            "state": "warn",
+            "severity": "low"
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "k2",
+      "path": "q",
+      "evaluator": {
+        "id": "code:q"
+      },
+      "state": "failed",
+      "severity": "medium",
+      "trials": {
+        "aggregation": "MajorityVote",
+        "trees": [
+          {
+            "path": "q",
+            "evaluator": {
+              "id": "code:q"
+            },
+            "state": "failed",
+            "severity": "medium"
+          },
+          {
+            "path": "q",
+            "evaluator": {
+              "id": "code:q"
+            },
+            "state": "error",
+            "reason": "The judge timed out."
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "k3",
+      "path": "q",
+      "evaluator": {
+        "id": "code:q"
+      },
+      "state": "passed",
+      "trials": {
+        "aggregation": "PassAtK",
+        "k": 3,
+        "trees": [
+          {
+            "path": "q",
+            "evaluator": {
+              "id": "code:q"
+            },
+            "state": "failed",
+            "severity": "low"
+          },
+          {
+            "path": "q",
+            "evaluator": {
+              "id": "code:q"
+            },
+            "state": "passed"
+          },
+          {
+            "path": "q",
+            "evaluator": {
+              "id": "code:q"
+            },
+            "state": "failed",
+            "severity": "low"
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "k4",
+      "path": "q",
+      "evaluator": {
+        "id": "code:q"
+      },
+      "state": "passed",
+      "trials": {
+        "aggregation": "AllPass",
+        "trees": [
+          {
+            "path": "q",
+            "evaluator": {
+              "id": "code:q"
+            },
+            "state": "passed"
+          }
+        ]
+      }
+    }
+  ],
+  "summary": {
+    "lanes": [
+      {
+        "lane": "quality",
+        "metrics": [
+          {
+            "metric": "pass_rate",
+            "path": "q"
+          }
+        ]
+      }
+    ]
+  }
+}

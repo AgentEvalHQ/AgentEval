@@ -58,7 +58,7 @@ One node of a run's result tree. A composite node carries aggregation; its child
 | `traceLink.traceId` | string | yes | ≤ 32 chars; pattern `^[0-9a-f]{32}$` | The trace id: 32 lower-case hex characters. |
 | `traceLink.spanId` | string |  | ≤ 16 chars; pattern `^[0-9a-f]{16}$` | The span id: 16 lower-case hex characters. |
 | `aggregation` | object |  |  | On a composite node: how its children became its verdict, and which branch of the verdict rules decided it. |
-| `aggregation.strategy` | one of `"WeightedSum"`, `"Min"`, `"WeightedMedian"`, `"CapByWorst"`, `"MajorityVote"` | yes |  | The strategy the producer used, for display: aggregation is descriptive (spec 03, RES-6). |
+| `aggregation.strategy` | one of `"WeightedSum"`, `"Min"`, `"WeightedMedian"`, `"CapByWorst"`, `"MajorityVote"`, `"Own"` | yes |  | The strategy the producer used, for display: aggregation is descriptive (spec 03, RES-6). |
 | `aggregation.threshold` | number or null |  |  | The threshold the composite score was compared with, or null (RES-5). |
 | `aggregation.score` | number or null |  |  | The composite score the strategy gave, or null when it gave none (RES-5). |
 | `aggregation.rulePath` | one of `"required-error"`, `"nothing-measured"`, `"threshold"`, `"severity"`, `"under-covered"` | yes |  | Which branch of the producer's verdict rules decided the state, for display (spec 03, RES-6). |

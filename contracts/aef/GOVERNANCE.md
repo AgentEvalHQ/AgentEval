@@ -23,7 +23,8 @@
    - `tools/schema_diff.py` accepts the change for the version it is released in.
 
    A CI job (`.github/workflows/aef.yml` in the AgentEval repository) runs these checks, the corpus regeneration
-   (byte for byte), the tools' self-tests and the DCO check on every change to `contracts/aef/`.
+   (byte for byte), the tools' self-tests and the DCO check on every change to `contracts/aef/`; on pull requests it
+   also runs AgentEval's implementation through the conformance runner.
 
    Every decision on a proposal, including a refusal, is recorded with its reason on the issue.
 

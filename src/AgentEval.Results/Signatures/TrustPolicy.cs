@@ -15,22 +15,30 @@ namespace AgentEval.Results.Signatures;
 /// [OVL-10]). Always an input from the verifier's caller, never read from a run, an overlay or a runner manifest.
 /// </summary>
 /// <remarks>
-/// The file format is spec 09 §9.2.1's: <c>{"keys": [{"identity": …, "publicKey": &lt;SPKI PEM&gt;, "may": ["redact"]?}]}</c>.
-/// A key's id is computed from its public key ([SIG-3]), never read from the policy, and no two keys of a policy have
-/// one key id. One identity may hold several keys (a rotation); what it may do is the union of their <c>may</c>
-/// ([SIG-4]). Members the format does not define are ignored. The order of <see cref="Keys"/> is the policy order
-/// [SIG-5] tries keys in and lists identities in.
+/// The file format is spec 09 §9.2.1's: <c>{"keys": [{"identity": …, "publicKey": &lt;SPKI PEM&gt;, "may": ["redact"]?}]}</c>,
+/// valid against <c>trust-policy.schema.json</c>, whose reader schema is its writer schema ([SIG-4], [VER-9]): a policy
+/// is closed, and one holding a member this version does not know is refused as a whole, as [SIG-3] refuses one. A
+/// key's id is computed from its public key ([SIG-3]), never read from the policy, and no two keys of a policy have one
+/// key id. One identity may hold several keys (a rotation); what it may do is the union of their <c>may</c> ([SIG-4]),
+/// matched by exact value: a value this version does not know grants nothing. The order of <see cref="Keys"/> is the
+/// policy order [SIG-5] tries keys in and lists identities in.
 /// </remarks>
 public sealed class TrustPolicy
 {
     /// <summary>The action a policy grants with <c>"may": ["redact"]</c>: authorizing redactions ([OVL-10]).</summary>
     public const string Redact = "redact";
 
+    /// <summary>The schema a trust policy is valid against ([SIG-4]): <c>trust-policy.schema.json</c>.</summary>
+    public const string SchemaName = "trust-policy";
+
     /// <summary>A policy that trusts no key.</summary>
     public static TrustPolicy Empty { get; } = new([]);
 
     /// <summary>A policy of these keys, in this order.</summary>
-    /// <exception cref="ArgumentException">Two keys have one key id ([SIG-3]).</exception>
+    /// <exception cref="ArgumentException">
+    /// Two keys have one key id ([SIG-3]), or the policy is not valid against <c>trust-policy.schema.json</c> ([SIG-4]: an
+    /// empty identity, a <c>may</c> value twice or empty, more keys or values than the schema allows).
+    /// </exception>
     public TrustPolicy(IEnumerable<TrustedKey> keys)
     {
         ArgumentNullException.ThrowIfNull(keys);
@@ -38,6 +46,11 @@ public sealed class TrustPolicy
         if (DuplicateKeyId(Keys) is { } keyId)
         {
             throw new ArgumentException($"The key {keyId} is listed twice: a trust policy lists each key once ([SIG-3]).", nameof(keys));
+        }
+
+        if (Keys.Count > 0 && Schemas.AefSchemas.Reader.Validate(SchemaName, ToJson()) is { } why)
+        {
+            throw new ArgumentException($"Not a trust policy valid against trust-policy.schema.json ([SIG-4]): {why}", nameof(keys));
         }
     }
 
@@ -52,10 +65,25 @@ public sealed class TrustPolicy
 
     /// <summary>
     /// Whether the policy lets <paramref name="identity"/> do <paramref name="action"/> beyond signing: the union of the
-    /// <c>may</c> of the identity's keys holds it ([SIG-4]).
+    /// <c>may</c> of the identity's keys holds it, by exact value ([SIG-4]).
     /// </summary>
     public bool Allows(string identity, string action) =>
         Keys.Any(k => string.Equals(k.Identity, identity, StringComparison.Ordinal) && k.May.Contains(action, StringComparer.Ordinal));
+
+    /// <summary>The policy in the file format of spec 09 §9.2.1 (each key's PEM as <see cref="PublicKeyInfo.ToPem"/> writes it).</summary>
+    public JsonObject ToJson() => new()
+    {
+        ["keys"] = new JsonArray([.. Keys.Select(k =>
+        {
+            var entry = new JsonObject { ["identity"] = k.Identity, ["publicKey"] = k.PublicKey.ToPem() };
+            if (k.May.Count > 0)
+            {
+                entry["may"] = new JsonArray([.. k.May.Select(m => (JsonNode?)m)]);
+            }
+
+            return (JsonNode?)entry;
+        })]),
+    };
 
     /// <summary>Reads a trust policy file.</summary>
     /// <exception cref="TrustPolicyException">The file is not a trust policy.</exception>
@@ -63,14 +91,16 @@ public sealed class TrustPolicy
     public static TrustPolicy Load(string path) => Parse(File.ReadAllBytes(path));
 
     /// <summary>
-    /// Reads a trust policy from its JSON bytes: an I-JSON object whose <c>keys</c> is an array of objects, each with a
-    /// string <c>identity</c>, a string <c>publicKey</c> holding a PEM SubjectPublicKeyInfo
-    /// (<see cref="PublicKeyInfo.FromPem"/>), and optionally <c>may</c>, an array of strings. A key of an algorithm AEF
-    /// does not verify with is kept, as <see cref="AefKeyAlgorithm.Unsupported"/> ([SIG-2]). The policy is refused as a
-    /// whole ([SIG-3]: a verifier does not verify against part of a policy) when a key is not a strict PEM of a DER
-    /// SubjectPublicKeyInfo, when a P-256 or Ed25519 key is not usable, or when two keys have one key id.
+    /// Reads a trust policy from its JSON bytes: an I-JSON object valid against <c>trust-policy.schema.json</c> ([SIG-4]:
+    /// closed for readers too, so a member this version does not know refuses it), whose <c>keys</c> each have an
+    /// <c>identity</c>, a <c>publicKey</c> holding a PEM SubjectPublicKeyInfo (<see cref="PublicKeyInfo.FromPem"/>), and
+    /// optionally <c>may</c>, distinct strings. A key of an algorithm AEF does not verify with is kept, as
+    /// <see cref="AefKeyAlgorithm.Unsupported"/> ([SIG-2]). The policy is refused as a whole ([SIG-3], [SIG-4]: a
+    /// verifier does not verify against part of a policy) when it is not valid against the schema, when a key is not a
+    /// strict PEM of a DER SubjectPublicKeyInfo, when a P-256 or Ed25519 key is not usable, or when two keys have one key
+    /// id. A <c>may</c> value this version does not know is kept, and grants nothing.
     /// </summary>
-    /// <exception cref="TrustPolicyException">The bytes are not a trust policy, or [SIG-3] refuses it.</exception>
+    /// <exception cref="TrustPolicyException">The bytes are not a trust policy, or [SIG-3] or [SIG-4] refuses it.</exception>
     public static TrustPolicy Parse(ReadOnlySpan<byte> utf8Json)
     {
         JsonObject root;
@@ -82,6 +112,12 @@ public sealed class TrustPolicy
         {
             throw new TrustPolicyException($"A trust policy is a JSON document ({e.Code}): {e.Message}");
         }
+
+        if (Schemas.AefSchemas.Reader.Validate(SchemaName, root) is { } why)
+        {
+            throw new TrustPolicyException($"A trust policy is valid against trust-policy.schema.json, closed for readers too ([SIG-4], [VER-9]): {why}");
+        }
+
         if (root["keys"] is not JsonArray list)
         {
             throw new TrustPolicyException("A trust policy is {\"keys\": [{\"identity\": …, \"publicKey\": <SPKI PEM>, \"may\": [...]?}]}.");

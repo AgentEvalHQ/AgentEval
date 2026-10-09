@@ -165,11 +165,12 @@ public static class AefSummaryCalculator
     }
 
     /// <summary>
-    /// §3.6: a written <c>value</c> or <c>sum</c> matches the recomputed one when they differ by at most
-    /// 1e-9 × max(1, |recomputed|).
+    /// §3.6: a written <c>value</c>, <c>sum</c> or <c>sumSq</c> matches the recomputed one when they differ by at most
+    /// 1e-9 × max(1, |recomputed|). A recomputed value that is not finite (a sum that overflows binary64) matches no
+    /// written number: JSON has none for it ([ENC-3]).
     /// </summary>
     public static bool Matches(double written, double recomputed) =>
-        Math.Abs(written - recomputed) <= 1e-9 * Math.Max(1, Math.Abs(recomputed));
+        double.IsFinite(recomputed) && Math.Abs(written - recomputed) <= 1e-9 * Math.Max(1, Math.Abs(recomputed));
 
     /// <summary>
     /// [SUM-8]: the median of the values; the median of an even count is the mean of the two middle values.

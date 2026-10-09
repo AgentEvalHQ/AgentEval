@@ -1,0 +1,19 @@
+{
+  "kind": "run",
+  "run": "run",
+  "policy": "policy.json",
+  "outcome": "intact",
+  "problems": [
+    [
+      "blobs/sha256/63/635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5",
+      "withheld"
+    ]
+  ],
+  "withheld": 1,
+  "signedBy": [],
+  "rules": [
+    "OVL-5",
+    "OVL-10",
+    "ENC-17"
+  ]
+}

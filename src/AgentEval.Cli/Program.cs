@@ -941,6 +941,7 @@ rootCmd.Add(SkillsScanCommand.Create());
 // fixture (ScriptedChatClient.FromFixture).
 rootCmd.Add(LogFileCommand.Create());
 rootCmd.Add(AssertAiCommand.Create());             // assert-ai — serve/import/export/calibrate with Microsoft's ASSERT (assert-ai 0.3)
+rootCmd.Add(AefCommand.Create());                  // aef — verify/seal/view/checkpoint AEF 1.0 runs; export store v1, import ASSERT
 
 var parseResult = rootCmd.Parse(args);
 
