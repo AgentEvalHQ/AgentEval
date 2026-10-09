@@ -2503,6 +2503,26 @@
    "level": "signed"
   },
   {
+   "id": "runs/withheld-blob-link-under-overlays",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "RUN-3",
+    "OVL-5",
+    "OVL-10"
+   ],
+   "path": "runs/withheld-blob-link-under-overlays",
+   "files": {
+    "expected.json": "57519fbf3b32a1c1d0570c339987fd2374b90494a1b9b61e5892cc72072ff784",
+    "policy.json": "9fbb1dc59dded854b7a9f069dea437f46b51ff219eaccda8d077a119ab22b463"
+   },
+   "level": "signed"
+  },
+  {
    "id": "runs/withheld-blob-orphan-envelope-beyond-limit",
    "kind": "run",
    "classes": [
@@ -4667,6 +4687,20 @@
     "run/seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84",
     "run/summary.json": "268eda205f131668d931d8804c9530cb7c99b2857d95e1ce1bc24fc3d6314679",
     "run/traces.otlp.jsonl": "3c29fa780cb029dd541c36edb35614f49df76f459a1f7c3e3702960892398787"
+   }
+  },
+  {
+   "id": "chain-vectors/withheld-blob-link-under-overlays",
+   "kind": "chain",
+   "classes": [
+    "Overlay verifier"
+   ],
+   "rules": [
+    "OVL-5"
+   ],
+   "path": "chain-vectors/withheld-blob-link-under-overlays",
+   "files": {
+    "expected.json": "c4b26243bf9dc7156141bbb5badd2ae025b37642f19fe867d03b2f3e17603830"
    }
   },
   {
@@ -10306,6 +10340,55 @@
    }
   },
   {
+   "id": "limits/overlays-in-another-case",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "RUN-3"
+   ],
+   "path": "limits/overlays-in-another-case",
+   "files": {
+    "expected.json": "78b9b2e8a23273d74449d3cf995613f5091cc426ab5e87d267e32f712298e545"
+   }
+  },
+  {
+   "id": "limits/overlays-is-a-file",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "RUN-3"
+   ],
+   "path": "limits/overlays-is-a-file",
+   "files": {
+    "expected.json": "9fb6048e15e074db9d87ae7fce0ed49ce3bcb55b54cc44ba06ffdaa248bb5c3b"
+   }
+  },
+  {
+   "id": "limits/overlays-is-a-link",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "RUN-3",
+    "OVL-1"
+   ],
+   "path": "limits/overlays-is-a-link",
+   "files": {
+    "expected.json": "b1dde124667b88c392abbabea3c56d1ee831ecee473a818970cce87527def812"
+   }
+  },
+  {
    "id": "limits/results-line-at-4-mib",
    "kind": "run",
    "classes": [
@@ -10422,6 +10505,40 @@
    "path": "limits/seal-beyond-40-mib",
    "files": {
     "expected.json": "d0c2518a5c208ee09511b5831f41338ea244f89a967543939f0ec52b7e6b334e"
+   }
+  },
+  {
+   "id": "limits/traces-lines-at-limit",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "ENC-17",
+    "ENC-18"
+   ],
+   "path": "limits/traces-lines-at-limit",
+   "files": {
+    "expected.json": "bd6cb73ced45b0546a8fd8c2515f9652bea1e74b646c1cf51513b5259e58e8fe"
+   }
+  },
+  {
+   "id": "limits/traces-lines-beyond-limit",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "ENC-17",
+    "ENC-18"
+   ],
+   "path": "limits/traces-lines-beyond-limit",
+   "files": {
+    "expected.json": "5f28b99426243648079d02397f67a33ad5229f8618dd7db9ef16c2685f27dd17"
    }
   },
   {
@@ -11786,6 +11903,22 @@
    }
   },
   {
+   "id": "protocol/plans/unknown-target-mode",
+   "kind": "plan",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-7",
+    "VER-8"
+   ],
+   "path": "protocol/plans/unknown-target-mode",
+   "files": {
+    "document.json": "3b22bf9af9e14313c62d1d499aaf182ae4a887613d5cc4a5ad36b5b7f5f10922",
+    "expected.json": "e2a344a2c300832ca93c094db8b1c0058ac00478e6453af9df5371c822c9f88b"
+   }
+  },
+  {
    "id": "protocol/plans/valid-ci-provider",
    "kind": "plan",
    "classes": [
@@ -11831,6 +11964,22 @@
    "files": {
     "document.json": "187f26d366ef3d7c58464707660c0e05be722ffce3406cbe4f0eae9250e22ad9",
     "expected.json": "bff30efc347b8bb6bfba5abeb85e425f83aa634ee33856c213688022db1c9f59"
+   }
+  },
+  {
+   "id": "protocol/plans/valid-target-mode-scripted",
+   "kind": "plan",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-7",
+    "RUN-7"
+   ],
+   "path": "protocol/plans/valid-target-mode-scripted",
+   "files": {
+    "document.json": "3aa805d44b32d0c2999a976846ac27473e27838c9605b21bfc5277bca2d582e8",
+    "expected.json": "bf55c8b5185cfe15b8b14bf01d06d39b358b144ffb715eef6213083d7445fe26"
    }
   },
   {
@@ -12024,6 +12173,39 @@
    "files": {
     "expected.json": "9becc602bb672b059430a7ef8941777f6c66f8845ac73a7d040646bd88b50ba7",
     "plan.json": "187f26d366ef3d7c58464707660c0e05be722ffce3406cbe4f0eae9250e22ad9",
+    "runner.json": "f4db73e1075ee8dea56e5ee907bc04240aa9f4c1febfb2cdda426e04f82bf3b1"
+   }
+  },
+  {
+   "id": "protocol/matching/target-mode-not-in-manifest",
+   "kind": "matching",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-7"
+   ],
+   "path": "protocol/matching/target-mode-not-in-manifest",
+   "files": {
+    "expected.json": "d1edd15340b130d7f173a37916fd7f5c1c5702657c48debf550afcf62bb7a1b1",
+    "plan.json": "a8a10340a76b26b50292537875fc2e639d67045174adc14169710fdea59e40f9",
+    "runner.json": "f4db73e1075ee8dea56e5ee907bc04240aa9f4c1febfb2cdda426e04f82bf3b1"
+   }
+  },
+  {
+   "id": "protocol/matching/target-mode-unknown",
+   "kind": "matching",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-7",
+    "VER-8"
+   ],
+   "path": "protocol/matching/target-mode-unknown",
+   "files": {
+    "expected.json": "ba2d7a335a3881e02ba9c6ff9e86e709929c73ab821db912dd61532d5c5d8548",
+    "plan.json": "3b22bf9af9e14313c62d1d499aaf182ae4a887613d5cc4a5ad36b5b7f5f10922",
     "runner.json": "f4db73e1075ee8dea56e5ee907bc04240aa9f4c1febfb2cdda426e04f82bf3b1"
    }
   },
@@ -12349,12 +12531,13 @@
    ],
    "rules": [
     "PLAN-2",
+    "PLAN-9",
     "STRM-3"
    ],
    "path": "protocol/streams/over-time",
    "files": {
     "events.ndjson": "e12b77d3f00ee38798ce69574ae53849e7e96d34705d02ba1e162a8b04756742",
-    "expected.json": "26afc4f18af25dc946cdabe8055f8fd5b06f2ee580d4b511a4950740bff7d82b"
+    "expected.json": "e2aa397fd1fd20da7e6183f25f09b680bee6c2dac6f5024341b7b47eaf3c7603"
    }
   },
   {
@@ -12492,13 +12675,14 @@
    ],
    "rules": [
     "PLAN-2",
+    "PLAN-9",
     "STRM-1",
     "STRM-3"
    ],
    "path": "protocol/streams/stopped-at-budget",
    "files": {
     "events.ndjson": "03b17476df2898ee117a722e497e4ef1821484e1dc91ad05c0c6a135e7c18c43",
-    "expected.json": "5fa5dbd71d54d041c6d30656c1ed0fca70478ff6ccc2f31e89bd6539c6170d12"
+    "expected.json": "715686620bb6e03aa90e37f2419eb7eb78b1c577f7f0049b6db5f34cd71a6cd0"
    }
   },
   {
@@ -13106,12 +13290,13 @@
    ],
    "rules": [
     "STRM-4",
-    "PLAN-2"
+    "PLAN-2",
+    "PLAN-8"
    ],
    "path": "protocol/plan-conformance/split-over-cases",
    "files": {
     "events.ndjson": "662a9c024469c0343a176e4c614be6f78cd888a29bdbe1bcdf3b10563f9e7991",
-    "expected.json": "9d41e84dc6c94aea01e10caa022bae26ce717c0c1b3b6c3ba3bff84ea70cdaf7",
+    "expected.json": "ccdbb1f0ffd166f3ee730dd5bfd08ffbeb1b3b31c833368248ff796873d88686",
     "plan.json": "a3a4de0f2d285cf6b1cb374c9e9a2a1c9a4172f1acbb76d7b82affd29aac66ec",
     "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
     "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
@@ -13198,12 +13383,13 @@
    ],
    "rules": [
     "STRM-4",
-    "RUN-8"
+    "RUN-8",
+    "PLAN-8"
    ],
    "path": "protocol/plan-conformance/suite-digest",
    "files": {
     "events.ndjson": "36c3be3fcbc92ae37bd29a73e29e0f627a4ef266c8d1a3334f70cdeb575e6693",
-    "expected.json": "088459afc9886436969bd4f32c373cc0fe43e1e299a4c7958baa5d10034ec5ba",
+    "expected.json": "12688520d89ec88b03228bd90223132d4df9386b8ddb26f8c8d6cb884d87ff57",
     "plan.json": "a3a4de0f2d285cf6b1cb374c9e9a2a1c9a4172f1acbb76d7b82affd29aac66ec",
     "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
     "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
@@ -13231,6 +13417,100 @@
     "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
     "runs/R-1/run.json": "48ea4214e391ac7439d8a6f39477e4ad4190316ee2cce5bafdaedcfa915d0e38",
     "runs/R-1/seal.json": "7445b14b7e040ed9f1400a8b6df50d71ddddb26db12245fc0a90fe8e47ac5e3f",
+    "runs/R-1/summary.json": "5c419eab3b644e909a540ec222c74ce57cf06afa52f2fc278c3667e009025cb7"
+   }
+  },
+  {
+   "id": "protocol/plan-conformance/target-mode-absent-is-live",
+   "kind": "plan-conformance",
+   "classes": [
+    "Stream verifier"
+   ],
+   "rules": [
+    "STRM-4",
+    "RUN-7"
+   ],
+   "path": "protocol/plan-conformance/target-mode-absent-is-live",
+   "files": {
+    "events.ndjson": "da08d14db6dafc96d17ed1ba2cc18b2ee86148e59b04ecc287d6d954ce1a9ccb",
+    "expected.json": "883ddfa393a2aff5bd50527b98b7f2394ef237984a6008e73883cbcfdf349592",
+    "plan.json": "a3a4de0f2d285cf6b1cb374c9e9a2a1c9a4172f1acbb76d7b82affd29aac66ec",
+    "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
+    "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
+    "runs/R-1/run.json": "81edf473e7716ec6e2bdcd28637764cde12db755b55363a9207a9f05b9ea67aa",
+    "runs/R-1/seal.json": "c195c73778c13de4e33f6cf84bfad411235626c8e2cab77ad8e3bae25182a651",
+    "runs/R-1/summary.json": "5c419eab3b644e909a540ec222c74ce57cf06afa52f2fc278c3667e009025cb7"
+   }
+  },
+  {
+   "id": "protocol/plan-conformance/target-mode-as-planned",
+   "kind": "plan-conformance",
+   "classes": [
+    "Stream verifier"
+   ],
+   "rules": [
+    "STRM-4",
+    "RUN-7",
+    "PLAN-7"
+   ],
+   "path": "protocol/plan-conformance/target-mode-as-planned",
+   "files": {
+    "events.ndjson": "662fcec84d09a044d2f98234bbc021c24b8a67227df493efcff469cb8ebf513c",
+    "expected.json": "b313a40e69d9b8c76eb4a2a847d93c4bd42c5e45ebf493be058c6eb1ee065ee9",
+    "plan.json": "9e3cfca99230d9bc4140d82b75f3993144733f5e2f02f10c2a6547c08bbc265f",
+    "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
+    "runs/R-1/results.ndjson": "2572cc41c5abbc0a2d1df009a2979e298727f2f3f8ffff2fba42b591fa7ba1c4",
+    "runs/R-1/run.json": "d0611e7f4815a994b572a1e89efc9503fa2b644e1ad74fca2f8d8dd2dd06dd49",
+    "runs/R-1/seal.json": "06df1a1f82d94b49e161665ff1dc4e3dc07e7e9008c245f3ac8351504ae10693",
+    "runs/R-1/summary.json": "418c82b5f4641fa04afc06868a69f46f354375d459e20a02566ead3a8c4a5f14",
+    "runs/R-2/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
+    "runs/R-2/results.ndjson": "dbedb5738e4b8728535ca10ac83d38c7a0a1a522250c073821db76a237ebb695",
+    "runs/R-2/run.json": "3174b23282f3f8ea88d4743ca567e413136504e32b865af7af42d116e28bf8bf",
+    "runs/R-2/seal.json": "ef808b9ac3d4a57a920643da2ee94bd786ae99223f1b7013d1cb9549a64f4199",
+    "runs/R-2/summary.json": "0a2b77a22a99056dc90d7e06c79b4d3402c40f8e1e8608925d545a583378ec1e"
+   }
+  },
+  {
+   "id": "protocol/plan-conformance/target-mode-live-plan",
+   "kind": "plan-conformance",
+   "classes": [
+    "Stream verifier"
+   ],
+   "rules": [
+    "STRM-4",
+    "RUN-7"
+   ],
+   "path": "protocol/plan-conformance/target-mode-live-plan",
+   "files": {
+    "events.ndjson": "6882c49b9b26fb3f17878bdb6ed76f6e8d639a2ca5bb061b92eeabc15ebc56f7",
+    "expected.json": "178b2579db17950b1ec5b381ae341c2b0525964412889432fb90d69b0e0bc9b2",
+    "plan.json": "b45cf46dec0a12834aaabd2f6236002d4a0ac9d5b2044b7134ed754b99958fa8",
+    "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
+    "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
+    "runs/R-1/run.json": "60f5085ed99138ba01f3fabfd260540f914fa0c8a28b7d5364d9e9a902ec4061",
+    "runs/R-1/seal.json": "2c4161fdbecf24db8befdbf3937e34a19b24f8f363654c7524abb2c12bdb7368",
+    "runs/R-1/summary.json": "5c419eab3b644e909a540ec222c74ce57cf06afa52f2fc278c3667e009025cb7"
+   }
+  },
+  {
+   "id": "protocol/plan-conformance/target-mode-live-run-on-scripted-plan",
+   "kind": "plan-conformance",
+   "classes": [
+    "Stream verifier"
+   ],
+   "rules": [
+    "STRM-4",
+    "RUN-7"
+   ],
+   "path": "protocol/plan-conformance/target-mode-live-run-on-scripted-plan",
+   "files": {
+    "events.ndjson": "b35df19fc53a44805ae30ca9eb1d806c0fe0d4b7893c312838c940786c9eafd3",
+    "expected.json": "e5e1b84bc5afa41b4e6ad36abc42194a2e4ca4c98367f747b96849dd41868775",
+    "plan.json": "9e3cfca99230d9bc4140d82b75f3993144733f5e2f02f10c2a6547c08bbc265f",
+    "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
+    "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
+    "runs/R-1/run.json": "5ffacca1d657e4ee35ef2cd6b1866b7bdc6809257475a90a7c85a2ae698683a2",
+    "runs/R-1/seal.json": "9d333e0b4c3afc1a1446df5d7c891304ed5e7f006c3fca59ba08d7b0604882a2",
     "runs/R-1/summary.json": "5c419eab3b644e909a540ec222c74ce57cf06afa52f2fc278c3667e009025cb7"
    }
   },
@@ -13786,6 +14066,22 @@
    }
   },
   {
+   "id": "write-vectors/produce/cases-not-a-list-refused",
+   "kind": "produce",
+   "classes": [
+    "Producer",
+    "Runner"
+   ],
+   "rules": [
+    "RES-4"
+   ],
+   "path": "write-vectors/produce/cases-not-a-list-refused",
+   "files": {
+    "expected.json": "55b0b76c095b292767716c065ae7d3b824e85e5ecb74098a8ad742f673f8b587",
+    "scenario.json": "2cb9442458d12a2a19ae3d5128e0a2765b6951042df3efb1fac0b22b15e95191"
+   }
+  },
+  {
    "id": "write-vectors/produce/child-path-not-under-parent-refused",
    "kind": "produce",
    "classes": [
@@ -13982,6 +14278,23 @@
     "expected-results.ndjson": "e4ecbd6aa30f72dbe953b8f2d7864c76d5237d891e5a4a5e12a75189911c318c",
     "expected.json": "6102a349721f0f5675a7315a54e6d70c9da208763443980dc40e0f2f68c02f06",
     "scenario.json": "8cdd2c24f382aa76783eef91023990f66fc8865a435112cb1bf00411f1d8aa39"
+   }
+  },
+  {
+   "id": "write-vectors/produce/summary-undeclared-metric-refused",
+   "kind": "produce",
+   "classes": [
+    "Producer",
+    "Runner"
+   ],
+   "rules": [
+    "SUM-1",
+    "SUM-3"
+   ],
+   "path": "write-vectors/produce/summary-undeclared-metric-refused",
+   "files": {
+    "expected.json": "dcba91151260202d7cf42da68fcfff8a91b3785daf1eba577c7680af9b5f5035",
+    "scenario.json": "e3d62e2febb7dc7dc5db5659220d4889bc9bc24e58b0b2a9a82645c38ed1db7d"
    }
   },
   {

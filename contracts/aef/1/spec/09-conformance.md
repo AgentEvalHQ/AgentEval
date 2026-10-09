@@ -14,7 +14,7 @@ that class. Requirements not listed for a class still apply to it where it does 
 | **Overlay verifier** | OVL-1–OVL-11, SIG-4, SIG-5 (batch signatures and redaction authority, [OVL-3], [OVL-10]) | `chain`, `overlay-view`, `signature` |
 | **Checkpoint verifier** | CKP-1–CKP-10, LANE-1–LANE-11, DEC-1–DEC-5, SIG-8, and Run verifier | `checkpoint`, `lane`, `decision`, `signature` ([CKP-9]), and the Run verifier's |
 | **Decision engine** | DEC-1–DEC-5 | `decision` |
-| **Runner** (*at risk* in 1.0, below) | PLAN-1–PLAN-7, STRM-1–STRM-2, RUN-12, and Producer and Sealer for the runs it produces | `plan`, `matching`, and the Producer's and the Sealer's |
+| **Runner** (*at risk* in 1.0, below) | PLAN-1–PLAN-10, STRM-1–STRM-2, RUN-12, and Producer and Sealer for the runs it produces | `plan`, `matching`, and the Producer's and the Sealer's |
 | **Stream verifier** | STRM-1–STRM-4, and Run verifier ([STRM-4] verifies the runs a stream reports) | `stream`, `plan-conformance`, and the Run verifier's |
 
 A class whose requirements include another class passes that class's vectors too; `index.json` lists each vector
@@ -22,7 +22,10 @@ under every class that must pass it, so a runner selects a class's vectors by it
 
 **The Runner class is released *at risk* in AEF 1.0** (GOVERNANCE.md, release criteria): neither implementation that
 passes the corpus is a runner, so its requirements have not been tested by a second implementation, and they may
-change in 1.1 more than a minor version normally allows.
+change in 1.1 more than a minor version normally allows. The reference tools include a minimal runner
+(`tools/aef_runner.py`, against a scripted target: it takes only plans that ask for `scripted`, and [STRM-3] and
+[STRM-4] find nothing in its jobs), so the class has one implementation; it is still at risk until a second,
+independent runner passes.
 
 A Run verifier conforms at the **intact** level, or at the **signed** level when it also verifies signatures (§4.4).
 `index.json` marks the vectors only the signed level must pass (`"level": "signed"`: the signature vectors, and
@@ -168,6 +171,7 @@ vector's folder before it runs the vector. Each step is an object with one membe
 | `{"remove": PATH}` | removes a file or a folder |
 | `{"files": [FOLDER, N]}` | creates `N` empty files in `FOLDER`, named `0` to `N`−1 |
 | `{"write": [PATH, PARTS]}`, `{"append": [PATH, PARTS]}` | writes or appends a file of `PARTS`: `[text, count]` pairs, each text in UTF-8 repeated `count` times |
+| `{"link": [PATH, TARGET]}` | makes `PATH` a symbolic link to `TARGET` (both relative to the vector's folder; the link itself holds the relative path between them). A runner on a platform that cannot create one skips the vector and reports it as skipped |
 
 Paths are relative to the vector's folder, `/`-separated, with no `..` segment, no drive and no leading `/`: a
 runner refuses a recipe whose paths would leave the corpus or the vector. The implementation is given the generated folder as it
@@ -208,8 +212,9 @@ each limit of [ENC-17] at its value or one beyond.
   | `seal-write` | `seal-write DIR --sealed-by B --sealed-at T` | writes `DIR/seal.json` ([SEAL-5]) and changes nothing else; `{"runHash": hex}`. Input errors (exit 2), with nothing written: an open run; a `T` before the run's `endedAt`; with `--sealed-by ingest`, a run with a path that breaks [RUN-3] or a file that is missing, does not read, or is not valid against its reader schema ([SEAL-1], [ENC-16]) |
   | `sign` | `sign FILE KEY --payload-type T` (`KEY`: an unencrypted PKCS#8 PEM private key, P-256 or Ed25519) | the DSSE envelope over `FILE`'s bytes ([SIG-1]): `payloadType`, `payload`, and one signature with the key's `keyid` ([SIG-3]). Input errors (exit 2): a key of an algorithm the implementation does not sign with, a key that is not an unencrypted PKCS#8 PEM, or an EC key on a curve other than P-256 |
 
-  For `lanes`, `--at` defaults to the time of the call; a plan or trust policy the reader refuses is an input error
-  (exit 2); `--policy` names a trust policy file ([SIG-4]).
+  For `lanes`, `--at` defaults to the time of the call. Wherever an operation is given a plan (`match`, `stream`,
+  `conform`) or a trust policy (`--policy`, [SIG-4]), one the reader refuses is an input error (exit 2), a plan whose
+  `timeout` is not a duration ([ENC-9]) among them.
 
   The write operations are judged rather than compared byte for byte: JSON formatting is free, so two conforming
   writers may write different bytes for one `summary.json`, `results.ndjson` or `seal.json`, and an ECDSA signature

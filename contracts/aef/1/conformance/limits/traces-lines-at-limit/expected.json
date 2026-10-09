@@ -1,0 +1,35 @@
+{
+  "kind": "run",
+  "run": "run",
+  "generate": [
+    {
+      "copy": [
+        "valid/completed-eval/run",
+        "run"
+      ]
+    },
+    {
+      "remove": "run/seal.json"
+    },
+    {
+      "remove": "run/overlays"
+    },
+    {
+      "append": [
+        "run/traces.otlp.jsonl",
+        [
+          [
+            "{}\n",
+            999999
+          ]
+        ]
+      ]
+    }
+  ],
+  "outcome": "unsealed",
+  "problems": [],
+  "rules": [
+    "ENC-17",
+    "ENC-18"
+  ]
+}

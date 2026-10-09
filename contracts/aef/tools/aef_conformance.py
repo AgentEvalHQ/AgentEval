@@ -84,6 +84,7 @@ import atexit
 import base64
 import concurrent.futures
 import hashlib
+import itertools
 import json
 import os
 import re
@@ -253,6 +254,10 @@ class Guard:
             raise CorpusRefused(f"{path.name} does not match its SHA-256 in index.json")
 
 
+class GenerateSkipped(Exception):
+    """A generated vector this platform cannot build (a symbolic link without the privilege): skipped, and counted."""
+
+
 class CorpusRefused(Exception):
     pass
 
@@ -310,6 +315,7 @@ def compare(diffs, label, actual, expected):
 
 
 _GENERATED = {}  # vector id -> the folder generated for it, once per process (implementations only read it)
+_GENERATED_COUNT = itertools.count(1)
 
 
 def _generated(v):
@@ -322,12 +328,12 @@ def _generated(v):
         root = Path(tempfile.mkdtemp(prefix="aef-generated-"))
         atexit.register(shutil.rmtree, root, True)
         _GENERATED[None] = root
-    folder = _GENERATED[None] / f"v{len(_GENERATED)}"
+    folder = _GENERATED[None] / f"v{next(_GENERATED_COUNT)}"  # a skipped vector's folder is never reused
     shutil.copytree(v.path, folder)
     corpus = v.path.parent.parent
     for step in v.expected["generate"]:
         (op, arg), = step.items()
-        for rel in (arg if op == "copy" else [arg] if op == "remove" else [arg[0]]):
+        for rel in (arg if op in ("copy", "link") else [arg] if op == "remove" else [arg[0]]):
             # §9.2.1: relative, `/`-separated, no `..`: a recipe never reaches outside the corpus or the vector
             if not isinstance(rel, str) or rel.startswith("/") or "\\" in rel or ":" in rel or ".." in rel.split("/"):
                 raise ValueError(f"{v.id}: a generate path that is not relative and inside: {rel!r}")
@@ -348,6 +354,13 @@ def _generated(v):
             with open(folder / arg[0], "wb" if op == "write" else "ab") as out:
                 for text, repeat in arg[1]:
                     out.write(text.encode("utf-8") * repeat)
+        elif op == "link":  # a symbolic link at arg[0] to arg[1], both relative to the vector's folder
+            link, target = folder / arg[0], folder / arg[1]
+            link.parent.mkdir(parents=True, exist_ok=True)
+            try:
+                os.symlink(os.path.relpath(target, link.parent), link, target_is_directory=target.is_dir())
+            except (OSError, NotImplementedError) as error:
+                raise GenerateSkipped(f"this platform cannot create a symbolic link ({error})") from None
         else:
             raise ValueError(f"{v.id}: a generate step this runner does not know: {op}")
     _GENERATED[v.id] = folder
@@ -840,6 +853,11 @@ def run_all(engine, vectors, refusals, quiet=False, show=print, skipped=()):
         for v in vectors:
             try:
                 diffs = run_vector(engine, v, Path(scratch))
+            except GenerateSkipped as why:  # spec 09 §9.2.1: skipped where the platform cannot build it, and said so
+                tally.setdefault(v.kind, [0, 0, 0])[2] += 1
+                if not quiet:
+                    show(f"skip  {v.kind:<12} {v.id} ({why})")
+                continue
             except Exception as error:  # a crash is a failure of that vector, not of the runner
                 diffs = [f"{type(error).__name__}: {error}"]
             tally.setdefault(v.kind, [0, 0, 0])[1 if diffs else 0] += 1

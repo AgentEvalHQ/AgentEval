@@ -42,4 +42,5 @@ specification.
 | `schemas/writer/` | What a producer writes (strict) |
 | `schemas/reader/` | What a reader accepts (tolerant; derived from the writer schemas) |
 | `conformance/` | The corpus: `index.json` lists every vector with its kind, classes and rules |
+| `runner-examples/` | Plans for the reference runner (`../tools/aef_runner.py`), each with what its job ends with; checked by `../tools/check_runner.py`, not conformance vectors |
 | `../tools/` | Reference tools in Python, no dependencies: generators, the verifier, the conformance runner |

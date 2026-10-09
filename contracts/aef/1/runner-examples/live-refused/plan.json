@@ -1,0 +1,25 @@
+{
+  "schemaVersion": "1.0",
+  "planId": "plan-runner-live-refused",
+  "subject": {
+    "ref": "agent:support/support-triage",
+    "version": "git:3f2a1c",
+    "endpoint": "http://localhost:5080/v1"
+  },
+  "suites": [
+    {
+      "ref": "suite:support/triage-scenarios",
+      "version": "4",
+      "lane": "quality"
+    }
+  ],
+  "limits": {
+    "maxUsd": 5.0
+  },
+  "contentCapture": "off",
+  "isolation": "process",
+  "provider": "local",
+  "runnerSelector": [
+    "target:scripted"
+  ]
+}

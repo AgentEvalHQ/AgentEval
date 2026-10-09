@@ -1,0 +1,13 @@
+{
+  "plan": "plan.json",
+  "runner": "../runner.json",
+  "at": "2026-10-09T09:00:00Z",
+  "terminal": "job.failed",
+  "limit": "maxUsd",
+  "runs": [
+    {"status": "completed", "cases": 3},
+    {"status": "aborted", "cases": 1}
+  ],
+  "spentUsd": 1.0,
+  "why": "four cases spend exactly the plan's maxUsd (equal is within it); the fifth would pass it, so the runner closes the second suite's run as aborted with the one case it ran, seals it, and ends with job.failed naming maxUsd and both runs"
+}

@@ -1,0 +1,38 @@
+{
+  "kind": "run",
+  "run": "run",
+  "generate": [
+    {
+      "copy": [
+        "valid/completed-eval/run",
+        "run"
+      ]
+    },
+    {
+      "copy": [
+        "valid/completed-eval/run/overlays",
+        "elsewhere"
+      ]
+    },
+    {
+      "remove": "run/overlays"
+    },
+    {
+      "link": [
+        "run/overlays",
+        "elsewhere"
+      ]
+    }
+  ],
+  "outcome": "invalid",
+  "problems": [
+    [
+      "overlays",
+      "path"
+    ]
+  ],
+  "rules": [
+    "RUN-3",
+    "OVL-1"
+  ]
+}

@@ -211,7 +211,7 @@ internal static partial class AefConverter
     /// </summary>
     public static AefConversion Finish(
         AefRunWriter writer, AefConversionOptions options, string from, IReadOnlyList<string> asserted, IReadOnlyList<string> notes,
-        AefRunStatus status, DateTimeOffset endedAt, string? abortReason)
+        AefRunStatus status, AefTime endedAt, string? abortReason)
     {
         var verification = writer.Close(status, endedAt, abortReason);
         AefSealResult? seal = null;

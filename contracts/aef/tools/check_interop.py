@@ -6,7 +6,8 @@ The examples are informative, like the interop pages: they are not conformance v
 expected.json naming the direction, the page and its sections, and what the check compares:
 
   "steps"      [{"args": [command, ...], "expected": path}]: runs aef_interop.py in the folder, "{out}" standing
-               for a fresh output path, and compares what it writes with the expected file or folder, byte for byte.
+               for a fresh output path, and compares what it writes with the expected file or folder: JSON and
+               NDJSON as JSON values (the pages fix values, not bytes: R7N-3), any other file byte for byte.
   "refusals"   [{"args": [...], "says": id}]: runs aef_interop.py and expects exit status 2, a message naming the
                page's rule (OT-n, IN-n, or a rule of the spec) and nothing written.
   "runs"       {folder: outcome}: every AEF run of the example, input or output, verifies with
@@ -76,7 +77,23 @@ def tree(path):
     return None
 
 
-def differences(expected, actual):
+JSON_SUFFIXES = (".json", ".ndjson", ".jsonl")
+
+
+def json_values(data, suffix):
+    """The JSON values of a file (one per line for NDJSON), or None when it does not read as JSON."""
+    try:
+        text = data.decode("utf-8")
+        if suffix == ".json":
+            return json.loads(text)  # Inspect's NaN is read as Python reads it
+        return [json.loads(line) for line in text.split("\n") if line]
+    except ValueError:
+        return None
+
+
+def differences(expected, actual, suffix=""):
+    """What differs between two outputs. The pages fix values, not bytes (R7N-3): a JSON or NDJSON file is compared
+    as JSON values (member order and number spelling are free, [ENC-2], [ENC-4]); any other file byte for byte."""
     if expected is None:
         return ["the expected output is missing"]
     if actual is None:
@@ -84,10 +101,14 @@ def differences(expected, actual):
     out = []
     for name in sorted(set(expected) | set(actual)):
         label = name or "the file"
+        kind = Path(name).suffix if name else suffix
         if name not in actual:
             out.append(f"{label}: not written")
         elif name not in expected:
             out.append(f"{label}: written, not expected")
+        elif kind in JSON_SUFFIXES and json_values(expected[name], kind) is not None:
+            if not equal(json_values(expected[name], kind), json_values(actual[name], kind)):
+                out.append(f"{label}: differs as JSON values")
         elif expected[name] != actual[name]:
             a, b = expected[name].decode("utf-8", "replace"), actual[name].decode("utf-8", "replace")
             at = next((i for i, (x, y) in enumerate(zip(a, b)) if x != y), min(len(a), len(b)))
@@ -119,7 +140,8 @@ def check_steps(folder, spec, update, problems):
                 else:
                     shutil.copyfile(out, expected_path)
                 continue
-            problems += [f"step {n}, {step['expected']}: {d}" for d in differences(tree(expected_path), tree(out))]
+            problems += [f"step {n}, {step['expected']}: {d}"
+                         for d in differences(tree(expected_path), tree(out), Path(step["expected"]).suffix)]
 
 
 def check_refusals(folder, spec, problems):

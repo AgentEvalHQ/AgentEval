@@ -4,7 +4,7 @@
 the ingest seal) and aef_schema.py (the writer schemas a converted run is checked against before it is written).
 
 The pages are informative, and so is this tool: nothing in the specification depends on it. Beyond their tables, the
-pages state rules and refusals of their own (OT-1 to OT-6 and IN-1 to IN-10, settled 10-09); the converter follows
+pages state rules and refusals of their own (OT-1 to OT-10 and IN-1 to IN-11, settled 10-09); the converter follows
 them, and a refusal exits with status 2 naming its rule. It never fills a gap the pages leave. The checked examples
 under 1/interop/examples/ run it (tools/check_interop.py).
 
@@ -18,18 +18,23 @@ Commands (the JSON each prints):
       opentelemetry.md, "AEF -> OpenTelemetry": writes OUT, OTLP/JSON logs as OpenTelemetry's file exporter writes
       them (one LogsData object per line): one `gen_ai.evaluation.result` event per score of each result line of the
       run folder RUN, and one without a score value for a line without scores; one LogsData line per result line
-      (OT-2). Prints {"events": n, "lines": m}. Refused: a line without scores whose name the summary does not give
-      (OT-1).
-  from-otel LOGS OUT --run-id ID --from SOURCE --subject REF --subject-kind KIND --target-mode MODE [--at TIME]
+      (OT-2), from the sealed lines, overlays not applied (OT-7). Prints {"events": n, "lines": m}. Refused, with
+      nothing written: a run that does not verify (OT-8); a line without scores whose name the summary does not give
+      (OT-1); a reasoning blob that is not UTF-8 or is over 4 MiB, a time timeUnixNano cannot hold (OT-9).
+  from-otel LOGS OUT --run-id ID --from SOURCE --subject REF --subject-kind KIND --target-mode MODE
+            [--content-capture on|off] [--at TIME]
       opentelemetry.md, "OpenTelemetry -> AEF": writes the run folder OUT (which must not exist yet, or be empty)
       from the OTLP/JSON logs file LOGS: one result line per `gen_ai.evaluation.result` event, the file itself as
       logs.otlp.jsonl, metrics.json with a declaration per scored metric, run.json with `imported` (OT-4), a
       summary.json without lanes, and the seal (`sealedBy: ingest`, README "A converted run is a new run"), sealed at
-      TIME (the conversion time; default now). Prints {"results": n, "runHash": hex}. Refused: the events of OT-6.
+      TIME (the conversion time; default now), and verified (OT-8). Prints {"results": n, "runHash": hex}.
+      Refused: the events of OT-4 and OT-6, and a run that would not verify (with --content-capture off, logs that
+      carry content, [SEC-6]).
   to-inspect RUN OUT [--ignore-overlays]
       inspect.md, "AEF -> Inspect": writes OUT, the run as one Inspect EvalLog in its .json form (log format 2).
-      An unscored value is the bare token NaN, as Inspect writes it (not JSON). Refused: the cases of IN-1, IN-3,
-      IN-4 and IN-5; a run with overlay events unless --ignore-overlays leaves them out (IN-4).
+      An unscored value is the bare token NaN, as Inspect writes it (not JSON). Refused: a run that does not verify
+      (IN-11); the cases of IN-1, IN-3, IN-4 and IN-5; a run with overlay events unless --ignore-overlays leaves them
+      out (IN-4).
   from-inspect LOG OUT --target-mode MODE [--content-capture on|off] [--at TIME]
       inspect.md, "Inspect -> AEF": writes the run folder OUT (which must not exist yet, or be empty) from the Inspect
       eval log LOG in its .json form (Inspect's NaN token read as an unscored value): run.json with `imported`
@@ -58,6 +63,7 @@ if str(TOOLS) not in sys.path:  # python -I leaves the script's own folder out o
 
 import aef_produce  # noqa: E402
 import aef_schema  # noqa: E402
+import aef_verify  # noqa: E402  (the reference verifier: a converter reads and writes only runs that verify)
 from aef_produce import InputError, read_json, read_ndjson, result_id  # noqa: E402
 
 AEF_VERSION = "1.0"
@@ -84,6 +90,19 @@ def _check_schema(schema, document, where):
     errors = _writer_schemas().validate(schema, document)
     if errors:
         raise InputError(f"{where} would not be valid against the writer {schema} schema: {errors[0]}")
+
+
+def _verified(run_dir, what, page):
+    """The outcome of `aef_verify.py run` on the folder, which must be intact or unsealed: no problem but an
+    authorized withhold (OT-8, IN-11). Raises InputError naming the first problems otherwise."""
+    try:
+        result = aef_verify.op_run(str(run_dir))
+    except (aef_verify.InputError, OSError) as error:
+        raise InputError(f"{what} cannot be verified: {error} ({page})") from None
+    if result["outcome"] not in ("intact", "unsealed"):
+        shown = ", ".join(f"{path} {code}" for path, code in result["problems"][:4])
+        raise InputError(f"{what} does not verify ({result['outcome']}: {shown}): refused ({page})")
+    return result["outcome"]
 
 
 def _compact(value):
@@ -145,25 +164,29 @@ def _read_run(run_dir):
     return run, lines, optional
 
 
-def _blob_text(run_dir, digest, where):
+def _blob_text(run_dir, digest, where, limit=None, rule=None):
     """The text of the blob a `sha256:<hex>` reference names ([EVD-3]), or None when the run does not hold it (a
-    redaction can withhold it, [OVL-10])."""
+    redaction can withhold it, [OVL-10]). A blob that is not UTF-8, or longer than limit bytes, is refused."""
     hexname = digest.split(":", 1)[1] if isinstance(digest, str) and digest.startswith("sha256:") else ""
     path = Path(run_dir) / "blobs" / "sha256" / hexname[:2] / hexname
     if not re.fullmatch("[0-9a-f]{64}", hexname) or not path.is_file():
         return None
+    data = path.read_bytes()
+    named = f" ({rule})" if rule else ""
+    if limit is not None and len(data) > limit:
+        raise InputError(f"{where}: the blob {digest} is {len(data)} bytes, over {limit}: refused{named}")
     try:
-        return path.read_bytes().decode("utf-8")
+        return data.decode("utf-8")
     except UnicodeDecodeError:
-        raise InputError(f"{where}: the blob {digest} is not UTF-8 text") from None
+        raise InputError(f"{where}: the blob {digest} is not UTF-8 text: refused{named}") from None
 
 
-def _explanation(run_dir, run, line, where):
+def _explanation(run_dir, run, line, where, limit=None, rule=None):
     """`reason`, or the `reasoning` blob's text when the line has no reason and the run keeps content."""
     if isinstance(line.get("reason"), str):
         return line["reason"]
     if "reasoning" in line and run.get("contentCapture") != "off":  # RUN-11: a reader takes an absent value as on
-        return _blob_text(run_dir, line["reasoning"].get("blob"), where)
+        return _blob_text(run_dir, line["reasoning"].get("blob"), where, limit, rule)
     return None
 
 
@@ -207,7 +230,11 @@ def otel_events(run_dir, run, line, summary, where):
     record = {}
     time = line.get("endedAt", line.get("startedAt"))  # `endedAt` (or `startedAt`) -> timeUnixNano
     if time is not None:
-        record["timeUnixNano"] = str(_nanos(time, f"{where} time"))
+        nanos = _nanos(time, f"{where} time")
+        if not 1 <= nanos <= 2 ** 64 - 1:  # OT-9: an unsigned 64-bit count of nanoseconds, 0 meaning unknown
+            raise InputError(f"{where}: the time {time} is outside what timeUnixNano holds (1970-01-01T00:00:00."
+                             "000000001Z to 2554-07-21T23:34:33.709551615Z): refused (opentelemetry.md, OT-9)")
+        record["timeUnixNano"] = str(nanos)
     record["eventName"] = EVENT_NAME
     link = line.get("traceLink")
     if isinstance(link, dict):  # the evaluated operation: the event's parent (a traceId alone names its trace)
@@ -215,7 +242,8 @@ def otel_events(run_dir, run, line, summary, where):
         if "spanId" in link:
             record["spanId"] = link["spanId"]
     # OT-3: SEC-6 forbids the explanation in the logs of a run that keeps no content; none is written for such a run.
-    explanation = None if run.get("contentCapture") == "off" else _explanation(run_dir, run, line, where)
+    explanation = None if run.get("contentCapture") == "off" else \
+        _explanation(run_dir, run, line, where, 4 * 1024 * 1024, "opentelemetry.md, OT-9")
     scores = line.get("scores") or []
     if not all(isinstance(s, dict) and isinstance(s.get("metric"), str) for s in scores):
         raise InputError(f"{where}: a score without a metric")
@@ -237,7 +265,10 @@ def otel_events(run_dir, run, line, summary, where):
 
 
 def to_otel(run_dir, out):
-    """Writes OUT: one OTLP/JSON LogsData line per result line of the run (OT-2). Returns the counts."""
+    """Writes OUT: one OTLP/JSON LogsData line per result line of the run (OT-2): its sealed lines, overlays not
+    applied (OT-7), of a run that verifies (OT-8). A refused line refuses the whole export (OT-1, OT-9): nothing is
+    written. Returns the counts."""
+    _verified(run_dir, "the run", "opentelemetry.md, OT-8")
     run, lines, optional = _read_run(run_dir)
     summary = optional.get("summary.json")
     service = ((run.get("subject") or {}).get("telemetry") or {}).get("serviceName")
@@ -337,7 +368,7 @@ def imported_line(run_id, record, where):
     a = _attributes(record, where)
     name = _string(a, "gen_ai.evaluation.name", where)
     if name is None:
-        raise InputError(f"{where}: an evaluation event without gen_ai.evaluation.name (the convention requires it)")
+        _refuse(where, "an event without gen_ai.evaluation.name, which the convention requires")
     value = _score_value(a, where)
     label = _string(a, "gen_ai.evaluation.score.label", where)
     explanation = _string(a, "gen_ai.evaluation.explanation", where)
@@ -363,7 +394,7 @@ def imported_line(run_id, record, where):
         if error_type is not None:
             _refuse(where, f"the label {label!r} beside error.type {error_type!r}")
         if len(label) > LABEL_MAX:
-            raise InputError(f"{where}: the label is longer than {LABEL_MAX} characters, the most scores[].label holds")
+            _refuse(where, f"a label longer than {LABEL_MAX} characters, the most scores[].label holds")
         state, score_label = "scored", label
     elif error_type is not None:  # error.type -> state: error
         if value is not None:
@@ -434,11 +465,13 @@ def _schema_url(container, where, urls):
         urls.append(url)
 
 
-def from_otel(logs_path, out, run_id, source, subject_ref, subject_kind, target_mode, at):
+def from_otel(logs_path, out, run_id, source, subject_ref, subject_kind, target_mode, at, capture="on"):
     """Writes the run folder OUT from the OTLP/JSON logs file (OT-4, OT-5, OT-6). Returns the counts."""
     out = Path(out)
     if out.exists() and not (out.is_dir() and not any(out.iterdir())):
         raise InputError(f"{out}: OUT is a folder that does not exist yet, or an empty one")
+    if capture not in ("on", "off"):
+        raise InputError("--content-capture is on or off ([RUN-11])")
     sealed_at = _nanos(at, "--at")
     data = Path(logs_path).read_bytes() if Path(logs_path).is_file() else None
     if data is None:
@@ -496,8 +529,10 @@ def from_otel(logs_path, out, run_id, source, subject_ref, subject_kind, target_
            "startedAt": _timestamp(started, "the first event"), "endedAt": _timestamp(ended, "the last event")}
     if urls:
         run["otel"] = {"schemaUrls": urls}  # the source's schema URL
+    run["contentCapture"] = capture  # OT-4: the converter's choice, on unless asked otherwise (RUN-11, RUN-15)
     run["imported"] = {"from": source, "asserted": ["runId", "status", "subject.ref", "subject.kind",
-                                                    "execution.targetMode", "startedAt", "endedAt"]}
+                                                    "execution.targetMode", "startedAt", "endedAt",
+                                                    "contentCapture"]}
     metrics = {"schemaVersion": AEF_VERSION, "metrics": []}
     for line in lines:  # no metric declaration: kind score, direction none, scale unbounded
         for score in line.get("scores", []):
@@ -519,12 +554,13 @@ def from_otel(logs_path, out, run_id, source, subject_ref, subject_kind, target_
         _write_text(out / "summary.json", json.dumps(summary, indent=2, ensure_ascii=False) + "\n")
         (out / "logs.otlp.jsonl").write_bytes(data)  # the log records themselves, as they came
         sealed = aef_produce.seal_write(out, "ingest", _timestamp(sealed_at, "--at"))  # README: sealed as ingest
+        _verified(out, "the converted run", "opentelemetry.md, OpenTelemetry -> AEF, OT-8")
     except BaseException:
         if created:
             shutil.rmtree(out, ignore_errors=True)
         else:
-            for child in out.iterdir():
-                child.unlink()
+            for child in list(out.iterdir()):
+                shutil.rmtree(child) if child.is_dir() else child.unlink()
         raise
     return {"results": len(lines), "runHash": sealed["runHash"]}
 
@@ -705,7 +741,9 @@ def inspect_results(summary, metrics, samples):
 
 
 def to_inspect(run_dir, out, ignore_overlays=False):
-    """Writes OUT: the run as one Inspect EvalLog in .json form. Returns the counts."""
+    """Writes OUT: the run as one Inspect EvalLog in .json form, from a run that verifies (IN-11). Returns the
+    counts."""
+    _verified(run_dir, "the run", "inspect.md, AEF -> Inspect, IN-11")
     run, lines, optional = _read_run(run_dir)
     if optional["overlays/events.ndjson"] and not ignore_overlays:
         _in_refusal("overlays/events.ndjson", f"{len(optional['overlays/events.ndjson'])} overlay event(s): the table "
@@ -1317,6 +1355,7 @@ def from_inspect(log_path, out, target_mode, capture, at):
             (out / "blobs" / "sha256" / digest[:2]).mkdir(parents=True, exist_ok=True)
             (out / "blobs" / "sha256" / digest[:2] / digest).write_bytes(data)
         sealed = aef_produce.seal_write(out, "ingest", _timestamp(sealed_at, "--at"))["runHash"] if closed else None
+        _verified(out, "the converted run", "inspect.md, Inspect -> AEF, IN-11")
     except BaseException:
         if created:
             shutil.rmtree(out, ignore_errors=True)
@@ -1346,6 +1385,7 @@ def dispatch(argv):
     p.add_argument("--subject", required=True, help="subject.ref, which the events do not give")
     p.add_argument("--subject-kind", required=True)
     p.add_argument("--target-mode", required=True, help="execution.targetMode, which the events do not give")
+    p.add_argument("--content-capture", default="on", help="contentCapture: on (default) or off (OT-4)")
     p.add_argument("--at", help="the time of the conversion (RFC 3339 UTC; default now): sealedAt, and the run's "
                                 "times when no event has one")
     p = sub.add_parser("to-inspect")
@@ -1363,7 +1403,8 @@ def dispatch(argv):
     if a.command == "to-otel":
         return to_otel(a.run, a.out)
     if a.command == "from-otel":
-        return from_otel(a.logs, a.out, a.run_id, a.source, a.subject, a.subject_kind, a.target_mode, at)
+        return from_otel(a.logs, a.out, a.run_id, a.source, a.subject, a.subject_kind, a.target_mode, at,
+                         a.content_capture)
     if a.command == "from-inspect":
         return from_inspect(a.log, a.out, a.target_mode, a.content_capture, at)
     return to_inspect(a.run, a.out, a.ignore_overlays)

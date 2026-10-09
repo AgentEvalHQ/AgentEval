@@ -1,0 +1,12 @@
+{
+  "plan": "plan.json",
+  "runner": "../runner.json",
+  "at": "2026-10-09T09:00:00Z",
+  "terminal": "job.failed",
+  "limit": "cases",
+  "runs": [
+    {"status": "completed", "cases": 3}
+  ],
+  "spentUsd": 0.75,
+  "why": "a cases limit of 3, met as the first suite ends: its run is complete, so it is closed completed; before the second suite's first case the limit is reached, so no second run is opened, and job.failed names the limit and the one run (PLAN-9). plan.estimated says 3 cases: the suites' 6, capped by the limit. The plan names only an endpoint, so each run's deployment.ref is endpoint: and the endpoint (PLAN-10)"
+}

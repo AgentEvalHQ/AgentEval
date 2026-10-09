@@ -1,0 +1,13 @@
+{
+  "kind": "plan-conformance",
+  "events": "events.ndjson",
+  "plan": "plan.json",
+  "runs": "runs",
+  "problems": [],
+  "rules": [
+    "STRM-4",
+    "RUN-7",
+    "PLAN-7"
+  ],
+  "why": "the plan asks for a scripted stand-in, and both runs are scripted: what the plan asked, so no problem"
+}

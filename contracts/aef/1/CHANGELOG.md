@@ -19,6 +19,59 @@ design; the two implementations agreed on every crafted input. Changes since:
   refused with a message that says so ([VER-4]).
 - **Left for 1.1, said so**: `produce` writes no evidence, gates or blobs (§9.1); at-limit vectors for 1,000,000
   result lines and 19,999 overlay files would need a million distinct valid lines or a 19,994-problem expectation.
+- **A minimal reference runner** (§9.1, spec 06): `tools/aef_runner.py` takes a plan only when [PLAN-7] says it does,
+  runs its suites against a built-in scripted target, stops at `maxUsd`, `cases` or `timeout` with `job.failed`, and
+  writes the event stream and one sealed run per suite with its `provenance` ([RUN-12]); `--at` fixes the clock.
+  `tools/check_runner.py` runs it on `runner-examples/` (several cases, a budget and a timeout that stop the job) and
+  the protocol corpus's plans and matching pairs, and checks the output with the independent tools: [STRM-3] and
+  [STRM-4] find nothing (its plans ask for `scripted`, below), every run is intact, and the same inputs give the same
+  bytes. The Runner class now has one implementation; it stays *at risk* until a second, independent runner passes.
+- **What building the runner found, ruled** (spec 06, §6.5). Before, [STRM-4] reported every run that was not `live`
+  as `target-mode`, and a plan could not ask for anything else, so no scripted runner could conform. Now:
+  - a plan may name its `targetMode` (the run's values; `live` when absent); [STRM-4] `target-mode` is a run whose
+    `execution.targetMode` is not the plan's, compared as written; a runner that cannot drive the target as asked
+    does not take the plan, and an unknown target mode is refused like any unknown plan value ([PLAN-7], [VER-8]);
+  - a runner resolves a suite by `ref` and `version`, checks a `digest` the plan gives and refuses the job on a
+    mismatch (`job.refused` before acceptance, `job.failed` after); one run per suite; case ids unique within the
+    job, prefixed when suites share them ([PLAN-8]);
+  - limits are checked before each case in [PLAN-2]'s order, the timeout includes closing and sealing, and a run a
+    limit cuts off is closed `aborted`, sealed and named in `job.failed`, with no lines for the cases not run
+    ([PLAN-9]);
+  - `subject.kind` comes from the ref's kind (else `other`), and a plan that names only an endpoint gives the
+    `deployment.ref` `endpoint:` plus the endpoint encoded as [ENC-13] says, a SHOULD ([PLAN-10]);
+  - smaller: `plan.estimated`'s `cases` is the suites' cases capped by the `cases` limit; `lane.completed` only from
+    a runner given the checkpoint's rules; a plan the reader refuses gets `job.refused` when its `planId` can be read,
+    otherwise no stream and an input error; credentials are resolved before `job.accepted`, and one that cannot be is
+    `job.refused` ([PLAN-3]); the stream goes to standard output or a file the caller names; job and run ids are the
+    runner's choice within [RUN-13]; isolation is the runner's claim, which AEF records and cannot check.
+  - The reference runner follows: its examples ask for `scripted`, it refuses a plan asking for another mode and a
+    suite whose content does not have the plan's digest, and `check_runner.py` now expects no [STRM-4] problem. New
+    examples: a live plan and a digest mismatch (both refused), a `cases` limit met as a suite ends, one suite named
+    twice.
+  - Vectors: plans asking for `scripted` and for an unknown mode (`reads` `refused`); matching with an unknown mode
+    (refused) and with a known one no manifest can rule out (taken); plan conformance for scripted runs on a scripted
+    plan (no problem), a live run on it, a scripted run on a plan asking for `live`, and a mocked run on a plan that
+    names no mode (each `target-mode`); `--self-check` switches the old reading back on (`target-mode-live`) and the
+    corpus notices.
+  - `aef_verify.py stream` crashed on a plan whose `timeout` is not a duration (`plans/timeout-in-seconds`); a plan
+    the reader refuses is now an input error (exit 2) for `match`, `stream` and `conform`, as §9.3 now says.
+- **Interop** (informative): a second AEF ↔ OpenTelemetry converter (AgentEval.Results.Adapters, .NET, written from
+  the page alone) reproduces the three OpenTelemetry examples.
+  - What it found in `opentelemetry.md` is ruled into the page as rules, settled 10-09 (R7N-3 to R7N-12):
+    - the page fixes values, not bytes, and `check_interop.py` now compares JSON outputs as values;
+    - a refused line refuses the whole export;
+    - the sealed lines are exported, overlays not applied (OT-7);
+    - only a run that verifies is exported or written (OT-8, and IN-11 for Inspect);
+    - a reasoning blob that is not UTF-8 or is over 4 MiB, and a time `timeUnixNano` cannot hold, refuse the export
+      (OT-9);
+    - a trial line belongs to its lane for OT-1;
+    - an import writes `contentCapture` (`on` unless asked otherwise) and asserts it;
+    - `error.type` beside the label `error` and no explanation is `error`, not a refusal;
+    - `evaluator.id` is the event's name, an explanation is cut at 4096 characters, and a label over 64 characters or
+      a nameless event is refused (OT-10).
+  - The reference converter follows. Its imported runs now carry `contentCapture`; `otel-aef` gains a label-`error`
+    event, and `aef-otel-aef` refused exports (a run that does not verify, a time before 1970, a reasoning blob that
+    is not UTF-8).
 
 ## Unreleased (draft): rework after critic round 5
 

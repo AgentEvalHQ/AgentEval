@@ -77,11 +77,12 @@ public static class AefReadings
         new("runner-event", "status", "runner-event#/oneOf/*/properties/status", How.Fallback, "not_measured", When: "lane.completed"),
         new("runner-event", "limit", "runner-event#/oneOf/*/properties/limit", How.AsWritten, When: "job.failed"),
 
-        // [PLAN-7]: a runner refuses a plan whose provider, isolation, content capture, credential scheme or purpose it
-        // does not know.
+        // [PLAN-7]: a runner refuses a plan whose provider, isolation, content capture, target mode, credential scheme or
+        // purpose it does not know.
         new("run-plan", "provider", "run-plan#/properties/provider", How.Fallback, "refused"),
         new("run-plan", "isolation", "run-plan#/properties/isolation", How.Fallback, "refused"),
         new("run-plan", "contentCapture", "run-plan#/properties/contentCapture", How.Fallback, "refused"),
+        new("run-plan", "targetMode", "run-plan#/properties/targetMode", How.Fallback, "refused"),
         new("run-plan", "credentialRefs[*].scheme", "run-plan#/properties/credentialRefs/items/properties/scheme", How.Fallback, "refused"),
         new("run-plan", "credentialRefs[*].purpose", "run-plan#/properties/credentialRefs/items/properties/purpose", How.Fallback, "refused"),
 

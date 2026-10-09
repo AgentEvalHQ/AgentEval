@@ -37,7 +37,9 @@ public enum AefEntryKind
 /// devices are in <see cref="OverlayIrregular"/>, for the overlay verifier to report as <c>unexpected-file</c>. When it
 /// holds more files than one events file and two per batch ([ENC-17]: 19,999), <see cref="OverlaysOverLimit"/> is set:
 /// the overlay verifier reports <c>limit</c> at <c>overlays</c> once and still checks the chain from the files it names
-/// ([OVL-5]). Every file is listed all the same (R4N-8: the listing a count needs is not bounded).
+/// ([OVL-5]). Every file is listed all the same (R4N-8: the listing a count needs is not bounded). The boundary itself is
+/// the run's (round 7): an entry named <c>overlays</c> that is not a folder, and a path outside it whose first segment is
+/// <c>overlays</c> in another case, are <c>path</c> problems in <see cref="Problems"/> (<see cref="AefFolder.BreaksTheOverlaysBoundary"/>).
 /// </remarks>
 /// <param name="Files">The regular files, by path, in byte order.</param>
 /// <param name="Problems">The <c>path</c> problems of [RUN-3] outside <c>overlays/</c>, or the one <c>limit</c> at <c>.</c>.</param>
@@ -142,9 +144,12 @@ public static class AefFolder
         // [RUN-3]'s rules are on the paths of files; a link, pipe, socket or device is a path problem whatever its name.
         // overlays/ is not checked by them (round 5): whatever it holds is the overlay chain's to report ([OVL-5]). Its
         // files are still listed whatever their number (R4N-8), for the chain to read.
-        var runFiles = files.Concat(irregular).Where(p => !IsUnderOverlays(p));
+        var runFiles = files.Concat(irregular).Where(p => !IsUnderOverlays(p)).ToList();
         var runIrregular = irregular.Where(p => !IsUnderOverlays(p));
-        var problems = AefPaths.Check(runFiles).Concat(runIrregular.Select(p => new AefProblem(p, "path"))).Distinct();
+        var problems = AefPaths.Check(runFiles)
+            .Concat(runIrregular.Select(p => new AefProblem(p, "path")))
+            .Concat(runFiles.Where(BreaksTheOverlaysBoundary).Select(p => new AefProblem(p, "path")))
+            .Distinct();
         return new AefFolderListing(
             [.. files.Order(AefProblemOrder.Utf8)],
             AefProblemOrder.Sort(problems),
@@ -157,6 +162,42 @@ public static class AefFolder
     {
         ArgumentNullException.ThrowIfNull(path);
         return path.StartsWith("overlays/", StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// [RUN-3] at the boundary of <c>overlays/</c> (round 7), for a path outside it (a file, or an entry that is neither a
+    /// file nor a folder): <c>overlays</c> itself is a folder, so an entry of that name that is a file or a link (a link
+    /// to a folder included: overlays on other storage are mounted, never linked) is a <c>path</c> problem of the run;
+    /// and a path whose first segment is <c>overlays</c> in another case (<c>Overlays/x</c>, a file <c>OVERLAYS</c>) is a
+    /// <c>path</c> problem at that path, whether or not the run has an <c>overlays</c> folder yet (the rule's text sets no
+    /// condition; overlays come after the seal, and would clash with it then).
+    /// </summary>
+    public static bool BreaksTheOverlaysBoundary(string path)
+    {
+        ArgumentNullException.ThrowIfNull(path);
+        if (IsUnderOverlays(path))
+        {
+            return false;   // overlays/ itself, and what it holds, are the overlay chain's (OVL-5)
+        }
+
+        var slash = path.IndexOf('/', StringComparison.Ordinal);
+        var first = slash < 0 ? path : path[..slash];
+        if (first.Length != "overlays".Length)
+        {
+            return false;
+        }
+
+        // ASCII letters only, compared without case: the fold [RUN-3]'s case clash uses.
+        for (var i = 0; i < first.Length; i++)
+        {
+            var c = first[i];
+            if ((char.IsAsciiLetterUpper(c) ? (char)(c | 0x20) : c) != "overlays"[i])
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /// <summary>

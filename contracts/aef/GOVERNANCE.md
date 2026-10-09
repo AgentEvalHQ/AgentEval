@@ -4,7 +4,8 @@
 
 - **Lead editor:** [@joslat](https://github.com/joslat), for the AgentEval project.
 - **Second editor:** an open seat, offered to a maintainer of the first independent implementation that passes the
-  corpus for at least one conformance class. Further editors join the same way.
+  corpus for at least one conformance class. Further editors join the same way. Implementations and their claims are listed in
+  [IMPLEMENTATIONS.md](IMPLEMENTATIONS.md).
 - Editors decide by consensus. When they do not reach it, the lead editor decides and records why in the changelog.
 - **Succession:** if the lead editor is unavailable for 90 days, the AgentEval maintainers appoint an acting lead
   editor, so the specification cannot be left without one.

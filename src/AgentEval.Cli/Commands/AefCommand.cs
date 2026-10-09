@@ -13,6 +13,7 @@ using AgentEval.Output;
 using AgentEval.Results;
 using AgentEval.Results.Adapters;
 using AgentEval.Results.Adapters.AssertAi;
+using AgentEval.Results.Adapters.Otel;
 using AgentEval.Results.Adapters.StoreV1;
 using AgentEval.Results.Checkpoints;
 using AgentEval.Results.Integrity;
@@ -29,10 +30,13 @@ namespace AgentEval.Cli.Commands;
 /// <item><c>view</c>: a run's effective view with its overlays (§4.3);</item>
 /// <item><c>checkpoint</c>: a checkpoint's problems ([CKP-7], [CKP-8]) and each lane's result (§5.3);</item>
 /// <item><c>export</c>: a run of AgentEval's older output store (store v1, §7.5) as an AEF run;</item>
-/// <item><c>import assert-ai</c>: an ASSERT run as an AEF run (interop/assert.md).</item>
+/// <item><c>import assert-ai</c>: an ASSERT run as an AEF run (interop/assert.md);</item>
+/// <item><c>import otel</c>: OpenTelemetry <c>gen_ai.evaluation.result</c> events as an AEF run (interop/opentelemetry.md);</item>
+/// <item><c>export-otel</c>: an AEF run as OpenTelemetry <c>gen_ai.evaluation.result</c> events, OTLP/JSON <c>LogsData</c> lines (interop/opentelemetry.md).</item>
 /// </list>
 /// Every verb takes <c>--json</c> for one JSON value on standard output. Exit codes: 0 when the run (or checkpoint) holds
-/// no problem, 1 when it does (or a seal is refused), 2 for a usage or input error.
+/// no problem, 1 when it does (or a seal is refused), 2 for a usage or input error (for <c>export-otel</c>, a run it
+/// refuses to export too: an invalid one, or a line the page's rules refuse).
 /// </summary>
 internal static class AefCommand
 {
@@ -40,13 +44,14 @@ internal static class AefCommand
 
     public static Command Create()
     {
-        var cmd = new Command("aef", "Work with AEF 1.0 runs (the AgentEval Evidence Format): verify, seal, view, check a checkpoint, export AgentEval's older store, import an ASSERT run.");
+        var cmd = new Command("aef", "Work with AEF 1.0 runs (the AgentEval Evidence Format): verify, seal, view, check a checkpoint, export AgentEval's older store, import an ASSERT run, export a run as OpenTelemetry events.");
         cmd.Add(CreateVerify());
         cmd.Add(CreateSeal());
         cmd.Add(CreateView());
         cmd.Add(CreateCheckpoint());
         cmd.Add(CreateExport());
         cmd.Add(CreateImport());
+        cmd.Add(CreateExportOtel());
         return cmd;
     }
 
@@ -496,7 +501,85 @@ internal static class AefCommand
             p.GetValue(runDir)!, p.GetValue(outDir)!, p.GetValue(taxonomy), p.GetValue(testSet), p.GetValue(calibration), p.GetValue(maxHarm), p.GetValue(maxOverRefusal),
             p.GetValue(capture)!, p.GetValue(noSeal), p.GetValue(key), p.GetValue(json), Console.Out, Console.Error)));
         cmd.Add(assertAi);
+        cmd.Add(CreateImportOtel());
         return cmd;
+    }
+
+    private static Command CreateImportOtel()
+    {
+        var logsFile = new Argument<string>("logs-file") { Description = "OTLP/JSON logs: one LogsData object per line (OpenTelemetry's file exporter), with gen_ai.evaluation.result events." };
+        var outDir = new Argument<string>("out-dir") { Description = "The AEF run folder to write (must not exist, or be empty)." };
+        var runId = new Option<string>("--run-id") { Description = "run.json runId (an AEF id): the events carry none.", Required = true };
+        var from = new Option<string>("--from") { Description = "run.json imported.from: the tool and version that wrote the events.", Required = true };
+        var subject = new Option<string>("--subject") { Description = "run.json subject.ref, a typed reference such as agent:support/support-triage: the events name no subject.", Required = true };
+        var subjectKind = new Option<string>("--subject-kind") { Description = "run.json subject.kind (agent, model, workflow, …).", DefaultValueFactory = _ => "agent" };
+        var targetMode = new Option<string>("--target-mode") { Description = "How the evaluated operations drove their target: live, replayed, scripted or mocked.", Required = true };
+        var json = JsonOption();
+        var (capture, noSeal, key) = ConversionOptions();
+        var otel = new Command("otel", "Import OpenTelemetry gen_ai.evaluation.result events as an AEF run (interop/opentelemetry.md, OpenTelemetry → AEF): a line per event, sealed by the importer (ingest). Exit 2 for an input the page refuses (OT-4, OT-6, OT-8).");
+        otel.Add(logsFile);
+        otel.Add(outDir);
+        foreach (var o in new Option[] { runId, from, subject, subjectKind, targetMode, capture, noSeal, key, json }) otel.Add(o);
+        otel.SetAction((ParseResult p, CancellationToken _) => Task.FromResult(RunImportOtel(
+            p.GetValue(logsFile)!, p.GetValue(outDir)!, p.GetValue(runId)!, p.GetValue(from)!, p.GetValue(subject)!, p.GetValue(subjectKind)!, p.GetValue(targetMode)!,
+            p.GetValue(capture)!, p.GetValue(noSeal), p.GetValue(key), p.GetValue(json), Console.Out, Console.Error)));
+        return otel;
+    }
+
+    internal static int RunImportOtel(
+        string logsFile, string outputDirectory, string runId, string from, string subjectRef, string subjectKind, string targetMode,
+        string contentCapture, bool noSeal, string? keyPath, bool asJson, TextWriter stdout, TextWriter stderr, TimeProvider? clock = null)
+    {
+        if (!AefNames.TryParse<AefContentCapture>(contentCapture, out var capture))
+        {
+            stderr.WriteLine($"✖ --content-capture must be on or off, not '{contentCapture}'.");
+            return ExitCodes.UsageError;
+        }
+
+        if (!AefNames.TryParse<AefTargetMode>(targetMode, out var mode))
+        {
+            stderr.WriteLine($"✖ --target-mode must be live, replayed, scripted or mocked, not '{targetMode}'.");
+            return ExitCodes.UsageError;
+        }
+
+        if (!AefNames.TryParse<AefSubjectKind>(subjectKind, out var kind))
+        {
+            stderr.WriteLine($"✖ --subject-kind '{subjectKind}' is not a subject kind AEF lists.");
+            return ExitCodes.UsageError;
+        }
+
+        EcdsaP256Signer? signer = null;
+        try
+        {
+            signer = keyPath is null ? null : AefSigningKey.Load(keyPath);
+            var conversion = AefOtelImporter.Import(logsFile, outputDirectory, new AefOtelImportOptions
+            {
+                RunId = runId,
+                From = from,
+                SubjectRef = subjectRef,
+                SubjectKind = kind.Value,
+                TargetMode = mode.Value,
+                ContentCapture = capture.Value,
+                Seal = !noSeal,
+                Signer = signer,
+                TimeProvider = clock,
+            });
+            return Converted(conversion, asJson, stdout);
+        }
+        catch (Exception e) when (IsInputError(e) || e is AefOtelImportException or NotSupportedException)
+        {
+            stderr.WriteLine($"✖ {e.Message}");
+            return ExitCodes.UsageError;
+        }
+        catch (InvalidOperationException e)
+        {
+            stderr.WriteLine($"✖ The imported run does not close or verify: {e.Message}");
+            return ExitCodes.TestFailure;
+        }
+        finally
+        {
+            signer?.Dispose();
+        }
     }
 
     internal static int RunImportAssertAi(
@@ -551,6 +634,65 @@ internal static class AefCommand
         {
             signer?.Dispose();
         }
+    }
+
+    // ---- export-otel ---------------------------------------------------------------------------------------------
+
+    private static Command CreateExportOtel()
+    {
+        var runDir = new Argument<string>("run-dir") { Description = "The AEF run folder (holding run.json): intact or unsealed; an invalid run is refused." };
+        var outFile = new Argument<string>("out-file") { Description = "The file to write (must not exist): OTLP/JSON LogsData, one per line, one line per result line." };
+        var policy = PolicyOption();
+        var json = JsonOption();
+        var cmd = new Command("export-otel", "Export an AEF run as OpenTelemetry gen_ai.evaluation.result events (interop/opentelemetry.md, AEF → OpenTelemetry): one event per score, labelled with the result's state, parented to its traceLink. Exit 2 when the run cannot be exported.");
+        cmd.Add(runDir);
+        cmd.Add(outFile);
+        foreach (var o in new Option[] { policy, json }) cmd.Add(o);
+        cmd.SetAction((ParseResult p, CancellationToken _) => Task.FromResult(RunExportOtel(
+            p.GetValue(runDir)!, p.GetValue(outFile)!, p.GetValue(policy), p.GetValue(json), Console.Out, Console.Error)));
+        return cmd;
+    }
+
+    internal static int RunExportOtel(string runDirectory, string outputFile, string? policyPath, bool asJson, TextWriter stdout, TextWriter stderr)
+    {
+        AefOtelExport export;
+        try
+        {
+            RequireFolder(runDirectory);
+            export = AefOtelExporter.ExportToFile(runDirectory, outputFile, new AefOtelExportOptions { Policy = LoadPolicy(policyPath) });
+        }
+        catch (Exception e) when (IsInputError(e) || e is AefOtelExportException)
+        {
+            // A missing or unreadable run, an output file that exists, an invalid run, or a refusal of the page's rules
+            // (AefOtelExportException names the rule): nothing is written.
+            stderr.WriteLine($"✖ {e.Message}");
+            return ExitCodes.UsageError;
+        }
+
+        if (asJson)
+        {
+            stdout.WriteLine(new JsonObject
+            {
+                ["runId"] = export.RunId,
+                ["outcome"] = AefRunVerification.Name(export.Outcome),
+                ["file"] = outputFile,
+                ["lines"] = export.Lines.Count,
+                ["events"] = export.Events,
+                ["notes"] = new JsonArray([.. export.Notes.Select(n => (JsonNode?)n)]),
+            }.ToJsonString(s_json));
+        }
+        else
+        {
+            stdout.WriteLine($"✔ AEF run {export.RunId} ({AefRunVerification.Name(export.Outcome)}) → {outputFile}: {Count(export.Lines.Count, "LogsData line")}, {Count(export.Events, "gen_ai.evaluation.result event")}");
+            foreach (var note in export.Notes)
+            {
+                stdout.WriteLine($"  - {note}");
+            }
+
+            stdout.WriteLine("  Not carried (interop/opentelemetry.md, What does not carry over): the run id and result paths, the result tree, trials, thresholds, evaluator identity, evidence, the seal and overlays.");
+        }
+
+        return ExitCodes.Success;
     }
 
     private static (Option<string> Capture, Option<bool> NoSeal, Option<string?> Key) ConversionOptions() =>

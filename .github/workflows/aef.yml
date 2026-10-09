@@ -57,6 +57,7 @@ jobs:
           python -X utf8 -I contracts/aef/tools/schema_diff.py --self-test
           python -X utf8 -I contracts/aef/tools/aef_decide.py --check
           python -X utf8 -I contracts/aef/tools/aef_stream.py --check
+          python -X utf8 -I contracts/aef/tools/check_runner.py
           python -X utf8 -I contracts/aef/tools/gen_reference.py --check
           python -X utf8 -I contracts/aef/tools/check_interop.py --quiet
 

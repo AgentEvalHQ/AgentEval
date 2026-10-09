@@ -40,7 +40,11 @@
   read (a link can point outside the run; a pipe would block a reader). The rules above are on the paths of files: a
   folder breaks them only through the files in it (for a case clash, the files under the later folder are
   reported), and an empty folder is ignored. `overlays/` is not checked by this rule: it grows after the run is
-  sealed, so whatever it holds is the overlay chain's to report ([OVL-5]), never a problem of the run.
+  sealed, so whatever it holds is the overlay chain's to report ([OVL-5]), never a problem of the run. `overlays`
+  itself is a folder: an entry of that name that is a file or a link (a link to a folder included: overlays on other
+  storage are mounted, never linked) is a `path` problem of the run; and a path whose first segment is `overlays` in another case (`Overlays/x`) is a
+  `path` problem at that path, whether or not the run has an `overlays` folder: on a case-insensitive file system it
+  would be that folder.
 - **[RUN-4] A closed run never changes.** While `status` is `running` the producer may rewrite its files. When it
   closes the run (`completed` or `aborted`) it writes their final form; from then on nothing edits, adds or removes a
   file outside `overlays/`. Everything added later is an overlay (§4.2).

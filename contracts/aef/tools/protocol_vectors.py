@@ -114,6 +114,12 @@ def documents():
          "a ci:<name> provider is known: the writer schema accepts it through its pattern, so a reader keeps it"),
         ("plans", "unknown-content-capture", "run-plan", dict(PLAN, contentCapture="partial"), "invalid", "valid",
          ["PLAN-7", "VER-8"], "a content capture this version does not know: a reader takes the plan, and a runner refuses it"),
+        ("plans", "valid-target-mode-scripted", "run-plan", dict(PLAN, targetMode="scripted"), "valid", "valid",
+         ["PLAN-7", "RUN-7"],
+         "a plan that asks for a scripted stand-in: a runner that cannot drive one refuses it, and its runs are checked "
+         "against scripted, not live"),
+        ("plans", "unknown-target-mode", "run-plan", dict(PLAN, targetMode="simulated"), "invalid", "valid",
+         ["PLAN-7", "VER-8"], "a target mode this version does not know: a reader takes the plan, and a runner refuses it"),
         ("runners", "valid", "runner", RUNNER, "valid", "valid", ["PLAN-6"], "a local runner"),
         ("runners", "no-provider", "runner", dict(RUNNER, providers=[]), "invalid", "invalid", ["PLAN-6"],
          "a runner supports at least one provider"),
@@ -133,6 +139,8 @@ READS = {
     ("plans", "unknown-credential-purpose"): {"credentialRefs[1].purpose": "refused"},
     ("plans", "valid-ci-provider"): {"provider": "ci:github"},
     ("plans", "unknown-content-capture"): {"contentCapture": "refused"},
+    ("plans", "valid-target-mode-scripted"): {"targetMode": "scripted"},
+    ("plans", "unknown-target-mode"): {"targetMode": "refused"},
     ("runners", "unknown-os"): {"os": "plan9"},
     ("runners", "unknown-kind"): {"kind": "warehouse"},
 }
@@ -157,11 +165,18 @@ def matching():
          "a runner of this version does not take a provider it does not know, even one its manifest lists (PLAN-7, VER-8)"),
         ("runner-os-unknown", PLAN, dict(RUNNER, os="plan9"), True,
          "a runner os this version does not know takes no part in matching (VER-8): tags and provider decide"),
+        ("target-mode-unknown", dict(PLAN, targetMode="simulated"), RUNNER, False,
+         "a runner does not take a plan whose target mode it does not know (PLAN-7, VER-8)"),
+        ("target-mode-not-in-manifest", dict(PLAN, targetMode="replayed"), RUNNER, True,
+         "a manifest does not say which target modes a runner can give, so matching decides by what it says (tags and "
+         "provider); a runner that cannot replay the subject refuses the plan itself (PLAN-7)"),
     ]
 
 
-# Matching vectors whose runner manifest only a reader accepts (a value a later minor may add), and their extra rules.
-MATCHING_READER_ONLY = {"runner-kind-unknown", "runner-os-unknown", "isolation-unknown", "provider-unknown-but-listed"}
+# Matching vectors whose plan or runner manifest only a reader accepts (a value a later minor may add): their extra
+# rule is VER-8.
+MATCHING_READER_ONLY = {"runner-kind-unknown", "runner-os-unknown", "isolation-unknown", "provider-unknown-but-listed",
+                        "target-mode-unknown"}
 
 
 def ev(seq, kind, at, **fields):
@@ -176,7 +191,7 @@ OTHER_HASH = "1406e38d556046d439c0218e150c737fe737a650f9dfd5f988a0c55d24f8bff4"
 STREAM_RULES = {
     "complete-sealed": ["STRM-1", "STRM-3"],
     "refused": ["STRM-1", "STRM-3"],
-    "stopped-at-budget": ["PLAN-2", "STRM-1", "STRM-3"],
+    "stopped-at-budget": ["PLAN-2", "PLAN-9", "STRM-1", "STRM-3"],
     "spend-at-budget": ["PLAN-2", "STRM-3"],
     "cancelled": ["STRM-1", "STRM-3"],
     "over-budget": ["PLAN-2", "STRM-3"],
@@ -203,7 +218,7 @@ STREAM_RULES = {
     "time-backwards": ["STRM-3"],
     "time-backwards-by-a-nanosecond": ["ENC-8", "STRM-3"],
     "over-cases": ["PLAN-2", "STRM-3"],
-    "over-time": ["PLAN-2", "STRM-3"],
+    "over-time": ["PLAN-2", "PLAN-9", "STRM-3"],
     "over-time-in-days": ["PLAN-2", "STRM-3", "ENC-9"],
     "unknown-kind-mid-stream": ["STRM-1", "VER-8"],
 }
@@ -309,6 +324,10 @@ CPLAN = dict(PLAN, planId="plan-43", subject=dict(PLAN["subject"], deployment=DE
              limits={"maxUsd": 3.0, "cases": 3, "timeout": "PT2H"})
 NO_JUDGES = {k: v for k, v in dict(CPLAN, planId="plan-44").items() if k != "judges"}
 CAPTURED = dict(CPLAN, planId="plan-45", contentCapture="on")
+# Plans that name their target mode (a plan without one, as CPLAN, asks for live).
+SCRIPTED_PLAN = dict(CPLAN, planId="plan-47", targetMode="scripted")
+LIVE_PLAN = dict(CPLAN, planId="plan-48", targetMode="live")
+SCRIPTED = {"targetMode": "scripted", "stimulus": "suite"}
 V6 = "git:2b19e0"  # the subject version before the plan's git:3f2a1c
 OTHER_RUBRIC = "sha256:" + "b7" * 32
 SCORE = "triage-score"
@@ -541,7 +560,7 @@ def conformance():
         ("suite", CPLAN, one_run([("run:R-1", "suite")], suite=dict(TRIAGE, version="3")), None, ["STRM-4"],
          "a suite version the plan does not name"),
         ("suite-digest", CPLAN, one_run([("run:R-1", "suite")], suite=dict(TRIAGE, digest="sha256:" + "5d" * 32)), None,
-         ["STRM-4", "RUN-8"], "the plan's suite and version, with other content than the digest the plan names"),
+         ["STRM-4", "RUN-8", "PLAN-8"], "the plan's suite and version, with other content than the digest the plan names"),
         ("deployment", CPLAN, one_run([("run:R-1", "deployment")], deployment=dict(DEPLOYMENT, ref=STAGING)), None,
          ["STRM-4", "PLAN-1", "RUN-6"], "the run records another deployment than the plan's"),
         ("deployment-endpoint", CPLAN,
@@ -563,13 +582,28 @@ def conformance():
          ["STRM-4", "RUN-11"], "no contentCapture reads as on, and the plan says off"),
         ("target-mode", CPLAN, one_run([("run:R-1", "target-mode")], execution={"targetMode": "replayed", "stimulus": "suite"}),
          None, ["STRM-4", "RUN-7"], "recorded answers played back, not the live subject"),
+        ("target-mode-as-planned", SCRIPTED_PLAN,
+         two_runs([], dict(cases=ONE_CASE, cost=1.5, execution=SCRIPTED), dict(execution=SCRIPTED)), None,
+         ["STRM-4", "RUN-7", "PLAN-7"],
+         "the plan asks for a scripted stand-in, and both runs are scripted: what the plan asked, so no problem"),
+        ("target-mode-live-plan", LIVE_PLAN, one_run([("run:R-1", "target-mode")], execution=SCRIPTED), None,
+         ["STRM-4", "RUN-7"], "a scripted run on a plan that asks for live by name"),
+        ("target-mode-absent-is-live", CPLAN,
+         one_run([("run:R-1", "target-mode")], execution={"targetMode": "mocked", "stimulus": "suite"}), None,
+         ["STRM-4", "RUN-7"], "a mocked run on a plan that names no target mode, which asks for live"),
+        ("target-mode-live-run-on-scripted-plan", SCRIPTED_PLAN, one_run([("run:R-1", "target-mode")]), None,
+         ["STRM-4", "RUN-7"],
+         "a live run on a plan that asks for scripted: not what the plan asked, though live evidence is the stronger "
+         "kind; the target mode is compared, not ranked"),
         ("over-cases", CPLAN, one_run([("job", "over-cases")], cases=TWO_CASES + (("case-19", "plain", 0.8), ("case-20", "plain", 0.9))),
          None, ["STRM-4", "PLAN-2"], "one run of four cases on a plan of three"),
         ("over-budget", CPLAN, one_run([("job", "over-budget")], failed=True, cost=3.4), None, ["STRM-4", "PLAN-2"],
          "one run, named by job.failed, that cost $3.40 on a plan of $3.00"),
         ("split-over-cases", CPLAN,
          two_runs([("job", "over-cases")], {}, dict(cases=SECURITY_CASE + (("LLM01-002", "plain", 1.0),))), None,
-         ["STRM-4", "PLAN-2"], "two runs of two cases each: each within the plan's three, the job's four above it"),
+         ["STRM-4", "PLAN-2", "PLAN-8"],
+         "two runs of two cases each: each within the plan's three, the job's four above it (case ids are unique "
+         "across the job's suites)"),
         ("split-over-budget", CPLAN, two_runs([("job", "over-budget")], dict(cases=ONE_CASE, cost=2.0), dict(cost=2.0)), None,
          ["STRM-4", "PLAN-2"], "two runs of $2.00 each: each within the plan's $3.00, the job's $4.00 above it"),
         ("no-cost", CPLAN, one_run([("run:R-1", "no-cost")], cost=None), None, ["STRM-4", "PLAN-2", "SUM-7"],

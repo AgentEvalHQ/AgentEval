@@ -2,12 +2,18 @@
   "direction": "AEF → OpenTelemetry → AEF",
   "page": "opentelemetry.md",
   "sections": ["How AEF holds OpenTelemetry data", "AEF → OpenTelemetry", "OpenTelemetry → AEF", "What does not carry over", "Worked example"],
-  "description": "The corpus run conformance/valid/completed-eval (copied to input/, overlays included): a composite with three children, four typed absences, warn and inconclusive lines, a reasoning blob, a trace link, usage. to-otel writes one LogsData line per result line (otel.jsonl); from-otel reads it back as a new run (run/), sealed as ingest. The trip keeps the case, the state, each score's metric and value, the reason or the reasoning's text, the trace link, the end time and the service name; it loses exactly the page's list.",
+  "description": "The corpus run conformance/valid/completed-eval (copied to input/, overlays included): a composite with three children, four typed absences, warn and inconclusive lines, a reasoning blob, a trace link, usage. to-otel writes one LogsData line per result line (otel.jsonl); from-otel reads it back as a new run (run/), sealed as ingest, with the converter's contentCapture (on) in imported.asserted (OT-4). Under refusals/: a corpus run that does not verify (conformance/runs/result-id-mismatch, copied), which no export reads (OT-8); and two small running runs that verify but that the export refuses as a whole, a time before 1970 and a reasoning blob that is not UTF-8 (OT-9). The trip keeps the case, the state, each score's metric and value, the reason or the reasoning's text, the trace link, the end time and the service name; it loses exactly the page's list.",
   "steps": [
     {"args": ["to-otel", "input", "{out}"], "expected": "otel.jsonl"},
     {"args": ["from-otel", "otel.jsonl", "{out}", "--run-id", "otel-roundtrip-0001", "--from", "aef_interop.py 1.0 (to-otel)", "--subject", "agent:support-api", "--subject-kind", "agent", "--target-mode", "live", "--at", "2026-10-09T00:00:00Z"], "expected": "run"}
   ],
-  "runs": {"input": "intact", "run": "intact"},
+  "refusals": [
+    {"args": ["to-otel", "refusals/result-id-mismatch", "{out}"], "says": "OT-8"},
+    {"args": ["to-inspect", "refusals/result-id-mismatch", "{out}"], "says": "IN-11"},
+    {"args": ["to-otel", "refusals/before-1970", "{out}"], "says": "OT-9"},
+    {"args": ["to-otel", "refusals/reasoning-not-utf8", "{out}"], "says": "OT-9"}
+  ],
+  "runs": {"input": "intact", "run": "intact", "refusals/before-1970": "unsealed", "refusals/reasoning-not-utf8": "unsealed"},
   "roundTrip": {
     "original": "input",
     "through": "otel.jsonl",

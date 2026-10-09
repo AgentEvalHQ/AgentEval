@@ -236,6 +236,16 @@ public sealed class AefOverlayWriter
             throw new InvalidOperationException($"{directory} is {documents.Status ?? "not closed"}: overlays are what is added to a run after it closed (§4.2, [RUN-4]).");
         }
 
+        // [RUN-3] (round 7): overlays is a folder of the run. An entry of that name that is a file or a link (an event
+        // appended through a link to a folder would be written outside the run), or a path whose first segment is
+        // overlays in another case (a case-insensitive file system would merge the two folders), is refused before
+        // anything is written.
+        var boundary = folder.PathProblems.Where(p => p.Code == "path" && AefFolder.BreaksTheOverlaysBoundary(p.Path)).ToList();
+        if (boundary.Count > 0)
+        {
+            throw new AefWriteException($"{directory}: overlays/ is not a folder of the run alone ([RUN-3]), so no overlay is written", boundary);
+        }
+
         var runHash = SealVerifier.RunHashOf(folder).Value;
         var chain = OverlayChain.Verify(folder, runId, runHash, documents.ResultIds);
         var broken = chain.Problems.Where(p => !OfOneEvent(p) && !(p is { Path: OverlayChain.EventsPath, Code: "uncovered" })).ToList();

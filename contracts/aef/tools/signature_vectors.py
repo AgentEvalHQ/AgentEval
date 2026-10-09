@@ -509,6 +509,23 @@ def redaction_vectors():
                 expected |= {"problems": chain_problems, "rules": ["OVL-5", "ENC-17"]}
             write_json(d / "expected.json", expected)
 
+    # R4N-8 (R6-5): a symbolic link under overlays/ is the chain's unexpected-file, never followed, never a problem of
+    # the run (generated: skipped where the platform cannot make a link).
+    for kind in ("run", "chain"):
+        d = CONF / ("runs" if kind == "run" else "chain-vectors") / "withheld-blob-link-under-overlays"
+        if d.exists():
+            shutil.rmtree(d)
+        expected = {"kind": kind, "run": "run",
+                    "generate": [{"copy": ["runs/withheld-blob/run", "run"]},
+                                 {"link": ["run/overlays/extra.json", "run/seal.json"]}]}
+        if kind == "run":
+            write_json(d / "policy.json", policy("ecdsa-a", may=("ecdsa-a",)))
+            expected |= {"policy": "policy.json", "outcome": "intact", "problems": [[blob_rel, "withheld"]],
+                         "withheld": 1, "signedBy": [], "rules": ["RUN-3", "OVL-5", "OVL-10"]}
+        else:
+            expected |= {"problems": [["overlays/extra.json", "unexpected-file"]], "rules": ["OVL-5"]}
+        write_json(d / "expected.json", expected)
+
     # R5-2, W3-21: a DSSE envelope at 56 MiB is read; one byte more is malformed and verifies for no one, and is never a
     # problem of the run: the attestation then signs for no one, a batch signature authorizes nothing, an orphan
     # envelope changes nothing.

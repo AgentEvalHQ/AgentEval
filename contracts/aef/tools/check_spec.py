@@ -42,6 +42,8 @@ UNTESTED = {
     "ENC-12": "a reader must not fetch the $id names: behaviour, not a file property",
     "ENC-14": "a rule on the schemas themselves: checked here (no lookaround, no backreference)",
     "CKP-6": "how a reader shows an approver's claimed identity: presentation",
+    "PLAN-10": "what a runner writes where the plan says nothing: a SHOULD no verifier checks; tools/check_runner.py "
+               "checks it on the reference runner's runs",
     "VER-5": "what a minor version may change: checked by tools/schema_diff.py --self-test against the next version",
     "VER-7": "deprecation: a process rule for later minors",
     "SEC-2": "a tool must not seal a run holding a secret: a process rule",

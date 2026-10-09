@@ -22,7 +22,7 @@
     {
       "name": "run.json",
       "digest": {
-        "sha256": "15682fc03eaa75be9c3389d2e7bf96145f3c3ad847bca3b7baf46c5dc863b9b8"
+        "sha256": "b291d57297bd782737e16d973c3ce05b8470f831dd3bd91dca9dfe4d90606bd1"
       }
     },
     {
@@ -36,7 +36,7 @@
   "predicate": {
     "schemaVersion": "1.0",
     "runId": "otel-roundtrip-0001",
-    "runHash": "645365e1d17f7671d34baaef244bbf9c165947ee509f3551186ec134c8c9aa62",
+    "runHash": "41009e009c384f891ac7d19df740c2fa01b43b0a5207993b93e585aead79f8d1",
     "producer": {
       "name": "aef_interop.py",
       "version": "1.0"

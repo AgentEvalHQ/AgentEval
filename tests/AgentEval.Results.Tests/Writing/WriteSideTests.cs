@@ -344,6 +344,30 @@ public class WriteSideTests
     }
 
     [Theory]
+    [InlineData("cases-not-a-list-refused", "the scenario: cases is not a list of objects")]
+    [InlineData("summary-undeclared-metric-refused", "metric latency is not declared in metrics.json ([SUM-1]")]
+    public void Produce_RefusesTheRoundSevenScenarios_ForTheReasonTheirVectorsState(string name, string reason)
+    {
+        // Round 7: each vector's "why" names the reason; the refusal must be that one, not another the scenario happens
+        // to meet first. cases-not-a-list: cases is an object, not §9.2.1's list of trees (an input error, read before
+        // anything is written). summary-undeclared-metric: the summary names latency, which metrics.json does not
+        // declare ([SUM-1], summarize's input error), refused by the writer after it began: nothing is left.
+        var folder = Path.Combine(Vectors, "produce", name);
+        var expected = JsonNode.Parse(File.ReadAllBytes(Path.Combine(folder, "expected.json")))!;
+        using var output = new WriterRun();
+
+        var (code, stdout, error) = Dispatch("produce", Path.Combine(folder, expected["scenario"]!.GetValue<string>()), output.Dir);
+
+        Assert.True(expected["refused"]!.GetValue<bool>());
+        Assert.Equal(2, code);
+        Assert.Equal("", stdout);
+        Assert.Contains(reason, error, StringComparison.Ordinal);
+        Assert.Single(error.TrimEnd('\r', '\n').Split('\n'));   // one reason on one line,
+        Assert.DoesNotContain("; ", error, StringComparison.Ordinal);    // not a list of everything wrong
+        Assert.False(Directory.Exists(output.Dir));
+    }
+
+    [Theory]
     [InlineData("2026-10-01T00:01:00.000000001Z")]   // nine fraction digits: finer than a DateTimeOffset holds
     [InlineData("2026-10-01T00:01:00.123456789Z")]
     [InlineData("2026-10-01T00:01:00.0000001Z")]

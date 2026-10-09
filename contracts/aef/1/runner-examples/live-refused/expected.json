@@ -1,0 +1,10 @@
+{
+  "plan": "plan.json",
+  "runner": "../runner.json",
+  "at": "2026-10-09T09:00:00Z",
+  "terminal": "job.refused",
+  "limit": null,
+  "runs": [],
+  "spentUsd": 0,
+  "why": "the plan names no targetMode, so it asks for the live subject; the runner carries its tag and supports its provider (matching says it takes the plan as far as its manifest tells), but its target is scripted and cannot be driven as asked, so it refuses the plan (PLAN-7)"
+}

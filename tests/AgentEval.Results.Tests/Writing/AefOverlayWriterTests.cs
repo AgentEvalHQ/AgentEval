@@ -174,6 +174,65 @@ public class AefOverlayWriterTests
         Assert.Contains(refused.Problems, p => p is { Path: "overlays/seal-0001.json", Code: "batch-digest" });
     }
 
+    [Fact]
+    public void Open_RefusesARunWhoseOverlaysIsAFile()
+    {
+        // [RUN-3] (round 7): overlays is a folder; a file of that name is a path problem of the run, and no event is
+        // appended to (or beside) it.
+        using var run = SealedRun(out _, out _);
+        File.WriteAllText(run.Full("overlays"), "not a folder");
+
+        var refused = Assert.Throws<AefWriteException>(() => AefOverlayWriter.Open(run.Dir));
+
+        Assert.Equal([new AefProblem("overlays", "path")], refused.Problems);
+        Assert.Equal("not a folder", File.ReadAllText(run.Full("overlays")));
+    }
+
+    [Fact]
+    public void Open_RefusesARunWhoseOverlaysIsALinkToAFolder_AndWritesNothingThrough()
+    {
+        // [RUN-3] (round 7): overlays on other storage are mounted, never linked. An event appended through the link
+        // would be written outside the run.
+        using var run = SealedRun(out _, out _);
+        var elsewhere = Path.Combine(Path.GetTempPath(), $"aef-elsewhere-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(elsewhere);
+        try
+        {
+            try
+            {
+                Directory.CreateSymbolicLink(run.Full("overlays"), elsewhere);
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
+            {
+                return;   // this system does not let the test make links (Windows without the privilege)
+            }
+
+            var refused = Assert.Throws<AefWriteException>(() => AefOverlayWriter.Open(run.Dir));
+
+            Assert.Equal([new AefProblem("overlays", "path")], refused.Problems);
+            Assert.Empty(Directory.EnumerateFileSystemEntries(elsewhere));
+        }
+        finally
+        {
+            Directory.Delete(elsewhere, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void Open_RefusesARunWithAPathThatIsOverlaysInAnotherCase()
+    {
+        // [RUN-3] (round 7): Overlays/x is a path problem at that path; a case-insensitive file system would put the
+        // overlays this writer adds into that folder.
+        using var run = SealedRun(out _, out _);
+        Directory.CreateDirectory(run.Full("Overlays"));
+        File.WriteAllText(run.Full("Overlays/notes.txt"), "x");
+
+        var refused = Assert.Throws<AefWriteException>(() => AefOverlayWriter.Open(run.Dir));
+
+        Assert.Equal([new AefProblem("Overlays/notes.txt", "path")], refused.Problems);
+        Assert.False(File.Exists(run.Full("overlays/events.ndjson")));
+    }
+
     [Theory]
     [InlineData("{\"schemaVersion\":\"1.", 0)]   // an unfinished last line: a writer still writing it, or one that crashed
     [InlineData("\n", 1)]                          // a blank line

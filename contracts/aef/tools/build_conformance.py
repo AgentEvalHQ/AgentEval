@@ -1326,6 +1326,21 @@ def limit_vectors():
         ("seal-at-40-mib", "run", [{"copy": [base, "run"]},
                                    {"write": ["run/seal.json", [[seal_text[:-1], 1], [" ", 40 * 1024 * 1024 - len(seal_text)], ["\n", 1]]]}],
          {"outcome": "intact", "problems": []}, ["ENC-17", "ENC-18"]),
+        # ENC-17 at its value (R6-5): 1,000,000 lines (empty TracesData lines, cheap to read), and one more.
+        ("traces-lines-at-limit", "run", unsealed + [{"append": ["run/traces.otlp.jsonl", [["{}\n", 999_999]]]}],
+         {"outcome": "unsealed", "problems": []}, ["ENC-17", "ENC-18"]),
+        ("traces-lines-beyond-limit", "run", unsealed + [{"append": ["run/traces.otlp.jsonl", [["{}\n", 1_000_000]]]}],
+         {"outcome": "invalid", "problems": [["traces.otlp.jsonl", "limit"]]}, ["ENC-17", "ENC-18"]),
+        # RUN-3 (R6-5, R5N-6): overlays is a folder; overlays linked from elsewhere is a path problem of the run.
+        ("overlays-is-a-link", "run", [{"copy": [base, "run"]}, {"copy": [base + "/overlays", "elsewhere"]},
+                                       {"remove": "run/overlays"}, {"link": ["run/overlays", "elsewhere"]}],
+         {"outcome": "invalid", "problems": [["overlays", "path"]]}, ["RUN-3", "OVL-1"]),
+        # RUN-3 (R7N-1, R7N-2): a file named overlays, and a first segment `overlays` in another case.
+        ("overlays-is-a-file", "run", unsealed + [{"write": ["run/overlays", [["x", 1]]]}],
+         {"outcome": "invalid", "problems": [["overlays", "path"]]}, ["RUN-3"]),
+        ("overlays-in-another-case", "run", unsealed + [{"files": ["run/Overlays", 0]},
+                                                         {"write": ["run/Overlays/notes.json", [["{}", 1]]]}],
+         {"outcome": "invalid", "problems": [["Overlays/notes.json", "path"]]}, ["RUN-3"]),
         ("results-line-at-4-mib", "run", unsealed + [{"write": ["run/results.ndjson", padded_results]}],
          {"outcome": "unsealed", "problems": []}, ["ENC-17", "ENC-18"]),
         # R4N-2: a batch whose range ends beyond what a reader reads (1,000,000 lines) is limit at its seal, and claims

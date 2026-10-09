@@ -24,6 +24,7 @@ output directory (`.agenteval/`, "AgentEval store v1", which predates AEF; [§7.
 | `profiles/runtime-verdict/` | The evidence attached to runtime verdicts (AEVP 0.1), a profile on top of AEF |
 | `tools/` | Python 3 reference tools, standard library only: the corpus generators, `derive_reader.py`, the reference verifier `aef_verify.py`, the reference writer `aef_produce.py`, the decision function `aef_decide.py`, the stream verifier `aef_stream.py`, the conformance runner `aef_conformance.py`, the schema validator `aef_schema.py`, `schema_diff.py`, and `aef_crypto.py` (DSSE, ECDSA P-256, Ed25519); [tools/README.md](tools/README.md) lists them all |
 | `GOVERNANCE.md`, `LICENSE`, `NOTICE` | How AEF is run, and its licence |
+| `IMPLEMENTATIONS.md` | The implementations and their conformance claims |
 
 ## Two implementations
 

@@ -24,7 +24,7 @@ public class CorpusTheories
     [MemberData(nameof(Vectors), "decision")]
     public void Decision(string id)
     {
-        var file = Folder(id);
+        var file = Folder(id)!;
         var vector = JsonNode.Parse(File.ReadAllBytes(file))!;
         var result = Run("decide", file);
 
@@ -68,7 +68,11 @@ public class CorpusTheories
     [MemberData(nameof(Vectors), "plan")]
     public void Document(string id)
     {
-        var folder = Folder(id);
+        if (Folder(id) is not { } folder)
+        {
+            return;   // a generated vector this platform cannot build (spec 09 §9.2.1: skipped)
+        }
+
         var expected = Expected(folder);
         var result = Run("document", (string)expected["schema"]!, Path.Combine(folder, (string?)expected["document"] ?? "document.json"));
 
@@ -85,7 +89,11 @@ public class CorpusTheories
     [MemberData(nameof(Vectors), "matching")]
     public void Matching(string id)
     {
-        var folder = Folder(id);
+        if (Folder(id) is not { } folder)
+        {
+            return;   // a generated vector this platform cannot build (spec 09 §9.2.1: skipped)
+        }
+
         var result = Run("match", Path.Combine(folder, "plan.json"), Path.Combine(folder, "runner.json"));
 
         Assert.Equal((bool)Expected(folder)["matches"]!, (bool)result["matches"]!);
@@ -95,7 +103,11 @@ public class CorpusTheories
     [MemberData(nameof(Vectors), "stream")]
     public void Stream(string id)
     {
-        var folder = Folder(id);
+        if (Folder(id) is not { } folder)
+        {
+            return;   // a generated vector this platform cannot build (spec 09 §9.2.1: skipped)
+        }
+
         var expected = Expected(folder);
         var result = Run("stream", Path.Combine(folder, "events.ndjson"), Path.Combine(folder, (string)expected["plan"]!));
 
@@ -143,7 +155,11 @@ public class CorpusTheories
     [MemberData(nameof(Vectors), "encoding")]
     public void RunVerification(string id)
     {
-        var folder = Folder(id);
+        if (Folder(id) is not { } folder)
+        {
+            return;   // a generated vector this platform cannot build (spec 09 §9.2.1: skipped)
+        }
+
         var expected = Expected(folder);
         string[] args = ["run", Path.Combine(folder, (string?)expected["run"] ?? "run")];
         if ((string?)expected["policy"] is { } policy)
@@ -177,7 +193,11 @@ public class CorpusTheories
     [MemberData(nameof(Vectors), "seal")]
     public void Seal(string id)
     {
-        var folder = Folder(id);
+        if (Folder(id) is not { } folder)
+        {
+            return;   // a generated vector this platform cannot build (spec 09 §9.2.1: skipped)
+        }
+
         var expected = Expected(folder);
         string[] args = ["seal", Path.Combine(folder, (string?)expected["run"] ?? "run")];
         if ((string?)expected["policy"] is { } policy)
@@ -198,7 +218,11 @@ public class CorpusTheories
     [MemberData(nameof(Vectors), "chain")]
     public void Chain(string id)
     {
-        var folder = Folder(id);
+        if (Folder(id) is not { } folder)
+        {
+            return;   // a generated vector this platform cannot build (spec 09 §9.2.1: skipped)
+        }
+
         var expected = Expected(folder);
         var result = Run("chain", Path.Combine(folder, (string?)expected["run"] ?? "run"));
 
@@ -209,7 +233,11 @@ public class CorpusTheories
     [MemberData(nameof(Vectors), "overlay-view")]
     public void OverlayView(string id)
     {
-        var folder = Folder(id);
+        if (Folder(id) is not { } folder)
+        {
+            return;   // a generated vector this platform cannot build (spec 09 §9.2.1: skipped)
+        }
+
         var expected = Expected(folder);
         string[] args = ["view", Path.Combine(folder, (string?)expected["run"] ?? "run"), "--at", (string)expected["at"]!];
         if ((string?)expected["policy"] is { } policy)
@@ -237,7 +265,11 @@ public class CorpusTheories
     [MemberData(nameof(Vectors), "checkpoint")]
     public void Checkpoint(string id)
     {
-        var folder = Folder(id);
+        if (Folder(id) is not { } folder)
+        {
+            return;   // a generated vector this platform cannot build (spec 09 §9.2.1: skipped)
+        }
+
         var expected = Expected(folder);
         var result = Run("checkpoint", Path.Combine(folder, "document.json"));
 
@@ -254,7 +286,11 @@ public class CorpusTheories
     [MemberData(nameof(Vectors), "lane")]
     public void Lane(string id)
     {
-        var folder = Folder(id);
+        if (Folder(id) is not { } folder)
+        {
+            return;   // a generated vector this platform cannot build (spec 09 §9.2.1: skipped)
+        }
+
         var expected = Expected(folder);
         string[] args = ["lanes", Path.Combine(folder, (string?)expected["checkpoint"] ?? "checkpoint.json"), "--runs", Path.Combine(folder, (string?)expected["runs"] ?? "runs")];
         if ((string?)expected["at"] is { } at)
@@ -289,7 +325,11 @@ public class CorpusTheories
     [MemberData(nameof(Vectors), "plan-conformance")]
     public void PlanConformance(string id)
     {
-        var folder = Folder(id);
+        if (Folder(id) is not { } folder)
+        {
+            return;   // a generated vector this platform cannot build (spec 09 §9.2.1: skipped)
+        }
+
         var expected = Expected(folder);
         string[] args = ["conform", Path.Combine(folder, (string)expected["events"]!), Path.Combine(folder, (string)expected["plan"]!), Path.Combine(folder, (string)expected["runs"]!)];
         if ((string?)expected["policy"] is { } policy)

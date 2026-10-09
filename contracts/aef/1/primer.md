@@ -263,7 +263,7 @@ The stream is the runner's own report. Given also the runs the job produced, a s
 | the one announced: the run hash of its first `evidence.produced`, and intact | `run-missing`, `run-hash` |
 | made by this job: its `provenance` names the plan, the plan's digest, the job and the runner | `provenance` |
 | of what the plan asked: its subject and version, one of its suites, and its judges and deployment or endpoint when it names them | `subject`, `suite`, `judges`, `deployment` |
-| run as the plan asked: `live`, with the plan's content capture | `target-mode`, `content-capture` |
+| run as the plan asked: in its target mode (`live` unless it names another), with its content capture | `target-mode`, `content-capture` |
 | made during the job: started no earlier than `job.accepted`, ended no later than the terminal event | `time` |
 | within the plan's limits: each run states its cost, and the cost and the distinct cases of all the job's runs together stay within them | `no-cost`, `over-budget`, `over-cases` |
 

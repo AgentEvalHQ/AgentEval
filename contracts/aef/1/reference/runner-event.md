@@ -37,7 +37,7 @@ A runner reports a job as NDJSON events, each with a sequence number. The stream
 | `jobId` | [jobId](#jobid) |  |  | The job the event reports on; every event of a stream has the first event's jobId (STRM-1, STRM-3). |
 | `at` | [at](#at) |  |  | When the event happened; never earlier than the previous event's at (STRM-1, STRM-3). |
 | `kind` | `"plan.estimated"` | yes |  | plan.estimated: the runner's estimate of cases and cost. |
-| `cases` | integer | yes | ≥ 0; ≤ 9007199254740991 | How many cases the runner expects to run. |
+| `cases` | integer | yes | ≥ 0; ≤ 9007199254740991 | How many cases the runner expects to run: the cases of the plan's suites, at most the plan's cases limit when it sets one. |
 | `usdLow` | number | yes | ≥ 0 | The low end of the estimated cost, in US dollars; never above usdHigh (STRM-3). |
 | `usdHigh` | number | yes | ≥ 0 | The high end of the estimated cost, in US dollars (STRM-3). |
 | `priceTable` | string |  | ≤ 64 chars | The price table the estimate used, by name. |
@@ -76,7 +76,7 @@ A runner reports a job as NDJSON events, each with a sequence number. The stream
 | `seq` | [seq](#seq) |  |  | 1 for the first event, then each event one more than the previous one. |
 | `jobId` | [jobId](#jobid) |  |  | The job the event reports on; every event of a stream has the first event's jobId (STRM-1, STRM-3). |
 | `at` | [at](#at) |  |  | When the event happened; never earlier than the previous event's at (STRM-1, STRM-3). |
-| `kind` | `"lane.completed"` | yes |  | lane.completed: a lane finished. |
+| `kind` | `"lane.completed"` | yes |  | lane.completed: a lane finished. Only from a runner given the checkpoint's rules (spec 05): a plan alone does not carry them. |
 | `lane` | [laneName](common.md#lanename) | yes |  | The lane that finished. |
 | `status` | one of `"passed"`, `"failed"`, `"not_measured"`, `"incomparable"` | yes |  | The lane's result: passed, failed, not_measured or incomparable. |
 | `ext` | [ext](#ext) |  |  | Producer extensions, named reverse-DNS or with the producer's prefix. A reader ignores what it does not know; never holds a secret (ENC-19, STRM-1). |
@@ -118,7 +118,7 @@ A runner reports a job as NDJSON events, each with a sequence number. The stream
 | `reason` | string | yes | ≥ 1 chars; ≤ 2048 chars | Why the job failed. |
 | `limit` | one of `"maxUsd"`, `"cases"`, `"timeout"` |  |  | Set when the runner stopped at a plan limit. |
 | `ext` | [ext](#ext) |  |  | Producer extensions, named reverse-DNS or with the producer's prefix. A reader ignores what it does not know; never holds a secret (ENC-19, STRM-1). |
-| `runs` | array of [id](common.md#id) |  | ≤ 1024 items | The runs it sealed before it stopped. Each must keep to the plan (STRM-4). |
+| `runs` | array of [id](common.md#id) |  | ≤ 1024 items | The runs it sealed before it stopped, a run a limit cut off (closed aborted) among them (PLAN-9). Each must keep to the plan (STRM-4). |
 
 ### `job.sealed`
 

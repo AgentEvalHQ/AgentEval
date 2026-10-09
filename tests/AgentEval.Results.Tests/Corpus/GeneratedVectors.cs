@@ -8,12 +8,14 @@ namespace AgentEval.Results.Tests.Corpus;
 /// Generated vectors (contracts/aef/1/spec/09-conformance.md, §9.2): a vector whose input would be too large for the
 /// corpus holds only expected.json, with <c>generate</c>, steps applied in order to a copy of the vector's folder. As in
 /// the conformance runner, generating is the runner's job: the driver is given the generated folder as it would be given
-/// a stored one. Each vector is generated once per test run, under the temporary folder, and removed at exit.
+/// a stored one. Each vector is generated once per test run, under the temporary folder, and removed at exit. A
+/// <c>link</c> step (round 7) makes a symbolic link; where this process cannot make one (Windows without the privilege),
+/// the vector is skipped: its theory returns without judging it, as the runner reports it skipped.
 /// </summary>
 internal static class GeneratedVectors
 {
     private static readonly string Root = Path.Combine(Path.GetTempPath(), $"aef-generated-{Guid.NewGuid():N}");
-    private static readonly ConcurrentDictionary<string, Lazy<string>> Folders = new(StringComparer.Ordinal);
+    private static readonly ConcurrentDictionary<string, Lazy<string?>> Folders = new(StringComparer.Ordinal);
 
     static GeneratedVectors()
     {
@@ -32,11 +34,15 @@ internal static class GeneratedVectors
         };
     }
 
-    /// <summary>The folder vector <paramref name="id"/>'s recipe gives.</summary>
-    public static string Of(string id, string vector, JsonArray steps) =>
-        Folders.GetOrAdd(id, _ => new Lazy<string>(() => Generate(vector, steps))).Value;
+    /// <summary>
+    /// The folder vector <paramref name="id"/>'s recipe gives, or null when this platform cannot carry it out (a
+    /// <c>link</c> step on a system that does not let this process make a symbolic link): the vector is skipped, as spec
+    /// 09 §9.2.1 says a runner does, never failed.
+    /// </summary>
+    public static string? Of(string id, string vector, JsonArray steps) =>
+        Folders.GetOrAdd(id, _ => new Lazy<string?>(() => Generate(vector, steps))).Value;
 
-    private static string Generate(string vector, JsonArray steps)
+    private static string? Generate(string vector, JsonArray steps)
     {
         var folder = Path.Combine(Root, $"v{Folders.Count}-{Guid.NewGuid():N}");
         Copy(vector, folder);
@@ -100,12 +106,47 @@ internal static class GeneratedVectors
                     }
 
                     break;
+                case "link":
+                    // PATH becomes a symbolic link to TARGET, both relative to the vector's folder; the link holds the
+                    // relative path from PATH's folder to TARGET (round 7). A platform that cannot make one skips the vector.
+                    var link = At(arg![0]);
+                    var linked = At(arg[1]);
+                    Directory.CreateDirectory(Path.GetDirectoryName(link)!);
+                    if (!TryLink(link, Path.GetRelativePath(Path.GetDirectoryName(link)!, linked), Directory.Exists(linked)))
+                    {
+                        return null;
+                    }
+
+                    break;
                 default:
                     throw new InvalidOperationException($"{vector}: a generate step this runner does not know: {op}");
             }
         }
 
         return folder;
+    }
+
+    // A symbolic link holding `target` as written (a relative path), to a folder or a file: false when this system does
+    // not let the process make one (Windows without the privilege or developer mode).
+    private static bool TryLink(string link, string target, bool folder)
+    {
+        try
+        {
+            if (folder)
+            {
+                Directory.CreateSymbolicLink(link, target);
+            }
+            else
+            {
+                File.CreateSymbolicLink(link, target);
+            }
+
+            return true;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
+        {
+            return false;
+        }
     }
 
     // A file, or a folder with everything under it.

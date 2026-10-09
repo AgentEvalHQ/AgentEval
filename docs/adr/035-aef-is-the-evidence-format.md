@@ -64,7 +64,7 @@ round 3), each round's findings reworked into the text, the schemas and the conf
   decision are all recomputable by anyone with the Python reference or their own implementation.
 - Mission Control 2.0 builds on a published contract instead of AgentEval internals.
 - Two implementations that disagreed on crafted inputs found real ambiguities before any user depended on them; the
-  corpus pins each one with a vector, except a symbolic link under `overlays/`, which no portable corpus can hold.
+  corpus pins each one with a vector (a symbolic link too, made by a generated vector where the platform can).
 - Imports and exports (ASSERT, Inspect, OpenAI Evals, EvalPort, OpenTelemetry, in-toto) have documented mappings.
 
 **Negative**

@@ -1,0 +1,12 @@
+{
+  "plan": "plan.json",
+  "runner": "../runner.json",
+  "at": "2026-10-09T09:00:00Z",
+  "terminal": "job.failed",
+  "limit": "timeout",
+  "runs": [
+    {"status": "aborted", "cases": 2}
+  ],
+  "spentUsd": 0.5,
+  "why": "a one-minute timeout: two 20-second cases fit; a third, with the second needed to close and seal its run, would end after it, so the runner seals the first run as aborted and ends with job.failed naming timeout, within the minute"
+}

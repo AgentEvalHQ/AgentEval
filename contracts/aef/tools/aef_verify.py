@@ -57,7 +57,8 @@ Commands (the JSON each prints):
       [STRM-4], written here from spec 06 §6.4 (not through aef_stream.py): the runs the stream's job.sealed and
       job.failed events name, found in the folder RUNS, against the plan. {"problems": [[path, code], ...]}, at
       'run:<runId>' and 'job'. The policy authorizes redactions (OVL-10).
-      Plan durations and freshness follow ENC-9's one grammar (parse_duration).
+      Plan durations and freshness follow ENC-9's one grammar (parse_duration). A PLAN the reader schema refuses (a
+      timeout that is no duration among them) is an input error for match, stream and conform (spec 09 §9.3).
 
 Times are RFC 3339 UTC strings (ENC-8). Exit status: 0 when the operation ran, 2 on a usage or input error.
 """
@@ -131,6 +132,7 @@ KNOWN_MUTATIONS = {
     "tree-across-cases": "a line may have a parent of another case (RES-5, R6-3)",
     "trial-under-plain": "a trial line may hang under a line that carries no trial (RES-8, R6-3)",
     "otlp-names": "spans under the pre-1.0 name instrumentationLibrarySpans are read too",
+    "target-mode-live": "STRM-4 compares a run's target mode with live, not with the plan's targetMode",
 }
 _ORIGINAL_COMPILE = aef_schema.compile_pattern
 
@@ -513,6 +515,7 @@ _TAXONOMY_SCHEMES = _writer_enum("result.schema.json#/properties/attack/properti
 _SUMMARY_VERDICTS = _writer_enum("summary.schema.json#/properties/lanes/items/properties/metrics/items/properties/verdict/enum")
 _THRESHOLD_OPS = _writer_enum("checkpoint.schema.json#/$defs/laneRule/oneOf/0/properties/op/enum")
 _PLAN_CONTENT_CAPTURE = _writer_enum("run-plan.schema.json#/properties/contentCapture/enum")
+_PLAN_TARGET_MODES = _writer_enum("run-plan.schema.json#/properties/targetMode/enum")
 _SEVERITY_MAX = _writer_enum("checkpoint.schema.json#/$defs/laneRule/oneOf/1/properties/max/enum")
 _SEALED_BY = _writer_enum("seal.schema.json#/properties/predicate/properties/sealedBy/enum")
 _ISOLATIONS = _writer_enum("run-plan.schema.json#/properties/isolation/enum")
@@ -559,6 +562,7 @@ READINGS = {
                   (isinstance(v, str) and re.fullmatch(r"ci:[a-z0-9-]{1,64}", v)) else "refused"),
                  ("isolation", _known(_ISOLATIONS, "refused")),
                  ("contentCapture", _known(_PLAN_CONTENT_CAPTURE, "refused")),
+                 ("targetMode", _known(_PLAN_TARGET_MODES, "refused")),
                  ("credentialRefs[*].scheme", _known(_CREDENTIAL_SCHEMES, "refused")),
                  ("credentialRefs[*].purpose", _known(_CREDENTIAL_PURPOSES, "refused"))],
     "runner-event": [("kind", _known({"job.accepted", "job.refused", "plan.estimated", "spend.updated",
@@ -1411,7 +1415,12 @@ class Run:
         # RUN-3, §4.5 (R5-1, R5-2): overlays/ is the chain's to report, and an envelope beyond its limit is only a
         # malformed signature (SIG-1): neither is a problem of the run.
         own = [p for p in self.folder.paths if not p.startswith("overlays/")]
-        problems = (set(reading) | path_problems(own)
+        # RUN-3: `overlays` is a folder (a file of that name is a path problem); a path whose first segment is
+        # `overlays` in another case is a path problem whatever else the run holds: on a case-insensitive file system
+        # it is the overlays folder.
+        clash = {(p, "path") for p in own if p == "overlays" or (
+            p.split("/", 1)[0] != "overlays" and p.split("/", 1)[0].lower() == "overlays")}
+        problems = (set(reading) | path_problems(own) | clash
                     | {(p, "path") for p in self.folder.special if not p.startswith("overlays/")}
                     | self.seal())
         if not reading:
@@ -2524,8 +2533,18 @@ def op_decide(path):
         return {"error": str(error) or type(error).__name__}
 
 
+def load_plan(path):
+    """A run plan given to match, stream or conform: (its bytes, the plan). InputError when it does not read or the
+    reader schema refuses it (spec 09 §9.3): PLAN-7, STRM-3 and STRM-4 are defined against a plan, and a timeout that
+    is no duration ([ENC-9]) cannot be checked against."""
+    plan = load_json_file(path)
+    if not isinstance(plan, dict) or not schema_valid("reader", "run-plan", plan):
+        raise InputError(f"{path}: not a run plan the reader schema accepts")
+    return Path(path).read_bytes(), plan
+
+
 def op_match(plan_path, runner_path):
-    return {"matches": bool(aef_stream.matches(load_json_file(plan_path), load_json_file(runner_path)))}
+    return {"matches": bool(aef_stream.matches(load_plan(plan_path)[1], load_json_file(runner_path)))}
 
 
 def _stream_event(raw):
@@ -2541,12 +2560,11 @@ def _stream_event(raw):
 
 
 def op_stream(events_path, plan_path):
-    data = Path(events_path).read_bytes()
     try:
-        plan_bytes = Path(plan_path).read_bytes()
-        plan = load_json_bytes(plan_bytes)
-    except (OSError, EncodingProblem) as error:
-        raise InputError(f"{plan_path}: {error}") from None
+        data = Path(events_path).read_bytes()
+    except OSError as error:
+        raise InputError(str(error)) from None
+    plan_bytes, plan = load_plan(plan_path)
     complete = data[:data.rfind(b"\n") + 1]  # STRM-2: a last line without LF is still being written
     if ndjson_framing(complete):  # STRM-3: one problem, and the stream is not checked further
         return {"problems": [["stream", "encoding"]]}
@@ -2569,9 +2587,7 @@ def op_conform(events_path, plan_path, runs_dir, policy=None):
         data = Path(events_path).read_bytes()
     except OSError as error:
         raise InputError(str(error)) from None
-    plan = load_json_file(plan_path)
-    if not isinstance(plan, dict):
-        raise InputError(f"{plan_path}: not a run plan")
+    plan = load_plan(plan_path)[1]
     events = []
     complete = data[:data.rfind(b"\n") + 1]  # STRM-2: an unfinished last line is not read
     if not ndjson_framing(complete):  # STRM-4 reads the events STRM-3 can read; the others take no part
@@ -2666,7 +2682,8 @@ def _plan_problems(doc, plan, accepted, terminal):
             isinstance(s, dict) and s.get("ref") == suite.get("ref") and s.get("version") == suite.get("version")
             and ("digest" not in s or s["digest"] == suite.get("digest")) for s in plan.get("suites") or []):
         codes.add("suite")
-    if get(doc, "execution", "targetMode") != "live":
+    asked = "live" if "target-mode-live" in MUTATIONS else plan.get("targetMode", "live")  # none asks for live
+    if get(doc, "execution", "targetMode") != asked:  # compared as written
         codes.add("target-mode")
     return codes
 

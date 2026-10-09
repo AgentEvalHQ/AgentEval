@@ -4,7 +4,7 @@
     {
       "name": "logs.otlp.jsonl",
       "digest": {
-        "sha256": "7673fb0abe19bf354e8a900405bfcb6fa2515f1d3b853dc672ea2e7f8e921a56"
+        "sha256": "a34a356af9e2e336b0e180e8172fe2b554c39750f94684d1d47cc9492e87d9f7"
       }
     },
     {
@@ -16,13 +16,13 @@
     {
       "name": "results.ndjson",
       "digest": {
-        "sha256": "120ffbf67dae63b88413d193e413eedd5eb56b45b60b5106dbcea888b81b4937"
+        "sha256": "2693b608a76617cccecaa3239bee07dac373539a220c3f7f7ec097280964ecad"
       }
     },
     {
       "name": "run.json",
       "digest": {
-        "sha256": "7329b2afdf8123f677e74d3d73dd0277cfe6057424b8e564844de780f7aa3099"
+        "sha256": "170bfa1b4810bb1d9ecb368bd24a6542e33b0536da51ca6a875a45fca0d6b624"
       }
     },
     {
@@ -36,7 +36,7 @@
   "predicate": {
     "schemaVersion": "1.0",
     "runId": "otel-import-0001",
-    "runHash": "0f7200e0c37615deb394e1890d25a429b0faab9b26e5d84d32a0e4b8d9cbc8c7",
+    "runHash": "cb9904dbbb33d0fc2921ceb9dd686861661459269c8eef4269663dbb7c3e428e",
     "producer": {
       "name": "aef_interop.py",
       "version": "1.0"

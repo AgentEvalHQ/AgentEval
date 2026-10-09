@@ -1,0 +1,14 @@
+{
+  "kind": "plan",
+  "schema": "run-plan",
+  "writer": "invalid",
+  "reader": "valid",
+  "reads": {
+    "targetMode": "refused"
+  },
+  "rules": [
+    "PLAN-7",
+    "VER-8"
+  ],
+  "why": "a target mode this version does not know: a reader takes the plan, and a runner refuses it"
+}

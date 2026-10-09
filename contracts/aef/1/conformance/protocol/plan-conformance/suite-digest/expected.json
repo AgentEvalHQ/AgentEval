@@ -11,7 +11,8 @@
   ],
   "rules": [
     "STRM-4",
-    "RUN-8"
+    "RUN-8",
+    "PLAN-8"
   ],
   "why": "the plan's suite and version, with other content than the digest the plan names"
 }

@@ -72,7 +72,7 @@ OTLP/JSON file), the output and an `expected.json` naming the direction and the 
 
 The examples are informative, like these pages: they are not conformance vectors, and nothing in the corpus depends on
 them. Every run they hold passes `tools/aef_verify.py run`. Writing the converter found what the two pages left
-undecided (OT-1 to OT-6, IN-1 to IN-10); settled on 10-09, each is now a rule or a stated refusal under the page's table
+undecided (OT-1 to OT-10, IN-1 to IN-11); settled on 10-09, each is now a rule or a stated refusal under the page's table
 for its direction.
 
 ## What survives a round trip

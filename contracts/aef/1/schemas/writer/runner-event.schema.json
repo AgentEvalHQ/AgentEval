@@ -105,7 +105,7 @@
           "const": "plan.estimated"
         },
         "cases": {
-          "description": "How many cases the runner expects to run.",
+          "description": "How many cases the runner expects to run: the cases of the plan's suites, at most the plan's cases limit when it sets one.",
           "type": "integer",
           "minimum": 0,
           "maximum": 9007199254740991
@@ -230,7 +230,7 @@
           "$ref": "#/properties/at"
         },
         "kind": {
-          "description": "lane.completed: a lane finished.",
+          "description": "lane.completed: a lane finished. Only from a runner given the checkpoint's rules (spec 05): a plan alone does not carry them.",
           "const": "lane.completed"
         },
         "lane": {
@@ -366,7 +366,7 @@
           "$ref": "#/properties/ext"
         },
         "runs": {
-          "description": "The runs it sealed before it stopped. Each must keep to the plan (STRM-4).",
+          "description": "The runs it sealed before it stopped, a run a limit cut off (closed aborted) among them (PLAN-9). Each must keep to the plan (STRM-4).",
           "type": "array",
           "items": {
             "$ref": "common.schema.json#/$defs/id"

@@ -578,13 +578,14 @@ def produce_vector(name, why, rules, cases, hand, lanes, metrics=None, run=None)
                                      "results": "expected-results.ndjson", "summary": summary, "why": why})
 
 
-def produce_refused(name, why, rules, cases, run=None):
+def produce_refused(name, why, rules, cases, run=None, summary=None):
     """A scenario that contradicts itself: the Producer refuses it (exit status 2) and writes nothing."""
     d = OUT / "produce" / name
     run_id = "produce-" + name
     write_json(d / "scenario.json", {
         "run": run or scenario_run(run_id), "metrics": {"schemaVersion": V, "metrics": [metric("pass_rate", "rate")]},
-        "cases": cases, "summary": {"lanes": [{"lane": "quality", "metrics": [{"metric": "pass_rate", "path": "q"}]}]}})
+        "cases": cases,
+        "summary": summary or {"lanes": [{"lane": "quality", "metrics": [{"metric": "pass_rate", "path": "q"}]}]}})
     write_json(d / "expected.json", {"kind": "produce", "rules": rules, "scenario": "scenario.json", "refused": True,
                                      "why": why})
 
@@ -753,6 +754,18 @@ def produce_vectors():
         [("quality", [E("pass_rate", "q", N=0, measured=[], sum="0", sumSq="0", value=None)])],
         run=scenario_run("produce-aborted-before-any-result", "aborted",
                          abortReason="The endpoint refused the first request (HTTP 401)."))
+
+    # R6-5: a scenario not of §9.2.1's shape, and a summarize input error raised through produce.
+    produce_refused(
+        "cases-not-a-list-refused",
+        "cases is an object, not a list of trees (spec 09 §9.2.1): a scenario not of that shape is an input error.",
+        ["RES-4"], {"k1": node("q", "passed")})
+    produce_refused(
+        "summary-undeclared-metric-refused",
+        "The summary asks for a metric metrics.json does not declare: summarize's input error, raised through produce "
+        "(spec 09 §9.3), so nothing is written.",
+        ["SUM-1", "SUM-3"], [case("k1", node("q", "passed"))],
+        summary={"lanes": [{"lane": "quality", "metrics": [{"metric": "latency", "path": "q"}]}]})
 
     # The scenarios that contradict themselves (spec 09 §9.3): refused, nothing written.
     root = lambda *children, **facts: node("answer", "passed", "composite:answer", aggregation={

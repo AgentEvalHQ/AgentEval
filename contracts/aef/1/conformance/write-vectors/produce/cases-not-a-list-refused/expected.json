@@ -1,0 +1,9 @@
+{
+  "kind": "produce",
+  "rules": [
+    "RES-4"
+  ],
+  "scenario": "scenario.json",
+  "refused": true,
+  "why": "cases is an object, not a list of trees (spec 09 §9.2.1): a scenario not of that shape is an input error."
+}

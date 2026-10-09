@@ -84,6 +84,11 @@ line without scores. The events go to an OTLP logs endpoint, or into the run's o
 writes them before the run closes. The rules below the table cover what the table does not; the reference converter,
 `tools/aef_interop.py to-otel`, follows both.
 
+**Values, not bytes** (settled 10-09, R7N-3). This page, in both directions, fixes values, not bytes: the order of
+members and of attributes, and the spelling of numbers, are free ([ENC-2](../spec/02-encoding.md#21-json-documents),
+[ENC-4](../spec/02-encoding.md#21-json-documents)). A checker compares JSON values, as `tools/check_interop.py` does.
+The worked example writes the attributes in the table's order.
+
 | AEF | OpenTelemetry | Fidelity |
 |---|---|---|
 | `traceLink.traceId`, `traceLink.spanId` | log record `traceId`, `spanId` | exact: both name the evaluated operation |
@@ -118,8 +123,9 @@ writes them before the run closes. The rules below the table cover what the tabl
 - **The event of a line without scores** (OT-1). `gen_ai.evaluation.name` is Required, and no field of a line without
   scores names a metric (a typed absence carries no scores, [RES-2](../spec/03-run.md#341-states)). The converter
   names the event after the metric of the summary entries at the line's path, in the lanes the line belongs to
-  ([SUM-3](../spec/03-run.md#36-summaryjson)). It refuses a line for which they name no metric or more than one (a run
-  with no `summary.json`, such as a running one).
+  ([SUM-3](../spec/03-run.md#36-summaryjson)); a trial line belongs to its lane like any line (R7N-9). It refuses a
+  line for which they name no metric or more than one (a run with no `summary.json`, such as a running one), and the
+  refusal refuses the whole export: nothing is written, and no line is skipped (R7N-4).
 - **The envelope** (OT-2). The converter writes one `LogsData` line per result line, holding that line's events, under
   the instrumentation scope `agenteval`, with `service.name` as the only resource attribute and no resource when
   `run.json` names no service. The event of a line with neither `endedAt` nor `startedAt` has no `timeUnixNano`, which
@@ -127,6 +133,16 @@ writes them before the run closes. The rules below the table cover what the tabl
 - **A run with `contentCapture: off`** (OT-3). The converter writes no `gen_ai.evaluation.explanation` for such a run,
   wherever the events go: [SEC-6](../spec/08-security.md#84-privacy) forbids the attribute in that run's own
   `logs.otlp.jsonl`, and the `reason` row of the table yields to it.
+- **The sealed results** (OT-7, R7N-5). The converter exports the lines as `results.ndjson` holds them, not the
+  effective view ([§4.3](../spec/04-integrity.md#43-the-effective-view)): overlays are not applied, so an `override`
+  does not change the exported state.
+- **Only a run that verifies** (OT-8, R7N-6). The converter exports a run only when `tools/aef_verify.py run` finds it
+  `intact` or `unsealed`, with no problem but an authorized withhold; it refuses any other run. A run it writes
+  from events is verified the same way, and refused (nothing written) when it does not verify.
+- **Refused exports** (OT-9, R7N-7, R7N-8). The converter refuses the whole export, and writes nothing, for a reasoning
+  blob it would send as an explanation that is not UTF-8 or is over 4 MiB, and for a time `timeUnixNano` cannot hold:
+  before 1970-01-01T00:00:00.000000001Z (0 means unknown) or after 2554-07-21T23:34:33.709551615Z (an unsigned 64-bit
+  count of nanoseconds).
 
 ## OpenTelemetry → AEF
 
@@ -157,28 +173,37 @@ converter, `tools/aef_interop.py from-otel`, follows the table and these rules (
 - **The run header** (OT-4). The converter takes the run id, `imported.from`, the subject's `ref` and `kind` and the
   target mode from the person converting; writes `status: completed`; takes `startedAt` and `endedAt` from the
   earliest and latest event time (the conversion time when no event has one); and lists each of these in
-  `imported.asserted`. It writes no `contentCapture` (a reader then treats the run as `on`,
-  [RUN-11](../spec/03-run.md#32-runjson): an explanation may hold a judge's reasoning), a `summary.json` without lanes
-  (the events carry no summary), and a metric declaration only for a metric some line scores. It seals the run at the
-  conversion time, which is not before the last event. It reads no traces, so it imports neither `gen_ai.agent.id` nor
-  the parent spans.
+  `imported.asserted`. It writes `contentCapture`, its own choice: `on` unless asked otherwise, listed in
+  `imported.asserted` too ([RUN-11](../spec/03-run.md#32-runjson), [RUN-15](../spec/03-run.md#32-runjson); as the
+  ASSERT importer does; R7N-10). It writes a `summary.json` without lanes (the events carry no summary), and a metric
+  declaration only for a metric some line scores. It seals the run at the conversion time, which is not before the
+  last event, and verifies it (OT-8). It reads no traces, so it imports neither `gen_ai.agent.id` nor the parent
+  spans.
 - **An event with both `error.type` and an explanation** (OT-5). Both rows write `reason`: the converter keeps the
-  explanation, and the type is lost. An `error.type` alone becomes the `reason`.
+  explanation, and the type is lost. An `error.type` without an explanation becomes the `reason`, with or without the
+  label `error`: that event is `error`, not a refusal (R7N-11).
+- **Each line** (OT-10, R7N-12). `evaluator.id` is the event's name. An explanation longer than 4096 characters is
+  cut to its first 4096.
 
-**Refused** (OT-4, OT-6; settled 10-09). The converter refuses these, naming the rule, and writes nothing:
+**Refused** (OT-4, OT-6, OT-8; settled 10-09). The converter refuses these, naming the rule, and writes nothing:
 
 - events whose resources name more than one `service.name`: a run has one subject (OT-4);
+- logs whose records carry content ([SEC-6](../spec/08-security.md#84-privacy)) when asked for `contentCapture: off`:
+  the run would not verify (OT-8);
+- an event without `gen_ai.evaluation.name`, which the convention requires (OT-6, R7N-12);
+- a label longer than 64 characters, the most `scores[].label` holds (OT-6, R7N-12);
 - an event with neither `test.case.name` nor `gen_ai.response.id`: a result needs a `caseId` (OT-6);
 - a second event of one case with the same name (a composite and its child scored on one metric, a case's trials, a
   line's two exports): the path comes from the name, so their lines would have one result id (OT-6);
 - a label that is not a state name, without a score value: `scores[].value` is required (OT-6);
-- a typed-absence label with a score value, or without an explanation: a typed absence has no scores and has a
-  `reason` (OT-6);
+- a typed-absence label with a score value, or without an explanation (the label `error` beside an `error.type`
+  excepted, OT-5): a typed absence has no scores and has a `reason` (OT-6);
 - the label `pending`: a converted run is closed ([RES-3](../spec/03-run.md#341-states)) (OT-6);
 - a label other than `error` beside `error.type` (OT-6);
 - an event with no label, no value and no `error.type` (OT-6).
 
-[`examples/otel-aef/refusals/`](examples/otel-aef/refusals/) holds one input for each.
+[`examples/otel-aef/refusals/`](examples/otel-aef/refusals/) holds an input for most of these, and
+[`examples/aef-otel-aef/refusals/`](examples/aef-otel-aef/refusals/) the refused exports of OT-8 and OT-9.
 
 ## What does not carry over
 
@@ -263,6 +288,7 @@ completion `chatcmpl-123`, imports into the same run as a `scored` line with the
 Nothing on this page waits on an AEF change. The losses above come from attributes OpenTelemetry has not defined yet:
 a run id, a test case id, evaluator identity, a score range and an interval.
 
-Settled 10-09: the cases writing the reference converter found undecided (OT-1 to OT-6) are now rules of this page.
-OT-1 to OT-3 are under [AEF → OpenTelemetry](#aef--opentelemetry); OT-4 and OT-5, and the refusals of OT-4 and OT-6,
-are under [OpenTelemetry → AEF](#opentelemetry--aef).
+Settled 10-09: the cases writing the reference converter found undecided (OT-1 to OT-6), and those a second converter
+(AgentEval.Results.Adapters, .NET) found (R7N-3 to R7N-12, as OT-7 to OT-10 and in the items they refine), are now
+rules of this page. OT-1 to OT-3 and OT-7 to OT-9 are under [AEF → OpenTelemetry](#aef--opentelemetry); OT-4, OT-5
+and OT-10, and the refusals of OT-4, OT-6 and OT-8, are under [OpenTelemetry → AEF](#opentelemetry--aef).

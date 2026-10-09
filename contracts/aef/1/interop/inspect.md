@@ -100,9 +100,14 @@ table cover what the table does not; the reference converter, `tools/aef_interop
   `stderr`; the entry's lane, metric, `N`, `notMeasured`, `verdict`, `rule` and `ci` under `metadata.aef`.
   `total_samples` and `completed_samples` are the number of samples.
 - **A sample's usage** (IN-5) is the sum of its lines' entries, per role and per model, as Inspect keeps it.
+- **Only a run that verifies** (IN-11, as OT-8 in [opentelemetry.md](opentelemetry.md); R7N-6). The converter
+  converts a run only when `tools/aef_verify.py run` finds it `intact` or `unsealed`, with no problem but an
+  authorized withhold, and exports its sealed lines: overlays are not applied (R7N-5).
 
-**Refused** (IN-1, IN-3 to IN-5; settled 10-09). The converter refuses these, naming the rule, and writes nothing:
+**Refused** (IN-1, IN-3 to IN-5, IN-11; settled 10-09). The converter refuses these, naming the rule, and writes
+nothing:
 
+- a run that does not verify (IN-11);
 - a run without a `suite`, or whose suite ref is not `suite:<task>`: `eval.task` is required (IN-1);
 - a run with more than one judge: a role of `eval.model_roles` holds one model (IN-1);
 - two summary entries at one path, since Inspect has one `EvalScore` per scorer; and an entry for a metric of kind
@@ -178,6 +183,7 @@ The reference converter, `tools/aef_interop.py from-inspect`, follows the table 
   asked otherwise); both are listed in `imported.asserted`, with `subject.ref` and `subject.kind`. `eval.run_id`,
   `eval.eval_set_id`, `eval.dataset` and `results.headline` go to `run.json`'s `ext."inspect_ai"`. A `started` log
   gives a running run, which is not sealed: only a closed run is ([SEAL-1](../spec/04-integrity.md#41-sealing-a-run)).
+  The run it writes is verified, and refused (nothing written) when it does not verify (IN-11).
 - **Scores** (IN-7). A score's metric is its key; a map member's metric is the member's key, a letter `C`, `I`, `P`
   or `N` in a map is the value its row gives with the letter as label, and a map's line is `scored`. NaN with
   `grader_failed` or `scoring_failed` is `error`; NaN with any other reason, or none, is `not_measured`; the three

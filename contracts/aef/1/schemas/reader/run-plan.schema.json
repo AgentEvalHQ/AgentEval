@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://agenteval.dev/aef/1/reader/run-plan.schema.json",
   "title": "AEF 1.0: run plan",
-  "description": "READER (tolerant), derived from the writer schema by tools/derive_reader.py. What a runner is asked to evaluate: the exact subject version, the suites and lanes, the limits, what text the runs keep (contentCapture), where and how it runs, and the credentials it needs, as references only (PLAN-1 to PLAN-5).",
+  "description": "READER (tolerant), derived from the writer schema by tools/derive_reader.py. What a runner is asked to evaluate: the exact subject version, the suites and lanes, the limits, what text the runs keep (contentCapture), how they drive the target (targetMode), where and how it runs, and the credentials it needs, as references only (PLAN-1 to PLAN-5).",
   "type": "object",
   "required": [
     "schemaVersion",
@@ -65,7 +65,7 @@
       }
     },
     "suites": {
-      "description": "The suites to run, each with an exact version and the lane it serves.",
+      "description": "The suites to run, each with an exact version and the lane it serves; a runner runs each as one run (PLAN-8).",
       "type": "array",
       "minItems": 1,
       "maxItems": 64,
@@ -86,7 +86,7 @@
           },
           "digest": {
             "$ref": "common.schema.json#/$defs/sha256Uri",
-            "description": "The SHA-256 of the suite's content, when it is frozen."
+            "description": "The SHA-256 of the suite's content, when it is frozen. A runner checks the content it resolves against it and refuses the job on a mismatch (PLAN-8)."
           },
           "lane": {
             "$ref": "common.schema.json#/$defs/laneName",
@@ -121,6 +121,10 @@
     },
     "contentCapture": {
       "description": "What text the runs keep: off or on, as run.json's contentCapture (RUN-11). Every run the runner produces carries this value (STRM-4).",
+      "type": "string"
+    },
+    "targetMode": {
+      "description": "How the runs drive the target, as run.json's execution.targetMode (RUN-7): live (the real subject; also when the plan has no targetMode), replayed, scripted or mocked. Every run the runner produces carries this value (STRM-4); a runner that cannot drive the target so refuses the plan (PLAN-7).",
       "type": "string"
     },
     "isolation": {

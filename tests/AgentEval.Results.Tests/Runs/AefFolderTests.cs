@@ -77,6 +77,105 @@ public sealed class AefFolderTests : IDisposable
         Assert.False(listing.OverlaysOverLimit);
     }
 
+    [Fact]
+    public void AFileNamedOverlays_IsAPathProblemOfTheRun()
+    {
+        // [RUN-3] (round 7): overlays is a folder; an entry of that name that is a file is a path problem of the run.
+        File.WriteAllText(Path.Combine(_run, "overlays"), "");
+
+        var listing = AefFolder.List(_run);
+
+        Assert.Contains("overlays", listing.Files);
+        Assert.Equal(new[] { new AefProblem("overlays", "path") }, listing.Problems);
+        Assert.Empty(listing.OverlayIrregular!);
+    }
+
+    [Fact]
+    public void ALinkNamedOverlays_ToAFolder_IsAPathProblemOfTheRun_AndIsNotFollowed()
+    {
+        // [RUN-3] (round 7): a link named overlays, to a folder included (overlays on other storage are mounted, never
+        // linked), is a path problem of the run; nothing behind it is listed, for the run or for the chain.
+        Directory.CreateDirectory(Path.Combine(_outside, "deeper"));
+        File.WriteAllText(Path.Combine(_outside, "events.ndjson"), "");
+        if (!TryLink(Path.Combine(_run, "overlays"), _outside, folder: true))
+        {
+            return;   // this system does not let the test make links (Windows without the privilege)
+        }
+
+        var listing = AefFolder.List(_run);
+
+        Assert.Equal(new[] { "blobs/sha256/ab/abcd", "results.ndjson", "run.json" }, listing.Files);
+        Assert.Equal(new[] { new AefProblem("overlays", "path") }, listing.Problems);
+        Assert.Empty(listing.OverlayIrregular!);
+    }
+
+    [Fact]
+    public void ALinkNamedOverlays_ToAFile_IsAPathProblemOfTheRun()
+    {
+        if (!TryLink(Path.Combine(_run, "overlays"), Path.Combine(_outside, "secret.txt"), folder: false))
+        {
+            return;
+        }
+
+        Assert.Equal(new[] { new AefProblem("overlays", "path") }, AefFolder.List(_run).Problems);
+    }
+
+    [Fact]
+    public void APathWhoseFirstSegmentIsOverlaysInAnotherCase_IsAPathProblemAtThatPath_BesideTheOverlaysFolder()
+    {
+        // [RUN-3] (round 7): beside overlays/, Overlays/x and a file OVERLAYS are path problems at their own paths (the
+        // clash with overlays/ is reported outside it, which the rule checks). Only a case-sensitive file system can hold
+        // both, so elsewhere (Windows, macOS by default) the test has nothing to build.
+        Directory.CreateDirectory(Path.Combine(_run, "overlays"));
+        File.WriteAllText(Path.Combine(_run, "overlays", "events.ndjson"), "");
+        if (Directory.Exists(Path.Combine(_run, "OVERLAYS")))
+        {
+            return;   // a case-insensitive file system
+        }
+
+        Directory.CreateDirectory(Path.Combine(_run, "Overlays", "sub"));
+        File.WriteAllText(Path.Combine(_run, "Overlays", "sub", "x"), "");
+        File.WriteAllText(Path.Combine(_run, "OVERLAYS"), "");
+
+        var listing = AefFolder.List(_run);
+
+        Assert.Equal(new[] { new AefProblem("OVERLAYS", "path"), new AefProblem("Overlays/sub/x", "path") }, listing.Problems);
+        Assert.Contains("overlays/events.ndjson", listing.Files);
+    }
+
+    [Fact]
+    public void APathWhoseFirstSegmentIsOverlaysInAnotherCase_IsAPathProblem_InARunWithoutOverlaysToo()
+    {
+        // [RUN-3] (round 7) sets no condition on the run: Overlays/notes.txt in a run with no overlays folder is a path
+        // problem all the same (overlays come after the seal, and would clash with it then). A file named OverlaysX, or
+        // a folder overlays-old, is not: its first segment is another name.
+        Directory.CreateDirectory(Path.Combine(_run, "Overlays"));
+        File.WriteAllText(Path.Combine(_run, "Overlays", "notes.txt"), "");
+        File.WriteAllText(Path.Combine(_run, "OverlaysX"), "");
+        Directory.CreateDirectory(Path.Combine(_run, "overlays-old"));
+        File.WriteAllText(Path.Combine(_run, "overlays-old", "y"), "");
+
+        var listing = AefFolder.List(_run);
+
+        Assert.Equal(new[] { new AefProblem("Overlays/notes.txt", "path") }, listing.Problems);
+    }
+
+    [Theory]
+    [InlineData("overlays", true)]
+    [InlineData("OVERLAYS", true)]
+    [InlineData("Overlays/x", true)]
+    [InlineData("oVeRlAyS/a/b", true)]
+    [InlineData("overlays/events.ndjson", false)]   // under overlays/: the chain's, never the run's
+    [InlineData("overlays/seal-0001.json", false)]
+    [InlineData("overlaysx", false)]
+    [InlineData("ext/overlays", false)]
+    [InlineData("ext/Overlays/x", false)]
+    [InlineData("overlay", false)]
+    public void TheOverlaysBoundary_IsTheFirstSegmentOverlaysInAnyCase_OutsideOverlays(string path, bool breaks)
+    {
+        Assert.Equal(breaks, AefFolder.BreaksTheOverlaysBoundary(path));
+    }
+
     // A symbolic link, where the operating system lets this process make one.
     private static bool TryLink(string path, string target)
     {

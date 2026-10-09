@@ -63,8 +63,11 @@ public static class RunnerEventStream
     /// <summary>
     /// [PLAN-7]: a runner takes a plan when it can take it (it carries every tag of the plan's runnerSelector, supports
     /// the plan's provider, and, for a remote-zone plan, is in the plan's zone) and knows the plan's provider,
-    /// isolation, content capture and credential schemes and purposes: what this version's writer schema accepts there
-    /// ([VER-8]). A runner refuses a plan holding a value it does not know, even one its own manifest lists.
+    /// isolation, content capture, target mode (an absent one is <c>live</c>, known) and credential schemes and
+    /// purposes: what this version's writer schema accepts there ([VER-8]). A runner refuses a plan holding a value it
+    /// does not know, even one its own manifest lists. A known target mode other than <c>live</c> is taken: a manifest
+    /// does not say which target modes a runner can give (round 7), so whether it can drive the target so is the
+    /// runner's to know, not the manifest's.
     /// </summary>
     public static bool Matches(JsonNode plan, JsonNode runner)
     {
@@ -85,6 +88,7 @@ public static class RunnerEventStream
         return Known("run-plan#/properties/provider", plan["provider"])
                && Known("run-plan#/properties/isolation", plan["isolation"])
                && Known("run-plan#/properties/contentCapture", plan["contentCapture"])
+               && Known("run-plan#/properties/targetMode", plan["targetMode"])
                && AefNode.Items(plan["credentialRefs"]).All(c =>
                    Known("run-plan#/properties/credentialRefs/items/properties/scheme", AefNode.Get(c, "scheme"))
                    && Known("run-plan#/properties/credentialRefs/items/properties/purpose", AefNode.Get(c, "purpose")));
@@ -373,7 +377,8 @@ public static class RunnerEventStream
         if ((AefNode.String(run["contentCapture"]) == "off" ? "off" : "on") != AefNode.String(plan["contentCapture"]))
             found.Add("content-capture");
 
-        if (AefNode.String(AefNode.At(run, "execution", "targetMode")) != "live")
+        // [STRM-4] target-mode (round 7): the plan's targetMode, live when the plan has none, compared as written ([RUN-7]).
+        if (AefNode.String(AefNode.At(run, "execution", "targetMode")) != (AefNode.String(plan["targetMode"]) ?? "live"))
             found.Add("target-mode");
 
         return found;

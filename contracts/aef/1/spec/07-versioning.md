@@ -65,7 +65,7 @@ better evidence than it is (each has a reader-only corpus vector):
 | a `threshold` rule's `op` | the lane's result is `not_measured` |
 | runner event `job.failed` `limit` | shown as written |
 | runner event `kind` | skipped by the verifier ([STRM-1]) |
-| plan `provider`, `isolation` or `contentCapture`, credential `scheme` or `purpose` | the runner refuses the plan ([PLAN-7]) |
+| plan `provider`, `isolation`, `contentCapture` or `targetMode`, credential `scheme` or `purpose` | the runner refuses the plan ([PLAN-7]) |
 | runner manifest `kind` or `os` | shown as written; it takes no part in matching ([PLAN-7]) |
 | runner event `lane.completed` `status` | `not_measured` |
 

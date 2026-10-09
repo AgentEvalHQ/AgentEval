@@ -104,6 +104,10 @@ each; a claim names the classes, the AEF version and the corpus version it passe
 | **Runner** | Accepts plans and writes event streams and sealed runs (*at risk* in 1.0, [§9.1](09-conformance.md#91-classes)) | 6 |
 | **Stream verifier** | Checks a runner's event stream against its plan | 6.4 |
 
+AEF's first consumer, AgentEval's Mission Control 2.0, relies on the Run verifier at the signed level, the Overlay
+verifier, the Checkpoint verifier (and with it the Decision engine) and the Stream verifier; AgentEval itself is a
+Producer and a Sealer of the runs they read.
+
 ## 1.8 Documents
 
 | Document | Contents |
@@ -113,7 +117,7 @@ each; a claim names the classes, the AEF version and the corpus version it passe
 | [03 The run](03-run.md) | The run folder and every file in it, the rules across files |
 | [04 Integrity](04-integrity.md) | Sealing, overlays, signatures, verification outcomes |
 | [05 Checkpoints](05-checkpoints.md) | Checkpoints, lane evaluation, the decision function |
-| [06 Runners](06-runners.md) | Run plans, runner manifests, matching, the event stream |
+| [06 Runners](06-runners.md) | Run plans, runner manifests, matching, the event stream, running a job |
 | [07 Versioning](07-versioning.md) | Writers and readers, minors and majors, unknown values, migration |
 | [08 Security and privacy](08-security.md) | Threat model, what is and is not protected, privacy |
 | [09 Conformance](09-conformance.md) | Classes, the corpus, running it, claiming conformance |

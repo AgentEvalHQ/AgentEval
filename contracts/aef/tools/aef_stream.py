@@ -60,29 +60,37 @@ def parse_time(text):
 
 
 def _plan_knowledge():
-    """The provider, isolation, content capture, credential schemes and purposes this version knows: what the writer
-    schemas accept there (VER-8)."""
+    """The provider, isolation, content capture, target modes, credential schemes and purposes this version knows: what
+    the writer schemas accept there (VER-8)."""
     writer = Path(__file__).resolve().parents[1] / "1" / "schemas" / "writer"
     plan = json.loads((writer / "run-plan.schema.json").read_bytes())["properties"]
     provider = json.loads((writer / "common.schema.json").read_bytes())["$defs"]["provider"]["anyOf"]
     creds = plan["credentialRefs"]["items"]["properties"]
     return (set(provider[0]["enum"]), re.compile(provider[1]["pattern"]), set(plan["isolation"]["enum"]),
-            set(plan["contentCapture"]["enum"]), set(creds["scheme"]["enum"]), set(creds["purpose"]["enum"]))
+            set(plan["contentCapture"]["enum"]), set(plan["targetMode"]["enum"]), set(creds["scheme"]["enum"]),
+            set(creds["purpose"]["enum"]))
+
+
+def target_mode(plan):
+    """The target mode a plan asks for: its targetMode, live when it has none (spec 06 §6.1)."""
+    return plan.get("targetMode", "live")
 
 
 def knows(plan):
     """PLAN-7: whether a runner of this version knows every value of the plan it must know, or must refuse it."""
-    providers, provider_pattern, isolations, captures, schemes, purposes = _plan_knowledge()
+    providers, provider_pattern, isolations, captures, modes, schemes, purposes = _plan_knowledge()
     p = plan.get("provider")
     return ((p in providers or (isinstance(p, str) and provider_pattern.fullmatch(p) is not None))
             and plan.get("isolation") in isolations
             and plan.get("contentCapture", "off") in captures
+            and target_mode(plan) in modes
             and all(c.get("scheme") in schemes and c.get("purpose") in purposes for c in plan.get("credentialRefs", [])))
 
 
 def matches(plan, runner):
     """PLAN-7: a runner takes a plan when it can take it (it carries every selector tag, supports the plan's provider,
-    and, for a remote-zone plan, is in the plan's zone) and knows its values (knows)."""
+    and, for a remote-zone plan, is in the plan's zone) and knows its values (knows), as far as its manifest tells: a
+    manifest does not say which target modes the runner can give."""
     return (knows(plan)
             and all(tag in runner.get("tags", []) for tag in plan.get("runnerSelector", []))
             and plan["provider"] in runner["providers"]
@@ -228,7 +236,7 @@ def departures(doc, plan, accepted, terminal):
     capture = "off" if doc.get("contentCapture") == "off" else "on"  # absent or unknown reads as on
     if capture != plan["contentCapture"]:
         found.append("content-capture")
-    if (doc.get("execution") or {}).get("targetMode") != "live":
+    if (doc.get("execution") or {}).get("targetMode") != target_mode(plan):  # as written; a plan without one asks for live
         found.append("target-mode")
     return found
 

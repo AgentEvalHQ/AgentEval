@@ -990,6 +990,8 @@ agenteval aef view <run-dir> [--at <time>] [--policy <trust-policy.json>] [--jso
 agenteval aef checkpoint <manifest.json> --runs <dir> [--policy <trust-policy.json>] [--at <time>] [--envelope <file>] [--json]
 agenteval aef export <store-dir> <out-dir> [--run <run-id>] [--target-mode live|replayed|scripted|mocked] [--content-capture on|off] [--no-seal] [--key <pkcs8.pem>] [--json]
 agenteval aef import assert-ai <assert-run-dir> <out-dir> [--taxonomy <file>] [--test-set <file>] [--calibration <file>] [--max-harm-rate <0-1>] [--max-over-refusal-rate <0-1>] [--content-capture on|off] [--no-seal] [--key <pkcs8.pem>] [--json]
+agenteval aef import otel <logs-file> <out-dir> --run-id <id> --from <tool> --subject <kind:name> [--subject-kind agent] --target-mode live|replayed|scripted|mocked [--content-capture on|off] [--no-seal] [--key <pkcs8.pem>] [--json]
+agenteval aef export-otel <run-dir> <out-file> [--policy <trust-policy.json>] [--json]
 ```
 
 **`verify`** reports a run as `intact`, `unsealed` or `invalid`, with every problem. With `--policy`, it also says
@@ -1015,6 +1017,19 @@ as `ingest` unless `--no-seal`.
 **`import assert-ai`** converts an [ASSERT](assert-interop.md) run into an AEF run: a root line and harm and
 over-refusal lines per case, ASSERT's rates in `summary.json`, with optional gate limits. With `--content-capture
 off`, no prompt, response, transcript or judge reasoning is kept.
+
+**`import otel`** converts OpenTelemetry `gen_ai.evaluation.result` events (OTLP/JSON logs, one `LogsData` per line)
+into an AEF run, as [the OpenTelemetry interop page](../contracts/aef/1/interop/opentelemetry.md) maps them: a line
+per event, the run's id, subject and target mode from you, `contentCapture` `on` unless `--content-capture off`
+(then logs carrying content are refused), sealed as `ingest` unless `--no-seal`, and verified. Events the page refuses
+(two services, an event with no case or no name, a second event of one case with one name, …) exit `2`, naming the
+rule.
+
+**`export-otel`** writes an AEF run as OpenTelemetry events: one `LogsData` line per result line, one
+`gen_ai.evaluation.result` event per score, labelled with the result's sealed state (overlays are not applied) and
+parented to its `traceLink`. The run must verify (`intact` or `unsealed`; `--policy` lets an authorized redaction
+withhold a reasoning blob); the output file must not exist. A run it cannot export (one that does not verify, a time
+OpenTelemetry cannot hold, a reasoning blob that is not UTF-8 or is over 4 MiB) exits `2`, and nothing is written.
 
 Every verb takes `--json` and then prints one JSON value. Exit `2` is a usage or input error.
 

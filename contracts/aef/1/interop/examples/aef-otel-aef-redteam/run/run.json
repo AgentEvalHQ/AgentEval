@@ -15,6 +15,7 @@
   },
   "startedAt": "2026-10-09T00:00:00Z",
   "endedAt": "2026-10-09T00:00:00Z",
+  "contentCapture": "on",
   "imported": {
     "from": "aef_interop.py 1.0 (to-otel)",
     "asserted": [
@@ -24,7 +25,8 @@
       "subject.kind",
       "execution.targetMode",
       "startedAt",
-      "endedAt"
+      "endedAt",
+      "contentCapture"
     ]
   }
 }

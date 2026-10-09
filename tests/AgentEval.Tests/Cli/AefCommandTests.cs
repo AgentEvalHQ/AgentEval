@@ -170,6 +170,72 @@ public class AefCommandTests : IDisposable
         Assert.Equal(ExitCodes.UsageError, await AefCommand.RunExportAsync(_root, Out("x"), null, "mocked", "on", false, null, false, TextWriter.Null, TextWriter.Null));
     }
 
+    [Fact]
+    public void ExportOtel_WritesOneLogsDataLinePerResultLine_AndRefusesWhatItCannotExport()
+    {
+        // The checked example's input run (interop/examples/aef-otel-aef/input): nine result lines, nine events.
+        var example = Path.Combine(AefSchemaSet.RepoRoot(), "contracts", "aef", "1", "interop", "examples", "aef-otel-aef");
+        Directory.CreateDirectory(_root);
+        var output = Path.Combine(_root, "otel.jsonl");
+
+        var (exit, json, _) = Run((o, e) => AefCommand.RunExportOtel(Path.Combine(example, "input"), output, null, true, o, e));
+        var report = JsonNode.Parse(json)!;
+        Assert.Equal(ExitCodes.Success, exit);
+        Assert.Equal(("01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10", "intact", 9, 9), ((string)report["runId"]!, (string)report["outcome"]!, (int)report["lines"]!, (int)report["events"]!));
+        var lines = File.ReadAllLines(output);
+        Assert.Equal(9, lines.Length);
+        Assert.All(lines, l => Assert.Equal("gen_ai.evaluation.result", (string)JsonNode.Parse(l)!["resourceLogs"]![0]!["scopeLogs"]![0]!["logRecords"]![0]!["eventName"]!));
+
+        // The text report; then the input errors (exit 2), with nothing written: the output file exists, the run is not
+        // a folder, the folder is not a run that verifies, the trust policy does not read.
+        var (textExit, text, _) = Run((o, e) => AefCommand.RunExportOtel(Path.Combine(example, "input"), Path.Combine(_root, "again.jsonl"), null, false, o, e));
+        Assert.Equal(ExitCodes.Success, textExit);
+        Assert.Contains("→", text, StringComparison.Ordinal);
+        Assert.Contains("9 LogsData lines, 9 gen_ai.evaluation.result events", text, StringComparison.Ordinal);
+
+        var (existsExit, _, existsError) = Run((o, e) => AefCommand.RunExportOtel(Path.Combine(example, "input"), output, null, false, o, e));
+        Assert.Equal(ExitCodes.UsageError, existsExit);
+        Assert.Contains("exists", existsError, StringComparison.Ordinal);
+        Assert.Equal(ExitCodes.UsageError, Run((o, e) => AefCommand.RunExportOtel(Path.Combine(_root, "nowhere"), Path.Combine(_root, "x.jsonl"), null, false, o, e)).Exit);
+        Assert.Equal(ExitCodes.UsageError, Run((o, e) => AefCommand.RunExportOtel(example, Path.Combine(_root, "x.jsonl"), null, true, o, e)).Exit);
+        Assert.Equal(ExitCodes.UsageError, Run((o, e) => AefCommand.RunExportOtel(Path.Combine(example, "input"), Path.Combine(_root, "x.jsonl"), Path.Combine(example, "expected.json"), false, o, e)).Exit);
+        Assert.False(File.Exists(Path.Combine(_root, "x.jsonl")));
+    }
+
+    [Fact]
+    public void ImportOtel_WritesASealedImportedRun_AndRefusesWhatThePageRefuses()
+    {
+        // interop/examples/otel-aef: seven evaluation events (and one log record that is none) as an AEF run.
+        var example = Path.Combine(AefSchemaSet.RepoRoot(), "contracts", "aef", "1", "interop", "examples", "otel-aef");
+        var clock = new FixedClock(new DateTimeOffset(2026, 10, 9, 0, 0, 0, TimeSpan.Zero));
+
+        var (exit, json, error) = Run((o, e) => AefCommand.RunImportOtel(Path.Combine(example, "input.jsonl"), Out(), "otel-import-0001", "hand-written OTLP/JSON (opentelemetry.md)", "agent:support/support-triage", "agent", "live", "on", false, null, true, o, e, clock));
+        Assert.True(exit == ExitCodes.Success, error);
+        var report = JsonNode.Parse(json)!;
+        Assert.Equal(("intact", "otel-import-0001", true), ((string)report["outcome"]!, (string)report["runId"]!, (bool)report["sealed"]!));
+        Assert.Equal(File.ReadAllLines(Path.Combine(example, "run", "results.ndjson")).Length, File.ReadAllLines(Path.Combine(Out(), "results.ndjson")).Length);
+        Assert.Contains("startedAt", report["asserted"]!.AsArray().Select(a => (string)a!));
+
+        // Refused, naming the rule (exit 2, nothing written); a bad target mode or subject kind is a usage error.
+        var (refusedExit, _, refusedError) = Run((o, e) => AefCommand.RunImportOtel(Path.Combine(example, "refusals", "pending.jsonl"), Out("x"), "r", "f", "agent:a", "agent", "live", "on", false, null, false, o, e, clock));
+        Assert.Equal(ExitCodes.UsageError, refusedExit);
+        Assert.Contains("OT-6", refusedError, StringComparison.Ordinal);
+        Assert.False(Directory.Exists(Out("x")));
+        var (offExit, _, offError) = Run((o, e) => AefCommand.RunImportOtel(Path.Combine(example, "input.jsonl"), Out("x"), "r", "f", "agent:a", "agent", "live", "off", false, null, false, o, e, clock));
+        Assert.Equal(ExitCodes.UsageError, offExit);   // OT-8: logs carrying explanations, asked for contentCapture off
+        Assert.Contains("content-capture", offError, StringComparison.Ordinal);
+        Assert.False(Directory.Exists(Out("x")));
+        Assert.Equal(ExitCodes.UsageError, Run((o, e) => AefCommand.RunImportOtel(Path.Combine(example, "input.jsonl"), Out("x"), "r", "f", "agent:a", "agent", "live", "maybe", false, null, false, o, e, clock)).Exit);
+        Assert.Equal(ExitCodes.UsageError, Run((o, e) => AefCommand.RunImportOtel(Path.Combine(example, "input.jsonl"), Out("x"), "r", "f", "agent:a", "agent", "real", "on", false, null, false, o, e, clock)).Exit);
+        Assert.Equal(ExitCodes.UsageError, Run((o, e) => AefCommand.RunImportOtel(Path.Combine(example, "input.jsonl"), Out("x"), "r", "f", "agent:a", "robot", "live", "on", false, null, false, o, e, clock)).Exit);
+        Assert.Equal(ExitCodes.UsageError, Run((o, e) => AefCommand.RunImportOtel(Path.Combine(example, "input.jsonl"), Out(), "r", "f", "agent:a", "agent", "live", "on", false, null, false, o, e, clock)).Exit);   // out-dir in use
+    }
+
+    private sealed class FixedClock(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
+    }
+
     private void Import(string output, bool seal) =>
         Assert.Equal(ExitCodes.Success, Run((o, e) => AefCommand.RunImportAssertAi(AssertSample, output, null, null, null, null, null, "on", !seal, null, false, o, e)).Exit);
 
