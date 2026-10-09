@@ -1,5 +1,25 @@
 # AEF 1.0 changelog
 
+## Unreleased (draft): rework after critic round 6
+
+Critic round 6 scored 9.1 of 10 (from 8.8): what blocks 1.0 is the patent commitment and an editorial pass, not the
+design; the two implementations agreed on every crafted input. Changes since:
+
+- **The later-minor rule reaches the manifest** ([CKP-7], [CKP-8], §5.3): a manifest is `unverifiable` for an unknown
+  state, outcome or lane status only when it declares a later minor; a 1.0 manifest is checked as usual, so a value
+  nobody defined never hides a wrong decision. Only the candidate's metric direction counts ([LANE-7]). Vectors: the
+  three version vectors now declare 1.1, each with a 1.0 twin; a 1.0 run with an unknown target mode; a baseline-only
+  unknown direction.
+- **A tree belongs to its case, and a trial is a whole tree** ([RES-5], [RES-8]): a child's `caseId` is its parent's
+  (`parent` otherwise); a trial line's parent carries `trial` (`trials` otherwise). Vectors for each, and a
+  `produce` vector for independent roots in trials.
+- **Editorial**: VER-1 names the files that carry no `schemaVersion`; §7.5 binds migrators, not a conformance class;
+  §9.2.1's paths stay inside, as the runner enforces; the in-toto page no longer offers Sigstore as a policy input;
+  the rationale, the producer guide and §9.2.1's scenario text brought in line; a trust policy of another major is
+  refused with a message that says so ([VER-4]).
+- **Left for 1.1, said so**: `produce` writes no evidence, gates or blobs (§9.1); at-limit vectors for 1,000,000
+  result lines and 19,999 overlay files would need a million distinct valid lines or a 19,994-problem expectation.
+
 ## Unreleased (draft): rework after critic round 5
 
 Critic round 5 scored 8.8 of 10 (from 8.6). Changes since:

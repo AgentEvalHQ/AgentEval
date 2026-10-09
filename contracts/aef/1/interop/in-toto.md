@@ -106,7 +106,7 @@ products", and its registrations "may be submitted directly to the IANA, where t
 | `overlays/seal-<nnnn>.dsse.json` | a DSSE envelope over a batch seal, `payloadType` `application/vnd.in-toto+json` | SIG-1 |
 | `<checkpoint>.dsse.json` | a DSSE envelope over a checkpoint manifest, which is not an in-toto Statement; `payloadType` `application/vnd.agenteval.aef.checkpoint+json` | SIG-1, [CKP-5](../spec/05-checkpoints.md#51-the-manifest) |
 | key ids, algorithms | `keyid` is `sha256:` of the public key's SubjectPublicKeyInfo; ECDSA P-256 or Ed25519 | [SIG-2, SIG-3](../spec/04-integrity.md#44-signatures) |
-| Sigstore | a trust-policy input, with its bundle given beside the envelope | [SIG-4](../spec/04-integrity.md#44-signatures) |
+| Sigstore | not in AEF 1.0's trust policy: a later minor may add keyless identities, and a 1.0 verifier refuses a policy that uses them | [SIG-4](../spec/04-integrity.md#44-signatures) |
 
 Both statements follow the in-toto conventions: a self-hosted type URI that carries the major version,
 lowerCamelCase fields, RFC 3339 times in `Z`, a `sha256` digest per subject. Both envelopes follow DSSE and the
@@ -133,7 +133,7 @@ in-toto envelope rules: the generic in-toto payload type, and file names that en
 | in-toto | AEF | Fidelity |
 |---|---|---|
 | another signer's DSSE envelope over the same `seal.json` bytes | another signature in `attestation.dsse.json`, or a second envelope kept beside the run | exact; a verifier checks each signature against its trust policy ([SIG-5](../spec/04-integrity.md#44-signatures)) |
-| a Sigstore bundle | a trust-policy input ([SIG-4](../spec/04-integrity.md#44-signatures)) | exact |
+| a Sigstore bundle | none in 1.0: keyless signing is not part of the trust policy ([SIG-4](../spec/04-integrity.md#44-signatures)) | lost: a 1.0 verifier needs a public key in its policy |
 | a Test Result statement | a run with one root line per listed test: `passed`, `warn` or `failed` | lossy: no scores. The converter supplies the subject, suite and target mode and lists them in `imported.asserted` ([RUN-15](../spec/03-run.md#32-runjson)) |
 | a Test Result's `url` | an evidence record with a URI link | exact |
 

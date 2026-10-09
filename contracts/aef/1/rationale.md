@@ -227,7 +227,8 @@ threat and which mechanism, if any, addresses it.
 readers never disagree on a file ([ENC-17]): JSON nested at most 64 deep; 4 MiB per JSON file or NDJSON line; 40 MiB
 for `seal.json` or a batch seal, which list every sealed file, and 56 MiB for a signature envelope, which holds one in
 base64; a million lines and 1 GiB per NDJSON file; 1 GiB per blob; 100,000 files per run, not counting the seal, its
-signature and `overlays/`, which holds at most 9,999 batches (19,999 files). A reader reports what it refuses as `limit`, and
+signature and `overlays/`, which holds at most 9,999 batches (19,999 files; more is `limit`, and the chain is still
+checked from the files it names). A reader reports what it refuses as `limit`, and
 refuses nothing within the limits ([ENC-18]).
 
 **What happens when AEF 1.1 adds a field?**
@@ -235,8 +236,10 @@ A 1.0 reader keeps working: it ignores the field, and reads an unknown value as 
 minor version only adds, and a problem code it adds applies only to what it adds, so a file valid under 1.0 stays
 valid ([VER-5]). It never adds a value to the three closed enums ([VER-9]), nor an aggregate a verifier recomputes
 ([SUM-8]). Checkpoints too: a 1.0 checkpoint verifier reports a lane as `unverifiable`, never as wrong, when
-recomputing it reads something it does not know, in the rule (a later rule kind, member, maximum, operator or axis)
-or in the runs (a target mode, a severity, a metric direction) ([CKP-8]); and a minor never changes what an existing
+recomputing it reads something it does not know in a document that declares a later minor, in the rule (a later rule
+kind, member, maximum, operator or axis) or in the runs (a target mode, a severity, a metric direction) ([CKP-8]),
+and a manifest likewise ([CKP-7]); a document that declares 1.0 is read as 1.0 reads it, so a value nobody defined
+never hides a wrong result; and a minor never changes what an existing
 rule computes through a field it adds to a run, only through a new rule kind or member ([VER-5]).
 `tools/schema_diff.py` refuses any schema change a minor may not make ([CONF-5]).
 

@@ -109,6 +109,23 @@ public class TrustPolicyTests
         }
     }
 
+    [Theory]
+    [InlineData("2.0", "AEF major version 2")]
+    [InlineData("0.9", "AEF major version 0")]
+    [InlineData("12.3", "AEF major version 12")]
+    [InlineData("1.1", "a later minor")]
+    public void APolicyOfAnotherMajorVersion_IsRefusedWithAMessageThatSaysSo(string schemaVersion, string said)
+    {
+        // [VER-4]: a reader refuses a major version it does not know, with a message that says so (round 6); and a later
+        // minor is named as such ([SIG-4]), not as a schema mismatch.
+        var json = $$"""{"schemaVersion":"{{schemaVersion}}","keys":[{"identity":"x","publicKey":{{JsonValue.Create(PemA).ToJsonString()}}}]}""";
+
+        var refused = Assert.Throws<TrustPolicyException>(() => TrustPolicy.Parse(Encoding.UTF8.GetBytes(json)));
+
+        Assert.Contains(said, refused.Message, StringComparison.Ordinal);
+        Assert.Contains(schemaVersion, refused.Message, StringComparison.Ordinal);
+    }
+
     [Fact]
     public void KeylessSigning_IsNotPartOf10sPolicy_AndAPolicyUsingItIsRefused()
     {

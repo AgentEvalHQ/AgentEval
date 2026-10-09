@@ -148,8 +148,9 @@ One line per node of the run's result tree.
 - **[RES-5]** A composite node carries `aggregation`: the `strategy` the producer used, its `threshold` and `score`, how
   many children were `measured` of the `total`, why the others were not (`unmeasured`: counts per typed absence), the
   `rulePath` (which branch of the producer's verdict rules decided the state) and `decisive` (the children that decided
-  it). Each child has `parentResultId` and `component` (`weight`, `required`); a node with children has
-  `aggregation`. Both are checked (§3.9 `component`, `aggregation`).
+  it). Each child has `parentResultId` and `component` (`weight`, `required`), and its parent's `caseId`: a tree
+  belongs to one case. A node with children has `aggregation`. All three are checked (§3.9 `parent`, `component`,
+  `aggregation`).
 - **[RES-6] Aggregation is descriptive.** It records how the producer reached a composite's state; it is not a
   formula AEF defines. A reader **MUST NOT** recompute a composite's state from its children or present a different
   one. `strategy` and `rulePath` are a vocabulary for display (see the table); a reader shows an unknown value as
@@ -183,7 +184,8 @@ One line per node of the run's result tree.
   and path carries `trials`: `n`, `passed` (≤ `n`), the `aggregation` and `agree` (`false` when the trials disagreed,
   ending in different states: the case is flaky). The case's result at that path is the rollup line, never one
   trial. A line carries `trial` or `trials`, never both. Every line under a trial's line carries the same `trial` (so
-  SUM-3 never counts a trial's children as the case's). When a case has trial lines at a path, exactly one rollup line
+  SUM-3 never counts a trial's children as the case's), and a trial line's parent, when it has one, carries `trial`
+  too: a trial is a whole tree of its case, as `produce` writes it (§9.2.1). When a case has trial lines at a path, exactly one rollup line
   at that path carries `trials`, whose `n` is the number of those trial lines, `passed` the number of them in state
   `passed`, and `agree` `true` exactly when they are all in one state (in a running run, a case still running may
   have no rollup yet): a failing trial cannot vanish behind its rollup, nor a case behind a missing one. A composite
@@ -300,11 +302,11 @@ an `encoding`, `limit` or `schema` problem: they would otherwise be checked agai
 | `schema` | the file (`results.ndjson:<line>` for a line) | the document or line is not valid against the reader schema, or holds a time that does not exist ([ENC-8]: a pattern cannot refuse `2026-02-31`); also a file [RUN-2] requires that is absent, at its path |
 | `path` | the path | [RUN-3]; for two paths that differ only in case, the later one in byte order |
 | `result-id` | `results.ndjson:<line>` | a `resultId` that is not the [RES-4] hash of the line, or one an earlier line already has |
-| `parent` | `results.ndjson:<line>` | a `parentResultId` that is no line of the run |
+| `parent` | `results.ndjson:<line>` | a `parentResultId` that is no line of the run, or a line of another case ([RES-5]) |
 | `component` | `results.ndjson:<line>` | a child (a line with `parentResultId`) without `component` ([RES-5]) |
 | `aggregation` | `results.ndjson:<line>` | [RES-5], [RES-6]: a node with children and no `aggregation`, a `total` that is not the number of children, counts that do not add up (an absent `unmeasured` or count is 0), or a `decisive` id that is not a child |
 | `annotator` | `results.ndjson:<line>` | a panel whose `agree` exceeds `of` ([RES-10]) |
-| `trials` | `results.ndjson:<line>` | a rollup whose `passed` exceeds `n`, or whose `n`, `passed` and `agree` are not what its trial lines give; a second rollup for one case and path (at the later one); or, at each trial line of a closed run, a trial line whose case and path have no rollup; or a line whose parent carries `trial` and that does not carry the same one; or a rollup whose parent is not the rollup at its trial lines' parents' path, when the case has one there (none when they are roots), or whose trial lines' parents are at several paths, or roots and not ([RES-8]) |
+| `trials` | `results.ndjson:<line>` | a rollup whose `passed` exceeds `n`, or whose `n`, `passed` and `agree` are not what its trial lines give; a second rollup for one case and path (at the later one); or, at each trial line of a closed run, a trial line whose case and path have no rollup; or a line whose parent carries `trial` and that does not carry the same one, or a line carrying `trial` whose parent carries none; or a rollup whose parent is not the rollup at its trial lines' parents' path, when the case has one there (none when they are roots), or whose trial lines' parents are at several paths, or roots and not ([RES-8]) |
 | `pending` | `results.ndjson:<line>` | a `pending` line in a closed run ([RES-3]) |
 | `evidence` | `results.ndjson:<line>` | an evidence id no record of `evidence.ndjson` has |
 | `evidence-id` | `evidence.ndjson:<line>` | an `evidenceId` an earlier line already has |

@@ -25,6 +25,55 @@
         }
       ],
       "blocking": true
+    },
+    {
+      "lane": "target-mode-in-1-0",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "p",
+        "op": ">=",
+        "value": 0.5
+      },
+      "runs": [
+        {
+          "runId": "DV-shadow",
+          "runHash": "3072f259326b7ff3692f1fddf67c11630625420730712ae3da2c75dac21388e4",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "baseline-direction-unknown",
+      "rule": {
+        "kind": "comparison",
+        "lane": "memory",
+        "metric": "recall",
+        "path": "mem",
+        "baseline": {
+          "runId": "DV-baseline",
+          "runHash": "110942527ced3ce30e27ce2233c378be42e646875fad252a01d310220d5e9957"
+        },
+        "significance": 0.05,
+        "minimumPairs": 20,
+        "axes": [
+          "subject",
+          "suite",
+          "judges",
+          "rubrics",
+          "target-mode"
+        ]
+      },
+      "runs": [
+        {
+          "runId": "DV-candidate",
+          "runHash": "5b4ff8908e2ea74546daee2a7f9a1379311588bcb1fc412bc5128c5fc7e0f776",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
     }
   ],
   "state": "decided",
@@ -45,6 +94,30 @@
         "evidence": [
           "afdff44bfc62bfe8a8b2216c917142c4956cdad62768811ff6c2b621a4d4241c"
         ]
+      },
+      {
+        "lane": "target-mode-in-1-0",
+        "blocking": true,
+        "result": {
+          "status": "passed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-03T00:00:00Z"
+        },
+        "evidence": [
+          "3072f259326b7ff3692f1fddf67c11630625420730712ae3da2c75dac21388e4"
+        ]
+      },
+      {
+        "lane": "baseline-direction-unknown",
+        "blocking": true,
+        "result": {
+          "status": "failed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-06T00:00:00Z"
+        },
+        "evidence": [
+          "5b4ff8908e2ea74546daee2a7f9a1379311588bcb1fc412bc5128c5fc7e0f776"
+        ]
       }
     ]
   },
@@ -55,10 +128,21 @@
         "lane": "junk-member",
         "status": "failed",
         "blocking": true
+      },
+      {
+        "lane": "target-mode-in-1-0",
+        "status": "passed",
+        "blocking": true
+      },
+      {
+        "lane": "baseline-direction-unknown",
+        "status": "failed",
+        "blocking": true
       }
     ],
     "reasons": [
       "failed:junk-member",
+      "failed:baseline-direction-unknown",
       "outcome:blocked"
     ]
   }

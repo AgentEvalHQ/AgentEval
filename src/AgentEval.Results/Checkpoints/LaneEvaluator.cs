@@ -151,7 +151,8 @@ public static class LaneEvaluator
         // for its rule, a run's document for a run-side value. One that declares this version is read as §7.3 says and
         // compared as usual.
         var readsUnknown = (AefVersion.DeclaresLaterMinor(checkpointVersion) && !AefSchemas.Writer.IsValid(RuleSchema, lane["rule"]))
-                           || runs.Append(baseline).OfType<AefStoredRun>().Any(run => ReadsUnknown(rule, run));
+                           || runs.OfType<AefStoredRun>().Any(run => ReadsUnknown(rule, run))
+                           || (baseline is not null && ReadsUnknown(rule, baseline, isBaseline: true));
 
         return new LaneEvaluation(name, rule, Result(rule, runs, baseline, subject, fallbackTime), ByBytes(problems), readsUnknown);
     }
@@ -165,13 +166,17 @@ public static class LaneEvaluator
     /// at that field) in a document that declares a later minor than this version ([VER-6]): an
     /// <c>execution.targetMode</c> in a run.json that does; for a <c>severity</c> rule, a <c>severity</c> on one of the
     /// rule's lines (its summary lane and path, trial lines included, whatever their state) that does; for a
-    /// <c>comparison</c> rule, the <c>direction</c> of the compared metric in a metrics.json that does. A value in a
-    /// document that declares this version is read as §7.3 says, and makes nothing unverifiable (round 5). A rule not valid
+    /// <c>comparison</c> rule, the <c>direction</c> of the compared metric in the candidate's metrics.json when it does
+    /// ([LANE-7] reads the candidate's alone, so a baseline's direction is never read: round 6). A value in a document
+    /// that declares this version is read as §7.3 says, and makes nothing unverifiable (round 5). A rule not valid
     /// against the writer schema, in a checkpoint that declares a later minor, is the other case ([CKP-8]);
     /// <see cref="Evaluate"/> checks both.
     /// </summary>
+    /// <param name="rule">The lane's rule.</param>
+    /// <param name="run">A found run of the lane, or its comparison's baseline.</param>
+    /// <param name="isBaseline">Whether <paramref name="run"/> is the comparison's baseline.</param>
     /// <exception cref="IOException">A run's file cannot be read.</exception>
-    public static bool ReadsUnknown(LaneRule rule, AefStoredRun run)
+    public static bool ReadsUnknown(LaneRule rule, AefStoredRun run, bool isBaseline = false)
     {
         ArgumentNullException.ThrowIfNull(rule);
         ArgumentNullException.ThrowIfNull(run);
@@ -191,7 +196,8 @@ public static class LaneEvaluator
                     && severity.InScope(AefNode.String(l.Value["path"]))
                     && l.Value["severity"] is { } value && !AefSchemas.Writer.IsValid(SeveritySchema, value));
             case ComparisonRule comparison:
-                return AefVersion.DeclaresLaterMinor(run.Documents.Metrics?["schemaVersion"])
+                return !isBaseline
+                       && AefVersion.DeclaresLaterMinor(run.Documents.Metrics?["schemaVersion"])
                        && Metric(run.Documents.Metrics, comparison.Metric)?["direction"] is { } direction
                        && !AefSchemas.Writer.IsValid(DirectionSchema, direction);
             default:

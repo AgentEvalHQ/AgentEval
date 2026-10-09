@@ -13,41 +13,56 @@ namespace AgentEval.Results.Checkpoints;
 /// </summary>
 public static class CheckpointManifest
 {
-    private static readonly HashSet<string> States = new(StringComparer.Ordinal) { "draft", "planned", "approved_to_spend", "running", "evidence_complete", "decided" };
+    // The values this version's writer schemas accept ([VER-8]: known), state by state and status by status.
+    private static readonly HashSet<string> Undecided = new(StringComparer.Ordinal) { "draft", "planned", "approved_to_spend", "running", "evidence_complete" };
+    private static readonly HashSet<string> States = new(Undecided, StringComparer.Ordinal) { "decided" };
     private static readonly HashSet<string> Outcomes = new(StringComparer.Ordinal) { "approved", "approved_with_exceptions", "blocked", "inconclusive", "expired" };
     private static readonly HashSet<string> LaneStatuses = new(StringComparer.Ordinal) { "passed", "failed", "missing", "not_measured", "incomparable", "stale", "waived" };
     private static readonly HashSet<string> EvidenceStatuses = new(StringComparer.Ordinal) { "passed", "failed", "not_measured", "incomparable" };
 
     /// <summary>
-    /// The problems, in name order: <c>decision</c> (not what the recorded input gives), <c>evidence</c> (a lane has
-    /// runs but no result in the input, a lane the input leaves out included, or a result but no runs, a result for a
-    /// lane the manifest does not have included), <c>exception-evidence</c> (an exception names a run hash that is not
-    /// one of its lane's runs), <c>lane-evidence</c> (a lane's evidence in the input is not the set of its runs' run
-    /// hashes), <c>lanes</c> (the input does not decide exactly the manifest's lanes), <c>outcome</c> (not the
-    /// decision's), <c>version</c> (the input is for another version). Or only
-    /// <c>unverifiable</c>: the manifest is in a state, or uses an outcome or status, this version does not know, or lacks
-    /// the decision a newer version may make optional; a reader cannot recompute it, and that is not tampering. Empty
-    /// for a manifest not yet decided, or aborted.
+    /// The problems, in name order: <c>decision</c> (not what the recorded input gives, or the input cannot be decided),
+    /// <c>evidence</c> (a lane has runs but no result in the input, a lane the input leaves out included, or a result but
+    /// no runs, a result for a lane the manifest does not have included), <c>exception-evidence</c> (an exception names a
+    /// run hash that is not one of its lane's runs), <c>lane-evidence</c> (a lane's evidence in the input is not the set
+    /// of its runs' run hashes), <c>lanes</c> (the input does not decide exactly the manifest's lanes), <c>outcome</c>
+    /// (not the decision's), <c>version</c> (the input is for another version). Or only <c>unverifiable</c>: the manifest
+    /// declares a later minor ([VER-6]) and holds a state, an outcome or a lane status this version does not know, whatever
+    /// else it holds; or it is checked as decided (<see cref="IsDecided"/>) and records an outcome other than
+    /// <c>aborted</c> without a decision, or a decision without its input: nothing can be recomputed, and that is not
+    /// tampering. Empty for a manifest not checked as decided, or aborted.
     /// </summary>
+    /// <remarks>
+    /// [CKP-7] (round 6): a manifest that declares this version, or an earlier one, is checked as usual whatever it holds.
+    /// An unknown lane status in its input reads as [DEC-2] says (<c>not_measured</c>); an unknown outcome, or lane status
+    /// in its decision, is whatever the comparison finds (<c>outcome</c>, <c>decision</c>); and one in a state this version
+    /// does not know that records an outcome or a decision is checked as decided, so a 1.0 manifest cannot escape the
+    /// checks with a state nobody defined. Such a manifest may lack what the schema requires only of <c>decided</c> with
+    /// a known outcome: a decision, or the decision's input; it is then <c>unverifiable</c> (Q4-39 R6N-1, R6N-2, ruled 10-09).
+    /// </remarks>
     public static IReadOnlyList<string> Verify(JsonNode manifest)
     {
         ArgumentNullException.ThrowIfNull(manifest);
         var state = AefNode.String(manifest["state"]);
         var outcome = AefNode.String(manifest["outcome"]);
-        if (state is null || !States.Contains(state))
+        var decision = manifest["decision"] as JsonObject;
+        var input = manifest["decisionInput"] as JsonObject;
+
+        // A later minor ([VER-6]) that holds a state, an outcome or a lane status this version does not know: a reader
+        // cannot recompute it, whatever else it holds.
+        if (AefVersion.DeclaresLaterMinor(manifest["schemaVersion"]) && HoldsUnknown(state, outcome, decision, input))
         {
             return ["unverifiable"];
         }
 
-        if (state != "decided" || outcome is null or "aborted")
+        // Not checked as decided (not yet decided), or abandoned: nothing to recompute.
+        if (!IsDecided(manifest))
         {
             return [];
         }
 
-        if (!Outcomes.Contains(outcome) || manifest["decisionInput"] is not JsonObject input || manifest["decision"] is not JsonObject decision
-            || !Outcomes.Contains(AefNode.String(decision["outcome"]) ?? "")
-            || AefNode.Objects(decision["lanes"]).Any(l => !LaneStatuses.Contains(AefNode.String(l["status"]) ?? ""))
-            || AefNode.Objects(input["lanes"]).Any(l => l["result"] is JsonObject r && !EvidenceStatuses.Contains(AefNode.String(r["status"]) ?? "")))
+        // Checked as decided, with an outcome but no decision, or a decision without its input: nothing can be recomputed.
+        if (decision is null || input is null)
         {
             return ["unverifiable"];
         }
@@ -105,7 +120,9 @@ public static class CheckpointManifest
 
         try
         {
-            // Only the fields this version defines are compared: a field a later minor adds to the output is not a difference.
+            // Only the fields this version defines are compared: a field a later minor adds to the output is not a
+            // difference. An input lane status this version does not know reads as not_measured ([DEC-2]); a recorded
+            // outcome or lane status it does not know is not what the function gives.
             var recomputed = CheckpointDecisionJson.Write(CheckpointDecision.Decide(CheckpointDecisionJson.ReadInput(input)));
             if (!JsonNode.DeepEquals(Known(recomputed), Known(decision))) problems.Add("decision");
         }
@@ -116,6 +133,36 @@ public static class CheckpointManifest
 
         return [.. problems];
     }
+
+    /// <summary>
+    /// Whether a manifest is <b>checked as decided</b> ([CKP-7]; [CKP-8] compares its lanes with its recorded input) and
+    /// not abandoned: its state is <c>decided</c>, or, in a manifest that declares this version or an earlier one, its
+    /// state is one this version does not know and it records an outcome or a decision (a 1.0 manifest cannot escape the
+    /// checks with a state nobody defined; Q4-39 R6N-2, R6N-3, ruled 10-09); and its outcome is not <c>aborted</c> (an
+    /// abandoned checkpoint has nothing to recompute). A manifest in a state before the decision is not checked as decided.
+    /// </summary>
+    public static bool IsDecided(JsonNode manifest)
+    {
+        ArgumentNullException.ThrowIfNull(manifest);
+        var state = AefNode.String(manifest["state"]);
+        var outcome = AefNode.String(manifest["outcome"]);
+        if (outcome == "aborted" || (state is not null && Undecided.Contains(state)))
+        {
+            return false;
+        }
+
+        return state == "decided"
+               || (!AefVersion.DeclaresLaterMinor(manifest["schemaVersion"]) && (outcome is not null || manifest["decision"] is JsonObject));
+    }
+
+    // [CKP-7]: a state, an outcome (the manifest's or its decision's) or a lane status (its decision's, or a result's in
+    // its input) that this version's writer schemas do not accept ([VER-8]).
+    private static bool HoldsUnknown(string? state, string? outcome, JsonObject? decision, JsonObject? input) =>
+        state is null || !States.Contains(state)
+        || (outcome is not null && outcome != "aborted" && !Outcomes.Contains(outcome))
+        || (decision is not null && !Outcomes.Contains(AefNode.String(decision["outcome"]) ?? ""))
+        || AefNode.Objects(decision?["lanes"]).Any(l => !LaneStatuses.Contains(AefNode.String(l["status"]) ?? ""))
+        || AefNode.Objects(input?["lanes"]).Any(l => l["result"] is JsonObject r && !EvidenceStatuses.Contains(AefNode.String(r["status"]) ?? ""));
 
     private static JsonObject Known(JsonNode decision) => new()
     {

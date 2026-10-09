@@ -881,6 +881,20 @@ def run_vectors():
                  "evaluator": {"id": "code:x"}, "state": "passed", "trials": trials}]
     vec("trials-mixed-parents", [[L(10), "trials"]], ["RES-8"], lines=lambda ls: ls + mixed_parents())
 
+    def trial_under_plain():  # R6-3: trial lines under a line that carries no trial: trials are whole-case trees
+        root = {"schemaVersion": V, "resultId": result_id(SMALL_ID, "k3", "t"), "caseId": "k3", "path": "t",
+                "evaluator": {"id": "code:t"}, "state": "passed", "aggregation": dict(agg1, measured=2, total=2)}
+        kids = [{"schemaVersion": V, "resultId": result_id(SMALL_ID, "k3", "t/x", trial), "parentResultId": root["resultId"],
+                 "caseId": "k3", "path": "t/x", "trial": trial, "evaluator": {"id": "code:x"}, "state": "passed",
+                 "component": comp} for trial in (0, 1)]
+        return [root] + kids + [{"schemaVersion": V, "resultId": result_id(SMALL_ID, "k3", "t/x"), "caseId": "k3",
+                                 "path": "t/x", "evaluator": {"id": "code:x"}, "state": "passed",
+                                 "trials": {"n": 2, "passed": 2, "aggregation": "AllPass", "agree": True}}]
+    vec("trials-under-a-plain-line", [[L(6), "trials"], [L(7), "trials"]], ["RES-8"],
+        lines=lambda ls: ls + trial_under_plain())
+    vec("tree-across-cases", [[L(2), "parent"]], ["RES-5"],
+        lines=lambda ls: [ls[0], dict(ls[1], caseId="k9", resultId=result_id(SMALL_ID, "k9", ls[1]["path"]))] + ls[2:])
+
     def running_without_parent_rollup():  # R5N-3: a running case may not have its rollup at t yet: nothing to check
         out = []
         for trial in (0, 1):
@@ -1684,8 +1698,23 @@ def checkpoints():
          "an abandoned checkpoint says why"),
         ("aborted-with-decision", dict(aborted, decision=decision), "invalid", "invalid", None, ["CKP-4"],
          "the decision function never aborts: an aborted checkpoint has no decision"),
-        ("state-sealed-is-gone", dict(decided, state="sealed"), "invalid", "valid", ["unverifiable"], ["CKP-4", "VER-3"],
-         "1.0 has no sealed state (a decided checkpoint's integrity is its signature); a reader takes it as unknown"),
+        ("state-sealed-is-gone", dict(decided, state="sealed", schemaVersion="1.1"), "invalid", "valid", ["unverifiable"],
+         ["CKP-4", "CKP-7", "VER-3"],
+         "a state a later minor (1.1) adds: a reader cannot recompute it, and says so rather than call it tampering"),
+        ("state-unknown-without-decision-in-1-0",
+         {k: v for k, v in dict(decided, state="sealed", outcome="approved").items() if k not in ("decision", "decisionInput")},
+         "invalid", "valid", ["unverifiable"], ["CKP-7", "VER-6"],
+         "a 1.0 manifest in a state nobody defined that records an outcome is checked as decided (R6N-2): with no "
+         "decision, nothing can be recomputed"),
+        ("state-unknown-decision-without-input-in-1-0",
+         {k: v for k, v in dict(decided, state="sealed").items() if k != "decisionInput"},
+         "invalid", "valid", ["unverifiable"], ["CKP-7", "VER-6"],
+         "a 1.0 manifest in a state nobody defined that records a decision without its input (R6N-1): nothing can be "
+         "recomputed"),
+        ("state-unknown-in-1-0", dict(decided, state="sealed", outcome="approved"), "invalid", "valid", ["outcome"],
+         ["CKP-7", "VER-6"],
+         "a 1.0 manifest with a state nobody defined is checked as usual (R6-2): its recorded outcome is not the "
+         "decision's"),
         ("latest-is-not-a-version", dict(planned, subject=dict(planned["subject"], version="Latest")), "invalid", "invalid", None, ["CKP-1"],
          "'latest' (any case) is resolved to an exact version before anything runs"),
         ("version-with-space", dict(planned, subject=dict(planned["subject"], version="1.2 beta")), "invalid", "invalid", None, ["ENC-10"],
@@ -1728,12 +1757,26 @@ def checkpoints():
         ("runs-without-evidence", dict(decided, decisionInput=dict(decision_input, lanes=decision_input["lanes"][:1] + [
             dict(decision_input["lanes"][1], result=None)] + decision_input["lanes"][2:])), "valid", "valid", ["decision", "evidence"], C7,
          "a lane with runs has a result (here the input drops it, so the recorded decision is not recomputed either)"),
-        ("newer-outcome", {k: v for k, v in dict(decided, outcome="ratified").items() if k not in ("decision", "decisionInput")},
+        ("newer-outcome", {k: v for k, v in dict(decided, outcome="ratified", schemaVersion="1.1").items()
+                           if k not in ("decision", "decisionInput")},
          "invalid", "valid", ["unverifiable"], C7,
-         "an outcome a later minor adds: a reader cannot recompute it, and says so rather than call it tampering"),
-        ("input-status-unknown", dict(decided, decisionInput=dict(decision_input, lanes=[dict(decision_input["lanes"][0], result=dict(
-            decision_input["lanes"][0]["result"], status="flaky"))] + decision_input["lanes"][1:])), "invalid", "valid", ["unverifiable"], C7,
-         "a lane status a later minor adds, in the recorded input: the decision cannot be recomputed"),
+         "an outcome a later minor (1.1) adds: a reader cannot recompute it, and says so rather than call it tampering"),
+        ("outcome-unknown-in-1-0", dict(decided, outcome="ratified"), "invalid", "valid", ["outcome"], C7 + ["VER-6"],
+         "a 1.0 manifest with an outcome nobody defined is checked as usual (R6-2): it is not the decision's outcome"),
+        ("input-status-unknown", dict(decided, schemaVersion="1.1", decisionInput=dict(decision_input, lanes=[dict(
+            decision_input["lanes"][0], result=dict(decision_input["lanes"][0]["result"], status="flaky"))]
+            + decision_input["lanes"][1:])), "invalid", "valid", ["unverifiable"], C7,
+         "a lane status a later minor (1.1) adds, in the recorded input: the decision cannot be recomputed"),
+        ("input-status-unknown-in-1-0", dict(decided, decisionInput=dict(decision_input, lanes=[dict(
+            decision_input["lanes"][0], result=dict(decision_input["lanes"][0]["result"], status="flaky"))]
+            + decision_input["lanes"][1:])), "invalid", "valid", ["decision"], C7 + ["DEC-2", "VER-6"],
+         "a 1.0 input lane status nobody defined reads as not_measured (DEC-2); the recorded decision is then not the "
+         "one recomputed (R6-2)"),
+        ("decision-status-unknown-in-1-0", dict(decided, decision=dict(decided["decision"], lanes=[
+            dict(decided["decision"]["lanes"][0], status="cleared")] + decided["decision"]["lanes"][1:])),
+         "invalid", "valid", ["decision"], C7 + ["VER-6"],
+         "a 1.0 decision with a lane status nobody defined is compared as usual (R6-2): it is not the decision "
+         "recomputed"),
         ("valid-decided-with-exceptions", excepted, "valid", "valid", [], ["CKP-4", "CKP-7", "DEC-1", "DEC-2", "DEC-3"],
          "a failed blocking lane waived by an exception for its exact runs, in force, recorded in the decision input: "
          "approved_with_exceptions"),

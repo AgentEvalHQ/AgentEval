@@ -38,4 +38,27 @@ public static class AefVersion
         var minor = schemaVersion.AsSpan(2);
         return minor[0] is >= '1' and <= '9' && !minor.ContainsAnyExceptInRange('0', '9');
     }
+
+    /// <summary>
+    /// The major version a <c>schemaVersion</c> declares when it is another than this version's ([VER-4]): a string of
+    /// decimal digits, a dot and decimal digits whose major is not <c>1</c> (<c>2.0</c> gives <c>2</c>); null for anything
+    /// else (major 1, or no <c>MAJOR.MINOR</c> at all, which the schema refuses as it is).
+    /// </summary>
+    public static string? OtherMajor(JsonNode? schemaVersion)
+    {
+        if (AefNode.String(schemaVersion) is not { } text || text.IndexOf('.', StringComparison.Ordinal) is not (> 0 and var dot)
+            || dot == text.Length - 1 || text.AsSpan(0, dot).ContainsAnyExceptInRange('0', '9') || text.AsSpan(dot + 1).ContainsAnyExceptInRange('0', '9'))
+        {
+            return null;
+        }
+
+        return text[..dot] == "1" ? null : text[..dot];
+    }
+
+    /// <summary>
+    /// [VER-4]'s message: <paramref name="document"/> (such as "The trust policy") declares <paramref name="schemaVersion"/>,
+    /// of major version <paramref name="major"/>, which this reader does not know.
+    /// </summary>
+    public static string OtherMajorMessage(string document, string schemaVersion, string major) =>
+        $"{document} declares schemaVersion {schemaVersion}, AEF major version {major}; this reader knows AEF major version 1 only ({Current}), and refuses another major version ([VER-4]).";
 }

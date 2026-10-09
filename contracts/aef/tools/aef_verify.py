@@ -127,7 +127,9 @@ KNOWN_MUTATIONS = {
     "events-whole-file": "the events file's framing is judged as a file, not line by line (OVL-5, R4-2, R4N-9)",
     "policy-loose": "a trust policy is not checked against its schema, and `may` is matched as a substring (SIG-4, R4-3)",
     "overlay-files-stop": "too many files under overlays/ stop the chain, so junk files void a redaction (OVL-5, R5-1)",
-    "declared-version": "a document that declares 1.0 can make a lane unverifiable (CKP-8, R5-4)",
+    "declared-version": "a document that declares 1.0 can make a lane or a manifest unverifiable (CKP-7, CKP-8, R5-4, R6-2)",
+    "tree-across-cases": "a line may have a parent of another case (RES-5, R6-3)",
+    "trial-under-plain": "a trial line may hang under a line that carries no trial (RES-8, R6-3)",
     "otlp-names": "spans under the pre-1.0 name instrumentationLibrarySpans are read too",
 }
 _ORIGINAL_COMPILE = aef_schema.compile_pattern
@@ -1262,6 +1264,9 @@ class Run:
             parent = o.get("parentResultId")
             if parent is not None and parent not in all_ids:
                 P.add((where, "parent"))
+            elif (parent is not None and parent in by_id and by_id[parent].get("caseId") != o.get("caseId")
+                  and "tree-across-cases" not in MUTATIONS):
+                P.add((where, "parent"))  # RES-5 (R6-3): a tree belongs to one case
             agg = o.get("aggregation")
             if isinstance(agg, dict):
                 measured, total = agg["measured"], agg["total"]
@@ -1278,6 +1283,8 @@ class Run:
             parent = by_id.get(o.get("parentResultId"))
             if parent is not None and "trial" in parent and o.get("trial") != parent["trial"]:
                 P.add((where, "trials"))  # RES-8: a trial's tree carries its trial
+            elif parent is not None and "trial" in o and "trial" not in parent and "trial-under-plain" not in MUTATIONS:
+                P.add((where, "trials"))  # RES-8 (R6-3): a trial line's parent carries trial: trials are whole trees
             trials = o.get("trials")
             path = o.get("path")
             if isinstance(trials, dict) and not MUTATIONS & {"trial-rollups", "rollup-tree"}:
@@ -1749,20 +1756,29 @@ def document_verdicts(schema, path):
     return verdict
 
 
+def checked_as_decided(m):
+    """CKP-7 (R6N-1..3): state decided, or, in a manifest that declares this version or an earlier one, a state this
+    version does not know with an outcome or a decision recorded."""
+    state = m.get("state")
+    return state == "decided" or (state not in CHECKPOINT_STATES and not _later_minor(m)
+                                  and (m.get("outcome") is not None or m.get("decision") is not None))
+
+
 def manifest_problems(m):
     """[CKP-7] codes for a manifest the reader accepts, in code order."""
     state, outcome = m.get("state"), m.get("outcome")
-    if state not in CHECKPOINT_STATES or (outcome is not None and outcome not in CHECKPOINT_OUTCOMES):
+    later = _later_minor(m)  # R6-2: only a later minor's values are unverifiable; a 1.0 manifest is checked as usual
+    if later and (state not in CHECKPOINT_STATES or (outcome is not None and outcome not in CHECKPOINT_OUTCOMES)):
         return ["unverifiable"]
-    if state != "decided" or outcome == "aborted":
+    if not checked_as_decided(m) or outcome == "aborted":
         return []
     decision, given = m.get("decision"), m.get("decisionInput")
     if not isinstance(decision, dict) or not isinstance(given, dict):
         return ["unverifiable"]
-    if decision.get("outcome") not in DECISION_OUTCOMES or any(
+    if later and (decision.get("outcome") not in DECISION_OUTCOMES or any(
             l.get("status") not in DECISION_LANE_STATUSES for l in decision.get("lanes", [])) or any(
             isinstance(l.get("result"), dict) and l["result"].get("status") not in INPUT_STATUSES
-            for l in given.get("lanes", [])):
+            for l in given.get("lanes", []))):
         return ["unverifiable"]
     problems = set()
     try:
@@ -1955,7 +1971,7 @@ def _reads_unknown(rule, runs):
                     continue
                 if "severity" in o and o["severity"] not in SEVERITY_ORDER and _later_minor(o):
                     return True
-        if kind == "comparison":
+        if kind == "comparison" and run is not runs[-1]:  # the candidates', never the baseline's (LANE-7)
             metrics = run.read()[0].get("metrics.json") or {}
             for m in metrics.get("metrics", []):
                 if (isinstance(m, dict) and m.get("id") == rule.get("metric") and "direction" in m
@@ -2147,7 +2163,7 @@ def op_lanes(checkpoint_path, runs_dir, at=None, policy=None, envelope=None):
     if not isinstance(m, dict) or not isinstance(m.get("lanes"), list):
         raise InputError(f"{checkpoint_path}: not a checkpoint manifest")
     store = Store(runs_dir, policy)
-    given = m.get("decisionInput") if m.get("state") == "decided" else None
+    given = m.get("decisionInput") if checked_as_decided(m) else None  # CKP-8: as CKP-7 checks it
     given = given if isinstance(given, dict) else None
     fallback = given["evaluatedAt"] if given and "evaluatedAt" in given else (at or utc_now())
     version = get(m, "subject", "version")
@@ -2287,6 +2303,9 @@ def policy_allows(policy, identity, action):
 def load_policy(policy):
     """[(identity, keyid, public key or None when its algorithm is not supported)], in policy order (SIG-4). The key
     id is computed from the key (SIG-3), never read from the policy."""
+    version = policy.get("schemaVersion") if isinstance(policy, dict) else None
+    if isinstance(version, str) and not version.startswith("1."):  # VER-4: another major is not read at all
+        raise InputError(f"a trust policy of AEF version {version}: a 1.x verifier reads major version 1 only (VER-4)")
     if "policy-loose" not in MUTATIONS and not document_ok("reader", "trust-policy", policy):  # SIG-4: refused whole
         raise InputError("a trust policy is {\"keys\": [{\"identity\": ..., \"publicKey\": <SPKI PEM>, \"may\": [...]?}]}, "
                          "valid against trust-policy.schema.json")
@@ -2680,9 +2699,13 @@ def dispatch(argv):
     p.add_argument("--policy")
     a = parser.parse_args(argv)
     if a.command == "run":
+        if a.policy:
+            load_policy(load_json_file(a.policy))  # refused as a whole, as an input error (SIG-4)
         return op_run(a.dir, load_json_file(a.policy) if a.policy else None,
                       load_json_file(a.anchors) if a.anchors else None)
     policy = load_json_file(a.policy) if getattr(a, "policy", None) else None
+    if policy is not None:
+        load_policy(policy)  # SIG-3, SIG-4, VER-4: refused as a whole, as an input error, wherever it is given
     if a.command == "seal":
         return op_seal(a.dir, policy)
     if a.command == "chain":

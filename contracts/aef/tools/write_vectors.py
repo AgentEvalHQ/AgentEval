@@ -653,6 +653,20 @@ def produce_vectors():
                       E("pass_rate", "q", N=2, measured=[1, 1], sum="2", sumSq="2", value="1")])])
 
     produce_vector(
+        "independent-roots-in-trials",
+        "One case with two independent root trees, at q and at q/x, each run in two trials (R5-5, R6-5): each has its "
+        "own rollup, and the rollup at q/x is a root, as its trial lines are: a path's spelling makes no parent.",
+        ["RES-8", "RES-4"],
+        [case("k1", node("q", "passed", quality=0.8), aggregation="AllPass",
+              trees=[node("q", "passed", quality=0.8), node("q", "passed", quality=0.8)]),
+         case("k1", node("q/x", "passed", quality=0.6), aggregation="AllPass",
+              trees=[node("q/x", "passed", quality=0.6), node("q/x", "passed", quality=0.6)])],
+        [H("k1", "q", 0), H("k1", "q", 1), H("k1", "q", trials=(2, 2, True)),
+         H("k1", "q/x", 0), H("k1", "q/x", 1), H("k1", "q/x", trials=(2, 2, True))],
+        [("quality", [E("quality", "q", N=1, measured=[0.8], sum="0.8", sumSq="0.64", value="0.8"),
+                      E("pass_rate", "q", N=1, measured=[1], sum="1", sumSq="1", value="1")])])
+
+    produce_vector(
         "trials-agreement",
         "agree is true exactly when a path's trial lines are all in one state (RES-8): two warn trials agree though "
         "neither passed; a failed and an error trial do not, though neither passed; a single trial agrees with itself. "

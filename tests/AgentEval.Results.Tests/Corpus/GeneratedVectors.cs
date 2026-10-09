@@ -40,7 +40,19 @@ internal static class GeneratedVectors
     {
         var folder = Path.Combine(Root, $"v{Folders.Count}-{Guid.NewGuid():N}");
         Copy(vector, folder);
-        string At(JsonNode? relative) => Path.Combine(folder, ((string)relative!).Replace('/', Path.DirectorySeparatorChar));
+        // Spec 09 §9.2.1 (round 6): a recipe's paths are relative, /-separated, with no .. segment, no drive and no leading
+        // /; a runner refuses a recipe whose paths would leave the corpus or the vector (a backslash would be a separator
+        // on Windows, so it is refused too).
+        string Relative(JsonNode? node)
+        {
+            var text = (string)node!;
+            return text.StartsWith('/') || text.Contains('\\', StringComparison.Ordinal) || text.Contains(':', StringComparison.Ordinal)
+                   || text.Split('/').Contains("..")
+                ? throw new InvalidOperationException($"{vector}: a generate path that would leave the corpus or the vector: {text}")
+                : text.Replace('/', Path.DirectorySeparatorChar);
+        }
+
+        string At(JsonNode? relative) => Path.Combine(folder, Relative(relative));
         foreach (var step in steps)
         {
             var (op, arg) = step!.AsObject().Single();
@@ -48,7 +60,7 @@ internal static class GeneratedVectors
             {
                 case "copy":
                     // SOURCE is relative to conformance/, TARGET to the vector's folder.
-                    var source = Path.Combine(AefCorpus.Conformance, ((string)arg![0]!).Replace('/', Path.DirectorySeparatorChar));
+                    var source = Path.Combine(AefCorpus.Conformance, Relative(arg![0]));
                     Copy(source, At(arg[1]));
                     break;
                 case "remove":

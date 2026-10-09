@@ -152,8 +152,9 @@ public sealed class AefRunWriter
     /// The line is not valid against the writer result schema; it breaks a rule of §3.9 about one line
     /// (<c>aggregation</c> counts, <c>annotator</c>, <c>trials</c>, <c>attack</c>, <c>result-times</c>,
     /// <c>interval</c>, a metric scored twice); it has the id of a line already added; <paramref name="parent"/> is no
-    /// line of this run; a child has no <c>component</c> ([RES-5]); a line under a trial's line does not carry its
-    /// <c>trial</c> ([RES-8]); its reasoning is no blob of this run; or the run
+    /// line of this run; a child has no <c>component</c>, or is of another case than its parent ([RES-5]: a tree belongs to
+    /// one case); a line under a trial's line does not carry its <c>trial</c>, or a line carrying <c>trial</c> is under one
+    /// that carries none ([RES-8]: a trial is a whole tree of its case); its reasoning is no blob of this run; or the run
     /// keeps no content and the line has reasoning or a prompt hash ([RUN-11]).
     /// </exception>
     /// <exception cref="InvalidOperationException">The run is closed ([RUN-4]).</exception>
@@ -166,9 +167,22 @@ public sealed class AefRunWriter
             throw new ArgumentException($"The parent {parent.ResultId} is no line of this run: a parentResultId names a line of the run (§3.9 parent).", nameof(parent));
         }
 
+        if (parent is not null && !string.Equals(parent.CaseId, result.CaseId, StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                $"A child of case '{parent.CaseId}' is of that case, not '{result.CaseId}': a tree belongs to one case ([RES-5], §3.9 parent).", nameof(result));
+        }
+
         if (parent?.Trial is { } trial && result.Trial != trial)
         {
             throw new ArgumentException($"A line under trial {trial} carries that trial: a trial's tree is the trial's ([RES-8], §3.9 trials).", nameof(result));
+        }
+
+        if (parent is not null && parent.Trial is null && result.Trial is { } own)
+        {
+            throw new ArgumentException(
+                $"Trial {own} of case '{result.CaseId}' at '{result.Path}' is under a line that carries no trial: a trial line's parent carries a trial too, as a trial is a whole tree of its case ([RES-8], §3.9 trials).",
+                nameof(result));
         }
 
         var resultId = ResultIdOf(result.CaseId, result.Path, result.Trial);

@@ -33,7 +33,8 @@ public class CrossFileRulesTests
         run.Results.Add(run.Results[2].DeepClone().AsObject());   // line 5 repeats line 3's id
 
         // Line 5 repeats a child of line 1: the same child again (counted once by [RES-6]'s total), only a result-id problem.
-        Assert.Equal(["results.ndjson:2 result-id", "results.ndjson:5 result-id"], Problems(run));
+        // Line 2, now of case k9, is also a child of another case's line ([RES-5], round 6).
+        Assert.Equal(["results.ndjson:2 parent", "results.ndjson:2 result-id", "results.ndjson:5 result-id"], Problems(run));
     }
 
     [Fact]
@@ -702,6 +703,38 @@ public class CrossFileRulesTests
         run.Results.Add(Child(Rollup("k3", "t/a", n: 1, passed: 1), rollup));
 
         Assert.Equal(["results.ndjson:7 trials"], Problems(run));
+    }
+
+    [Fact]
+    public void Trials_ATrialLineUnderALineThatCarriesNoTrial_IsTrials_AtTheTrialLine()
+    {
+        // [RES-8], §3.9 trials (round 6): a trial line's parent, when it has one, carries trial too, so a trial is a whole
+        // tree of its case. Trial lines under the case's plain line at t (as runs/trials-under-a-plain-line), and under a
+        // rollup, are trials at each of them; the rollup at t/x is a root, as the case has no rollup at t.
+        using var run = new TestRun();
+        var plain = Line("k3", "t", "passed");
+        plain["aggregation"] = TestRun.Obj("""{"strategy": "Min", "rulePath": "threshold", "measured": 2, "total": 2}""");
+        run.Results.AddRange([plain, Child(Trial("k3", "t/x", 0, "passed"), plain), Child(Trial("k3", "t/x", 1, "passed"), plain), Rollup("k3", "t/x", n: 2, passed: 2)]);
+        Assert.Equal(["results.ndjson:6 trials", "results.ndjson:7 trials"], Problems(run));
+
+        using var underRollup = new TestRun();
+        var rollup = Rollup("k3", "u", n: 1, passed: 1);
+        rollup["aggregation"] = TestRun.Obj("""{"strategy": "Min", "rulePath": "threshold", "measured": 1, "total": 1}""");
+        underRollup.Results.AddRange([Trial("k3", "u", 0, "passed"), rollup, Child(Trial("k3", "u/x", 0, "passed"), rollup), Rollup("k3", "u/x", n: 1, passed: 1)]);
+        Assert.Equal(["results.ndjson:7 trials", "results.ndjson:8 trials"], Problems(underRollup));
+    }
+
+    [Fact]
+    public void Parent_ALineOfAnotherCase_IsParent_AtTheChild()
+    {
+        // [RES-5], §3.9 parent (round 6): a child's caseId is its parent's; a tree belongs to one case.
+        using var run = new TestRun();
+        var child = Child(Line("k9", "q/c", "passed"), run.Results[0]);
+        run.Results.Add(child);
+        run.Results[0]["aggregation"]!["total"] = 3;
+        run.Results[0]["aggregation"]!["measured"] = 3;
+
+        Assert.Equal(["results.ndjson:5 parent"], Problems(run));
     }
 
     [Fact]

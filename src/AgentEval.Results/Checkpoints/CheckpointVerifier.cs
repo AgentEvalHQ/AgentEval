@@ -156,8 +156,9 @@ public static class CheckpointVerifier
             // minor recorded what it cannot recompute): its rule is not valid against the writer schema in a checkpoint
             // that does, or a run it reads holds an unknown value it computes with in a document that does
             // (LaneEvaluator.ReadsUnknown). That lane is unverifiable, never lane-result. In a document that declares this
-            // version, such a value is read as §7.3 says and compared as usual (round 5).
-            if (AefNode.String(manifest["state"]) == "decided" && input is not null
+            // version, such a value is read as §7.3 says and compared as usual (round 5). A 1.0 manifest in a state this
+            // version does not know that records a decision is compared as a decided one ([CKP-7], round 6).
+            if (CheckpointManifest.IsDecided(manifest) && input is not null
                 && AefNode.Objects(input["lanes"]).FirstOrDefault(l => AefNode.String(l["lane"]) == evaluation.Lane) is { } recorded)
             {
                 IReadOnlyList<string> codes = evaluation.ReadsUnknown ? ["unverifiable"] : Differences(recorded["result"] as JsonObject, evaluation.Result);
@@ -216,6 +217,11 @@ public static class CheckpointVerifier
         catch (AefReadException e)
         {
             throw new FormatException($"The checkpoint manifest is not an I-JSON document: {e.Message}", e);
+        }
+
+        if (AefVersion.OtherMajor(document["schemaVersion"]) is { } major)
+        {
+            throw new FormatException(AefVersion.OtherMajorMessage("The checkpoint manifest", (string)document["schemaVersion"]!, major));
         }
 
         return AefSchemas.Reader.Validate("checkpoint", document) is { } why

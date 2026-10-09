@@ -909,6 +909,45 @@ public class AefRunWriterTests
     }
 
     [Fact]
+    public void ATrialLine_UnderALineThatCarriesNoTrial_IsRefused_Res8()
+    {
+        // [RES-8], §3.9 trials (round 6): a trial line's parent, when it has one, carries trial too: a trial is a whole tree
+        // of its case. Neither the case's plain line nor its rollup may hold a trial line; nothing is written.
+        using var run = new WriterRun();
+        var writer = run.Create();
+        var aggregation = new AefAggregation { Strategy = AefAggregationStrategy.Min, RulePath = AefRulePath.Threshold, Measured = 1, Total = 1 };
+        var plain = writer.AddResult(WriterRun.Leaf("k1") with { Aggregation = aggregation });
+        writer.AddResult(WriterRun.Leaf("k2", trial: 0));
+        var rollup = writer.AddResult(WriterRun.Leaf("k2") with { Trials = new AefTrials(1, 1, AefTrialAggregation.AllPass, true), Aggregation = aggregation });
+        var before = run.Lines("results.ndjson").Count;
+
+        var underPlain = Assert.Throws<ArgumentException>(() => plain.AddChild(WriterRun.Leaf("k1", "q/a", trial: 0) with { Component = new AefComponent(1, true) }));
+        Assert.Contains("a trial line's parent carries a trial too", underPlain.Message, StringComparison.Ordinal);
+        Assert.Throws<ArgumentException>(() => rollup.AddChild(WriterRun.Leaf("k2", "q/a", trial: 0) with { Component = new AefComponent(1, true) }));
+        Assert.Equal(before, run.Lines("results.ndjson").Count);
+    }
+
+    [Fact]
+    public void AChildOfAnotherCase_IsRefused_Res5()
+    {
+        // [RES-5], §3.9 parent (round 6): a child has its parent's caseId: a tree belongs to one case; nothing is written.
+        using var run = new WriterRun();
+        var writer = run.Create();
+        var parent = writer.AddResult(WriterRun.Leaf("k1") with
+        {
+            Aggregation = new AefAggregation { Strategy = AefAggregationStrategy.Min, RulePath = AefRulePath.Threshold, Measured = 1, Total = 1 },
+        });
+
+        var refused = Assert.Throws<ArgumentException>(() => parent.AddChild(WriterRun.Leaf("k2", "q/a") with { Component = new AefComponent(1, true) }));
+        Assert.Contains("a tree belongs to one case", refused.Message, StringComparison.Ordinal);
+        Assert.Single(run.Lines("results.ndjson"));
+
+        parent.AddChild(WriterRun.Leaf("k1", "q/a") with { Component = new AefComponent(1, true) });
+        writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1));
+        Assert.Empty(run.Problems());
+    }
+
+    [Fact]
     public void ARollupsAgree_IsWhatItsTrialLinesGive_Res8()
     {
         using var run = new WriterRun();

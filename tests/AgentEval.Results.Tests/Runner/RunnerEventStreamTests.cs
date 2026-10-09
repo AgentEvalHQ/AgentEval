@@ -139,11 +139,11 @@ public sealed class RunnerEventStreamTests : IDisposable
     [Fact]
     public void TheJobsCases_AreTheDistinctCaseIdsOfLinesWithoutAParent_AcrossItsRuns()
     {
-        // k2's child line names another caseId: it is no case of the job (it has a parent).
+        // k2 has a child line, of its own case ([RES-5], round 6: a tree belongs to one case, so a child never adds one).
         var a = JobRun("R-1", 0.1, b =>
         {
             b.Line("k1", "p", "passed", trial: 0).Line("k1", "p", "passed", trial: 1).Line("k1", "p", "passed", rollup: (2, 2))
-                .Line("k2", "p", "failed", severity: "low").Line("k9", "p/child", "failed", severity: "low", parentCaseId: "k2", parentPath: "p");
+                .Line("k2", "p", "failed", severity: "low").Line("k2", "p/child", "failed", severity: "low", parentCaseId: "k2", parentPath: "p");
             b.Results[^2]["aggregation"] = JsonNode.Parse($$"""
                 {"strategy": "Min", "rulePath": "severity", "measured": 1, "total": 1, "unmeasured": {"not_measured": 0, "not_applicable": 0, "skipped": 0, "error": 0},
                  "decisive": ["{{b.Results[^1]["resultId"]}}"]}

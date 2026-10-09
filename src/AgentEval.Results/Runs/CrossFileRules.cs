@@ -283,7 +283,11 @@ public static class CrossFileRules
 
                 if (AefNode.String(line["parentResultId"]) is { } parent)
                 {
-                    if (!_resultIds.Contains(parent))
+                    // [RES-5] (round 6): a parentResultId names a line of the run, and of the child's case: a tree belongs
+                    // to one case. With several lines of that id (a result-id problem), the first is the one it names.
+                    var named = byId.GetValueOrDefault(parent);
+                    if (!_resultIds.Contains(parent)
+                        || (named is not null && !string.Equals(AefNode.String(named["caseId"]), AefNode.String(line["caseId"]), StringComparison.Ordinal)))
                     {
                         Add(where, "parent");
                     }
@@ -294,9 +298,12 @@ public static class CrossFileRules
                         Add(where, "component");
                     }
 
-                    // [RES-8]: every line under a trial's line carries the same trial (numbers compare as binary64).
-                    if (byId.TryGetValue(parent, out var parentLine) && parentLine.ContainsKey("trial")
-                        && (AefNode.Number(line["trial"]) is not { } trial || trial != AefNode.Number(parentLine["trial"])))
+                    // [RES-8]: every line under a trial's line carries the same trial (numbers compare as binary64), and
+                    // (round 6) a trial line's parent carries a trial too: a trial is a whole tree of its case.
+                    if (named is not null
+                        && (named.ContainsKey("trial")
+                            ? AefNode.Number(line["trial"]) is not { } trial || trial != AefNode.Number(named["trial"])
+                            : line.ContainsKey("trial")))
                     {
                         Add(where, "trials");
                     }

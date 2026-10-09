@@ -35,7 +35,8 @@ CODES_UNTESTED = {}
 # Backticked words in the rules that define codes in prose which are not codes: DSSE fields, manifest fields a code's
 # explanation names, a state value, literals.
 NOT_CODES = {"payload", "payloadType", "signatures", "keyid", "sig", "runs", "status", "axes", "s", "null", "aborted",
-             "severity", "direction", "comparison"}  # CKP-8 names the fields a lane reads
+             "severity", "direction", "comparison",  # CKP-8 names the fields a lane reads
+             "decided"}  # CKP-7 names the state
 
 UNTESTED = {
     "ENC-12": "a reader must not fetch the $id names: behaviour, not a file property",

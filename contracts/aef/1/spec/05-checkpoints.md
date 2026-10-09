@@ -45,8 +45,8 @@ A checkpoint manifest is a JSON document (schema `checkpoint`), conventionally `
 
 `LaneResult(rule, runs, baseline?) → result | null` turns a lane's sealed runs into the `result` the decision function
 takes (§5.4). It is pure: it reads only the runs' sealed files. A lane with no runs, or none of whose runs is found,
-has the result `null`. A rule kind this version does not know gives `not_measured` ([VER-3]), and [CKP-8] does not
-compare it.
+has the result `null`. A rule kind this version does not know gives `not_measured` ([VER-3]); whether [CKP-8]
+compares it depends on the version the checkpoint declares.
 
 ### 5.3.1 `threshold`
 
@@ -220,10 +220,17 @@ policy. It reports problems as a path and a code, ordered by path and code.
   is not one of its lane's `runs`), `lane-evidence` (a lane's `evidence` in the input is not the set of its `runs`' run
   hashes in the manifest; none is the empty set), `lanes` (the input does not decide exactly the manifest's lanes, with
   the same names, blocking and freshness, in order), `outcome` (the outcome is not the decision's), `version` (the input
-  is for another version). Only the fields this version defines are compared. A manifest in a state, or with an outcome
-  or a lane status, this version does not know, or one with a decided outcome but no decision, is reported only as
-  `unverifiable`: a reader cannot recompute it, which is not the same as finding it wrong. A checkpoint not yet
-  decided, or abandoned (`aborted`), has nothing to recompute and no problems.
+  is for another version). Only the fields this version defines are compared. A manifest that declares a later minor
+  ([VER-6]) and holds a state, an outcome or a lane status this version does not know is reported only as
+  `unverifiable`, whatever else it holds: a reader cannot recompute it, which is not the same as finding it wrong. A
+  manifest is **checked as decided** when its state is `decided`, or, in a manifest that declares this version or an
+  earlier one, when its state is one this version does not know and it records an outcome or a decision. One checked
+  as decided that records an outcome other than `aborted` without a decision, or a decision without its input, is
+  reported only as `unverifiable`: nothing can be recomputed. A manifest that declares this version, or an earlier one, is checked as usual whatever it holds:
+  an input lane status reads as [DEC-2] says, and an unknown recorded state, outcome or lane status is a `decision`,
+  `outcome` or `lanes` problem as the comparison finds it, so a 1.0 manifest cannot escape them with a value nobody
+  defined. A checkpoint not yet
+  decided (not checked as decided), or abandoned (`aborted`), has nothing to recompute and no problems.
 - **[CKP-8] Against the runs.** A run is **found** when a run folder's `run.json` has the `runId` and the run's run
   hash ([SEAL-4]: its seal's, or for an unsealed run the recomputed one) is the one named. Whether its files still
   match is then the run verifier's question: a run changed since it was sealed is found, and not intact. When several
@@ -232,7 +239,7 @@ policy. It reports problems as a path and a code, ordered by path and code.
   a lane names, or a comparison's baseline (path `lanes/<lane>/runs/<runId>`): `run-missing` (not found),
   `run-unverified` (found, but not intact: unsealed, or with problems; a blob withheld by an authorized redaction is
   not a problem). The verifier takes the trust policy (for authorized redactions) and the evaluation time as inputs. Then, for a
-  decided checkpoint, each lane's result recomputed with §5.3 is compared with the recorded input (path
+  checkpoint [CKP-7] checks as decided, each lane's result recomputed with §5.3 is compared with the recorded input (path
   `lanes/<lane>`): `lane-result` (another `status` or other `axes`, or a result where `null` was recorded or the
   reverse), `lane-version` (another `subjectVersion`), `oldest-closed` (another `oldestClosedAt`). A lane the recorded
   input decides is not compared when what its recomputation depends on holds something this version does not know
@@ -246,7 +253,8 @@ policy. It reports problems as a path and a code, ordered by path and code.
   kind, a member or a value a later minor added, such as a severity maximum, a threshold operator or a comparison
   axis), or when a run it reads (a found run of the lane or its baseline) holds an unknown `execution.targetMode`,
   an unknown `severity` on one of a `severity` lane's lines (its lane and path, trial lines included), or an unknown
-  `direction` for a `comparison` lane's metric.
+  `direction` for a `comparison` lane's metric in the candidate's `metrics.json` ([LANE-7] reads the candidate's
+  alone).
 - **[CKP-9] The signature**, when an envelope is present and a trust policy given: the per-signature results of §4.4.
   A checkpoint that verifies with no problems and a signature verified for a trusted identity **anchors** its runs,
   its comparison baselines included (§4.5).

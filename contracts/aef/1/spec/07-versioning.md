@@ -5,7 +5,8 @@
 - **[VER-1]** Every JSON file and every NDJSON line carries `schemaVersion`, `MAJOR.MINOR` in decimal without
   leading zeros (this version: `1.0`; never `1.00`, so a minor is compared as the number it reads),
   except the in-toto statements (`seal.json`, `overlays/seal-<nnnn>.json`), whose `_type` in-toto fixes: they carry it
-  in `predicate.schemaVersion`.
+  in `predicate.schemaVersion`. Files whose format AEF does not own carry none: DSSE envelopes, OTLP lines, blobs and
+  `ext/`; a trust policy, a caller's input, may ([SIG-4]).
 - **[VER-2]** A **writer** produces documents valid against `schemas/writer/`: only known fields, only known enum
   values, its own version.
 - **[VER-3]** A **reader** accepts documents valid against `schemas/reader/`: any minor of major 1, unknown fields
@@ -78,7 +79,8 @@ better evidence than it is (each has a reader-only corpus vector):
 
 AgentEval's output directory before AEF (`.agenteval/`, "store v1": a workspace with per-run scenario files and
 evidence) is not AEF. Mapping it is the reader's choice, and informative here, except the case ids and paths of the
-results: a migration uses them, so two migrations of one store give the same result ids ([RES-4]).
+results: a migration uses them, so two migrations of one store give the same result ids ([RES-4]). Those bind a tool
+that migrates store v1 runs, and no conformance class of §9.1.
 
 **The run**
 

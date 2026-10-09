@@ -177,8 +177,8 @@ public sealed class CheckpointVerifierTests : IDisposable
     [InlineData("severity-passed", "1.1", "unverifiable")]       // on a line of any state: the text names its lines, not its failures
     [InlineData("severity-trial", "1.1", "unverifiable")]        // trial lines included
     [InlineData("direction", "1.1", "unverifiable")]             // an unknown direction of the compared metric, in the candidate
-    [InlineData("baseline-direction", "1.1", "unverifiable")]    // or in the baseline, a found run the lane reads
-    [InlineData("baseline-target-mode", "1.1", "unverifiable")]
+    [InlineData("baseline-direction", "1.1", null)]              // round 6: not in the baseline ([LANE-7] reads the candidate's alone)
+    [InlineData("baseline-target-mode", "1.1", "unverifiable")]  // the baseline's target mode is read ([LANE-1])
     [InlineData("target-mode", "1.0", "lane-result")]            // round 5: in a 1.0 document, read as §7.3 says: mocked, so not eligible
     [InlineData("severity", "1.0", "lane-result")]               // critical, above the rule's max: failed
     [InlineData("severity-passed", "1.0", null)]                 // a passed line's severity is not read: passed, as recorded
@@ -336,6 +336,52 @@ public sealed class CheckpointVerifierTests : IDisposable
 
         Assert.Contains("evidence", CheckpointManifest.Verify(document));
         Assert.Contains("lanes", CheckpointManifest.Verify(document));
+    }
+
+    [Theory]
+    [InlineData("1.0", "sealed", "approved", true, true, "outcome")]                // checked as usual (vector state-unknown-in-1-0)
+    [InlineData("1.0", "sealed", "inconclusive", true, true, "")]                   // nothing differs: no problem
+    [InlineData("1.0", "sealed", null, true, true, "outcome")]                      // a decision with no outcome: not the decision's
+    [InlineData("1.0", "sealed", "approved", false, false, "unverifiable")]         // a decided outcome but no decision
+    [InlineData("1.0", "decided", "ratified", false, false, "unverifiable")]
+    [InlineData("1.0", "sealed", null, false, false, "")]                           // nothing recorded: nothing to recompute
+    [InlineData("1.0", "sealed", "inconclusive", true, false, "unverifiable")]      // a decision without its input (R6N-1, ruled 10-09)
+    [InlineData("1.0", "sealed", null, true, false, "unverifiable")]
+    [InlineData("1.1", "sealed", "inconclusive", true, true, "unverifiable")]       // a later minor's state
+    [InlineData("1.1", "decided", "ratified", true, true, "unverifiable")]
+    [InlineData("1.1", "decided", "approved", true, true, "outcome")]               // a later minor that holds nothing unknown: checked
+    [InlineData("1.0", "decided", "aborted", false, false, "")]
+    [InlineData("1.1", "sealed", "aborted", false, false, "unverifiable")]
+    public void AManifestHoldingAValueThisVersionDoesNotKnow_IsUnverifiableOnlyInALaterMinor_Ckp7(
+        string declared, string state, string? outcome, bool decision, bool input, string expected)
+    {
+        // [CKP-7] (round 6): only a manifest that declares a later minor and holds a state, an outcome or a lane status
+        // this version does not know is unverifiable, besides one with a decided outcome but no decision; a 1.0 manifest
+        // is checked as usual whatever it holds.
+        var document = JsonNode.Parse(File.ReadAllBytes(Path.Combine(AefCorpus.Conformance, "checkpoints", "valid-decided", "document.json")))!.AsObject();
+        document["schemaVersion"] = declared;
+        document["state"] = state;
+        document["outcome"] = outcome;
+        if (!decision) document.Remove("decision");
+        if (!input) document.Remove("decisionInput");
+
+        Assert.Equal(expected.Split(' ', StringSplitOptions.RemoveEmptyEntries), CheckpointManifest.Verify(document));
+    }
+
+    [Fact]
+    public void A10ManifestInAStateThisVersionDoesNotKnow_IsComparedWithItsRuns_AsADecidedOne_Ckp7()
+    {
+        // [CKP-7] (round 6): a 1.0 manifest cannot escape the checks with a state nobody defined; [CKP-8] compares its
+        // recorded results too. In a manifest of a later minor, such a state is unverifiable, and not compared.
+        var manifest = Corpus("threshold");
+        Lane(manifest, "pass")["result"]!["status"] = "failed";
+        manifest["state"] = "sealed";
+
+        Assert.Equal([new AefProblem("lanes/pass", "lane-result")], CheckpointVerifier.Lanes(manifest, AefRunStore.Open(CorpusRuns("threshold")), At).Problems);
+
+        manifest["schemaVersion"] = "1.1";
+        Assert.Empty(CheckpointVerifier.Lanes(manifest, AefRunStore.Open(CorpusRuns("threshold")), At).Problems);
+        Assert.Equal(["unverifiable"], CheckpointManifest.Verify(manifest));
     }
 
     [Fact]

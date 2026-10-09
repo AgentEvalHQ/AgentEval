@@ -6,7 +6,7 @@
   "rules": [
     "CKP-7"
   ],
-  "why": "a lane status a later minor adds, in the recorded input: the decision cannot be recomputed",
+  "why": "a lane status a later minor (1.1) adds, in the recorded input: the decision cannot be recomputed",
   "problems": [
     "unverifiable"
   ]

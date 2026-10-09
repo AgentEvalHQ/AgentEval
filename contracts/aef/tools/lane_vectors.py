@@ -9,6 +9,7 @@ aef_decide so that the manifest itself is consistent ([CKP-7]); the lane vectors
 Usage: python contracts/aef/tools/lane_vectors.py   (after build_conformance.py)
 """
 import hashlib
+import json
 import shutil
 import sys
 from pathlib import Path
@@ -550,9 +551,44 @@ def v_declared_version(runs):
     read as 1.0 reads it, the member ignored, and its false recorded result is lane-result."""
     T = "2026-10-03T00:00:00Z"
     plain = make_run(runs, "DV-plain", [dict(case="c1", path="p", state="passed", scores=scores(m=1.0))], ended=T)
-    lanes = [("junk-member", dict(threshold("quality", ">=", 0.5), minimumShare=0.9), [plain], True)]
-    return (lanes, {"junk-member": res("passed", T)}, [["lanes/junk-member", "lane-result"]], ["CKP-8", "VER-6"],
-            {"junk-member": res("failed", T)})
+    # R6-2: a 1.0 run with a target mode nobody defined reads it as mocked (§7.3): not eligible, and the lie shows.
+    shadow = make_run(runs, "DV-shadow", [dict(case="c1", path="p", state="passed", scores=scores(m=1.0))],
+                      mode="live-shadow", ended=T)
+    # R6-2: only the candidate's direction counts (LANE-7): a baseline declaring 1.1 with an unknown direction changes
+    # nothing, and the lane is compared as usual.
+    pairs = [dict(case=f"b{i:02d}", path="mem", state="passed", scores=scores(recall=r, latency=100, tokens=10))
+             for i, r in enumerate([0.4] * 15 + [0.6] * 5 + [0.5] * 3, start=1)]
+    candidate = make_run(runs, "DV-candidate", pairs, lane="memory",
+                         metrics=(("recall", "score", "higher_better"), ("latency", "duration", "lower_better"),
+                                  ("tokens", "count", "none")),
+                         entries=(("recall", "mem"), ("latency", "mem"), ("tokens", "mem")), ended="2026-10-06T00:00:00Z")
+    baseline = make_run(runs, "DV-baseline",
+                        [dict(case=f"b{i:02d}", path="mem", state="passed", scores=scores(recall=0.5, latency=100, tokens=10))
+                         for i in range(1, 24)], lane="memory", version="v6",
+                        metrics=(("recall", "score", "target_band"), ("latency", "duration", "lower_better"),
+                                 ("tokens", "count", "none")),
+                        entries=(("recall", "mem"), ("latency", "mem"), ("tokens", "mem")), ended="2026-09-20T00:00:00Z",
+                        schema_version="1.1")
+    lanes = [("junk-member", dict(threshold("quality", ">=", 0.5), minimumShare=0.9), [plain], True),
+             ("target-mode-in-1-0", threshold("quality", ">=", 0.5), [shadow], True),
+             ("baseline-direction-unknown", cmp_rule(baseline), [candidate], True)]
+    # 15 regressed of 20 pairs: p = 0.0207 <= 0.05, failed (as v_comparison's "regressed").
+    results = {"junk-member": res("passed", T), "target-mode-in-1-0": res("not_measured", T),
+               "baseline-direction-unknown": res("failed", "2026-10-06T00:00:00Z")}
+    recorded = {"junk-member": res("failed", T), "target-mode-in-1-0": res("passed", T),
+                "baseline-direction-unknown": res("failed", "2026-10-06T00:00:00Z")}
+    return (lanes, results, [["lanes/junk-member", "lane-result"], ["lanes/target-mode-in-1-0", "lane-result"]],
+            ["CKP-8", "VER-6", "LANE-7"], recorded)
+
+
+def v_unknown_state(runs):
+    """CKP-7, CKP-8 (R6N-3): a 1.0 checkpoint in a state nobody defined that records a decision is checked as decided:
+    its lanes are compared, and a false recorded result is lane-result. (main() rewrites the state after writing.)"""
+    T = "2026-10-03T00:00:00Z"
+    run = make_run(runs, "US-plain", [dict(case="c1", path="p", state="passed", scores=scores(m=1.0))], ended=T)
+    lanes = [("quality", threshold("quality", ">=", 0.5), [run], True)]
+    return (lanes, {"quality": res("passed", T)}, [["lanes/quality", "lane-result"]], ["CKP-7", "CKP-8", "VER-6"],
+            {"quality": res("failed", T)})
 
 
 def v_comparison_unknown_axis(runs):
@@ -604,6 +640,9 @@ def main():
     vector("severity-max-unknown", v_severity_max_unknown, version="1.1")
     vector("reads-unknown", v_reads_unknown, version="1.1")
     vector("declared-version", v_declared_version)
+    vector("unknown-state-in-1-0", v_unknown_state)
+    manifest = OUT / "unknown-state-in-1-0" / "checkpoint.json"
+    write_json(manifest, dict(json.loads(manifest.read_text(encoding="utf-8")), state="sealed"))
     vector("comparison-large", v_comparison_large)
     vector("binding", v_binding, deployment="deployment:shop/assistant@prod")
     vector("recorded-differs", v_recorded_differs)

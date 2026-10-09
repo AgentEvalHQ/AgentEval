@@ -142,7 +142,7 @@ A node holds the facts of one line: `path`, `evaluator` and `state`, and optiona
 `lane`, all written as given; `component` (`weight`, `required`), on every child and only there; on every node with
 children, `aggregation`: the producer's `strategy` and `rulePath`, and optionally `threshold`, `score` and `decisive`
 (the paths of the children that decided it); and `children`, the nodes one level down (a child's `path` is its
-parent's, then `/` and a name without `/`, as [RES-8] reads a parent path). A case run in trials also has `trials`:
+parent's, then `/` and a name without `/`: a scenario's paths follow its trees, so a Producer can check them). A case run in trials also has `trials`:
 the `aggregation` its rollups carry (and `k`, for `PassAtK`), and `trees`, one node per trial in trial order, each at
 the case's `path`. The case's own node and its children are then its rollups, with a node at each path its trial
 trees have and at no other.
@@ -169,7 +169,8 @@ vector's folder before it runs the vector. Each step is an object with one membe
 | `{"files": [FOLDER, N]}` | creates `N` empty files in `FOLDER`, named `0` to `N`−1 |
 | `{"write": [PATH, PARTS]}`, `{"append": [PATH, PARTS]}` | writes or appends a file of `PARTS`: `[text, count]` pairs, each text in UTF-8 repeated `count` times |
 
-Paths are relative to the vector's folder, `/`-separated. The implementation is given the generated folder as it
+Paths are relative to the vector's folder, `/`-separated, with no `..` segment, no drive and no leading `/`: a
+runner refuses a recipe whose paths would leave the corpus or the vector. The implementation is given the generated folder as it
 would be given a stored one: generating is the runner's job, never the implementation's. `limits/` holds these vectors,
 each limit of [ENC-17] at its value or one beyond.
 

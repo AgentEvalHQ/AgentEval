@@ -19,7 +19,8 @@ A closed run that checks clean needs `run.json`, `results.ndjson`, `metrics.json
    file's final form at once. After this, nothing outside `overlays/` changes ([RUN-4]).
 5. **Seal it** ([SEAL-1]–[SEAL-5]), and sign the seal if anyone else will rely on the run ([SIG-1]).
 
-`tools/aef_produce.py` is a reference writer for steps 4 and 5; `tools/aef_verify.py run DIR` checks the result.
+`tools/aef_produce.py` is a reference writer: it writes a run's results and summary from its facts (steps 2 and 3,
+the `produce` operation of §9.3) and seals and signs it (step 5); `tools/aef_verify.py run DIR` checks the result.
 
 ## Say what you did not measure
 

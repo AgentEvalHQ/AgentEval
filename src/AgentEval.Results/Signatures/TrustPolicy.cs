@@ -115,6 +115,19 @@ public sealed class TrustPolicy
             throw new TrustPolicyException($"A trust policy is a JSON document ({e.Code}): {e.Message}");
         }
 
+        // [VER-4]: another major version is refused with a message that says so; [SIG-4]: so is a later minor (the schema's
+        // const), named as such rather than as a schema mismatch.
+        if (AefVersion.OtherMajor(root["schemaVersion"]) is { } major)
+        {
+            throw new TrustPolicyException(AefVersion.OtherMajorMessage("The trust policy", (string)root["schemaVersion"]!, major));
+        }
+
+        if (AefVersion.DeclaresLaterMinor(root["schemaVersion"]))
+        {
+            throw new TrustPolicyException(
+                $"The trust policy declares schemaVersion {(string)root["schemaVersion"]!}, a later minor than this verifier's {AefVersion.Current}; a trust policy is closed, so a verifier refuses one of a later version ([SIG-4]).");
+        }
+
         if (Schemas.AefSchemas.Reader.Validate(SchemaName, root) is { } why)
         {
             throw new TrustPolicyException($"A trust policy is valid against trust-policy.schema.json, closed for readers too ([SIG-4], [VER-9]): {why}");
