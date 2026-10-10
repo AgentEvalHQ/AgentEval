@@ -80,6 +80,7 @@ public class MAFEvaluationHarnessJudgeFailureTests
 
         Assert.Equal(1, judge.Calls);
         Assert.False(result.Passed, $"a judge that produced no verdict must not pass at PassingScore={passingScore}");
+        Assert.True(result.JudgeFailed, "the result must say the judge produced no verdict, so a recorder reports it as not measured");
         Assert.NotEqual(EvaluationDefaults.DefaultFailureScore, result.Score);
         Assert.Contains("no verdict", result.Details, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("Failed to parse evaluation", result.Details, StringComparison.Ordinal);
@@ -101,6 +102,7 @@ public class MAFEvaluationHarnessJudgeFailureTests
 
         Assert.Equal(1, judge.Calls);
         Assert.False(result.Passed);
+        Assert.True(result.JudgeFailed);
         Assert.NotEqual(EvaluationDefaults.DefaultFailureScore, result.Score);
         Assert.Contains("no verdict", result.Details, StringComparison.OrdinalIgnoreCase);
         Assert.NotNull(result.Failure);

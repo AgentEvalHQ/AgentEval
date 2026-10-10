@@ -116,6 +116,13 @@ public class TestResult
 
     /// <summary>Exception if the test errored.</summary>
     public Exception? Error { get; set; }
+
+    /// <summary>
+    /// The judge produced no verdict (<see cref="Core.EvaluationResult.EvaluationFailed"/>): an evaluation-infrastructure
+    /// failure, not a grade. <see cref="Passed"/> is then false and <see cref="Score"/> 0 only as placeholders, so a
+    /// consumer that records outcomes must read this first and report the case as not measured, never as failed.
+    /// </summary>
+    public bool JudgeFailed { get; set; }
     
     /// <summary>Tool usage information from the agent run.</summary>
     public ToolUsageReport? ToolUsage { get; set; }

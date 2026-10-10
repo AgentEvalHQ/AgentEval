@@ -1472,6 +1472,7 @@ class AgentEval.Models.TestResult
     AgentEval.Models.ToolCallTimeline Timeline { get; set; }
     AgentEval.Models.ToolUsageReport ToolUsage { get; set; }
     Boolean HasError { get; }
+    Boolean JudgeFailed { get; set; }
     Boolean Passed { get; set; }
     Boolean ToolsWereCalled { get; }
     Exception Error { get; set; }
