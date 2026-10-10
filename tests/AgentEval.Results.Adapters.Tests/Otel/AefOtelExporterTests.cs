@@ -207,7 +207,7 @@ public sealed class AefOtelExporterTests : IDisposable
             w.AddResult(Leaf("k1", "q", AefState.Failed, [("m", 0.25), ("n", 3)]) with
             {
                 EndedAt = AefTime.Parse("2026-10-01T10:00:01.5Z"),
-                TraceLink = new AefTraceLink("4bf92f3577b34da6a3ce929d0e0e4736", "00f067aa0ba902b7"),
+                TraceLink = new AefTraceLink("4bf92f3577b34da6a3ce929d0e0e4736", "00f067aa0ba902b7"), // DevSkim: ignore DS173237 — W3C Trace Context example ids
                 Reason = "two scores",
             });
         });
@@ -223,7 +223,7 @@ public sealed class AefOtelExporterTests : IDisposable
         {
             var nanos = new DateTimeOffset(2026, 10, 1, 10, 0, 1, 500, TimeSpan.Zero).ToUnixTimeMilliseconds() * 1_000_000;
             Assert.Equal(nanos.ToString(CultureInfo.InvariantCulture), (string)record["timeUnixNano"]!);
-            Assert.Equal(("4bf92f3577b34da6a3ce929d0e0e4736", "00f067aa0ba902b7"), ((string)record["traceId"]!, (string)record["spanId"]!));
+            Assert.Equal(("4bf92f3577b34da6a3ce929d0e0e4736", "00f067aa0ba902b7"), ((string)record["traceId"]!, (string)record["spanId"]!)); // DevSkim: ignore DS173237 — W3C Trace Context example ids
             Assert.Equal("gen_ai.evaluation.result", (string)record["eventName"]!);
             Assert.Equal("failed", (string)Attr(record, "gen_ai.evaluation.score.label")!["stringValue"]!);
             Assert.Equal("two scores", (string)Attr(record, "gen_ai.evaluation.explanation")!["stringValue"]!);
@@ -239,7 +239,7 @@ public sealed class AefOtelExporterTests : IDisposable
             w.AddResult(Leaf("k1", "q", AefState.Passed, [("m", 1)]) with
             {
                 StartedAt = AefTime.Parse("1970-01-01T00:00:00.000000001Z"),
-                TraceLink = new AefTraceLink("4bf92f3577b34da6a3ce929d0e0e4736"),
+                TraceLink = new AefTraceLink("4bf92f3577b34da6a3ce929d0e0e4736"), // DevSkim: ignore DS173237 — W3C Trace Context example id
             });
             w.AddResult(Leaf("k2", "q", AefState.Passed, [("m", 1)]));
         });
@@ -248,7 +248,7 @@ public sealed class AefOtelExporterTests : IDisposable
 
         var first = Records(JsonNode.Parse(export.Lines[0])!).Single();
         Assert.Equal("1", (string)first["timeUnixNano"]!);
-        Assert.Equal("4bf92f3577b34da6a3ce929d0e0e4736", (string)first["traceId"]!);
+        Assert.Equal("4bf92f3577b34da6a3ce929d0e0e4736", (string)first["traceId"]!); // DevSkim: ignore DS173237 — W3C Trace Context example id
         Assert.False(first.ContainsKey("spanId"));
         var second = Records(JsonNode.Parse(export.Lines[1])!).Single();
         Assert.False(second.ContainsKey("timeUnixNano"));   // OT-2: OTLP reads none as unknown

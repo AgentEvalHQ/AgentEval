@@ -34,7 +34,7 @@ public static class AefSigningKey
         ArgumentNullException.ThrowIfNull(pem);
         if (!PemEncoding.TryFind(pem, out var fields) || !pem.AsSpan()[fields.Label].SequenceEqual("PRIVATE KEY"))
         {
-            throw new ArgumentException("Not an unencrypted PKCS#8 PEM block (-----BEGIN PRIVATE KEY-----).", nameof(pem));
+            throw new ArgumentException("Not an unencrypted PKCS#8 PEM block (-----BEGIN PRIVATE KEY-----).", nameof(pem)); // DevSkim: ignore DS173238 — the PEM label in an error message, no key
         }
 
         var der = new byte[fields.DecodedDataLength];

@@ -69,7 +69,7 @@ public sealed class FakeEmbeddings : IAgentEvalEmbeddings
         // runs and broke the documented cross-process determinism (BUG-25). FNV-1a over the
         // UTF-8 bytes is deterministic across processes and platforms.
         var textSeed = unchecked((int)StableHash(text));
-        var textRandom = new Random(textSeed);
+        var textRandom = new Random(textSeed); // DevSkim: ignore DS148264 — a seeded fake embedding must be reproducible; nothing secret
         
         // Generate base embedding from text hash
         for (int i = 0; i < _dimensions; i++)

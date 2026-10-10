@@ -45,7 +45,7 @@ export function PromptHashPill({ promptHash }: PromptHashPillProps) {
     try {
       await navigator.clipboard.writeText(promptHash);
       setCopied(true);
-      window.setTimeout(() => setCopied(false), 1200);
+      window.setTimeout(() => setCopied(false), 1200); // DevSkim: ignore DS172411 — a function, not a code string
     } catch {
       // Some browsers (or non-secure contexts) refuse clipboard writes.
       // Fall through silently — the full hash is still surfaced via the

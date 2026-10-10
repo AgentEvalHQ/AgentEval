@@ -347,10 +347,10 @@ public class AefRunWriterTests
     {
         using var run = new WriterRun();
         var writer = run.Create();
-        writer.AddTraces(Traces(("4bf92f3577b34da6a3ce929d0e0e4736", "00f067aa0ba902b7")));
+        writer.AddTraces(Traces(("4bf92f3577b34da6a3ce929d0e0e4736", "00f067aa0ba902b7"))); // DevSkim: ignore DS173237 — W3C Trace Context example ids
         writer.AddLogs(Logs(body: true));
-        writer.AddEvidence(new AefEvidence { EvidenceId = "E-span", Kind = AefEvidenceKind.Span, Link = AefEvidenceLink.ToSpan("4bf92f3577b34da6a3ce929d0e0e4736", "00f067aa0ba902b7") });
-        writer.AddResult(WriterRun.Leaf("k1") with { TraceLink = new AefTraceLink("4bf92f3577b34da6a3ce929d0e0e4736"), Evidence = ["E-span"] });
+        writer.AddEvidence(new AefEvidence { EvidenceId = "E-span", Kind = AefEvidenceKind.Span, Link = AefEvidenceLink.ToSpan("4bf92f3577b34da6a3ce929d0e0e4736", "00f067aa0ba902b7") }); // DevSkim: ignore DS173237 — W3C Trace Context example ids
+        writer.AddResult(WriterRun.Leaf("k1") with { TraceLink = new AefTraceLink("4bf92f3577b34da6a3ce929d0e0e4736"), Evidence = ["E-span"] }); // DevSkim: ignore DS173237 — W3C Trace Context example id
         writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1));
 
         Assert.Empty(run.Problems());
@@ -493,7 +493,7 @@ public class AefRunWriterTests
     {
         using var run = new WriterRun();
         var writer = run.Create(AefContentCapture.Off);
-        var traces = Traces(("4bf92f3577b34da6a3ce929d0e0e4736", "00f067aa0ba902b7"));
+        var traces = Traces(("4bf92f3577b34da6a3ce929d0e0e4736", "00f067aa0ba902b7")); // DevSkim: ignore DS173237 — W3C Trace Context example ids
         var span = traces["resourceSpans"]![0]!["scopeSpans"]![0]!["spans"]![0]!.AsObject();
         var holder = onAnEvent ? new JsonObject { ["name"] = "e" } : span;
         holder["attributes"] = new JsonArray(new JsonObject { ["key"] = attribute, ["value"] = new JsonObject { ["stringValue"] = "x" } });
@@ -525,7 +525,7 @@ public class AefRunWriterTests
     {
         using var run = new WriterRun();
         var writer = run.Create(AefContentCapture.On);
-        var traces = Traces(("4bf92f3577b34da6a3ce929d0e0e4736", "00f067aa0ba902b7"));
+        var traces = Traces(("4bf92f3577b34da6a3ce929d0e0e4736", "00f067aa0ba902b7")); // DevSkim: ignore DS173237 — W3C Trace Context example ids
         traces["resourceSpans"]![0]!["scopeSpans"]![0]!["spans"]![0]!["attributes"] =
             new JsonArray(new JsonObject { ["key"] = "gen_ai.input.messages", ["value"] = new JsonObject { ["stringValue"] = "hi" } });
 
@@ -826,8 +826,8 @@ public class AefRunWriterTests
             GateId = "gate:ci", DecisionId = "d-1", Rule = new AefGateRule("fail-on"), Inputs = new AefGateInputs { Results = [writer.ResultIdOf("k8", "q")] },
             Comparability = AefComparability.NotApplicable, Outcome = AefGateOutcome.NoShip, DecidedAt = WriterRun.Start,
         });
-        writer.AddTraces(Traces(("4bf92f3577b34da6a3ce929d0e0e4736", "00f067aa0ba902b7")));
-        writer.AddResult(WriterRun.Leaf("k4") with { TraceLink = new AefTraceLink("4bf92f3577b34da6a3ce929d0e0e4737") });
+        writer.AddTraces(Traces(("4bf92f3577b34da6a3ce929d0e0e4736", "00f067aa0ba902b7"))); // DevSkim: ignore DS173237 — W3C Trace Context example ids
+        writer.AddResult(WriterRun.Leaf("k4") with { TraceLink = new AefTraceLink("4bf92f3577b34da6a3ce929d0e0e4737") }); // DevSkim: ignore DS173237 — a trace id one off the example's
         writer.SetSummary(new AefSummary { Lanes = [new AefSummaryLane("a", [new AefSummaryEntry { Metric = "undeclared-too", Path = "q" }])] });
         var before = run.Snapshot();
 
@@ -1100,7 +1100,7 @@ public class AefRunWriterTests
         using var run = new WriterRun();
         var writer = run.Create(AefContentCapture.Off);
         var attribute = new JsonArray(new JsonObject { ["key"] = "gen_ai.system_instructions", ["value"] = new JsonObject { ["stringValue"] = "x" } });
-        var traces = Traces(("4bf92f3577b34da6a3ce929d0e0e4736", "00f067aa0ba902b7"));
+        var traces = Traces(("4bf92f3577b34da6a3ce929d0e0e4736", "00f067aa0ba902b7")); // DevSkim: ignore DS173237 — W3C Trace Context example ids
         var logs = Logs(body: false);
         if (resource)
         {

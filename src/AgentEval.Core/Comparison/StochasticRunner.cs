@@ -76,7 +76,6 @@ public class StochasticRunner : IStochasticRunner
         options.Validate();
         
         var results = new List<TestResult>();
-        var random = options.Seed.HasValue ? new Random(options.Seed.Value) : new Random();
         var stopwatch = Stopwatch.StartNew();
         
         if (options.MaxParallelism == 1)

@@ -388,7 +388,7 @@ public class MemoryBenchmarkRunner : IMemoryBenchmarkRunner
             // Inject themed distractor turns at deterministic positions in the corpus
             if (corpusTurns != null && preset.ContextPressure?.DistractorTurns is { Count: > 0 } distractorTurns)
             {
-                var rng = new Random(42); // deterministic seed for reproducibility
+                var rng = new Random(42); // deterministic seed for reproducibility. DevSkim: ignore DS148264 — distractor positions, nothing secret
                 foreach (var d in distractorTurns)
                 {
                     var insertAt = rng.Next(0, corpusTurns.Count);

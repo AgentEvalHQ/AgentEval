@@ -29,9 +29,9 @@ public static class EcdsaP256
     public const int PointSize = 1 + 2 * ScalarSize;
 
     // P-256 (FIPS 186-5 / SP 800-186 §3.2.1.3): y^2 = x^3 - 3x + b over GF(p); the base point has prime order n.
-    private static readonly BigInteger P = Hex("ffffffff00000001000000000000000000000000ffffffffffffffffffffffff");
-    private static readonly BigInteger B = Hex("5ac635d8aa3a93e7b3ebbd55769886bc651d06b0cc53b0f63bce3c3e27d2604b");
-    private static readonly BigInteger N = Hex("ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551");
+    private static readonly BigInteger P = Hex("ffffffff00000001000000000000000000000000ffffffffffffffffffffffff"); // DevSkim: ignore DS173237 — public curve constant
+    private static readonly BigInteger B = Hex("5ac635d8aa3a93e7b3ebbd55769886bc651d06b0cc53b0f63bce3c3e27d2604b"); // DevSkim: ignore DS173237 — public curve constant
+    private static readonly BigInteger N = Hex("ffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551"); // DevSkim: ignore DS173237 — public curve constant
 
     /// <summary>
     /// Whether <paramref name="message"/> is signed by <paramref name="signature"/> (strict DER) under the public key
@@ -51,7 +51,7 @@ public static class EcdsaP256
         SHA256.HashData(message, hash);
         using var key = ECDsa.Create(new ECParameters
         {
-            Curve = ECCurve.NamedCurves.nistP256,
+            Curve = ECCurve.NamedCurves.nistP256, // DevSkim: ignore DS440100 — P-256 is the curve [SIG-2] specifies
             Q = new ECPoint { X = point[1..(1 + ScalarSize)].ToArray(), Y = point[(1 + ScalarSize)..].ToArray() },
         });
         return key.VerifyHash(hash, rs, DSASignatureFormat.IeeeP1363FixedFieldConcatenation);

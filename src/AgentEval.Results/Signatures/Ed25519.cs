@@ -35,7 +35,7 @@ public static class Ed25519
 
     // edwards25519 (RFC 8032 §5.1, Table 1): -x^2 + y^2 = 1 + d x^2 y^2 over GF(p).
     private static readonly BigInteger P = BigInteger.Pow(2, 255) - 19;
-    private static readonly BigInteger L = BigInteger.Pow(2, 252) + BigInteger.Parse("27742317777372353535851937790883648493", System.Globalization.CultureInfo.InvariantCulture);
+    private static readonly BigInteger L = BigInteger.Pow(2, 252) + BigInteger.Parse("27742317777372353535851937790883648493", System.Globalization.CultureInfo.InvariantCulture); // DevSkim: ignore DS173237 — the public group order
     private static readonly BigInteger D = Mod(-121665 * Inverse(121666));
     private static readonly BigInteger SqrtMinusOne = BigInteger.ModPow(2, (P - 1) / 4, P);
     private static readonly Point Identity = new(0, 1, 1, 0);

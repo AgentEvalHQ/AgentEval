@@ -51,9 +51,11 @@ jobs:
         directory-to-scan: .
         output-filename: devskim-results.sarif
         # Path exclusions — content / generated / planning, not code:
-        # - samples/.../Articles/Yaml: scenario content intentionally names
-        #   weak hash algorithms (MD5/SHA-1) as the prohibited input the agent
-        #   must refuse — not code that uses them.
+        # - Articles/Yaml (the compliance packs' scenarios, src/AgentEval.Compliance.*/Articles/Yaml,
+        #   formerly under samples/): scenario content intentionally names weak hash algorithms
+        #   (MD5/SHA-1) as the prohibited input the agent must refuse — not code that uses them.
+        #   Most of those names sit in YAML block scalars, where a suppression comment would
+        #   become part of the prompt.
         # - node_modules + docs/_site: generated content.
         # - strategy/: internal-only planning + calibration-baseline reports.
         # - Fixtures/consumer-probe/: the consuming project's probe output and corpus metadata,
@@ -64,8 +66,15 @@ jobs:
         #   them is the same false positive — the 64-hex values DevSkim reads as leaked tokens are
         #   SHA-256 content hashes that exist precisely so a result can name the corpus that
         #   produced it. Data, not code.
+        # - contracts/aef/1/conformance/ + contracts/aef/1/interop/examples/: the AEF conformance
+        #   corpus and interop examples, written by contracts/aef/tools/. JSON and NDJSON cannot carry
+        #   a suppression comment, and every finding in them is the same false positive: the 64-hex
+        #   values are SHA-256 digests (run hashes, file and blob digests, key ids) and trace ids, and
+        #   signature-vectors/keys/ holds test keys derived from public strings and published so
+        #   anyone can check the vectors (its README: never trust them). Data, not code; the tools
+        #   that write it stay scanned.
         # Real source code under src/ and tests/ remains scanned.
-        ignore-globs: "**/samples/**/Articles/Yaml/**,**/node_modules/**,**/_site/**,**/strategy/**,**/Data/typedmemeval/**,**/Data/typedmemeval-judge-calibration*.json,**/Fixtures/consumer-probe/**"
+        ignore-globs: "**/Articles/Yaml/**,**/node_modules/**,**/_site/**,**/strategy/**,**/Data/typedmemeval/**,**/Data/typedmemeval-judge-calibration*.json,**/Fixtures/consumer-probe/**,**/contracts/aef/1/conformance/**,**/contracts/aef/1/interop/examples/**"
         # Rule exclusions — informational rules that produce only false
         # positives in this codebase. Real-security rules (DS126858 weak
         # hash, DS148264 weak random, DS425040 untrusted deserialize) stay

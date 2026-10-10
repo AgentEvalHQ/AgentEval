@@ -8,7 +8,7 @@ namespace AgentEval.Results.Tests.Runs;
 /// <summary>[SEAL-2]–[SEAL-4]: the manifest's lines, its order by the UTF-8 bytes of the whole path, and the run hash.</summary>
 public sealed class AefManifestTests : IDisposable
 {
-    private const string Empty = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+    private const string Empty = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"; // DevSkim: ignore DS173237 — SHA-256 of no bytes
     private readonly string _dir = Path.Combine(Path.GetTempPath(), $"aef-manifest-{Guid.NewGuid():N}");
 
     public void Dispose()
@@ -93,7 +93,7 @@ public sealed class AefManifestTests : IDisposable
     public void ABlobIsHashedAsAStream_AndItsSizeIsTheBytesHashed()
     {
         var blob = new byte[(3 << 20) + 7];   // more than one read buffer
-        new Random(7).NextBytes(blob);
+        new Random(7).NextBytes(blob); // DevSkim: ignore DS148264 — test bytes, nothing secret
         var name = Hex(SHA256.HashData(blob));
         var path = AefRunFolder.BlobPath(name);
         Directory.CreateDirectory(Path.Combine(_dir, Path.GetDirectoryName(path)!));

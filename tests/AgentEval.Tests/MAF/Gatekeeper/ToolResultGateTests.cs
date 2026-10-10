@@ -509,8 +509,8 @@ public class ToolResultGateTests
 
     [Theory]
     [InlineData("AKIAABCDEFGHIJKLMNOP")]                                              // AWS access key
-    [InlineData("ghp_abcdefghijklmnopqrstuvwxyz0123456789")]                          // GitHub token
-    [InlineData("-----BEGIN RSA PRIVATE KEY-----\nMIIEow==\n-----END RSA PRIVATE KEY-----")] // private key block
+    [InlineData("ghp_abcdefghijklmnopqrstuvwxyz0123456789")]                          // GitHub token. DevSkim: ignore DS173239 — a fake: a-z then 0-9
+    [InlineData("-----BEGIN RSA PRIVATE KEY-----\nMIIEow==\n-----END RSA PRIVATE KEY-----")] // private key block. DevSkim: ignore DS173238 — a fake, no key in it
     [InlineData("Bearer abcdefghijklmnopqrstuvwxyz0123456789")]                       // bearer token
     public async Task ToolResultSecretGate_SecretShape_RedactsAndMasks(string secretText)
     {
@@ -548,7 +548,7 @@ public class ToolResultGateTests
         // treated as "no match" — so a PEM private key in a result that timed out the scan flowed to the model
         // UNMASKED. Force the timeout deterministically with a 1-tick budget over a large input, and assert the
         // gate fails CLOSED: the key never appears in what the model would see, and the verdict is not Allow.
-        var pemKey = "-----BEGIN RSA PRIVATE KEY-----\n" + new string('M', 2048) + "\n-----END RSA PRIVATE KEY-----";
+        var pemKey = "-----BEGIN RSA PRIVATE KEY-----\n" + new string('M', 2048) + "\n-----END RSA PRIVATE KEY-----"; // DevSkim: ignore DS173238 — a fake, 'M' x 2048
         var bigResult = new string('x', 200_000) + "\n" + pemKey + "\n" + new string('y', 200_000);
 
         var gate = new ToolResultSecretGate(matchTimeout: TimeSpan.FromTicks(1));
@@ -556,7 +556,7 @@ public class ToolResultGateTests
 
         Assert.NotEqual(ToolResultAction.Allow, verdict.Action);   // must NOT pass the secret through
         var shown = verdict.RedactedResult as string ?? string.Empty;
-        Assert.DoesNotContain("-----BEGIN RSA PRIVATE KEY-----", shown, StringComparison.Ordinal);
+        Assert.DoesNotContain("-----BEGIN RSA PRIVATE KEY-----", shown, StringComparison.Ordinal); // DevSkim: ignore DS173238 — the label only, no key
         Assert.DoesNotContain(new string('M', 2048), shown, StringComparison.Ordinal);   // the key body itself
     }
 

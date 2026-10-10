@@ -40,7 +40,7 @@ public sealed class EcdsaP256Signer : IAefSigner, IDisposable
 
         _key = ECDsa.Create(new ECParameters
         {
-            Curve = ECCurve.NamedCurves.nistP256,
+            Curve = ECCurve.NamedCurves.nistP256, // DevSkim: ignore DS440100 — P-256 is the curve [SIG-2] specifies
             Q = parameters.Q,
             D = parameters.D,
         });
@@ -51,7 +51,7 @@ public sealed class EcdsaP256Signer : IAefSigner, IDisposable
     /// <summary>A signer with a new random P-256 key.</summary>
     public static EcdsaP256Signer Generate()
     {
-        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256); // DevSkim: ignore DS440100 — P-256 is the curve [SIG-2] specifies
         return new EcdsaP256Signer(key);
     }
 

@@ -44,7 +44,7 @@ public class DsseVerifierTests
     [Fact]
     public void TheSignersKeyId_IsThatOfThePlatformsSubjectPublicKeyInfo()
     {
-        using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256); // DevSkim: ignore DS440100 — the curve under test
         using var signer = new EcdsaP256Signer(ecdsa);
         Assert.Equal(KeyId.Of(ecdsa.ExportSubjectPublicKeyInfo()), signer.KeyId);
         Assert.Equal(signer.PublicKey.KeyId, signer.KeyId);
@@ -53,7 +53,7 @@ public class DsseVerifierTests
     [Fact]
     public void ASignerFromPem_SignsWhatItsPublicKeyVerifies()
     {
-        using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256); // DevSkim: ignore DS440100 — the curve under test
         using var signer = EcdsaP256Signer.FromPem(ecdsa.ExportPkcs8PrivateKeyPem());
         Assert.True(PublicKeyInfo.FromDer(ecdsa.ExportSubjectPublicKeyInfo()).Verify("m"u8, signer.Sign("m"u8)));
     }
@@ -61,7 +61,7 @@ public class DsseVerifierTests
     [Fact]
     public void ASignerRefusesAKeyNotOnP256()
     {
-        using var p384 = ECDsa.Create(ECCurve.NamedCurves.nistP384);
+        using var p384 = ECDsa.Create(ECCurve.NamedCurves.nistP384); // DevSkim: ignore DS440100 — a wrong curve, asserted refused
         Assert.Throws<ArgumentException>(() => new EcdsaP256Signer(p384));
     }
 

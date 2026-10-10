@@ -203,7 +203,7 @@ public class TrxExporter : IResultExporter
 
     private static Guid CreateDeterministicGuid(string input)
     {
-        var hash = MD5.HashData(Encoding.UTF8.GetBytes(input));
+        var hash = MD5.HashData(Encoding.UTF8.GetBytes(input)); // DevSkim: ignore DS126858 — a stable GUID from a test name, not a security use
         return new Guid(hash);
     }
 }

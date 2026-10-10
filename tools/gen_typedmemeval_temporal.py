@@ -302,7 +302,7 @@ def _ask(shape: str, events: list[str], rng: random.Random) -> str:  # DevSkim: 
         # one link that names both of them, which is a single-session lookup; the ends are related
         # only by following every link in between. See _links_needed.
         pair = [events[0], events[-1]]
-        rng.shuffle(pair)
+        rng.shuffle(pair)  # DevSkim: ignore DS148264 - deterministic corpus generation
         return f"Which came first, {pair[0]} or {pair[1]}?"
     if shape == SHAPE_RECENCY:
         # SPREAD ACROSS THE CHAIN, not the last three. Asking about three adjacent events made the
@@ -310,10 +310,10 @@ def _ask(shape: str, events: list[str], rng: random.Random) -> str:  # DevSkim: 
         # the shape scored 15/15 at V1, V8 AND V9 - the only one in the family no system could be
         # ranked by. Spanning the chain means every link has to be followed.
         window = [events[0], events[len(events) // 2], events[-1]]
-        rng.shuffle(window)
+        rng.shuffle(window)  # DevSkim: ignore DS148264 - deterministic corpus generation
         return f"Of {window[0]}, {window[1]} and {window[2]}, which happened most recently?"
     window = [events[0], events[2]]
-    rng.shuffle(window)
+    rng.shuffle(window)  # DevSkim: ignore DS148264 - deterministic corpus generation
     return f"Between {window[0]} and {window[1]}, what happened in between?"
 
 

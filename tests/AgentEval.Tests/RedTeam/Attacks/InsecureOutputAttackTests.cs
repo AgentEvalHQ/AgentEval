@@ -353,7 +353,7 @@ public sealed class InsecureOutputAttackTests
             .Where(p => p.Technique == "http_header_injection")
             .ToList();
         
-        var headerPatterns = new[] { "\\r\\n", "Set-Cookie", "Content-Type", "header" };
+        var headerPatterns = new[] { "\\r\\n", "Set-Cookie", "Content-Type", "header" }; // DevSkim: ignore DS610001 — words a probe must name, not a header
         Assert.All(probes, p => 
             Assert.Contains(headerPatterns, pattern => 
                 p.Prompt.Contains(pattern, StringComparison.OrdinalIgnoreCase)));

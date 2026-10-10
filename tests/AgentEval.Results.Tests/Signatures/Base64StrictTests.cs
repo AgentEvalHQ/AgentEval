@@ -75,7 +75,7 @@ public class Base64StrictTests
     [Fact]
     public void EveryLength_RoundTrips_InBothAlphabets_PaddedOrNot()
     {
-        var random = new Random(8032);
+        var random = new Random(8032); // DevSkim: ignore DS148264 — test bytes, nothing secret
         for (var length = 0; length < 40; length++)
         {
             var bytes = new byte[length];

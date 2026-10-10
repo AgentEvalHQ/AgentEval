@@ -86,7 +86,7 @@ public class AefCommandTests : IDisposable
     public void Seal_SealsAClosedRun_SignedWithAKey_AndRefusesToSealItTwice()
     {
         Import(Out(), seal: false);
-        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var key = ECDsa.Create(ECCurve.NamedCurves.nistP256); // DevSkim: ignore DS440100 — the curve AEF signs with
         var keyPath = Path.Combine(_root, "key.pem");
         File.WriteAllText(keyPath, key.ExportPkcs8PrivateKeyPem());
         var policyPath = Path.Combine(_root, "policy.json");

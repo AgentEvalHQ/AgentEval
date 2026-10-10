@@ -40,7 +40,7 @@ public class PublicKeyInfoTests
     [Fact]
     public void AP256Key_EncodesAsThePlatformDoes()
     {
-        using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256); // DevSkim: ignore DS440100 — the curve under test
         var q = ecdsa.ExportParameters(false).Q;
         var platform = PublicKeyInfo.FromDer(ecdsa.ExportSubjectPublicKeyInfo());
         var ours = PublicKeyInfo.FromP256(q.X!, q.Y!);
@@ -83,7 +83,7 @@ public class PublicKeyInfoTests
     [Fact]
     public void AnEcKeyOnAnotherCurve_IsUnsupported()
     {
-        using var p384 = ECDsa.Create(ECCurve.NamedCurves.nistP384);
+        using var p384 = ECDsa.Create(ECCurve.NamedCurves.nistP384); // DevSkim: ignore DS440100 — a wrong curve, asserted unsupported
         var key = PublicKeyInfo.FromDer(p384.ExportSubjectPublicKeyInfo());
         Assert.Equal(AefKeyAlgorithm.Unsupported, key.Algorithm);
         Assert.Contains("another curve", key.UnsupportedReason, StringComparison.Ordinal);
@@ -223,7 +223,7 @@ public class PublicKeyInfoTests
 
     private static byte[] UncompressedPoint()
     {
-        using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256); // DevSkim: ignore DS440100 — the curve under test
         var q = ecdsa.ExportParameters(false).Q;
         return [0x04, .. q.X!, .. q.Y!];
     }

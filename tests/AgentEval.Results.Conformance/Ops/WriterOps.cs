@@ -56,7 +56,7 @@ internal static class WriterSamples
 
     public static readonly byte[] Reasoning = Encoding.UTF8.GetBytes("The answer misses the refund policy: ünïcødé ✓, and a CRLF\r\n");
 
-    private const string TraceId = "4bf92f3577b34da6a3ce929d0e0e4736";
+    private const string TraceId = "4bf92f3577b34da6a3ce929d0e0e4736"; // DevSkim: ignore DS173237 — W3C Trace Context example id
     private const string AgentSpan = "00f067aa0ba902b7";
     private const string JudgeSpan = "a3ce929d0e0e4736";
 
