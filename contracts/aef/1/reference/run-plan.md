@@ -37,8 +37,8 @@ What a runner is asked to evaluate: the exact subject version, the suites and la
 | `runnerSelector` | array of string |  | ≤ 32 items | Tags a runner's capability manifest must all carry. |
 | `ext` | [ext](common.md#ext) |  |  | Producer extensions, named reverse-DNS or with the producer's prefix. A reader ignores what it does not know; never holds a secret (ENC-19, PLAN-4). |
 | `zone` | string |  | pattern `^[a-z0-9][a-z0-9._:-]{0,63}$` | The network zone a remote-zone run must execute in. |
-| `judges` | array of object |  | ≤ 16 items | The judge models and rubrics the evaluators use, fixed by the plan. |
-| `judges[].model` | string | yes | ≥ 1 chars; ≤ 256 chars | The judge model the evaluators must use. |
+| `judges` | array of object |  | ≤ 16 items | The judge models and rubrics the evaluators may use, fixed by the plan: a run names those that graded it, some of these in this order (STRM-4). |
+| `judges[].model` | string | yes | ≥ 1 chars; ≤ 256 chars | A judge model the evaluators may use. |
 | `judges[].provider` | string |  | ≤ 128 chars | Who serves the judge model. |
 | `judges[].rubricDigest` | [sha256Uri](common.md#sha256uri) |  |  | The SHA-256 of the rubric the judge must grade with. |
 | `baseline` | object or object |  |  | What a comparison lane compares against: a policy, or one sealed run. |

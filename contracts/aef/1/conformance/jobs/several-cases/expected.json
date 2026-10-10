@@ -87,10 +87,11 @@
     "PLAN-8",
     "PLAN-9",
     "PLAN-10",
+    "RUN-9",
     "RUN-12",
     "STRM-1",
     "STRM-3",
     "STRM-4"
   ],
-  "why": "three suites, one without a lane, the first named with the digest of its content, which the runner checks before it accepts the job; an env credential that is set; nine cases within every limit, one run per suite, each sealed and announced, then job.sealed naming the three. usdHigh is the sum of the cost bounds (the first suite's are $0.50); the job ends after 9 cases of 20 s and 3 closes of 1 s"
+  "why": "three suites, one without a lane, the first named with the digest of its content, which the runner checks before it accepts the job; an env credential that is set; a judge the plan names, which grades no scripted case, so the runs name none (RUN-9); nine cases within every limit, one run per suite, each sealed and announced, then job.sealed naming the three. usdHigh is the sum of the cost bounds (the first suite's are $0.50); the job ends after 9 cases of 20 s and 3 closes of 1 s"
 }

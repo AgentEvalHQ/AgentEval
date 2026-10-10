@@ -9,7 +9,7 @@
     "task_version": "2",
     "dataset": {
       "name": "edges",
-      "samples": 3
+      "samples": 8
     },
     "model": "acme/gpt x",
     "model_roles": {
@@ -42,7 +42,7 @@
     ]
   },
   "results": {
-    "total_samples": 3,
+    "total_samples": 8,
     "completed_samples": 1,
     "scores": [
       {
@@ -127,6 +127,98 @@
         "message": "RuntimeError: the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; ",
         "traceback": "",
         "traceback_ansi": ""
+      }
+    },
+    {
+      "id": "d",
+      "epoch": 1,
+      "input": "",
+      "target": "",
+      "limit": {
+        "type": "token",
+        "limit": 1000.0
+      }
+    },
+    {
+      "id": "e",
+      "epoch": 1,
+      "input": "",
+      "target": "",
+      "limit": {
+        "type": "token",
+        "limit": 1e+16
+      }
+    },
+    {
+      "id": "f",
+      "epoch": 1,
+      "input": "",
+      "target": "",
+      "limit": {
+        "type": "message",
+        "limit": 1e+21
+      }
+    },
+    {
+      "id": "g",
+      "epoch": 1,
+      "input": "",
+      "target": "",
+      "error": {
+        "message": "",
+        "traceback": "",
+        "traceback_ansi": ""
+      }
+    },
+    {
+      "id": "h",
+      "epoch": 1,
+      "input": [
+        {
+          "role": "user",
+          "source": "input",
+          "content": "Rate this answer."
+        }
+      ],
+      "target": "",
+      "output": {
+        "model": "acme/gpt x",
+        "time": 1.0,
+        "choices": [
+          {
+            "stop_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "Fine — done.\n"
+            }
+          }
+        ],
+        "metadata": {
+          "ｚ": 1,
+          "😀": 2.5,
+          "z": true,
+          "é": null
+        }
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "Rate this answer."
+        },
+        {
+          "role": "assistant",
+          "content": "Fine — done.\n"
+        }
+      ],
+      "scores": {
+        "q": {
+          "value": 0.5
+        },
+        "m": {
+          "value": {
+            "x": 0.25
+          }
+        }
       }
     }
   ]

@@ -1,5 +1,30 @@
 # AEF 1.0 changelog
 
+## Unreleased (draft): rework after critic round 8
+
+Critic round 8 scored 9.4 of 10 (from 9.3): "technically AEF is now at 1.0 quality: every class, the Runner
+included, has two separately written implementations that pass the whole corpus"; what keeps it from publishing is
+the patent commitment and a first green CI run. Changes since:
+
+- **A run names the judges that graded it** ([RUN-9], [STRM-4]): STRM-4's `judges` accepts a sub-list of the plan's
+  judges, in the plan's order, none twice, so a run no judge touched no longer claims one; a scripted target's runs
+  name none (§9.2.1). Five plan-conformance vectors (none, some, one the plan does not name, out of order, twice).
+- **Limits with cases in flight** ([PLAN-9]): cases may run concurrently; the spend so far includes the bound of every
+  case started and not complete, `cases` counts cases started, the time check holds for every case in flight, and a
+  run's cost beyond its cases is bounded and checked as a case's is, in both sums.
+- **The `job` operation's edges** (§9.3): a start time from which the job's clock would leave [ENC-8]'s years is an
+  input error, found before anything is written; the vectors' `keychain` and `vault` references name paths that
+  cannot exist, so a runner that can read either refuses them too.
+- **Inspect: a limit spelled from its value** (inspect.md, IN-8): `<limit>` is written as ECMAScript's
+  Number::toString writes the binary64 value (`1000`, `10000000000000000`, `1e+21`), so any JSON parser gives the same
+  text; a limit with an empty `type` or a value that is not finite is refused; an error without a message has a
+  stated reason. Content that is not text becomes a blob serialized by JCS (RFC 8785), so two converters give it one
+  name from the same values; such content holding NaN is refused. Five samples and three refusals added to
+  `inspect-aef-edges`; the non-text blobs of `inspect-aef` are renamed to their JCS forms.
+- **Documentation**: the primer explains bounds, case ids and the scripted target; the rationale gains "Limits checked
+  against bounds, not estimates", "A case keeps its suite's id" and "A scripted target for runner conformance"; the
+  §9.3 `sign` row is back inside its table, and check_spec now reports a table row indented unlike its table.
+
 ## Unreleased (draft): rework after critic round 7
 
 Critic round 7 scored 9.3 of 10 (from 9.1): eleven dimensions at 9.3 to 9.6; what keeps 1.0 back is the patent
@@ -20,7 +45,7 @@ commitment and a first green CI run. Changes since:
   part of "can take", so matching answers for a scripted plan and a scheduler can route one.
 - **[PLAN-10] is a MUST**: two runners given one plan derive the same `subject.kind` and `deployment.ref`.
 - **The Runner class has vectors a second runner can pass** (§9.1, §9.2.1, §9.3): `job` vectors
-  (`conformance/jobs/`, 19) run a plan against a *scripted target*, a test fixture with fixed answers, costs, bounds
+  (`conformance/jobs/`, 23) run a plan against a *scripted target*, a test fixture with fixed answers, costs, bounds
   and durations, on a fixed clock, through a new operation `job PLAN RUNNER TARGET OUT --at T`; the judge checks the
   stream and the runs with [STRM-3], [STRM-4] and the run verifier, the cases and states run, the spend, the
   estimate, the end time, and that no credential value or path is written. They include a case whose cost fits but

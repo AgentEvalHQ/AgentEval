@@ -55,8 +55,7 @@ public static class AssertInteropRun
         var target = new AssertAiTarget(async (messages, token) =>
             (await agent.RunAsync(messages, null, null, token).ConfigureAwait(false)).Messages.ToList());
 
-        var port = FreePort();
-        await using var server = AssertAiTargetServer.Start(target, port, "/assert");
+        await using var server = StartOnFreePort(target, "/assert");
         output.WriteLine($"  ▶ BillingDesk (a MAF ChatClientAgent with 2 tools) serves ASSERT at {server.Endpoint}");
 
         // The body ASSERT POSTs: Python json.dumps of {message, history}, history ending with the current message.
@@ -191,6 +190,24 @@ public static class AssertInteropRun
 
     private static string JudgeNote(AssertAiRun run) =>
         $"ASSERT's judge ({string.Join(", ", run.Rows.Select(r => r.JudgeModel).Distinct())}) is not calibrated here: part 3 writes the cases to measure it on.";
+
+    /// <summary>
+    /// Starts the server on a free port. A port found free can be taken by another process before the listener binds
+    /// it, so a bind that fails is retried on a new port, a few times.
+    /// </summary>
+    private static AssertAiTargetServer StartOnFreePort(AssertAiTarget target, string path)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return AssertAiTargetServer.Start(target, FreePort(), path);
+            }
+            catch (System.Net.HttpListenerException) when (attempt < 5)
+            {
+            }
+        }
+    }
 
     private static int FreePort()
     {

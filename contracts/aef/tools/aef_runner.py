@@ -58,7 +58,7 @@ What it does:
   7. [PLAN-10] Every run carries the plan's subject (kind from the ref's kind: agent, workflow, model, endpoint or
      mcp-server, otherwise other), deployment and endpoint (a plan that names only an endpoint gives the deployment
      ref endpoint:<the endpoint, encoded as ENC-13 encodes a name>), suite (with the plan's digest, or none), judges and
-     contentCapture, `targetMode` scripted, costPolicy (the plan's maxUsd, the target's priceTable), a summary whose
+     contentCapture, no judges (no model grades a scripted case, [RUN-9]), `targetMode` scripted, costPolicy (the plan's maxUsd, the target's priceTable), a summary whose
      cost.totalUsd is the sum of its cases' `usd`, and `provenance`: the planId, planDigest, jobId and runnerId of the
      job.accepted ([RUN-12]).
 Sums of costs are computed exactly and written as the nearest binary64 ([SUM-5]). The target calls no model. Lane
@@ -70,7 +70,8 @@ folder per sealed run, OUT/runs/<runId>/ (run.json, results.ndjson, metrics.json
 nothing else. It prints {"events", "jobId", "limit", "runs", "terminal"}. Exit status: 0 when it ran the job
 (whatever its end: accepted or refused, sealed or failed), 2 with a message on standard error for a usage or input
 error (nothing written): an unreadable PLAN, a plan that names no planId, a RUNNER the reader schema refuses, a TARGET
-not of §9.2.1's shape (a member it does not name among them), an OUT that is not empty, a TIME that is no time.
+not of §9.2.1's shape (a member it does not name among them), an OUT that is not empty, a TIME that is no time, a TIME
+from which the clock, moved by every case's secondsBound and closeSeconds, would leave the years 0001 to 9999.
 
 Not for production: the target is a fixture, and the runs say so.
 """
@@ -145,6 +146,7 @@ KNOWN_MUTATIONS = {
     "digest-resolved": "a run whose plan suite has no digest carries the digest of the content resolved (PLAN-8, R7R-4)",
     "env-empty-set": "an env credential whose variable is empty is resolved (PLAN-3, R7R-7)",
     "isolation-any": "a plan asking for container or remote-zone isolation is taken (R7R-8)",
+    "judges-copied": "each run names the plan's judges, though no model graded a scripted case (R8-2)",
 }
 
 
@@ -595,8 +597,9 @@ class Job:
         doc["suite"] = {k: run.suite[k] for k in ("ref", "version", "digest") if k in run.suite}  # the plan's digest, or none
         if "digest-resolved" in MUTATIONS and "digest" not in doc["suite"]:
             doc["suite"]["digest"] = suite_digest(target_suite(self.target, run.suite)["content"])
+        # RUN-9: a run's judges are the models that graded it; the scripted target grades with none (spec 09 §9.2.1)
         judges = [{k: j[k] for k in ("model", "provider", "rubricDigest") if k in j} for j in plan.get("judges") or []]
-        if judges:
+        if judges and "judges-copied" in MUTATIONS:
             doc["judges"] = judges
         doc.update(startedAt=format_time(run.started), endedAt=format_time(ended),
                    contentCapture=plan["contentCapture"],
@@ -729,6 +732,14 @@ def job(plan_path, runner_path, target_path, out_dir, at=None):
     if errors:
         raise InputError(f"the runner manifest is not valid against the runner schema: {errors[0]}")
     target = read_target(target_path)
+    if clock.fixed:  # spec 09 §9.3: the clock, moved as far as the target could move it, stays within ENC-8's years
+        furthest = sum(_whole(c["secondsBound"]) for s in target["suites"] for c in s["cases"])
+        furthest += _whole(target["closeSeconds"]) * len(target["suites"])
+        try:
+            format_time(_plus(clock.now(), furthest))  # beyond 9999-12-31: InputError
+        except InputError:
+            raise InputError(f"--at {at}: the job's clock, moved by every case's secondsBound and closeSeconds, would "
+                             f"leave the years 0001 to 9999 ([ENC-8])") from None
     if not schemas("writer").is_valid("common#/$defs/id", plan.get("planId")):
         raise InputError("the plan names no planId a job.refused could carry: it is not a plan")
     out = Path(out_dir)

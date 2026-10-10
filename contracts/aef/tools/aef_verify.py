@@ -137,6 +137,7 @@ KNOWN_MUTATIONS = {
     "cases-by-id": "STRM-4 counts a job's cases by caseId alone, so one case id in two suites counts once",
     "overlays-boundary": "a file named overlays, and a first segment Overlays in another case, are not path problems "
                          "(RUN-3)",
+    "judges-same-list": "STRM-4 asks a run for the plan's whole list of judges, not some of them (R8-2)",
 }
 _ORIGINAL_COMPILE = aef_schema.compile_pattern
 
@@ -2677,8 +2678,20 @@ def _plan_problems(doc, plan, accepted, terminal):
         return [(get(j, "model", default=_MISSING), get(j, "rubricDigest", default=_MISSING))
                 for j in items or [] if isinstance(j, dict)]
 
-    if plan.get("judges") and judges(doc.get("judges")) != judges(plan["judges"]):
-        codes.add("judges")
+    if plan.get("judges"):
+        # STRM-4: a run names the judges that graded it (RUN-9): some of the plan's, in the plan's order, none twice
+        named, planned = judges(doc.get("judges")), judges(plan["judges"])
+        if "judges-same-list" in MUTATIONS:
+            within = named == planned
+        else:
+            position, within = 0, len(set(named)) == len(named)
+            for judge in named:
+                while position < len(planned) and planned[position] != judge:
+                    position += 1
+                within = within and position < len(planned)
+                position += 1
+        if not within:
+            codes.add("judges")
     provenance = doc.get("provenance")
     if accepted is None or not isinstance(provenance, dict) or any(
             provenance.get(k) != accepted.get(k) for k in ("planId", "planDigest", "jobId", "runnerId")):

@@ -3,7 +3,6 @@
 // Licensed under the MIT License.
 
 using System.Globalization;
-using System.Numerics;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -12,7 +11,7 @@ namespace AgentEval.Results.Adapters.Inspect;
 
 /// <summary>
 /// JSON as an Inspect eval log holds it (contracts/aef/1/interop/inspect.md, "The target"): a score's unscored value is
-/// the bare token <c>NaN</c>, which is not JSON, and Inspect (Python) writes its logs with <c>json.dumps</c>. In a tree
+/// the bare token <c>NaN</c>, which is not JSON, and which neither System.Text.Json's reader nor its writer handle. In a tree
 /// read or built here, <c>NaN</c>, <c>Infinity</c> and <c>-Infinity</c> are held as marker strings
 /// (<see cref="NaN"/>), which no Inspect text holds (they start with U+0000), and written back as the bare tokens.
 /// </summary>
@@ -21,8 +20,11 @@ internal static class InspectJson
     /// <summary>The marker of Inspect's NaN in a tree.</summary>
     public const string NaNMarker = "\u0000NaN\u0000";
 
-    private const string InfinityMarker = "\u0000Infinity\u0000";
-    private const string MinusInfinityMarker = "\u0000-Infinity\u0000";
+    /// <summary>The marker of Inspect's <c>Infinity</c> in a tree.</summary>
+    public const string InfinityMarker = "\u0000Infinity\u0000";
+
+    /// <summary>The marker of Inspect's <c>-Infinity</c> in a tree.</summary>
+    public const string MinusInfinityMarker = "\u0000-Infinity\u0000";
 
     /// <summary>A fresh NaN value.</summary>
     public static JsonValue NaN() => JsonValue.Create(NaNMarker);
@@ -32,6 +34,14 @@ internal static class InspectJson
 
     /// <summary>Whether <paramref name="node"/> is a non-finite number (NaN or an infinity).</summary>
     public static bool IsNonFinite(JsonNode? node) => Marker(node) is not null;
+
+    /// <summary>Whether <paramref name="node"/> holds <c>Infinity</c> or <c>-Infinity</c> anywhere in it.</summary>
+    public static bool HoldsInfinity(JsonNode? node) => node switch
+    {
+        JsonObject obj => obj.Any(m => HoldsInfinity(m.Value)),
+        JsonArray array => array.Any(HoldsInfinity),
+        _ => Marker(node) is InfinityMarker or MinusInfinityMarker,
+    };
 
     /// <summary>Whether <paramref name="node"/> holds a non-finite number anywhere in it.</summary>
     public static bool HoldsNonFinite(JsonNode? node) => node switch
@@ -105,9 +115,10 @@ internal static class InspectJson
     }
 
     /// <summary>
-    /// The text Python's <c>json.dumps(value, indent=2, ensure_ascii=False)</c> writes, as Inspect writes a <c>.json</c>
-    /// log: two-space indent, <c>": "</c> between a name and its value, non-ASCII text as UTF-8, numbers as Python spells
-    /// them (<see cref="Number"/>), and the markers as the bare tokens.
+    /// A <c>.json</c> log laid out as Inspect lays one out (Python's <c>json.dumps(value, indent=2, ensure_ascii=False)</c>):
+    /// two-space indent, <c>": "</c> between a name and its value, non-ASCII text as UTF-8, numbers as
+    /// <see cref="Number"/> writes them, and the markers as the bare tokens (<c>NaN</c>), which a standard JSON writer
+    /// does not write. The page fixes values, not bytes (R7I-1): the layout is a courtesy.
     /// </summary>
     public static string Indented(JsonNode? value)
     {
@@ -116,30 +127,132 @@ internal static class InspectJson
         return output.ToString();
     }
 
-    /// <summary>The text Python's <c>json.dumps(value, separators=(",", ":"), ensure_ascii=False)</c> writes, in UTF-8.</summary>
-    public static byte[] Compact(JsonNode? value)
+    /// <summary>
+    /// <paramref name="value"/> serialized by the JSON Canonicalization Scheme (RFC 8785, JCS), in UTF-8: no whitespace;
+    /// numbers as ECMAScript's <c>Number::toString</c> writes them (<see cref="Shortest"/>); strings with only <c>"</c>,
+    /// <c>\</c> and the control characters escaped (<c>\b \f \n \r \t</c> by name, the others as <c>\u00xx</c>), the rest
+    /// literal; object members sorted by the UTF-16 code units of their names. So two writers give the same bytes for the
+    /// same values, whatever their parser kept of member order or number spelling (inspect.md, "Content that is not text").
+    /// </summary>
+    /// <exception cref="FormatException">A NaN, an infinity or an unpaired surrogate, which JCS cannot write.</exception>
+    public static byte[] Canonical(JsonNode? value)
     {
         var output = new StringBuilder();
-        Write(output, value, indent: 0, indented: false);
+        WriteCanonical(output, value);
         return Encoding.UTF8.GetBytes(output.ToString());
     }
 
+    private static void WriteCanonical(StringBuilder output, JsonNode? node)
+    {
+        switch (node)
+        {
+            case null:
+                output.Append("null");
+                break;
+            case JsonObject obj:
+                output.Append('{');
+                var members = obj.Select(m => (Name: Checked(m.Key), m.Value)).ToList();
+                members.Sort((a, b) => string.CompareOrdinal(a.Name, b.Name));   // UTF-16 code units (RFC 8785 §3.2.3)
+                for (var i = 0; i < members.Count; i++)
+                {
+                    if (i > 0)
+                    {
+                        output.Append(',');
+                    }
+
+                    CanonicalString(output, members[i].Name);
+                    output.Append(':');
+                    WriteCanonical(output, members[i].Value);
+                }
+
+                output.Append('}');
+                break;
+            case JsonArray array:
+                output.Append('[');
+                for (var i = 0; i < array.Count; i++)
+                {
+                    if (i > 0)
+                    {
+                        output.Append(',');
+                    }
+
+                    WriteCanonical(output, array[i]);
+                }
+
+                output.Append(']');
+                break;
+            case JsonValue value:
+                switch (value.GetValueKind())
+                {
+                    case JsonValueKind.String:
+                        string text;
+                        try
+                        {
+                            text = value.GetValue<string>();
+                        }
+                        catch (InvalidOperationException)
+                        {
+                            throw new FormatException("it holds a string with an unpaired surrogate, which JCS cannot write");
+                        }
+
+                        if (text is NaNMarker or InfinityMarker or MinusInfinityMarker)
+                        {
+                            throw new FormatException($"it holds {text.Trim('\0')}, which JCS cannot write");
+                        }
+
+                        CanonicalString(output, Checked(text));
+                        break;
+                    case JsonValueKind.Number:
+                        output.Append(Shortest(value.GetValue<double>()));
+                        break;
+                    case JsonValueKind.True:
+                        output.Append("true");
+                        break;
+                    case JsonValueKind.False:
+                        output.Append("false");
+                        break;
+                    default:
+                        output.Append("null");
+                        break;
+                }
+
+                break;
+        }
+    }
+
+    // A string with no unpaired surrogate (JCS cannot write one).
+    private static string Checked(string text)
+    {
+        for (var i = 0; i < text.Length; i++)
+        {
+            if (char.IsHighSurrogate(text[i]) && i + 1 < text.Length && char.IsLowSurrogate(text[i + 1]))
+            {
+                i++;
+            }
+            else if (char.IsSurrogate(text[i]))
+            {
+                throw new FormatException("it holds a string with an unpaired surrogate, which JCS cannot write");
+            }
+        }
+
+        return text;
+    }
+
+    // RFC 8785 §3.2.2.2 (ECMAScript's JSON.stringify): ", \ and the control characters escaped, the rest literal.
+    private static void CanonicalString(StringBuilder output, string text) => String(output, text);
+
     /// <summary>
-    /// A number as Python's <c>json</c> writes it: an integer (a JSON number without fraction or exponent) in plain digits,
-    /// any other number as Python's <c>repr</c> of the float (the shortest text that reads back as the same binary64 value,
-    /// <c>1.0</c>, <c>0.0001</c>, <c>1e-05</c>, <c>1e+16</c>).
+    /// A number as the log or the run spells it (the page fixes values, not bytes, R7I-1): a number read from a file
+    /// keeps its own text; a number computed here (a duration in seconds, a sum of costs) is written as
+    /// <see cref="Shortest"/> writes it.
     /// </summary>
     public static string Number(JsonValue value)
     {
         if (value.TryGetValue<JsonElement>(out var element))
         {
-            var text = element.GetRawText();
-            return text.AsSpan().IndexOfAny(".eE") < 0
-                ? BigInteger.Parse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture)
-                : Repr(double.Parse(text, NumberStyles.Float, CultureInfo.InvariantCulture));
+            return element.GetRawText();
         }
 
-        // A value built in memory: an integer type stays an integer, a double is a float.
         if (value.TryGetValue<int>(out var n))
         {
             return n.ToString(CultureInfo.InvariantCulture);
@@ -150,29 +263,29 @@ internal static class InspectJson
             return l.ToString(CultureInfo.InvariantCulture);
         }
 
-        return value.TryGetValue<double>(out var d) ? Repr(d) : value.ToJsonString();
+        return value.TryGetValue<double>(out var d) ? Shortest(d) : value.ToJsonString();
     }
 
-    /// <summary>Python's <c>repr</c> of a float (its <c>json</c> module writes floats so).</summary>
-    public static string Repr(double value)
+    /// <summary>
+    /// A finite binary64 value as text from its value alone (R8-4): the shortest decimal that reads back as the same value
+    /// ([ENC-4]), spelled as ECMAScript's <c>Number::toString</c> spells it: an integral value with no fraction, plain
+    /// digits up to 21 of them, then exponent form (<c>1000</c>, <c>10000000000000000</c>, <c>1e+21</c>,
+    /// <c>0.000001</c>, <c>1e-7</c>). So two parsers that read <c>1000.0</c> and <c>1000</c> alike write the same text.
+    /// </summary>
+    /// <exception cref="ArgumentException">NaN or an infinity.</exception>
+    public static string Shortest(double value)
     {
-        if (double.IsNaN(value))
+        if (!double.IsFinite(value))
         {
-            return "NaN";
-        }
-
-        if (double.IsInfinity(value))
-        {
-            return value > 0 ? "Infinity" : "-Infinity";
+            throw new ArgumentException($"{value} is not a finite number.", nameof(value));
         }
 
         if (value == 0)
         {
-            return double.IsNegative(value) ? "-0.0" : "0.0";
+            return "0";   // -0 too, as Number::toString writes it
         }
 
-        // The shortest round-trip digits (.NET Core 3.0 and later), then Python's layout: fixed notation when the decimal
-        // point falls from 4 places left of the first digit to 16 right of it, else d.ddde±XX.
+        // The shortest round-trip digits (.NET Core 3.0 and later), as d1…dk × 10^(n − k).
         var r = Math.Abs(value).ToString("R", CultureInfo.InvariantCulture);
         var e = r.IndexOfAny(['E', 'e']);
         var exponent = e < 0 ? 0 : int.Parse(r[(e + 1)..], NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture);
@@ -180,32 +293,40 @@ internal static class InspectJson
         var dot = mantissa.IndexOf('.', StringComparison.Ordinal);
         var whole = dot < 0 ? mantissa : mantissa[..dot];
         var digits = whole + (dot < 0 ? "" : mantissa[(dot + 1)..]);
-        var point = whole.Length + exponent;
+        var n = whole.Length + exponent;
         var lead = digits.Length - digits.TrimStart('0').Length;
         digits = digits[lead..].TrimEnd('0');
-        point -= lead;
+        n -= lead;
+        var k = digits.Length;
 
-        string text;
-        if (point is > -4 and <= 16)
+        // ECMAScript Number::toString (ECMA-262, 6.1.6.1.20), steps 6 to 10.
+        var text = n switch
         {
-            text = point <= 0 ? "0." + new string('0', -point) + digits
-                : point >= digits.Length ? digits + new string('0', point - digits.Length) + ".0"
-                : digits[..point] + "." + digits[point..];
-        }
-        else
-        {
-            var power = point - 1;
-            text = digits[..1] + (digits.Length > 1 ? "." + digits[1..] : "") + "e" + (power < 0 ? "-" : "+")
-                   + Math.Abs(power).ToString("00", CultureInfo.InvariantCulture);
-        }
-
+            _ when k <= n && n <= 21 => digits + new string('0', n - k),
+            > 0 and <= 21 => digits[..n] + "." + digits[n..],
+            > -6 and <= 0 => "0." + new string('0', -n) + digits,
+            _ => (k == 1 ? digits : digits[..1] + "." + digits[1..]) + "e" + (n - 1 < 0 ? "-" : "+")
+                 + Math.Abs(n - 1).ToString(CultureInfo.InvariantCulture),
+        };
         return value < 0 ? "-" + text : text;
     }
 
-    private static string? Marker(JsonNode? node) =>
-        node is JsonValue v && v.GetValueKind() == JsonValueKind.String && v.GetValue<string>() is NaNMarker or InfinityMarker or MinusInfinityMarker
-            ? v.GetValue<string>()
-            : null;
+    private static string? Marker(JsonNode? node)
+    {
+        if (node is not JsonValue v || v.GetValueKind() != JsonValueKind.String)
+        {
+            return null;
+        }
+
+        try
+        {
+            return v.GetValue<string>() is NaNMarker or InfinityMarker or MinusInfinityMarker ? v.GetValue<string>() : null;
+        }
+        catch (InvalidOperationException)
+        {
+            return null;   // a string System.Text.Json cannot read (an unpaired surrogate) is no marker
+        }
+    }
 
     private static bool Token(byte[] utf8, int at, ReadOnlySpan<byte> token) =>
         at + token.Length <= utf8.Length && utf8.AsSpan(at, token.Length).SequenceEqual(token);

@@ -113,7 +113,9 @@ public static class AefScriptedRunner
     /// <returns>What the job wrote: refused, sealed or failed, all of them a job that ran.</returns>
     /// <exception cref="FormatException">
     /// An input error, with nothing written: a plan that does not read as an I-JSON document or names no <c>planId</c> a
-    /// <c>job.refused</c> can carry (a valid id), or a manifest the reader <c>runner</c> schema refuses.
+    /// <c>job.refused</c> can carry (a valid id), a manifest the reader <c>runner</c> schema refuses, or a start from
+    /// which the job's clock, moved by every case's time bound and <c>closeSeconds</c> once per suite of the target,
+    /// would leave the years 0001 to 9999 ([ENC-8]).
     /// </exception>
     /// <exception cref="ArgumentException"><paramref name="output"/> is a file, or a folder that is not empty.</exception>
     /// <exception cref="IOException">The output cannot be written.</exception>
@@ -135,6 +137,7 @@ public static class AefScriptedRunner
         }
 
         var document = ReadPlan(plan);
+        CheckClock(target, options.At);
         var job = new Job(document, plan, runner, target, options);
         Directory.CreateDirectory(output);
         return job.Run(output);
@@ -160,6 +163,30 @@ public static class AefScriptedRunner
         }
 
         return document;
+    }
+
+    // §9.3: the job's clock, moved by every case's secondsBound and closeSeconds once per suite of the target, stays in
+    // [ENC-8]'s years; a start from which it would not is an input error, found before anything is written. The clock of
+    // any job against the target moves no further (a case takes no more than its bound, and a suite is one run).
+    private static void CheckClock(AefScriptedTarget target, AefTime at)
+    {
+        const long beyond = 400_000_000_000;   // more seconds than 0001 to 9999 hold: the sum stops there, and cannot overflow
+        var seconds = 0L;
+        foreach (var suite in target.Suites)
+        {
+            foreach (var scripted in suite.Cases)
+            {
+                seconds = Math.Min(beyond, seconds + Math.Min(beyond, scripted.SecondsBound));
+            }
+
+            seconds = Math.Min(beyond, seconds + Math.Min(beyond, target.CloseSeconds));
+        }
+
+        if (!at.AddSeconds(seconds).IsValid)
+        {
+            throw new FormatException(
+                $"--at {at}: the job's clock, moved by the target's time bounds and closeSeconds ({seconds} s), would pass the end of the year 9999 ([ENC-8], spec 09 §9.3).");
+        }
     }
 
     private static string ReadVersion()
@@ -397,12 +424,9 @@ public static class AefScriptedRunner
                 },
                 Deployment = deployment is null ? null : new AefDeployment { Ref = deployment, Endpoint = AefNode.String(subject["endpoint"]) },
                 Suite = new AefSuite { Ref = suite.Ref, Version = suite.Version, Digest = AefNode.String(planSuite["digest"]) },
-                Judges = AefNode.Objects(_plan["judges"]).Select(j => new AefJudge
-                {
-                    Model = AefNode.String(j["model"])!,
-                    Provider = AefNode.String(j["provider"]),
-                    RubricDigest = AefNode.String(j["rubricDigest"]),
-                }).ToList() is { Count: > 0 } judges ? judges : null,
+
+                // No judges: a scripted target grades with no model, and a run names the models that graded it ([RUN-9];
+                // §9.2.1, round 8). The plan's judges bound which may; none is within them ([STRM-4]).
                 StartedAt = _clock,
                 ContentCapture = AefNode.String(_plan["contentCapture"]) == "on" ? AefContentCapture.On : AefContentCapture.Off,
                 CostPolicy = new AefCostPolicy { MaxUsd = AefNode.Number(AefNode.At(_plan, "limits", "maxUsd")), PriceTable = _target.PriceTable },

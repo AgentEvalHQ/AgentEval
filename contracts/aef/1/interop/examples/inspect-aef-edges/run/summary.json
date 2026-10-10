@@ -8,12 +8,12 @@
         {
           "metric": "q",
           "path": "q",
-          "N": 3,
-          "n": 1,
-          "notMeasured": 2,
-          "sum": 0.9,
-          "sumSq": 0.81,
-          "value": 0.9,
+          "N": 8,
+          "n": 2,
+          "notMeasured": 6,
+          "sum": 1.4,
+          "sumSq": 1.06,
+          "value": 0.7,
           "verdict": "scored"
         }
       ]

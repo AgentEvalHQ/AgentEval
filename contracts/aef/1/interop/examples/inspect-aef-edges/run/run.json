@@ -43,7 +43,7 @@
       "run_id": "edgesRun01",
       "dataset": {
         "name": "edges",
-        "samples": 3
+        "samples": 8
       },
       "epochs_reducer": [
         "collect"

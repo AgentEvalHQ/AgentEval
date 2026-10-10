@@ -440,6 +440,56 @@ public sealed class AefScriptedRunnerTests : IDisposable
         Assert.DoesNotContain(later.Runs[0].Id, first.Runs.Select(r => r.Id));
     }
 
+    [Fact]
+    public void ARunNamesNoJudge_ThoughThePlanNamesSome_AndKeepsToThePlan()
+    {
+        // The plan's judges bound which models may grade; a scripted target grades with none ([RUN-9], [STRM-4], round 8).
+        var plan = Plan(suites: [("suite:s/a", "1")]);
+        plan["judges"] = new JsonArray(new JsonObject { ["model"] = "gpt-5.1", ["provider"] = "azure.ai.openai", ["rubricDigest"] = "sha256:" + new string('a', 64) });
+
+        var job = Run(plan, Target(1, Suite("suite:s/a", "1", Case("a-1"))));
+
+        Assert.Equal("job.sealed", job.Result.Terminal);
+        AssertKeepsTheStreamRules(job);
+    }
+
+    [Theory]
+    [InlineData("9999-12-31T23:59:00Z", 60L, 0L, false)]      // 60 s from 23:59:00 is past 9999-12-31T23:59:59Z
+    [InlineData("9999-12-31T23:58:00Z", 59L, 1L, true)]       // 59 s and one close of 1 s: 23:59:00, within
+    [InlineData("9999-12-31T23:58:59.5Z", 59L, 1L, true)]     // 23:59:59.5: within the last second of [ENC-8]'s years
+    [InlineData("9999-12-31T23:58:00.5Z", 119L, 1L, false)]   // 10000-01-01T00:00:00.5Z: past it
+    public void AStartFromWhichTheClockWouldLeaveEnc8sYears_IsAnInputError_AndNothingIsWritten(string at, long secondsBound, long closeSeconds, bool runs)
+    {
+        // §9.3: the bound is the start plus every case's secondsBound and closeSeconds once per suite of the target,
+        // whatever the plan runs (round 8; the critic's probe made the driver throw).
+        var target = AefScriptedTarget.Read(Target(closeSeconds, Suite("suite:s/a", "1", Case("a-1", seconds: secondsBound, secondsBound: secondsBound))));
+        var plan = Encoding.UTF8.GetBytes(Plan(suites: [("suite:s/a", "1")]).ToJsonString());
+        var output = Path.Combine(_root, Guid.NewGuid().ToString("N"));
+
+        if (runs)
+        {
+            Assert.Equal("job.sealed", AefScriptedRunner.Run(plan, Manifest(), target, output, new AefJobOptions { At = AefTime.Parse(at) }).Terminal);
+        }
+        else
+        {
+            Assert.Throws<FormatException>(() => AefScriptedRunner.Run(plan, Manifest(), target, output, new AefJobOptions { At = AefTime.Parse(at) }));
+            Assert.False(Directory.Exists(output));
+        }
+    }
+
+    [Fact]
+    public void TheClocksRange_CountsEverySuiteOfTheTarget_NotOnlyThePlans()
+    {
+        // The plan runs suite a (10 s); the target's suite b (10 s) counts too: 20 s from 23:59:45 leaves 9999.
+        var target = AefScriptedTarget.Read(Target(0, Suite("suite:s/a", "1", Case("a-1", seconds: 10, secondsBound: 10)),
+                                                       Suite("suite:s/b", "1", Case("b-1", seconds: 10, secondsBound: 10))));
+        var plan = Encoding.UTF8.GetBytes(Plan(suites: [("suite:s/a", "1")]).ToJsonString());
+        var output = Path.Combine(_root, Guid.NewGuid().ToString("N"));
+
+        Assert.Throws<FormatException>(() => AefScriptedRunner.Run(plan, Manifest(), target, output, new AefJobOptions { At = AefTime.Parse("9999-12-31T23:59:45Z") }));
+        Assert.False(Directory.Exists(output));
+    }
+
     // ------------------------------------------------------------------ the target's shape (§9.2.1)
 
     [Theory]
@@ -531,6 +581,7 @@ public sealed class AefScriptedRunnerTests : IDisposable
             Assert.Equal((AefOutcome.Intact, 0), (verification.Outcome, verification.Problems.Count));
             Assert.Equal("scripted", (string?)run.Run["execution"]!["targetMode"]);
             Assert.Equal(job.Result.JobId, (string?)run.Run["provenance"]!["jobId"]);
+            Assert.Null(run.Run["judges"]);   // a scripted target grades with no model (§9.2.1, round 8)
         }
     }
 

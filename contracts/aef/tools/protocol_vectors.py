@@ -354,6 +354,9 @@ LIVE_PLAN = dict(CPLAN, planId="plan-48", targetMode="live")
 SCRIPTED = {"targetMode": "scripted", "stimulus": "suite"}
 V6 = "git:2b19e0"  # the subject version before the plan's git:3f2a1c
 OTHER_RUBRIC = "sha256:" + "b7" * 32
+# A plan that names two judges (R8-2: a run names those that graded it, some of the plan's in its order, none twice).
+SECOND_JUDGE = {"model": "llama-3.3-70b", "provider": "local", "rubricDigest": OTHER_RUBRIC}
+TWO_JUDGES = dict(CPLAN, planId="plan-50", judges=CPLAN["judges"] + [SECOND_JUDGE])
 SCORE = "triage-score"
 DROP = object()
 TWO_CASES = (("case-17", "composite", 0.4), ("case-18", "plain", 0.9))
@@ -597,9 +600,22 @@ def conformance():
         ("ended-after-terminal", CPLAN, one_run([("run:R-1", "time")], endedAt="2026-10-08T12:02:00.000000001Z"), None,
          ["STRM-4", "ENC-8"], "the run ended a nanosecond after the job's terminal event"),
         ("judges", CPLAN, one_run([("run:R-1", "judges")], judges=judge(model="gpt-4o-mini")), None, ["STRM-4"],
-         "another judge model, with the plan's rubric"),
+         "a judge the plan does not name: another model, with the plan's rubric (changed in round 8: a run's judges "
+         "are some of the plan's, not its whole list)"),
         ("judges-rubric", CPLAN, one_run([("run:R-1", "judges")], judges=judge(rubricDigest=OTHER_RUBRIC)), None, ["STRM-4"],
-         "the plan's judge model, with another rubric"),
+         "a judge the plan does not name: the plan's model, with another rubric (changed in round 8: a run's judges are "
+         "some of the plan's, not its whole list)"),
+        ("judges-none", CPLAN, one_run([], judges=DROP), None, ["STRM-4", "RUN-9"],
+         "a run that names no judge, on a plan that names one: no model graded it, which is within the plan"),
+        ("judges-some", TWO_JUDGES, one_run([], judges=judge(**SECOND_JUDGE)), None, ["STRM-4", "RUN-9"],
+         "a run graded by the plan's second judge only: some of the plan's judges, which is within"),
+        ("judges-not-named", TWO_JUDGES,
+         one_run([("run:R-1", "judges")], judges=judge() + judge(model="gpt-4o-mini", provider="openai")), None,
+         ["STRM-4", "RUN-9"], "the plan's first judge, then one the plan does not name"),
+        ("judges-out-of-order", TWO_JUDGES, one_run([("run:R-1", "judges")], judges=judge(**SECOND_JUDGE) + judge()),
+         None, ["STRM-4", "RUN-9"], "both of the plan's judges, the second before the first: not in the plan's order"),
+        ("judges-twice", TWO_JUDGES, one_run([("run:R-1", "judges")], judges=judge() + judge()), None,
+         ["STRM-4", "RUN-9"], "the plan's first judge named twice"),
         ("content-capture", CPLAN, one_run([("run:R-1", "content-capture")], contentCapture="on"), None, ["STRM-4", "RUN-11"],
          "content kept on a plan that keeps none"),
         ("content-capture-absent", CPLAN, one_run([("run:R-1", "content-capture")], contentCapture=DROP), None,

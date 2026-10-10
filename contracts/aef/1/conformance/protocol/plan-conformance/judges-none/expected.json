@@ -1,0 +1,12 @@
+{
+  "kind": "plan-conformance",
+  "events": "events.ndjson",
+  "plan": "plan.json",
+  "runs": "runs",
+  "problems": [],
+  "rules": [
+    "STRM-4",
+    "RUN-9"
+  ],
+  "why": "a run that names no judge, on a plan that names one: no model graded it, which is within the plan"
+}

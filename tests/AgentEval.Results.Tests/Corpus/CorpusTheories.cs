@@ -389,6 +389,8 @@ public class CorpusTheories
                 Assert.Equal((suiteRef, version, (string?)want["status"]),
                     ((string?)run["suite"]!["ref"], (string?)run["suite"]!["version"], (string?)run["status"]));
 
+                Assert.Null(run["judges"]);   // a scripted target grades with no model (§9.2.1, round 8)
+
                 // The plan's digest or none ([PLAN-8]); endedAt the end of the run's last case on §9.2.1's clock.
                 var planned = planJson["suites"]?.AsArray().FirstOrDefault(s => (string?)s!["ref"] == suiteRef && (string?)s["version"] == version);
                 Assert.Equal((string?)planned?["digest"], (string?)run["suite"]!["digest"]);

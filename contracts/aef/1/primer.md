@@ -262,7 +262,7 @@ The stream is the runner's own report. Given also the runs the job produced, a s
 |---|---|
 | the one announced: the run hash of its first `evidence.produced`, and intact | `run-missing`, `run-hash` |
 | made by this job: its `provenance` names the plan, the plan's digest, the job and the runner | `provenance` |
-| of what the plan asked: its subject and version, one of its suites, and its judges and deployment or endpoint when it names them | `subject`, `suite`, `judges`, `deployment` |
+| of what the plan asked: its subject and version, one of its suites, its deployment or endpoint when the plan names them, and only judges the plan names | `subject`, `suite`, `judges`, `deployment` |
 | run as the plan asked: in its target mode (`live` unless it names another), with its content capture | `target-mode`, `content-capture` |
 | made during the job: started no earlier than `job.accepted`, ended no later than the terminal event | `time` |
 | within the plan's limits: each run states its cost, and the cost and the distinct cases of all the job's runs together stay within them | `no-cost`, `over-budget`, `over-cases` |
@@ -271,6 +271,24 @@ Counting over the whole job means a runner cannot stay under a limit by splittin
 started before the job was accepted is evidence the runner already had: adopted, not produced, and a plan does not
 authorize adopting runs. The vectors, including the cases a plausible wrong implementation gets wrong, are in
 [`conformance/protocol/plan-conformance/`](conformance/protocol/plan-conformance/).
+
+### Running a job: bounds, case ids and a scripted target
+
+A runner stops *before* a limit, not after it. Before each case it adds what the case **could** cost and take, its
+cost bound and its time bound, to what the job has spent and taken so far, and starts the case only when the sum is
+still within the plan's limits ([PLAN-9]). The bounds are the runner's own: the most a case can cost under its price
+table and the limits it enforces on the target (a maximum of tokens, say), and the deadline it enforces on the case.
+Cases running at the same time count at their bounds until they complete. A runner that keeps to its bounds therefore
+never passes a limit, and the stream verifier reports one that does.
+
+A case keeps its suite's id in every run of every job ([PLAN-8]). A comparison lane pairs a candidate's cases with a
+baseline's by id, so a runner that renamed cases would make two runs of one suite pair nothing.
+
+The `job` vectors test a runner without a live subject. A **scripted target**
+([§9.2.1](spec/09-conformance.md#921-vector-files)) answers each case with a fixed state, cost, bound and
+duration, and the job's clock moves only as it says, so one plan gives one job on any machine. The conformance runner
+then checks what a runner decides: which plans it takes, which cases it runs and in which runs, where a limit stops
+it, what it spends and estimates, and that it writes no credential. Two runners written apart pass them.
 
 ## 6. Reading tolerantly, writing strictly
 

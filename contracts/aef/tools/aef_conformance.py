@@ -85,7 +85,7 @@ Usage:
       unpadded base64), and once per break of the reference runner aef_runner.py (a limit checked against a case's
       cost or duration instead of its bound, the budget checked exactly or by the job's spend alone, case ids
       prefixed, credentials not resolved or an empty one resolved, a suite named twice taken, a container plan taken,
-      a fixed severity, no lane on the lines, a computed suite digest). Each mutation must make some vector fail that
+      a fixed severity, no lane on the lines, a computed suite digest, the plan's judges copied into each run). Each mutation must make some vector fail that
       passes unmutated.
 Exit status: 0 when every vector passes (and, with --self-check, every mutation is caught), else 1.
 """
@@ -1048,6 +1048,8 @@ def judge_job_output(out_dir, out, plan_path, target_path, e, secret_values, at=
             continue
         get = aef_verify.get
         compare(diffs, f"{where} execution.targetMode", get(doc, "execution", "targetMode"), "scripted")
+        if doc.get("judges") not in (None, []):  # §9.2.1: the scripted target grades with no model (RUN-9)
+            diffs.append(f"{where} names judges, though no model graded its cases: {json.dumps(doc['judges'])}")
         compare(diffs, f"{where} provenance (RUN-12)", doc.get("provenance"),
                 {key: accepted.get(key) for key in ("planId", "planDigest", "jobId", "runnerId")})
         compare(diffs, f"{where} subject.kind and deployment.ref (PLAN-10)",

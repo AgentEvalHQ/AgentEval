@@ -12,5 +12,5 @@
   "rules": [
     "STRM-4"
   ],
-  "why": "another judge model, with the plan's rubric"
+  "why": "a judge the plan does not name: another model, with the plan's rubric (changed in round 8: a run's judges are some of the plan's, not its whole list)"
 }

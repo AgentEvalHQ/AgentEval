@@ -13108,12 +13108,78 @@
    "path": "protocol/plan-conformance/judges",
    "files": {
     "events.ndjson": "46c61ce87aa6787f09010a9505ccf823dcd8470949307a56aa88aba914d4cc71",
-    "expected.json": "9d51a078d71899f9b94a60af8f1197a6da13f54dc1436ca88f645be985f71a87",
+    "expected.json": "d0975f726fbd058ca679e25260f1403f0e08e565b02d0d1e0b69195798fc178c",
     "plan.json": "a3a4de0f2d285cf6b1cb374c9e9a2a1c9a4172f1acbb76d7b82affd29aac66ec",
     "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
     "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
     "runs/R-1/run.json": "159aa830963167c3893beefd653f2da5e6a82b1a322556855061f851f913cea4",
     "runs/R-1/seal.json": "c2a39c89e0d97f7c86d353315ef864a82481f322048ec2d7cb16b5413617d382",
+    "runs/R-1/summary.json": "5c419eab3b644e909a540ec222c74ce57cf06afa52f2fc278c3667e009025cb7"
+   }
+  },
+  {
+   "id": "protocol/plan-conformance/judges-none",
+   "kind": "plan-conformance",
+   "classes": [
+    "Stream verifier"
+   ],
+   "rules": [
+    "STRM-4",
+    "RUN-9"
+   ],
+   "path": "protocol/plan-conformance/judges-none",
+   "files": {
+    "events.ndjson": "9b7cd9e472dd58fad3d84bfd4cf26795406cae6d1364f2e22e55386e4995bee4",
+    "expected.json": "66cb8d4dadba288b0e263ad2d33d339b025f63ff1d0a64e036bed9d88169b553",
+    "plan.json": "a3a4de0f2d285cf6b1cb374c9e9a2a1c9a4172f1acbb76d7b82affd29aac66ec",
+    "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
+    "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
+    "runs/R-1/run.json": "23413d6384311250955eb457eeef7f05616cd6ea4364cfb62e5441593b81d472",
+    "runs/R-1/seal.json": "fc8a9e2a50b57f58f6c58d1e34145cbc1ab8df41541a1fb759b5eb0c2d856deb",
+    "runs/R-1/summary.json": "5c419eab3b644e909a540ec222c74ce57cf06afa52f2fc278c3667e009025cb7"
+   }
+  },
+  {
+   "id": "protocol/plan-conformance/judges-not-named",
+   "kind": "plan-conformance",
+   "classes": [
+    "Stream verifier"
+   ],
+   "rules": [
+    "STRM-4",
+    "RUN-9"
+   ],
+   "path": "protocol/plan-conformance/judges-not-named",
+   "files": {
+    "events.ndjson": "d27bfb6e2b225a17c2853618cfd484bfef27de2e8252365ac2dc71f3c1ae58ef",
+    "expected.json": "03131863bfd0563b921257c11e2b781c6529ba3d98568581b2fd321edf977094",
+    "plan.json": "b555cca1a54d85ffd3202bc9d3d326ee770accc03fe54a682925ac6d41e0eaed",
+    "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
+    "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
+    "runs/R-1/run.json": "6c659ea9e245b43779a36fa2b301b4d2763a922002d28ce3e58cad987d6404c1",
+    "runs/R-1/seal.json": "72dd80a007c95dfafada78461525f93477654a25081991daf6c994da930d9ccd",
+    "runs/R-1/summary.json": "5c419eab3b644e909a540ec222c74ce57cf06afa52f2fc278c3667e009025cb7"
+   }
+  },
+  {
+   "id": "protocol/plan-conformance/judges-out-of-order",
+   "kind": "plan-conformance",
+   "classes": [
+    "Stream verifier"
+   ],
+   "rules": [
+    "STRM-4",
+    "RUN-9"
+   ],
+   "path": "protocol/plan-conformance/judges-out-of-order",
+   "files": {
+    "events.ndjson": "c7924bca62d1e84c5660c744cc79de22f44603d976375f8235c8338be7e7bc86",
+    "expected.json": "7cf45b967f3943a73cd2ceb4d6e6016aa504480a90489d1f9f55bdbe1f06a8d0",
+    "plan.json": "b555cca1a54d85ffd3202bc9d3d326ee770accc03fe54a682925ac6d41e0eaed",
+    "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
+    "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
+    "runs/R-1/run.json": "61c1cb6f265184e5f35cec20ca9bb2c3b5d28937447afa679a7ed19b3601f717",
+    "runs/R-1/seal.json": "b67e6b2515e464da25f9fad97afaab774ac627dfc9c4a3d8ef54941684131a75",
     "runs/R-1/summary.json": "5c419eab3b644e909a540ec222c74ce57cf06afa52f2fc278c3667e009025cb7"
    }
   },
@@ -13129,12 +13195,56 @@
    "path": "protocol/plan-conformance/judges-rubric",
    "files": {
     "events.ndjson": "fb39e85e4c5db34eb8931fe93713fe4c2a4b1d37c78fab1a8ce7824e8c9f922e",
-    "expected.json": "800fcb6f962cb57040a5e2f7278b6fa65bbf10b74deab2164885f3d19ad2b76f",
+    "expected.json": "4f4fd0ed7d50c7981f95d6a0bdbee99d6b4611a75b644edd1611d13f8a7e1d70",
     "plan.json": "a3a4de0f2d285cf6b1cb374c9e9a2a1c9a4172f1acbb76d7b82affd29aac66ec",
     "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
     "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
     "runs/R-1/run.json": "3153edc765461c7176af0a4e44cb82d2834100b5afccaea64ce2d0e07e415148",
     "runs/R-1/seal.json": "bc2b122eefa4ba261ff9bcada7acccdbdc97da90f3304b76f3f4f8d9ed0b54ec",
+    "runs/R-1/summary.json": "5c419eab3b644e909a540ec222c74ce57cf06afa52f2fc278c3667e009025cb7"
+   }
+  },
+  {
+   "id": "protocol/plan-conformance/judges-some",
+   "kind": "plan-conformance",
+   "classes": [
+    "Stream verifier"
+   ],
+   "rules": [
+    "STRM-4",
+    "RUN-9"
+   ],
+   "path": "protocol/plan-conformance/judges-some",
+   "files": {
+    "events.ndjson": "b3a9ae3602cbdec48519cc572d8b6a132811a89b7216397b312b72f94f74a241",
+    "expected.json": "79e0dfa249f51d281b9d3f62c9f36e071e3281ef90a23136ec85a4ce7fcfcd49",
+    "plan.json": "b555cca1a54d85ffd3202bc9d3d326ee770accc03fe54a682925ac6d41e0eaed",
+    "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
+    "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
+    "runs/R-1/run.json": "3e89237b0068480d781566773437e59cf1b77db43d73a29c666d9dc7be9c43ef",
+    "runs/R-1/seal.json": "f166c17c7f14536284c229615870152d9e28579e3702d7cf6a8e811176b55f05",
+    "runs/R-1/summary.json": "5c419eab3b644e909a540ec222c74ce57cf06afa52f2fc278c3667e009025cb7"
+   }
+  },
+  {
+   "id": "protocol/plan-conformance/judges-twice",
+   "kind": "plan-conformance",
+   "classes": [
+    "Stream verifier"
+   ],
+   "rules": [
+    "STRM-4",
+    "RUN-9"
+   ],
+   "path": "protocol/plan-conformance/judges-twice",
+   "files": {
+    "events.ndjson": "26a7bf86aa2d16f1a75d9397c5e053e4e4d7cc0098ba0617f04148e98cf547e0",
+    "expected.json": "0bd3ee24327e4d395f239bc63528ad813024d51a62894e742c48563266eeafff",
+    "plan.json": "b555cca1a54d85ffd3202bc9d3d326ee770accc03fe54a682925ac6d41e0eaed",
+    "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
+    "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
+    "runs/R-1/run.json": "8dcc71153030441554e03c9708560f7d4d56981d7d3b5d816aae72ba6c0bbc8f",
+    "runs/R-1/seal.json": "4af5c2e9b56ccfb44729378b476947b0a8bb25ff87dd7366cb0b1ccfbfb047bb",
     "runs/R-1/summary.json": "5c419eab3b644e909a540ec222c74ce57cf06afa52f2fc278c3667e009025cb7"
    }
   },
@@ -15136,8 +15246,8 @@
    ],
    "path": "jobs/keychain-credential",
    "files": {
-    "expected.json": "33f0a06eb7c15a5c8c2cb39b2564ba0a0e4539a880b4190f357b3ccc140faf64",
-    "plan.json": "2ae5009d87c88742176aa62eb4114535f251f0e0ddab6b48e027a0ba982addae",
+    "expected.json": "de14ef64eeb908aee6b3e6678ef8cd019876224d989533b5a512f480c0b514bf",
+    "plan.json": "ffda6b99e82d652fe0c012ba06e41b1c4fffe94a3e15f39d65e633b4fd493915",
     "target.json": "f3398d8e5bcabca468f42eae9e2a72c5629a0b2cf1dbe1b9506eedd966ec6910"
    }
   },
@@ -15222,6 +15332,7 @@
     "PLAN-8",
     "PLAN-9",
     "PLAN-10",
+    "RUN-9",
     "RUN-12",
     "STRM-1",
     "STRM-3",
@@ -15229,7 +15340,7 @@
    ],
    "path": "jobs/several-cases",
    "files": {
-    "expected.json": "8caad12f043d1634d88464cdd817c61420ff1b50e094c6604bb9c192929d7c51",
+    "expected.json": "d9776408abfeb9a2bbc26a4021962dcfde52ba22f349e1c452aaa993031c7ecc",
     "plan.json": "017670bbbb48e37f3b7d0edd494a9d64d54070410402f01bd4c12dec28681e7e",
     "target.json": "b72dca841dfd8ff4d1035d8b0a3207c7bab422653d68630bfedd3ad5d036462a"
    }
@@ -15315,8 +15426,8 @@
    ],
    "path": "jobs/vault-credential",
    "files": {
-    "expected.json": "4818c5ce462187300495fb2d7626676875862ba340546b6aed9792154afb5000",
-    "plan.json": "0310f6d3737f059bd162c7e642a69d58845ae7cd45b6508731e98259fadf30ac",
+    "expected.json": "de8488276c6c682e1395c83458a653c49dca9c4f9dbcbd0d7db54133662c683a",
+    "plan.json": "09cc58028679c31157ed69368bb50da9d98c7c3a048476b711af3feb0e365451",
     "target.json": "f3398d8e5bcabca468f42eae9e2a72c5629a0b2cf1dbe1b9506eedd966ec6910"
    }
   },

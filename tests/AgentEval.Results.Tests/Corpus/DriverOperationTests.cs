@@ -96,6 +96,45 @@ public class DriverOperationTests
     }
 
     [Fact]
+    public void Job_AStartFromWhichTheClockWouldLeaveEnc8sYears_ExitsWith2_AndWritesNothing()
+    {
+        // The critic's round-8 probe: --at 9999-12-31T23:59:00Z with a suite of 60 s once made the driver throw (exit 134)
+        // and leave files. It is an input error, found before anything is written ([CONF-3], spec 09 §9.3).
+        var jobs = Path.Combine(AefCorpus.Conformance, "jobs");
+        var plan = Temp("""
+            {"schemaVersion": "1.0", "planId": "plan-clock", "subject": {"ref": "agent:a/b", "version": "1"},
+             "suites": [{"ref": "suite:s/a", "version": "1"}], "limits": {"maxUsd": 5}, "contentCapture": "off",
+             "targetMode": "scripted", "isolation": "process", "provider": "local"}
+            """);
+        var target = Temp("""
+            {"suites": [{"ref": "suite:s/a", "version": "1", "content": "a",
+              "cases": [{"caseId": "a-1", "state": "passed", "usd": 0, "usdBound": 0, "seconds": 60, "secondsBound": 60}]}],
+             "closeSeconds": 1, "priceTable": "p"}
+            """);
+        var output = Path.Combine(Path.GetTempPath(), $"aef-driver-job-{Guid.NewGuid():N}");
+        try
+        {
+            var (code, stdout, stderr) = Run("job", plan, Path.Combine(jobs, "runner.json"), target, output, "--at", "9999-12-31T23:59:00Z");
+
+            Assert.Equal((2, ""), (code, stdout));
+            Assert.Contains("--at", stderr, StringComparison.Ordinal);
+            Assert.False(Directory.Exists(output));
+
+            (code, stdout, _) = Run("job", plan, Path.Combine(jobs, "runner.json"), target, output, "--at", "9999-12-31T23:58:00Z");
+            Assert.Equal((0, "{\"events\":6}\n"), (code, stdout));   // accepted, estimated, the case and its spend, announced, sealed
+        }
+        finally
+        {
+            File.Delete(plan);
+            File.Delete(target);
+            if (Directory.Exists(output))
+            {
+                Directory.Delete(output, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
     public void ResultId_ATrialWrittenAs3Point0_IsTrial3()
     {
         Assert.Equal(Run("result-id", "r", "c", "p", "3").Stdout, Run("result-id", "r", "c", "p", "3.0").Stdout);

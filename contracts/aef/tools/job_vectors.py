@@ -21,6 +21,9 @@ V = "1.0"
 AT = "2026-10-09T09:00:00Z"
 CLOSE = 1  # closeSeconds: closing and sealing a run takes one second
 PRICE_TABLE = "aef-scripted-2026-10"
+# Spec 09 §9.3: a keychain or vault reference of a job vector names a path that cannot exist, so that a runner that can
+# read keychains or vaults refuses it as one that cannot.
+ABSENT = "aef-conformance/absent-3f9d2c71-8b4e-4a6f-9e21-5c7d0a8b6e43"
 
 
 def write_json(path, obj):
@@ -140,9 +143,11 @@ def vectors():
          dict(env={"AEF_TEST_JUDGE_KEY": "set"}, terminal="job.sealed", limit=None,
               runs=[run(bounded_triage, "completed", 3), run(SECURITY, "completed", 3), run(TONE, "completed", 3)],
               spentUsd=2.25, estimated={"cases": 9, "usdLow": 2.25, "usdHigh": 3.0}, endsAt="2026-10-09T09:03:03Z",
-              rules=["PLAN-3", "PLAN-7", "PLAN-8", "PLAN-9", "PLAN-10", "RUN-12", "STRM-1", "STRM-3", "STRM-4"],
+              rules=["PLAN-3", "PLAN-7", "PLAN-8", "PLAN-9", "PLAN-10", "RUN-9", "RUN-12", "STRM-1", "STRM-3",
+                     "STRM-4"],
               why="three suites, one without a lane, the first named with the digest of its content, which the runner "
-                  "checks before it accepts the job; an env credential that is set; nine cases within every limit, "
+                  "checks before it accepts the job; an env credential that is set; a judge the plan names, which "
+                  "grades no scripted case, so the runs name none (RUN-9); nine cases within every limit, "
                   "one run per suite, each sealed and announced, then job.sealed naming the three. usdHigh is the sum "
                   "of the cost bounds (the first suite's are $0.50); the job ends after 9 cases of 20 s and 3 closes "
                   "of 1 s")),
@@ -281,17 +286,19 @@ def vectors():
                  env={"AEF_TEST_EMPTY_KEY": "empty"})),
         ("vault-credential",
          plan("plan-job-vault-credential", [(TRIAGE, "quality", None)], {"maxUsd": 5.0},
-              credentialRefs=[{"name": "AZURE_OPENAI_API_KEY", "scheme": "vault", "path": "kv/agenteval/judge-key",
+              credentialRefs=[{"name": "AZURE_OPENAI_API_KEY", "scheme": "vault", "path": ABSENT,
                                "purpose": "judge"}]),
          target(TRIAGE), None,
-         refused(["PLAN-3"], "a credential kept in a vault the runner cannot reach: a refusal before job.accepted, "
-                             "not a job that fails later")),
+         refused(["PLAN-3"], "a vault reference whose path names nothing (spec 09 §9.3): whether or not the runner "
+                             "can read a vault, the credential cannot be resolved, so the plan is refused before "
+                             "job.accepted, not a job that fails later")),
         ("keychain-credential",
          plan("plan-job-keychain-credential", [(TRIAGE, "quality", None)], {"maxUsd": 5.0},
-              credentialRefs=[{"name": "SUPPORT_API_KEY", "scheme": "keychain", "path": "agenteval/support-dev",
+              credentialRefs=[{"name": "SUPPORT_API_KEY", "scheme": "keychain", "path": ABSENT,
                                "purpose": "subject"}]),
          target(TRIAGE), None,
-         refused(["PLAN-3"], "a credential in a keychain the runner cannot read: refused before job.accepted")),
+         refused(["PLAN-3"], "a keychain reference whose path names nothing (spec 09 §9.3): whether or not the runner "
+                             "can read a keychain, the credential cannot be resolved: refused before job.accepted")),
         # -- suites (PLAN-8)
         ("suite-missing",
          plan("plan-job-suite-missing", [(TRIAGE, "quality", None),

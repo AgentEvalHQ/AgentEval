@@ -237,9 +237,9 @@ def departures(doc, plan, accepted, terminal):
     if not any(suite.get("ref") == s["ref"] and suite.get("version") == s["version"]
                and ("digest" not in s or suite.get("digest") == s["digest"]) for s in plan["suites"]):
         found.append("suite")
-    if plan.get("judges"):
+    if plan.get("judges"):  # the run's judges graded it (RUN-9): some of the plan's, in its order, none twice
         pairs = lambda judges: [(j.get("model"), j.get("rubricDigest")) for j in judges]
-        if pairs(doc.get("judges", [])) != pairs(plan["judges"]):
+        if not sub_list(pairs(doc.get("judges") or []), pairs(plan["judges"])):
             found.append("judges")
     capture = "off" if doc.get("contentCapture") == "off" else "on"  # absent or unknown reads as on
     if capture != plan["contentCapture"]:
@@ -247,6 +247,14 @@ def departures(doc, plan, accepted, terminal):
     if (doc.get("execution") or {}).get("targetMode") != target_mode(plan):  # as written; a plan without one asks for live
         found.append("target-mode")
     return found
+
+
+def sub_list(items, of):
+    """STRM-4 judges: items are some of `of`, in its order, none twice (each item matched to a later entry)."""
+    if len(set(items)) != len(items):
+        return False
+    rest = iter(of)
+    return all(any(item == entry for entry in rest) for item in items)
 
 
 def conform(events, plan, runs, policy=None, examine=examine):

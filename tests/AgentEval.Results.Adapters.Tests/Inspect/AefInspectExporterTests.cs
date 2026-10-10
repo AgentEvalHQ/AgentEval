@@ -16,7 +16,7 @@ namespace AgentEval.Results.Adapters.Tests.Inspect;
 /// table" (IN-1 to IN-5, IN-11) and those settled 10-10 (R7I, IN-12, IN-13), the refusals and the worked example. The
 /// checked examples (interop/examples/aef-inspect, aef-inspect-trials, aef-inspect-edges) are reproduced from their
 /// input runs and compared as JSON values, as the page fixes values, not bytes (R7I-1); the first two also byte for
-/// byte, as Python's <c>json.dumps(log, indent=2, ensure_ascii=False)</c> writes them.
+/// byte, a check of the writer's layout only.
 /// </summary>
 public sealed class AefInspectExporterTests : IDisposable
 {
@@ -68,9 +68,10 @@ public sealed class AefInspectExporterTests : IDisposable
     [Theory]
     [InlineData("aef-inspect")]
     [InlineData("aef-inspect-trials")]
-    public void TheLog_IsWhatPythonsJsonDumpsWrites_ByteForByteForTheFirstExamples(string name)
+    public void TheLog_IsLaidOutAsInspectLaysItOut_ForTheFirstExamples(string name)
     {
-        // Not required (R7I-1), but kept: the writer writes as Inspect does, json.dumps(indent=2, ensure_ascii=False).
+        // Not required (R7I-1: values, not bytes), and kept as a check of the writer's layout: two-space indent, UTF-8
+        // text, NaN bare, the run's numbers as the run spells them.
         var example = Path.Combine(Interop, "examples", name);
         var want = File.ReadAllText(Path.Combine(example, "inspect.json"), new UTF8Encoding(false)).Replace("\r\n", "\n", StringComparison.Ordinal);
 
@@ -437,18 +438,20 @@ public sealed class AefInspectExporterTests : IDisposable
     }
 
     [Theory]
-    [InlineData(1.0, "1.0")]
-    [InlineData(0.0, "0.0")]
+    [InlineData(1000.0, "1000")]                                   // R8-4: 1000.0 and 1000 are one value
+    [InlineData(1e16, "10000000000000000")]
+    [InlineData(1e21, "1e+21")]
+    [InlineData(1.2345678901234567e20, "123456789012345670000")]
+    [InlineData(1.5e300, "1.5e+300")]
+    [InlineData(0.000001, "0.000001")]
+    [InlineData(1e-7, "1e-7")]
+    [InlineData(2.5e-7, "2.5e-7")]
+    [InlineData(0.0, "0")]
     [InlineData(-0.5, "-0.5")]
     [InlineData(4.21, "4.21")]
-    [InlineData(0.0001, "0.0001")]
-    [InlineData(0.00001, "1e-05")]
-    [InlineData(1.5e-7, "1.5e-07")]
-    [InlineData(1e15, "1000000000000000.0")]
-    [InlineData(1e16, "1e+16")]
-    [InlineData(1.2345678901234567e20, "1.2345678901234567e+20")]
     [InlineData(0.1 + 0.2, "0.30000000000000004")]
-    public void ANumber_IsWrittenAsPythonsReprWritesIt(double value, string text) => Assert.Equal(text, InspectJson.Repr(value));
+    public void ANumberFromItsValueAlone_IsSpelledAsEcmaScriptsNumberToStringSpellsIt(double value, string text) =>
+        Assert.Equal(text, InspectJson.Shortest(value));
 
     // ------------------------------------------------------------------ helpers
 

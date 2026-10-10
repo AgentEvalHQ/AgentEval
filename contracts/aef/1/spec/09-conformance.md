@@ -185,9 +185,9 @@ same `caseId`. A target, a suite or a case with a member named nowhere here is n
 
 A runner resolves a suite of the plan ([PLAN-8]) by finding the target's suite of that `ref` and `version`. The target
 needs no credential; the runner resolves the plan's all the same ([PLAN-3]). It gives the target mode `scripted`, and
-each run's `execution.targetMode` says so ([RUN-7]). A scripted target runs in the runner's process, so the runner
-gives the isolation `process` only, and refuses a plan that asks for `container` or `remote-zone` ([PLAN-7]). Running
-the job, the runner:
+each run's `execution.targetMode` says so ([RUN-7]). It grades with no model, so the runs name no `judges` ([RUN-9],
+[STRM-4]). A scripted target runs in the runner's process, so the runner gives the isolation `process` only, and
+refuses a plan that asks for `container` or `remote-zone` ([PLAN-7]). Running the job, the runner:
 - runs the plan's suites in the plan's order, one run per suite, and a suite's cases in the target's order;
 - writes one result line per case it runs: the case's root (no `parentResultId`) at path `check`, with the case's
   `caseId`, unrewritten, its `state`, its `severity` when it has one, and the `lane` the plan gives its suite, if any
@@ -259,8 +259,8 @@ each limit of [ENC-17] at its value or one beyond.
   | `summarize` | `summarize DIR REQUEST` | the `summary.json` document of the run in `DIR` for the entries of `REQUEST`: `schemaVersion`, the run's `runId` ([SUM-2]), and per lane and entry, in request order, `metric`, `path`, `N`, `n`, `notMeasured`, `sum`, `sumSq`, `value`, `verdict` (`not_measured` when `n` is 0, [SUM-6]; otherwise the request's, or `scored` when it gives none), and `rule` and `aggregate` as requested. Input errors (exit 2): a metric `metrics.json` does not declare; a lane named twice, or one lane, metric and path twice ([SUM-9]); an `aggregate` method AEF does not define without a `value`; a `value` for an entry AEF computes (the mean or sum, or `median`, `min` or `max`), which would contradict it; results or metrics that do not read |
   | `produce` | `produce SCENARIO OUT` | writes the run the `SCENARIO` file describes (§9.2.1) in the folder `OUT`, which does not exist yet or is empty: `run.json` as given, or with `contentCapture: on` added when the scenario has none, `metrics.json` as given, `results.ndjson` and `summary.json`, and nothing else; `{"results": the number of lines}`. Input errors (exit 2), with nothing written: a scenario not of that shape; a run that is not closed; a `pending` node ([RES-3]); a child whose `path` is not its parent's and one more level; a `decisive` path that is no child's ([RES-6]); a node with children and no `aggregation`, or a child without `component` ([RES-5]); a trial tree rooted elsewhere than its case, or a path the case's tree and its trial trees do not both have ([RES-8]); two lines of one case at one path and trial (they would have one `resultId`, [RES-4]); and the input errors of `summarize` |
   | `seal-write` | `seal-write DIR --sealed-by B --sealed-at T` | writes `DIR/seal.json` ([SEAL-5]) and changes nothing else; `{"runHash": hex}`. Input errors (exit 2), with nothing written: an open run; a `T` before the run's `endedAt`; with `--sealed-by ingest`, a run with a path that breaks [RUN-3] or a file that is missing, does not read, or is not valid against its reader schema ([SEAL-1], [ENC-16]) |
-  | `job` | `job PLAN RUNNER TARGET OUT --at T` (`--at` is always given) | runs the plan `PLAN` as the runner the manifest `RUNNER` describes ([PLAN-7]), against the scripted target `TARGET`, on the clock §9.2.1 gives; writes, in a folder `OUT` that does not exist yet or is empty, the event stream `OUT/events.ndjson` and `OUT/runs/<runId>/` for each run it seals, and nothing else; `{"events": the number of events}`. Exit 0 whatever the job's end: accepted or refused, sealed or failed. Input errors (exit 2), with nothing written: a `PLAN` that does not read or names no `planId` a `job.refused` can carry ([PLAN-7]), a `RUNNER` the reader refuses, a `TARGET` not of §9.2.1's shape, an `OUT` that is not empty, a `T` that is not a time |
-| `sign` | `sign FILE KEY --payload-type T` (`KEY`: an unencrypted PKCS#8 PEM private key, P-256 or Ed25519) | the DSSE envelope over `FILE`'s bytes ([SIG-1]): `payloadType`, `payload`, and one signature with the key's `keyid` ([SIG-3]). Input errors (exit 2): a key of an algorithm the implementation does not sign with, a key that is not an unencrypted PKCS#8 PEM, or an EC key on a curve other than P-256 |
+  | `job` | `job PLAN RUNNER TARGET OUT --at T` (`--at` is always given) | runs the plan `PLAN` as the runner the manifest `RUNNER` describes ([PLAN-7]), against the scripted target `TARGET`, on the clock §9.2.1 gives; writes, in a folder `OUT` that does not exist yet or is empty, the event stream `OUT/events.ndjson` and `OUT/runs/<runId>/` for each run it seals, and nothing else; `{"events": the number of events}`. Exit 0 whatever the job's end: accepted or refused, sealed or failed. Input errors (exit 2), with nothing written: a `PLAN` that does not read or names no `planId` a `job.refused` can carry ([PLAN-7]), a `RUNNER` the reader refuses, a `TARGET` not of §9.2.1's shape, an `OUT` that is not empty, a `T` that is not a time, and a `T` from which the job's clock, moved by every case's `secondsBound` and `closeSeconds` (each of the target's cases, and once per suite), would leave [ENC-8]'s years. Each is found before anything is written |
+  | `sign` | `sign FILE KEY --payload-type T` (`KEY`: an unencrypted PKCS#8 PEM private key, P-256 or Ed25519) | the DSSE envelope over `FILE`'s bytes ([SIG-1]): `payloadType`, `payload`, and one signature with the key's `keyid` ([SIG-3]). Input errors (exit 2): a key of an algorithm the implementation does not sign with, a key that is not an unencrypted PKCS#8 PEM, or an EC key on a curve other than P-256 |
 
   For `lanes`, `--at` defaults to the time of the call. Wherever an operation is given a plan (`match`, `stream`,
   `conform`) or a trust policy (`--policy`, [SIG-4]), one the reader refuses is an input error (exit 2), a plan whose
@@ -293,7 +293,9 @@ each limit of [ENC-17] at its value or one beyond.
     deterministic ([RFC 8032]), `sig` must also be the expected one; an ECDSA signature is not compared.
   - `job`: the runner gives a fresh `OUT`, and runs the operation in an environment it controls: it sets each
     variable the vector's `env` names `set` to a fresh random value, sets each it names `empty` to the empty string,
-    and removes each it names `absent`. The operation exits 0, and:
+    and removes each it names `absent`. A vector's `keychain` and `vault` credential references name paths that
+    cannot exist (`aef-conformance/absent-` and a fixed UUID), so a runner that can read a keychain or a vault refuses
+    them as one that cannot. The operation exits 0, and:
     - `OUT` holds `events.ndjson` and a folder `runs/<runId>/` for each run an `evidence.produced` announces, and
       nothing else; `events` is the number of its lines, and every event is valid against the writer `runner-event`
       schema;
@@ -303,7 +305,8 @@ each limit of [ENC-17] at its value or one beyond.
       For a plan the reader refuses, which they cannot check, the stream is one `job.refused` naming the plan's
       `planId` and the SHA-256 of its bytes;
     - each run announced verifies `intact` with no problem, and its files are valid against their writer schemas; its
-      `execution.targetMode` is `scripted`, its `provenance` the `job.accepted`'s ([RUN-12]), its `subject.kind` and
+      `execution.targetMode` is `scripted`, it names no `judges`, its `provenance` the `job.accepted`'s ([RUN-12]), its
+      `subject.kind` and
       `deployment.ref` those [PLAN-10] derives, its `suite.digest` the plan's, or none when the plan gives none
       ([PLAN-8]), and its `endedAt` the end of its last case on the clock of §9.2.1; its `metrics.json` declares
       `pass-rate` and its `summary.json` has the lanes §9.2.1 gives, with `cost.totalUsd` the sum of its cases' `usd`;

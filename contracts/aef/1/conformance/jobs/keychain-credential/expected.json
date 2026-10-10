@@ -13,5 +13,5 @@
   "rules": [
     "PLAN-3"
   ],
-  "why": "a credential in a keychain the runner cannot read: refused before job.accepted"
+  "why": "a keychain reference whose path names nothing (spec 09 §9.3): whether or not the runner can read a keychain, the credential cannot be resolved: refused before job.accepted"
 }

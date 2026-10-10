@@ -93,10 +93,10 @@ writes one: a score's value, and a metric's value over no samples (IN-3).
 
 **Beyond the table** (settled 10-09; the ids are those of the former "Still open" items):
 
-- **The eval header Inspect requires** (IN-1). `eval.task` is the suite's ref without `suite:`. `eval.model` is a
-  model subject's ref without `model:`, and for any other subject (an agent, a workflow) the subject's `ref` as
-  written, its name decoded (R7I-8). The converter writes `eval.dataset` with the number of cases and their ids, and `eval.model_roles` with the
-  run's judge under the role `judge`, the name AEF's `usage` gives it.
+- **The eval header Inspect requires** (IN-1). `eval.task` is the suite's ref without `suite:`. `eval.model` is a model
+  subject's ref without `model:`, and for any other subject (an agent, a workflow) the subject's `ref` as written, its
+  name decoded (R7I-8). The converter writes `eval.dataset` with the number of cases and their ids, and
+  `eval.model_roles` with the run's judge under the role `judge`, the name AEF's `usage` gives it.
 - **A measured line without a score** (IN-2). A `passed`, `failed`, `warn`, `inconclusive` or `scored` line without
   `scores` (a code check's verdict, a split panel) is `Score.value` NaN with the state name in `Score.reason`, as a
   typed absence is.
@@ -138,8 +138,8 @@ writes one: a score's value, and a metric's value over no samples (IN-3).
   place.
 - **Duration** (R7I-11). `total_time` is `durationMs` / 1000, one binary64 division, not rounded.
 
-**Refused** (IN-1, IN-3 to IN-5, IN-11, IN-12; settled 10-09 and 10-10). The converter refuses these, naming the rule, and writes
-nothing:
+**Refused** (IN-1, IN-3 to IN-5, IN-11, IN-12; settled 10-09 and 10-10). The converter refuses these, naming the rule,
+and writes nothing:
 
 - a run that does not verify (IN-11);
 - a run without a `suite`, or whose suite ref is not `suite:<task>`: `eval.task` is required (IN-1);
@@ -149,13 +149,13 @@ nothing:
 - a run with overlay events: the table sends `override` and `adjudicate` to `Score.history` and the other kinds to
   `log_updates`, but not the shape of either entry. Asked to leave them out (`--ignore-overlays`), as
   [`examples/aef-inspect/`](examples/aef-inspect/) does, the converter converts the rest (IN-4);
-- `output` or `transcript` evidence a sample's lines cite: `samples[].output` is a `ModelOutput` and `messages` a list of `ChatMessage`, and
-  the table does not say how a blob's text becomes either (IN-5);
+- `output` or `transcript` evidence a sample's lines cite: `samples[].output` is a `ModelOutput` and `messages` a list
+  of `ChatMessage`, and the table does not say how a blob's text becomes either (IN-5);
 - `input` or `expected` evidence a sample's lines cite that is not a blob of the run, or two such records with
   different text for one sample (IN-5);
 - a reasoning or case-content blob that is not UTF-8 (IN-12);
-- a sample whose root lines carry two different `startedAt`, `endedAt` or `durationMs`: the table takes them from "a case's
-  root line", and a case can have several roots (IN-5).
+- a sample whose root lines carry two different `startedAt`, `endedAt` or `durationMs`: the table takes them from "a
+  case's root line", and a case can have several roots (IN-5).
 
 ## Inspect → AEF
 
@@ -231,15 +231,15 @@ The reference converter, `tools/aef_interop.py from-inspect`, follows the table 
   reasoning and no response, in `reason` or `ext` either ([RUN-11](../spec/03-run.md#32-runjson)), and the
   `Score.explanation` row yields to it.
 - **Samples** (IN-8). `trial` is `epoch` − 1 when `eval.config.epochs` is above 1. A sample's times go on each of its
-  lines; its `total_time` (as `durationMs`) and its usage go on its first line. The usage is one entry per
-  `role_usage` role (`agent`, `judge` and `attacker` as they are, a role of `eval.model_roles` as `judge`, any other
-  as `other`), with the role's model when the sample's `model_usage` has it; and an `agent` entry from `model_usage`
-  under `eval.model` when no role is the agent. A sample with `error` or `limit` puts each of its lines in `error`
-  (`not_measured` for a limit), without scores, with the message in `reason`; one that stopped before it was scored
-  gets a line per scorer of `eval.scorers`. With `contentCapture: on`, `input`, `target`, `output` (when it has
-  choices) and `messages` are blobs, as written when they are text and as compact JSON otherwise, cited by every line
-  of the sample, one evidence record per kind and content. With more than one epoch, each reduction gives the case's
-  rollup at its scorer: the reduced score read as a sample's is, `trials.aggregation` and `k` from its reducer.
+  lines; its `total_time` (as `durationMs`) and its usage go on its first line. The usage is one entry per `role_usage`
+  role (`agent`, `judge` and `attacker` as they are, a role of `eval.model_roles` as `judge`, any other as `other`),
+  with the role's model when the sample's `model_usage` has it; and an `agent` entry from `model_usage` under
+  `eval.model` when no role is the agent. A sample with `error` or `limit` puts each of its lines in `error`
+  (`not_measured` for a limit), without scores, with the message in `reason`; one that stopped before it was scored gets
+  a line per scorer of `eval.scorers`. With `contentCapture: on`, `input`, `target`, `output` (when it has choices) and
+  `messages` are blobs, as written when they are text and otherwise serialized by JCS (settled 10-10, below), cited by
+  every line of the sample, one evidence record per kind and content. With more than one epoch, each reduction gives the
+  case's rollup at its scorer: the reduced score read as a sample's is, `trials.aggregation` and `k` from its reducer.
 - **The summary** (IN-9). One lane, `main`. Each `results.scores` entry gives one summary entry at its name for the
   metric of that name: its `accuracy` or `mean` is the entry's mean, and any other metric beside it goes to
   `summary.json`'s `ext."inspect_ai"`; without a mean, its one other metric is the entry's `aggregate`. `N`, `n`,
@@ -264,6 +264,26 @@ The reference converter, `tools/aef_interop.py from-inspect`, follows the table 
   and a limit that is not `{type, limit}` is refused. An error message, like an explanation (OT-10), is cut to its
   first 4096 characters, with no mark. An empty `input`, `target` or explanation gives no blob. Two roles that land
   on one AEF role and model are added together.
+- **A limit's number, and an error without a message** (IN-8, settled 10-10, R8-4). `<limit>` is written from the
+  number's binary64 value alone: the shortest decimal that reads back as the same value, the form
+  [ENC-4](../spec/02-encoding.md#21-json-documents) recommends, spelled as ECMAScript's `Number::toString` spells it.
+  An integral value has no fraction (`1000` for both `1000` and `1000.0`), up to 21 digits in plain digits (`1e16`
+  is `10000000000000000`), then in exponent form (`1e21` is `1e+21`; `1e-7` is `1e-7`, `1e-6` is `0.000001`). So a
+  JSON parser that does not keep `1000.0` apart from `1000` writes the same reason, as "values, not bytes" requires.
+  A limit whose `type` is empty, or whose `limit` is not a finite number (Inspect's `NaN`), is refused; an infinity
+  never reaches it, since a log holding `Infinity` is refused as it is read (IN-6). A sample `error` with an empty or
+  absent message gives the reason "Inspect recorded an error without a message".
+- **Content that is not text** (IN-8, settled 10-10). A list of messages, a `ModelOutput` or a list of targets
+  becomes a blob holding its JSON serialized by the JSON Canonicalization Scheme
+  ([RFC 8785](https://www.rfc-editor.org/rfc/rfc8785), JCS): no whitespace; numbers as ECMAScript's `Number::toString`
+  writes them, as for a limit; strings with only `"`, `\` and the control characters escaped; object members sorted
+  by the UTF-16 code units of their names; UTF-8. Two converters then write the same bytes, and so the same blob name
+  and evidence digest, for the same values, whatever their JSON parser keeps of member order or number spelling. This
+  does not contradict [Seal the bytes, not a canonical form](../rationale.md#seal-the-bytes-not-a-canonical-form): JCS
+  only chooses the bytes a converter writes into a new blob, the run is then sealed over those bytes
+  ([SEAL-2](../spec/04-integrity.md#41-sealing-a-run)), and nothing is read back through a canonical form. JCS has
+  no NaN, infinity or unpaired surrogate, so content that holds one is refused: writing it another way would give two
+  converters two names again.
 - **The summary** (IN-9, R7I-10, R7I-15). The run's usage is one entry per `stats.model_usage` model (its role from
   `eval.model_roles` as IN-8 maps it, `agent` for `eval.model`, `other` otherwise), in the log's order; only without
   `model_usage`, one entry per `stats.role_usage` role, without a model. An entry with no metric (or `stderr` alone)
@@ -277,12 +297,16 @@ The reference converter, `tools/aef_interop.py from-inspect`, follows the table 
 **Refused** (IN-6 to IN-10; settled 10-09 and 10-10). The converter refuses these, naming the rule, and writes nothing:
 
 - an `eval_id` that is not an AEF id; a time without an offset; a closed log without `stats.completed_at`, or one
-  that ends before it starts; an `error` log without a message (IN-6);
+  that ends before it starts; an `error` log without a message; a log holding `Infinity` or `-Infinity`, which no AEF
+  number holds ([ENC-3](../spec/02-encoding.md#21-json-documents)) (IN-6);
 - a value that is a boolean, or a string other than `C`, `I`, `P` and `N` (IN-7);
 - more than one epochs reducer; an epoch beyond `eval.config.epochs`; a sample without scores (or, for one that
-  stopped, in a log that names no scorer); two scores of one case, path and epoch; a limit that is not `{type, limit}`; with more than
-  one epoch, a reduction whose reducer has no AEF value; a reduction with no epoch lines, and, in a closed log, a case's path with epoch lines and no reduction
-  ([RES-8](../spec/03-run.md#344-repeated-trials)) (IN-8);
+  stopped, in a log that names no scorer); two scores of one case, path and epoch; a limit that is not
+  `{type, limit}`, whose `type` is empty or whose `limit` is not a finite number (R8-4); content that is not text
+  holding NaN or an unpaired surrogate, which JCS cannot write, when the run keeps content (`contentCapture: on`;
+  with `off` the content is not written, so it is not refused; settled 10-10); with more than one epoch, a
+  reduction whose reducer has no AEF value; a reduction with no epoch lines, and, in a closed log, a case's path with
+  epoch lines and no reduction ([RES-8](../spec/03-run.md#344-repeated-trials)) (IN-8);
 - a `results.scores` entry with both `accuracy` and `mean`, or with no mean and more than one other metric, or whose
   metric cannot be an `aggregate` method; and a mean, median, minimum or maximum Inspect gives that the lines do
   not (IN-9);

@@ -213,6 +213,59 @@ public sealed class RunnerEventStreamTests : IDisposable
         Assert.DoesNotContain("secret/where-it-lives", why, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("[]", "")]                     // no judge: within
+    [InlineData(null, "")]                     // no judges member: within
+    [InlineData("[\"B\"]", "")]              // some of the plan's
+    [InlineData("[\"A\", \"B\"]", "")]     // all, in the plan's order
+    [InlineData("[\"B\", \"A\"]", "run:R-1 judges")]   // out of the plan's order
+    [InlineData("[\"A\", \"A\"]", "run:R-1 judges")]   // one named twice
+    [InlineData("[\"A\", \"C\"]", "run:R-1 judges")]   // one the plan does not name
+    [InlineData("[\"A-other-rubric\"]", "run:R-1 judges")] // the plan's model with another rubric digest
+    public void ARunsJudges_AreASubListOfThePlans_InItsOrder_NoneTwice(string? runJudges, string expected)
+    {
+        // [STRM-4] judges (round 8): a run names the models that graded it ([RUN-9]), so none, or some of the plan's, is
+        // within. Judges by (model, rubricDigest).
+        static JsonObject Judge(string name) => name switch
+        {
+            "A" => new() { ["model"] = "gpt-5.1", ["rubricDigest"] = "sha256:" + new string('a', 64) },
+            "B" => new() { ["model"] = "llama-3.3-70b", ["rubricDigest"] = "sha256:" + new string('b', 64) },
+            "C" => new() { ["model"] = "gpt-4o-mini", ["rubricDigest"] = "sha256:" + new string('a', 64) },
+            _ => new() { ["model"] = "gpt-5.1", ["rubricDigest"] = "sha256:" + new string('c', 64) },
+        };
+
+        JobRun("R-1", 0.1, b =>
+        {
+            if (runJudges is not null)
+            {
+                b.Run["judges"] = new JsonArray([.. JsonNode.Parse(runJudges)!.AsArray().Select(j => (JsonNode?)Judge((string)j!))]);
+            }
+
+            return b.Line("c1", "p", "passed");
+        });
+        var plan = Plan();
+        plan["judges"] = new JsonArray(Judge("A"), Judge("B"));
+
+        Assert.Equal(expected.Length == 0 ? Array.Empty<string>() : [expected], Conform(plan, Announce("R-1"), Sealed(3, "R-1")));
+
+        plan.Remove("judges");   // a plan that names no judges leaves them unchecked
+        Assert.Empty(Conform(plan, Announce("R-1"), Sealed(3, "R-1")));
+    }
+
+    [Fact]
+    public void AJudgesAbsentRubricDigest_EqualsOnlyAnAbsentOne()
+    {
+        JobRun("R-1", 0.1, b =>
+        {
+            b.Run["judges"] = new JsonArray(new JsonObject { ["model"] = "gpt-5.1", ["rubricDigest"] = "sha256:" + new string('a', 64) });
+            return b.Line("c1", "p", "passed");
+        });
+        var plan = Plan();
+        plan["judges"] = new JsonArray(new JsonObject { ["model"] = "gpt-5.1" });
+
+        Assert.Equal(["run:R-1 judges"], Conform(plan, Announce("R-1"), Sealed(3, "R-1")));
+    }
+
     [Fact]
     public void ARunWithoutACost_IsANoCostProblem_AndARunNoFolderHolds_IsMissing()
     {

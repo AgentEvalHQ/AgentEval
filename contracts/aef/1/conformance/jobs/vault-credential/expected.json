@@ -13,5 +13,5 @@
   "rules": [
     "PLAN-3"
   ],
-  "why": "a credential kept in a vault the runner cannot reach: a refusal before job.accepted, not a job that fails later"
+  "why": "a vault reference whose path names nothing (spec 09 §9.3): whether or not the runner can read a vault, the credential cannot be resolved, so the plan is refused before job.accepted, not a job that fails later"
 }

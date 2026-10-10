@@ -11,7 +11,9 @@
 7. no schema pattern uses lookaround or a backreference ([ENC-14]);
 8. every job vector's inputs are files of the corpus, its env names set, empty or absent, its target's cases have a
    severity exactly when failed or warn, and the cases it expects are the first cases of a suite its scripted target
-   has; and run.json, a plan and a runner manifest list the same target modes.
+   has; and run.json, a plan and a runner manifest list the same target modes;
+9. every row of a table in the spec is indented as its table's first row (a row that is not leaves the table: in a
+   list item, CommonMark renders it as a paragraph of pipes).
 
 Usage: python contracts/aef/tools/check_spec.py
 """
@@ -148,6 +150,18 @@ def main():
         problems.append(f"problem code '{code}' is expected by no corpus vector (add one, or list it in CODES_UNTESTED)")
     for code in sorted(set(CODES_UNTESTED) & used_codes):
         problems.append(f"CODES_UNTESTED lists '{code}', but a vector expects it: take it off the list")
+
+    # Tables: a row indented otherwise than its table's first row is not part of the table (CommonMark, GFM).
+    for name, t in text.items():
+        first = None
+        for n, line in enumerate(t.splitlines(), start=1):
+            row = re.match(r"( *)\|", line)
+            if row is None:
+                first = None
+            elif first is None:
+                first = len(row.group(1))
+            elif len(row.group(1)) != first:
+                problems.append(f"{name}:{n}: a table row indented {len(row.group(1))} spaces, its table {first}")
 
     # §9.1 against index.json: the vector kinds each class names (with the classes it includes) are the kinds the
     # index lists under it.

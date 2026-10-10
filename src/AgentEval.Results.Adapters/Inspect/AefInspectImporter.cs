@@ -44,7 +44,7 @@ public sealed class AefInspectImportException(string message) : Exception(messag
 /// label, a map one score per member, a list <c>ext</c>; NaN is <c>error</c> (grader or scoring failed) or
 /// <c>not_measured</c>; a reason that blames the model makes the line <c>failed</c>; the explanation a reasoning blob,
 /// the answer and metadata <c>ext.inspect_ai</c>. A sample's times go on each of its lines, its duration and usage on
-/// its first; its content is blobs cited by each line. A sample that stopped is a line per scorer in <c>error</c> (or
+/// its first; its content is blobs cited by each line: text as written, anything else serialized by JCS (RFC 8785). A sample that stopped is a line per scorer in <c>error</c> (or
 /// <c>not_measured</c> for a limit).</item>
 /// <item>With more than one epoch, each line carries <c>trial</c> = <c>epoch</c> − 1, and each reduction gives the
 /// case's rollup at its scorer, counted from the epochs' lines.</item>
@@ -111,6 +111,11 @@ public static partial class AefInspectImporter
         // Read everything, and refuse what the page refuses, before anything is written.
         var log = InspectJson.Parse(File.ReadAllBytes(logFile)) as JsonObject
                   ?? throw new InvalidDataException($"{logFile} is not an Inspect eval log: its value is not an object.");
+        if (InspectJson.HoldsInfinity(log))
+        {
+            // IN-6: no AEF number holds an infinity ([ENC-3]), wherever the log holds one.
+            throw new AefInspectImportException($"{logFile} holds Infinity or -Infinity, which no AEF number holds ([ENC-3]): the log is refused as it is read (IN-6).");
+        }
         var plan = Read(log, options);
 
         var clock = options.TimeProvider ?? TimeProvider.System;
@@ -280,7 +285,7 @@ public static partial class AefInspectImporter
         {
             null => "0",   // Inspect's default
             JsonValue v when v.GetValueKind() == JsonValueKind.String => v.GetValue<string>(),
-            JsonValue v when v.GetValueKind() == JsonValueKind.Number => InspectJson.Number(v),
+            JsonValue v when v.GetValueKind() == JsonValueKind.Number => InspectJson.Shortest(v.GetValue<double>()),   // from its value alone (R8-4)
             _ => throw new InvalidDataException("The log's task_version is neither a number nor a string."),
         };
         if (!AefConverter.IsExactVersion(taskVersion))
@@ -410,20 +415,23 @@ public static partial class AefInspectImporter
                     NoHistory(score as JsonObject, where);
                 }
 
-                // The message, cut to its first 4096 characters with no mark (R7I-12); a limit is "<type> limit <limit>",
-                // and one that is not {type, limit} is refused (IN-8).
+                // The message, cut to its first 4096 characters with no mark (R7I-12), or, empty or absent, "Inspect
+                // recorded an error without a message"; a limit is "<type> limit <limit>", the number written from its
+                // binary64 value alone (R8-4); a limit that is not {type, limit}, whose type is empty or whose limit is not
+                // a finite number (Inspect's NaN), is refused (IN-8).
                 string reason;
                 if (error is not null)
                 {
                     reason = Text(error["message"]) is { Length: > 0 } message ? Cut(message) : "Inspect recorded an error without a message";
                 }
-                else if (Text(limit!["type"]) is { Length: > 0 } type && limit["limit"] is JsonValue value && value.GetValueKind() == JsonValueKind.Number && !InspectJson.IsNonFinite(value))
+                else if (Text(limit!["type"]) is { Length: > 0 } type && limit["limit"] is JsonValue value && value.GetValueKind() == JsonValueKind.Number)
                 {
-                    reason = Cut($"{type} limit {InspectJson.Number(value)}");
+                    reason = Cut($"{type} limit {InspectJson.Shortest(value.GetValue<double>())}");
                 }
                 else
                 {
-                    throw new AefInspectImportException($"{where}.limit is not {{type, limit}}, and the line's reason is \"<type> limit <limit>\" (IN-8).");
+                    throw new AefInspectImportException(
+                        $"{where}.limit is {InspectJson.Indented(limit).ReplaceLineEndings(" ")}: a limit is {{type, limit}} with a type and a finite number, and the line's reason is \"<type> limit <limit>\" (IN-8).");
                 }
 
                 var state = error is not null ? AefState.Error : AefState.NotMeasured;
@@ -460,7 +468,7 @@ public static partial class AefInspectImporter
                              ("output", AefEvidenceKind.Output, "output"), ("messages", AefEvidenceKind.Transcript, "messages"),
                          })
                 {
-                    if (Content(sample[member], member) is not { } bytes)
+                    if (Content(sample[member], member, where) is not { } bytes)
                     {
                         continue;
                     }
@@ -1011,7 +1019,7 @@ public static partial class AefInspectImporter
         if (differs)
         {
             throw new AefInspectImportException(
-                $"{where} ({name}): Inspect's {metric} is {InspectJson.Indented(given)}, and the lines give {(computed is { } c ? InspectJson.Repr(c) : "none (nothing measured)")} (IN-9).");
+                $"{where} ({name}): Inspect's {metric} is {InspectJson.Indented(given)}, and the lines give {(computed is { } c ? InspectJson.Shortest(c) : "none (nothing measured)")} (IN-9).");
         }
     }
 
@@ -1071,7 +1079,7 @@ public static partial class AefInspectImporter
         var text = id switch
         {
             JsonValue v when v.GetValueKind() == JsonValueKind.String => v.GetValue<string>(),
-            JsonValue v when v.GetValueKind() == JsonValueKind.Number => InspectJson.Number(v),
+            JsonValue v when v.GetValueKind() == JsonValueKind.Number => InspectJson.Shortest(v.GetValue<double>()),   // from its value alone (R8-4)
             _ => throw new InvalidDataException($"{where} is neither an integer nor a string."),
         };
         return AefConverter.IsResultText(text, 256) && !InspectJson.IsNonFinite(id)
@@ -1079,17 +1087,48 @@ public static partial class AefInspectImporter
             : throw new InvalidDataException($"{where}: '{text}' cannot be a caseId (1-256 characters, no control character, [RES-4]).");
     }
 
-    // A sample's input, target, output (when it has choices) or messages as a blob: text as written, anything else as
-    // compact JSON; none when empty.
-    private static byte[]? Content(JsonNode? value, string member) => value switch
+    // A sample's input, target, output (when it has choices) or messages as a blob: text as written, anything else (a list
+    // of messages, a ModelOutput, a list of targets) serialized by JCS, RFC 8785 ("Content that is not text", IN-8); none
+    // when empty. Content JCS cannot write (NaN, an unpaired surrogate) is refused (IN-8).
+    private static byte[]? Content(JsonNode? value, string member, string where)
     {
-        null => null,
-        JsonValue v when v.GetValueKind() == JsonValueKind.String => v.GetValue<string>() is { Length: > 0 } text ? Encoding.UTF8.GetBytes(text) : null,
-        JsonObject o when member == "output" => o["choices"] is JsonArray { Count: > 0 } ? InspectJson.Compact(o) : null,
-        JsonArray { Count: 0 } => null,
-        JsonObject { Count: 0 } => null,
-        _ => InspectJson.Compact(value),
-    };
+        if (InspectJson.IsNonFinite(value))
+        {
+            throw new AefInspectImportException($"{where}.{member} is NaN, which JCS cannot write: content that is not text holding NaN is refused (IN-8).");
+        }
+
+        if (value is JsonValue text && text.GetValueKind() == JsonValueKind.String)
+        {
+            try
+            {
+                return text.GetValue<string>() is { Length: > 0 } written ? Encoding.UTF8.GetBytes(written) : null;   // text, as written
+            }
+            catch (InvalidOperationException e)
+            {
+                throw new InvalidDataException($"{where}.{member} is not text that UTF-8 can hold: {e.Message}", e);
+            }
+        }
+
+        var json = value switch
+        {
+            JsonObject o when member == "output" => o["choices"] is JsonArray { Count: > 0 } ? o : null,
+            JsonArray { Count: 0 } or JsonObject { Count: 0 } => null,
+            _ => value,
+        };
+        if (json is null)
+        {
+            return null;
+        }
+
+        try
+        {
+            return InspectJson.Canonical(json);
+        }
+        catch (FormatException e)
+        {
+            throw new AefInspectImportException($"{where}.{member}: {e.Message}: content that is not text holding NaN or an unpaired surrogate is refused (IN-8).");
+        }
+    }
 
     private static long? Integer(JsonNode? node, string where)
     {

@@ -54,6 +54,7 @@ import math
 import re
 import shutil
 import sys
+from decimal import Decimal
 from fractions import Fraction
 from pathlib import Path
 
@@ -845,6 +846,7 @@ INSTRUMENT_BLAMED = ("grader_failed", "scoring_failed")  # with NaN: state error
 FROM_REDUCER = {"majority": "MajorityVote", "mode": "MajorityVote", "mean": "Mean", "median": "Median", "max": "Max"}
 MEAN_METRICS = ("accuracy", "mean")  # a summary entry's mean (SUM-5)
 NO_VALUE_REASON = "Inspect recorded no value (NaN) and no reason"  # IN-7
+ERROR_REASON = "Inspect recorded an error without a message"  # IN-8, R8-4
 _INSPECT_TIME = re.compile(r"([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\.([0-9]{1,9}))?"
                            r"(Z|[+-][0-9]{2}:[0-9]{2})")
 _AEF_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
@@ -921,6 +923,40 @@ def _unref(name):
         return name
 
 
+def _finite(value):
+    """A JSON number (not a boolean) whose binary64 value is finite ([ENC-3], [ENC-4])."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        return math.isfinite(float(value))
+    except OverflowError:  # an integer literal beyond binary64
+        return False
+
+
+def _shortest(value):
+    """A finite number written from its binary64 value alone (R8-4): the shortest decimal that reads back as the same
+    binary64 value, the form [ENC-4] recommends, spelled as ECMAScript's Number::toString spells it. 1000 and 1000.0
+    give 1000, 1e16 gives 10000000000000000, 1e21 gives 1e+21, 1e-7 gives 1e-7, 0.5 gives 0.5."""
+    x = float(value)
+    if x == 0:
+        return "0"  # -0 too
+    sign = "-" if x < 0 else ""
+    digits_tuple = Decimal(repr(abs(x))).normalize().as_tuple()  # repr: the shortest round-trip digits
+    digits = "".join(map(str, digits_tuple.digits))
+    k = len(digits)
+    n = digits_tuple.exponent + k  # x = 0.d1d2...dk x 10^n
+    if k <= n <= 21:
+        text = digits + "0" * (n - k)
+    elif 0 < n <= 21:
+        text = digits[:n] + "." + digits[n:]
+    elif -6 < n <= 0:
+        text = "0." + "0" * -n + digits
+    else:
+        e = n - 1
+        text = (digits if k == 1 else digits[0] + "." + digits[1:]) + "e" + ("+" if e >= 0 else "-") + str(abs(e))
+    return sign + text
+
+
 def _in(where, what, item):
     raise InputError(f"{where}: {what}: refused (inspect.md, Inspect -> AEF, {item})")
 
@@ -990,9 +1026,38 @@ def _merged(entries):
     return list(out.values())
 
 
-def _text_bytes(value):
-    """The bytes of a case's content: a string as its UTF-8 text, anything else as compact JSON."""
-    return value.encode("utf-8") if isinstance(value, str) else _compact(value).encode("utf-8")
+_JCS_ESCAPES = {'"': '\\"', "\\": "\\\\", "\b": "\\b", "\f": "\\f", "\n": "\\n", "\r": "\\r", "\t": "\\t"}
+
+
+def _jcs(value, where):
+    """RFC 8785, the JSON Canonicalization Scheme (IN-8, settled 10-10): no whitespace; numbers as ECMAScript writes
+    them (_shortest); strings with only `"`, `\\` and the control characters escaped (\\b \\f \\n \\r \\t, else
+    \\u00xx); object members sorted by the UTF-16 code units of their names. JCS has no NaN or infinity, and no
+    unpaired surrogate: such content is refused (IN-8)."""
+    if value is None or isinstance(value, bool):
+        return {None: "null", True: "true", False: "false"}[value]
+    if isinstance(value, (int, float)):
+        if not _finite(value):
+            _in(where, "content that is not text holds a number JCS cannot write (NaN)", "IN-8")
+        return _shortest(value)
+    if isinstance(value, str):
+        try:
+            value.encode("utf-8")
+        except UnicodeEncodeError:
+            _in(where, "content that is not text holds an unpaired surrogate, which JCS cannot write", "IN-8")
+        return '"' + "".join(_JCS_ESCAPES.get(c) or (f"\\u{ord(c):04x}" if c < " " else c) for c in value) + '"'
+    if isinstance(value, list):
+        return "[" + ",".join(_jcs(item, where) for item in value) + "]"
+    if isinstance(value, dict):
+        members = sorted(value.items(), key=lambda kv: kv[0].encode("utf-16-be"))
+        return "{" + ",".join(_jcs(k, where) + ":" + _jcs(v, where) for k, v in members) + "}"
+    raise InputError(f"{where}: content that is not JSON")
+
+
+def _text_bytes(value, where):
+    """The bytes of a case's content (IN-8): a string as its UTF-8 text; anything else serialized by JCS (RFC 8785),
+    so two converters give the same bytes, and the same blob name, for the same values."""
+    return value.encode("utf-8") if isinstance(value, str) else _jcs(value, where).encode("utf-8")
 
 
 class _Blobs:
@@ -1079,7 +1144,7 @@ def inspect_line(run_id, case_id, path, trial, score, evaluator_id, capture, blo
     return line
 
 
-def _sample_content(sample, capture, blobs):
+def _sample_content(sample, capture, blobs, where):
     """The evidence ids of a sample's input, target, output and messages, kept only with contentCapture on (IN-8)."""
     if capture != "on":
         return []
@@ -1091,7 +1156,7 @@ def _sample_content(sample, capture, blobs):
                                ("messages", "transcript", sample.get("messages"))):
         if value in (None, "", [], {}):
             continue
-        ids.append(blobs.evidence(kind, _text_bytes(value), f"Inspect samples[].{field}"))
+        ids.append(blobs.evidence(kind, _text_bytes(value, f"{where}.{field}"), f"Inspect samples[].{field}"))
     return list(dict.fromkeys(ids))
 
 
@@ -1206,7 +1271,7 @@ def from_inspect(log_path, out, target_mode, capture, at):
         if not isinstance(scores, dict) or not scores:
             _in(where, "a sample without scores (and, for one that stopped, a log naming no scorer): its case would "
                        "have no line", "IN-8")
-        evidence = _sample_content(sample, capture, blobs)
+        evidence = _sample_content(sample, capture, blobs, where)
         sample_lines = []
         for path, score in scores.items():
             _text(path, "path", 1024, f"{where}.scores")
@@ -1221,11 +1286,13 @@ def from_inspect(log_path, out, target_mode, capture, at):
         if failure or limit:  # samples[].error, limit -> error (not_measured for a limit), the message in reason
             if failure:
                 message = failure.get("message") if isinstance(failure, dict) else failure
-            elif isinstance(limit, dict) and isinstance(limit.get("type"), str) and \
-                    isinstance(limit.get("limit"), (int, float)) and not isinstance(limit.get("limit"), bool):
-                message = f"{limit['type']} limit {json.dumps(limit['limit'])}"  # R7I-12: "token limit 1000"
+                if not isinstance(message, str) or not message:
+                    message = ERROR_REASON  # R8-4: an error without a message
+            elif isinstance(limit, dict) and isinstance(limit.get("type"), str) and limit["type"] and \
+                    _finite(limit.get("limit")):
+                message = f"{limit['type']} limit {_shortest(limit['limit'])}"  # R7I-12, R8-4: "token limit 1000"
             else:
-                _in(where, "a limit that is not {type, limit}", "IN-8")
+                _in(where, "a limit that is not {type, limit} with a type and a finite number (R8-4)", "IN-8")
             for line in sample_lines:
                 line["state"] = "error" if failure else "not_measured"
                 line["reason"] = str(message)[:REASON_MAX] or NO_VALUE_REASON

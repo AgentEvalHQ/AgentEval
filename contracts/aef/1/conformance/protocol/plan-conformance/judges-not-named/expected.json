@@ -1,0 +1,17 @@
+{
+  "kind": "plan-conformance",
+  "events": "events.ndjson",
+  "plan": "plan.json",
+  "runs": "runs",
+  "problems": [
+    [
+      "run:R-1",
+      "judges"
+    ]
+  ],
+  "rules": [
+    "STRM-4",
+    "RUN-9"
+  ],
+  "why": "the plan's first judge, then one the plan does not name"
+}

@@ -57,15 +57,56 @@ internal static class JobOps
         }
 
         AefJobResult result;
+        var existed = Directory.Exists(output);
         try
         {
             result = AefScriptedRunner.Run(plan, runner, target, output, new AefJobOptions { At = at });
         }
         catch (FormatException e)
         {
-            throw new UsageException(e.Message);
+            throw new UsageException(e.Message);   // an input error, found before anything was written
+        }
+        catch (Exception e) when (e is not (OutOfMemoryException or StackOverflowException))
+        {
+            // The driver exits 0 or 2 only ([CONF-3]): anything else the job throws is reported as an error, and OUT is left
+            // as it was (absent, or empty).
+            Clear(output, existed);
+            throw new UsageException($"the job failed: {e.GetType().Name}: {e.Message}");
         }
 
         return DriverIO.Print(stdout, new JsonObject { ["events"] = result.Events });
+    }
+
+    private static void Clear(string output, bool existed)
+    {
+        try
+        {
+            if (!Directory.Exists(output))
+            {
+                return;
+            }
+
+            if (!existed)
+            {
+                Directory.Delete(output, recursive: true);
+                return;
+            }
+
+            foreach (var entry in new DirectoryInfo(output).EnumerateFileSystemInfos())
+            {
+                if (entry is DirectoryInfo folder)
+                {
+                    folder.Delete(recursive: true);
+                }
+                else
+                {
+                    entry.Delete();
+                }
+            }
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            // Best effort: the error is reported either way.
+        }
     }
 }

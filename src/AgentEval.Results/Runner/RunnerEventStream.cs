@@ -438,11 +438,13 @@ public static class RunnerEventStream
                 && (AefNode.String(s["digest"]) is not { } digest || digest == AefNode.String(AefNode.Get(suite, "digest")))))
             found.Add("suite");
 
-        // An absent model or rubric digest equals only an absent one.
+        // The run's judges are the models that graded it ([RUN-9]): a sub-list of the plan's (round 8), each one of the
+        // plan's by model and rubric digest (an absent value equals only an absent one), in the plan's order, none named
+        // twice. None, or some of the plan's, is within. Checked only when the plan names judges.
         static List<(string?, string?)> Judges(JsonNode? list) =>
             [.. AefNode.Objects(list).Select(j => (AefNode.String(j["model"]), AefNode.String(j["rubricDigest"])))];
         var planned = Judges(plan["judges"]);
-        if (planned.Count > 0 && !Judges(run["judges"]).SequenceEqual(planned))
+        if (planned.Count > 0 && !IsSubList(Judges(run["judges"]), planned))
             found.Add("judges");
 
         // [RUN-11], [VER-8]: an absent or unknown contentCapture reads as on.
@@ -454,6 +456,34 @@ public static class RunnerEventStream
             found.Add("target-mode");
 
         return found;
+    }
+
+    // Whether every item of run is one of planned, in planned's order, none twice: each matched at a later place of planned
+    // than the item before it.
+    private static bool IsSubList(List<(string?, string?)> run, List<(string?, string?)> planned)
+    {
+        if (run.Distinct().Count() != run.Count)
+        {
+            return false;
+        }
+
+        var at = 0;
+        foreach (var judge in run)
+        {
+            while (at < planned.Count && planned[at] != judge)
+            {
+                at++;
+            }
+
+            if (at == planned.Count)
+            {
+                return false;
+            }
+
+            at++;
+        }
+
+        return true;
     }
 
     /// <summary>A plan's timeout in seconds: an AEF duration of days, hours and minutes ([ENC-9], <see cref="AefDuration"/>).</summary>

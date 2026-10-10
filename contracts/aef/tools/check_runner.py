@@ -20,7 +20,8 @@ What is checked here:
     targetMode) and mocked: refused. Each job runs twice with --at, and the outputs must be byte-identical (this
     runner's own property: ids are free for other runners).
   - The system clock: one job without --at, judged with every check but the clock's.
-  - Usage and input errors: a manifest the reader refuses, an impossible --at, a target not of §9.2.1's shape (a cost
+  - Usage and input errors: a manifest the reader refuses, an impossible --at, an --at from which the job's clock
+    would leave ENC-8's years (9999-12-31T23:59:00Z, with two minutes of cases), a target not of §9.2.1's shape (a cost
     bound below a cost, a member §9.2.1 does not name in the target, a suite or a case) and a non-empty OUT each exit
     2 and write nothing; and `aef_verify.py stream` and `conform`, given a plan the reader
     refuses (plans/timeout-in-seconds), exit 2 with a message, never a traceback.
@@ -259,10 +260,13 @@ def main():
             printed = engine.call(["job"] + argv + [out, "--at", AT])
             report(f"input error: {name}", [] if "error" in printed and not out.exists() else
                    [f"{printed}, OUT {'written' if out.exists() else 'absent'}"])
-        out = tmp / f"error-{count}"
-        printed = engine.call(["job", plan, runner, target, out, "--at", "2026-02-31T09:00:00Z"])
-        report("usage error: an --at that is no time", [] if "error" in printed and not out.exists() else
-               [f"{printed}, OUT {'written' if out.exists() else 'absent'}"])
+        for name, at in (("an --at that is no time", "2026-02-31T09:00:00Z"),
+                         # spec 09 §9.3: 6 cases of 20 s and 2 closes of 1 s from 23:59 would leave the year 9999
+                         ("an --at from which the job's clock would leave ENC-8's years", "9999-12-31T23:59:00Z")):
+            out = tmp / f"error-{count}"
+            printed = engine.call(["job", plan, runner, target, out, "--at", at])
+            report(f"usage error: {name}", [] if "error" in printed and not out.exists() else
+                   [f"{printed}, OUT {'written' if out.exists() else 'absent'}"])
         out = tmp / "not-empty"
         out.mkdir()
         (out / "keep.txt").write_bytes(b"x")

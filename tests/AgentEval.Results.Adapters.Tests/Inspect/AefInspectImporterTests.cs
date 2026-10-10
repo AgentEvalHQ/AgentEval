@@ -130,12 +130,15 @@ public sealed class AefInspectImporterTests : IDisposable
     public static TheoryData<string, int> Refusals()
     {
         var data = new TheoryData<string, int>();
-        var refusals = JsonNode.Parse(File.ReadAllText(Path.Combine(Examples, "inspect-aef", "expected.json")))!["refusals"]!.AsArray();
-        for (var i = 0; i < refusals.Count; i++)
+        foreach (var name in new[] { "inspect-aef", "inspect-aef-edges" })
         {
-            if ((string?)refusals[i]!["args"]![0] == "from-inspect")
+            var refusals = JsonNode.Parse(File.ReadAllText(Path.Combine(Examples, name, "expected.json")))!["refusals"]!.AsArray();
+            for (var i = 0; i < refusals.Count; i++)
             {
-                data.Add("inspect-aef", i);
+                if ((string?)refusals[i]!["args"]![0] == "from-inspect")
+                {
+                    data.Add(name, i);
+                }
             }
         }
 
@@ -149,7 +152,7 @@ public sealed class AefInspectImporterTests : IDisposable
         var example = Path.Combine(Examples, name);
         var refusal = JsonNode.Parse(File.ReadAllText(Path.Combine(example, "expected.json")))!["refusals"]![index]!;
         var (input, options) = Arguments(example, refusal["args"]!.AsArray());
-        var output = Path.Combine(_root, $"refused-{index}");
+        var output = Path.Combine(_root, $"refused-{name}-{index}");
 
         var refused = Assert.Throws<AefInspectImportException>(() => AefInspectImporter.Import(input, output, options));
 
@@ -193,10 +196,15 @@ public sealed class AefInspectImporterTests : IDisposable
     [InlineData("no-end", "IN-6")]
     [InlineData("end-before-start", "IN-6")]
     [InlineData("error-without-message", "IN-6")]
+    [InlineData("infinity", "IN-6")]
+    [InlineData("minus-infinity", "IN-6")]
     public void TheHeader_IsRefused_WhenThePageRefusesIt(string what, string rule)
     {
         Action<JsonObject> edit = what switch
         {
+            // A log holding Infinity anywhere is refused as it is read: no AEF number holds one ([ENC-3]).
+            "infinity" => log => log["samples"]![0]!["metadata"] = new JsonObject { ["budget"] = InspectJson.InfinityMarker },
+            "minus-infinity" => log => log["eval"]!["metadata"] = new JsonObject { ["floor"] = InspectJson.MinusInfinityMarker },
             "eval-id" => log => log["eval"]!["eval_id"] = "not an id!",
             "no-end" => log => log["stats"]!.AsObject().Remove("completed_at"),
             "end-before-start" => log => log["stats"]!["completed_at"] = "2026-10-06T11:59:00+02:00",
@@ -271,6 +279,7 @@ public sealed class AefInspectImporterTests : IDisposable
     [InlineData("two-scores")]
     [InlineData("reduction-without-lines")]
     [InlineData("bad-limit")]
+    [InlineData("limit-not-a-number")]
     [InlineData("reducer-without-value-in-a-reduction")]
     public void TheSamples_AreRefused_WhenThePageRefusesThem(string what)
     {
@@ -280,6 +289,11 @@ public sealed class AefInspectImporterTests : IDisposable
             {
                 log["samples"]![0]!["scores"] = null;
                 log["samples"]![0]!["limit"] = new JsonObject { ["type"] = "token" };
+            },
+            "limit-not-a-number" => log =>
+            {
+                log["samples"]![0]!["scores"] = null;
+                log["samples"]![0]!["limit"] = new JsonObject { ["type"] = "token", ["limit"] = "1000" };
             },
             "reducer-without-value-in-a-reduction" => log =>
             {
@@ -376,6 +390,34 @@ public sealed class AefInspectImporterTests : IDisposable
         Assert.Null(conversion.Seal);
         Assert.Equal("running", (string)AefTestRuns.Document(output, "run.json")["status"]!);
         Assert.False(File.Exists(Path.Combine(output, "summary.json")));
+    }
+
+    [Fact]
+    public void ContentThatIsNotText_IsSerializedByJcs_SoAnySpellingOfTheSameValuesGivesOneBlob()
+    {
+        // RFC 8785: no whitespace, members sorted by UTF-16 code units (😀, U+D83D U+DE00, before ｚ, U+FF5A), numbers as
+        // Number::toString writes them, only ", \ and control characters escaped.
+        var one = InspectJson.Parse(Encoding.UTF8.GetBytes("{\"ｚ\": 2, \"b\": 1.0, \"😀\": [2.50, \"—\\n\"], \"a\": {\"y\": 1e21, \"x\": null}}"));
+        var two = InspectJson.Parse(Encoding.UTF8.GetBytes("{\"a\":{\"x\":null,\"y\":1E+21},\"b\":1,\"😀\":[2.5,\"\\u2014\\u000a\"],\"ｚ\":2.0}"));
+
+        var bytes = InspectJson.Canonical(one);
+
+        Assert.Equal("{\"a\":{\"x\":null,\"y\":1e+21},\"b\":1,\"😀\":[2.5,\"—\\n\"],\"ｚ\":2}", Encoding.UTF8.GetString(bytes));
+        Assert.Equal(bytes, InspectJson.Canonical(two));
+    }
+
+    [Fact]
+    public void ContentHoldingNaN_OrAnUnpairedSurrogate_IsRefused()
+    {
+        // IN-8: JCS has no NaN and no unpaired surrogate (content-nan.json in the example; here, the surrogate).
+        var (input, output) = Files(log => log["samples"]![0]!["messages"] = new JsonArray(new JsonObject { ["role"] = "user", ["content"] = "LONE" }));
+        File.WriteAllText(input, File.ReadAllText(input).Replace("\"LONE\"", "\"\\ud800\"", StringComparison.Ordinal), new UTF8Encoding(false));
+
+        var refused = Assert.Throws<AefInspectImportException>(() => AefInspectImporter.Import(input, output, new AefInspectImportOptions { TargetMode = AefTargetMode.Live, TimeProvider = new Clock(At) }));
+
+        Assert.Contains("unpaired surrogate", refused.Message, StringComparison.Ordinal);
+        Assert.Contains("IN-8", refused.Message, StringComparison.Ordinal);
+        Assert.False(Directory.Exists(output));
     }
 
     // ------------------------------------------------------------------ usage
