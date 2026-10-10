@@ -49,8 +49,9 @@ public sealed record AefEvalRunOptions
 
 /// <summary>
 /// Writes an <c>agenteval eval</c> run as a sealed AEF run: one root line per case at path <c>case</c> in lane
-/// <c>eval</c>, with the metrics <c>pass</c> and <c>score</c> and a summary over them. The run is AgentEval's own
-/// (no <c>imported</c>), sealed by its producer.
+/// <c>eval</c>, with the metrics <c>pass</c> and <c>score</c> and a summary over them. A case run several times
+/// (<c>--runs</c>) has one line per trial and a rollup line ([RES-8]). The run is AgentEval's own (no
+/// <c>imported</c>), sealed by its producer.
 /// </summary>
 public static class AefEvalWriter
 {
@@ -65,12 +66,64 @@ public static class AefEvalWriter
         DateTimeOffset startedAt, DateTimeOffset endedAt)
     {
         ArgumentNullException.ThrowIfNull(summary);
+        return WriteRun(runsRoot, summary.Results.Select(r => (IReadOnlyList<TestResult>)[r]).ToList(), caseIds, null, options, startedAt, endedAt);
+    }
+
+    /// <summary>
+    /// Writes a run whose cases each ran <c>n</c> times: a line per trial (<c>trial</c> 0 to n − 1) and a rollup per case
+    /// with <c>trials</c>, under <c>AtLeast</c> with <paramref name="requirePasses"/> ([RES-8], [RUN-8]).
+    /// </summary>
+    public static (string Directory, string RunHash) WriteTrials(
+        string runsRoot, IReadOnlyList<IReadOnlyList<TestResult>> trials, IReadOnlyList<string> caseIds, int requirePasses,
+        AefEvalRunOptions options, DateTimeOffset startedAt, DateTimeOffset endedAt)
+    {
+        ArgumentNullException.ThrowIfNull(trials);
+        if (trials.Count == 0 || trials.Any(t => t.Count != trials[0].Count) || trials[0].Count is < 1 or > 1000)
+        {
+            throw new ArgumentException("every case needs the same number of trials, 1 to 1000", nameof(trials));
+        }
+
+        if (requirePasses < 1 || requirePasses > trials[0].Count)
+        {
+            throw new ArgumentOutOfRangeException(nameof(requirePasses), requirePasses, "requirePasses is 1 to the number of trials (RUN-8).");
+        }
+
+        return WriteRun(runsRoot, trials, caseIds, requirePasses, options, startedAt, endedAt);
+    }
+
+    /// <summary>
+    /// The least number of passing trials out of <paramref name="trials"/> that meets a pass-share threshold, compared as
+    /// AgentEval's stochastic runner compares it (pass rate ≥ threshold): how a share threshold is written as
+    /// <c>AtLeast</c> ([RES-8]). A threshold that zero passes meet has no <c>AtLeast</c> form, since <c>requirePasses</c>
+    /// is at least 1.
+    /// </summary>
+    public static int RequirePasses(double threshold, int trials)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(trials, 1);
+        for (var k = 0; k <= trials; k++)
+        {
+            if ((double)k / trials >= threshold)
+            {
+                return k > 0 ? k : throw new ArgumentOutOfRangeException(nameof(threshold), threshold,
+                    "a threshold that zero passing trials meet cannot be written as AtLeast (requirePasses is at least 1)");
+            }
+        }
+
+        throw new ArgumentOutOfRangeException(nameof(threshold), threshold, "no number of passing trials meets the threshold");
+    }
+
+    private static (string Directory, string RunHash) WriteRun(
+        string runsRoot, IReadOnlyList<IReadOnlyList<TestResult>> cases, IReadOnlyList<string> caseIds, int? requirePasses,
+        AefEvalRunOptions options, DateTimeOffset startedAt, DateTimeOffset endedAt)
+    {
         ArgumentNullException.ThrowIfNull(caseIds);
         ArgumentNullException.ThrowIfNull(options);
-        if (caseIds.Count != summary.Results.Count)
+        if (caseIds.Count != cases.Count)
         {
-            throw new ArgumentException("one case id per result", nameof(caseIds));
+            throw new ArgumentException("one case id per case", nameof(caseIds));
         }
+
+        var all = cases.SelectMany(c => c).ToList();
 
         var runId = $"{startedAt.UtcDateTime:yyyyMMddTHHmmssZ}-eval-{Convert.ToHexString(RandomNumberGenerator.GetBytes(4)).ToLowerInvariant()}";
         var directory = Path.Combine(runsRoot, $"{startedAt.UtcDateTime:yyyy}", $"{startedAt.UtcDateTime:MM}", runId);
@@ -88,8 +141,11 @@ public static class AefEvalWriter
                 Version = "sha256-" + digest["sha256:".Length..][..12],
                 Digest = digest,
                 Frozen = true,
+                ExecutionPolicy = requirePasses is { } k
+                    ? new AefExecutionPolicy { TrialsPerCase = cases[0].Count, RequirePasses = k, Aggregation = AefTrialAggregation.AtLeast }
+                    : null,
             },
-            Judges = options.JudgeModel is not null && summary.Results.Any(Graded)
+            Judges = options.JudgeModel is not null && all.Any(Graded)
                 ? [new AefJudge { Model = options.JudgeModel, Mode = AefJudgeMode.Single }]
                 : null,
             StartedAt = AefTime.FromDateTimeOffset(startedAt),
@@ -110,16 +166,27 @@ public static class AefEvalWriter
                 new AefMetric
                 {
                     Id = ScoreMetric, Kind = AefMetricKind.Score, Direction = AefMetricDirection.HigherBetter, Scale = AefScale.Between(0, 100),
-                    Description = "The case's score from AgentEval's evaluation harness (0 to 100).",
+                    Description = "The case's score from AgentEval's evaluation harness (0 to 100); for a case run in trials, the mean over its measured trials.",
                 },
             ]);
 
-            for (var i = 0; i < summary.Results.Count; i++)
+            for (var i = 0; i < cases.Count; i++)
             {
-                writer.AddResult(Root(summary.Results[i], caseIds[i]));
+                if (requirePasses is not { } required)
+                {
+                    writer.AddResult(Line(cases[i][0], caseIds[i], trial: null));
+                    continue;
+                }
+
+                for (var t = 0; t < cases[i].Count; t++)
+                {
+                    writer.AddResult(Line(cases[i][t], caseIds[i], t));
+                }
+
+                writer.AddResult(Rollup(cases[i], caseIds[i], required));
             }
 
-            var cost = summary.Results.Select(r => r.Performance?.EstimatedCost).Where(c => c is not null).Sum(c => (double)c!.Value);
+            var cost = all.Select(r => r.Performance?.EstimatedCost).Where(c => c is not null).Sum(c => (double)c!.Value);
             writer.SetSummary(new AefSummary
             {
                 Lanes = [new AefSummaryLane(Lane, [new AefSummaryEntry { Metric = PassMetric, Path = CasePath }, new AefSummaryEntry { Metric = ScoreMetric, Path = CasePath }])],
@@ -168,11 +235,41 @@ public static class AefEvalWriter
     // The judge graded a case when it returned criteria results and a verdict ([RUN-9]).
     private static bool Graded(TestResult result) => result.CriteriaResults is not null && !result.JudgeFailed;
 
-    private static AefResult Root(TestResult result, string caseId)
+    // A judge that produced no verdict measured nothing: its Passed and Score are placeholders, so the case is an error
+    // (a typed absence, [RES-1]), never a failure.
+    private static AefState StateOf(TestResult result) =>
+        result.Error is not null || result.JudgeFailed ? AefState.Error : result.Passed ? AefState.Passed : AefState.Failed;
+
+    // A case's result over its trials ([RES-8]): passed when at least requirePasses trials passed; failed when they could
+    // not have, even had every unmeasured trial passed; otherwise not decided, an error. Its score is the mean of the
+    // measured trials'. Usage and duration stay on the trial lines, so nothing is counted twice.
+    private static AefResult Rollup(IReadOnlyList<TestResult> trials, string caseId, int requirePasses)
     {
-        // A judge that produced no verdict measured nothing: its Passed and Score are placeholders, so the case is an
-        // error (a typed absence, [RES-1]), never a failure.
-        var state = result.Error is not null || result.JudgeFailed ? AefState.Error : result.Passed ? AefState.Passed : AefState.Failed;
+        var states = trials.Select(StateOf).ToList();
+        var passed = states.Count(s => s == AefState.Passed);
+        var unmeasured = states.Count(s => s == AefState.Error);
+        var state = passed >= requirePasses ? AefState.Passed
+            : passed + unmeasured >= requirePasses ? AefState.Error
+            : AefState.Failed;
+        var measured = trials.Where(t => StateOf(t) != AefState.Error).ToList();
+        return new AefResult
+        {
+            CaseId = caseId,
+            Path = CasePath,
+            Evaluator = new AefEvaluator("agenteval.harness", AefConverter.Version),
+            State = state,
+            Reason = state == AefState.Error
+                ? $"{unmeasured} of {trials.Count} trials were not measured, so whether at least {requirePasses} pass is undecided"
+                : null,
+            Scores = state == AefState.Error || measured.Count == 0 ? null : [new AefScore { Metric = ScoreMetric, Value = measured.Average(t => (double)t.Score) }],
+            Lane = Lane,
+            Trials = new AefTrials(trials.Count, passed, AefTrialAggregation.AtLeast, states.Distinct().Count() == 1),
+        };
+    }
+
+    private static AefResult Line(TestResult result, string caseId, int? trial)
+    {
+        var state = StateOf(result);
         var performance = result.Performance;
         var usage = performance is null || (performance.PromptTokens is null && performance.CompletionTokens is null && performance.EstimatedCost is null)
             ? null
@@ -202,6 +299,7 @@ public static class AefEvalWriter
             Lane = Lane,
             DurationMs = performance is { } p && p.EndTime > p.StartTime ? (p.EndTime - p.StartTime).TotalMilliseconds : null,
             Usage = usage,   // no test name: without a dataset id it is the start of the input ([RUN-11])
+            Trial = trial,
         };
     }
 }

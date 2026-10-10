@@ -160,14 +160,35 @@ public class EvalCommandTemperatureAndRunsTests
     }
 
     [Fact]
-    public async Task Eval_WithAef_AndRunsAboveOne_IsAUsageError_RatherThanWritingNothing()
+    public async Task Eval_WithAef_AndRuns_WritesATrialPerRun_AndARollup_ThatVerifiesIntact()
     {
-        var options = new EvalOptions { Dataset = new FileInfo("unused.yaml"), Format = "json", Runs = 5, Aef = new DirectoryInfo("aef") };
+        var dataset = CreateTempDataset();
+        var cfg = WriteValidCopilotStudioConfig();
+        var output = TempPath(".json");
+        var aef = Directory.CreateTempSubdirectory("aef-eval-").FullName;
+        try
+        {
+            var plain = SutOptions(dataset, cfg, output);
+            var options = new EvalOptions
+            {
+                Dataset = plain.Dataset, Sut = plain.Sut, TargetOptions = plain.TargetOptions, Format = "json", Output = output,
+                Aef = new DirectoryInfo(aef), Runs = 3, SuccessThreshold = 0.5,
+            };
 
-        var (exit, stderr) = await CaptureStdErrAsync(() => EvalCommand.ExecuteAsync(options, default, sutOverride: BenignSut()));
+            var (_, stderr) = await CaptureStdErrAsync(() => EvalCommand.ExecuteAsync(options, default, sutOverride: BenignSut()));
 
-        Assert.Equal(ExitCodes.UsageError, exit);
-        Assert.Contains("--aef cannot be combined with --runs above 1", stderr);
+            Assert.Contains("AEF run:", stderr);
+            var run = Assert.Single(Directory.GetFiles(aef, "run.json", SearchOption.AllDirectories));
+            var dir = Path.GetDirectoryName(run)!;
+            Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact, AgentEval.Results.Integrity.AefRunVerifier.Verify(dir).Outcome);
+            var policy = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(run))!["suite"]!["executionPolicy"]!;
+            Assert.Equal(3, (int)policy["trialsPerCase"]!);
+            Assert.Equal(2, (int)policy["requirePasses"]!);   // the least of 3 that meets 50%
+            var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => System.Text.Json.Nodes.JsonNode.Parse(l)!).ToList();
+            Assert.Equal(3, lines.Count(l => l["trial"] is not null));
+            Assert.Equal(3, (int)lines.Single(l => l["trials"] is not null)["trials"]!["n"]!);
+        }
+        finally { TryDelete(dataset); TryDelete(cfg); TryDelete(output); Directory.Delete(aef, recursive: true); }
     }
 
     [Fact]

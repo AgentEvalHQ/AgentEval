@@ -247,13 +247,6 @@ internal static class EvalCommand
             return ExitCodes.UsageError;
         }
 
-        // An AEF run of --runs above 1 needs trial lines and their rollup, which are not written yet: refuse an explicit
-        // --aef rather than write nothing, and say so for the workspace default.
-        if (opts.Runs > 1 && opts.Aef is not null && !opts.NoAef)
-        {
-            Console.Error.WriteLine("  Error: --aef cannot be combined with --runs above 1 yet: AEF trial runs are not written in this release.");
-            return ExitCodes.UsageError;
-        }
 
         // The golden trace is read before any agent call, so a missing or unreadable file costs nothing.
         var (golden, goldenError) = await LoadGoldenAsync(opts, ct);
@@ -427,9 +420,8 @@ internal static class EvalCommand
                     "  Warning: --metrics has no effect combined with --runs > 1 in this release " +
                     "(stochastic scoring is not wired to the named-metric pipeline yet).");
 
-            if (!opts.NoAef && !opts.Quiet && EvalAef.Root(opts) is not null)
-                Console.Error.WriteLine("  AEF: --runs above 1 is not written as AEF yet, so this evaluation wrote no AEF run.");
-            return await ExecuteStochasticAsync(opts, harness, agent, testCases, evalOptions, resolvedName, ct);
+            return await ExecuteStochasticAsync(opts, harness, agent, testCases, evalOptions, resolvedName,
+                standIn ? AefTargetMode.Mocked : AefTargetMode.Live, ct);
         }
 
         // 6c. Standard single-run evaluation path
@@ -461,7 +453,8 @@ internal static class EvalCommand
         // fails the command only when --aef asked for it; otherwise it is a warning and the evaluation stands.
         // A real target (--endpoint, --azure, --sut) is live; a stand-in a caller passes in is never written as live.
         var targetMode = standIn ? AefTargetMode.Mocked : AefTargetMode.Live;
-        var aefFailed = WriteAef(opts, summary, testCases, resolvedName, targetMode, startedAt, DateTimeOffset.UtcNow);
+        var aefFailed = WriteAef(opts, resolvedName, targetMode,
+            (runs, aefOptions) => AefEvalWriter.Write(runs, summary, EvalAef.CaseIds(testCases), aefOptions, startedAt, DateTimeOffset.UtcNow));
 
         // 7. Export
         var report = summary.ToEvaluationReport(
@@ -582,8 +575,8 @@ internal static class EvalCommand
     /// written. A write the user did not ask for fails with a warning: the evaluation's own result stands.
     /// </summary>
     private static bool WriteAef(
-        EvalOptions opts, TestSummary summary, IReadOnlyList<DatasetTestCase> cases, string resolvedName,
-        AefTargetMode targetMode, DateTimeOffset startedAt, DateTimeOffset endedAt)
+        EvalOptions opts, string resolvedName, AefTargetMode targetMode,
+        Func<string, AefEvalRunOptions, (string Directory, string RunHash)> write)
     {
         var root = EvalAef.Root(opts);
         if (root is null)
@@ -596,7 +589,7 @@ internal static class EvalCommand
         try
         {
             var subjectRef = opts.Subject ?? AefEvalWriter.Ref("model", resolvedName);   // resolvedName answered the cases
-            var (directory, runHash) = AefEvalWriter.Write(Path.Combine(root, "runs"), summary, EvalAef.CaseIds(cases), new AefEvalRunOptions
+            var (directory, runHash) = write(Path.Combine(root, "runs"), new AefEvalRunOptions
             {
                 SubjectRef = subjectRef,
                 SubjectKind = AefEvalWriter.KindOf(subjectRef),
@@ -607,7 +600,7 @@ internal static class EvalCommand
                 TargetMode = targetMode,
                 DatasetName = Path.GetRelativePath(Directory.GetCurrentDirectory(), opts.Dataset.FullName).Replace('\\', '/'),
                 DatasetBytes = File.ReadAllBytes(opts.Dataset.FullName),
-            }, startedAt, endedAt);
+            });
             if (!opts.Quiet)
                 Console.Error.WriteLine($"  AEF run: {directory} (run hash {runHash[..12]}…)");
             return false;
@@ -741,6 +734,7 @@ internal static class EvalCommand
         IReadOnlyList<DatasetTestCase> datasetTestCases,
         EvaluationOptions evalOptions,
         string resolvedName,
+        AefTargetMode targetMode,
         CancellationToken ct)
     {
         var runner = new StochasticRunner(harness, statisticsCalculator: null, evalOptions);
@@ -781,6 +775,12 @@ internal static class EvalCommand
             agentName: resolvedName, modelName: resolvedName, endpoint: EndpointLabel(opts));
         await ExportReportAsync(opts, report, ct);
 
+        // AEF: a line per trial and a rollup per case, under AtLeast with the least pass count that meets the threshold.
+        var aefFailed = WriteAef(opts, resolvedName, targetMode,
+            (runs, aefOptions) => AefEvalWriter.WriteTrials(
+                runs, results.Select(r => r.IndividualResults).ToList(), EvalAef.CaseIds(datasetTestCases),
+                AefEvalWriter.RequirePasses(opts.SuccessThreshold, opts.Runs), aefOptions, startTime, DateTimeOffset.UtcNow));
+
         // Summary
         if (!opts.Quiet)
         {
@@ -791,6 +791,8 @@ internal static class EvalCommand
             Console.Error.WriteLine($"  Threshold: {opts.SuccessThreshold:P0}");
         }
 
+        if (aefFailed)
+            return ExitCodes.RuntimeError;
         return allPassed ? ExitCodes.Success : ExitCodes.TestFailure;
     }
 }
