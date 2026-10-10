@@ -111,7 +111,7 @@ public class SignTestTests
         Assert.False(SignTest.PAtMost(500_500, m - 500_500, 0.05));   // 500 above: p ≈ 0.16
         Assert.False(SignTest.PAtMost(500_000, m - 500_000, 0.4));    // exactly half: p just above 0.5
         watch.Stop();
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(10), $"took {watch.Elapsed}");
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(60), $"took {watch.Elapsed}");   // a guard, as below
     }
 
     [Fact]
@@ -125,7 +125,7 @@ public class SignTestTests
         Assert.False(SignTest.PAtMost(r, m - r, Math.BitDecrement(0.5)));
         Assert.Equal(BigInteger.One << (m - 1), SignTest.UpperTail(m, r));
         watch.Stop();
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(10), $"took {watch.Elapsed}");
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(60), $"took {watch.Elapsed}");   // a guard, as below
     }
 
     [Theory]
@@ -161,7 +161,9 @@ public class SignTestTests
         var (lower, upper) = SignTest.TailBounds(m, r);
 
         Assert.True(lower.CompareTo(exact) <= 0 && exact.CompareTo(upper) <= 0);
-        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(10), $"took {watch.Elapsed}");
+        // A guard against a pathological (super-linear) path, not a benchmark: it takes 7–10 s locally and passed
+        // 10 s on a shared CI runner collecting coverage, so the bound leaves room for slow machines.
+        Assert.True(watch.Elapsed < TimeSpan.FromSeconds(60), $"took {watch.Elapsed}");
     }
 
     [Theory]

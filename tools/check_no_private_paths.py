@@ -111,6 +111,26 @@ def mention_patterns():
     return patterns
 
 
+def is_mention(content):
+    """Whether a line git grep matched really cites a private prefix.
+
+    The Windows spelling (`strategy\\`) also matches a JSON-escaped quote after a word, as in the escaped
+    `{\\"strategy\\":\\"WeightedSum\\"}` an AEF corpus vector holds: a backslash before `"` escapes the quote and
+    is no path separator. Every other match counts.
+    """
+    for prefix in PRIVATE_PREFIXES:
+        if prefix in content:
+            return True
+        if '/' in prefix:
+            windows = prefix.replace('/', '\\')
+            start = content.find(windows)
+            while start != -1:
+                if not content.startswith('"', start + len(windows)):
+                    return True
+                start = content.find(windows, start + 1)
+    return False
+
+
 def find_mentions():
     """Every tracked file whose content mentions a private prefix.
 
@@ -136,7 +156,10 @@ def find_mentions():
             return None
         path, number, content = parts
         lines.setdefault(path, []).append((int(number), content.rstrip('\r')))
-    binary = sorted(p for p in all_out.split('\0') if p and p not in lines)
+    text_files = set(lines)
+    binary = sorted(p for p in all_out.split('\0') if p and p not in text_files)
+    lines = {path: kept for path, found in lines.items()
+             if (kept := [(n, c) for n, c in found if is_mention(c)])}
     return lines, binary
 
 

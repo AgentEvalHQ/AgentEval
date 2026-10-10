@@ -36,9 +36,9 @@ round 3), each round's findings reworked into the text, the schemas and the conf
    process (every change with its vectors, a DCO sign-off, a CI job), versioning and the release criteria.
 3. **AgentEval.Results is AgentEval's implementation, and the second implementation every conformance class needs.**
    It is written from the text, never from the reference tools, and passes the corpus through the command-line
-   contract of spec 09 §9.3 (`tests/AgentEval.Results.Conformance`): today every class but Runner, as reader,
+   contract of spec 09 §9.3 (`tests/AgentEval.Results.Conformance`): today every class, Runner included, as reader,
    verifier and writer. Whatever implementing finds is ruled in the specification, never resolved silently in code
-   (`strategy/MissionControl/AEF-Q4-39-findings.md` records 100+ such rulings).
+   (`contracts/aef/1/CHANGELOG.md` records the rulings, round by round).
 4. **Release.** AEF 1.0 ships with AgentEval 1.0. Until the `aef-1.0` tag it may change freely: nobody depends on it
    yet, and every finding of implementation or review is fixed in the text. At the tag it freezes: afterwards a 1.x
    minor only adds ([VER-5]), errata are fixed in the next minor, and anything else is AEF 2.0. The tag requires:
