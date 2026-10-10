@@ -1,0 +1,63 @@
+{
+  "schemaVersion": "1.0",
+  "planId": "plan-42",
+  "checkpointId": "cp_01J9K4",
+  "subject": {
+    "ref": "agent:support/support-triage",
+    "version": "git:3f2a1c",
+    "endpoint": "http://localhost:5080/v1"
+  },
+  "suites": [
+    {
+      "ref": "suite:support/triage-scenarios",
+      "version": "4",
+      "lane": "quality"
+    },
+    {
+      "ref": "suite:owasp/llm-top10",
+      "version": "2026.1",
+      "lane": "security"
+    }
+  ],
+  "limits": {
+    "maxUsd": 3.0,
+    "cases": 2,
+    "timeout": "PT1M"
+  },
+  "contentCapture": "off",
+  "isolation": "process",
+  "provider": "local",
+  "judges": [
+    {
+      "model": "gpt-5.1",
+      "provider": "azure.ai.openai",
+      "rubricDigest": "sha256:a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9"
+    }
+  ],
+  "baseline": {
+    "policy": "latest-sealed-on-main"
+  },
+  "comparability": {
+    "required": [
+      "judges",
+      "rubrics"
+    ]
+  },
+  "credentialRefs": [
+    {
+      "name": "AZURE_OPENAI_API_KEY",
+      "scheme": "env",
+      "path": "AZURE_OPENAI_API_KEY",
+      "purpose": "judge"
+    },
+    {
+      "name": "SUPPORT_API_KEY",
+      "scheme": "keychain",
+      "path": "agenteval/support-dev",
+      "purpose": "subject"
+    }
+  ],
+  "runnerSelector": [
+    "os:linux"
+  ]
+}

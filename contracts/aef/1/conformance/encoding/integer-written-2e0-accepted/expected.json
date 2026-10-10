@@ -1,0 +1,9 @@
+{
+  "kind": "encoding",
+  "run": "run",
+  "outcome": "intact",
+  "problems": [],
+  "rules": [
+    "ENC-4"
+  ]
+}

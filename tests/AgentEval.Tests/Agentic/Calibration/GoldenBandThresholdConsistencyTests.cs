@@ -60,7 +60,7 @@ public class GoldenBandThresholdConsistencyTests(ITestOutputHelper output)
                 if (eval is null)
                     continue;
 
-                var result = await eval.EvaluateAsync(new EvalInput(Query: entry.Input, Response: entry.AgentResponse));
+                var result = await eval.EvaluateAsync(entry.ToEvalInput());
                 // Decided without the judge, or no verdict at all — by STATE, not label: a composite that withheld its pass
                 // because a required component did not run (e.g. tool_input_accuracy on a text-only golden record, whose
                 // schema check has no tool definitions to read) reports warn but measured nothing it could stand on.

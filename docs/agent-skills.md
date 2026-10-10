@@ -141,6 +141,12 @@ pattern). `agenteval skills baseline list|diff|history` inspects it. `--repo` sc
 skill-directory convention under a repo root (`AgentEval.Skills.AgentSkillDirectoryConventions`) and
 aggregates the results. See [CLI reference](cli.md#agenteval-skills-baseline) for the full command surface.
 
+**Provenance pointer:** when a project `skills-lock.json` (`{"version": 1, "skills": {"<name>": {"source",
+"ref", …}}}`, as ChilliCream's `skills` CLI writes it) sits in the scanned directory or a parent up to the
+repository root, `skills scan` prints each flagged skill's source and ref next to its findings and stores them on
+the baseline entries (`SkillBaselineEntry.Source` / `Ref`). It reads only those fields, fetches nothing, and
+ignores an entry holding control characters.
+
 **Cross-location drift + trust-on-first-use (Wave 2):** two governance signals built directly on Wave 1's
 content hashing, both surfaced as ordinary `SkillComplianceFinding`s (so they render in console/markdown/
 json output automatically, no new schema):
@@ -302,11 +308,13 @@ score:
 | Efficiency | Phase 1's `SkillDisclosureEfficiencyMetric` (optional) |
 | Security | Phase 3's real attack outcome + hash-pin drift findings |
 
-A missing axis is **never** fabricated as perfect — the score is the mean of only the axes actually supplied,
-and `SkillSecurityIndexResult.AxesMeasured` tells you how many of the three went in.
+A missing axis is **never** fabricated as perfect — the score is the mean of only the axes actually measured,
+and `SkillSecurityIndexResult.AxesMeasured` tells you how many of the three went in. An axis that was supplied but
+measured nothing counts as missing, and the explanation says so: an efficiency `MetricResult` that is not measured
+(its score is a placeholder 0), or a security outcome with no probe run and no drift finding.
 
 ```csharp
-var indexResult = SkillSecurityIndex.Compute(new SkillSecurityIndexInputs(complianceReport, efficiencyResult: null, securityOutcome));
+var indexResult = SkillSecurityIndex.Compute(new SkillSecurityIndexInputs(complianceReport, Efficiency: null, securityOutcome));
 Console.WriteLine($"Skill Security Index: {indexResult.Score:F0}/100 ({indexResult.AxesMeasured}/3 axes measured)");
 ```
 

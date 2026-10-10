@@ -1,0 +1,119 @@
+{
+  "kind": "lane",
+  "checkpoint": "checkpoint.json",
+  "runs": "runs",
+  "lanes": [
+    {
+      "lane": "low-allows-low",
+      "result": {
+        "status": "passed",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-03T00:00:00Z"
+      }
+    },
+    {
+      "lane": "none-refuses-low",
+      "result": {
+        "status": "failed",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-03T00:00:00Z"
+      }
+    },
+    {
+      "lane": "missing-is-critical",
+      "result": {
+        "status": "failed",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-03T00:00:00Z"
+      }
+    },
+    {
+      "lane": "unmeasured",
+      "result": {
+        "status": "not_measured",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-03T00:00:00Z"
+      }
+    },
+    {
+      "lane": "failure-beats-unmeasured",
+      "result": {
+        "status": "failed",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-03T00:00:00Z"
+      }
+    },
+    {
+      "lane": "two-runs",
+      "result": {
+        "status": "not_measured",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-03T00:00:00Z"
+      }
+    },
+    {
+      "lane": "warn-counts",
+      "result": {
+        "status": "failed",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-03T00:00:00Z"
+      }
+    },
+    {
+      "lane": "all-inconclusive",
+      "result": {
+        "status": "not_measured",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-03T00:00:00Z"
+      }
+    },
+    {
+      "lane": "no-results",
+      "result": {
+        "status": "not_measured",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-03T00:00:00Z"
+      }
+    },
+    {
+      "lane": "not-applicable-ignored",
+      "result": {
+        "status": "passed",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-03T00:00:00Z"
+      }
+    },
+    {
+      "lane": "minimum-not-met",
+      "result": {
+        "status": "not_measured",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-03T00:00:00Z"
+      }
+    },
+    {
+      "lane": "minimum-met",
+      "result": {
+        "status": "passed",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-03T00:00:00Z"
+      }
+    },
+    {
+      "lane": "failing-trial-counts",
+      "result": {
+        "status": "failed",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-03T00:00:00Z"
+      }
+    }
+  ],
+  "problems": [],
+  "rules": [
+    "LANE-3",
+    "RES-9",
+    "RES-2",
+    "RES-8",
+    "LANE-10"
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "kind": "run",
+  "run": "run",
+  "outcome": "invalid",
+  "problems": [
+    [
+      "blobs/sha256/40/40b8d4f78b1295f8045b3f83e4f940afad55818a740c2fd349b6c14e95534ff0",
+      "blob-digest"
+    ]
+  ],
+  "rules": [
+    "EVD-3"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "kind": "plan-conformance",
+  "events": "events.ndjson",
+  "plan": "plan.json",
+  "runs": "runs",
+  "problems": [
+    [
+      "run:R-1",
+      "judges"
+    ]
+  ],
+  "rules": [
+    "STRM-4",
+    "PLAN-1"
+  ],
+  "why": "the plan's model and rubric, served by another provider than the plan names: a judge is its model, provider and rubricDigest"
+}

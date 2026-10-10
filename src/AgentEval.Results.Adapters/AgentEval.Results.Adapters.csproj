@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Conversions into AEF 1.0 (TODO Q4-39, WP5b): AgentEval's own output store (store v1, contracts/aef/1/spec §7.5) and
+       Microsoft's ASSERT runs (contracts/aef/1/interop/assert.md), written with AgentEval.Results' writer and sealer.
+       Not packed, and referenced only by the CLI (AgentEval.Cli) and tests: AgentEval.Results must never reach the
+       umbrella AgentEval package, which embeds every project it references (PrivateAssets=all), so nothing the umbrella
+       references may reference this project or AgentEval.Results. -->
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>AgentEval.Results.Adapters</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="AgentEval.Results.Adapters.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\AgentEval.Results\AgentEval.Results.csproj" />
+    <ProjectReference Include="..\AgentEval.Abstractions\AgentEval.Abstractions.csproj" />
+    <ProjectReference Include="..\AgentEval.Interop.AssertAi\AgentEval.Interop.AssertAi.csproj" />
+  </ItemGroup>
+</Project>

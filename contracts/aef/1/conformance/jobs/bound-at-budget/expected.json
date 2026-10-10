@@ -1,0 +1,43 @@
+{
+  "kind": "job",
+  "plan": "plan.json",
+  "runner": "../runner.json",
+  "target": "target.json",
+  "at": "2026-10-09T09:00:00Z",
+  "terminal": "job.sealed",
+  "limit": null,
+  "runs": [
+    {
+      "suite": {
+        "ref": "suite:support/padded-costs",
+        "version": "1"
+      },
+      "status": "completed",
+      "cases": [
+        [
+          "pad-1",
+          "passed"
+        ],
+        [
+          "pad-2",
+          "passed"
+        ],
+        [
+          "pad-3",
+          "passed"
+        ]
+      ]
+    }
+  ],
+  "spentUsd": 0.75,
+  "estimated": {
+    "cases": 3,
+    "usdLow": 0.75,
+    "usdHigh": 1.5
+  },
+  "endsAt": "2026-10-09T09:01:01Z",
+  "rules": [
+    "PLAN-9"
+  ],
+  "why": "before the third case the spend is $0.50 and its cost bound $0.50: exactly maxUsd, which is within it, so the case runs and the job is sealed"
+}

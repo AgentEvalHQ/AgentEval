@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "1.0",
+  "metrics": [
+    {
+      "id": "latency",
+      "kind": "score",
+      "direction": "none",
+      "scale": "unbounded"
+    }
+  ]
+}

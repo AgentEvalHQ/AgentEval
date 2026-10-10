@@ -1,0 +1,72 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "ext/Z",
+      "digest": {
+        "sha256": "d74bd81ff1eef77da2f7418ef5d16c8c152e36e80e5fd7acd2c0cdde37229718"
+      }
+    },
+    {
+      "name": "ext/a-b",
+      "digest": {
+        "sha256": "c2c06392ab9e0a91a4986f87c7f0d4d158783c022cce49ab4b8f878eb65c5642"
+      }
+    },
+    {
+      "name": "ext/a.b",
+      "digest": {
+        "sha256": "8601235cfb7425df9de896d318d1a9040bd9c96973b065e0c9a5e2d3b513fb74"
+      }
+    },
+    {
+      "name": "ext/a/b",
+      "digest": {
+        "sha256": "3b4910198f1853636f098c480da93f026cd740992ae0058cb2776f4b10a220a2"
+      }
+    },
+    {
+      "name": "metrics.json",
+      "digest": {
+        "sha256": "7a8c98009e013cc6380ca5fb1a37fd680c5f96538be5e7fabf6279ab46675465"
+      }
+    },
+    {
+      "name": "results.ndjson",
+      "digest": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "run.json",
+      "digest": {
+        "sha256": "daa1603de88114caf27e75545f907c421041cbf5a5a75a955666fac5b9f36f15"
+      }
+    },
+    {
+      "name": "summary.json",
+      "digest": {
+        "sha256": "d31287707259107e22d53eac3b4dda672267b7017cc53f7ace5d8b919912a7d6"
+      }
+    }
+  ],
+  "predicateType": "https://agenteval.dev/aef/1/evidence",
+  "predicate": {
+    "schemaVersion": "1.0",
+    "runId": "01928f3f-0000-7000-8000-000000000001",
+    "runHash": "6e69b54e7c30775a13134b7f83220096e6c5019259aafc71006c1e50fd5fc8ca",
+    "producer": {
+      "name": "agenteval-cli",
+      "version": "1.0.0"
+    },
+    "subject": {
+      "ref": "agent:people/hr-bot"
+    },
+    "deployment": null,
+    "suite": null,
+    "judges": [],
+    "closedAt": "2026-10-03T09:00:02Z",
+    "sealedAt": "2026-10-08T09:00:00Z",
+    "sealedBy": "ingest"
+  }
+}

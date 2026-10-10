@@ -1,0 +1,13 @@
+{
+  "kind": "reader-only",
+  "schema": "overlay-event",
+  "writer": "invalid",
+  "reader": "valid",
+  "reads": {
+    "kind": "annotate"
+  },
+  "rules": [
+    "VER-3",
+    "OVL-1"
+  ]
+}

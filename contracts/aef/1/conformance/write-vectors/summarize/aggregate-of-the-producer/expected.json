@@ -1,0 +1,50 @@
+{
+  "kind": "summarize",
+  "rules": [
+    "SUM-8",
+    "SUM-6"
+  ],
+  "run": "run",
+  "request": "request.json",
+  "summary": {
+    "schemaVersion": "1.0",
+    "runId": "summarize-aggregate-of-the-producer",
+    "lanes": [
+      {
+        "lane": "quality",
+        "metrics": [
+          {
+            "metric": "quality",
+            "path": "q",
+            "N": 3,
+            "n": 2,
+            "notMeasured": 1,
+            "sum": 1.1,
+            "sumSq": 0.8500000000000001,
+            "value": 0.75,
+            "verdict": "scored",
+            "aggregate": {
+              "method": "pass@k",
+              "k": 3
+            }
+          },
+          {
+            "metric": "quality",
+            "path": "z",
+            "N": 1,
+            "n": 0,
+            "notMeasured": 1,
+            "sum": 0,
+            "sumSq": 0,
+            "value": null,
+            "verdict": "not_measured",
+            "aggregate": {
+              "method": "f1"
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "why": "An aggregate method AEF does not define (pass@k, f1): the value is the producer's figure, as written, but N, n, notMeasured, sum and sumSq are computed; with n at 0 the value is null all the same."
+}

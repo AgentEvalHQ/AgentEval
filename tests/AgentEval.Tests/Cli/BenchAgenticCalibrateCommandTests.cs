@@ -154,21 +154,22 @@ public class BenchAgenticCalibrateCommandTests : IDisposable
     [Fact]
     public async Task ACategoryEmptiedByCarveOuts_SaysSo_AndNeverCallsThemUnrouted()
     {
-        // B6c-15 (found in the B12 pre-flight): memory and reasoning hold only carved-out keys, yet the report said their
+        // B6c-15 (found in the B12 pre-flight): memory and reasoning held only carved-out keys, yet the report said their
         // entries "had no dispatch wiring (this means a new golden key is not yet routed)", and every category's table
-        // repeated the same count as "Skipped (unknown key)".
+        // repeated the same count as "Skipped (unknown key)". Both now hold dispatched keys beside carved ones (the
+        // entries carry conversation history and tool calls); the carved ones must still be named as carved.
         var outPath = Path.Combine(_root, "report-carved.md");
 
         await BenchAgenticCalibrateCommand.RunCoreAsync(
             rootOverride: _root, outPathOverride: outPath, evaluatorOverride: new AlwaysPassEvaluator());
 
         var report = await File.ReadAllTextAsync(outPath);
-        Assert.Contains("## memory [SKIP]", report, StringComparison.Ordinal);   // every memory key is carved out
-        Assert.Contains("carved out by key, not calibratable on these goldens (", report, StringComparison.Ordinal);
+        Assert.DoesNotContain("## memory [SKIP]", report, StringComparison.Ordinal);   // memory_recall_accuracy & co. run
+        Assert.Contains("| Carved out by key (not dispatched) | 5 (long_conversation_coherence) |", report, StringComparison.Ordinal);
         // Reasoning is NOT empty: reasoning_correctness is dispatched and skips 4 of its 9 records (no reasoning-style
         // phrasing), so the key is excluded and the category is INCOMPLETE. B6c-15 pinned it as SKIP — review round 3 H1.
         Assert.Contains("## reasoning [INCOMPLETE]", report, StringComparison.Ordinal);
-        Assert.Contains("intermediate_step_hallucination", report, StringComparison.Ordinal);
+        Assert.Contains("(plan_formulation_quality, self_correction_quality) |", report, StringComparison.Ordinal);
         Assert.DoesNotContain("not yet routed", report, StringComparison.Ordinal);       // every golden key is known
         Assert.DoesNotContain("Skipped (unknown key)", report, StringComparison.Ordinal);
     }

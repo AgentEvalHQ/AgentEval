@@ -1,0 +1,13 @@
+{
+  "kind": "chain",
+  "run": "run",
+  "problems": [
+    [
+      "overlays/events.ndjson",
+      "uncovered"
+    ]
+  ],
+  "rules": [
+    "OVL-5"
+  ]
+}

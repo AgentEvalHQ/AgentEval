@@ -1,0 +1,10 @@
+{
+  "kind": "document",
+  "schema": "result",
+  "document": "document.ndjson",
+  "writer": "valid",
+  "reader": "valid",
+  "rules": [
+    "VER-3"
+  ]
+}

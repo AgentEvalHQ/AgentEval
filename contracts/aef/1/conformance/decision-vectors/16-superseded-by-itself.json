@@ -1,0 +1,42 @@
+{
+  "description": "supersededBy equal to the checkpoint's own version is not a supersession.",
+  "rules": [
+    "DEC-1",
+    "DEC-2",
+    "DEC-3",
+    "DEC-4",
+    "DEC-5"
+  ],
+  "input": {
+    "subjectVersion": "git:3f2a1c",
+    "evaluatedAt": "2026-10-08T12:00:00Z",
+    "supersededBy": "git:3f2a1c",
+    "lanes": [
+      {
+        "lane": "quality",
+        "blocking": true,
+        "evidence": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "result": {
+          "status": "passed",
+          "subjectVersion": "git:3f2a1c",
+          "oldestClosedAt": "2026-10-07T10:00:00Z"
+        }
+      }
+    ]
+  },
+  "expected": {
+    "outcome": "approved",
+    "lanes": [
+      {
+        "lane": "quality",
+        "status": "passed",
+        "blocking": true
+      }
+    ],
+    "reasons": [
+      "outcome:approved"
+    ]
+  }
+}

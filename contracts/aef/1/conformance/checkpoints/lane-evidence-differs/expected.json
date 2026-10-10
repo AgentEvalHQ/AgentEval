@@ -1,0 +1,14 @@
+{
+  "kind": "checkpoint",
+  "schema": "checkpoint",
+  "writer": "valid",
+  "reader": "valid",
+  "rules": [
+    "CKP-7",
+    "DEC-1"
+  ],
+  "why": "the input's run hashes for a lane are not the run hashes of the lane's runs",
+  "problems": [
+    "lane-evidence"
+  ]
+}

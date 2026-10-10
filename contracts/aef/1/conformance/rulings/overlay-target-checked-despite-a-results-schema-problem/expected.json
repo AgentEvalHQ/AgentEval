@@ -1,0 +1,15 @@
+{
+  "kind": "chain",
+  "run": "run",
+  "problems": [
+    [
+      "overlays/events.ndjson:3",
+      "target"
+    ]
+  ],
+  "rules": [
+    "OVL-2",
+    "OVL-5"
+  ],
+  "why": "results.ndjson line 2 has a state 1.0 does not define, a schema problem; the file still reads (no encoding or limit problem), so OVL-2's target check is made, and the third event, which names a result the run does not have, is target."
+}

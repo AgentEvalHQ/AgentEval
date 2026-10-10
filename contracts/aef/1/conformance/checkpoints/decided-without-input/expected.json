@@ -1,0 +1,10 @@
+{
+  "kind": "checkpoint",
+  "schema": "checkpoint",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "CKP-4"
+  ],
+  "why": "a decision is recorded with its input, so it can be recomputed"
+}

@@ -18,6 +18,7 @@ namespace AgentEval.DataLoaders;
 /// <list type="bullet">
 ///   <item>First row must be headers</item>
 ///   <item>Columns: id, input/question/prompt, expected/answer, category (all optional except input)</item>
+///   <item>Header names match in any spelling: <c>expected_output</c>, <c>expectedOutput</c>, <c>Expected Output</c></item>
 ///   <item>Quoted strings with escaped quotes ("") supported</item>
 ///   <item>Empty fields handled gracefully</item>
 /// </list>
@@ -125,14 +126,18 @@ public class CsvDatasetLoader : IDatasetLoader
         for (int i = 0; i < headers.Count; i++)
         {
             var header = headers[i].Trim().ToLowerInvariant();
-            
-            // Map common column name variants to standard names
-            var standardName = header switch
+
+            // Map column name variants to standard names, in any spelling (DatasetFieldNames): expectedOutput,
+            // expected_output and Expected Output are one column. Other columns keep their header as the metadata key.
+            var standardName = DatasetFieldNames.Normalize(header) switch
             {
-                "question" or "prompt" or "query" => "input",
-                "answer" or "expected_output" or "response" => "expected",
-                "contexts" or "documents" => "context",
-                "ground_truth" => "ground_truth",
+                "input" or "question" or "prompt" or "query" => "input",
+                "expected" or "answer" or "expectedoutput" or "response" => "expected",
+                "context" or "contexts" or "documents" => "context",
+                "expectedtools" => "expected_tools",
+                "evaluationcriteria" => "evaluation_criteria",
+                "passingscore" => "passing_score",
+                "groundtruth" => "ground_truth",
                 _ => header
             };
             
@@ -225,9 +230,12 @@ public class CsvDatasetLoader : IDatasetLoader
 
         // Parse passing score
         var passingScoreValue = GetValue("passing_score");
-        if (!string.IsNullOrEmpty(passingScoreValue) && int.TryParse(passingScoreValue, out var parsedScore))
+        if (!string.IsNullOrEmpty(passingScoreValue))
         {
-            testCase.PassingScore = parsedScore;
+            // An unparseable value used to be ignored, so the default threshold applied without a word.
+            testCase.PassingScore = int.TryParse(passingScoreValue, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedScore)
+                ? parsedScore
+                : throw new InvalidDataException($"passing_score must be a whole number, not '{passingScoreValue}'.");
         }
 
         // Parse ground_truth JSON blob (e.g., {"name":"tool","arguments":{"key":"value"}})
@@ -238,14 +246,18 @@ public class CsvDatasetLoader : IDatasetLoader
             {
                 using var doc = JsonDocument.Parse(groundTruthValue);
                 var root = doc.RootElement;
+                if (root.ValueKind != JsonValueKind.Object)
+                {
+                    throw new JsonException("not a tool call object");   // text such as a quoted answer: metadata, below
+                }
 
                 var gt = new GroundTruthToolCall();
-                if (root.TryGetProperty("name", out var nameEl))
+                if (JsonParsingHelper.TryGetField(root, "name", out var nameEl))
                 {
                     gt.Name = nameEl.GetString() ?? "";
                 }
 
-                if (root.TryGetProperty("arguments", out var argsEl) && argsEl.ValueKind == JsonValueKind.Object)
+                if (JsonParsingHelper.TryGetField(root, "arguments", out var argsEl) && argsEl.ValueKind == JsonValueKind.Object)
                 {
                     foreach (var prop in argsEl.EnumerateObject())
                     {

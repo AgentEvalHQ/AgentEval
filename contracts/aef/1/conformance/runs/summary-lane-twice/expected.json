@@ -1,0 +1,15 @@
+{
+  "kind": "run",
+  "run": "run",
+  "outcome": "invalid",
+  "problems": [
+    [
+      "summary.json",
+      "summary-duplicate"
+    ]
+  ],
+  "rules": [
+    "SUM-9",
+    "SUM-3"
+  ]
+}

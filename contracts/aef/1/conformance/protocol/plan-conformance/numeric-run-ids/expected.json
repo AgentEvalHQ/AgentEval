@@ -1,0 +1,21 @@
+{
+  "kind": "plan-conformance",
+  "events": "events.ndjson",
+  "plan": "plan.json",
+  "runs": "runs",
+  "problems": [
+    [
+      "run:10",
+      "subject"
+    ],
+    [
+      "run:9",
+      "subject"
+    ]
+  ],
+  "rules": [
+    "STRM-4",
+    "CONF-2"
+  ],
+  "why": "runs 9 and 10 of another subject version: run:10 is reported first, by bytes, as it is not a line path"
+}

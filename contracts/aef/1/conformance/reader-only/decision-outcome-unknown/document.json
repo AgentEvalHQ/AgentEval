@@ -1,0 +1,13 @@
+{
+  "outcome": "approved_by_quorum",
+  "lanes": [
+    {
+      "lane": "quality",
+      "status": "passed",
+      "blocking": true
+    }
+  ],
+  "reasons": [
+    "outcome:approved"
+  ]
+}

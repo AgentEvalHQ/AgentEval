@@ -1,0 +1,9 @@
+{
+  "kind": "produce",
+  "rules": [
+    "RES-8"
+  ],
+  "scenario": "scenario.json",
+  "refused": true,
+  "why": "The second trial's tree is rooted at q2, not at the case's path q: a trial's lines are the case's at its own paths, and its rollup is at the same path (RES-8). The Producer refuses the scenario."
+}

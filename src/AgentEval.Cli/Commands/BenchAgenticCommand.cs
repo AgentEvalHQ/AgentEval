@@ -32,7 +32,7 @@ public static class BenchAgenticCommand
         string? budgetTier = null,
         string? traceFile = null,
         CancellationToken ct = default) =>
-        RunAsync(preset, subject, rootOverride, inputText, responseText, evaluatorOverride: null, budgetTier, traceFile, mock: false, ct);
+        RunAsync(preset, subject, rootOverride, inputText, responseText, evaluatorOverride: null, budgetTier, traceFile, mock: false, ct: ct);
 
     /// <summary>Runs the bench agentic command with optional overrides (used in tests).</summary>
     internal static async Task<int> RunAsync(
@@ -45,8 +45,13 @@ public static class BenchAgenticCommand
         string? budgetTier = null,
         string? traceFile = null,
         bool mock = false,
+        string? reference = null,
+        string? context = null,
         CancellationToken ct = default)
     {
+        // A blank reference or context is none: the checks that need one then report not measured, as without the flag.
+        reference = string.IsNullOrWhiteSpace(reference) ? null : reference;
+        context = string.IsNullOrWhiteSpace(context) ? null : context;
         // Treat an empty/whitespace --trace the same as omitted (so the load below and the all-skipped hint further
         // down use one consistent notion of "no trace supplied").
         if (string.IsNullOrWhiteSpace(traceFile))
@@ -206,7 +211,7 @@ public static class BenchAgenticCommand
                     "answer see an empty one. Pass --response/--response-file to grade a specific answer.");
             }
         }
-        var evalInput = new EvalInput(Query: query, Response: agentResponse);
+        var evalInput = new EvalInput(Query: query, Response: agentResponse, Context: context, GroundTruth: reference);
         if (glassBoxTrace is not null)
         {
             evalInput = evalInput.WithTrace(glassBoxTrace);
@@ -305,6 +310,7 @@ public static class BenchAgenticCommand
         if (subResults is { Count: > 0 } && subResults.All(s => s.Score.Label == "skipped"))
         {
             var isGlassBox = string.Equals(preset, "glass-box-diagnostics", StringComparison.OrdinalIgnoreCase);
+            var isRag = string.Equals(preset, "rag-quality", StringComparison.OrdinalIgnoreCase);
             Console.Error.WriteLine(
                 $"[bench agentic] NOTE: all {subResults.Count} evaluator(s) in preset '{preset}' were SKIPPED — "
                 + "no score was produced (SKIPPED below means 'nothing ran', not a 0% result). "
@@ -312,7 +318,9 @@ public static class BenchAgenticCommand
                     ? (traceFile is null
                         ? "This preset reads a Glass Box trace; pass --trace <file> to activate it."
                         : "Check that the supplied trace contains the entry scopes these evaluators read.")
-                    : "This preset reads inputs from EvalInput.Metadata (e.g. \"agentic_telemetry\" / \"run_results\"), which this CLI path does not populate."));
+                    : isRag
+                        ? "This preset grades against a reference answer and a retrieved context; pass --reference/--reference-file and --context/--context-file."
+                        : "This preset reads inputs from EvalInput.Metadata (e.g. \"agentic_telemetry\" / \"run_results\"), which this CLI path does not populate."));
         }
 
         // ── Exit code ─────────────────────────────────────────────────────────

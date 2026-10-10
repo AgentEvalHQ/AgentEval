@@ -1,0 +1,85 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "blobs/sha256/51/51bd1689d2818f7f629971e7ff7ab2d79505d0145679f53ef4a62a435155becf",
+      "digest": {
+        "sha256": "51bd1689d2818f7f629971e7ff7ab2d79505d0145679f53ef4a62a435155becf"
+      }
+    },
+    {
+      "name": "blobs/sha256/71/71f5a27e6d6d47f77e006fb82aee1169b5ebef34c7397783cafeadfb6c0aaf23",
+      "digest": {
+        "sha256": "71f5a27e6d6d47f77e006fb82aee1169b5ebef34c7397783cafeadfb6c0aaf23"
+      }
+    },
+    {
+      "name": "blobs/sha256/ad/ad28e3442c1d96e27f9300c7d5c734ddc987ab5751c827c068e86776433bca0e",
+      "digest": {
+        "sha256": "ad28e3442c1d96e27f9300c7d5c734ddc987ab5751c827c068e86776433bca0e"
+      }
+    },
+    {
+      "name": "blobs/sha256/c7/c724c785c692363be2772a64845374ccb87c8639323c5a346639138b329f4839",
+      "digest": {
+        "sha256": "c724c785c692363be2772a64845374ccb87c8639323c5a346639138b329f4839"
+      }
+    },
+    {
+      "name": "evidence.ndjson",
+      "digest": {
+        "sha256": "86959fc4ef536390ca8c6bffc4a55b4fce1002e32652369babcfef52196bc463"
+      }
+    },
+    {
+      "name": "metrics.json",
+      "digest": {
+        "sha256": "73925ec0cadc60d12a091124860d118950b294a7ee3dcde2c022148e5aa8cafc"
+      }
+    },
+    {
+      "name": "results.ndjson",
+      "digest": {
+        "sha256": "8e6557031c5cf73521cd5f5006ccb6274dbf733a48fcddee3aabbd216d9d613c"
+      }
+    },
+    {
+      "name": "run.json",
+      "digest": {
+        "sha256": "e0c13fd197221070659250c42c4ef7c2de9c0e0fc0e9eda53c267e8790edf76f"
+      }
+    },
+    {
+      "name": "summary.json",
+      "digest": {
+        "sha256": "c1ee4d8e5278c629c10638123f290d492fc6167ee3586b6a0a382362f7d09f3a"
+      }
+    }
+  ],
+  "predicateType": "https://agenteval.dev/aef/1/evidence",
+  "predicate": {
+    "schemaVersion": "1.0",
+    "runId": "edgesLog01",
+    "runHash": "5b6f44cabc5ae72fa5c205550e7660a6a7cff305f483aaf54db45e1f0f031ddc",
+    "producer": {
+      "name": "aef_interop.py",
+      "version": "1.0"
+    },
+    "subject": {
+      "ref": "model:acme/gpt%20x"
+    },
+    "deployment": null,
+    "suite": {
+      "ref": "suite:edges",
+      "version": "2"
+    },
+    "judges": [
+      {
+        "model": "acme/judge"
+      }
+    ],
+    "closedAt": "2026-10-08T10:02:00Z",
+    "sealedAt": "2026-10-09T00:00:00Z",
+    "sealedBy": "ingest"
+  }
+}

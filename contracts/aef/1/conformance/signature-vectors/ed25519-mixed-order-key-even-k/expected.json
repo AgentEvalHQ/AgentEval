@@ -1,0 +1,22 @@
+{
+  "kind": "signature",
+  "envelope": "envelope.dsse.json",
+  "file": "seal.json",
+  "payloadType": "application/vnd.in-toto+json",
+  "policy": "policy.json",
+  "envelopeResult": null,
+  "signatures": [
+    {
+      "keyid": "sha256:c8d82ced5edd54ed0ed552670788b82bad2073c8bb3e26e240b1ae712f95ecdb",
+      "result": "verified",
+      "identity": "spiffe://example.com/ci/mixed-order"
+    }
+  ],
+  "verifiesFor": [
+    "spiffe://example.com/ci/mixed-order"
+  ],
+  "rules": [
+    "SIG-2",
+    "SIG-6"
+  ]
+}

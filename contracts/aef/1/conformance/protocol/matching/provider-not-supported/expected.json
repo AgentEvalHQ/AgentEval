@@ -1,0 +1,8 @@
+{
+  "kind": "matching",
+  "matches": false,
+  "rules": [
+    "PLAN-7"
+  ],
+  "why": "it does not support the plan's provider"
+}

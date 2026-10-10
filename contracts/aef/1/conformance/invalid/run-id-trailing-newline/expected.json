@@ -1,0 +1,10 @@
+{
+  "kind": "document",
+  "schema": "run",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "ENC-15"
+  ],
+  "why": "a pattern's $ is the end of the input: a final newline does not match"
+}

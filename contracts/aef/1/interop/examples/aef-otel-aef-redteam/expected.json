@@ -1,0 +1,46 @@
+{
+  "direction": "AEF → OpenTelemetry → AEF",
+  "page": "opentelemetry.md",
+  "sections": ["AEF → OpenTelemetry", "OpenTelemetry → AEF", "What does not carry over"],
+  "description": "The corpus run conformance/valid/redteam-campaign (copied to input/): contentCapture off (OT-3), no service name (OT-2: no resource), no times (the imported run takes the conversion time, OT-4), attack lines without scores (named after the summary's metric at their path, resisted: OT-1), and a scored latency line. The trip keeps the case, the state, and the latency's metric and value; it loses exactly the page's list, attack and severity included.",
+  "steps": [
+    {"args": ["to-otel", "input", "{out}"], "expected": "otel.jsonl"},
+    {"args": ["from-otel", "otel.jsonl", "{out}", "--run-id", "otel-roundtrip-0002", "--from", "aef_interop.py 1.0 (to-otel)", "--subject", "agent:support/support-triage", "--subject-kind", "agent", "--target-mode", "scripted", "--at", "2026-10-09T00:00:00Z"], "expected": "run"}
+  ],
+  "refusals": [
+    {"args": ["to-inspect", "input", "{out}"], "says": "IN-1"}
+  ],
+  "runs": {"input": "intact", "run": "intact"},
+  "roundTrip": {
+    "original": "input",
+    "through": "otel.jsonl",
+    "result": "run",
+    "listsCovered": ["AEF → OpenTelemetry"],
+    "kept": [
+      {"fields": ["results:caseId"], "page": "`caseId` | `test.case.name` (core registry) | exact"},
+      {"fields": ["results:state"], "page": "`state` | `gen_ai.evaluation.score.label` (RUN-14) | exact"},
+      {"fields": ["results:scores[].metric"], "page": "`scores[].metric` | `gen_ai.evaluation.name` | exact"},
+      {"fields": ["results:scores[].value"], "page": "`scores[].value` | `gen_ai.evaluation.score.value` | exact"}
+    ],
+    "lost": [
+      {"list": "AEF → OpenTelemetry", "item": "The run id and the result path.", "fields": ["run.json:runId", "results:path", "results:resultId"]},
+      {"list": "AEF → OpenTelemetry", "item": "The result tree", "absent": ["results:parentResultId", "results:component", "results:aggregation"]},
+      {"list": "AEF → OpenTelemetry", "item": "A score's own `label`", "absent": ["results:scores[].label", "results:scores[].normalized"]},
+      {"list": "AEF → OpenTelemetry", "item": "Several scores of one line as one result", "absent": ["results:scores (two or more on one line)"]},
+      {"list": "AEF → OpenTelemetry", "item": "Trials and their rollups.", "absent": ["results:trial", "results:trials"]},
+      {"list": "AEF → OpenTelemetry", "item": "Thresholds, verdict rules and uncertainty.", "absent": ["run.json:config.thresholds", "results:verdictRule", "results:uncertainty"]},
+      {"list": "AEF → OpenTelemetry", "item": "Evaluator and annotator identity", "fields": ["results:evaluator"], "absent": ["results:annotator"]},
+      {"list": "AEF → OpenTelemetry", "item": "`severity`, `durationMs`, `turns`, `attack` and `lane`.", "fields": ["results:severity", "results:durationMs", "results:turns", "results:attack"], "absent": ["results:lane"]},
+      {"list": "AEF → OpenTelemetry", "item": "The reasoning blob", "absent": ["results:reasoning"]},
+      {"list": "AEF → OpenTelemetry", "item": "A line's start time, when it also has an end time", "absent": ["results:startedAt"]},
+      {"list": "AEF → OpenTelemetry", "item": "The traces and the `usage` on their spans", "absent": ["file:traces.otlp.jsonl", "results:usage"]},
+      {"list": "AEF → OpenTelemetry", "item": "Metric declarations, the summary and gate decisions.", "fields": ["file:metrics.json", "file:summary.json"], "absent": ["file:gates.ndjson"]},
+      {"list": "AEF → OpenTelemetry", "item": "The run header, except the subject's `service.name`", "fields": ["run.json"]},
+      {"list": "AEF → OpenTelemetry", "item": "Evidence (its records, blobs and digests), the seal, overlays and signatures.", "fields": ["file:seal.json"], "absent": ["file:evidence.ndjson", "file:blobs", "results:evidence", "file:overlays", "file:attestation.dsse.json"]}
+    ],
+    "added": [
+      {"fields": ["file:logs.otlp.jsonl"], "page": "the log record itself | a line of `logs.otlp.jsonl` | exact"},
+      {"fields": ["run.json:imported"], "page": "its `run.json` names the source in `imported` and lists what the converter supplied"}
+    ]
+  }
+}

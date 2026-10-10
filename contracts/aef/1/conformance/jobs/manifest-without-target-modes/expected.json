@@ -1,0 +1,18 @@
+{
+  "kind": "job",
+  "plan": "plan.json",
+  "runner": "runner.json",
+  "target": "target.json",
+  "at": "2026-10-09T09:00:00Z",
+  "terminal": "job.refused",
+  "limit": null,
+  "runs": [],
+  "spentUsd": 0,
+  "estimated": null,
+  "endsAt": "2026-10-09T09:00:00Z",
+  "rules": [
+    "PLAN-6",
+    "PLAN-7"
+  ],
+  "why": "the runner acts as a manifest that names no targetModes, so it gives live only: it does not take a plan that asks for scripted"
+}

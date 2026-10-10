@@ -1,0 +1,53 @@
+{
+  "suites": [
+    {
+      "ref": "suite:support/refunds",
+      "version": "1",
+      "content": "suite:support/refunds@1\nrefund-1\nrefund-2\n",
+      "cases": [
+        {
+          "caseId": "refund-1",
+          "state": "passed",
+          "usd": 0.1,
+          "usdBound": 0.1,
+          "seconds": 20,
+          "secondsBound": 20
+        },
+        {
+          "caseId": "refund-2",
+          "state": "passed",
+          "usd": 0.1,
+          "usdBound": 0.1,
+          "seconds": 20,
+          "secondsBound": 20
+        }
+      ]
+    },
+    {
+      "ref": "suite:support/chargebacks",
+      "version": "1",
+      "content": "suite:support/chargebacks@1\nchargeback-1\nchargeback-2\n",
+      "cases": [
+        {
+          "caseId": "chargeback-1",
+          "state": "passed",
+          "usd": 0.1,
+          "usdBound": 0.1,
+          "seconds": 20,
+          "secondsBound": 20
+        },
+        {
+          "caseId": "chargeback-2",
+          "state": "failed",
+          "severity": "high",
+          "usd": 0.3,
+          "usdBound": 0.3,
+          "seconds": 20,
+          "secondsBound": 20
+        }
+      ]
+    }
+  ],
+  "closeSeconds": 1,
+  "priceTable": "aef-scripted-2026-10"
+}

@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "CFEW",
+  "lanes": [
+    {
+      "lane": "memory",
+      "metrics": [
+        {
+          "metric": "recall",
+          "path": "mem",
+          "n": 23,
+          "N": 23,
+          "notMeasured": 0,
+          "value": 0.4739130434782609,
+          "verdict": "passed",
+          "rule": "recorded by the producer",
+          "sum": 10.9,
+          "sumSq": 5.25
+        },
+        {
+          "metric": "latency",
+          "path": "mem",
+          "n": 23,
+          "N": 23,
+          "notMeasured": 0,
+          "value": 105.21739130434783,
+          "verdict": "passed",
+          "rule": "recorded by the producer",
+          "sum": 2420,
+          "sumSq": 258000
+        },
+        {
+          "metric": "tokens",
+          "path": "mem",
+          "n": 23,
+          "N": 23,
+          "notMeasured": 0,
+          "value": 230,
+          "verdict": "passed",
+          "rule": "recorded by the producer",
+          "sum": 230,
+          "sumSq": 2300
+        }
+      ]
+    }
+  ]
+}

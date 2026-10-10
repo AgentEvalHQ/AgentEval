@@ -1,0 +1,2 @@
+{"schemaVersion":"1.0","resultId":"r_cdfef7e9613bbd9bb8875ebb007df231","caseId":"c1","path":"a","evaluator":{"id":"code:check"},"state":"failed","severity":"medium"}
+{"schemaVersion":"1.0","resultId":"r_1e8b51ed004bad4f0a2bf7400208dba4","caseId":"c2","path":"a","evaluator":{"id":"code:check"},"state":"error","reason":"Nothing to measure."}

@@ -1,0 +1,148 @@
+{
+  "version": 2,
+  "status": "started",
+  "eval": {
+    "eval_id": "01928f40-1111-7111-8111-111111111111",
+    "run_id": "01928f40-1111-7111-8111-111111111111",
+    "created": "2026-10-04T10:00:00Z",
+    "task": "travel/bookings",
+    "task_version": "1",
+    "dataset": {
+      "samples": 2,
+      "sample_ids": [
+        "case-3",
+        "case-4"
+      ]
+    },
+    "model": "workflow:travel/trip-planner",
+    "config": {
+      "epochs": 3,
+      "epochs_reducer": [
+        "majority"
+      ]
+    },
+    "packages": {
+      "agenteval-py": "0.1.0a1"
+    },
+    "metadata": {
+      "aef": {
+        "execution": {
+          "targetMode": "live",
+          "stimulus": "generated"
+        }
+      }
+    }
+  },
+  "stats": {
+    "started_at": "2026-10-04T10:00:00Z"
+  },
+  "samples": [
+    {
+      "id": "case-3",
+      "epoch": 1,
+      "input": "",
+      "target": "",
+      "scores": {
+        "booking": {
+          "value": NaN,
+          "reason": "passed",
+          "metadata": {
+            "aef": {
+              "resultId": "r_cf1b02a7154738a1261804c59fe883bf",
+              "state": "passed",
+              "evaluator": {
+                "id": "code:booking-made"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "case-3",
+      "epoch": 2,
+      "input": "",
+      "target": "",
+      "scores": {
+        "booking": {
+          "value": NaN,
+          "reason": "failed",
+          "metadata": {
+            "aef": {
+              "resultId": "r_d5da50928dc9c31da7f2a2f6db9991c0",
+              "state": "failed",
+              "evaluator": {
+                "id": "code:booking-made"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "case-3",
+      "epoch": 3,
+      "input": "",
+      "target": "",
+      "scores": {
+        "booking": {
+          "value": NaN,
+          "reason": "passed",
+          "metadata": {
+            "aef": {
+              "resultId": "r_17d7e9eb6cbbc2e64fbceccc1456e1fc",
+              "state": "passed",
+              "evaluator": {
+                "id": "code:booking-made"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "case-4",
+      "epoch": 1,
+      "input": "",
+      "target": "",
+      "scores": {
+        "booking": {
+          "value": NaN,
+          "reason": "pending",
+          "explanation": "Still running.",
+          "metadata": {
+            "aef": {
+              "resultId": "r_c8bae1edf052fe149d2bedf103e2fff7",
+              "state": "pending",
+              "evaluator": {
+                "id": "code:booking-made"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "reductions": [
+    {
+      "scorer": "booking",
+      "reducer": "majority",
+      "samples": [
+        {
+          "value": NaN,
+          "reason": "passed",
+          "metadata": {
+            "aef": {
+              "resultId": "r_0bc286a4b428bf061205239b41c8a0d6",
+              "state": "passed",
+              "evaluator": {
+                "id": "code:booking-made"
+              }
+            }
+          },
+          "sample_id": "case-3"
+        }
+      ]
+    }
+  ]
+}

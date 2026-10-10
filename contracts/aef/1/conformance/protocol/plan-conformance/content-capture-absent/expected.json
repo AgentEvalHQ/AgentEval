@@ -1,0 +1,17 @@
+{
+  "kind": "plan-conformance",
+  "events": "events.ndjson",
+  "plan": "plan.json",
+  "runs": "runs",
+  "problems": [
+    [
+      "run:R-1",
+      "content-capture"
+    ]
+  ],
+  "rules": [
+    "STRM-4",
+    "RUN-11"
+  ],
+  "why": "no contentCapture reads as on, and the plan says off"
+}

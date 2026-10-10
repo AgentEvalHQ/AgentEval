@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "1.0",
+  "planId": "plan-job-cases-stop-at-suite-end",
+  "subject": {
+    "ref": "model:openai/gpt-5.1",
+    "version": "2026-08-01",
+    "endpoint": "https://api.example.com/v1"
+  },
+  "suites": [
+    {
+      "ref": "suite:support/triage-scenarios",
+      "version": "4",
+      "lane": "quality"
+    },
+    {
+      "ref": "suite:owasp/llm-top10",
+      "version": "2026.1",
+      "lane": "security"
+    }
+  ],
+  "limits": {
+    "maxUsd": 5.0,
+    "cases": 3
+  },
+  "contentCapture": "off",
+  "targetMode": "scripted",
+  "isolation": "process",
+  "provider": "local"
+}

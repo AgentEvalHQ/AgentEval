@@ -102,6 +102,46 @@ public class SkillSecurityIndexTests
     }
 
     [Fact]
+    public void Compute_ANotMeasuredEfficiency_IsLeftOut_NotAveragedInAsZero()
+    {
+        // Its placeholder 0 used to be averaged in: a clean compliance scan (100) read as 50.
+        var report = SkillComplianceValidator.Validate([Clean()]);
+        var notMeasured = MetricResult.NotMeasured("code_skill_disclosure_efficiency", "no run trace was supplied");
+
+        var result = SkillSecurityIndex.Compute(new SkillSecurityIndexInputs(report, notMeasured, null));
+
+        Assert.Null(result.EfficiencyComponent);
+        Assert.Equal(1, result.AxesMeasured);
+        Assert.Equal(100.0, result.Score);
+        Assert.Contains("efficiency (supplied but not measured: no run trace was supplied)", result.Explanation);
+    }
+
+    [Fact]
+    public void Compute_ANonFiniteEfficiencyScore_IsNotAMeasurement()
+    {
+        var result = SkillSecurityIndex.Compute(new SkillSecurityIndexInputs(null, MetricResult.Pass("m", double.NaN), null));
+
+        Assert.Null(result.EfficiencyComponent);
+        Assert.Null(result.Score);   // NaN used to pass through Math.Clamp into the composite
+        Assert.DoesNotContain("No axis was supplied", result.Explanation);   // it was supplied; it was not measured
+        Assert.Contains("NOT measured: compliance, efficiency (supplied but not measured", result.Explanation);
+    }
+
+    [Fact]
+    public void Compute_SecurityWithNoProbeAndNoDriftFinding_IsNotMeasured_NotAPerfect100()
+    {
+        var report = SkillComplianceValidator.Validate([Clean() with { Name = "" }]);   // a High finding: 60
+        var nothingRun = new SkillSecurityOutcome(ProbesRun: 0, ProbesResisted: 0, ProbesSucceeded: 0);
+
+        var result = SkillSecurityIndex.Compute(new SkillSecurityIndexInputs(report, null, nothingRun));
+
+        Assert.Null(result.SecurityComponent);
+        Assert.Equal(1, result.AxesMeasured);
+        Assert.Equal(result.ComplianceComponent, result.Score);   // not lifted by an unearned 100
+        Assert.Contains("security (no probe run and no drift check finding)", result.Explanation);
+    }
+
+    [Fact]
     public void Compute_NullInputs_Throws()
     {
         Assert.Throws<ArgumentNullException>(() => SkillSecurityIndex.Compute(null!));

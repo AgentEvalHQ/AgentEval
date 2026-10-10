@@ -1,0 +1,47 @@
+{
+  "kind": "summarize",
+  "rules": [
+    "SUM-2",
+    "SUM-3",
+    "SUM-4",
+    "SUM-5",
+    "SUM-6"
+  ],
+  "run": "run",
+  "request": "request.json",
+  "summary": {
+    "schemaVersion": "1.0",
+    "runId": "summarize-mean-of-scores",
+    "lanes": [
+      {
+        "lane": "quality",
+        "metrics": [
+          {
+            "metric": "quality",
+            "path": "q",
+            "N": 7,
+            "n": 5,
+            "notMeasured": 2,
+            "sum": 3.15,
+            "sumSq": 2.1325,
+            "value": 0.63,
+            "verdict": "passed",
+            "rule": "quality >= 0.6"
+          },
+          {
+            "metric": "latency",
+            "path": "q",
+            "N": 7,
+            "n": 1,
+            "notMeasured": 6,
+            "sum": 120,
+            "sumSq": 14400,
+            "value": 120,
+            "verdict": "scored"
+          }
+        ]
+      }
+    ]
+  },
+  "why": "Every measured state with a score for the metric is measured (passed, failed, warn, inconclusive, scored); a line without one is counted in N but not measured; a line at another path is not counted. The entry with no rule has the verdict scored."
+}

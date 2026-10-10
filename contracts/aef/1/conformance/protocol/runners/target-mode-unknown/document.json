@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "1.0",
+  "runnerId": "runner-local-01",
+  "identity": {
+    "workloadId": "git:owner@example.com"
+  },
+  "kind": "local",
+  "os": "linux",
+  "runtime": {
+    "name": "dotnet",
+    "version": "10.0.4"
+  },
+  "providers": [
+    "local",
+    "docker"
+  ],
+  "tags": [
+    "os:linux",
+    "gpu:none"
+  ],
+  "gpu": false,
+  "version": "0.44.0",
+  "targetModes": [
+    "scripted",
+    "simulated"
+  ]
+}

@@ -36,11 +36,11 @@ internal static class MockTarget
 
     /// <summary>The real targets of the red-team and perf commands, as named in their refusal.</summary>
     public const string AgentTargets =
-        "--sut <target>, --endpoint <url> --model <name>, or --azure-from-env (the configured provider)";
+        "--sut <target>, --endpoint <url> --model <name>, or --from-env (the configured provider)";
 
     /// <summary>The real targets of <c>bench gdpr</c> and <c>bench eu-ai-act</c>, as named in their refusal.</summary>
     public const string ComplianceTargets =
-        "--sut <target>, --azure-from-env (the configured provider), or the agent's real answer with --response/--response-file";
+        "--sut <target>, --from-env (the configured provider), or the agent's real answer with --response/--response-file";
 
     /// <summary>True when <paramref name="sut"/> names the mock.</summary>
     public static bool IsRequested(string? sut) =>

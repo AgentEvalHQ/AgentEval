@@ -1,0 +1,251 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/aef/1/reader/decision.schema.json",
+  "title": "AEF 1.0: the checkpoint decision function's input and output",
+  "description": "READER (tolerant), derived from the writer schema by tools/derive_reader.py. Decide(input) -> output is pure: no I/O, no clock (the evaluation time is an input). Its rules are DEC-1 to DEC-5 and its vectors are in conformance/decision-vectors/. This schema is the output; $defs/input is the input.",
+  "type": "object",
+  "required": [
+    "outcome",
+    "lanes",
+    "reasons"
+  ],
+  "properties": {
+    "outcome": {
+      "description": "expired (superseded, or a lane is stale); blocked (a blocking lane failed and is not waived); inconclusive (a lane is missing, not_measured or incomparable); approved_with_exceptions (otherwise, when an exception waived a lane); or approved (DEC-3).",
+      "type": "string"
+    },
+    "lanes": {
+      "description": "Each input lane's status, in the input's order (DEC-2).",
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "required": [
+          "lane",
+          "status",
+          "blocking"
+        ],
+        "properties": {
+          "lane": {
+            "$ref": "common.schema.json#/$defs/laneName",
+            "description": "The lane's name (DEC-2)."
+          },
+          "status": {
+            "$ref": "#/$defs/laneStatus",
+            "description": "The lane's status under the decision rules (DEC-2)."
+          },
+          "blocking": {
+            "description": "Whether the lane blocks the release when it fails, as in the input (DEC-3).",
+            "type": "boolean"
+          },
+          "axes": {
+            "description": "For incomparable: the comparability axes that differ.",
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 64
+            },
+            "maxItems": 16
+          }
+        }
+      }
+    },
+    "reasons": {
+      "description": "Reason codes, so every implementation produces the same list: one per lane that did not pass, advisory-failed and waived included, in the input's lane order; a failed lane none of whose exceptions applies is followed by exception-expired:<lane> when one is for its evidence but not in force, then exception-other-evidence:<lane> when one is for other evidence; then superseded:<version> when it applies; then outcome:<outcome> (DEC-2, DEC-4).",
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*(:[!-~]{1,128})?$"
+      }
+    }
+  },
+  "$defs": {
+    "laneStatus": {
+      "description": "passed / failed: the lane's rule held or did not on its evidence. missing: no evidence for this exact version at the evaluation time (none, another version's, or evidence that did not exist yet). not_measured: the rule could not decide on the evidence, for example nothing was measured or a run is not eligible. incomparable: a comparison's runs differ on a required axis. stale: older than the lane's freshness at the evaluation time. waived: failed, with an exception for exactly this evidence in force at the evaluation time; only a failure is ever waived (DEC-2, LANE-1).",
+      "type": "string"
+    },
+    "input": {
+      "description": "The decision function's input: the exact version, the evaluation time, an optional newer version, each lane's result and the run hashes it came from, and any exceptions. At least one lane, no lane twice, and every exception for a lane of the input, with at least one run hash, expiring after it is granted (DEC-1).",
+      "type": "object",
+      "required": [
+        "subjectVersion",
+        "evaluatedAt",
+        "lanes"
+      ],
+      "properties": {
+        "subjectVersion": {
+          "description": "The checkpoint's exact subject version.",
+          "$ref": "common.schema.json#/$defs/exactVersion"
+        },
+        "evaluatedAt": {
+          "$ref": "common.schema.json#/$defs/timestamp",
+          "description": "The time the decision is made for. Freshness, future evidence and whether an exception is in force are judged against it (DEC-1, DEC-2)."
+        },
+        "supersededBy": {
+          "description": "A newer subject version known at the evaluation time, if any. When set and different from subjectVersion, the outcome is expired (DEC-3).",
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "$ref": "common.schema.json#/$defs/exactVersion"
+            }
+          ]
+        },
+        "lanes": {
+          "description": "The lanes, at least one and none twice; the reasons follow this order (DEC-1, DEC-4).",
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "required": [
+              "lane",
+              "blocking",
+              "result"
+            ],
+            "allOf": [
+              {
+                "description": "A lane with a result names the sealed evidence it came from (DEC-1).",
+                "if": {
+                  "properties": {
+                    "result": {
+                      "description": "Applies to a lane with a result (DEC-1).",
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "result"
+                  ]
+                },
+                "then": {
+                  "required": [
+                    "evidence"
+                  ]
+                }
+              }
+            ],
+            "properties": {
+              "lane": {
+                "$ref": "common.schema.json#/$defs/laneName",
+                "description": "The lane's name (DEC-1)."
+              },
+              "blocking": {
+                "description": "Whether a failure of this lane blocks the release (DEC-3).",
+                "type": "boolean"
+              },
+              "freshness": {
+                "$ref": "common.schema.json#/$defs/duration",
+                "description": "How old the lane's evidence may be. Without it, the lane never goes stale (DEC-2)."
+              },
+              "evidence": {
+                "description": "The run hash of each of the lane's runs, each once, in ascending order: the exact sealed evidence of its result. Required with a result. An exception waives the lane only when its evidence is this same set; in a checkpoint it is the set of the lane's runs' run hashes (DEC-1, DEC-2, CKP-7).",
+                "type": "array",
+                "maxItems": 1024,
+                "uniqueItems": true,
+                "items": {
+                  "$ref": "common.schema.json#/$defs/sha256Hex"
+                }
+              },
+              "result": {
+                "description": "What the lane's rule gave on its evidence (computed from the runs, outside this function), or null when there is no evidence.",
+                "anyOf": [
+                  {
+                    "type": "null"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "status",
+                      "subjectVersion",
+                      "oldestClosedAt"
+                    ],
+                    "properties": {
+                      "status": {
+                        "description": "What the lane's rule gave: passed, failed, not_measured or incomparable. A status this version does not know reads as not_measured (DEC-2).",
+                        "type": "string"
+                      },
+                      "subjectVersion": {
+                        "description": "The version the evidence was produced for.",
+                        "$ref": "common.schema.json#/$defs/exactVersion"
+                      },
+                      "oldestClosedAt": {
+                        "description": "When the oldest run the lane's result relied on closed: freshness is measured from it.",
+                        "$ref": "common.schema.json#/$defs/timestamp"
+                      },
+                      "axes": {
+                        "description": "For incomparable: the axes that differ, in the order the rule lists them (LANE-6).",
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "maxLength": 64
+                        },
+                        "maxItems": 16
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "exceptions": {
+          "description": "Exceptions: each accepts the failure of named, sealed evidence until a time; it is not a policy. One for a failed lane's exact evidence and in force at evaluatedAt makes the lane waived; it never changes a missing, stale, not_measured or incomparable lane. A checkpoint records them in its decisionInput, so whoever signs the checkpoint vouches for them (DEC-1, DEC-2, CKP-5, CKP-9).",
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "description": "One exception. Each names a lane of this input and at least one run hash, and expires after it is granted, or the function refuses the input (DEC-1).",
+            "type": "object",
+            "required": [
+              "lane",
+              "evidence",
+              "reason",
+              "by",
+              "at",
+              "expires"
+            ],
+            "properties": {
+              "lane": {
+                "$ref": "common.schema.json#/$defs/laneName",
+                "description": "The lane it applies to: a lane of this input, or the function refuses the input (DEC-1)."
+              },
+              "evidence": {
+                "description": "The run hashes whose failure it accepts, each once, in ascending order; at least one, or the function refuses the input. It waives the lane only when this is the same set as the lane's evidence: a re-run has new run hashes, and is not accepted. In a checkpoint, every one is a run hash of the lane's runs (DEC-1, DEC-2, CKP-7).",
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 1024,
+                "uniqueItems": true,
+                "items": {
+                  "$ref": "common.schema.json#/$defs/sha256Hex"
+                }
+              },
+              "requirement": {
+                "$ref": "common.schema.json#/$defs/id",
+                "description": "The external requirement id whose risk it accepts, shown beside the waived lane; it takes no part in the decision (DEC-1, DEC-2)."
+              },
+              "reason": {
+                "description": "Why the risk is accepted, shown beside the waived lane (DEC-1, DEC-2).",
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
+              },
+              "by": {
+                "$ref": "common.schema.json#/$defs/trustedIdentity",
+                "description": "Who granted it. A claim (CKP-6): the checkpoint's signature is what makes the exception attributable, so a reader shows by with the assurance of that signature (DEC-1, CKP-5, CKP-9)."
+              },
+              "at": {
+                "$ref": "common.schema.json#/$defs/timestamp",
+                "description": "When it was granted: it is in force from this time, inclusive (DEC-2, DEC-5)."
+              },
+              "expires": {
+                "$ref": "common.schema.json#/$defs/timestamp",
+                "description": "When it stops being in force: from this time on it waives nothing. Later than at, or the function refuses the input (DEC-1, DEC-2, CKP-10)."
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

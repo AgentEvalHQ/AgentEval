@@ -1,0 +1,4 @@
+# The corpus is part of the specification: nothing in it is ever ignored, whatever the repository around it ignores
+# (AgentEval's root .gitignore drops every runs/ folder, which holds run vectors here).
+!/1/conformance/**/runs/
+!/1/conformance/**

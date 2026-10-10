@@ -1,0 +1,58 @@
+{
+  "direction": "AEF → OpenTelemetry → AEF",
+  "page": "opentelemetry.md",
+  "sections": ["How AEF holds OpenTelemetry data", "AEF → OpenTelemetry", "OpenTelemetry → AEF", "What does not carry over", "Worked example"],
+  "description": "The corpus run conformance/valid/completed-eval (copied to input/, overlays included): a composite with three children, four typed absences, warn and inconclusive lines, a reasoning blob, a trace link, usage. to-otel writes one LogsData line per result line (otel.jsonl); from-otel reads it back as a new run (run/), sealed as ingest, with the converter's contentCapture (on) in imported.asserted (OT-4). Under refusals/: a corpus run that does not verify (conformance/runs/result-id-mismatch, copied), which no export reads (OT-8); and two small running runs that verify but that the export refuses as a whole, a time before 1970 and a reasoning blob that is not UTF-8 (OT-9). The trip keeps the case, the state, each score's metric and value, the reason or the reasoning's text, the trace link, the end time and the service name; it loses exactly the page's list.",
+  "steps": [
+    {"args": ["to-otel", "input", "{out}"], "expected": "otel.jsonl"},
+    {"args": ["from-otel", "otel.jsonl", "{out}", "--run-id", "otel-roundtrip-0001", "--from", "aef_interop.py 1.0 (to-otel)", "--subject", "agent:support-api", "--subject-kind", "agent", "--target-mode", "live", "--at", "2026-10-09T00:00:00Z"], "expected": "run"}
+  ],
+  "refusals": [
+    {"args": ["to-otel", "refusals/result-id-mismatch", "{out}"], "says": "OT-8"},
+    {"args": ["to-inspect", "refusals/result-id-mismatch", "{out}"], "says": "IN-11"},
+    {"args": ["to-otel", "refusals/before-1970", "{out}"], "says": "OT-9"},
+    {"args": ["to-otel", "refusals/reasoning-not-utf8", "{out}"], "says": "OT-9"}
+  ],
+  "runs": {"input": "intact", "run": "intact", "refusals/before-1970": "unsealed", "refusals/reasoning-not-utf8": "unsealed"},
+  "roundTrip": {
+    "original": "input",
+    "through": "otel.jsonl",
+    "result": "run",
+    "listsCovered": ["AEF → OpenTelemetry"],
+    "kept": [
+      {"fields": ["results:caseId"], "page": "`caseId` | `test.case.name` (core registry) | exact"},
+      {"fields": ["results:state"], "page": "`state` | `gen_ai.evaluation.score.label` (RUN-14) | exact"},
+      {"fields": ["results:scores[].metric"], "page": "`scores[].metric` | `gen_ai.evaluation.name` | exact"},
+      {"fields": ["results:scores[].value"], "page": "`scores[].value` | `gen_ai.evaluation.score.value` | exact"},
+      {"fields": ["results:reason"], "page": "`reason` | `gen_ai.evaluation.explanation` | exact"},
+      {"fields": ["results:reasoning (its text, as reason)"], "page": "`reasoning` (a blob; `contentCapture: on`) | `gen_ai.evaluation.explanation`, when the line has no `reason` | lossy: the text survives"},
+      {"fields": ["results:traceLink"], "page": "`traceLink.traceId`, `traceLink.spanId` | log record `traceId`, `spanId` | exact"},
+      {"fields": ["results:endedAt"], "page": "`endedAt` (or `startedAt`) | `timeUnixNano` | exact"},
+      {"fields": ["run.json:subject.telemetry.serviceName"], "page": "`run.json` `subject.telemetry.serviceName` | resource attribute `service.name` | exact"}
+    ],
+    "lost": [
+      {"list": "AEF → OpenTelemetry", "item": "The run id and the result path.", "fields": ["run.json:runId", "results:path", "results:resultId"]},
+      {"list": "AEF → OpenTelemetry", "item": "The result tree", "fields": ["results:parentResultId", "results:component", "results:aggregation"]},
+      {"list": "AEF → OpenTelemetry", "item": "A score's own `label`", "fields": ["results:scores[].normalized"], "absent": ["results:scores[].label"]},
+      {"list": "AEF → OpenTelemetry", "item": "Several scores of one line as one result", "absent": ["results:scores (two or more on one line)"]},
+      {"list": "AEF → OpenTelemetry", "item": "Trials and their rollups.", "absent": ["results:trial", "results:trials"]},
+      {"list": "AEF → OpenTelemetry", "item": "Thresholds, verdict rules and uncertainty.", "fields": ["run.json:config.thresholds", "results:verdictRule"], "absent": ["results:uncertainty"]},
+      {"list": "AEF → OpenTelemetry", "item": "Evaluator and annotator identity", "fields": ["results:evaluator", "results:annotator"]},
+      {"list": "AEF → OpenTelemetry", "item": "`severity`, `durationMs`, `turns`, `attack` and `lane`.", "fields": ["results:severity", "results:durationMs", "results:turns"], "absent": ["results:attack", "results:lane"]},
+      {"list": "AEF → OpenTelemetry", "item": "The reasoning blob", "fields": ["results:reasoning"]},
+      {"list": "AEF → OpenTelemetry", "item": "A line's start time, when it also has an end time", "fields": ["results:startedAt"]},
+      {"list": "AEF → OpenTelemetry", "item": "The traces and the `usage` on their spans", "fields": ["file:traces.otlp.jsonl", "results:usage"]},
+      {"list": "AEF → OpenTelemetry", "item": "Metric declarations, the summary and gate decisions.", "fields": ["file:metrics.json", "file:summary.json", "file:gates.ndjson"]},
+      {"list": "AEF → OpenTelemetry", "item": "The run header, except the subject's `service.name`", "fields": ["run.json"]},
+      {"list": "AEF → OpenTelemetry", "item": "Evidence (its records, blobs and digests), the seal, overlays and signatures.", "fields": ["file:evidence.ndjson", "file:blobs", "results:evidence", "file:seal.json", "file:overlays"], "absent": ["file:attestation.dsse.json"]}
+    ],
+    "added": [
+      {"fields": ["file:logs.otlp.jsonl"], "page": "the log record itself | a line of `logs.otlp.jsonl` | exact"},
+      {"fields": ["run.json:imported"], "page": "its `run.json` names the source in `imported` and lists what the converter supplied"}
+    ]
+  },
+  "pageBlocks": [
+    {"page": "opentelemetry.md", "section": "Worked example", "block": 1, "equals": {"file": "input/results.ndjson", "line": 3}},
+    {"page": "opentelemetry.md", "section": "Worked example", "block": 2, "equals": {"file": "otel.jsonl", "line": 3}}
+  ]
+}

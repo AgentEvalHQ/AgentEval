@@ -1,0 +1,29 @@
+{
+  "kind": "chain",
+  "run": "run",
+  "generate": [
+    {
+      "copy": [
+        "valid/completed-eval/run",
+        "run"
+      ]
+    },
+    {
+      "files": [
+        "run/overlays/many",
+        19997
+      ]
+    }
+  ],
+  "problems": [
+    [
+      "overlays",
+      "limit"
+    ]
+  ],
+  "rules": [
+    "ENC-17",
+    "ENC-18",
+    "OVL-5"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "kind": "plan",
+  "schema": "run-plan",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "PLAN-3",
+    "PLAN-4"
+  ],
+  "why": "a credential is a reference with a name and a purpose, never a bare value"
+}

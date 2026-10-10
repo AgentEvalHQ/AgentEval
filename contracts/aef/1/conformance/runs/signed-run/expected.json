@@ -1,0 +1,14 @@
+{
+  "kind": "run",
+  "run": "run",
+  "policy": "policy.json",
+  "outcome": "intact",
+  "problems": [],
+  "signedBy": [
+    "git:alice@example.com"
+  ],
+  "rules": [
+    "SIG-5",
+    "SIG-7"
+  ]
+}

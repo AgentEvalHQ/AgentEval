@@ -95,11 +95,13 @@ Tool gates are pure/bounded by construction (`GateCost.PureCode`/`GateCost.Bound
 itself refuses `Network`/`Llm` gates inline), so replaying them against already-captured calls needs no
 network call and no live agent.
 
-**Status:** library API, demonstrated in the sample above. Getting `GatedToolCall`s to replay from a REAL
-production trace currently means capturing them yourself (e.g. from an `AgentTrace`, or reconstructing them
-from a `--capture-fixture` JSONL capture — see [CLI troubleshooting reference](../cli.md)). A
-`agenteval log-file gate-replay` command wiring this directly to a capture file is the natural, mechanical
-next step — not built yet.
+**From the command line:** `agenteval log-file gate-replay <capture.jsonl> --baseline <gates.json> --candidate
+<gates.json>` runs the same comparison over the tool calls in a `--capture-fixture` capture, with each configuration
+written as a JSON array of gate ids and parameters (see [`agenteval log-file`](../cli.md#agenteval-log-file)). It
+replays the gates that read a call's own arguments (`tool:forbidden-tool`, `tool:argument-pattern`,
+`tool:domain-allowlist`); a capture holds no tool results, so the gates that read the conversation are refused
+there. For those, build the `GatedToolCall`s with their full history (for example from an `AgentTrace`) and call
+`GateReplayer.CompareAsync` as above.
 
 ## Unified Trust Score
 

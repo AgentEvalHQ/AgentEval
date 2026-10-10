@@ -1,0 +1,310 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/aef/1/writer/summary.schema.json",
+  "title": "AEF 1.0: summary.json",
+  "description": "Aggregates per lane and metric, with what was measured beside what was asked for, and the sufficient statistics to pool runs.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runId",
+    "lanes"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "common.schema.json#/$defs/schemaVersion",
+      "description": "The AEF version this document follows, MAJOR.MINOR: 1.0 for AEF 1.0 (VER-1)."
+    },
+    "runId": {
+      "$ref": "common.schema.json#/$defs/id",
+      "description": "The runId of the run.json beside it (SUM-2)."
+    },
+    "lanes": {
+      "description": "One entry per lane: a named group of cases, such as a suite (SUM-3).",
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "lane",
+          "metrics"
+        ],
+        "properties": {
+          "lane": {
+            "description": "quality, security, memory, performance, compliance, or a producer's own.",
+            "$ref": "common.schema.json#/$defs/laneName"
+          },
+          "metrics": {
+            "description": "The lane's entries, one per metric and result path (SUM-3).",
+            "type": "array",
+            "maxItems": 1024,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "metric",
+                "n",
+                "N",
+                "notMeasured",
+                "value",
+                "verdict",
+                "path"
+              ],
+              "properties": {
+                "metric": {
+                  "description": "The metric summarised, by its id in metrics.json (SUM-1, SUM-3).",
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                "n": {
+                  "description": "Measured.",
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "N": {
+                  "description": "The lane's lines at this path, one per case, not counting not_applicable lines (SUM-4, SUM-5).",
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "notMeasured": {
+                  "description": "N minus n: the lines counted in N that were not measured (SUM-5).",
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "value": {
+                  "description": "sum for a metric of kind count, otherwise sum / n (the rate or mean of the measured values); null when n is 0 (SUM-5).",
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "stderr": {
+                  "description": "The producer's standard error over the measured values, or null (SUM-5).",
+                  "type": [
+                    "number",
+                    "null"
+                  ],
+                  "minimum": 0
+                },
+                "ci": {
+                  "description": "The producer's interval over the measured values, or null (SUM-5).",
+                  "anyOf": [
+                    {
+                      "type": "null"
+                    },
+                    {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": [
+                        "low",
+                        "high",
+                        "level"
+                      ],
+                      "properties": {
+                        "low": {
+                          "description": "The interval's lower bound.",
+                          "type": "number"
+                        },
+                        "high": {
+                          "description": "The interval's upper bound.",
+                          "type": "number"
+                        },
+                        "level": {
+                          "description": "The confidence level, strictly between 0 and 1: 0.95 for a 95% interval.",
+                          "type": "number",
+                          "exclusiveMinimum": 0,
+                          "exclusiveMaximum": 1
+                        },
+                        "method": {
+                          "description": "How the interval was computed, as the producer names it.",
+                          "type": "string",
+                          "maxLength": 64
+                        }
+                      }
+                    }
+                  ]
+                },
+                "verdict": {
+                  "description": "The producer's verdict on the entry under its rule (SUM-6): not_measured when n is 0, scored when the producer applied no rule.",
+                  "enum": [
+                    "passed",
+                    "failed",
+                    "warn",
+                    "inconclusive",
+                    "not_measured",
+                    "scored"
+                  ]
+                },
+                "rule": {
+                  "description": "The rule the verdict applied, as text for display (SUM-6).",
+                  "type": "string",
+                  "maxLength": 1024
+                },
+                "sum": {
+                  "description": "The sum of the measured values (SUM-5).",
+                  "type": "number"
+                },
+                "sumSq": {
+                  "description": "The sum of the squares of the measured values (SUM-5).",
+                  "type": "number",
+                  "minimum": 0
+                },
+                "path": {
+                  "description": "The result path this entry summarises, one line per case (spec 03, SUM-3).",
+                  "$ref": "common.schema.json#/$defs/text"
+                },
+                "aggregate": {
+                  "description": "When value is not the mean (or, for a count, the sum) of the measured values: how it was computed (SUM-8). A verifier recomputes value for median, min and max; any other method is the producer's, shown as written, and no lane reads the entry (LANE-2).",
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": [
+                    "method"
+                  ],
+                  "properties": {
+                    "method": {
+                      "description": "median, min or max (defined by AEF and recomputed), or another name such as pass@k or f1 (the producer's, shown as written).",
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 64,
+                      "pattern": "^[a-z][a-z0-9@._-]*$"
+                    },
+                    "k": {
+                      "description": "k, for pass@k and the like.",
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 9007199254740991
+                    }
+                  }
+                }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "n": {
+                        "description": "Applies when no line was measured (SUM-5).",
+                        "const": 0
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "value": {
+                        "description": "With n at 0, value is null (SUM-5).",
+                        "type": "null"
+                      },
+                      "verdict": {
+                        "description": "With n at 0, the verdict is not_measured (SUM-6).",
+                        "const": "not_measured"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "ext": {
+      "$ref": "common.schema.json#/$defs/ext",
+      "description": "Producer extensions, named reverse-DNS or with the producer's prefix. A reader ignores what it does not know; never holds a secret (ENC-19)."
+    },
+    "cost": {
+      "description": "The run's total cost (spec 03, SUM-7).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "totalUsd"
+      ],
+      "properties": {
+        "totalUsd": {
+          "description": "The run's total cost, in US dollars (SUM-7).",
+          "type": "number",
+          "minimum": 0
+        },
+        "source": {
+          "description": "Where the figure came from (SUM-7).",
+          "type": "string",
+          "maxLength": 256
+        }
+      }
+    },
+    "usage": {
+      "description": "The run's total usage, one entry per party and model (SUM-7): no party and model twice.",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "description": "What one party consumed over the whole run (SUM-7).",
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "gen_ai.usage.input_tokens": {
+            "description": "Input tokens, as OpenTelemetry's gen_ai.usage.input_tokens (RES-10).",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "gen_ai.usage.output_tokens": {
+            "description": "Output tokens, as OpenTelemetry's gen_ai.usage.output_tokens (RES-10).",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "costUsd": {
+            "description": "The cost, in US dollars (RES-10).",
+            "type": "number",
+            "minimum": 0
+          },
+          "costSource": {
+            "description": "Where the cost figure came from, such as a price table.",
+            "type": "string",
+            "maxLength": 128
+          },
+          "role": {
+            "description": "Whose usage this is: agent (the subject), judge, attacker (an attacker model) or other.",
+            "enum": [
+              "agent",
+              "judge",
+              "attacker",
+              "other"
+            ]
+          },
+          "gen_ai.usage.cache_read.input_tokens": {
+            "description": "Input tokens served from a cache, as OpenTelemetry's gen_ai.usage.cache_read.input_tokens; included in input_tokens (RES-10).",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "gen_ai.usage.cache_write.input_tokens": {
+            "description": "Input tokens written to a cache, as OpenTelemetry's gen_ai.usage.cache_write.input_tokens; included in input_tokens (RES-10).",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "gen_ai.usage.reasoning.output_tokens": {
+            "description": "Reasoning tokens, as OpenTelemetry's gen_ai.usage.reasoning.output_tokens; included in output_tokens (RES-10).",
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          },
+          "model": {
+            "description": "The model this party used, when it used one.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "required": [
+          "role"
+        ]
+      }
+    }
+  }
+}

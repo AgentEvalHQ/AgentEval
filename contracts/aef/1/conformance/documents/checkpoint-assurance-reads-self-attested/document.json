@@ -1,0 +1,96 @@
+{
+  "schemaVersion": "1.0",
+  "checkpointId": "cp_01J9K4",
+  "template": {
+    "ref": "template:support/release-candidate",
+    "version": "3"
+  },
+  "subject": {
+    "ref": "agent:support/support-triage",
+    "version": "git:3f2a1c",
+    "image": "sha256:9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d",
+    "deployment": "deployment:support/support-triage@prod-eu",
+    "resolvedFrom": "latest",
+    "resolvedAt": "2026-10-02T13:58:00Z"
+  },
+  "lanes": [
+    {
+      "lane": "quality",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "triage",
+        "path": "triage",
+        "op": ">=",
+        "value": 0.8
+      },
+      "requirements": [
+        "REQ-07"
+      ],
+      "runs": [
+        {
+          "runId": "Q-184",
+          "runHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "security",
+      "rule": {
+        "kind": "severity",
+        "max": "low"
+      },
+      "requirements": [
+        "REQ-15"
+      ],
+      "runs": [
+        {
+          "runId": "R-921",
+          "runHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "origin": "adopted:ci"
+        },
+        {
+          "runId": "R-930",
+          "runHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true,
+      "freshness": "P14D"
+    },
+    {
+      "lane": "memory",
+      "rule": {
+        "kind": "comparison",
+        "lane": "memory",
+        "metric": "recall",
+        "path": "recall",
+        "baseline": {
+          "runId": "M-77",
+          "runHash": "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        },
+        "significance": 0.05,
+        "minimumPairs": 20,
+        "axes": [
+          "suite",
+          "judges",
+          "target-mode"
+        ]
+      },
+      "runs": [],
+      "blocking": false
+    }
+  ],
+  "budget": {
+    "approvedUsd": 10.0,
+    "spentUsd": 6.4,
+    "approvedBy": {
+      "identity": "oidc:https://login.example.com/u-7f3a",
+      "assurance": "authenticated"
+    }
+  },
+  "state": "planned",
+  "outcome": null
+}

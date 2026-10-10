@@ -8,14 +8,78 @@
 
 AgentEval is designed for extensibility. You can:
 
-- Create custom metrics for domain-specific evaluation
+- Create custom evaluators (`IEval`) for domain-specific evaluation
 - Wrap external evaluation frameworks
 - Build plugins for custom evaluation workflows
 - Integrate with Microsoft's official evaluators
 
 ---
 
-## Creating Custom Metrics
+## Creating Custom Evaluators (`IEval`)
+
+**Start here.** `IEval` is the evaluator contract the benchmarks, composites (`CompositeEval`), calibration,
+exporters and the run store all read: a result carries its score, label, severity, evidence, provenance (judge
+model, tokens, cost), and whether anything was measured at all. `IMetric`, below, is the older interface, kept so
+existing metrics keep working.
+
+A deterministic eval derives from `AtomicCodeEval` and implements one method:
+
+```csharp
+using AgentEval.Evals;
+
+/// <summary>Passes when the response length is within [minLength, maxLength].</summary>
+public sealed class ResponseLengthEval(int minLength = 50, int maxLength = 500)
+    : AtomicCodeEval("response_length", "Response length", "quality.format", "1.0.0")
+{
+    protected override EvalResult Evaluate(EvalInput input)
+    {
+        // No response is not a short response: say nothing could be measured, never score it as a 0 fail.
+        if (input.Response is null)
+        {
+            return NotApplicable("There is no response to measure.");
+        }
+
+        var length = input.Response.Length;
+        var passed = length >= minLength && length <= maxLength;
+        var score = passed ? 1.0
+            : length < minLength ? (double)length / minLength
+            : Math.Max(0.0, 1.0 - (double)(length - maxLength) / maxLength);
+
+        return Build(score, passed, severity: passed ? "none" : "low",
+            dimensions: new Dictionary<string, double> { ["length"] = length });
+    }
+}
+```
+
+Run it on its own, or admit it to a pipeline with the chance floor it is judged against:
+
+```csharp
+using AgentEval.Core;          // AgentEvalBuilder
+using AgentEval.Evals.Meta;    // ChanceFloor
+
+var result = await new ResponseLengthEval().EvaluateAsync(new EvalInput("Summarise the ticket", Response: answer));
+Console.WriteLine($"{result.Score.Label} ({result.Score.Value:P0})");
+
+var runner = await new AgentEvalBuilder()
+    .AddEval(new ResponseLengthEval(), ChanceFloor.NotDerivable("no draw model: any length can be written"))
+    .BuildAsync(ct);
+```
+
+- Scores are 0–1; `Build` sets the label (`pass` / `fail`), the severity (`none`, `low`, `medium`, `high`,
+  `critical`) and per-dimension values.
+- When the eval cannot measure anything on this input (no response, no context, no tool data), return
+  `NotApplicable(reason)`: never `Passed`, and aggregates leave it out instead of counting it as a 0 fail.
+- A model-judged eval is an `AtomicLlmEval`, constructed with a judge (`IEvaluator`) and the criteria to grade; it
+  records the judge model, tokens and cost.
+- [Deterministic evals](deterministic-evals.md) is the full contract: the chance floor, what `EvalInput` holds
+  for a real run (`null` tool calls versus an empty list), and the undecidable verdict.
+
+---
+
+## Creating Custom Metrics (`IMetric`, compatibility)
+
+`IMetric` predates `IEval` and is kept for compatibility: the metric registry, `--metrics` and the MAF bridge still
+read it. For new code, prefer an `IEval` (above).
 
 ### Basic Metric
 
@@ -705,6 +769,9 @@ public class ToneMetricTests
 
 ### 1. Use Appropriate Interface
 
+For new evaluators, implement `IEval` ([above](#creating-custom-evaluators-ieval)). When you do write an `IMetric`,
+declare what it needs:
+
 ```csharp
 // ✅ Good: RAG metric declares its requirements
 public class MyRagMetric : IRAGMetric
@@ -771,4 +838,4 @@ public MyMetric(double threshold = 70)
 - [Embedding Metrics](embedding-metrics.md) - Fast similarity evaluation
 - [Benchmarks Guide](benchmarks.md) - Performance benchmarking
 - [Snapshots](snapshots.md) - Snapshot comparison with `ISnapshotComparer` interface
-- [Sample 26: Extensibility](../samples/AgentEval.Samples/Sample26_Extensibility.cs) - End-to-end extensibility demo with custom metrics, exporters, loaders, and attack types
+- [Sample 26: Extensibility](../samples/AgentEval.Samples/DataAndInfrastructure/06_Extensibility.cs) - End-to-end extensibility demo with custom metrics, exporters, loaders, and attack types

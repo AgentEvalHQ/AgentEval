@@ -1,0 +1,10 @@
+{
+  "kind": "stream",
+  "plan": "../plan.json",
+  "problems": [],
+  "readerOnly": true,
+  "rules": [
+    "STRM-1",
+    "VER-8"
+  ]
+}

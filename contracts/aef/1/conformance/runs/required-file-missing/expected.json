@@ -1,0 +1,14 @@
+{
+  "kind": "run",
+  "run": "run",
+  "outcome": "invalid",
+  "problems": [
+    [
+      "metrics.json",
+      "schema"
+    ]
+  ],
+  "rules": [
+    "RUN-2"
+  ]
+}

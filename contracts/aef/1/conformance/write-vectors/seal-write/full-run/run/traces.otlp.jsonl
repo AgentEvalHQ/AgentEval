@@ -1,0 +1,1 @@
+{"resourceSpans":[{"resource":{"attributes":[]},"scopeSpans":[{"scope":{"name":"agenteval"},"spans":[{"traceId":"4bf92f3577b34da6a3ce929d0e0e4736","spanId":"00f067aa0ba902b7","name":"invoke_agent triage","kind":3,"startTimeUnixNano":"1790949731120000000","endTimeUnixNano":"1790949733400000000"}]}]}]}

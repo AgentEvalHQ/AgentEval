@@ -1,0 +1,253 @@
+{
+  "schemaVersion": "1.0",
+  "checkpointId": "cp_d8327b32b0f9",
+  "subject": {
+    "ref": "agent:shop/assistant",
+    "version": "v7"
+  },
+  "lanes": [
+    {
+      "lane": "status-differs",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "p",
+        "op": ">=",
+        "value": 0.5
+      },
+      "runs": [
+        {
+          "runId": "Q3",
+          "runHash": "7b777f4a95dae53fe170abd0131e0d6ea88ce1abfdc1d4424afa2f3cc74b7340",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "version-differs",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "p",
+        "op": ">=",
+        "value": 0.5
+      },
+      "runs": [
+        {
+          "runId": "Q1",
+          "runHash": "c9371709ba68cac3e98d8113ac51d50dae8a8e282133584e7a365a6a42110d1b",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "oldest-differs",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "p",
+        "op": ">=",
+        "value": 0.5
+      },
+      "runs": [
+        {
+          "runId": "Q1",
+          "runHash": "c9371709ba68cac3e98d8113ac51d50dae8a8e282133584e7a365a6a42110d1b",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "axes-differ",
+      "rule": {
+        "kind": "comparison",
+        "lane": "memory",
+        "metric": "recall",
+        "path": "mem",
+        "baseline": {
+          "runId": "B",
+          "runHash": "5c480aeff60c7a9ecbc35d2b2d06e144fa90228881895128a48d749d40c0d3fd"
+        },
+        "significance": 0.05,
+        "minimumPairs": 20,
+        "axes": [
+          "suite",
+          "judges"
+        ]
+      },
+      "runs": [
+        {
+          "runId": "CJ",
+          "runHash": "62187edf3d1d5209b4b741d0fc9f023612db20666ab2f71a0c76c58bd218a697",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "recorded-null",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "p",
+        "op": ">=",
+        "value": 0.5
+      },
+      "runs": [
+        {
+          "runId": "Q1",
+          "runHash": "c9371709ba68cac3e98d8113ac51d50dae8a8e282133584e7a365a6a42110d1b",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "all-equal",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "p",
+        "op": ">=",
+        "value": 0.5
+      },
+      "runs": [
+        {
+          "runId": "Q1",
+          "runHash": "c9371709ba68cac3e98d8113ac51d50dae8a8e282133584e7a365a6a42110d1b",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    }
+  ],
+  "state": "decided",
+  "outcome": "inconclusive",
+  "decisionInput": {
+    "subjectVersion": "v7",
+    "evaluatedAt": "2026-10-08T00:00:00Z",
+    "supersededBy": null,
+    "lanes": [
+      {
+        "lane": "status-differs",
+        "blocking": true,
+        "result": {
+          "status": "passed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-01T12:00:00Z"
+        },
+        "evidence": [
+          "7b777f4a95dae53fe170abd0131e0d6ea88ce1abfdc1d4424afa2f3cc74b7340"
+        ]
+      },
+      {
+        "lane": "version-differs",
+        "blocking": true,
+        "result": {
+          "status": "passed",
+          "subjectVersion": "v6",
+          "oldestClosedAt": "2026-10-01T12:00:00Z"
+        },
+        "evidence": [
+          "c9371709ba68cac3e98d8113ac51d50dae8a8e282133584e7a365a6a42110d1b"
+        ]
+      },
+      {
+        "lane": "oldest-differs",
+        "blocking": true,
+        "result": {
+          "status": "passed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-01T12:00:01Z"
+        },
+        "evidence": [
+          "c9371709ba68cac3e98d8113ac51d50dae8a8e282133584e7a365a6a42110d1b"
+        ]
+      },
+      {
+        "lane": "axes-differ",
+        "blocking": true,
+        "result": {
+          "status": "incomparable",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-06T00:00:00Z",
+          "axes": [
+            "suite"
+          ]
+        },
+        "evidence": [
+          "62187edf3d1d5209b4b741d0fc9f023612db20666ab2f71a0c76c58bd218a697"
+        ]
+      },
+      {
+        "lane": "recorded-null",
+        "blocking": true,
+        "result": null
+      },
+      {
+        "lane": "all-equal",
+        "blocking": true,
+        "result": {
+          "status": "passed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-01T12:00:00Z"
+        },
+        "evidence": [
+          "c9371709ba68cac3e98d8113ac51d50dae8a8e282133584e7a365a6a42110d1b"
+        ]
+      }
+    ]
+  },
+  "decision": {
+    "outcome": "inconclusive",
+    "lanes": [
+      {
+        "lane": "status-differs",
+        "status": "passed",
+        "blocking": true
+      },
+      {
+        "lane": "version-differs",
+        "status": "missing",
+        "blocking": true
+      },
+      {
+        "lane": "oldest-differs",
+        "status": "passed",
+        "blocking": true
+      },
+      {
+        "lane": "axes-differ",
+        "status": "incomparable",
+        "blocking": true,
+        "axes": [
+          "suite"
+        ]
+      },
+      {
+        "lane": "recorded-null",
+        "status": "missing",
+        "blocking": true
+      },
+      {
+        "lane": "all-equal",
+        "status": "passed",
+        "blocking": true
+      }
+    ],
+    "reasons": [
+      "wrong-version:version-differs",
+      "incomparable:axes-differ",
+      "missing:recorded-null",
+      "outcome:inconclusive"
+    ]
+  }
+}

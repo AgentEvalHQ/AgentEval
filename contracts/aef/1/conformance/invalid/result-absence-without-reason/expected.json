@@ -1,0 +1,10 @@
+{
+  "kind": "document",
+  "schema": "result",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "RES-2"
+  ],
+  "why": "a typed absence says why"
+}

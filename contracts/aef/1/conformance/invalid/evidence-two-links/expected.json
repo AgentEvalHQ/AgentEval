@@ -1,0 +1,10 @@
+{
+  "kind": "document",
+  "schema": "evidence",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "EVD-1"
+  ],
+  "why": "a link is exactly one of blob, span or uri"
+}

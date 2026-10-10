@@ -1,0 +1,49 @@
+{
+  "kind": "seal-write",
+  "rules": [
+    "SEAL-1",
+    "SEAL-2",
+    "SEAL-3",
+    "SEAL-4",
+    "SEAL-5",
+    "EVD-3"
+  ],
+  "run": "run",
+  "sealedBy": "producer",
+  "sealedAt": "2026-10-02T14:06:24Z",
+  "manifest": "expected-manifest.txt",
+  "predicate": {
+    "schemaVersion": "1.0",
+    "runId": "seal-write-full",
+    "runHash": "3dbdbf23ac91036328fa30e6166960f94fdd9b0eeefed0ab0ec9e4fcb20e9f22",
+    "producer": {
+      "name": "agenteval-cli",
+      "version": "1.0.0"
+    },
+    "subject": {
+      "ref": "agent:support/triage",
+      "version": "git:3f2a1c"
+    },
+    "deployment": {
+      "ref": "deployment:support/triage@dev"
+    },
+    "suite": {
+      "ref": "suite:support/triage",
+      "version": "4",
+      "digest": "sha256:bf538be93bec0a241580a57abd1b6d9955c0ca43c52eac0697981268dbdd5c9a"
+    },
+    "judges": [
+      {
+        "model": "gpt-5.1",
+        "rubricDigest": "sha256:29fd018a9848938bc2b0e33fffa32bde2827e81388d0e03195919be5835c3605"
+      },
+      {
+        "model": "judge-b"
+      }
+    ],
+    "closedAt": "2026-10-02T14:06:23.004Z",
+    "sealedAt": "2026-10-02T14:06:24Z",
+    "sealedBy": "producer"
+  },
+  "why": "Every file but seal.json is sealed, the blob byte for byte; the predicate holds only what SEAL-5 names of run.json (no runtime, no subject kind, no deployment endpoint, no executionPolicy, no judge provider, mode or calibration), the judges in order, and closedAt as run.json's endedAt."
+}

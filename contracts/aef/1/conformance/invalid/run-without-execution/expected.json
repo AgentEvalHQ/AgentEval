@@ -1,0 +1,10 @@
+{
+  "kind": "document",
+  "schema": "run",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "RUN-7"
+  ],
+  "why": "a run says how its target was driven"
+}

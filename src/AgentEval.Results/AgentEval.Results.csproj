@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- AEF 1.0 in .NET: today the checkpoint decision function, checkpoint manifest checks and the runner stream verifier;
+       the run writer, reader, validator, sealer and verifiers come with AgentEval's AEF component (TODO Q4-39). Not packed
+       until it ships (it writes and reads a draft format). -->
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>AgentEval.Results</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="AgentEval.Tests" />
+    <InternalsVisibleTo Include="AgentEval.Results.Tests" />
+  </ItemGroup>
+
+  <!-- The AEF 1.0 writer and reader schemas, embedded from contracts/aef/1/schemas (linked, never copied, so there is
+       one source; a test checks the embedded bytes equal the files). Schemas/AefSchemas.cs compiles them. -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\contracts\aef\1\schemas\writer\*.schema.json"
+                      Link="Schemas\aef\writer\%(Filename)%(Extension)"
+                      LogicalName="AgentEval.Results.Schemas.writer.%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\..\contracts\aef\1\schemas\reader\*.schema.json"
+                      Link="Schemas\aef\reader\%(Filename)%(Extension)"
+                      LogicalName="AgentEval.Results.Schemas.reader.%(Filename)%(Extension)" />
+  </ItemGroup>
+</Project>

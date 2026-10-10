@@ -1,0 +1,13 @@
+{
+  "kind": "reader-only",
+  "schema": "run",
+  "writer": "invalid",
+  "reader": "valid",
+  "reads": {
+    "execution.targetMode": "mocked"
+  },
+  "rules": [
+    "VER-3",
+    "RUN-7"
+  ]
+}

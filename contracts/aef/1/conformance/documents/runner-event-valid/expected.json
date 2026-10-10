@@ -1,0 +1,14 @@
+{
+  "kind": "document",
+  "schema": "runner-event",
+  "writer": "valid",
+  "reader": "valid",
+  "reads": {
+    "limit": "maxUsd"
+  },
+  "rules": [
+    "VER-1",
+    "VER-8",
+    "STRM-1"
+  ]
+}

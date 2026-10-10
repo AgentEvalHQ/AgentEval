@@ -16,7 +16,8 @@ namespace AgentEval.Cli.Commands;
 /// The <c>agenteval log-file</c> command group — <c>to-fixture</c> turns a <c>--capture-fixture</c> JSONL
 /// capture into a deterministic, versionable test fixture (see <see cref="LogFixtureGenerator"/>);
 /// <c>replay</c> resends every captured round-trip to a different target and diffs structurally/behaviorally
-/// (see <see cref="LogFileReplayer"/>).
+/// (see <see cref="LogFileReplayer"/>); <c>gate-replay</c> runs two tool-gate configurations over the captured
+/// tool calls (see <see cref="LogFileGateReplay"/>).
 /// </summary>
 internal static class LogFileCommand
 {
@@ -31,6 +32,7 @@ internal static class LogFileCommand
         var logFileCmd = new Command("log-file", "Utilities for working with --capture-fixture JSONL captures.");
         logFileCmd.Subcommands.Add(BuildToFixtureCommand());
         logFileCmd.Subcommands.Add(BuildReplayCommand());
+        logFileCmd.Subcommands.Add(LogFileGateReplay.Create());
         return logFileCmd;
     }
 
@@ -112,8 +114,8 @@ internal static class LogFileCommand
         var endpointOpt = new Option<string?>("--endpoint") { Description = "OpenAI-compatible endpoint URL to replay against." };
         var modelOpt = new Option<string?>("--model") { Description = "Model/deployment name (required with --endpoint)." };
         var apiKeyOpt = new Option<string?>("--api-key") { Description = "API key for --endpoint. Falls back to OPENAI_API_KEY." };
-        var azureFromEnvOpt = new Option<bool>("--azure-from-env")
-            { Description = "Replay against a chat client built from the environment: the provider AI_INFERENCE_PROVIDER selects (azure, bitdeer, openai, foundry or openai-compatible; auto-detected when unset). Despite the name, not only Azure OpenAI. Requires a configured provider; run with none set to see what is missing." };
+        var azureFromEnvOpt = FromEnvOption.Create(
+            "Replay against a chat client built from the environment: the provider AI_INFERENCE_PROVIDER selects (azure, bitdeer, openai, foundry or openai-compatible; auto-detected when unset). Requires a configured provider; run with none set to see what is missing. --azure-from-env is the old name and still works.");
         var strictTextOpt = new Option<bool>("--strict-text")
             { Description = "Also compare exact response text (in addition to the structural comparison). Off by default — LLM output isn't reproducible even against the literal same model/config at temperature > 0." };
 
@@ -191,7 +193,7 @@ internal static class LogFileCommand
             return exitCode == ExitCodes.Success
                 ? (chatClient, EnvironmentTargetLabel(resolvedModel, ProviderChatClientFactory.Settings), null)
                 : (null, string.Empty,
-                    $"--azure-from-env found no usable inference provider ({InferenceProviderEnvironment.SelectorVariable} " +
+                    $"--from-env found no usable inference provider ({InferenceProviderEnvironment.SelectorVariable} " +
                     "selects one; with it unset, the first fully configured provider is used) — see the message above for why.");
         }
 
@@ -213,11 +215,11 @@ internal static class LogFileCommand
             return (CliChatClientDiagnostics.Wrap(EndpointFactory.CreateOpenAICompatible(endpoint, model, apiKey), "replay-target"), $"{endpoint} ({model})", null);
         }
 
-        return (null, string.Empty, "log-file replay needs a target: pass --azure-from-env, or --endpoint/--model.");
+        return (null, string.Empty, "log-file replay needs a target: pass --from-env, or --endpoint/--model.");
     }
 
     /// <summary>
-    /// The report's target label for <c>--azure-from-env</c>: the provider tag and the model, for example
+    /// The report's target label for <c>--from-env</c>: the provider tag and the model, for example
     /// <c>bitdeer:zai-org/GLM-5.3-Flash</c>.
     /// </summary>
     /// <param name="model">The model the factory built the client for.</param>
@@ -239,7 +241,7 @@ internal static class LogFileCommand
         return $"{provider}:{shownModel}";
     }
 
-    private static async Task<IReadOnlyList<FixtureCaptureEntry>> LoadCapturedEntriesAsync(string path, CancellationToken ct)
+    internal static async Task<IReadOnlyList<FixtureCaptureEntry>> LoadCapturedEntriesAsync(string path, CancellationToken ct)
     {
         var lines = await File.ReadAllLinesAsync(path, ct).ConfigureAwait(false);
         var entries = new List<FixtureCaptureEntry>();

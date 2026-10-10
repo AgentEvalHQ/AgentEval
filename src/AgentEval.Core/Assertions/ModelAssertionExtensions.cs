@@ -19,5 +19,24 @@ public static class ModelAssertionExtensions
     public static PerformanceAssertions Should(this PerformanceMetrics metrics) => new(metrics);
 
     /// <summary>Start fluent assertions on a tool usage report.</summary>
-    public static ToolUsageAssertions Should(this ToolUsageReport report) => new(report);
+    /// <remarks>
+    /// A <see langword="null"/> report means AgentEval has no record of the agent's tool calls, so no tool assertion
+    /// can hold: it fails with a <see cref="ToolAssertionException"/> that says why, rather than passing or being
+    /// skipped. An agent that cannot call tools fails the same way a tool assertion would on an empty report.
+    /// </remarks>
+    /// <exception cref="ToolAssertionException"><paramref name="report"/> is <see langword="null"/>.</exception>
+    public static ToolUsageAssertions Should(this ToolUsageReport? report) =>
+        report is null ? throw NoToolData() : new(report);
+
+    private static ToolAssertionException NoToolData() => ToolAssertionException.Create(
+        "There is no tool-call data to assert on: the result's ToolUsage is null.",
+        expected: "A tool usage report (empty when the agent called no tools)",
+        actual: "No report",
+        suggestions:
+        [
+            "The agent's adapter must return the conversation in AgentResponse.RawMessages, or AgentEval cannot see " +
+            "which tools were called. ChatClientAgentAdapter and the MAF adapter do; a custom IEvaluableAgent that " +
+            "returns only text does not.",
+            "Tool tracking must be on: EvaluationOptions.TrackTools = true (the default).",
+        ]);
 }

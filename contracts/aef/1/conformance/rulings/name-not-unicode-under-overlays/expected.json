@@ -1,0 +1,26 @@
+{
+  "kind": "run",
+  "run": "run",
+  "generate": [
+    {
+      "copy": [
+        "valid/completed-eval/run",
+        "run"
+      ]
+    },
+    {
+      "ill-formed-name": [
+        "run/overlays",
+        "n",
+        "o.txt"
+      ]
+    }
+  ],
+  "outcome": "intact",
+  "problems": [],
+  "rules": [
+    "RUN-3",
+    "OVL-5"
+  ],
+  "why": "the same name under overlays/: nothing under overlays/ is a problem of the run (§4.5), so the run is intact."
+}

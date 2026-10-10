@@ -1,0 +1,10 @@
+{
+  "kind": "document",
+  "schema": "result",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "RES-8"
+  ],
+  "why": "a line is a trial or a case's rollup, not both"
+}

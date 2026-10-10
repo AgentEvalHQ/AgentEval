@@ -1,0 +1,219 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/aef/1/writer/seal.schema.json",
+  "title": "AEF 1.0: seal.json",
+  "description": "An in-toto Statement v1 over every file of the run except seal.json, attestation.dsse.json and overlays/: one subject per file, the exact bytes' SHA-256, and the run hash (SEAL-1, SEAL-5).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "_type",
+    "subject",
+    "predicateType",
+    "predicate"
+  ],
+  "properties": {
+    "_type": {
+      "description": "The in-toto Statement type, v1 (SEAL-5).",
+      "const": "https://in-toto.io/Statement/v1"
+    },
+    "subject": {
+      "description": "One subject per sealed file, each listed once (SEAL-5, SEAL-6).",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100000,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "digest"
+        ],
+        "properties": {
+          "name": {
+            "description": "The file's path inside the run folder.",
+            "$ref": "common.schema.json#/$defs/relativePath"
+          },
+          "digest": {
+            "description": "The file's digest (SEAL-5).",
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "sha256"
+            ],
+            "properties": {
+              "sha256": {
+                "$ref": "common.schema.json#/$defs/sha256Hex",
+                "description": "The SHA-256 of the file's exact bytes (SEAL-2)."
+              }
+            }
+          }
+        }
+      }
+    },
+    "predicateType": {
+      "description": "Marks the statement as an AEF evidence seal (SEAL-5).",
+      "const": "https://agenteval.dev/aef/1/evidence"
+    },
+    "predicate": {
+      "description": "The run's id and run hash, what run.json says about its producer, subject, deployment, suite and judges, and when it closed and was sealed (SEAL-5).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schemaVersion",
+        "runId",
+        "runHash",
+        "producer",
+        "subject",
+        "closedAt",
+        "sealedBy",
+        "sealedAt",
+        "deployment",
+        "suite",
+        "judges"
+      ],
+      "properties": {
+        "schemaVersion": {
+          "$ref": "common.schema.json#/$defs/schemaVersion",
+          "description": "The AEF version of this seal, MAJOR.MINOR: 1.0 for AEF 1.0. It sits in the predicate because in-toto fixes the statement's _type (VER-1)."
+        },
+        "runId": {
+          "$ref": "common.schema.json#/$defs/id",
+          "description": "run.json's runId (SEAL-5)."
+        },
+        "runHash": {
+          "description": "SHA-256 of the manifest: one line per sealed file, ordered by the UTF-8 bytes of its path, '<sha256-hex>  <size>  <path>\\n'.",
+          "$ref": "common.schema.json#/$defs/sha256Hex"
+        },
+        "producer": {
+          "description": "The producer, as run.json gives it (SEAL-5).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "version"
+          ],
+          "properties": {
+            "name": {
+              "description": "run.json's producer.name (SEAL-5).",
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            },
+            "version": {
+              "description": "run.json's producer.version (SEAL-5).",
+              "$ref": "common.schema.json#/$defs/exactVersion"
+            }
+          }
+        },
+        "subject": {
+          "description": "The subject, as run.json gives it (SEAL-5).",
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "ref"
+          ],
+          "properties": {
+            "ref": {
+              "$ref": "common.schema.json#/$defs/ref",
+              "description": "run.json's subject.ref (SEAL-5)."
+            },
+            "version": {
+              "$ref": "common.schema.json#/$defs/exactVersion",
+              "description": "run.json's subject.version, when it has one (SEAL-5)."
+            }
+          }
+        },
+        "deployment": {
+          "description": "The deployment, as run.json gives it, or null (SEAL-5).",
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "ref"
+              ],
+              "properties": {
+                "ref": {
+                  "$ref": "common.schema.json#/$defs/ref",
+                  "description": "run.json's deployment.ref (SEAL-5)."
+                }
+              }
+            }
+          ]
+        },
+        "suite": {
+          "description": "The suite, as run.json gives it, or null (SEAL-5).",
+          "anyOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "ref",
+                "version"
+              ],
+              "properties": {
+                "ref": {
+                  "$ref": "common.schema.json#/$defs/ref",
+                  "description": "run.json's suite.ref (SEAL-5)."
+                },
+                "version": {
+                  "$ref": "common.schema.json#/$defs/exactVersion",
+                  "description": "run.json's suite.version (SEAL-5)."
+                },
+                "digest": {
+                  "$ref": "common.schema.json#/$defs/sha256Uri",
+                  "description": "run.json's suite.digest, when it has one (SEAL-5)."
+                }
+              }
+            }
+          ]
+        },
+        "judges": {
+          "description": "The judges, as run.json gives them and in the same order (SEAL-5).",
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "model"
+            ],
+            "properties": {
+              "model": {
+                "description": "The judge's model, as in run.json (SEAL-5).",
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
+              "rubricDigest": {
+                "$ref": "common.schema.json#/$defs/sha256Uri",
+                "description": "The judge's rubric digest, as in run.json (SEAL-5)."
+              }
+            }
+          }
+        },
+        "closedAt": {
+          "$ref": "common.schema.json#/$defs/timestamp",
+          "description": "When the run closed: run.json's endedAt (SEAL-5)."
+        },
+        "sealedBy": {
+          "description": "producer: the producer sealed the run; ingest: a host sealed it when it took custody, which it does only for a run valid against the reader schemas (SEAL-1, SEAL-5).",
+          "enum": [
+            "producer",
+            "ingest"
+          ]
+        },
+        "sealedAt": {
+          "description": "When the seal was made.",
+          "$ref": "common.schema.json#/$defs/timestamp"
+        }
+      }
+    }
+  }
+}

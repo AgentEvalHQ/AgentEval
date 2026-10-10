@@ -1,0 +1,12 @@
+{
+  "kind": "plan",
+  "schema": "run-plan",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "PLAN-1",
+    "PLAN-4",
+    "RUN-10"
+  ],
+  "why": "an endpoint is scheme, host and path only, as in run.json: a query string is where a key hides"
+}

@@ -1,0 +1,60 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "seal-write-full",
+  "status": "completed",
+  "producer": {
+    "name": "agenteval-cli",
+    "version": "1.0.0",
+    "runtime": {
+      "name": "dotnet",
+      "version": "10.0.4"
+    }
+  },
+  "subject": {
+    "ref": "agent:support/triage",
+    "kind": "agent",
+    "version": "git:3f2a1c",
+    "environment": "dev"
+  },
+  "deployment": {
+    "ref": "deployment:support/triage@dev",
+    "environment": "dev",
+    "endpoint": "http://localhost:5080"
+  },
+  "execution": {
+    "targetMode": "live",
+    "stimulus": "suite"
+  },
+  "suite": {
+    "ref": "suite:support/triage",
+    "version": "4",
+    "digest": "sha256:bf538be93bec0a241580a57abd1b6d9955c0ca43c52eac0697981268dbdd5c9a",
+    "frozen": true,
+    "executionPolicy": {
+      "trialsPerCase": 1
+    }
+  },
+  "judges": [
+    {
+      "model": "gpt-5.1",
+      "provider": "azure.ai.openai",
+      "mode": "single",
+      "rubricDigest": "sha256:29fd018a9848938bc2b0e33fffa32bde2827e81388d0e03195919be5835c3605",
+      "calibration": {
+        "labelSet": "labels:support/triage-golden@2",
+        "n": 120,
+        "accuracy": 0.925,
+        "kappa": 0.81,
+        "dangerousErrors": 1,
+        "measuredAt": "2026-09-20T10:00:00Z"
+      }
+    },
+    {
+      "model": "judge-b",
+      "mode": "single"
+    }
+  ],
+  "startedAt": "2026-10-02T14:02:11.120Z",
+  "endedAt": "2026-10-02T14:06:23.004Z",
+  "contentCapture": "on"
+}

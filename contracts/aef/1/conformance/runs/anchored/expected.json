@@ -1,0 +1,11 @@
+{
+  "kind": "run",
+  "run": "run",
+  "outcome": "intact",
+  "problems": [],
+  "rules": [
+    "SIG-8"
+  ],
+  "anchors": "anchors.json",
+  "anchored": true
+}

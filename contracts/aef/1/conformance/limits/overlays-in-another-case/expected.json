@@ -1,0 +1,45 @@
+{
+  "kind": "run",
+  "run": "run",
+  "generate": [
+    {
+      "copy": [
+        "valid/completed-eval/run",
+        "run"
+      ]
+    },
+    {
+      "remove": "run/seal.json"
+    },
+    {
+      "remove": "run/overlays"
+    },
+    {
+      "files": [
+        "run/Overlays",
+        0
+      ]
+    },
+    {
+      "write": [
+        "run/Overlays/notes.json",
+        [
+          [
+            "{}",
+            1
+          ]
+        ]
+      ]
+    }
+  ],
+  "outcome": "invalid",
+  "problems": [
+    [
+      "Overlays/notes.json",
+      "path"
+    ]
+  ],
+  "rules": [
+    "RUN-3"
+  ]
+}

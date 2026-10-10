@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Diagnostics.CodeAnalysis;
 using System.Security.Cryptography;
 using System.Text;
 using AgentEval.Decisions;
@@ -46,6 +47,7 @@ namespace AgentEval.Evals;
 /// shadow — not as a gate that decides whether the stronger judge runs — until it is.
 /// </para>
 /// </remarks>
+[Experimental(DecisionsPreview.DiagnosticId)]
 public sealed class DecisionEval : AtomicEval
 {
     /// <summary>The <c>Provenance.Type</c> this eval writes. Listed in the v1 result schema's enum.</summary>

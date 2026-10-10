@@ -1,0 +1,13 @@
+{
+  "kind": "job",
+  "plan": "plan.json",
+  "runner": "../runner.json",
+  "target": "target.json",
+  "at": "2026-10-09T09:00:00Z",
+  "refused": true,
+  "rules": [
+    "PLAN-5",
+    "PLAN-7"
+  ],
+  "why": "a plan with no planId: a job.refused could not name it, so it is not a plan, and the operation writes no stream"
+}

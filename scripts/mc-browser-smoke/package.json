@@ -1,0 +1,9 @@
+{
+  "name": "mc-browser-smoke",
+  "private": true,
+  "type": "module",
+  "description": "Opens every Mission Control page of the installed agenteval tool in a headless browser. See run.sh.",
+  "devDependencies": {
+    "playwright": "1.64.0"
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "kind": "produce",
+  "rules": [
+    "RES-4",
+    "RES-5",
+    "RES-6",
+    "RES-8",
+    "SUM-3"
+  ],
+  "scenario": "scenario.json",
+  "results": "expected-results.ndjson",
+  "summary": {
+    "schemaVersion": "1.0",
+    "runId": "produce-composite-in-two-trials",
+    "lanes": [
+      {
+        "lane": "quality",
+        "metrics": [
+          {
+            "metric": "pass_rate",
+            "path": "plan",
+            "N": 1,
+            "n": 1,
+            "notMeasured": 0,
+            "sum": 0,
+            "sumSq": 0,
+            "value": 0,
+            "verdict": "scored"
+          },
+          {
+            "metric": "pass_rate",
+            "path": "plan/steps",
+            "N": 1,
+            "n": 1,
+            "notMeasured": 0,
+            "sum": 0,
+            "sumSq": 0,
+            "value": 0,
+            "verdict": "scored"
+          },
+          {
+            "metric": "pass_rate",
+            "path": "plan/tools",
+            "N": 1,
+            "n": 1,
+            "notMeasured": 0,
+            "sum": 1,
+            "sumSq": 1,
+            "value": 1,
+            "verdict": "scored"
+          }
+        ]
+      }
+    ]
+  },
+  "why": "A composite case in two trials; the second stopped before its tools step. Each trial's tree is its own: its lines carry its trial, its children's parent is that trial's root, its decisive ids are that trial's. The rollups form the case's tree: one at each path the trials have, the children's under the root's, with their component; n and passed are counted per path (plan/tools has one trial line: n 1, agree true). The summary counts the rollup at each path."
+}

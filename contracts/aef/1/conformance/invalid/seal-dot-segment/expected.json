@@ -1,0 +1,10 @@
+{
+  "kind": "document",
+  "schema": "seal",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "RUN-3"
+  ],
+  "why": "no segment is . or .."
+}

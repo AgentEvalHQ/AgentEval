@@ -1,0 +1,15 @@
+{
+  "kind": "seal",
+  "run": "run",
+  "problems": [
+    [
+      "results.ndjson",
+      "digest"
+    ]
+  ],
+  "rules": [
+    "SEAL-6",
+    "SEAL-2",
+    "RUN-4"
+  ]
+}

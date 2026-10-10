@@ -1,0 +1,12 @@
+{
+  "kind": "job",
+  "plan": "plan.json",
+  "runner": "../runner.json",
+  "target": "target.json",
+  "at": "2026-02-31T09:00:00Z",
+  "refused": true,
+  "rules": [
+    "ENC-8"
+  ],
+  "why": "the clock's start is February 31st: not a time"
+}

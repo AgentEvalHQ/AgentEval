@@ -1,0 +1,73 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "blobs/sha256/47/474400071c193b3faf9f2c7f82e28fea484a7b59a07fc0a247282870d6441e99",
+      "digest": {
+        "sha256": "474400071c193b3faf9f2c7f82e28fea484a7b59a07fc0a247282870d6441e99"
+      }
+    },
+    {
+      "name": "evidence.ndjson",
+      "digest": {
+        "sha256": "0cb5efa41e591fed8fc988a7e2063ba7285b4faebe8ddbac0d7782643ceb8642"
+      }
+    },
+    {
+      "name": "gates.ndjson",
+      "digest": {
+        "sha256": "a7015f35139336ec94132638061773933c7e118c718e81dea171768d1377b26e"
+      }
+    },
+    {
+      "name": "metrics.json",
+      "digest": {
+        "sha256": "701b6cea546c6b90406e51fcdb9dac9da83ec984406cf96b5a410b4215b4bc3d"
+      }
+    },
+    {
+      "name": "results.ndjson",
+      "digest": {
+        "sha256": "b380b10d7a2363e75f2884e7c58f132bd80b6ec3f10ac7b0071a414ed15c5edf"
+      }
+    },
+    {
+      "name": "run.json",
+      "digest": {
+        "sha256": "69f20a0f63a1ff1fa9521dee737a44ccdba294b7a16a38b1fbe34cac5a1e3890"
+      }
+    },
+    {
+      "name": "summary.json",
+      "digest": {
+        "sha256": "4fef2b72f59caace4ce7b0a6648d8e6c6dc9f63cdbe06b7190ea786c4fc26c75"
+      }
+    },
+    {
+      "name": "traces.otlp.jsonl",
+      "digest": {
+        "sha256": "7ed4f10a3ccf2cb1b5f6b44865f2b35896b891c7fd7d05d2ddba7b5ffd417921"
+      }
+    }
+  ],
+  "predicateType": "https://agenteval.dev/aef/1/evidence",
+  "predicate": {
+    "schemaVersion": "1.0",
+    "runId": "run-small-1",
+    "runHash": "4caacb8e6fa1fd4280ea635d14606011eae62f3421d84159f41cceaf41d866bb",
+    "producer": {
+      "name": "p",
+      "version": "1"
+    },
+    "subject": {
+      "ref": "agent:a/b",
+      "version": "v1"
+    },
+    "deployment": null,
+    "suite": null,
+    "judges": [],
+    "closedAt": "2026-10-01T00:01:00Z",
+    "sealedAt": "2026-10-08T09:00:00Z",
+    "sealedBy": "producer"
+  }
+}

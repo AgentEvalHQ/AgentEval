@@ -1,0 +1,16 @@
+{
+  "kind": "plan-conformance",
+  "events": "events.ndjson",
+  "plan": "plan.json",
+  "runs": "runs",
+  "problems": [
+    [
+      "run:R-1",
+      "suite"
+    ]
+  ],
+  "rules": [
+    "STRM-4"
+  ],
+  "why": "a suite version the plan does not name"
+}

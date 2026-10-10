@@ -1,0 +1,13 @@
+{
+  "kind": "reader-only",
+  "schema": "run",
+  "writer": "invalid",
+  "reader": "valid",
+  "reads": {
+    "suite.executionPolicy.aggregation": "Bootstrap"
+  },
+  "rules": [
+    "VER-8",
+    "RES-6"
+  ]
+}

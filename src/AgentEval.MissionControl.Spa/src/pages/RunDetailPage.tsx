@@ -45,6 +45,8 @@ interface RunDetailResponse {
       passed: number;
       failed: number;
       warnings: number;
+      // Checks that did not run: skipped or errored. Neither a pass nor a fail, and they keep a run from passing.
+      skipped: number;
     };
     cost: {
       estimatedCost: number;
@@ -92,7 +94,7 @@ const RUN_DETAIL_QUERY = /* GraphQL */ `
     }
     runSummary(runId: $runId) {
       verdict
-      stats { total passed failed warnings }
+      stats { total passed failed warnings skipped }
       cost { estimatedCost promptTokens completionTokens }
     }
     scenarios(runId: $runId) {
@@ -186,7 +188,7 @@ export function RunDetailPage() {
               </div>
             </header>
 
-            <section className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <section className="grid grid-cols-2 lg:grid-cols-5 gap-3">
               <Stat
                 label="Verdict"
                 value={
@@ -203,6 +205,13 @@ export function RunDetailPage() {
                 label="Failures"
                 value={`${d.runSummary?.stats.failed ?? "—"}`}
                 tone={d.runSummary && d.runSummary.stats.failed > 0 ? "warn" : "neutral"}
+              />
+              {/* Without this tile a run whose every check errored showed FAIL beside "Failures 0". */}
+              <Stat
+                label="Not measured"
+                value={`${d.runSummary?.stats.skipped ?? "—"}`}
+                tone={d.runSummary && d.runSummary.stats.skipped > 0 ? "warn" : "neutral"}
+                hint="skipped or errored"
               />
               <Stat
                 label="Cost"
@@ -366,10 +375,12 @@ function Stat({
   label,
   value,
   tone = "neutral",
+  hint,
 }: {
   label: string;
   value: string;
   tone?: "neutral" | "warn";
+  hint?: string;
 }) {
   const valueClass =
     tone === "warn" ? "text-red-700" : "text-slate-900";
@@ -377,6 +388,7 @@ function Stat({
     <div className="rounded-lg border border-slate-200 bg-white p-3">
       <dt className="text-xs text-slate-500">{label}</dt>
       <dd className={`text-lg font-semibold mt-1 ${valueClass}`}>{value}</dd>
+      {hint && <p className="text-[11px] text-slate-500 mt-0.5">{hint}</p>}
     </div>
   );
 }

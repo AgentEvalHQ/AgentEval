@@ -1,0 +1,3 @@
+{"schemaVersion":"1.0","resultId":"r_fa1ec18b8eb077193af1f81cceac5c1b","caseId":"c1","path":"a","evaluator":{"id":"code:check"},"state":"failed","trial":0,"severity":"critical"}
+{"schemaVersion":"1.0","resultId":"r_48204033624f1bbd1be836354fd8fdf8","caseId":"c1","path":"a","evaluator":{"id":"code:check"},"state":"passed","trial":1}
+{"schemaVersion":"1.0","resultId":"r_04fe6cef1566eb694f9f1492f724f77c","caseId":"c1","path":"a","evaluator":{"id":"code:check"},"state":"passed","trials":{"n":2,"passed":1,"aggregation":"AnyPass","agree":false}}

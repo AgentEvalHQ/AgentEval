@@ -1,0 +1,14 @@
+{
+  "kind": "run",
+  "run": "run",
+  "outcome": "invalid",
+  "problems": [
+    [
+      "gates.ndjson:1",
+      "gate"
+    ]
+  ],
+  "rules": [
+    "GATE-1"
+  ]
+}

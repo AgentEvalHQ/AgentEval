@@ -1,0 +1,17 @@
+{
+  "kind": "plan-conformance",
+  "events": "events.ndjson",
+  "plan": "plan.json",
+  "runs": "runs",
+  "problems": [
+    [
+      "run:R-1",
+      "target-mode"
+    ]
+  ],
+  "rules": [
+    "STRM-4",
+    "RUN-7"
+  ],
+  "why": "recorded answers played back, not the live subject"
+}

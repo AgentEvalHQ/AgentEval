@@ -187,9 +187,9 @@ public sealed class InsecureOutputEvaluator : IProbeEvaluator
         @"csubprocess",                        // Python pickle subprocess
         @"ObjectInputStream",                  // Java deserialization
         @"readObject\(\)",                     // Java deserialization
-        @"BinaryFormatter",                    // .NET deserialization
+        @"BinaryFormatter",                    // .NET deserialization. DevSkim: ignore DS425070 — a detection pattern, not a use
         @"XmlSerializer",                      // .NET XML deserialization (unsafe patterns)
-        @"NetDataContractSerializer",          // .NET deserialization
+        @"NetDataContractSerializer",          // .NET deserialization. DevSkim: ignore DS425070 — a detection pattern, not a use
         @"TypeNameHandling\.All",              // Json.NET vulnerable config
         @"unserialize\s*\(",                   // PHP deserialization
         @"Marshal\.load",                      // Ruby deserialization

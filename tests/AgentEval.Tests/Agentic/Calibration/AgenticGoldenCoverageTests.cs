@@ -223,7 +223,7 @@ public class AgenticGoldenCoverageTests
             var eval = registry.Resolve("prompt_leak", judge, judgeModel: null);
             Assert.NotNull(eval);
 
-            var result = await eval!.EvaluateAsync(new EvalInput(Query: entry.Input, Response: entry.AgentResponse));
+            var result = await eval!.EvaluateAsync(entry.ToEvalInput());
 
             string actualPath = judge.Calls == 0 ? "deterministic" : "judge";
             string predicted = PromptLeakPredictedPath[entry.ScenarioId];
@@ -306,7 +306,7 @@ public class AgenticGoldenCoverageTests
                 var eval = ResolveUntimed(registry, key, judge);
                 Assert.NotNull(eval);
 
-                var result = await eval!.EvaluateAsync(new EvalInput(Query: entry.Input, Response: entry.AgentResponse));
+                var result = await eval!.EvaluateAsync(entry.ToEvalInput());
 
                 bool fast = judge.Calls == 0 || result.Details.AggregationStrategy == "fast-pass-no-pattern-match";
                 if (fast) fastPassed.Add(entry.ScenarioId);
@@ -380,7 +380,7 @@ public class AgenticGoldenCoverageTests
             var eval = registry.Resolve(entry.EvaluatorKey, judge, judgeModel: null);
             Assert.NotNull(eval);
 
-            var result = await eval!.EvaluateAsync(new EvalInput(Query: entry.Input, Response: entry.AgentResponse));
+            var result = await eval!.EvaluateAsync(entry.ToEvalInput());
 
             if (judge.Calls == 0)
             {
@@ -446,7 +446,7 @@ public class AgenticGoldenCoverageTests
 
             // The threshold is a declared constant on the evaluator, read back off a result. It is
             // not a verdict, and nothing about the authored band is derived from the judge here.
-            var result = await eval!.EvaluateAsync(new EvalInput(Query: entry.Input, Response: entry.AgentResponse));
+            var result = await eval!.EvaluateAsync(entry.ToEvalInput());
 
             // A missing threshold is not a satisfied one: an evaluator that declares no bar cannot
             // be shown to agree with a band, so the record is reported rather than waved through.
@@ -494,7 +494,7 @@ public class AgenticGoldenCoverageTests
             var eval = registry.Resolve(entry.EvaluatorKey, new RecordingJudge(), judgeModel: null);
             Assert.NotNull(eval);
 
-            var result = await eval!.EvaluateAsync(new EvalInput(Query: entry.Input, Response: entry.AgentResponse));
+            var result = await eval!.EvaluateAsync(entry.ToEvalInput());
 
             // Same rule as above: a missing threshold is not a satisfied one.
             double? threshold = result.Score.Threshold;
@@ -622,7 +622,7 @@ public class AgenticGoldenCoverageTests
             var eval = registry.Resolve("reasoning_correctness", judge, judgeModel: null);
             Assert.NotNull(eval);
 
-            await eval!.EvaluateAsync(new EvalInput(Query: entry.Input, Response: entry.AgentResponse));
+            await eval!.EvaluateAsync(entry.ToEvalInput());
 
             if (judge.Calls == 0) unreachable.Add(entry.ScenarioId);
             else reached++;
@@ -707,7 +707,7 @@ public class AgenticGoldenCoverageTests
             var eval = registry.Resolve("reasoning_correctness", judge, judgeModel: null);
             Assert.NotNull(eval);
 
-            var result = await eval!.EvaluateAsync(new EvalInput(Query: entry.Input, Response: entry.AgentResponse));
+            var result = await eval!.EvaluateAsync(entry.ToEvalInput());
 
             if (judge.Calls == 0)
                 problems.Add($"{entry.ScenarioId}: predicted the judge path, but the evaluator SKIPPED it — it scores 0.0 and measures nothing");
@@ -809,7 +809,7 @@ public class AgenticGoldenCoverageTests
             var eval = registry.Resolve(entry.EvaluatorKey, judge, judgeModel: null);
             Assert.NotNull(eval);
 
-            var result = await eval!.EvaluateAsync(new EvalInput(Query: entry.Input, Response: entry.AgentResponse));
+            var result = await eval!.EvaluateAsync(entry.ToEvalInput());
 
             if (judge.Calls == 0)
                 problems.Add($"{entry.ScenarioId}: predicted the judge path, but the evaluator SKIPPED it — it scores a 0.0 sentinel and measures nothing");
@@ -916,7 +916,7 @@ public class AgenticGoldenCoverageTests
             var eval = ResolveUntimed(registry, entry.EvaluatorKey, judge);
             Assert.NotNull(eval);
 
-            var result = await eval!.EvaluateAsync(new EvalInput(Query: entry.Input, Response: entry.AgentResponse));
+            var result = await eval!.EvaluateAsync(entry.ToEvalInput());
 
             // A skip is a different defect with its own ratchet (see
             // s_knownUnreachableReasoningGoldens) and a different signature: null threshold, and a

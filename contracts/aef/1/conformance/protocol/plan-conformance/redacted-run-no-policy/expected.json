@@ -1,0 +1,18 @@
+{
+  "kind": "plan-conformance",
+  "events": "events.ndjson",
+  "plan": "plan.json",
+  "runs": "runs",
+  "problems": [
+    [
+      "run:R-1",
+      "run-hash"
+    ]
+  ],
+  "rules": [
+    "STRM-4",
+    "SEAL-4",
+    "OVL-10"
+  ],
+  "why": "the same run with no trust policy: nothing authorizes the redaction, the blob is missing, the run is not intact"
+}

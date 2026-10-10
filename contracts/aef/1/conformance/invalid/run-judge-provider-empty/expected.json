@@ -1,0 +1,10 @@
+{
+  "kind": "document",
+  "schema": "run",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "RUN-9"
+  ],
+  "why": "a judge's provider names who served it: an empty one names nobody, so a run leaves it out"
+}

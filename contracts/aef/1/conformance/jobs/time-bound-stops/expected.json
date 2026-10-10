@@ -1,0 +1,36 @@
+{
+  "kind": "job",
+  "plan": "plan.json",
+  "runner": "../runner.json",
+  "target": "target.json",
+  "at": "2026-10-09T09:00:00Z",
+  "terminal": "job.failed",
+  "limit": "timeout",
+  "runs": [
+    {
+      "suite": {
+        "ref": "suite:support/slow-lookups",
+        "version": "1"
+      },
+      "status": "aborted",
+      "cases": [
+        [
+          "lookup-1",
+          "passed"
+        ]
+      ]
+    }
+  ],
+  "spentUsd": 0.25,
+  "estimated": {
+    "cases": 3,
+    "usdLow": 0.75,
+    "usdHigh": 0.75
+  },
+  "endsAt": "2026-10-09T09:00:21Z",
+  "rules": [
+    "PLAN-9",
+    "PLAN-10"
+  ],
+  "why": "after one case the job is 20 seconds in; the second would take 20 seconds, which fits a one-minute timeout with the second kept for closing, but its time bound is 40 (20 + 40 + 1 > 60): the runner stops. The subject's kind, pipeline, is not one run.json knows, so subject.kind is other (PLAN-10)"
+}

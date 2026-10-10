@@ -2,6 +2,7 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
+using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics;
 using AgentEval.Decisions;
 using AgentEval.Memory.External.Models;
@@ -37,6 +38,7 @@ namespace AgentEval.Memory.External;
 /// <i>measure</i> a decision model against the incumbent judge, not to grade a citable run with it.
 /// </para>
 /// </remarks>
+[Experimental(DecisionsPreview.DiagnosticId)]
 public sealed class DecisionBenchmarkJudge : IExternalBenchmarkJudge
 {
     /// <summary>The question id used on the wire; the protocol pairs answers to it.</summary>

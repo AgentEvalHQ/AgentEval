@@ -1,0 +1,377 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/aef/1/reader/overlay-event.schema.json",
+  "title": "AEF 1.0: one line of overlays/events.ndjson",
+  "description": "READER (tolerant), derived from the writer schema by tools/derive_reader.py. Everything after a run closed: a human decision, an adjudication, an annotation, a waiver. Appended, never edited; the run's own sealed files never change.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "eventId",
+    "kind",
+    "target",
+    "by",
+    "at"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "common.schema.json#/$defs/schemaVersion",
+      "description": "The AEF version this line follows, MAJOR.MINOR: 1.0 for AEF 1.0 (VER-1)."
+    },
+    "eventId": {
+      "description": "The event's id, unique in the events file: ov_ and then 1-64 letters or digits (OVL-1).",
+      "type": "string",
+      "pattern": "^ov_[A-Za-z0-9]{1,64}$"
+    },
+    "kind": {
+      "description": "What the event does: approve or reject sets a review status; override or adjudicate sets a result's effective state; waive waives until expires; redact withholds a blob; acknowledge, accept_baseline and annotate are recorded with no effect (OVL-1).",
+      "type": "string"
+    },
+    "target": {
+      "description": "What the event is about, always inside its own run (spec 04, OVL-2).",
+      "type": "object",
+      "required": [
+        "run"
+      ],
+      "properties": {
+        "run": {
+          "description": "The run's own runId.",
+          "$ref": "common.schema.json#/$defs/id"
+        },
+        "runHash": {
+          "description": "The run's run hash.",
+          "$ref": "common.schema.json#/$defs/sha256Hex"
+        },
+        "result": {
+          "$ref": "common.schema.json#/$defs/resultId",
+          "description": "The result the event is about; it must be a result of the run (OVL-2)."
+        },
+        "requirement": {
+          "$ref": "common.schema.json#/$defs/id",
+          "description": "The requirement the event is about, by its external id (OVL-1)."
+        },
+        "blob": {
+          "description": "For redact: the SHA-256 of the blob withheld.",
+          "$ref": "common.schema.json#/$defs/sha256Hex"
+        }
+      }
+    },
+    "state": {
+      "description": "The state an override or adjudication sets on its result.",
+      "$ref": "common.schema.json#/$defs/state"
+    },
+    "reason": {
+      "description": "Why. Required for override, adjudicate, waive and redact (OVL-1).",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 4096
+    },
+    "expires": {
+      "$ref": "common.schema.json#/$defs/timestamp",
+      "description": "When a waiver ends. Required for waive (OVL-9)."
+    },
+    "by": {
+      "$ref": "common.schema.json#/$defs/trustedIdentity",
+      "description": "Who wrote the event, and the assurance the writer claims (OVL-1, OVL-3)."
+    },
+    "at": {
+      "$ref": "common.schema.json#/$defs/timestamp",
+      "description": "When the event was written. Shown, never used to reorder events (OVL-1, OVL-6)."
+    },
+    "ext": {
+      "$ref": "common.schema.json#/$defs/ext",
+      "description": "Producer extensions, named reverse-DNS or with the producer's prefix. A reader ignores what it does not know; never holds a secret (ENC-19)."
+    }
+  },
+  "allOf": [
+    {
+      "description": "A waiver always says why and until when.",
+      "if": {
+        "properties": {
+          "kind": {
+            "description": "Applies to a waiver (OVL-1).",
+            "const": "waive"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "reason",
+          "expires"
+        ]
+      }
+    },
+    {
+      "description": "An override or adjudication names the result, the state it sets, and why.",
+      "if": {
+        "properties": {
+          "kind": {
+            "description": "Applies to an override or an adjudication (OVL-1).",
+            "enum": [
+              "override",
+              "adjudicate"
+            ]
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "state",
+          "reason"
+        ],
+        "properties": {
+          "target": {
+            "description": "The target names a result (OVL-1).",
+            "required": [
+              "result"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "description": "A redaction names the blob and says why.",
+      "if": {
+        "properties": {
+          "kind": {
+            "description": "Applies to a redaction (OVL-1).",
+            "const": "redact"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "required": [
+          "reason"
+        ],
+        "properties": {
+          "target": {
+            "description": "The target names a blob (OVL-1).",
+            "required": [
+              "blob"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "description": "An approval or rejection is about the run or a result. (OVL-1)",
+      "if": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "approve",
+              "reject"
+            ]
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "target": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "requirement"
+                  ]
+                },
+                {
+                  "required": [
+                    "blob"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "An override or adjudication targets one result, never a requirement or a blob. (OVL-1)",
+      "if": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "override",
+              "adjudicate"
+            ]
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "target": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "requirement"
+                  ]
+                },
+                {
+                  "required": [
+                    "blob"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "A waiver targets a result or a requirement, never a blob. (OVL-1)",
+      "if": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "waive"
+            ]
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "target": {
+            "allOf": [
+              {
+                "not": {
+                  "anyOf": [
+                    {
+                      "required": [
+                        "blob"
+                      ]
+                    }
+                  ]
+                }
+              },
+              {
+                "anyOf": [
+                  {
+                    "required": [
+                      "result"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "requirement"
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "description": "A redaction targets a blob alone. (OVL-1)",
+      "if": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "redact"
+            ]
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "target": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "result"
+                  ]
+                },
+                {
+                  "required": [
+                    "requirement"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "A note, acknowledgement or baseline acceptance is about the run, a result or a requirement, never a blob. (OVL-1)",
+      "if": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "acknowledge",
+              "accept_baseline",
+              "annotate"
+            ]
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "target": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "blob"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "An override or adjudication never sets pending: a closed run has no pending result (RES-3, OVL-1).",
+      "if": {
+        "properties": {
+          "kind": {
+            "enum": [
+              "override",
+              "adjudicate"
+            ]
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "state": {
+            "not": {
+              "const": "pending"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

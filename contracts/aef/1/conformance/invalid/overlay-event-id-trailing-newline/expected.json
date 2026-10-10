@@ -1,0 +1,10 @@
+{
+  "kind": "document",
+  "schema": "overlay-event",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "ENC-15"
+  ],
+  "why": "an event id's pattern ends at the end of the input"
+}

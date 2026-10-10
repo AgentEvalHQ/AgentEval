@@ -1,0 +1,42 @@
+{
+  "description": "Freshness in hours: closed 37 h before, allowed 36 h.",
+  "rules": [
+    "DEC-1",
+    "DEC-2",
+    "DEC-3",
+    "DEC-4"
+  ],
+  "input": {
+    "subjectVersion": "git:3f2a1c",
+    "evaluatedAt": "2026-10-08T12:00:00Z",
+    "lanes": [
+      {
+        "lane": "security",
+        "blocking": true,
+        "freshness": "PT36H",
+        "evidence": [
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        ],
+        "result": {
+          "status": "passed",
+          "subjectVersion": "git:3f2a1c",
+          "oldestClosedAt": "2026-10-06T23:00:00Z"
+        }
+      }
+    ]
+  },
+  "expected": {
+    "outcome": "expired",
+    "lanes": [
+      {
+        "lane": "security",
+        "status": "stale",
+        "blocking": true
+      }
+    ],
+    "reasons": [
+      "stale:security",
+      "outcome:expired"
+    ]
+  }
+}

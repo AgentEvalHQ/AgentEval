@@ -1,0 +1,46 @@
+{
+  "suites": [
+    {
+      "ref": "suite:support/billing-disputes",
+      "version": "1",
+      "content": "suite:support/billing-disputes@1\nbill-1\nbill-2\nbill-3\nbill-4\n",
+      "cases": [
+        {
+          "caseId": "bill-1",
+          "state": "passed",
+          "usd": 0.25,
+          "usdBound": 0.25,
+          "seconds": 20,
+          "secondsBound": 20
+        },
+        {
+          "caseId": "bill-2",
+          "state": "passed",
+          "usd": 0.25,
+          "usdBound": 0.25,
+          "seconds": 20,
+          "secondsBound": 20
+        },
+        {
+          "caseId": "bill-3",
+          "state": "failed",
+          "severity": "none",
+          "usd": 0.25,
+          "usdBound": 0.25,
+          "seconds": 20,
+          "secondsBound": 20
+        },
+        {
+          "caseId": "bill-4",
+          "state": "passed",
+          "usd": 0.25,
+          "usdBound": 0.5,
+          "seconds": 20,
+          "secondsBound": 20
+        }
+      ]
+    }
+  ],
+  "closeSeconds": 1,
+  "priceTable": "aef-scripted-2026-10"
+}

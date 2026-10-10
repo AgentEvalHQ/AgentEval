@@ -1,0 +1,23 @@
+{
+  "kind": "overlay-view",
+  "run": "run",
+  "at": "2026-10-08T12:00:00Z",
+  "rules": [
+    "OVL-2",
+    "OVL-5",
+    "OVL-8"
+  ],
+  "view": {
+    "results": [],
+    "reviews": [
+      {
+        "target": "run",
+        "status": "reject",
+        "event": "ov_0003"
+      }
+    ],
+    "waivers": [],
+    "withheld": [],
+    "unsealedEvents": 0
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "kind": "plan",
+  "schema": "runner",
+  "writer": "valid",
+  "reader": "valid",
+  "rules": [
+    "PLAN-6"
+  ],
+  "why": "a local runner"
+}

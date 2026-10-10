@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- aef-dotnet: AgentEval.Results driven through the AEF conformance command-line contract (spec 09 §9.3), so the
+       Python runner can check a conformance class claim against it (tools/aef_conformance.py, with "dotnet
+       out/aef-dotnet.dll" as its command and the class to check; see run-corpus.sh). One operation per invocation, input paths as arguments, one JSON value on standard output. Not shipped. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <AssemblyName>aef-dotnet</AssemblyName>
+    <RootNamespace>AgentEval.Results.Conformance</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="AgentEval.Results.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AgentEval.Results\AgentEval.Results.csproj" />
+  </ItemGroup>
+
+</Project>

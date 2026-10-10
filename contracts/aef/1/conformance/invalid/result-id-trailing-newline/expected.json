@@ -1,0 +1,10 @@
+{
+  "kind": "document",
+  "schema": "result",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "RES-4"
+  ],
+  "why": "a result id is exactly r_ and 32 hex characters (refused by its length too)"
+}

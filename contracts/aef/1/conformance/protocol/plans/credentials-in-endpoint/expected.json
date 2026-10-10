@@ -1,0 +1,11 @@
+{
+  "kind": "plan",
+  "schema": "run-plan",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "PLAN-1",
+    "PLAN-4"
+  ],
+  "why": "an endpoint never carries credentials"
+}

@@ -1,0 +1,14 @@
+{
+  "kind": "run",
+  "run": "run",
+  "outcome": "invalid",
+  "problems": [
+    [
+      "results.ndjson:2",
+      "parent"
+    ]
+  ],
+  "rules": [
+    "RES-5"
+  ]
+}

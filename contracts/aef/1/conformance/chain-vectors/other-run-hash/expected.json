@@ -1,0 +1,14 @@
+{
+  "kind": "chain",
+  "run": "run",
+  "problems": [
+    [
+      "overlays/seal-0002.json",
+      "run-hash"
+    ]
+  ],
+  "rules": [
+    "OVL-4",
+    "OVL-5"
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "lanes": [
+    {
+      "lane": "quality",
+      "metrics": [
+        {
+          "metric": "quality",
+          "path": "q",
+          "aggregate": {
+            "method": "pass@k",
+            "k": 3
+          },
+          "value": 0.75
+        },
+        {
+          "metric": "quality",
+          "path": "z",
+          "aggregate": {
+            "method": "f1"
+          },
+          "value": 0.5
+        }
+      ]
+    }
+  ]
+}

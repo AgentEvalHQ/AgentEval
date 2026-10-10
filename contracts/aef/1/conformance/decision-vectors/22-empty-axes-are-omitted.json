@@ -1,0 +1,42 @@
+{
+  "description": "An incomparable lane with no axes named has no axes in the output.",
+  "rules": [
+    "DEC-1",
+    "DEC-2",
+    "DEC-3",
+    "DEC-4"
+  ],
+  "input": {
+    "subjectVersion": "git:3f2a1c",
+    "evaluatedAt": "2026-10-08T12:00:00Z",
+    "lanes": [
+      {
+        "lane": "memory",
+        "blocking": true,
+        "evidence": [
+          "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        ],
+        "result": {
+          "status": "incomparable",
+          "subjectVersion": "git:3f2a1c",
+          "oldestClosedAt": "2026-10-07T10:00:00Z",
+          "axes": []
+        }
+      }
+    ]
+  },
+  "expected": {
+    "outcome": "inconclusive",
+    "lanes": [
+      {
+        "lane": "memory",
+        "status": "incomparable",
+        "blocking": true
+      }
+    ],
+    "reasons": [
+      "incomparable:memory",
+      "outcome:inconclusive"
+    ]
+  }
+}

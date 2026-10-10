@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "S-1-0-with-a-1-1-line",
+  "lanes": [
+    {
+      "lane": "security",
+      "metrics": [
+        {
+          "metric": "ok",
+          "path": "a",
+          "n": 4,
+          "N": 4,
+          "notMeasured": 0,
+          "value": 0.5,
+          "verdict": "passed",
+          "rule": "recorded by the producer",
+          "sum": 2,
+          "sumSq": 2
+        }
+      ]
+    }
+  ]
+}

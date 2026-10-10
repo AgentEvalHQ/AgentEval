@@ -1,0 +1,10 @@
+{
+  "kind": "document",
+  "schema": "overlay-event",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "OVL-1"
+  ],
+  "why": "a waiver names the result or requirement it waives"
+}

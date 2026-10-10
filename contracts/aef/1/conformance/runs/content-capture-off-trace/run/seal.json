@@ -1,0 +1,67 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "evidence.ndjson",
+      "digest": {
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    {
+      "name": "gates.ndjson",
+      "digest": {
+        "sha256": "a7015f35139336ec94132638061773933c7e118c718e81dea171768d1377b26e"
+      }
+    },
+    {
+      "name": "metrics.json",
+      "digest": {
+        "sha256": "81ac87c69d20ca49d69e0a5541b062fe1f8fcc4529117c6d6f29eac1403b3d6c"
+      }
+    },
+    {
+      "name": "results.ndjson",
+      "digest": {
+        "sha256": "05d17be0c3581582985cf1fba806124023e81ee12405766a6e96141c0a88d1eb"
+      }
+    },
+    {
+      "name": "run.json",
+      "digest": {
+        "sha256": "51ee82b38cdc9a2657be2344bb0675fa4ccaca59dafe9d32a05b93cfdb3a48c3"
+      }
+    },
+    {
+      "name": "summary.json",
+      "digest": {
+        "sha256": "fe9548e607cab4fc632706c94cefc75b67a9efde0c1c0c6bb604206386960a3c"
+      }
+    },
+    {
+      "name": "traces.otlp.jsonl",
+      "digest": {
+        "sha256": "ea93c5e102d1ff5e60d631501a188bd342ca837f2a3a6e81021741f0400d014f"
+      }
+    }
+  ],
+  "predicateType": "https://agenteval.dev/aef/1/evidence",
+  "predicate": {
+    "schemaVersion": "1.0",
+    "runId": "run-small-1",
+    "runHash": "cbc20b443e9e40a98e9536a0d65aa7a00b2a1bf0914a6570ed24834e557fb070",
+    "producer": {
+      "name": "p",
+      "version": "1"
+    },
+    "subject": {
+      "ref": "agent:a/b",
+      "version": "v1"
+    },
+    "deployment": null,
+    "suite": null,
+    "judges": [],
+    "closedAt": "2026-10-01T00:01:00Z",
+    "sealedAt": "2026-10-08T09:00:00Z",
+    "sealedBy": "producer"
+  }
+}

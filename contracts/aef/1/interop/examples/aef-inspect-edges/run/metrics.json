@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0",
+  "metrics": [
+    {
+      "id": "letter",
+      "kind": "score",
+      "direction": "none",
+      "scale": "unbounded"
+    },
+    {
+      "id": "acc",
+      "kind": "score",
+      "direction": "none",
+      "scale": "unbounded"
+    },
+    {
+      "id": "grade",
+      "kind": "score",
+      "direction": "none",
+      "scale": "unbounded"
+    }
+  ]
+}

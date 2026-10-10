@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "otel-import-0001",
+  "status": "completed",
+  "producer": {
+    "name": "aef_interop.py",
+    "version": "1.0"
+  },
+  "subject": {
+    "ref": "agent:support/support-triage",
+    "kind": "agent",
+    "telemetry": {
+      "serviceName": "support-api"
+    }
+  },
+  "execution": {
+    "targetMode": "live"
+  },
+  "startedAt": "2026-10-02T14:02:15Z",
+  "endedAt": "2026-10-02T14:06:44.25Z",
+  "otel": {
+    "schemaUrls": [
+      "https://opentelemetry.io/schemas/gen-ai-dev/1.42.0-dev"
+    ]
+  },
+  "contentCapture": "on",
+  "imported": {
+    "from": "hand-written OTLP/JSON (opentelemetry.md)",
+    "asserted": [
+      "runId",
+      "status",
+      "subject.ref",
+      "subject.kind",
+      "execution.targetMode",
+      "startedAt",
+      "endedAt",
+      "contentCapture"
+    ]
+  }
+}

@@ -1,0 +1,26 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Interoperability with Microsoft's ASSERT (responsibleai/ASSERT, PyPI assert-ai): serve a .NET agent as an ASSERT
+       target, read an ASSERT run into AgentEval results, compute ASSERT's headline numbers, write ASSERT's judge inputs,
+       and calibrate ASSERT's judge on AgentEval's labelled cases. Shipped inside the AgentEval package (not packed on
+       its own). Formats pinned to assert-ai 0.3.0; see docs/assert-interop.md. -->
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>AgentEval.Interop.AssertAi</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="AgentEval.Tests" />
+    <!-- AEF import (AssertAiImporter) reads ASSERT's files with the same Python-compatible reader (AssertAiJson). -->
+    <InternalsVisibleTo Include="AgentEval.Results.Adapters" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../AgentEval.Abstractions/AgentEval.Abstractions.csproj" />
+    <ProjectReference Include="../AgentEval.Core/AgentEval.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.AI" />
+  </ItemGroup>
+</Project>

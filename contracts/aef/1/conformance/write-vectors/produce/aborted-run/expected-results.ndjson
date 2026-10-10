@@ -1,0 +1,3 @@
+{"schemaVersion":"1.0","resultId":"r_f766756ff9a9272ed3042b4d8ad337fd","caseId":"k1","path":"q","evaluator":{"id":"code:q"},"state":"passed","scores":[{"metric":"quality","value":0.8}]}
+{"schemaVersion":"1.0","resultId":"r_3abc231864518ed892305dad5c02ebae","caseId":"k2","path":"q","evaluator":{"id":"code:q"},"state":"error","reason":"The run was aborted while the case ran."}
+{"schemaVersion":"1.0","resultId":"r_8d807a1227ac464656a4524f38fb0747","caseId":"k3","path":"q","evaluator":{"id":"code:q"},"state":"skipped","reason":"Not run: the run was aborted."}

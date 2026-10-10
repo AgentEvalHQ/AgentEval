@@ -1,0 +1,10 @@
+{
+  "kind": "job",
+  "plan": "plan.json",
+  "runner": "../runner.json",
+  "target": "target.json",
+  "at": "2026-10-09T09:00:00Z",
+  "refused": true,
+  "rules": [],
+  "why": "the target has a member spec 09 §9.2.1 does not name (schemaVersion): not of its shape"
+}

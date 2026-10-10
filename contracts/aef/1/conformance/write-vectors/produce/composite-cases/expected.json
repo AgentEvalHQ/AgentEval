@@ -1,0 +1,79 @@
+{
+  "kind": "produce",
+  "rules": [
+    "RES-4",
+    "RES-5",
+    "RES-6",
+    "SUM-3",
+    "SUM-4"
+  ],
+  "scenario": "scenario.json",
+  "results": "expected-results.ndjson",
+  "summary": {
+    "schemaVersion": "1.0",
+    "runId": "produce-composite-cases",
+    "lanes": [
+      {
+        "lane": "quality",
+        "metrics": [
+          {
+            "metric": "pass_rate",
+            "path": "answer",
+            "N": 1,
+            "n": 1,
+            "notMeasured": 0,
+            "sum": 1,
+            "sumSq": 1,
+            "value": 1,
+            "verdict": "scored"
+          },
+          {
+            "metric": "quality",
+            "path": "answer",
+            "N": 1,
+            "n": 1,
+            "notMeasured": 0,
+            "sum": 0.85,
+            "sumSq": 0.7224999999999999,
+            "value": 0.85,
+            "verdict": "scored"
+          },
+          {
+            "metric": "pass_rate",
+            "path": "answer/tone",
+            "N": 1,
+            "n": 0,
+            "notMeasured": 1,
+            "sum": 0,
+            "sumSq": 0,
+            "value": null,
+            "verdict": "not_measured"
+          },
+          {
+            "metric": "pass_rate",
+            "path": "answer/citations",
+            "N": 0,
+            "n": 0,
+            "notMeasured": 0,
+            "sum": 0,
+            "sumSq": 0,
+            "value": null,
+            "verdict": "not_measured"
+          },
+          {
+            "metric": "pass_rate",
+            "path": "scenario",
+            "N": 1,
+            "n": 1,
+            "notMeasured": 0,
+            "sum": 0,
+            "sumSq": 0,
+            "value": 0,
+            "verdict": "scored"
+          }
+        ]
+      }
+    ]
+  },
+  "why": "Two composite cases. answer (WeightedSum) has three children: total 3 and measured 1, the not_measured and the not_applicable child counted in unmeasured (a composite counts every child, unlike SUM-4's N), decisive the grounded child's id. scenario (Own) has two assertions of weight 0, each with its component all the same. Every child has its parent's id and its component; the summary reads each path's lines."
+}

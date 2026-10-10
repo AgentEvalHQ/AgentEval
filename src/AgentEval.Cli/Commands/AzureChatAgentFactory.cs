@@ -18,14 +18,15 @@ namespace AgentEval.Cli.Commands;
 /// </summary>
 /// <remarks>
 /// <para>
-/// The name predates provider selection, as does the <c>--azure-from-env</c> flag: neither is
-/// Azure-only any more. With only the <c>AZURE_OPENAI_*</c> trio set, the resolver auto-detects
-/// Azure OpenAI and behaves as before.
+/// The name predates provider selection, as does <c>--azure-from-env</c>, the old name of
+/// <c>--from-env</c> (still accepted, see <see cref="FromEnvOption"/>): this class is not Azure-only any
+/// more. With only the <c>AZURE_OPENAI_*</c> trio set, the resolver auto-detects Azure OpenAI and behaves
+/// as before.
 /// </para>
 /// <para>
 /// Two entry points. <see cref="TryBuildFromEnv(string, string?)"/> wraps the client in
 /// <see cref="ChatClientAgentAdapter"/> as the agent under test when the caller passes
-/// <c>--azure-from-env</c> to a command that otherwise needs <c>--sut</c>, <c>--endpoint</c> or a supplied response
+/// <c>--from-env</c> to a command that otherwise needs <c>--sut</c>, <c>--endpoint</c> or a supplied response
 /// (for example <c>bench owasp</c>, <c>bench mitre</c>, <c>bench nist</c>, <c>bench perf</c>,
 /// <c>bench eu-ai-act</c>). <see cref="TryBuildChatClientFromEnv"/> returns the raw client, for
 /// <c>bench memory</c>, <c>bench longmemeval</c> and <c>bench typedmemeval</c>
@@ -76,7 +77,7 @@ internal static class AzureChatAgentFactory
         if (chatClient is null)
         {
             Console.Error.WriteLine(
-                "✖ --azure-from-env was passed but no inference provider is configured.\n" +
+                "✖ --from-env was passed but no inference provider is configured.\n" +
                 $"  {diagnostic}\n" +
                 "  Configure one and retry, or name another target (--sut, --endpoint/--model).");
             return (null, null, ExitCodes.RuntimeError);

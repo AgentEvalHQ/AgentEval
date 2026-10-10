@@ -1,0 +1,11 @@
+{
+  "kind": "document",
+  "schema": "run",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "RUN-8",
+    "RES-8"
+  ],
+  "why": "AtLeast is decided by requirePasses, the least number of passing trials, which it requires"
+}

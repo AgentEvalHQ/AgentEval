@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "SS",
+  "lanes": [
+    {
+      "lane": "security",
+      "metrics": [
+        {
+          "metric": "ok",
+          "path": "tools",
+          "n": 1,
+          "N": 1,
+          "notMeasured": 0,
+          "value": 1.0,
+          "verdict": "passed",
+          "rule": "recorded by the producer",
+          "sum": 1,
+          "sumSq": 1
+        },
+        {
+          "metric": "ok",
+          "path": "chat",
+          "n": 1,
+          "N": 1,
+          "notMeasured": 0,
+          "value": 1.0,
+          "verdict": "passed",
+          "rule": "recorded by the producer",
+          "sum": 1,
+          "sumSq": 1
+        }
+      ]
+    },
+    {
+      "lane": "quality",
+      "metrics": [
+        {
+          "metric": "ok",
+          "path": "chat",
+          "n": 1,
+          "N": 1,
+          "notMeasured": 0,
+          "value": 0.0,
+          "verdict": "passed",
+          "rule": "recorded by the producer",
+          "sum": 0,
+          "sumSq": 0
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+{
+  "kind": "plan-conformance",
+  "events": "events.ndjson",
+  "plan": "plan.json",
+  "runs": "runs",
+  "problems": [
+    [
+      "job",
+      "over-cases"
+    ]
+  ],
+  "rules": [
+    "STRM-4",
+    "PLAN-2",
+    "PLAN-8"
+  ],
+  "why": "two runs of two cases each: each within the plan's three, the job's four above it"
+}

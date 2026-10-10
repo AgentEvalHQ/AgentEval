@@ -1,0 +1,13 @@
+{
+  "kind": "stream",
+  "plan": "../plan.json",
+  "problems": [
+    [
+      "event:2",
+      "accepted-twice"
+    ]
+  ],
+  "rules": [
+    "STRM-3"
+  ]
+}

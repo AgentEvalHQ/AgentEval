@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0",
+  "metrics": [
+    {
+      "id": "m",
+      "kind": "score",
+      "direction": "sideways",
+      "scale": {
+        "min": 0,
+        "max": 1
+      }
+    }
+  ]
+}

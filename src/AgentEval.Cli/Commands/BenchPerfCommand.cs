@@ -97,7 +97,7 @@ public static class BenchPerfCommand
         }
 
         // ── Resolve target agent ─────────────────────────────────────────────
-        // --sut <target> / --endpoint (agentOverride) > --azure-from-env > the stand-in, only when asked for.
+        // --sut <target> / --endpoint (agentOverride) > --from-env > the stand-in, only when asked for.
         IEvaluableAgent agent;
         if (agentOverride is not null)
         {
@@ -118,7 +118,7 @@ public static class BenchPerfCommand
 
         // ── Build EvalInput from prompt(s) ───────────────────────────────────
         // P0-1: price the model the agent actually used: --model for an --endpoint target, the model the provider
-        // resolved for --azure-from-env. Without it the cost leaf falls back to agent.Name, which never matches a
+        // resolved for --from-env. Without it the cost leaf falls back to agent.Name, which never matches a
         // pricing entry.
         var resolvedPrompt = string.IsNullOrWhiteSpace(prompt) ? "Hello!" : prompt;
         var metadata = new Dictionary<string, object>

@@ -1,0 +1,12 @@
+{
+  "kind": "seal-write",
+  "rules": [
+    "SEAL-1",
+    "RUN-3"
+  ],
+  "run": "run",
+  "sealedBy": "ingest",
+  "sealedAt": "2026-10-08T09:00:00Z",
+  "refused": true,
+  "why": "Sealed on custody (ingest), a run is sealed only when its paths keep RUN-3; ext/notes v2.txt holds a space. The sealer refuses (exit status 2) and writes nothing."
+}

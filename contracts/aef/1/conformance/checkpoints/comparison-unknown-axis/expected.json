@@ -1,0 +1,12 @@
+{
+  "kind": "checkpoint",
+  "schema": "checkpoint",
+  "writer": "invalid",
+  "reader": "valid",
+  "rules": [
+    "LANE-6",
+    "VER-3"
+  ],
+  "why": "an axis a later minor adds: a reader accepts it, and the comparison is incomparable",
+  "problems": []
+}

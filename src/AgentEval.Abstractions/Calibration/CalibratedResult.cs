@@ -66,7 +66,20 @@ public record CalibratedResult
     /// Only meaningful when using <see cref="VotingStrategy.Unanimous"/>.
     /// </summary>
     public bool HasConsensus { get; init; }
-    
+
+    /// <summary>
+    /// False when fewer judges than <see cref="CalibratedJudgeOptions.MinimumJudgesRequired"/> measured anything
+    /// because the metric lacked an input it needs (see <c>MetricResult.Measured</c>). Such a result is neither
+    /// a pass nor a fail: <see cref="Score"/> is a placeholder 0 and <see cref="NotMeasuredReason"/> says why.
+    /// A judge that returned not measured is never counted in <see cref="JudgeScores"/>.
+    /// </summary>
+    public bool Measured { get; init; } = true;
+
+    /// <summary>
+    /// Why the evaluation was not measured (the metrics' own reasons), or null when <see cref="Measured"/> is true.
+    /// </summary>
+    public string? NotMeasuredReason { get; init; }
+
     /// <summary>
     /// Gets the number of judges that participated in the evaluation.
     /// </summary>
@@ -84,6 +97,9 @@ public record CalibratedResult
     {
         get
         {
+            if (!Measured)
+                return $"Not measured: {NotMeasuredReason}";
+
             var ciText = ConfidenceLower.HasValue && ConfidenceUpper.HasValue
                 ? string.Create(CultureInfo.InvariantCulture, $"95% CI: [{ConfidenceLower:F1}, {ConfidenceUpper:F1}]")
                 : "CI: N/A";

@@ -642,6 +642,89 @@ public class CalibratedJudgeTests
         Assert.Equal(90, result.Score);
     }
 
+    [Fact]
+    public async Task EvaluateAsync_EveryJudgeNotMeasured_ReturnsNotMeasured_NotZeroWithConsensus()
+    {
+        // Faithfulness needs a retrieved context; without one each judge returns not measured, placeholder 0.
+        var clients = new Dictionary<string, IChatClient>
+        {
+            ["J1"] = new FakeChatClient("""{"score": 90, "explanation": "unused"}"""),
+            ["J2"] = new FakeChatClient("""{"score": 90, "explanation": "unused"}"""),
+            ["J3"] = new FakeChatClient("""{"score": 90, "explanation": "unused"}"""),
+        };
+        var judge = new CalibratedJudge(clients.Select(kv => (kv.Key, kv.Value)).ToArray());
+        var noContext = new EvaluationContext { Input = "Q", Output = "A" };
+
+        var result = await judge.EvaluateAsync(noContext, jn => new FaithfulnessMetric(clients[jn]));
+
+        Assert.False(result.Measured);
+        Assert.Contains("not measured", result.NotMeasuredReason, StringComparison.OrdinalIgnoreCase);
+        Assert.Empty(result.JudgeScores);
+        Assert.False(result.HasConsensus);
+        Assert.Equal(0, result.Agreement);
+        Assert.StartsWith("Not measured:", result.Summary);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_OneJudgeNotMeasured_IsLeftOutOfTheVote()
+    {
+        var metrics = new Dictionary<string, IMetric>
+        {
+            ["J1"] = new FixedResultMetric(MetricResult.Pass("m", 80)),
+            ["J2"] = new FixedResultMetric(MetricResult.Pass("m", 100)),
+            ["J3"] = new FixedResultMetric(MetricResult.NotMeasured("m", "m: no reference answer was supplied: not measured.")),
+        };
+        var judge = new CalibratedJudge(
+            metrics.Keys.Select(k => (k, (IChatClient)new FakeChatClient())).ToArray(),
+            new CalibratedJudgeOptions { Strategy = VotingStrategy.Mean });
+
+        var result = await judge.EvaluateAsync(CreateSampleContext(), jn => metrics[jn]);
+
+        Assert.True(result.Measured);
+        Assert.Null(result.NotMeasuredReason);
+        Assert.Equal(90, result.Score); // (80+100)/2 — not (80+100+0)/3
+        Assert.Equal(["J1", "J2"], result.JudgeScores.Keys.Order());
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_NotEnoughMeasured_BecauseOfNotMeasured_ReturnsNotMeasured()
+    {
+        var metrics = new Dictionary<string, IMetric>
+        {
+            ["J1"] = new FixedResultMetric(MetricResult.Pass("m", 80)),
+            ["J2"] = new FixedResultMetric(MetricResult.NotMeasured("m", "m: no context: not measured.")),
+        };
+        var judge = new CalibratedJudge(
+            metrics.Keys.Select(k => (k, (IChatClient)new FakeChatClient())).ToArray(),
+            new CalibratedJudgeOptions { MinimumJudgesRequired = 2 });
+
+        var result = await judge.EvaluateAsync(CreateSampleContext(), jn => metrics[jn]);
+
+        Assert.False(result.Measured);
+        Assert.Equal("m: no context: not measured.", result.NotMeasuredReason);
+        Assert.Equal(["J1"], result.JudgeScores.Keys);
+    }
+
+    [Fact]
+    public async Task EvaluateAsync_NotEnoughMeasured_WithAFailedJudgeToo_ThrowsRatherThanNotMeasured()
+    {
+        // J3's failure is part of the shortfall: reading the result as "not measured" would hide the outage.
+        var metrics = new Dictionary<string, IMetric>
+        {
+            ["J1"] = new FixedResultMetric(MetricResult.Pass("m", 80)),
+            ["J2"] = new FixedResultMetric(MetricResult.NotMeasured("m", "m: no context: not measured.")),
+            ["J3"] = new ThrowingMetric("Model overloaded"),
+        };
+        var judge = new CalibratedJudge(
+            metrics.Keys.Select(k => (k, (IChatClient)new FakeChatClient())).ToArray(),
+            new CalibratedJudgeOptions { MinimumJudgesRequired = 2 });
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            judge.EvaluateAsync(CreateSampleContext(), jn => metrics[jn]));
+
+        Assert.Contains("J3: Model overloaded", ex.Message);
+    }
+
     #endregion
     
     #region Helper Methods
@@ -656,6 +739,22 @@ public class CalibratedJudgeTests
             GroundTruth = "Paris"
         };
     }
-    
+
+    private sealed class FixedResultMetric(MetricResult result) : IMetric
+    {
+        public string Name => result.MetricName;
+        public string Description => "Returns a fixed result.";
+        public Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken cancellationToken = default)
+            => Task.FromResult(result);
+    }
+
+    private sealed class ThrowingMetric(string message) : IMetric
+    {
+        public string Name => "m";
+        public string Description => "Always throws, as a failed judge call does.";
+        public Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken cancellationToken = default)
+            => throw new HttpRequestException(message);
+    }
+
     #endregion
 }

@@ -200,7 +200,9 @@ public class BaselineExtensionsTests
         Assert.NotEmpty(baseline.CategoryResults);
         Assert.All(baseline.CategoryResults.Values, entry =>
         {
+#pragma warning disable CS0618 // obsolete because nothing fills it, which is what this pins
             Assert.Null(entry.Stochastic);
+#pragma warning restore CS0618
             Assert.Equal(1, entry.ScenarioCount);
         });
     }

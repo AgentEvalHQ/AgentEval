@@ -1,0 +1,22 @@
+{
+  "lanes": [
+    {
+      "lane": "quality",
+      "metrics": [
+        {
+          "metric": "quality",
+          "path": "q"
+        }
+      ]
+    },
+    {
+      "lane": "quality",
+      "metrics": [
+        {
+          "metric": "pass_rate",
+          "path": "q"
+        }
+      ]
+    }
+  ]
+}

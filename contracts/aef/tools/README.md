@@ -1,0 +1,55 @@
+# AEF reference tools
+
+Python 3.12 (tested on Windows and Linux), standard library only. Run each as `python -X utf8 -I <tool>.py`.
+
+## Checking things
+
+| Tool | Does | Self-check |
+|---|---|---|
+| `aef_verify.py` | The reference verifier: runs, seals, overlay chains and views, checkpoints, lanes, signatures, paths, result ids. Written from the specification alone. | through `aef_conformance.py` |
+| `aef_conformance.py` | The conformance runner ([CONF-3](../1/spec/09-conformance.md#93-running-the-corpus)): runs every vector of the corpus through an implementation and compares the results; judges the write-side vectors with the reference verifier. `--self-check` switches checks of the verifier off, and breaks writers of `aef_produce.py`, one at a time, and confirms the corpus notices each. | `--self-check` |
+| `aef_produce.py` | The reference writer for the write-side vectors: computes a run's `summary.json`, writes a run from a scenario's facts (result ids, parents, trials, rollups, aggregation counts, summary), seals a run, signs a file with a PKCS#8 key. Written from the specification alone. | through `aef_conformance.py --self-check` |
+| `aef_decide.py` | The decision function (spec 05, §5.4). | `--check` |
+| `aef_stream.py` | The runner stream verifier and plan matching (spec 06). | `--check` |
+| `aef_runner.py` | A minimal reference runner (spec 06), written from spec 06 and §9.2.1 alone: `job PLAN RUNNER TARGET OUT [--at TIME]`, the `job` operation of [§9.3](../1/spec/09-conformance.md#93-running-the-corpus), runs a plan against a scripted target (a fixture of suites and cases with fixed states, severities, costs, durations and their bounds). It takes a plan only when [PLAN-7] says it does by the manifest's `targetModes` and the plan asks for `scripted` and the isolation `process`, resolves every credential (an `env` one when its variable is set and not empty; never `keychain` or `vault`, [PLAN-3]) and every suite (in the target, once, with the plan's `digest`, [PLAN-8]) before it accepts, keeps the suite's case ids and names its lane on each line (and no judges: no model grades a scripted case), stops at the plan's `maxUsd` (in both sums the verifiers compute), `cases` or `timeout` against each case's bounds with `job.failed` ([PLAN-9]), and writes the event stream and one sealed run per suite, with their `provenance`. `--at` fixes the clock, so the output is reproducible. | the `job` vectors, through `aef_conformance.py` (and `--self-check`); `check_runner.py` |
+| `check_runner.py` | Runs `aef_runner.py` where the `job` vectors do not reach, and judges each job with their judge (`aef_conformance.py`, §9.3): the plans of the protocol corpus (as copies the runner can run: asking for `scripted`, without `keychain` or `vault` credentials) and its matching pairs, against a scripted target of their suites, where the runner must take exactly the plans `aef_stream.py`'s matching and the suites allow, with byte-identical output for the same inputs and `--at`; one job on the system clock; and the usage and input errors (exit 2, nothing written), with `aef_verify.py stream` and `conform` given a plan the reader refuses. | runs on the files |
+| `aef_schema.py` | A JSON Schema 2020-12 validator with the pattern semantics AEF requires ([ENC-14], [ENC-15]). | `--self-test` (compares with the `jsonschema` package when it is installed) |
+| `aef_crypto.py` | DSSE, ECDSA P-256 and Ed25519, key ids. | `--self-test` |
+| `check_spec.py` | Checks that the spec, the schemas and the corpus agree: rule ids, problem codes, field names; that the spec's tables keep their rows; and that no published page cites a review id, which only the editors' notes resolve. | runs on the files |
+| `schema_diff.py` | Fails on a schema change a minor version may not make ([VER-5], [CONF-5]). | `--self-test` |
+
+## Interop (informative)
+
+| Tool | Does | Self-check |
+|---|---|---|
+| `aef_interop.py` | Reference converters for two of the [interop mappings](../1/interop/README.md), written from their pages alone: `to-otel` (a run as OpenTelemetry `gen_ai.evaluation.result` events, OTLP/JSON logs), `from-otel` (OTLP/JSON logs as an imported run, sealed as `ingest`), `to-inspect` (a run as an Inspect eval log) and `from-inspect` (an Inspect eval log as an imported run, sealed as `ingest` when closed). It reads and writes only runs that verify (through `aef_verify.py`), and follows the rules and refusals the pages state beyond their tables (OT-1 to OT-10, IN-1 to IN-13), and a refusal names its rule. | through `check_interop.py` |
+| `check_interop.py` | Runs the checked examples in `1/interop/examples/`: reruns each conversion and compares the output as JSON values (other files byte for byte: the pages fix values, not bytes), checks the refusals, verifies every run with `aef_verify.py run`, checks a round trip's losses field by field against the page's "What does not carry over" list, and checks that the pages' worked-example blocks equal the examples' data. Not conformance vectors. `--update` rewrites the expected outputs. | runs on the files |
+
+## Building the corpus and the derived files
+
+Every expected result in the corpus is written by hand in these generators; each generator implements only what it
+writes (a seal, a result id, a key id). Run them in this order; they rewrite their files byte for byte:
+
+1. `derive_reader.py`: the reader schemas from the writer schemas ([VER-3]).
+2. `build_conformance.py`: valid runs, run, encoding, seal, chain and overlay-view vectors, invalid and reader-only
+   documents, checkpoint manifests, path lists, result ids.
+3. `lane_vectors.py`: checkpoints with small sealed runs.
+4. `signature_vectors.py`: envelopes, test keys (public and private) and trust policies, and signed runs.
+5. `decision_vectors.py`, `protocol_vectors.py`: the decision function's and the runner protocol's vectors.
+6. `write_vectors.py`: the write-side vectors (`summarize`, `produce`, `seal-write`, `sign`), from the runs, seals
+   and keys above.
+7. `pin_vectors.py`: `conformance/rulings/`, one vector per ruling made where two implementations disagreed (each of
+   an existing kind).
+8. `job_vectors.py`: `conformance/jobs/`, the Runner's `job` vectors: a plan, a scripted target and the job expected.
+9. `build_index.py`: `conformance/index.json`, last.
+10. `gen_reference.py`: the field reference from the schemas (`--check` fails when the pages are stale; the AEF CI job runs it).
+
+## Testing your implementation
+
+`aef_conformance.py --command "<your program>"` drives any implementation that follows the command-line contract of
+[§9.3](../1/spec/09-conformance.md#93-running-the-corpus): its table gives every operation, its arguments and its
+output. `aef_verify.py` follows it, and its module docstring adds detail.
+
+The runner checks every
+corpus file against `index.json` first, so a modified corpus cannot pass. To claim conformance, run the vectors of
+the classes you claim and name the corpus version (the SHA-256 of `index.json`) in the claim ([CONF-4]).

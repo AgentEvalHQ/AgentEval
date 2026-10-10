@@ -1,0 +1,13 @@
+{
+  "kind": "job",
+  "plan": "plan.json",
+  "runner": "runner.json",
+  "target": "target.json",
+  "at": "2026-10-09T09:00:00Z",
+  "refused": true,
+  "rules": [
+    "PLAN-6",
+    "VER-3"
+  ],
+  "why": "the manifest the runner acts as supports no provider: the reader schema refuses it, so there is no runner to run the job as"
+}

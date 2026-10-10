@@ -1,0 +1,13 @@
+{
+  "kind": "seal",
+  "run": "run",
+  "problems": [
+    [
+      "seal.json",
+      "run-hash"
+    ]
+  ],
+  "rules": [
+    "SEAL-6"
+  ]
+}

@@ -83,3 +83,7 @@ its gate and two are INCOMPLETE.
 - **Cases** counts the cases scored. Evaluators that a single-turn golden case cannot exercise are carved out of
   `calibrate` and not counted; the [agentic how-it-works page](agentic/how-it-works.md#calibration-quality-today)
   lists them and why.
+- **The categories are as this run grouped them.** Since then, `goal_decomposition_quality` and `refusal_quality`
+  are grouped under Reasoning and UX. They ended in "quality" and were filed under Quality by mistake. Memory is no
+  longer SKIP: four memory and multi-turn evaluators, and `intermediate_step_hallucination`, are dispatched again now
+  that golden cases can carry earlier turns and tool calls. None of these changes has been measured yet.

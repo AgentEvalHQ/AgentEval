@@ -1,0 +1,28 @@
+{
+  "direction": "OpenTelemetry → AEF",
+  "page": "opentelemetry.md",
+  "sections": ["OpenTelemetry → AEF", "Worked example"],
+  "description": "A hand-written OTLP/JSON logs file (input.jsonl): the page's exported event; the OpenTelemetry registry's own example (Relevance 4.0, labelled relevant, for the completion chatcmpl-123, under a schema URL); and another evaluator's batch with a value without a label, a typed absence, error.type alone, the label error with error.type and no explanation (OT-5: the type is the reason, not a refusal), error.type beside an explanation (OT-5), a state-name label with a value, and a log record that is no evaluation event. from-otel imports it as run otel-import-0001 (run/), sealed as ingest, with what it supplied in imported.asserted, contentCapture on included (OT-4). Asked for contentCapture off, the converter refuses this file: its records carry explanations, which SEC-6 forbids in such a run's logs. Each file under refusals/ is an event the page does not place, which the converter refuses (OT-4, OT-6, RUN-14).",
+  "steps": [
+    {"args": ["from-otel", "input.jsonl", "{out}", "--run-id", "otel-import-0001", "--from", "hand-written OTLP/JSON (opentelemetry.md)", "--subject", "agent:support/support-triage", "--subject-kind", "agent", "--target-mode", "live", "--at", "2026-10-09T00:00:00Z"], "expected": "run"}
+  ],
+  "refusals": [
+    {"args": ["from-otel", "refusals/no-case.jsonl", "{out}", "--run-id", "r", "--from", "f", "--subject", "agent:a", "--subject-kind", "agent", "--target-mode", "live", "--at", "2026-10-09T00:00:00Z"], "says": "OT-6"},
+    {"args": ["from-otel", "refusals/same-name.jsonl", "{out}", "--run-id", "r", "--from", "f", "--subject", "agent:a", "--subject-kind", "agent", "--target-mode", "live", "--at", "2026-10-09T00:00:00Z"], "says": "OT-6"},
+    {"args": ["from-otel", "refusals/label-without-value.jsonl", "{out}", "--run-id", "r", "--from", "f", "--subject", "agent:a", "--subject-kind", "agent", "--target-mode", "live", "--at", "2026-10-09T00:00:00Z"], "says": "OT-6"},
+    {"args": ["from-otel", "refusals/absence-with-value.jsonl", "{out}", "--run-id", "r", "--from", "f", "--subject", "agent:a", "--subject-kind", "agent", "--target-mode", "live", "--at", "2026-10-09T00:00:00Z"], "says": "OT-6"},
+    {"args": ["from-otel", "refusals/absence-without-explanation.jsonl", "{out}", "--run-id", "r", "--from", "f", "--subject", "agent:a", "--subject-kind", "agent", "--target-mode", "live", "--at", "2026-10-09T00:00:00Z"], "says": "OT-6"},
+    {"args": ["from-otel", "refusals/pending.jsonl", "{out}", "--run-id", "r", "--from", "f", "--subject", "agent:a", "--subject-kind", "agent", "--target-mode", "live", "--at", "2026-10-09T00:00:00Z"], "says": "OT-6"},
+    {"args": ["from-otel", "refusals/label-beside-error-type.jsonl", "{out}", "--run-id", "r", "--from", "f", "--subject", "agent:a", "--subject-kind", "agent", "--target-mode", "live", "--at", "2026-10-09T00:00:00Z"], "says": "OT-6"},
+    {"args": ["from-otel", "refusals/nothing-measured.jsonl", "{out}", "--run-id", "r", "--from", "f", "--subject", "agent:a", "--subject-kind", "agent", "--target-mode", "live", "--at", "2026-10-09T00:00:00Z"], "says": "OT-6"},
+    {"args": ["from-otel", "refusals/two-services.jsonl", "{out}", "--run-id", "r", "--from", "f", "--subject", "agent:a", "--subject-kind", "agent", "--target-mode", "live", "--at", "2026-10-09T00:00:00Z"], "says": "OT-4"},
+    {"args": ["from-otel", "input.jsonl", "{out}", "--run-id", "r", "--from", "f", "--subject", "agent:a", "--subject-kind", "agent", "--target-mode", "live", "--at", "2026-10-02T14:06:44Z"], "says": "SEAL-1"},
+    {"args": ["from-otel", "input.jsonl", "{out}", "--run-id", "r", "--from", "f", "--subject", "agent:a", "--subject-kind", "agent", "--target-mode", "live", "--content-capture", "off", "--at", "2026-10-09T00:00:00Z"], "says": "content-capture"}
+  ],
+  "runs": {"run": "intact"},
+  "pageBlocks": [
+    {"page": "opentelemetry.md", "section": "Worked example", "block": 2, "equals": {"file": "input.jsonl", "line": 1}},
+    {"page": "opentelemetry.md", "section": "Worked example", "block": 3, "equals": {"file": "run/results.ndjson", "line": 1}},
+    {"page": "opentelemetry.md", "section": "Worked example", "block": 4, "equals": {"file": "run/results.ndjson", "line": 2}}
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "kind": "plan-conformance",
+  "events": "events.ndjson",
+  "plan": "plan.json",
+  "runs": "runs",
+  "problems": [],
+  "rules": [
+    "STRM-4",
+    "RUN-9"
+  ],
+  "why": "the plan's judge names its model and provider and no rubric, which it leaves to the runner; the run names the rubric that graded: the plan's judge, within"
+}

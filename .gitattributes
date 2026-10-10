@@ -14,3 +14,10 @@ src/AgentEval.Memory/Data/longmemeval/timegrounded/*.json text eol=lf
 # provenance, and its metadata sidecar records the hash it describes, so a CRLF checkout must
 # not make the two disagree.
 src/AgentEval.Memory/Data/typedmemeval/**/*.json text eol=lf
+
+# The ASSERT sample run is content-hashed by its importer and by interop/assert.md's worked example (suite version,
+# rubric digest): its bytes must not depend on the platform that checked it out.
+samples/interop/assert-ai/example-run/** text eol=lf
+
+# Shell scripts run on Linux runners and in containers: a CR breaks `set -o pipefail`.
+*.sh text eol=lf

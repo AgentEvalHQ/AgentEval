@@ -1,0 +1,57 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "kE7rQx2mVt9uJ3pL8sNw4a",
+  "status": "completed",
+  "producer": {
+    "name": "aef_interop.py",
+    "version": "1.0"
+  },
+  "subject": {
+    "ref": "model:openai/gpt-5.1-mini",
+    "kind": "model"
+  },
+  "execution": {
+    "targetMode": "live"
+  },
+  "suite": {
+    "ref": "suite:refund_policy",
+    "version": "3",
+    "executionPolicy": {
+      "trialsPerCase": 2,
+      "aggregation": "MajorityVote"
+    }
+  },
+  "judges": [
+    {
+      "model": "openai/gpt-5.1"
+    }
+  ],
+  "startedAt": "2026-10-06T10:00:01.25Z",
+  "endedAt": "2026-10-06T10:04:30Z",
+  "contentCapture": "off",
+  "imported": {
+    "from": "inspect_ai 0.3.277",
+    "asserted": [
+      "subject.ref",
+      "subject.kind",
+      "execution.targetMode",
+      "contentCapture"
+    ]
+  },
+  "ext": {
+    "inspect_ai": {
+      "run_id": "Fz5cHn8yRb2wKq6tDm1pXe",
+      "eval_set_id": "Lp3sV8dQ2mXc",
+      "dataset": {
+        "name": "refunds",
+        "location": "refunds.jsonl",
+        "samples": 3,
+        "sample_ids": [
+          1,
+          "tricky",
+          "broken"
+        ]
+      }
+    }
+  }
+}

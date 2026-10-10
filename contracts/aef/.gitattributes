@@ -1,0 +1,4 @@
+# Seals hash exact bytes: git must never convert line endings in the corpus (a CRLF file is a vector).
+1/conformance/** -text
+# The interop examples hold sealed runs and NDJSON, and tools/check_interop.py compares them byte for byte.
+1/interop/examples/** -text

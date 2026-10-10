@@ -1,0 +1,30 @@
+{
+  "kind": "chain",
+  "run": "run",
+  "generate": [
+    {
+      "copy": [
+        "valid/completed-eval/run",
+        "run"
+      ]
+    },
+    {
+      "ill-formed-name": [
+        "run/overlays",
+        "n",
+        "o.txt"
+      ]
+    }
+  ],
+  "problems": [
+    [
+      "overlays/n�o.txt",
+      "unexpected-file"
+    ]
+  ],
+  "rules": [
+    "OVL-5",
+    "RUN-3"
+  ],
+  "why": "the same name under overlays/, as the chain reports it: an unexpected file, named with U+FFFD in place of the ill-formed unit."
+}

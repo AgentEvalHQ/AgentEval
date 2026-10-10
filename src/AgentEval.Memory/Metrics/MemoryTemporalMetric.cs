@@ -37,7 +37,8 @@ public class MemoryTemporalMetric : IMemoryMetric
             var memoryResult = context.GetProperty<MemoryEvaluationResult>(MemoryEvaluationContextExtensions.MemoryResultKey);
             if (memoryResult == null)
             {
-                return Task.FromResult(MetricResult.Fail(Name, "MemoryEvaluationResult not found in evaluation context."));
+                return Task.FromResult(MetricResult.NotMeasured(Name,
+                    "MemoryEvaluationResult not found in evaluation context, and this metric reads it: not measured."));
             }
 
             // Check if this was a temporal evaluation
@@ -50,6 +51,12 @@ public class MemoryTemporalMetric : IMemoryMetric
                     ["reason"] = "Non-temporal scenario"
                 };
                 return Task.FromResult(MetricResult.Pass(Name, 0, "Non-temporal scenario - metric not applicable", notApplicableDetails));
+            }
+
+            if (!memoryResult.IsMeasured)
+            {
+                return Task.FromResult(MetricResult.NotMeasured(Name,
+                    "Not measured: the judge produced no score for any query."));
             }
 
             // Extract temporal-specific metrics

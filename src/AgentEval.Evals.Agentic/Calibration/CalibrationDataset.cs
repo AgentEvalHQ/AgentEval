@@ -4,6 +4,7 @@
 
 using System.Reflection;
 using System.Text.Json;
+using AgentEval.Evals.Agentic.Conversation;
 
 namespace AgentEval.Evals.Agentic.Calibration;
 
@@ -24,6 +25,35 @@ public sealed record CalibrationEntry(
     /// similarity was calibrated on a judge that improvised a reference (#203, B12a).
     /// </summary>
     public string? GroundTruth { get; init; }
+
+    /// <summary>
+    /// The turns before <see cref="Input"/>, oldest first, for an evaluator that grades a reply against the conversation
+    /// (<c>memory_recall_accuracy</c>, <c>turn_coherence</c>, <c>goal_tracking</c>). Passed as
+    /// <see cref="EvalInput.Metadata"/>[<see cref="ConversationHistoryHelper.MetadataKey"/>], where those evaluators read
+    /// it at run time. The goldens used to paste the turns into <see cref="Input"/> as text, which the evaluators do not
+    /// read, so they skipped every entry and were carved out of calibration.
+    /// </summary>
+    public IReadOnlyList<ConversationTurn>? ConversationHistory { get; init; }
+
+    /// <summary>The context or documents the agent had; passed as <see cref="EvalInput.Context"/>.</summary>
+    public string? Context { get; init; }
+
+    /// <summary>
+    /// The tool calls the agent made, in the order it made them; passed as <see cref="EvalInput.ToolCalls"/>, so an
+    /// evaluator that checks the response against tool results (<c>intermediate_step_hallucination</c>) sees them.
+    /// </summary>
+    public IReadOnlyList<ToolCall>? ToolCalls { get; init; }
+
+    /// <summary>The <see cref="EvalInput"/> this entry is graded on.</summary>
+    public EvalInput ToEvalInput() => new(
+        Query: Input,
+        Response: AgentResponse,
+        Context: Context,
+        GroundTruth: GroundTruth,
+        ToolCalls: ToolCalls,
+        Metadata: ConversationHistory is { Count: > 0 } history
+            ? new Dictionary<string, object> { [ConversationHistoryHelper.MetadataKey] = history }
+            : null);
 }
 
 /// <summary>A named collection of calibration entries for a single agentic category.</summary>
@@ -166,9 +196,23 @@ public sealed class CalibrationDatasetLoader
 
         var lower = keyOrSuffix.ToLowerInvariant();
 
+        // Exact evaluator keys first. The filename-suffix scan below used to run first and caught every key ending in
+        // "quality": refusal_quality (ux), goal_decomposition_quality, plan_formulation_quality and
+        // self_correction_quality (reasoning) were all calibrated, and gated, as "quality".
+        if (ExactKeyCategory(lower) is { } exact) return exact;
+
+        // ── Evaluator-key prefixes ───────────────────────────────────────────
+        // Original mappings (preserved for backwards compatibility):
+        if (lower.StartsWith("task_", StringComparison.Ordinal) ||
+            lower.StartsWith("intent_", StringComparison.Ordinal))
+            return "system";
+
+        if (lower.StartsWith("tool_", StringComparison.Ordinal))
+            return "process";
+
         // Filename-style suffix: "20-system" / "20-process" / "20-quality" / "ux" / etc.
         // These match the suffix of golden filenames like "golden-20-quality" → "quality"
-        // and "golden-memory-multiturn" → "memory" (via the explicit-key path below).
+        // and "golden-memory-multiturn" → "memory".
         if (lower.EndsWith("system", StringComparison.Ordinal)) return "system";
         if (lower.EndsWith("process", StringComparison.Ordinal)) return "process";
         if (lower.EndsWith("quality", StringComparison.Ordinal)) return "quality";
@@ -180,15 +224,11 @@ public sealed class CalibrationDatasetLoader
         if (lower.EndsWith("adversarial-direct", StringComparison.Ordinal)) return "adversarial";
         if (lower.EndsWith("safety", StringComparison.Ordinal)) return "safety";
 
-        // ── Evaluator-key prefixes / exact matches ───────────────────────────
-        // Original mappings (preserved for backwards compatibility):
-        if (lower.StartsWith("task_", StringComparison.Ordinal) ||
-            lower.StartsWith("intent_", StringComparison.Ordinal))
-            return "system";
+        return "unknown";
+    }
 
-        if (lower.StartsWith("tool_", StringComparison.Ordinal))
-            return "process";
-
+    private static string? ExactKeyCategory(string lower)
+    {
         // T1.3 extensions: route the 38 previously-"unknown" evaluator keys into
         // their proper buckets. Per the v1.1 audit (plan-13 Part 4), 25 of these
         // already had goldens on disk but were silently dropped by the runner;
@@ -269,7 +309,7 @@ public sealed class CalibrationDatasetLoader
                 return "safety";
 
             default:
-                return "unknown";
+                return null;
         }
     }
 }

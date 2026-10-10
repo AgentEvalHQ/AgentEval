@@ -1,0 +1,20 @@
+{
+  "kind": "signature",
+  "envelope": "envelope.dsse.json",
+  "file": "seal.json",
+  "payloadType": "application/vnd.in-toto+json",
+  "policy": "policy.json",
+  "envelopeResult": null,
+  "signatures": [
+    {
+      "keyid": "",
+      "result": "untrusted-key"
+    }
+  ],
+  "verifiesFor": [],
+  "rules": [
+    "SIG-2",
+    "SIG-5",
+    "SIG-6"
+  ]
+}

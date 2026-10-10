@@ -1,0 +1,21 @@
+{
+  "kind": "signature",
+  "envelope": "envelope.dsse.json",
+  "file": "seal.json",
+  "payloadType": "application/vnd.in-toto+json",
+  "policy": "policy.json",
+  "envelopeResult": "payload-mismatch",
+  "signatures": [
+    {
+      "keyid": "sha256:b5465da5f72069887e490258fc60e5319c05344df17f2c9d91ad2c779d07734e",
+      "result": "verified",
+      "identity": "git:alice@example.com"
+    }
+  ],
+  "verifiesFor": [],
+  "rules": [
+    "SIG-1",
+    "SIG-5",
+    "SIG-6"
+  ]
+}

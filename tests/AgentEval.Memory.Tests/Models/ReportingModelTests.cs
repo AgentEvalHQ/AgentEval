@@ -127,8 +127,9 @@ public class ReportingModelTests
         Assert.Null(dim.BestBaselineId);
     }
 
-    // --- StochasticData tests ---
+    // --- StochasticData tests (obsolete type; kept working until it is removed) ---
 
+#pragma warning disable CS0618
     [Fact]
     public void StochasticData_CoefficientOfVariation_ComputedCorrectly()
     {
@@ -142,6 +143,7 @@ public class ReportingModelTests
         var data = new StochasticData { Runs = 5, Mean = 0, StdDev = 4, Min = 0, Max = 0 };
         Assert.Equal(0, data.CoefficientOfVariation);
     }
+#pragma warning restore CS0618
 
     // --- JSON round-trip tests ---
 

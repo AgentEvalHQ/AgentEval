@@ -1,0 +1,26 @@
+{
+  "lanes": [
+    {
+      "lane": "quality",
+      "metrics": [
+        {
+          "metric": "quality",
+          "path": "q",
+          "rule": "quality >= 0.5",
+          "verdict": "failed"
+        },
+        {
+          "metric": "latency",
+          "path": "q",
+          "aggregate": {
+            "method": "median"
+          }
+        },
+        {
+          "metric": "quality",
+          "path": "q/absent"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,65 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "kE7rQx2mVt9uJ3pL8sNw4a",
+  "lanes": [
+    {
+      "lane": "main",
+      "metrics": [
+        {
+          "metric": "correct",
+          "path": "correct",
+          "N": 3,
+          "n": 2,
+          "notMeasured": 1,
+          "sum": 1.5,
+          "sumSq": 1.25,
+          "value": 0.75,
+          "verdict": "scored",
+          "stderr": 0.25
+        },
+        {
+          "metric": "quality",
+          "path": "quality",
+          "N": 3,
+          "n": 2,
+          "notMeasured": 1,
+          "sum": 1.7000000000000002,
+          "sumSq": 1.4500000000000002,
+          "value": 0.8500000000000001,
+          "verdict": "scored",
+          "stderr": 0.05
+        }
+      ]
+    }
+  ],
+  "usage": [
+    {
+      "role": "agent",
+      "model": "openai/gpt-5.1-mini",
+      "gen_ai.usage.input_tokens": 720,
+      "gen_ai.usage.output_tokens": 180,
+      "gen_ai.usage.cache_read.input_tokens": 256,
+      "costUsd": 0.0018
+    },
+    {
+      "role": "judge",
+      "model": "openai/gpt-5.1",
+      "gen_ai.usage.input_tokens": 1600,
+      "gen_ai.usage.output_tokens": 240,
+      "gen_ai.usage.reasoning.output_tokens": 128,
+      "costUsd": 0.008
+    }
+  ],
+  "cost": {
+    "totalUsd": 0.0098
+  },
+  "ext": {
+    "inspect_ai": {
+      "metrics": {
+        "quality": {
+          "max": 0.9
+        }
+      }
+    }
+  }
+}

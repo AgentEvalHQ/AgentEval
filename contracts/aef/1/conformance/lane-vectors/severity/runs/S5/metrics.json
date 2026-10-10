@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0",
+  "metrics": [
+    {
+      "id": "ok",
+      "kind": "rate",
+      "direction": "higher_better",
+      "scale": {
+        "min": 0,
+        "max": 1
+      }
+    }
+  ]
+}

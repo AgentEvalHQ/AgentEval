@@ -1,0 +1,13 @@
+{
+  "kind": "reader-only",
+  "schema": "checkpoint",
+  "writer": "invalid",
+  "reader": "valid",
+  "reads": {
+    "lanes[0].rule.op": "not_measured"
+  },
+  "rules": [
+    "VER-8",
+    "LANE-2"
+  ]
+}

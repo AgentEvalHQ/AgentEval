@@ -14,7 +14,7 @@ public class ModelPricingTests
 {
     [Theory]
     [InlineData("gpt-5.5", 1000, 1000, 0.035)] // 0.005 + 0.030
-    [InlineData("gpt-4o", 1000, 500, 0.0125)] // 0.005 + 0.0075
+    [InlineData("gpt-4o", 1000, 500, 0.0075)] // 0.0025 + 0.005
     [InlineData("gpt-4o-mini", 1000, 500, 0.00045)] // 0.00015 + 0.0003
     [InlineData("gpt-3.5-turbo", 1000, 1000, 0.002)] // 0.0005 + 0.0015
     public void EstimateCost_WithKnownModel_ReturnsCorrectCost(
@@ -38,7 +38,7 @@ public class ModelPricingTests
         var pricing = ModelPricing.GetPricing(deployment);
 
         Assert.NotNull(pricing);
-        // gpt-4o-mini input = 0.00015/1K, NOT gpt-4 (0.03) or gpt-4o (0.005).
+        // gpt-4o-mini input = 0.00015/1K, NOT gpt-4 (0.03) or gpt-4o (0.0025).
         Assert.Equal(0.00015m, pricing!.Value.InputPer1K);
         Assert.Equal(0.0006m, pricing.Value.OutputPer1K);
     }
@@ -49,7 +49,7 @@ public class ModelPricingTests
         var pricing = ModelPricing.GetPricing("eastus-gpt-4o-chat");
 
         Assert.NotNull(pricing);
-        Assert.Equal(0.005m, pricing!.Value.InputPer1K); // gpt-4o, not gpt-4 (0.03)
+        Assert.Equal(0.0025m, pricing!.Value.InputPer1K); // gpt-4o, not gpt-4 (0.03)
     }
 
     [Fact]

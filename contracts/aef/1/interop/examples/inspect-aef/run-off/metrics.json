@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "1.0",
+  "metrics": [
+    {
+      "id": "correct",
+      "kind": "score",
+      "direction": "none",
+      "scale": "unbounded"
+    },
+    {
+      "id": "quality",
+      "kind": "score",
+      "direction": "none",
+      "scale": "unbounded"
+    },
+    {
+      "id": "cites_policy",
+      "kind": "score",
+      "direction": "none",
+      "scale": "unbounded"
+    },
+    {
+      "id": "steps",
+      "kind": "score",
+      "direction": "none",
+      "scale": "unbounded"
+    }
+  ]
+}

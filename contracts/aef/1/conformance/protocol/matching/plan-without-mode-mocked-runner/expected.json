@@ -1,0 +1,8 @@
+{
+  "kind": "matching",
+  "matches": false,
+  "rules": [
+    "PLAN-7"
+  ],
+  "why": "a plan that names no target mode asks for live, and the runner gives only a mock"
+}

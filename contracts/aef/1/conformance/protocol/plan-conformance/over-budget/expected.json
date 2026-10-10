@@ -1,0 +1,17 @@
+{
+  "kind": "plan-conformance",
+  "events": "events.ndjson",
+  "plan": "plan.json",
+  "runs": "runs",
+  "problems": [
+    [
+      "job",
+      "over-budget"
+    ]
+  ],
+  "rules": [
+    "STRM-4",
+    "PLAN-2"
+  ],
+  "why": "one run, named by job.failed, that cost $3.40 on a plan of $3.00"
+}

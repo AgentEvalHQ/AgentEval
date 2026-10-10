@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "R-sum-beyond-binary64",
+  "lanes": [
+    {
+      "lane": "quality",
+      "metrics": [
+        {
+          "metric": "m",
+          "path": "p",
+          "n": 2,
+          "N": 2,
+          "notMeasured": 0,
+          "value": null,
+          "verdict": "not_measured",
+          "rule": "recorded by the producer"
+        }
+      ]
+    }
+  ]
+}

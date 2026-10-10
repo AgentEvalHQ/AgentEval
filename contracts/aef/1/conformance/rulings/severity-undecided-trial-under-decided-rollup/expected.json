@@ -1,0 +1,29 @@
+{
+  "kind": "lane",
+  "checkpoint": "checkpoint.json",
+  "runs": "runs",
+  "lanes": [
+    {
+      "lane": "undecided-trial-decided-rollup",
+      "result": {
+        "status": "passed",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-03T00:00:00Z"
+      }
+    },
+    {
+      "lane": "minimum-counts-rollups-not-trials",
+      "result": {
+        "status": "not_measured",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-03T00:00:00Z"
+      }
+    }
+  ],
+  "problems": [],
+  "rules": [
+    "LANE-3",
+    "RES-8"
+  ],
+  "why": "LANE-3 reads trial lines in step 1 only (a failing trial fails the lane). In step 2 a case is its rollup: c1's inconclusive trial does not make the lane not_measured, since c1's rollup passed; and minimumN counts the two decided lines (c1's rollup, c2), not the passed trial: 3 is not met."
+}

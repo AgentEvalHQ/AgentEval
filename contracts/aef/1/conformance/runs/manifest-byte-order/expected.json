@@ -1,0 +1,9 @@
+{
+  "kind": "run",
+  "run": "run",
+  "outcome": "intact",
+  "problems": [],
+  "rules": [
+    "SEAL-3"
+  ]
+}

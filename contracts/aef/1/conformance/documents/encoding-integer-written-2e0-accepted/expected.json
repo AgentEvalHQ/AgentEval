@@ -1,0 +1,11 @@
+{
+  "kind": "document",
+  "schema": "summary",
+  "document": "document.json",
+  "writer": "valid",
+  "reader": "valid",
+  "rules": [
+    "ENC-4",
+    "VER-3"
+  ]
+}

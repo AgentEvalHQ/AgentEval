@@ -1,0 +1,17 @@
+{
+  "lanes": [
+    {
+      "lane": "performance",
+      "metrics": [
+        {
+          "metric": "latency",
+          "path": "q",
+          "aggregate": {
+            "method": "median"
+          },
+          "value": 300
+        }
+      ]
+    }
+  ]
+}

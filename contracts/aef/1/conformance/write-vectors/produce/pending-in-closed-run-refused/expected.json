@@ -1,0 +1,9 @@
+{
+  "kind": "produce",
+  "rules": [
+    "RES-3"
+  ],
+  "scenario": "scenario.json",
+  "refused": true,
+  "why": "The run is completed, and case k2 is still pending: a closed run has no pending line; it becomes skipped or error, with a reason (RES-3), which only the producer can say. The Producer refuses the scenario."
+}

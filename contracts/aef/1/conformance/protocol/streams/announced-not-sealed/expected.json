@@ -1,0 +1,13 @@
+{
+  "kind": "stream",
+  "plan": "../plan.json",
+  "problems": [
+    [
+      "event:10",
+      "unsealed-run"
+    ]
+  ],
+  "rules": [
+    "STRM-3"
+  ]
+}

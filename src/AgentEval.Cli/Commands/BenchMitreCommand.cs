@@ -15,7 +15,7 @@ namespace AgentEval.Cli.Commands;
 /// <summary>
 /// Implements the <c>agenteval bench mitre</c> subcommand. Runs the MITRE ATLAS
 /// red-team scan against the named target (<c>--sut</c>, <c>--endpoint</c>/<c>--model</c> or
-/// <c>--azure-from-env</c>; without one it refuses, see <see cref="MockTarget"/>),
+/// <c>--from-env</c>; without one it refuses, see <see cref="MockTarget"/>),
 /// persists the resulting <see cref="EvalResult"/> through the unified output-store,
 /// and additionally emits the rich <see cref="MITREATLASReport"/> as JSON +
 /// Markdown alongside.

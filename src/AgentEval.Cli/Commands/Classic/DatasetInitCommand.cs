@@ -105,8 +105,8 @@ internal static class DatasetInitCommand
         #   - input: The prompt sent to the agent
         #   - expected: (optional) Expected response for comparison
         #   - context: (optional) Retrieved context for RAG evaluation
-        #   - groundTruth: (optional) Ground truth for faithfulness metrics
         #   - tags: (optional) Tags for filtering and grouping
+        # Field names match in any spelling: expected_output, expectedOutput and ExpectedOutput are one field.
 
         examples:
           - id: greeting_test
@@ -119,7 +119,6 @@ internal static class DatasetInitCommand
             expected: "Paris"
             context:
               - "France is a country in Western Europe. Its capital is Paris."
-            groundTruth: "The capital of France is Paris."
             tags: [knowledge, geography]
 
           - id: reasoning_test
@@ -142,7 +141,6 @@ internal static class DatasetInitCommand
               "input": "What is the capital of France?",
               "expected": "Paris",
               "context": ["France is a country in Western Europe. Its capital is Paris."],
-              "groundTruth": "The capital of France is Paris.",
               "tags": ["knowledge", "geography"]
             },
             {

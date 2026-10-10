@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "1.0",
+  "resultId": "r_ba65738f221f7575808d2c10c60dc056",
+  "caseId": "c",
+  "path": "p",
+  "evaluator": {
+    "id": "e"
+  },
+  "state": "failed",
+  "severity": "high",
+  "aggregation": {
+    "strategy": "WeightedSum",
+    "threshold": 0.7,
+    "score": 0.86,
+    "rulePath": "failure-effect",
+    "measured": 2,
+    "total": 2,
+    "decisive": []
+  }
+}

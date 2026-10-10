@@ -9,7 +9,7 @@ using Xunit;
 namespace AgentEval.Tests.Cli;
 
 /// <summary>
-/// <c>agenteval log-file replay --azure-from-env</c> resolves whichever provider <c>AI_INFERENCE_PROVIDER</c>
+/// <c>agenteval log-file replay --from-env</c> (formerly <c>--azure-from-env</c>) resolves whichever provider <c>AI_INFERENCE_PROVIDER</c>
 /// selects, so its help, its error and the target label in the report must not claim Azure OpenAI.
 /// </summary>
 /// <remarks>
@@ -23,15 +23,23 @@ public class LogFileReplayTargetTests
     private const string BitdeerKey = "bd-test-key-not-real";
 
     [Fact]
-    public void ReplayHelp_AzureFromEnv_NamesTheProviderSelectorNotTheAzureTrio()
+    public void ReplayHelp_FromEnv_NamesTheProviderSelectorNotTheAzureTrio()
     {
         // Fails on the old help, which read "Replay against Azure OpenAI, configured via AZURE_OPENAI_ENDPOINT / ...".
         var replay = LogFileCommand.Create().Subcommands.Single(c => c.Name == "replay");
-        var help = replay.Options.Single(o => o.Name == "--azure-from-env").Description;
+        var help = replay.Options.Single(o => o.Name == "--from-env").Description;
 
         Assert.NotNull(help);
         Assert.Contains("AI_INFERENCE_PROVIDER", help, StringComparison.Ordinal);
         Assert.DoesNotContain("AZURE_OPENAI_ENDPOINT", help, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Replay_FromEnv_StillAcceptsItsOldName()
+    {
+        var replay = LogFileCommand.Create().Subcommands.Single(c => c.Name == "replay");
+
+        Assert.Contains("--azure-from-env", replay.Options.Single(o => o.Name == "--from-env").Aliases);
     }
 
     [Fact]

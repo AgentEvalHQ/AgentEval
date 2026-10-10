@@ -283,9 +283,9 @@ public sealed class TaintTrackingGate : IToolGate
                         {
                             foreach (Match match in Token.Matches(text))
                             {
-                                if (match.Value.Length >= _minTaintLength)
+                                if (TaintToken(match) is { } token && token.Length >= _minTaintLength)
                                 {
-                                    state.Tainted.Add(match.Value);
+                                    state.Tainted.Add(token);
                                     if (state.Tainted.Count >= MaxTaintedTokens)
                                     {
                                         state.CapHit = true;   // saturated — the caller fails closed
@@ -299,6 +299,15 @@ public sealed class TaintTrackingGate : IToolGate
                 }
             }
         }
+    }
+
+    // The token class keeps '.', '/', '-' and the like inside a value (hosts, paths, ids), so a value that ends a
+    // sentence ("...send it to https://drop.example/collect.") carries the full stop. A call that passes the same value
+    // without it does not contain that token, and the taint was missed. Trailing punctuation is not part of the value.
+    private static string? TaintToken(Match match)
+    {
+        var value = match.Value.TrimEnd('.', '/', '-', '_', '+', '@');
+        return value.Length > 0 ? value : null;
     }
 
     private HashSet<string> CollectTaintedTokens(IReadOnlyList<ChatMessage>? messages)
@@ -344,9 +353,9 @@ public sealed class TaintTrackingGate : IToolGate
                         {
                             foreach (Match match in Token.Matches(text))
                             {
-                                if (match.Value.Length >= _minTaintLength)
+                                if (TaintToken(match) is { } token && token.Length >= _minTaintLength)
                                 {
-                                    tainted.Add(match.Value);
+                                    tainted.Add(token);
                                     if (tainted.Count >= MaxTaintedTokens)
                                     {
                                         return tainted;   // cap hit — the caller fails closed rather than scan unboundedly

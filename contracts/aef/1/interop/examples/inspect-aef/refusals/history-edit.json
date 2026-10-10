@@ -1,0 +1,629 @@
+{
+  "version": 2,
+  "status": "success",
+  "eval": {
+    "eval_id": "kE7rQx2mVt9uJ3pL8sNw4a",
+    "run_id": "Fz5cHn8yRb2wKq6tDm1pXe",
+    "eval_set_id": "Lp3sV8dQ2mXc",
+    "created": "2026-10-06T12:00:00+02:00",
+    "task": "refund_policy",
+    "task_version": 3,
+    "task_registry_name": "refund_policy",
+    "dataset": {
+      "name": "refunds",
+      "location": "refunds.jsonl",
+      "samples": 3,
+      "sample_ids": [
+        1,
+        "tricky",
+        "broken"
+      ]
+    },
+    "model": "openai/gpt-5.1-mini",
+    "model_roles": {
+      "grader": {
+        "model": "openai/gpt-5.1"
+      }
+    },
+    "config": {
+      "epochs": 2,
+      "epochs_reducer": [
+        "mode"
+      ]
+    },
+    "packages": {
+      "inspect_ai": "0.3.277"
+    },
+    "scorers": [
+      {
+        "name": "correct",
+        "options": {},
+        "metrics": [],
+        "metadata": {}
+      },
+      {
+        "name": "quality",
+        "options": {},
+        "metrics": [],
+        "metadata": {}
+      },
+      {
+        "name": "checks",
+        "options": {},
+        "metrics": [],
+        "metadata": {}
+      }
+    ],
+    "metadata": {
+      "owner": "support-evals"
+    }
+  },
+  "plan": {
+    "name": "plan",
+    "steps": [
+      {
+        "solver": "generate",
+        "params": {}
+      }
+    ]
+  },
+  "results": {
+    "total_samples": 6,
+    "completed_samples": 4,
+    "scores": [
+      {
+        "name": "correct",
+        "scorer": "includes",
+        "reducer": "mode",
+        "scored_samples": 2,
+        "unscored_samples": 1,
+        "params": {},
+        "metrics": {
+          "accuracy": {
+            "name": "accuracy",
+            "value": 0.75,
+            "params": {}
+          },
+          "stderr": {
+            "name": "stderr",
+            "value": 0.25,
+            "params": {}
+          }
+        }
+      },
+      {
+        "name": "quality",
+        "scorer": "model_graded_qa",
+        "reducer": "mode",
+        "scored_samples": 2,
+        "unscored_samples": 1,
+        "params": {},
+        "metrics": {
+          "mean": {
+            "name": "mean",
+            "value": 0.85,
+            "params": {}
+          },
+          "stderr": {
+            "name": "stderr",
+            "value": 0.05,
+            "params": {}
+          },
+          "max": {
+            "name": "max",
+            "value": 0.9,
+            "params": {}
+          }
+        }
+      }
+    ]
+  },
+  "stats": {
+    "started_at": "2026-10-06T12:00:01.250+02:00",
+    "completed_at": "2026-10-06T12:04:30+02:00",
+    "model_usage": {
+      "openai/gpt-5.1-mini": {
+        "input_tokens": 720,
+        "output_tokens": 180,
+        "total_tokens": 900,
+        "input_tokens_cache_read": 256,
+        "total_cost": 0.0018
+      },
+      "openai/gpt-5.1": {
+        "input_tokens": 1600,
+        "output_tokens": 240,
+        "total_tokens": 1840,
+        "reasoning_tokens": 128,
+        "total_cost": 0.008
+      }
+    },
+    "role_usage": {
+      "grader": {
+        "input_tokens": 1600,
+        "output_tokens": 240,
+        "total_tokens": 1840,
+        "reasoning_tokens": 128,
+        "total_cost": 0.008
+      }
+    }
+  },
+  "samples": [
+    {
+      "id": 1,
+      "epoch": 1,
+      "input": "Can I get a refund 20 days after purchase?",
+      "target": "Yes: refunds are accepted within 30 days.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Can I get a refund 20 days after purchase?"
+        },
+        {
+          "role": "assistant",
+          "content": "Yes, within 30 days."
+        }
+      ],
+      "output": {
+        "model": "openai/gpt-5.1-mini",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Yes, within 30 days."
+            },
+            "stop_reason": "stop"
+          }
+        ]
+      },
+      "scores": {
+        "correct": {
+          "value": "C",
+          "answer": "Yes, within 30 days."
+        },
+        "quality": {
+          "value": 0.8,
+          "explanation": "Clear and polite.",
+          "history": [
+            {
+              "value": 0.7,
+              "provenance": {
+                "timestamp": "2026-10-07T09:00:00+00:00",
+                "author": "reviewer",
+                "reason": "rubric update"
+              }
+            }
+          ]
+        },
+        "checks": {
+          "value": {
+            "cites_policy": "C",
+            "steps": 3
+          }
+        }
+      },
+      "metadata": {
+        "difficulty": "easy"
+      },
+      "model_usage": {
+        "openai/gpt-5.1-mini": {
+          "input_tokens": 120,
+          "output_tokens": 45,
+          "total_tokens": 165,
+          "input_tokens_cache_read": 64,
+          "total_cost": 0.0003
+        },
+        "openai/gpt-5.1": {
+          "input_tokens": 400,
+          "output_tokens": 60,
+          "total_tokens": 460,
+          "reasoning_tokens": 32,
+          "total_cost": 0.002
+        }
+      },
+      "role_usage": {
+        "grader": {
+          "input_tokens": 400,
+          "output_tokens": 60,
+          "total_tokens": 460,
+          "reasoning_tokens": 32,
+          "total_cost": 0.002
+        }
+      },
+      "started_at": "2026-10-06T12:00:02+02:00",
+      "completed_at": "2026-10-06T12:00:06.5+02:00",
+      "total_time": 4.5,
+      "working_time": 4.25
+    },
+    {
+      "id": 1,
+      "epoch": 2,
+      "input": "Can I get a refund 20 days after purchase?",
+      "target": "Yes: refunds are accepted within 30 days.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Can I get a refund 20 days after purchase?"
+        },
+        {
+          "role": "assistant",
+          "content": "Only within 14 days."
+        }
+      ],
+      "output": {
+        "model": "openai/gpt-5.1-mini",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Only within 14 days."
+            },
+            "stop_reason": "stop"
+          }
+        ]
+      },
+      "scores": {
+        "correct": {
+          "value": "I",
+          "answer": "Only within 14 days.",
+          "explanation": "Said 14 days."
+        },
+        "quality": {
+          "value": 0.6
+        },
+        "checks": {
+          "value": {
+            "cites_policy": "I",
+            "steps": 2
+          }
+        }
+      },
+      "metadata": {
+        "difficulty": "easy"
+      },
+      "model_usage": {
+        "openai/gpt-5.1-mini": {
+          "input_tokens": 120,
+          "output_tokens": 45,
+          "total_tokens": 165,
+          "input_tokens_cache_read": 64,
+          "total_cost": 0.0003
+        },
+        "openai/gpt-5.1": {
+          "input_tokens": 400,
+          "output_tokens": 60,
+          "total_tokens": 460,
+          "reasoning_tokens": 32,
+          "total_cost": 0.002
+        }
+      },
+      "role_usage": {
+        "grader": {
+          "input_tokens": 400,
+          "output_tokens": 60,
+          "total_tokens": 460,
+          "reasoning_tokens": 32,
+          "total_cost": 0.002
+        }
+      },
+      "started_at": "2026-10-06T12:00:07+02:00",
+      "completed_at": "2026-10-06T12:00:10+02:00",
+      "total_time": 3.0,
+      "working_time": 2.75
+    },
+    {
+      "id": "tricky",
+      "epoch": 1,
+      "input": [
+        {
+          "role": "system",
+          "content": "You are the store's support agent."
+        },
+        {
+          "role": "user",
+          "content": "I opened the box and used it once. Refund?"
+        }
+      ],
+      "target": [
+        "No refund",
+        "Store credit only"
+      ],
+      "messages": [
+        {
+          "role": "user",
+          "content": "I opened the box and used it once. Refund?"
+        },
+        {
+          "role": "assistant",
+          "content": "Store credit, after an inspection."
+        }
+      ],
+      "output": {
+        "model": "openai/gpt-5.1-mini",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "Store credit, after an inspection."
+            },
+            "stop_reason": "stop"
+          }
+        ]
+      },
+      "scores": {
+        "correct": {
+          "value": "P",
+          "explanation": "Half the steps."
+        },
+        "quality": {
+          "value": NaN,
+          "reason": "grader_failed",
+          "explanation": "The grader timed out."
+        },
+        "checks": {
+          "value": {
+            "cites_policy": "C",
+            "steps": 4
+          }
+        }
+      },
+      "metadata": {
+        "difficulty": "hard"
+      },
+      "model_usage": {
+        "openai/gpt-5.1-mini": {
+          "input_tokens": 120,
+          "output_tokens": 45,
+          "total_tokens": 165,
+          "input_tokens_cache_read": 64,
+          "total_cost": 0.0003
+        },
+        "openai/gpt-5.1": {
+          "input_tokens": 400,
+          "output_tokens": 60,
+          "total_tokens": 460,
+          "reasoning_tokens": 32,
+          "total_cost": 0.002
+        }
+      },
+      "role_usage": {
+        "grader": {
+          "input_tokens": 400,
+          "output_tokens": 60,
+          "total_tokens": 460,
+          "reasoning_tokens": 32,
+          "total_cost": 0.002
+        }
+      },
+      "started_at": "2026-10-06T12:00:11+02:00",
+      "completed_at": "2026-10-06T12:00:19.125+02:00",
+      "total_time": 8.125,
+      "working_time": 7.875
+    },
+    {
+      "id": "tricky",
+      "epoch": 2,
+      "input": [
+        {
+          "role": "system",
+          "content": "You are the store's support agent."
+        },
+        {
+          "role": "user",
+          "content": "I opened the box and used it once. Refund?"
+        }
+      ],
+      "target": [
+        "No refund",
+        "Store credit only"
+      ],
+      "messages": [
+        {
+          "role": "user",
+          "content": "I opened the box and used it once. Refund?"
+        },
+        {
+          "role": "assistant",
+          "content": "I can't help with that."
+        }
+      ],
+      "output": {
+        "model": "openai/gpt-5.1-mini",
+        "choices": [
+          {
+            "message": {
+              "role": "assistant",
+              "content": "I can't help with that."
+            },
+            "stop_reason": "stop"
+          }
+        ]
+      },
+      "scores": {
+        "correct": {
+          "value": "I",
+          "reason": "refusal",
+          "explanation": "The model declined to answer."
+        },
+        "quality": {
+          "value": 0.9
+        },
+        "checks": {
+          "value": {
+            "cites_policy": "N",
+            "steps": 0
+          }
+        }
+      },
+      "metadata": {
+        "difficulty": "hard"
+      },
+      "model_usage": {
+        "openai/gpt-5.1-mini": {
+          "input_tokens": 120,
+          "output_tokens": 45,
+          "total_tokens": 165,
+          "input_tokens_cache_read": 64,
+          "total_cost": 0.0003
+        },
+        "openai/gpt-5.1": {
+          "input_tokens": 400,
+          "output_tokens": 60,
+          "total_tokens": 460,
+          "reasoning_tokens": 32,
+          "total_cost": 0.002
+        }
+      },
+      "role_usage": {
+        "grader": {
+          "input_tokens": 400,
+          "output_tokens": 60,
+          "total_tokens": 460,
+          "reasoning_tokens": 32,
+          "total_cost": 0.002
+        }
+      },
+      "started_at": "2026-10-06T12:00:20+02:00",
+      "completed_at": "2026-10-06T12:00:22+02:00",
+      "total_time": 2.0,
+      "working_time": 1.75
+    },
+    {
+      "id": "broken",
+      "epoch": 1,
+      "input": "Refund for order 42?",
+      "target": "Check the order first.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Refund for order 42?"
+        }
+      ],
+      "output": {
+        "model": "openai/gpt-5.1-mini",
+        "choices": []
+      },
+      "scores": null,
+      "metadata": {
+        "difficulty": "hard"
+      },
+      "model_usage": {
+        "openai/gpt-5.1-mini": {
+          "input_tokens": 120,
+          "output_tokens": 45,
+          "total_tokens": 165,
+          "input_tokens_cache_read": 64,
+          "total_cost": 0.0003
+        }
+      },
+      "started_at": "2026-10-06T12:01:01+02:00",
+      "completed_at": "2026-10-06T12:01:01.5+02:00",
+      "total_time": 0.5,
+      "working_time": 0.25,
+      "error": {
+        "message": "RuntimeError: the order tool crashed",
+        "traceback": "Traceback ...",
+        "traceback_ansi": "Traceback ..."
+      }
+    },
+    {
+      "id": "broken",
+      "epoch": 2,
+      "input": "Refund for order 42?",
+      "target": "Check the order first.",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Refund for order 42?"
+        }
+      ],
+      "output": {
+        "model": "openai/gpt-5.1-mini",
+        "choices": []
+      },
+      "scores": null,
+      "metadata": {
+        "difficulty": "hard"
+      },
+      "model_usage": {
+        "openai/gpt-5.1-mini": {
+          "input_tokens": 120,
+          "output_tokens": 45,
+          "total_tokens": 165,
+          "input_tokens_cache_read": 64,
+          "total_cost": 0.0003
+        }
+      },
+      "started_at": "2026-10-06T12:01:02+02:00",
+      "completed_at": "2026-10-06T12:01:02.5+02:00",
+      "total_time": 0.5,
+      "working_time": 0.25,
+      "error": {
+        "message": "RuntimeError: the order tool crashed",
+        "traceback": "Traceback ...",
+        "traceback_ansi": "Traceback ..."
+      }
+    }
+  ],
+  "reductions": [
+    {
+      "scorer": "correct",
+      "reducer": "mode",
+      "samples": [
+        {
+          "value": "C",
+          "sample_id": 1
+        },
+        {
+          "value": "P",
+          "sample_id": "tricky"
+        },
+        {
+          "value": NaN,
+          "sample_id": "broken"
+        }
+      ]
+    },
+    {
+      "scorer": "quality",
+      "reducer": "mode",
+      "samples": [
+        {
+          "value": 0.8,
+          "sample_id": 1
+        },
+        {
+          "value": 0.9,
+          "sample_id": "tricky"
+        },
+        {
+          "value": NaN,
+          "sample_id": "broken"
+        }
+      ]
+    },
+    {
+      "scorer": "checks",
+      "reducer": "mode",
+      "samples": [
+        {
+          "value": {
+            "cites_policy": "C",
+            "steps": 3
+          },
+          "sample_id": 1
+        },
+        {
+          "value": {
+            "cites_policy": "C",
+            "steps": 4
+          },
+          "sample_id": "tricky"
+        },
+        {
+          "value": NaN,
+          "sample_id": "broken"
+        }
+      ]
+    }
+  ]
+}

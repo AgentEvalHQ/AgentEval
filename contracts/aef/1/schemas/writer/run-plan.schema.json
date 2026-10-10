@@ -1,0 +1,350 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/aef/1/writer/run-plan.schema.json",
+  "title": "AEF 1.0: run plan",
+  "description": "What a runner is asked to evaluate: the exact subject version, the suites and lanes, the limits, what text the runs keep (contentCapture), how they drive the target (targetMode), where and how it runs, and the credentials it needs, as references only (PLAN-1 to PLAN-5).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "planId",
+    "subject",
+    "suites",
+    "limits",
+    "contentCapture",
+    "isolation",
+    "provider"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "common.schema.json#/$defs/schemaVersion",
+      "description": "The AEF version this document follows, MAJOR.MINOR: 1.0 for AEF 1.0 (VER-1)."
+    },
+    "planId": {
+      "$ref": "common.schema.json#/$defs/id",
+      "description": "The plan's id. With the digest of the plan file's bytes, it identifies the plan (PLAN-5)."
+    },
+    "checkpointId": {
+      "$ref": "common.schema.json#/$defs/id",
+      "description": "The checkpoint the plan gathers evidence for, when there is one."
+    },
+    "subject": {
+      "description": "Resolved and immutable: 'latest' is resolved before the plan exists.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ref",
+        "version"
+      ],
+      "properties": {
+        "ref": {
+          "$ref": "common.schema.json#/$defs/ref",
+          "description": "The subject to evaluate, as a typed reference (PLAN-1)."
+        },
+        "version": {
+          "$ref": "common.schema.json#/$defs/exactVersion",
+          "description": "The subject's exact version; never latest (PLAN-1)."
+        },
+        "image": {
+          "description": "The OCI image manifest digest of an already-built image.",
+          "$ref": "common.schema.json#/$defs/sha256Uri"
+        },
+        "deployment": {
+          "$ref": "common.schema.json#/$defs/ref",
+          "description": "Where the subject is deployed, as a typed reference. Every run the runner produces records it as its deployment.ref (STRM-4)."
+        },
+        "endpoint": {
+          "description": "Where the subject answers: scheme, host and path only, as run.json's deployment.endpoint. No user information, no query string and no fragment, where credentials hide (PLAN-1, PLAN-4, RUN-10). Every run the runner produces records it as its deployment.endpoint (STRM-4).",
+          "type": "string",
+          "maxLength": 2048,
+          "pattern": "^[a-z][a-z0-9+.-]*://[!\"$-.0->A-~]+(/[!\"$->@-~]*)?$"
+        },
+        "repository": {
+          "description": "Where the image is pulled from (registry/name), when it is.",
+          "type": "string",
+          "pattern": "^[!-~]{1,256}$"
+        }
+      }
+    },
+    "suites": {
+      "description": "The suites to run, each with an exact version and the lane it serves; a runner runs each as one run (PLAN-8).",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "ref",
+          "version"
+        ],
+        "properties": {
+          "ref": {
+            "$ref": "common.schema.json#/$defs/ref",
+            "description": "The suite, as a typed reference."
+          },
+          "version": {
+            "$ref": "common.schema.json#/$defs/exactVersion",
+            "description": "The suite's exact version."
+          },
+          "digest": {
+            "$ref": "common.schema.json#/$defs/sha256Uri",
+            "description": "The SHA-256 of the suite's content, when it is frozen. A runner checks the content it resolves against it and refuses the job on a mismatch (PLAN-8)."
+          },
+          "lane": {
+            "$ref": "common.schema.json#/$defs/laneName",
+            "description": "The lane the suite serves."
+          }
+        }
+      }
+    },
+    "limits": {
+      "description": "Hard limits the runner enforces: it stops before exceeding them, and says so in the event stream.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maxUsd"
+      ],
+      "properties": {
+        "maxUsd": {
+          "description": "The most the runner may spend, in US dollars. Always set; spend equal to it is within it (PLAN-2, STRM-3).",
+          "type": "number",
+          "minimum": 0
+        },
+        "cases": {
+          "description": "The most cases the runner may complete, when set (PLAN-2).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "timeout": {
+          "$ref": "common.schema.json#/$defs/duration",
+          "description": "The longest the job may take, from its job.accepted, as a duration (ENC-9): PT2H, PT45M, P1D, P1DT2H30M (PLAN-2, STRM-3)."
+        }
+      }
+    },
+    "contentCapture": {
+      "description": "What text the runs keep: off or on, as run.json's contentCapture (RUN-11). Every run the runner produces carries this value (STRM-4).",
+      "enum": [
+        "off",
+        "on"
+      ]
+    },
+    "targetMode": {
+      "description": "How the runs drive the target, as run.json's execution.targetMode (RUN-7): live (the real subject; also when the plan has no targetMode), replayed, scripted or mocked. Every run the runner produces carries this value (STRM-4); a runner that cannot drive the target so refuses the plan (PLAN-7).",
+      "enum": [
+        "live",
+        "replayed",
+        "scripted",
+        "mocked"
+      ]
+    },
+    "isolation": {
+      "description": "How the run is isolated: process, container (an already-built image, named by digest) or remote-zone (in the network zone given by zone) (PLAN-1).",
+      "enum": [
+        "process",
+        "container",
+        "remote-zone"
+      ]
+    },
+    "provider": {
+      "$ref": "common.schema.json#/$defs/provider",
+      "description": "Where the run executes: local, docker, k8s or ci:<name>. A runner that does not support it, or does not know it, refuses the plan (PLAN-7)."
+    },
+    "credentialRefs": {
+      "description": "What the runner resolves where it runs, and gives to the process the purpose names as an environment variable called name. A plan holds references, never secret values.",
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "scheme",
+          "path",
+          "purpose"
+        ],
+        "properties": {
+          "name": {
+            "description": "The environment variable the value is given as.",
+            "type": "string",
+            "pattern": "^[A-Z_][A-Z0-9_]{0,127}$"
+          },
+          "scheme": {
+            "description": "Where the value lives: env (an environment variable), keychain or vault. A runner refuses a plan with a scheme it does not know (PLAN-3, PLAN-7).",
+            "enum": [
+              "env",
+              "keychain",
+              "vault"
+            ]
+          },
+          "path": {
+            "description": "The variable, keychain entry or vault path: a name, never the value.",
+            "type": "string",
+            "pattern": "^[!-~]{1,512}$"
+          },
+          "purpose": {
+            "description": "What the credential is for: subject, judge, attacker, evaluator or other. The runner gives the value to the process this names, and refuses a purpose it does not know (PLAN-3, PLAN-7).",
+            "enum": [
+              "subject",
+              "judge",
+              "attacker",
+              "evaluator",
+              "other"
+            ]
+          }
+        }
+      }
+    },
+    "runnerSelector": {
+      "description": "Tags a runner's capability manifest must all carry.",
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9][a-z0-9._:-]{0,63}$"
+      }
+    },
+    "ext": {
+      "$ref": "common.schema.json#/$defs/ext",
+      "description": "Producer extensions, named reverse-DNS or with the producer's prefix. A reader ignores what it does not know; never holds a secret (ENC-19, PLAN-4)."
+    },
+    "zone": {
+      "description": "The network zone a remote-zone run must execute in.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9._:-]{0,63}$"
+    },
+    "judges": {
+      "description": "The judge models and rubrics the evaluators may use, fixed by the plan: a run names those that graded it, some of these in this order (STRM-4).",
+      "type": "array",
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "model"
+        ],
+        "properties": {
+          "model": {
+            "description": "A judge model the evaluators may use.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "provider": {
+            "description": "Who must serve the judge model. Never empty; a judge without one leaves the provider to the runner, and a run names the one that served (STRM-4).",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "rubricDigest": {
+            "$ref": "common.schema.json#/$defs/sha256Uri",
+            "description": "The SHA-256 of the rubric the judge must grade with. A judge without one leaves the rubric to the runner, and a run names the one that graded (STRM-4)."
+          }
+        }
+      }
+    },
+    "baseline": {
+      "description": "What a comparison lane compares against: a policy, or one sealed run.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "policy"
+          ],
+          "properties": {
+            "policy": {
+              "description": "A baseline policy, by name.",
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "runId",
+            "runHash"
+          ],
+          "properties": {
+            "runId": {
+              "$ref": "common.schema.json#/$defs/id",
+              "description": "The baseline run's runId."
+            },
+            "runHash": {
+              "$ref": "common.schema.json#/$defs/sha256Hex",
+              "description": "The baseline run's run hash (SEAL-4)."
+            }
+          }
+        }
+      ]
+    },
+    "comparability": {
+      "description": "The comparability axes a comparison lane uses, fixed by the plan so the runner cannot pick them.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "required"
+      ],
+      "properties": {
+        "required": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "$ref": "common.schema.json#/$defs/axis"
+          },
+          "uniqueItems": true,
+          "description": "The axes on which a comparison lane's runs must match their baseline (spec 05, LANE-6)."
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "description": "A container run evaluates an already-built image, identified by digest.",
+      "if": {
+        "properties": {
+          "isolation": {
+            "description": "Applies to a container run (PLAN-1).",
+            "const": "container"
+          }
+        },
+        "required": [
+          "isolation"
+        ]
+      },
+      "then": {
+        "properties": {
+          "subject": {
+            "description": "A container run names its image by digest (PLAN-1).",
+            "required": [
+              "image"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "description": "A remote-zone run names its zone.",
+      "if": {
+        "properties": {
+          "isolation": {
+            "description": "Applies to a remote-zone run.",
+            "const": "remote-zone"
+          }
+        },
+        "required": [
+          "isolation"
+        ]
+      },
+      "then": {
+        "required": [
+          "zone"
+        ]
+      }
+    }
+  ]
+}

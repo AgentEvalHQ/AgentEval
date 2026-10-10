@@ -1,0 +1,5 @@
+{"schemaVersion":"1.0","resultId":"r_c0e0302f9b877bc71e5fa489671ae0d8","caseId":"k1","path":"q","trial":0,"evaluator":{"id":"code:q"},"state":"passed","scores":[{"metric":"quality","value":0.9}]}
+{"schemaVersion":"1.0","resultId":"r_2ed585799e0f0357054934c726fea22d","caseId":"k1","path":"q","trial":1,"evaluator":{"id":"code:q"},"state":"failed","scores":[{"metric":"quality","value":0.2}],"severity":"high"}
+{"schemaVersion":"1.0","resultId":"r_2204c6e7fcabf13187d24bee74968277","caseId":"k1","path":"q","trial":2,"evaluator":{"id":"code:q"},"state":"passed","scores":[{"metric":"quality","value":0.8}]}
+{"schemaVersion":"1.0","resultId":"r_88797551bcd59756520dbb36576feb41","caseId":"k1","path":"q","evaluator":{"id":"code:q"},"state":"passed","scores":[{"metric":"quality","value":0.8}],"trials":{"n":3,"passed":2,"aggregation":"MajorityVote","agree":false}}
+{"schemaVersion":"1.0","resultId":"r_d9ac4338e2408dcfec35af85b1c6f7ec","caseId":"k2","path":"q","evaluator":{"id":"code:q"},"state":"passed","scores":[{"metric":"quality","value":0.7}]}

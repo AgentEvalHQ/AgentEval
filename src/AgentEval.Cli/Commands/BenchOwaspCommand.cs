@@ -15,7 +15,7 @@ namespace AgentEval.Cli.Commands;
 /// <summary>
 /// Implements the <c>agenteval bench owasp</c> subcommand. Runs the OWASP LLM Top 10
 /// red-team scan against the named target (<c>--sut</c>, <c>--endpoint</c>/<c>--model</c> or
-/// <c>--azure-from-env</c>; without one it refuses, see <see cref="MockTarget"/>),
+/// <c>--from-env</c>; without one it refuses, see <see cref="MockTarget"/>),
 /// persists the resulting <see cref="EvalResult"/> through the unified output-store,
 /// and additionally emits the rich <see cref="OWASPComplianceReport"/> as JSON +
 /// Markdown alongside.

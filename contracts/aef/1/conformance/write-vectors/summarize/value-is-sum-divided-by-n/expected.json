@@ -1,0 +1,31 @@
+{
+  "kind": "summarize",
+  "rules": [
+    "SUM-5"
+  ],
+  "run": "run",
+  "request": "request.json",
+  "summary": {
+    "schemaVersion": "1.0",
+    "runId": "summarize-value-is-sum-divided-by-n",
+    "lanes": [
+      {
+        "lane": "quality",
+        "metrics": [
+          {
+            "metric": "delta",
+            "path": "q",
+            "N": 5,
+            "n": 5,
+            "notMeasured": 0,
+            "sum": 2.1,
+            "sumSq": 0.91,
+            "value": 0.42000000000000004,
+            "verdict": "scored"
+          }
+        ]
+      }
+    ]
+  },
+  "why": "the value is the binary64 sum divided by n, in one binary64 division: 0.3 + 0.4 + 0.5 + 0.4 + 0.5 is 2.1, and 2.1 / 5 is 0.42000000000000004, not the exact mean 0.42. SUM-5 defines it to one binary64 value, so it is compared exactly: a Producer that writes the exact mean 0.42 fails this vector."
+}

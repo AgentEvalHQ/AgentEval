@@ -331,6 +331,20 @@ var goldenResponse = goldenTrace.Entries.First(e => e.Type == TraceEntryType.Res
 Assert.Equal(goldenResponse, currentResponse);
 ```
 
+Exact text rarely survives a model run twice. To compare a whole dataset run by verdict and tool calls instead, use
+`GoldenTrace` and `GoldenTraceComparer` (`AgentEval.Snapshots`), or `agenteval eval --save-golden` / `--golden`
+from the command line: each test case is reported as regressed, improved, tools changed, output changed or unchanged,
+and only a regression fails the run (see the [CLI reference](cli.md)).
+
+```csharp
+var summary = await harness.RunBatchAsync(agent, testCases);
+var current = GoldenTrace.FromResults(summary.Results, model: "gpt-4o");
+var golden = await GoldenTrace.LoadAsync("golden/cases.trace.json");
+
+var comparison = GoldenTraceComparer.Compare(golden, current);
+Assert.False(comparison.HasRegression, string.Join("\n", comparison.Cases.Select(c => $"{c.Change} {c.Name}: {c.Detail}")));
+```
+
 ### 5. Performance Baseline
 Compare performance metrics over time:
 ```csharp
@@ -353,4 +367,4 @@ Assert.True(newDuration <= oldDuration * 1.1,
 
 ---
 
-See [Sample 13](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Sample13_TraceRecordReplay.cs) for runnable examples of single-agent, multi-turn, workflow, and streaming traces.
+See [Sample 13](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/DataAndInfrastructure/03_TraceRecordReplay.cs) for runnable examples of single-agent, multi-turn, workflow, and streaming traces.

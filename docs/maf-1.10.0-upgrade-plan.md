@@ -79,12 +79,12 @@ handlers already pass `MafValidateFanOut` (0 starvation risks).
 
 | Project | TFMs | MAF reference | Notes |
 |---|---|---|---|
-| [src/AgentEval/AgentEval.csproj](src/AgentEval/AgentEval.csproj) | net8/9/10 | direct: `Microsoft.Agents.AI`, `.Workflows` | Umbrella NuGet package |
-| [src/AgentEval.MAF/AgentEval.MAF.csproj](src/AgentEval.MAF/AgentEval.MAF.csproj) | net8/9/10 | direct: `Microsoft.Agents.AI`, `.Workflows` | Core MAF integration |
-| [src/AgentEval.Cli/AgentEval.Cli.csproj](src/AgentEval.Cli/AgentEval.Cli.csproj) | **net8/10** (no net9) | transitive via `AgentEval.MAF` project ref | ✅ **Canonical home — lives in THIS repo** at `src/AgentEval.Cli`. It is the source for the `AgentEval.Cli` NuGet package; the external `AgentEvalHQ/AgentEval.Cli` repo is being **retired**. Packed as the `agenteval` dotnet tool |
-| [samples/AgentEval.Samples/AgentEval.Samples.csproj](samples/AgentEval.Samples/AgentEval.Samples.csproj) | net10 | direct: `Microsoft.Agents.AI.OpenAI`, `.Workflows`, `.Workflows.Generators` | Uses src project refs |
-| [tests/AgentEval.Tests/AgentEval.Tests.csproj](tests/AgentEval.Tests/AgentEval.Tests.csproj) | net8/9/10 | transitive via src project refs | Inherits the central bump automatically |
-| [tests/AgentEval.Memory.Tests/AgentEval.Memory.Tests.csproj](tests/AgentEval.Memory.Tests/AgentEval.Memory.Tests.csproj) | net8/9/10 | transitive via src project refs | Inherits the central bump automatically |
+| [src/AgentEval/AgentEval.csproj](https://github.com/AgentEvalHQ/AgentEval/blob/main/src/AgentEval/AgentEval.csproj) | net8/9/10 | direct: `Microsoft.Agents.AI`, `.Workflows` | Umbrella NuGet package |
+| [src/AgentEval.MAF/AgentEval.MAF.csproj](https://github.com/AgentEvalHQ/AgentEval/blob/main/src/AgentEval.MAF/AgentEval.MAF.csproj) | net8/9/10 | direct: `Microsoft.Agents.AI`, `.Workflows` | Core MAF integration |
+| [src/AgentEval.Cli/AgentEval.Cli.csproj](https://github.com/AgentEvalHQ/AgentEval/blob/main/src/AgentEval.Cli/AgentEval.Cli.csproj) | **net8/10** (no net9) | transitive via `AgentEval.MAF` project ref | ✅ **Canonical home — lives in THIS repo** at `src/AgentEval.Cli`. It is the source for the `AgentEval.Cli` NuGet package; the external `AgentEvalHQ/AgentEval.Cli` repo is being **retired**. Packed as the `agenteval` dotnet tool |
+| [samples/AgentEval.Samples/AgentEval.Samples.csproj](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/AgentEval.Samples.csproj) | net10 | direct: `Microsoft.Agents.AI.OpenAI`, `.Workflows`, `.Workflows.Generators` | Uses src project refs |
+| [tests/AgentEval.Tests/AgentEval.Tests.csproj](https://github.com/AgentEvalHQ/AgentEval/blob/main/tests/AgentEval.Tests/AgentEval.Tests.csproj) | net8/9/10 | transitive via src project refs | Inherits the central bump automatically |
+| [tests/AgentEval.Memory.Tests/AgentEval.Memory.Tests.csproj](https://github.com/AgentEvalHQ/AgentEval/blob/main/tests/AgentEval.Memory.Tests/AgentEval.Memory.Tests.csproj) | net8/9/10 | transitive via src project refs | Inherits the central bump automatically |
 
 → **Single edit** in `Directory.Packages.props` covers all of Group A: bump the 4 `Microsoft.Agents.AI*` packages → `1.10.0`, bump `Microsoft.Extensions.AI*` → `≥ 10.6.0`, and re-validate the `OpenTelemetry.Api` security pin (GHSA-g94r-2vxg-569j).
 
@@ -96,15 +96,15 @@ Split by whether they can be upgraded now:
 
 | Project | TFM | Inline MAF pins | Consumes `AgentEval` NuGet? | Action |
 |---|---|---|---|---|
-| [samples/AgentEval.TravelDemo/AgentEval.TravelDemo.csproj](samples/AgentEval.TravelDemo/AgentEval.TravelDemo.csproj) | net10 | `Microsoft.Agents.AI` 1.3.0, `.Workflows` 1.3.0 | ❌ No (pure MAF) | ✅ Attach to CPM (§4.2) → auto-bumps to 1.10.0 |
+| [samples/AgentEval.TravelDemo/AgentEval.TravelDemo.csproj](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.TravelDemo/AgentEval.TravelDemo.csproj) | net10 | `Microsoft.Agents.AI` 1.3.0, `.Workflows` 1.3.0 | ❌ No (pure MAF) | ✅ Attach to CPM (§4.2) → auto-bumps to 1.10.0 |
 
 #### B2 — Do **NOT** touch yet 🔒 (gated on a republished `AgentEval` package built on 1.10.0)
 
 | Project | TFM | Inline MAF pins | Consumes `AgentEval` NuGet? | Why deferred |
 |---|---|---|---|---|
-| [samples/AgentEval.NuGetConsumer/AgentEval.NuGetConsumer.csproj](samples/AgentEval.NuGetConsumer/AgentEval.NuGetConsumer.csproj) | net10 | `Microsoft.Agents.AI` 1.3.0, `Extensions.AI` 10.5.0 | ✅ `AgentEval` 0.8.1-beta | **Explicitly left untouched** — external-consumer simulation; bump only after republish (§4.1) |
-| [samples/AgentEval.NuGetConsumer.Tests/AgentEval.NuGetConsumer.Tests.csproj](samples/AgentEval.NuGetConsumer.Tests/AgentEval.NuGetConsumer.Tests.csproj) | net10 | transitive via NuGetConsumer | ✅ `AgentEval` 0.10.1-beta | Tests the above — left untouched with it |
-| [samples/AgentEval.TravelDemo.Evals/AgentEval.TravelDemo.Evals.csproj](samples/AgentEval.TravelDemo.Evals/AgentEval.TravelDemo.Evals.csproj) | net10 | `Microsoft.Agents.AI` 1.3.0, `.Workflows` 1.3.0 | ✅ `AgentEval` 0.10.1-beta | Same published-package binding constraint (§4.1) |
+| [samples/AgentEval.NuGetConsumer/AgentEval.NuGetConsumer.csproj](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.NuGetConsumer/AgentEval.NuGetConsumer.csproj) | net10 | `Microsoft.Agents.AI` 1.3.0, `Extensions.AI` 10.5.0 | ✅ `AgentEval` 0.8.1-beta | **Explicitly left untouched** — external-consumer simulation; bump only after republish (§4.1) |
+| [samples/AgentEval.NuGetConsumer.Tests/AgentEval.NuGetConsumer.Tests.csproj](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.NuGetConsumer.Tests/AgentEval.NuGetConsumer.Tests.csproj) | net10 | transitive via NuGetConsumer | ✅ `AgentEval` 0.10.1-beta | Tests the above — left untouched with it |
+| [samples/AgentEval.TravelDemo.Evals/AgentEval.TravelDemo.Evals.csproj](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.TravelDemo.Evals/AgentEval.TravelDemo.Evals.csproj) | net10 | `Microsoft.Agents.AI` 1.3.0, `.Workflows` 1.3.0 | ✅ `AgentEval` 0.10.1-beta | Same published-package binding constraint (§4.1) |
 
 ### 4.1 Published-NuGet sequencing constraint 🔒
 

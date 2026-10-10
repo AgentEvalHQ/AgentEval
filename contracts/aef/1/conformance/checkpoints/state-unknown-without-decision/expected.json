@@ -1,0 +1,14 @@
+{
+  "kind": "checkpoint",
+  "schema": "checkpoint",
+  "writer": "invalid",
+  "reader": "valid",
+  "rules": [
+    "CKP-7",
+    "VER-6"
+  ],
+  "why": "the same manifest declaring a later minor (1.1): its state may be one that minor defines, so nothing it holds can be recomputed",
+  "problems": [
+    "unverifiable"
+  ]
+}

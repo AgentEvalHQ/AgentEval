@@ -1,0 +1,10 @@
+{
+  "kind": "summarize",
+  "rules": [
+    "SUM-8"
+  ],
+  "run": "run",
+  "request": "request.json",
+  "refused": true,
+  "why": "The request gives the aggregate method pass@k, which AEF does not define, and no value: the value of such an entry is the producer's figure ([SUM-8]), and with n = 2 it is a number, so there is nothing to write: an input error (exit status 2), never a null value."
+}

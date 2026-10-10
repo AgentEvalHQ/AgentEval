@@ -1,0 +1,40 @@
+{
+  "kind": "run",
+  "run": "run",
+  "generate": [
+    {
+      "copy": [
+        "valid/completed-eval/run",
+        "run"
+      ]
+    },
+    {
+      "remove": "run/seal.json"
+    },
+    {
+      "remove": "run/overlays"
+    },
+    {
+      "append": [
+        "run/traces.otlp.jsonl",
+        [
+          [
+            "{}\n",
+            1000000
+          ]
+        ]
+      ]
+    }
+  ],
+  "outcome": "invalid",
+  "problems": [
+    [
+      "traces.otlp.jsonl",
+      "limit"
+    ]
+  ],
+  "rules": [
+    "ENC-17",
+    "ENC-18"
+  ]
+}

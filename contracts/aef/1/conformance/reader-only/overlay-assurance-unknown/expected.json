@@ -1,0 +1,13 @@
+{
+  "kind": "reader-only",
+  "schema": "overlay-event",
+  "writer": "invalid",
+  "reader": "valid",
+  "reads": {
+    "by.assurance": "self-attested"
+  },
+  "rules": [
+    "VER-3",
+    "OVL-3"
+  ]
+}

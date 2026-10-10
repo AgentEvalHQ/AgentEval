@@ -1,0 +1,578 @@
+{
+  "schemaVersion": "1.0",
+  "checkpointId": "cp_533cbfe95669",
+  "subject": {
+    "ref": "agent:shop/assistant",
+    "version": "v7"
+  },
+  "lanes": [
+    {
+      "lane": "live",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "p",
+        "op": ">=",
+        "value": 0.5
+      },
+      "runs": [
+        {
+          "runId": "G-live",
+          "runHash": "b5ed02a91b819b9c5075fd4169654b806b5fa75629622b58480a59304a1f591a",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "scripted",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "p",
+        "op": ">=",
+        "value": 0.5
+      },
+      "runs": [
+        {
+          "runId": "G-scripted",
+          "runHash": "acdd9ba8bef917023d57fb25f0bfe516a84e14cfd790b0b09776544ae33a06bf",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "replayed",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "p",
+        "op": ">=",
+        "value": 0.5
+      },
+      "runs": [
+        {
+          "runId": "G-replayed",
+          "runHash": "a992db425cc27bea1f31d693e23f4aaa44ca8d036a6a83ee35c258811ba05d91",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "mocked",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "p",
+        "op": ">=",
+        "value": 0.5
+      },
+      "runs": [
+        {
+          "runId": "G-mocked",
+          "runHash": "0b88e6b765169789a3989b9a941d6ffaa52e601e58fc9009b63a4cf26467327a",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "aborted",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "p",
+        "op": ">=",
+        "value": 0.5
+      },
+      "runs": [
+        {
+          "runId": "G-aborted",
+          "runHash": "c882fe1968b1e2e8e66efe8f1e7fa970642a7cae2e0c66f887987adafe246dbf",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "other-version",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "p",
+        "op": ">=",
+        "value": 0.5
+      },
+      "runs": [
+        {
+          "runId": "G-v6",
+          "runHash": "44ad1623c4cd05b135d8fa91cd8a3d15485a1f617c359b5c546af3ccd95ff93f",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "mixed-versions",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "p",
+        "op": ">=",
+        "value": 0.5
+      },
+      "runs": [
+        {
+          "runId": "G-live",
+          "runHash": "b5ed02a91b819b9c5075fd4169654b806b5fa75629622b58480a59304a1f591a",
+          "origin": "launched"
+        },
+        {
+          "runId": "G-v6",
+          "runHash": "44ad1623c4cd05b135d8fa91cd8a3d15485a1f617c359b5c546af3ccd95ff93f",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "no-version",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "p",
+        "op": ">=",
+        "value": 0.5
+      },
+      "runs": [
+        {
+          "runId": "G-noversion",
+          "runHash": "c60142b151b515c3e036260ab0eb85412f2e5531f8fb3aa56d3ac1b52ea5b5b8",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "unsealed",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "p",
+        "op": ">=",
+        "value": 0.5
+      },
+      "runs": [
+        {
+          "runId": "G-unsealed",
+          "runHash": "14cdecb3e11dbdfbdb870617cf421a838936843c2d2961efdf5dc986607c7e1d",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "tampered",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "p",
+        "op": ">=",
+        "value": 0.5
+      },
+      "runs": [
+        {
+          "runId": "G-tampered",
+          "runHash": "1e87cd71864b9d7937c228768605358fc9c3c6bf849dfb03ddf8288b72982a01",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "not-intact",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "p",
+        "op": ">=",
+        "value": 0.5
+      },
+      "runs": [
+        {
+          "runId": "G-bad-summary",
+          "runHash": "bcfe70da6853a5e0472d18b95e95cc59bf24e523efdb43d9dd764b0459404238",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "missing",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "p",
+        "op": ">=",
+        "value": 0.5
+      },
+      "runs": [
+        {
+          "runId": "R-404",
+          "runHash": "fc229599cde8d4a71ca65d925b598ed192e34dadb644b4d701e8f0b2bab9664e",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "wrong-hash",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "p",
+        "op": ">=",
+        "value": 0.5
+      },
+      "runs": [
+        {
+          "runId": "G-live",
+          "runHash": "0000000000000000000000000000000000000000000000000000000000000000",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "one-missing",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "p",
+        "op": ">=",
+        "value": 0.5
+      },
+      "runs": [
+        {
+          "runId": "G-live",
+          "runHash": "b5ed02a91b819b9c5075fd4169654b806b5fa75629622b58480a59304a1f591a",
+          "origin": "launched"
+        },
+        {
+          "runId": "R-404",
+          "runHash": "fc229599cde8d4a71ca65d925b598ed192e34dadb644b4d701e8f0b2bab9664e",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "intact-copy-beside-a-tampered-one",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "p",
+        "op": ">=",
+        "value": 0.5
+      },
+      "runs": [
+        {
+          "runId": "G-live",
+          "runHash": "b5ed02a91b819b9c5075fd4169654b806b5fa75629622b58480a59304a1f591a",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    }
+  ],
+  "state": "decided",
+  "outcome": "inconclusive",
+  "decisionInput": {
+    "subjectVersion": "v7",
+    "evaluatedAt": "2026-10-08T00:00:00Z",
+    "supersededBy": null,
+    "lanes": [
+      {
+        "lane": "live",
+        "blocking": true,
+        "result": {
+          "status": "passed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-05T00:00:00Z"
+        },
+        "evidence": [
+          "b5ed02a91b819b9c5075fd4169654b806b5fa75629622b58480a59304a1f591a"
+        ]
+      },
+      {
+        "lane": "scripted",
+        "blocking": true,
+        "result": {
+          "status": "not_measured",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-05T00:00:00Z"
+        },
+        "evidence": [
+          "acdd9ba8bef917023d57fb25f0bfe516a84e14cfd790b0b09776544ae33a06bf"
+        ]
+      },
+      {
+        "lane": "replayed",
+        "blocking": true,
+        "result": {
+          "status": "not_measured",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-05T00:00:00Z"
+        },
+        "evidence": [
+          "a992db425cc27bea1f31d693e23f4aaa44ca8d036a6a83ee35c258811ba05d91"
+        ]
+      },
+      {
+        "lane": "mocked",
+        "blocking": true,
+        "result": {
+          "status": "not_measured",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-05T00:00:00Z"
+        },
+        "evidence": [
+          "0b88e6b765169789a3989b9a941d6ffaa52e601e58fc9009b63a4cf26467327a"
+        ]
+      },
+      {
+        "lane": "aborted",
+        "blocking": true,
+        "result": {
+          "status": "not_measured",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-05T00:00:00Z"
+        },
+        "evidence": [
+          "c882fe1968b1e2e8e66efe8f1e7fa970642a7cae2e0c66f887987adafe246dbf"
+        ]
+      },
+      {
+        "lane": "other-version",
+        "blocking": true,
+        "result": {
+          "status": "passed",
+          "subjectVersion": "v6",
+          "oldestClosedAt": "2026-10-05T00:00:00Z"
+        },
+        "evidence": [
+          "44ad1623c4cd05b135d8fa91cd8a3d15485a1f617c359b5c546af3ccd95ff93f"
+        ]
+      },
+      {
+        "lane": "mixed-versions",
+        "blocking": true,
+        "result": {
+          "status": "passed",
+          "subjectVersion": "v6",
+          "oldestClosedAt": "2026-10-05T00:00:00Z"
+        },
+        "evidence": [
+          "44ad1623c4cd05b135d8fa91cd8a3d15485a1f617c359b5c546af3ccd95ff93f",
+          "b5ed02a91b819b9c5075fd4169654b806b5fa75629622b58480a59304a1f591a"
+        ]
+      },
+      {
+        "lane": "no-version",
+        "blocking": true,
+        "result": {
+          "status": "not_measured",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-05T00:00:00Z"
+        },
+        "evidence": [
+          "c60142b151b515c3e036260ab0eb85412f2e5531f8fb3aa56d3ac1b52ea5b5b8"
+        ]
+      },
+      {
+        "lane": "unsealed",
+        "blocking": true,
+        "result": {
+          "status": "not_measured",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-08T00:00:00Z"
+        },
+        "evidence": [
+          "14cdecb3e11dbdfbdb870617cf421a838936843c2d2961efdf5dc986607c7e1d"
+        ]
+      },
+      {
+        "lane": "tampered",
+        "blocking": true,
+        "result": {
+          "status": "not_measured",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-08T00:00:00Z"
+        },
+        "evidence": [
+          "1e87cd71864b9d7937c228768605358fc9c3c6bf849dfb03ddf8288b72982a01"
+        ]
+      },
+      {
+        "lane": "not-intact",
+        "blocking": true,
+        "result": {
+          "status": "not_measured",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-08T00:00:00Z"
+        },
+        "evidence": [
+          "bcfe70da6853a5e0472d18b95e95cc59bf24e523efdb43d9dd764b0459404238"
+        ]
+      },
+      {
+        "lane": "missing",
+        "blocking": true,
+        "result": null
+      },
+      {
+        "lane": "wrong-hash",
+        "blocking": true,
+        "result": null
+      },
+      {
+        "lane": "one-missing",
+        "blocking": true,
+        "result": {
+          "status": "not_measured",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-05T00:00:00Z"
+        },
+        "evidence": [
+          "b5ed02a91b819b9c5075fd4169654b806b5fa75629622b58480a59304a1f591a",
+          "fc229599cde8d4a71ca65d925b598ed192e34dadb644b4d701e8f0b2bab9664e"
+        ]
+      },
+      {
+        "lane": "intact-copy-beside-a-tampered-one",
+        "blocking": true,
+        "result": {
+          "status": "passed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-05T00:00:00Z"
+        },
+        "evidence": [
+          "b5ed02a91b819b9c5075fd4169654b806b5fa75629622b58480a59304a1f591a"
+        ]
+      }
+    ]
+  },
+  "decision": {
+    "outcome": "inconclusive",
+    "lanes": [
+      {
+        "lane": "live",
+        "status": "passed",
+        "blocking": true
+      },
+      {
+        "lane": "scripted",
+        "status": "not_measured",
+        "blocking": true
+      },
+      {
+        "lane": "replayed",
+        "status": "not_measured",
+        "blocking": true
+      },
+      {
+        "lane": "mocked",
+        "status": "not_measured",
+        "blocking": true
+      },
+      {
+        "lane": "aborted",
+        "status": "not_measured",
+        "blocking": true
+      },
+      {
+        "lane": "other-version",
+        "status": "missing",
+        "blocking": true
+      },
+      {
+        "lane": "mixed-versions",
+        "status": "missing",
+        "blocking": true
+      },
+      {
+        "lane": "no-version",
+        "status": "not_measured",
+        "blocking": true
+      },
+      {
+        "lane": "unsealed",
+        "status": "not_measured",
+        "blocking": true
+      },
+      {
+        "lane": "tampered",
+        "status": "not_measured",
+        "blocking": true
+      },
+      {
+        "lane": "not-intact",
+        "status": "not_measured",
+        "blocking": true
+      },
+      {
+        "lane": "missing",
+        "status": "missing",
+        "blocking": true
+      },
+      {
+        "lane": "wrong-hash",
+        "status": "missing",
+        "blocking": true
+      },
+      {
+        "lane": "one-missing",
+        "status": "not_measured",
+        "blocking": true
+      },
+      {
+        "lane": "intact-copy-beside-a-tampered-one",
+        "status": "passed",
+        "blocking": true
+      }
+    ],
+    "reasons": [
+      "not-measured:scripted",
+      "not-measured:replayed",
+      "not-measured:mocked",
+      "not-measured:aborted",
+      "wrong-version:other-version",
+      "wrong-version:mixed-versions",
+      "not-measured:no-version",
+      "not-measured:unsealed",
+      "not-measured:tampered",
+      "not-measured:not-intact",
+      "missing:missing",
+      "missing:wrong-hash",
+      "not-measured:one-missing",
+      "outcome:inconclusive"
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "kind": "document",
+  "schema": "result",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "VER-9",
+    "RES-1"
+  ],
+  "why": "state is closed for major 1: a reader refuses a value it does not know rather than guess"
+}

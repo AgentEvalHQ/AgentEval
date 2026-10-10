@@ -1,0 +1,595 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/aef/1/writer/checkpoint.schema.json",
+  "title": "AEF 1.0: checkpoint manifest",
+  "description": "A release decision over several evidence lanes for one exact subject version: the lanes and their rules, the exact sealed runs each lane used (with their run hashes), the decision function's input and output once decided, and the state (CKP-1 to CKP-6).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "checkpointId",
+    "subject",
+    "lanes",
+    "state"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "common.schema.json#/$defs/schemaVersion",
+      "description": "The AEF version this document follows, MAJOR.MINOR: 1.0 for AEF 1.0 (VER-1)."
+    },
+    "checkpointId": {
+      "$ref": "common.schema.json#/$defs/id",
+      "description": "The checkpoint's id. A manifest is conventionally stored as checkpoints/<checkpointId>.json."
+    },
+    "template": {
+      "description": "The template the checkpoint was made from.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ref",
+        "version"
+      ],
+      "properties": {
+        "ref": {
+          "$ref": "common.schema.json#/$defs/ref",
+          "description": "The template, as a typed reference."
+        },
+        "version": {
+          "$ref": "common.schema.json#/$defs/exactVersion",
+          "description": "The template's exact version."
+        }
+      }
+    },
+    "subject": {
+      "description": "The exact version decided on. 'latest' is resolved before anything runs, and recorded: resolvedFrom says what was asked, version what it resolved to.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "ref",
+        "version"
+      ],
+      "properties": {
+        "ref": {
+          "$ref": "common.schema.json#/$defs/ref",
+          "description": "The subject decided on, as a typed reference (CKP-1)."
+        },
+        "version": {
+          "$ref": "common.schema.json#/$defs/exactVersion",
+          "description": "The exact version decided on; never latest (CKP-1)."
+        },
+        "image": {
+          "$ref": "common.schema.json#/$defs/sha256Uri",
+          "description": "The subject's OCI image manifest digest, when it is evaluated as an image."
+        },
+        "deployment": {
+          "$ref": "common.schema.json#/$defs/ref",
+          "description": "Where the subject is deployed, as a typed reference."
+        },
+        "resolvedFrom": {
+          "description": "What was asked for, such as latest, before it was resolved to version (CKP-1).",
+          "type": "string",
+          "maxLength": 256
+        },
+        "resolvedAt": {
+          "$ref": "common.schema.json#/$defs/timestamp",
+          "description": "When the version was resolved."
+        }
+      }
+    },
+    "lanes": {
+      "description": "The evidence lanes, at least one, each named once (CKP-2).",
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "lane",
+          "rule",
+          "runs",
+          "blocking"
+        ],
+        "properties": {
+          "lane": {
+            "$ref": "common.schema.json#/$defs/laneName",
+            "description": "The lane's name, unique in the manifest (CKP-2)."
+          },
+          "rule": {
+            "$ref": "#/$defs/laneRule",
+            "description": "How the lane's result follows from its runs (CKP-2)."
+          },
+          "requirements": {
+            "description": "The external requirement ids the lane answers (CKP-2).",
+            "type": "array",
+            "maxItems": 256,
+            "items": {
+              "$ref": "common.schema.json#/$defs/id"
+            }
+          },
+          "runs": {
+            "description": "The exact sealed runs this lane used; empty while pending.",
+            "type": "array",
+            "maxItems": 1024,
+            "items": {
+              "$ref": "common.schema.json#/$defs/runRef"
+            }
+          },
+          "blocking": {
+            "description": "A failed blocking lane blocks the release; a failed advisory lane is reported, never ignored.",
+            "type": "boolean"
+          },
+          "freshness": {
+            "description": "The shortest freshness among the lane's requirements, resolved when the checkpoint was planned.",
+            "$ref": "common.schema.json#/$defs/duration"
+          }
+        }
+      }
+    },
+    "budget": {
+      "description": "What the checkpoint may spend, what it spent, and who approved it (CKP-6).",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "approvedUsd": {
+          "description": "The approved budget, in US dollars.",
+          "type": "number",
+          "minimum": 0
+        },
+        "spentUsd": {
+          "description": "What has been spent so far, in US dollars.",
+          "type": "number",
+          "minimum": 0
+        },
+        "approvedBy": {
+          "$ref": "common.schema.json#/$defs/trustedIdentity",
+          "description": "Who approved the budget. A claim: a reader shows its assurance only as far as it verified it (CKP-6)."
+        }
+      }
+    },
+    "state": {
+      "description": "draft, planned, approved_to_spend, running, evidence_complete, then decided, in that order. An abandoned checkpoint moves to decided with the outcome aborted (CKP-4).",
+      "enum": [
+        "draft",
+        "planned",
+        "approved_to_spend",
+        "running",
+        "evidence_complete",
+        "decided"
+      ]
+    },
+    "outcome": {
+      "description": "Set from state decided on; null before. approved, approved_with_exceptions, blocked, inconclusive or expired from the decision function (DEC-3); aborted when the checkpoint was abandoned (abortReason says why), never from the decision function (CKP-4).",
+      "anyOf": [
+        {
+          "type": "null"
+        },
+        {
+          "enum": [
+            "approved",
+            "approved_with_exceptions",
+            "blocked",
+            "inconclusive",
+            "expired",
+            "aborted"
+          ]
+        }
+      ]
+    },
+    "decision": {
+      "description": "The decision function's output, recorded when the state became decided.",
+      "$ref": "decision.schema.json"
+    },
+    "ext": {
+      "$ref": "common.schema.json#/$defs/ext",
+      "description": "Producer extensions, named reverse-DNS or with the producer's prefix. A reader ignores what it does not know; never holds a secret (ENC-19)."
+    },
+    "abortReason": {
+      "description": "Why the checkpoint was abandoned. Required with the outcome aborted (CKP-4).",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+    },
+    "decisionInput": {
+      "description": "The decision function's input, recorded with its output so anyone can recompute it. Each lane's evidence is the set of its runs' run hashes, and each exception names only run hashes of its lane's runs; its exceptions are recorded here, so whoever signs the checkpoint vouches for them (CKP-4, CKP-5, CKP-7, CKP-9, DEC-1).",
+      "$ref": "decision.schema.json#/$defs/input"
+    }
+  },
+  "allOf": [
+    {
+      "description": "Decided by the decision function: its input and output are recorded.",
+      "if": {
+        "properties": {
+          "state": {
+            "description": "Applies to a decided checkpoint (CKP-4).",
+            "const": "decided"
+          },
+          "outcome": {
+            "description": "With an outcome the decision function gave (CKP-4, DEC-3).",
+            "enum": [
+              "approved",
+              "approved_with_exceptions",
+              "blocked",
+              "inconclusive",
+              "expired"
+            ]
+          }
+        },
+        "required": [
+          "state",
+          "outcome"
+        ]
+      },
+      "then": {
+        "required": [
+          "decision",
+          "decisionInput"
+        ]
+      }
+    },
+    {
+      "description": "Abandoned: it says why, and records no decision.",
+      "if": {
+        "properties": {
+          "outcome": {
+            "description": "Applies to an abandoned checkpoint (CKP-4).",
+            "const": "aborted"
+          }
+        },
+        "required": [
+          "outcome"
+        ]
+      },
+      "then": {
+        "required": [
+          "abortReason"
+        ],
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "decision"
+              ]
+            },
+            {
+              "required": [
+                "decisionInput"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "description": "From decided on, there is an outcome.",
+      "if": {
+        "properties": {
+          "state": {
+            "description": "Applies to a decided checkpoint (CKP-4).",
+            "const": "decided"
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "required": [
+          "outcome"
+        ],
+        "properties": {
+          "outcome": {
+            "description": "A decided checkpoint has an outcome (CKP-4).",
+            "not": {
+              "type": "null"
+            }
+          }
+        }
+      }
+    },
+    {
+      "description": "Before the decision, there is none.",
+      "if": {
+        "properties": {
+          "state": {
+            "description": "Applies before the checkpoint is decided (CKP-4).",
+            "enum": [
+              "draft",
+              "planned",
+              "approved_to_spend",
+              "running",
+              "evidence_complete"
+            ]
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "outcome": {
+            "description": "Before decided, the outcome is null (CKP-4).",
+            "type": "null"
+          }
+        },
+        "not": {
+          "anyOf": [
+            {
+              "required": [
+                "decision"
+              ]
+            },
+            {
+              "required": [
+                "decisionInput"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "laneRule": {
+      "description": "What kind of rule a lane applies. A family with no published pass threshold takes comparison or evidence-present, never threshold.",
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "lane",
+            "metric",
+            "path",
+            "op",
+            "value"
+          ],
+          "properties": {
+            "kind": {
+              "description": "threshold: a summary entry against a value (LANE-2).",
+              "const": "threshold"
+            },
+            "lane": {
+              "description": "The summary lane.",
+              "$ref": "common.schema.json#/$defs/laneName"
+            },
+            "metric": {
+              "description": "The summary entry's metric (LANE-2).",
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "path": {
+              "description": "The result path.",
+              "$ref": "common.schema.json#/$defs/text"
+            },
+            "op": {
+              "description": "How the entry's value is compared with value, as binary64: >=, >, <= or < (LANE-2).",
+              "enum": [
+                ">=",
+                ">",
+                "<=",
+                "<"
+              ]
+            },
+            "value": {
+              "description": "The threshold the entry's value is compared with (LANE-2).",
+              "type": "number"
+            },
+            "suite": {
+              "description": "Only runs of this suite are eligible: the same ref, and the same version and digest for those given (LANE-1).",
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "ref"
+              ],
+              "properties": {
+                "ref": {
+                  "description": "The suite.",
+                  "$ref": "common.schema.json#/$defs/ref"
+                },
+                "version": {
+                  "description": "Its exact version.",
+                  "$ref": "common.schema.json#/$defs/exactVersion"
+                },
+                "digest": {
+                  "description": "The SHA-256 of its frozen content.",
+                  "$ref": "common.schema.json#/$defs/sha256Uri"
+                }
+              }
+            },
+            "minimumN": {
+              "description": "The fewest measured lines the rule needs; fewer gives not_measured (LANE-2, LANE-3).",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "max"
+          ],
+          "properties": {
+            "kind": {
+              "description": "severity: the worst severity allowed among failures (LANE-3).",
+              "const": "severity"
+            },
+            "max": {
+              "description": "The worst severity allowed among failures; a failure with no severity counts as critical (spec 05, LANE-3).",
+              "enum": [
+                "none",
+                "low",
+                "medium",
+                "high"
+              ]
+            },
+            "lane": {
+              "description": "Only result lines of this summary lane count (LANE-3, SUM-3).",
+              "$ref": "common.schema.json#/$defs/laneName"
+            },
+            "path": {
+              "description": "Only result lines at this path or below it count (LANE-3).",
+              "$ref": "common.schema.json#/$defs/text"
+            },
+            "suite": {
+              "description": "Only runs of this suite are eligible: the same ref, and the same version and digest for those given (LANE-1).",
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "ref"
+              ],
+              "properties": {
+                "ref": {
+                  "description": "The suite.",
+                  "$ref": "common.schema.json#/$defs/ref"
+                },
+                "version": {
+                  "description": "Its exact version.",
+                  "$ref": "common.schema.json#/$defs/exactVersion"
+                },
+                "digest": {
+                  "description": "The SHA-256 of its frozen content.",
+                  "$ref": "common.schema.json#/$defs/sha256Uri"
+                }
+              }
+            },
+            "minimumN": {
+              "description": "The fewest measured lines the rule needs; fewer gives not_measured (LANE-2, LANE-3).",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "lane",
+            "metric",
+            "path",
+            "baseline",
+            "significance",
+            "minimumPairs",
+            "axes"
+          ],
+          "properties": {
+            "kind": {
+              "description": "comparison: no significant regression of one run against a baseline run (LANE-5).",
+              "const": "comparison"
+            },
+            "lane": {
+              "description": "The summary lane.",
+              "$ref": "common.schema.json#/$defs/laneName"
+            },
+            "metric": {
+              "description": "The summary metric compared (LANE-7).",
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 256
+            },
+            "path": {
+              "description": "The result path.",
+              "$ref": "common.schema.json#/$defs/text"
+            },
+            "baseline": {
+              "description": "The baseline run, exactly.",
+              "$ref": "common.schema.json#/$defs/runPointer"
+            },
+            "significance": {
+              "description": "The sign test's significance level, strictly between 0 and 1: the lane fails when p is at most this (LANE-8).",
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "exclusiveMaximum": 1
+            },
+            "minimumPairs": {
+              "description": "The fewest untied pairs the test needs; with fewer, the result is not_measured (LANE-8).",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "axes": {
+              "description": "The comparability axes both runs must agree on (spec 05, LANE-6).",
+              "type": "array",
+              "maxItems": 16,
+              "uniqueItems": true,
+              "items": {
+                "$ref": "common.schema.json#/$defs/axis"
+              }
+            },
+            "suite": {
+              "description": "Only runs of this suite are eligible: the same ref, and the same version and digest for those given (LANE-1).",
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "ref"
+              ],
+              "properties": {
+                "ref": {
+                  "description": "The suite.",
+                  "$ref": "common.schema.json#/$defs/ref"
+                },
+                "version": {
+                  "description": "Its exact version.",
+                  "$ref": "common.schema.json#/$defs/exactVersion"
+                },
+                "digest": {
+                  "description": "The SHA-256 of its frozen content.",
+                  "$ref": "common.schema.json#/$defs/sha256Uri"
+                }
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "kind",
+            "runs"
+          ],
+          "properties": {
+            "kind": {
+              "description": "evidence-present: at least a number of eligible runs (LANE-4).",
+              "const": "evidence-present"
+            },
+            "runs": {
+              "description": "At least this many eligible runs.",
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 9007199254740991
+            },
+            "suite": {
+              "description": "Only runs of this suite are eligible: the same ref, and the same version and digest for those given (LANE-1).",
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "ref"
+              ],
+              "properties": {
+                "ref": {
+                  "description": "The suite.",
+                  "$ref": "common.schema.json#/$defs/ref"
+                },
+                "version": {
+                  "description": "Its exact version.",
+                  "$ref": "common.schema.json#/$defs/exactVersion"
+                },
+                "digest": {
+                  "description": "The SHA-256 of its frozen content.",
+                  "$ref": "common.schema.json#/$defs/sha256Uri"
+                }
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

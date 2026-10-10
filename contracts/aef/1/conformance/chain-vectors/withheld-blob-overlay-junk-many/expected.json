@@ -1,0 +1,28 @@
+{
+  "kind": "chain",
+  "run": "run",
+  "generate": [
+    {
+      "copy": [
+        "runs/withheld-blob/run",
+        "run"
+      ]
+    },
+    {
+      "files": [
+        "run/overlays/junk",
+        19997
+      ]
+    }
+  ],
+  "problems": [
+    [
+      "overlays",
+      "limit"
+    ]
+  ],
+  "rules": [
+    "OVL-5",
+    "ENC-17"
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "1.0",
+  "seq": 4,
+  "kind": "job.failed",
+  "jobId": "job-7",
+  "at": "2026-10-08T12:00:03Z",
+  "reason": "The runner ran out of memory.",
+  "limit": "memory",
+  "runs": []
+}

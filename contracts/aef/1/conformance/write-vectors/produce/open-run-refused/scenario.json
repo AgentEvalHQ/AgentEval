@@ -1,0 +1,58 @@
+{
+  "run": {
+    "schemaVersion": "1.0",
+    "runId": "produce-open-run-refused",
+    "status": "running",
+    "producer": {
+      "name": "p",
+      "version": "1"
+    },
+    "subject": {
+      "ref": "agent:a/b",
+      "kind": "agent",
+      "version": "v1"
+    },
+    "execution": {
+      "targetMode": "live"
+    },
+    "startedAt": "2026-10-01T00:00:00Z",
+    "contentCapture": "on"
+  },
+  "metrics": {
+    "schemaVersion": "1.0",
+    "metrics": [
+      {
+        "id": "pass_rate",
+        "kind": "rate",
+        "direction": "higher_better",
+        "scale": {
+          "min": 0,
+          "max": 1
+        }
+      }
+    ]
+  },
+  "cases": [
+    {
+      "caseId": "k1",
+      "path": "q",
+      "evaluator": {
+        "id": "code:q"
+      },
+      "state": "passed"
+    }
+  ],
+  "summary": {
+    "lanes": [
+      {
+        "lane": "quality",
+        "metrics": [
+          {
+            "metric": "pass_rate",
+            "path": "q"
+          }
+        ]
+      }
+    ]
+  }
+}

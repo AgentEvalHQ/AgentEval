@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "1.1",
+  "metrics": [
+    {
+      "id": "recall",
+      "kind": "score",
+      "direction": "target_band",
+      "scale": {
+        "min": 0,
+        "max": 1
+      }
+    },
+    {
+      "id": "latency",
+      "kind": "duration",
+      "direction": "lower_better",
+      "scale": "unbounded",
+      "unit": "ms"
+    },
+    {
+      "id": "tokens",
+      "kind": "count",
+      "direction": "none",
+      "scale": "unbounded"
+    }
+  ]
+}

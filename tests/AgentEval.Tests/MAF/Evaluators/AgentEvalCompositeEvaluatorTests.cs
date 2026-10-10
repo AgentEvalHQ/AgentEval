@@ -191,6 +191,63 @@ public class AgentEvalCompositeEvaluatorTests
         Assert.True(queryNode.Score.Passed);
         Assert.True(report.Score.Passed);
     }
+
+    private static EvalResult SkippedLeaf(string name) =>
+        EvalResult.Skipped(new NamedEval(name), $"{name}: no context: not measured.");
+
+    private sealed class NamedEval(string name) : IEval
+    {
+        public string Key => name;
+        public string Name => name;
+        public string Category => "quality";
+        public string Version => "1.0.0";
+        public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default) => throw new NotSupportedException();
+    }
+
+    [Fact]
+    public async Task ASkippedLeaf_HasNoValue_AndIsInconclusive_NotTheLowestScore()
+    {
+        // Review round 17 M1, composite side: a skipped leaf reached MAF as value 1.0 (the lowest score on MEAI's 1–5
+        // scale) rated Poor, so anything averaging Value counted a placeholder as a real worst score.
+        var tree = Tree(Leaf("relevance", 0.9), SkippedLeaf("faithfulness"));
+        var evaluator = new AgentEvalCompositeEvaluator(new StubComposite(tree));
+
+        var item = await Run(tree, evaluator);
+        var skipped = (NumericMetric)item.Metrics["faithfulness"];
+
+        Assert.Null(skipped.Value);
+        Assert.Equal(EvaluationRating.Inconclusive, skipped.Interpretation!.Rating);
+        Assert.False(skipped.Interpretation.Failed);   // still informational
+        Assert.StartsWith("AgentEval score: 0/100 (skipped,", skipped.Interpretation.Reason, StringComparison.Ordinal);
+        Assert.Equal(1.0 + 0.9 * 4.0, ((NumericMetric)item.Metrics["relevance"]).Value!.Value, 6);
+    }
+
+    [Fact]
+    public async Task ASkippedLeaf_RoundTripsThroughTheReportBridge_AsSkipped()
+    {
+        var tree = Tree(Leaf("relevance", 0.9), SkippedLeaf("faithfulness"));
+        var item = await Run(tree, new AgentEvalCompositeEvaluator(new StubComposite(tree)));
+
+        var report = MeaiToEvalResultBridge.Build("run", ["q"], new AgentEvaluationResults("agenteval", [item]));
+
+        var leaves = report.Details.SubResults![0].Details.SubResults!;
+        Assert.Contains(leaves, l => l.Metric.Key == "faithfulness" && l.Score.Label == "skipped" && !l.Score.CountsTowardAggregate());
+    }
+
+    [Fact]
+    public async Task ASkippedRoot_HasNoValue_AndStillFailsTheMafItem()
+    {
+        var root = SkippedLeaf("everything");
+        var evaluator = new AgentEvalCompositeEvaluator(new StubComposite(root));
+
+        var item = await Run(root, evaluator);
+        var overall = (NumericMetric)item.Metrics["everything (overall)"];
+        var maf = new AgentEvaluationResults("agenteval", [item]);
+
+        Assert.Null(overall.Value);
+        Assert.Equal(EvaluationRating.Inconclusive, overall.Interpretation!.Rating);
+        Assert.False(maf.AllPassed);   // fail-closed: nothing measured never passes an item
+    }
 }
 
 /// <summary>

@@ -1,0 +1,37 @@
+{
+  "suites": [
+    {
+      "ref": "suite:support/padded-costs",
+      "version": "1",
+      "content": "suite:support/padded-costs@1\npad-1\npad-2\npad-3\n",
+      "cases": [
+        {
+          "caseId": "pad-1",
+          "state": "passed",
+          "usd": 0.25,
+          "usdBound": 0.5,
+          "seconds": 20,
+          "secondsBound": 20
+        },
+        {
+          "caseId": "pad-2",
+          "state": "passed",
+          "usd": 0.25,
+          "usdBound": 0.5,
+          "seconds": 20,
+          "secondsBound": 20
+        },
+        {
+          "caseId": "pad-3",
+          "state": "passed",
+          "usd": 0.25,
+          "usdBound": 0.5,
+          "seconds": 20,
+          "secondsBound": 20
+        }
+      ]
+    }
+  ],
+  "closeSeconds": 1,
+  "priceTable": "aef-scripted-2026-10"
+}

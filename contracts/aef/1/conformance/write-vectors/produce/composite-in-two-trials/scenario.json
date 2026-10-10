@@ -1,0 +1,185 @@
+{
+  "run": {
+    "schemaVersion": "1.0",
+    "runId": "produce-composite-in-two-trials",
+    "status": "completed",
+    "producer": {
+      "name": "p",
+      "version": "1"
+    },
+    "subject": {
+      "ref": "agent:a/b",
+      "kind": "agent",
+      "version": "v1"
+    },
+    "execution": {
+      "targetMode": "live"
+    },
+    "startedAt": "2026-10-01T00:00:00Z",
+    "contentCapture": "on",
+    "endedAt": "2026-10-01T00:01:00Z"
+  },
+  "metrics": {
+    "schemaVersion": "1.0",
+    "metrics": [
+      {
+        "id": "quality",
+        "kind": "score",
+        "direction": "higher_better",
+        "scale": {
+          "min": 0,
+          "max": 1
+        }
+      },
+      {
+        "id": "pass_rate",
+        "kind": "rate",
+        "direction": "higher_better",
+        "scale": {
+          "min": 0,
+          "max": 1
+        }
+      }
+    ]
+  },
+  "cases": [
+    {
+      "caseId": "k1",
+      "path": "plan",
+      "evaluator": {
+        "id": "composite:plan"
+      },
+      "state": "failed",
+      "severity": "high",
+      "aggregation": {
+        "strategy": "Min",
+        "threshold": 0.5,
+        "score": 0.1,
+        "rulePath": "threshold",
+        "decisive": [
+          "plan/steps"
+        ]
+      },
+      "children": [
+        {
+          "path": "plan/steps",
+          "evaluator": {
+            "id": "code:plan/steps"
+          },
+          "state": "failed",
+          "component": {
+            "weight": 1,
+            "required": true
+          },
+          "severity": "high"
+        },
+        {
+          "path": "plan/tools",
+          "evaluator": {
+            "id": "code:plan/tools"
+          },
+          "state": "passed",
+          "component": {
+            "weight": 1,
+            "required": true
+          }
+        }
+      ],
+      "trials": {
+        "aggregation": "AllPass",
+        "trees": [
+          {
+            "path": "plan",
+            "evaluator": {
+              "id": "composite:plan"
+            },
+            "state": "passed",
+            "aggregation": {
+              "strategy": "Min",
+              "threshold": 0.5,
+              "score": 0.9,
+              "rulePath": "threshold",
+              "decisive": []
+            },
+            "children": [
+              {
+                "path": "plan/steps",
+                "evaluator": {
+                  "id": "code:plan/steps"
+                },
+                "state": "passed",
+                "component": {
+                  "weight": 1,
+                  "required": true
+                }
+              },
+              {
+                "path": "plan/tools",
+                "evaluator": {
+                  "id": "code:plan/tools"
+                },
+                "state": "passed",
+                "component": {
+                  "weight": 1,
+                  "required": true
+                }
+              }
+            ]
+          },
+          {
+            "path": "plan",
+            "evaluator": {
+              "id": "composite:plan"
+            },
+            "state": "failed",
+            "severity": "high",
+            "aggregation": {
+              "strategy": "Min",
+              "threshold": 0.5,
+              "score": 0.1,
+              "rulePath": "threshold",
+              "decisive": [
+                "plan/steps"
+              ]
+            },
+            "children": [
+              {
+                "path": "plan/steps",
+                "evaluator": {
+                  "id": "code:plan/steps"
+                },
+                "state": "failed",
+                "component": {
+                  "weight": 1,
+                  "required": true
+                },
+                "severity": "high"
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "summary": {
+    "lanes": [
+      {
+        "lane": "quality",
+        "metrics": [
+          {
+            "metric": "pass_rate",
+            "path": "plan"
+          },
+          {
+            "metric": "pass_rate",
+            "path": "plan/steps"
+          },
+          {
+            "metric": "pass_rate",
+            "path": "plan/tools"
+          }
+        ]
+      }
+    ]
+  }
+}

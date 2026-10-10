@@ -1,0 +1,41 @@
+{
+  "kind": "overlay-view",
+  "run": "run",
+  "at": "2026-10-08T12:00:00Z",
+  "rules": [
+    "OVL-9",
+    "ENC-8"
+  ],
+  "view": {
+    "results": [],
+    "reviews": [],
+    "waivers": [
+      {
+        "target": {
+          "requirement": "REQ-1"
+        },
+        "expires": "2026-10-08T12:00:00Z",
+        "active": false,
+        "event": "ov_0001"
+      },
+      {
+        "target": {
+          "requirement": "REQ-2"
+        },
+        "expires": "2026-10-09T00:00:00Z",
+        "active": true,
+        "event": "ov_0002"
+      },
+      {
+        "target": {
+          "result": "r_38cdcb141e64be0aa999495f4d1437df"
+        },
+        "expires": "2026-10-20T00:00:00Z",
+        "active": false,
+        "event": "ov_0003"
+      }
+    ],
+    "withheld": [],
+    "unsealedEvents": 0
+  }
+}

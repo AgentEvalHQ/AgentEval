@@ -1,0 +1,11 @@
+{
+  "kind": "checkpoint",
+  "schema": "checkpoint",
+  "writer": "valid",
+  "reader": "valid",
+  "rules": [
+    "CKP-4"
+  ],
+  "why": "an abandoned checkpoint says why and records no decision",
+  "problems": []
+}

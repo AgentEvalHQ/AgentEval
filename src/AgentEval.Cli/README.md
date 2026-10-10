@@ -74,7 +74,7 @@ agenteval bench nist  --subject my-agent
 
 # Quality & performance
 agenteval bench agentic --subject my-agent
-agenteval bench perf latency --subject my-agent --azure-from-env
+agenteval bench perf latency --subject my-agent --from-env
 agenteval bench longmemeval --subject my-agent --preset subset
 agenteval bench memory --subject my-agent --preset quick
 ```

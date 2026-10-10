@@ -1,0 +1,1 @@
+{"schemaVersion":"1.0","eventId":"ov_0001","kind":"redact","target":{"run":"R-1","blob":"d364490e8f1b41bdcd79f00d5633ef9484aeda4c3a2b795525b95c8ddab84348"},"reason":"The judge's reasoning quoted a customer's address.","by":{"identity":"git:alice@example.com","assurance":"signed"},"at":"2026-10-08T13:00:00Z"}

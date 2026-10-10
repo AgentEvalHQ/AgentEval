@@ -1,0 +1,4 @@
+{"schemaVersion":"1.0","seq":1,"kind":"job.accepted","jobId":"job-7","at":"2026-10-08T12:00:00Z","planId":"plan-43","planDigest":"a3a4de0f2d285cf6b1cb374c9e9a2a1c9a4172f1acbb76d7b82affd29aac66ec","runnerId":"runner-local-01"}
+{"schemaVersion":"1.0","seq":2,"kind":"evidence.produced","jobId":"job-7","at":"2026-10-08T12:01:01Z","runId":"R-1","runHash":"51698ccdc5c9bc7edca1dc2f02e94cf0418e739f553366de596f62ba2a2fe7ae"}
+{"schemaVersion":"1.0","seq":3,"kind":"evidence.produced","jobId":"job-7","at":"2026-10-08T12:01:02Z","runId":"R-2","runHash":"1b5842ac47f18a04e4d1ff482fa42b8d6461d11816b69047c7157dde3342c10f"}
+{"schemaVersion":"1.0","seq":4,"kind":"job.sealed","jobId":"job-7","at":"2026-10-08T12:02:00Z","runs":["R-1","R-2"]}

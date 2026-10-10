@@ -1,0 +1,16 @@
+{
+  "kind": "plan-conformance",
+  "events": "events.ndjson",
+  "plan": "plan.json",
+  "runs": "runs",
+  "problems": [
+    [
+      "run:R-1",
+      "judges"
+    ]
+  ],
+  "rules": [
+    "STRM-4"
+  ],
+  "why": "a judge the plan does not name: the plan's model, with another rubric (a run's judges are some of the plan's, never one it does not name)"
+}

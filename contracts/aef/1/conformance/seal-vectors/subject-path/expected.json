@@ -1,0 +1,13 @@
+{
+  "kind": "seal",
+  "run": "run",
+  "problems": [
+    [
+      "overlays/events.ndjson",
+      "subject-path"
+    ]
+  ],
+  "rules": [
+    "SEAL-6"
+  ]
+}

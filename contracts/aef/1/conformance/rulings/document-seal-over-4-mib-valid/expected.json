@@ -1,0 +1,33 @@
+{
+  "kind": "document",
+  "schema": "seal",
+  "document": "document.json",
+  "writer": "valid",
+  "reader": "valid",
+  "generate": [
+    {
+      "write": [
+        "document.json",
+        [
+          [
+            "{\n  \"_type\": \"https://in-toto.io/Statement/v1\",\n  \"subject\": [\n    {\n      \"name\": \"blobs/sha256/47/474400071c193b3faf9f2c7f82e28fea484a7b59a07fc0a247282870d6441e99\",\n      \"digest\": {\n        \"sha256\": \"474400071c193b3faf9f2c7f82e28fea484a7b59a07fc0a247282870d6441e99\"\n      }\n    },\n    {\n      \"name\": \"evidence.ndjson\",\n      \"digest\": {\n        \"sha256\": \"0cb5efa41e591fed8fc988a7e2063ba7285b4faebe8ddbac0d7782643ceb8642\"\n      }\n    },\n    {\n      \"name\": \"gates.ndjson\",\n      \"digest\": {\n        \"sha256\": \"a7015f35139336ec94132638061773933c7e118c718e81dea171768d1377b26e\"\n      }\n    },\n    {\n      \"name\": \"metrics.json\",\n      \"digest\": {\n        \"sha256\": \"81ac87c69d20ca49d69e0a5541b062fe1f8fcc4529117c6d6f29eac1403b3d6c\"\n      }\n    },\n    {\n      \"name\": \"results.ndjson\",\n      \"digest\": {\n        \"sha256\": \"86590893e81c0f70fb80c1895493c1da3af645cd79ca7a284550469074d70764\"\n      }\n    },\n    {\n      \"name\": \"run.json\",\n      \"digest\": {\n        \"sha256\": \"69f20a0f63a1ff1fa9521dee737a44ccdba294b7a16a38b1fbe34cac5a1e3890\"\n      }\n    },\n    {\n      \"name\": \"summary.json\",\n      \"digest\": {\n        \"sha256\": \"fe9548e607cab4fc632706c94cefc75b67a9efde0c1c0c6bb604206386960a3c\"\n      }\n    },\n    {\n      \"name\": \"traces.otlp.jsonl\",\n      \"digest\": {\n        \"sha256\": \"7ed4f10a3ccf2cb1b5f6b44865f2b35896b891c7fd7d05d2ddba7b5ffd417921\"\n      }\n    }\n  ],\n  \"predicateType\": \"https://agenteval.dev/aef/1/evidence\",\n  \"predicate\": {\n    \"schemaVersion\": \"1.0\",\n    \"runId\": \"run-small-1\",\n    \"runHash\": \"3e489b93410aeb5c050267cdb1cde3ed2dabe74b4b7b96d8a2061fc65d59b419\",\n    \"producer\": {\n      \"name\": \"p\",\n      \"version\": \"1\"\n    },\n    \"subject\": {\n      \"ref\": \"agent:a/b\",\n      \"version\": \"v1\"\n    },\n    \"deployment\": null,\n    \"suite\": null,\n    \"judges\": [],\n    \"closedAt\": \"2026-10-01T00:01:00Z\",\n    \"sealedAt\": \"2026-10-08T09:00:00Z\",\n    \"sealedBy\": \"producer\"\n  }\n}",
+            1
+          ],
+          [
+            " ",
+            4192406
+          ],
+          [
+            "\n",
+            1
+          ]
+        ]
+      ]
+    }
+  ],
+  "rules": [
+    "ENC-17",
+    "ENC-18"
+  ],
+  "why": "a valid seal.json padded with spaces to 4 MiB + 1 byte. A seal's limit is 40 MiB (ENC-17), so the document operation accepts it: the limit is the schema's file's, not one size for every document (its twin document-run-over-4-mib is refused at the same size)."
+}

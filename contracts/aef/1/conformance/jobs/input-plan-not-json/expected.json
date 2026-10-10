@@ -1,0 +1,12 @@
+{
+  "kind": "job",
+  "plan": "plan.json",
+  "runner": "../runner.json",
+  "target": "target.json",
+  "at": "2026-10-09T09:00:00Z",
+  "refused": true,
+  "rules": [
+    "ENC-1"
+  ],
+  "why": "the plan file is not a JSON text (it ends mid-object): no plan, so no job.refused can name it"
+}

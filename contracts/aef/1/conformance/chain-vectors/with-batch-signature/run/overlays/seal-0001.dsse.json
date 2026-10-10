@@ -1,0 +1,10 @@
+{
+  "payloadType": "application/vnd.in-toto+json",
+  "payload": "",
+  "signatures": [
+    {
+      "keyid": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+      "sig": "AAAA"
+    }
+  ]
+}

@@ -1,0 +1,63 @@
+{
+  "kind": "chain",
+  "run": "run",
+  "generate": [
+    {
+      "copy": [
+        "runs/withheld-blob/run",
+        "run"
+      ]
+    },
+    {
+      "write": [
+        "run/overlays/.DS_Store",
+        [
+          [
+            "x",
+            1
+          ]
+        ]
+      ]
+    },
+    {
+      "write": [
+        "run/overlays/notes 1.txt",
+        [
+          [
+            "x",
+            1
+          ]
+        ]
+      ]
+    },
+    {
+      "write": [
+        "run/overlays/events.ndjson.bak",
+        [
+          [
+            "{}\n",
+            1
+          ]
+        ]
+      ]
+    }
+  ],
+  "problems": [
+    [
+      "overlays/.DS_Store",
+      "unexpected-file"
+    ],
+    [
+      "overlays/events.ndjson.bak",
+      "unexpected-file"
+    ],
+    [
+      "overlays/notes 1.txt",
+      "unexpected-file"
+    ]
+  ],
+  "rules": [
+    "OVL-5",
+    "ENC-17"
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "kind": "document",
+  "schema": "metrics",
+  "document": "document.json",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "ENC-2",
+    "VER-3"
+  ]
+}

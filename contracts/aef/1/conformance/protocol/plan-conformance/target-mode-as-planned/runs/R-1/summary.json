@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "R-1",
+  "lanes": [
+    {
+      "lane": "quality",
+      "metrics": [
+        {
+          "metric": "triage-score",
+          "path": "triage",
+          "n": 1,
+          "N": 1,
+          "notMeasured": 0,
+          "value": 0.4,
+          "verdict": "failed",
+          "rule": "triage-score >= 0.8",
+          "sum": 0.4,
+          "sumSq": 0.16000000000000003
+        }
+      ]
+    }
+  ],
+  "cost": {
+    "totalUsd": 1.5,
+    "source": "provider-billing"
+  }
+}

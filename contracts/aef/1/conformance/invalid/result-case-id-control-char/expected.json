@@ -1,0 +1,10 @@
+{
+  "kind": "document",
+  "schema": "result",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "RES-4"
+  ],
+  "why": "caseId and path hold no control character, so the U+001F a result id joins with cannot appear in them"
+}

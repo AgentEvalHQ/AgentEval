@@ -1,0 +1,10 @@
+{
+  "kind": "plan",
+  "schema": "run-plan",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "PLAN-1"
+  ],
+  "why": "a container run evaluates an already-built image, named by digest"
+}

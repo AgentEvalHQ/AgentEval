@@ -1,0 +1,12 @@
+{
+  "kind": "job",
+  "plan": "plan.json",
+  "runner": "../runner.json",
+  "target": "target.json",
+  "at": "2026-10-09T09:00:00Z",
+  "refused": true,
+  "rules": [
+    "PLAN-9"
+  ],
+  "why": "a case whose cost bound ($0.125) is below its cost ($0.25): a bound is the most a case can cost"
+}

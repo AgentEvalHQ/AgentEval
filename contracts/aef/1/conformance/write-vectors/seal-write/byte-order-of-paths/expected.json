@@ -1,0 +1,32 @@
+{
+  "kind": "seal-write",
+  "rules": [
+    "SEAL-3",
+    "SEAL-4",
+    "SEAL-5"
+  ],
+  "run": "run",
+  "sealedBy": "ingest",
+  "sealedAt": "2026-10-08T09:00:00Z",
+  "manifest": "expected-manifest.txt",
+  "predicate": {
+    "schemaVersion": "1.0",
+    "runId": "seal-write-byte-order",
+    "runHash": "5a49cde05ebebcea449f4627757e088e134b597eb32c3d58f135ea62a06f1a31",
+    "producer": {
+      "name": "p",
+      "version": "1"
+    },
+    "subject": {
+      "ref": "agent:a/b",
+      "version": "v1"
+    },
+    "deployment": null,
+    "suite": null,
+    "judges": [],
+    "closedAt": "2026-10-01T00:01:00Z",
+    "sealedAt": "2026-10-08T09:00:00Z",
+    "sealedBy": "ingest"
+  },
+  "why": "Subjects and manifest lines are ordered by the UTF-8 bytes of the path: Z (0x5A) before a, and - (0x2D) before . (0x2E) before / (0x2F) before _ (0x5F), so ext/a/b comes after ext/a.b, where a sort by path segments would put it first. An empty file is sealed too."
+}

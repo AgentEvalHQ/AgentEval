@@ -1,0 +1,2 @@
+{"resourceLogs":[{"resource":{"attributes":[]},"scopeLogs":[{"scope":{"name":"p"},"logRecords":[{"timeUnixNano":"1790812812000000000","eventName":"gen_ai.evaluation.result","attributes":[{"key":"gen_ai.evaluation.name","value":{"stringValue":"m"}},{"key":"gen_ai.evaluation.explanation","value":{"stringValue":"The card ending 4242 was refunded."}}]}]}]}]}
+{"resourceLogs":[{"resource":{"attributes":[]},"scopeLogs":[{"scope":{"name":"p"},"logRecords":[{"timeUnixNano":"1790812812000000000","body":{"stringValue":"Refund my order, card 4242"}}]}]}]}

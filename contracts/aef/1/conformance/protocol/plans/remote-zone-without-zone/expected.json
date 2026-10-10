@@ -1,0 +1,10 @@
+{
+  "kind": "plan",
+  "schema": "run-plan",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "PLAN-7"
+  ],
+  "why": "a remote-zone run names its zone: the zone a runner must be in to take the plan"
+}

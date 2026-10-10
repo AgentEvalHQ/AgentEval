@@ -1,0 +1,33 @@
+{
+  "kind": "produce",
+  "rules": [
+    "RES-8",
+    "SUM-3",
+    "SUM-4"
+  ],
+  "scenario": "scenario.json",
+  "results": "expected-results.ndjson",
+  "summary": {
+    "schemaVersion": "1.0",
+    "runId": "produce-trials-agreement",
+    "lanes": [
+      {
+        "lane": "quality",
+        "metrics": [
+          {
+            "metric": "pass_rate",
+            "path": "q",
+            "N": 4,
+            "n": 4,
+            "notMeasured": 0,
+            "sum": 2,
+            "sumSq": 2,
+            "value": 0.5,
+            "verdict": "scored"
+          }
+        ]
+      }
+    ]
+  },
+  "why": "agree is true exactly when a path's trial lines are all in one state (RES-8): two warn trials agree though neither passed; a failed and an error trial do not, though neither passed; a single trial agrees with itself. passed counts the passed trials only. PassAtK's k is carried beside the aggregation."
+}

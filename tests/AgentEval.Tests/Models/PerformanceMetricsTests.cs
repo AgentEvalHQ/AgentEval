@@ -55,12 +55,12 @@ public class PerformanceMetricsTests
     [Fact]
     public void ModelPricing_EstimateCost_WithValidModel_ReturnsCost()
     {
-        // gpt-4o: $0.005/1K input, $0.015/1K output
+        // gpt-4o: $0.0025/1K input, $0.01/1K output
         var cost = ModelPricing.EstimateCost("gpt-4o", inputTokens: 1000, outputTokens: 500);
         
         Assert.NotNull(cost);
-        // Expected: (1000/1000 * 0.005) + (500/1000 * 0.015) = 0.005 + 0.0075 = 0.0125
-        Assert.Equal(0.0125m, cost!.Value);
+        // Expected: (1000/1000 * 0.0025) + (500/1000 * 0.01) = 0.0025 + 0.005 = 0.0075
+        Assert.Equal(0.0075m, cost!.Value);
     }
     
     [Fact]

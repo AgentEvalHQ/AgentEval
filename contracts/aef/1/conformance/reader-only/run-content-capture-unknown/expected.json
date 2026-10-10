@@ -1,0 +1,13 @@
+{
+  "kind": "reader-only",
+  "schema": "run",
+  "writer": "invalid",
+  "reader": "valid",
+  "reads": {
+    "contentCapture": "on"
+  },
+  "rules": [
+    "VER-3",
+    "RUN-11"
+  ]
+}

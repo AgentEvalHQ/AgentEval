@@ -1,0 +1,60 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "metrics.json",
+      "digest": {
+        "sha256": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8"
+      }
+    },
+    {
+      "name": "results.ndjson",
+      "digest": {
+        "sha256": "6b7bb0c4567de6f60c7c5a89f38287e4b48f0f79195157e84058a7c84dda5b4a"
+      }
+    },
+    {
+      "name": "run.json",
+      "digest": {
+        "sha256": "b9f000fca7a357450e3079c163af67238641e2af9611831112d0a1af6739acd7"
+      }
+    },
+    {
+      "name": "summary.json",
+      "digest": {
+        "sha256": "13228453f6a60aa8e1dcd00a8c992148e3066890cb3ba4722219725b78293e37"
+      }
+    }
+  ],
+  "predicateType": "https://agenteval.dev/aef/1/evidence",
+  "predicate": {
+    "schemaVersion": "1.0",
+    "runId": "R-2",
+    "runHash": "6f6961bd5e1c14245bd1ae5467b6fce037030674607b3e0d75ff40d99983852d",
+    "producer": {
+      "name": "agenteval-cli",
+      "version": "1.0.0"
+    },
+    "subject": {
+      "ref": "agent:support/support-triage",
+      "version": "git:3f2a1c"
+    },
+    "deployment": {
+      "ref": "deployment:support/support-triage@dev"
+    },
+    "suite": {
+      "ref": "suite:support/triage-scenarios",
+      "version": "4",
+      "digest": "sha256:4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c"
+    },
+    "judges": [
+      {
+        "model": "gpt-5.1",
+        "rubricDigest": "sha256:a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9"
+      }
+    ],
+    "closedAt": "2026-10-08T12:00:50Z",
+    "sealedAt": "2026-10-08T12:00:55Z",
+    "sealedBy": "producer"
+  }
+}

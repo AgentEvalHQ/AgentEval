@@ -1,0 +1,15 @@
+{
+  "kind": "checkpoint",
+  "schema": "checkpoint",
+  "writer": "invalid",
+  "reader": "valid",
+  "rules": [
+    "CKP-4",
+    "CKP-7",
+    "VER-3"
+  ],
+  "why": "a state a later minor (1.1) adds: a reader cannot recompute it, and says so rather than call it tampering",
+  "problems": [
+    "unverifiable"
+  ]
+}

@@ -1,0 +1,115 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "blobs/sha256/47/474400071c193b3faf9f2c7f82e28fea484a7b59a07fc0a247282870d6441e99",
+      "digest": {
+        "sha256": "474400071c193b3faf9f2c7f82e28fea484a7b59a07fc0a247282870d6441e99"
+      }
+    },
+    {
+      "name": "evidence.ndjson",
+      "digest": {
+        "sha256": "0cb5efa41e591fed8fc988a7e2063ba7285b4faebe8ddbac0d7782643ceb8642"
+      }
+    },
+    {
+      "name": "ext/B.txt",
+      "digest": {
+        "sha256": "43a53dda4f92b65ceafb56454396b652043fd1bd620cc9e6b05a2240ebeb20c3"
+      }
+    },
+    {
+      "name": "ext/a-b.txt",
+      "digest": {
+        "sha256": "52f940a6400df8280d40229bfd2c2bd2f2656b0c0a11795a91021641d586eff2"
+      }
+    },
+    {
+      "name": "ext/a.txt",
+      "digest": {
+        "sha256": "b908e4daaf9d57fe9cb551a689a35c9a9e0fac85fdf11faaa0a1ba0e5efc06fd"
+      }
+    },
+    {
+      "name": "ext/a_b.txt",
+      "digest": {
+        "sha256": "5aa38cd970259aa17c3469e7db48e5f52d2ea7f2ce293875b554ff2d20fb9a38"
+      }
+    },
+    {
+      "name": "ext/x-y.txt",
+      "digest": {
+        "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+      }
+    },
+    {
+      "name": "ext/x.y.txt",
+      "digest": {
+        "sha256": "53c234e5e8472b6ac51c1ae1cab3fe06fad053beb8ebfd8977b010655bfdd3c3"
+      }
+    },
+    {
+      "name": "ext/x/y.txt",
+      "digest": {
+        "sha256": "1121cfccd5913f0a63fec40a6ffd44ea64f9dc135c66634ba001d10bcf4302a2"
+      }
+    },
+    {
+      "name": "gates.ndjson",
+      "digest": {
+        "sha256": "a7015f35139336ec94132638061773933c7e118c718e81dea171768d1377b26e"
+      }
+    },
+    {
+      "name": "metrics.json",
+      "digest": {
+        "sha256": "81ac87c69d20ca49d69e0a5541b062fe1f8fcc4529117c6d6f29eac1403b3d6c"
+      }
+    },
+    {
+      "name": "results.ndjson",
+      "digest": {
+        "sha256": "86590893e81c0f70fb80c1895493c1da3af645cd79ca7a284550469074d70764"
+      }
+    },
+    {
+      "name": "run.json",
+      "digest": {
+        "sha256": "69f20a0f63a1ff1fa9521dee737a44ccdba294b7a16a38b1fbe34cac5a1e3890"
+      }
+    },
+    {
+      "name": "summary.json",
+      "digest": {
+        "sha256": "fe9548e607cab4fc632706c94cefc75b67a9efde0c1c0c6bb604206386960a3c"
+      }
+    },
+    {
+      "name": "traces.otlp.jsonl",
+      "digest": {
+        "sha256": "7ed4f10a3ccf2cb1b5f6b44865f2b35896b891c7fd7d05d2ddba7b5ffd417921"
+      }
+    }
+  ],
+  "predicateType": "https://agenteval.dev/aef/1/evidence",
+  "predicate": {
+    "schemaVersion": "1.0",
+    "runId": "run-small-1",
+    "runHash": "4af571e398e9726d65d5dee9f259ff0b277c39fc9b907d0737256b9570d19fe5",
+    "producer": {
+      "name": "p",
+      "version": "1"
+    },
+    "subject": {
+      "ref": "agent:a/b",
+      "version": "v1"
+    },
+    "deployment": null,
+    "suite": null,
+    "judges": [],
+    "closedAt": "2026-10-01T00:01:00Z",
+    "sealedAt": "2026-10-08T09:00:00Z",
+    "sealedBy": "producer"
+  }
+}

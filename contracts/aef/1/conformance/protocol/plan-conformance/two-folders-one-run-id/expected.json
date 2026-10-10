@@ -1,0 +1,13 @@
+{
+  "kind": "plan-conformance",
+  "events": "events.ndjson",
+  "plan": "plan.json",
+  "runs": "runs",
+  "problems": [],
+  "rules": [
+    "STRM-4",
+    "RUN-1",
+    "RUN-13"
+  ],
+  "why": "two runs have the runId R-1, so they are different runs: the one in path order first is of an earlier version; the one with the announced run hash keeps to the plan"
+}

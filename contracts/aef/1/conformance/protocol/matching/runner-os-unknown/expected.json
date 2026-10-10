@@ -1,0 +1,10 @@
+{
+  "kind": "matching",
+  "matches": true,
+  "readerOnly": true,
+  "rules": [
+    "PLAN-7",
+    "VER-8"
+  ],
+  "why": "a runner os this version does not know takes no part in matching (VER-8): tags and provider decide"
+}

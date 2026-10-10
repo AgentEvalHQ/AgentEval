@@ -39,7 +39,7 @@ public class RedTeamCommandTests
     }
 
     [Fact]
-    public void Create_Has51Options()
+    public void Create_Has53Options()
     {
         // 16 base + Wave E (save-baseline, baseline, fail-on) = 19
         // + Wave C′ (attacker, attacker-model) = 21
@@ -61,8 +61,10 @@ public class RedTeamCommandTests
         //   --sut seam) = 49
         // + benign-control arm (--benign-controls: over-refusal beside the attack success rate) = 50
         // + gatekeeper-demo --scripted (the deterministic model on request, for a stable CI baseline) = 51
+        // + --transform (the 18 encoding codecs, reachable from the CLI) = 52
+        // + --memory-trials (runs per case for --attacks memory-poisoning) = 53
         var command = RedTeamCommand.Create();
-        Assert.Equal(51, command.Options.Count);
+        Assert.Equal(53, command.Options.Count);
     }
 
     [Theory] // ADR-021: --judge-rubric maps strict | lenient | evidence-anchored (case- and alias-tolerant).
@@ -170,6 +172,7 @@ public class RedTeamCommandTests
     [InlineData("max-turn-timeout")]    // per-turn timeout (L21)
     [InlineData("explain")]         // --explain LLM rationale
     [InlineData("package-registry")] // LLM03 live registry oracle
+    [InlineData("transform")]       // encoding codecs over every single-turn probe
     [InlineData("calibration")]     // garak-inspired relative z-score scoring
     [InlineData("pack")]            // benchmark pack downloader (#10)
     [InlineData("accept-license")]  // benchmark pack license gate (#10)
@@ -978,5 +981,72 @@ public class RedTeamCommandTests
         var ex = await Assert.ThrowsAsync<ArgumentException>(
             () => RedTeamCommand.ExecuteAsync(opts, CancellationToken.None));
         Assert.Contains("--package-registry", ex.Message);
+    }
+
+    // ── --transform: the 18 encoding codecs, reachable from the CLI (they were library-only) ──
+
+    [Fact]
+    public async Task ExecuteAsync_UnknownTransform_Throws_BeforeAnyScan()
+    {
+        var opts = new RedTeamOptions
+        {
+            Endpoint = "http://localhost:11434/v1",
+            Model = "gpt-4o",
+            Intensity = "moderate",
+            Format = "json",
+            Transform = "base64,klingon",
+        };
+
+        var ex = await Assert.ThrowsAsync<ArgumentException>(
+            () => RedTeamCommand.ExecuteAsync(opts, CancellationToken.None));
+        Assert.Contains("--transform 'klingon'", ex.Message);
+        Assert.Contains("rot13", ex.Message);
+    }
+
+    [Theory]
+    [InlineData(null, 0)]
+    [InlineData("  ", 0)]
+    [InlineData("base64", 1)]
+    [InlineData("BASE64, rot13", 2)]
+    [InlineData("base64,base64", 1)]
+    [InlineData("reversible", 16)]
+    [InlineData("lossy", 2)]
+    [InlineData("all", 18)]
+    [InlineData("all,base64", 18)]
+    public void ResolveTransformers_NamesAndGroups(string? spec, int expected)
+    {
+        var resolved = RedTeamCommand.ResolveTransformers(spec);
+
+        Assert.Equal(expected, resolved?.Count ?? 0);
+    }
+
+    [Fact]
+    public void ApplyTransforms_KeepsThePlaintextControl_AndAddsOneVariantPerCodec()
+    {
+        var injection = Attack.ByName("PromptInjection")!;
+        var transformers = RedTeamCommand.ResolveTransformers("base64,rot13")!;
+
+        var roster = RedTeamCommand.ApplyTransforms([injection], transformers, out var unencoded);
+
+        var plain = injection.GetProbes(Intensity.Quick);
+        var probes = roster.Single().GetProbes(Intensity.Quick);
+        Assert.Empty(unencoded);
+        Assert.Equal(plain.Count * 3, probes.Count);
+        Assert.All(plain, p => Assert.Contains(probes, q => q.Id == p.Id));   // the control still runs
+        Assert.Contains(probes, q => q.Id.EndsWith("+base64", StringComparison.Ordinal));
+        Assert.Equal(injection.Name, roster.Single().Name);
+    }
+
+    [Fact]
+    public void ApplyTransforms_LeavesMultiTurnAttacksUnencoded_AndNamesThem()
+    {
+        var crescendo = Attack.ByName("Crescendo")!;
+        var injection = Attack.ByName("PromptInjection")!;
+
+        var roster = RedTeamCommand.ApplyTransforms([crescendo, injection], RedTeamCommand.ResolveTransformers("hex")!, out var unencoded);
+
+        Assert.Same(crescendo, roster[0]);
+        Assert.Equal(["Crescendo"], unencoded);
+        Assert.NotSame(injection, roster[1]);
     }
 }

@@ -1,0 +1,14 @@
+{
+  "kind": "checkpoint",
+  "schema": "checkpoint",
+  "writer": "invalid",
+  "reader": "valid",
+  "rules": [
+    "CKP-7",
+    "VER-6"
+  ],
+  "why": "a 1.0 manifest with a state nobody defined is checked as usual: its recorded outcome is not the decision's",
+  "problems": [
+    "outcome"
+  ]
+}

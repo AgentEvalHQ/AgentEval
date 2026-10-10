@@ -342,4 +342,4 @@ This is how `CrossSessionEvaluator` tests persistent memory: it plants facts, re
 - [Extensibility](extensibility.md) - Custom conversation metrics
 - [Tracing](tracing.md) - Record & Replay for deterministic conversation testing
 - [Snapshots](snapshots.md) - Snapshot regression testing for conversation outputs
-- [Sample 08](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Sample08_ConversationEvaluation.cs) - Runnable conversation evaluation example
+- [Sample 08](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/WorkflowsAndConversations/01_ConversationEvaluation.cs) - Runnable conversation evaluation example

@@ -1,0 +1,273 @@
+[
+  {
+    "name": "ascii",
+    "paths": [
+      "run.json",
+      "ext/a-b_c.d/e.txt"
+    ],
+    "problems": [],
+    "rules": [
+      "RUN-3"
+    ]
+  },
+  {
+    "name": "leading-dot",
+    "paths": [
+      ".DS_Store",
+      "ext/.hidden",
+      "ext/a/.git/x"
+    ],
+    "problems": [
+      [
+        ".DS_Store",
+        "path"
+      ],
+      [
+        "ext/.hidden",
+        "path"
+      ],
+      [
+        "ext/a/.git/x",
+        "path"
+      ]
+    ],
+    "rules": [
+      "RUN-3"
+    ]
+  },
+  {
+    "name": "space",
+    "paths": [
+      "ext/a b.txt"
+    ],
+    "problems": [
+      [
+        "ext/a b.txt",
+        "path"
+      ]
+    ],
+    "rules": [
+      "RUN-3"
+    ]
+  },
+  {
+    "name": "not-ascii",
+    "paths": [
+      "ext/café.txt"
+    ],
+    "problems": [
+      [
+        "ext/café.txt",
+        "path"
+      ]
+    ],
+    "rules": [
+      "RUN-3"
+    ]
+  },
+  {
+    "name": "backslash",
+    "paths": [
+      "ext\\a.txt"
+    ],
+    "problems": [
+      [
+        "ext\\a.txt",
+        "path"
+      ]
+    ],
+    "rules": [
+      "RUN-3"
+    ]
+  },
+  {
+    "name": "dot-segment",
+    "paths": [
+      "ext/./a"
+    ],
+    "problems": [
+      [
+        "ext/./a",
+        "path"
+      ]
+    ],
+    "rules": [
+      "RUN-3"
+    ]
+  },
+  {
+    "name": "dot-dot-segment",
+    "paths": [
+      "ext/../run.json"
+    ],
+    "problems": [
+      [
+        "ext/../run.json",
+        "path"
+      ]
+    ],
+    "rules": [
+      "RUN-3"
+    ]
+  },
+  {
+    "name": "trailing-dot",
+    "paths": [
+      "ext/a."
+    ],
+    "problems": [
+      [
+        "ext/a.",
+        "path"
+      ]
+    ],
+    "rules": [
+      "RUN-3"
+    ]
+  },
+  {
+    "name": "empty-segment",
+    "paths": [
+      "ext//a"
+    ],
+    "problems": [
+      [
+        "ext//a",
+        "path"
+      ]
+    ],
+    "rules": [
+      "RUN-3"
+    ]
+  },
+  {
+    "name": "leading-slash",
+    "paths": [
+      "/ext/a"
+    ],
+    "problems": [
+      [
+        "/ext/a",
+        "path"
+      ]
+    ],
+    "rules": [
+      "RUN-3"
+    ]
+  },
+  {
+    "name": "reserved-name",
+    "paths": [
+      "ext/CON"
+    ],
+    "problems": [
+      [
+        "ext/CON",
+        "path"
+      ]
+    ],
+    "rules": [
+      "RUN-3"
+    ]
+  },
+  {
+    "name": "reserved-name-any-case-and-extension",
+    "paths": [
+      "ext/con.txt",
+      "ext/Aux.tar.gz",
+      "ext/lpt9.log",
+      "ext/nul"
+    ],
+    "problems": [
+      [
+        "ext/Aux.tar.gz",
+        "path"
+      ],
+      [
+        "ext/con.txt",
+        "path"
+      ],
+      [
+        "ext/lpt9.log",
+        "path"
+      ],
+      [
+        "ext/nul",
+        "path"
+      ]
+    ],
+    "rules": [
+      "RUN-3"
+    ]
+  },
+  {
+    "name": "not-reserved",
+    "paths": [
+      "ext/COM10",
+      "ext/console.txt",
+      "ext/CONx",
+      "ext/LPT0"
+    ],
+    "problems": [],
+    "rules": [
+      "RUN-3"
+    ]
+  },
+  {
+    "name": "case-clash",
+    "paths": [
+      "ext/A.txt",
+      "ext/a.txt"
+    ],
+    "problems": [
+      [
+        "ext/a.txt",
+        "path"
+      ]
+    ],
+    "rules": [
+      "RUN-3"
+    ]
+  },
+  {
+    "name": "case-clash-in-a-folder",
+    "paths": [
+      "ext/Data/x",
+      "ext/data/y"
+    ],
+    "problems": [
+      [
+        "ext/data/y",
+        "path"
+      ]
+    ],
+    "rules": [
+      "RUN-3"
+    ]
+  },
+  {
+    "name": "length-255",
+    "paths": [
+      "ext/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    ],
+    "problems": [],
+    "rules": [
+      "RUN-3"
+    ]
+  },
+  {
+    "name": "length-256",
+    "paths": [
+      "ext/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab"
+    ],
+    "problems": [
+      [
+        "ext/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab",
+        "path"
+      ]
+    ],
+    "rules": [
+      "RUN-3"
+    ]
+  }
+]

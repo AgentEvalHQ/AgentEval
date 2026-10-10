@@ -1,0 +1,11 @@
+{
+  "kind": "document",
+  "schema": "gate-decision",
+  "document": "document.ndjson",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "ENC-7",
+    "VER-3"
+  ]
+}

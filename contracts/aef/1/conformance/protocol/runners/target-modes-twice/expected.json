@@ -1,0 +1,10 @@
+{
+  "kind": "plan",
+  "schema": "runner",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "PLAN-6"
+  ],
+  "why": "a target mode is named once"
+}

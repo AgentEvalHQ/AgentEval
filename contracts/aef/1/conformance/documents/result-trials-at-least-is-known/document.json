@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1.0",
+  "resultId": "r_ba65738f221f7575808d2c10c60dc056",
+  "caseId": "c",
+  "path": "p",
+  "evaluator": {
+    "id": "e"
+  },
+  "state": "passed",
+  "trials": {
+    "n": 5,
+    "passed": 4,
+    "aggregation": "AtLeast",
+    "agree": false
+  }
+}

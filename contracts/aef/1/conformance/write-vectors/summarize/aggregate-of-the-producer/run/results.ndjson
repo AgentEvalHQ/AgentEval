@@ -1,0 +1,4 @@
+{"schemaVersion":"1.0","resultId":"r_4cf8dc57ff8dfd6d96432b0e3125e8ba","caseId":"k1","path":"q","evaluator":{"id":"e:q"},"state":"passed","scores":[{"metric":"quality","value":0.9}]}
+{"schemaVersion":"1.0","resultId":"r_391d54001be8d1cb0b5f94e6c18bad8c","caseId":"k2","path":"q","evaluator":{"id":"e:q"},"state":"failed","scores":[{"metric":"quality","value":0.2}]}
+{"schemaVersion":"1.0","resultId":"r_8b3a465c9f262691cd8ef7b80176b4ab","caseId":"k3","path":"q","evaluator":{"id":"e:q"},"state":"not_measured","reason":"The input the evaluator needs was not there."}
+{"schemaVersion":"1.0","resultId":"r_bd57ed6fc65258548eeff942a2d6036c","caseId":"k1","path":"z","evaluator":{"id":"e:z"},"state":"skipped","reason":"Not run."}

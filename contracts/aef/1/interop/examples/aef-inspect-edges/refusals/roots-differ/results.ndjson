@@ -1,0 +1,2 @@
+{"schemaVersion":"1.0","resultId":"r_3f1ab20ceacc173cabb4abbf28845850","caseId":"c1","path":"a","evaluator":{"id":"check:a"},"state":"scored","scores":[{"metric":"q","value":0.5}],"startedAt":"2026-10-08T09:01:00Z"}
+{"schemaVersion":"1.0","resultId":"r_ca4b5f6d01d158e5a143c9139323181e","caseId":"c1","path":"b","evaluator":{"id":"check:b"},"state":"scored","scores":[{"metric":"q","value":0.6}],"startedAt":"2026-10-08T09:01:02Z"}

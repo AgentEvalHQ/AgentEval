@@ -22,7 +22,7 @@ Costs assume `gpt-4o`-class for the agent under test and cover the agent's calls
 The subject identity is the **agent under test**, not the dev's name. AgentEval persists every run under `.agenteval/subjects/agents/{subject}/runs/{runId}/` — the subject name is the canonical handle for trend lines, baselines, and history.
 
 ```bash
-agenteval bench owasp --preset smoke --subject MyBookingAgent --azure-from-env
+agenteval bench owasp --preset smoke --subject MyBookingAgent --from-env
 ```
 
 Without a target the command refuses. `--sut mock` scans a built-in stand-in that refuses everything, which passes by construction; the run says MOCK, exits 11 and is not stored, so it can never be read as a signal about your agent.
@@ -33,13 +33,13 @@ Start with `smoke` to verify the scan completes end-to-end against your agent. A
 
 ```bash
 # 1. Smoke first — three attacks, Quick intensity, CI-friendly
-agenteval bench owasp --preset smoke --subject MyAgent --azure-from-env
+agenteval bench owasp --preset smoke --subject MyAgent --from-env
 
 # 2. After smoke passes, broaden to top10
-agenteval bench owasp --preset top10 --subject MyAgent --azure-from-env
+agenteval bench owasp --preset top10 --subject MyAgent --from-env
 
 # 3. Before a security review, run audit-grade for the evidence pack
-agenteval bench owasp --preset audit --subject MyAgent --azure-from-env
+agenteval bench owasp --preset audit --subject MyAgent --from-env
 ```
 
 ### 3. Read the report top-down
@@ -90,7 +90,7 @@ Once you have a baseline, every subsequent run shows up as a diff against it:
 agenteval baseline set --subject MyAgent --run <runId>
 
 # Future runs auto-diff against the baseline
-agenteval bench owasp --preset top10 --subject MyAgent --azure-from-env
+agenteval bench owasp --preset top10 --subject MyAgent --from-env
 # Output shows per-category deltas; exit code reflects "any regression"
 ```
 

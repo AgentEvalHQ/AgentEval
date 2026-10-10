@@ -34,12 +34,13 @@ public class MemoryTemporalMetricTests
     // --- Missing MemoryEvaluationResult ---
 
     [Fact]
-    public async Task EvaluateAsync_WithoutMemoryResult_ReturnsFailWithNotFound()
+    public async Task EvaluateAsync_WithoutMemoryResult_IsNotMeasured()
     {
         var context = new EvaluationContext { Input = "test", Output = "test" };
 
         var result = await _metric.EvaluateAsync(context);
 
+        Assert.False(result.Measured);
         Assert.False(result.Passed);
         Assert.Contains("not found", result.Explanation, StringComparison.OrdinalIgnoreCase);
     }

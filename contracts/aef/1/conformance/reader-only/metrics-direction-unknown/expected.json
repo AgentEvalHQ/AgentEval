@@ -1,0 +1,12 @@
+{
+  "kind": "reader-only",
+  "schema": "metrics",
+  "writer": "invalid",
+  "reader": "valid",
+  "reads": {
+    "metrics[0].direction": "none"
+  },
+  "rules": [
+    "VER-3"
+  ]
+}

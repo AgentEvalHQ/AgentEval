@@ -1,0 +1,23 @@
+{
+  "direction": "Inspect → AEF",
+  "page": "inspect.md",
+  "sections": ["Inspect → AEF", "What does not carry over"],
+  "description": "A hand-written Inspect eval log (log.json): task refund_policy, two epochs reduced by mode, three scorers (letters C, I and P; numbers with a grader_failed NaN; a map of a letter and a number), a refusal reason, explanations, answers, case content (text and chat messages), usage per role and model with a grader role, a sample that failed before it was scored, reductions, and results with accuracy, mean, stderr and max. from-inspect imports it twice: with content kept (run/: blobs and evidence for the case content, explanations as reasoning blobs) and with --content-capture off (run-off/: no blob, and no explanation or answer, RUN-11). Both are sealed as ingest, with what the converter supplied in imported.asserted (IN-6). The summary is recomputed from the lines and equals Inspect's accuracy and mean (IN-9). Each file under refusals/ changes one thing the page refuses (IN-6 to IN-10).",
+  "steps": [
+    {"args": ["from-inspect", "log.json", "{out}", "--target-mode", "live", "--at", "2026-10-09T00:00:00Z"], "expected": "run"},
+    {"args": ["from-inspect", "log.json", "{out}", "--target-mode", "live", "--content-capture", "off", "--at", "2026-10-09T00:00:00Z"], "expected": "run-off"}
+  ],
+  "refusals": [
+    {"args": ["from-inspect", "refusals/time-without-offset.json", "{out}", "--target-mode", "live", "--at", "2026-10-09T00:00:00Z"], "says": "IN-6"},
+    {"args": ["from-inspect", "refusals/string-value.json", "{out}", "--target-mode", "live", "--at", "2026-10-09T00:00:00Z"], "says": "IN-7"},
+    {"args": ["from-inspect", "refusals/boolean-value.json", "{out}", "--target-mode", "live", "--at", "2026-10-09T00:00:00Z"], "says": "IN-7"},
+    {"args": ["from-inspect", "refusals/reducer-without-value.json", "{out}", "--target-mode", "live", "--at", "2026-10-09T00:00:00Z"], "says": "IN-8"},
+    {"args": ["from-inspect", "refusals/missing-reduction.json", "{out}", "--target-mode", "live", "--at", "2026-10-09T00:00:00Z"], "says": "IN-8"},
+    {"args": ["from-inspect", "refusals/mean-differs.json", "{out}", "--target-mode", "live", "--at", "2026-10-09T00:00:00Z"], "says": "IN-9"},
+    {"args": ["from-inspect", "refusals/accuracy-and-mean.json", "{out}", "--target-mode", "live", "--at", "2026-10-09T00:00:00Z"], "says": "IN-9"},
+    {"args": ["from-inspect", "refusals/history-edit.json", "{out}", "--target-mode", "live", "--at", "2026-10-09T00:00:00Z"], "says": "IN-10"},
+    {"args": ["from-inspect", "refusals/log-updates.json", "{out}", "--target-mode", "live", "--at", "2026-10-09T00:00:00Z"], "says": "IN-10"},
+    {"args": ["from-inspect", "log.json", "{out}", "--target-mode", "live", "--at", "2026-10-06T10:04:29Z"], "says": "SEAL-1"}
+  ],
+  "runs": {"run": "intact", "run-off": "intact"}
+}

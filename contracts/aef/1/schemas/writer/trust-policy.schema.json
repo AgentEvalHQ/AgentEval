@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/aef/1/writer/trust-policy.schema.json",
+  "title": "AEF 1.0: a trust policy",
+  "description": "SIG-4: the public keys a verifier trusts, each with the identity it speaks for and what that identity may do beyond signing. An input to verification, never read from a run. Closed for readers too (spec 07, VER-9): a verifier cannot honour a restriction it does not know, so it refuses a policy with a member it does not know. A 'may' value it does not know grants nothing.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "keys"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "description": "The AEF version the policy is written for (SIG-4); a verifier refuses a later one.",
+      "const": "1.0"
+    },
+    "keys": {
+      "type": "array",
+      "maxItems": 10000,
+      "items": {
+        "$ref": "#/$defs/key"
+      }
+    }
+  },
+  "$defs": {
+    "key": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identity",
+        "publicKey"
+      ],
+      "properties": {
+        "identity": {
+          "description": "Who the key speaks for, for example git:alice@example.com, spiffe://..., oidc:issuer/subject.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1024
+        },
+        "publicKey": {
+          "description": "The SubjectPublicKeyInfo as PEM, in RFC 7468's strict form (SIG-3 checks the rest).",
+          "type": "string",
+          "maxLength": 65536,
+          "pattern": "^-----BEGIN PUBLIC KEY-----\\r?\\n[A-Za-z0-9+/=\\r\\n]+-----END PUBLIC KEY-----(\\r?\\n)?$"
+        },
+        "may": {
+          "description": "What the identity may do beyond signing: 'redact' authorizes redactions (OVL-10). Values a verifier does not know grant nothing.",
+          "type": "array",
+          "uniqueItems": true,
+          "maxItems": 64,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          }
+        }
+      }
+    }
+  }
+}

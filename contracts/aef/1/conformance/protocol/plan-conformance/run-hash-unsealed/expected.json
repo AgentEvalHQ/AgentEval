@@ -1,0 +1,17 @@
+{
+  "kind": "plan-conformance",
+  "events": "events.ndjson",
+  "plan": "plan.json",
+  "runs": "runs",
+  "problems": [
+    [
+      "run:R-1",
+      "run-hash"
+    ]
+  ],
+  "rules": [
+    "STRM-4",
+    "SEAL-4"
+  ],
+  "why": "no seal.json, so the run hash is recomputed from the files, and it is the one announced; but an unsealed run is not intact"
+}

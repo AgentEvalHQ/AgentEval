@@ -346,6 +346,14 @@ public sealed class MemoryGateContext
     public MemoryBudgetSnapshot? Budget { get; }
     public bool HasAdministrativeCrossScopeCapability { get; }
 
+    /// <summary>The same context with <paramref name="content"/> in place of the content (a sanitized form).</summary>
+    /// <remarks>
+    /// Every other field is carried over. It used to drop <see cref="RecordMetadata"/>, <see cref="Budget"/> and
+    /// <see cref="HasAdministrativeCrossScopeCapability"/>, and the pipeline evaluates every gate after a Sanitize verdict
+    /// on this copy: the recall-admission gate delimits untrusted recalled content by default, so the resource-budget
+    /// gate after it found no snapshot and blocked every such recall (<c>memory.budget.snapshot_missing</c>); a write
+    /// whose secret was redacted was blocked the same way.
+    /// </remarks>
     public MemoryGateContext WithContent(string? content)
         => new(
             OperationId,
@@ -360,7 +368,10 @@ public sealed class MemoryGateContext
             Conflicts,
             RunId,
             LogicalSessionId,
-            Destination);
+            Destination,
+            RecordMetadata,
+            Budget,
+            HasAdministrativeCrossScopeCapability);
 
     private static string ResolveDigest(string? content, string? suppliedDigest)
     {

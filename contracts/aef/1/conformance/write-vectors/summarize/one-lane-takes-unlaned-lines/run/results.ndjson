@@ -1,0 +1,3 @@
+{"schemaVersion":"1.0","resultId":"r_563ec98555453ea24b12a62773a1c2cf","caseId":"k1","path":"q","evaluator":{"id":"e:q"},"state":"passed","scores":[{"metric":"quality","value":0.6}]}
+{"schemaVersion":"1.0","resultId":"r_5a09303cd29a772b3e52d7fbf04c9bb4","caseId":"k2","path":"q","evaluator":{"id":"e:q"},"state":"failed","scores":[{"metric":"quality","value":0.2}],"lane":"main"}
+{"schemaVersion":"1.0","resultId":"r_e0fbbe1747b050e2039f6bb7e0f13bea","caseId":"k3","path":"q","evaluator":{"id":"e:q"},"state":"passed","scores":[{"metric":"quality","value":1.0}],"lane":"aux"}

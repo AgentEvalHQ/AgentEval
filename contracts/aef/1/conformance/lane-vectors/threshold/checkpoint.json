@@ -1,0 +1,473 @@
+{
+  "schemaVersion": "1.0",
+  "checkpointId": "cp_497e22fe854a",
+  "subject": {
+    "ref": "agent:shop/assistant",
+    "version": "v7"
+  },
+  "lanes": [
+    {
+      "lane": "pass",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "p",
+        "op": ">=",
+        "value": 0.5
+      },
+      "runs": [
+        {
+          "runId": "Q1",
+          "runHash": "2dc8e8322f809c1af1ec2e308f0bda4ebd24bc5c58a69701e0b02c551d312369",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "ge-boundary",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "p",
+        "op": ">=",
+        "value": 0.75
+      },
+      "runs": [
+        {
+          "runId": "Q1",
+          "runHash": "2dc8e8322f809c1af1ec2e308f0bda4ebd24bc5c58a69701e0b02c551d312369",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "gt-boundary",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "p",
+        "op": ">",
+        "value": 0.75
+      },
+      "runs": [
+        {
+          "runId": "Q1",
+          "runHash": "2dc8e8322f809c1af1ec2e308f0bda4ebd24bc5c58a69701e0b02c551d312369",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "le",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "p",
+        "op": "<=",
+        "value": 0.5
+      },
+      "runs": [
+        {
+          "runId": "Q1",
+          "runHash": "2dc8e8322f809c1af1ec2e308f0bda4ebd24bc5c58a69701e0b02c551d312369",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "lt",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "p",
+        "op": "<",
+        "value": 0.8
+      },
+      "runs": [
+        {
+          "runId": "Q1",
+          "runHash": "2dc8e8322f809c1af1ec2e308f0bda4ebd24bc5c58a69701e0b02c551d312369",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "no-entry",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "nope",
+        "op": ">=",
+        "value": 0.5
+      },
+      "runs": [
+        {
+          "runId": "Q1",
+          "runHash": "2dc8e8322f809c1af1ec2e308f0bda4ebd24bc5c58a69701e0b02c551d312369",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "other-summary-lane",
+      "rule": {
+        "kind": "threshold",
+        "lane": "security",
+        "metric": "m",
+        "path": "p",
+        "op": ">=",
+        "value": 0.5
+      },
+      "runs": [
+        {
+          "runId": "Q1",
+          "runHash": "2dc8e8322f809c1af1ec2e308f0bda4ebd24bc5c58a69701e0b02c551d312369",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "n-zero",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "p",
+        "op": ">=",
+        "value": 0.5
+      },
+      "runs": [
+        {
+          "runId": "Q2",
+          "runHash": "c7b92b2e9ddc4cb416eb0722a199699cd8e2d650deaa5043b041de1625b3b059",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "one-fails",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "p",
+        "op": ">=",
+        "value": 0.5
+      },
+      "runs": [
+        {
+          "runId": "Q1",
+          "runHash": "2dc8e8322f809c1af1ec2e308f0bda4ebd24bc5c58a69701e0b02c551d312369",
+          "origin": "launched"
+        },
+        {
+          "runId": "Q3",
+          "runHash": "bd7122abbd9935e19453f831069e6e9d1e40a4aec2060bc674d76b9945d27f95",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "failed-beats-unmeasured",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "p",
+        "op": ">=",
+        "value": 0.5
+      },
+      "runs": [
+        {
+          "runId": "Q2",
+          "runHash": "c7b92b2e9ddc4cb416eb0722a199699cd8e2d650deaa5043b041de1625b3b059",
+          "origin": "launched"
+        },
+        {
+          "runId": "Q3",
+          "runHash": "bd7122abbd9935e19453f831069e6e9d1e40a4aec2060bc674d76b9945d27f95",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "unmeasured-beats-passed",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "p",
+        "op": ">=",
+        "value": 0.5
+      },
+      "runs": [
+        {
+          "runId": "Q1",
+          "runHash": "2dc8e8322f809c1af1ec2e308f0bda4ebd24bc5c58a69701e0b02c551d312369",
+          "origin": "launched"
+        },
+        {
+          "runId": "Q2",
+          "runHash": "c7b92b2e9ddc4cb416eb0722a199699cd8e2d650deaa5043b041de1625b3b059",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "no-runs",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "m",
+        "path": "p",
+        "op": ">=",
+        "value": 0.5
+      },
+      "runs": [],
+      "blocking": false
+    }
+  ],
+  "state": "decided",
+  "outcome": "blocked",
+  "decisionInput": {
+    "subjectVersion": "v7",
+    "evaluatedAt": "2026-10-08T00:00:00Z",
+    "supersededBy": null,
+    "lanes": [
+      {
+        "lane": "pass",
+        "blocking": true,
+        "result": {
+          "status": "passed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-01T12:00:00Z"
+        },
+        "evidence": [
+          "2dc8e8322f809c1af1ec2e308f0bda4ebd24bc5c58a69701e0b02c551d312369"
+        ]
+      },
+      {
+        "lane": "ge-boundary",
+        "blocking": true,
+        "result": {
+          "status": "passed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-01T12:00:00Z"
+        },
+        "evidence": [
+          "2dc8e8322f809c1af1ec2e308f0bda4ebd24bc5c58a69701e0b02c551d312369"
+        ]
+      },
+      {
+        "lane": "gt-boundary",
+        "blocking": true,
+        "result": {
+          "status": "failed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-01T12:00:00Z"
+        },
+        "evidence": [
+          "2dc8e8322f809c1af1ec2e308f0bda4ebd24bc5c58a69701e0b02c551d312369"
+        ]
+      },
+      {
+        "lane": "le",
+        "blocking": true,
+        "result": {
+          "status": "failed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-01T12:00:00Z"
+        },
+        "evidence": [
+          "2dc8e8322f809c1af1ec2e308f0bda4ebd24bc5c58a69701e0b02c551d312369"
+        ]
+      },
+      {
+        "lane": "lt",
+        "blocking": true,
+        "result": {
+          "status": "passed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-01T12:00:00Z"
+        },
+        "evidence": [
+          "2dc8e8322f809c1af1ec2e308f0bda4ebd24bc5c58a69701e0b02c551d312369"
+        ]
+      },
+      {
+        "lane": "no-entry",
+        "blocking": true,
+        "result": {
+          "status": "not_measured",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-01T12:00:00Z"
+        },
+        "evidence": [
+          "2dc8e8322f809c1af1ec2e308f0bda4ebd24bc5c58a69701e0b02c551d312369"
+        ]
+      },
+      {
+        "lane": "other-summary-lane",
+        "blocking": true,
+        "result": {
+          "status": "not_measured",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-01T12:00:00Z"
+        },
+        "evidence": [
+          "2dc8e8322f809c1af1ec2e308f0bda4ebd24bc5c58a69701e0b02c551d312369"
+        ]
+      },
+      {
+        "lane": "n-zero",
+        "blocking": true,
+        "result": {
+          "status": "not_measured",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-02T12:00:00Z"
+        },
+        "evidence": [
+          "c7b92b2e9ddc4cb416eb0722a199699cd8e2d650deaa5043b041de1625b3b059"
+        ]
+      },
+      {
+        "lane": "one-fails",
+        "blocking": true,
+        "result": {
+          "status": "failed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-09-28T08:30:00.5Z"
+        },
+        "evidence": [
+          "2dc8e8322f809c1af1ec2e308f0bda4ebd24bc5c58a69701e0b02c551d312369",
+          "bd7122abbd9935e19453f831069e6e9d1e40a4aec2060bc674d76b9945d27f95"
+        ]
+      },
+      {
+        "lane": "failed-beats-unmeasured",
+        "blocking": true,
+        "result": {
+          "status": "failed",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-09-28T08:30:00.5Z"
+        },
+        "evidence": [
+          "bd7122abbd9935e19453f831069e6e9d1e40a4aec2060bc674d76b9945d27f95",
+          "c7b92b2e9ddc4cb416eb0722a199699cd8e2d650deaa5043b041de1625b3b059"
+        ]
+      },
+      {
+        "lane": "unmeasured-beats-passed",
+        "blocking": true,
+        "result": {
+          "status": "not_measured",
+          "subjectVersion": "v7",
+          "oldestClosedAt": "2026-10-01T12:00:00Z"
+        },
+        "evidence": [
+          "2dc8e8322f809c1af1ec2e308f0bda4ebd24bc5c58a69701e0b02c551d312369",
+          "c7b92b2e9ddc4cb416eb0722a199699cd8e2d650deaa5043b041de1625b3b059"
+        ]
+      },
+      {
+        "lane": "no-runs",
+        "blocking": false,
+        "result": null
+      }
+    ]
+  },
+  "decision": {
+    "outcome": "blocked",
+    "lanes": [
+      {
+        "lane": "pass",
+        "status": "passed",
+        "blocking": true
+      },
+      {
+        "lane": "ge-boundary",
+        "status": "passed",
+        "blocking": true
+      },
+      {
+        "lane": "gt-boundary",
+        "status": "failed",
+        "blocking": true
+      },
+      {
+        "lane": "le",
+        "status": "failed",
+        "blocking": true
+      },
+      {
+        "lane": "lt",
+        "status": "passed",
+        "blocking": true
+      },
+      {
+        "lane": "no-entry",
+        "status": "not_measured",
+        "blocking": true
+      },
+      {
+        "lane": "other-summary-lane",
+        "status": "not_measured",
+        "blocking": true
+      },
+      {
+        "lane": "n-zero",
+        "status": "not_measured",
+        "blocking": true
+      },
+      {
+        "lane": "one-fails",
+        "status": "failed",
+        "blocking": true
+      },
+      {
+        "lane": "failed-beats-unmeasured",
+        "status": "failed",
+        "blocking": true
+      },
+      {
+        "lane": "unmeasured-beats-passed",
+        "status": "not_measured",
+        "blocking": true
+      },
+      {
+        "lane": "no-runs",
+        "status": "missing",
+        "blocking": false
+      }
+    ],
+    "reasons": [
+      "failed:gt-boundary",
+      "failed:le",
+      "not-measured:no-entry",
+      "not-measured:other-summary-lane",
+      "not-measured:n-zero",
+      "failed:one-fails",
+      "failed:failed-beats-unmeasured",
+      "not-measured:unmeasured-beats-passed",
+      "missing:no-runs",
+      "outcome:blocked"
+    ]
+  }
+}

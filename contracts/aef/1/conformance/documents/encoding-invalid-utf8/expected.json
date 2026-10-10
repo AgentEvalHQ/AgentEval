@@ -1,0 +1,11 @@
+{
+  "kind": "document",
+  "schema": "evidence",
+  "document": "document.ndjson",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "ENC-1",
+    "VER-3"
+  ]
+}

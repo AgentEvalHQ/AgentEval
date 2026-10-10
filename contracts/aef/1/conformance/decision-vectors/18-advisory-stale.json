@@ -1,0 +1,59 @@
+{
+  "description": "A stale advisory lane expires the checkpoint too: stale evidence decides nothing.",
+  "rules": [
+    "DEC-1",
+    "DEC-2",
+    "DEC-3",
+    "DEC-4"
+  ],
+  "input": {
+    "subjectVersion": "git:3f2a1c",
+    "evaluatedAt": "2026-10-08T12:00:00Z",
+    "lanes": [
+      {
+        "lane": "quality",
+        "blocking": true,
+        "evidence": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "result": {
+          "status": "passed",
+          "subjectVersion": "git:3f2a1c",
+          "oldestClosedAt": "2026-10-07T10:00:00Z"
+        }
+      },
+      {
+        "lane": "performance",
+        "blocking": false,
+        "freshness": "P7D",
+        "evidence": [
+          "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        ],
+        "result": {
+          "status": "passed",
+          "subjectVersion": "git:3f2a1c",
+          "oldestClosedAt": "2026-09-01T00:00:00Z"
+        }
+      }
+    ]
+  },
+  "expected": {
+    "outcome": "expired",
+    "lanes": [
+      {
+        "lane": "quality",
+        "status": "passed",
+        "blocking": true
+      },
+      {
+        "lane": "performance",
+        "status": "stale",
+        "blocking": false
+      }
+    ],
+    "reasons": [
+      "stale:performance",
+      "outcome:expired"
+    ]
+  }
+}

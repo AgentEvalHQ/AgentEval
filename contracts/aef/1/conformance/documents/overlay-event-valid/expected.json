@@ -1,0 +1,11 @@
+{
+  "kind": "document",
+  "schema": "overlay-event",
+  "document": "document.ndjson",
+  "writer": "valid",
+  "reader": "valid",
+  "rules": [
+    "VER-1",
+    "VER-3"
+  ]
+}

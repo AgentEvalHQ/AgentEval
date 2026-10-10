@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "R-1",
+  "status": "completed",
+  "producer": {
+    "name": "agenteval-cli",
+    "version": "1.0.0"
+  },
+  "subject": {
+    "ref": "agent:support/support-triage",
+    "kind": "agent",
+    "version": "git:3f2a1c"
+  },
+  "deployment": {
+    "ref": "deployment:support/support-triage@dev",
+    "endpoint": "http://localhost:5080/v1"
+  },
+  "suite": {
+    "ref": "suite:support/triage-scenarios",
+    "version": "4",
+    "digest": "sha256:4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c"
+  },
+  "judges": [
+    {
+      "model": "gpt-5.1",
+      "provider": "azure.ai.openai",
+      "mode": "single",
+      "rubricDigest": "sha256:a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9"
+    }
+  ],
+  "startedAt": "2026-10-08T12:00:10Z",
+  "endedAt": "2026-10-08T12:00:50Z",
+  "contentCapture": "off",
+  "execution": {
+    "targetMode": "live",
+    "stimulus": "suite"
+  },
+  "provenance": {
+    "planId": "plan-53",
+    "planDigest": "84bb369837a34cf5748243ce46255cfaed01df7f2e100292756fae8e618714a3",
+    "jobId": "job-7",
+    "runnerId": "runner-local-01"
+  }
+}

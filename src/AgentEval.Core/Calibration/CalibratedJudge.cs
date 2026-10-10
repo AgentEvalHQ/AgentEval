@@ -135,6 +135,7 @@ public class CalibratedJudge : ICalibratedJudge
         
         var judgeScores = new Dictionary<string, double>();
         var errors = new List<(string Judge, Exception Error)>();
+        var notMeasured = new List<(string Judge, string Reason)>();
         
         // Run judges with parallelism limit
         using var semaphore = new SemaphoreSlim(_options.MaxParallelJudges);
@@ -149,7 +150,13 @@ public class CalibratedJudge : ICalibratedJudge
                 var metric = metricFactory(judge.Name);
                 var result = await metric.EvaluateAsync(context, cts.Token);
 
-                return (Judge: judge.Name, Score: (double?)result.Score, Error: (Exception?)null);
+                // A not-measured result's Score is a placeholder 0; voting it in would drag the aggregate down
+                // and, with every judge not measured, report 0 with 100% agreement and consensus.
+                if (!result.Measured)
+                    return (Judge: judge.Name, Score: (double?)null, Error: (Exception?)null,
+                        NotMeasured: result.Explanation ?? $"{result.MetricName}: not measured.");
+
+                return (Judge: judge.Name, Score: (double?)result.Score, Error: (Exception?)null, NotMeasured: (string?)null);
             }
             catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
             {
@@ -160,13 +167,13 @@ public class CalibratedJudge : ICalibratedJudge
                     $"Judge '{judge.Name}' exceeded the per-judge timeout of {_options.Timeout}.");
                 if (!_options.ContinueOnJudgeFailure)
                     throw timeout;
-                return (Judge: judge.Name, Score: (double?)null, Error: (Exception?)timeout);
+                return (Judge: judge.Name, Score: (double?)null, Error: (Exception?)timeout, NotMeasured: (string?)null);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 if (!_options.ContinueOnJudgeFailure)
                     throw;
-                return (Judge: judge.Name, Score: (double?)null, Error: (Exception?)ex);
+                return (Judge: judge.Name, Score: (double?)null, Error: (Exception?)ex, NotMeasured: (string?)null);
             }
             finally
             {
@@ -187,8 +194,28 @@ public class CalibratedJudge : ICalibratedJudge
             {
                 errors.Add((result.Judge, result.Error));
             }
+            else if (result.NotMeasured != null)
+            {
+                notMeasured.Add((result.Judge, result.NotMeasured));
+            }
         }
-        
+
+        // Too few measured because the input lacked something: not measured, not a judge failure.
+        // Only when no judge failed: a failed or timed-out judge in the shortfall is an outage, and an outage throws below.
+        if (judgeScores.Count < _options.MinimumJudgesRequired && notMeasured.Count > 0 && errors.Count == 0)
+        {
+            return new CalibratedResult
+            {
+                Score = 0,
+                Agreement = 0,
+                JudgeScores = judgeScores,
+                Strategy = _options.Strategy,
+                HasConsensus = false,
+                Measured = false,
+                NotMeasuredReason = string.Join(" ", notMeasured.Select(n => n.Reason).Distinct(StringComparer.Ordinal)),
+            };
+        }
+
         // Check if we have enough successful judges
         if (judgeScores.Count < _options.MinimumJudgesRequired)
         {

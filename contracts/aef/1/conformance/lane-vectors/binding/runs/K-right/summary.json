@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "K-right",
+  "lanes": [
+    {
+      "lane": "quality",
+      "metrics": [
+        {
+          "metric": "m",
+          "path": "p",
+          "n": 2,
+          "N": 2,
+          "notMeasured": 0,
+          "value": 0.75,
+          "verdict": "passed",
+          "rule": "recorded by the producer",
+          "sum": 1.5,
+          "sumSq": 1.25
+        }
+      ]
+    }
+  ]
+}

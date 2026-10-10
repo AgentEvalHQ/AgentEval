@@ -1,0 +1,21 @@
+{
+  "kind": "chain",
+  "run": "run",
+  "problems": [
+    [
+      "overlays/events.ndjson",
+      "uncovered"
+    ],
+    [
+      "overlays/seal-0001.json",
+      "missing"
+    ],
+    [
+      "overlays/seal-0002.json",
+      "previous"
+    ]
+  ],
+  "rules": [
+    "OVL-5"
+  ]
+}

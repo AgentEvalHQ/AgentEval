@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "S-two-passed",
+  "lanes": [
+    {
+      "lane": "security",
+      "metrics": [
+        {
+          "metric": "ok",
+          "path": "a",
+          "n": 2,
+          "N": 2,
+          "notMeasured": 0,
+          "value": 1.0,
+          "verdict": "passed",
+          "rule": "recorded by the producer",
+          "sum": 2,
+          "sumSq": 2
+        }
+      ]
+    }
+  ]
+}

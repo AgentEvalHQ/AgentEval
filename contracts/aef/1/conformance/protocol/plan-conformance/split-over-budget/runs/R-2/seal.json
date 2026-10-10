@@ -1,0 +1,59 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "metrics.json",
+      "digest": {
+        "sha256": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8"
+      }
+    },
+    {
+      "name": "results.ndjson",
+      "digest": {
+        "sha256": "dbedb5738e4b8728535ca10ac83d38c7a0a1a522250c073821db76a237ebb695"
+      }
+    },
+    {
+      "name": "run.json",
+      "digest": {
+        "sha256": "041aabd09593a895096e0d64fa40d6184333fca5765ae834797dda8781a51e05"
+      }
+    },
+    {
+      "name": "summary.json",
+      "digest": {
+        "sha256": "f1a8a8886dd1bb1f076feaacbbe9c43e1e4b94e67b10db087b358f832f7cf265"
+      }
+    }
+  ],
+  "predicateType": "https://agenteval.dev/aef/1/evidence",
+  "predicate": {
+    "schemaVersion": "1.0",
+    "runId": "R-2",
+    "runHash": "61702599c8bb10bc94fbab8ae985dd7ab9f19f317ac0abc618e0469f9bf3716d",
+    "producer": {
+      "name": "agenteval-cli",
+      "version": "1.0.0"
+    },
+    "subject": {
+      "ref": "agent:support/support-triage",
+      "version": "git:3f2a1c"
+    },
+    "deployment": {
+      "ref": "deployment:support/support-triage@dev"
+    },
+    "suite": {
+      "ref": "suite:owasp/llm-top10",
+      "version": "2026.1"
+    },
+    "judges": [
+      {
+        "model": "gpt-5.1",
+        "rubricDigest": "sha256:a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9"
+      }
+    ],
+    "closedAt": "2026-10-08T12:00:50Z",
+    "sealedAt": "2026-10-08T12:00:55Z",
+    "sealedBy": "producer"
+  }
+}

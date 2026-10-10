@@ -1,0 +1,83 @@
+{
+  "version": 2,
+  "status": "success",
+  "eval": {
+    "eval_id": "edges-off",
+    "run_id": "edges-off",
+    "created": "2026-10-08T09:00:00Z",
+    "task": "edges",
+    "task_version": "1",
+    "dataset": {
+      "samples": 2,
+      "sample_ids": [
+        "c1",
+        "c2"
+      ]
+    },
+    "model": "acme/gpt-y",
+    "config": {},
+    "packages": {
+      "example": "1"
+    },
+    "metadata": {
+      "aef": {
+        "execution": {
+          "targetMode": "live"
+        },
+        "contentCapture": "off"
+      }
+    }
+  },
+  "results": {
+    "total_samples": 2,
+    "completed_samples": 2,
+    "scores": []
+  },
+  "stats": {
+    "started_at": "2026-10-08T09:00:00Z",
+    "completed_at": "2026-10-08T09:05:00Z"
+  },
+  "samples": [
+    {
+      "id": "c1",
+      "epoch": 1,
+      "input": "",
+      "target": "",
+      "scores": {
+        "q": {
+          "value": 0.7,
+          "metadata": {
+            "aef": {
+              "resultId": "r_2b747743d4f8a429915a54b956398dd0",
+              "state": "scored",
+              "evaluator": {
+                "id": "check:q"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "c2",
+      "epoch": 1,
+      "input": "",
+      "target": "",
+      "scores": {
+        "q": {
+          "value": NaN,
+          "reason": "skipped",
+          "metadata": {
+            "aef": {
+              "resultId": "r_e849694237511ce58156a8df2c6cb272",
+              "state": "skipped",
+              "evaluator": {
+                "id": "check:q"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

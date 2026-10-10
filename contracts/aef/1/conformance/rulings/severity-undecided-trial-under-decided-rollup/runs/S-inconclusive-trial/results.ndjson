@@ -1,0 +1,4 @@
+{"schemaVersion":"1.0","resultId":"r_e196c0239b5c8e41c02efb0364c81abc","caseId":"c1","path":"a","evaluator":{"id":"code:check"},"state":"inconclusive","trial":0}
+{"schemaVersion":"1.0","resultId":"r_c959455b011184cd57c4b747e0211981","caseId":"c1","path":"a","evaluator":{"id":"code:check"},"state":"passed","trial":1}
+{"schemaVersion":"1.0","resultId":"r_546cac7757ac4d3aebb76d37a6862621","caseId":"c1","path":"a","evaluator":{"id":"code:check"},"state":"passed","trials":{"n":2,"passed":1,"aggregation":"AnyPass","agree":false}}
+{"schemaVersion":"1.0","resultId":"r_79575d8ce2911e5675a764fa968e43c4","caseId":"c2","path":"a","evaluator":{"id":"code:check"},"state":"passed"}

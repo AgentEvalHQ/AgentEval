@@ -1,0 +1,55 @@
+{
+  "kind": "job",
+  "plan": "plan.json",
+  "runner": "../runner.json",
+  "target": "target.json",
+  "at": "2026-10-09T09:00:00Z",
+  "terminal": "job.failed",
+  "limit": "maxUsd",
+  "runs": [
+    {
+      "suite": {
+        "ref": "suite:support/refunds",
+        "version": "1"
+      },
+      "status": "completed",
+      "cases": [
+        [
+          "refund-1",
+          "passed"
+        ],
+        [
+          "refund-2",
+          "passed"
+        ]
+      ]
+    },
+    {
+      "suite": {
+        "ref": "suite:support/chargebacks",
+        "version": "1"
+      },
+      "status": "aborted",
+      "cases": [
+        [
+          "chargeback-1",
+          "passed"
+        ]
+      ]
+    }
+  ],
+  "spentUsd": 0.30000000000000004,
+  "estimated": {
+    "cases": 4,
+    "usdLow": 0.6,
+    "usdHigh": 0.6
+  },
+  "endsAt": "2026-10-09T09:01:02Z",
+  "rules": [
+    "PLAN-9",
+    "SUM-5",
+    "STRM-3",
+    "STRM-4"
+  ],
+  "why": "runs of $0.10 + $0.10 and $0.10 + $0.30 on a maxUsd of $0.60. Before the fourth case, the job's spend with its bound, 0.1 + 0.1 + 0.1 + 0.3 added exactly and rounded once, is 0.6: within; the runs' costs, 0.2 and 0.1 + 0.3 rounded to 0.4, added and rounded once, are 0.6000000000000001: above it, as STRM-4 would find. So the runner stops before the fourth case"
+}

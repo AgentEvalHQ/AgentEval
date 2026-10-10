@@ -32,7 +32,13 @@ namespace AgentEval.Cli.Commands;
 /// </remarks>
 public static class McServeCommand
 {
-    public static async Task<int> RunAsync(int port, string? workspaceRoot)
+    /// <param name="port">The port to bind.</param>
+    /// <param name="workspaceRoot">The workspace root, or null for the current directory.</param>
+    /// <param name="stop">
+    /// Cancelled by the command line on Ctrl+C and on SIGTERM (a service manager, <c>kill</c>, CI). The server child
+    /// does not receive SIGTERM, so it is stopped here; before, the launcher exited and the server kept the port.
+    /// </param>
+    public static async Task<int> RunAsync(int port, string? workspaceRoot, CancellationToken stop = default)
     {
 #if NET10_0_OR_GREATER
         // Defense-in-depth canonicalisation for operator-supplied --workspace.
@@ -127,32 +133,15 @@ public static class McServeCommand
         Console.WriteLine($"  rest:      http://localhost:{port}/api/v1/version");
         Console.WriteLine("  Ctrl+C to stop");
 
-        // Wire Ctrl+C so it cleanly stops the child instead of orphaning it.
-        // On Windows the console-control event reaches both processes (Kestrel
-        // handles its own SIGINT), so we just need to wait for the child to
-        // exit gracefully. If the user hits Ctrl+C a SECOND time the child
-        // hasn't responded — escalate to Kill immediately on the next press.
-        using var cts = new CancellationTokenSource();
-        Process? procHandle = null;
-        var pressCount = 0;
+        // Ctrl+C and SIGTERM both stop the server. The command line cancels `stop` on either signal, before this
+        // process's own Ctrl+C handler runs, and the server child does not always receive the signal (SIGTERM reaches
+        // this process alone). Mission Control only reads the workspace, so the child is stopped at once: nothing is
+        // lost. The Ctrl+C handler covers a host that does not cancel `stop`.
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(stop);
         ConsoleCancelEventHandler cancelHandler = (_, e) =>
         {
-            e.Cancel = true; // suppress immediate process termination
-            pressCount++;
-            if (pressCount == 1)
-            {
-                cts.Cancel();
-            }
-            else
-            {
-                // Second (or later) press — operator wants out NOW.
-                try
-                {
-                    if (procHandle is { HasExited: false })
-                        procHandle.Kill(entireProcessTree: true);
-                }
-                catch { /* best-effort */ }
-            }
+            e.Cancel = true; // suppress immediate process termination; the child is stopped below
+            cts.Cancel();
         };
         Console.CancelKeyPress += cancelHandler;
 
@@ -161,29 +150,15 @@ public static class McServeCommand
             var startStopwatch = System.Diagnostics.Stopwatch.StartNew();
             using var proc = Process.Start(psi)
                 ?? throw new InvalidOperationException("Process.Start returned null.");
-            procHandle = proc;
             try
             {
                 await proc.WaitForExitAsync(cts.Token);
             }
             catch (OperationCanceledException)
             {
-                Console.WriteLine("⏹ Stopping Mission Control… (Ctrl+C again to force-kill)");
-                if (!proc.HasExited)
-                {
-                    // 10 s grace — Kestrel typically releases in <2 s but
-                    // cold container hosts / slow CI can take longer.
-                    using var graceCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-                    try
-                    {
-                        await proc.WaitForExitAsync(graceCts.Token);
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        try { proc.Kill(entireProcessTree: true); }
-                        catch { /* best-effort */ }
-                    }
-                }
+                Console.WriteLine("⏹ Stopping Mission Control…");
+                try { proc.Kill(entireProcessTree: true); }
+                catch { /* best-effort: it may have exited meanwhile */ }
                 return 0;
             }
 
@@ -218,7 +193,7 @@ public static class McServeCommand
         await Task.CompletedTask;
         Console.Error.WriteLine("✖ `agenteval mc serve` requires .NET 10 or newer.");
         Console.Error.WriteLine("    Run with `dotnet --version` to check; install from https://dot.net.");
-        _ = port; _ = workspaceRoot;
+        _ = port; _ = workspaceRoot; _ = stop;
         return ExitCodes.RuntimeError;
 #endif
     }

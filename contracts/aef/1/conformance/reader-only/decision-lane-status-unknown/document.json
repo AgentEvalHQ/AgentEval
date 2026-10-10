@@ -1,0 +1,13 @@
+{
+  "outcome": "approved",
+  "lanes": [
+    {
+      "lane": "quality",
+      "status": "partly",
+      "blocking": true
+    }
+  ],
+  "reasons": [
+    "outcome:approved"
+  ]
+}

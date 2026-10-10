@@ -1,0 +1,17 @@
+{
+  "kind": "chain",
+  "run": "run",
+  "problems": [
+    [
+      "overlays/seal-0002.json",
+      "line-boundary"
+    ],
+    [
+      "overlays/seal-0002.json",
+      "offset"
+    ]
+  ],
+  "rules": [
+    "OVL-5"
+  ]
+}

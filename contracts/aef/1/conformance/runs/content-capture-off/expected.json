@@ -1,0 +1,27 @@
+{
+  "kind": "run",
+  "run": "run",
+  "outcome": "invalid",
+  "problems": [
+    [
+      "evidence.ndjson:1",
+      "content-capture"
+    ],
+    [
+      "evidence.ndjson:2",
+      "content-capture"
+    ],
+    [
+      "results.ndjson:2",
+      "content-capture"
+    ],
+    [
+      "results.ndjson:3",
+      "content-capture"
+    ]
+  ],
+  "rules": [
+    "RUN-11",
+    "SEC-3"
+  ]
+}

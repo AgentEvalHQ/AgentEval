@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "K-suite-other-digest",
+  "status": "completed",
+  "producer": {
+    "name": "agenteval-cli",
+    "version": "1.0.0"
+  },
+  "subject": {
+    "ref": "agent:shop/assistant",
+    "kind": "agent",
+    "version": "v7"
+  },
+  "execution": {
+    "targetMode": "live"
+  },
+  "suite": {
+    "ref": "suite:shop/memory",
+    "version": "3",
+    "digest": "sha256:1d7921d2b0f7133088770326257b054760dd6345a0830ccd6033ca196238e085"
+  },
+  "judges": [
+    {
+      "model": "gpt-5.1",
+      "provider": "azure.ai.openai",
+      "mode": "single",
+      "rubricDigest": "sha256:72e1d3bc7f71a5266fec19a8953d3b8af83375dd9d4efacb5761968ae4605e35"
+    }
+  ],
+  "startedAt": "2026-09-01T00:00:00Z",
+  "endedAt": "2026-10-05T00:00:00Z",
+  "deployment": {
+    "ref": "deployment:shop/assistant@prod"
+  }
+}

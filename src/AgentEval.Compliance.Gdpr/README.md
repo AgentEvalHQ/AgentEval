@@ -15,10 +15,10 @@ with the canonical `IOutputStore` audit chain.
 ## Quick Start
 
 ```
-dotnet run --project src/AgentEval.Cli --framework net10.0 -- bench gdpr --preset smoke --subject TravelAgent --azure-from-env
+dotnet run --project src/AgentEval.Cli --framework net10.0 -- bench gdpr --preset smoke --subject TravelAgent --from-env
 ```
 
-The run needs a target (`--azure-from-env` drives the model the configured provider serves; see the CLI reference
+The run needs a target (`--from-env` drives the model the configured provider serves; see the CLI reference
 for the others) and a judge from a configured provider (`AI_INFERENCE_PROVIDER`). Without a judge the CLI exits 3.
 
 ## Project Layout

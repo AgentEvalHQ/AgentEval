@@ -21,6 +21,7 @@ using AgentEval.Exporters;
 using AgentEval.MAF;
 using AgentEval.Models;
 using AgentEval.Output;
+using AgentEval.Snapshots;
 using Microsoft.Extensions.AI;
 
 namespace AgentEval.Cli.Commands;
@@ -87,8 +88,9 @@ internal static class EvalCommand
         {
             DefaultValueFactory = _ => 1,
             Description = "Runs per test case (default: 1; must be at least 1). Above 1 is stochastic analysis, which " +
-                          "the stochastic runner accepts from 3 runs; it prints per-test statistics to stderr and " +
-                          "writes no export, so --format, -o and --output-dir are ignored with a warning.",
+                          "the stochastic runner accepts from 3 runs: a test case passes when its pass rate reaches " +
+                          "--success-threshold. The export has one entry per test case, scored as the mean over its " +
+                          "runs, with the run count, runs passed, pass rate and score SD as metric columns.",
         };
         var thresholdOpt = new Option<double>("--success-threshold")
             { DefaultValueFactory = _ => 0.8, Description = "Success rate threshold for stochastic evaluation (default: 0.8)" };
@@ -99,6 +101,25 @@ internal static class EvalCommand
         var outputOpt = new Option<FileInfo?>("-o", "--output") { Description = "Output file (default: stdout)" };
         var outputDirOpt = new Option<DirectoryInfo?>("--output-dir")
             { Description = "Write structured results to a directory (ADR-002 format: results.jsonl + summary.json + run.json)" };
+
+        // Golden trace (regression against a saved run)
+        var saveGoldenOpt = new Option<FileInfo?>("--save-golden")
+        {
+            Description = "Save this run as a golden trace: each test case's verdict, output and tool calls with their " +
+                          "arguments, as JSON to commit beside the dataset. With --golden, the comparison is made first.",
+        };
+        var goldenOpt = new Option<FileInfo?>("--golden")
+        {
+            Description = "Compare this run with a golden trace saved by --save-golden. Each test case is reported as " +
+                          "regressed, improved, tools changed, output changed, unchanged, added or removed (stderr). " +
+                          "The exit code then follows the comparison: 1 when a test case that passed in the golden trace " +
+                          "fails now, else 0, so a test that was already failing does not fail the build.",
+        };
+        var failOnToolChangeFlag = new Option<bool>("--fail-on-tool-change")
+        {
+            Description = "With --golden, also exit 1 when any test case called different tools, or the same tools with " +
+                          "different arguments, than in the golden trace.",
+        };
 
         // Verbosity
         var verboseFlag = new Option<bool>("--verbose") { Description = "Show detailed progress" };
@@ -122,6 +143,9 @@ internal static class EvalCommand
         command.Options.Add(formatOpt);
         command.Options.Add(outputOpt);
         command.Options.Add(outputDirOpt);
+        command.Options.Add(saveGoldenOpt);
+        command.Options.Add(goldenOpt);
+        command.Options.Add(failOnToolChangeFlag);
         command.Options.Add(verboseFlag);
         command.Options.Add(quietFlag);
 
@@ -150,9 +174,11 @@ internal static class EvalCommand
                 JudgeEndpoint = parseResult.GetValue(judgeEndpointOpt),
                 JudgeModel = parseResult.GetValue(judgeModelOpt),
                 Format = parseResult.GetValue(formatOpt)!,
-                FormatGiven = WasGiven(parseResult, formatOpt),
                 Output = parseResult.GetValue(outputOpt),
                 OutputDir = parseResult.GetValue(outputDirOpt),
+                SaveGolden = parseResult.GetValue(saveGoldenOpt),
+                Golden = parseResult.GetValue(goldenOpt),
+                FailOnToolChange = parseResult.GetValue(failOnToolChangeFlag),
                 Verbose = parseResult.GetValue(verboseFlag),
                 Quiet = parseResult.GetValue(quietFlag),
             };
@@ -188,7 +214,9 @@ internal static class EvalCommand
     /// <c>--endpoint</c>/<c>--azure</c> path would build — the same kind of seam for that path. Every validation
     /// still runs and the agent is still built from <paramref name="opts"/>; only the client construction is
     /// replaced. It has no effect when <c>--sut</c> is set.
-    /// Returns exit code: 0 = all passed, 1 = test failure, 2 = usage error (<c>--runs</c>), 3 = runtime error.
+    /// Returns exit code: 0 = all passed, 1 = test failure, 2 = usage error (<c>--runs</c>, the golden-trace options),
+    /// 3 = runtime error. With <c>--golden</c>, 1 means a regression against the golden trace (or, with
+    /// <c>--fail-on-tool-change</c>, a tool change) rather than any failing test.
     /// </summary>
     internal static async Task<int> ExecuteAsync(
         EvalOptions opts, CancellationToken ct, IEvaluableAgent? sutOverride = null, IChatClient? agentClientOverride = null)
@@ -199,6 +227,14 @@ internal static class EvalCommand
         if (ValidateRuns(opts) is { } runsError)
         {
             Console.Error.WriteLine($"  Error: {runsError}");
+            return ExitCodes.UsageError;
+        }
+
+        // The golden trace is read before any agent call, so a missing or unreadable file costs nothing.
+        var (golden, goldenError) = await LoadGoldenAsync(opts, ct);
+        if (goldenError is not null)
+        {
+            Console.Error.WriteLine($"  Error: {goldenError}");
             return ExitCodes.UsageError;
         }
 
@@ -363,19 +399,7 @@ internal static class EvalCommand
                     "  Warning: --metrics has no effect combined with --runs > 1 in this release " +
                     "(stochastic scoring is not wired to the named-metric pipeline yet).");
 
-            // No exporter accepts a stochastic result. EvaluationReport holds one score per test, and the
-            // JUnit, TRX, CSV and Markdown exporters do not write its metadata, so a projected report would read
-            // as a single run. Rather than export something that looks like a different measurement, name every
-            // export option this mode does not honour — before any agent call is made. Printed even with
-            // --quiet: --quiet keeps only the export, and the export is what is missing.
-            var ignoredExport = ExportOptionsIgnoredByStochasticMode(opts);
-            if (ignoredExport.Count > 0)
-                Console.Error.WriteLine(
-                    $"  Warning: --runs {opts.Runs} (stochastic mode) writes no export: nothing is written to stdout " +
-                    "or to any path named here, and a file already at one of them is left unchanged. " +
-                    $"Ignored: {string.Join(", ", ignoredExport)}.");
-
-            return await ExecuteStochasticAsync(opts, harness, agent, testCases, evalOptions, ct);
+            return await ExecuteStochasticAsync(opts, harness, agent, testCases, evalOptions, resolvedName, ct);
         }
 
         // 6c. Standard single-run evaluation path
@@ -406,37 +430,94 @@ internal static class EvalCommand
         var report = summary.ToEvaluationReport(
             agentName: resolvedName,
             modelName: resolvedName,
-            endpoint: opts.Sut is not null ? $"sut:{opts.Sut}" : (opts.Endpoint ?? "azure"));
-
-        // Directory format is handled exclusively via --output-dir, not the stream-based export path
-        var isDirectoryFormat = opts.Format.Equals("directory", StringComparison.OrdinalIgnoreCase)
-            || opts.Format.Equals("dir", StringComparison.OrdinalIgnoreCase);
-
-        if (isDirectoryFormat && opts.OutputDir is null)
-            throw new ArgumentException(
-                "The 'directory' format produces a structured directory (results.jsonl, summary.json, run.json). " +
-                "Specify --output-dir <path> to write the directory output.",
-                nameof(opts.Format));
-
-        if (!isDirectoryFormat)
-            await ExportHandler.ExportAsync(report, opts.Format, opts.Output, ct);
-
-        // 7b. Directory export (ADR-002) — can coexist with single-file export
-        if (opts.OutputDir is not null)
-        {
-            var dirName = DirectoryExporter.GenerateDirectoryName(report);
-            var dirPath = new DirectoryInfo(Path.Combine(opts.OutputDir.FullName, dirName));
-            await ExportHandler.ExportToDirectoryAsync(report, dirPath, opts.Dataset.FullName, ct);
-            if (!opts.Quiet)
-                Console.Error.WriteLine($"  Results written to: {dirPath.FullName}");
-        }
+            endpoint: EndpointLabel(opts));
+        await ExportReportAsync(opts, report, ct);
 
         // 8. Summary (unless --quiet)
         if (!opts.Quiet)
             ConsoleReporter.WriteSummary(summary);
 
-        // 9. Exit code: 0 = all passed, 1 = any failure
+        // 9. Golden trace: compare with the saved run first, then save this one (both may be given, to update it).
+        var thisRun = GoldenTrace.FromResults(summary.Results, resolvedName);
+        GoldenTraceComparison? comparison = null;
+        if (golden is not null)
+        {
+            comparison = GoldenTraceComparer.Compare(golden, thisRun);
+            WriteGoldenComparison(comparison, opts);
+        }
+
+        if (opts.SaveGolden is not null)
+        {
+            await thisRun.SaveAsync(opts.SaveGolden.FullName, ct);
+            if (!opts.Quiet)
+                Console.Error.WriteLine($"  Golden trace saved: {opts.SaveGolden.FullName}");
+        }
+
+        // 10. Exit code: 0 = all passed, 1 = any failure. Against a golden trace, 1 = a regression (or a tool change
+        // with --fail-on-tool-change); a test that was already failing in the golden trace does not fail the run.
+        if (comparison is not null)
+            return comparison.HasRegression || (opts.FailOnToolChange && comparison.HasToolChange)
+                ? ExitCodes.TestFailure
+                : ExitCodes.Success;
         return summary.AllPassed ? ExitCodes.Success : ExitCodes.TestFailure;
+    }
+
+    /// <summary>
+    /// Checks the golden-trace options and loads <c>--golden</c>. Returns the trace (or null when not given) and the
+    /// usage error, if any.
+    /// </summary>
+    internal static async Task<(GoldenTrace? Golden, string? Error)> LoadGoldenAsync(EvalOptions opts, CancellationToken ct)
+    {
+        if (opts.FailOnToolChange && opts.Golden is null)
+            return (null, "--fail-on-tool-change needs --golden <file> to compare with.");
+        if (opts.Runs > 1 && (opts.Golden is not null || opts.SaveGolden is not null))
+            return (null, "a golden trace records one run per test case; --golden and --save-golden cannot be combined with --runs above 1.");
+        if (opts.Golden is null)
+            return (null, null);
+        if (!opts.Golden.Exists)
+            return (null, $"golden trace not found: {opts.Golden.FullName}");
+        try
+        {
+            return (await GoldenTrace.LoadAsync(opts.Golden.FullName, ct), null);
+        }
+        catch (InvalidDataException ex)
+        {
+            return (null, ex.Message);
+        }
+    }
+
+    private static void WriteGoldenComparison(GoldenTraceComparison comparison, EvalOptions opts)
+    {
+        // Regressions are printed even with --quiet: they decide the exit code.
+        var w = Console.Error;
+        if (!opts.Quiet)
+        {
+            w.WriteLine();
+            w.WriteLine($"  === Compared with the golden trace {opts.Golden!.Name} ===");
+            w.WriteLine(
+                $"  Regressed {comparison.Count(TraceChange.Regressed)}, improved {comparison.Count(TraceChange.Improved)}, " +
+                $"tools changed {comparison.Count(TraceChange.ToolsChanged)}, output changed {comparison.Count(TraceChange.OutputChanged)}, " +
+                $"unchanged {comparison.Count(TraceChange.Unchanged)}, added {comparison.Count(TraceChange.Added)}, " +
+                $"removed {comparison.Count(TraceChange.Removed)}.");
+        }
+
+        foreach (var c in comparison.Cases.OrderBy(c => c.Change))
+        {
+            if (c.Change == TraceChange.Unchanged || (opts.Quiet && c.Change != TraceChange.Regressed))
+                continue;
+            w.WriteLine($"  {Label(c.Change),-15} {c.Name}{(c.Detail is null ? "" : $": {c.Detail}")}");
+        }
+
+        static string Label(TraceChange change) => change switch
+        {
+            TraceChange.Regressed => "REGRESSED",
+            TraceChange.Improved => "improved",
+            TraceChange.ToolsChanged => "tools changed",
+            TraceChange.OutputChanged => "output changed",
+            TraceChange.Added => "added",
+            TraceChange.Removed => "removed",
+            _ => "unchanged",
+        };
     }
 
     /// <summary>
@@ -456,9 +537,38 @@ internal static class EvalCommand
         Performance = testResult.Performance,
     };
 
-    /// <summary>True when <paramref name="option"/> appeared on the command line rather than taking its default.</summary>
-    internal static bool WasGiven(ParseResult parseResult, Option option) =>
-        parseResult.GetResult(option) is { Implicit: false };
+    private static string EndpointLabel(EvalOptions opts) =>
+        opts.Sut is not null ? $"sut:{opts.Sut}" : (opts.Endpoint ?? "azure");
+
+    /// <summary>
+    /// Writes <paramref name="report"/> in the requested <c>--format</c> (to <c>-o</c>, or stdout) and, with
+    /// <c>--output-dir</c>, as the ADR-002 directory too. The single-run and the stochastic path both export here.
+    /// </summary>
+    private static async Task ExportReportAsync(EvalOptions opts, EvaluationReport report, CancellationToken ct)
+    {
+        // Directory format is handled exclusively via --output-dir, not the stream-based export path
+        var isDirectoryFormat = opts.Format.Equals("directory", StringComparison.OrdinalIgnoreCase)
+            || opts.Format.Equals("dir", StringComparison.OrdinalIgnoreCase);
+
+        if (isDirectoryFormat && opts.OutputDir is null)
+            throw new ArgumentException(
+                "The 'directory' format produces a structured directory (results.jsonl, summary.json, run.json). " +
+                "Specify --output-dir <path> to write the directory output.",
+                nameof(opts.Format));
+
+        if (!isDirectoryFormat)
+            await ExportHandler.ExportAsync(report, opts.Format, opts.Output, ct);
+
+        // Directory export (ADR-002) — can coexist with single-file export
+        if (opts.OutputDir is not null)
+        {
+            var dirName = DirectoryExporter.GenerateDirectoryName(report);
+            var dirPath = new DirectoryInfo(Path.Combine(opts.OutputDir.FullName, dirName));
+            await ExportHandler.ExportToDirectoryAsync(report, dirPath, opts.Dataset.FullName, ct);
+            if (!opts.Quiet)
+                Console.Error.WriteLine($"  Results written to: {dirPath.FullName}");
+        }
+    }
 
     /// <summary>
     /// Why <c>--runs</c> cannot be honoured, or <see langword="null"/> when it can. Below 1 is refused here. Above 1
@@ -532,24 +642,8 @@ internal static class EvalCommand
     }
 
     /// <summary>
-    /// The export options stochastic mode (<c>--runs</c> greater than 1) does not honour, each with the value given.
-    /// <c>--format</c> counts when it was given on the command line, or when a caller set a value other than the
-    /// default.
-    /// </summary>
-    internal static IReadOnlyList<string> ExportOptionsIgnoredByStochasticMode(EvalOptions opts)
-    {
-        var ignored = new List<string>();
-        if (opts.FormatGiven || !string.Equals(opts.Format, DefaultFormat, StringComparison.OrdinalIgnoreCase))
-            ignored.Add($"--format {opts.Format}");
-        if (opts.Output is not null)
-            ignored.Add($"-o/--output {opts.Output.FullName}");
-        if (opts.OutputDir is not null)
-            ignored.Add($"--output-dir {opts.OutputDir.FullName}");
-        return ignored;
-    }
-
-    /// <summary>
-    /// Stochastic evaluation path — runs each test case N times and reports statistics.
+    /// Stochastic evaluation path — runs each test case N times, exports one entry per test case
+    /// (<see cref="StochasticReport"/>) and prints the statistics to stderr.
     /// </summary>
     private static async Task<int> ExecuteStochasticAsync(
         EvalOptions opts,
@@ -557,6 +651,7 @@ internal static class EvalCommand
         IEvaluableAgent agent,
         IReadOnlyList<DatasetTestCase> datasetTestCases,
         EvaluationOptions evalOptions,
+        string resolvedName,
         CancellationToken ct)
     {
         var runner = new StochasticRunner(harness, statisticsCalculator: null, evalOptions);
@@ -567,6 +662,7 @@ internal static class EvalCommand
 
         var allPassed = true;
         var results = new List<StochasticResult>();
+        var startTime = DateTimeOffset.UtcNow;
 
         foreach (var datasetTestCase in datasetTestCases)
         {
@@ -589,6 +685,12 @@ internal static class EvalCommand
             if (!result.Passed)
                 allPassed = false;
         }
+
+        // Export: one entry per test case, its verdict the stochastic one. Same suite name as the single-run batch.
+        var report = StochasticReport.Build(
+            results, "BatchEvaluation", opts.Runs, opts.SuccessThreshold, startTime, DateTimeOffset.UtcNow,
+            agentName: resolvedName, modelName: resolvedName, endpoint: EndpointLabel(opts));
+        await ExportReportAsync(opts, report, ct);
 
         // Summary
         if (!opts.Quiet)
@@ -641,14 +743,17 @@ internal sealed class EvalOptions
     public string? JudgeModel { get; init; }
     public required string Format { get; init; }
 
-    /// <summary>
-    /// True when <c>--format</c> appeared on the command line, as opposed to <see cref="Format"/> holding the
-    /// default — so stochastic mode can name an explicitly requested format it will not write.
-    /// </summary>
-    public bool FormatGiven { get; init; }
-
     public FileInfo? Output { get; init; }
     public DirectoryInfo? OutputDir { get; init; }
+
+    /// <summary>Where to save this run as a golden trace (<c>--save-golden</c>).</summary>
+    public FileInfo? SaveGolden { get; init; }
+
+    /// <summary>The golden trace to compare this run with (<c>--golden</c>).</summary>
+    public FileInfo? Golden { get; init; }
+
+    /// <summary>With <see cref="Golden"/>, also fail when any test case's tool calls changed.</summary>
+    public bool FailOnToolChange { get; init; }
     public bool Verbose { get; init; }
     public bool Quiet { get; init; }
 }

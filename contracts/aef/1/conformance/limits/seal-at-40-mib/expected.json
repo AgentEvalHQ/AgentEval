@@ -1,0 +1,37 @@
+{
+  "kind": "run",
+  "run": "run",
+  "generate": [
+    {
+      "copy": [
+        "valid/completed-eval/run",
+        "run"
+      ]
+    },
+    {
+      "write": [
+        "run/seal.json",
+        [
+          [
+            "{\n  \"_type\": \"https://in-toto.io/Statement/v1\",\n  \"subject\": [\n    {\n      \"name\": \"blobs/sha256/63/635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5\",\n      \"digest\": {\n        \"sha256\": \"635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5\"\n      }\n    },\n    {\n      \"name\": \"evidence.ndjson\",\n      \"digest\": {\n        \"sha256\": \"f76af41ebe790477719e419c60ab430ef5cc98263b8fd8dd5bb52988a03108b1\"\n      }\n    },\n    {\n      \"name\": \"gates.ndjson\",\n      \"digest\": {\n        \"sha256\": \"6db8527cfa0e3d60c242253e40f123eb56b4105f2b14a622af21370fd10b9c63\"\n      }\n    },\n    {\n      \"name\": \"metrics.json\",\n      \"digest\": {\n        \"sha256\": \"cd5980b59a1023260f2c7fa19d0a8075802dbb17e83485a547dc3b977649ef87\"\n      }\n    },\n    {\n      \"name\": \"results.ndjson\",\n      \"digest\": {\n        \"sha256\": \"08719682aba1da613d9712bdc1ad15c838048a064843fe12f61a36f7b6936e5c\"\n      }\n    },\n    {\n      \"name\": \"run.json\",\n      \"digest\": {\n        \"sha256\": \"6833f5f2e31f266973749d72f60cf9656d8689145780a14670e35c07795c1f5c\"\n      }\n    },\n    {\n      \"name\": \"summary.json\",\n      \"digest\": {\n        \"sha256\": \"268eda205f131668d931d8804c9530cb7c99b2857d95e1ce1bc24fc3d6314679\"\n      }\n    },\n    {\n      \"name\": \"traces.otlp.jsonl\",\n      \"digest\": {\n        \"sha256\": \"3c29fa780cb029dd541c36edb35614f49df76f459a1f7c3e3702960892398787\"\n      }\n    }\n  ],\n  \"predicateType\": \"https://agenteval.dev/aef/1/evidence\",\n  \"predicate\": {\n    \"schemaVersion\": \"1.0\",\n    \"runId\": \"01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10\",\n    \"runHash\": \"f16b6a74505a359810e44611732c4d53ff61d32852983b165414811eb6a6627b\",\n    \"producer\": {\n      \"name\": \"agenteval-cli\",\n      \"version\": \"1.0.0\"\n    },\n    \"subject\": {\n      \"ref\": \"agent:support/support-triage\",\n      \"version\": \"git:3f2a1c\"\n    },\n    \"deployment\": {\n      \"ref\": \"deployment:support/support-triage@dev\"\n    },\n    \"suite\": {\n      \"ref\": \"suite:support/triage-scenarios\",\n      \"version\": \"4\",\n      \"digest\": \"sha256:f1b4f6f2c254e91b0c23b6c40c1554dd8a7b04715858206d4537698e34caaedd\"\n    },\n    \"judges\": [\n      {\n        \"model\": \"gpt-5.1\",\n        \"rubricDigest\": \"sha256:29fd018a9848938bc2b0e33fffa32bde2827e81388d0e03195919be5835c3605\"\n      }\n    ],\n    \"closedAt\": \"2026-10-02T14:06:23.004Z\",\n    \"sealedAt\": \"2026-10-02T14:06:24Z\",\n    \"sealedBy\": \"producer\"\n  }\n}",
+            1
+          ],
+          [
+            " ",
+            41940704
+          ],
+          [
+            "\n",
+            1
+          ]
+        ]
+      ]
+    }
+  ],
+  "outcome": "intact",
+  "problems": [],
+  "rules": [
+    "ENC-17",
+    "ENC-18"
+  ]
+}

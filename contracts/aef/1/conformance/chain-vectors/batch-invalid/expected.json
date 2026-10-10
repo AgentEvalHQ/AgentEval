@@ -1,0 +1,17 @@
+{
+  "kind": "chain",
+  "run": "run",
+  "problems": [
+    [
+      "overlays/events.ndjson",
+      "uncovered"
+    ],
+    [
+      "overlays/seal-0002.json",
+      "batch-invalid"
+    ]
+  ],
+  "rules": [
+    "OVL-5"
+  ]
+}

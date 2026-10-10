@@ -4,6 +4,7 @@
 using System.Text;
 using AgentEval.Samples.Benchmarks;
 using AgentEval.Samples.EvalJoin;
+using AgentEval.Samples.Interop;
 using AgentEval.Samples.Providers;
 
 namespace AgentEval.Samples;
@@ -226,6 +227,12 @@ public static class Program
         new('O', "Domain Packs", "🔑 a model provider — the checks of one field composed into one verdict",
         [
             new("Healthcare Safety Pack",    "Synthetic cases: judges for what the agent said, a deterministic check of the tools it called, one critical failure fails the case; then the same checks on 3 canned unsafe replies as labelled controls", HealthcareSafetyPackSample.RunAsync),
+        ]),
+
+        // ⚠ APPENDED — see the note above group M. Legacy numbers: P1 = 106.
+        new('P', "Interop", "★ offline by default — --live serves a real model for a real ASSERT run",
+        [
+            new("ASSERT (Microsoft RAI)",    "A MAF agent served as ASSERT's HTTP target; an ASSERT run read into AgentEval (harm and over-refusal as ASSERT computes them, verdicts composed with an AgentEval check); labelled cases written for ASSERT's judge", AssertInterop.RunAsync),
         ]),
     ];
 

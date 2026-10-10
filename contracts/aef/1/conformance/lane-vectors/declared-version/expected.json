@@ -1,0 +1,47 @@
+{
+  "kind": "lane",
+  "checkpoint": "checkpoint.json",
+  "runs": "runs",
+  "lanes": [
+    {
+      "lane": "junk-member",
+      "result": {
+        "status": "passed",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-03T00:00:00Z"
+      }
+    },
+    {
+      "lane": "target-mode-in-1-0",
+      "result": {
+        "status": "not_measured",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-03T00:00:00Z"
+      }
+    },
+    {
+      "lane": "baseline-direction-unknown",
+      "result": {
+        "status": "failed",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-06T00:00:00Z"
+      }
+    }
+  ],
+  "problems": [
+    [
+      "lanes/junk-member",
+      "lane-result"
+    ],
+    [
+      "lanes/target-mode-in-1-0",
+      "lane-result"
+    ]
+  ],
+  "rules": [
+    "CKP-8",
+    "VER-6",
+    "LANE-7",
+    "LANE-10"
+  ]
+}

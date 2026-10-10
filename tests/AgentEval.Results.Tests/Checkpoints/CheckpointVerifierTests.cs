@@ -1,0 +1,487 @@
+using System.Text.Json.Nodes;
+using AgentEval.Results.Checkpoints;
+using AgentEval.Results.Json;
+using AgentEval.Results.Signatures;
+using AgentEval.Results.Tests.Corpus;
+
+namespace AgentEval.Results.Tests.Checkpoints;
+
+/// <summary>
+/// §5.5: the checkpoint verifier against the runs ([CKP-8]: found, intact, each lane recomputed and compared with the
+/// recorded input) and its signature ([CKP-9]: a verified checkpoint with no problem anchors its runs), and the manifest
+/// rules ([CKP-7]) this package changed.
+/// </summary>
+public sealed class CheckpointVerifierTests : IDisposable
+{
+    private const string At = "2026-10-08T00:00:00Z";
+    private readonly string _root = Path.Combine(Path.GetTempPath(), $"aef-checkpoint-{Guid.NewGuid():N}");
+
+    public void Dispose()
+    {
+        try
+        {
+            Directory.Delete(_root, recursive: true);
+        }
+        catch (IOException)
+        {
+        }
+    }
+
+    [Fact]
+    public void ADecidedCheckpoint_WhoseRecordedResultsAreRecomputed_HasNoProblem_AndASignedOneAnchorsItsRuns()
+    {
+        var (manifest, hashes) = Decided();
+        using var signer = EcdsaP256Signer.Generate();
+        var policy = new TrustPolicy([new TrustedKey("git:alice@example.com", signer.PublicKey, null)]);
+        var envelope = DsseEnvelope.Create(Dsse.CheckpointPayloadType, manifest, signer).ToJson();
+
+        var verification = CheckpointVerifier.Verify(manifest, AefRunStore.Open(_root), new CheckpointVerifyOptions { At = At, Policy = policy, Envelope = envelope });
+
+        Assert.Empty(verification.ManifestProblems);
+        Assert.Empty(verification.Problems);
+        Assert.Equal(["git:alice@example.com"], verification.SignedBy);
+        Assert.Equal(hashes.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal), verification.Anchors);   // each once, in byte order (spec 09 §9.3)
+        Assert.Equal(["quality", "regression"], verification.Lanes.Select(l => l.Lane));
+    }
+
+    [Fact]
+    public void AnEnvelopeFile_IsVerified_AndOneBeyond56Mebibytes_IsMalformedWithoutBeingRead_AndAnchorsNothing()
+    {
+        // [SIG-1] (round 5), [CKP-9]: an envelope given as a file; beyond its limit it verifies for no one.
+        var (manifest, hashes) = Decided();
+        using var signer = EcdsaP256Signer.Generate();
+        var policy = new TrustPolicy([new TrustedKey("git:alice@example.com", signer.PublicKey, null)]);
+        var envelope = DsseEnvelope.Create(Dsse.CheckpointPayloadType, manifest, signer).ToJson();
+        var file = Path.Combine(_root, "release.dsse.json");
+        File.WriteAllBytes(file, envelope);
+
+        var signed = CheckpointVerifier.Verify(manifest, AefRunStore.Open(_root), new CheckpointVerifyOptions { At = At, Policy = policy, EnvelopeFile = file });
+        Assert.Equal(["git:alice@example.com"], signed.SignedBy);
+        Assert.Equal(hashes.Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal), signed.Anchors);
+
+        File.WriteAllBytes(file, [.. envelope, .. Enumerable.Repeat((byte)' ', AefLimits.MaxEnvelopeBytes + 1 - envelope.Length)]);
+        var oversized = CheckpointVerifier.Verify(manifest, AefRunStore.Open(_root), new CheckpointVerifyOptions { At = At, Policy = policy, EnvelopeFile = file });
+        Assert.Equal(DsseEnvelopeResult.Malformed, oversized.Signature!.EnvelopeResult);
+        Assert.Empty(oversized.SignedBy);
+        Assert.Empty(oversized.Anchors);
+        Assert.Empty(oversized.Problems);
+    }
+
+    [Fact]
+    public void ACheckpointWithAProblem_OrSignedByNoTrustedKey_AnchorsNothing()
+    {
+        var (manifest, _) = Decided();
+        using var signer = EcdsaP256Signer.Generate();
+        using var stranger = EcdsaP256Signer.Generate();
+        var policy = new TrustPolicy([new TrustedKey("git:alice@example.com", signer.PublicKey, null)]);
+
+        var untrusted = CheckpointVerifier.Verify(manifest, AefRunStore.Open(_root),
+            new CheckpointVerifyOptions { At = At, Policy = policy, Envelope = DsseEnvelope.Create(Dsse.CheckpointPayloadType, manifest, stranger).ToJson() });
+        Assert.Empty(untrusted.SignedBy);
+        Assert.Empty(untrusted.Anchors);
+
+        // The payload type is the checkpoint's ([SIG-1]): an in-toto envelope over the same bytes is a mismatch.
+        var wrongType = CheckpointVerifier.Verify(manifest, AefRunStore.Open(_root),
+            new CheckpointVerifyOptions { At = At, Policy = policy, Envelope = DsseEnvelope.Create(Dsse.InTotoPayloadType, manifest, signer).ToJson() });
+        Assert.Empty(wrongType.Anchors);
+
+        Directory.Delete(Path.Combine(_root, "C"), recursive: true);   // the candidate is gone
+        var missing = CheckpointVerifier.Verify(manifest, AefRunStore.Open(_root),
+            new CheckpointVerifyOptions { At = At, Policy = policy, Envelope = DsseEnvelope.Create(Dsse.CheckpointPayloadType, manifest, signer).ToJson() });
+        Assert.Contains(new AefProblem("lanes/regression/runs/C", "run-missing"), missing.Problems);
+        Assert.Equal(["git:alice@example.com"], missing.SignedBy);
+        Assert.Empty(missing.Anchors);
+
+        var unsigned = CheckpointVerifier.Verify(manifest, AefRunStore.Open(_root), new CheckpointVerifyOptions { At = At });
+        Assert.Null(unsigned.Signature);
+        Assert.Empty(unsigned.Anchors);
+    }
+
+    [Theory]
+    [InlineData("2026-10-01T12:00:00.000Z", null)]                 // the same time, written otherwise ([ENC-8])
+    [InlineData("2026-10-01T12:00:00.000000001Z", "oldest-closed")]   // a nanosecond later
+    [InlineData("2026-10-01T11:59:59.999999999Z", "oldest-closed")]
+    public void ARecordedAge_IsComparedAsATime_AtFullPrecision(string recorded, string? problem)
+    {
+        var manifest = Corpus("threshold");
+        Lane(manifest, "pass")["result"]!["oldestClosedAt"] = recorded;
+
+        var (_, problems) = CheckpointVerifier.Lanes(manifest, AefRunStore.Open(CorpusRuns("threshold")), At);
+
+        Assert.Equal(problem is null ? [] : [new AefProblem("lanes/pass", problem)], problems);
+    }
+
+    [Fact]
+    public void ARecordedResult_ThatDiffersInStatusVersionAxesOrPresence_IsReportedAtItsLane()
+    {
+        var manifest = Corpus("threshold");
+        Lane(manifest, "pass")["result"]!["status"] = "failed";
+        Lane(manifest, "le")["result"]!["subjectVersion"] = "v6";
+        Lane(manifest, "lt")["result"]!["axes"] = new JsonArray("judges");
+        Lane(manifest, "no-runs")["result"] = new JsonObject { ["status"] = "passed", ["subjectVersion"] = "v7", ["oldestClosedAt"] = At };
+        Lane(manifest, "no-entry")["result"] = null;
+
+        var (_, problems) = CheckpointVerifier.Lanes(manifest, AefRunStore.Open(CorpusRuns("threshold")), At);
+
+        Assert.Equal(
+            ["lanes/le lane-version", "lanes/lt lane-result", "lanes/no-entry lane-result", "lanes/no-runs lane-result", "lanes/pass lane-result"],
+            problems.Select(p => $"{p.Path} {p.Code}"));
+    }
+
+    [Theory]
+    [InlineData("le", "op", "=>", "1.1", "unverifiable")]
+    [InlineData("lt", "kind", "bayesian", "1.1", "unverifiable")]
+    [InlineData("le", "op", "=>", "1.0", "lane-result")]          // a 1.0 checkpoint cannot escape lane-result (round 5)
+    [InlineData("lt", "kind", "bayesian", "1.0", "lane-result")]
+    public void ALaneWhoseRuleHoldsAValueThisVersionDoesNotKnow_IsUnverifiable_OnlyInACheckpointOfALaterMinor(
+        string lane, string field, string value, string declared, string expected)
+    {
+        // R3-2, [CKP-8] (round 5): a later minor recorded a result this version cannot recompute; the lane's result is
+        // still read (§7.3). Only a checkpoint that declares a later minor can make the lane unverifiable: one that
+        // declares 1.0 is read as §7.3 says (the lane is not_measured) and compared as usual.
+        var manifest = Corpus("threshold");
+        manifest["schemaVersion"] = declared;
+        manifest["lanes"]!.AsArray().Single(l => (string?)l!["lane"] == lane)!["rule"]![field] = value;
+        Lane(manifest, lane)["result"]!["status"] = "passed";
+
+        var (lanes, problems) = CheckpointVerifier.Lanes(manifest, AefRunStore.Open(CorpusRuns("threshold")), At);
+
+        Assert.Equal([new AefProblem($"lanes/{lane}", expected)], problems);
+        Assert.Equal(LaneEvidenceStatus.NotMeasured, lanes.Single(l => l.Lane == lane).Result!.Status);
+    }
+
+    [Theory]
+    [InlineData("minimumShare", 0.9, "1.1", true)]    // a member a later minor added
+    [InlineData("minimumN", 0.5, "1.1", true)]        // a value the writer schema refuses (an integer field)
+    [InlineData("minimumShare", 0.9, "1.12", true)]
+    [InlineData("minimumShare", 0.9, "1.0", false)]   // in a 1.0 checkpoint the member is ignored (§7.3), and the lane compared
+    [InlineData("minimumN", 0.5, "1.0", false)]
+    [InlineData("minimumShare", 0.9, "1.10", true)]   // minor 10, compared as a number ([VER-1], R5N-4)
+    public void ALaneWhoseRuleIsNotValidAgainstTheWriterSchema_IsUnverifiable_OnlyInACheckpointOfALaterMinor(
+        string member, double value, string declared, bool unverifiable)
+    {
+        // [CKP-8] (round 4): any rule this version's writer schema refuses, not only four fields of it; (round 5) in a
+        // checkpoint that declares a later minor. The corpus checkpoint's recorded results are the recomputed ones.
+        var manifest = Corpus("threshold");
+        manifest["schemaVersion"] = declared;
+        manifest["lanes"]!.AsArray().Single(l => (string?)l!["lane"] == "pass")!["rule"]![member] = value;
+
+        var (_, problems) = CheckpointVerifier.Lanes(manifest, AefRunStore.Open(CorpusRuns("threshold")), At);
+
+        Assert.Equal(unverifiable ? [new AefProblem("lanes/pass", "unverifiable")] : [], problems);
+    }
+
+    [Theory]
+    [InlineData("target-mode", "1.1", "unverifiable")]           // an unknown execution.targetMode in a run of the lane
+    [InlineData("severity", "1.1", "unverifiable")]              // an unknown severity on a severity lane's line
+    [InlineData("severity-passed", "1.1", "unverifiable")]       // on a line of any state: the text names its lines, not its failures
+    [InlineData("severity-trial", "1.1", "unverifiable")]        // trial lines included
+    [InlineData("direction", "1.1", "unverifiable")]             // an unknown direction of the compared metric, in the candidate
+    [InlineData("baseline-direction", "1.1", null)]              // round 6: not in the baseline ([LANE-7] reads the candidate's alone)
+    [InlineData("baseline-target-mode", "1.1", "unverifiable")]  // the baseline's target mode is read ([LANE-1])
+    [InlineData("target-mode", "1.0", "lane-result")]            // round 5: in a 1.0 document, read as §7.3 says: mocked, so not eligible
+    [InlineData("severity", "1.0", "lane-result")]               // critical, above the rule's max: failed
+    [InlineData("severity-passed", "1.0", null)]                 // a passed line's severity is not read: passed, as recorded
+    [InlineData("severity-trial", "1.0", "lane-result")]
+    [InlineData("direction", "1.0", "lane-result")]              // none: not measured
+    [InlineData("baseline-direction", "1.0", null)]              // the baseline's direction is not read: passed, as recorded
+    [InlineData("baseline-target-mode", "1.0", "lane-result")]   // a baseline that is not live: not measured
+    [InlineData("severity-line-only", "1.1", "lane-result")]     // pre-release: a 1.1 line in a 1.0 run is read at 1.0 (critical)
+    [InlineData("direction-metrics-only", "1.1", "lane-result")] // and a 1.1 metrics.json in a 1.0 run
+    public void ALaneThatReadsAValueThisVersionDoesNotKnowInARun_IsUnverifiable_OnlyWhenTheRunDeclaresALaterMinor(
+        string what, string declared, string? expected)
+    {
+        // [CKP-8] (round 4): recomputing the lane reads something this version does not know; whatever was recorded,
+        // the lane is unverifiable, never lane-result. (Round 5) only in a run that declares a later minor; (pre-release)
+        // a run-side value's minor is its run's run.json's, whatever the line or metrics.json holding it declares, so a
+        // value in a 1.0 run is read as §7.3 says and compared as usual, and a lie gives lane-result. The checkpoint
+        // itself declares 1.0 here.
+        var declaredByTheRun = !what.EndsWith("-only", StringComparison.Ordinal);
+        what = what.Replace("-line-only", "", StringComparison.Ordinal).Replace("-metrics-only", "", StringComparison.Ordinal);
+        var run = new LaneRunBuilder("R");
+        JsonObject rule = Threshold();
+        var lane = (Runs: new List<string> { "R" }, Baseline: (LaneRunBuilder?)null);
+        switch (what)
+        {
+            case "target-mode":
+                run.Score("c1", 0.9).Entry("quality", "m", "p");
+                run.Run["execution"]!["targetMode"] = "live-shadow";
+                run.Run["schemaVersion"] = declared;
+                break;
+            case "severity" or "severity-passed" or "severity-trial":
+                rule = new JsonObject { ["kind"] = "severity", ["max"] = "low", ["path"] = "a" };
+                if (what == "severity-trial")
+                {
+                    run.Line("c1", "a", "failed", severity: "info", trial: 0).Line("c1", "a", "failed", severity: "low", rollup: (1, 0));
+                }
+                else
+                {
+                    run.Line("c1", "a", what == "severity" ? "failed" : "passed", severity: "info");
+                }
+
+                run.Results.First(l => (string?)l["severity"] == "info")["schemaVersion"] = declared;
+                if (declaredByTheRun)
+                {
+                    run.Run["schemaVersion"] = declared;
+                }
+
+                break;
+            default:
+                var baseline = new LaneRunBuilder("B", "v6");
+                for (var i = 0; i < 20; i++)
+                {
+                    baseline.Score($"k{i}", 0.5, path: "mem");
+                    run.Score($"k{i}", 0.6, path: "mem");
+                }
+
+                var unknown = what.StartsWith("baseline", StringComparison.Ordinal) ? baseline : run;
+                if (what.EndsWith("direction", StringComparison.Ordinal))
+                {
+                    unknown.Metrics["metrics"]![0]!["direction"] = "target_band";
+                    unknown.Metrics["schemaVersion"] = declared;
+                    if (declaredByTheRun)
+                    {
+                        unknown.Run["schemaVersion"] = declared;
+                    }
+                }
+                else
+                {
+                    unknown.Run["execution"]!["targetMode"] = "live-shadow";
+                    unknown.Run["schemaVersion"] = declared;
+                }
+
+                lane.Baseline = baseline;
+                break;
+        }
+
+        var hash = LaneRunBuilder.RunHashOf(run.Write(_root));
+        if (lane.Baseline is { } b)
+        {
+            rule = new JsonObject
+            {
+                ["kind"] = "comparison", ["lane"] = "quality", ["metric"] = "m", ["path"] = "mem",
+                ["baseline"] = new JsonObject { ["runId"] = "B", ["runHash"] = LaneRunBuilder.RunHashOf(b.Write(_root)) },
+                ["significance"] = 0.05, ["minimumPairs"] = 10, ["axes"] = new JsonArray("subject"),
+            };
+        }
+
+        var recorded = new JsonObject { ["status"] = "passed", ["subjectVersion"] = "v7", ["oldestClosedAt"] = "2026-10-05T00:00:00Z" };
+        var manifest = DecidedOneLane(rule, ("R", hash), recorded);
+
+        var (_, problems) = CheckpointVerifier.Lanes(manifest, AefRunStore.Open(_root), At);
+
+        Assert.Equal(expected is null ? [] : [new AefProblem("lanes/l", expected)], problems);
+    }
+
+    [Fact]
+    public void ALaterMinorCheckpoint_DoesNotMakeAnUnknownRunSideValueInA10RunUnverifiable()
+    {
+        // [CKP-8] (round 5): each value is judged by the document that holds it. A checkpoint of 1.1 over a run.json of
+        // 1.0 holding an unknown target mode: the run is read as §7.3 says (mocked: not eligible), and the lane compared.
+        var run = new LaneRunBuilder("R").Score("c1", 0.9).Entry("quality", "m", "p");
+        run.Run["execution"]!["targetMode"] = "live-shadow";
+        var hash = LaneRunBuilder.RunHashOf(run.Write(_root));
+        var manifest = DecidedOneLane(Threshold(), ("R", hash), new JsonObject { ["status"] = "passed", ["subjectVersion"] = "v7", ["oldestClosedAt"] = "2026-10-05T00:00:00Z" });
+        manifest["schemaVersion"] = "1.1";
+
+        var (_, problems) = CheckpointVerifier.Lanes(manifest, AefRunStore.Open(_root), At);
+
+        Assert.Equal([new AefProblem("lanes/l", "lane-result")], problems);
+    }
+
+    [Fact]
+    public void AnUnknownSeverityOutsideASeverityLanesScope_OrInAnotherKindOfLane_IsNotRead()
+    {
+        // [CKP-8]: only the lane's lines (its summary lane and path) are read for their severity, and only by a severity lane.
+        var run = new LaneRunBuilder("R").Line("c1", "a", "passed").Line("c2", "b", "failed", severity: "info").Score("c3", 0.9).Entry("quality", "m", "p");
+        var hash = LaneRunBuilder.RunHashOf(run.Write(_root));
+        var recorded = new JsonObject { ["status"] = "passed", ["subjectVersion"] = "v7", ["oldestClosedAt"] = "2026-10-05T00:00:00Z" };
+
+        var severity = DecidedOneLane(new JsonObject { ["kind"] = "severity", ["max"] = "low", ["path"] = "a" }, ("R", hash), recorded);
+        Assert.Empty(CheckpointVerifier.Lanes(severity, AefRunStore.Open(_root), At).Problems);
+
+        var threshold = DecidedOneLane(Threshold(), ("R", hash), recorded.DeepClone().AsObject());
+        Assert.Empty(CheckpointVerifier.Lanes(threshold, AefRunStore.Open(_root), At).Problems);
+    }
+
+    // A decided checkpoint of one lane "l" over one run, with this recorded result (the decision is not recomputed here).
+    private static JsonObject DecidedOneLane(JsonObject rule, (string RunId, string RunHash) run, JsonObject recorded) => new()
+    {
+        ["schemaVersion"] = "1.0", ["checkpointId"] = "cp_1",
+        ["subject"] = new JsonObject { ["ref"] = LaneRunBuilder.Subject, ["version"] = "v7" },
+        ["lanes"] = new JsonArray(Lane("l", rule, run)),
+        ["state"] = "decided", ["outcome"] = "approved",
+        ["decisionInput"] = new JsonObject
+        {
+            ["subjectVersion"] = "v7", ["evaluatedAt"] = At,
+            ["lanes"] = new JsonArray(new JsonObject { ["lane"] = "l", ["blocking"] = true, ["result"] = recorded, ["evidence"] = new JsonArray(run.RunHash) }),
+        },
+    };
+
+    [Fact]
+    public void AnUndecidedCheckpoint_IsNotComparedWithARecordedInput_AndTakesTheGivenTimeForItsAge()
+    {
+        var running = new LaneRunBuilder("R").Score("c1", 0.9);
+        running.Run["status"] = "running";
+        running.Run.Remove("endedAt");
+        var dir = running.Write(_root, seal: false);
+        var manifest = new JsonObject
+        {
+            ["schemaVersion"] = "1.0", ["checkpointId"] = "cp_1",
+            ["subject"] = new JsonObject { ["ref"] = LaneRunBuilder.Subject, ["version"] = "v7" },
+            ["lanes"] = new JsonArray(Lane("quality", Threshold(), ("R", LaneRunBuilder.RunHashOf(dir)))),
+            ["state"] = "running", ["outcome"] = null,
+        };
+
+        var (lanes, problems) = CheckpointVerifier.Lanes(manifest, AefRunStore.Open(_root), "2026-10-09T08:00:00.25Z");
+
+        Assert.Equal("2026-10-09T08:00:00.25Z", lanes.Single().Result!.OldestClosedAt);
+        Assert.Equal([new AefProblem("lanes/quality/runs/R", "run-unverified")], problems);
+    }
+
+    [Fact]
+    public void AManifestLaneWithRuns_ThatTheInputLeavesOut_HasNoResultThere_AndIsAnEvidenceProblem()
+    {
+        // [CKP-7] evidence: "a lane has runs but no result in the input" (W4-3).
+        var document = JsonNode.Parse(File.ReadAllBytes(Path.Combine(AefCorpus.Conformance, "checkpoints", "valid-decided", "document.json")))!.AsObject();
+        var input = document["decisionInput"]!["lanes"]!.AsArray();
+        var withRuns = NameOf(document["lanes"]!.AsArray().First(l => l!["runs"]!.AsArray().Count > 0)!);
+        input.Remove(input.First(l => (string?)l!["lane"] == withRuns)!);
+
+        Assert.Contains("evidence", CheckpointManifest.Verify(document));
+        Assert.Contains("lanes", CheckpointManifest.Verify(document));
+    }
+
+    [Theory]
+    [InlineData("1.0", "sealed", "approved", true, true, "outcome")]                // checked as usual (vector state-unknown-in-1-0)
+    [InlineData("1.0", "sealed", "inconclusive", true, true, "")]                   // nothing differs: no problem
+    [InlineData("1.0", "sealed", null, true, true, "outcome")]                      // a decision with no outcome: not the decision's
+    [InlineData("1.0", "sealed", "approved", false, false, "decision")]             // a decided outcome but no decision (R7-4)
+    [InlineData("1.0", "decided", "ratified", false, false, "decision")]            // vector outcome-unknown-without-decision-in-1-0
+    [InlineData("1.0", "decided", "approved", false, false, "decision")]
+    [InlineData("1.0", "sealed", null, false, false, "")]                           // nothing recorded: nothing to recompute
+    [InlineData("1.0", "sealed", "inconclusive", true, false, "decision")]          // a decision without its input (R6N-1, revised by R7-4)
+    [InlineData("1.0", "sealed", null, true, false, "decision")]
+    [InlineData("1.1", "sealed", "inconclusive", true, true, "unverifiable")]       // a later minor's state
+    [InlineData("1.1", "sealed", "approved", false, false, "unverifiable")]         // vector state-unknown-without-decision
+    [InlineData("1.1", "decided", "ratified", true, true, "unverifiable")]
+    [InlineData("1.1", "decided", "approved", false, false, "unverifiable")]        // a later minor's decided manifest without a decision
+    [InlineData("1.1", "decided", "approved", true, false, "unverifiable")]
+    [InlineData("1.1", "decided", "approved", true, true, "outcome")]               // a later minor that holds nothing unknown: checked
+    [InlineData("1.0", "decided", "aborted", false, false, "")]
+    [InlineData("1.1", "sealed", "aborted", false, false, "unverifiable")]
+    public void AManifestHoldingAValueThisVersionDoesNotKnow_IsUnverifiableOnlyInALaterMinor_Ckp7(
+        string declared, string state, string? outcome, bool decision, bool input, string expected)
+    {
+        // [CKP-7] (rounds 6 and 7): only a later minor's values are unverifiable: a manifest that declares a later minor
+        // and holds a state, an outcome or a lane status this version does not know, or one checked as decided with
+        // nothing to recompute (no decision, or a decision without its input). A 1.0 manifest is checked as usual whatever
+        // it holds, and one checked as decided with nothing to recompute is a decision problem (R7-4).
+        var document = JsonNode.Parse(File.ReadAllBytes(Path.Combine(AefCorpus.Conformance, "checkpoints", "valid-decided", "document.json")))!.AsObject();
+        document["schemaVersion"] = declared;
+        document["state"] = state;
+        document["outcome"] = outcome;
+        if (!decision) document.Remove("decision");
+        if (!input) document.Remove("decisionInput");
+
+        Assert.Equal(expected.Split(' ', StringSplitOptions.RemoveEmptyEntries), CheckpointManifest.Verify(document));
+    }
+
+    [Fact]
+    public void A10ManifestInAStateThisVersionDoesNotKnow_IsComparedWithItsRuns_AsADecidedOne_Ckp7()
+    {
+        // [CKP-7] (round 6): a 1.0 manifest cannot escape the checks with a state nobody defined; [CKP-8] compares its
+        // recorded results too. In a manifest of a later minor, such a state is unverifiable, and not compared.
+        var manifest = Corpus("threshold");
+        Lane(manifest, "pass")["result"]!["status"] = "failed";
+        manifest["state"] = "sealed";
+
+        Assert.Equal([new AefProblem("lanes/pass", "lane-result")], CheckpointVerifier.Lanes(manifest, AefRunStore.Open(CorpusRuns("threshold")), At).Problems);
+
+        manifest["schemaVersion"] = "1.1";
+        Assert.Empty(CheckpointVerifier.Lanes(manifest, AefRunStore.Open(CorpusRuns("threshold")), At).Problems);
+        Assert.Equal(["unverifiable"], CheckpointManifest.Verify(manifest));
+    }
+
+    [Fact]
+    public void AManifestTheReaderRefuses_IsRefused()
+    {
+        Assert.Throws<FormatException>(() => CheckpointVerifier.Read("""{"schemaVersion": "1.0"}"""u8));
+        Assert.Throws<FormatException>(() => CheckpointVerifier.Read("""{"a": 1, "a": 2}"""u8));
+    }
+
+    // A decided checkpoint over two runs written here: a threshold lane and a comparison lane, its input and decision
+    // recomputed, as a producer records them. Returns its bytes and the run hashes it names (the baseline included).
+    private (byte[] Manifest, List<string> Hashes) Decided()
+    {
+        var q = new LaneRunBuilder("Q").Score("c1", 0.9).Entry("quality", "m", "p").Write(_root);
+        var baseline = new LaneRunBuilder("B", "v6");
+        var candidate = new LaneRunBuilder("C");
+        for (var i = 0; i < 20; i++)
+        {
+            baseline.Score($"k{i}", 0.5, path: "mem");
+            candidate.Score($"k{i}", 0.6, path: "mem");
+        }
+
+        var b = baseline.Entry("quality", "m", "mem").Write(_root);
+        var c = candidate.Entry("quality", "m", "mem").Write(_root);
+        var (qh, bh, ch) = (LaneRunBuilder.RunHashOf(q), LaneRunBuilder.RunHashOf(b), LaneRunBuilder.RunHashOf(c));
+
+        var comparison = new JsonObject
+        {
+            ["kind"] = "comparison", ["lane"] = "quality", ["metric"] = "m", ["path"] = "mem",
+            ["baseline"] = new JsonObject { ["runId"] = "B", ["runHash"] = bh },
+            ["significance"] = 0.05, ["minimumPairs"] = 10, ["axes"] = new JsonArray("subject", "judges"),
+        };
+        var manifest = new JsonObject
+        {
+            ["schemaVersion"] = "1.0", ["checkpointId"] = "cp_signed",
+            ["subject"] = new JsonObject { ["ref"] = LaneRunBuilder.Subject, ["version"] = "v7" },
+            ["lanes"] = new JsonArray(Lane("quality", Threshold(), ("Q", qh)), Lane("regression", comparison, ("C", ch))),
+            ["state"] = "evidence_complete", ["outcome"] = null,
+        };
+
+        var (lanes, problems) = CheckpointVerifier.Lanes(manifest, AefRunStore.Open(_root), At);
+        Assert.Empty(problems);
+        var input = new JsonObject
+        {
+            ["subjectVersion"] = "v7", ["evaluatedAt"] = At,
+            ["lanes"] = new JsonArray([.. lanes.Select((l, i) => (JsonNode?)new JsonObject
+            {
+                ["lane"] = l.Lane, ["blocking"] = true, ["result"] = l.Result!.ToJson(),
+                ["evidence"] = new JsonArray(i == 0 ? qh : ch),
+            })]),
+        };
+        var decision = CheckpointDecisionJson.Write(CheckpointDecision.Decide(CheckpointDecisionJson.ReadInput(input)));
+        manifest["state"] = "decided";
+        manifest["outcome"] = decision["outcome"]!.DeepClone();
+        manifest["decisionInput"] = input;
+        manifest["decision"] = decision;
+        Assert.Equal("approved", (string?)manifest["outcome"]);
+        return (AefJsonWriter.Document(manifest), [qh, ch, bh]);
+    }
+
+    private static JsonObject Threshold() => new()
+    {
+        ["kind"] = "threshold", ["lane"] = "quality", ["metric"] = "m", ["path"] = "p", ["op"] = ">=", ["value"] = 0.5,
+    };
+
+    private static JsonObject Lane(string name, JsonObject rule, params (string RunId, string RunHash)[] runs) => new()
+    {
+        ["lane"] = name,
+        ["rule"] = rule,
+        ["runs"] = new JsonArray([.. runs.Select(r => (JsonNode?)new JsonObject { ["runId"] = r.RunId, ["runHash"] = r.RunHash, ["origin"] = "launched" })]),
+        ["blocking"] = true,
+    };
+
+    // A lane of a corpus manifest's recorded input.
+    private static JsonObject Lane(JsonObject manifest, string name) =>
+        manifest["decisionInput"]!["lanes"]!.AsArray().Single(l => (string?)l!["lane"] == name)!.AsObject();
+
+    private static JsonObject Corpus(string vector) =>
+        JsonNode.Parse(File.ReadAllBytes(Path.Combine(AefCorpus.Conformance, "lane-vectors", vector, "checkpoint.json")))!.AsObject();
+
+    private static string CorpusRuns(string vector) => Path.Combine(AefCorpus.Conformance, "lane-vectors", vector, "runs");
+
+    private static string NameOf(JsonNode lane) => (string)lane["lane"]!;
+}

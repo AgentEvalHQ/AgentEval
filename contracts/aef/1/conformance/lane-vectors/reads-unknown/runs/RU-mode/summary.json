@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.1",
+  "runId": "RU-mode",
+  "lanes": [
+    {
+      "lane": "quality",
+      "metrics": [
+        {
+          "metric": "m",
+          "path": "p",
+          "n": 1,
+          "N": 1,
+          "notMeasured": 0,
+          "value": 1.0,
+          "verdict": "passed",
+          "rule": "recorded by the producer",
+          "sum": 1.0,
+          "sumSq": 1.0
+        }
+      ]
+    }
+  ]
+}

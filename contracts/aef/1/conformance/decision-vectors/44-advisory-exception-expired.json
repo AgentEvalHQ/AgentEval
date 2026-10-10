@@ -1,0 +1,74 @@
+{
+  "description": "An advisory failure whose exception expired: approved, and both the failure and the lapse are reported.",
+  "rules": [
+    "DEC-1",
+    "DEC-2",
+    "DEC-3",
+    "DEC-4"
+  ],
+  "input": {
+    "subjectVersion": "git:3f2a1c",
+    "evaluatedAt": "2026-10-08T12:00:00Z",
+    "lanes": [
+      {
+        "lane": "quality",
+        "blocking": true,
+        "evidence": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "result": {
+          "status": "passed",
+          "subjectVersion": "git:3f2a1c",
+          "oldestClosedAt": "2026-10-07T10:00:00Z"
+        }
+      },
+      {
+        "lane": "performance",
+        "blocking": false,
+        "evidence": [
+          "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        ],
+        "result": {
+          "status": "failed",
+          "subjectVersion": "git:3f2a1c",
+          "oldestClosedAt": "2026-10-07T10:00:00Z"
+        }
+      }
+    ],
+    "exceptions": [
+      {
+        "lane": "performance",
+        "evidence": [
+          "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+        ],
+        "reason": "The performance failure is accepted until the fix ships; tracked in the release review.",
+        "by": {
+          "identity": "oidc:https://login.example.com/u-7f3a",
+          "assurance": "authenticated"
+        },
+        "at": "2026-10-07T11:00:00Z",
+        "expires": "2026-10-08T00:00:00Z"
+      }
+    ]
+  },
+  "expected": {
+    "outcome": "approved",
+    "lanes": [
+      {
+        "lane": "quality",
+        "status": "passed",
+        "blocking": true
+      },
+      {
+        "lane": "performance",
+        "status": "failed",
+        "blocking": false
+      }
+    ],
+    "reasons": [
+      "advisory-failed:performance",
+      "exception-expired:performance",
+      "outcome:approved"
+    ]
+  }
+}

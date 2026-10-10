@@ -7,6 +7,266 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`agenteval aef`: AEF 1.0 runs from the command line.** AEF, the AgentEval Evidence Format, is AgentEval's
+  evidence format from 1.0 on ([ADR-035](docs/adr/035-aef-is-the-evidence-format.md); a release candidate until the
+  `aef-1.0` tag). `aef verify` reports a run as intact, unsealed or invalid with every problem, and who signed it under
+  your trust policy; `aef seal` seals a closed run and signs it with `--key`; `aef view` shows it as its reviews,
+  overrides and waivers leave it; `aef checkpoint` checks a release checkpoint against its runs and recomputes its
+  decision; `aef export` converts a run of the `.agenteval/` store into an AEF run (store v1 does not record how the
+  target was driven, so it is marked `mocked` unless `--target-mode` says otherwise); `aef import assert-ai` converts
+  an ASSERT run, rates included. Every verb takes `--json`. The format, its schemas, a conformance corpus of over 600
+  vectors and Python reference tools are in `contracts/aef/` (Apache-2.0); the guide is `docs/aef.md`.
+- **`assert-ai calibrate -o` records when the calibration was measured** (`measuredAt`), so an AEF import can tell a
+  calibration that applies to a run from one measured after it.
+- **Releases open Mission Control in a browser before publishing.** `scripts/mc-browser-smoke/run.sh` installs the
+  packed tool the way a user does, serves a workspace with stored runs, and opens every page in headless Chromium. A
+  page fails on a console, request or GraphQL error, an error or empty state ("Failed to load", "No … found"), a main
+  area with almost no text, missing the data the fixture put there, or a matrix cell whose status shows blank or "?";
+  the run fails if the server outlives a SIGTERM. The release workflow runs it after packing, before the push. On the code before this
+  week's three page fixes it fails exactly those three pages, which the server tests had passed: they sent their own
+  queries, and their fixture stored compliance statuses lower-case where real evidence stores `PASS`/`WARN` (the
+  fixture now stores what real runs store).
+- **Calibration confidence intervals** — `CalibrationReport` now exposes `AccuracyInterval` and `FprInterval`
+  (`WilsonInterval` structs) alongside the point estimates. A small gold set no longer hides its own
+  uncertainty: `0/8` reads `0.0 % [0.0 %, 32.4 %]` instead of a deceptively tidy `0.0 %`. The 95 % Wilson
+  interval is printed in `AssertInlineReady` error messages and serialised in the CLI `--certify` JSON
+  (schema bumped to `1.1`).
+- **Calibration split label** — `CalibrationOptions.SplitLabel` (e.g. `"held-out"` or `"training"`) is
+  threaded through to `CalibrationReport.SplitLabel` and shown in the CLI report and error messages. No
+  effect on promotion logic; purely informational metadata so readers can see whether numbers are overfitted.
+- **Gatekeeper OpenTelemetry bridge** — `GatekeeperInstrumentation` (`AgentEval.MAF`) declares the
+  `AgentEval.Gatekeeper` `ActivitySource` and `Meter`; subscribe with
+  `AddSource("AgentEval.Gatekeeper")` / `AddMeter("AgentEval.Gatekeeper")`. `OtelGatekeeperObserver`
+  is an `IGatekeeperObserver` that emits a span and increments the `agenteval.gatekeeper.findings`
+  counter for every actionable finding (Block / Mutate / Redact / Incident). `GateCalibrationHarness`
+  emits `AgentEval.Calibration` spans with accuracy, dangerous-error count, and inline-ready tags.
+- **OWASP Top 10 for Agentic Applications crosswalk** (`docs/owasp-agentic-top10.md`) — for each of ASI01–ASI10
+  (the 2026 list, published 2025-12-09): which red-team attacks probe it, which Gatekeeper gates defend against it at
+  runtime, and what is missing. Probes and gates both exist for ASI01 Agent Goal Hijack and ASI02 Tool Misuse and
+  Exploitation. ASI03–ASI06 and ASI08–ASI10 are partly covered, most of them by gates with no probes. ASI07 Insecure
+  Inter-Agent Communication is not covered.
+- **`bench agentic --reference/--reference-file` and `--context/--context-file`.** The reference answer and the
+  retrieved context reach every check as `EvalInput.GroundTruth` / `EvalInput.Context`, so `rag-quality` can pass
+  from the CLI: groundedness grades against the context; similarity, F1 and response completeness against the
+  reference. Through 0.43 the CLI had no way to supply either, and the preset could not pass. A blank value counts as
+  none; a missing file is a usage error (exit 2). When every check in `rag-quality` is skipped, the run's note now
+  names these flags.
+- **`redteam --transform <codecs>`.** The 18 encoding codecs were reachable only from code (`AttackPipeline.WithTransform`).
+  The flag takes codec names (`base64`, `rot13`, `hex`, …) or a group (`reversible`, `lossy`, `all`) and runs every
+  single-turn probe in the scan once per codec as well as in plaintext, which stays as the control. Multi-turn,
+  tool-aware and tree attacks run unencoded and are named, since encoding them would silently downgrade them to
+  single-turn. An unknown codec fails before any probe runs. The red-team docs listed three codecs that do not exist
+  (NATO, homoglyph, zero-width) and said the library example kept the original probes, which `WithTransform` drops
+  unless `keepOriginal: true`; both are corrected.
+- **AUROC and held-out accuracy for scored classifiers** — `AgentEval.Calibration.ThresholdCalibration` (`AgentEval.Core`)
+  calibrates a judge or decision model that outputs a score rather than a verdict. `Auroc` measures how well the scores
+  separate the gold classes with no cut, and is `NaN` with one class present, never 0.5. `EvaluateHeldOut` chooses the
+  cut on training cases (`ChooseCut`, by accuracy or balanced accuracy) and measures it unchanged on held-out cases, with
+  a 95% Wilson interval. `Split` makes a stratified split that is reproducible for a given seed. New public types:
+  `ScoredCase`, `CutObjective`, `HeldOutEvaluation`, `ThresholdCalibration`. Documented in the eval and benchmark
+  architecture guide, §7.5.
+- **Calibration entries carry earlier turns, context and tool calls; five more agentic evaluators are calibrated.**
+  `CalibrationEntry` gained `ConversationHistory`, `Context` and `ToolCalls`, and `ToEvalInput()`. The runner passes them
+  where the evaluators read them at run time (the history as `Metadata["conversation_history"]`). The multi-turn goldens
+  had pasted the earlier turns into `input` as text, which the evaluators do not read, so every entry skipped and the
+  memory evaluators were carved out of `bench agentic calibrate`. 13 multi-turn and 4 step-hallucination cases now carry
+  them structured, and `memory_recall_accuracy`, `turn_coherence`, `goal_tracking`, `clarification_appropriateness`
+  and `intermediate_step_hallucination` are dispatched: 45 of 60 evaluators, was 40. Three stay carved out because
+  their golden cases cannot be graded as written: `long_conversation_coherence` (its cases describe the conversation
+  instead of containing it), `self_correction_quality` (its correction turn has room for one message) and
+  `plan_formulation_quality` (its only failing case is skipped as having no plan). None of the five has been measured
+  against a judge yet. Three pass bands started below their evaluator's threshold and now start at it, as in 0.43.
+- **Golden-trace regression.** `agenteval eval --save-golden <file>` saves a run as a golden trace: each test case's
+  verdict, score, output, and tool calls in order with their arguments. `--golden <file>` compares a later run with it
+  and reports each test case as regressed, improved, tools changed, output changed, unchanged, added or removed. With
+  `--golden` the exit code follows the comparison: `1` only when a test case that passed in the golden trace fails now,
+  so a test that was already failing does not fail the build. `--fail-on-tool-change` also fails on changed tool calls.
+  Output changes are reported but never fail the run, since model output varies. A run with no tool data is not
+  compared on tools. In code: `GoldenTrace.FromResults`, `SaveAsync`/`LoadAsync` and `GoldenTraceComparer.Compare` in
+  `AgentEval.Snapshots` (new public types: `GoldenTrace`, `GoldenTraceCase`, `GoldenToolCall`, `GoldenTraceComparer`,
+  `GoldenTraceComparison`, `TraceCaseComparison`, `TraceChange`).
+- **Core and Abstractions API snapshots** — `CorePublicApiSnapshotTests` and
+  `AbstractionsPublicApiSnapshotTests` freeze the public surface of `AgentEval.Core` and
+  `AgentEval.Abstractions` using the same Verify-based pattern as the existing Gatekeeper snapshot.
+  Any silent API change now fails CI. `EnablePackageValidation` is on the umbrella `AgentEval` package, the one
+  project that packs (Core and Abstractions ship inside it), so every pack checks its per-framework assemblies
+  against each other.
+- **`agenteval compare --fail-on-regression`.** A comparable result exited 0 whatever it showed, so a CI step running
+  `compare` never failed on a regression. With the flag it exits 1 when a scenario the baseline passed fails in the
+  candidate, and names those scenarios; incomparable runs still exit 13. The default exit codes are unchanged. `--json`
+  now also carries `recovered`, `regressed` and `regressedScenarios` when the runs are comparable.
+- **`agenteval log-file gate-replay`.** `GateReplayer` (what would a different tool-gate configuration have done to
+  the same traffic?) was reachable only from code. The command runs two configurations, each a JSON array of gate ids
+  and parameters (`[{"gate": "tool:forbidden-tool", "forbidden": ["send_email"]}]`), over every tool call in a
+  `--capture-fixture` capture, with no model and no network; it prints both verdicts per call, marks the divergences,
+  and counts the calls the candidate newly blocks and newly lets through (`--json` too). It replays the three gates
+  that read a call's own arguments; a capture holds no tool results, so a gate that reads the conversation is refused
+  with that reason rather than replayed on half a history. A capture masks credential shapes, so a call whose
+  arguments were masked is marked not measured under an argument gate and left out of the counts (a change that drops
+  a key-pattern gate would otherwise read "lets through 0").
+- **`skills scan` names where a skill came from.** When a project `skills-lock.json` (the file ChilliCream's `skills`
+  CLI writes) is in the scanned directory or a parent up to the repository root, each finding carries a pointer such
+  as `→ from chillicream/agent-skills@a1b2c3d` (console, Markdown and JSON), and `--write-baseline` stores the source
+  and ref on the snapshot. `SkillBaselineEntry.Source`/`Ref` and the renderers' provenance parameter existed but
+  nothing filled them. Offline; an unreadable lock file is a warning, and an entry holding control characters is
+  ignored.
+- **Microsoft ASSERT interoperability (`agenteval assert-ai`, `AgentEval.Interop.AssertAi`).** Formats of `assert-ai`
+  0.3.0, read from ASSERT's source and checked against its own tests: serve a .NET chat client or MAF agent as ASSERT's
+  HTTP endpoint target (every tool call sent as a result with its arguments, since ASSERT's judge never sees a call
+  without one); read an ASSERT run into AgentEval results (a failed judge is `error`, a case with no score row is
+  named and `skipped`, a case with no relevant category `inapplicable`), with ASSERT's harm and over-refusal rates
+  computed as ASSERT computes them and an `IEval` that puts its verdicts in a composite; write AgentEval's
+  conversations as an ASSERT judge-only run; calibrate ASSERT's judge on AgentEval's labelled cases (accuracy, κ,
+  dangerous errors). Sample P1 (`dotnet run -- 106`), `docs/assert-interop.md`. A round trip with a running ASSERT
+  has not been done yet. (An earlier draft of the docs page, never released, described this as already shipped.)
+- **`agenteval redteam --attacks memory-poisoning`.** The memory-security corpus (12 attacks, 4 benign controls) and its
+  five checks had no CLI path and nothing that produced observations from a run. The new run puts the model you name
+  behind AgentEval's default memory protection (`UseGatekeeper` + `ProtectMemory` over the five memory gates), runs
+  each case as a plant session, a restart and a trigger session over a shared memory store, then a recall through the
+  same result gate, and scores the observations: one row per case, each labelled SCRIPTED or LIVE and with who planted
+  it, and the five verdicts (`--format markdown|json`, `--memory-trials`, exit 0 / 1 / 11; not measured is `null` in
+  the JSON). Five cases are planted by the harness; their store outcomes are the gates' and the store's, the same
+  for every model, and the report ends with the attack cases split by who planted them. The cases the model decides
+  are not measured when it never read the plant, a call timed out, failed or stopped at the output limit (4,096
+  tokens; found on the first live run, where a reasoning model's empty reply was read as declining), or it did nothing in the case and was
+  not shown to use the memory tools (no memory write proposed on a benign control it completed in that trial); an
+  action is not measured when the poison is stored but no recall the model made matched it. `--scripted` runs a scripted worst-case model instead, labelled. With the
+  defaults it contains cross-user recall, a low-trust write under a protected fact's key, untrusted procedure
+  promotion and recalled data copied into a sensitive tool; it stores and recalls low-trust poison (labelled), lets a
+  fact rewritten under a new key be recalled ahead of the trusted one, recalls a tampered record (integrity
+  verification is off by default), and lets the 32-write run budget fill the 32-record recall window. The OWASP
+  Agentic page said the recall gate drops tampered records; it does only when integrity verification is required.
+
+### Changed
+- **The extensibility guide starts with `IEval`.** It opened with `IMetric`, the older interface, and mentioned
+  `IEval` (what the benchmarks, composites, calibration and exporters read) only in a note halfway down. It now leads
+  with a custom `AtomicCodeEval`, how to admit it with a chance floor, and how to report "not measured"; `IMetric`
+  follows as the compatibility path. The example is compiled and run by a test.
+- **`--azure-from-env` is now `--from-env`.** The flag builds the target from whichever provider `AI_INFERENCE_PROVIDER`
+  selects, not only Azure, and the name said otherwise (0.41 called it a misnomer and kept it). `bench gdpr`,
+  `eu-ai-act`, `owasp`, `mitre`, `nist`, `perf` and `log-file replay` take `--from-env`; `--azure-from-env` is kept as an
+  alias, so no script that passes it breaks. Help, messages and docs use the new name.
+- **`eval --runs N` (N above 1) now writes its export.** It used to write none: `--format`, `-o` and `--output-dir`
+  were ignored with a warning, and an output file left by an earlier run stayed in place, looking current to whatever
+  read it next. The export now has one entry per test case, not one per run. The entry passes or fails on the pass
+  rate against `--success-threshold`, and its score is the mean over the runs. Every format carries the runs as metric
+  columns (`stochastic_runs`, `stochastic_runs_passed`, `stochastic_pass_rate`, `stochastic_score_sd`). A failure
+  message names the pass rate and threshold, and JUnit system-out and TRX stdout list each run. The report's name says
+  `(stochastic, N runs per test)`. `EvalOptions.FormatGiven`, which existed only for the old warning, is removed.
+- **`SystemOneClientOptions.TypeSafeDefaultModel`** is now `"jev-1.13.0"` (was `"jev-latest"`). The moving alias
+  `"jev-latest"` always resolved to `"jev-1.13.0"` and `DecisionResponse.Model` echoes the resolved build, so
+  provenance is unchanged; the default is pinned for reproducibility in line with `OpenRouterDefaultModel`.
+- **Breaking at compile time: `DecisionEval`, `DecisionJudge` and `DecisionBenchmarkJudge` are now
+  `[Experimental("AGENTEVAL_DECISIONS_PREVIEW001")]`**, like the rest of the decision-model surface they are built on
+  (`IDecisionClient`, `SystemOneDecisionClient`). Microsoft.Extensions.AI is defining its own decision abstraction, and
+  AgentEval will adapt to it, so these three can change shape too; until now nothing told a caller that. Code that uses
+  them must acknowledge the preview: `<NoWarn>$(NoWarn);AGENTEVAL_DECISIONS_PREVIEW001</NoWarn>` or a `#pragma`.
+
+### Deprecated
+- **`StochasticData` and `CategoryScoreEntry.Stochastic`** (`AgentEval.Memory`) are `[Obsolete]` and will be removed in a
+  later release. Nothing ever filled them: the memory benchmark has no multi-run mode, and the report never read them.
+  Repeated runs of a test case are measured by `AgentEval.Comparison.StochasticRunner`.
+
+### Fixed
+- **Stopping `agenteval mc serve` with SIGTERM left the server running.** The command starts the server as a child
+  process and stopped it on Ctrl+C only. A service manager, `kill` or a CI step sends SIGTERM to the launcher alone,
+  so the launcher exited and the server kept the port and went on serving. Ctrl+C and SIGTERM now both stop the
+  server at once (it only reads the workspace, so nothing is lost); the 10-second grace and the second-press
+  escalation are gone, since the command line cancels on the first signal before the tool's own handler ran.
+- **Gatekeeper memory protection blocked every recall of untrusted content, and every write it redacted.**
+  `MemoryGateContext.WithContent` copied the context without its record metadata, budget snapshot and
+  administrative cross-scope flag, and the pipeline evaluates every gate after a Sanitize verdict on that copy. The
+  recall-admission gate delimits untrusted recalled content by default, so the resource-budget gate after it found no
+  snapshot and blocked the recall (`memory.budget.snapshot_missing`); a write whose credential or e-mail address
+  was redacted was blocked the same way. It failed closed, so nothing unsafe got through, but recall did not work
+  with the default gates. Found by the memory-poisoning harness.
+- **`TaintTrackingGate` (and the memory influence gate on it) missed a value that ended a sentence.** Its token
+  pattern keeps `.`, `/` and `-` inside a value, so "send it to https://drop.example/collect." tainted
+  `drop.example/collect.` with the full stop, and a call carrying `https://drop.example/collect` did not contain that
+  token and was allowed. Trailing punctuation is no longer part of a tainted value, so a sentence-final word is
+  tainted like the same word anywhere else; a value of exactly the minimum length followed by punctuation is now too
+  short to taint. Found by the memory-poisoning review.
+- **Three Mission Control pages showed nothing, or were rejected, under `mc serve`.** The tests wrote their own
+  GraphQL queries, so all three were green.
+  - The compliance matrix looked statuses up in lower case while the evidence stores them upper case (`PASS`), so
+    every cell rendered with no colour and no symbol. Statuses are mapped now, and `ERROR` and `SKIPPED` get cells and
+    legend entries of their own instead of passing for "no evidence".
+  - The evaluator list declared its filter as `CostTier`; the schema's type is `EvaluatorCostTier`, so every load
+    failed with HTTP 400.
+  - The scenario tree nests `details` four levels deep (root, pillar, article, judge), and Hot Chocolate's
+    coordinate-cycle rule, which runs outside Development only, allows three: every drill-down failed with HC0087.
+    The rule now allows four, in every environment; the depth and cost limits are unchanged.
+  A new test sends every GraphQL operation in the web app's source to the server under Production settings.
+- **Mission Control's run page shows the checks that did not run.** It showed Verdict, Scenarios, Failures and Cost; a
+  skipped or errored check is neither a pass nor a fail (it counts in the run's `skipped` bucket and keeps the run from
+  passing), so a run whose every check errored read FAIL beside "Failures 0". A **Not measured** tile (skipped or
+  errored) now shows that count, in red when it is not 0.
+- **`SafetyMetricGate` refuses a metric it can never measure.** The gate gives its metric only the inspected text, so
+  a metric that needs a retrieved context or a reference answer (`GroundednessMetric`) was never measured and the gate
+  blocked every message, with "safety metric failed"-style reasons. Building the gate with such a metric now throws
+  `ArgumentException` saying why. **Behaviour change:** code that built the gate with such a metric used to start and
+  block every message (under the default `WarnOnly` policy, warn on every message); it now fails at startup. A metric
+  not measured at run time for another reason still blocks (fail-closed), and the reason now says it was not
+  measured; a result marked passed but not measured blocks too.
+- **The Skill Health & Security Index no longer scores what was not measured.** An efficiency `MetricResult` that was
+  not measured carries a placeholder score of 0, and the index averaged it in: a clean compliance scan (100) read as
+  50. A security outcome with no probe run and no drift finding scored a perfect 100, though the code said that axis
+  had no data. Both now count as not measured and are named so in the explanation; a non-finite efficiency score
+  is not a measurement either. The `agent-skills.md` example also named a parameter that does not exist.
+- **Datasets written in camelCase lost their expected outputs, and every test passed.** The JSON, JSONL, CSV and YAML
+  loaders read snake_case keys only. `expectedOutput` (and `expectedTools`, `groundTruth`, `evaluationCriteria`,
+  `passingScore`) was kept as metadata by the JSON loaders and dropped by the YAML loader, and a test case with no
+  expected output and no judge passes any non-empty answer at 100. `eval` on such a dataset passed whatever the agent
+  said. Field names now match in any spelling in every format: `expected_output`, `expectedOutput`, `ExpectedOutput`,
+  `expected-output`; two spellings of one field in a test case are an error. The same silent loss, and the same
+  outcome, came from a number where text was expected: JSON dropped `"expected": 4`. Numbers and booleans are now read
+  as written, and a list or object where one value belongs is an error, as are a `passing_score` that is not a whole
+  number (CSV ignored it, JSON threw a bare `FormatException`) and a JSON array item that is not an object (skipped).
+  Errors name the test case, line or row. The YAML loader also accepts the `testCases:` wrapper its documentation
+  shows (it rejected the file), applies `<<:` merge keys, keeps unknown keys as metadata as the JSON loaders do,
+  accepts a single string where a list is expected, and reports a syntax error with its line instead of "must be an
+  array of test cases". A `ground_truth` that is text rather than a tool call (`name` + `arguments`) is kept as
+  metadata, as JSON did; `agenteval init` no longer writes one (its templates carried `groundTruth: "<text>"`,
+  described as "ground truth for faithfulness metrics", which nothing read).
+- **Agentic calibration filed every evaluator whose key ends in "quality" under Quality.** The category router checked
+  golden-filename suffixes before evaluator keys, so `refusal_quality` (UX) and `goal_decomposition_quality`,
+  `plan_formulation_quality` and `self_correction_quality` (Reasoning) were scored and gated with Quality, against
+  its relaxed 0.65 / 0.40 gate. Exact keys now route first. The 2026-10-05 calibration results grouped them that way,
+  and say so.
+- **A tool assertion on a result with no tool data fails with the reason.** When the agent's adapter returns no
+  `RawMessages`, or tool tracking is off, `TestResult.ToolUsage` is null and AgentEval cannot see the agent's tool calls.
+  `result.ToolUsage!.Should().HaveCalledTool(...)` then crashed with `ArgumentNullException (Parameter 'report')`. It
+  now fails with a `ToolAssertionException` that says there is no tool-call data and names both causes. It still
+  fails: an assertion that cannot see the tool calls must not pass, or be skipped. An agent that cannot call tools, or
+  did not, produces an empty report and fails as before, with "No tools were called".
+- **One set of model prices, dated.** `ModelPricing` (run cost) and `JudgeCostMap` (judge cost) disagreed, so a model
+  cost different amounts depending on the report. Both now carry OpenAI's and Anthropic's published standard-tier prices
+  as checked on 2026-10-07, and a test fails when a model both tables know is priced differently. Estimates change for:
+  `gpt-4o` $2.50 / $10 per 1M (was the 2024 $5 / $15 in `ModelPricing`), `gpt-5` $1.25 / $10 (was $5 / $20 in both),
+  `gpt-5-mini` $0.25 / $2 (was a placeholder), `o3-mini` $1.10 / $4.40, `claude-3-5-haiku` $0.80 / $4 (`ModelPricing`
+  had Claude 3 Haiku's price). Added `gpt-5-nano`, the `gpt-4.1` family to `ModelPricing`, and `gpt-5.5` to
+  `JudgeCostMap`, where a gpt-5.5 judge otherwise matched `gpt-5` and, after this fix, would have read a quarter of its cost.
+- **`CalibratedJudge` no longer votes a not-measured judge in as 0.** A metric that lacks an input (Faithfulness
+  without a retrieved context, for example) returns not measured with a placeholder score of 0; the calibrated
+  judge averaged that 0 in, so three judges on Faithfulness without context reported score 0, 100 % agreement and
+  consensus. A not-measured judge is now left out of the vote, like a timed-out one. When too few judges measured
+  because the input lacked something, the result is not measured (`CalibratedResult.Measured` is false,
+  `NotMeasuredReason` carries the metric's reason) instead of a score or an exception.
+- **Memory metrics report not measured instead of failing at 0 or passing.** All five code-computed memory
+  metrics (`code_memory_retention`, reach-back, noise resilience, temporal, reducer fidelity) failed at 0 when
+  the context carried no `MemoryEvaluationResult`, and three failed at 0 with an explanation that already said
+  "Not measured" when the judge scored no query. They now return `MetricResult.NotMeasured`. Two passed with
+  nothing measured and now report not measured too: reach-back on a scenario with no questions (passed at 0)
+  and reducer fidelity on a scenario with no expected facts (passed at 100). The temporal metric gained the
+  "judge scored no query" check it was missing. An exception during evaluation is still a failure.
+- **`AgentEvalCompositeEvaluator` no longer reports a skipped node as MEAI's lowest score.** A skipped, errored or
+  not-applicable node in the composite tree reached MAF as value 1.0 (the bottom of MEAI's 1–5 scale) rated
+  Poor, so anything averaging metric values counted a placeholder as a real worst score. It now carries no
+  value and an Inconclusive rating, as `ResultConverter` already did for a not-measured metric; the reason
+  marker keeps its label, so the report bridge still reads it back as skipped, and a skipped root still fails
+  the MAF item.
+
 ## [0.43.0-beta] - 2026-10-06
 
 One release with four parts, newest first below:

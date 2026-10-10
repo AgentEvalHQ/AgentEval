@@ -1,0 +1,33 @@
+{
+  "kind": "document",
+  "schema": "run",
+  "document": "document.json",
+  "writer": "invalid",
+  "reader": "invalid",
+  "generate": [
+    {
+      "write": [
+        "document.json",
+        [
+          [
+            "{\n  \"schemaVersion\": \"1.0\",\n  \"runId\": \"run-small-1\",\n  \"status\": \"completed\",\n  \"producer\": {\n    \"name\": \"p\",\n    \"version\": \"1\"\n  },\n  \"subject\": {\n    \"ref\": \"agent:a/b\",\n    \"kind\": \"agent\",\n    \"version\": \"v1\"\n  },\n  \"execution\": {\n    \"targetMode\": \"live\"\n  },\n  \"startedAt\": \"2026-10-01T00:00:00Z\",\n  \"endedAt\": \"2026-10-01T00:01:00Z\",\n  \"contentCapture\": \"on\"\n}",
+            1
+          ],
+          [
+            " ",
+            4193934
+          ],
+          [
+            "\n",
+            1
+          ]
+        ]
+      ]
+    }
+  ],
+  "rules": [
+    "ENC-17",
+    "ENC-18"
+  ],
+  "why": "a valid run.json padded with spaces to 4 MiB + 1 byte. The document operation applies the limit of the file its schema names (ENC-17): a run.json is a JSON file of at most 4 MiB, so both schemas refuse it, however valid its content. Its twin, document-seal-over-4-mib-valid, is the same size and valid."
+}

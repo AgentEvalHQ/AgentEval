@@ -5,7 +5,7 @@
 // Ported from AgentEvalHQ/AgentEval.Cli v0.2.0-alpha during the v1.1 CLI consolidation.
 // Coexists with AzureChatAgentFactory (Phase-1 T0.2): EndpointFactory is the EXPLICIT
 // path (--endpoint --model --api-key / --azure --deployment-name --api-key),
-// AzureChatAgentFactory is the AZURE_OPENAI_* env-var convention (used by --azure-from-env).
+// AzureChatAgentFactory is the AZURE_OPENAI_* env-var convention (used by --from-env).
 
 using System.ClientModel;
 using Azure;

@@ -1,0 +1,13 @@
+{
+  "kind": "reader-only",
+  "schema": "runner-event",
+  "writer": "invalid",
+  "reader": "valid",
+  "reads": {
+    "limit": "memory"
+  },
+  "rules": [
+    "VER-8",
+    "STRM-1"
+  ]
+}

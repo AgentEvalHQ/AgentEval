@@ -1,0 +1,54 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "logs.otlp.jsonl",
+      "digest": {
+        "sha256": "95082150b301e12e630c7507da960db4c2692277beed39b5e162de2aa1628642"
+      }
+    },
+    {
+      "name": "metrics.json",
+      "digest": {
+        "sha256": "d280a87a92c980fc8c7a5658a98d3671e3c684f7da6ba9567b4b0382c4f0da3e"
+      }
+    },
+    {
+      "name": "results.ndjson",
+      "digest": {
+        "sha256": "3fd4a07096f21993d3ac682e0c4271f54ab0e407ede14d11e9b215e8e14c3b9c"
+      }
+    },
+    {
+      "name": "run.json",
+      "digest": {
+        "sha256": "b291d57297bd782737e16d973c3ce05b8470f831dd3bd91dca9dfe4d90606bd1"
+      }
+    },
+    {
+      "name": "summary.json",
+      "digest": {
+        "sha256": "6cbb095a98e9f5036d7cdce41364a2c6fb8088031f4b31ce7bbe8a54a6e99b3c"
+      }
+    }
+  ],
+  "predicateType": "https://agenteval.dev/aef/1/evidence",
+  "predicate": {
+    "schemaVersion": "1.0",
+    "runId": "otel-roundtrip-0001",
+    "runHash": "41009e009c384f891ac7d19df740c2fa01b43b0a5207993b93e585aead79f8d1",
+    "producer": {
+      "name": "aef_interop.py",
+      "version": "1.0"
+    },
+    "subject": {
+      "ref": "agent:support-api"
+    },
+    "deployment": null,
+    "suite": null,
+    "judges": [],
+    "closedAt": "2026-10-02T14:02:15Z",
+    "sealedAt": "2026-10-09T00:00:00Z",
+    "sealedBy": "ingest"
+  }
+}

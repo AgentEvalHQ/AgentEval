@@ -1,0 +1,14 @@
+{
+  "kind": "chain",
+  "run": "run",
+  "problems": [
+    [
+      "overlays/notes.txt",
+      "unexpected-file"
+    ]
+  ],
+  "rules": [
+    "OVL-5",
+    "RUN-2"
+  ]
+}

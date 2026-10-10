@@ -1,0 +1,41 @@
+{
+  "kind": "job",
+  "plan": "plan.json",
+  "runner": "../runner.json",
+  "target": "target.json",
+  "at": "2026-10-09T09:00:00Z",
+  "terminal": "job.failed",
+  "limit": "cases",
+  "runs": [
+    {
+      "suite": {
+        "ref": "suite:support/triage-scenarios",
+        "version": "4"
+      },
+      "status": "aborted",
+      "cases": [
+        [
+          "case-1",
+          "passed"
+        ],
+        [
+          "case-2",
+          "passed"
+        ]
+      ]
+    }
+  ],
+  "spentUsd": 0.5,
+  "estimated": {
+    "cases": 2,
+    "usdLow": 0.5,
+    "usdHigh": 0.5
+  },
+  "endsAt": "2026-10-09T09:00:41Z",
+  "rules": [
+    "PLAN-9",
+    "RUN-5",
+    "RES-1"
+  ],
+  "why": "a cases limit of 2 in a suite of 3: the run is cut off before its last case, closed aborted with two result lines and none for the case not run"
+}

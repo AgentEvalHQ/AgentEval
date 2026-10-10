@@ -23,7 +23,7 @@ interface EvaluatorsResponse {
 }
 
 const EVALUATORS_QUERY = /* GraphQL */ `
-  query EvaluatorRegistry($category: String, $costTier: CostTier) {
+  query EvaluatorRegistry($category: String, $costTier: EvaluatorCostTier) {
     evaluators(category: $category, costTier: $costTier) {
       key
       name

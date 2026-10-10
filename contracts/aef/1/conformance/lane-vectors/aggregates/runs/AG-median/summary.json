@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "AG-median",
+  "lanes": [
+    {
+      "lane": "quality",
+      "metrics": [
+        {
+          "metric": "m",
+          "path": "p",
+          "n": 3,
+          "N": 3,
+          "notMeasured": 0,
+          "value": 0.9,
+          "verdict": "passed",
+          "rule": "recorded by the producer",
+          "sum": 2.25,
+          "sumSq": 1.8725,
+          "aggregate": {
+            "method": "median"
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+{
+  "kind": "plan",
+  "schema": "run-plan",
+  "writer": "invalid",
+  "reader": "valid",
+  "reads": {
+    "provider": "refused"
+  },
+  "rules": [
+    "PLAN-7",
+    "VER-8"
+  ],
+  "why": "a provider this version does not know: the writer refuses it, a reader takes it, and a runner refuses the plan"
+}

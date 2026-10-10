@@ -1,0 +1,11 @@
+{
+  "kind": "plan",
+  "schema": "run-plan",
+  "writer": "valid",
+  "reader": "valid",
+  "rules": [
+    "PLAN-2",
+    "ENC-9"
+  ],
+  "why": "a timeout is a duration (ENC-9): days, hours and minutes, like a freshness"
+}

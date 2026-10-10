@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Tests of AgentEval's AEF 1.0 component (AgentEval.Results, TODO Q4-39): unit tests per area, and the conformance
+       corpus (contracts/aef/1/conformance) run in-process through the aef-dotnet driver's Dispatch. The claim of a
+       conformance class rests on the Python runner (tools/aef_conformance.py, given the driver's command), not on
+       these tests. -->
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio" />
+    <PackageReference Include="coverlet.collector" />
+    <!-- A second, independent schema validator to compare AgentEval.Results' own against (never used by product code). -->
+    <PackageReference Include="JsonSchema.Net" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\AgentEval.Results\AgentEval.Results.csproj" />
+    <ProjectReference Include="..\AgentEval.Results.Conformance\AgentEval.Results.Conformance.csproj" />
+  </ItemGroup>
+
+</Project>

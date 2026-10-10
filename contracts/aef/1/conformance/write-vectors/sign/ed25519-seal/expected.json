@@ -1,0 +1,17 @@
+{
+  "kind": "sign",
+  "rules": [
+    "SIG-1",
+    "SIG-2",
+    "SIG-3"
+  ],
+  "algorithm": "ed25519",
+  "file": "seal.json",
+  "payloadType": "application/vnd.in-toto+json",
+  "key": "../../../signature-vectors/keys/ed25519-a.key.pem",
+  "policy": "policy.json",
+  "keyid": "sha256:2986cef07918485086a97ba70ef87ea966b8c3634fb59bcafc4e8b6a9ea5d787",
+  "identity": "spiffe://example.com/ci/sealer",
+  "why": "A run's seal.json signed with an Ed25519 key: the envelope verifies, and the signature is the one RFC 8032 gives.",
+  "sig": "8G9KEr+xm20Grzuy67d0s50FSDFAZnNlktBxU5FSOouTyBcQL1f3EDzPEOSBOl2gKfeFlaEL2lQDA+RcBG9/BA=="
+}

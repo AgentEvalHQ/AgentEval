@@ -1,0 +1,69 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "blobs/sha256/52/52cb6b5e4a038af1756708f98afb718a08c75b87b2f03dbee4dd9c8139c15c5e",
+      "digest": {
+        "sha256": "52cb6b5e4a038af1756708f98afb718a08c75b87b2f03dbee4dd9c8139c15c5e"
+      }
+    },
+    {
+      "name": "blobs/sha256/cb/cb5c5907a6f594ac1ade889186911a129c2a09a518f73f94cdd3022eea283caa",
+      "digest": {
+        "sha256": "cb5c5907a6f594ac1ade889186911a129c2a09a518f73f94cdd3022eea283caa"
+      }
+    },
+    {
+      "name": "evidence.ndjson",
+      "digest": {
+        "sha256": "efbc2d45cd616abd22f3a8d08b760e6119db69ef5457748023d16351aed8be0f"
+      }
+    },
+    {
+      "name": "metrics.json",
+      "digest": {
+        "sha256": "7ed06a277dfceb547307c8b0a1efc071ddd7afebb96827460f1cab1fda73ce87"
+      }
+    },
+    {
+      "name": "results.ndjson",
+      "digest": {
+        "sha256": "15dc75c7fc72b56449487477b6331a4d183e78cd820783b823c3279add682ae6"
+      }
+    },
+    {
+      "name": "run.json",
+      "digest": {
+        "sha256": "01541e040145a1c51a91cdfe100c3869167ca159672f97571e085f50b280bce2"
+      }
+    },
+    {
+      "name": "summary.json",
+      "digest": {
+        "sha256": "d2a6b65650add65c5224772e3b226b7fd054d01fc425292524c45fe4a189a278"
+      }
+    }
+  ],
+  "predicateType": "https://agenteval.dev/aef/1/evidence",
+  "predicate": {
+    "schemaVersion": "1.0",
+    "runId": "edges-1",
+    "runHash": "a89832f385f674b632260ff4bb0ec1482ca79f446b89d96df2779e979e059325",
+    "producer": {
+      "name": "aef_interop.py",
+      "version": "1.0"
+    },
+    "subject": {
+      "ref": "model:acme/gpt%20x"
+    },
+    "deployment": null,
+    "suite": {
+      "ref": "suite:edges",
+      "version": "1"
+    },
+    "judges": [],
+    "closedAt": "2026-10-08T09:05:00Z",
+    "sealedAt": "2026-10-09T00:00:00Z",
+    "sealedBy": "ingest"
+  }
+}

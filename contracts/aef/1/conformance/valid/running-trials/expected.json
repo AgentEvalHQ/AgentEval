@@ -1,0 +1,14 @@
+{
+  "kind": "run",
+  "run": "run",
+  "outcome": "unsealed",
+  "problems": [],
+  "rules": [
+    "RUN-1",
+    "RUN-2",
+    "RES-1",
+    "SUM-5",
+    "RES-8",
+    "RUN-4"
+  ]
+}

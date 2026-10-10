@@ -1,0 +1,14 @@
+{
+  "kind": "checkpoint",
+  "schema": "checkpoint",
+  "writer": "valid",
+  "reader": "valid",
+  "rules": [
+    "CKP-7",
+    "DEC-2"
+  ],
+  "why": "the recorded decision ignores an exception in force in the recorded input: not what the input gives",
+  "problems": [
+    "decision"
+  ]
+}

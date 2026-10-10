@@ -1,0 +1,10 @@
+{
+  "kind": "checkpoint",
+  "schema": "checkpoint",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "CKP-2"
+  ],
+  "why": "a lane name is an id, so a reason code can carry it"
+}

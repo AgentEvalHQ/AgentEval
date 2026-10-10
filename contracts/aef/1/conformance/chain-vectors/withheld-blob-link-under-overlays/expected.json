@@ -1,0 +1,27 @@
+{
+  "kind": "chain",
+  "run": "run",
+  "generate": [
+    {
+      "copy": [
+        "runs/withheld-blob/run",
+        "run"
+      ]
+    },
+    {
+      "link": [
+        "run/overlays/extra.json",
+        "run/seal.json"
+      ]
+    }
+  ],
+  "problems": [
+    [
+      "overlays/extra.json",
+      "unexpected-file"
+    ]
+  ],
+  "rules": [
+    "OVL-5"
+  ]
+}

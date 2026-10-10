@@ -1,0 +1,45 @@
+{
+  "kind": "lane",
+  "checkpoint": "checkpoint.json",
+  "runs": "runs",
+  "lanes": [
+    {
+      "lane": "large-at-005",
+      "result": {
+        "status": "failed",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-06T00:00:00Z"
+      }
+    },
+    {
+      "lane": "large-at-004",
+      "result": {
+        "status": "passed",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-06T00:00:00Z"
+      }
+    },
+    {
+      "lane": "one-step-below-p",
+      "result": {
+        "status": "passed",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-06T00:00:00Z"
+      }
+    },
+    {
+      "lane": "one-step-above-p",
+      "result": {
+        "status": "failed",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-06T00:00:00Z"
+      }
+    }
+  ],
+  "problems": [],
+  "rules": [
+    "LANE-8",
+    "LANE-11",
+    "LANE-10"
+  ]
+}

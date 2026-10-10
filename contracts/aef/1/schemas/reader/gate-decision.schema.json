@@ -1,0 +1,136 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/aef/1/reader/gate-decision.schema.json",
+  "title": "AEF 1.0: one line of gates.ndjson",
+  "description": "READER (tolerant), derived from the writer schema by tools/derive_reader.py. A gate decision the producer made when the run closed (a CLI --fail-on gate, a baseline comparison): its rule, inputs, outcome and exit code, sealed with the run.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "gateId",
+    "decisionId",
+    "rule",
+    "inputs",
+    "comparability",
+    "outcome",
+    "decidedAt"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "common.schema.json#/$defs/schemaVersion",
+      "description": "The AEF version this line follows, MAJOR.MINOR: 1.0 for AEF 1.0 (VER-1)."
+    },
+    "gateId": {
+      "$ref": "common.schema.json#/$defs/ref",
+      "description": "The gate that decided, as a typed reference."
+    },
+    "decisionId": {
+      "$ref": "common.schema.json#/$defs/id",
+      "description": "This decision's id."
+    },
+    "rule": {
+      "description": "The rule the gate applied (GATE-1).",
+      "type": "object",
+      "required": [
+        "strategy"
+      ],
+      "properties": {
+        "strategy": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "description": "The gate's strategy, for display."
+        },
+        "inputs": {
+          "description": "What the strategy read, by name, for display.",
+          "type": "array",
+          "maxItems": 64,
+          "items": {
+            "type": "string",
+            "maxLength": 128
+          }
+        }
+      }
+    },
+    "inputs": {
+      "description": "What the decision was taken on: results, requirements and a baseline run (GATE-1).",
+      "type": "object",
+      "properties": {
+        "results": {
+          "description": "The results the decision read; each is a line of the run (GATE-1).",
+          "type": "array",
+          "maxItems": 4096,
+          "items": {
+            "$ref": "common.schema.json#/$defs/resultId"
+          }
+        },
+        "requirements": {
+          "description": "The external requirement ids the decision answers (GATE-1).",
+          "type": "array",
+          "maxItems": 1024,
+          "items": {
+            "$ref": "common.schema.json#/$defs/id"
+          }
+        },
+        "baselineRun": {
+          "description": "The baseline run, exactly.",
+          "$ref": "common.schema.json#/$defs/runPointer"
+        }
+      }
+    },
+    "comparability": {
+      "description": "Whether a comparison the gate needed was shown comparable. incomparable never yields ship.",
+      "type": "string"
+    },
+    "outcome": {
+      "description": "ship, no_ship or inconclusive. Never ship when the comparison was incomparable (GATE-1, GATE-2).",
+      "type": "string"
+    },
+    "exitCode": {
+      "description": "The exit code the gate ended with, from 0 to 255 (GATE-1).",
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 255
+    },
+    "decisive": {
+      "description": "The results that decided the outcome; each is a line of the run (GATE-1).",
+      "type": "array",
+      "maxItems": 1024,
+      "items": {
+        "$ref": "common.schema.json#/$defs/resultId"
+      }
+    },
+    "decidedAt": {
+      "$ref": "common.schema.json#/$defs/timestamp",
+      "description": "When the decision was taken."
+    },
+    "ext": {
+      "$ref": "common.schema.json#/$defs/ext",
+      "description": "Producer extensions, named reverse-DNS or with the producer's prefix. A reader ignores what it does not know; never holds a secret (ENC-19)."
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "comparability": {
+            "description": "Applies when the comparison was incomparable (GATE-2).",
+            "const": "incomparable"
+          }
+        },
+        "required": [
+          "comparability"
+        ]
+      },
+      "then": {
+        "properties": {
+          "outcome": {
+            "description": "The outcome is never ship (GATE-2).",
+            "not": {
+              "const": "ship"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

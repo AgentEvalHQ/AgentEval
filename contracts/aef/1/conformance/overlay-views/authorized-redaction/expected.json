@@ -1,0 +1,28 @@
+{
+  "kind": "overlay-view",
+  "run": "run",
+  "policy": "policy.json",
+  "at": "2026-10-08T12:00:00Z",
+  "rules": [
+    "OVL-10",
+    "OVL-9"
+  ],
+  "view": {
+    "results": [],
+    "reviews": [],
+    "waivers": [
+      {
+        "target": {
+          "requirement": "REQ-09"
+        },
+        "expires": "2026-11-01T00:00:00Z",
+        "active": true,
+        "event": "ov_0002"
+      }
+    ],
+    "withheld": [
+      "635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5"
+    ],
+    "unsealedEvents": 0
+  }
+}

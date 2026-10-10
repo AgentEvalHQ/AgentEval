@@ -1,0 +1,14 @@
+{
+  "kind": "seal",
+  "run": "run",
+  "problems": [
+    [
+      "seal.json",
+      "limit"
+    ]
+  ],
+  "rules": [
+    "ENC-17",
+    "SEAL-6"
+  ]
+}

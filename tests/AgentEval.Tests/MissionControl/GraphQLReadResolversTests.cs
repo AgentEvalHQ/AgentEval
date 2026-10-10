@@ -223,7 +223,7 @@ public class GraphQLReadResolversTests : IClassFixture<SeededMissionControlFacto
         Assert.False(string.IsNullOrEmpty(runId));
 
         var summaryResp = await client.PostAsJsonAsync("/graphql",
-            new { query = $"{{ runSummary(runId: \"{runId}\") {{ verdict stats {{ total passed failed warnings }} }} }}" });
+            new { query = $"{{ runSummary(runId: \"{runId}\") {{ verdict stats {{ total passed failed warnings skipped }} }} }}" });
         summaryResp.EnsureSuccessStatusCode();
 
         var body = await summaryResp.Content.ReadAsStringAsync();
@@ -235,6 +235,8 @@ public class GraphQLReadResolversTests : IClassFixture<SeededMissionControlFacto
         Assert.Equal(2, stats.GetProperty("total").GetInt32());
         Assert.Equal(2, stats.GetProperty("passed").GetInt32());
         Assert.Equal(0, stats.GetProperty("failed").GetInt32());
+        // The run page's "Not measured" tile reads this; a field missing from the schema fails the whole query.
+        Assert.Equal(0, stats.GetProperty("skipped").GetInt32());
     }
 
     [Fact]

@@ -1,0 +1,1 @@
+{"schemaVersion":"1.0","resultId":"r_0bee32b8a803d2280c306a2d8be2e3bc","caseId":"c1","path":"a","evaluator":{"id":"check:a"},"state":"scored","scores":[{"metric":"q","value":0.5}],"evidence":["E-1"]}

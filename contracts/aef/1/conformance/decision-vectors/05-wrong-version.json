@@ -1,0 +1,59 @@
+{
+  "description": "Evidence for another version is no evidence for this one.",
+  "rules": [
+    "DEC-1",
+    "DEC-2",
+    "DEC-3",
+    "DEC-4",
+    "DEC-5"
+  ],
+  "input": {
+    "subjectVersion": "git:3f2a1c",
+    "evaluatedAt": "2026-10-08T12:00:00Z",
+    "lanes": [
+      {
+        "lane": "quality",
+        "blocking": true,
+        "evidence": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "result": {
+          "status": "passed",
+          "subjectVersion": "git:3f2a1c",
+          "oldestClosedAt": "2026-10-07T10:00:00Z"
+        }
+      },
+      {
+        "lane": "compliance",
+        "blocking": true,
+        "evidence": [
+          "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+        ],
+        "result": {
+          "status": "passed",
+          "subjectVersion": "git:000000",
+          "oldestClosedAt": "2026-10-07T10:00:00Z"
+        }
+      }
+    ]
+  },
+  "expected": {
+    "outcome": "inconclusive",
+    "lanes": [
+      {
+        "lane": "quality",
+        "status": "passed",
+        "blocking": true
+      },
+      {
+        "lane": "compliance",
+        "status": "missing",
+        "blocking": true
+      }
+    ],
+    "reasons": [
+      "wrong-version:compliance",
+      "outcome:inconclusive"
+    ]
+  }
+}

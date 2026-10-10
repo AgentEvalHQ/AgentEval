@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "1.0",
+  "seq": 4,
+  "kind": "job.failed",
+  "jobId": "job-7",
+  "at": "2026-10-08T12:00:03Z",
+  "reason": "The next case would pass the $3.00 limit.",
+  "limit": "maxUsd",
+  "runs": [
+    "R-1"
+  ]
+}

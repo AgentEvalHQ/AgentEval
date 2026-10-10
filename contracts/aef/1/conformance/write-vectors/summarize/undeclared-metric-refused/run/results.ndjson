@@ -1,0 +1,2 @@
+{"schemaVersion":"1.0","resultId":"r_9d9842a3c6bc46bb005fd5bc8d30d9a8","caseId":"k1","path":"q","evaluator":{"id":"e:q"},"state":"passed","scores":[{"metric":"quality","value":0.9}]}
+{"schemaVersion":"1.0","resultId":"r_50a30f3b004d0bd353d5bfd135921b58","caseId":"k2","path":"q","evaluator":{"id":"e:q"},"state":"failed","scores":[{"metric":"quality","value":0.4}]}

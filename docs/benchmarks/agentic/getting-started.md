@@ -189,10 +189,11 @@ QUESTION="Book me a flight to Lisbon next Friday and a hotel near the old town."
 # Run the Agentic Execution preset (task completion, adherence, intent, tool accuracy, navigation)
 agenteval bench agentic --preset agentic-execution --subject MyTravelAgent --input "$QUESTION" --response-file answer.txt
 
-# Run the RAG Quality preset (from the CLI it cannot pass: there is no option yet for a reference answer or retrieved
-# context, so similarity and F1 are not measured (WARN at best), and it FAILs when groundedness (graded without a
-# context), response completeness (without a reference) or relevance fails; use the library or the MAF bridge to pass them)
-agenteval bench agentic --preset rag-quality --subject MyTravelAgent --input "$QUESTION" --response-file answer.txt
+# Run the RAG Quality preset. Groundedness grades against the retrieved context (--context/--context-file);
+# similarity, F1 and response completeness grade against the reference answer (--reference/--reference-file).
+# Without them those checks report "not measured" and the preset cannot pass.
+agenteval bench agentic --preset rag-quality --subject MyTravelAgent --input "$QUESTION" --response-file answer.txt \
+  --reference-file expected.txt --context-file retrieved.txt
 
 # Run the Judge Quality preset (no LLM required)
 agenteval bench agentic --preset judge-quality --subject MyTravelAgent --input "$QUESTION" --response-file answer.txt
@@ -454,7 +455,7 @@ In a preset, an accuracy check that comes back **warn** makes the preset **WARN*
     - **Pure-code telemetry** (`cost`, `error_rate`, `latency`, `retry_rate`, `token_usage`, `tool_latency`): derive scores from caller-supplied `AgenticTelemetry` payloads — no LLM judge involved.
     - **Operational aggregates** (`stochastic_stability`, `cost_quality_efficiency`): consume prior `EvalResult` collections and compute variance / efficiency stats — no LLM involvement.
     - **Judge-quality meta** (`calibration_accuracy`, `judge_agreement`, `judge_drift`): consume other evaluators' outputs as input — their `EvalInput.Metadata` contract is incompatible with the calibration golden's `query/response` shape.
-    - **Multi-turn / trace-dependent** (5 memory and multi-turn evaluators + 3 trace-dependent reasoning evaluators): the `CalibrationEntry` record is single-turn `(input, response)` and cannot carry the conversation-history / reasoning-trace data these evaluators need to grade against. They stay out of calibration for as long as the entry format lacks those fields.
+    - **Golden cases that cannot be graded as written** (`long_conversation_coherence`, `self_correction_quality`, `plan_formulation_quality`). A `CalibrationEntry` can carry `conversationHistory`, `context` and `toolCalls`, which the other multi-turn and trace evaluators now get. These three need new golden cases or an evaluator change: the first one's cases describe the conversation instead of containing it, the second's correction turn has room for one message, and the third's only failing case is skipped as having no plan.
     - **Deterministic non-LLM** (`f1_score`): token-overlap math with no judge, so calibrating it would not measure a judge.
 
   Active per-category thresholds are recorded in the calibration markdown report header. The default gate is `accuracy ≥ 0.85` and `Cohen's kappa ≥ 0.70`; each `BenchAgenticCalibrateCommand.s_categoryOverrides` entry documents its measurement floor + retirement criterion inline.

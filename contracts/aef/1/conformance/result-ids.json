@@ -1,0 +1,44 @@
+[
+  {
+    "runId": "01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10",
+    "caseId": "case-17",
+    "path": "triage",
+    "trial": null,
+    "resultId": "r_479d157f3423e95d566bcbfc0c6d2461"
+  },
+  {
+    "runId": "01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10",
+    "caseId": "case-17",
+    "path": "triage/helpfulness",
+    "trial": null,
+    "resultId": "r_1264eeb36620c9cbe97b71ffdbcfd331"
+  },
+  {
+    "runId": "r-1",
+    "caseId": "case-3",
+    "path": "booking",
+    "trial": 0,
+    "resultId": "r_26ddaab93e84b418bd4ce6031ad25658"
+  },
+  {
+    "runId": "r-1",
+    "caseId": "case-3",
+    "path": "booking",
+    "trial": 12,
+    "resultId": "r_242544b3bd811705238310e91ec2049b"
+  },
+  {
+    "runId": "run-7",
+    "caseId": "casé-été ラン",
+    "path": "مرحبا/—",
+    "trial": null,
+    "resultId": "r_ee576850e7406d9aeca69c9f03afc2e3"
+  },
+  {
+    "runId": "run-7",
+    "caseId": "case-3",
+    "path": "booking",
+    "trial": 3.0,
+    "resultId": "r_bc898ea424c0f3cd262cbaa096d064c9"
+  }
+]

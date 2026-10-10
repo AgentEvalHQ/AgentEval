@@ -1,0 +1,9 @@
+{
+  "kind": "produce",
+  "rules": [
+    "RES-5"
+  ],
+  "scenario": "scenario.json",
+  "refused": true,
+  "why": "The child answer/grounded has no component facts: every child carries its weight and whether it is required (RES-5), which only the producer knows. The Producer refuses the scenario."
+}

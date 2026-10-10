@@ -1,0 +1,10 @@
+{
+  "kind": "document",
+  "schema": "seal",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "SEAL-5"
+  ],
+  "why": "an AEF seal's predicate type is https://agenteval.dev/aef/1/evidence"
+}

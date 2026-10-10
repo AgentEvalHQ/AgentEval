@@ -1,0 +1,15 @@
+{
+  "kind": "stream",
+  "plan": "../plan-day.json",
+  "problems": [
+    [
+      "event:3",
+      "over-time"
+    ]
+  ],
+  "rules": [
+    "PLAN-2",
+    "STRM-3",
+    "ENC-9"
+  ]
+}

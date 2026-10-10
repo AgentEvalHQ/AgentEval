@@ -1,0 +1,8 @@
+{
+  "kind": "matching",
+  "matches": false,
+  "rules": [
+    "PLAN-7"
+  ],
+  "why": "a manifest without targetModes gives live only, so a runner that names none does not take a plan that asks to replay the subject (PLAN-6, PLAN-7)"
+}

@@ -1,0 +1,3 @@
+{"schemaVersion":"1.0","seq":1,"kind":"job.accepted","jobId":"job-7","at":"2026-10-08T12:00:00Z","planId":"plan-41","planDigest":"187f26d366ef3d7c58464707660c0e05be722ffce3406cbe4f0eae9250e22ad9","runnerId":"runner-local-01"}
+{"schemaVersion":"1.0","seq":2,"kind":"job.accepted","jobId":"job-7","at":"2026-10-08T12:00:01Z","planId":"plan-41","planDigest":"187f26d366ef3d7c58464707660c0e05be722ffce3406cbe4f0eae9250e22ad9","runnerId":"runner-local-01"}
+{"schemaVersion":"1.0","seq":3,"kind":"job.cancelled","jobId":"job-7","at":"2026-10-08T12:00:02Z","reason":"Cancelled by the approver."}

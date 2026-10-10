@@ -1,0 +1,14 @@
+{
+  "kind": "plan",
+  "schema": "runner",
+  "writer": "invalid",
+  "reader": "valid",
+  "reads": {
+    "os": "plan9"
+  },
+  "rules": [
+    "PLAN-6",
+    "VER-8"
+  ],
+  "why": "an os this version does not know: the writer refuses it, a reader accepts it and shows it as written"
+}

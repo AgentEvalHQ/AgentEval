@@ -1,0 +1,5 @@
+{"schemaVersion":"1.0","resultId":"r_f3e00b2949025dff27aa6ff52c584fa7","caseId":"k1","path":"q","evaluator":{"id":"e:q"},"state":"passed","scores":[{"metric":"quality","value":0.8}]}
+{"schemaVersion":"1.0","resultId":"r_c36166316a4bd4141ab32ae1b5a718ff","caseId":"k2","path":"q","evaluator":{"id":"e:q"},"state":"not_measured","reason":"The input the evaluator needs was not there."}
+{"schemaVersion":"1.0","resultId":"r_bfdb49187ebf4f777f5ebd5cf529b86f","caseId":"k3","path":"q","evaluator":{"id":"e:q"},"state":"skipped","reason":"Not run."}
+{"schemaVersion":"1.0","resultId":"r_1867a90790eb27bdf3c62640be04f881","caseId":"k4","path":"q","evaluator":{"id":"e:q"},"state":"error","reason":"The judge returned HTTP 429 three times."}
+{"schemaVersion":"1.0","resultId":"r_f1b003639de4a8377713d25f3496d67a","caseId":"k5","path":"q","evaluator":{"id":"e:q"},"state":"failed","scores":[{"metric":"quality","value":0.2}]}

@@ -229,7 +229,7 @@ LLM-as-judge, named metrics (`--metrics`), and the `--output-dir` ADR-002 direct
 
 | Option | Description |
 |--------|-------------|
-| `--dataset <path>` | Required. Input dataset file. |
+| `--dataset <path>` | Required. Input dataset file: JSON, JSONL, CSV/TSV or YAML. Field names match in any spelling (`expected_output`, `expectedOutput`, `ExpectedOutput`). |
 | `--endpoint <url>` / `--azure` / `--deployment-name <name>` | Choose OpenAI-compatible or Azure OpenAI mode. |
 | `--model <name>` | Required for non-Azure endpoints. |
 | `--api-key <key>` | API key or environment variable fallback. |
@@ -241,10 +241,13 @@ LLM-as-judge, named metrics (`--metrics`), and the `--output-dir` ADR-002 direct
 | `--runs <N>` | Runs per test case. Default `1`. Must be at least `1`; greater than `1` is stochastic mode (below), which needs at least 3 runs. |
 | `--success-threshold <0..1>` | Stochastic mode only: the share of a test case's runs that must pass for the test case to pass. Default `0.8`. Not used, and not checked, when `--runs` is `1`. |
 | `--judge` / `--judge-model` | Separate LLM-as-judge endpoint/model. |
-| `--format <fmt>` | Export format. Default `json`. Not written in stochastic mode. |
-| `-o, --output <path>` | Output file for single-file formats. Default: stdout. Not written in stochastic mode. |
-| `--output-dir <path>` | Structured directory output (`results.jsonl`, `summary.json`, `run.json`). Not written in stochastic mode. |
-| `--quiet` | Suppress the header, progress, summary, and the `--metrics` and `--sut` warnings. Errors, and the stochastic-mode export warning below, are still printed. |
+| `--format <fmt>` | Export format. Default `json`. In stochastic mode, one entry per test case (below). |
+| `-o, --output <path>` | Output file for single-file formats. Default: stdout. |
+| `--output-dir <path>` | Structured directory output (`results.jsonl`, `summary.json`, `run.json`). |
+| `--save-golden <path>` | Save this run as a golden trace: each test case's verdict, output, and tool calls with their arguments, as JSON to commit beside the dataset (below). |
+| `--golden <path>` | Compare this run with a golden trace and exit on regressions only (below). |
+| `--fail-on-tool-change` | With `--golden`, also exit `1` when a test case's tool calls changed. |
+| `--quiet` | Suppress the header, progress, summary, and the `--metrics` and `--sut` warnings. Errors are still printed. |
 
 **Stochastic mode (`--runs` greater than 1)**
 
@@ -253,12 +256,43 @@ Each test case is run N times. A test case passes when the share of its runs tha
 least 3 runs, so `--runs 2` is a usage error (exit `2`), as are `0` and negative values; in this mode a
 `--success-threshold` outside 0–1 is a usage error too. These checks run before anything is loaded or called.
 
-A table and a pass/fail line per test case, and a closing summary, are printed to stderr. **No export is
-written**: nothing goes to stdout, to `-o`, or to `--output-dir`, because no exporter accepts a stochastic
-result — the report the exporters take holds one score per test, and the JUnit, TRX, CSV and Markdown
-exporters do not write its metadata, so a stochastic result would read as a single run. When `--format`, `-o` or
-`--output-dir` is given, a warning names each one with its value before the first agent call, and a file
-already at one of those paths is left unchanged. `--metrics` is ignored in this mode, with a warning.
+A table and a pass/fail line per test case, and a closing summary, are printed to stderr. The export (`--format`,
+`-o`, `--output-dir`) has **one entry per test case**, not one per run: it passes or fails on the pass rate, and its
+score is the mean over the runs. Every format carries the runs as four metric columns: `stochastic_runs`,
+`stochastic_runs_passed`, `stochastic_pass_rate` (0–100) and `stochastic_score_sd`. A failed test case's message names
+its pass rate and the threshold (`3 of 5 runs passed (60.0%), below the 80% threshold.`). JUnit system-out and TRX
+stdout also list each run with its score or error and the confidence interval for the mean. The report's name ends in
+`(stochastic, N runs per test)`, and `Mode`, `RunsPerTest` and `SuccessThreshold` are recorded in the JSON export's
+`metadata` and in the directory export's `run.json`. Through 0.43 this mode wrote no export at all. `--metrics` is ignored in this mode, with a warning.
+
+**Golden traces (`--save-golden`, `--golden`)**
+
+A golden trace is a saved run: for each test case, whether it passed, its score, the agent's output, and the tool calls
+it made in order, with their arguments (object keys sorted, so key order is not a change). Save one from a run you
+trust and commit it:
+
+```bash
+agenteval eval --dataset cases.yaml --endpoint <url> --model <name> --save-golden golden/cases.trace.json
+```
+
+Later runs compare against it:
+
+```bash
+agenteval eval --dataset cases.yaml --endpoint <url> --model <name> --golden golden/cases.trace.json
+```
+
+Each test case is reported on stderr as **regressed** (passed in the golden trace, fails now), **improved**, **tools
+changed** (a tool added, dropped or reordered, or called with other arguments), **output changed**, unchanged, **added**
+or **removed**. Test cases are matched by name. Output is compared after trimming and normalising line endings. Model
+output varies from run to run, so an output change is reported and does not fail the run. When either run recorded no
+tool data, tool calls are not compared.
+
+With `--golden` the exit code follows the comparison, not the raw verdicts: `1` when a test case regressed (or, with
+`--fail-on-tool-change`, called different tools), `0` otherwise. A test that already failed in the golden trace does
+not fail the build. Regressions are printed even with `--quiet`. Give both options to compare and then update the
+file. A golden trace records one run per test case, so neither option combines with `--runs` above 1. A
+`--golden` file that is missing or unreadable is a usage error, raised before any agent call. In code, the same is
+`GoldenTrace.FromResults(results)` and `GoldenTraceComparer.Compare(golden, current)` in `AgentEval.Snapshots`.
 
 **With `--sut`**
 
@@ -269,9 +303,9 @@ The target configures its own model, so `--temperature`, `--max-tokens`, `--syst
 
 | Code | Meaning |
 |------|---------|
-| `0` | Every test case passed. |
-| `1` | At least one test case failed — in stochastic mode, its pass rate was below `--success-threshold`. |
-| `2` | Usage error: a missing `--dataset`, an unknown option, a value that does not parse (such as `--runs abc`), `--runs` below 1, or a `--runs` or `--success-threshold` value stochastic mode does not accept. |
+| `0` | Every test case passed. With `--golden`: no test case regressed (and, with `--fail-on-tool-change`, none changed its tool calls). |
+| `1` | At least one test case failed — in stochastic mode, its pass rate was below `--success-threshold`. With `--golden`: a test case regressed, or changed its tool calls under `--fail-on-tool-change`. |
+| `2` | Usage error: a missing `--dataset`, an unknown option, a value that does not parse (such as `--runs abc`), `--runs` below 1, a `--runs` or `--success-threshold` value stochastic mode does not accept, a `--golden` file that is missing or not a golden trace, `--fail-on-tool-change` without `--golden`, or a golden-trace option with `--runs` above 1. |
 | `3` | Runtime or configuration error — including a missing `--endpoint`/`--azure`/`--model`, a dataset that does not exist or is empty, an unknown `--metrics` name, and an unknown `--format`, which is reported only after the evaluation has run. |
 
 ---
@@ -377,7 +411,7 @@ have measured the same thing.
 **Synopsis**
 
 ```
-agenteval compare --baseline <run-dir> --candidate <run-dir> [--strict] [--json]
+agenteval compare --baseline <run-dir> --candidate <run-dir> [--strict] [--json] [--fail-on-regression]
 ```
 
 **What it does**
@@ -413,13 +447,15 @@ the delta cannot be read against chance, and scenarios graded by a judge running
 | `--baseline <path>` | Required. The baseline run directory. |
 | `--candidate <path>` | Required. The candidate run directory. |
 | `--strict` | Also refuse when an axis was recorded by neither run. |
-| `--json` | Print the comparison as JSON on stdout instead of the report. `deltas` is `null` when the comparison is refused. |
+| `--json` | Print the comparison as JSON on stdout instead of the report. `deltas` is left out when the comparison is refused; when it is not, `recovered`, `regressed` and `regressedScenarios` (the ids) are included. |
+| `--fail-on-regression` | Exit `1` when the runs are comparable and a scenario the baseline passed fails in the candidate, and name those scenarios. For a CI step that must fail on a regression; without it, a comparable result exits `0` whatever it shows. |
 
 **Exit codes**
 
 | Code | Meaning |
 |------|---------|
 | `0` | Comparable; the deltas are printed. |
+| `1` | With `--fail-on-regression`: comparable, and at least one scenario regressed (passed in the baseline, did not pass in the candidate: failed, errored or not run). A scenario not measured in the baseline cannot regress, so it does not set this exit code even when the candidate fails it. |
 | `2` | A path is missing or not a directory, holds no scenario files, or holds a file that is not a readable scenario; or a run repeats a scenario id. |
 | `13` | Incomparable; the reasons are printed and no delta is. |
 
@@ -466,10 +502,10 @@ agenteval bench agentic calibrate [--root <path>] [--out <path>] [--records <pat
 - **Exit codes:** `bench <family>` and `bench <regulation> calibrate` return **9** (FAIL), **10** (WARN — `bench <family>` only), or **11** (indeterminate) for a benchmark gate outcome, and **3** if the judge fails to configure — see [Exit codes](#exit-codes). A missing required option (`--subject`, and for some families `--input`, `--vertical`, `--agent-trace`/`--chat-trace` or `--workflow-trace`), an `--evidence-detail` value other than `references` or `content`, and `agenteval bench` with no family and no `--list` return **2**.
 - Compliance and agentic families support calibration helpers where available. Each calibration report names the judge's provider and model in its header.
 - **`bench gdpr calibrate --decisions` and `bench eu-ai-act calibrate --decisions`** grade the golden datasets with the decision model (TypeSafe Jev) instead of the generative judge. The transport is read from `TYPESAFE_API_KEY` or `OPENROUTER_API_KEY` (`JEV_TRANSPORT` forces one, `JEV_MODEL` pins a build); with neither configured the command exits **3**. The report header names the provider (TypeSafe or OpenRouter) and the model that was requested, marked as requested, because the provider may serve a different build under that name. It never contains the key or the endpoint.
-- **`typedmemeval` takes `--vertical <prospective|episodic|arithmetic|workingmemory|forgetting>` and `--subject`, both required** — the verticals measure different mechanisms, so there is no default. Corpora are embedded (no download, no dataset path); `AZURE_OPENAI_*` is required and there is no stub fallback. It prints the typed outcome vector with every denominator and gates on nothing: the family publishes no pass threshold, so a run exits **0** when it measured anything and **11** (`GateIndeterminate`) when it measured nothing, and its run summary is recorded as `WARN` (indeterminate) rather than PASS/FAIL. Cite results as `TypedMemEval-<Vertical> v5 (AgentEval)` — never summed or averaged with LongMemEval numbers. `--vertical prospective` additionally requires the agent under test to implement `ITimestampedHistoryInjectableAgent`; the run refuses before its first provider call otherwise.
+- **`typedmemeval` takes `--vertical <prospective|episodic|arithmetic|workingmemory|forgetting>` and `--subject`, both required** — the verticals measure different mechanisms, so there is no default. Corpora are embedded (no download, no dataset path); a real model is required, from whichever provider `AI_INFERENCE_PROVIDER` selects (the `AZURE_OPENAI_*` trio when it is unset), and there is no stub fallback. It prints the typed outcome vector with every denominator and gates on nothing: the family publishes no pass threshold, so a run exits **0** when it measured anything and **11** (`GateIndeterminate`) when it measured nothing, and its run summary is recorded as `WARN` (indeterminate) rather than PASS/FAIL. Cite results as `TypedMemEval-<Vertical> v5 (AgentEval)` — never summed or averaged with LongMemEval numbers. `--vertical prospective` additionally requires the agent under test to implement `ITimestampedHistoryInjectableAgent`; the run refuses before its first provider call otherwise.
 - Family-specific options and presets are documented under [Benchmarks](benchmarks.md) and the family pages in the TOC.
 - For the Trace Fidelity and AutoAudit families, see the historical design docs under `docs/glassbox-history/` (linked in the TOC under Resources).
-- **Every `bench` family that grades an agent needs a real target, or it refuses (exit 2).** `owasp`/`mitre`/`nist`/`perf` take `--azure-from-env` (the configured provider), `--sut copilot-studio` (same flags as `eval`/`redteam`) or a generic `--endpoint <url> --model <name> [--api-key <key>]` OpenAI-compatible endpoint. `gdpr`/`eu-ai-act` take `--azure-from-env` or `--sut copilot-studio` (each scenario's prompt is sent to the live agent), or the agent's real answer with `--response`/`--response-file` plus the `--input` it answered. `agentic` grades a supplied `--response`/`--response-file` with its `--input`. `--sut mock` runs a built-in stand-in instead of an agent: the run says MOCK, exits 11 whatever it scores, and nothing is written to `.agenteval/`. Through 0.42 these commands quietly fell back to a stand-in and stored the result as a measurement.
+- **Every `bench` family that grades an agent needs a real target, or it refuses (exit 2).** `owasp`/`mitre`/`nist`/`perf` take `--from-env` (the configured provider; `--azure-from-env`, its old name, still works), `--sut copilot-studio` (same flags as `eval`/`redteam`) or a generic `--endpoint <url> --model <name> [--api-key <key>]` OpenAI-compatible endpoint. `gdpr`/`eu-ai-act` take `--from-env` or `--sut copilot-studio` (each scenario's prompt is sent to the live agent), or the agent's real answer with `--response`/`--response-file` plus the `--input` it answered. `agentic` grades a supplied `--response`/`--response-file` with its `--input`, plus `--reference`/`--reference-file` (the expected answer) and `--context`/`--context-file` (the retrieved context) for the checks that grade against them (`rag-quality`); without them those checks report not measured. `--sut mock` runs a built-in stand-in instead of an agent: the run says MOCK, exits 11 whatever it scores, and nothing is written to `.agenteval/`. Through 0.42 these commands quietly fell back to a stand-in and stored the result as a measurement.
 - **`owasp`/`mitre`/`nist` grade judge first, as `redteam --judge` does.** The judge model comes from the environment (the `AZURE_OPENAI_JUDGE_*` override if set, otherwise the provider `AI_INFERENCE_PROVIDER` selects); there is no option to pick it. With no provider configured the command exits **3**; `--sut mock` needs none and grades with the oracles alone. Before the scan the command makes one short call to the judge and exits **3** if it does not answer. The semantic attacks are graded by Composite Judges (several judge calls per probe); the other attacks by their per-attack oracle, which asks the judge only when it is inconclusive, and the judge may then only raise the probe to "attack succeeded". If a judge call fails during the scan, or the scan runs out of time, the run is INCOMPLETE: stored as `WARN` and exit **11**, never a pass — unless what it did measure already fails it,
 which stays a fail (`FAIL`, exit **9**). See the [OWASP](benchmarks/owasp/getting-started.md#presets) and [MITRE](benchmarks/mitre/getting-started.md#presets) pages for probe counts.
 
@@ -523,8 +559,9 @@ agenteval redteam [--azure] [--endpoint <url>] [--model <name>] [--deployment-na
 | `--azure` / `--endpoint` / `--deployment-name` | Azure OpenAI mode. |
 | `--endpoint` / `--model` | OpenAI-compatible mode (OpenAI, Ollama, Groq, vLLM, LM Studio, etc.). |
 | `--sut` | Built-in target instead of an endpoint: `gatekeeper-demo` (the Gatekeeper demo: the configured model behind the gate, or a labelled scripted model when no provider is configured) or `copilot-studio` (a live Microsoft Copilot Studio agent). |
-| `--scripted` | With `--sut gatekeeper-demo`: run the scripted model even when a provider is configured. Deterministic and free; use it for stable CI baselines. A baseline taken on one model is refused against a run on another (exit 3). See [Attack the gate](gatekeeper/attack-the-gate.md). |
-| `--attacks` | Comma-separated attack list; `--pack` imports external benchmark packs. |
+| `--scripted` | With `--sut gatekeeper-demo`: run the scripted model even when a provider is configured. Deterministic and free; use it for stable CI baselines. A baseline taken on one model is refused against a run on another (exit 3). See [Attack the gate](gatekeeper/attack-the-gate.md). With `--attacks memory-poisoning`: run a scripted worst-case model instead of `--endpoint`/`--model`; it saves what it is told and acts on recalled poison (it shows the gates, not a model). |
+| `--attacks` | Comma-separated attack list; `--pack` imports external benchmark packs. `memory-poisoning` runs on its own: the memory-security corpus against the model you name, behind AgentEval's memory protection (see [Memory poisoning](redteam.md#memory-poisoning)); it takes `--memory-trials <n>`, `--format markdown\|json`, `--fail-on vuln\|never` and `--timeout-per-probe` (each model call), refuses the probe-scan options (`--sut`, `--intensity`, `--system-prompt`, `--pack`, …) rather than ignoring them, and exits `0` pass, `1` a security check failed, `11` one could not be measured and none failed. |
+| `--transform` | Also run every single-turn probe encoded: codecs (`base64`, `rot13`, `hex`, …) or a group (`reversible`, `lossy`, `all`). The plaintext probes still run; each codec multiplies the probe count. See [Transform pipeline](redteam.md#transform-pipeline). |
 | `--judge` / `--attacker` | Separate judge/attacker models for LLM-as-judge and attacker-LLM flows. |
 | `--format` / `-o` | Export format and output destination. |
 | `--baseline`, `--save-baseline`, `--fail-on` | Regression gating for CI. |
@@ -590,6 +627,12 @@ renders a report. v1 is compliance-only — the composite Skill Health & Securit
 cross-location content drift (`--repo`/`scan-workspace` only, always on), trust-on-first-use reputation
 matching (`--check-baseline`, opt-in), and manifest hash-pin drift against an explicit trust-time pin
 (`--manifest-baseline`, opt-in) — see [Agent Skills](agent-skills.md#2--compliance-scanner) for how each works.
+
+When a `skills-lock.json` (the project lock file skill installers such as ChilliCream's `skills` CLI write) is in
+`<path>` or a parent of it up to the repository root, each finding names where its skill came from
+(`→ from chillicream/agent-skills@a1b2c3d`, in every format), and `--write-baseline` stores the source and ref on
+the snapshot. Nothing is fetched: it is a pointer for a person to check upstream, and it never changes a finding
+or the exit code.
 
 **Options**
 
@@ -775,7 +818,8 @@ Work with a file written by [`--capture-fixture`](#fixture-capture).
 
 ```
 agenteval log-file to-fixture <captured.jsonl> --out <fixture.json>
-agenteval log-file replay     <captured.jsonl> --out <report.md> (--azure-from-env | --endpoint <url> --model <name> [--api-key <key>]) [--strict-text]
+agenteval log-file replay     <captured.jsonl> --out <report.md> (--from-env | --endpoint <url> --model <name> [--api-key <key>]) [--strict-text]
+agenteval log-file gate-replay <captured.jsonl> --baseline <gates.json> --candidate <gates.json> [--json]
 ```
 
 **`to-fixture`** writes a JSON array of scripted turns that `ScriptedChatClient.FromFixture` loads, so a test
@@ -799,23 +843,50 @@ Token usage and latency are shown for information and never change a verdict. `e
 are not replayed; the report counts them as skipped. The Markdown report is written to `--out` and also printed
 to stdout.
 
+**`gate-replay`** answers "what would this gate change have done to real traffic?" without a model or a network
+call. It takes every tool call in the capture's `response` lines and runs two Gatekeeper tool-gate configurations
+over each one with the real gates (`GateReplayer`): `--baseline`, the gates in force, and `--candidate`, the
+proposed ones. It prints both verdicts for every call, marks the calls whose verdict differs, and counts the calls
+the candidate newly blocks and newly lets through (`--json` gives the same as JSON). A configuration is a JSON
+array of gates, named by the ids `agenteval gatekeeper list-gates` prints; `[]` is no gate:
+
+```json
+[
+  { "gate": "tool:forbidden-tool", "forbidden": ["send_email", "delete_db"] },
+  { "gate": "tool:argument-pattern", "pattern": "rm\\s+-rf" },
+  { "gate": "tool:domain-allowlist", "allowedDomains": ["docs.example.com"] }
+]
+```
+
+Only these three gates, which read a call's own arguments, are replayed. A capture keeps the text of earlier
+messages but not tool results, so a gate that reads the conversation (`tool:referential-integrity`,
+`tool:taint-tracking`) would not decide here what it decided live; it is refused with that reason rather than
+replayed on half a history. Each gate is replayed with its default settings.
+
+`--capture-fixture` masks credential shapes (keys, tokens) in what it writes, so a call whose arguments were masked
+does not carry what the model sent. When either configuration has an argument gate (`tool:argument-pattern`,
+`tool:domain-allowlist`), such a call is marked "not measured" (`"measured": false` in `--json`) and left out of the
+counts: its verdict would be about the mask.
+
 **Options**
 
 | Option | Description |
 |--------|-------------|
 | `<captured>` | Required, positional. A file written by `--capture-fixture`. |
 | `--out <path>` | Required. `to-fixture`: the fixture JSON array. `replay`: the Markdown report. A missing parent directory is created. |
-| `--azure-from-env` (`replay`) | Replay against the provider `AI_INFERENCE_PROVIDER` selects (see [Environment variables](#environment-variables)) — despite its name, not only Azure OpenAI. Checked before `--endpoint`. |
+| `--from-env` (`replay`) | Replay against the provider `AI_INFERENCE_PROVIDER` selects (see [Environment variables](#environment-variables)). `--azure-from-env` is its old name and still works. Checked before `--endpoint`. |
 | `--endpoint <url>` / `--model <name>` / `--api-key <key>` (`replay`) | Replay against an OpenAI-compatible endpoint. `--model` is required with `--endpoint`. Without `--api-key`, `OPENAI_API_KEY` is used, and without that a placeholder key for keyless local servers. |
 | `--strict-text` (`replay`) | Also fail a round-trip whose text is not identical. Off by default: model output is not reproducible, even against the same model with the same settings. |
+| `--baseline <gates.json>` / `--candidate <gates.json>` (`gate-replay`) | Required. The two gate configurations to compare. |
+| `--json` (`gate-replay`) | Print the comparison as JSON on stdout instead of the report. |
 
 **Exit codes**
 
 | Code | Meaning |
 |------|---------|
-| `0` | `to-fixture`: the fixture was written. `replay`: no round-trip failed (flags do not fail the run). |
+| `0` | `to-fixture`: the fixture was written. `replay`: no round-trip failed (flags do not fail the run). `gate-replay`: the replay ran, whatever it found. |
 | `1` | `replay`: at least one round-trip failed. |
-| `2` | `replay`: no target was given, `--endpoint` was given without `--model`, or `--azure-from-env` found no configured provider. |
+| `2` | `replay`: no target was given, `--endpoint` was given without `--model`, or `--from-env` found no configured provider. `gate-replay`: a configuration file is missing, is not a JSON array of gates, or names a gate it cannot replay; or the capture holds no tool call. |
 | `3` | The capture file does not exist, or another error occurred (for example, a line that is not a capture record). |
 
 ---
@@ -865,6 +936,126 @@ agenteval mc doctor
 4. On non-Windows, `dotnet` is on PATH (the CLI spawns the MC `.dll` via `dotnet`).
 
 Prints `Errors: N | Warnings: N | OK: N` and exits `2` on any error.
+
+### `agenteval assert-ai`
+
+Work with Microsoft's [ASSERT](https://github.com/responsibleai/ASSERT) (`assert-ai` 0.3.0 formats). The guide is
+[ASSERT Interoperability](assert-interop.md).
+
+**Synopsis**
+
+```
+agenteval assert-ai serve (--from-env [--model <m>] | --endpoint <url> --model <m> [--api-key <key>]) [--system-prompt <text>] [--port 8765] [--path /assert] [--host localhost]
+agenteval assert-ai import <run-dir> [--format text|json|markdown] [-o <file>] [--taxonomy <file>] [--test-set <file>] [--calibration <file>] [--max-harm-rate <0-1>] [--max-over-refusal-rate <0-1>] [--max-unmeasured <0-1>]
+agenteval assert-ai export --golden <file.jsonl>... --taxonomy <taxonomy.json> --judge-model <model> --out <dir> [--evaluator <key>...] [--suite agenteval] [--run judge-1] [--assert-root <path>]
+agenteval assert-ai calibrate <run-dir> --cases <agenteval-cases.json> [--format text|json] [-o <calibration.json>]
+```
+
+**`serve`** answers ASSERT's endpoint requests (`{message, history}` → `{response, events}`) with the model your
+provider variables select, or an OpenAI-compatible endpoint, until Ctrl+C. Point ASSERT's
+`pipeline.inference.target.endpoint` at the URL it prints; keep the host name `localhost` (ASSERT refuses a literal
+`127.0.0.1` unless `ASSERT_ALLOW_PRIVATE_ENDPOINTS=1`). `--host +` answers every host name, for ASSERT in a container
+calling `host.docker.internal`; on Windows that needs a URL reservation (`netsh http add urlacl url=http://+:8765/
+user=Everyone`, as administrator). It serves a bare model; to serve an agent with tools, use `AssertAiTarget` from
+code.
+
+**`import`** reads an ASSERT run directory (the one holding `scores.jsonl`) and prints ASSERT's harm and over-refusal
+rates per kind of test case, computed as ASSERT computes them, every case's verdict, and the cases with no score row.
+A failed judge is an error and a case with no row is named, never counted as a pass. Exit `1` when a rate is above
+`--max-harm-rate` or `--max-over-refusal-rate`; `11` when a gate is set and it cannot pass: more cases unmeasured than
+`--max-unmeasured` allows (default none), the run's manifest says it did not complete, or no rate could be measured;
+`2` for a directory or file that cannot be read.
+
+**`export`** writes labelled golden cases (the agentic calibration JSONL format) as an ASSERT judge-only run, with the
+config to run it and `agenteval-cases.json` mapping ASSERT's positional ids back to the case ids. `--taxonomy` is
+required: ASSERT's judge cannot run without one.
+
+**`calibrate`** compares ASSERT's verdicts on exported cases with their labels: accuracy with a 95% Wilson interval,
+Cohen's κ, dangerous errors (a labelled failure not flagged, including when the judge found no category relevant) and
+false alarms; a case the judge did not decide is counted as not measured. It refuses a run whose transcripts are not
+the ones exported with the case map. `-o` writes the result for `import --calibration`, which attaches it only to runs
+of the same judge on the same taxonomy. Exit `11` when the judge decided no case.
+
+### `agenteval aef`
+
+Work with AEF 1.0 runs, the AgentEval Evidence Format (a release candidate). The guide is
+[AEF Evidence Format](aef.md).
+
+**Synopsis**
+
+```
+agenteval aef verify <run-dir> [--policy <trust-policy.json>] [--anchors <run-hashes.json>] [--json]
+agenteval aef seal <run-dir> [--key <pkcs8.pem>] [--sealed-by producer|ingest] [--json]
+agenteval aef view <run-dir> [--at <time>] [--policy <trust-policy.json>] [--json]
+agenteval aef checkpoint <manifest.json> --runs <dir> [--policy <trust-policy.json>] [--at <time>] [--envelope <file>] [--json]
+agenteval aef export <store-dir> <out-dir> [--run <run-id>] [--target-mode live|replayed|scripted|mocked] [--content-capture on|off] [--no-seal] [--key <pkcs8.pem>] [--json]
+agenteval aef import assert-ai <assert-run-dir> <out-dir> [--taxonomy <file>] [--test-set <file>] [--calibration <file>] [--max-harm-rate <0-1>] [--max-over-refusal-rate <0-1>] [--content-capture on|off] [--no-seal] [--key <pkcs8.pem>] [--json]
+agenteval aef import otel <logs-file> <out-dir> --run-id <id> --from <tool> --subject <kind:name> [--subject-kind agent] --target-mode live|replayed|scripted|mocked [--content-capture on|off] [--no-seal] [--key <pkcs8.pem>] [--json]
+agenteval aef export-otel <run-dir> <out-file> [--policy <trust-policy.json>] [--json]
+agenteval aef import inspect <log-file> <out-dir> --target-mode live|replayed|scripted|mocked [--content-capture on|off] [--no-seal] [--key <pkcs8.pem>] [--json]
+agenteval aef export-inspect <run-dir> <out-file> [--ignore-overlays] [--policy <trust-policy.json>] [--json]
+```
+
+**`verify`** reports a run as `intact`, `unsealed` or `invalid`, with every problem. With `--policy`, it also says
+which trusted identities signed it, and lets authorized redactions withhold blobs; with `--anchors`, whether one of
+the run hashes you trust is the run's. Exit `1` when the run is invalid.
+
+**`seal`** writes `seal.json` for a closed run, and `attestation.dsse.json` when `--key` gives a signing key (ECDSA
+P-256). `--sealed-by producer` (the default) is for the run's own producer, which may seal only a run with no
+problem; `ingest` is for a host taking custody of a run. Exit `1` when the run cannot be sealed.
+
+**`view`** shows the run as its overlays leave it at `--at` (default: now): overridden results, reviews, waivers in
+force, withheld blobs. The sealed files never change.
+
+**`checkpoint`** checks a checkpoint manifest alone, against the runs it names (found under `--runs` by their
+`run.json`), each lane's recomputed result and its decision, and its signature (`<name>.dsse.json` beside the
+manifest, or `--envelope`). Exit `1` on any problem.
+
+**`export`** converts a run of AgentEval's `.agenteval/` store (store v1) into an AEF run marked as imported. Give a
+run folder, or the workspace with `--run`. Store v1 does not record how the target was driven, so `--target-mode`
+defaults to `mocked`: an exported run is never passed off as live evidence unless you say it was. The run is sealed
+as `ingest` unless `--no-seal`.
+
+**`import assert-ai`** converts an [ASSERT](assert-interop.md) run into an AEF run: a root line and harm and
+over-refusal lines per case, ASSERT's rates in `summary.json`, with optional gate limits. With `--content-capture
+off`, no prompt, response, transcript or judge reasoning is kept.
+
+**`import otel`** converts OpenTelemetry `gen_ai.evaluation.result` events (OTLP/JSON logs, one `LogsData` per line)
+into an AEF run, as [the OpenTelemetry interop page](../contracts/aef/1/interop/opentelemetry.md) maps them: a line
+per event, the run's id, subject and target mode from you, `contentCapture` `on` unless `--content-capture off`
+(then logs carrying content are refused), sealed as `ingest` unless `--no-seal`, and verified. Events the page refuses
+(two services, an event with no case or no name, a second event of one case with one name, …) exit `2`, naming the
+rule.
+
+**`export-otel`** writes an AEF run as OpenTelemetry events: one `LogsData` line per result line, one
+`gen_ai.evaluation.result` event per score, labelled with the result's sealed state (overlays are not applied) and
+parented to its `traceLink`. The run must verify (`intact` or `unsealed`; `--policy` lets an authorized redaction
+withhold a reasoning blob); the output file must not exist. A run it cannot export (one that does not verify, a time
+OpenTelemetry cannot hold, a reasoning blob that is not UTF-8 or is over 4 MiB) exits `2`, and nothing is written.
+
+**`import inspect`** converts an [Inspect](https://inspect.aisi.org.uk/) eval log in `.json` form (for an `.eval` log,
+run `inspect log dump` first) into an AEF run, as [the Inspect interop page](../contracts/aef/1/interop/inspect.md)
+maps it: a line per sample and score (`trial` = `epoch` − 1 when the log has more than one epoch), a rollup line per
+reduction, the summary recomputed from the lines in one lane `main`, and the run's usage from `stats`. The subject is
+`model:<eval.model>`; the target mode is yours, and `contentCapture` is `on` unless `--content-capture off` (then no
+case content, explanation or answer is kept). A closed log is sealed as `ingest` unless `--no-seal`; a `started` log
+gives a running run, which is not sealed. The log is read as I-JSON within a nesting depth of 64, Inspect's bare `NaN`
+allowed only where an unscored value can be. A log the page refuses (one that is not I-JSON, such as a member named
+twice, `Infinity` or a number that overflows; a time without an offset; a numeric `id` that is no integer of at most
+2^53 − 1; a boolean value or a string other than `C`, `I`, `P` and `N`; a reducer without an AEF value; a missing
+reduction; a mean the lines do not give; `Score.history`, an invalidation or `log_updates`; …) exits `2`, naming the
+rule, and nothing is written.
+
+**`export-inspect`** writes an AEF run as one Inspect `EvalLog` in `.json` form: a sample per case and trial, a score
+per result line under its path (the AEF facts Inspect has no field for under `metadata.aef`), a reduction per rollup
+line, an `EvalScore` per summary entry; `eval.model` is the subject's ref with its name decoded. A run with
+`contentCapture: off` gives no explanation, not even a line's reason. The run must verify (`intact` or `unsealed`;
+`--policy` lets an authorized redaction withhold a blob, which is then left out), and its sealed lines are exported: a
+run with overlay events is refused unless `--ignore-overlays` leaves them out. A run the page refuses (no suite, two
+judges, two summary entries at one path, a `count` metric, `output` or `transcript` evidence a line cites, a reasoning
+or content blob that is not UTF-8, …) exits `2`, naming the rule, and nothing is written.
+
+Every verb takes `--json` and then prints one JSON value. Exit `2` is a usage or input error.
 
 ---
 

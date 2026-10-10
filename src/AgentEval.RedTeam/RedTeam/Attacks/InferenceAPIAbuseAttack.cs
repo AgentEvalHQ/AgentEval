@@ -296,7 +296,7 @@ public sealed class InferenceAPIAbuseAttack : IAttackType
     private static string GenerateRandomText(int length)
     {
         const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ";
-        var random = new Random(42); // Fixed seed for reproducible tests
+        var random = new Random(42); // Fixed seed for reproducible tests. DevSkim: ignore DS148264 — filler text, nothing secret
         var result = new char[length];
         
         for (int i = 0; i < length; i++)

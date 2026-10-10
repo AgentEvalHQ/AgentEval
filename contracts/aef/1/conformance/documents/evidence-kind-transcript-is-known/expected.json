@@ -1,0 +1,13 @@
+{
+  "kind": "document",
+  "schema": "evidence",
+  "writer": "valid",
+  "reader": "valid",
+  "reads": {
+    "kind": "transcript"
+  },
+  "rules": [
+    "VER-8",
+    "EVD-1"
+  ]
+}

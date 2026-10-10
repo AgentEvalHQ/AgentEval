@@ -1,0 +1,34 @@
+{
+  "kind": "lane",
+  "checkpoint": "checkpoint.json",
+  "runs": "runs",
+  "lanes": [
+    {
+      "lane": "found",
+      "result": {
+        "status": "passed",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-01T12:00:00Z"
+      }
+    },
+    {
+      "lane": "missing-runs",
+      "result": null
+    }
+  ],
+  "problems": [
+    [
+      "lanes/missing-runs/runs/x.ndjson:10",
+      "run-missing"
+    ],
+    [
+      "lanes/missing-runs/runs/x.ndjson:9",
+      "run-missing"
+    ]
+  ],
+  "rules": [
+    "CKP-8",
+    "CONF-2"
+  ],
+  "why": "missing runs x.ndjson:9 and x.ndjson:10. Only the line paths of a run's own NDJSON and JSONL files order by line number (§3.9); lanes/missing-runs/runs/x.ndjson:10 is not one, so it orders by its bytes, before :9."
+}

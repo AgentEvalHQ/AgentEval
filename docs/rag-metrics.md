@@ -600,7 +600,7 @@ var result = await metric.EvaluateAsync(context);
 - [Metrics Reference](metrics-reference.md) - Quick reference for all metrics
 - [Evaluation Guide](evaluation-guide.md) - Choosing metrics for your use case
 - [Naming Conventions](naming-conventions.md) - Metric naming standards
-- [Sample 05](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Sample05_ComprehensiveRAG.cs) - Complete RAG build + evaluate (all 8 metrics)
+- [Sample 05](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/MetricsAndQuality/01_ComprehensiveRAG.cs) - Complete RAG build + evaluate (all 8 metrics)
 
 ---
 

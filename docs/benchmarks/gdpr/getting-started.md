@@ -19,7 +19,7 @@
 
 ## Quick Start
 
-> **Access path.** The GDPR benchmark runs through the `agenteval` CLI binaries and is also available programmatically via NuGet (`using AgentEval.Compliance.Gdpr;`) — see [NuGet samples](../../samples/) for end-to-end consumer tests.
+> **Access path.** The GDPR benchmark runs through the `agenteval` CLI binaries and is also available programmatically via NuGet (`using AgentEval.Compliance.Gdpr;`) — see the [GDPR benchmark sample](../../../samples/AgentEval.Samples/Benchmarks/04_GdprBenchmark.cs) for an end-to-end example.
 
 > **Real judging needs a configured inference provider**: the one `AI_INFERENCE_PROVIDER` selects — Azure OpenAI, Bitdeer, OpenAI, Azure AI Foundry or any OpenAI-compatible host; see the [provider table](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to) for the variables each needs — or a judge-only Azure OpenAI endpoint set with all three `AZURE_OPENAI_JUDGE_*` variables, which wins when present. With the selector unset, the first fully configured provider in that table's order is used. If no provider is configured, or a selected provider is missing variables, the CLI refuses to run (exit code **3** — see [Exit codes](../../cli.md#exit-codes)). See [CLI Reference — Environment variables](../../cli.md#environment-variables) for the full contract.
 
@@ -31,15 +31,15 @@ AZURE_OPENAI_API_KEY=<your-key>
 AZURE_OPENAI_DEPLOYMENT=<your-gpt-4o-deployment>
 ```
 
-Then run any of the three presets. Each run needs a target: `--azure-from-env` drives the model the configured
+Then run any of the three presets. Each run needs a target: `--from-env` drives the model the configured
 provider serves, `--sut copilot-studio` a Copilot Studio agent, and `--response`/`--response-file` with `--input`
 grades an answer your agent already gave. Without one the command refuses; `--sut mock` grades a canned answer that
 measures nothing and is not stored.
 
 ```
-agenteval bench gdpr --preset smoke --subject TravelAgent --azure-from-env
-agenteval bench gdpr --preset standard --subject TravelAgent --azure-from-env
-agenteval bench gdpr --preset audit --subject TravelAgent --azure-from-env
+agenteval bench gdpr --preset smoke --subject TravelAgent --from-env
+agenteval bench gdpr --preset standard --subject TravelAgent --from-env
+agenteval bench gdpr --preset audit --subject TravelAgent --from-env
 ```
 
 ---
@@ -58,7 +58,7 @@ agenteval bench gdpr --preset audit --subject TravelAgent --azure-from-env
 Presets can be composed using `+` syntax. The weights of all active scenarios are renormalized automatically:
 
 ```
-agenteval bench gdpr --preset standard+healthcare --subject TravelAgent --azure-from-env
+agenteval bench gdpr --preset standard+healthcare --subject TravelAgent --from-env
 ```
 
 ---
@@ -234,7 +234,7 @@ var eval = standard.WithExtraScenarios(healthcarePack);
 For the CLI-equivalent invocation (no programmatic wiring), use the preset-composition syntax:
 
 ```bash
-agenteval bench gdpr --preset standard+healthcare --subject MyAgent --azure-from-env
+agenteval bench gdpr --preset standard+healthcare --subject MyAgent --from-env
 ```
 
 ---

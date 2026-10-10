@@ -217,7 +217,7 @@ All three follow the same architectural pattern. They differ in subject matter (
 | **Domain packs** | Healthcare, HR, children | High-risk employment, credit, education | n/a — generic |
 | **Default aggregation** | WeightedSum per article; per-pillar varies | Pillar 1 uses Min (any prohibition violation fails); others WeightedSum | WeightedSum |
 | **`audit` preset aggregation** | CapByWorst at top level | CapByWorst at top level — critical Pillar 1 failure caps overall verdict at FAIL | Multi-run stochastic |
-| **Calibration status** | Not reproducible from the repository — see the note below the table | Not reproducible from the repository — see the note below the table | 40 evaluators dispatched, 20 carved out; ux and adversarial gated at 0.85 / 0.70, the other six scored categories at relaxed per-category gates (`s_categoryOverrides`) |
+| **Calibration status** | Not reproducible from the repository — see the note below the table | Not reproducible from the repository — see the note below the table | 45 evaluators dispatched, 15 carved out; ux and adversarial gated at 0.85 / 0.70, the other six scored categories at relaxed per-category gates (`s_categoryOverrides`) |
 | **Where YAML lives** | `src/AgentEval.Compliance.Gdpr/Articles/Yaml/` | `src/AgentEval.Compliance.EuAiAct/Articles/Yaml/` | No YAML — each evaluator defines its criteria in code |
 | **Judge prompt** | `src/AgentEval.Compliance.Gdpr/Resources/Prompts/gdpr-judge-system.v1.md` — sent by `bench gdpr` and, from 0.42.0-beta, by `bench gdpr calibrate` (one resolver for both) | `src/AgentEval.Compliance.EuAiAct/Resources/Prompts/eu-ai-act-judge-system.v1.md` — sent by `bench eu-ai-act` and, from 0.42.0-beta, by its `calibrate` | The generic default judge prompt; the per-evaluator files under `Resources/Prompts/` are references and are not sent |
 | **Smoke preset cost** | < $0.10 | < $0.10 | < $0.05 |
@@ -361,6 +361,29 @@ Beyond categorical verdict agreement, the calibration runner also tracks the **n
 The criteria-resolution logic in `CalibrationRunner` has two special cases — synthetic-ID fallback and Pillar 1 strict-refusal — that exist *because actual calibration runs revealed actual problems*. This is what mature calibration tooling looks like: not just "compute the metric", but "encode the lessons from past calibration failures so the next run doesn't repeat them."
 
 Anyone reading the calibration code should expect more such cases to accumulate over time. That's the system working as intended.
+
+### 7.5 Scores rather than verdicts: AUROC and a held-out cut
+
+Accuracy and κ compare verdicts. A judge's 0–100 score and a decision model's probability need a cut before they
+become verdicts, and the cut is a choice that can overfit. `AgentEval.Calibration.ThresholdCalibration` (in
+`AgentEval.Core`) covers both halves:
+
+- **`Auroc(cases)`**: how well the scores separate the gold positives from the negatives, with no cut at all. It is the
+  probability that a random positive scores above a random negative, counting a tie as half. With only one class
+  present it returns `NaN`, never 0.5, like κ.
+- **`EvaluateHeldOut(training, heldOut)`**: chooses the cut on the training cases (`ChooseCut`, maximising accuracy or,
+  for an imbalanced set, balanced accuracy) and applies it unchanged to the held-out cases. Report the held-out
+  accuracy, which comes with its 95% Wilson interval. The training accuracy is a maximum chosen on those same cases, so
+  it is optimistic.
+- **`Split(cases, heldOutFraction, seed)`**: a stratified split that gives the same result for the same seed. Fix the
+  seed before looking at any result, and report it with the numbers.
+
+```csharp
+var cases = gold.Select(g => new ScoredCase(judgeScore[g.Id], g.ShouldFlag)).ToList();
+var (training, heldOut) = ThresholdCalibration.Split(cases, heldOutFraction: 0.3, seed: 20261007);
+var result = ThresholdCalibration.EvaluateHeldOut(training, heldOut);
+// result.Cut, result.HeldOutAccuracy (Estimate, Lower, Upper), result.HeldOutAuroc
+```
 
 ---
 

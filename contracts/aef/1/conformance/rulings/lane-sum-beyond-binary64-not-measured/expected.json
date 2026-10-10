@@ -1,0 +1,21 @@
+{
+  "kind": "lane",
+  "checkpoint": "checkpoint.json",
+  "runs": "runs",
+  "lanes": [
+    {
+      "lane": "at-least-zero",
+      "result": {
+        "status": "not_measured",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-01T12:00:00Z"
+      }
+    }
+  ],
+  "problems": [],
+  "rules": [
+    "SUM-5",
+    "LANE-2"
+  ],
+  "why": "the run's two scores of 1.5e308 have a sum beyond binary64, so its summary's value is null: the lane reads the run as not measured, not as passed, however low its threshold."
+}

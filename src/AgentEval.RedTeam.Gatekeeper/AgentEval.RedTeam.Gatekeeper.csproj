@@ -13,6 +13,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="AgentEval.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="../AgentEval.MAF/AgentEval.MAF.csproj" />
     <ProjectReference Include="../AgentEval.RedTeam/AgentEval.RedTeam.csproj" />
   </ItemGroup>

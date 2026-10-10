@@ -32,7 +32,7 @@ Sourced verbatim from `BenchmarkFamilyRegistry` (see `src/AgentEval.Evals.Perfor
 
 | Preset | Description (verbatim) | Cost tier | Typical iterations | Approx. LLM cost |
 |---|---|---|---|---|
-| `latency` | P99 latency measurement (3 iterations x N prompts + warmup) | Low | 1 prompt x 3 iterations + 1 warmup = 4 calls | telemetry-only (~$0.001 per call against gpt-4o-mini if using `--azure-from-env`; `--sut mock`: free, and measures nothing) |
+| `latency` | P99 latency measurement (3 iterations x N prompts + warmup) | Low | 1 prompt x 3 iterations + 1 warmup = 4 calls | telemetry-only (~$0.001 per call against gpt-4o-mini if using `--from-env`; `--sut mock`: free, and measures nothing) |
 | `throughput` | Concurrent throughput measurement (default 2 workers x 5s) | Low | 2 concurrent workers x ~5s window (typically 5-20 calls depending on agent speed) | telemetry-only |
 | `cost` | Per-prompt token + cost estimate (pricing-table-backed) | Low | 1 call per supplied prompt | telemetry-only |
 
@@ -50,9 +50,9 @@ The `bench perf` family exposes three subcommands (one per preset):
 
 ```bash
 # Real model from the configured inference provider
-agenteval bench perf latency --subject MyAgent --azure-from-env
-agenteval bench perf throughput --subject MyAgent --azure-from-env --prompt "Summarise the last quarter's earnings."
-agenteval bench perf cost --subject MyAgent --azure-from-env --prompt "Hello!"
+agenteval bench perf latency --subject MyAgent --from-env
+agenteval bench perf throughput --subject MyAgent --from-env --prompt "Summarise the last quarter's earnings."
+agenteval bench perf cost --subject MyAgent --from-env --prompt "Hello!"
 
 # Any OpenAI-compatible endpoint
 agenteval bench perf latency --subject MyAgent --endpoint http://localhost:11434/v1 --model llama3.1
@@ -60,9 +60,9 @@ agenteval bench perf latency --subject MyAgent --endpoint http://localhost:11434
 
 The `--prompt` flag overrides the default `"Hello!"` prompt. The benchmark uses the same prompt for latency + throughput + cost measurements within a single run.
 
-`--azure-from-env` builds the agent from whichever provider `AI_INFERENCE_PROVIDER` selects — Azure OpenAI, Bitdeer, OpenAI, Azure AI Foundry or any OpenAI-compatible host; see the [provider table](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to) for the variables each one needs. Despite its name, the flag is not Azure-only: with the selector unset, the first fully configured provider in that table's order is used, so an environment with only the `AZURE_OPENAI_*` trio still gets Azure OpenAI. If no provider is configured, the command fails and names what is missing. Without a target the command refuses (exit 2). `--sut mock` measures a built-in stand-in (a 50 ms echo) instead: the run says MOCK, exits 11 whatever it scores, and nothing is written to `.agenteval/`, because it measures no agent.
+`--from-env` builds the agent from whichever provider `AI_INFERENCE_PROVIDER` selects — Azure OpenAI, Bitdeer, OpenAI, Azure AI Foundry or any OpenAI-compatible host; see the [provider table](../../cli.md#ai_inference_provider--which-provider-the-cli-talks-to) for the variables each one needs. Despite its name, the flag is not Azure-only: with the selector unset, the first fully configured provider in that table's order is used, so an environment with only the `AZURE_OPENAI_*` trio still gets Azure OpenAI. If no provider is configured, the command fails and names what is missing. Without a target the command refuses (exit 2). `--sut mock` measures a built-in stand-in (a 50 ms echo) instead: the run says MOCK, exits 11 whatever it scores, and nothing is written to `.agenteval/`, because it measures no agent.
 
-The cost leaf prices the model the agent used: the model the provider resolved for `--azure-from-env` (the Azure deployment, the Bitdeer model id, and so on), or `--model` for an `--endpoint` target. A `--sut` target names no model, so the leaf falls back to the `--subject` name and then to the model id the provider reported in its response. If no name is in the pricing table, the cost is not measured: the cost leaf is skipped, no cost is reported, and a warning names the model.
+The cost leaf prices the model the agent used: the model the provider resolved for `--from-env` (the Azure deployment, the Bitdeer model id, and so on), or `--model` for an `--endpoint` target. A `--sut` target names no model, so the leaf falls back to the `--subject` name and then to the model id the provider reported in its response. If no name is in the pricing table, the cost is not measured: the cost leaf is skipped, no cost is reported, and a warning names the model.
 
 ## Output
 
@@ -98,7 +98,7 @@ The composite verdict is `pass` when composite score >= 0.6 AND no leaf is label
 
 ## When to use this benchmark
 
-- You need a quick smoke on P99 latency regressions for an agent in CI (use `latency` against a real agent via `--azure-from-env`).
+- You need a quick smoke on P99 latency regressions for an agent in CI (use `latency` against a real agent via `--from-env`).
 - You want a baseline cost-per-call estimate against the pricing table to detect prompt-bloat regressions (use `cost`).
 - You want a sanity-check on sustained throughput under modest concurrency (use `throughput`, default 2 workers x 5s).
 - You need a single command that runs all three telemetry dimensions and produces a unified `EvalResult` for downstream Mission Control rendering.
@@ -163,7 +163,7 @@ Known limitations:
 - Cold-start latency is explicitly excluded (the warmup iteration runs first).
 - Cost estimation requires the agent's model name to appear in `ModelPricing.GetPricing`. For any other model the cost is not measured and the cost leaf is skipped.
 - Per-prompt input is single-string only; multi-prompt CSV / metadata override (via `EvalInput.Metadata["prompts"]`) is supported programmatically but not exposed on the CLI subcommands.
-- The CLI measures a plain chat model: built with `--azure-from-env` from any configured provider, an OpenAI-compatible `--endpoint`, or a built-in `--sut` target. There is no option that loads an agent from a manifest file. An agent with its own tools, memory or a non-chat interface is measured from a small program that wraps it as an `IEvaluableAgent` — see `samples/AgentEval.Samples/Benchmarks/02_PerformanceBenchmark.cs` and [Programmatic use](#programmatic-use).
+- The CLI measures a plain chat model: built with `--from-env` from any configured provider, an OpenAI-compatible `--endpoint`, or a built-in `--sut` target. There is no option that loads an agent from a manifest file. An agent with its own tools, memory or a non-chat interface is measured from a small program that wraps it as an `IEvaluableAgent` — see `samples/AgentEval.Samples/Benchmarks/02_PerformanceBenchmark.cs` and [Programmatic use](#programmatic-use).
 
 See also:
 - [OWASP getting-started](../owasp/getting-started.md) — security red-team family.

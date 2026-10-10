@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agenteval.dev/aef/1/reader/evidence.schema.json",
+  "title": "AEF 1.0: one line of evidence.ndjson",
+  "description": "READER (tolerant), derived from the writer schema by tools/derive_reader.py. One piece of evidence a result cites: what it is, its digest, and where to find it.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "evidenceId",
+    "kind",
+    "link"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "$ref": "common.schema.json#/$defs/schemaVersion",
+      "description": "The AEF version this line follows, MAJOR.MINOR: 1.0 for AEF 1.0 (VER-1)."
+    },
+    "evidenceId": {
+      "$ref": "common.schema.json#/$defs/evidenceId",
+      "description": "The record's id, unique in the run; results cite it (EVD-1)."
+    },
+    "kind": {
+      "description": "What the evidence is: a span, a tool call, judge reasoning, a compliance artifact, a document, the case's input, its expected answer, the subject's output, a transcript of the conversation, or other. tool_call, judge_reasoning, document, input, expected, output and transcript are content: none is written under contentCapture off (RUN-11).",
+      "type": "string"
+    },
+    "digest": {
+      "$ref": "common.schema.json#/$defs/sha256Uri",
+      "description": "For a blob link, required: the blob's SHA-256. For a URI link, optional: the SHA-256 of what the URI served. A span link has none (spec 03, EVD-2)."
+    },
+    "link": {
+      "description": "Exactly one of: a blob in this run, a span (traceId and spanId), or a URI outside the run. The span is in traces.otlp.jsonl when the run has that file, else in a trace store outside the run (EVD-1).",
+      "type": "object",
+      "minProperties": 1,
+      "properties": {
+        "blob": {
+          "$ref": "common.schema.json#/$defs/sha256Uri",
+          "description": "A blob of this run, by its digest; the file is blobs/sha256/<first two hex>/<hex> (EVD-3)."
+        },
+        "traceId": {
+          "description": "The span's trace id: 32 lower-case hex characters, given with spanId.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{32}$",
+          "maxLength": 32
+        },
+        "spanId": {
+          "description": "The span's id: 16 lower-case hex characters, given with traceId.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{16}$",
+          "maxLength": 16
+        },
+        "uri": {
+          "$ref": "common.schema.json#/$defs/uri",
+          "description": "A URI outside the run (EVD-1)."
+        }
+      },
+      "oneOf": [
+        {
+          "required": [
+            "blob"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "traceId"
+                ]
+              },
+              {
+                "required": [
+                  "spanId"
+                ]
+              },
+              {
+                "required": [
+                  "uri"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "required": [
+            "traceId",
+            "spanId"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "blob"
+                ]
+              },
+              {
+                "required": [
+                  "uri"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "required": [
+            "uri"
+          ],
+          "not": {
+            "anyOf": [
+              {
+                "required": [
+                  "blob"
+                ]
+              },
+              {
+                "required": [
+                  "traceId"
+                ]
+              },
+              {
+                "required": [
+                  "spanId"
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "description": {
+      "description": "What the evidence is, in words, for a reader (EVD-1).",
+      "type": "string",
+      "maxLength": 1024
+    },
+    "ext": {
+      "$ref": "common.schema.json#/$defs/ext",
+      "description": "Producer extensions, named reverse-DNS or with the producer's prefix. A reader ignores what it does not know; never holds a secret (ENC-19)."
+    }
+  },
+  "allOf": [
+    {
+      "description": "A blob link carries the blob's digest.",
+      "if": {
+        "properties": {
+          "link": {
+            "description": "Applies to a blob link (EVD-2).",
+            "required": [
+              "blob"
+            ]
+          }
+        },
+        "required": [
+          "link"
+        ]
+      },
+      "then": {
+        "required": [
+          "digest"
+        ]
+      }
+    },
+    {
+      "description": "A span link carries no digest.",
+      "if": {
+        "properties": {
+          "link": {
+            "description": "Applies to a span link (EVD-2).",
+            "required": [
+              "traceId"
+            ]
+          }
+        },
+        "required": [
+          "link"
+        ]
+      },
+      "then": {
+        "not": {
+          "required": [
+            "digest"
+          ]
+        }
+      }
+    }
+  ]
+}

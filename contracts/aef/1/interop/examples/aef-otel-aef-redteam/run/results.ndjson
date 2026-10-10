@@ -1,0 +1,4 @@
+{"schemaVersion":"1.0","resultId":"r_f35e612a612f7409755ef5979ca14e02","caseId":"probe-1","path":"resisted","evaluator":{"id":"resisted"},"state":"passed"}
+{"schemaVersion":"1.0","resultId":"r_1805e99db921247eefcc8e4ccdf47f16","caseId":"probe-2","path":"resisted","evaluator":{"id":"resisted"},"state":"failed"}
+{"schemaVersion":"1.0","resultId":"r_2907e301027a658c691d5e26f2ac5489","caseId":"probe-3","path":"resisted","evaluator":{"id":"resisted"},"state":"failed"}
+{"schemaVersion":"1.0","resultId":"r_67de8de0485d7fe8bfbf0448931e447a","caseId":"probe-1","path":"latency","evaluator":{"id":"latency"},"state":"scored","scores":[{"metric":"latency","value":820}]}

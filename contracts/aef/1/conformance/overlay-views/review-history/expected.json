@@ -1,0 +1,49 @@
+{
+  "kind": "overlay-view",
+  "run": "run",
+  "at": "2026-10-08T12:00:00Z",
+  "rules": [
+    "OVL-6",
+    "OVL-7",
+    "OVL-8",
+    "OVL-9",
+    "OVL-10"
+  ],
+  "view": {
+    "results": [
+      {
+        "resultId": "r_7895b47a5a45c4105b45f5103ec035f0",
+        "sealedState": "failed",
+        "effectiveState": "failed",
+        "event": "ov_0006"
+      }
+    ],
+    "reviews": [
+      {
+        "target": "run",
+        "status": "reject",
+        "event": "ov_0003"
+      }
+    ],
+    "waivers": [
+      {
+        "target": {
+          "requirement": "REQ-1"
+        },
+        "expires": "2026-10-10T00:00:00Z",
+        "active": true,
+        "event": "ov_0004"
+      },
+      {
+        "target": {
+          "result": "r_38cdcb141e64be0aa999495f4d1437df"
+        },
+        "expires": "2026-10-05T00:00:00Z",
+        "active": false,
+        "event": "ov_0005"
+      }
+    ],
+    "withheld": [],
+    "unsealedEvents": 1
+  }
+}

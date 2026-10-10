@@ -1,0 +1,11 @@
+{
+  "kind": "document",
+  "schema": "seal",
+  "document": "document.json",
+  "writer": "valid",
+  "reader": "valid",
+  "rules": [
+    "VER-1",
+    "VER-3"
+  ]
+}

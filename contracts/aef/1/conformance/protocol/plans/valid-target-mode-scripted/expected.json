@@ -1,0 +1,14 @@
+{
+  "kind": "plan",
+  "schema": "run-plan",
+  "writer": "valid",
+  "reader": "valid",
+  "reads": {
+    "targetMode": "scripted"
+  },
+  "rules": [
+    "PLAN-7",
+    "RUN-7"
+  ],
+  "why": "a plan that asks for a scripted stand-in: a runner that cannot drive one refuses it, and its runs are checked against scripted, not live"
+}

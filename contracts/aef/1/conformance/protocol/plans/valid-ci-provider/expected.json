@@ -1,0 +1,14 @@
+{
+  "kind": "plan",
+  "schema": "run-plan",
+  "writer": "valid",
+  "reader": "valid",
+  "reads": {
+    "provider": "ci:github"
+  },
+  "rules": [
+    "PLAN-1",
+    "VER-8"
+  ],
+  "why": "a ci:<name> provider is known: the writer schema accepts it through its pattern, so a reader keeps it"
+}

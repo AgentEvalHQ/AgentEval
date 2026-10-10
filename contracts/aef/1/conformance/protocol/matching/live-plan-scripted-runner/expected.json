@@ -1,0 +1,8 @@
+{
+  "kind": "matching",
+  "matches": false,
+  "rules": [
+    "PLAN-7"
+  ],
+  "why": "a plan that asks for live by name, and a runner that gives only a scripted stand-in"
+}

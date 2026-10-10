@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "CJ",
+  "status": "completed",
+  "producer": {
+    "name": "agenteval-cli",
+    "version": "1.0.0"
+  },
+  "subject": {
+    "ref": "agent:shop/assistant",
+    "kind": "agent",
+    "version": "v7"
+  },
+  "execution": {
+    "targetMode": "live"
+  },
+  "suite": {
+    "ref": "suite:shop/memory",
+    "version": "3",
+    "digest": "sha256:274a646f723ee564ebb96a7bee4170df73b077d42e41ad3fc6a7c825d11dc9b1"
+  },
+  "judges": [
+    {
+      "model": "gpt-6",
+      "provider": "azure.ai.openai",
+      "mode": "single",
+      "rubricDigest": "sha256:ff515bdc1901ab128bdf852dd2214fa5e658e8d9ca1d351a6579fbcf1b5f8437"
+    }
+  ],
+  "startedAt": "2026-09-01T00:00:00Z",
+  "endedAt": "2026-10-06T00:00:00Z"
+}

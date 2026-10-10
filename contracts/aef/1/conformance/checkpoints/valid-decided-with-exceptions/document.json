@@ -1,0 +1,143 @@
+{
+  "schemaVersion": "1.0",
+  "checkpointId": "cp_01J9K4",
+  "template": {
+    "ref": "template:support/release-candidate",
+    "version": "3"
+  },
+  "subject": {
+    "ref": "agent:support/support-triage",
+    "version": "git:3f2a1c",
+    "image": "sha256:9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d9d",
+    "deployment": "deployment:support/support-triage@prod-eu",
+    "resolvedFrom": "latest",
+    "resolvedAt": "2026-10-02T13:58:00Z"
+  },
+  "lanes": [
+    {
+      "lane": "quality",
+      "rule": {
+        "kind": "threshold",
+        "lane": "quality",
+        "metric": "triage",
+        "path": "triage",
+        "op": ">=",
+        "value": 0.8
+      },
+      "requirements": [
+        "REQ-07"
+      ],
+      "runs": [
+        {
+          "runId": "Q-184",
+          "runHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true
+    },
+    {
+      "lane": "security",
+      "rule": {
+        "kind": "severity",
+        "max": "low"
+      },
+      "requirements": [
+        "REQ-15"
+      ],
+      "runs": [
+        {
+          "runId": "R-921",
+          "runHash": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "origin": "adopted:ci"
+        },
+        {
+          "runId": "R-930",
+          "runHash": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc",
+          "origin": "launched"
+        }
+      ],
+      "blocking": true,
+      "freshness": "P14D"
+    }
+  ],
+  "budget": {
+    "approvedUsd": 10.0,
+    "spentUsd": 6.4,
+    "approvedBy": {
+      "identity": "oidc:https://login.example.com/u-7f3a",
+      "assurance": "self-attested"
+    }
+  },
+  "state": "decided",
+  "outcome": "approved_with_exceptions",
+  "decisionInput": {
+    "subjectVersion": "git:3f2a1c",
+    "evaluatedAt": "2026-10-02T14:30:00Z",
+    "supersededBy": null,
+    "lanes": [
+      {
+        "lane": "quality",
+        "blocking": true,
+        "evidence": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "result": {
+          "status": "passed",
+          "subjectVersion": "git:3f2a1c",
+          "oldestClosedAt": "2026-10-02T13:10:00Z"
+        }
+      },
+      {
+        "lane": "security",
+        "blocking": true,
+        "freshness": "P14D",
+        "evidence": [
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        ],
+        "result": {
+          "status": "failed",
+          "subjectVersion": "git:3f2a1c",
+          "oldestClosedAt": "2026-09-30T08:00:00Z"
+        }
+      }
+    ],
+    "exceptions": [
+      {
+        "lane": "security",
+        "evidence": [
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+          "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+        ],
+        "requirement": "REQ-15",
+        "reason": "A medium-severity prompt-injection finding is accepted until the 3.2.1 patch; tracked in the release review.",
+        "by": {
+          "identity": "oidc:https://login.example.com/u-7f3a",
+          "assurance": "authenticated"
+        },
+        "at": "2026-10-02T14:00:00Z",
+        "expires": "2026-10-16T00:00:00Z"
+      }
+    ]
+  },
+  "decision": {
+    "outcome": "approved_with_exceptions",
+    "lanes": [
+      {
+        "lane": "quality",
+        "status": "passed",
+        "blocking": true
+      },
+      {
+        "lane": "security",
+        "status": "waived",
+        "blocking": true
+      }
+    ],
+    "reasons": [
+      "waived:security",
+      "outcome:approved_with_exceptions"
+    ]
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "kind": "plan",
+  "schema": "run-plan",
+  "writer": "invalid",
+  "reader": "valid",
+  "reads": {
+    "credentialRefs[0].scheme": "refused"
+  },
+  "rules": [
+    "PLAN-3",
+    "PLAN-7",
+    "VER-8"
+  ],
+  "why": "a credential scheme this version does not know: a reader takes the plan, and a runner refuses it"
+}

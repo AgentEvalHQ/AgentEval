@@ -1,0 +1,67 @@
+{
+  "description": "A waived lane beside a missing one: inconclusive before approved_with_exceptions.",
+  "rules": [
+    "DEC-1",
+    "DEC-2",
+    "DEC-3",
+    "DEC-4"
+  ],
+  "input": {
+    "subjectVersion": "git:3f2a1c",
+    "evaluatedAt": "2026-10-08T12:00:00Z",
+    "lanes": [
+      {
+        "lane": "quality",
+        "blocking": true,
+        "result": null
+      },
+      {
+        "lane": "security",
+        "blocking": true,
+        "evidence": [
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        ],
+        "result": {
+          "status": "failed",
+          "subjectVersion": "git:3f2a1c",
+          "oldestClosedAt": "2026-10-07T10:00:00Z"
+        }
+      }
+    ],
+    "exceptions": [
+      {
+        "lane": "security",
+        "evidence": [
+          "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        ],
+        "reason": "The security failure is accepted until the fix ships; tracked in the release review.",
+        "by": {
+          "identity": "oidc:https://login.example.com/u-7f3a",
+          "assurance": "authenticated"
+        },
+        "at": "2026-10-07T15:00:00Z",
+        "expires": "2026-10-21T00:00:00Z"
+      }
+    ]
+  },
+  "expected": {
+    "outcome": "inconclusive",
+    "lanes": [
+      {
+        "lane": "quality",
+        "status": "missing",
+        "blocking": true
+      },
+      {
+        "lane": "security",
+        "status": "waived",
+        "blocking": true
+      }
+    ],
+    "reasons": [
+      "missing:quality",
+      "waived:security",
+      "outcome:inconclusive"
+    ]
+  }
+}

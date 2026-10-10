@@ -1,0 +1,403 @@
+{
+  "version": 2,
+  "status": "success",
+  "eval": {
+    "eval_id": "01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10",
+    "run_id": "01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10",
+    "created": "2026-10-02T14:02:11.120Z",
+    "task": "support/triage-scenarios",
+    "task_version": "4",
+    "dataset": {
+      "samples": 6,
+      "sample_ids": [
+        "case-17",
+        "case-18",
+        "case-19",
+        "case-20",
+        "case-21",
+        "case-22"
+      ]
+    },
+    "model": "agent:support/support-triage",
+    "model_roles": {
+      "judge": {
+        "model": "gpt-5.1"
+      }
+    },
+    "config": {
+      "epochs": 1
+    },
+    "packages": {
+      "agenteval-cli": "1.0.0"
+    },
+    "metadata": {
+      "aef": {
+        "suite": {
+          "digest": "sha256:f1b4f6f2c254e91b0c23b6c40c1554dd8a7b04715858206d4537698e34caaedd"
+        },
+        "judges": [
+          {
+            "model": "gpt-5.1",
+            "rubricDigest": "sha256:29fd018a9848938bc2b0e33fffa32bde2827e81388d0e03195919be5835c3605",
+            "calibration": {
+              "labelSet": "labels:support/triage-golden@2",
+              "n": 120,
+              "accuracy": 0.925,
+              "kappa": 0.81,
+              "dangerousErrors": 1,
+              "measuredAt": "2026-09-20T10:00:00Z"
+            }
+          }
+        ],
+        "execution": {
+          "targetMode": "live",
+          "stimulus": "suite"
+        },
+        "contentCapture": "on",
+        "deployment": {
+          "ref": "deployment:support/support-triage@dev",
+          "environment": "dev",
+          "endpoint": "http://localhost:5080"
+        }
+      }
+    }
+  },
+  "results": {
+    "total_samples": 6,
+    "completed_samples": 6,
+    "scores": [
+      {
+        "name": "triage",
+        "scorer": "triage",
+        "scored_samples": 2,
+        "unscored_samples": 4,
+        "metrics": {
+          "mean": {
+            "name": "mean",
+            "value": 0.665
+          },
+          "stderr": {
+            "name": "stderr",
+            "value": 0.115
+          }
+        },
+        "metadata": {
+          "aef": {
+            "lane": "quality",
+            "metric": "triage",
+            "N": 6,
+            "notMeasured": 4,
+            "verdict": "failed",
+            "rule": "triage >= 0.8"
+          }
+        }
+      },
+      {
+        "name": "triage/helpfulness",
+        "scorer": "triage/helpfulness",
+        "scored_samples": 1,
+        "unscored_samples": 0,
+        "metrics": {
+          "mean": {
+            "name": "mean",
+            "value": 0.1
+          }
+        },
+        "metadata": {
+          "aef": {
+            "lane": "quality",
+            "metric": "helpfulness",
+            "N": 1,
+            "notMeasured": 0,
+            "verdict": "failed",
+            "rule": "helpfulness >= 0.7"
+          }
+        }
+      },
+      {
+        "name": "triage/groundedness",
+        "scorer": "triage/groundedness",
+        "scored_samples": 0,
+        "unscored_samples": 0,
+        "metrics": {
+          "mean": {
+            "name": "mean",
+            "value": NaN
+          }
+        },
+        "metadata": {
+          "aef": {
+            "lane": "quality",
+            "metric": "groundedness",
+            "N": 0,
+            "notMeasured": 0,
+            "verdict": "not_measured",
+            "rule": "groundedness >= 0.7"
+          }
+        }
+      }
+    ]
+  },
+  "stats": {
+    "started_at": "2026-10-02T14:02:11.120Z",
+    "completed_at": "2026-10-02T14:06:23.004Z"
+  },
+  "samples": [
+    {
+      "id": "case-17",
+      "epoch": 1,
+      "input": "",
+      "target": "",
+      "scores": {
+        "triage": {
+          "value": 0.55,
+          "metadata": {
+            "aef": {
+              "resultId": "r_479d157f3423e95d566bcbfc0c6d2461",
+              "state": "failed",
+              "evaluator": {
+                "id": "composite:triage",
+                "version": "2"
+              },
+              "severity": "medium",
+              "verdictRule": {
+                "expr": "triage >= threshold",
+                "threshold": 0.8,
+                "source": "run.config.thresholds.triage"
+              },
+              "aggregation": {
+                "strategy": "WeightedSum",
+                "threshold": 0.8,
+                "score": 0.55,
+                "rulePath": "threshold",
+                "measured": 2,
+                "total": 3,
+                "minimumMeasuredShare": 0.5,
+                "unmeasured": {
+                  "not_measured": 0,
+                  "not_applicable": 1,
+                  "skipped": 0,
+                  "error": 0
+                },
+                "decisive": [
+                  "r_1264eeb36620c9cbe97b71ffdbcfd331"
+                ]
+              }
+            }
+          }
+        },
+        "triage/policy": {
+          "value": 1.0,
+          "metadata": {
+            "aef": {
+              "resultId": "r_bb4438fbedb43552a9fe55695931d5e4",
+              "state": "passed",
+              "evaluator": {
+                "id": "code:refund-escalation",
+                "version": "1"
+              },
+              "parentResultId": "r_479d157f3423e95d566bcbfc0c6d2461",
+              "annotator": {
+                "kind": "CODE"
+              },
+              "component": {
+                "weight": 0.5,
+                "required": true
+              }
+            }
+          }
+        },
+        "triage/helpfulness": {
+          "value": 0.1,
+          "explanation": "The answer escalated the refund — as policy §4 requires · « correct » ✓ 👍 مرحبا\r\nSecond line (CRLF kept).\n",
+          "metadata": {
+            "aef": {
+              "resultId": "r_1264eeb36620c9cbe97b71ffdbcfd331",
+              "state": "failed",
+              "evaluator": {
+                "id": "llm:helpfulness",
+                "version": "3"
+              },
+              "parentResultId": "r_479d157f3423e95d566bcbfc0c6d2461",
+              "severity": "medium",
+              "verdictRule": {
+                "expr": "helpfulness >= threshold",
+                "threshold": 0.7,
+                "source": "suite"
+              },
+              "annotator": {
+                "kind": "LLM",
+                "model": "gpt-5.1",
+                "promptHash": "sha256:cf07194ee232eb531e15f690000d19846dea69cf05504782658afcfacb9228a2",
+                "rubricDigest": "sha256:29fd018a9848938bc2b0e33fffa32bde2827e81388d0e03195919be5835c3605"
+              },
+              "component": {
+                "weight": 0.5,
+                "required": false
+              }
+            }
+          }
+        },
+        "triage/groundedness": {
+          "value": NaN,
+          "reason": "not_applicable",
+          "explanation": "No retrieved context was recorded for this case: nothing to ground against.",
+          "metadata": {
+            "aef": {
+              "resultId": "r_306364ba4d940f649ea348dadfbe17de",
+              "state": "not_applicable",
+              "evaluator": {
+                "id": "llm:groundedness",
+                "version": "1"
+              },
+              "parentResultId": "r_479d157f3423e95d566bcbfc0c6d2461",
+              "component": {
+                "weight": 0.0,
+                "required": false
+              }
+            }
+          }
+        }
+      },
+      "model_usage": {
+        "gpt-5.1": {
+          "input_tokens": 1747,
+          "output_tokens": 488,
+          "total_tokens": 2235,
+          "reasoning_tokens": 301,
+          "total_cost": 0.012
+        }
+      },
+      "role_usage": {
+        "agent": {
+          "input_tokens": 912,
+          "output_tokens": 214,
+          "total_tokens": 1126,
+          "input_tokens_cache_read": 640
+        },
+        "judge": {
+          "input_tokens": 1747,
+          "output_tokens": 488,
+          "total_tokens": 2235,
+          "reasoning_tokens": 301,
+          "total_cost": 0.012
+        }
+      },
+      "total_time": 4.21
+    },
+    {
+      "id": "case-18",
+      "epoch": 1,
+      "input": "",
+      "target": "",
+      "scores": {
+        "triage": {
+          "value": 0.78,
+          "metadata": {
+            "aef": {
+              "resultId": "r_3b156bcb57417545db27c39e78c955bd",
+              "state": "warn",
+              "evaluator": {
+                "id": "composite:triage",
+                "version": "2"
+              },
+              "severity": "low"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "case-19",
+      "epoch": 1,
+      "input": "",
+      "target": "",
+      "scores": {
+        "triage": {
+          "value": NaN,
+          "reason": "inconclusive",
+          "explanation": "The panel split 1–1 (a third judge timed out).",
+          "metadata": {
+            "aef": {
+              "resultId": "r_b75a850bf7391d59bb946e65234b129f",
+              "state": "inconclusive",
+              "evaluator": {
+                "id": "composite:triage",
+                "version": "2"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "case-20",
+      "epoch": 1,
+      "input": "",
+      "target": "",
+      "scores": {
+        "triage": {
+          "value": NaN,
+          "reason": "not_measured",
+          "explanation": "The agent's reply was empty: there was nothing to grade.",
+          "metadata": {
+            "aef": {
+              "resultId": "r_674d2ba3bec9579616f495572ca9c7f6",
+              "state": "not_measured",
+              "evaluator": {
+                "id": "composite:triage",
+                "version": "2"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "case-21",
+      "epoch": 1,
+      "input": "",
+      "target": "",
+      "scores": {
+        "triage": {
+          "value": NaN,
+          "reason": "skipped",
+          "explanation": "Skipped by --max-cases 20.",
+          "metadata": {
+            "aef": {
+              "resultId": "r_7e085ed2b7a63e44c634e50ee8152782",
+              "state": "skipped",
+              "evaluator": {
+                "id": "composite:triage",
+                "version": "2"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "case-22",
+      "epoch": 1,
+      "input": "",
+      "target": "",
+      "scores": {
+        "triage": {
+          "value": NaN,
+          "reason": "error",
+          "explanation": "The judge returned HTTP 429 three times.",
+          "metadata": {
+            "aef": {
+              "resultId": "r_d1cf4f8e911edc07bc099e8435c9114a",
+              "state": "error",
+              "evaluator": {
+                "id": "composite:triage",
+                "version": "2"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

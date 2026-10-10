@@ -1,0 +1,14 @@
+{
+  "kind": "checkpoint",
+  "schema": "checkpoint",
+  "writer": "valid",
+  "reader": "valid",
+  "rules": [
+    "CKP-7"
+  ],
+  "why": "the input decides exactly the manifest's lanes",
+  "problems": [
+    "decision",
+    "lanes"
+  ]
+}

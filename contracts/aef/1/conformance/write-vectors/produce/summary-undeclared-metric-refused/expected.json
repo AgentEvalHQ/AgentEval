@@ -1,0 +1,10 @@
+{
+  "kind": "produce",
+  "rules": [
+    "SUM-1",
+    "SUM-3"
+  ],
+  "scenario": "scenario.json",
+  "refused": true,
+  "why": "The summary asks for a metric metrics.json does not declare: summarize's input error, raised through produce (spec 09 §9.3), so nothing is written."
+}

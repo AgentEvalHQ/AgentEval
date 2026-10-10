@@ -1,0 +1,26 @@
+{
+  "description": "An evaluatedAt on 31 February: the reader schema refuses the input, so the function refuses it (DEC-1, ENC-8).",
+  "rules": [
+    "DEC-1"
+  ],
+  "input": {
+    "subjectVersion": "git:3f2a1c",
+    "evaluatedAt": "2026-02-31T00:00:00Z",
+    "lanes": [
+      {
+        "lane": "quality",
+        "blocking": true,
+        "evidence": [
+          "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        ],
+        "result": {
+          "status": "passed",
+          "subjectVersion": "git:3f2a1c",
+          "oldestClosedAt": "2026-10-07T10:00:00Z"
+        }
+      }
+    ]
+  },
+  "expectedError": "input-invalid",
+  "schemaInvalid": true
+}

@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "edgesLog01",
+  "lanes": [
+    {
+      "lane": "main",
+      "metrics": [
+        {
+          "metric": "q",
+          "path": "q",
+          "N": 12,
+          "n": 5,
+          "notMeasured": 7,
+          "sum": 2.0,
+          "sumSq": 1.2,
+          "value": 0.4,
+          "verdict": "scored"
+        }
+      ]
+    }
+  ],
+  "usage": [
+    {
+      "role": "judge",
+      "gen_ai.usage.input_tokens": 100,
+      "gen_ai.usage.output_tokens": 20
+    },
+    {
+      "role": "attacker",
+      "gen_ai.usage.input_tokens": 30,
+      "gen_ai.usage.output_tokens": 5
+    }
+  ]
+}

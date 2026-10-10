@@ -1,0 +1,17 @@
+{
+  "kind": "job",
+  "plan": "plan.json",
+  "runner": "../runner.json",
+  "target": "target.json",
+  "at": "2026-10-09T09:00:00Z",
+  "terminal": "job.refused",
+  "limit": null,
+  "runs": [],
+  "spentUsd": 0,
+  "estimated": null,
+  "endsAt": "2026-10-09T09:00:00Z",
+  "rules": [
+    "PLAN-3"
+  ],
+  "why": "a vault reference whose path names nothing (spec 09 §9.3): whether or not the runner can read a vault, the credential cannot be resolved, so the plan is refused before job.accepted, not a job that fails later"
+}

@@ -1,0 +1,14 @@
+{
+  "kind": "plan-conformance",
+  "events": "events.ndjson",
+  "plan": "plan.json",
+  "runs": "runs",
+  "policy": "policy.json",
+  "problems": [],
+  "rules": [
+    "STRM-4",
+    "SEAL-4",
+    "OVL-10"
+  ],
+  "why": "a blob withheld by a redaction the trust policy authorizes leaves the run intact, with its seal's run hash, the one announced"
+}

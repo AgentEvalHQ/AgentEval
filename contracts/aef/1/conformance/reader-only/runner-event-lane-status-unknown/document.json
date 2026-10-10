@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "1.0",
+  "seq": 7,
+  "kind": "lane.completed",
+  "jobId": "job-7",
+  "at": "2026-10-08T12:00:06Z",
+  "lane": "quality",
+  "status": "partly"
+}

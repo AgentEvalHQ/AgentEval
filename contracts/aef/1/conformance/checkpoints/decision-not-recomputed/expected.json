@@ -1,0 +1,13 @@
+{
+  "kind": "checkpoint",
+  "schema": "checkpoint",
+  "writer": "valid",
+  "reader": "valid",
+  "rules": [
+    "CKP-7"
+  ],
+  "why": "the recorded decision is what the recorded input gives",
+  "problems": [
+    "decision"
+  ]
+}

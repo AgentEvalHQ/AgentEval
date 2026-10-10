@@ -1,0 +1,80 @@
+{
+  "_source": "tests/test_http_endpoint_events.py lines 91-147 @ e03aa809 (MIT). Python literals transcribed to JSON.",
+  "endpoint": "http://localhost:8080/chat",
+  "request_body_asserted_by_test": {
+    "message": "restore the line",
+    "history": [
+      {
+        "role": "user",
+        "content": "restore the line"
+      }
+    ]
+  },
+  "allow_redirects_asserted_by_test": false,
+  "endpoint_response_body": {
+    "response": "The line is restored.",
+    "events": [
+      {
+        "role": "tool_call",
+        "tool_name": "resume_line",
+        "tool_args": {
+          "line_id": "L1002"
+        },
+        "tool_call_id": "tc-1",
+        "content": ""
+      },
+      {
+        "role": "tool_result",
+        "tool_name": "resume_line",
+        "tool_args": {
+          "line_id": "L1002"
+        },
+        "tool_call_id": "tc-1",
+        "content": "{\"mode\":\"pass\",\"real_executed\":true}",
+        "raw": {
+          "action_mediation": {
+            "mode": "pass",
+            "real_executed": true,
+            "returned": {
+              "status": "resumed"
+            }
+          },
+          "internal_diagnostics": {
+            "token": "must-not-persist"
+          }
+        }
+      }
+    ],
+    "internal_diagnostics": {
+      "token": "secret-value"
+    }
+  },
+  "expected_interaction_message_roles": [
+    "user",
+    "assistant",
+    "tool",
+    "assistant"
+  ],
+  "expected_tool_call_message_tool_calls": [
+    {
+      "id": "endpoint-action-0",
+      "function": "resume_line",
+      "arguments": {
+        "line_id": "L1002"
+      }
+    }
+  ],
+  "expected_tool_result_raw": {
+    "endpoint": "http://localhost:8080/chat",
+    "action_mediation": {
+      "mode": "pass",
+      "real_executed": true,
+      "returned": {
+        "status": "resumed"
+      }
+    }
+  },
+  "expected_turn_raw": {
+    "endpoint": "http://localhost:8080/chat"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "kind": "run",
+  "run": "run",
+  "outcome": "invalid",
+  "problems": [
+    [
+      "summary.json",
+      "summary"
+    ]
+  ],
+  "rules": [
+    "SUM-5",
+    "SUM-6"
+  ],
+  "why": "the same lines, and a summary that writes the exact mean, 1.5e308, a finite number: SUM-5 gives no binary64 value for a mean whose sum is beyond binary64, so its value is null, and this is a summary problem."
+}

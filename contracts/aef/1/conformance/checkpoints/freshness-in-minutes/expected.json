@@ -1,0 +1,12 @@
+{
+  "kind": "checkpoint",
+  "schema": "checkpoint",
+  "writer": "valid",
+  "reader": "valid",
+  "rules": [
+    "ENC-9",
+    "CKP-3"
+  ],
+  "why": "a freshness in minutes",
+  "problems": []
+}

@@ -1,0 +1,1 @@
+{"schemaVersion":"1.0","gateId":"gate:a/b","decisionId":"D-1","rule":{"strategy":"threshold"},"inputs":{"results":["r_b9854f7a799a016d487f5a5a391c431f"]},"comparability":"not_applicable","outcome":"no_ship","decidedAt":"2026-10-01T00:01:00Z"}

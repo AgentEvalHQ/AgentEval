@@ -1,0 +1,91 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "blobs/sha256/02/02068092a512417a3b5b77ebcd731cfb6516ab5b5bb5886d09dbb856c648d286",
+      "digest": {
+        "sha256": "02068092a512417a3b5b77ebcd731cfb6516ab5b5bb5886d09dbb856c648d286"
+      }
+    },
+    {
+      "name": "blobs/sha256/63/635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5",
+      "digest": {
+        "sha256": "635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5"
+      }
+    },
+    {
+      "name": "blobs/sha256/a8/a8f368767aeea6d16221c58b6a36d153a8aa6a09d591ef84fac4c80cd3edce5e",
+      "digest": {
+        "sha256": "a8f368767aeea6d16221c58b6a36d153a8aa6a09d591ef84fac4c80cd3edce5e"
+      }
+    },
+    {
+      "name": "blobs/sha256/a9/a9f1a74c5419f8e4e3a02fa5275e88b6d65365a91e12fe62173e5fed8fdd42db",
+      "digest": {
+        "sha256": "a9f1a74c5419f8e4e3a02fa5275e88b6d65365a91e12fe62173e5fed8fdd42db"
+      }
+    },
+    {
+      "name": "blobs/sha256/c8/c8a62cdfe25ae96d7c2a1cfcbd355ecb6bd7bb17356fedffcf6091749aae2751",
+      "digest": {
+        "sha256": "c8a62cdfe25ae96d7c2a1cfcbd355ecb6bd7bb17356fedffcf6091749aae2751"
+      }
+    },
+    {
+      "name": "blobs/sha256/f8/f8d05b476566d2868415f9c439d35d35a728f15acc2b976055f18eeda961e854",
+      "digest": {
+        "sha256": "f8d05b476566d2868415f9c439d35d35a728f15acc2b976055f18eeda961e854"
+      }
+    },
+    {
+      "name": "metrics.json",
+      "digest": {
+        "sha256": "1993389522346cddb5e116c6bed603c51c662fe57da29c19d7ae69672f3be53d"
+      }
+    },
+    {
+      "name": "results.ndjson",
+      "digest": {
+        "sha256": "fb934b2cca18138f90ce0e2adc2b543dc8131d33c20bfc800c64d0c34ca7a508"
+      }
+    },
+    {
+      "name": "run.json",
+      "digest": {
+        "sha256": "bef0946b16c31151d364f6ce1969b24bf6aa51bb6e30adcdbb51a2575b82a05f"
+      }
+    },
+    {
+      "name": "summary.json",
+      "digest": {
+        "sha256": "aef38ddca5276c5df8da86276b1373c6156405209a1343ca31edb21b037a95b6"
+      }
+    }
+  ],
+  "predicateType": "https://agenteval.dev/aef/1/evidence",
+  "predicate": {
+    "schemaVersion": "1.0",
+    "runId": "01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10",
+    "runHash": "8eb0cf7bf9fad78082936cb028024dfb1066b655a2c220f16484b71b7a62144e",
+    "producer": {
+      "name": "aef_interop.py",
+      "version": "1.0"
+    },
+    "subject": {
+      "ref": "model:agent:support/support-triage"
+    },
+    "deployment": null,
+    "suite": {
+      "ref": "suite:support/triage-scenarios",
+      "version": "4"
+    },
+    "judges": [
+      {
+        "model": "gpt-5.1"
+      }
+    ],
+    "closedAt": "2026-10-02T14:06:23.004Z",
+    "sealedAt": "2026-10-09T00:00:00Z",
+    "sealedBy": "ingest"
+  }
+}

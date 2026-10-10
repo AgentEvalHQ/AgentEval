@@ -1,0 +1,18 @@
+{
+  "kind": "plan-conformance",
+  "events": "events.ndjson",
+  "plan": "plan.json",
+  "runs": "runs",
+  "problems": [
+    [
+      "run:R-1",
+      "no-cost"
+    ]
+  ],
+  "rules": [
+    "STRM-4",
+    "PLAN-2",
+    "SUM-7"
+  ],
+  "why": "R-1's summary states no cost: with a budget to keep, that is a problem, not $0"
+}

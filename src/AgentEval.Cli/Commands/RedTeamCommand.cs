@@ -23,6 +23,7 @@ using AgentEval.RedTeam.Evaluators;
 using AgentEval.RedTeam.Importers;
 using AgentEval.RedTeam.Reporting;
 using AgentEval.RedTeam.Reporting.Compliance;
+using AgentEval.RedTeam.Transforms;
 using Microsoft.Extensions.AI;
 
 namespace AgentEval.Cli.Commands;
@@ -68,7 +69,14 @@ internal static class RedTeamCommand
 
         // Attack selection
         var attacksOpt = new Option<string?>("--attacks")
-            { Description = "Comma-separated attack types (e.g., PromptInjection,Jailbreak). Default: all. Opt-in multi-turn: Crescendo, PAIR, TAP (PAIR/TAP require --attacker), ToolEscalation (best at --sut-tier instrumented)." };
+            { Description = "Comma-separated attack types (e.g., PromptInjection,Jailbreak). Default: all. Opt-in multi-turn: Crescendo, PAIR, TAP (PAIR/TAP require --attacker), ToolEscalation (best at --sut-tier instrumented). memory-poisoning runs on its own: the memory-security corpus against the model you name behind AgentEval's memory protection (--scripted: the scripted worst-case model)." };
+        var memoryTrialsOpt = new Option<int>("--memory-trials")
+        {
+            DefaultValueFactory = _ => 1,
+            Description = "With --attacks memory-poisoning: runs per case (1-100). Every case runs the same number of times.",
+        };
+        var transformOpt = new Option<string?>("--transform")
+            { Description = "Also run every single-turn probe encoded: comma-separated codecs (base64, base32, hex, url, rot13, caesar, atbash, reversed, xor, binary, octal, ascii_decimal, html_entities, html_hex_entities, unicode_escapes, fullwidth, morse, leetspeak) or a group (reversible | lossy | all). The plaintext probes still run as the control; each codec adds one encoded variant per probe, so the probe count (and judge cost) multiplies. Multi-turn, tool-aware and tree attacks run unencoded." };
         var importProbesOpt = new Option<FileInfo?>("--import-probes")
             { Description = "Import a JSON or CSV seed-prompt dataset (HarmBench/JailbreakBench/etc.; dispatched by .json/.csv extension) and run it alongside the built-in attacks. Probes without an expected-token oracle are Inconclusive unless --judge is set." };
         var importPromptFieldOpt = new Option<string?>("--import-prompt-field")
@@ -173,6 +181,8 @@ internal static class RedTeamCommand
         }
         command.Options.Add(systemPromptCanaryOpt);
         command.Options.Add(attacksOpt);
+        command.Options.Add(memoryTrialsOpt);
+        command.Options.Add(transformOpt);
         command.Options.Add(importProbesOpt);
         command.Options.Add(importPromptFieldOpt);
         command.Options.Add(importIdColumnOpt);
@@ -212,6 +222,10 @@ internal static class RedTeamCommand
         {
             var opts = new RedTeamOptions
             {
+                ExplicitOptions = parseResult.CommandResult.Children.OfType<OptionResult>()
+                    .Where(r => !r.Implicit)
+                    .SelectMany(r => r.Option.Aliases.Prepend(r.Option.Name))
+                    .ToHashSet(StringComparer.Ordinal),
                 Endpoint = parseResult.GetValue(endpointOpt),
                 Azure = parseResult.GetValue(azureFlag),
                 Model = parseResult.GetValue(modelOpt),
@@ -225,6 +239,8 @@ internal static class RedTeamCommand
                     t => t.Sut, t => t.BindOptions(parseResult), StringComparer.OrdinalIgnoreCase),
                 SystemPromptCanary = parseResult.GetValue(systemPromptCanaryOpt),
                 Attacks = parseResult.GetValue(attacksOpt),
+                MemoryTrials = parseResult.GetValue(memoryTrialsOpt),
+                Transform = parseResult.GetValue(transformOpt),
                 ImportProbes = parseResult.GetValue(importProbesOpt),
                 ImportPromptField = parseResult.GetValue(importPromptFieldOpt),
                 ImportIdColumn = parseResult.GetValue(importIdColumnOpt),
@@ -265,7 +281,9 @@ internal static class RedTeamCommand
             // nothing to evaluate. ExecuteAsync still throws for it, for its direct callers; through 0.42 the
             // command line reported that throw as a runtime error (exit 3). `--pack list` evaluates nothing and needs
             // no target: ExecuteAsync prints the catalog before anything else.
-            if (opts.Sut is null && opts.Endpoint is null && !opts.Azure && !IsPackList(opts))
+            // memory-poisoning validates its own target (it also accepts --scripted, and says so).
+            if (opts.Sut is null && opts.Endpoint is null && !opts.Azure && !IsPackList(opts)
+                && !MemoryPoisoningRedTeamDriver.IsSelected(opts.Attacks))
             {
                 Console.Error.WriteLine("  Error: Specify --endpoint <url> or --azure, or --sut <target>.");
                 return ExitCodes.UsageError;
@@ -293,6 +311,63 @@ internal static class RedTeamCommand
     }
 
     /// <summary>
+    /// Parses <c>--transform</c>: codec names and the groups <c>reversible</c>, <c>lossy</c>, <c>all</c>, comma-separated,
+    /// case-insensitive, duplicates collapsed. Null when the option is absent or blank.
+    /// </summary>
+    /// <exception cref="ArgumentException">A name is neither a codec nor a group.</exception>
+    internal static IReadOnlyList<IProbeTransformer>? ResolveTransformers(string? spec)
+    {
+        if (string.IsNullOrWhiteSpace(spec))
+            return null;
+
+        var byName = Transformers.AllEncodings.ToDictionary(t => t.Name, StringComparer.OrdinalIgnoreCase);
+        var resolved = new List<IProbeTransformer>();
+        foreach (var name in spec.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            IReadOnlyList<IProbeTransformer>? group = name.ToLowerInvariant() switch
+            {
+                "all" => Transformers.AllEncodings,
+                "reversible" => Transformers.ReversibleEncodings,
+                "lossy" => Transformers.LossyEncodings,
+                _ => null,
+            };
+            if (group is not null)
+                resolved.AddRange(group);
+            else if (byName.TryGetValue(name, out var transformer))
+                resolved.Add(transformer);
+            else
+                throw new ArgumentException(
+                    $"Unknown --transform '{name}'. Valid: reversible | lossy | all, or any of: {string.Join(", ", byName.Keys)}");
+        }
+
+        // Expand mode refuses two transformers with one name (their probe ids would collide).
+        var distinct = resolved.DistinctBy(t => t.Name, StringComparer.Ordinal).ToList();
+        return distinct.Count == 0 ? null : distinct;
+    }
+
+    /// <summary>
+    /// Wraps every single-turn attack in <paramref name="roster"/> so each probe also runs once per transformer, keeping
+    /// the plaintext probe as the control. Multi-turn, tool-aware and tree attacks are left as they are (encoding them
+    /// would silently downgrade them to single-turn) and named in <paramref name="unencoded"/>.
+    /// </summary>
+    internal static IReadOnlyList<IAttackType> ApplyTransforms(
+        IReadOnlyList<IAttackType> roster, IReadOnlyList<IProbeTransformer> transformers, out IReadOnlyList<string> unencoded)
+    {
+        var skipped = new List<string>();
+        var result = roster.Select(a =>
+        {
+            if (a is IMultiTurnAttack or IToolAwareAttack or ITreeAttack)
+            {
+                skipped.Add(a.Name);
+                return a;
+            }
+            return new TransformedAttack(a, transformers, TransformMode.Expand, keepOriginal: true);
+        }).ToList();
+        unencoded = skipped;
+        return result;
+    }
+
+    /// <summary>
     /// Core execution logic — separated from command wiring for testability. <paramref name="sutOverride"/>, when
     /// non-null, is used as the system-under-test instead of constructing one — the credential-free test seam that
     /// lets a fake agent drive a full built-in-target scan offline.
@@ -300,8 +375,21 @@ internal static class RedTeamCommand
     private static bool IsPackList(RedTeamOptions opts) =>
         string.Equals(opts.Pack?.Trim(), "list", StringComparison.OrdinalIgnoreCase);
 
-    internal static async Task<int> ExecuteAsync(RedTeamOptions opts, CancellationToken ct, IEvaluableAgent? sutOverride = null)
+    internal static async Task<int> ExecuteAsync(
+        RedTeamOptions opts, CancellationToken ct, IEvaluableAgent? sutOverride = null, IChatClient? memoryModelOverride = null)
     {
+        // `--attacks memory-poisoning` is not a probe scan: multi-session cases over a memory store, scored by the
+        // memory-security checks (MemoryPoisoningRedTeamDriver). memoryModelOverride is its credential-free test seam.
+        // First, so a probe-scan option beside it (--pack list too) is refused rather than acted on.
+        if (MemoryPoisoningRedTeamDriver.IsSelected(opts.Attacks))
+            return await MemoryPoisoningRedTeamDriver.RunAsync(opts, memoryModelOverride, ct).ConfigureAwait(false);
+
+        if (opts.MemoryTrials != 1)
+        {
+            Console.Error.WriteLine("  Error: --memory-trials applies to --attacks memory-poisoning only.");
+            return ExitCodes.UsageError;
+        }
+
         // 0. `--pack list`: print the benchmark-pack catalog and exit (no scan, no endpoint required).
         if (IsPackList(opts))
         {
@@ -363,6 +451,9 @@ internal static class RedTeamCommand
         var packageRegistry = (opts.PackageRegistry ?? "none").Trim().ToLowerInvariant();
         if (packageRegistry is not ("none" or "live"))
             throw new ArgumentException($"Unknown --package-registry: '{opts.PackageRegistry}'. Valid: none | live");
+
+        // A --transform typo fails here too, before any import, download or probe.
+        var transformers = ResolveTransformers(opts.Transform);
 
         // Jun14v2-L4: the timeout/throttle bounds are a static config error knowable before any I/O — validate here in
         // step 1 (matching L22) so `--timeout-per-probe 0` / an over-the-ceiling value fails fast, not after the
@@ -493,6 +584,18 @@ internal static class RedTeamCommand
                 Console.Error.WriteLine(hasSupplyChain
                     ? "  SupplyChain: live package registry (PyPI/npm/NuGet) enabled — a registry outage under-detects rather than false-flagging."
                     : "  Warning: --package-registry live has no effect — the SupplyChain attack is not in the selected --attacks set.");
+        }
+
+        if (transformers is not null)
+        {
+            attacks = ApplyTransforms(attacks ?? Attack.All, transformers, out var unencoded);
+            if (!opts.Quiet)
+            {
+                Console.Error.WriteLine($"  Transforms: {string.Join(", ", transformers.Select(t => t.Name))} — each single-turn probe also runs " +
+                                        $"encoded ({transformers.Count} variant(s) per probe, plus the plaintext control).");
+                if (unencoded.Count > 0)
+                    Console.Error.WriteLine($"  Not encoded (multi-turn / tool-aware / tree): {string.Join(", ", unencoded)}");
+            }
         }
 
         // 4. Resolve intensity
@@ -927,6 +1030,12 @@ internal sealed class RedTeamOptions
     public IReadOnlyDictionary<string, IRedTeamTargetOptions?> TargetOptions { get; init; }
         = new Dictionary<string, IRedTeamTargetOptions?>(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>
+    /// Every name and alias of the options given on the command line (null when built in code). A run that reads only
+    /// some options refuses the others by presence, so a flag given with its default value is not silently ignored.
+    /// </summary>
+    public IReadOnlySet<string>? ExplicitOptions { get; init; }
+
     /// <summary>Reads the bound options a built-in target contributed (see <see cref="TargetOptions"/>) for target
     /// <paramref name="sut"/>, cast to <typeparamref name="T"/>; <c>null</c> if the target contributed none. Matches
     /// <paramref name="sut"/> case-insensitively regardless of how <see cref="TargetOptions"/> was built, so a caller
@@ -944,6 +1053,9 @@ internal sealed class RedTeamOptions
     }
     public string? SystemPromptCanary { get; init; }
     public string? Attacks { get; init; }
+    /// <summary>With <c>--attacks memory-poisoning</c>: runs per case.</summary>
+    public int MemoryTrials { get; init; } = 1;
+    public string? Transform { get; init; }
     public FileInfo? ImportProbes { get; init; }
     public string? ImportPromptField { get; init; }
     public string? ImportIdColumn { get; init; }

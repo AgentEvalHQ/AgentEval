@@ -1,0 +1,14 @@
+{
+  "kind": "checkpoint",
+  "schema": "checkpoint",
+  "writer": "valid",
+  "reader": "valid",
+  "rules": [
+    "CKP-7"
+  ],
+  "why": "a lane with runs has a result (here the input drops it, so the recorded decision is not recomputed either)",
+  "problems": [
+    "decision",
+    "evidence"
+  ]
+}

@@ -31,7 +31,8 @@ boundary.
 ### Calibration is part of the configuration
 
 Calibrate the exact model deployment, rubric, prompt, parser, timeout, temperature posture, and output cap that will
-run in production. `GateCalibrationHarness` compares decisive outcomes with reviewed labels and a deterministic
+run in production. By default a judge sends no temperature (`JudgeGateOptions.Temperature` is `null`), so the
+provider's own default applies and can change under you; pin it when the model accepts an explicit value. `GateCalibrationHarness` compares decisive outcomes with reviewed labels and a deterministic
 baseline. `IsInlineReady` is necessary, not a generalization claim.
 
 A calibration-set result is not a held-out estimate. For broad promotion, preserve a separate validation split or a

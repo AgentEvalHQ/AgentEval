@@ -1,0 +1,14 @@
+{
+  "kind": "document",
+  "schema": "run",
+  "writer": "valid",
+  "reader": "valid",
+  "reads": {
+    "suite.executionPolicy.aggregation": "AtLeast"
+  },
+  "rules": [
+    "VER-8",
+    "RUN-8",
+    "RES-8"
+  ]
+}

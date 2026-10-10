@@ -1,0 +1,12 @@
+{
+  "kind": "document",
+  "schema": "result",
+  "document": "document.ndjson",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "ENC-5",
+    "ENC-7",
+    "VER-3"
+  ]
+}

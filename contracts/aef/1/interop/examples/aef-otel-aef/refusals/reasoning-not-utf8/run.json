@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "reasoning-not-utf8",
+  "status": "running",
+  "producer": {
+    "name": "example",
+    "version": "1"
+  },
+  "subject": {
+    "ref": "agent:example/a",
+    "kind": "agent"
+  },
+  "execution": {
+    "targetMode": "live"
+  },
+  "startedAt": "2026-10-01T00:00:00Z",
+  "contentCapture": "on"
+}

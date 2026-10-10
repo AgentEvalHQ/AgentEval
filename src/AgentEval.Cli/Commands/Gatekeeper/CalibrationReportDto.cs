@@ -21,16 +21,21 @@ internal sealed record CalibrationReportDto
         DefaultIgnoreCondition = JsonIgnoreCondition.Never,
     };
 
-    public string SchemaVersion { get; init; } = "1.0";
+    public string SchemaVersion { get; init; } = "1.1";
     public string Axis { get; init; } = "";
+    public string? SplitLabel { get; init; }
     public int TruePositives { get; init; }
     public int TrueNegatives { get; init; }
     public int FalsePositives { get; init; }
     public int FalseNegatives { get; init; }
     public int Total { get; init; }
     public double DecisiveAccuracy { get; init; }
+    public double AccuracyLower { get; init; }
+    public double AccuracyUpper { get; init; }
     public int DangerousErrorCount { get; init; }
     public double FalsePositiveRate { get; init; }
+    public double FprLower { get; init; }
+    public double FprUpper { get; init; }
     public double KappaVsGold { get; init; }
     public double? BaselineAccuracy { get; init; }
     public bool? BeatsBaseline { get; init; }
@@ -43,14 +48,19 @@ internal sealed record CalibrationReportDto
     public static CalibrationReportDto From(CalibrationReport r, bool redactCaseText) => new()
     {
         Axis = r.Axis,
+        SplitLabel = r.SplitLabel,
         TruePositives = r.TruePositives,
         TrueNegatives = r.TrueNegatives,
         FalsePositives = r.FalsePositives,
         FalseNegatives = r.FalseNegatives,
         Total = r.Total,
         DecisiveAccuracy = r.DecisiveAccuracy,
+        AccuracyLower = r.AccuracyInterval.Lower,
+        AccuracyUpper = r.AccuracyInterval.Upper,
         DangerousErrorCount = r.DangerousErrorCount,
         FalsePositiveRate = r.FalsePositiveRate,
+        FprLower = r.FprInterval.Lower,
+        FprUpper = r.FprInterval.Upper,
         KappaVsGold = r.KappaVsGold,
         BaselineAccuracy = r.BaselineAccuracy,
         BeatsBaseline = r.BeatsBaseline,

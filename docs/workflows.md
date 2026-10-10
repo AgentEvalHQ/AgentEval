@@ -1056,8 +1056,8 @@ See [Tracing](tracing.md) for complete Record & Replay documentation.
 - [Export Formats](export.md) - JUnit XML / SARIF / JSON export for CI/CD pipelines
 
 **Live Examples:**
-- [Sample 09: Real MAF Workflow Evaluation](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Sample09_WorkflowEvaluationReal.cs) - Sequential content pipeline (Planner → Researcher → Writer → Editor)
-- [Sample 10: Workflow with Tools](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/Sample10_WorkflowWithTools.cs) - Tool-enabled trip planning workflow with function calling
+- [Sample 09: Real MAF Workflow Evaluation](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/WorkflowsAndConversations/02_WorkflowEvaluationReal.cs) - Sequential content pipeline (Planner → Researcher → Writer → Editor)
+- [Sample 10: Workflow with Tools](https://github.com/AgentEvalHQ/AgentEval/blob/main/samples/AgentEval.Samples/WorkflowsAndConversations/03_WorkflowWithTools.cs) - Tool-enabled trip planning workflow with function calling
 
 **Microsoft Agent Framework:**
 - [MAF Official Documentation](https://github.com/microsoft/agent-framework) - Microsoft Agent Framework docs

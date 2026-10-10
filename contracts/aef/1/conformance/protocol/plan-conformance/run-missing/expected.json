@@ -1,0 +1,17 @@
+{
+  "kind": "plan-conformance",
+  "events": "events.ndjson",
+  "plan": "plan.json",
+  "runs": "runs",
+  "problems": [
+    [
+      "run:R-2",
+      "run-missing"
+    ]
+  ],
+  "rules": [
+    "STRM-4",
+    "RUN-1"
+  ],
+  "why": "R-2 was announced and sealed, but no folder holds it"
+}

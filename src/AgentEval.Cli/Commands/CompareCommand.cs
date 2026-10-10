@@ -67,6 +67,13 @@ public static class CompareCommand
         {
             Description = "Emit the comparison as JSON on stdout instead of a human-readable report.",
         };
+        var failOnRegressionOpt = new Option<bool>("--fail-on-regression")
+        {
+            Description =
+                $"Exit {ExitCodes.TestFailure} when the runs are comparable and a scenario the baseline passed fails in the "
+              + $"candidate, so a CI step fails on a regression. Without it a comparable result exits 0 whatever it "
+              + $"shows. Incomparable runs still exit {ExitCodes.Incomparable}.",
+        };
 
         var cmd = new Command("compare",
             "Compare two run directories. Emits deltas only when the two runs can be SHOWN comparable; "
@@ -76,12 +83,14 @@ public static class CompareCommand
         cmd.Add(candidateOpt);
         cmd.Add(strictOpt);
         cmd.Add(jsonOpt);
+        cmd.Add(failOnRegressionOpt);
 
         cmd.SetAction((ParseResult parse, CancellationToken ct) => Task.FromResult(Run(
             parse.GetValue(baselineOpt)!,
             parse.GetValue(candidateOpt)!,
             parse.GetValue(strictOpt),
-            parse.GetValue(jsonOpt))));
+            parse.GetValue(jsonOpt),
+            parse.GetValue(failOnRegressionOpt))));
 
         return cmd;
     }
@@ -91,11 +100,14 @@ public static class CompareCommand
     /// <param name="candidatePath">Candidate run directory.</param>
     /// <param name="strict">Treat unpinned axes as blocking.</param>
     /// <param name="asJson">Emit JSON instead of a report.</param>
+    /// <param name="failOnRegression">Return <see cref="ExitCodes.TestFailure"/> when a comparable result regressed.</param>
     /// <returns>
-    /// 0 when comparable, <see cref="ExitCodes.Incomparable"/> when refused,
+    /// 0 when comparable, <see cref="ExitCodes.TestFailure"/> when comparable with a regression and
+    /// <paramref name="failOnRegression"/> is set, <see cref="ExitCodes.Incomparable"/> when refused,
     /// <see cref="ExitCodes.UsageError"/> when a path is unusable.
     /// </returns>
-    public static int Run(string baselinePath, string candidatePath, bool strict = false, bool asJson = false)
+    public static int Run(
+        string baselinePath, string candidatePath, bool strict = false, bool asJson = false, bool failOnRegression = false)
     {
         if (!TryLoad(baselinePath, "--baseline", out var baseline)) return ExitCodes.UsageError;
         if (!TryLoad(candidatePath, "--candidate", out var candidate)) return ExitCodes.UsageError;
@@ -110,6 +122,8 @@ public static class CompareCommand
             Console.Error.WriteLine($"✖ {ex.Message}");
             return ExitCodes.UsageError;
         }
+
+        bool comparable = comparison.Verdict is ComparisonVerdict.Comparable;
 
         if (asJson)
         {
@@ -126,7 +140,10 @@ public static class CompareCommand
                     .ToList(),
                 scenariosWithoutAFloor = comparison.ScenariosWithoutAFloor.Count,
                 judgeGradedItsOwnSubject = comparison.ScenariosWhereTheJudgeGradedItsOwnSubject.Count,
-                deltas = comparison.Verdict is ComparisonVerdict.Comparable
+                recovered = comparable ? comparison.Recovered : (int?)null,
+                regressed = comparable ? comparison.Regressed : (int?)null,
+                regressedScenarios = comparable ? RegressedIds(comparison) : null,
+                deltas = comparable
                     ? comparison.Scenarios.Select(s => new
                     {
                         scenario = s.ScenarioId,
@@ -137,13 +154,27 @@ public static class CompareCommand
                     : null,
             }, s_json));
 
-            return comparison.Verdict is ComparisonVerdict.Comparable ? 0 : ExitCodes.Incomparable;
+            return ExitCode(comparison, failOnRegression);
         }
 
-        return Render(comparison, baselinePath, candidatePath, strict);
+        Render(comparison, baselinePath, candidatePath, strict, failOnRegression);
+        return ExitCode(comparison, failOnRegression);
     }
 
-    private static int Render(RunComparison comparison, string baselinePath, string candidatePath, bool strict)
+    // One decision for both outputs, so --json and the report cannot disagree on the exit code.
+    private static int ExitCode(RunComparison comparison, bool failOnRegression) =>
+        comparison.Verdict is not ComparisonVerdict.Comparable ? ExitCodes.Incomparable
+        : failOnRegression && comparison.Regressed > 0 ? ExitCodes.TestFailure
+        : 0;
+
+    private static List<string> RegressedIds(RunComparison comparison) =>
+        comparison.Scenarios
+            .Where(s => s is { BaselinePassed: true, CandidatePassed: false })
+            .Select(s => s.ScenarioId)
+            .ToList();
+
+    private static void Render(
+        RunComparison comparison, string baselinePath, string candidatePath, bool strict, bool failOnRegression)
     {
         Console.WriteLine();
         Console.WriteLine("agenteval compare — ADR-031 S5");
@@ -167,7 +198,7 @@ public static class CompareCommand
                 Console.WriteLine($"   • … and {comparison.RefusalReasons.Count - 40} more");
 
             Console.WriteLine();
-            return ExitCodes.Incomparable;
+            return;
         }
 
         Console.WriteLine("✅ COMPARABLE — every gating axis matched on every shared scenario.");
@@ -214,7 +245,16 @@ public static class CompareCommand
         Console.WriteLine(string.Create(CultureInfo.InvariantCulture,
             $"  mean score delta: {FormatDelta(comparison.MeanScoreDelta)}  ·  recovered {comparison.Recovered}  ·  regressed {comparison.Regressed}"));
         Console.WriteLine();
-        return 0;
+
+        if (failOnRegression && comparison.Regressed > 0)
+        {
+            Console.WriteLine($"❌ REGRESSED — passed in the baseline, did not pass in the candidate (failed, errored or not run) (exit {ExitCodes.TestFailure}, --fail-on-regression):");
+            foreach (string id in RegressedIds(comparison).Take(40))
+                Console.WriteLine($"   • {id}");
+            if (comparison.Regressed > 40)
+                Console.WriteLine($"   • … and {comparison.Regressed - 40} more");
+            Console.WriteLine();
+        }
     }
 
     private static void WriteBlindSpots(RunComparison comparison)

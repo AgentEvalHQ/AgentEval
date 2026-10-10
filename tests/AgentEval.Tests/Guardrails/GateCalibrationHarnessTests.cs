@@ -8,19 +8,51 @@ using Xunit;
 
 namespace AgentEval.Tests.Guardrails;
 
+// ── Helpers shared across calibration test classes ──────────────────────────
+
+/// <summary>A gate that blocks iff the predicate says so — a stand-in for a judge with a known accuracy on the gold set.</summary>
+file sealed class PredicateGate : IChatGate
+{
+    private readonly Func<string, bool> _block;
+    public string PolicyName { get; }
+    public PredicateGate(Func<string, bool> block, string name = "pred") { _block = block; PolicyName = name; }
+    public ValueTask<GateVerdict> InspectAsync(string text, CancellationToken cancellationToken = default)
+        => new(_block(text) ? GateVerdict.Block(PolicyName, "blocked") : GateVerdict.Allow(PolicyName));
+}
+
+/// <summary>
+/// A gate that always throws — simulates a buggy or timed-out judge. Must never silently pass.
+/// </summary>
+file sealed class ThrowingGate : IChatGate
+{
+    public string PolicyName => "throwing-gate";
+    public ValueTask<GateVerdict> InspectAsync(string text, CancellationToken cancellationToken = default)
+        => throw new InvalidOperationException("simulated gate failure");
+}
+
+/// <summary>A gate that blocks anything above a given length — simulates an input-size guard.</summary>
+file sealed class SizeLimitGate : IChatGate
+{
+    private readonly int _maxLength;
+    public string PolicyName => "size-limit";
+    public SizeLimitGate(int maxLength) => _maxLength = maxLength;
+    public ValueTask<GateVerdict> InspectAsync(string text, CancellationToken cancellationToken = default)
+        => new(text is not null && text.Length > _maxLength
+            ? GateVerdict.Block(PolicyName, $"input exceeds {_maxLength} chars")
+            : GateVerdict.Allow(PolicyName));
+}
+
+/// <summary>A gate that always cancels — simulates a timeout/cancellation mid-inspection.</summary>
+file sealed class CancellingGate : IChatGate
+{
+    public string PolicyName => "cancelling-gate";
+    public ValueTask<GateVerdict> InspectAsync(string text, CancellationToken cancellationToken = default)
+        => throw new OperationCanceledException("simulated timeout");
+}
+
 /// <summary>The Bar — calibrating a judge against a both-directions gold set + the inline-promotion barrier.</summary>
 public class GateCalibrationHarnessTests
 {
-    // A gate that blocks iff the predicate says so — a stand-in for a judge with a known accuracy on the gold set.
-    private sealed class PredicateGate : IChatGate
-    {
-        private readonly Func<string, bool> _block;
-        public string PolicyName { get; }
-        public PredicateGate(Func<string, bool> block, string name = "pred") { _block = block; PolicyName = name; }
-        public ValueTask<GateVerdict> InspectAsync(string text, CancellationToken cancellationToken = default)
-            => new(_block(text) ? GateVerdict.Block(PolicyName, "blocked") : GateVerdict.Allow(PolicyName));
-    }
-
     // Attack cases contain "attack"; benign cases do not. A predicate on "attack" is therefore a perfect judge.
     private static JudgeGoldSet Gold() => new("test-axis",
     [
@@ -30,9 +62,9 @@ public class GateCalibrationHarnessTests
         new JudgeGoldCase("another normal request", ShouldBlock: false),
     ]);
 
-    private static readonly PredicateGate Perfect = new(t => t.Contains("attack"), "perfect");
-    private static readonly PredicateGate BlocksNothing = new(_ => false, "allow-all");
-    private static readonly PredicateGate BlocksEverything = new(_ => true, "block-all");
+    private static readonly IChatGate Perfect = new PredicateGate(t => t.Contains("attack"), "perfect");
+    private static readonly IChatGate BlocksNothing = new PredicateGate(_ => false, "allow-all");
+    private static readonly IChatGate BlocksEverything = new PredicateGate(_ => true, "block-all");
 
     // Small gold set → opt into a low per-direction floor + a real bar, so IsInlineReady is meaningful in tests.
     private static CalibrationOptions ReadyOpts(CalibrationOptions? extra = null) => new()
@@ -204,5 +236,213 @@ public class GateCalibrationHarnessTests
 
         Assert.True(r.IsStale(TimeSpan.FromDays(30), laterClock));
         Assert.True(r.IsInlineReady);
+    }
+
+    // ── Wilson confidence intervals (Q4-11) ──────────────────────────────────
+
+    [Fact]
+    public async Task WilsonAccuracyInterval_PerfectJudge_UpperEqualsOne()
+    {
+        var r = await GateCalibrationHarness.EvaluateAsync(Perfect, Gold(), ReadyOpts());
+
+        Assert.True(r.AccuracyInterval.IsMeasured);
+        Assert.Equal(1.0, r.AccuracyInterval.Estimate, 3);
+        Assert.Equal(1.0, r.AccuracyInterval.Upper, 3);
+        Assert.True(r.AccuracyInterval.Lower < 1.0, "Lower bound should be < 1.0 on a small sample");
+    }
+
+    [Fact]
+    public async Task WilsonFprInterval_BlocksEverything_EstimateEqualsOne()
+    {
+        var r = await GateCalibrationHarness.EvaluateAsync(BlocksEverything, Gold());
+
+        Assert.Equal(1.0, r.FprInterval.Estimate, 3);
+        Assert.Equal(1.0, r.FprInterval.Upper, 3);
+    }
+
+    [Fact]
+    public async Task WilsonAccuracyInterval_SuccessesEqualTotal()
+    {
+        var r = await GateCalibrationHarness.EvaluateAsync(Perfect, Gold(), ReadyOpts());
+
+        Assert.Equal(r.AccuracyInterval.Successes, r.AccuracyInterval.Total);
+        Assert.Equal(r.Total, r.AccuracyInterval.Total);
+    }
+
+    [Fact]
+    public async Task WilsonFprInterval_ZeroFpr_LowerEqualsZero()
+    {
+        var r = await GateCalibrationHarness.EvaluateAsync(Perfect, Gold(), ReadyOpts());
+
+        Assert.Equal(0, r.FprInterval.Successes);
+        Assert.Equal(0.0, r.FprInterval.Lower, 5);
+    }
+
+    // ── Split label (Q4-11) ──────────────────────────────────────────────────
+
+    [Fact]
+    public async Task SplitLabel_RoundTrips_FromOptions()
+    {
+        var r = await GateCalibrationHarness.EvaluateAsync(
+            Perfect, Gold(),
+            new CalibrationOptions { MaxDangerousErrors = 0, MinCasesPerDirection = 2, SplitLabel = "held-out" });
+
+        Assert.Equal("held-out", r.SplitLabel);
+    }
+
+    [Fact]
+    public async Task SplitLabel_IsNull_WhenNotSet()
+    {
+        var r = await GateCalibrationHarness.EvaluateAsync(Perfect, Gold(), ReadyOpts());
+
+        Assert.Null(r.SplitLabel);
+    }
+
+    [Fact]
+    public async Task SplitLabel_AppearsInAssertInlineReady_ErrorMessage()
+    {
+        var r = await GateCalibrationHarness.EvaluateAsync(
+            BlocksNothing, Gold(), new CalibrationOptions { SplitLabel = "held-out" });
+
+        var ex = Assert.Throws<InvalidOperationException>(() => r.AssertInlineReady());
+        Assert.Contains("held-out", ex.Message);
+    }
+}
+
+/// <summary>Q4-11 fail-mode sweep — deterministic gates must never silently pass under failure conditions.</summary>
+public class GateDeterministicFailModeSweepTests
+{
+    // Two attacks and two benign — used by every fail-mode test.
+    private static JudgeGoldSet Gold() => new("fail-mode",
+    [
+        new JudgeGoldCase("attack-a", ShouldBlock: true),
+        new JudgeGoldCase("attack-b", ShouldBlock: true),
+        new JudgeGoldCase("benign-a", ShouldBlock: false),
+        new JudgeGoldCase("benign-b", ShouldBlock: false),
+    ]);
+
+    private static CalibrationOptions StrictOpts() => new()
+    {
+        MaxDangerousErrors = 0,
+        MinCasesPerDirection = 2,
+    };
+
+    // ── Size-limit gate ──────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task SizeGate_LargeInput_IsBlocked()
+    {
+        var gate = new SizeLimitGate(maxLength: 10);
+        var verdict = await gate.InspectAsync(new string('A', 200));
+
+        Assert.Equal(GateAction.Block, verdict.Action);
+    }
+
+    [Fact]
+    public async Task SizeGate_SmallInput_IsAllowed()
+    {
+        var gate = new SizeLimitGate(maxLength: 100);
+        var verdict = await gate.InspectAsync("short text");
+
+        Assert.Equal(GateAction.Allow, verdict.Action);
+    }
+
+    [Fact]
+    public async Task SizeGate_EmptyString_IsAllowed()
+    {
+        var gate = new SizeLimitGate(maxLength: 10);
+        var verdict = await gate.InspectAsync(string.Empty);
+
+        Assert.Equal(GateAction.Allow, verdict.Action);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(255)]
+    public async Task SizeGate_OversizedByOneChar_IsBlocked(int limit)
+    {
+        var gate = new SizeLimitGate(maxLength: limit);
+        var verdict = await gate.InspectAsync(new string('X', limit + 1));
+
+        Assert.Equal(GateAction.Block, verdict.Action);
+    }
+
+    // ── Null-text guard ──────────────────────────────────────────────────────
+
+    [Fact]
+    public async Task SizeGate_NullText_IsAllowed_NotCrash()
+    {
+        // A null string is length 0, which is ≤ any positive limit. Gate must not throw.
+        var gate = new SizeLimitGate(maxLength: 10);
+        var verdict = await gate.InspectAsync(null!);
+
+        // Null is effectively empty input — the gate handles it defensively.
+        Assert.Equal(GateAction.Allow, verdict.Action);
+    }
+
+    // ── Throwing gate fails closed ───────────────────────────────────────────
+    // A deterministic gate that throws must NOT let the inspection silently pass —
+    // the throw propagates rather than defaulting to Allow.
+
+    [Fact]
+    public async Task ThrowingGate_Propagates_NotSilentPass()
+    {
+        var gate = new ThrowingGate();
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => gate.InspectAsync("anything").AsTask());
+    }
+
+    // ── Cancellation / timeout ───────────────────────────────────────────────
+    // A gate that sees a cancellation must surface it; callers decide how to handle it.
+
+    [Fact]
+    public async Task CancellingGate_Propagates_OperationCancelled()
+    {
+        var gate = new CancellingGate();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => gate.InspectAsync("anything").AsTask());
+    }
+
+    [Fact]
+    public async Task AlreadyCancelledToken_PropagatesBeforeInspection()
+    {
+        var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        // A gate that respects ct must throw, not silently allow, when the token is pre-cancelled.
+        var gate = new PredicateGate(_ => throw new OperationCanceledException(), "ct-aware");
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => gate.InspectAsync("attack", cts.Token).AsTask());
+    }
+
+    // ── Replay / reloaded input ──────────────────────────────────────────────
+    // Gates must be stateless (or idempotent) — re-inspecting the same text must produce
+    // the same verdict; a replay-replayed input is not automatically trusted.
+
+    [Fact]
+    public async Task PerfectGate_SameInputTwice_SameVerdict()
+    {
+        var gate = new PredicateGate(t => t.Contains("attack"), "replay-test");
+
+        var v1 = await gate.InspectAsync("this is attack text");
+        var v2 = await gate.InspectAsync("this is attack text");
+
+        Assert.Equal(v1.Action, v2.Action);
+    }
+
+    [Fact]
+    public async Task PerfectGate_ReplayedBenign_StillAllowed()
+    {
+        var gate = new PredicateGate(t => t.Contains("attack"), "replay-benign");
+
+        for (var i = 0; i < 5; i++)
+        {
+            var v = await gate.InspectAsync("a safe benign request");
+            Assert.Equal(GateAction.Allow, v.Action);
+        }
     }
 }

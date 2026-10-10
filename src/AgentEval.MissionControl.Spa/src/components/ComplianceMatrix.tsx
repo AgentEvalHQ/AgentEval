@@ -5,7 +5,28 @@
 // stays the SPA's only chart dependency (docs/missioncontrol/charting.md).
 // No test measures how the grid behaves at large subject counts.
 
-type CellStatus = "pass" | "warn" | "fail" | "no-data";
+// What a cell shows. The evidence stores a control's status upper-case ("PASS", "WARN", "FAIL", "ERROR",
+// "SKIPPED"; EvalScore.ReportStatus), so it is mapped here, never used as a key as it comes: a raw "PASS"
+// matched no entry below and every cell rendered blank (MC 01 P1-1). ERROR and SKIPPED are checks that did not
+// complete or did not run: shown as such, never as "no data" (no evidence at all) or as a pass.
+type CellStatus = "pass" | "warn" | "fail" | "error" | "skipped" | "unknown" | "no-data";
+
+function cellStatus(raw: string | null | undefined): CellStatus {
+  switch ((raw ?? "").trim().toLowerCase()) {
+    case "pass":
+      return "pass";
+    case "warn":
+      return "warn";
+    case "fail":
+      return "fail";
+    case "error":
+      return "error";
+    case "skipped":
+      return "skipped";
+    default:
+      return "unknown";
+  }
+}
 
 export interface MatrixSubject {
   name: string;
@@ -20,7 +41,8 @@ export interface MatrixControl {
 export interface MatrixCell {
   subjectName: string;
   controlId: string;
-  status: CellStatus;
+  // As stored in the evidence, e.g. "PASS"; see cellStatus().
+  status: string;
   passRate: number;
   lastEvidenceAt: string;
   lastEvidenceRunId: string;
@@ -46,6 +68,9 @@ const CELL_TONE: Record<CellStatus, string> = {
   pass:      "bg-green-200 hover:bg-green-300",
   warn:      "bg-amber-200 hover:bg-amber-300",
   fail:      "bg-red-200 hover:bg-red-300",
+  error:     "bg-orange-200 hover:bg-orange-300",
+  skipped:   "bg-slate-300 hover:bg-slate-400",
+  unknown:   "bg-purple-100 hover:bg-purple-200",
   "no-data": "bg-slate-100 hover:bg-slate-200",
 };
 
@@ -53,6 +78,9 @@ const CELL_LABEL: Record<CellStatus, string> = {
   pass:      "✓",
   warn:      "!",
   fail:      "✗",
+  error:     "E",
+  skipped:   "–",
+  unknown:   "?",
   "no-data": "·",
 };
 
@@ -139,7 +167,7 @@ function Row({
       </div>
       {controls.map((c) => {
         const cell = cellIndex.get(`${subject.name}::${c.id}`);
-        const status: CellStatus = cell?.status ?? "no-data";
+        const status: CellStatus = cell ? cellStatus(cell.status) : "no-data";
         // Plan-08 portal-review A1 (2026-05-24): when the per-cell audit-chain check
         // fails, overlay a diagonal yellow-stripe pattern + "⚠" badge over the cell's
         // normal status colour. This keeps the underlying status visible (auditor still
@@ -189,7 +217,10 @@ function Legend() {
       <LegendDot tone="bg-green-200" label="pass" />
       <LegendDot tone="bg-amber-200" label="warn" />
       <LegendDot tone="bg-red-200" label="fail" />
-      <LegendDot tone="bg-slate-100" label="no data" />
+      <LegendDot tone="bg-orange-200" label="error (did not complete)" />
+      <LegendDot tone="bg-slate-300" label="skipped (not measured)" />
+      <LegendDot tone="bg-purple-100" label="? status not recognized (not a pass)" />
+      <LegendDot tone="bg-slate-100" label="no evidence" />
       <span className="inline-flex items-center gap-1.5">
         <span
           className="size-3 rounded-sm ring-2 ring-amber-500 ring-inset"

@@ -580,7 +580,7 @@ live-verified against real Azure OpenAI) for the end-to-end demonstration.
 **Phase 4a/4b — Skill Health & Security Index + hash-pin drift.** `AgentEval.Skills.SkillSecurityIndex`
 joins the three independently-produced signals (Phase 2 compliance, Phase 1 efficiency, Phase 3 security)
 into one composite 0-100 score — a missing axis is never fabricated as perfect; the score is the mean of
-only the axes actually supplied. `AgentEval.Guardrails.ManifestFingerprint`/`ManifestDriftDetector` (pure,
+only the axes actually measured. `AgentEval.Guardrails.ManifestFingerprint`/`ManifestDriftDetector` (pure,
 MAF-free, reusable for a future MCP-tool-description equivalent) back
 `AgentEval.Skills.SkillManifestPoisoningGate` + `SkillManifestBaseline` — deterministic trust-time drift
 detection for a rug-pulled skill, JSON-persisted (mirrors the RedTeam baseline/diff CI pattern). Phase 4c

@@ -1,0 +1,9 @@
+{
+  "kind": "produce",
+  "rules": [
+    "RES-4"
+  ],
+  "scenario": "scenario.json",
+  "refused": true,
+  "why": "Two trees of case k1 are rooted at q: their lines would have one resultId (RES-4). The Producer refuses the scenario."
+}

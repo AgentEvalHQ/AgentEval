@@ -1,0 +1,9 @@
+{
+  "kind": "seal",
+  "run": "run",
+  "problems": [],
+  "rules": [
+    "SEAL-6",
+    "ENC-8"
+  ]
+}

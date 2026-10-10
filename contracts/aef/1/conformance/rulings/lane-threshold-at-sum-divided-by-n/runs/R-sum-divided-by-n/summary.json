@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "R-sum-divided-by-n",
+  "lanes": [
+    {
+      "lane": "quality",
+      "metrics": [
+        {
+          "metric": "m",
+          "path": "p",
+          "n": 5,
+          "N": 5,
+          "notMeasured": 0,
+          "value": 0.42000000000000004,
+          "verdict": "passed",
+          "rule": "recorded by the producer",
+          "sum": 2.1,
+          "sumSq": 0.91
+        }
+      ]
+    }
+  ]
+}

@@ -13,10 +13,10 @@ namespace AgentEval.Cli.Commands;
 
 /// <summary>
 /// Implements the <c>agenteval bench agentic calibrate</c> subcommand.
-/// Loads golden calibration datasets for 40 dispatched agentic evaluators across
-/// 9 categories (system, process, ux, adversarial, reasoning, calibration, quality,
-/// safety; memory fully carved per Path A' R2 — see <c>s_carveOutKeys</c> below for
-/// the full 20-evaluator carve-out list), evaluates them through the configured LLM
+/// Loads golden calibration datasets for 45 dispatched agentic evaluators across
+/// 9 categories (system, process, ux, adversarial, reasoning, calibration, memory, quality,
+/// safety — see <c>s_carveOutKeys</c> below for the 15-evaluator carve-out list),
+/// evaluates them through the configured LLM
 /// judge, and writes a Markdown report. Exits with 2 if any category fails accuracy
 /// or Cohen's kappa thresholds.
 /// </summary>
@@ -62,12 +62,10 @@ public static class BenchAgenticCalibrateCommand
     /// retires. NOTE: safety + adversarial currently INFRA-FAIL on Azure due to
     /// content-filter blocking the judge call on harmful-content goldens (an open
     /// follow-up, R1 / T0.10, tracked outside this repository).</para>
-    /// <para><b>reasoning</b> (Path A' v1.1) — after carving out the 3 trace-
-    /// dependent reasoning evaluators (R4: intermediate_step_hallucination,
-    /// plan_formulation_quality, self_correction_quality) the remaining 2 evaluators
-    /// (reasoning_correctness, goal_decomposition_quality) ARE single-turn-gradeable.
-    /// Override 0.70 / 0.40 reflects measured floor on the surviving evaluators
-    /// pending a per-evaluator override sweep (R3 follow-up).</para>
+    /// <para><b>reasoning</b> (Path A' v1.1) — the override 0.70 / 0.40 was measured on
+    /// reasoning_correctness and goal_decomposition_quality alone, pending a per-evaluator
+    /// override sweep (R3 follow-up). intermediate_step_hallucination is dispatched again
+    /// since the entries carry tool calls; it has not been measured against this gate yet.</para>
     /// <para><b>quality</b> (Path A' v1.1) — 6 evaluators (groundedness, relevance,
     /// coherence, fluency, similarity, response_completeness) after carving out
     /// f1_score (deterministic token-overlap, no LLM). Observed pre-carve-out
@@ -82,9 +80,9 @@ public static class BenchAgenticCalibrateCommand
     /// overrides will reduce the count once T3.14 lands. ux / adversarial run
     /// against the default 0.85 / 0.70 gate.</para>
     /// <para><b>unknown</b> — entries whose evaluator key is not present in the
-    /// dispatch table. After Path A' carve-outs the dispatch is 40 of 60: the
-    /// 20 carve-outs (11 pure-code/meta from T1.3 + 9 multi-turn/trace-dependent
-    /// from Path A') are deliberately omitted (see <c>s_carveOutKeys</c>). The
+    /// dispatch table. The dispatch is 45 of 60: the 15 carve-outs (11 pure-code/meta
+    /// from T1.3, 3 whose goldens cannot be graded as written, and f1_score) are
+    /// deliberately omitted (see <c>s_carveOutKeys</c>). The
     /// category remains skipped (see <c>IsAgentInfraSkipCategory</c>) so a stray
     /// non-conforming key in a future golden does not break the gate.</para>
     /// </remarks>
@@ -99,12 +97,12 @@ public static class BenchAgenticCalibrateCommand
     };
 
     /// <summary>
-    /// The 20 evaluator keys deliberately omitted from the dispatch table because
+    /// The 15 evaluator keys deliberately omitted from the dispatch table because
     /// LLM-judge calibration adds no signal — either the evaluator is pure-code,
     /// a meta-evaluator that operates on already-evaluated results, or its
     /// grading semantics structurally don't fit single-turn calibration entries.
     /// Documented here so the coverage test can assert deliberate omission rather
-    /// than accidental gap, and so future readers understand the 60→40 dispatch math.
+    /// than accidental gap, and so future readers understand the 60→45 dispatch math.
     /// <para>
     /// <b>Pure-code telemetry (6)</b> — cost, error_rate, latency, retry_rate,
     /// token_usage, tool_latency: derive their score from <see cref="EvalInput.Metadata"/>
@@ -126,26 +124,19 @@ public static class BenchAgenticCalibrateCommand
     /// (the dataset format is judge-of-judge metadata, not query/response pairs).
     /// </para>
     /// <para>
-    /// <b>Multi-turn memory evaluators (5)</b> — memory_recall_accuracy,
-    /// turn_coherence, goal_tracking, clarification_appropriateness,
-    /// long_conversation_coherence: all five grade whether the agent CORRECTLY
-    /// RECALLS information from EARLIER conversation turns. A calibration entry
-    /// is single-turn (one prompt + one response, no prior context) so the judge
-    /// cannot tell whether the response is genuinely recalling or hallucinating.
-    /// Pre-carve-out measurement (Path A' analysis): 14.3% accuracy on n=21,
-    /// well below random — the judge is essentially guessing. Path A' (v1.1):
-    /// carve out; T3.13 follow-up extends the calibration entry schema to carry
-    /// multi-turn history for proper measurement.
-    /// </para>
-    /// <para>
-    /// <b>Trace-dependent reasoning evaluators (3)</b> — intermediate_step_hallucination,
-    /// plan_formulation_quality, self_correction_quality: these require the agent's
-    /// INTERMEDIATE THINKING TRACE to grade. A calibration entry carries only
-    /// (prompt, agentResponse, expectedVerdict) with no trace data — the judge
-    /// has no signal. The 2 surviving reasoning evaluators (reasoning_correctness,
-    /// goal_decomposition_quality) ARE single-turn-gradeable from input/output
-    /// alone and remain in the dispatch table. Path A' (v1.1): carve out;
-    /// T3.15 follow-up extends the entry schema to carry trace_steps[].
+    /// <b>Goldens that cannot be graded as written (3)</b>. Path A' (v1.1) carved out
+    /// all five multi-turn memory evaluators and the three trace-dependent reasoning
+    /// evaluators, because an entry had no place for earlier turns or tool calls and the
+    /// goldens pasted them into the input as text, which the evaluators do not read.
+    /// Entries now carry <c>conversationHistory</c>, <c>toolCalls</c> and <c>context</c>,
+    /// and five of the eight are dispatched again. Three stay out:
+    /// long_conversation_coherence, whose goldens describe the conversation
+    /// ("[Full 12-turn conversation about …]") instead of containing it, so there are no
+    /// turns to move; self_correction_quality, whose correction turn is one message, so
+    /// the user's correction and the agent's reply cannot both be given to it; and
+    /// plan_formulation_quality, whose only 'fail' golden ("Just build the app and release
+    /// it.") is skipped as "no plan found", so its fail direction can never be measured.
+    /// Each needs new goldens, or an evaluator change, before it can be calibrated.
     /// </para>
     /// <para>
     /// <b>Deterministic non-LLM (1)</b> — f1_score: pure token-overlap math, no
@@ -167,11 +158,9 @@ public static class BenchAgenticCalibrateCommand
         "cost_quality_efficiency",
         // Judge-quality meta (3)
         "calibration_accuracy", "judge_agreement", "judge_drift",
-        // Multi-turn memory (5) — Path A' R2: need prior-turn context single-turn entries don't carry
-        "memory_recall_accuracy", "turn_coherence", "goal_tracking",
-        "clarification_appropriateness", "long_conversation_coherence",
-        // Trace-dependent reasoning (3) — Path A' R4: need agent reasoning-trace data
-        "intermediate_step_hallucination", "plan_formulation_quality", "self_correction_quality",
+        // Goldens that cannot be graded as written (3): one describes its conversation instead of carrying it, one's
+        // evaluator takes the correction turn as one message, one's only 'fail' case is skipped as having no plan
+        "long_conversation_coherence", "self_correction_quality", "plan_formulation_quality",
         // Deterministic non-LLM (1) — Path A': f1_score is token-overlap math, no judge
         "f1_score",
     };
@@ -323,11 +312,10 @@ public static class BenchAgenticCalibrateCommand
         // could not hold these entries; MEASUREMENT_STATUS §67.6 records the
         // correction and ADR-031 C1 now carries it.
         //
-        // Path A' (v1.1) scope is unchanged: 40 dispatched keys across 9
-        // categories (system 5, process 6, ux 3, adversarial 5, reasoning 2,
-        // calibration 2, memory 0, quality 6, safety 11). s_carveOutKeys below
-        // still holds the 20-key carve-out list and its rationale, because the
-        // calibration report reads the carve-outs from here.
+        // 45 dispatched keys across 9 categories (system 5, process 6, ux 3,
+        // adversarial 5, reasoning 3, calibration 2, memory 4, quality 6,
+        // safety 11). s_carveOutKeys holds the 15-key carve-out list and its
+        // rationale, because the calibration report reads the carve-outs from here.
         //
         // Registration is explicit rather than left to [ModuleInitializer]
         // timing: `Register()` is idempotent, so calling it after the module
@@ -459,10 +447,9 @@ public static class BenchAgenticCalibrateCommand
         {
             if (IsAgentInfraSkipCategory(category, categoryReport))
             {
-                // Path A' (v1.1) carved out 9 more evaluators (5 multi-turn memory +
-                // 3 trace-dependent reasoning + f1_score), trimming dispatch from
-                // 49 → 40 of 60. The carved-key entries route into memory / reasoning
-                // categories where every entry skips — surfaced as SKIP, naming the
+                // A category whose every key is carved out (the three in s_carveOutKeys'
+                // "cannot be graded as written" group route into memory / reasoning, which
+                // now have dispatched keys too) would skip entirely — surfaced as SKIP, naming the
                 // carved-out keys apart from any not routed at all (B6c-15): only the
                 // latter means a golden added a brand-new key without extending DeriveCategory.
                 Console.WriteLine($"  [SKIP] {category}: nothing dispatched — {UndispatchedSentence(categoryReport)}.");

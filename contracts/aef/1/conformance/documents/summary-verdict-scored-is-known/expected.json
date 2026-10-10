@@ -1,0 +1,15 @@
+{
+  "kind": "document",
+  "schema": "summary",
+  "writer": "valid",
+  "reader": "valid",
+  "reads": {
+    "lanes[0].metrics[0].verdict": "scored",
+    "usage[0].role": "attacker"
+  },
+  "rules": [
+    "VER-8",
+    "SUM-6",
+    "SUM-7"
+  ]
+}

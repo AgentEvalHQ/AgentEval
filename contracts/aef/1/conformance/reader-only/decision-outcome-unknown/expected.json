@@ -1,0 +1,13 @@
+{
+  "kind": "reader-only",
+  "schema": "decision",
+  "writer": "invalid",
+  "reader": "valid",
+  "reads": {
+    "outcome": "unverifiable"
+  },
+  "rules": [
+    "VER-8",
+    "CKP-7"
+  ]
+}

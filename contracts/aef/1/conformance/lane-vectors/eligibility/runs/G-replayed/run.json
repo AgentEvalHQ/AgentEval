@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "G-replayed",
+  "status": "completed",
+  "producer": {
+    "name": "agenteval-cli",
+    "version": "1.0.0"
+  },
+  "subject": {
+    "ref": "agent:shop/assistant",
+    "kind": "agent",
+    "version": "v7"
+  },
+  "execution": {
+    "targetMode": "replayed"
+  },
+  "suite": {
+    "ref": "suite:shop/memory",
+    "version": "3",
+    "digest": "sha256:274a646f723ee564ebb96a7bee4170df73b077d42e41ad3fc6a7c825d11dc9b1"
+  },
+  "judges": [
+    {
+      "model": "gpt-5.1",
+      "provider": "azure.ai.openai",
+      "mode": "single",
+      "rubricDigest": "sha256:72e1d3bc7f71a5266fec19a8953d3b8af83375dd9d4efacb5761968ae4605e35"
+    }
+  ],
+  "startedAt": "2026-09-01T00:00:00Z",
+  "endedAt": "2026-10-05T00:00:00Z"
+}
