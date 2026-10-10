@@ -1,0 +1,10 @@
+{
+  "direction": "Inspect → AEF",
+  "page": "inspect.md",
+  "sections": ["Inspect → AEF"],
+  "description": "A small hand-written Inspect log (log.json, one epoch) that pins the rulings settled 10-10 (R7I). Its model acme/gpt x becomes model:acme/gpt%20x (R7I-8). Of eval.model_roles, grader and grader_b share one judge model, written once, and attacker is no judge (R7I-16). The epochs reducer collect has no AEF value: with one epoch it is kept in run.json's ext (R7I-14). Without stats.started_at, eval.created stands for the start, listed last in imported.asserted (R7I-17). An empty explanation and empty content give no blob (R7I-17). The NaN member of a map gets no score (R7I-13). A sample stopped by a token limit gives the reason \"token limit 1000\", and an error message of 5,074 characters is cut to its first 4096 (R7I-12). Two roles that land on one AEF role and model are added together; without stats.model_usage, the run's usage comes from role_usage (R7I-10). A results entry with no metric is a plain mean entry, with nothing of Inspect's to compare (R7I-15).",
+  "steps": [
+    {"args": ["from-inspect", "log.json", "{out}", "--target-mode", "live", "--at", "2026-10-09T00:00:00Z"], "expected": "run"}
+  ],
+  "runs": {"run": "intact"}
+}

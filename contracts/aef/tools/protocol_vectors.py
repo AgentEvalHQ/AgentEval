@@ -127,6 +127,16 @@ def documents():
          "an os this version does not know: the writer refuses it, a reader accepts it and shows it as written"),
         ("runners", "unknown-kind", "runner", dict(RUNNER, kind="warehouse"), "invalid", "valid", ["PLAN-6", "VER-8"],
          "a runner kind this version does not know: the writer refuses it, a reader accepts it and shows it as written"),
+        ("runners", "valid-target-modes", "runner", dict(RUNNER, targetModes=["live", "scripted"]), "valid", "valid",
+         ["PLAN-6", "RUN-7"], "a runner that gives the live subject and a scripted stand-in"),
+        ("runners", "target-modes-empty", "runner", dict(RUNNER, targetModes=[]), "invalid", "invalid", ["PLAN-6"],
+         "a manifest that names target modes names at least one: without the field it gives live only"),
+        ("runners", "target-modes-twice", "runner", dict(RUNNER, targetModes=["scripted", "scripted"]), "invalid",
+         "invalid", ["PLAN-6"], "a target mode is named once"),
+        ("runners", "target-mode-unknown", "runner", dict(RUNNER, targetModes=["scripted", "simulated"]), "invalid",
+         "valid", ["PLAN-6", "VER-8"],
+         "a target mode this version does not know: the writer refuses it, a reader accepts the manifest (no plan of "
+         "this version can ask for it)"),
     ]
 
 
@@ -167,9 +177,19 @@ def matching():
          "a runner os this version does not know takes no part in matching (VER-8): tags and provider decide"),
         ("target-mode-unknown", dict(PLAN, targetMode="simulated"), RUNNER, False,
          "a runner does not take a plan whose target mode it does not know (PLAN-7, VER-8)"),
-        ("target-mode-not-in-manifest", dict(PLAN, targetMode="replayed"), RUNNER, True,
-         "a manifest does not say which target modes a runner can give, so matching decides by what it says (tags and "
-         "provider); a runner that cannot replay the subject refuses the plan itself (PLAN-7)"),
+        ("target-mode-not-in-manifest", dict(PLAN, targetMode="replayed"), RUNNER, False,
+         "a manifest without targetModes gives live only, so a runner that names none does not take a plan that asks "
+         "to replay the subject (PLAN-6, PLAN-7)"),
+        ("scripted-plan-manifest-without-modes", dict(PLAN, targetMode="scripted"), RUNNER, False,
+         "a scripted plan, and a manifest without targetModes: it gives live only"),
+        ("scripted-plan-scripted-runner", dict(PLAN, targetMode="scripted"), dict(RUNNER, targetModes=["scripted"]),
+         True, "a scripted plan, and a runner that gives scripted"),
+        ("live-plan-scripted-runner", dict(PLAN, targetMode="live"), dict(RUNNER, targetModes=["scripted"]), False,
+         "a plan that asks for live by name, and a runner that gives only a scripted stand-in"),
+        ("live-plan-live-and-scripted-runner", dict(PLAN, targetMode="live"),
+         dict(RUNNER, targetModes=["live", "scripted"]), True, "a live plan, and a runner that gives live among others"),
+        ("plan-without-mode-mocked-runner", PLAN, dict(RUNNER, targetModes=["mocked"]), False,
+         "a plan that names no target mode asks for live, and the runner gives only a mock"),
     ]
 
 
@@ -221,6 +241,7 @@ STREAM_RULES = {
     "over-time": ["PLAN-2", "PLAN-9", "STRM-3"],
     "over-time-in-days": ["PLAN-2", "STRM-3", "ENC-9"],
     "unknown-kind-mid-stream": ["STRM-1", "VER-8"],
+    "case-completed-names-run": ["STRM-1", "STRM-3", "PLAN-8"],
 }
 UNFINISHED = {"last-line-without-lf"}  # its last line has no LF (STRM-2): it is still being written
 
@@ -293,6 +314,8 @@ def streams(digest, small_digest, day_digest):
                                   ev(4, "job.cancelled", "2026-10-09T12:00:01Z", reason="x")],
          [("event:3", "over-time")], False),
         ("unknown-kind-mid-stream", p, [accepted, ev(2, "job.paused", T.format(1)), cancel(3, 2)], [], True),
+        ("case-completed-names-run", p,
+         sealed[:3] + [dict(e, runId="R-1") for e in sealed[3:5]] + sealed[5:], [], False),
         ("event-invalid-mid-stream", p, [accepted, json.dumps(dict(ev(2, "spend.updated", T.format(1), spentUsd=0.1), seq="2"),
                                                               separators=(",", ":")).encode(),
                                           ev(3, "spend.updated", T.format(2), spentUsd=0.2), cancel(4, 3)],
@@ -323,6 +346,7 @@ CPLAN = dict(PLAN, planId="plan-43", subject=dict(PLAN["subject"], deployment=DE
              suites=[dict(PLAN["suites"][0], digest=TRIAGE["digest"]), PLAN["suites"][1]],
              limits={"maxUsd": 3.0, "cases": 3, "timeout": "PT2H"})
 NO_JUDGES = {k: v for k, v in dict(CPLAN, planId="plan-44").items() if k != "judges"}
+FOUR_CASES = dict(CPLAN, planId="plan-49", limits={"maxUsd": 3.0, "cases": 4, "timeout": "PT2H"})
 CAPTURED = dict(CPLAN, planId="plan-45", contentCapture="on")
 # Plans that name their target mode (a plan without one, as CPLAN, asks for live).
 SCRIPTED_PLAN = dict(CPLAN, planId="plan-47", targetMode="scripted")
@@ -602,8 +626,14 @@ def conformance():
         ("split-over-cases", CPLAN,
          two_runs([("job", "over-cases")], {}, dict(cases=SECURITY_CASE + (("LLM01-002", "plain", 1.0),))), None,
          ["STRM-4", "PLAN-2", "PLAN-8"],
-         "two runs of two cases each: each within the plan's three, the job's four above it (case ids are unique "
-         "across the job's suites)"),
+         "two runs of two cases each: each within the plan's three, the job's four above it"),
+        ("shared-case-ids-over-cases", CPLAN, two_runs([("job", "over-cases")], {}, dict(cases=TWO_CASES)), None,
+         ["STRM-4", "PLAN-2", "PLAN-8"],
+         "two suites that share the case ids case-17 and case-18: a case is its suite with its id, so the job has four "
+         "cases, above the plan's three (counted by caseId alone it would have two)"),
+        ("shared-case-ids-at-cases", FOUR_CASES, two_runs([], {}, dict(cases=TWO_CASES)), None,
+         ["STRM-4", "PLAN-2", "PLAN-8"],
+         "the same two runs on a plan of four cases: the job's four cases are exactly its limit, which is within it"),
         ("split-over-budget", CPLAN, two_runs([("job", "over-budget")], dict(cases=ONE_CASE, cost=2.0), dict(cost=2.0)), None,
          ["STRM-4", "PLAN-2"], "two runs of $2.00 each: each within the plan's $3.00, the job's $4.00 above it"),
         ("no-cost", CPLAN, one_run([("run:R-1", "no-cost")], cost=None), None, ["STRM-4", "PLAN-2", "SUM-7"],

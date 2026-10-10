@@ -1,0 +1,45 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "edges-1",
+  "status": "aborted",
+  "abortReason": "The endpoint stopped answering.",
+  "producer": {
+    "name": "aef_interop.py",
+    "version": "1.0"
+  },
+  "subject": {
+    "ref": "model:acme/gpt%20x",
+    "kind": "model"
+  },
+  "execution": {
+    "targetMode": "live"
+  },
+  "suite": {
+    "ref": "suite:edges",
+    "version": "1"
+  },
+  "startedAt": "2026-10-08T09:00:00Z",
+  "endedAt": "2026-10-08T09:05:00Z",
+  "contentCapture": "on",
+  "imported": {
+    "from": "inspect_ai",
+    "asserted": [
+      "subject.ref",
+      "subject.kind",
+      "execution.targetMode",
+      "contentCapture"
+    ]
+  },
+  "ext": {
+    "inspect_ai": {
+      "run_id": "edges-1",
+      "dataset": {
+        "samples": 2,
+        "sample_ids": [
+          "c1",
+          "c2"
+        ]
+      }
+    }
+  }
+}

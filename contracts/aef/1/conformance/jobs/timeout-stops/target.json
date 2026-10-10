@@ -1,0 +1,68 @@
+{
+  "suites": [
+    {
+      "ref": "suite:support/escalation-paths",
+      "version": "7",
+      "content": "suite:support/escalation-paths@7\npath-1\npath-2\npath-3\n",
+      "cases": [
+        {
+          "caseId": "path-1",
+          "state": "passed",
+          "usd": 0.25,
+          "usdBound": 0.25,
+          "seconds": 20,
+          "secondsBound": 20
+        },
+        {
+          "caseId": "path-2",
+          "state": "passed",
+          "usd": 0.25,
+          "usdBound": 0.25,
+          "seconds": 20,
+          "secondsBound": 20
+        },
+        {
+          "caseId": "path-3",
+          "state": "passed",
+          "usd": 0.25,
+          "usdBound": 0.25,
+          "seconds": 20,
+          "secondsBound": 20
+        }
+      ]
+    },
+    {
+      "ref": "suite:support/handoff",
+      "version": "3",
+      "content": "suite:support/handoff@3\nhandoff-1\nhandoff-2\nhandoff-3\n",
+      "cases": [
+        {
+          "caseId": "handoff-1",
+          "state": "passed",
+          "usd": 0.25,
+          "usdBound": 0.25,
+          "seconds": 20,
+          "secondsBound": 20
+        },
+        {
+          "caseId": "handoff-2",
+          "state": "passed",
+          "usd": 0.25,
+          "usdBound": 0.25,
+          "seconds": 20,
+          "secondsBound": 20
+        },
+        {
+          "caseId": "handoff-3",
+          "state": "passed",
+          "usd": 0.25,
+          "usdBound": 0.25,
+          "seconds": 20,
+          "secondsBound": 20
+        }
+      ]
+    }
+  ],
+  "closeSeconds": 1,
+  "priceTable": "aef-scripted-2026-10"
+}

@@ -199,6 +199,10 @@
           "$ref": "common.schema.json#/$defs/state",
           "description": "The case's state (RES-1)."
         },
+        "runId": {
+          "$ref": "common.schema.json#/$defs/id",
+          "description": "The run the case is a case of. A runner SHOULD name it: two suites of a job may share case ids (PLAN-8)."
+        },
         "ext": {
           "$ref": "#/properties/ext"
         }

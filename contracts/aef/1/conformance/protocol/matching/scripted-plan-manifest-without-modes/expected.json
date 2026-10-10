@@ -1,0 +1,8 @@
+{
+  "kind": "matching",
+  "matches": false,
+  "rules": [
+    "PLAN-7"
+  ],
+  "why": "a scripted plan, and a manifest without targetModes: it gives live only"
+}

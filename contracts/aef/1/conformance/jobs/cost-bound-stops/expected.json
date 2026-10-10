@@ -1,0 +1,43 @@
+{
+  "kind": "job",
+  "plan": "plan.json",
+  "runner": "../runner.json",
+  "target": "target.json",
+  "at": "2026-10-09T09:00:00Z",
+  "terminal": "job.failed",
+  "limit": "maxUsd",
+  "runs": [
+    {
+      "suite": {
+        "ref": "suite:support/billing-disputes",
+        "version": "1"
+      },
+      "status": "aborted",
+      "cases": [
+        [
+          "bill-1",
+          "passed"
+        ],
+        [
+          "bill-2",
+          "passed"
+        ],
+        [
+          "bill-3",
+          "failed"
+        ]
+      ]
+    }
+  ],
+  "spentUsd": 0.75,
+  "estimated": {
+    "cases": 4,
+    "usdLow": 1.0,
+    "usdHigh": 1.25
+  },
+  "endsAt": "2026-10-09T09:01:01Z",
+  "rules": [
+    "PLAN-9"
+  ],
+  "why": "after three cases the spend is $0.75; the fourth would cost $0.25, which fits, but its cost bound is $0.50, which would take the spend to $1.25, above maxUsd: the runner checks the bound, not the cost it cannot know in advance, and stops"
+}

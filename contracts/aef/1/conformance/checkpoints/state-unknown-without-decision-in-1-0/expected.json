@@ -7,8 +7,8 @@
     "CKP-7",
     "VER-6"
   ],
-  "why": "a 1.0 manifest in a state nobody defined that records an outcome is checked as decided (R6N-2): with no decision, nothing can be recomputed",
+  "why": "a 1.0 manifest in a state nobody defined that records an outcome is checked as decided (R6N-2): with no decision, the input cannot be decided (R7-4: only a later minor's is unverifiable)",
   "problems": [
-    "unverifiable"
+    "decision"
   ]
 }

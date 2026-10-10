@@ -231,6 +231,68 @@ public class AefCommandTests : IDisposable
         Assert.Equal(ExitCodes.UsageError, Run((o, e) => AefCommand.RunImportOtel(Path.Combine(example, "input.jsonl"), Out(), "r", "f", "agent:a", "agent", "live", "on", false, null, false, o, e, clock)).Exit);   // out-dir in use
     }
 
+    [Fact]
+    public void ExportInspect_WritesTheCheckedLog_AndRefusesWhatItCannotExport()
+    {
+        // interop/examples/aef-inspect: the input run (six cases, with overlay events) as one Inspect EvalLog, byte for
+        // byte the example's inspect.json; without --ignore-overlays the run is refused (IN-4).
+        var example = Path.Combine(AefSchemaSet.RepoRoot(), "contracts", "aef", "1", "interop", "examples", "aef-inspect");
+        Directory.CreateDirectory(_root);
+        var output = Path.Combine(_root, "inspect.json");
+
+        var (exit, json, error) = Run((o, e) => AefCommand.RunExportInspect(Path.Combine(example, "input"), output, true, null, true, o, e));
+        Assert.True(exit == ExitCodes.Success, error);
+        var report = JsonNode.Parse(json)!;
+        Assert.Equal(("01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10", "intact", 6), ((string)report["runId"]!, (string)report["outcome"]!, (int)report["samples"]!));
+        Assert.Equal(File.ReadAllText(Path.Combine(example, "inspect.json")).Replace("\r\n", "\n", StringComparison.Ordinal), File.ReadAllText(output));
+
+        var (textExit, text, _) = Run((o, e) => AefCommand.RunExportInspect(Path.Combine(example, "input"), Path.Combine(_root, "again.json"), true, null, false, o, e));
+        Assert.Equal(ExitCodes.Success, textExit);
+        Assert.Contains("one Inspect EvalLog, 6 samples", text, StringComparison.Ordinal);
+
+        // Refused (exit 2, nothing written): overlay events without --ignore-overlays, an output file that exists, a
+        // folder that is not a run.
+        var (refusedExit, _, refusedError) = Run((o, e) => AefCommand.RunExportInspect(Path.Combine(example, "input"), Path.Combine(_root, "x.json"), false, null, false, o, e));
+        Assert.Equal(ExitCodes.UsageError, refusedExit);
+        Assert.Contains("IN-4", refusedError, StringComparison.Ordinal);
+        var (existsExit, _, existsError) = Run((o, e) => AefCommand.RunExportInspect(Path.Combine(example, "input"), output, true, null, false, o, e));
+        Assert.Equal(ExitCodes.UsageError, existsExit);
+        Assert.Contains("exists", existsError, StringComparison.Ordinal);
+        Assert.Equal(ExitCodes.UsageError, Run((o, e) => AefCommand.RunExportInspect(Path.Combine(_root, "nowhere"), Path.Combine(_root, "x.json"), true, null, false, o, e)).Exit);
+        Assert.Equal(ExitCodes.UsageError, Run((o, e) => AefCommand.RunExportInspect(example, Path.Combine(_root, "x.json"), true, null, true, o, e)).Exit);
+        Assert.False(File.Exists(Path.Combine(_root, "x.json")));
+    }
+
+    [Fact]
+    public void ImportInspect_WritesASealedImportedRun_AndRefusesWhatThePageRefuses()
+    {
+        // interop/examples/inspect-aef: a hand-written Inspect log (two epochs, three scorers, a sample that crashed).
+        var example = Path.Combine(AefSchemaSet.RepoRoot(), "contracts", "aef", "1", "interop", "examples", "inspect-aef");
+        var clock = new FixedClock(new DateTimeOffset(2026, 10, 9, 0, 0, 0, TimeSpan.Zero));
+
+        var (exit, json, error) = Run((o, e) => AefCommand.RunImportInspect(Path.Combine(example, "log.json"), Out(), "live", "on", false, null, true, o, e, clock));
+        Assert.True(exit == ExitCodes.Success, error);
+        var report = JsonNode.Parse(json)!;
+        Assert.Equal(("intact", "kE7rQx2mVt9uJ3pL8sNw4a", true, "inspect_ai 0.3.277"), ((string)report["outcome"]!, (string)report["runId"]!, (bool)report["sealed"]!, (string)report["from"]!));
+        Assert.Equal(File.ReadAllLines(Path.Combine(example, "run", "results.ndjson")).Length, File.ReadAllLines(Path.Combine(Out(), "results.ndjson")).Length);
+        Assert.Contains("execution.targetMode", report["asserted"]!.AsArray().Select(a => (string)a!));
+
+        // Refused, naming the rule (exit 2, nothing written): a Score.history edit, a conversion time before the log's
+        // end; a bad target mode or capture, or an output folder in use, is a usage error.
+        var (refusedExit, _, refusedError) = Run((o, e) => AefCommand.RunImportInspect(Path.Combine(example, "refusals", "history-edit.json"), Out("x"), "live", "on", false, null, false, o, e, clock));
+        Assert.Equal(ExitCodes.UsageError, refusedExit);
+        Assert.Contains("IN-10", refusedError, StringComparison.Ordinal);
+        Assert.False(Directory.Exists(Out("x")));
+        var early = new FixedClock(new DateTimeOffset(2026, 10, 6, 10, 4, 29, TimeSpan.Zero));
+        var (sealExit, _, sealError) = Run((o, e) => AefCommand.RunImportInspect(Path.Combine(example, "log.json"), Out("x"), "live", "on", false, null, false, o, e, early));
+        Assert.Equal(ExitCodes.UsageError, sealExit);
+        Assert.Contains("SEAL-1", sealError, StringComparison.Ordinal);
+        Assert.False(Directory.Exists(Out("x")));
+        Assert.Equal(ExitCodes.UsageError, Run((o, e) => AefCommand.RunImportInspect(Path.Combine(example, "log.json"), Out("x"), "real", "on", false, null, false, o, e, clock)).Exit);
+        Assert.Equal(ExitCodes.UsageError, Run((o, e) => AefCommand.RunImportInspect(Path.Combine(example, "log.json"), Out("x"), "live", "maybe", false, null, false, o, e, clock)).Exit);
+        Assert.Equal(ExitCodes.UsageError, Run((o, e) => AefCommand.RunImportInspect(Path.Combine(example, "log.json"), Out(), "live", "on", false, null, false, o, e, clock)).Exit);   // out-dir in use
+    }
+
     private sealed class FixedClock(DateTimeOffset now) : TimeProvider
     {
         public override DateTimeOffset GetUtcNow() => now;

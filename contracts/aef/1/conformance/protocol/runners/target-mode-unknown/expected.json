@@ -1,0 +1,11 @@
+{
+  "kind": "plan",
+  "schema": "runner",
+  "writer": "invalid",
+  "reader": "valid",
+  "rules": [
+    "PLAN-6",
+    "VER-8"
+  ],
+  "why": "a target mode this version does not know: the writer refuses it, a reader accepts the manifest (no plan of this version can ask for it)"
+}

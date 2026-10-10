@@ -61,37 +61,102 @@ public static class RunnerEventStream
     private static readonly string[] Provenance = ["planId", "planDigest", "jobId", "runnerId"];
 
     /// <summary>
-    /// [PLAN-7]: a runner takes a plan when it can take it (it carries every tag of the plan's runnerSelector, supports
-    /// the plan's provider, and, for a remote-zone plan, is in the plan's zone) and knows the plan's provider,
-    /// isolation, content capture, target mode (an absent one is <c>live</c>, known) and credential schemes and
-    /// purposes: what this version's writer schema accepts there ([VER-8]). A runner refuses a plan holding a value it
-    /// does not know, even one its own manifest lists. A known target mode other than <c>live</c> is taken: a manifest
-    /// does not say which target modes a runner can give (round 7), so whether it can drive the target so is the
-    /// runner's to know, not the manifest's.
+    /// [PLAN-7], as far as the manifest tells: a runner takes a plan when it can take it (it carries every tag of the
+    /// plan's runnerSelector, supports the plan's provider, gives the plan's target mode, and, for a remote-zone plan, is
+    /// in the plan's zone) and knows the plan's provider, isolation, content capture, target mode (an absent one is
+    /// <c>live</c>, known) and credential schemes and purposes: what this version's writer schema accepts there
+    /// ([VER-8]). A runner refuses a plan holding a value it does not know, even one its own manifest lists. The target
+    /// mode it gives is one of its manifest's <c>targetModes</c> ([PLAN-6]; a manifest without them gives <c>live</c>
+    /// only), compared as written with the plan's (<c>live</c> when the plan has none), round 7. Whether it can resolve
+    /// the plan's suites and credentials and keep to its limits is the job's question (<see cref="AefScriptedRunner"/>),
+    /// not the manifest's.
     /// </summary>
-    public static bool Matches(JsonNode plan, JsonNode runner)
+    public static bool Matches(JsonNode plan, JsonNode runner) => WhyNot(plan, runner) is null;
+
+    /// <summary>
+    /// Why the runner the manifest describes does not take the plan as far as its manifest tells ([PLAN-7], see
+    /// <see cref="Matches"/>), for a <c>job.refused</c>'s reason; null when it takes it. The reason names a credential by
+    /// its <c>name</c> and its place, never by its <c>path</c> ([PLAN-3]).
+    /// </summary>
+    public static string? WhyNot(JsonNode plan, JsonNode runner)
     {
         ArgumentNullException.ThrowIfNull(plan);
         ArgumentNullException.ThrowIfNull(runner);
+        if (Unknown(plan) is { } unknown)
+        {
+            return $"the plan's {unknown} is a value this version does not know ([PLAN-7], [VER-8])";
+        }
+
         var tags = AefNode.Strings(runner["tags"]).ToHashSet(StringComparer.Ordinal);
+        if (AefNode.Items(plan["runnerSelector"]).FirstOrDefault(t => AefNode.String(t) is not { } tag || !tags.Contains(tag)) is { } missing)
+        {
+            return $"the runner does not carry the tag {missing?.ToJsonString()} the plan's runnerSelector names ([PLAN-7])";
+        }
+
         var providers = AefNode.Strings(runner["providers"]).ToHashSet(StringComparer.Ordinal);
-        return Knows(plan)
-               && AefNode.Items(plan["runnerSelector"]).All(t => AefNode.String(t) is { } tag && tags.Contains(tag))
-               && AefNode.String(plan["provider"]) is { } provider && providers.Contains(provider)
-               && (AefNode.String(plan["isolation"]) != "remote-zone" || AefNode.String(runner["networkZone"]) == AefNode.String(plan["zone"]));
+        if (AefNode.String(plan["provider"]) is not { } provider || !providers.Contains(provider))
+        {
+            return $"the runner does not support the plan's provider {plan["provider"]?.ToJsonString()} ([PLAN-7])";
+        }
+
+        if (!TargetModesOf(runner).Contains(TargetModeOf(plan), StringComparer.Ordinal))
+        {
+            return $"the plan asks for the target mode {TargetModeOf(plan)}, and the runner gives {string.Join(", ", TargetModesOf(runner))} only ([PLAN-6], [PLAN-7])";
+        }
+
+        if (AefNode.String(plan["isolation"]) == "remote-zone" && AefNode.String(runner["networkZone"]) != AefNode.String(plan["zone"]))
+        {
+            return "the runner is not in the network zone the plan's remote-zone isolation names ([PLAN-7])";
+        }
+
+        return null;
     }
 
-    private static bool Knows(JsonNode plan)
+    /// <summary>The target mode a plan asks for ([PLAN-1]): its <c>targetMode</c> as written, <c>live</c> when it has none.</summary>
+    public static string TargetModeOf(JsonNode plan)
+    {
+        ArgumentNullException.ThrowIfNull(plan);
+        return plan["targetMode"] is { } mode ? AefNode.String(mode) ?? "" : "live";
+    }
+
+    /// <summary>
+    /// The target modes a runner's manifest says it gives ([PLAN-6]): its <c>targetModes</c> as written, or <c>live</c>
+    /// only when it names none.
+    /// </summary>
+    public static IReadOnlyList<string> TargetModesOf(JsonNode runner)
+    {
+        ArgumentNullException.ThrowIfNull(runner);
+        return runner["targetModes"] is null ? ["live"] : [.. AefNode.Strings(runner["targetModes"])];
+    }
+
+    // The first value [PLAN-7] needs the runner to know that this version's writer schema does not accept there ([VER-8]),
+    // named for a reason (a credential by its place and name, never its path), or null when it knows them all.
+    private static string? Unknown(JsonNode plan)
     {
         static bool Known(string schema, JsonNode? value) => value is null || AefSchemas.Writer.IsValid(schema, value);
 
-        return Known("run-plan#/properties/provider", plan["provider"])
-               && Known("run-plan#/properties/isolation", plan["isolation"])
-               && Known("run-plan#/properties/contentCapture", plan["contentCapture"])
-               && Known("run-plan#/properties/targetMode", plan["targetMode"])
-               && AefNode.Items(plan["credentialRefs"]).All(c =>
-                   Known("run-plan#/properties/credentialRefs/items/properties/scheme", AefNode.Get(c, "scheme"))
-                   && Known("run-plan#/properties/credentialRefs/items/properties/purpose", AefNode.Get(c, "purpose")));
+        foreach (var field in new[] { "provider", "isolation", "contentCapture", "targetMode" })
+        {
+            if (!Known($"run-plan#/properties/{field}", plan[field]))
+            {
+                return field;
+            }
+        }
+
+        var i = 0;
+        foreach (var credential in AefNode.Items(plan["credentialRefs"]))
+        {
+            i++;
+            foreach (var field in new[] { "scheme", "purpose" })
+            {
+                if (!Known($"run-plan#/properties/credentialRefs/items/properties/{field}", AefNode.Get(credential, field)))
+                {
+                    return $"credential {i} ({AefNode.String(AefNode.Get(credential, "name")) ?? "no name"}) {field}";
+                }
+            }
+        }
+
+        return null;
     }
 
     /// <summary>
@@ -318,11 +383,18 @@ public static class RunnerEventStream
             problems.Add(("job", "over-budget"));
         }
 
+        // A case is its run's suite (ref and version) with its caseId (round 7, [PLAN-8]): one case id in two suites counts
+        // twice, and in two runs of one suite once.
         if (AefNode.Number(AefNode.At(plan, "limits", "cases")) is { } allowed
-            && checkedRuns.SelectMany(r => r.Documents.Results.Objects)
-                .Where(l => !l.Value.ContainsKey("parentResultId"))
-                .Select(l => AefNode.String(l.Value["caseId"])).OfType<string>()
-                .Distinct(StringComparer.Ordinal).Count() > allowed)
+            && checkedRuns.SelectMany(r => r.Documents.Results.Objects
+                    .Where(l => !l.Value.ContainsKey("parentResultId"))
+                    .Select(l => AefNode.String(l.Value["caseId"]))
+                    .OfType<string>()
+                    .Select(caseId => (
+                        Ref: AefNode.String(AefNode.At(r.Run, "suite", "ref")),
+                        Version: AefNode.String(AefNode.At(r.Run, "suite", "version")),
+                        CaseId: caseId)))
+                .Distinct().Count() > allowed)
         {
             problems.Add(("job", "over-cases"));
         }

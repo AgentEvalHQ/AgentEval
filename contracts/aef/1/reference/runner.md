@@ -2,7 +2,7 @@
 
 *Generated from [`schemas/writer/runner.schema.json`](../schemas/writer/runner.schema.json) by `tools/gen_reference.py`. Do not edit: edit the schema.*
 
-What a runner is and can do: its identity, kind, platform, the providers it supports and its tags. A plan's runnerSelector is matched against the tags.
+What a runner is and can do: its identity, kind, platform, the providers it supports, its tags and the target modes it can give. A plan's runnerSelector is matched against the tags.
 
 | Field | Type | Required | Bounds | Description |
 |---|---|---|---|---|
@@ -20,5 +20,6 @@ What a runner is and can do: its identity, kind, platform, the providers it supp
 | `tags` | array of string | yes | ≤ 64 items | The runner's tags. It can take a plan only when it carries every tag of the plan's runnerSelector (PLAN-7). |
 | `gpu` | boolean |  |  | Whether the runner has a GPU (PLAN-6). |
 | `networkZone` | string |  | pattern `^[a-z0-9][a-z0-9._:-]{0,63}$` | The network zone the runner runs in. A remote-zone plan needs it to be the plan's zone (PLAN-7). |
+| `targetModes` | array of one of `"live"`, `"replayed"`, `"scripted"`, `"mocked"` |  | ≥ 1 items; unique | The target modes the runner can give, as run.json's execution.targetMode (RUN-7). A manifest without them gives live only; a runner can take a plan only when its targetMode (live when it has none) is one of them (PLAN-6, PLAN-7). |
 | `version` | string | yes | ≥ 1 chars; ≤ 64 chars | The runner software's version. |
 | `ext` | [ext](common.md#ext) |  |  | Producer extensions, named reverse-DNS or with the producer's prefix. A reader ignores what it does not know; never holds a secret (ENC-19). |

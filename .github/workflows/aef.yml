@@ -37,7 +37,7 @@ jobs:
         run: |
           set -e
           cd contracts/aef/tools
-          for tool in derive_reader build_conformance lane_vectors signature_vectors decision_vectors protocol_vectors write_vectors pin_vectors build_index; do
+          for tool in derive_reader build_conformance lane_vectors signature_vectors decision_vectors protocol_vectors write_vectors pin_vectors job_vectors build_index; do
             python -X utf8 -I "$tool.py" > /dev/null
           done
           cd "$GITHUB_WORKSPACE"
@@ -57,6 +57,7 @@ jobs:
           python -X utf8 -I contracts/aef/tools/schema_diff.py --self-test
           python -X utf8 -I contracts/aef/tools/aef_decide.py --check
           python -X utf8 -I contracts/aef/tools/aef_stream.py --check
+          # the reference runner beyond the job vectors: the protocol corpus's plans, the system clock, usage errors
           python -X utf8 -I contracts/aef/tools/check_runner.py
           python -X utf8 -I contracts/aef/tools/gen_reference.py --check
           python -X utf8 -I contracts/aef/tools/check_interop.py --quiet
@@ -97,5 +98,9 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: AgentEval.Results through the conformance runner (every class but Runner; Ed25519 signing is optional)
-        run: bash tests/AgentEval.Results.Conformance/run-corpus.sh net10.0 --quiet --sign-algorithms ecdsa-p256
+      # The classes it claims (IMPLEMENTATIONS.md): all nine, Runner through its scripted runner (the job vectors).
+      - name: AgentEval.Results through the conformance runner (every class; Ed25519 signing is optional)
+        run: >-
+          bash tests/AgentEval.Results.Conformance/run-corpus.sh net10.0 --quiet --sign-algorithms ecdsa-p256
+          --class Producer --class Sealer --class Reader --class "Run verifier" --class "Overlay verifier"
+          --class "Checkpoint verifier" --class "Decision engine" --class "Stream verifier" --class Runner

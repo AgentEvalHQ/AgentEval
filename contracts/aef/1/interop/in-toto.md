@@ -517,9 +517,16 @@ The second batch of the corpus run, `overlays/seal-0002.json`, as written:
 
 ## Media types
 
-**Proposed. None of these is registered with IANA.** They follow the vendor-tree form of RFC 6838
-(`vnd.agenteval.aef.*`), and become usable names only after an IANA registration, which is subject to Expert Review
-([I8](README.md#gaps-found-by-these-mappings)). One is already used by the specification: the checkpoint payload type of SIG-1.
+**Two uses, two standings.**
+
+- **As a DSSE `payloadType`** a name needs no registration: DSSE takes any string that names how to read the payload
+  unambiguously, a URI or a media type ([DSSE](https://github.com/secure-systems-lab/dsse/blob/master/envelope.md)).
+  `application/vnd.agenteval.aef.checkpoint+json` is such a name for SIG-1, and is fixed by the specification
+  ([SIG-1](../spec/04-integrity.md#44-signatures)), whatever IANA does.
+- **As media types** in IANA's sense (a `Content-Type`, a file type) the `vnd.agenteval.aef.*` names below are
+  **proposed, not registered**. They follow the vendor-tree form of RFC 6838, whose registration IANA grants after
+  Expert Review ([I8](README.md#gaps-found-by-these-mappings)). Until then they are AEF's names by convention, and a
+  server that wants a registered type serves AEF's JSON files as `application/json`.
 
 | Artifact | Proposed media type | Note |
 |---|---|---|

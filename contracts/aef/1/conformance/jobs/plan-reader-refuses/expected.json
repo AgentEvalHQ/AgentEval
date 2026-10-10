@@ -1,0 +1,19 @@
+{
+  "kind": "job",
+  "plan": "plan.json",
+  "runner": "../runner.json",
+  "target": "target.json",
+  "at": "2026-10-09T09:00:00Z",
+  "terminal": "job.refused",
+  "limit": null,
+  "runs": [],
+  "spentUsd": 0,
+  "estimated": null,
+  "endsAt": "2026-10-09T09:00:00Z",
+  "rules": [
+    "PLAN-7",
+    "VER-3",
+    "ENC-9"
+  ],
+  "why": "the plan's timeout is no duration (ENC-9 has no seconds): the reader schema refuses the plan, and its planId can be read, so the runner refuses it with job.refused naming that planId and the SHA-256 of the plan's bytes"
+}

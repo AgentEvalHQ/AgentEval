@@ -1,0 +1,11 @@
+{
+  "kind": "plan",
+  "schema": "runner",
+  "writer": "valid",
+  "reader": "valid",
+  "rules": [
+    "PLAN-6",
+    "RUN-7"
+  ],
+  "why": "a runner that gives the live subject and a scripted stand-in"
+}

@@ -1,0 +1,20 @@
+{
+  "kind": "job",
+  "plan": "plan.json",
+  "runner": "../runner.json",
+  "target": "target.json",
+  "at": "2026-10-09T09:00:00Z",
+  "env": {
+    "AEF_TEST_UNSET_KEY": "absent"
+  },
+  "terminal": "job.refused",
+  "limit": null,
+  "runs": [],
+  "spentUsd": 0,
+  "estimated": null,
+  "endsAt": "2026-10-09T09:00:00Z",
+  "rules": [
+    "PLAN-3"
+  ],
+  "why": "the plan's env credential names a variable that is not set where the runner runs: it cannot be resolved, so the plan is refused before job.accepted, though the scripted target needs no credential"
+}

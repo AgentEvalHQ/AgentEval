@@ -220,17 +220,22 @@ policy. It reports problems as a path and a code, ordered by path and code.
   is not one of its lane's `runs`), `lane-evidence` (a lane's `evidence` in the input is not the set of its `runs`' run
   hashes in the manifest; none is the empty set), `lanes` (the input does not decide exactly the manifest's lanes, with
   the same names, blocking and freshness, in order), `outcome` (the outcome is not the decision's), `version` (the input
-  is for another version). Only the fields this version defines are compared. A manifest that declares a later minor
-  ([VER-6]) and holds a state, an outcome or a lane status this version does not know is reported only as
-  `unverifiable`, whatever else it holds: a reader cannot recompute it, which is not the same as finding it wrong. A
-  manifest is **checked as decided** when its state is `decided`, or, in a manifest that declares this version or an
-  earlier one, when its state is one this version does not know and it records an outcome or a decision. One checked
-  as decided that records an outcome other than `aborted` without a decision, or a decision without its input, is
-  reported only as `unverifiable`: nothing can be recomputed. A manifest that declares this version, or an earlier one, is checked as usual whatever it holds:
-  an input lane status reads as [DEC-2] says, and an unknown recorded state, outcome or lane status is a `decision`,
-  `outcome` or `lanes` problem as the comparison finds it, so a 1.0 manifest cannot escape them with a value nobody
-  defined. A checkpoint not yet
-  decided (not checked as decided), or abandoned (`aborted`), has nothing to recompute and no problems.
+  is for another version). Only the fields this version defines are compared. Which manifests are compared, and how:
+  1. **A later minor's values.** A manifest that declares a later minor ([VER-6]) and holds a state, an outcome or a
+     lane status this version does not know is reported only as `unverifiable`, whatever else it holds: a reader
+     cannot recompute it, which is not the same as finding it wrong.
+  2. **Checked as decided.** A manifest is checked as decided when its state is `decided`, or, in a manifest that
+     declares this version or an earlier one, when its state is one this version does not know and it records an
+     outcome or a decision. One checked as decided that records an outcome other than `aborted` without a decision,
+     or a decision without its input, gives nothing to recompute: in a manifest that declares a later minor it is
+     reported only as `unverifiable`; in one that declares this version or an earlier one it is a `decision` problem
+     (the input cannot be decided).
+  3. **This version's manifests are checked as usual**, whatever they hold: an input lane status reads as [DEC-2]
+     says, and an unknown recorded state, outcome or lane status is a `decision`, `outcome` or `lanes` problem as the
+     comparison finds it. Only a later minor's values are `unverifiable`, so a 1.0 manifest cannot escape these rules
+     with a value nobody defined.
+  4. **Nothing to recompute.** A checkpoint not yet decided (not checked as decided), or abandoned (`aborted`), has no
+     problems.
 - **[CKP-8] Against the runs.** A run is **found** when a run folder's `run.json` has the `runId` and the run's run
   hash ([SEAL-4]: its seal's, or for an unsealed run the recomputed one) is the one named. Whether its files still
   match is then the run verifier's question: a run changed since it was sealed is found, and not intact. When several

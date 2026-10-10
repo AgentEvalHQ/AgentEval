@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "reasoning-not-utf8",
+  "status": "running",
+  "producer": {
+    "name": "example",
+    "version": "1"
+  },
+  "subject": {
+    "ref": "model:acme/gpt%20x",
+    "kind": "model"
+  },
+  "execution": {
+    "targetMode": "live"
+  },
+  "suite": {
+    "ref": "suite:edges",
+    "version": "1"
+  },
+  "startedAt": "2026-10-08T09:00:00Z",
+  "contentCapture": "on"
+}

@@ -1,0 +1,67 @@
+{
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "blobs/sha256/c7/c724c785c692363be2772a64845374ccb87c8639323c5a346639138b329f4839",
+      "digest": {
+        "sha256": "c724c785c692363be2772a64845374ccb87c8639323c5a346639138b329f4839"
+      }
+    },
+    {
+      "name": "evidence.ndjson",
+      "digest": {
+        "sha256": "58ca651a809aa4d6aa7579c8e0514ea172e95b07f87bd11fe51ee28335e0995f"
+      }
+    },
+    {
+      "name": "metrics.json",
+      "digest": {
+        "sha256": "73925ec0cadc60d12a091124860d118950b294a7ee3dcde2c022148e5aa8cafc"
+      }
+    },
+    {
+      "name": "results.ndjson",
+      "digest": {
+        "sha256": "e1ee928ee798c67005c0f830358a6771e9696a2f72924b58f6c0de7f8de43a4c"
+      }
+    },
+    {
+      "name": "run.json",
+      "digest": {
+        "sha256": "eb66c3be18d46786010d31bf786c09b9563598bb8b6b6c5de679c6132aaac7f9"
+      }
+    },
+    {
+      "name": "summary.json",
+      "digest": {
+        "sha256": "16ff9eff9df67021db5550019ccc01003f88c5f3ff789f7c79b2dd41a1aaac5c"
+      }
+    }
+  ],
+  "predicateType": "https://agenteval.dev/aef/1/evidence",
+  "predicate": {
+    "schemaVersion": "1.0",
+    "runId": "edgesLog01",
+    "runHash": "532de76d865a6d89acfed4bc8933a1432a135a011e94a0922eaa6550a8b99385",
+    "producer": {
+      "name": "aef_interop.py",
+      "version": "1.0"
+    },
+    "subject": {
+      "ref": "model:acme/gpt%20x"
+    },
+    "deployment": null,
+    "suite": {
+      "ref": "suite:edges",
+      "version": "2"
+    },
+    "judges": [
+      {
+        "model": "acme/judge"
+      }
+    ],
+    "closedAt": "2026-10-08T10:02:00Z",
+    "sealedAt": "2026-10-09T00:00:00Z",
+    "sealedBy": "ingest"
+  }
+}

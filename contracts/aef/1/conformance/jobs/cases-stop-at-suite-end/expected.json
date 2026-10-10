@@ -1,0 +1,45 @@
+{
+  "kind": "job",
+  "plan": "plan.json",
+  "runner": "../runner.json",
+  "target": "target.json",
+  "at": "2026-10-09T09:00:00Z",
+  "terminal": "job.failed",
+  "limit": "cases",
+  "runs": [
+    {
+      "suite": {
+        "ref": "suite:support/triage-scenarios",
+        "version": "4"
+      },
+      "status": "completed",
+      "cases": [
+        [
+          "case-1",
+          "passed"
+        ],
+        [
+          "case-2",
+          "passed"
+        ],
+        [
+          "case-3",
+          "failed"
+        ]
+      ]
+    }
+  ],
+  "spentUsd": 0.75,
+  "estimated": {
+    "cases": 3,
+    "usdLow": 0.75,
+    "usdHigh": 1.5
+  },
+  "endsAt": "2026-10-09T09:01:01Z",
+  "rules": [
+    "PLAN-9",
+    "PLAN-10",
+    "STRM-1"
+  ],
+  "why": "a cases limit of 3, met as the first suite ends: its last case is run, so its run is closed completed; before the second suite's first case the limit is reached, no second run is opened, and job.failed names the limit and the one run. plan.estimated counts 3 of the 6 cases, and their bounds. The plan names only an endpoint, so each run's deployment.ref is endpoint: and the endpoint (PLAN-10)"
+}

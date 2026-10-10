@@ -4,7 +4,7 @@
 the ingest seal) and aef_schema.py (the writer schemas a converted run is checked against before it is written).
 
 The pages are informative, and so is this tool: nothing in the specification depends on it. Beyond their tables, the
-pages state rules and refusals of their own (OT-1 to OT-10 and IN-1 to IN-11, settled 10-09); the converter follows
+pages state rules and refusals of their own (OT-1 to OT-10 and IN-1 to IN-13, settled 10-09 and 10-10); the converter follows
 them, and a refusal exits with status 2 naming its rule. It never fills a gap the pages leave. The checked examples
 under 1/interop/examples/ run it (tools/check_interop.py).
 
@@ -33,8 +33,8 @@ Commands (the JSON each prints):
   to-inspect RUN OUT [--ignore-overlays]
       inspect.md, "AEF -> Inspect": writes OUT, the run as one Inspect EvalLog in its .json form (log format 2).
       An unscored value is the bare token NaN, as Inspect writes it (not JSON). Refused: a run that does not verify
-      (IN-11); the cases of IN-1, IN-3, IN-4 and IN-5; a run with overlay events unless --ignore-overlays leaves them
-      out (IN-4).
+      (IN-11); the cases of IN-1, IN-3, IN-4, IN-5 and IN-12; a run with overlay events unless --ignore-overlays leaves
+      them out (IN-4).
   from-inspect LOG OUT --target-mode MODE [--content-capture on|off] [--at TIME]
       inspect.md, "Inspect -> AEF": writes the run folder OUT (which must not exist yet, or be empty) from the Inspect
       eval log LOG in its .json form (Inspect's NaN token read as an unscored value): run.json with `imported`
@@ -640,7 +640,10 @@ def inspect_score(run_dir, run, line, where):
                 raise InputError(f"{where}: the metric {s.get('metric')!r} is scored twice")
             values[s.get("metric")] = s["label"] if "label" in s else s.get("value")  # a label is the value
         score["value"] = next(iter(values.values())) if len(values) == 1 else values  # two or more: a map
-    explanation = _explanation(run_dir, run, line, where)
+    # IN-13 (R7I-3): a run that keeps no content gives no explanation, as OT-3. IN-12 (R7I-9): a reasoning blob that
+    # is not UTF-8 refuses the export; one an authorized redaction withholds is left out.
+    explanation = None if run.get("contentCapture") == "off" else \
+        _explanation(run_dir, run, line, where, rule="inspect.md, AEF -> Inspect, IN-12")
     if explanation is not None:
         score["explanation"] = explanation
     aef = {"resultId": line.get("resultId"), "state": line["state"], "evaluator": line.get("evaluator")}
@@ -663,9 +666,11 @@ def _case_content(run_dir, lines, evidence, where):
             if kind not in ("input", "expected"):
                 continue
             blob = (record.get("link") or {}).get("blob")
-            text = _blob_text(run_dir, blob, where) if blob else None
-            if text is None:
+            if not blob:
                 _in_refusal(where, f"{kind} evidence {evidence_id} that is not a blob of the run", "IN-5")
+            text = _blob_text(run_dir, blob, where, rule="inspect.md, AEF -> Inspect, IN-12")
+            if text is None:  # IN-12: withheld by an authorized redaction (the run verified): left out
+                continue
             if found.get(kind, text) != text:
                 _in_refusal(where, f"two {kind} evidence records with different text", "IN-5")
             found[kind] = text
@@ -673,11 +678,13 @@ def _case_content(run_dir, lines, evidence, where):
 
 
 def _root_fact(roots, field, where):
-    """A fact of "a case's root line" (startedAt, endedAt, durationMs): refused when two roots carry it (IN-5)."""
+    """A fact of "a case's root line" (startedAt, endedAt, durationMs): roots that carry the same value (times as
+    instants, [ENC-8]) count as one; two different values are refused (IN-5, R7I-5)."""
     carried = [root[field] for root in roots if field in root]
-    if len(carried) > 1:
-        _in_refusal(where, f"{len(carried)} root lines carry {field}, and the table takes it from the case's root "
-                           "line", "IN-5")
+    same = (lambda v: _nanos(v, f"{where} {field}")) if field in ("startedAt", "endedAt") else (lambda v: v)
+    if len({same(v) for v in carried}) > 1:
+        _in_refusal(where, f"root lines carry {len(set(map(same, carried)))} different {field} values, and the table "
+                           "takes it from the case's root line", "IN-5")
     return carried[0] if carried else None
 
 
@@ -761,7 +768,9 @@ def to_inspect(run_dir, out, ignore_overlays=False):
     if status is None:
         raise InputError(f"run.json: the status {run.get('status')!r} is not one AEF 1.0 defines ([RUN-5])")
     ref = subject.get("ref", "")
-    model = ref[len("model:"):] if subject.get("kind") == "model" and ref.startswith("model:") else ref  # IN-1
+    kind_part, _, name_part = ref.partition(":")
+    name_part = _unref(name_part)  # R7I-8: the name decoded, so the import's ENC-13 encoding gives the ref back
+    model = name_part if subject.get("kind") == "model" and kind_part == "model" else f"{kind_part}:{name_part}"
     case_ids = list(dict.fromkeys(line["caseId"] for line in lines))
     spec = {"eval_id": run["runId"], "run_id": run["runId"], "created": run.get("startedAt"),
             "task": suite["ref"][len("suite:"):], "task_version": suite.get("version"),
@@ -815,7 +824,7 @@ def to_inspect(run_dir, out, ignore_overlays=False):
         stats["role_usage"] = role_usage
     log["stats"] = stats
     if status == "error":
-        log["error"] = {"message": run.get("abortReason", ""), "traceback": ""}
+        log["error"] = {"message": run.get("abortReason", ""), "traceback": "", "traceback_ansi": ""}  # R7I-7
     log["samples"] = samples
     if rollups:
         log["reductions"] = [
@@ -896,6 +905,20 @@ def _ref(kind, name):
     if len(text) > 256:
         text = text[:239] + "~" + hashlib.sha256(data).hexdigest()[:16]
     return f"{kind}:{text}"
+
+
+def _unref(name):
+    """The free text a ref's name encodes ([ENC-13]): every %XX is the byte XX, `-` is the empty name. A name that
+    does not decode to UTF-8 is kept as written (R7I-8)."""
+    if name == "-":
+        return ""
+    if "%" not in name:
+        return name
+    try:
+        return re.sub(rb"%([0-9A-Fa-f]{2})", lambda m: bytes([int(m.group(1), 16)]),
+                      name.encode("ascii")).decode("utf-8")
+    except (UnicodeEncodeError, UnicodeDecodeError):
+        return name
 
 
 def _in(where, what, item):
@@ -1017,8 +1040,8 @@ def inspect_line(run_id, case_id, path, trial, score, evaluator_id, capture, blo
     if isinstance(value, float) and math.isnan(value):  # unscored
         state = "error" if reason_name in INSTRUMENT_BLAMED else "failed" if reason_name in MODEL_BLAMED \
             else "not_measured"
-    elif isinstance(value, dict):  # a map: one score per member, scored
-        scores = [measured(v, k) for k, v in value.items()]
+    elif isinstance(value, dict):  # a map: one score per member, scored; a NaN member is unscored (R7I-13)
+        scores = [measured(v, k) for k, v in value.items() if not (isinstance(v, float) and math.isnan(v))]
         state = "scored"
     elif isinstance(value, list):  # a list: kept in ext, no score
         extra["value"], state = value, "scored"
@@ -1119,9 +1142,9 @@ def from_inspect(log_path, out, target_mode, capture, at):
     reducers = config.get("epochs_reducer") or []
     if len(reducers) > 1:
         _in("eval.config.epochs_reducer", f"{len(reducers)} reducers: a trial aggregation is one", "IN-8")
+    mapped = _from_reducer(reducers[0], epochs, "eval.config.epochs_reducer") if reducers else None
     if "epochs" in config:
         policy = {"trialsPerCase": epochs}
-        mapped = _from_reducer(reducers[0], epochs, "eval.config.epochs_reducer") if reducers else None
         if mapped:
             policy["aggregation"] = mapped[0]
             if mapped[1] is not None:
@@ -1129,8 +1152,10 @@ def from_inspect(log_path, out, target_mode, capture, at):
         suite["executionPolicy"] = policy
     run["suite"] = suite
     model_roles = spec.get("model_roles") or {}
-    if model_roles:
-        run["judges"] = [{"model": role.get("model")} for role in model_roles.values()]  # eval.model_roles -> judges
+    judged = [c.get("model") for r, c in model_roles.items()
+              if isinstance(c, dict) and _aef_role(r, model_roles) == "judge"]
+    if judged:  # eval.model_roles -> judges: a model that grades, each once (R7I-16)
+        run["judges"] = [{"model": m} for m in dict.fromkeys(judged)]
     asserted = ["subject.ref", "subject.kind", "execution.targetMode", "contentCapture"]
     if stats.get("started_at"):
         started = _inspect_nanos(stats["started_at"], "stats.started_at")
@@ -1151,6 +1176,8 @@ def from_inspect(log_path, out, target_mode, capture, at):
     source = f"inspect_ai {packages['inspect_ai']}" if isinstance(packages.get("inspect_ai"), str) else "inspect_ai"
     run["imported"] = {"from": source, "asserted": asserted}
     ext = {k: spec[k] for k in ("run_id", "eval_set_id", "dataset") if spec.get(k) is not None}
+    if reducers and not mapped:
+        ext["epochs_reducer"] = reducers  # R7I-14: a reducer without an AEF value, kept as data
     if results.get("headline") is not None:
         ext["headline"] = results["headline"]
     if ext:
@@ -1192,8 +1219,13 @@ def from_inspect(log_path, out, target_mode, capture, at):
             seen.add(key)
             sample_lines.append(line)
         if failure or limit:  # samples[].error, limit -> error (not_measured for a limit), the message in reason
-            message = (failure.get("message") if isinstance(failure, dict) else failure) if failure else \
-                "limit: " + _compact(limit)
+            if failure:
+                message = failure.get("message") if isinstance(failure, dict) else failure
+            elif isinstance(limit, dict) and isinstance(limit.get("type"), str) and \
+                    isinstance(limit.get("limit"), (int, float)) and not isinstance(limit.get("limit"), bool):
+                message = f"{limit['type']} limit {json.dumps(limit['limit'])}"  # R7I-12: "token limit 1000"
+            else:
+                _in(where, "a limit that is not {type, limit}", "IN-8")
             for line in sample_lines:
                 line["state"] = "error" if failure else "not_measured"
                 line["reason"] = str(message)[:REASON_MAX] or NO_VALUE_REASON
@@ -1290,9 +1322,12 @@ def from_inspect(log_path, out, target_mode, capture, at):
             if chosen not in aef_produce.DEFINED_AGGREGATES and isinstance(given, (int, float)) and \
                     not isinstance(given, bool) and math.isfinite(given):
                 entry["value"] = given  # the producer's figure (SUM-8)
+        elif others:
+            _in(where, "no mean and more than one other metric", "IN-9")
         else:
-            _in(where, "no mean and not exactly one other metric", "IN-9")
-        inspect_values[name] = ((measures[chosen] or {}).get("value"), (measures.get("stderr") or {}).get("value"))
+            chosen = None  # R7I-15: no metric: a plain mean entry, with nothing of Inspect's to compare
+        inspect_values[name] = ((measures[chosen] or {}).get("value") if chosen else None,
+                                (measures.get("stderr") or {}).get("value"), chosen is not None)
         request.append(entry)
     names = []
     for line in lines:
@@ -1304,11 +1339,11 @@ def from_inspect(log_path, out, target_mode, capture, at):
     if closed:
         summary = aef_produce.summary_of(run, metrics, lines, {"lanes": [{"lane": "main", "metrics": request}]})
         for entry in summary["lanes"][0]["metrics"]:
-            given, stderr = inspect_values[entry["path"]]
+            given, stderr, compared = inspect_values[entry["path"]]
             given = None if isinstance(given, float) and math.isnan(given) else given
             mine = entry["value"]
-            if (given is None) != (mine is None) or (mine is not None and (
-                    not isinstance(given, (int, float)) or abs(mine - given) > 1e-9 * max(1, abs(mine)))):
+            if compared and ((given is None) != (mine is None) or (mine is not None and (  # within §3.6 (R7I-15)
+                    not isinstance(given, (int, float)) or abs(mine - given) > 1e-9 * max(1, abs(mine))))):
                 _in(f"results.scores {entry['path']!r}", f"Inspect gives {given!r}, the lines give {mine!r}: the "
                                                          "summary is recomputed from the lines ([SUM-5])", "IN-9")
             if isinstance(stderr, (int, float)) and not isinstance(stderr, bool) and math.isfinite(stderr) \
@@ -1321,6 +1356,9 @@ def from_inspect(log_path, out, target_mode, capture, at):
             role = next((_aef_role(r, model_roles) for r, c in model_roles.items() if c.get("model") == used),
                         "agent" if used == model else "other")
             usage.append(_usage_entry(role, used, totals, f"stats.model_usage[{used!r}]"))
+        if not stats.get("model_usage"):  # R7I-10: without model_usage, one entry per role_usage role, no model
+            for role, totals in (stats.get("role_usage") or {}).items():
+                usage.append(_usage_entry(_aef_role(role, model_roles), None, totals, f"stats.role_usage[{role!r}]"))
         if usage:
             summary["usage"] = _merged(usage)
         costs = [u["costUsd"] for u in usage if "costUsd" in u]

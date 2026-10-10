@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://agenteval.dev/aef/1/reader/runner.schema.json",
   "title": "AEF 1.0: runner capability manifest",
-  "description": "READER (tolerant), derived from the writer schema by tools/derive_reader.py. What a runner is and can do: its identity, kind, platform, the providers it supports and its tags. A plan's runnerSelector is matched against the tags.",
+  "description": "READER (tolerant), derived from the writer schema by tools/derive_reader.py. What a runner is and can do: its identity, kind, platform, the providers it supports, its tags and the target modes it can give. A plan's runnerSelector is matched against the tags.",
   "type": "object",
   "required": [
     "schemaVersion",
@@ -100,6 +100,15 @@
       "description": "The network zone the runner runs in. A remote-zone plan needs it to be the plan's zone (PLAN-7).",
       "type": "string",
       "pattern": "^[a-z0-9][a-z0-9._:-]{0,63}$"
+    },
+    "targetModes": {
+      "description": "The target modes the runner can give, as run.json's execution.targetMode (RUN-7). A manifest without them gives live only; a runner can take a plan only when its targetMode (live when it has none) is one of them (PLAN-6, PLAN-7).",
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string"
+      }
     },
     "version": {
       "description": "The runner software's version.",

@@ -72,8 +72,9 @@ OTLP/JSON file), the output and an `expected.json` naming the direction and the 
 
 The examples are informative, like these pages: they are not conformance vectors, and nothing in the corpus depends on
 them. Every run they hold passes `tools/aef_verify.py run`. Writing the converter found what the two pages left
-undecided (OT-1 to OT-10, IN-1 to IN-11); settled on 10-09, each is now a rule or a stated refusal under the page's table
-for its direction.
+undecided (OT-1 to OT-10, IN-1 to IN-11; settled on 10-09); a second, independent converter in .NET found more
+(R7N, R7I; settled on 10-09 and 10-10, IN-12 and IN-13 among them). Each is now a rule or a stated refusal under the
+page's table for its direction, and both converters reproduce every example.
 
 ## What survives a round trip
 
@@ -105,7 +106,7 @@ mapping still loses something.
 | I5 | Trial aggregations beyond `MajorityVote` | `AllPass`, `AnyPass`, `Mean`, `Median`, `Max`, `PassAtK` (with `k`) |
 | I6 | Times per result | `startedAt` and `endedAt` on a result line |
 | I7 | Facts a converter supplied | `imported` in `run.json`: the original tool and the fields the converter asserted ([RUN-15](../spec/03-run.md#32-runjson)) |
-| I8 | An attestation bound to the evaluated artifact; registered media types | **Open.** [in-toto.md](in-toto.md) gives the companion statement's shape and the proposed media type names; registering them is an external process. |
+| I8 | An attestation bound to the evaluated artifact; registered media types | **Open, drafted.** [in-toto.md](in-toto.md) gives the companion statement's shape and the proposed media type names. Registering the two predicate types with in-toto and the `vnd.agenteval.aef.*` media types with IANA are external processes; both submissions are drafted for the owner. A DSSE `payloadType` needs no registration, so SIG-1 does not wait on either. |
 
 Found while mapping the current format: a summary entry with no rule is now `scored`
 ([SUM-6](../spec/03-run.md#36-summaryjson)), and `summary.json` has the run's usage per party and model

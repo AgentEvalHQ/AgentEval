@@ -31,6 +31,8 @@ public static class Program
         ["summarize"] = Ops.WriteSideOps.Summarize, ["seal-write"] = Ops.WriteSideOps.SealWrite, ["sign"] = Ops.WriteSideOps.Sign, ["write-samples"] = Ops.WriterOps.WriteSamples,
         // Round 4: produce (a Producer writes the run a scenario describes)
         ["produce"] = Ops.ProduceOps.Produce,
+        // Round 7: job (a Runner runs a plan against a scripted target)
+        ["job"] = Ops.JobOps.Job,
     };
 
     public static int Main(string[] args)

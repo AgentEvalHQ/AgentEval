@@ -1,0 +1,52 @@
+{
+  "kind": "job",
+  "plan": "plan.json",
+  "runner": "../runner.json",
+  "target": "target.json",
+  "at": "2026-10-09T09:00:00Z",
+  "terminal": "job.sealed",
+  "limit": null,
+  "runs": [
+    {
+      "suite": {
+        "ref": "suite:support/rounding",
+        "version": "1"
+      },
+      "status": "completed",
+      "cases": [
+        [
+          "round-1",
+          "passed"
+        ],
+        [
+          "round-2",
+          "passed"
+        ],
+        [
+          "round-3",
+          "passed"
+        ],
+        [
+          "round-4",
+          "passed"
+        ],
+        [
+          "round-5",
+          "passed"
+        ]
+      ]
+    }
+  ],
+  "spentUsd": 1.0,
+  "estimated": {
+    "cases": 5,
+    "usdLow": 1.0,
+    "usdHigh": 1.0
+  },
+  "endsAt": "2026-10-09T09:01:41Z",
+  "rules": [
+    "PLAN-9",
+    "SUM-5"
+  ],
+  "why": "after four cases the spend is $1.00, the maxUsd; the fifth's cost bound is 1e-17, and $1.00 + 1e-17 rounds to $1.00 in both sums the verifiers compute: within the limit, so the case runs (its exact sum, above $1.00, is no sum a verifier computes)"
+}

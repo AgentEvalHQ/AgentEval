@@ -14,18 +14,17 @@ that class. Requirements not listed for a class still apply to it where it does 
 | **Overlay verifier** | OVL-1–OVL-11, SIG-4, SIG-5 (batch signatures and redaction authority, [OVL-3], [OVL-10]) | `chain`, `overlay-view`, `signature` |
 | **Checkpoint verifier** | CKP-1–CKP-10, LANE-1–LANE-11, DEC-1–DEC-5, SIG-8, and Run verifier | `checkpoint`, `lane`, `decision`, `signature` ([CKP-9]), and the Run verifier's |
 | **Decision engine** | DEC-1–DEC-5 | `decision` |
-| **Runner** (*at risk* in 1.0, below) | PLAN-1–PLAN-10, STRM-1–STRM-2, RUN-12, and Producer and Sealer for the runs it produces | `plan`, `matching`, and the Producer's and the Sealer's |
+| **Runner** | PLAN-1–PLAN-10, STRM-1–STRM-2, RUN-12, and Producer and Sealer for the runs it produces | `plan`, `matching`, `job`, and the Producer's and the Sealer's |
 | **Stream verifier** | STRM-1–STRM-4, and Run verifier ([STRM-4] verifies the runs a stream reports) | `stream`, `plan-conformance`, and the Run verifier's |
 
 A class whose requirements include another class passes that class's vectors too; `index.json` lists each vector
 under every class that must pass it, so a runner selects a class's vectors by its name alone.
 
-**The Runner class is released *at risk* in AEF 1.0** (GOVERNANCE.md, release criteria): neither implementation that
-passes the corpus is a runner, so its requirements have not been tested by a second implementation, and they may
-change in 1.1 more than a minor version normally allows. The reference tools include a minimal runner
-(`tools/aef_runner.py`, against a scripted target: it takes only plans that ask for `scripted`, and [STRM-3] and
-[STRM-4] find nothing in its jobs), so the class has one implementation; it is still at risk until a second,
-independent runner passes.
+**The Runner class** has two implementations that pass its vectors, written apart: the reference tools' minimal runner
+(`tools/aef_runner.py`) and AgentEval's (IMPLEMENTATIONS.md). Both give the target mode `scripted` only, so no vector
+tests what the requirements ask of a runner that drives a live target: that it gives each credential to the process
+its purpose names ([PLAN-3]), and holds a live case within the bounds it states ([PLAN-9]). An erratum found there is
+fixed as GOVERNANCE.md says.
 
 A Run verifier conforms at the **intact** level, or at the **signed** level when it also verifies signatures (§4.4).
 `index.json` marks the vectors only the signed level must pass (`"level": "signed"`: the signature vectors, and
@@ -37,10 +36,16 @@ verifier (§9.3), so a correct validator over a broken writer does not pass. `pr
 run as a producer has them when it writes one (the header, the metrics, each case's states and its own decisions)
 and judges the run it writes: what [RES-4]–[RES-8] derive from those facts (result ids, parents, trial numbers,
 rollups, aggregation counts) and the summary. A Producer's evidence, gate decisions and blobs are not yet written
-under test: the run vectors check them only as a reader would (a gap 1.1 may close). A Runner has no write-side
-vector of its own: what it writes is a job
-over a live subject, which a corpus cannot hold. It is tested by `plan` and `matching`, and by the Producer and Sealer
-vectors, which it passes for the runs it produces; the event stream it writes is checked against [STRM-3] and
+under test: the run vectors check them only as a reader would (a gap 1.1 may close).
+
+The `job` vectors test a Runner as the writer of a job. A live subject's answers, costs and durations are not the
+corpus's to fix, so a `job` vector gives the runner a scripted target instead (§9.2.1): a test fixture that answers
+each case with a fixed state, cost and duration, on a clock that moves only as the fixture says. The conformance
+runner judges the stream and the runs the runner writes (§9.3): what [STRM-3] and [STRM-4] check, each run as a Run
+verifier reads it, and what [PLAN-3] and [PLAN-6]–[PLAN-10] make of that plan and that target: whether the runner
+takes the plan, which suites and cases it runs and in which runs, where a limit stops it, what it spends and
+estimates, and that it writes no credential. A Runner also passes the `plan` and `matching` vectors, and the Producer
+and Sealer vectors for the runs it produces; the stream it writes for a live job is checked against [STRM-3] and
 [STRM-4] whenever someone verifies it (a Stream verifier).
 
 A Sealer signs with at least one of [SIG-2]'s algorithms (a verifier supports both; a signer uses one), and passes
@@ -75,6 +80,7 @@ and is cross-checked by a second, independent implementation.
 | `matching` | a plan and a runner manifest | whether the runner takes the plan ([PLAN-7]: it can take it and knows its values) |
 | `stream` | an event stream, its plan and the plan's digest | the problems of [STRM-3] |
 | `plan-conformance` | an event stream, its plan, the runs it produced, and optionally a trust policy | the problems of [STRM-4] |
+| `job` | a run plan, a runner manifest, a scripted target (§9.2.1), the clock's start, and the variables to set or remove | the job the runner writes, judged (§9.3): how it starts and ends, its runs and their cases, its spend and estimate |
 | `fixture` | files several vectors use (test keys, a stream's plans) | nothing to run: the runner checks their digests |
 | `paths` | a list of paths in a run folder | the problems of [RUN-3] |
 | `summarize` | a run without its `summary.json`, and the entries to compute (lane, metric, path; optionally `aggregate`, `rule`, `verdict`) | the `summary.json` [SUM-2]–[SUM-9] give; or that it refuses the request |
@@ -111,6 +117,7 @@ or `[` is written `["name"]`, a JSON string), the known value a reader takes the
 | `summarize` | `write-vectors/summarize/<name>/`: the run in `run/` (`run.json`, `results.ndjson`, `metrics.json`; no `summary.json`) and `request.json` | `run`, `request` (the request file: `{"lanes": [{"lane", "metrics": [{"metric", "path", "aggregate"?, "rule"?, "verdict"?, "value"?}]}]}`, the entries to compute in order; `verdict` is the producer's under its `rule`, and `value` its figure for an `aggregate` method AEF does not define, [SUM-8]), and either `summary` (the expected `summary.json`) or `refused: true` (an input error of §9.3); `why` |
 | `produce` | `write-vectors/produce/<name>/scenario.json` | `scenario` (the scenario file, below), and either `results` (a file beside `expected.json` holding the expected lines of `results.ndjson`, in no particular order) and `summary` (the expected `summary.json`), or `refused: true` (a scenario that contradicts itself: an input error of §9.3); `why` |
 | `seal-write` | `write-vectors/seal-write/<name>/run/` | `run`, `sealedBy`, `sealedAt`, and either `manifest` (a file beside `expected.json` holding the expected manifest) and `predicate` (the expected predicate), or `refused: true` (the run is open; `sealedAt` is before its `endedAt`; or, sealed by `ingest`, a path breaks [RUN-3] or a file is not valid against its reader schema: [SEAL-1]); `why` |
+| `job` | `jobs/<name>/`: `plan.json` and `target.json`; the runner manifest is `jobs/runner.json`, shared, unless the vector holds its own | `plan`, `runner` and `target` (the inputs, as paths from the vector's folder), `at` (the clock's start), optionally `env` (per variable, `set`, `empty` or `absent`: §9.3); `terminal` (the last event's kind), `limit` (`job.failed`'s, or `null`), `runs` (per run, in the order announced: `suite`, its `ref` and `version`; `status`; and `cases`, a `[caseId, state]` pair per case run, in order), `spentUsd` (the last `spend.updated`; 0 when there is none), `estimated` (`plan.estimated`'s `cases`, `usdLow` and `usdHigh`, or `null` for a refusal), `endsAt` (the terminal event's time), `why` |
 | `sign` | `write-vectors/sign/<name>/` (private test keys in `signature-vectors/keys/`) | `algorithm` (`ecdsa-p256` or `ed25519`: what a Sealer needs to run it, also in `index.json`), `file`, `payloadType`, `key` (an unencrypted PKCS#8 PEM private key, P-256 or Ed25519, as a path from the vector's folder), `policy` (a trust policy holding its public key), `keyid`, `identity`, `why`, and for Ed25519 `sig` (the expected signature, base64) |
 
 **The effective view** of an `overlay-view` vector (§4.3) is an object with:
@@ -161,6 +168,48 @@ The producer writes one line per node, with `schemaVersion` and its case's `case
 
 §3.4 orders no line of `results.ndjson`, so neither does a `produce` vector: its lines are compared as a set.
 
+**A scripted target** (an input of `job`) is a test fixture that stands for the subject and answers each case with
+fixed results. It is a JSON object with:
+- `suites`: the suites it has, each with `ref`, `version`, `content` (a string: the suite's digest, [PLAN-8], is
+  `sha256:` and the lowercase hex SHA-256 of its UTF-8 bytes) and `cases`, one or more, in the order the suite runs
+  them;
+- `closeSeconds`: the time closing and sealing one run takes, in whole seconds;
+- `priceTable`: the name, of 1 to 64 characters, of the price table its costs come from, as a run's
+  `costPolicy.priceTable` gives it.
+
+A case has `caseId`; `state`, a state of [RES-1] other than `pending`; `severity`, how bad its failure is ([RES-9]),
+on a case whose `state` is `failed` or `warn` and on no other; `usd`, its cost, and `usdBound`, its cost bound
+([PLAN-9]), not below `usd`; `seconds`, its duration on the job's clock, and `secondsBound`, its time bound, not below
+`seconds`, both in whole seconds. No two suites have the same `ref` and `version`, and no two cases of a suite the
+same `caseId`. A target, a suite or a case with a member named nowhere here is not of this shape.
+
+A runner resolves a suite of the plan ([PLAN-8]) by finding the target's suite of that `ref` and `version`. The target
+needs no credential; the runner resolves the plan's all the same ([PLAN-3]). It gives the target mode `scripted`, and
+each run's `execution.targetMode` says so ([RUN-7]). A scripted target runs in the runner's process, so the runner
+gives the isolation `process` only, and refuses a plan that asks for `container` or `remote-zone` ([PLAN-7]). Running
+the job, the runner:
+- runs the plan's suites in the plan's order, one run per suite, and a suite's cases in the target's order;
+- writes one result line per case it runs: the case's root (no `parentResultId`) at path `check`, with the case's
+  `caseId`, unrewritten, its `state`, its `severity` when it has one, and the `lane` the plan gives its suite, if any
+  ([PLAN-8]); and a `reason` on a typed absence ([RES-2]). The line's other members are the runner's;
+- declares in each run's `metrics.json` the metric `pass-rate` (kind `rate`, direction `higher_better`, scale 0 to 1);
+  for a suite the plan gives a `lane`, the run's `summary.json` has that lane, with one entry, `pass-rate` at path
+  `check`, and for a suite without one, no lane;
+- adds the case's `usd` to the spend when the case completes. The spend (`spentUsd`), a run's `cost.totalUsd` in its
+  `summary.json` (the `usd` of its cases), and `plan.estimated`'s `usdLow` and `usdHigh` (the `usd` and the `usdBound`
+  of the cases it counts: the first ones, in run order) are each computed exactly and rounded once ([SUM-5]);
+- checks the limits before each case with the case's `usdBound` and `secondsBound`, and with `closeSeconds` as the
+  time it keeps for closing and sealing the run ([PLAN-9]);
+- closes a run `completed` when its suite's last case has run, before it checks the limits for the next case; a run a
+  limit stops before its suite's last case is closed `aborted`, and a suite whose first case a limit stops has no run
+  ([PLAN-9]).
+
+**The job's clock.** Under `--at T` the clock starts at `T` and moves only when a case runs, by its `seconds`, and when
+a run is closed and sealed, by `closeSeconds`. A run's `endedAt` is the end of the last case it ran; closing and
+sealing it then take `closeSeconds`. The first event, `job.accepted` or `job.refused`, is at `T`; the terminal event
+is at `T` plus the `seconds` of every case run and `closeSeconds` for every run sealed. The other events' times are
+the runner's, as far as [STRM-3] and [STRM-4] allow.
+
 **Generated vectors.** A vector whose input would be too large for the corpus (a run of 100,000 files, a 40 MiB seal)
 holds only `expected.json`, with `generate`: a list of steps the conformance runner applies, in order, to a copy of the
 vector's folder before it runs the vector. Each step is an object with one member:
@@ -183,8 +232,8 @@ each limit of [ENC-17] at its value or one beyond.
 - **[CONF-3]** A conformance runner reads `index.json`, selects the vectors of the classes it claims, performs for each
   the operation its `kind` names on the input, and compares the result with the expected one. It checks the SHA-256 of
   every file it reads against the index, so a modified corpus cannot pass.
-- `tools/aef_conformance.py` is such a runner for the reference implementation (`tools/aef_verify.py`, and
-  `tools/aef_produce.py` for the write operations). An
+- `tools/aef_conformance.py` is such a runner for the reference implementation (`tools/aef_verify.py`,
+  `tools/aef_produce.py` for the write operations, and `tools/aef_runner.py` for `job`). An
   implementation in another language is driven by it through this command-line contract: one invocation per
   operation, input paths as arguments, one JSON value (UTF-8, no BOM) on standard output, exit status 0 when the
   operation ran and 2 with a message on standard error for a usage or input error. Problems are `[path, code]` pairs
@@ -208,17 +257,18 @@ each limit of [ENC-17] at its value or one beyond.
   | `paths` | `paths FILE` | `[{"name", "problems"}]` for the corpus file |
   | `result-id` | `result-id RUNID CASEID PATH [TRIAL]` | `{"resultId"}` |
   | `summarize` | `summarize DIR REQUEST` | the `summary.json` document of the run in `DIR` for the entries of `REQUEST`: `schemaVersion`, the run's `runId` ([SUM-2]), and per lane and entry, in request order, `metric`, `path`, `N`, `n`, `notMeasured`, `sum`, `sumSq`, `value`, `verdict` (`not_measured` when `n` is 0, [SUM-6]; otherwise the request's, or `scored` when it gives none), and `rule` and `aggregate` as requested. Input errors (exit 2): a metric `metrics.json` does not declare; a lane named twice, or one lane, metric and path twice ([SUM-9]); an `aggregate` method AEF does not define without a `value`; a `value` for an entry AEF computes (the mean or sum, or `median`, `min` or `max`), which would contradict it; results or metrics that do not read |
-  | `produce` | `produce SCENARIO OUT` | writes the run the `SCENARIO` file describes (§9.2.1) in the folder `OUT`, which does not exist yet or is empty: `run.json` and `metrics.json` as given, `results.ndjson` and `summary.json`, and nothing else; `{"results": the number of lines}`. Input errors (exit 2), with nothing written: a scenario not of that shape; a run that is not closed; a `pending` node ([RES-3]); a child whose `path` is not its parent's and one more level; a `decisive` path that is no child's ([RES-6]); a node with children and no `aggregation`, or a child without `component` ([RES-5]); a trial tree rooted elsewhere than its case, or a path the case's tree and its trial trees do not both have ([RES-8]); two lines of one case at one path and trial (they would have one `resultId`, [RES-4]); and the input errors of `summarize` |
+  | `produce` | `produce SCENARIO OUT` | writes the run the `SCENARIO` file describes (§9.2.1) in the folder `OUT`, which does not exist yet or is empty: `run.json` as given, or with `contentCapture: on` added when the scenario has none, `metrics.json` as given, `results.ndjson` and `summary.json`, and nothing else; `{"results": the number of lines}`. Input errors (exit 2), with nothing written: a scenario not of that shape; a run that is not closed; a `pending` node ([RES-3]); a child whose `path` is not its parent's and one more level; a `decisive` path that is no child's ([RES-6]); a node with children and no `aggregation`, or a child without `component` ([RES-5]); a trial tree rooted elsewhere than its case, or a path the case's tree and its trial trees do not both have ([RES-8]); two lines of one case at one path and trial (they would have one `resultId`, [RES-4]); and the input errors of `summarize` |
   | `seal-write` | `seal-write DIR --sealed-by B --sealed-at T` | writes `DIR/seal.json` ([SEAL-5]) and changes nothing else; `{"runHash": hex}`. Input errors (exit 2), with nothing written: an open run; a `T` before the run's `endedAt`; with `--sealed-by ingest`, a run with a path that breaks [RUN-3] or a file that is missing, does not read, or is not valid against its reader schema ([SEAL-1], [ENC-16]) |
-  | `sign` | `sign FILE KEY --payload-type T` (`KEY`: an unencrypted PKCS#8 PEM private key, P-256 or Ed25519) | the DSSE envelope over `FILE`'s bytes ([SIG-1]): `payloadType`, `payload`, and one signature with the key's `keyid` ([SIG-3]). Input errors (exit 2): a key of an algorithm the implementation does not sign with, a key that is not an unencrypted PKCS#8 PEM, or an EC key on a curve other than P-256 |
+  | `job` | `job PLAN RUNNER TARGET OUT --at T` (`--at` is always given) | runs the plan `PLAN` as the runner the manifest `RUNNER` describes ([PLAN-7]), against the scripted target `TARGET`, on the clock §9.2.1 gives; writes, in a folder `OUT` that does not exist yet or is empty, the event stream `OUT/events.ndjson` and `OUT/runs/<runId>/` for each run it seals, and nothing else; `{"events": the number of events}`. Exit 0 whatever the job's end: accepted or refused, sealed or failed. Input errors (exit 2), with nothing written: a `PLAN` that does not read or names no `planId` a `job.refused` can carry ([PLAN-7]), a `RUNNER` the reader refuses, a `TARGET` not of §9.2.1's shape, an `OUT` that is not empty, a `T` that is not a time |
+| `sign` | `sign FILE KEY --payload-type T` (`KEY`: an unencrypted PKCS#8 PEM private key, P-256 or Ed25519) | the DSSE envelope over `FILE`'s bytes ([SIG-1]): `payloadType`, `payload`, and one signature with the key's `keyid` ([SIG-3]). Input errors (exit 2): a key of an algorithm the implementation does not sign with, a key that is not an unencrypted PKCS#8 PEM, or an EC key on a curve other than P-256 |
 
   For `lanes`, `--at` defaults to the time of the call. Wherever an operation is given a plan (`match`, `stream`,
   `conform`) or a trust policy (`--policy`, [SIG-4]), one the reader refuses is an input error (exit 2), a plan whose
-  `timeout` is not a duration ([ENC-9]) among them.
+  `timeout` is not a duration ([ENC-9]) among them; `job` refuses such a plan with `job.refused` instead ([PLAN-7]).
 
-  The write operations are judged rather than compared byte for byte: JSON formatting is free, so two conforming
-  writers may write different bytes for one `summary.json`, `results.ndjson` or `seal.json`, and an ECDSA signature
-  need not be deterministic. The runner judges what was written with the reference verifier, whichever
+  The write operations (and `job`) are judged rather than compared byte for byte: JSON formatting is free, so two
+  conforming writers may write different bytes for one `summary.json`, `results.ndjson` or `seal.json`, and an ECDSA
+  signature need not be deterministic. The runner judges what was written with the reference verifier, whichever
   implementation is under test:
   - `summarize`: the output is valid against the writer `summary` schema; `runId`, the lanes and entries in request
     order, `N`, `n`, `notMeasured`, `verdict`, `rule` and `aggregate` are as expected; `sum`, `sumSq` and `value` match
@@ -241,6 +291,33 @@ each limit of [ENC-17] at its value or one beyond.
     padding ([SIG-1]); the `signature` operation, with the vector's trust policy, gives `envelopeResult` null, that
     signature `verified` for the vector's identity, and `verifiesFor` that identity. For Ed25519, whose signatures are
     deterministic ([RFC 8032]), `sig` must also be the expected one; an ECDSA signature is not compared.
+  - `job`: the runner gives a fresh `OUT`, and runs the operation in an environment it controls: it sets each
+    variable the vector's `env` names `set` to a fresh random value, sets each it names `empty` to the empty string,
+    and removes each it names `absent`. The operation exits 0, and:
+    - `OUT` holds `events.ndjson` and a folder `runs/<runId>/` for each run an `evidence.produced` announces, and
+      nothing else; `events` is the number of its lines, and every event is valid against the writer `runner-event`
+      schema;
+    - the first event is `job.refused` when the vector expects a refusal and `job.accepted` otherwise, at `T`; the last
+      is the expected terminal event, with the expected `limit` (none but on `job.failed`), at `endsAt` (§9.2.1);
+    - [STRM-3] and [STRM-4] find no problem: the reference verifier's `stream` and `conform`, given the plan and `OUT`.
+      For a plan the reader refuses, which they cannot check, the stream is one `job.refused` naming the plan's
+      `planId` and the SHA-256 of its bytes;
+    - each run announced verifies `intact` with no problem, and its files are valid against their writer schemas; its
+      `execution.targetMode` is `scripted`, its `provenance` the `job.accepted`'s ([RUN-12]), its `subject.kind` and
+      `deployment.ref` those [PLAN-10] derives, its `suite.digest` the plan's, or none when the plan gives none
+      ([PLAN-8]), and its `endedAt` the end of its last case on the clock of §9.2.1; its `metrics.json` declares
+      `pass-rate` and its `summary.json` has the lanes §9.2.1 gives, with `cost.totalUsd` the sum of its cases' `usd`;
+    - the runs, in the order announced, are the expected ones: each with its suite's `ref` and `version`, its
+      `status`, and one line per case run, the case's root at path `check` with its `caseId`, `state`, `severity` (none
+      when the case has none) and `lane` (none when the plan gives its suite none), and no other line. The
+      `case.completed` events are the expected cases, in order; one that names a `runId` names its case's run;
+    - the last `spend.updated` is `spentUsd` (0 when there is none); `plan.estimated` is written once, with the
+      expected `cases`, `usdLow` and `usdHigh`, or not at all for a refusal;
+    - no byte written in `OUT`, and none printed, holds a value given to a credential's variable, or a credential
+      reference's `path` ([PLAN-3], [PLAN-4]).
+
+    Ids, reasons, and the members of a result line the runner chooses, are free. Times are judged only by the clock
+    of §9.2.1 and by [STRM-3] and [STRM-4]; numbers are compared as binary64 ([CONF-2]).
   - A vector with `refused: true` passes when the operation is an input error (exit 2); for `seal-write`, the run's
     folder must also be unchanged, and for `produce`, `OUT` must hold no file.
 

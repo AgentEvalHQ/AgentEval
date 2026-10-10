@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "1.0",
+  "planId": "plan-job-env-credential-set",
+  "subject": {
+    "ref": "agent:support/support-triage",
+    "version": "git:3f2a1c",
+    "deployment": "deployment:support/support-triage@dev"
+  },
+  "suites": [
+    {
+      "ref": "suite:support/triage-scenarios",
+      "version": "4",
+      "lane": "quality"
+    },
+    {
+      "ref": "suite:owasp/llm-top10",
+      "version": "2026.1",
+      "lane": "security"
+    }
+  ],
+  "limits": {
+    "maxUsd": 5.0,
+    "timeout": "PT1H"
+  },
+  "contentCapture": "off",
+  "targetMode": "scripted",
+  "isolation": "process",
+  "provider": "local",
+  "judges": [
+    {
+      "model": "gpt-5.1",
+      "provider": "azure.ai.openai",
+      "rubricDigest": "sha256:a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9"
+    }
+  ],
+  "credentialRefs": [
+    {
+      "name": "SUPPORT_API_KEY",
+      "scheme": "env",
+      "path": "AEF_TEST_SUBJECT_KEY",
+      "purpose": "subject"
+    },
+    {
+      "name": "AZURE_OPENAI_API_KEY",
+      "scheme": "env",
+      "path": "AEF_TEST_JUDGE_KEY",
+      "purpose": "judge"
+    }
+  ]
+}

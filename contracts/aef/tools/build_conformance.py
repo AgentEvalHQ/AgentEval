@@ -1718,14 +1718,24 @@ def checkpoints():
          "a state a later minor (1.1) adds: a reader cannot recompute it, and says so rather than call it tampering"),
         ("state-unknown-without-decision-in-1-0",
          {k: v for k, v in dict(decided, state="sealed", outcome="approved").items() if k not in ("decision", "decisionInput")},
-         "invalid", "valid", ["unverifiable"], ["CKP-7", "VER-6"],
+         "invalid", "valid", ["decision"], ["CKP-7", "VER-6"],
          "a 1.0 manifest in a state nobody defined that records an outcome is checked as decided (R6N-2): with no "
-         "decision, nothing can be recomputed"),
+         "decision, the input cannot be decided (R7-4: only a later minor's is unverifiable)"),
         ("state-unknown-decision-without-input-in-1-0",
          {k: v for k, v in dict(decided, state="sealed").items() if k != "decisionInput"},
+         "invalid", "valid", ["decision"], ["CKP-7", "VER-6"],
+         "a 1.0 manifest in a state nobody defined that records a decision without its input (R6N-1): the input cannot "
+         "be decided (R7-4)"),
+        ("outcome-unknown-without-decision-in-1-0",
+         {k: v for k, v in dict(decided, outcome="ratified").items() if k not in ("decision", "decisionInput")},
+         "invalid", "valid", ["decision"], ["CKP-7", "VER-6"],
+         "a 1.0 manifest decided with an outcome nobody defined and no decision: not unverifiable, which only a later "
+         "minor's values are, but a decision that cannot be recomputed (R7-4)"),
+        ("state-unknown-without-decision", dict({k: v for k, v in dict(decided, state="sealed", outcome="approved").items()
+                                                  if k not in ("decision", "decisionInput")}, schemaVersion="1.1"),
          "invalid", "valid", ["unverifiable"], ["CKP-7", "VER-6"],
-         "a 1.0 manifest in a state nobody defined that records a decision without its input (R6N-1): nothing can be "
-         "recomputed"),
+         "the same manifest declaring a later minor (1.1): its state may be one that minor defines, so nothing it "
+         "holds can be recomputed"),
         ("state-unknown-in-1-0", dict(decided, state="sealed", outcome="approved"), "invalid", "valid", ["outcome"],
          ["CKP-7", "VER-6"],
          "a 1.0 manifest with a state nobody defined is checked as usual (R6-2): its recorded outcome is not the "

@@ -160,6 +160,60 @@ public sealed class RunnerEventStreamTests : IDisposable
     }
 
     [Fact]
+    public void ACase_IsItsRunsSuiteWithItsCaseId_SoTwoSuitesThatShareCaseIds_CountTwice()
+    {
+        // [STRM-4] over-cases (round 7, [PLAN-8]): k1 and k2 in two suites are four cases, not two.
+        JobRun("R-1", 0.1, b => b.Line("k1", "p", "passed").Line("k2", "p", "passed"));
+        JobRun("R-2", 0.1, b =>
+        {
+            b.Run["suite"] = new JsonObject { ["ref"] = "suite:shop/regression", ["version"] = "1" };
+            return b.Line("k1", "p", "passed").Line("k2", "p", "failed", severity: "low");
+        });
+        var plan = Plan(cases: 4);
+        plan["suites"]!.AsArray().Add(new JsonObject { ["ref"] = "suite:shop/regression", ["version"] = "1", ["lane"] = "regression" });
+
+        Assert.Empty(Conform(plan, Announce("R-1", "R-2"), Sealed(9, "R-1", "R-2")));
+        plan["limits"]!["cases"] = 3;
+        Assert.Equal(["job over-cases"], Conform(plan, Announce("R-1", "R-2"), Sealed(9, "R-1", "R-2")));
+    }
+
+    [Theory]
+    [InlineData(null, null, true)]                                  // a plan without a mode asks for live; a manifest without modes gives it
+    [InlineData("scripted", null, false)]                           // a manifest without targetModes gives live only
+    [InlineData(null, """["scripted"]""", false)]
+    [InlineData("live", """["live", "scripted"]""", true)]
+    [InlineData("scripted", """["live", "scripted"]""", true)]
+    [InlineData("mocked", """["live", "scripted"]""", false)]
+    public void ARunnerTakesAPlan_OnlyWhenItGivesThePlansTargetMode_Plan7(string? planMode, string? runnerModes, bool takes)
+    {
+        var plan = Plan();
+        if (planMode is not null) plan["targetMode"] = planMode;
+        var runner = new JsonObject
+        {
+            ["schemaVersion"] = "1.0", ["runnerId"] = "runner-1", ["kind"] = "local", ["os"] = "linux",
+            ["runtime"] = new JsonObject { ["name"] = "any", ["version"] = "1" }, ["providers"] = new JsonArray("local"),
+            ["tags"] = new JsonArray(), ["version"] = "1.0.0",
+        };
+        if (runnerModes is not null) runner["targetModes"] = JsonNode.Parse(runnerModes);
+
+        Assert.Equal(takes, RunnerEventStream.Matches(plan, runner));
+        Assert.Equal(takes, RunnerEventStream.WhyNot(plan, runner) is null);
+    }
+
+    [Fact]
+    public void ARunnersReasonForNotTakingAPlan_NamesACredentialByItsNameNeverItsPath()
+    {
+        var plan = Plan();
+        plan["credentialRefs"] = new JsonArray(new JsonObject { ["name"] = "KEY", ["scheme"] = "hsm", ["path"] = "secret/where-it-lives", ["purpose"] = "subject" });
+        var runner = new JsonObject { ["providers"] = new JsonArray("local"), ["tags"] = new JsonArray() };
+
+        var why = RunnerEventStream.WhyNot(plan, runner);
+
+        Assert.Contains("KEY", why, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret/where-it-lives", why, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ARunWithoutACost_IsANoCostProblem_AndARunNoFolderHolds_IsMissing()
     {
         JobRun("R-1", null);

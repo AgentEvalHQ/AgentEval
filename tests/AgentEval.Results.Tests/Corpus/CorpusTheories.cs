@@ -1,6 +1,10 @@
 using System.Text;
 using System.Text.Json.Nodes;
+using AgentEval.Results.Checkpoints;
 using AgentEval.Results.Conformance;
+using AgentEval.Results.Integrity;
+using AgentEval.Results.Runner;
+using AgentEval.Results.Schemas;
 
 namespace AgentEval.Results.Tests.Corpus;
 
@@ -340,10 +344,116 @@ public class CorpusTheories
         AssertProblems(expected["problems"], Run(args)["problems"]);
     }
 
+    [Theory]
+    [MemberData(nameof(Vectors), "job")]
+    public void Job(string id)
+    {
+        // Spec 09 §9.3's job judge, in part (the Python runner's is the one that counts): the variables the vector names
+        // are set (to a fresh value, or to the empty string) or removed for the call, and what the job wrote is compared
+        // with the expected job and checked as a Stream verifier and a Run verifier check it.
+        var folder = Folder(id);
+        var expected = Expected(folder);
+        var output = Path.Combine(Path.GetTempPath(), $"aef-job-{Guid.NewGuid():N}");
+        var variables = expected["env"]?.AsObject().Select(v => (Name: v.Key, Value: (string?)v.Value switch
+        {
+            "set" => $"aef-secret-{Guid.NewGuid():N}",
+            "empty" => "",
+            _ => null,
+        })).ToList() ?? [];
+        var saved = variables.Select(v => (v.Name, Value: Environment.GetEnvironmentVariable(v.Name))).ToList();
+        try
+        {
+            variables.ForEach(v => Environment.SetEnvironmentVariable(v.Name, v.Value));
+            var plan = Path.Combine(folder, (string)expected["plan"]!);
+            var result = Run("job", plan, Path.Combine(folder, (string)expected["runner"]!), Path.Combine(folder, (string)expected["target"]!), output, "--at", (string)expected["at"]!);
+
+            var events = File.ReadAllLines(Path.Combine(output, "events.ndjson")).Select(l => JsonNode.Parse(l)!).ToList();
+            Assert.Equal((int)result["events"]!, events.Count);
+            Assert.Equal((string?)expected["at"], (string?)events[0]["at"]);
+            Assert.Equal((string?)expected["endsAt"], (string?)events[^1]["at"]);
+            Assert.Equal(((string?)expected["terminal"], (string?)expected["limit"]), ((string?)events[^1]["kind"], (string?)events[^1]["limit"]));
+
+            var runs = events.Where(e => (string?)e["kind"] == "evidence.produced").Select(e => (string)e["runId"]!).ToList();
+            Assert.Equal(expected["runs"]!.AsArray().Count, runs.Count);
+            var planJson = JsonNode.Parse(File.ReadAllBytes(plan))!;
+            var target = JsonNode.Parse(File.ReadAllBytes(Path.Combine(folder, (string)expected["target"]!)))!;
+            JsonNode? Fixture(string suiteRef, string version, string caseId) => target["suites"]!.AsArray()
+                .Single(s => (string?)s!["ref"] == suiteRef && (string?)s["version"] == version)!["cases"]!.AsArray()
+                .Single(c => (string?)c!["caseId"] == caseId);
+            var clock = AefTime.Parse((string)expected["at"]!);
+            foreach (var (want, runId) in expected["runs"]!.AsArray().Zip(runs))
+            {
+                var runFolder = Path.Combine(output, "runs", runId);
+                var run = JsonNode.Parse(File.ReadAllBytes(Path.Combine(runFolder, "run.json")))!;
+                var (suiteRef, version) = ((string)want!["suite"]!["ref"]!, (string)want["suite"]!["version"]!);
+                Assert.Equal((suiteRef, version, (string?)want["status"]),
+                    ((string?)run["suite"]!["ref"], (string?)run["suite"]!["version"], (string?)run["status"]));
+
+                // The plan's digest or none ([PLAN-8]); endedAt the end of the run's last case on §9.2.1's clock.
+                var planned = planJson["suites"]?.AsArray().FirstOrDefault(s => (string?)s!["ref"] == suiteRef && (string?)s["version"] == version);
+                Assert.Equal((string?)planned?["digest"], (string?)run["suite"]!["digest"]);
+                clock = clock.AddSeconds(want["cases"]!.AsArray().Sum(c => (long)Fixture(suiteRef, version, (string)c![0]!)!["seconds"]!));
+                Assert.Equal(clock.ToString(), (string?)run["endedAt"]);
+                clock = clock.AddSeconds((long)target["closeSeconds"]!);
+
+                // One line per case run: its caseId, state, the fixture's severity, and the plan's lane for its suite.
+                var lane = (string?)planned?["lane"];
+                Assert.Equal(want["cases"]!.AsArray().Select(c => $"{c![0]} {c[1]} {(string?)Fixture(suiteRef, version, (string)c[0]!)!["severity"]} {lane}"),
+                    File.ReadAllLines(Path.Combine(runFolder, "results.ndjson")).Select(l => JsonNode.Parse(l)!)
+                        .Select(l => $"{l["caseId"]} {l["state"]} {(string?)l["severity"]} {(string?)l["lane"]}"));
+
+                // pass-rate declared; the suite's lane, pass-rate at check, or no lane (§9.2.1).
+                var metrics = JsonNode.Parse(File.ReadAllBytes(Path.Combine(runFolder, "metrics.json")))!["metrics"]!.AsArray();
+                Assert.Contains(metrics, m => (string?)m!["id"] == "pass-rate" && (string?)m["kind"] == "rate" && (string?)m["direction"] == "higher_better");
+                var lanes = JsonNode.Parse(File.ReadAllBytes(Path.Combine(runFolder, "summary.json")))!["lanes"]!.AsArray();
+                Assert.Equal(lane is null ? Array.Empty<string>() : [$"{lane} pass-rate check"],
+                    lanes.SelectMany(l => l!["metrics"]!.AsArray().Select(m => $"{l["lane"]} {m!["metric"]} {m["path"]}")));
+
+                var verification = AefRunVerifier.Verify(runFolder);
+                Assert.Equal((AefOutcome.Intact, 0), (verification.Outcome, verification.Problems.Count));
+            }
+
+            Assert.Equal((double)expected["spentUsd"]!, (double?)events.LastOrDefault(e => (string?)e["kind"] == "spend.updated")?["spentUsd"] ?? 0);
+            var estimate = events.SingleOrDefault(e => (string?)e["kind"] == "plan.estimated");
+            Assert.Equal(expected["estimated"] is null, estimate is null);
+            if (estimate is not null)
+            {
+                Assert.Equal(((double)expected["estimated"]!["cases"]!, (double)expected["estimated"]!["usdLow"]!, (double)expected["estimated"]!["usdHigh"]!),
+                    ((double)estimate["cases"]!, (double)estimate["usdLow"]!, (double)estimate["usdHigh"]!));
+            }
+
+            // [STRM-3] and [STRM-4], for a plan the reader accepts; no credential's value or path in any byte written.
+            var planBytes = File.ReadAllBytes(plan);
+            var planDocument = JsonNode.Parse(planBytes)!;
+            if (AefSchemas.Reader.IsValid("run-plan", planDocument))
+            {
+                var stream = RunnerEventStream.Read(File.ReadAllBytes(Path.Combine(output, "events.ndjson")));
+                Assert.Empty(RunnerEventStream.Verify(stream, planDocument, Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(planBytes)).ToLowerInvariant()));
+                Assert.Empty(RunnerEventStream.Conform(stream, planDocument, AefRunStore.Open(output)));
+            }
+
+            var secrets = variables.Select(v => v.Value).Where(v => !string.IsNullOrEmpty(v)).OfType<string>()
+                .Concat(planDocument["credentialRefs"]?.AsArray().Select(c => (string?)c!["path"]).OfType<string>() ?? []);
+            foreach (var file in Directory.GetFiles(output, "*", SearchOption.AllDirectories))
+            {
+                var bytes = File.ReadAllBytes(file);
+                Assert.All(secrets, s => Assert.True(bytes.AsSpan().IndexOf(Encoding.UTF8.GetBytes(s)) < 0, $"{file} holds a credential's value or path"));
+            }
+        }
+        finally
+        {
+            saved.ForEach(v => Environment.SetEnvironmentVariable(v.Name, v.Value));
+            if (Directory.Exists(output))
+            {
+                Directory.Delete(output, recursive: true);
+            }
+        }
+    }
+
     [Fact]
     public void EveryKindThisComponentCovers_HasVectors()
     {
-        foreach (var kind in new[] { "decision", "document", "reader-only", "plan", "matching", "stream", "result-id", "paths", "run", "encoding", "seal", "chain", "overlay-view", "checkpoint", "lane", "plan-conformance", "produce" })
+        foreach (var kind in new[] { "decision", "document", "reader-only", "plan", "matching", "stream", "result-id", "paths", "run", "encoding", "seal", "chain", "overlay-view", "checkpoint", "lane", "plan-conformance", "produce", "job" })
         {
             Assert.Contains(Index, v => (string?)v!["kind"] == kind);
         }

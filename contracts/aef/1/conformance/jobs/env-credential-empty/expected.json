@@ -1,0 +1,20 @@
+{
+  "kind": "job",
+  "plan": "plan.json",
+  "runner": "../runner.json",
+  "target": "target.json",
+  "at": "2026-10-09T09:00:00Z",
+  "env": {
+    "AEF_TEST_EMPTY_KEY": "empty"
+  },
+  "terminal": "job.refused",
+  "limit": null,
+  "runs": [],
+  "spentUsd": 0,
+  "estimated": null,
+  "endsAt": "2026-10-09T09:00:00Z",
+  "rules": [
+    "PLAN-3"
+  ],
+  "why": "the plan's env credential names a variable that is set to the empty string: an empty value is no credential, so it does not resolve and the plan is refused"
+}

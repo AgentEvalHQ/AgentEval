@@ -1,0 +1,107 @@
+{
+  "version": 2,
+  "status": "error",
+  "eval": {
+    "eval_id": "edges-1",
+    "run_id": "edges-1",
+    "created": "2026-10-08T09:00:00Z",
+    "task": "edges",
+    "task_version": "1",
+    "dataset": {
+      "samples": 2,
+      "sample_ids": [
+        "c1",
+        "c2"
+      ]
+    },
+    "model": "acme/gpt x",
+    "config": {},
+    "packages": {
+      "example": "1"
+    },
+    "metadata": {
+      "aef": {
+        "execution": {
+          "targetMode": "live"
+        },
+        "contentCapture": "on"
+      }
+    }
+  },
+  "results": {
+    "total_samples": 2,
+    "completed_samples": 2,
+    "scores": []
+  },
+  "stats": {
+    "started_at": "2026-10-08T09:00:00Z",
+    "completed_at": "2026-10-08T09:05:00Z"
+  },
+  "error": {
+    "message": "The endpoint stopped answering.",
+    "traceback": "",
+    "traceback_ansi": ""
+  },
+  "samples": [
+    {
+      "id": "c1",
+      "epoch": 1,
+      "input": "",
+      "target": "",
+      "scores": {
+        "letter": {
+          "value": "C",
+          "metadata": {
+            "aef": {
+              "resultId": "r_5bdf555d455acd0da5670801faf5eacc",
+              "state": "passed",
+              "evaluator": {
+                "id": "check:letter"
+              }
+            }
+          }
+        },
+        "two": {
+          "value": {
+            "acc": 0.5,
+            "grade": "C"
+          },
+          "metadata": {
+            "aef": {
+              "resultId": "r_45b4bc087ddc4992157c07f88022ea5e",
+              "state": "scored",
+              "evaluator": {
+                "id": "check:two"
+              }
+            }
+          }
+        }
+      },
+      "started_at": "2026-10-08T09:01:00Z",
+      "completed_at": "2026-10-08T09:01:01.5Z",
+      "total_time": 1.5
+    },
+    {
+      "id": "c2",
+      "epoch": 1,
+      "input": "What is 2+2?",
+      "target": "",
+      "scores": {
+        "letter": {
+          "value": NaN,
+          "reason": "not_applicable",
+          "explanation": "No letter was asked for.",
+          "metadata": {
+            "aef": {
+              "resultId": "r_95c0ac7e5ed2bc11106ff5a7afb144de",
+              "state": "not_applicable",
+              "evaluator": {
+                "id": "check:letter"
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
+}

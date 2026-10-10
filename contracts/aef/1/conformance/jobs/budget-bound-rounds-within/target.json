@@ -1,0 +1,53 @@
+{
+  "suites": [
+    {
+      "ref": "suite:support/rounding",
+      "version": "1",
+      "content": "suite:support/rounding@1\nround-1\nround-2\nround-3\nround-4\nround-5\n",
+      "cases": [
+        {
+          "caseId": "round-1",
+          "state": "passed",
+          "usd": 0.25,
+          "usdBound": 0.25,
+          "seconds": 20,
+          "secondsBound": 20
+        },
+        {
+          "caseId": "round-2",
+          "state": "passed",
+          "usd": 0.25,
+          "usdBound": 0.25,
+          "seconds": 20,
+          "secondsBound": 20
+        },
+        {
+          "caseId": "round-3",
+          "state": "passed",
+          "usd": 0.25,
+          "usdBound": 0.25,
+          "seconds": 20,
+          "secondsBound": 20
+        },
+        {
+          "caseId": "round-4",
+          "state": "passed",
+          "usd": 0.25,
+          "usdBound": 0.25,
+          "seconds": 20,
+          "secondsBound": 20
+        },
+        {
+          "caseId": "round-5",
+          "state": "passed",
+          "usd": 1e-17,
+          "usdBound": 1e-17,
+          "seconds": 20,
+          "secondsBound": 20
+        }
+      ]
+    }
+  ],
+  "closeSeconds": 1,
+  "priceTable": "aef-scripted-2026-10"
+}

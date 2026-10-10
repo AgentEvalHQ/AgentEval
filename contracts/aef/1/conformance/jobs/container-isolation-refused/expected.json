@@ -1,0 +1,17 @@
+{
+  "kind": "job",
+  "plan": "plan.json",
+  "runner": "runner.json",
+  "target": "target.json",
+  "at": "2026-10-09T09:00:00Z",
+  "terminal": "job.refused",
+  "limit": null,
+  "runs": [],
+  "spentUsd": 0,
+  "estimated": null,
+  "endsAt": "2026-10-09T09:00:00Z",
+  "rules": [
+    "PLAN-7"
+  ],
+  "why": "the plan asks for a container; the runner supports the provider docker, but a scripted target runs in the runner's process, so it gives the isolation process only"
+}

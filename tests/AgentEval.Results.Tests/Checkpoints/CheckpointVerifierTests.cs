@@ -342,22 +342,27 @@ public sealed class CheckpointVerifierTests : IDisposable
     [InlineData("1.0", "sealed", "approved", true, true, "outcome")]                // checked as usual (vector state-unknown-in-1-0)
     [InlineData("1.0", "sealed", "inconclusive", true, true, "")]                   // nothing differs: no problem
     [InlineData("1.0", "sealed", null, true, true, "outcome")]                      // a decision with no outcome: not the decision's
-    [InlineData("1.0", "sealed", "approved", false, false, "unverifiable")]         // a decided outcome but no decision
-    [InlineData("1.0", "decided", "ratified", false, false, "unverifiable")]
+    [InlineData("1.0", "sealed", "approved", false, false, "decision")]             // a decided outcome but no decision (R7-4)
+    [InlineData("1.0", "decided", "ratified", false, false, "decision")]            // vector outcome-unknown-without-decision-in-1-0
+    [InlineData("1.0", "decided", "approved", false, false, "decision")]
     [InlineData("1.0", "sealed", null, false, false, "")]                           // nothing recorded: nothing to recompute
-    [InlineData("1.0", "sealed", "inconclusive", true, false, "unverifiable")]      // a decision without its input (R6N-1, ruled 10-09)
-    [InlineData("1.0", "sealed", null, true, false, "unverifiable")]
+    [InlineData("1.0", "sealed", "inconclusive", true, false, "decision")]          // a decision without its input (R6N-1, revised by R7-4)
+    [InlineData("1.0", "sealed", null, true, false, "decision")]
     [InlineData("1.1", "sealed", "inconclusive", true, true, "unverifiable")]       // a later minor's state
+    [InlineData("1.1", "sealed", "approved", false, false, "unverifiable")]         // vector state-unknown-without-decision
     [InlineData("1.1", "decided", "ratified", true, true, "unverifiable")]
+    [InlineData("1.1", "decided", "approved", false, false, "unverifiable")]        // a later minor's decided manifest without a decision
+    [InlineData("1.1", "decided", "approved", true, false, "unverifiable")]
     [InlineData("1.1", "decided", "approved", true, true, "outcome")]               // a later minor that holds nothing unknown: checked
     [InlineData("1.0", "decided", "aborted", false, false, "")]
     [InlineData("1.1", "sealed", "aborted", false, false, "unverifiable")]
     public void AManifestHoldingAValueThisVersionDoesNotKnow_IsUnverifiableOnlyInALaterMinor_Ckp7(
         string declared, string state, string? outcome, bool decision, bool input, string expected)
     {
-        // [CKP-7] (round 6): only a manifest that declares a later minor and holds a state, an outcome or a lane status
-        // this version does not know is unverifiable, besides one with a decided outcome but no decision; a 1.0 manifest
-        // is checked as usual whatever it holds.
+        // [CKP-7] (rounds 6 and 7): only a later minor's values are unverifiable: a manifest that declares a later minor
+        // and holds a state, an outcome or a lane status this version does not know, or one checked as decided with
+        // nothing to recompute (no decision, or a decision without its input). A 1.0 manifest is checked as usual whatever
+        // it holds, and one checked as decided with nothing to recompute is a decision problem (R7-4).
         var document = JsonNode.Parse(File.ReadAllBytes(Path.Combine(AefCorpus.Conformance, "checkpoints", "valid-decided", "document.json")))!.AsObject();
         document["schemaVersion"] = declared;
         document["state"] = state;

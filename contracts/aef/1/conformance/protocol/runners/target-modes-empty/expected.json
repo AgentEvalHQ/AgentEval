@@ -1,0 +1,10 @@
+{
+  "kind": "plan",
+  "schema": "runner",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "PLAN-6"
+  ],
+  "why": "a manifest that names target modes names at least one: without the field it gives live only"
+}

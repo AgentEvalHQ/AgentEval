@@ -66,6 +66,7 @@ A runner reports a job as NDJSON events, each with a sequence number. The stream
 | `kind` | `"case.completed"` | yes |  | case.completed: a case finished; the plan's cases limit counts these (STRM-3). |
 | `caseId` | any | yes | ≥ 1 chars; ≤ 256 chars | The case that finished. |
 | `state` | [state](common.md#state) | yes |  | The case's state (RES-1). |
+| `runId` | [id](common.md#id) |  |  | The run the case is a case of. A runner SHOULD name it: two suites of a job may share case ids (PLAN-8). |
 | `ext` | [ext](#ext) |  |  | Producer extensions, named reverse-DNS or with the producer's prefix. A reader ignores what it does not know; never holds a secret (ENC-19, STRM-1). |
 
 ### `lane.completed`

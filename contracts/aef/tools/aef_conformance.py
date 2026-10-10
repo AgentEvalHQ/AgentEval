@@ -2,9 +2,10 @@
 """The AEF 1.0 conformance runner (spec 09 §9.3): runs every vector of conformance/ through an implementation and
 compares its result with the expected one. Standard library only.
 
-The implementation is tools/aef_verify.py (with tools/aef_produce.py for the write operations), called in-process, or
-any program that follows aef_verify.py's command-line contract (one command per operation, input paths as arguments,
-one JSON value on standard output), given with --command. Each vector's `kind` names the operation:
+The implementation is tools/aef_verify.py (with tools/aef_produce.py for the write operations, and tools/aef_runner.py
+for `job`), called in-process, or any program that follows aef_verify.py's command-line contract (one command per
+operation, input paths as arguments, one JSON value on standard output), given with --command. Each vector's `kind`
+names the operation:
 
   kind          vectors                                   operation          compared
   run           valid/, runs/                             run DIR [--policy P] [--anchors A]
@@ -50,8 +51,15 @@ one JSON value on standard output), given with --command. Each vector's `kind` n
                                                                              key id, standard base64, verified for the
                                                                              identity by the signature operation; for
                                                                              Ed25519 the signature bytes
+  job           jobs/                                     job PLAN RUNNER TARGET OUT --at T
+                                                                             in a fresh OUT, with the vector's
+                                                                             environment: the stream and the runs as
+                                                                             spec 09 §9.3 judges them (STRM-3, STRM-4,
+                                                                             each run intact, the runs and cases
+                                                                             expected, spend, estimate, no credential
+                                                                             written)
 
-The write operations (summarize, produce, seal-write, sign) are judged by the reference verifier, in-process,
+The write operations (summarize, produce, seal-write, sign, job) are judged by the reference verifier, in-process,
 whichever implementation is under test: aef_verify.py checks what the implementation wrote.
 
 When conformance/index.json exists (CONF-1), the vectors are read from it and every file's SHA-256 is checked
@@ -74,7 +82,11 @@ Usage:
       binary64, trial lines counted, result ids without the trial, parents found by path, trial children without
       their trial, rollup counts and agreement, aggregation counts, a weight-0 child without component, a
       contradictory scenario written, a file left out of the seal, paths in segment order, another signing key,
-      unpadded base64). Each mutation must make some vector fail that passes unmutated.
+      unpadded base64), and once per break of the reference runner aef_runner.py (a limit checked against a case's
+      cost or duration instead of its bound, the budget checked exactly or by the job's spend alone, case ids
+      prefixed, credentials not resolved or an empty one resolved, a suite named twice taken, a container plan taken,
+      a fixed severity, no lane on the lines, a computed suite digest). Each mutation must make some vector fail that
+      passes unmutated.
 Exit status: 0 when every vector passes (and, with --self-check, every mutation is caught), else 1.
 """
 from __future__ import annotations
@@ -88,12 +100,14 @@ import itertools
 import json
 import os
 import re
+import secrets
 import shlex
 import shutil
 import subprocess
 import sys
 import tempfile
 from collections import OrderedDict
+from fractions import Fraction
 from pathlib import Path
 
 TOOLS = Path(__file__).resolve().parent
@@ -101,6 +115,7 @@ if str(TOOLS) not in sys.path:  # python -I leaves the script's own folder out o
     sys.path.insert(0, str(TOOLS))
 
 import aef_produce  # noqa: E402
+import aef_runner  # noqa: E402
 import aef_verify  # noqa: E402
 
 CORPUS = TOOLS.parent / "1" / "conformance"
@@ -110,16 +125,31 @@ CORPUS = TOOLS.parent / "1" / "conformance"
 
 class InProcess:
     """The reference implementation, called as a library with the same arguments as its command line: aef_verify.py,
-    and aef_produce.py for the write operations."""
-    name = "aef_verify.py and aef_produce.py (in-process)"
+    aef_produce.py for the write operations, and aef_runner.py for job."""
+    name = "aef_verify.py, aef_produce.py and aef_runner.py (in-process)"
 
-    def call(self, argv):
+    def call(self, argv, env=None):
+        """env: the environment variables to set (a value) or remove (None) for this call only (spec 09 §9.3)."""
         argv = [str(a) for a in argv]
-        module = aef_produce if argv and argv[0] in aef_produce.OPERATIONS else aef_verify
+        module = (aef_produce if argv and argv[0] in aef_produce.OPERATIONS else
+                  aef_runner if argv and argv[0] in aef_runner.OPERATIONS else aef_verify)
+        saved = {name: os.environ.get(name) for name in env or {}}
         try:
+            _apply(os.environ, env or {})
             return module.dispatch(argv)
-        except (aef_verify.InputError, aef_produce.InputError) as error:
+        except (aef_verify.InputError, aef_produce.InputError, aef_runner.InputError) as error:
             return {"error": str(error)}
+        finally:
+            _apply(os.environ, saved)
+
+
+def _apply(environ, changes):
+    """Sets each variable given a value, and removes each given None."""
+    for name, value in changes.items():
+        if value is None:
+            environ.pop(name, None)
+        else:
+            environ[name] = value
 
 
 class External:
@@ -129,8 +159,12 @@ class External:
         self.command = shlex.split(command, posix=os.name != "nt")
         self.name = command
 
-    def call(self, argv):
-        done = subprocess.run(self.command + [str(a) for a in argv], capture_output=True)
+    def call(self, argv, env=None):
+        environ = None
+        if env:
+            environ = dict(os.environ)
+            _apply(environ, env)
+        done = subprocess.run(self.command + [str(a) for a in argv], capture_output=True, env=environ)
         if done.returncode != 0:
             return {"error": f"exit {done.returncode}: {done.stderr.decode('utf-8', 'replace').strip()}"}
         try:
@@ -155,6 +189,7 @@ KIND_CLASSES = {
     "decision": ["Checkpoint verifier", "Decision engine"], "plan": ["Runner"], "matching": ["Runner"],
     "stream": ["Stream verifier"], "plan-conformance": ["Stream verifier"],
     "summarize": ["Producer"], "produce": ["Producer"], "seal-write": ["Sealer"], "sign": ["Sealer"],
+    "job": ["Runner"],
 }
 WRITE_KINDS = ("summarize", "produce", "seal-write", "sign")  # write-vectors/<kind>/<name>/ (spec 09 §9.2.1)
 SIGN_ALGORITHMS = ("ecdsa-p256", "ed25519")  # SIG-2: a signer uses one of these; a sign vector names the one it needs
@@ -212,6 +247,12 @@ def walk(corpus, notices):
                 vectors.append(Vector(kind, f"write-vectors/{kind}/{d.name}", d, read_json(d / "expected.json")))
     else:
         notices.append("notice: write-vectors/ does not exist; its vectors are skipped")
+    jobs = corpus / "jobs"
+    if jobs.is_dir():
+        for d in sorted(p for p in jobs.iterdir() if (p / "expected.json").is_file()):
+            vectors.append(Vector("job", f"jobs/{d.name}", d, read_json(d / "expected.json")))
+    else:
+        notices.append("notice: jobs/ does not exist; its vectors are skipped")
     for name, kind in (("paths.json", "paths"), ("result-ids.json", "result-id")):
         f = corpus / name
         if not f.is_file():
@@ -503,6 +544,8 @@ def run_vector(engine, v, scratch):
         compare(diffs, "resultId", out.get("resultId", out), item["resultId"])
     elif v.kind in WRITE_KINDS:
         judge_write(engine, v, scratch, diffs)
+    elif v.kind == "job":
+        _judge_job(engine, v, scratch, diffs)
     else:
         diffs.append(f"no operation for kind {v.kind!r} in this runner yet")
     return diffs
@@ -837,6 +880,234 @@ def _judge_sign(engine, v, scratch, diffs):
         compare(diffs, "sig (Ed25519)", signatures[0].get("sig"), e["sig"])
 
 
+# ---------------------------------------------------------------------------- the job vectors (spec 09 §9.3)
+
+JOB_RUN_FILES = {"run.json": "run", "results.ndjson": "result", "metrics.json": "metrics", "summary.json": "summary",
+                 "seal.json": "seal"}  # the files of a run the judge checks against their writer schemas
+SUBJECT_KINDS = aef_verify._writer_enum("run.schema.json#/properties/subject/properties/kind/enum")
+
+
+def job_environment(env):
+    """{variable: a fresh random value, the empty string, or None to remove it} for a vector's `env` ({name: "set",
+    "empty" or "absent"}, spec 09 §9.3)."""
+    value = {"set": lambda: f"aef-secret-{secrets.token_hex(16)}", "empty": lambda: "", "absent": lambda: None}
+    return {name: value[state]() for name, state in env.items()}
+
+
+def _job(engine, v, scratch, diffs):
+    """Runs a job vector's operation in a fresh OUT; returns (OUT, the operation's output, the variables set)."""
+    e, d = v.expected, v.path
+    for name in ("runner", "target", "plan"):
+        if v.guard is not None:
+            v.guard.check(d / e[name])  # the shared runner manifest lives outside the vector's folder
+    out_dir = Path(tempfile.mkdtemp(dir=scratch)) / "out"  # does not exist yet: the operation creates it
+    env = job_environment(e.get("env") or {})
+    out = engine.call(["job", d / e["plan"], d / e["runner"], d / e["target"], out_dir, "--at", e["at"]], env=env)
+    return out_dir, out, env
+
+
+def _judge_job(engine, v, scratch, diffs):
+    e, d = v.expected, v.path
+    out_dir, out, env = _job(engine, v, scratch, diffs)
+    diffs.extend(judge_job_output(out_dir, out, d / e["plan"], d / e["target"], e,
+                                  [value for value in env.values() if value], at=e["at"]))
+
+
+def _exact_sum(values):
+    """A sum computed exactly and rounded once ([SUM-5]), as the binary64 value written."""
+    return float(sum((Fraction(x) for x in values), Fraction(0)))
+
+
+def _plan_secrets(plan):
+    """What a runner never writes (PLAN-3, PLAN-4): every credential reference's path, and a bare value written where
+    a reference belongs."""
+    refs = plan.get("credentialRefs") if isinstance(plan, dict) else None
+    found = []
+    for ref in refs if isinstance(refs, list) else []:
+        if isinstance(ref, str):
+            found.append(ref)
+        elif isinstance(ref, dict) and isinstance(ref.get("path"), str):
+            found.append(ref["path"])
+    return [s for s in found if s]
+
+
+def _enc13_name(text):
+    """ENC-13: a name derived from free text: each UTF-8 byte from ! to ~ but % kept, every other byte as %XX; - for an
+    empty name, %2D for -; beyond 256 characters, the first 239, ~ and 16 hex digits of the SHA-256 of the text."""
+    name = "".join(chr(b) if 0x21 <= b <= 0x7E and b != 0x25 else "%{:02X}".format(b) for b in text.encode("utf-8"))
+    if name in ("", "-"):
+        return {"": "-", "-": "%2D"}[name]
+    return name if len(name) <= 256 else name[:239] + "~" + hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
+
+
+def _derived(plan):
+    """PLAN-10: (subject.kind, deployment.ref) a run of the plan has: the ref's kind when run.json knows it, else
+    other; the plan's deployment, or endpoint: and its endpoint encoded as ENC-13 says, or none."""
+    subject = plan["subject"]
+    kind = subject["ref"].split(":", 1)[0]
+    ref = subject.get("deployment") or ("endpoint:" + _enc13_name(subject["endpoint"]) if "endpoint" in subject else None)
+    return (kind if kind in SUBJECT_KINDS else "other"), ref
+
+
+def judge_job_output(out_dir, out, plan_path, target_path, e, secret_values, at=None):
+    """Spec 09 §9.3: the differences between what a job wrote in OUT (and printed) and the expected job e: `terminal`,
+    `limit`, `runs` (each `suite`, `status`, `cases` as [caseId, state] in order), `spentUsd`, `estimated` (or null),
+    and, with `at`, `endsAt`. secret_values: the values given to credential variables, never to be written."""
+    diffs = []
+    plan_bytes = Path(plan_path).read_bytes()
+    plan = json.loads(plan_bytes.decode("utf-8"))
+    target = read_json(target_path)
+    cost = {(s["ref"], s["version"], c["caseId"]): c["usd"] for s in target["suites"] for c in s["cases"]}
+    if not isinstance(out, dict) or "error" in out:
+        return [out.get("error") if isinstance(out, dict) else f"not a JSON object: {json.dumps(out)}"]
+    written = _files(out_dir) if out_dir.is_dir() else {}
+    if "events.ndjson" not in written:
+        return [f"no events.ndjson in OUT (it holds {', '.join(sorted(written)) or 'nothing'})"]
+    events, data = [], written["events.ndjson"]
+    lines = _read_lines(data, "events.ndjson", diffs)
+    if lines is None:
+        return diffs
+    for i, event in enumerate(lines, start=1):
+        if not (isinstance(event, dict) and aef_verify.document_ok("writer", "runner-event", event)):
+            diffs.append(f"events.ndjson:{i} is not valid against the writer runner-event schema")
+            event = event if isinstance(event, dict) else {}
+        events.append(event)
+    if not events:
+        return diffs + ["events.ndjson holds no event"]
+    compare(diffs, "events (the operation's output)", out.get("events"), len(events))
+    first, last = events[0], events[-1]
+    kinds = [x.get("kind") for x in events]
+    compare(diffs, "the first event", first.get("kind"),
+            "job.refused" if e["terminal"] == "job.refused" else "job.accepted")
+    compare(diffs, "the terminal event and its limit", [last.get("kind"), last.get("limit")], [e["terminal"], e["limit"]])
+    if at is not None:  # §9.2.1: the job's clock
+        if aef_verify.time_key(first.get("at")) != aef_verify.time_key(at):
+            diffs.append(f"the first event is at {first.get('at')}, not at the clock's start {at}")
+        if "endsAt" in e and aef_verify.time_key(last.get("at")) != aef_verify.time_key(e["endsAt"]):
+            diffs.append(f"the terminal event is at {last.get('at')}, not at {e['endsAt']} (the start, the seconds of "
+                         f"the cases run and closeSeconds per run sealed)")
+
+    # The files: the stream, and one folder per run announced.
+    announced = []
+    for x in events:
+        if x.get("kind") == "evidence.produced" and x.get("runId") not in announced:
+            announced.append(x.get("runId"))
+    folders = {name.split("/")[1] for name in written if name.startswith("runs/") and name.count("/") >= 2}
+    others = sorted(n for n in written if n != "events.ndjson" and not (n.startswith("runs/") and n.count("/") >= 2))
+    if others or folders != set(announced):
+        diffs.append(f"OUT holds {sorted(written)}: not only events.ndjson and runs/<runId>/ for the runs announced "
+                     f"({announced})")
+
+    # STRM-3 and STRM-4, by the reference verifier; a plan the reader refuses gets one job.refused naming it.
+    events_path = out_dir / "events.ndjson"
+    readable = isinstance(plan, dict) and aef_verify.schema_valid("reader", "run-plan", plan)
+    if readable:
+        stream = aef_verify.op_stream(events_path, plan_path)["problems"]
+        if stream:
+            diffs.append(f"STRM-3 finds {stream}")
+        conform = aef_verify.op_conform(events_path, plan_path, out_dir)["problems"]
+        if conform:
+            diffs.append(f"STRM-4 finds {conform}")
+    else:
+        compare(diffs, "the one event for a plan the reader refuses", [kinds, first.get("planId"), first.get("planDigest")],
+                [["job.refused"], plan.get("planId") if isinstance(plan, dict) else None,
+                 hashlib.sha256(plan_bytes).hexdigest()])
+
+    # Each run, in the order announced.
+    accepted = first if first.get("kind") == "job.accepted" else {}
+    compare(diffs, "the runs announced", len(announced), len(e["runs"]))
+    kind, deployment = _derived(plan) if readable else (None, None)
+    plan_suites = {(s.get("ref"), s.get("version")): s for s in plan.get("suites") or [] if isinstance(s, dict)} \
+        if readable else {}
+    fixture = {(s["ref"], s["version"], c["caseId"]): c for s in target["suites"] for c in s["cases"]}
+    # §9.2.1's clock: a run's endedAt is the end of its last case; closing and sealing it then take closeSeconds.
+    ended, clock = [], aef_verify.time_key(at) if at is not None else None
+    for r in e["runs"]:
+        for c, _ in r["cases"]:
+            seconds = fixture.get((r["suite"]["ref"], r["suite"]["version"], c), {}).get("seconds", 0)
+            clock = None if clock is None else (clock[0] + int(seconds), clock[1])
+        ended.append(clock)
+        clock = None if clock is None else (clock[0] + int(target["closeSeconds"]), clock[1])
+    for k, run_id in enumerate(announced):
+        folder = out_dir / "runs" / str(run_id)
+        want = e["runs"][k] if k < len(e["runs"]) else None
+        where = f"run {k + 1} ({run_id})"
+        verdict = aef_verify.op_run(folder)
+        if [verdict["outcome"], verdict["problems"]] != ["intact", []]:
+            diffs.append(f"{where}: the run verifier gives {verdict['outcome']} {verdict['problems']}, not intact")
+        for name, schema in JOB_RUN_FILES.items():
+            if (folder / name).is_file() and aef_verify.op_document(schema, folder / name)["writer"] != "valid":
+                diffs.append(f"{where}: {name} is not valid against the writer {schema} schema")
+        try:
+            doc = aef_verify.load_json_bytes((folder / "run.json").read_bytes())
+            results = _read_lines((folder / "results.ndjson").read_bytes(), f"{where} results.ndjson", diffs) or []
+            summary = aef_verify.load_json_bytes((folder / "summary.json").read_bytes())
+            metrics = aef_verify.load_json_bytes((folder / "metrics.json").read_bytes())
+        except (OSError, aef_verify.EncodingProblem) as error:
+            diffs.append(f"{where}: {error}")
+            continue
+        get = aef_verify.get
+        compare(diffs, f"{where} execution.targetMode", get(doc, "execution", "targetMode"), "scripted")
+        compare(diffs, f"{where} provenance (RUN-12)", doc.get("provenance"),
+                {key: accepted.get(key) for key in ("planId", "planDigest", "jobId", "runnerId")})
+        compare(diffs, f"{where} subject.kind and deployment.ref (PLAN-10)",
+                [get(doc, "subject", "kind"), get(doc, "deployment", "ref")], [kind, deployment])
+        if want is None:
+            continue
+        suite = [get(doc, "suite", "ref"), get(doc, "suite", "version")]
+        compare(diffs, f"{where} suite", suite, [want["suite"]["ref"], want["suite"]["version"]])
+        compare(diffs, f"{where} status", doc.get("status"), want["status"])
+        planned = plan_suites.get((want["suite"]["ref"], want["suite"]["version"]), {})
+        lane = planned.get("lane")
+        # PLAN-8: the plan's digest, or none (suite.digest is LANE-6's suite-content axis)
+        compare(diffs, f"{where} suite.digest (PLAN-8)", get(doc, "suite", "digest"), planned.get("digest"))
+        if k < len(ended) and ended[k] is not None and aef_verify.time_key(doc.get("endedAt")) != ended[k]:
+            diffs.append(f"{where} endedAt {doc.get('endedAt')}: not the end of its last case on §9.2.1's clock")
+        roots = {}
+        for i, line in enumerate(results, start=1):
+            if not isinstance(line, dict) or line.get("parentResultId") is not None or line.get("path") != "check":
+                diffs.append(f"{where} results.ndjson:{i}: not a case's root at path check")
+            elif line.get("caseId") in roots:
+                diffs.append(f"{where} results.ndjson:{i}: a second line for case {line.get('caseId')}")
+            else:
+                roots[line.get("caseId")] = [line.get("state"), line.get("severity"), line.get("lane")]
+        compare(diffs, f"{where} cases (caseId: state, severity, lane)", roots,
+                {c: [s, fixture.get((suite[0], suite[1], c), {}).get("severity"), lane] for c, s in want["cases"]})
+        # §9.2.1: metrics.json declares pass-rate; summary.json has the suite's lane, pass-rate at check, or no lane
+        declared = [m for m in (metrics.get("metrics") if isinstance(metrics, dict) else None) or []
+                    if isinstance(m, dict) and m.get("id") == "pass-rate"]
+        compare(diffs, f"{where} metrics.json pass-rate", [[m.get("kind"), m.get("direction"), m.get("scale")]
+                                                          for m in declared],
+                [["rate", "higher_better", {"min": 0, "max": 1}]])
+        lanes = [[l.get("lane"), [[x.get("metric"), x.get("path")] for x in l.get("metrics") or [] if isinstance(x, dict)]]
+                 for l in summary.get("lanes") or [] if isinstance(l, dict)]
+        compare(diffs, f"{where} summary.json lanes (lane, [metric, path])", lanes,
+                [[lane, [["pass-rate", "check"]]]] if lane is not None else [])
+        compare(diffs, f"{where} summary.json cost.totalUsd", get(summary, "cost", "totalUsd"),
+                _exact_sum(cost.get((suite[0], suite[1], c), 0) for c, _ in want["cases"]))
+    # The cases as they completed, in order, each naming its run when it names one.
+    completed = [x for x in events if x.get("kind") == "case.completed"]
+    expected_cases = [(c, s, k) for k, r in enumerate(e["runs"]) for c, s in r["cases"]]
+    compare(diffs, "case.completed (caseId, state), in order", [[x.get("caseId"), x.get("state")] for x in completed],
+            [[c, s] for c, s, _ in expected_cases])
+    for x, (c, _, k) in zip(completed, expected_cases):
+        if "runId" in x and k < len(announced) and x["runId"] != announced[k]:
+            diffs.append(f"case.completed for {c} names the run {x['runId']}, not {announced[k]}")
+    spends = [x.get("spentUsd") for x in events if x.get("kind") == "spend.updated"]
+    compare(diffs, "the last spend.updated", (spends or [0])[-1], e["spentUsd"])
+    estimates = [{key: x.get(key) for key in ("cases", "usdLow", "usdHigh")}
+                 for x in events if x.get("kind") == "plan.estimated"]
+    compare(diffs, "plan.estimated", estimates, [] if e["estimated"] is None else [e["estimated"]])
+
+    # PLAN-3, PLAN-4: no credential value and no credential path in any byte written or printed.
+    secrets_ = [s.encode("utf-8") for s in list(secret_values) + _plan_secrets(plan)]
+    for name, content in sorted(written.items()) + [("standard output", json.dumps(out).encode("utf-8"))]:
+        for secret in secrets_:
+            if secret in content:
+                diffs.append(f"{name} holds a credential's value or path (PLAN-3)")
+    return diffs
+
+
 def run_all(engine, vectors, refusals, quiet=False, show=print, skipped=()):
     """{kind: [passed, failed, skipped]} and the failing ids. `skipped`: vectors not run (the sign vectors of an
     algorithm the implementation does not sign with), counted as such."""
@@ -907,8 +1178,9 @@ def _mutation_failures(job):
     # job runs exactly one mutation (or none).
     aef_verify.set_mutations(set())
     aef_produce.set_mutations(set())
+    aef_runner.set_mutations(set())
     if name is not None:
-        {"aef_verify": aef_verify, "aef_produce": aef_produce}[module_name].set_mutations({name})
+        {"aef_verify": aef_verify, "aef_produce": aef_produce, "aef_runner": aef_runner}[module_name].set_mutations({name})
     _, failing = run_all(InProcess(), vectors, refusals, quiet=True, show=lambda *a: None)
     return failing
 
@@ -916,13 +1188,13 @@ def _mutation_failures(job):
 def self_check(vectors, refusals, corpus, index):
     """Runs the corpus under each mutation, in parallel processes; every mutation must make a vector fail."""
     caught_all = True
-    print("self-check: each mutation switches one check of aef_verify.py off, or breaks one writer of aef_produce.py; "
-          "the corpus must notice")
+    print("self-check: each mutation switches one check of aef_verify.py off, or breaks one writer of aef_produce.py or "
+          "one rule of aef_runner.py; the corpus must notice")
     # The heavy generated vectors (a run of 100,000 files, a 40 MiB seal) are left out: run once per mutation they
     # would make the self-check take an hour, and "limits" is caught by the light ones.
     ids = {v.id for v in vectors if not _heavy(v)}
     ids |= {r[1] for r in refusals}
-    mutations = [(module, name, what) for module in (aef_verify, aef_produce)
+    mutations = [(module, name, what) for module in (aef_verify, aef_produce, aef_runner)
                  for name, what in module.KNOWN_MUTATIONS.items()]
     jobs = [(corpus, index, ids, None, None)] + [(corpus, index, ids, m.__name__, name) for m, name, _ in mutations]
     with concurrent.futures.ProcessPoolExecutor(max_workers=min(len(jobs), os.cpu_count() or 1)) as pool:

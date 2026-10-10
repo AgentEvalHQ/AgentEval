@@ -992,6 +992,8 @@ agenteval aef export <store-dir> <out-dir> [--run <run-id>] [--target-mode live|
 agenteval aef import assert-ai <assert-run-dir> <out-dir> [--taxonomy <file>] [--test-set <file>] [--calibration <file>] [--max-harm-rate <0-1>] [--max-over-refusal-rate <0-1>] [--content-capture on|off] [--no-seal] [--key <pkcs8.pem>] [--json]
 agenteval aef import otel <logs-file> <out-dir> --run-id <id> --from <tool> --subject <kind:name> [--subject-kind agent] --target-mode live|replayed|scripted|mocked [--content-capture on|off] [--no-seal] [--key <pkcs8.pem>] [--json]
 agenteval aef export-otel <run-dir> <out-file> [--policy <trust-policy.json>] [--json]
+agenteval aef import inspect <log-file> <out-dir> --target-mode live|replayed|scripted|mocked [--content-capture on|off] [--no-seal] [--key <pkcs8.pem>] [--json]
+agenteval aef export-inspect <run-dir> <out-file> [--ignore-overlays] [--policy <trust-policy.json>] [--json]
 ```
 
 **`verify`** reports a run as `intact`, `unsealed` or `invalid`, with every problem. With `--policy`, it also says
@@ -1030,6 +1032,25 @@ rule.
 parented to its `traceLink`. The run must verify (`intact` or `unsealed`; `--policy` lets an authorized redaction
 withhold a reasoning blob); the output file must not exist. A run it cannot export (one that does not verify, a time
 OpenTelemetry cannot hold, a reasoning blob that is not UTF-8 or is over 4 MiB) exits `2`, and nothing is written.
+
+**`import inspect`** converts an [Inspect](https://inspect.aisi.org.uk/) eval log in `.json` form (for an `.eval` log,
+run `inspect log dump` first) into an AEF run, as [the Inspect interop page](../contracts/aef/1/interop/inspect.md)
+maps it: a line per sample and score (`trial` = `epoch` − 1 when the log has more than one epoch), a rollup line per
+reduction, the summary recomputed from the lines in one lane `main`, and the run's usage from `stats`. The subject is
+`model:<eval.model>`; the target mode is yours, and `contentCapture` is `on` unless `--content-capture off` (then no
+case content, explanation or answer is kept). A closed log is sealed as `ingest` unless `--no-seal`; a `started` log
+gives a running run, which is not sealed. A log the page refuses (a time without an offset, a boolean value or a string
+other than `C`, `I`, `P` and `N`, a reducer without an AEF value, a missing reduction, a mean the lines do not give,
+`Score.history`, an invalidation or `log_updates`, …) exits `2`, naming the rule, and nothing is written.
+
+**`export-inspect`** writes an AEF run as one Inspect `EvalLog` in `.json` form: a sample per case and trial, a score
+per result line under its path (the AEF facts Inspect has no field for under `metadata.aef`), a reduction per rollup
+line, an `EvalScore` per summary entry; `eval.model` is the subject's ref with its name decoded. A run with
+`contentCapture: off` gives no explanation, not even a line's reason. The run must verify (`intact` or `unsealed`;
+`--policy` lets an authorized redaction withhold a blob, which is then left out), and its sealed lines are exported: a
+run with overlay events is refused unless `--ignore-overlays` leaves them out. A run the page refuses (no suite, two
+judges, two summary entries at one path, a `count` metric, `output` or `transcript` evidence a line cites, a reasoning
+or content blob that is not UTF-8, …) exits `2`, naming the rule, and nothing is written.
 
 Every verb takes `--json` and then prints one JSON value. Exit `2` is a usage or input error.
 

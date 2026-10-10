@@ -47,6 +47,12 @@ document. Inspect's documentation tells other languages to get JSON with `inspec
 One AEF run gives one `EvalLog` in `.json` form. Writing `.eval` also needs zstd. The rules and refusals below the
 table cover what the table does not; the reference converter, `tools/aef_interop.py to-inspect`, follows both.
 
+**Values, not bytes** (settled 10-10, R7I-1). As for OpenTelemetry (R7N-3), this page fixes values, not bytes, in
+both directions: the order of members and the spelling of numbers are free
+([ENC-2](../spec/02-encoding.md#21-json-documents), [ENC-4](../spec/02-encoding.md#21-json-documents)), and a checker
+compares JSON values, as `tools/check_interop.py` does. An unscored value is the bare token `NaN` wherever Inspect
+writes one: a score's value, and a metric's value over no samples (IN-3).
+
 | AEF | Inspect | Fidelity |
 |---|---|---|
 | `runId` | `eval.eval_id` and `eval.run_id` | exact |
@@ -89,7 +95,7 @@ table cover what the table does not; the reference converter, `tools/aef_interop
 
 - **The eval header Inspect requires** (IN-1). `eval.task` is the suite's ref without `suite:`. `eval.model` is a
   model subject's ref without `model:`, and for any other subject (an agent, a workflow) the subject's `ref` as
-  written. The converter writes `eval.dataset` with the number of cases and their ids, and `eval.model_roles` with the
+  written, its name decoded (R7I-8). The converter writes `eval.dataset` with the number of cases and their ids, and `eval.model_roles` with the
   run's judge under the role `judge`, the name AEF's `usage` gives it.
 - **A measured line without a score** (IN-2). A `passed`, `failed`, `warn`, `inconclusive` or `scored` line without
   `scores` (a code check's verdict, a split panel) is `Score.value` NaN with the state name in `Score.reason`, as a
@@ -101,10 +107,38 @@ table cover what the table does not; the reference converter, `tools/aef_interop
   `total_samples` and `completed_samples` are the number of samples.
 - **A sample's usage** (IN-5) is the sum of its lines' entries, per role and per model, as Inspect keeps it.
 - **Only a run that verifies** (IN-11, as OT-8 in [opentelemetry.md](opentelemetry.md); R7N-6). The converter
-  converts a run only when `tools/aef_verify.py run` finds it `intact` or `unsealed`, with no problem but an
-  authorized withhold, and exports its sealed lines: overlays are not applied (R7N-5).
+  converts a run only when a Run verifier ([§4.5](../spec/04-integrity.md#45-verification-outcomes)) finds it
+  `intact` or `unsealed`, with no problem but an authorized withhold, and exports its sealed lines: overlays are not applied (R7N-5).
 
-**Refused** (IN-1, IN-3 to IN-5, IN-11; settled 10-09). The converter refuses these, naming the rule, and writes
+**Settled 10-10** (what a second converter, AgentEval.Results.Adapters in .NET, found; R7I-n):
+
+- **Scores** (R7I-2). A score with a label is its label (`C`). A line with two or more scores is a map keyed by
+  metric, each member the score's label or, without one, its value: the inverse of IN-7.
+- **A run with `contentCapture: off`** (IN-13, R7I-3). No score gets an explanation, as OT-3 rules for OpenTelemetry:
+  a run that keeps no content exports none of its free text as an explanation, whatever its `reason` holds
+  ([RUN-11](../spec/03-run.md#32-runjson)).
+- **Usage** (R7I-4). `total_tokens` is `input_tokens` + `output_tokens`, written when either is present; a missing
+  count is left out, never 0; cache and reasoning tokens are not added to it.
+- **Root lines** (IN-5, R7I-5). Two roots that carry the same `startedAt`, `endedAt` or `durationMs` count as one
+  (times compared as instants, [ENC-8](../spec/02-encoding.md#23-values)); only different values are refused.
+- **Case content** (IN-5, R7I-6). Only the evidence records a sample's lines cite are read: `input` and `target` come
+  from them, and only a cited `output` or `transcript` record, or a cited `input` or `expected` record that is not a
+  blob, is refused. A record no line cites is not carried ("other evidence") and not refused.
+- **The header** (IN-1, R7I-7). `eval.config` is `{}` without an execution policy, and `epochs_reducer` a one-item
+  list. `AllPass` is `at_least_<n>` with n the policy's `trialsPerCase` in `eval.config`, and the rollup's `trials.n`
+  in its reduction. `eval.metadata.aef.judges` is written only when a judge has a `rubricDigest` or a `calibration`,
+  each judge as its `model`, `rubricDigest` and `calibration`. An aborted run's `error` is `message` (its
+  `abortReason`), `traceback` `""` and `traceback_ansi` `""`, the three members Inspect requires.
+- **The model's name** (IN-1, R7I-8). `eval.model` is the subject's ref with its name decoded as
+  [ENC-13](../spec/02-encoding.md#24-identifiers-and-names) encodes it (each `%XX` the byte XX, read as UTF-8; `-` the
+  empty name; a name that does not decode is kept as written): a model subject's name alone, any other subject's
+  `kind:name`. So `model:acme/gpt%20x` gives `acme/gpt x`, which the import encodes back (IN-6).
+- **Blobs** (IN-12, R7I-9). A reasoning or case-content blob that is not UTF-8 refuses the export, as OT-9 does; one
+  an authorized redaction withholds ([OVL-10](../spec/04-integrity.md#42-overlays)) is left out, with nothing in its
+  place.
+- **Duration** (R7I-11). `total_time` is `durationMs` / 1000, one binary64 division, not rounded.
+
+**Refused** (IN-1, IN-3 to IN-5, IN-11, IN-12; settled 10-09 and 10-10). The converter refuses these, naming the rule, and writes
 nothing:
 
 - a run that does not verify (IN-11);
@@ -115,11 +149,12 @@ nothing:
 - a run with overlay events: the table sends `override` and `adjudicate` to `Score.history` and the other kinds to
   `log_updates`, but not the shape of either entry. Asked to leave them out (`--ignore-overlays`), as
   [`examples/aef-inspect/`](examples/aef-inspect/) does, the converter converts the rest (IN-4);
-- `output` or `transcript` evidence: `samples[].output` is a `ModelOutput` and `messages` a list of `ChatMessage`, and
+- `output` or `transcript` evidence a sample's lines cite: `samples[].output` is a `ModelOutput` and `messages` a list of `ChatMessage`, and
   the table does not say how a blob's text becomes either (IN-5);
-- `input` or `expected` evidence that is not a blob of the run, or two such records with different text for one
-  sample (IN-5);
-- a sample whose root lines carry two `startedAt`, `endedAt` or `durationMs`: the table takes them from "a case's
+- `input` or `expected` evidence a sample's lines cite that is not a blob of the run, or two such records with
+  different text for one sample (IN-5);
+- a reasoning or case-content blob that is not UTF-8 (IN-12);
+- a sample whose root lines carry two different `startedAt`, `endedAt` or `durationMs`: the table takes them from "a case's
   root line", and a case can have several roots (IN-5).
 
 ## Inspect → AEF
@@ -212,14 +247,41 @@ The reference converter, `tools/aef_interop.py from-inspect`, follows the table 
   `stderr` is Inspect's. Every metric a line or the summary names is declared with kind `score`, direction `none`
   and scale `unbounded`.
 
-**Refused** (IN-6 to IN-10; settled 10-09). The converter refuses these, naming the rule, and writes nothing:
+**Settled 10-10** (R7I-n):
+
+- **The judges** (IN-6, R7I-16). `judges[]` holds each model of an `eval.model_roles` role that IN-8 maps to `judge`,
+  once, in the log's order: a role named `agent` or `attacker` is no judge ([RUN-9](../spec/03-run.md#32-runjson): a
+  judge grades).
+- **The header** (IN-6, R7I-14, R7I-17). An epochs reducer without an AEF value is left out of `executionPolicy` and
+  kept in `run.json`'s `ext."inspect_ai".epochs_reducer`; with more than one epoch, a reduction that uses one is
+  refused (IN-8). When `eval.created` stands for the start, `startedAt` is the last of `imported.asserted`. The
+  [ENC-13](../spec/02-encoding.md#24-identifiers-and-names) encoding of a ref's name is the inverse of the export's
+  decoding (R7I-8).
+- **Scores** (IN-7, R7I-13). A list value is kept as `ext."inspect_ai".value`, beside `answer` and `metadata`;
+  `Score.metadata` is kept with `contentCapture: off` too. A NaN member of a map gets no score.
+- **Samples** (IN-8, R7I-10, R7I-11, R7I-12, R7I-17). `durationMs` is `total_time` × 1000, one binary64
+  multiplication, not rounded. A sample stopped by a limit has the reason `<type> limit <limit>` (`token limit 1000`),
+  and a limit that is not `{type, limit}` is refused. An error message, like an explanation (OT-10), is cut to its
+  first 4096 characters, with no mark. An empty `input`, `target` or explanation gives no blob. Two roles that land
+  on one AEF role and model are added together.
+- **The summary** (IN-9, R7I-10, R7I-15). The run's usage is one entry per `stats.model_usage` model (its role from
+  `eval.model_roles` as IN-8 maps it, `agent` for `eval.model`, `other` otherwise), in the log's order; only without
+  `model_usage`, one entry per `stats.role_usage` role, without a model. An entry with no metric (or `stderr` alone)
+  is a plain mean entry, with nothing of Inspect's to compare. A mean, median, minimum or maximum is compared within
+  [§3.6](../spec/03-run.md#36-summaryjson)'s tolerance, 1e-9 × max(1, |recomputed|): Inspect's 0.85 and the lines'
+  0.8500000000000001 agree. `scored_samples` and `unscored_samples` are not checked.
+
+[`examples/aef-inspect-edges/`](examples/aef-inspect-edges/) and
+[`examples/inspect-aef-edges/`](examples/inspect-aef-edges/) pin these rulings.
+
+**Refused** (IN-6 to IN-10; settled 10-09 and 10-10). The converter refuses these, naming the rule, and writes nothing:
 
 - an `eval_id` that is not an AEF id; a time without an offset; a closed log without `stats.completed_at`, or one
   that ends before it starts; an `error` log without a message (IN-6);
 - a value that is a boolean, or a string other than `C`, `I`, `P` and `N` (IN-7);
 - more than one epochs reducer; an epoch beyond `eval.config.epochs`; a sample without scores (or, for one that
-  stopped, in a log that names no scorer); two scores of one case, path and epoch; a reducer without an AEF value, a
-  reduction with no epoch lines, and, in a closed log, a case's path with epoch lines and no reduction
+  stopped, in a log that names no scorer); two scores of one case, path and epoch; a limit that is not `{type, limit}`; with more than
+  one epoch, a reduction whose reducer has no AEF value; a reduction with no epoch lines, and, in a closed log, a case's path with epoch lines and no reduction
   ([RES-8](../spec/03-run.md#344-repeated-trials)) (IN-8);
 - a `results.scores` entry with both `accuracy` and `mean`, or with no mean and more than one other metric, or whose
   metric cannot be an `aggregate` method; and a mean, median, minimum or maximum Inspect gives that the lines do
@@ -240,8 +302,9 @@ checks, field by field, that what the trip loses is what the first list says.
 - The state: Inspect has no verdict, and one unscored value, NaN, for every typed absence. The table keeps the state
   in `Score.metadata`, which comes back as `ext` (IN-7): a number comes back `scored`, NaN `not_measured`, `error` or
   `failed`.
-- A typed absence's reason: it travels as the explanation, and comes back as a `reasoning` blob (not at all with
-  `contentCapture: off`), with the state's name as `reason`.
+- A typed absence's reason: it travels as the explanation (unless the run keeps no content, IN-13), and comes back
+  as a `reasoning` blob (or not at all, when the import writes `contentCapture: off`), with the state's name as
+  `reason`.
 - The result tree and its aggregation, severity, verdict rules, thresholds and uncertainty.
 - Evaluator and annotator identity: an evaluator comes back as its scorer (IN-7).
 - A score's metric and `normalized` value: a single score's metric comes back as its key, the path (IN-7).
@@ -262,8 +325,8 @@ checks, field by field, that what the trip loses is what the first list says.
 **Inspect → AEF.**
 
 - List-valued scores, kept in `ext` (IN-7).
-- Reducers without an AEF value (`at_least` for a k other than 1 or all, `pass_k`, `collect`): refused with more than
-  one epoch (IN-8).
+- Reducers without an AEF value (`at_least` for a k other than 1 or all, `pass_k`, `collect`): kept in `ext` with one
+  epoch, refused with more (IN-8, R7I-14).
 - `working_time`.
 - Inspect's event transcript as structured events.
 - Groups of runs (`eval_set_id`, kept in `ext`: AEF has no field for a group of sibling runs,

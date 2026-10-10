@@ -1,0 +1,55 @@
+{
+  "schemaVersion": "1.0",
+  "planId": "plan-job-several-cases",
+  "checkpointId": "cp_job_vectors",
+  "subject": {
+    "ref": "agent:support/support-triage",
+    "version": "git:3f2a1c",
+    "deployment": "deployment:support/support-triage@dev",
+    "endpoint": "http://localhost:5080/v1"
+  },
+  "suites": [
+    {
+      "ref": "suite:support/triage-scenarios",
+      "version": "4",
+      "digest": "sha256:3b3e2dd5bbd1ac8053a0dd262f85ba568d82842ae67704e30d6edd051926e605",
+      "lane": "quality"
+    },
+    {
+      "ref": "suite:owasp/llm-top10",
+      "version": "2026.1",
+      "lane": "security"
+    },
+    {
+      "ref": "suite:support/tone-checks",
+      "version": "2"
+    }
+  ],
+  "limits": {
+    "maxUsd": 5.0,
+    "cases": 20,
+    "timeout": "PT1H"
+  },
+  "contentCapture": "on",
+  "targetMode": "scripted",
+  "isolation": "process",
+  "provider": "local",
+  "judges": [
+    {
+      "model": "gpt-5.1",
+      "provider": "azure.ai.openai",
+      "rubricDigest": "sha256:a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9"
+    }
+  ],
+  "credentialRefs": [
+    {
+      "name": "AZURE_OPENAI_API_KEY",
+      "scheme": "env",
+      "path": "AEF_TEST_JUDGE_KEY",
+      "purpose": "judge"
+    }
+  ],
+  "runnerSelector": [
+    "target:scripted"
+  ]
+}

@@ -7725,6 +7725,22 @@
    }
   },
   {
+   "id": "checkpoints/outcome-unknown-without-decision-in-1-0",
+   "kind": "checkpoint",
+   "classes": [
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "CKP-7",
+    "VER-6"
+   ],
+   "path": "checkpoints/outcome-unknown-without-decision-in-1-0",
+   "files": {
+    "document.json": "f74e02c831100eef7ef69c8178848db1391a738c3aa34f53e80f60c022aebabd",
+    "expected.json": "6269ea98c76f8b17a8b0feb559eb379222e37a35911f89e9b2e6e7efd28049a2"
+   }
+  },
+  {
    "id": "checkpoints/planned-with-outcome",
    "kind": "checkpoint",
    "classes": [
@@ -7799,7 +7815,7 @@
    "path": "checkpoints/state-unknown-decision-without-input-in-1-0",
    "files": {
     "document.json": "3cf68c8a69e84b56002f12d0ed0c27305e8e4130a55d874761641c1abb75be84",
-    "expected.json": "ad0d02adfc15dfd4f302a253945cb166cda662c596b4fed4ef21f20f6fe3be32"
+    "expected.json": "1e38e45d6b1b24c5797751a88d1a59ee4a327239d3e8d9d4c5e9d1607b910566"
    }
   },
   {
@@ -7819,6 +7835,22 @@
    }
   },
   {
+   "id": "checkpoints/state-unknown-without-decision",
+   "kind": "checkpoint",
+   "classes": [
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "CKP-7",
+    "VER-6"
+   ],
+   "path": "checkpoints/state-unknown-without-decision",
+   "files": {
+    "document.json": "425a60f6476d628c4d2b363a3d5099d829601044f069941644ab4906bca7274c",
+    "expected.json": "e562532e02171a3d40285bf2f10ec22e93e3c8f0293c7a63a6befb712bb457dc"
+   }
+  },
+  {
    "id": "checkpoints/state-unknown-without-decision-in-1-0",
    "kind": "checkpoint",
    "classes": [
@@ -7831,7 +7863,7 @@
    "path": "checkpoints/state-unknown-without-decision-in-1-0",
    "files": {
     "document.json": "ff3da6ad74d78b1ad7f09a6e9192fd93444ec6d7ebde1e32e9b3f47d513bbdc3",
-    "expected.json": "acf5f1d275b2cd66ca28047c227512126082514a548c737b900151c69460a6e3"
+    "expected.json": "bf110972f3fbb32f80d341b83e5ec8ebc3a4aaa8e57061c968b303f6e3c1be56"
    }
   },
   {
@@ -12014,6 +12046,52 @@
    }
   },
   {
+   "id": "protocol/runners/target-mode-unknown",
+   "kind": "plan",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-6",
+    "VER-8"
+   ],
+   "path": "protocol/runners/target-mode-unknown",
+   "files": {
+    "document.json": "ed2705217674c0aa5db410fb82edec9d9bc02b46b1696aac638e209d77c20f9b",
+    "expected.json": "2939900ebd7fc308819159465a0d6efcab66f3fd2d913a3a311676af5acd032d"
+   }
+  },
+  {
+   "id": "protocol/runners/target-modes-empty",
+   "kind": "plan",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-6"
+   ],
+   "path": "protocol/runners/target-modes-empty",
+   "files": {
+    "document.json": "b3d4ee423ff10770f8a8d8cad703aee67da1c750a9efe81cbe402d2888985e89",
+    "expected.json": "160caa64a7d8613fac58b8be1648176a330adfec13ecf9fc599d471bd327b02d"
+   }
+  },
+  {
+   "id": "protocol/runners/target-modes-twice",
+   "kind": "plan",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-6"
+   ],
+   "path": "protocol/runners/target-modes-twice",
+   "files": {
+    "document.json": "1713a16da56c5936eab0a6782d5085572ba4203c459a9e6ed504f12246395ac7",
+    "expected.json": "f2bde50c00282ebd48a5aa87592c41d0d90927ac109615435c7ebb84de1bc754"
+   }
+  },
+  {
    "id": "protocol/runners/unknown-kind",
    "kind": "plan",
    "classes": [
@@ -12061,6 +12139,22 @@
    }
   },
   {
+   "id": "protocol/runners/valid-target-modes",
+   "kind": "plan",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-6",
+    "RUN-7"
+   ],
+   "path": "protocol/runners/valid-target-modes",
+   "files": {
+    "document.json": "1e89913fbacfafc4d9ad4cc108e3d1367816f8f46c507f1405e69411f53e0975",
+    "expected.json": "dcdb6febdccd8d5952af1bd814d7b23dfd28a51023986de1f4b7a8dd38100d44"
+   }
+  },
+  {
    "id": "protocol/matching/isolation-unknown",
    "kind": "matching",
    "classes": [
@@ -12078,6 +12172,38 @@
    }
   },
   {
+   "id": "protocol/matching/live-plan-live-and-scripted-runner",
+   "kind": "matching",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-7"
+   ],
+   "path": "protocol/matching/live-plan-live-and-scripted-runner",
+   "files": {
+    "expected.json": "f0a3c461941ed50132f0449e9d8a0103ac79d76370cebf8b145e2347f6178395",
+    "plan.json": "7bc0ac21c2e59b0b044f98fa4ce74e2ae758cb1b1b7da134987b7228b1dc779c",
+    "runner.json": "1e89913fbacfafc4d9ad4cc108e3d1367816f8f46c507f1405e69411f53e0975"
+   }
+  },
+  {
+   "id": "protocol/matching/live-plan-scripted-runner",
+   "kind": "matching",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-7"
+   ],
+   "path": "protocol/matching/live-plan-scripted-runner",
+   "files": {
+    "expected.json": "4ea0e7c3d7bbe0d0e380d31485e8f068cab7501772d04abd3c4c873adfb878e4",
+    "plan.json": "7bc0ac21c2e59b0b044f98fa4ce74e2ae758cb1b1b7da134987b7228b1dc779c",
+    "runner.json": "be415f7c4abaacd5c3d66ce41a6fb309fce47990962464f13db78307b99b4923"
+   }
+  },
+  {
    "id": "protocol/matching/missing-tag",
    "kind": "matching",
    "classes": [
@@ -12091,6 +12217,22 @@
     "expected.json": "207563bfc5af487b8793ab806dcbae963fbbb1ab85ea4c40476f39c25bec84f3",
     "plan.json": "913c06f0634702ba82836ed1ec54bc8ed1bb41ba4b1a26fe8976e187662bf2b6",
     "runner.json": "f4db73e1075ee8dea56e5ee907bc04240aa9f4c1febfb2cdda426e04f82bf3b1"
+   }
+  },
+  {
+   "id": "protocol/matching/plan-without-mode-mocked-runner",
+   "kind": "matching",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-7"
+   ],
+   "path": "protocol/matching/plan-without-mode-mocked-runner",
+   "files": {
+    "expected.json": "d958d10fb3a2fe31a2e92932e7600f261219eaf654412e6c893ce874add776b0",
+    "plan.json": "187f26d366ef3d7c58464707660c0e05be722ffce3406cbe4f0eae9250e22ad9",
+    "runner.json": "cc18d076d6a271d7f21662876513f2df6b927652fddda64f7a4b9dd223edb801"
    }
   },
   {
@@ -12161,6 +12303,38 @@
    }
   },
   {
+   "id": "protocol/matching/scripted-plan-manifest-without-modes",
+   "kind": "matching",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-7"
+   ],
+   "path": "protocol/matching/scripted-plan-manifest-without-modes",
+   "files": {
+    "expected.json": "af2dda009fe6c7fcd4d026a7a4dfe2d38329bf17f52396679eec4d00c575d18a",
+    "plan.json": "3aa805d44b32d0c2999a976846ac27473e27838c9605b21bfc5277bca2d582e8",
+    "runner.json": "f4db73e1075ee8dea56e5ee907bc04240aa9f4c1febfb2cdda426e04f82bf3b1"
+   }
+  },
+  {
+   "id": "protocol/matching/scripted-plan-scripted-runner",
+   "kind": "matching",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-7"
+   ],
+   "path": "protocol/matching/scripted-plan-scripted-runner",
+   "files": {
+    "expected.json": "179b54ce2efebd33bae1b3cb5e33d52a8b732f775438af8c903de91ac2478b07",
+    "plan.json": "3aa805d44b32d0c2999a976846ac27473e27838c9605b21bfc5277bca2d582e8",
+    "runner.json": "be415f7c4abaacd5c3d66ce41a6fb309fce47990962464f13db78307b99b4923"
+   }
+  },
+  {
    "id": "protocol/matching/tags-and-provider",
    "kind": "matching",
    "classes": [
@@ -12187,7 +12361,7 @@
    ],
    "path": "protocol/matching/target-mode-not-in-manifest",
    "files": {
-    "expected.json": "d1edd15340b130d7f173a37916fd7f5c1c5702657c48debf550afcf62bb7a1b1",
+    "expected.json": "69bb96a48b1b27f52def76b46f010bd9af1dee5a76b2689ae4ac6b01c5612bf1",
     "plan.json": "a8a10340a76b26b50292537875fc2e639d67045174adc14169710fdea59e40f9",
     "runner.json": "f4db73e1075ee8dea56e5ee907bc04240aa9f4c1febfb2cdda426e04f82bf3b1"
    }
@@ -12301,6 +12475,23 @@
    "files": {
     "events.ndjson": "8c0a317ae3773e4b023b66ef93692cc1ac46c03ec631a93667719fa61bbcf1dd",
     "expected.json": "9d040331e1fcf97546295d0909402753a2b2d134c0869dcb3d7ac647d89f967e"
+   }
+  },
+  {
+   "id": "protocol/streams/case-completed-names-run",
+   "kind": "stream",
+   "classes": [
+    "Stream verifier"
+   ],
+   "rules": [
+    "STRM-1",
+    "STRM-3",
+    "PLAN-8"
+   ],
+   "path": "protocol/streams/case-completed-names-run",
+   "files": {
+    "events.ndjson": "cb5acd424c89c93312b99731390087bd2e2cc44a0537cf3f062640ac0194614e",
+    "expected.json": "f2a438e66996ac84ab9b91b9ac5782cda884a8ca38f985c12e99da623dcf76ac"
    }
   },
   {
@@ -13256,6 +13447,62 @@
    }
   },
   {
+   "id": "protocol/plan-conformance/shared-case-ids-at-cases",
+   "kind": "plan-conformance",
+   "classes": [
+    "Stream verifier"
+   ],
+   "rules": [
+    "STRM-4",
+    "PLAN-2",
+    "PLAN-8"
+   ],
+   "path": "protocol/plan-conformance/shared-case-ids-at-cases",
+   "files": {
+    "events.ndjson": "fa91c88c4521c055dd10dfd189c3a4ab0a6f3f6d4859ab1f1771fce0990f4639",
+    "expected.json": "e8c6e62b2abebf0098d7d456c29119e515c47eebe942d603d40ba40ba9ee0466",
+    "plan.json": "151822f03484ad97f0682d0cbcc264c4ee57659864b5e00a30cd5468935ea022",
+    "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
+    "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
+    "runs/R-1/run.json": "0664468a79a44cd52a5147e3c48e1a8a6a35e5d54a90c3bce79bd94e26cee627",
+    "runs/R-1/seal.json": "16c6181067fceb5c2d6498cf1e0aec8a103ef43148fa86827f3d8dc86fde4bfc",
+    "runs/R-1/summary.json": "5c419eab3b644e909a540ec222c74ce57cf06afa52f2fc278c3667e009025cb7",
+    "runs/R-2/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
+    "runs/R-2/results.ndjson": "0e0655cf6a7279c4b3e2923f115fecc8c3df16252ea3d9a0e126c432a5285126",
+    "runs/R-2/run.json": "3343c31d85c97a9aba4c5399cad8d5bed12bf036f4bc69d3ddb829b6910c4aca",
+    "runs/R-2/seal.json": "e8224b5e0f893868e88eff5910f7c057f027a2f94a36eef9332a0d5d07016fef",
+    "runs/R-2/summary.json": "f85ba477ebcdf9392dc629c07960c56bdc4e58fb923c62362b70afd9f893c102"
+   }
+  },
+  {
+   "id": "protocol/plan-conformance/shared-case-ids-over-cases",
+   "kind": "plan-conformance",
+   "classes": [
+    "Stream verifier"
+   ],
+   "rules": [
+    "STRM-4",
+    "PLAN-2",
+    "PLAN-8"
+   ],
+   "path": "protocol/plan-conformance/shared-case-ids-over-cases",
+   "files": {
+    "events.ndjson": "3f8bb3bdbec1264d0113ccea9e803080cead1a5762fe29c86df2912fb9b2dc43",
+    "expected.json": "8d88214e2f4e02cfa0652591b445d95cae7d897fb215d2233c41fb789c8d6056",
+    "plan.json": "a3a4de0f2d285cf6b1cb374c9e9a2a1c9a4172f1acbb76d7b82affd29aac66ec",
+    "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
+    "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
+    "runs/R-1/run.json": "67282a92981e7e9845599d939b7beb49e472a5794c1730a408a543993e110b19",
+    "runs/R-1/seal.json": "ded8024c222036ce06e6967fc96392feb148104cd1982e44d1149e0ca9482316",
+    "runs/R-1/summary.json": "5c419eab3b644e909a540ec222c74ce57cf06afa52f2fc278c3667e009025cb7",
+    "runs/R-2/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
+    "runs/R-2/results.ndjson": "0e0655cf6a7279c4b3e2923f115fecc8c3df16252ea3d9a0e126c432a5285126",
+    "runs/R-2/run.json": "041aabd09593a895096e0d64fa40d6184333fca5765ae834797dda8781a51e05",
+    "runs/R-2/seal.json": "8de4283e735f8ea49cfa897daed68010361f1af56c8ba9f60d128ed17e02912b",
+    "runs/R-2/summary.json": "f85ba477ebcdf9392dc629c07960c56bdc4e58fb923c62362b70afd9f893c102"
+   }
+  },
+  {
    "id": "protocol/plan-conformance/split-over-budget",
    "kind": "plan-conformance",
    "classes": [
@@ -13296,7 +13543,7 @@
    "path": "protocol/plan-conformance/split-over-cases",
    "files": {
     "events.ndjson": "662a9c024469c0343a176e4c614be6f78cd888a29bdbe1bcdf3b10563f9e7991",
-    "expected.json": "ccdbb1f0ffd166f3ee730dd5bfd08ffbeb1b3b31c833368248ff796873d88686",
+    "expected.json": "bcbb34d0707fa6a911ac52134127d3bd86a85f2005c84a7966a5b1b0184cd8a8",
     "plan.json": "a3a4de0f2d285cf6b1cb374c9e9a2a1c9a4172f1acbb76d7b82affd29aac66ec",
     "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
     "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
@@ -14670,6 +14917,422 @@
     "seal.json": "8dfc2032726fddf7b420ef4ecf4649bbe9460b675a158805247b1f30620bea84"
    },
    "algorithm": "ed25519"
+  },
+  {
+   "id": "jobs/bound-at-budget",
+   "kind": "job",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-9"
+   ],
+   "path": "jobs/bound-at-budget",
+   "files": {
+    "expected.json": "6b48063a582507f2445edcaaa40edba9f5b4e0d6431f7d85098acdf66d08d89f",
+    "plan.json": "7f145c0e8bc620c35d86585d336dac4154bd10a80a5ec0433be086c9378372d8",
+    "target.json": "fe0d8e15bc920a6e50456985b19a9b73e0c785c087597815d6fb60ed17f1b987"
+   }
+  },
+  {
+   "id": "jobs/budget-bound-rounds-within",
+   "kind": "job",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-9",
+    "SUM-5"
+   ],
+   "path": "jobs/budget-bound-rounds-within",
+   "files": {
+    "expected.json": "974493cd22661880627d288981df26e0db89a5ddec3e0d77ef4a0b9f3cbf7109",
+    "plan.json": "620df1644b089154db82fdca2ade7f91e292d7717e18386d0de216c6f4117de2",
+    "target.json": "1464fabbc6f0ab37716254e27c63036b2d2ec717cd18bfa05f6b98f43f1a4096"
+   }
+  },
+  {
+   "id": "jobs/budget-runs-sum-stops",
+   "kind": "job",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-9",
+    "SUM-5",
+    "STRM-3",
+    "STRM-4"
+   ],
+   "path": "jobs/budget-runs-sum-stops",
+   "files": {
+    "expected.json": "a9ccd81b8dad2c508709af31dad95ae2a3fb2631a7b878a2e533c84e13bea273",
+    "plan.json": "848bdb3db61699eca8e3392c2110113c8db7bc94382e131d3ddc23585fa168f1",
+    "target.json": "0db1d05467fad1b50a3dc4833ef67ad2fb2cf49c5629a6a83b61ffe9811e814d"
+   }
+  },
+  {
+   "id": "jobs/budget-stops",
+   "kind": "job",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-2",
+    "PLAN-9",
+    "PLAN-10",
+    "STRM-1",
+    "RUN-5"
+   ],
+   "path": "jobs/budget-stops",
+   "files": {
+    "expected.json": "6a649cdaeaff8d993a93afa701e53ea62ee670d72090d304f63f8c244a24fc3b",
+    "plan.json": "881c2e071bb3c5837c14beb61918d4f8372c76f014b4df713127dcb8da811ea3",
+    "target.json": "061ac90c8767f5f60396b7e7f47762ca83f9b7b50c29b28b1a9d790b4c61dc35"
+   }
+  },
+  {
+   "id": "jobs/cases-stop-at-suite-end",
+   "kind": "job",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-9",
+    "PLAN-10",
+    "STRM-1"
+   ],
+   "path": "jobs/cases-stop-at-suite-end",
+   "files": {
+    "expected.json": "af8c3c0dd6a35b7beb7219771c3726a93d4f1010f2466558ff719470d2b8455a",
+    "plan.json": "0007319871b361179c4aba2af328a75a3d5ce80c7259c21baad056629ea11637",
+    "target.json": "77312e176b930de057d14e6381d884b4deb24ccc952a17ef2f08b7ed7c4d3e99"
+   }
+  },
+  {
+   "id": "jobs/cases-stop-mid-suite",
+   "kind": "job",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-9",
+    "RUN-5",
+    "RES-1"
+   ],
+   "path": "jobs/cases-stop-mid-suite",
+   "files": {
+    "expected.json": "7b7a36783d5a0009bb67fdad3ac1372db5bed75098a13512286fe196d9557131",
+    "plan.json": "081458a6916322045dccc4429c4cfd63ba79243b37bbf239fb1e34f50f3d0aab",
+    "target.json": "f3398d8e5bcabca468f42eae9e2a72c5629a0b2cf1dbe1b9506eedd966ec6910"
+   }
+  },
+  {
+   "id": "jobs/container-isolation-refused",
+   "kind": "job",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-7"
+   ],
+   "path": "jobs/container-isolation-refused",
+   "files": {
+    "expected.json": "8e4d783131a8e9204429dfe747494d3896dc08b53bd36cd69d86a0c0df657782",
+    "plan.json": "2c5e91ecec08397d69b2e8cd80471bc4bd2647ba91a72857151c2a3064346e3a",
+    "runner.json": "aadbb04a84de3e71d2b2a23e608a0513866b8d9e2c7ceed0426f3ddb824a6e12",
+    "target.json": "f3398d8e5bcabca468f42eae9e2a72c5629a0b2cf1dbe1b9506eedd966ec6910"
+   }
+  },
+  {
+   "id": "jobs/cost-bound-stops",
+   "kind": "job",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-9"
+   ],
+   "path": "jobs/cost-bound-stops",
+   "files": {
+    "expected.json": "ad871d9b8d970e354dfa7eb137bbab7262eda7a41c3b323f8d6faf6c6e5a1ecc",
+    "plan.json": "36e1b02b0a99d42b47caed89c416feef39412cf45754598aec9538cd025f80db",
+    "target.json": "ef5dcd55514d7e7d75d324eb950ecca4409d0f543f9326aee46b19c76c6d075f"
+   }
+  },
+  {
+   "id": "jobs/digest-mismatch",
+   "kind": "job",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-8"
+   ],
+   "path": "jobs/digest-mismatch",
+   "files": {
+    "expected.json": "a86b37fd6640b36be408a369cfdd1a799de0fa583f6660e9e13ca3effc1626a5",
+    "plan.json": "60100fe586492e8e86c9455b4235a121d36b28ca4775e5520d5f24a29d9d8863",
+    "target.json": "f3398d8e5bcabca468f42eae9e2a72c5629a0b2cf1dbe1b9506eedd966ec6910"
+   }
+  },
+  {
+   "id": "jobs/env-credential-empty",
+   "kind": "job",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-3"
+   ],
+   "path": "jobs/env-credential-empty",
+   "files": {
+    "expected.json": "39583f27b4bf45b2bda3a1cf055de6de3f1fae128cb12dadf7a4710e98c741d2",
+    "plan.json": "cf6242434e9a8dba9798f89d12fe670a9354b172400b01d734355cd03fdefc69",
+    "target.json": "f3398d8e5bcabca468f42eae9e2a72c5629a0b2cf1dbe1b9506eedd966ec6910"
+   }
+  },
+  {
+   "id": "jobs/env-credential-set",
+   "kind": "job",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-3",
+    "PLAN-4",
+    "SEC-1"
+   ],
+   "path": "jobs/env-credential-set",
+   "files": {
+    "expected.json": "ea1d9e5315a798046d918a2f2217d66a295066bdf48faf84485ef164069adf7c",
+    "plan.json": "553276d06f211f7c5d526609a341adb5180e2529a96c21b4342112c354dba2ff",
+    "target.json": "061ac90c8767f5f60396b7e7f47762ca83f9b7b50c29b28b1a9d790b4c61dc35"
+   }
+  },
+  {
+   "id": "jobs/env-credential-unset",
+   "kind": "job",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-3"
+   ],
+   "path": "jobs/env-credential-unset",
+   "files": {
+    "expected.json": "60aa37ee174028ae75beb6747c3f91b3da8b158935272d5a82ab31a75552c39a",
+    "plan.json": "9590ad9341c4720a09e47f5e13bcbb3dd131220bdf206cc4a3f2c6bca358040d",
+    "target.json": "f3398d8e5bcabca468f42eae9e2a72c5629a0b2cf1dbe1b9506eedd966ec6910"
+   }
+  },
+  {
+   "id": "jobs/keychain-credential",
+   "kind": "job",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-3"
+   ],
+   "path": "jobs/keychain-credential",
+   "files": {
+    "expected.json": "33f0a06eb7c15a5c8c2cb39b2564ba0a0e4539a880b4190f357b3ccc140faf64",
+    "plan.json": "2ae5009d87c88742176aa62eb4114535f251f0e0ddab6b48e027a0ba982addae",
+    "target.json": "f3398d8e5bcabca468f42eae9e2a72c5629a0b2cf1dbe1b9506eedd966ec6910"
+   }
+  },
+  {
+   "id": "jobs/live-refused",
+   "kind": "job",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-6",
+    "PLAN-7"
+   ],
+   "path": "jobs/live-refused",
+   "files": {
+    "expected.json": "db00ac1fde8990a1ea268520d7a6d10d2e6ba7501fc3202e7d075f4ca60f6bea",
+    "plan.json": "0397ee17161ec51c6bc1b8de60064bbbc9a466b4a6201d63a9e4b34b8f17bd94",
+    "target.json": "f3398d8e5bcabca468f42eae9e2a72c5629a0b2cf1dbe1b9506eedd966ec6910"
+   }
+  },
+  {
+   "id": "jobs/manifest-without-target-modes",
+   "kind": "job",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-6",
+    "PLAN-7"
+   ],
+   "path": "jobs/manifest-without-target-modes",
+   "files": {
+    "expected.json": "656f0d3093772de5fcb7a90972cf6fec70cd92d007480d7be0b7d81615ad766f",
+    "plan.json": "2e6d0628741126a7317d55af30a77c7bb7529bb033edf7ac57ec3cde17212ae1",
+    "runner.json": "0f4e59bd90be097462e7d659626930b3165e21b71ac1569c690d5fbb3b601e60",
+    "target.json": "f3398d8e5bcabca468f42eae9e2a72c5629a0b2cf1dbe1b9506eedd966ec6910"
+   }
+  },
+  {
+   "id": "jobs/plan-reader-refuses",
+   "kind": "job",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-7",
+    "VER-3",
+    "ENC-9"
+   ],
+   "path": "jobs/plan-reader-refuses",
+   "files": {
+    "expected.json": "7168a5936898cb23818039ecb3ffd5dee5c81e9f7fbb8f46f8279986c45e5574",
+    "plan.json": "a43268d9ffb8c7e209bcb125ab10321401490e29d435dcbb1356abc3d12b594e",
+    "target.json": "f3398d8e5bcabca468f42eae9e2a72c5629a0b2cf1dbe1b9506eedd966ec6910"
+   }
+  },
+  {
+   "id": "jobs/same-suite-twice",
+   "kind": "job",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-8"
+   ],
+   "path": "jobs/same-suite-twice",
+   "files": {
+    "expected.json": "440595298e67db630bbc56d529baa4750de4f88b83fdf9cd2f4f4112b7db4620",
+    "plan.json": "d885f7cd4ec11b03ad9a913ad8a5b6a980207615cf374dc8b949a1b3f0cec1d5",
+    "target.json": "f3398d8e5bcabca468f42eae9e2a72c5629a0b2cf1dbe1b9506eedd966ec6910"
+   }
+  },
+  {
+   "id": "jobs/several-cases",
+   "kind": "job",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-3",
+    "PLAN-7",
+    "PLAN-8",
+    "PLAN-9",
+    "PLAN-10",
+    "RUN-12",
+    "STRM-1",
+    "STRM-3",
+    "STRM-4"
+   ],
+   "path": "jobs/several-cases",
+   "files": {
+    "expected.json": "8caad12f043d1634d88464cdd817c61420ff1b50e094c6604bb9c192929d7c51",
+    "plan.json": "017670bbbb48e37f3b7d0edd494a9d64d54070410402f01bd4c12dec28681e7e",
+    "target.json": "b72dca841dfd8ff4d1035d8b0a3207c7bab422653d68630bfedd3ad5d036462a"
+   }
+  },
+  {
+   "id": "jobs/shared-case-ids",
+   "kind": "job",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-8",
+    "STRM-4"
+   ],
+   "path": "jobs/shared-case-ids",
+   "files": {
+    "expected.json": "944ee1166969f7de275be701437e333a0cbe1b3125edc5841f155516f7bb70ee",
+    "plan.json": "4e85f5f8a154256f20b1ec0420bd5b6eabc843d2021c667725b1ff452f9a5a63",
+    "target.json": "b9b6424b18d3eef81a145df6f12af76c0259789ae15b32c0a16862c9d698b230"
+   }
+  },
+  {
+   "id": "jobs/suite-missing",
+   "kind": "job",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-8"
+   ],
+   "path": "jobs/suite-missing",
+   "files": {
+    "expected.json": "756720c2954e9b0d83779c320afd8b6a09225c0bf28c787eedace246af6526c7",
+    "plan.json": "8ef7ea1d7b727e5e29d53d4f061c7b6d7a9e92a9205bf1ff440a95e90e306730",
+    "target.json": "f3398d8e5bcabca468f42eae9e2a72c5629a0b2cf1dbe1b9506eedd966ec6910"
+   }
+  },
+  {
+   "id": "jobs/time-bound-stops",
+   "kind": "job",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-9",
+    "PLAN-10"
+   ],
+   "path": "jobs/time-bound-stops",
+   "files": {
+    "expected.json": "9371d5402fa71e0b120f961b49990d04526c5719429aaef180dff87a8a78ee28",
+    "plan.json": "ad20094f02b6d93482b46d2f702bd8b4d706a5fc6da1b0075152d8efe494276a",
+    "target.json": "fb09b8cc89653594d07c37f3905b9cccc1246424ddac505e5c657003276ccd95"
+   }
+  },
+  {
+   "id": "jobs/timeout-stops",
+   "kind": "job",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-9",
+    "PLAN-10",
+    "STRM-1",
+    "STRM-3",
+    "RUN-5"
+   ],
+   "path": "jobs/timeout-stops",
+   "files": {
+    "expected.json": "d620ea25ec500b21e007a08a1a3e8b2c1c2514d464dab95e5c6081fc03cb72ab",
+    "plan.json": "ee8797e45bb80feec5f5520e6026535cfee926ab4d6b65cce6e1e17263225170",
+    "target.json": "d1a990591b647dfb6da41d31c34b26924fb5469b05150140335b7eff60cc4bc6"
+   }
+  },
+  {
+   "id": "jobs/vault-credential",
+   "kind": "job",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-3"
+   ],
+   "path": "jobs/vault-credential",
+   "files": {
+    "expected.json": "4818c5ce462187300495fb2d7626676875862ba340546b6aed9792154afb5000",
+    "plan.json": "0310f6d3737f059bd162c7e642a69d58845ae7cd45b6508731e98259fadf30ac",
+    "target.json": "f3398d8e5bcabca468f42eae9e2a72c5629a0b2cf1dbe1b9506eedd966ec6910"
+   }
+  },
+  {
+   "id": "jobs/shared",
+   "kind": "fixture",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-6"
+   ],
+   "path": "jobs",
+   "files": {
+    "runner.json": "69b089f759f20f25f836c688be21548e0269fb09d0336fe672eaf6b1ba2966b9"
+   }
   }
  ]
 }

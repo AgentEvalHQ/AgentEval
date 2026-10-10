@@ -50,7 +50,8 @@ Commands (the JSON each prints):
       The decision function (§5.4, written here from DEC-1 to DEC-5) on a decision input, or on a decision vector's
       "input": {"output": {...}} or {"error": message} when the function refuses the input.
   match PLAN RUNNER
-      [PLAN-7] (through aef_stream.py). {"matches": true|false}
+      [PLAN-7] (through aef_stream.py): tags, provider, zone, the plan's values, and the target mode (a plan without
+      one asks for live; a manifest without targetModes gives live only). {"matches": true|false}
   stream EVENTS PLAN
       [STRM-3] (through aef_stream.py) against the plan's bytes. {"problems": [[where, problem], ...]}
   conform EVENTS PLAN RUNS [--policy POLICY]
@@ -133,6 +134,9 @@ KNOWN_MUTATIONS = {
     "trial-under-plain": "a trial line may hang under a line that carries no trial (RES-8, R6-3)",
     "otlp-names": "spans under the pre-1.0 name instrumentationLibrarySpans are read too",
     "target-mode-live": "STRM-4 compares a run's target mode with live, not with the plan's targetMode",
+    "cases-by-id": "STRM-4 counts a job's cases by caseId alone, so one case id in two suites counts once",
+    "overlays-boundary": "a file named overlays, and a first segment Overlays in another case, are not path problems "
+                         "(RUN-3)",
 }
 _ORIGINAL_COMPILE = aef_schema.compile_pattern
 
@@ -1420,6 +1424,8 @@ class Run:
         # it is the overlays folder.
         clash = {(p, "path") for p in own if p == "overlays" or (
             p.split("/", 1)[0] != "overlays" and p.split("/", 1)[0].lower() == "overlays")}
+        if "overlays-boundary" in MUTATIONS:
+            clash = set()
         problems = (set(reading) | path_problems(own) | clash
                     | {(p, "path") for p in self.folder.special if not p.startswith("overlays/")}
                     | self.seal())
@@ -1783,7 +1789,8 @@ def manifest_problems(m):
         return []
     decision, given = m.get("decision"), m.get("decisionInput")
     if not isinstance(decision, dict) or not isinstance(given, dict):
-        return ["unverifiable"]
+        # R7-4: nothing to recompute; a later minor's is unverifiable, this version's cannot be decided
+        return ["unverifiable"] if later else ["decision"]
     if later and (decision.get("outcome") not in DECISION_OUTCOMES or any(
             l.get("status") not in DECISION_LANE_STATUSES for l in decision.get("lanes", [])) or any(
             isinstance(l.get("result"), dict) and l["result"].get("status") not in INPUT_STATUSES
@@ -2628,8 +2635,6 @@ def op_conform(events_path, plan_path, runs_dir, policy=None):
         found.append(run)
         problems.update((where, code) for code in _plan_problems(run.run_doc, plan, accepted, terminal))
         if as_number(get(run.read()[0].get("summary.json"), "cost", "totalUsd")) is None:
-            problems.add((where, "no-cost"))  # the budget cannot be checked without it
-        if as_number(get(run.read()[0].get("summary.json"), "cost", "totalUsd")) is None:
             problems.add((where, "no-cost"))  # STRM-4: the budget cannot be checked without it
 
     limits = plan.get("limits") if isinstance(plan.get("limits"), dict) else {}
@@ -2641,7 +2646,11 @@ def op_conform(events_path, plan_path, runs_dir, policy=None):
         problems.add(("job", "over-budget"))
     max_cases = as_number(limits.get("cases"))
     if max_cases is not None:
-        cases = {o.get("caseId") for r in found for _, o in r.objects("results.ndjson")
+        # A case is its run's suite (ref and version) with its caseId: one case id in two suites counts twice, in two
+        # runs of one suite once (PLAN-8).
+        suite = lambda r: () if "cases-by-id" in MUTATIONS else (get(r.run_doc, "suite", "ref"),
+                                                                 get(r.run_doc, "suite", "version"))
+        cases = {suite(r) + (o.get("caseId"),) for r in found for _, o in r.objects("results.ndjson")
                  if o.get("parentResultId") is None}
         if len(cases) > max_cases:
             problems.add(("job", "over-cases"))

@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "edgesLog01",
+  "status": "completed",
+  "producer": {
+    "name": "aef_interop.py",
+    "version": "1.0"
+  },
+  "subject": {
+    "ref": "model:acme/gpt%20x",
+    "kind": "model"
+  },
+  "execution": {
+    "targetMode": "live"
+  },
+  "suite": {
+    "ref": "suite:edges",
+    "version": "2",
+    "executionPolicy": {
+      "trialsPerCase": 1
+    }
+  },
+  "judges": [
+    {
+      "model": "acme/judge"
+    }
+  ],
+  "startedAt": "2026-10-08T10:00:00Z",
+  "endedAt": "2026-10-08T10:02:00Z",
+  "contentCapture": "on",
+  "imported": {
+    "from": "inspect_ai 0.3.277",
+    "asserted": [
+      "subject.ref",
+      "subject.kind",
+      "execution.targetMode",
+      "contentCapture",
+      "startedAt"
+    ]
+  },
+  "ext": {
+    "inspect_ai": {
+      "run_id": "edgesRun01",
+      "dataset": {
+        "name": "edges",
+        "samples": 3
+      },
+      "epochs_reducer": [
+        "collect"
+      ]
+    }
+  }
+}

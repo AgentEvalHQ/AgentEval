@@ -1,0 +1,547 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 AgentEval Contributors
+// Licensed under the MIT License.
+
+using System.Globalization;
+using System.Text;
+using System.Text.Json.Nodes;
+using AgentEval.Results.Adapters.Inspect;
+using AgentEval.Results.Adapters.Tests.Otel;
+using AgentEval.Results.Integrity;
+using AgentEval.Results.Writing;
+
+namespace AgentEval.Results.Adapters.Tests.Inspect;
+
+/// <summary>
+/// Inspect → AEF (contracts/aef/1/interop/inspect.md), written from the page's text: the table, the rules IN-6 to IN-9,
+/// the rules settled 10-10 (R7I), the refusals (IN-6 to IN-11) and the worked example. Each checked example's
+/// <c>from-inspect</c> step (interop/examples/inspect-aef and inspect-aef-edges, and the way back of aef-inspect,
+/// aef-inspect-trials and aef-inspect-edges) is reproduced and compared with
+/// the example's run as JSON values ([ENC-2], [ENC-4]: an AEF writer's member order and number spelling are free), except
+/// the producer, which names the converter ([RUN-15]); blobs by name (their SHA-256). Each refusal of the examples is
+/// refused, naming its rule.
+/// </summary>
+public sealed class AefInspectImporterTests : IDisposable
+{
+    private static readonly string Examples = Path.Combine(AefTestRuns.RepoRoot, "contracts", "aef", "1", "interop", "examples");
+    private static readonly DateTimeOffset At = new(2026, 10, 9, 0, 0, 0, TimeSpan.Zero);
+
+    private readonly string _root = AefTestRuns.TempPath("aef-inspect-import");
+
+    public void Dispose() => AefTestRuns.Delete(_root);
+
+    public static TheoryData<string, int> Steps() => new()
+    {
+        { "inspect-aef", 0 },
+        { "inspect-aef", 1 },
+        { "aef-inspect", 1 },
+        { "aef-inspect-trials", 1 },
+        { "aef-inspect-edges", 1 },
+        { "inspect-aef-edges", 0 },
+    };
+
+    [Theory]
+    [MemberData(nameof(Steps))]
+    public void TheCheckedExample_IsReproduced(string name, int step)
+    {
+        var example = Path.Combine(Examples, name);
+        var expectedJson = JsonNode.Parse(File.ReadAllText(Path.Combine(example, "expected.json")))!;
+        var args = expectedJson["steps"]![step]!;
+        var (input, options) = Arguments(example, args["args"]!.AsArray());
+        Assert.Equal("from-inspect", (string)args["args"]![0]!);
+        var expectedName = (string)args["expected"]!;
+        var expected = Path.Combine(example, expectedName);
+        var output = Path.Combine(_root, $"{name}-{step}");
+
+        var conversion = AefInspectImporter.Import(input, output, options);
+
+        Assert.Equal((string)expectedJson["runs"]![expectedName]!, AefRunVerification.Name(conversion.Verification.Outcome));
+        Assert.Empty(conversion.Verification.Problems);
+
+        // results.ndjson and evidence.ndjson line by line; metrics.json and summary.json: the example's, as JSON values.
+        foreach (var file in new[] { "results.ndjson", "evidence.ndjson" })
+        {
+            Assert.Equal(File.Exists(Path.Combine(expected, file)), File.Exists(Path.Combine(output, file)));
+            if (!File.Exists(Path.Combine(expected, file)))
+            {
+                continue;
+            }
+
+            var want = Lines(expected, file);
+            var have = Lines(output, file);
+            Assert.Equal(want.Count, have.Count);
+            for (var i = 0; i < want.Count; i++)
+            {
+                Assert.True(AefOtelExporterTests.SameJson(want[i], have[i]), $"{name} {file} line {i + 1}:\nexpected {want[i].ToJsonString()}\ngot      {have[i].ToJsonString()}");
+            }
+        }
+
+        foreach (var file in new[] { "metrics.json", "summary.json" })
+        {
+            Assert.Equal(File.Exists(Path.Combine(expected, file)), File.Exists(Path.Combine(output, file)));
+            if (File.Exists(Path.Combine(expected, file)))
+            {
+                Assert.True(AefOtelExporterTests.SameJson(AefTestRuns.Document(expected, file), AefTestRuns.Document(output, file)), $"{file}: {AefTestRuns.Document(output, file).ToJsonString()}");
+            }
+        }
+
+        // run.json: the example's but for the producer (the converter, [RUN-15]).
+        var run = AefTestRuns.Document(output, "run.json");
+        Assert.Equal(AefConverter.ProducerName, (string)run["producer"]!["name"]!);
+        run.Remove("producer");
+        var wantRun = AefTestRuns.Document(expected, "run.json");
+        wantRun.Remove("producer");
+        Assert.True(AefOtelExporterTests.SameJson(wantRun, run), $"run.json: {run.ToJsonString()}");
+
+        // The blobs, by name (the SHA-256 of their bytes).
+        Assert.Equal(Blobs(expected), Blobs(output));
+
+        // The seal: ingest, at the conversion time, closedAt the run's end; a running run is not sealed ([SEAL-1]).
+        Assert.Equal(File.Exists(Path.Combine(expected, "seal.json")), File.Exists(Path.Combine(output, "seal.json")));
+        if (File.Exists(Path.Combine(expected, "seal.json")))
+        {
+            var seal = AefTestRuns.Document(output, "seal.json")["predicate"]!;
+            var wantSeal = AefTestRuns.Document(expected, "seal.json")["predicate"]!;
+            Assert.Equal("ingest", (string)seal["sealedBy"]!);
+            foreach (var time in new[] { "sealedAt", "closedAt" })
+            {
+                Assert.Equal(AefTime.Parse((string)wantSeal[time]!), AefTime.Parse((string)seal[time]!));
+            }
+        }
+    }
+
+    [Fact]
+    public void ThePagesWorkedExample_ImportsAsItsLastBlock()
+    {
+        // The page's last json block is the second line of examples/aef-inspect/run/results.ndjson: triage/policy read back.
+        var example = Path.Combine(Examples, "aef-inspect");
+        var (input, options) = Arguments(example, JsonNode.Parse(File.ReadAllText(Path.Combine(example, "expected.json")))!["steps"]![1]!["args"]!.AsArray());
+        var output = Path.Combine(_root, "worked");
+
+        AefInspectImporter.Import(input, output, options);
+
+        var page = File.ReadAllText(Path.Combine(Examples, "..", "inspect.md"), new UTF8Encoding(false)).Replace("\r\n", "\n", StringComparison.Ordinal);
+        var section = page[page.IndexOf("\n## Worked example\n", StringComparison.Ordinal)..];
+        var last = section[(section.LastIndexOf("```json\n", StringComparison.Ordinal) + "```json\n".Length)..];
+        last = last[..last.IndexOf("\n```", StringComparison.Ordinal)];
+        Assert.True(AefOtelExporterTests.SameJson(JsonNode.Parse(last), AefTestRuns.Results(output)[1]), AefTestRuns.Results(output)[1].ToJsonString());
+    }
+
+    public static TheoryData<string, int> Refusals()
+    {
+        var data = new TheoryData<string, int>();
+        var refusals = JsonNode.Parse(File.ReadAllText(Path.Combine(Examples, "inspect-aef", "expected.json")))!["refusals"]!.AsArray();
+        for (var i = 0; i < refusals.Count; i++)
+        {
+            if ((string?)refusals[i]!["args"]![0] == "from-inspect")
+            {
+                data.Add("inspect-aef", i);
+            }
+        }
+
+        return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(Refusals))]
+    public void ARefusalOfTheExamples_IsRefused_NamingItsRule_AndNothingIsWritten(string name, int index)
+    {
+        var example = Path.Combine(Examples, name);
+        var refusal = JsonNode.Parse(File.ReadAllText(Path.Combine(example, "expected.json")))!["refusals"]![index]!;
+        var (input, options) = Arguments(example, refusal["args"]!.AsArray());
+        var output = Path.Combine(_root, $"refused-{index}");
+
+        var refused = Assert.Throws<AefInspectImportException>(() => AefInspectImporter.Import(input, output, options));
+
+        Assert.Contains((string)refusal["says"]!, refused.Message, StringComparison.Ordinal);
+        Assert.False(Directory.Exists(output));
+    }
+
+    // ------------------------------------------------------------------ IN-6: the run header
+
+    [Fact]
+    public void TheRunId_IsEvalId_OrRunIdWhenEvalIdIsEmpty_AndCreatedStartsALogWithoutStartedAt()
+    {
+        var (output, _) = Import(log =>
+        {
+            log["eval"]!["eval_id"] = "";
+            log["stats"]!.AsObject().Remove("started_at");
+        });
+
+        var run = AefTestRuns.Document(output, "run.json");
+        Assert.Equal(("r1", "2026-10-06T10:00:00Z"), ((string)run["runId"]!, (string)run["startedAt"]!));
+        Assert.Contains("startedAt", run["imported"]!["asserted"]!.AsArray().Select(a => (string)a!));
+        Assert.Equal("inspect_ai 0.3.277", (string)run["imported"]!["from"]!);
+    }
+
+    [Fact]
+    public void ACancelledLog_IsAnAbortedRun_AndAnErrorLog_HasItsMessageAsTheReason()
+    {
+        var (cancelled, _) = Import(log => log["status"] = "cancelled");
+        Assert.Equal(("aborted", "cancelled"), ((string)AefTestRuns.Document(cancelled, "run.json")["status"]!, (string)AefTestRuns.Document(cancelled, "run.json")["abortReason"]!));
+
+        var (error, _) = Import(log =>
+        {
+            log["status"] = "error";
+            log["error"] = new JsonObject { ["message"] = "RuntimeError: boom", ["traceback"] = "", ["traceback_ansi"] = "" };
+        });
+        Assert.Equal("RuntimeError: boom", (string)AefTestRuns.Document(error, "run.json")["abortReason"]!);
+    }
+
+    [Theory]
+    [InlineData("eval-id", "IN-6")]
+    [InlineData("no-end", "IN-6")]
+    [InlineData("end-before-start", "IN-6")]
+    [InlineData("error-without-message", "IN-6")]
+    public void TheHeader_IsRefused_WhenThePageRefusesIt(string what, string rule)
+    {
+        Action<JsonObject> edit = what switch
+        {
+            "eval-id" => log => log["eval"]!["eval_id"] = "not an id!",
+            "no-end" => log => log["stats"]!.AsObject().Remove("completed_at"),
+            "end-before-start" => log => log["stats"]!["completed_at"] = "2026-10-06T11:59:00+02:00",
+            _ => log =>
+            {
+                log["status"] = "error";
+                log["error"] = new JsonObject { ["message"] = "", ["traceback"] = "" };
+            },
+        };
+
+        AssertRefused(edit, rule);
+    }
+
+    // ------------------------------------------------------------------ IN-7: scores
+
+    [Fact]
+    public void AScore_IsReadAsItsRowSays()
+    {
+        var (output, _) = Import(log => log["samples"]![0]!["scores"] = new JsonObject
+        {
+            ["s"] = new JsonObject { ["value"] = "C" },
+            ["number"] = new JsonObject { ["value"] = 0.7, ["reason"] = "refusal" },             // blames the model: failed
+            ["scoring"] = new JsonObject { ["value"] = InspectJson.NaN(), ["reason"] = "scoring_failed" },
+            ["blamed"] = new JsonObject { ["value"] = InspectJson.NaN(), ["reason"] = "no_response" },
+            ["absent"] = new JsonObject { ["value"] = InspectJson.NaN(), ["reason"] = "not_applicable" },
+            ["list"] = new JsonObject { ["value"] = new JsonArray(1, 2) },
+            ["map"] = new JsonObject { ["value"] = new JsonObject { ["grade"] = "P", ["steps"] = 2 } },
+        });
+
+        var lines = AefTestRuns.Results(output).ToDictionary(l => (string)l["path"]!);
+        Assert.Equal(("passed", "C"), ((string)lines["s"]["state"]!, (string)lines["s"]["scores"]![0]!["label"]!));
+        Assert.Equal(("failed", "refusal", 0.7), ((string)lines["number"]["state"]!, (string)lines["number"]["reason"]!, (double)lines["number"]["scores"]![0]!["value"]!));
+        Assert.Equal(("error", "scoring_failed"), ((string)lines["scoring"]["state"]!, (string)lines["scoring"]["reason"]!));
+        Assert.Equal(("failed", "no_response"), ((string)lines["blamed"]["state"]!, (string)lines["blamed"]["reason"]!));
+        Assert.Equal(("not_measured", "not_applicable"), ((string)lines["absent"]["state"]!, (string)lines["absent"]["reason"]!));
+        Assert.Equal(("scored", "[1,2]"), ((string)lines["list"]["state"]!, lines["list"]["ext"]!["inspect_ai"]!["value"]!.ToJsonString()));
+        Assert.False(lines["list"].ContainsKey("scores"));
+        Assert.Equal("""[{"metric":"grade","value":0.5,"label":"P"},{"metric":"steps","value":2}]""", lines["map"]["scores"]!.ToJsonString());
+        Assert.Equal("scored", (string)lines["map"]["state"]!);
+    }
+
+    [Fact]
+    public void WithContentCaptureOff_NoExplanationAnswerOrContentIsKept()
+    {
+        var (output, _) = Import(log => log["samples"]![0]!["scores"] = new JsonObject
+        {
+            ["s"] = new JsonObject { ["value"] = "C", ["answer"] = "Yes.", ["explanation"] = "Right.", ["metadata"] = new JsonObject { ["k"] = 1 } },
+        }, AefContentCapture.Off);
+
+        var line = Assert.Single(AefTestRuns.Results(output));
+        Assert.False(line.ContainsKey("reasoning"));
+        Assert.Equal("""{"inspect_ai":{"metadata":{"k":1}}}""", line["ext"]!.ToJsonString());
+        Assert.False(File.Exists(Path.Combine(output, "evidence.ndjson")));
+        Assert.False(Directory.Exists(Path.Combine(output, "blobs")));
+    }
+
+    [Theory]
+    [InlineData("\"B\"")]
+    [InlineData("true")]
+    [InlineData("{\"grade\":\"B\"}")]
+    [InlineData("{\"ok\":false}")]
+    public void ABooleanOrAStringOtherThanALetter_IsRefused(string value) =>
+        AssertRefused(log => log["samples"]![0]!["scores"]!["s"]!["value"] = JsonNode.Parse(value), "IN-7");
+
+    // ------------------------------------------------------------------ IN-8: samples and epochs
+
+    [Theory]
+    [InlineData("two-reducers")]
+    [InlineData("epoch-beyond")]
+    [InlineData("no-scores")]
+    [InlineData("stopped-without-scorers")]
+    [InlineData("two-scores")]
+    [InlineData("reduction-without-lines")]
+    [InlineData("bad-limit")]
+    [InlineData("reducer-without-value-in-a-reduction")]
+    public void TheSamples_AreRefused_WhenThePageRefusesThem(string what)
+    {
+        Action<JsonObject> edit = what switch
+        {
+            "bad-limit" => log =>
+            {
+                log["samples"]![0]!["scores"] = null;
+                log["samples"]![0]!["limit"] = new JsonObject { ["type"] = "token" };
+            },
+            "reducer-without-value-in-a-reduction" => log =>
+            {
+                // With more than one epoch, a reduction whose reducer has no AEF value (R7I-14).
+                log["eval"]!["config"] = new JsonObject { ["epochs"] = 2, ["epochs_reducer"] = new JsonArray("collect") };
+                var second = log["samples"]![0]!.DeepClone();
+                second["epoch"] = 2;
+                log["samples"]!.AsArray().Add(second);
+                log["reductions"] = new JsonArray(new JsonObject
+                {
+                    ["scorer"] = "s",
+                    ["reducer"] = "collect",
+                    ["samples"] = new JsonArray(new JsonObject { ["value"] = "C", ["sample_id"] = 1 }),
+                });
+            },
+            "two-reducers" => log => log["eval"]!["config"] = new JsonObject { ["epochs"] = 2, ["epochs_reducer"] = new JsonArray("mean", "max") },
+            "epoch-beyond" => log => log["samples"]![0]!["epoch"] = 2,
+            "no-scores" => log => log["samples"]![0]!["scores"] = new JsonObject(),
+            "stopped-without-scorers" => log =>
+            {
+                log["eval"]!.AsObject().Remove("scorers");
+                log["samples"]![0]!["scores"] = null;
+                log["samples"]![0]!["error"] = new JsonObject { ["message"] = "crashed" };
+            },
+            "two-scores" => log => log["samples"]!.AsArray().Add(log["samples"]![0]!.DeepClone()),
+            _ => log =>
+            {
+                log["eval"]!["config"] = new JsonObject { ["epochs"] = 2, ["epochs_reducer"] = new JsonArray("mean") };
+                log["reductions"] = new JsonArray(new JsonObject
+                {
+                    ["scorer"] = "s",
+                    ["reducer"] = "mean",
+                    ["samples"] = new JsonArray(new JsonObject { ["value"] = 1, ["sample_id"] = "elsewhere" }),
+                });
+            },
+        };
+
+        AssertRefused(edit, "IN-8");
+    }
+
+    [Fact]
+    public void Epochs_AreTrials_AReductionARollupCountedFromThem_AndTheReducerTheAggregation()
+    {
+        var (output, _) = Import(log =>
+        {
+            log["eval"]!["config"] = new JsonObject { ["epochs"] = 2, ["epochs_reducer"] = new JsonArray("at_least_2") };
+            var second = log["samples"]![0]!.DeepClone();
+            second["epoch"] = 2;
+            second["scores"]!["s"]!["value"] = "I";
+            log["samples"]!.AsArray().Add(second);
+            log["reductions"] = new JsonArray(new JsonObject
+            {
+                ["scorer"] = "s",
+                ["reducer"] = "pass_at_2",
+                ["samples"] = new JsonArray(new JsonObject { ["value"] = 1.0, ["sample_id"] = 1 }),
+            });
+            log["results"]!["scores"]![0]!["metrics"] = new JsonObject { ["accuracy"] = new JsonObject { ["name"] = "accuracy", ["value"] = 1.0 } };
+        });
+
+        var run = AefTestRuns.Document(output, "run.json");
+        Assert.Equal("""{"trialsPerCase":2,"aggregation":"AllPass"}""", run["suite"]!["executionPolicy"]!.ToJsonString());
+        var lines = AefTestRuns.Results(output);
+        Assert.Equal([0, 1], lines.Take(2).Select(l => (int)l["trial"]!));
+        Assert.Equal("""{"n":2,"passed":1,"aggregation":"PassAtK","agree":false,"k":2}""", lines[2]["trials"]!.ToJsonString());
+    }
+
+    [Fact]
+    public void ASampleThatStopped_IsALinePerScorer_InErrorOrNotMeasuredForALimit()
+    {
+        var (output, _) = Import(log =>
+        {
+            log["samples"]![0]!["scores"] = null;
+            log["samples"]![0]!["limit"] = new JsonObject { ["type"] = "token", ["limit"] = 1000 };
+            log["eval"]!["scorers"] = new JsonArray(new JsonObject { ["name"] = "s" }, new JsonObject { ["name"] = "t" });
+            log["results"]!["scores"]![0]!["metrics"] = new JsonObject { ["accuracy"] = new JsonObject { ["name"] = "accuracy", ["value"] = InspectJson.NaN() } };
+        });
+
+        var lines = AefTestRuns.Results(output);
+        Assert.Equal(["s", "t"], lines.Select(l => (string)l["path"]!));
+        Assert.All(lines, l => Assert.Equal(("not_measured", "token limit 1000"), ((string)l["state"]!, (string)l["reason"]!)));
+        Assert.Equal("match", (string)lines[0]["evaluator"]!["id"]!);
+    }
+
+    [Fact]
+    public void AStartedLog_IsARunningRun_NotSealed()
+    {
+        var (output, conversion) = Import(log =>
+        {
+            log["status"] = "started";
+            log["stats"]!.AsObject().Remove("completed_at");
+        });
+
+        Assert.Equal(AefOutcome.Unsealed, conversion.Verification.Outcome);
+        Assert.Null(conversion.Seal);
+        Assert.Equal("running", (string)AefTestRuns.Document(output, "run.json")["status"]!);
+        Assert.False(File.Exists(Path.Combine(output, "summary.json")));
+    }
+
+    // ------------------------------------------------------------------ usage
+
+    [Fact]
+    public void Usage_IsOneEntryPerRole_WithItsModel_AndTheRunsTotalsOnePerModel()
+    {
+        var (output, _) = Import(log =>
+        {
+            log["eval"]!["model_roles"] = new JsonObject { ["grader"] = new JsonObject { ["model"] = "openai/g" } };
+            log["samples"]![0]!["role_usage"] = new JsonObject
+            {
+                ["grader"] = new JsonObject { ["input_tokens"] = 4, ["output_tokens"] = 1, ["total_tokens"] = 5 },
+                ["critic"] = new JsonObject { ["input_tokens"] = 2, ["output_tokens"] = 1, ["total_tokens"] = 3 },
+            };
+            log["samples"]![0]!["model_usage"] = new JsonObject
+            {
+                ["openai/m"] = new JsonObject { ["input_tokens"] = 10, ["output_tokens"] = 5, ["total_tokens"] = 15, ["total_cost"] = 0.25 },
+                ["openai/g"] = new JsonObject { ["input_tokens"] = 4, ["output_tokens"] = 1, ["total_tokens"] = 5 },
+            };
+            log["stats"]!["model_usage"] = log["samples"]![0]!["model_usage"]!.DeepClone();
+        });
+
+        var usage = AefTestRuns.Results(output)[0]["usage"]!.AsArray();
+        Assert.Equal(
+            ["judge openai/g", "other ", "agent openai/m"],
+            usage.Select(u => $"{(string)u!["role"]!} {(string?)u["model"]}"));
+        var summary = AefTestRuns.Document(output, "summary.json");
+        Assert.Equal(["agent openai/m", "judge openai/g"], summary["usage"]!.AsArray().Select(u => $"{(string)u!["role"]!} {(string?)u["model"]}"));
+        Assert.Equal(0.25, (double)summary["cost"]!["totalUsd"]!);
+    }
+
+    // ------------------------------------------------------------------ IN-9: the summary
+
+    [Fact]
+    public void AnEntryWithoutAMean_IsItsOneOtherMetricAsTheAggregate_RecomputedWhenAefDefinesIt()
+    {
+        var (output, _) = Import(log =>
+        {
+            log["samples"]![0]!["scores"]!["s"]!["value"] = 0.25;
+            log["results"]!["scores"]!.AsArray().Add(new JsonObject
+            {
+                ["name"] = "u",
+                ["scorer"] = "u",
+                ["metrics"] = new JsonObject { ["pass_at_k"] = new JsonObject { ["name"] = "pass_at_k", ["value"] = 0.5, ["params"] = new JsonObject { ["k"] = 3 } } },
+            });
+            log["samples"]![0]!["scores"]!["u"] = new JsonObject { ["value"] = 1 };
+            log["results"]!["scores"]![0]!["metrics"] = new JsonObject { ["max"] = new JsonObject { ["name"] = "max", ["value"] = 0.25 } };
+        });
+
+        var entries = AefTestRuns.Document(output, "summary.json")["lanes"]![0]!["metrics"]!.AsArray();
+        Assert.Equal(("""{"method":"max"}""", 0.25), (entries[0]!["aggregate"]!.ToJsonString(), (double)entries[0]!["value"]!));
+        Assert.Equal(("""{"method":"pass_at_k","k":3}""", 0.5), (entries[1]!["aggregate"]!.ToJsonString(), (double)entries[1]!["value"]!));
+    }
+
+    [Theory]
+    [InlineData("""{"max":{"name":"max","value":0.9}}""")]                                            // the lines give 1
+    [InlineData("""{"max":{"name":"max","value":1},"median":{"name":"median","value":1}}""")]        // no mean, two others
+    [InlineData("""{"Bad Name":{"name":"Bad Name","value":1}}""")]                                   // cannot be a method
+    public void ASummaryEntry_IsRefused_WhenThePageRefusesIt(string metrics) =>
+        AssertRefused(log => log["results"]!["scores"]![0]!["metrics"] = JsonNode.Parse(metrics), "IN-9");
+
+    // ------------------------------------------------------------------ IN-10
+
+    [Fact]
+    public void AnInvalidation_IsRefused() =>
+        AssertRefused(log => log["samples"]![0]!["invalidation"] = new JsonObject { ["reason"] = "leaked" }, "IN-10");
+
+    // ------------------------------------------------------------------ helpers
+
+    // The step's arguments as the reference converter takes them: input, {out}, then --target-mode, --content-capture and
+    // --at (the conversion time).
+    private static (string Input, AefInspectImportOptions Options) Arguments(string example, JsonArray args)
+    {
+        var named = new Dictionary<string, string>(StringComparer.Ordinal);
+        for (var i = 3; i + 1 < args.Count; i += 2)
+        {
+            named[(string)args[i]!] = (string)args[i + 1]!;
+        }
+
+        return (Path.Combine(example, (string)args[1]!), new AefInspectImportOptions
+        {
+            TargetMode = AefNames.TryParse<AefTargetMode>(named["--target-mode"], out var mode) ? mode.Value : throw new FormatException(named["--target-mode"]),
+            ContentCapture = named.TryGetValue("--content-capture", out var text)
+                ? AefNames.TryParse<AefContentCapture>(text, out var capture) ? capture.Value : throw new FormatException(text)
+                : AefContentCapture.On,
+            TimeProvider = new Clock(DateTimeOffset.Parse(named["--at"], CultureInfo.InvariantCulture)),
+        });
+    }
+
+    // A small closed log: one sample of one case, one scorer s (scorer match) with its accuracy.
+    private static JsonObject BaseLog() => new()
+    {
+        ["version"] = 2,
+        ["status"] = "success",
+        ["eval"] = new JsonObject
+        {
+            ["eval_id"] = "e1",
+            ["run_id"] = "r1",
+            ["created"] = "2026-10-06T12:00:00+02:00",
+            ["task"] = "refunds",
+            ["task_version"] = 1,
+            ["model"] = "openai/m",
+            ["config"] = new JsonObject { ["epochs"] = 1 },
+            ["packages"] = new JsonObject { ["inspect_ai"] = "0.3.277" },
+            ["scorers"] = new JsonArray(new JsonObject { ["name"] = "s" }),
+        },
+        ["results"] = new JsonObject
+        {
+            ["total_samples"] = 1,
+            ["completed_samples"] = 1,
+            ["scores"] = new JsonArray(new JsonObject
+            {
+                ["name"] = "s",
+                ["scorer"] = "match",
+                ["metrics"] = new JsonObject { ["accuracy"] = new JsonObject { ["name"] = "accuracy", ["value"] = 1.0 } },
+            }),
+        },
+        ["stats"] = new JsonObject { ["started_at"] = "2026-10-06T12:00:01+02:00", ["completed_at"] = "2026-10-06T12:01:00+02:00" },
+        ["samples"] = new JsonArray(new JsonObject
+        {
+            ["id"] = 1,
+            ["epoch"] = 1,
+            ["input"] = "Refund?",
+            ["target"] = "Yes.",
+            ["scores"] = new JsonObject { ["s"] = new JsonObject { ["value"] = "C" } },
+        }),
+    };
+
+    private (string Output, AefConversion Conversion) Import(Action<JsonObject> edit, AefContentCapture capture = AefContentCapture.On)
+    {
+        var (input, output) = Files(edit);
+        var conversion = AefInspectImporter.Import(input, output, new AefInspectImportOptions { TargetMode = AefTargetMode.Live, ContentCapture = capture, TimeProvider = new Clock(At) });
+        Assert.NotEqual(AefOutcome.Invalid, conversion.Verification.Outcome);
+        return (output, conversion);
+    }
+
+    private void AssertRefused(Action<JsonObject> edit, string rule)
+    {
+        var (input, output) = Files(edit);
+        var refused = Assert.Throws<AefInspectImportException>(() => AefInspectImporter.Import(input, output, new AefInspectImportOptions { TargetMode = AefTargetMode.Live, TimeProvider = new Clock(At) }));
+        Assert.Contains(rule, refused.Message, StringComparison.Ordinal);
+        Assert.False(Directory.Exists(output));
+    }
+
+    private (string Input, string Output) Files(Action<JsonObject> edit)
+    {
+        var log = BaseLog();
+        edit(log);
+        Directory.CreateDirectory(_root);
+        var name = Guid.NewGuid().ToString("N");
+        var input = Path.Combine(_root, name + ".json");
+        File.WriteAllText(input, InspectJson.Indented(log) + "\n", new UTF8Encoding(false));
+        return (input, Path.Combine(_root, name));
+    }
+
+    private static List<JsonObject> Lines(string run, string file) =>
+        [.. File.ReadAllLines(Path.Combine(run, file)).Where(l => l.Length > 0).Select(l => JsonNode.Parse(l)!.AsObject())];
+
+    private static List<string> Blobs(string run) =>
+        Directory.Exists(Path.Combine(run, "blobs"))
+            ? [.. Directory.EnumerateFiles(Path.Combine(run, "blobs"), "*", SearchOption.AllDirectories).Select(Path.GetFileName).OfType<string>().Order(StringComparer.Ordinal)]
+            : [];
+
+    private sealed class Clock(DateTimeOffset now) : TimeProvider
+    {
+        public override DateTimeOffset GetUtcNow() => now;
+    }
+}

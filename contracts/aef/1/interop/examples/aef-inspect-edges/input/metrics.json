@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "1.0",
+  "metrics": [
+    {
+      "id": "correct",
+      "kind": "score",
+      "direction": "higher_better",
+      "scale": {
+        "min": 0,
+        "max": 1
+      }
+    },
+    {
+      "id": "acc",
+      "kind": "score",
+      "direction": "higher_better",
+      "scale": {
+        "min": 0,
+        "max": 1
+      }
+    },
+    {
+      "id": "grade",
+      "kind": "score",
+      "direction": "higher_better",
+      "scale": {
+        "min": 0,
+        "max": 1
+      }
+    }
+  ]
+}

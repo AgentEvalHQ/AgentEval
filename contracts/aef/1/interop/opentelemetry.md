@@ -136,8 +136,9 @@ The worked example writes the attributes in the table's order.
 - **The sealed results** (OT-7, R7N-5). The converter exports the lines as `results.ndjson` holds them, not the
   effective view ([§4.3](../spec/04-integrity.md#43-the-effective-view)): overlays are not applied, so an `override`
   does not change the exported state.
-- **Only a run that verifies** (OT-8, R7N-6). The converter exports a run only when `tools/aef_verify.py run` finds it
-  `intact` or `unsealed`, with no problem but an authorized withhold; it refuses any other run. A run it writes
+- **Only a run that verifies** (OT-8, R7N-6). The converter exports a run only when a Run verifier
+  ([§4.5](../spec/04-integrity.md#45-verification-outcomes)) finds it `intact` or `unsealed`, with no problem but
+  an authorized withhold; it refuses any other run (the reference converter uses `tools/aef_verify.py run`). A run it writes
   from events is verified the same way, and refused (nothing written) when it does not verify.
 - **Refused exports** (OT-9, R7N-7, R7N-8). The converter refuses the whole export, and writes nothing, for a reasoning
   blob it would send as an explanation that is not UTF-8 or is over 4 MiB, and for a time `timeUnixNano` cannot hold:

@@ -1,8 +1,8 @@
 {
   "kind": "matching",
-  "matches": true,
+  "matches": false,
   "rules": [
     "PLAN-7"
   ],
-  "why": "a manifest does not say which target modes a runner can give, so matching decides by what it says (tags and provider); a runner that cannot replay the subject refuses the plan itself (PLAN-7)"
+  "why": "a manifest without targetModes gives live only, so a runner that names none does not take a plan that asks to replay the subject (PLAN-6, PLAN-7)"
 }

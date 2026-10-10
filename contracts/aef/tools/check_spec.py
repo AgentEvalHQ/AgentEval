@@ -8,7 +8,10 @@
 5. when the corpus is in a git work tree, git ignores none of its files (a repository's own ignore rules, such as
    AgentEval's `runs/`, must not drop vectors from a commit);
 6. every rule is named by some corpus vector, or listed in UNTESTED with the reason no vector can test it;
-7. no schema pattern uses lookaround or a backreference ([ENC-14]).
+7. no schema pattern uses lookaround or a backreference ([ENC-14]);
+8. every job vector's inputs are files of the corpus, its env names set, empty or absent, its target's cases have a
+   severity exactly when failed or warn, and the cases it expects are the first cases of a suite its scripted target
+   has; and run.json, a plan and a runner manifest list the same target modes.
 
 Usage: python contracts/aef/tools/check_spec.py
 """
@@ -26,7 +29,9 @@ PREFIXES = "(?:ENC|RUN|RES|SUM|EVD|GATE|SEAL|OVL|SIG|CKP|LANE|DEC|PLAN|STRM|VER|
 NOT_FIELDS = {"ExportTraceServiceRequest", "signedBy", "LaneResult", "MeasurementState", "additionalProperties", "allOf",
               "anyOf", "effectiveState", "endTimeUnixNano", "envelopeResult", "expectedError", "instrumentationLibrarySpans", "keyid", "maxItems",
               "maxLength", "minItems", "minLength", "oneOf", "payloadType", "publicKey", "readOnly", "sealedState",
-              "startTimeUnixNano", "uniqueItems", "unsealedEvents", "verifiesFor", "writeOnly"}
+              "startTimeUnixNano", "uniqueItems", "unsealedEvents", "verifiesFor", "writeOnly",
+              # spec 09 §9.2.1: the scripted target of the job vectors, and what a job vector expects
+              "closeSeconds", "secondsBound", "usdBound", "endsAt"}
 
 
 # Rules no corpus vector can test, and why. Everything else needs a vector that names it (CONF-1).
@@ -42,8 +47,6 @@ UNTESTED = {
     "ENC-12": "a reader must not fetch the $id names: behaviour, not a file property",
     "ENC-14": "a rule on the schemas themselves: checked here (no lookaround, no backreference)",
     "CKP-6": "how a reader shows an approver's claimed identity: presentation",
-    "PLAN-10": "what a runner writes where the plan says nothing: a SHOULD no verifier checks; tools/check_runner.py "
-               "checks it on the reference runner's runs",
     "VER-5": "what a minor version may change: checked by tools/schema_diff.py --self-test against the next version",
     "VER-7": "deprecation: a process rule for later minors",
     "SEC-2": "a tool must not seal a run holding a secret: a process rule",
@@ -192,6 +195,32 @@ def main():
         problems.append(f"UNTESTED lists {rid}, which the spec does not define")
     for rid in sorted(set(UNTESTED) & used_rules):
         problems.append(f"UNTESTED lists {rid}, but a vector names it: take it off the list")
+
+    # The job vectors (spec 09 §9.2.1): each names its inputs, which are files of the corpus, and expects runs the
+    # target has; and a target mode is spelled alike wherever a schema lists them (run.json, a plan, a manifest).
+    for exp in sorted((conf / "jobs").glob("*/expected.json")):
+        e, where = json.loads(exp.read_text(encoding="utf-8")), exp.parent.name
+        for name in ("plan", "runner", "target"):
+            if not (exp.parent / e[name]).is_file():
+                problems.append(f"jobs/{where}: its {name} {e[name]} is not a file")
+        if set((e.get("env") or {}).values()) - {"set", "empty", "absent"}:
+            problems.append(f"jobs/{where}: env gives a variable something other than set, empty or absent")
+        target = json.loads((exp.parent / e["target"]).read_text(encoding="utf-8"))
+        for c in (c for s in target["suites"] for c in s["cases"]):
+            if (c["state"] in ("failed", "warn")) != ("severity" in c):  # §9.2.1, RES-9
+                problems.append(f"jobs/{where}: case {c['caseId']} has a severity, but not exactly as failed or warn")
+        cases = {(s["ref"], s["version"]): [[c["caseId"], c["state"]] for c in s["cases"]] for s in target["suites"]}
+        for run in e["runs"]:
+            have = cases.get((run["suite"]["ref"], run["suite"]["version"]), [])
+            if run["cases"] != have[:len(run["cases"])] or not run["cases"]:
+                problems.append(f"jobs/{where}: a run's cases are not the first cases of a suite its target has")
+    writer = {n: json.loads((AEF / "schemas" / "writer" / f"{n}.schema.json").read_text(encoding="utf-8"))
+              for n in ("run", "run-plan", "runner")}
+    modes = [writer["run"]["properties"]["execution"]["properties"]["targetMode"]["enum"],
+             writer["run-plan"]["properties"]["targetMode"]["enum"],
+             writer["runner"]["properties"]["targetModes"]["items"]["enum"]]
+    if any(m != modes[0] for m in modes):
+        problems.append(f"the target modes of run.json, a plan and a runner manifest differ: {modes}")
 
     for kind in ("writer", "reader"):
         for f in sorted((AEF / "schemas" / kind).glob("*.schema.json")):

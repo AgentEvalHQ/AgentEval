@@ -13,6 +13,7 @@ using AgentEval.Output;
 using AgentEval.Results;
 using AgentEval.Results.Adapters;
 using AgentEval.Results.Adapters.AssertAi;
+using AgentEval.Results.Adapters.Inspect;
 using AgentEval.Results.Adapters.Otel;
 using AgentEval.Results.Adapters.StoreV1;
 using AgentEval.Results.Checkpoints;
@@ -32,11 +33,13 @@ namespace AgentEval.Cli.Commands;
 /// <item><c>export</c>: a run of AgentEval's older output store (store v1, §7.5) as an AEF run;</item>
 /// <item><c>import assert-ai</c>: an ASSERT run as an AEF run (interop/assert.md);</item>
 /// <item><c>import otel</c>: OpenTelemetry <c>gen_ai.evaluation.result</c> events as an AEF run (interop/opentelemetry.md);</item>
-/// <item><c>export-otel</c>: an AEF run as OpenTelemetry <c>gen_ai.evaluation.result</c> events, OTLP/JSON <c>LogsData</c> lines (interop/opentelemetry.md).</item>
+/// <item><c>export-otel</c>: an AEF run as OpenTelemetry <c>gen_ai.evaluation.result</c> events, OTLP/JSON <c>LogsData</c> lines (interop/opentelemetry.md);</item>
+/// <item><c>import inspect</c>: an Inspect eval log (<c>.json</c> form) as an AEF run (interop/inspect.md);</item>
+/// <item><c>export-inspect</c>: an AEF run as an Inspect eval log, <c>.json</c> form (interop/inspect.md).</item>
 /// </list>
 /// Every verb takes <c>--json</c> for one JSON value on standard output. Exit codes: 0 when the run (or checkpoint) holds
-/// no problem, 1 when it does (or a seal is refused), 2 for a usage or input error (for <c>export-otel</c>, a run it
-/// refuses to export too: an invalid one, or a line the page's rules refuse).
+/// no problem, 1 when it does (or a seal is refused), 2 for a usage or input error (for <c>export-otel</c> and
+/// <c>export-inspect</c>, a run it refuses to export too: an invalid one, or one the page's rules refuse).
 /// </summary>
 internal static class AefCommand
 {
@@ -44,7 +47,7 @@ internal static class AefCommand
 
     public static Command Create()
     {
-        var cmd = new Command("aef", "Work with AEF 1.0 runs (the AgentEval Evidence Format): verify, seal, view, check a checkpoint, export AgentEval's older store, import an ASSERT run, export a run as OpenTelemetry events.");
+        var cmd = new Command("aef", "Work with AEF 1.0 runs (the AgentEval Evidence Format): verify, seal, view, check a checkpoint, export AgentEval's older store, import an ASSERT run, OpenTelemetry events or an Inspect log, export a run as OpenTelemetry events or an Inspect log.");
         cmd.Add(CreateVerify());
         cmd.Add(CreateSeal());
         cmd.Add(CreateView());
@@ -52,6 +55,7 @@ internal static class AefCommand
         cmd.Add(CreateExport());
         cmd.Add(CreateImport());
         cmd.Add(CreateExportOtel());
+        cmd.Add(CreateExportInspect());
         return cmd;
     }
 
@@ -502,6 +506,7 @@ internal static class AefCommand
             p.GetValue(capture)!, p.GetValue(noSeal), p.GetValue(key), p.GetValue(json), Console.Out, Console.Error)));
         cmd.Add(assertAi);
         cmd.Add(CreateImportOtel());
+        cmd.Add(CreateImportInspect());
         return cmd;
     }
 
@@ -567,6 +572,68 @@ internal static class AefCommand
             return Converted(conversion, asJson, stdout);
         }
         catch (Exception e) when (IsInputError(e) || e is AefOtelImportException or NotSupportedException)
+        {
+            stderr.WriteLine($"✖ {e.Message}");
+            return ExitCodes.UsageError;
+        }
+        catch (InvalidOperationException e)
+        {
+            stderr.WriteLine($"✖ The imported run does not close or verify: {e.Message}");
+            return ExitCodes.TestFailure;
+        }
+        finally
+        {
+            signer?.Dispose();
+        }
+    }
+
+    private static Command CreateImportInspect()
+    {
+        var logFile = new Argument<string>("log-file") { Description = "An Inspect eval log in .json form (or 'inspect log dump' of an .eval log): one EvalLog." };
+        var outDir = new Argument<string>("out-dir") { Description = "The AEF run folder to write (must not exist, or be empty)." };
+        var targetMode = new Option<string>("--target-mode") { Description = "How the log's solver drove its target, which Inspect does not record: live, replayed, scripted or mocked.", Required = true };
+        var json = JsonOption();
+        var (capture, noSeal, key) = ConversionOptions();
+        var inspect = new Command("inspect", "Import an Inspect eval log as an AEF run (interop/inspect.md, Inspect → AEF): a line per sample and score, a rollup per reduction, sealed by the importer (ingest) when the log is closed. Exit 2 for a log the page refuses (IN-6 to IN-11).");
+        inspect.Add(logFile);
+        inspect.Add(outDir);
+        foreach (var o in new Option[] { targetMode, capture, noSeal, key, json }) inspect.Add(o);
+        inspect.SetAction((ParseResult p, CancellationToken _) => Task.FromResult(RunImportInspect(
+            p.GetValue(logFile)!, p.GetValue(outDir)!, p.GetValue(targetMode)!, p.GetValue(capture)!, p.GetValue(noSeal), p.GetValue(key), p.GetValue(json), Console.Out, Console.Error)));
+        return inspect;
+    }
+
+    internal static int RunImportInspect(
+        string logFile, string outputDirectory, string targetMode, string contentCapture, bool noSeal, string? keyPath, bool asJson,
+        TextWriter stdout, TextWriter stderr, TimeProvider? clock = null)
+    {
+        if (!AefNames.TryParse<AefContentCapture>(contentCapture, out var capture))
+        {
+            stderr.WriteLine($"✖ --content-capture must be on or off, not '{contentCapture}'.");
+            return ExitCodes.UsageError;
+        }
+
+        if (!AefNames.TryParse<AefTargetMode>(targetMode, out var mode))
+        {
+            stderr.WriteLine($"✖ --target-mode must be live, replayed, scripted or mocked, not '{targetMode}'.");
+            return ExitCodes.UsageError;
+        }
+
+        EcdsaP256Signer? signer = null;
+        try
+        {
+            signer = keyPath is null ? null : AefSigningKey.Load(keyPath);
+            var conversion = AefInspectImporter.Import(logFile, outputDirectory, new AefInspectImportOptions
+            {
+                TargetMode = mode.Value,
+                ContentCapture = capture.Value,
+                Seal = !noSeal,
+                Signer = signer,
+                TimeProvider = clock,
+            });
+            return Converted(conversion, asJson, stdout);
+        }
+        catch (Exception e) when (IsInputError(e) || e is AefInspectImportException or NotSupportedException)
         {
             stderr.WriteLine($"✖ {e.Message}");
             return ExitCodes.UsageError;
@@ -690,6 +757,65 @@ internal static class AefCommand
             }
 
             stdout.WriteLine("  Not carried (interop/opentelemetry.md, What does not carry over): the run id and result paths, the result tree, trials, thresholds, evaluator identity, evidence, the seal and overlays.");
+        }
+
+        return ExitCodes.Success;
+    }
+
+    // ---- export-inspect ------------------------------------------------------------------------------------------
+
+    private static Command CreateExportInspect()
+    {
+        var runDir = new Argument<string>("run-dir") { Description = "The AEF run folder (holding run.json): intact or unsealed; an invalid run is refused." };
+        var outFile = new Argument<string>("out-file") { Description = "The file to write (must not exist): one Inspect EvalLog in .json form." };
+        var ignoreOverlays = new Option<bool>("--ignore-overlays") { Description = "Convert a run with overlay events, leaving them out (without it such a run is refused, IN-4)." };
+        var policy = PolicyOption();
+        var json = JsonOption();
+        var cmd = new Command("export-inspect", "Export an AEF run as an Inspect eval log in .json form (interop/inspect.md, AEF → Inspect): a sample per case and trial, a score per result line, a reduction per rollup, the summary as results. Exit 2 when the run cannot be exported.");
+        cmd.Add(runDir);
+        cmd.Add(outFile);
+        foreach (var o in new Option[] { ignoreOverlays, policy, json }) cmd.Add(o);
+        cmd.SetAction((ParseResult p, CancellationToken _) => Task.FromResult(RunExportInspect(
+            p.GetValue(runDir)!, p.GetValue(outFile)!, p.GetValue(ignoreOverlays), p.GetValue(policy), p.GetValue(json), Console.Out, Console.Error)));
+        return cmd;
+    }
+
+    internal static int RunExportInspect(string runDirectory, string outputFile, bool ignoreOverlays, string? policyPath, bool asJson, TextWriter stdout, TextWriter stderr)
+    {
+        AefInspectExport export;
+        try
+        {
+            RequireFolder(runDirectory);
+            export = AefInspectExporter.ExportToFile(runDirectory, outputFile, new AefInspectExportOptions { Policy = LoadPolicy(policyPath), IgnoreOverlays = ignoreOverlays });
+        }
+        catch (Exception e) when (IsInputError(e) || e is AefInspectExportException)
+        {
+            // A missing or unreadable run, an output file that exists, an invalid run, or a refusal of the page's rules
+            // (AefInspectExportException names the rule): nothing is written.
+            stderr.WriteLine($"✖ {e.Message}");
+            return ExitCodes.UsageError;
+        }
+
+        if (asJson)
+        {
+            stdout.WriteLine(new JsonObject
+            {
+                ["runId"] = export.RunId,
+                ["outcome"] = AefRunVerification.Name(export.Outcome),
+                ["file"] = outputFile,
+                ["samples"] = export.Samples,
+                ["notes"] = new JsonArray([.. export.Notes.Select(n => (JsonNode?)n)]),
+            }.ToJsonString(s_json));
+        }
+        else
+        {
+            stdout.WriteLine($"✔ AEF run {export.RunId} ({AefRunVerification.Name(export.Outcome)}) → {outputFile}: one Inspect EvalLog, {Count(export.Samples, "sample")}");
+            foreach (var note in export.Notes)
+            {
+                stdout.WriteLine($"  - {note}");
+            }
+
+            stdout.WriteLine("  Not carried (interop/inspect.md, What does not carry over): the state (kept in Score.metadata), the result tree, evaluator identity, evidence links, the seal and overlays, the summary's lanes and rules.");
         }
 
         return ExitCodes.Success;

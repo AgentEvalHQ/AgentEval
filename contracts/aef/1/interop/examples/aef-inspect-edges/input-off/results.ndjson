@@ -1,0 +1,2 @@
+{"schemaVersion":"1.0","resultId":"r_2b747743d4f8a429915a54b956398dd0","caseId":"c1","path":"q","evaluator":{"id":"check:q"},"state":"scored","scores":[{"metric":"q","value":0.7}],"reason":"Measured on the short form."}
+{"schemaVersion":"1.0","resultId":"r_e849694237511ce58156a8df2c6cb272","caseId":"c2","path":"q","evaluator":{"id":"check:q"},"state":"skipped","reason":"Skipped by --max-cases 1."}

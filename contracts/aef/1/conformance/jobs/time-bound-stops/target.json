@@ -1,0 +1,37 @@
+{
+  "suites": [
+    {
+      "ref": "suite:support/slow-lookups",
+      "version": "1",
+      "content": "suite:support/slow-lookups@1\nlookup-1\nlookup-2\nlookup-3\n",
+      "cases": [
+        {
+          "caseId": "lookup-1",
+          "state": "passed",
+          "usd": 0.25,
+          "usdBound": 0.25,
+          "seconds": 20,
+          "secondsBound": 20
+        },
+        {
+          "caseId": "lookup-2",
+          "state": "passed",
+          "usd": 0.25,
+          "usdBound": 0.25,
+          "seconds": 20,
+          "secondsBound": 40
+        },
+        {
+          "caseId": "lookup-3",
+          "state": "passed",
+          "usd": 0.25,
+          "usdBound": 0.25,
+          "seconds": 20,
+          "secondsBound": 20
+        }
+      ]
+    }
+  ],
+  "closeSeconds": 1,
+  "priceTable": "aef-scripted-2026-10"
+}

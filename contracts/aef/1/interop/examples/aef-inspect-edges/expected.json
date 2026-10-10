@@ -1,0 +1,18 @@
+{
+  "direction": "AEF → Inspect → AEF",
+  "page": "inspect.md",
+  "sections": ["AEF → Inspect", "Inspect → AEF"],
+  "description": "Small hand-written runs that pin the rulings settled 10-10 (R7I). input/ is an aborted run that keeps content: its error has message, traceback and traceback_ansi (R7I-7); its model subject model:acme/gpt%20x is exported with the name decoded, acme/gpt x, and comes back as model:acme/gpt%20x (R7I-8, run/); a labelled score is its label and a line with two scores is a map keyed by metric (R7I-2); the two roots of case c1 carry the same times, spelled two ways, and the same duration, which count as one (R7I-5); case c2's input comes from the record its line cites, and an output record no line cites is neither carried nor refused (R7I-6). input-off/ keeps no content: no score gets an explanation (R7I-3, as OT-3). Each run under refusals/ verifies and is refused: two roots with different start times (R7I-5), a cited output record (R7I-6), a reasoning blob that is not UTF-8 (R7I-9).",
+  "steps": [
+    {"args": ["to-inspect", "input", "{out}"], "expected": "inspect.json"},
+    {"args": ["from-inspect", "inspect.json", "{out}", "--target-mode", "live", "--at", "2026-10-09T00:00:00Z"], "expected": "run"},
+    {"args": ["to-inspect", "input-off", "{out}"], "expected": "inspect-off.json"}
+  ],
+  "refusals": [
+    {"args": ["to-inspect", "refusals/roots-differ", "{out}"], "says": "IN-5"},
+    {"args": ["to-inspect", "refusals/output-cited", "{out}"], "says": "IN-5"},
+    {"args": ["to-inspect", "refusals/reasoning-not-utf8", "{out}"], "says": "IN-12"}
+  ],
+  "runs": {"input": "unsealed", "input-off": "unsealed", "run": "intact", "refusals/roots-differ": "unsealed",
+           "refusals/output-cited": "unsealed", "refusals/reasoning-not-utf8": "unsealed"}
+}

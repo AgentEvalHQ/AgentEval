@@ -35,6 +35,8 @@ CLASSES = {
     "produce": ["Producer"],
     "seal-write": ["Sealer"],
     "sign": ["Sealer"],
+    # A runner runs a plan against a scripted target, and the runner judges the job it writes (spec 09 §9.3).
+    "job": ["Runner"],
 }
 
 
@@ -110,6 +112,17 @@ def main():
                 assert exp.get("algorithm") in ("ecdsa-p256", "ed25519"), f"{d}: no signing algorithm"
                 e["algorithm"] = exp["algorithm"]
             vectors.append(e)
+    # jobs/<name>/ (job_vectors.py): a plan, a scripted target and the job expected; jobs/runner.json is the runner
+    # manifest most of them share.
+    folder = ROOT / "jobs"
+    if folder.exists():
+        for d in sorted((p for p in folder.iterdir() if p.is_dir()), key=lambda p: p.name.encode()):
+            exp = json.loads((d / "expected.json").read_text(encoding="utf-8"))
+            assert exp["kind"] == "job", f"{d}: kind {exp['kind']} in jobs/"
+            vectors.append(entry(f"jobs/{d.name}", "job", exp.get("rules", []), f"jobs/{d.name}", files_of(d)))
+        shared = {p.name: sha(p) for p in sorted(folder.glob("*.json"), key=lambda p: p.name.encode())}
+        if shared:
+            vectors.append(entry("jobs/shared", "fixture", ["PLAN-6"], "jobs", shared, CLASSES["job"]))
 
     # Spec 09 §9.1: a class whose requirements include another class passes that class's vectors too.
     for v in vectors:

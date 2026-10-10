@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "1.0",
+  "metrics": [
+    {
+      "id": "q",
+      "kind": "score",
+      "direction": "none",
+      "scale": "unbounded"
+    },
+    {
+      "id": "x",
+      "kind": "score",
+      "direction": "none",
+      "scale": "unbounded"
+    }
+  ]
+}

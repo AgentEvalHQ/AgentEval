@@ -76,6 +76,12 @@ def target_mode(plan):
     return plan.get("targetMode", "live")
 
 
+def target_modes(runner):
+    """The target modes a runner gives: its manifest's targetModes, live only when it has none (PLAN-6)."""
+    modes = runner.get("targetModes")
+    return modes if isinstance(modes, list) else ["live"]
+
+
 def knows(plan):
     """PLAN-7: whether a runner of this version knows every value of the plan it must know, or must refuse it."""
     providers, provider_pattern, isolations, captures, modes, schemes, purposes = _plan_knowledge()
@@ -89,11 +95,13 @@ def knows(plan):
 
 def matches(plan, runner):
     """PLAN-7: a runner takes a plan when it can take it (it carries every selector tag, supports the plan's provider,
-    and, for a remote-zone plan, is in the plan's zone) and knows its values (knows), as far as its manifest tells: a
-    manifest does not say which target modes the runner can give."""
+    gives the plan's target mode, and, for a remote-zone plan, is in the plan's zone) and knows its values (knows), as
+    far as its manifest tells. A plan without a targetMode asks for live; a manifest without targetModes gives live
+    only."""
     return (knows(plan)
             and all(tag in runner.get("tags", []) for tag in plan.get("runnerSelector", []))
             and plan["provider"] in runner["providers"]
+            and target_mode(plan) in target_modes(runner)
             and (plan["isolation"] != "remote-zone" or runner.get("networkZone") == plan.get("zone")))
 
 
@@ -271,13 +279,16 @@ def conform(events, plan, runs, policy=None, examine=examine):
             chosen.append(run[0])
         problems.extend((f"run:{run_id}", p) for p in found)
 
-    # The job's limits, over the runs found, each once: a runner cannot pass by splitting its work across runs.
+    # The job's limits, over the runs found, each once: a runner cannot pass by splitting its work across runs. A case
+    # is its run's suite (ref and version) with its caseId: one case id in two suites counts twice (PLAN-8).
     limits, costs, cases = plan["limits"], [], set()
     for folder in chosen:
         summary = json.loads((folder / "summary.json").read_bytes()) if (folder / "summary.json").is_file() else {}
         costs.append((summary.get("cost") or {}).get("totalUsd", 0))
+        suite = json.loads((folder / "run.json").read_bytes()).get("suite") or {}
         lines = ndjson(folder / "results.ndjson") if (folder / "results.ndjson").is_file() else []
-        cases |= {line["caseId"] for line in lines if line.get("parentResultId") is None}
+        cases |= {(suite.get("ref"), suite.get("version"), line["caseId"])
+                  for line in lines if line.get("parentResultId") is None}
     if math.fsum(costs) > limits["maxUsd"]:  # STRM-4 (W4-2): summed exactly, rounded once, then compared
         problems.append(("job", "over-budget"))
     if "cases" in limits and len(cases) > limits["cases"]:

@@ -1,0 +1,8 @@
+{
+  "kind": "matching",
+  "matches": true,
+  "rules": [
+    "PLAN-7"
+  ],
+  "why": "a scripted plan, and a runner that gives scripted"
+}

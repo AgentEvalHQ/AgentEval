@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "1.0",
+  "planId": "plan-job-manifest-without-target-modes",
+  "subject": {
+    "ref": "agent:support/support-triage",
+    "version": "git:3f2a1c",
+    "deployment": "deployment:support/support-triage@dev"
+  },
+  "suites": [
+    {
+      "ref": "suite:support/triage-scenarios",
+      "version": "4",
+      "lane": "quality"
+    }
+  ],
+  "limits": {
+    "maxUsd": 5.0
+  },
+  "contentCapture": "off",
+  "targetMode": "scripted",
+  "isolation": "process",
+  "provider": "local"
+}

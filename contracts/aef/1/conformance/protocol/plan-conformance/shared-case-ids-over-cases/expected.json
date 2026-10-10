@@ -1,0 +1,18 @@
+{
+  "kind": "plan-conformance",
+  "events": "events.ndjson",
+  "plan": "plan.json",
+  "runs": "runs",
+  "problems": [
+    [
+      "job",
+      "over-cases"
+    ]
+  ],
+  "rules": [
+    "STRM-4",
+    "PLAN-2",
+    "PLAN-8"
+  ],
+  "why": "two suites that share the case ids case-17 and case-18: a case is its suite with its id, so the job has four cases, above the plan's three (counted by caseId alone it would have two)"
+}

@@ -1,0 +1,43 @@
+{
+  "kind": "job",
+  "plan": "plan.json",
+  "runner": "../runner.json",
+  "target": "target.json",
+  "at": "2026-10-09T09:00:00Z",
+  "terminal": "job.failed",
+  "limit": "timeout",
+  "runs": [
+    {
+      "suite": {
+        "ref": "suite:support/escalation-paths",
+        "version": "7"
+      },
+      "status": "aborted",
+      "cases": [
+        [
+          "path-1",
+          "passed"
+        ],
+        [
+          "path-2",
+          "passed"
+        ]
+      ]
+    }
+  ],
+  "spentUsd": 0.5,
+  "estimated": {
+    "cases": 6,
+    "usdLow": 1.5,
+    "usdHigh": 1.5
+  },
+  "endsAt": "2026-10-09T09:00:41Z",
+  "rules": [
+    "PLAN-9",
+    "PLAN-10",
+    "STRM-1",
+    "STRM-3",
+    "RUN-5"
+  ],
+  "why": "a one-minute timeout: two 20-second cases fit; a third, with the second needed to close and seal its run, would end after it (40 + 20 + 1 > 60), so the runner seals the first run as aborted and ends with job.failed naming timeout, 41 seconds in"
+}

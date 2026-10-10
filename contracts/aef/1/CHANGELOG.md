@@ -1,5 +1,65 @@
 # AEF 1.0 changelog
 
+## Unreleased (draft): rework after critic round 7
+
+Critic round 7 scored 9.3 of 10 (from 9.1): eleven dimensions at 9.3 to 9.6; what keeps 1.0 back is the patent
+commitment and a first green CI run. Changes since:
+
+- **Limits a live runner can follow** ([PLAN-9]): a runner checks each limit against what the next case *could*
+  take: the spend plus the case's cost bound, the time plus its time bound and the time it keeps for closing and
+  sealing. The bounds are the runner's own; a runner that cannot bound a case's cost takes no plan, one that cannot
+  enforce a deadline takes none with a `timeout`; `plan.estimated`'s `usdHigh` is the sum of the bounds. Before, "the
+  first limit the case would pass" could be read two ways for a case whose cost is known only afterwards.
+- **Every credential resolved** ([PLAN-3]), whatever the target needs; a credential of scheme `env` resolves when its
+  variable is set. The reference runner no longer exempts its scripted target.
+- **A case keeps its suite's id** ([PLAN-8]): a runner never rewrites case ids, so a case has one id in every run of
+  its suite, whatever plan it runs in, and comparison lanes pair it ([LANE-7]); [STRM-4] `over-cases` counts a case
+  with its suite (`ref`, `version`, `caseId`); a plan that names one suite twice, or a suite the runner cannot
+  resolve, is refused. `case.completed` **SHOULD** name its run (`runId`).
+- **A runner manifest names its target modes** ([PLAN-6], [PLAN-7]): optional `targetModes` (absent: `live` only),
+  part of "can take", so matching answers for a scripted plan and a scheduler can route one.
+- **[PLAN-10] is a MUST**: two runners given one plan derive the same `subject.kind` and `deployment.ref`.
+- **The Runner class has vectors a second runner can pass** (§9.1, §9.2.1, §9.3): `job` vectors
+  (`conformance/jobs/`, 19) run a plan against a *scripted target*, a test fixture with fixed answers, costs, bounds
+  and durations, on a fixed clock, through a new operation `job PLAN RUNNER TARGET OUT --at T`; the judge checks the
+  stream and the runs with [STRM-3], [STRM-4] and the run verifier, the cases and states run, the spend, the
+  estimate, the end time, and that no credential value or path is written. They include a case whose cost fits but
+  whose bound does not, the same for time, spend exactly at the budget by bounds, credentials set, unset and of
+  schemes the runner cannot resolve, a missing suite, two suites sharing case ids, and a manifest without target
+  modes. `runner-examples/` became these vectors; `tools/check_runner.py` keeps the sweep of the corpus plans, the
+  system clock and usage errors.
+- **A second runner, and what it found** (R7R-1 to R7R-10). AgentEval.Results' scripted runner, written from the
+  text alone, passes every `job` vector, so two implementations pass the Runner class's vectors and the class is no
+  longer released *at risk* (§9.1 says what no vector reaches: live targets). Ruled from its findings:
+  - the budget is checked as [STRM-3] and [STRM-4] will compute it: the job's spend and the sum of the runs' costs,
+    each rounded once, with the case's bound added to its run; the two sums can differ in the last bit, so "a runner
+    that keeps to its bounds never passes a limit" was false under either alone ([PLAN-9]);
+  - a run of a suite that serves a lane names the lane on its lines and gives it in its summary, so a checkpoint lane
+    can read it ([PLAN-8], [SUM-3], [LANE-2]); a run carries the plan's suite `digest` and no other ([PLAN-8]);
+  - no run is opened for a suite a limit stops before its first case ([PLAN-9]); a credential's `path` is never
+    written, and an empty `env` variable does not resolve ([PLAN-3]);
+  - the scripted target fixes each case's `severity`, the run's end before closing, `process` isolation only, and
+    its own shape (an unknown member is an input error) (§9.2.1).
+- **CKP-7 says one thing** (§5.3): a list of four. Only a later minor's values are `unverifiable`; a 1.0 manifest
+  checked as decided without a decision, or without its input, is a `decision` problem. The rulings R6N-1 and R6N-2
+  are revised: their vectors now expect `decision`; added a 1.0 manifest with an unknown outcome and no decision, and
+  its 1.1 twin.
+- **Self-check**: runner mutations (cost bound, time bound, case-id prefixes, credentials, a suite twice), RUN-3's
+  `overlays` boundary, and `over-cases` by id alone; each is caught.
+- **Editorial**: OT-8 and IN-11 are defined by a Run verifier (§4.5), the reference tool named as one; §9.3 `produce`
+  says what its judge accepts (`contentCapture: on` added when the scenario has none); §9.1's opening on runners;
+  IMPLEMENTATIONS.md says CI's first run is pending.
+- **Interop: both directions of both mappings have two converters.** AgentEval.Results.Adapters now converts AEF
+  to and from Inspect eval logs as well as OpenTelemetry, written from the page alone, and reproduces every checked
+  example. What it found (R7I-1 to R7I-17) is ruled into inspect.md (settled 10-10): values, not bytes; a run that
+  keeps no content exports no explanation (IN-13), as OT-3; a blob that is not UTF-8 refuses the export, a withheld
+  one is left out (IN-12), as OT-9; only the records a sample's lines cite are read or refused; a ref's name is
+  decoded on export; equal root times count as one; a reducer with no AEF value is refused only with more than one
+  epoch; `judges[]` holds judge roles only; and the header details (`config`, `epochs_reducer`, usage, durations,
+  limits, cut messages). Two example folders pin them (`aef-inspect-edges`, `inspect-aef-edges`).
+- **Media types** (in-toto.md, I8): a DSSE `payloadType` needs no registration, so SIG-1's checkpoint type stands as
+  it is; as media types the `vnd.agenteval.aef.*` names are proposed, and their IANA registration is drafted.
+
 ## Unreleased (draft): rework after critic round 6
 
 Critic round 6 scored 9.1 of 10 (from 8.8): what blocks 1.0 is the patent commitment and an editorial pass, not the
@@ -22,7 +82,7 @@ design; the two implementations agreed on every crafted input. Changes since:
 - **A minimal reference runner** (§9.1, spec 06): `tools/aef_runner.py` takes a plan only when [PLAN-7] says it does,
   runs its suites against a built-in scripted target, stops at `maxUsd`, `cases` or `timeout` with `job.failed`, and
   writes the event stream and one sealed run per suite with its `provenance` ([RUN-12]); `--at` fixes the clock.
-  `tools/check_runner.py` runs it on `runner-examples/` (several cases, a budget and a timeout that stop the job) and
+  `tools/check_runner.py` runs it on `runner-examples/` (since round 7, the `job` vectors; several cases, a budget and a timeout that stop the job) and
   the protocol corpus's plans and matching pairs, and checks the output with the independent tools: [STRM-3] and
   [STRM-4] find nothing (its plans ask for `scripted`, below), every run is intact, and the same inputs give the same
   bytes. The Runner class now has one implementation; it stays *at risk* until a second, independent runner passes.

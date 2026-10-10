@@ -1,0 +1,1 @@
+{"schemaVersion":"1.0","resultId":"r_99b0f2a903d1ed956a5a4d11892e2f4a","caseId":"c1","path":"a","evaluator":{"id":"check:a"},"state":"scored","scores":[{"metric":"q","value":0.5}],"reasoning":{"blob":"sha256:486f1683a5d895c7a40a8d6e1abe16f947b0de2c009734442207f3ba8b7d0df3","bytes":25}}

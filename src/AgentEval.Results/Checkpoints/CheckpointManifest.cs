@@ -28,9 +28,10 @@ public static class CheckpointManifest
     /// of its runs' run hashes), <c>lanes</c> (the input does not decide exactly the manifest's lanes), <c>outcome</c>
     /// (not the decision's), <c>version</c> (the input is for another version). Or only <c>unverifiable</c>: the manifest
     /// declares a later minor ([VER-6]) and holds a state, an outcome or a lane status this version does not know, whatever
-    /// else it holds; or it is checked as decided (<see cref="IsDecided"/>) and records an outcome other than
-    /// <c>aborted</c> without a decision, or a decision without its input: nothing can be recomputed, and that is not
-    /// tampering. Empty for a manifest not checked as decided, or aborted.
+    /// else it holds; or it declares a later minor, is checked as decided (<see cref="IsDecided"/>) and records an outcome
+    /// other than <c>aborted</c> without a decision, or a decision without its input: nothing can be recomputed, and that
+    /// is not tampering. Such a manifest that declares this version or an earlier one is only <c>decision</c>: its input
+    /// cannot be decided. Empty for a manifest not checked as decided, or aborted.
     /// </summary>
     /// <remarks>
     /// [CKP-7] (round 6): a manifest that declares this version, or an earlier one, is checked as usual whatever it holds.
@@ -38,7 +39,8 @@ public static class CheckpointManifest
     /// in its decision, is whatever the comparison finds (<c>outcome</c>, <c>decision</c>); and one in a state this version
     /// does not know that records an outcome or a decision is checked as decided, so a 1.0 manifest cannot escape the
     /// checks with a state nobody defined. Such a manifest may lack what the schema requires only of <c>decided</c> with
-    /// a known outcome: a decision, or the decision's input; it is then <c>unverifiable</c> (Q4-39 R6N-1, R6N-2, ruled 10-09).
+    /// a known outcome: a decision, or the decision's input; it is then a <c>decision</c> problem, since only a later
+    /// minor's values are <c>unverifiable</c> (Q4-39 R6N-1, R6N-2, revised by R7-4, ruled 10-09).
     /// </remarks>
     public static IReadOnlyList<string> Verify(JsonNode manifest)
     {
@@ -62,9 +64,11 @@ public static class CheckpointManifest
         }
 
         // Checked as decided, with an outcome but no decision, or a decision without its input: nothing can be recomputed.
+        // A later minor's is unverifiable (it may be one that minor allows); in a manifest that declares this version or an
+        // earlier one, the input cannot be decided: a decision problem ([CKP-7] item 2, round 7, R7-4).
         if (decision is null || input is null)
         {
-            return ["unverifiable"];
+            return [AefVersion.DeclaresLaterMinor(manifest["schemaVersion"]) ? "unverifiable" : "decision"];
         }
 
         var problems = new SortedSet<string>(StringComparer.Ordinal);

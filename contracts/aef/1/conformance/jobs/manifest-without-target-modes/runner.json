@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "1.0",
+  "runnerId": "runner-scripted-01",
+  "identity": {
+    "workloadId": "conformance:job-vectors"
+  },
+  "kind": "local",
+  "os": "linux",
+  "runtime": {
+    "name": "any",
+    "version": "1"
+  },
+  "providers": [
+    "local"
+  ],
+  "tags": [
+    "os:linux",
+    "target:scripted"
+  ],
+  "gpu": false,
+  "version": "1.0.0"
+}
