@@ -15,7 +15,7 @@ Python 3.12 (tested on Windows and Linux), standard library only. Run each as `p
 | `check_runner.py` | Runs `aef_runner.py` where the `job` vectors do not reach, and judges each job with their judge (`aef_conformance.py`, §9.3): the plans of the protocol corpus (as copies the runner can run: asking for `scripted`, without `keychain` or `vault` credentials) and its matching pairs, against a scripted target of their suites, where the runner must take exactly the plans `aef_stream.py`'s matching and the suites allow, with byte-identical output for the same inputs and `--at`; one job on the system clock; and the usage and input errors (exit 2, nothing written), with `aef_verify.py stream` and `conform` given a plan the reader refuses. | runs on the files |
 | `aef_schema.py` | A JSON Schema 2020-12 validator with the pattern semantics AEF requires ([ENC-14], [ENC-15]). | `--self-test` (compares with the `jsonschema` package when it is installed) |
 | `aef_crypto.py` | DSSE, ECDSA P-256 and Ed25519, key ids. | `--self-test` |
-| `check_spec.py` | Checks that the spec, the schemas and the corpus agree: rule ids, problem codes, field names. | runs on the files |
+| `check_spec.py` | Checks that the spec, the schemas and the corpus agree: rule ids, problem codes, field names; that the spec's tables keep their rows; and that no published page cites a review id, which only the editors' notes resolve. | runs on the files |
 | `schema_diff.py` | Fails on a schema change a minor version may not make ([VER-5], [CONF-5]). | `--self-test` |
 
 ## Interop (informative)

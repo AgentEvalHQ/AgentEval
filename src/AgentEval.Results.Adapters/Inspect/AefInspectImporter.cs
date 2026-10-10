@@ -225,6 +225,7 @@ public static partial class AefInspectImporter
         }
         catch (FormatException e)
         {
+            // Not I-JSON (R9-2), Infinity, a bare NaN where a member name stands (R10-3), or any other syntax error.
             throw new AefInspectImportException($"{logFile}: {e.Message}: the log is refused as it is read (IN-6).");
         }
 
@@ -295,15 +296,12 @@ public static partial class AefInspectImporter
                 case null:
                     return;
                 case var _ when content.Contains(at):
+                    // Content may hold a NaN value: IN-8 refuses it when the content is written. A bare NaN as a member
+                    // name, there as anywhere, was refused by the parser (not JSON).
                     return;
                 case JsonObject obj:
                     foreach (var (name, child) in obj)
                     {
-                        if (name == InspectJson.NaNMarker)
-                        {
-                            throw new AefInspectImportException($"{logFile}: {path} has a member named NaN, which is no JSON (IN-6).");
-                        }
-
                         Walk(child, $"{path}.{name}");
                     }
 
@@ -419,7 +417,7 @@ public static partial class AefInspectImporter
         var taskVersion = eval["task_version"] switch
         {
             null => "0",   // Inspect's default
-            JsonValue v when v.GetValueKind() == JsonValueKind.String && !InspectJson.IsNonFinite(v) => v.GetValue<string>(),
+            JsonValue v when v.GetValueKind() == JsonValueKind.String && !InspectJson.IsNaN(v) => v.GetValue<string>(),
             JsonValue v when v.GetValueKind() == JsonValueKind.Number => SafeInteger(v)   // an integer of at most 2^53 − 1, in decimal digits (R9-2)
                 ?? throw Refuse("IN-6", $"The log's task_version {v.ToJsonString()} is a number that is no integer of at most 2^53 − 1 in magnitude (R9-2)"),
             _ => throw Refuse("IN-6", "The log's task_version is neither a number nor a string"),
@@ -445,13 +443,9 @@ public static partial class AefInspectImporter
             }
         }
 
-        // ---- epochs and the reducer (IN-8)
+        // ---- epochs (an integer from 1 to 1000, IN-6, "Integers") and the reducer (IN-8)
         var config = eval["config"] as JsonObject;
-        var epochsGiven = Integer(config?["epochs"], "eval.config.epochs", "IN-8");
-        if (epochsGiven is < 1)
-        {
-            throw Refuse("IN-8", "eval.config.epochs is below 1.");
-        }
+        var epochsGiven = Integer(config?["epochs"], "eval.config.epochs", "IN-6", min: 1, max: 1000);
 
         var epochs = epochsGiven ?? 1;
         (AefTrialAggregation Aggregation, long? K)? runAggregation = null;
@@ -517,12 +511,7 @@ public static partial class AefInspectImporter
             }
 
             var caseId = CaseId(sample["id"], $"{where}.id");
-            var epoch = Integer(sample["epoch"], $"{where}.epoch", "IN-8") ?? 1;
-            if (epoch < 1)
-            {
-                throw Refuse("IN-8", $"{where}: epoch {epoch} is below 1.");
-            }
-
+            var epoch = Integer(sample["epoch"], $"{where}.epoch", "IN-8", min: 1) ?? 1;   // 1 to epochs ("Integers")
             if (epoch > epochs)
             {
                 throw new AefInspectImportException($"{where}: epoch {epoch} is beyond eval.config.epochs ({epochs}) (IN-8).");
@@ -546,7 +535,7 @@ public static partial class AefInspectImporter
                 errorReason = (error as JsonObject ?? throw Refuse("IN-8", $"{where}.error is {error.ToJsonString()}, not an object as Inspect writes one (R9-2)"))["message"] switch
                 {
                     null => NoMessage,
-                    JsonValue said when said.GetValueKind() == JsonValueKind.String && !InspectJson.IsNonFinite(said) => said.GetValue<string>() is { Length: > 0 } message ? Cut(message) : NoMessage,
+                    JsonValue said when said.GetValueKind() == JsonValueKind.String && !InspectJson.IsNaN(said) => said.GetValue<string>() is { Length: > 0 } message ? Cut(message) : NoMessage,
                     _ => throw Refuse("IN-8", $"{where}.error.message is not text (R9-2)"),
                 };
             }
@@ -773,10 +762,6 @@ public static partial class AefInspectImporter
             state = reason is not null && BlameTheInstrument.Contains(reason) ? AefState.Error : AefState.NotMeasured;
             reason ??= NoReason;
         }
-        else if (InspectJson.IsNonFinite(value))
-        {
-            throw Refuse("IN-7", $"{where}: the value is an infinity, and AEF numbers are finite ([ENC-3]).");
-        }
         else
         {
             switch (value)
@@ -811,10 +796,10 @@ public static partial class AefInspectImporter
 
                         scores.Add(item switch
                         {
-                            JsonValue n when n.GetValueKind() == JsonValueKind.Number && !InspectJson.IsNonFinite(n) => new AefScore { Metric = member, Value = n.GetValue<double>() },
+                            JsonValue n when n.GetValueKind() == JsonValueKind.Number && !InspectJson.IsNaN(n) => new AefScore { Metric = member, Value = n.GetValue<double>() },
                             JsonValue s when s.GetValueKind() == JsonValueKind.String && Letters.TryGetValue(s.GetValue<string>(), out var r) =>
                                 new AefScore { Metric = member, Value = r.Value, Label = s.GetValue<string>() },
-                            JsonValue s when s.GetValueKind() == JsonValueKind.String && !InspectJson.IsNonFinite(s) =>
+                            JsonValue s when s.GetValueKind() == JsonValueKind.String && !InspectJson.IsNaN(s) =>
                                 throw new AefInspectImportException($"{where}: the member {member} is '{s.GetValue<string>()}', a string other than C, I, P and N (IN-7)."),
                             JsonValue b when b.GetValueKind() is JsonValueKind.True or JsonValueKind.False =>
                                 throw new AefInspectImportException($"{where}: the member {member} is a boolean (IN-7)."),
@@ -934,12 +919,12 @@ public static partial class AefInspectImporter
             agent |= aefRole == AefUsageRole.Agent;
             var roleModel = role == "agent" ? evalModel : roles.FirstOrDefault(r => r.Role == role).Model;
             var model = roleModel is not null && modelUsage?.ContainsKey(roleModel) == true ? roleModel : null;
-            entries.Add(UsageOf(usage as JsonObject, aefRole, model, $"{where}.role_usage.{role}"));
+            entries.Add(UsageOf(usage as JsonObject, aefRole, model, $"{where}.role_usage.{role}", "IN-8"));
         }
 
         if (!agent && modelUsage?[evalModel] is JsonObject own)
         {
-            entries.Add(UsageOf(own, AefUsageRole.Agent, evalModel, $"{where}.model_usage"));
+            entries.Add(UsageOf(own, AefUsageRole.Agent, evalModel, $"{where}.model_usage", "IN-8"));
         }
 
         return Merge(entries);
@@ -958,7 +943,7 @@ public static partial class AefInspectImporter
                 var role = model == evalModel ? AefUsageRole.Agent
                     : roles.FirstOrDefault(r => r.Model == model) is { Role: { } named } ? Role(named, roles)
                     : AefUsageRole.Other;
-                entries.Add(UsageOf(usage as JsonObject, role, model, $"stats.model_usage.{model}"));
+                entries.Add(UsageOf(usage as JsonObject, role, model, $"stats.model_usage.{model}", "IN-9"));
             }
         }
         else
@@ -966,7 +951,7 @@ public static partial class AefInspectImporter
             // Only without model_usage: one entry per role_usage role, without a model (R7I-10).
             foreach (var (role, usage) in stats?["role_usage"] as JsonObject ?? new JsonObject())
             {
-                entries.Add(UsageOf(usage as JsonObject, Role(role, roles), null, $"stats.role_usage.{role}"));
+                entries.Add(UsageOf(usage as JsonObject, Role(role, roles), null, $"stats.role_usage.{role}", "IN-9"));
             }
         }
 
@@ -982,24 +967,27 @@ public static partial class AefInspectImporter
         _ => AefUsageRole.Other,
     };
 
-    // A ModelUsage as an AEF usage entry: tokens under gen_ai.usage.* names, total_cost as costUsd; total_tokens is not kept.
-    private static AefUsage UsageOf(JsonObject? usage, AefUsageRole role, string? model, string where)
+    // A ModelUsage as an AEF usage entry: tokens under gen_ai.usage.* names, total_cost as costUsd; total_tokens is read
+    // and not kept. Every token count is an integer of at least 0 ("Integers"): a sample's under IN-8, the run's under IN-9.
+    private static AefUsage UsageOf(JsonObject? usage, AefUsageRole role, string? model, string where, string rule)
     {
         if (usage is null)
         {
-            throw Refuse("IN-8", $"{where} is not a ModelUsage object.");
+            throw Refuse(rule, $"{where} is not a ModelUsage object.");
         }
 
+        long? Tokens(string name) => Integer(usage[name], $"{where}.{name}", rule, min: 0);
+        Tokens("total_tokens");
         return new AefUsage
         {
             Role = role,
             Model = model,
-            InputTokens = Integer(usage["input_tokens"], $"{where}.input_tokens", "IN-8"),
-            OutputTokens = Integer(usage["output_tokens"], $"{where}.output_tokens", "IN-8"),
-            CacheReadInputTokens = Integer(usage["input_tokens_cache_read"], $"{where}.input_tokens_cache_read", "IN-8"),
-            CacheWriteInputTokens = Integer(usage["input_tokens_cache_write"], $"{where}.input_tokens_cache_write", "IN-8"),
-            ReasoningOutputTokens = Integer(usage["reasoning_tokens"], $"{where}.reasoning_tokens", "IN-8"),
-            CostUsd = usage["total_cost"] is JsonValue cost && cost.GetValueKind() == JsonValueKind.Number ? cost.GetValue<double>() : null,
+            InputTokens = Tokens("input_tokens"),
+            OutputTokens = Tokens("output_tokens"),
+            CacheReadInputTokens = Tokens("input_tokens_cache_read"),
+            CacheWriteInputTokens = Tokens("input_tokens_cache_write"),
+            ReasoningOutputTokens = Tokens("reasoning_tokens"),
+            CostUsd = usage["total_cost"] is JsonValue cost && !InspectJson.IsNaN(cost) && cost.GetValueKind() == JsonValueKind.Number ? cost.GetValue<double>() : null,
         };
     }
 
@@ -1051,7 +1039,7 @@ public static partial class AefInspectImporter
                 throw new AefInspectImportException($"{where} ({name}) has both accuracy and mean, and a summary entry has one mean (IN-9).");
             }
 
-            var stderr = all.FirstOrDefault(m => m.Name == "stderr").Metric?["value"] is JsonValue se && se.GetValueKind() == JsonValueKind.Number && !InspectJson.IsNonFinite(se)
+            var stderr = all.FirstOrDefault(m => m.Name == "stderr").Metric?["value"] is JsonValue se && se.GetValueKind() == JsonValueKind.Number && !InspectJson.IsNaN(se)
                 ? se.GetValue<double>()
                 : (double?)null;
             var rest = all.Where(m => m.Name is not ("accuracy" or "mean" or "stderr")).ToList();
@@ -1084,14 +1072,14 @@ public static partial class AefInspectImporter
                     throw new AefInspectImportException($"{where} ({name}): its metric {method} cannot be an aggregate method (a lower-case letter, then lower-case letters, digits and @ . _ -, at most 64) (IN-9).");
                 }
 
-                aggregate = new AefAggregate(method, Integer(At(metric["params"], "k"), $"{where}.metrics.{method}.params.k", "IN-9"));
+                aggregate = new AefAggregate(method, Integer(At(metric["params"], "k"), $"{where}.metrics.{method}.params.k", "IN-9", min: 1));
                 if (method is "median" or "min" or "max")
                 {
                     Check(metric["value"], figures.Count == 0 ? null : Aggregate(method, figures), name, method, where);
                 }
                 else if (figures.Count > 0)
                 {
-                    producerValue = metric["value"] is JsonValue pv && pv.GetValueKind() == JsonValueKind.Number && !InspectJson.IsNonFinite(pv)
+                    producerValue = metric["value"] is JsonValue pv && pv.GetValueKind() == JsonValueKind.Number && !InspectJson.IsNaN(pv)
                         ? pv.GetValue<double>()
                         : throw Refuse("IN-9", $"{where} ({name}): its metric {method} has no finite value, and its lines are measured ([SUM-8]).");
                 }
@@ -1233,7 +1221,7 @@ public static partial class AefInspectImporter
     {
         var text = id switch
         {
-            JsonValue v when v.GetValueKind() == JsonValueKind.String && !InspectJson.IsNonFinite(v) => v.GetValue<string>(),
+            JsonValue v when v.GetValueKind() == JsonValueKind.String && !InspectJson.IsNaN(v) => v.GetValue<string>(),
             JsonValue v when v.GetValueKind() == JsonValueKind.Number => SafeInteger(v)
                 ?? throw Refuse("IN-8", $"{where} is {v.ToJsonString()}, a number that is no integer of at most 2^53 − 1 in magnitude, so it gives no caseId (R9-2)"),
             _ => throw Refuse("IN-8", $"{where} is neither an integer nor a string"),
@@ -1248,7 +1236,7 @@ public static partial class AefInspectImporter
     // when empty. Content JCS cannot write (NaN, an unpaired surrogate) is refused (IN-8).
     private static byte[]? Content(JsonNode? value, string member, string where)
     {
-        if (InspectJson.IsNonFinite(value))
+        if (InspectJson.IsNaN(value))
         {
             throw new AefInspectImportException($"{where}.{member} is NaN, which JCS cannot write: content that is not text holding NaN is refused (IN-8).");
         }
@@ -1286,23 +1274,30 @@ public static partial class AefInspectImporter
         }
     }
 
-    // An integer of the log, read as its binary64 value ([ENC-4]: 2 and 2.0 alike), of at most 2^53 − 1 in magnitude.
-    private static long? Integer(JsonNode? node, string where, string rule)
+    // An integer of the log ("Integers", settled 10-10): read by its binary64 value alone ([ENC-4]: 2, 2.0 and 2e0 alike),
+    // of at most 2^53 − 1 in magnitude and within the field's range; anything else refused, naming the field's rule.
+    private static long? Integer(JsonNode? node, string where, string rule, long min = long.MinValue, long max = long.MaxValue)
     {
         if (node is null)
         {
             return null;
         }
 
-        return node is JsonValue v && v.GetValueKind() == JsonValueKind.Number && SafeInteger(v) is { } text
-            ? long.Parse(text, CultureInfo.InvariantCulture)
-            : throw Refuse(rule, $"{where} is not an integer of at most 2^53 − 1 in magnitude");
+        if (InspectJson.IsNaN(node) || node is not JsonValue v || v.GetValueKind() != JsonValueKind.Number || SafeInteger(v) is not { } text)
+        {
+            throw Refuse(rule, $"{where} is not an integer of at most 2^53 − 1 in magnitude");
+        }
+
+        var value = long.Parse(text, CultureInfo.InvariantCulture);
+        return value >= min && value <= max
+            ? value
+            : throw Refuse(rule, $"{where} is {value.ToString(CultureInfo.InvariantCulture)}, outside {(max == long.MaxValue ? $"its range (at least {min.ToString(CultureInfo.InvariantCulture)})" : $"{min.ToString(CultureInfo.InvariantCulture)} to {max.ToString(CultureInfo.InvariantCulture)}")}");
     }
 
     // A value of the log copied into AEF: AEF numbers are finite ([ENC-3]).
     private static JsonNode? Copy(JsonNode? node, string where)
     {
-        if (InspectJson.HoldsNonFinite(node))
+        if (InspectJson.HoldsNaN(node))
         {
             throw Refuse("IN-7", $"{where} holds NaN or an infinity, and AEF numbers are finite ([ENC-3]).");
         }
@@ -1311,7 +1306,7 @@ public static partial class AefInspectImporter
     }
 
     private static string? Text(JsonNode? node) =>
-        node is JsonValue v && v.GetValueKind() == JsonValueKind.String && !InspectJson.IsNonFinite(v) ? v.GetValue<string>() : null;
+        node is JsonValue v && v.GetValueKind() == JsonValueKind.String && !InspectJson.IsNaN(v) ? v.GetValue<string>() : null;
 
     private static IEnumerable<JsonObject> Objects(JsonNode? node) => node is JsonArray array ? array.OfType<JsonObject>() : [];
 }

@@ -10,6 +10,7 @@ Usage: python contracts/aef/tools/lane_vectors.py   (after build_conformance.py)
 """
 import hashlib
 import json
+import math
 import shutil
 import sys
 from pathlib import Path
@@ -47,7 +48,9 @@ def summarize(lines, lane, entries, kinds):
                 if v is not None:
                     values.append(v)
         n = len(values)
-        s = sum(values)
+        # SUM-5: the sum computed exactly and rounded once (fsum; integers stay integers), and the value that binary64
+        # sum divided by n, in one binary64 division
+        s = sum(values) if all(isinstance(v, int) for v in values) else math.fsum(values)
         value = None if n == 0 else s if kinds[metric] == "count" else s / n
         metrics.append({"metric": metric, "path": path, "n": n, "N": total, "notMeasured": total - n, "value": value,
                         "verdict": "not_measured" if n == 0 else "passed", "rule": "recorded by the producer",

@@ -18,3 +18,4 @@
 {"schemaVersion":"1.0","resultId":"r_759bce17361c9e99ca5f5bb6afccc5bb","caseId":"1000","path":"q","evaluator":{"id":"q"},"state":"scored","scores":[{"metric":"q","value":0.2}]}
 {"schemaVersion":"1.0","resultId":"r_ede0f9168ec6eb94d969ce98fd5143c7","caseId":"k","path":"q","evaluator":{"id":"q"},"state":"error","reason":"Inspect recorded an error without a message"}
 {"schemaVersion":"1.0","resultId":"r_2725477e2afb95a9614a4cb036af2434","caseId":"k","path":"m","evaluator":{"id":"m"},"state":"error","reason":"Inspect recorded an error without a message"}
+{"schemaVersion":"1.0","resultId":"r_e7f3c54699daaa045fb3e1baa640d508","caseId":"l","path":"q","evaluator":{"id":"q"},"state":"scored","scores":[{"metric":"q","value":0.3}],"usage":[{"role":"judge","model":"acme/judge","gen_ai.usage.input_tokens":7,"gen_ai.usage.output_tokens":1}]}

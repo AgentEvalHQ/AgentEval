@@ -214,7 +214,7 @@ links skips it and says so). The corpus's expected results come from neither: th
 written by hand, or by generators that implement only the rule they write, and cross-checked by a second
 implementation ([§9.2](spec/09-conformance.md#92-the-corpus)). The same holds for the Runner class and both interop
 mappings: a second runner and a second converter for each mapping, each written from the text, found what the first
-had left to the code (the R7R and R7I findings in the changelog).
+had left to the code, and the text was ruled the same way ([changelog](CHANGELOG.md)).
 
 ## FAQ
 

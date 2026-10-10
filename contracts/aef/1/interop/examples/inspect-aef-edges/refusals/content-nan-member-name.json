@@ -69,7 +69,7 @@
   },
   "samples": [
     {
-      "id": 9007199254740993,
+      "id": "a",
       "epoch": 1,
       "input": "",
       "target": "",
@@ -193,12 +193,7 @@
             }
           }
         ],
-        "metadata": {
-          "ｚ": 1,
-          "😀": 2.5,
-          "z": true,
-          "é": null
-        }
+        "metadata": {NaN: 1}
       },
       "messages": [
         {

@@ -196,15 +196,10 @@ public sealed class AefInspectImporterTests : IDisposable
     [InlineData("no-end", "IN-6")]
     [InlineData("end-before-start", "IN-6")]
     [InlineData("error-without-message", "IN-6")]
-    [InlineData("infinity", "IN-6")]
-    [InlineData("minus-infinity", "IN-6")]
     public void TheHeader_IsRefused_WhenThePageRefusesIt(string what, string rule)
     {
         Action<JsonObject> edit = what switch
         {
-            // A log holding Infinity anywhere is refused as it is read: no AEF number holds one ([ENC-3]).
-            "infinity" => log => log["samples"]![0]!["metadata"] = new JsonObject { ["budget"] = InspectJson.InfinityMarker },
-            "minus-infinity" => log => log["eval"]!["metadata"] = new JsonObject { ["floor"] = InspectJson.MinusInfinityMarker },
             "eval-id" => log => log["eval"]!["eval_id"] = "not an id!",
             "no-end" => log => log["stats"]!.AsObject().Remove("completed_at"),
             "end-before-start" => log => log["stats"]!["completed_at"] = "2026-10-06T11:59:00+02:00",
@@ -453,6 +448,23 @@ public sealed class AefInspectImporterTests : IDisposable
     [InlineData("eval-metadata", "NaN", "IN-6")]                        // NaN where no unscored value can be
     [InlineData("score-metadata", "NaN", "IN-6")]
     [InlineData("eval-metadata", "-Infinity", "IN-6")]
+    [InlineData("score-metadata", "Infinity", "IN-6")]
+    [InlineData("content-key", "NaN", "IN-6")]                          // R10-3: a bare NaN as a member name is no JSON
+    [InlineData("content-key-off", "NaN", "IN-6")]                      // n04: in content not written too
+    [InlineData("score-metadata-key", "NaN", "IN-6")]
+    [InlineData("score-marker-string", "\"\\u0000NaN\\u0000\"", "IN-7")]   // n01: a string, never a NaN
+    [InlineData("list-score", "[1, NaN]", "IN-6")]                      // n05: a NaN in a list is no unscored value
+    [InlineData("epochs", "1.5", "IN-6")]                               // "Integers": epochs 1 to 1000
+    [InlineData("epochs", "0", "IN-6")]
+    [InlineData("epochs", "1001", "IN-6")]
+    [InlineData("epoch", "0", "IN-8")]                                  // an epoch 1 to epochs
+    [InlineData("epoch", "1.5", "IN-8")]
+    [InlineData("sample-tokens", "-1", "IN-8")]                         // a sample's tokens, at least 0
+    [InlineData("sample-tokens", "7.5", "IN-8")]
+    [InlineData("run-tokens", "-1", "IN-9")]                            // the run's tokens
+    [InlineData("run-tokens", "1e16", "IN-9")]                          // beyond 2^53 − 1
+    [InlineData("k", "1.5", "IN-9")]                                    // k, at least 1
+    [InlineData("k", "0", "IN-9")]
     [InlineData("twice", "\"\\u0073\"", "IN-6")]                        // a member named twice, once escaped
     public void AMalformedLog_IsRefused_NamingItsRule_AndNeverThrows(string where, string raw, string rule)
     {
@@ -476,7 +488,19 @@ public sealed class AefInspectImporterTests : IDisposable
                 case "content": sample["output"] = new JsonObject { ["choices"] = new JsonArray(new JsonObject { ["n"] = "RAW" }) }; break;
                 case "score": sample["scores"]!["s"]!["value"] = "RAW"; break;
                 case "total_time": sample["total_time"] = "RAW"; break;
-                case "content-key": sample["messages"] = new JsonArray(new JsonObject { ["RAWKEY"] = 1 }); break;
+                case "content-key" or "content-key-off": sample["output"] = new JsonObject { ["choices"] = new JsonArray(), ["metadata"] = new JsonObject { ["RAWKEY"] = 1 } }; break;
+                case "score-marker-string": sample["scores"]!["s"]!["value"] = "RAW"; break;
+                case "list-score": sample["scores"]!["s"]!["value"] = "RAW"; break;
+                case "epochs": log["eval"]!["config"]!["epochs"] = "RAW"; break;
+                case "epoch": sample["epoch"] = "RAW"; break;
+                case "sample-tokens": sample["role_usage"] = new JsonObject { ["agent"] = new JsonObject { ["input_tokens"] = "RAW" } }; break;
+                case "run-tokens": log["stats"]!["model_usage"] = new JsonObject { ["openai/m"] = new JsonObject { ["input_tokens"] = "RAW" } }; break;
+                case "k":
+                    log["results"]!["scores"]![0]!["metrics"] = new JsonObject
+                    {
+                        ["pass_at_k"] = new JsonObject { ["name"] = "pass_at_k", ["value"] = 0.5, ["params"] = new JsonObject { ["k"] = "RAW" } },
+                    };
+                    break;
                 case "score-metadata-key": sample["scores"]!["s"]!["metadata"] = new JsonObject { ["RAWKEY"] = 1 }; break;
                 case "eval-metadata-key": log["eval"]!["metadata"] = new JsonObject { ["RAWKEY"] = 1 }; break;
                 case "explanation": sample["scores"]!["s"]!["explanation"] = "RAW"; break;
@@ -491,10 +515,94 @@ public sealed class AefInspectImporterTests : IDisposable
             : raw;
         File.WriteAllText(input, File.ReadAllText(input).Replace("\"RAWKEY\"", text, StringComparison.Ordinal).Replace("\"RAW\"", text, StringComparison.Ordinal), new UTF8Encoding(false));
 
-        var refused = Assert.Throws<AefInspectImportException>(() => AefInspectImporter.Import(input, output, new AefInspectImportOptions { TargetMode = AefTargetMode.Live, TimeProvider = new Clock(At) }));
+        var capture = where.EndsWith("-off", StringComparison.Ordinal) ? AefContentCapture.Off : AefContentCapture.On;
+        var refused = Assert.Throws<AefInspectImportException>(() => AefInspectImporter.Import(input, output, new AefInspectImportOptions { TargetMode = AefTargetMode.Live, ContentCapture = capture, TimeProvider = new Clock(At) }));
 
         Assert.Contains($"({rule})", refused.Message, StringComparison.Ordinal);
         Assert.False(Directory.Exists(output));
+    }
+
+    [Theory]
+    [InlineData("epochs", "1.0")]
+    [InlineData("epoch", "1.0")]
+    [InlineData("sample-tokens", "7.0")]
+    [InlineData("run-tokens", "100.0")]
+    [InlineData("k", "2.0")]
+    public void AnInteger_IsReadByItsValueAlone_HoweverItIsWritten(string where, string raw)
+    {
+        // "Integers" (IN-6, IN-8, IN-9): 7, 7.0 and 7e0 are one integer.
+        var (input, output) = Files(log =>
+        {
+            var sample = log["samples"]![0]!;
+            switch (where)
+            {
+                case "epochs": log["eval"]!["config"]!["epochs"] = "RAW"; break;
+                case "epoch": sample["epoch"] = "RAW"; break;
+                case "sample-tokens": sample["role_usage"] = new JsonObject { ["agent"] = new JsonObject { ["input_tokens"] = "RAW" } }; break;
+                case "run-tokens": log["stats"]!["model_usage"] = new JsonObject { ["openai/m"] = new JsonObject { ["input_tokens"] = "RAW" } }; break;
+                default:
+                    log["results"]!["scores"]![0]!["metrics"] = new JsonObject
+                    {
+                        ["pass_at_k"] = new JsonObject { ["name"] = "pass_at_k", ["value"] = 0.5, ["params"] = new JsonObject { ["k"] = "RAW" } },
+                    };
+                    break;
+            }
+        });
+        File.WriteAllText(input, File.ReadAllText(input).Replace("\"RAW\"", raw, StringComparison.Ordinal), new UTF8Encoding(false));
+
+        AefInspectImporter.Import(input, output, new AefInspectImportOptions { TargetMode = AefTargetMode.Live, TimeProvider = new Clock(At) });
+
+        var run = AefTestRuns.Document(output, "run.json");
+        var line = AefTestRuns.Results(output)[0];
+        var summary = AefTestRuns.Document(output, "summary.json");
+        Assert.Equal(where switch
+        {
+            "epochs" => "1",
+            "epoch" => "1",
+            "sample-tokens" => "7",
+            "run-tokens" => "100",
+            _ => "2",
+        }, where switch
+        {
+            "epochs" => run["suite"]!["executionPolicy"]!["trialsPerCase"]!.ToJsonString(),
+            "epoch" => (AefTestRuns.Results(output).Count).ToString(CultureInfo.InvariantCulture),
+            "sample-tokens" => line["usage"]![0]!["gen_ai.usage.input_tokens"]!.ToJsonString(),
+            "run-tokens" => summary["usage"]![0]!["gen_ai.usage.input_tokens"]!.ToJsonString(),
+            _ => summary["lanes"]![0]!["metrics"]![0]!["aggregate"]!["k"]!.ToJsonString(),
+        });
+    }
+
+    [Theory]
+    [InlineData("eval-metadata")]          // n02
+    [InlineData("explanation")]            // n39
+    [InlineData("model")]                  // n41
+    [InlineData("role-model")]             // n42
+    [InlineData("limit-type")]             // n46
+    [InlineData("content")]                // n03 (with the infinity's spelling)
+    public void TheStringThatOnceStoodForNaN_IsAStringLikeAnyOther(string where)
+    {
+        // R10-3: a NaN is the bare token alone, a node no string of a log can imitate; "\u0000NaN\u0000" is text.
+        const string marker = "\u0000NaN\u0000";
+        var (output, conversion) = Import(log =>
+        {
+            var sample = log["samples"]![0]!;
+            switch (where)
+            {
+                case "eval-metadata": log["eval"]!["metadata"] = new JsonObject { ["x"] = marker }; break;
+                case "explanation": sample["scores"]!["s"]!["explanation"] = marker; break;
+                case "model": log["eval"]!["model"] = marker; break;
+                case "role-model": log["eval"]!["model_roles"] = new JsonObject { ["grader"] = new JsonObject { ["model"] = marker } }; break;
+                case "limit-type":
+                    sample["scores"] = null;
+                    sample["limit"] = new JsonObject { ["type"] = marker, ["limit"] = 1000 };
+                    log["results"]!["scores"]![0]!["metrics"] = new JsonObject();
+                    break;
+                default: sample["output"] = new JsonObject { ["choices"] = new JsonArray(new JsonObject { ["text"] = "\u0000Infinity\u0000" }) }; break;
+            }
+        });
+
+        Assert.NotEqual(AefOutcome.Invalid, conversion.Verification.Outcome);
+        Assert.Single(AefTestRuns.Results(output));
     }
 
     [Theory]

@@ -236,9 +236,10 @@ each limit of [ENC-17] at its value or one beyond.
   `tools/aef_produce.py` for the write operations, and `tools/aef_runner.py` for `job`). An
   implementation in another language is driven by it through this command-line contract: one invocation per
   operation, input paths as arguments, one JSON value (UTF-8, no BOM) on standard output, exit status 0 when the
-  operation ran and 2 with a message on standard error for a usage or input error. Problems are `[path, code]` pairs
-  in the order of §3.9, except a checkpoint's [CKP-7] codes, which are codes alone in code order. Times are RFC 3339
-  UTC strings ([ENC-8]).
+  operation ran and 2 with a message on standard error for a usage or input error. An input error is exit 2 and
+  nothing else: any other exit status (1, a crash, a signal) is neither, and fails the vector, whatever it expects.
+  Problems are `[path, code]` pairs in the order of §3.9, except a checkpoint's [CKP-7] codes, which are codes alone
+  in code order. Times are RFC 3339 UTC strings ([ENC-8]).
 
   | Vector kind | Operation | Output |
   |---|---|---|
@@ -272,7 +273,8 @@ each limit of [ENC-17] at its value or one beyond.
   implementation is under test:
   - `summarize`: the output is valid against the writer `summary` schema; `runId`, the lanes and entries in request
     order, `N`, `n`, `notMeasured`, `verdict`, `rule` and `aggregate` are as expected; `sum`, `sumSq` and `value` match
-    the expected values (the exact computation, rounded once) under §3.6's rule, within 1e-9 × max(1, |expected|);
+    the expected values ([SUM-5]: `sum` and `sumSq` computed exactly and rounded once, `value` that `sum` divided by
+    `n`) under §3.6's rule, within 1e-9 × max(1, |expected|);
     and the run, with the output added as its `summary.json`, verifies `unsealed` with no problems.
   - `produce`: the runner gives a fresh `OUT`. It then holds the four files and no other; `run.json` and
     `metrics.json` are the scenario's `run` and `metrics`; every line of `results.ndjson` is valid against the writer
@@ -321,9 +323,10 @@ each limit of [ENC-17] at its value or one beyond.
 
     Ids, reasons, and the members of a result line the runner chooses, are free. Times are judged only by the clock
     of §9.2.1 and by [STRM-3] and [STRM-4]; numbers are compared as binary64 ([CONF-2]).
-  - A vector with `refused: true` passes when the operation is an input error (exit 2); for `seal-write`, the run's
-    folder must also be unchanged, and for `produce` and `job`, `OUT` must hold no file. The `job` vectors hold every
-    input error of its row but one: an `OUT` that is not empty, since the runner always gives a fresh `OUT`.
+  - A vector with `refused: true` passes when the operation is an input error: exit 2, with a message on standard
+    error ([CONF-3]); for `seal-write`, the run's folder must also be unchanged, and for `produce` and `job`, `OUT`
+    must hold no file. The `job` vectors hold every input error of its row but one: an `OUT` that is not empty, since
+    the runner always gives a fresh `OUT`.
 
 ## 9.4 Claiming conformance
 

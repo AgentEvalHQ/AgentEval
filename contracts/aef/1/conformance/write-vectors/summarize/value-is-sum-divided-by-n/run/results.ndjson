@@ -1,0 +1,5 @@
+{"schemaVersion":"1.0","resultId":"r_773a8ede9f5fb9fcf748c9d888bf152c","caseId":"k1","path":"q","evaluator":{"id":"e:q"},"state":"scored","scores":[{"metric":"delta","value":0.3}]}
+{"schemaVersion":"1.0","resultId":"r_f30036dcc0df9c00f483a1f07fa21e7d","caseId":"k2","path":"q","evaluator":{"id":"e:q"},"state":"scored","scores":[{"metric":"delta","value":0.4}]}
+{"schemaVersion":"1.0","resultId":"r_bef9d335623112fd7a004974f4f898e1","caseId":"k3","path":"q","evaluator":{"id":"e:q"},"state":"scored","scores":[{"metric":"delta","value":0.5}]}
+{"schemaVersion":"1.0","resultId":"r_ab1a562fe39334b55de21b66cb4c4948","caseId":"k4","path":"q","evaluator":{"id":"e:q"},"state":"scored","scores":[{"metric":"delta","value":0.4}]}
+{"schemaVersion":"1.0","resultId":"r_992df2d26654736ed0c7dcd8ee968a04","caseId":"k5","path":"q","evaluator":{"id":"e:q"},"state":"scored","scores":[{"metric":"delta","value":0.5}]}

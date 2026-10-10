@@ -157,8 +157,9 @@ on its standard output or to a file the caller names, a remote one over its chan
   child line or repeated trials, runs that start or end exactly at the job's edges, runs a nanosecond outside them,
   judges (none on a plan that names some, some of the plan's, one on a plan that names none, one it does not name,
   the plan's model and rubric under another provider, one model and rubric under two providers, the plan's out of
-  order, one judge more often than the plan names it), and target modes: scripted runs on a plan that asks for `scripted`, a live run on it, a scripted run on a
-  plan that asks for `live`, and a mocked run on one that names no mode).
+  order, one judge more often than the plan names it), and target modes: scripted runs on a plan that asks for
+  `scripted`, a live run on it, a scripted run on a plan that asks for `live`, and a mocked run on one that names no
+  mode).
 - **Not in 1.0:** signed jobs a remote runner pulls from a queue (so it can check who sent a plan). A later minor adds
   them; until then a remote runner authenticates its channel by other means.
 

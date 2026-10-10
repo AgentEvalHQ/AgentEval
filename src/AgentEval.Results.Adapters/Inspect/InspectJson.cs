@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using System.Globalization;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -13,50 +14,51 @@ namespace AgentEval.Results.Adapters.Inspect;
 /// <summary>
 /// JSON as an Inspect eval log holds it (contracts/aef/1/interop/inspect.md, "The target"): a score's unscored value is
 /// the bare token <c>NaN</c>, which is not JSON, and which neither System.Text.Json's reader nor its writer handle. In a tree
-/// read or built here, <c>NaN</c>, <c>Infinity</c> and <c>-Infinity</c> are held as marker strings
-/// (<see cref="NaN"/>), which no Inspect text holds (they start with U+0000), and written back as the bare tokens.
+/// read or built here, a <c>NaN</c> is a node of its own (<see cref="NaN"/>), known by its identity (<see cref="IsNaN"/>):
+/// no string or number of a log can be one (R10-3), and it is written back as the bare token.
 /// </summary>
 internal static class InspectJson
 {
-    /// <summary>The marker of Inspect's NaN in a tree.</summary>
-    public const string NaNMarker = "\u0000NaN\u0000";
+    // The NaN nodes: known by reference, so that no value of a log (a string "\u0000NaN\u0000" included) can pass for one.
+    private static readonly ConditionalWeakTable<JsonNode, object> NaNs = new();
 
-    /// <summary>The marker of Inspect's <c>Infinity</c> in a tree.</summary>
-    public const string InfinityMarker = "\u0000Infinity\u0000";
-
-    /// <summary>The marker of Inspect's <c>-Infinity</c> in a tree.</summary>
-    public const string MinusInfinityMarker = "\u0000-Infinity\u0000";
-
-    /// <summary>A fresh NaN value.</summary>
-    public static JsonValue NaN() => JsonValue.Create(NaNMarker);
-
-    /// <summary>Whether <paramref name="node"/> is Inspect's NaN.</summary>
-    public static bool IsNaN(JsonNode? node) => Marker(node) == NaNMarker;
-
-    /// <summary>Whether <paramref name="node"/> is a non-finite number (NaN or an infinity).</summary>
-    public static bool IsNonFinite(JsonNode? node) => Marker(node) is not null;
-
-    /// <summary>Whether <paramref name="node"/> holds a non-finite number anywhere in it.</summary>
-    public static bool HoldsNonFinite(JsonNode? node) => node switch
+    /// <summary>A fresh NaN node.</summary>
+    public static JsonValue NaN()
     {
-        JsonObject obj => obj.Any(m => HoldsNonFinite(m.Value)),
-        JsonArray array => array.Any(HoldsNonFinite),
-        _ => IsNonFinite(node),
+        var node = JsonValue.Create("NaN")!;   // its text is never read as a value: IsNaN tells it apart by identity
+        NaNs.Add(node, NaNs);
+        return node;
+    }
+
+    /// <summary>Whether <paramref name="node"/> is a NaN node (<see cref="NaN"/>, or a bare <c>NaN</c> read by <see cref="Parse"/>).</summary>
+    public static bool IsNaN(JsonNode? node) => node is not null && NaNs.TryGetValue(node, out _);
+
+    /// <summary>Whether <paramref name="node"/> holds a NaN node anywhere in it.</summary>
+    public static bool HoldsNaN(JsonNode? node) => node switch
+    {
+        JsonObject obj => obj.Any(m => HoldsNaN(m.Value)),
+        JsonArray array => array.Any(HoldsNaN),
+        _ => IsNaN(node),
     };
 
     /// <summary>
     /// Reads an Inspect log as I-JSON (RFC 7493), as AEF reads its own files ([ENC-1] to [ENC-3]), within [ENC-17]'s
     /// nesting depth of 64 (inspect.md, "Reading the log", R9-2), with the one exception Inspect needs: a bare
-    /// <c>NaN</c>, read as <see cref="NaNMarker"/> (where it may stand is the caller's to check). Refused: a byte-order
-    /// mark, bytes that are not UTF-8, a member named twice, an unpaired surrogate in a string or a name,
-    /// <c>Infinity</c> or <c>-Infinity</c>, a number that overflows binary64, any other syntax error, nesting deeper
-    /// than 64. There is no size limit: an Inspect log is not an AEF file.
+    /// <c>NaN</c> where a value stands, read as a NaN node (<see cref="IsNaN"/>; where it may stand is the caller's to
+    /// check). Refused: a byte-order mark, bytes that are not UTF-8, a member named twice, an unpaired surrogate in a
+    /// string or a name, <c>Infinity</c> or <c>-Infinity</c>, a number that overflows binary64, a bare <c>NaN</c> where
+    /// a member name stands and any other syntax error, nesting deeper than 64. There is no size limit: an Inspect log is
+    /// not an AEF file.
     /// </summary>
     /// <exception cref="FormatException">The text is refused; the message says why.</exception>
     public static JsonNode? Parse(byte[] utf8)
     {
         ArgumentNullException.ThrowIfNull(utf8);
-        var text = new List<byte>(utf8.Length + 64);
+
+        // Each bare NaN outside a string becomes "" in the text checked and read, and its offset there is kept: the node
+        // read at that offset is a NaN node; a member name there is a syntax error. No other string is ever a NaN.
+        var text = new List<byte>(utf8.Length);
+        var nans = new HashSet<long>();
         var inString = false;
         for (var i = 0; i < utf8.Length; i++)
         {
@@ -91,7 +93,9 @@ internal static class InspectJson
 
             if (Token(utf8, i, "NaN"u8))
             {
-                text.AddRange(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(NaNMarker)));
+                nans.Add(text.Count);
+                text.Add((byte)'"');
+                text.Add((byte)'"');
                 i += 2;   // the loop steps past the last byte
                 continue;
             }
@@ -99,22 +103,82 @@ internal static class InspectJson
             text.Add(b);
         }
 
+        var bytes = text.ToArray();
         try
         {
             // AgentEval.Results' own I-JSON reader: the checks every AEF reader makes, on the bytes, before a node is built.
-            return AefJsonReader.ParseValue(text.ToArray(), int.MaxValue);
+            AefJsonReader.Check(bytes, int.MaxValue);
         }
         catch (AefReadException e)
         {
             throw new FormatException($"the log is not I-JSON within a depth of {AefLimits.MaxDepth}: {e.Message}", e);
         }
+
+        return Build(bytes, nans);
+    }
+
+    // The tree of a text Check accepted, a NaN node where a bare NaN stood.
+    private static JsonNode? Build(byte[] bytes, HashSet<long> nans)
+    {
+        var reader = new Utf8JsonReader(bytes, new JsonReaderOptions { MaxDepth = AefLimits.MaxDepth * 2 });
+        JsonNode? root = null;
+        var open = new Stack<JsonNode>();
+        string? name = null;
+        while (reader.Read())
+        {
+            switch (reader.TokenType)
+            {
+                case JsonTokenType.PropertyName:
+                    if (nans.Contains(reader.TokenStartIndex))
+                    {
+                        throw new FormatException("a bare NaN stands where a member name is, which is not JSON");
+                    }
+
+                    name = reader.GetString();
+                    continue;
+                case JsonTokenType.EndObject or JsonTokenType.EndArray:
+                    open.Pop();
+                    continue;
+            }
+
+            JsonNode? node = reader.TokenType switch
+            {
+                JsonTokenType.StartObject => new JsonObject(),
+                JsonTokenType.StartArray => new JsonArray(),
+                JsonTokenType.String when nans.Contains(reader.TokenStartIndex) => NaN(),
+                JsonTokenType.String => JsonValue.Create(reader.GetString()),
+                JsonTokenType.Number => JsonValue.Create(JsonElement.ParseValue(ref reader)),   // its own text kept
+                JsonTokenType.True => JsonValue.Create(true),
+                JsonTokenType.False => JsonValue.Create(false),
+                _ => null,
+            };
+            if (open.Count == 0)
+            {
+                root = node;
+            }
+            else if (open.Peek() is JsonObject obj)
+            {
+                obj.Add(name!, node);   // Check refused a member named twice
+            }
+            else
+            {
+                ((JsonArray)open.Peek()).Add(node);
+            }
+
+            if (node is JsonObject or JsonArray)
+            {
+                open.Push(node);
+            }
+        }
+
+        return root;
     }
 
     /// <summary>
     /// A <c>.json</c> log laid out as Inspect lays one out (Python's <c>json.dumps(value, indent=2, ensure_ascii=False)</c>):
     /// two-space indent, <c>": "</c> between a name and its value, non-ASCII text as UTF-8, numbers as
-    /// <see cref="Number"/> writes them, and the markers as the bare tokens (<c>NaN</c>), which a standard JSON writer
-    /// does not write. The page fixes values, not bytes (R7I-1): the layout is a courtesy.
+    /// <see cref="Number"/> writes them, and a NaN node as the bare token <c>NaN</c>, which a standard JSON writer does not
+    /// write. The page fixes values, not bytes (R7I-1): the layout is a courtesy.
     /// </summary>
     public static string Indented(JsonNode? value)
     {
@@ -147,7 +211,7 @@ internal static class InspectJson
                 break;
             case JsonObject obj:
                 output.Append('{');
-                var members = obj.Select(m => (Name: m.Key == NaNMarker ? throw new FormatException("it holds NaN as a member name, which JCS cannot write") : Checked(m.Key), m.Value)).ToList();
+                var members = obj.Select(m => (Name: Checked(m.Key), m.Value)).ToList();
                 members.Sort((a, b) => string.CompareOrdinal(a.Name, b.Name));   // UTF-16 code units (RFC 8785 §3.2.3)
                 for (var i = 0; i < members.Count; i++)
                 {
@@ -177,6 +241,8 @@ internal static class InspectJson
 
                 output.Append(']');
                 break;
+            case JsonValue value when IsNaN(value):
+                throw new FormatException("it holds NaN, which JCS cannot write");
             case JsonValue value:
                 switch (value.GetValueKind())
                 {
@@ -189,11 +255,6 @@ internal static class InspectJson
                         catch (InvalidOperationException)
                         {
                             throw new FormatException("it holds a string with an unpaired surrogate, which JCS cannot write");
-                        }
-
-                        if (text is NaNMarker or InfinityMarker or MinusInfinityMarker)
-                        {
-                            throw new FormatException($"it holds {text.Trim('\0')}, which JCS cannot write");
                         }
 
                         CanonicalString(output, Checked(text));
@@ -307,23 +368,6 @@ internal static class InspectJson
         return value < 0 ? "-" + text : text;
     }
 
-    private static string? Marker(JsonNode? node)
-    {
-        if (node is not JsonValue v || v.GetValueKind() != JsonValueKind.String)
-        {
-            return null;
-        }
-
-        try
-        {
-            return v.GetValue<string>() is NaNMarker or InfinityMarker or MinusInfinityMarker ? v.GetValue<string>() : null;
-        }
-        catch (InvalidOperationException)
-        {
-            return null;   // a string System.Text.Json cannot read (an unpaired surrogate) is no marker
-        }
-    }
-
     private static bool Token(byte[] utf8, int at, ReadOnlySpan<byte> token) =>
         at + token.Length <= utf8.Length && utf8.AsSpan(at, token.Length).SequenceEqual(token);
 
@@ -383,17 +427,10 @@ internal static class InspectJson
                 output.Append(']');
                 break;
             case JsonValue value:
-                switch (Marker(value))
+                if (IsNaN(value))
                 {
-                    case NaNMarker:
-                        output.Append("NaN");
-                        return;
-                    case InfinityMarker:
-                        output.Append("Infinity");
-                        return;
-                    case MinusInfinityMarker:
-                        output.Append("-Infinity");
-                        return;
+                    output.Append("NaN");   // Inspect's bare token
+                    return;
                 }
 
                 switch (value.GetValueKind())

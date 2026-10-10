@@ -134,8 +134,10 @@ public sealed class AefScriptedTarget
             suites.Add(new AefScriptedSuite(suiteRef, version, Text(suite["content"], $"{where}.content"), cases));
         }
 
+        // 1 to 64 characters, counted as JSON Schema counts them (code points, as run.json's costPolicy.priceTable's
+        // maxLength does), not UTF-16 units: an emoji is one character (Q4-39, critic round 10, R10-5).
         var priceTable = Text(target["priceTable"], "priceTable");
-        if (priceTable.Length is 0 or > 64)
+        if (Characters(priceTable) is 0 or > 64 || !AefSchemas.Writer.IsValid("run#/properties/costPolicy/properties/priceTable", target["priceTable"]))
         {
             throw new FormatException("priceTable: a price table's name has 1 to 64 characters.");
         }
@@ -211,6 +213,9 @@ public sealed class AefScriptedTarget
 
         return obj;
     }
+
+    /// <summary>The characters of a text as JSON Schema's <c>minLength</c> and <c>maxLength</c> count them: Unicode code points.</summary>
+    internal static int Characters(string text) => text.EnumerateRunes().Count();
 
     private static JsonArray Array(JsonNode? node, string where) =>
         node as JsonArray ?? throw new FormatException($"{where} is not a list.");

@@ -124,6 +124,29 @@ CORPUS = TOOLS.parent / "1" / "conformance"
 
 # ---------------------------------------------------------------------------- engines
 
+class Exited(dict):
+    """What an operation gives when it did not run (CONF-3): {"error": a message}, with the exit status (`code`) and
+    what it wrote on standard error (`stderr`). A dict subclass, so that no JSON an implementation prints can pass for
+    one."""
+
+    def __init__(self, code, message, stderr=""):
+        super().__init__(error=message)
+        self.code, self.stderr = code, stderr
+
+
+def input_error(out):
+    """CONF-3: a usage or input error is exit 2 with a message on standard error, and nothing else. Exit 1, a crash, a
+    signal or any other status is not one: it fails a vector that expects a refusal as it fails any other."""
+    return isinstance(out, Exited) and out.code == 2 and bool(out.stderr.strip())
+
+
+def _seen(out):
+    """An operation's output, for a difference: its exit status and message when it did not run."""
+    if isinstance(out, Exited):
+        return f"exit {out.code}: {out['error']}"
+    return json.dumps(out, ensure_ascii=False)
+
+
 class InProcess:
     """The reference implementation, called as a library with the same arguments as its command line: aef_verify.py,
     aef_produce.py for the write operations, and aef_runner.py for job."""
@@ -139,7 +162,7 @@ class InProcess:
             _apply(os.environ, env or {})
             return module.dispatch(argv)
         except (aef_verify.InputError, aef_produce.InputError, aef_runner.InputError) as error:
-            return {"error": str(error)}
+            return Exited(2, str(error), str(error))  # the command line exits 2 with this message
         finally:
             _apply(os.environ, saved)
 
@@ -166,12 +189,13 @@ class External:
             environ = dict(os.environ)
             _apply(environ, env)
         done = subprocess.run(self.command + [str(a) for a in argv], capture_output=True, env=environ)
-        if done.returncode != 0:
-            return {"error": f"exit {done.returncode}: {done.stderr.decode('utf-8', 'replace').strip()}"}
+        stderr = done.stderr.decode("utf-8", "replace")
+        if done.returncode != 0:  # kept: only 2 is an input error (CONF-3)
+            return Exited(done.returncode, f"exit {done.returncode}: {stderr.strip()[-2000:]}", stderr)
         try:
             return json.loads(done.stdout.decode("utf-8"))
         except ValueError as error:
-            return {"error": f"standard output is not one JSON value: {error}"}
+            return Exited(0, f"standard output is not one JSON value: {error}", stderr)
 
 
 # ---------------------------------------------------------------------------- vectors
@@ -490,8 +514,8 @@ def run_vector(engine, v, scratch):
         if "payloadType" in e:
             argv += ["--payload-type", e["payloadType"]]
         out = engine.call(argv)
-        if e.get("policyRefused"):  # SIG-3: a policy with a key that cannot be used is refused as a whole
-            return [] if "error" in out else [f"the policy was accepted: {json.dumps(out)}"]
+        if e.get("policyRefused"):  # SIG-3: a policy with a key that cannot be used is refused as a whole (exit 2)
+            return [] if input_error(out) else [f"not refused as an input error (exit 2): {_seen(out)}"]
         if "error" in out:
             return [out["error"]]
         want_envelope = e.get("envelopeResult", e.get("envelope") if e.get("envelope") in (None, "malformed", "payload-mismatch") else None)
@@ -501,7 +525,9 @@ def run_vector(engine, v, scratch):
     elif v.kind == "decision":
         out = engine.call(["decide", d])
         if "expectedError" in e:
-            if "error" not in out:
+            if isinstance(out, Exited):  # decide refuses with {"error"} and exit 0 (spec 09 §9.3)
+                diffs.append(f"did not run: {_seen(out)}")
+            elif "error" not in out:
                 diffs.append(f"decided what it must refuse ({e['expectedError']}): {json.dumps(out.get('output'))}")
         else:
             compare(diffs, "output", out.get("output", out), e["expected"])
@@ -591,8 +617,8 @@ def judge_write(engine, v, scratch, diffs):
     if v.kind == "summarize":
         out = engine.call(["summarize", d / e.get("run", "run"), d / e["request"]])
         if e.get("refused"):  # an input that contradicts what the Producer must compute: an input error (exit 2)
-            if not (isinstance(out, dict) and "error" in out):
-                diffs.append(f"computed a summary for a request it must refuse: {json.dumps(out)}")
+            if not input_error(out):
+                diffs.append(f"not refused as an input error (exit 2, a message on standard error): {_seen(out)}")
             return
         if not isinstance(out, dict) or "error" in out:
             diffs.append(out.get("error") if isinstance(out, dict) else f"not a JSON object: {json.dumps(out)}")
@@ -741,8 +767,8 @@ def _judge_produce(engine, v, scratch, diffs):
     out = engine.call(["produce", scenario_file, out_dir])
     written = _files(out_dir) if out_dir.is_dir() else {}
     if e.get("refused"):  # a scenario that contradicts itself: an input error (exit 2), and nothing written
-        if not (isinstance(out, dict) and "error" in out):
-            diffs.append(f"wrote a run for a scenario it must refuse: {json.dumps(out)}")
+        if not input_error(out):
+            diffs.append(f"not refused as an input error (exit 2, a message on standard error): {_seen(out)}")
         if written:
             diffs.append(f"wrote files although it refused: {', '.join(sorted(written))}")
         return
@@ -809,8 +835,8 @@ def _judge_seal_write(engine, v, scratch, diffs):
     after = _files(work)
     changed = sorted(p for p in set(before) | set(after) if p != "seal.json" and before.get(p) != after.get(p))
     if e.get("refused"):  # [SEAL-1]: the run cannot be sealed; the operation refuses it and writes nothing
-        if not (isinstance(out, dict) and "error" in out):
-            diffs.append(f"sealed a run it must refuse: {json.dumps(out)}")
+        if not input_error(out):
+            diffs.append(f"not refused as an input error (exit 2, a message on standard error): {_seen(out)}")
         if after != before:
             diffs.append(f"changed the run folder although it refused: {sorted(set(before) ^ set(after)) or changed}")
         return
@@ -911,8 +937,8 @@ def _judge_job(engine, v, scratch, diffs):
     e, d = v.expected, v.path
     out_dir, out, env = _job(engine, v, scratch, diffs)
     if e.get("refused"):  # spec 09 §9.3: an input error (exit 2), with nothing written in OUT
-        if not (isinstance(out, dict) and "error" in out):
-            diffs.append(f"ran a job it must refuse as an input error: {json.dumps(out)}")
+        if not input_error(out):
+            diffs.append(f"not refused as an input error (exit 2, a message on standard error): {_seen(out)}")
         written = sorted(_files(out_dir)) if out_dir.is_dir() else []
         if written:
             diffs.append(f"wrote files although it refused: {', '.join(written)}")

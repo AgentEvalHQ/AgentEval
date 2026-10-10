@@ -7,7 +7,7 @@ expected.json naming the direction, the page and its sections, and what the chec
 
   "steps"      [{"args": [command, ...], "expected": path}]: runs aef_interop.py in the folder, "{out}" standing
                for a fresh output path, and compares what it writes with the expected file or folder: JSON and
-               NDJSON as JSON values (the pages fix values, not bytes: R7N-3), any other file byte for byte.
+               NDJSON as JSON values (the pages fix values, not bytes), any other file byte for byte.
   "refusals"   [{"args": [...], "says": id}]: runs aef_interop.py and expects exit status 2, a message naming the
                page's rule (OT-n, IN-n, or a rule of the spec) and nothing written.
   "runs"       {folder: outcome}: every AEF run of the example, input or output, verifies with
@@ -92,7 +92,7 @@ def json_values(data, suffix):
 
 
 def differences(expected, actual, suffix=""):
-    """What differs between two outputs. The pages fix values, not bytes (R7N-3): a JSON or NDJSON file is compared
+    """What differs between two outputs. The pages fix values, not bytes: a JSON or NDJSON file is compared
     as JSON values (member order and number spelling are free, [ENC-2], [ENC-4]); any other file byte for byte."""
     if expected is None:
         return ["the expected output is missing"]

@@ -14460,6 +14460,25 @@
    }
   },
   {
+   "id": "write-vectors/summarize/value-is-sum-divided-by-n",
+   "kind": "summarize",
+   "classes": [
+    "Producer",
+    "Runner"
+   ],
+   "rules": [
+    "SUM-5"
+   ],
+   "path": "write-vectors/summarize/value-is-sum-divided-by-n",
+   "files": {
+    "expected.json": "b6833cc7e1b7874503bd017b4caa4cbee2269ab3c89a5df304354f83965a2d4c",
+    "request.json": "bedb30c4c93639aee567d27186f0e94867ddf0c00019c5145a43963a749532b4",
+    "run/metrics.json": "3c0d08411b2259c712ac474ca2e3fe07bed55f10285ff3c4027130390a402813",
+    "run/results.ndjson": "a884f00545f6f922662c7bf6157ded6ebdf062b202db781c53b2c92de76cabbf",
+    "run/run.json": "e1e7e529dcaf84ebd56f1c6b464d6a315ff0e8ced6c91a597fb16f2685b7f978"
+   }
+  },
+  {
    "id": "write-vectors/produce/aborted-before-any-result",
    "kind": "produce",
    "classes": [

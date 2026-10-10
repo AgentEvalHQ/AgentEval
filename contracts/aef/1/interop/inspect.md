@@ -47,8 +47,8 @@ document. Inspect's documentation tells other languages to get JSON with `inspec
 One AEF run gives one `EvalLog` in `.json` form. Writing `.eval` also needs zstd. The rules and refusals below the
 table cover what the table does not; the reference converter, `tools/aef_interop.py to-inspect`, follows both.
 
-**Values, not bytes** (settled 10-10, R7I-1). As for OpenTelemetry (R7N-3), this page fixes values, not bytes, in
-both directions: the order of members and the spelling of numbers are free
+**Values, not bytes** (settled 10-10). As for OpenTelemetry ([opentelemetry.md](opentelemetry.md)), this page fixes
+values, not bytes, in both directions: the order of members and the spelling of numbers are free
 ([ENC-2](../spec/02-encoding.md#21-json-documents), [ENC-4](../spec/02-encoding.md#21-json-documents)), and a checker
 compares JSON values, as `tools/check_interop.py` does. An unscored value is the bare token `NaN` wherever Inspect
 writes one: a score's value, and a metric's value over no samples (IN-3).
@@ -95,7 +95,7 @@ writes one: a score's value, and a metric's value over no samples (IN-3).
 
 - **The eval header Inspect requires** (IN-1). `eval.task` is the suite's ref without `suite:`. `eval.model` is a model
   subject's ref without `model:`, and for any other subject (an agent, a workflow) the subject's `ref` as written, its
-  name decoded (R7I-8). The converter writes `eval.dataset` with the number of cases and their ids, and
+  name decoded. The converter writes `eval.dataset` with the number of cases and their ids, and
   `eval.model_roles` with the run's judge under the role `judge`, the name AEF's `usage` gives it.
 - **A measured line without a score** (IN-2). A `passed`, `failed`, `warn`, `inconclusive` or `scored` line without
   `scores` (a code check's verdict, a split panel) is `Score.value` NaN with the state name in `Score.reason`, as a
@@ -106,37 +106,37 @@ writes one: a score's value, and a metric's value over no samples (IN-3).
   `stderr`; the entry's lane, metric, `N`, `notMeasured`, `verdict`, `rule` and `ci` under `metadata.aef`.
   `total_samples` and `completed_samples` are the number of samples.
 - **A sample's usage** (IN-5) is the sum of its lines' entries, per role and per model, as Inspect keeps it.
-- **Only a run that verifies** (IN-11, as OT-8 in [opentelemetry.md](opentelemetry.md); R7N-6). The converter
-  converts a run only when a Run verifier ([§4.5](../spec/04-integrity.md#45-verification-outcomes)) finds it
-  `intact` or `unsealed`, with no problem but an authorized withhold, and exports its sealed lines: overlays are not applied (R7N-5).
+- **Only a run that verifies** (IN-11, as OT-8 in [opentelemetry.md](opentelemetry.md)). The converter converts a run
+  only when a Run verifier ([§4.5](../spec/04-integrity.md#45-verification-outcomes)) finds it `intact` or `unsealed`,
+  with no problem but an authorized withhold, and exports its sealed lines: overlays are not applied, as OT-7 says.
 
-**Settled 10-10** (what a second converter, AgentEval.Results.Adapters in .NET, found; R7I-n):
+**Settled 10-10** (what a second converter, AgentEval.Results.Adapters in .NET, found):
 
-- **Scores** (R7I-2). A score with a label is its label (`C`). A line with two or more scores is a map keyed by
+- **Scores**. A score with a label is its label (`C`). A line with two or more scores is a map keyed by
   metric, each member the score's label or, without one, its value: the inverse of IN-7.
-- **A run with `contentCapture: off`** (IN-13, R7I-3). No score gets an explanation, as OT-3 rules for OpenTelemetry:
+- **A run with `contentCapture: off`** (IN-13). No score gets an explanation, as OT-3 rules for OpenTelemetry:
   a run that keeps no content exports none of its free text as an explanation, whatever its `reason` holds
   ([RUN-11](../spec/03-run.md#32-runjson)).
-- **Usage** (R7I-4). `total_tokens` is `input_tokens` + `output_tokens`, written when either is present; a missing
+- **Usage**. `total_tokens` is `input_tokens` + `output_tokens`, written when either is present; a missing
   count is left out, never 0; cache and reasoning tokens are not added to it.
-- **Root lines** (IN-5, R7I-5). Two roots that carry the same `startedAt`, `endedAt` or `durationMs` count as one
+- **Root lines** (IN-5). Two roots that carry the same `startedAt`, `endedAt` or `durationMs` count as one
   (times compared as instants, [ENC-8](../spec/02-encoding.md#23-values)); only different values are refused.
-- **Case content** (IN-5, R7I-6). Only the evidence records a sample's lines cite are read: `input` and `target` come
+- **Case content** (IN-5). Only the evidence records a sample's lines cite are read: `input` and `target` come
   from them, and only a cited `output` or `transcript` record, or a cited `input` or `expected` record that is not a
   blob, is refused. A record no line cites is not carried ("other evidence") and not refused.
-- **The header** (IN-1, R7I-7). `eval.config` is `{}` without an execution policy, and `epochs_reducer` a one-item
+- **The header** (IN-1). `eval.config` is `{}` without an execution policy, and `epochs_reducer` a one-item
   list. `AllPass` is `at_least_<n>` with n the policy's `trialsPerCase` in `eval.config`, and the rollup's `trials.n`
   in its reduction. `eval.metadata.aef.judges` is written only when a judge has a `rubricDigest` or a `calibration`,
   each judge as its `model`, `rubricDigest` and `calibration`. An aborted run's `error` is `message` (its
   `abortReason`), `traceback` `""` and `traceback_ansi` `""`, the three members Inspect requires.
-- **The model's name** (IN-1, R7I-8). `eval.model` is the subject's ref with its name decoded as
+- **The model's name** (IN-1). `eval.model` is the subject's ref with its name decoded as
   [ENC-13](../spec/02-encoding.md#24-identifiers-and-names) encodes it (each `%XX` the byte XX, read as UTF-8; `-` the
   empty name; a name that does not decode is kept as written): a model subject's name alone, any other subject's
   `kind:name`. So `model:acme/gpt%20x` gives `acme/gpt x`, which the import encodes back (IN-6).
-- **Blobs** (IN-12, R7I-9). A reasoning or case-content blob that is not UTF-8 refuses the export, as OT-9 does; one
+- **Blobs** (IN-12). A reasoning or case-content blob that is not UTF-8 refuses the export, as OT-9 does; one
   an authorized redaction withholds ([OVL-10](../spec/04-integrity.md#42-overlays)) is left out, with nothing in its
   place.
-- **Duration** (R7I-11). `total_time` is `durationMs` / 1000, one binary64 division, not rounded.
+- **Duration**. `total_time` is `durationMs` / 1000, one binary64 division, not rounded.
 
 **Refused** (IN-1, IN-3 to IN-5, IN-11, IN-12; settled 10-09 and 10-10). The converter refuses these, naming the rule,
 and writes nothing:
@@ -214,7 +214,7 @@ The reference converter, `tools/aef_interop.py from-inspect`, follows the table 
   `abortReason` is `error.message`. `imported.from` is `inspect_ai` and the version `eval.packages` gives, or
   `inspect_ai` alone. The names of `suite.ref` and `subject.ref` are encoded as
   [ENC-13](../spec/02-encoding.md#24-identifiers-and-names) says, and `suite.version` is `eval.task_version` as text
-  (Inspect's default is 0; a number as R9-2 says, below). `execution.targetMode` and `contentCapture` come from the
+  (Inspect's default is 0; a number as the rule below says). `execution.targetMode` and `contentCapture` come from the
   person converting (`on` unless asked otherwise); both are listed in `imported.asserted`, with `subject.ref` and
   `subject.kind`. `eval.run_id`, `eval.eval_set_id`, `eval.dataset` and `results.headline` go to `run.json`'s
   `ext."inspect_ai"`. A `started` log gives a running run, which is not sealed: only a closed run is
@@ -248,33 +248,32 @@ The reference converter, `tools/aef_interop.py from-inspect`, follows the table 
   `stderr` is Inspect's. Every metric a line or the summary names is declared with kind `score`, direction `none`
   and scale `unbounded`.
 
-**Settled 10-10** (R7I-n):
+**Settled 10-10**:
 
-- **The judges** (IN-6, R7I-16). `judges[]` holds each model of an `eval.model_roles` role that IN-8 maps to `judge`,
+- **The judges** (IN-6). `judges[]` holds each model of an `eval.model_roles` role that IN-8 maps to `judge`,
   once, in the log's order: a role named `agent` or `attacker` is no judge ([RUN-9](../spec/03-run.md#32-runjson): a
   judge grades).
-- **The header** (IN-6, R7I-14, R7I-17). An epochs reducer without an AEF value is left out of `executionPolicy` and
+- **The header** (IN-6). An epochs reducer without an AEF value is left out of `executionPolicy` and
   kept in `run.json`'s `ext."inspect_ai".epochs_reducer`; with more than one epoch, a reduction that uses one is
   refused (IN-8). When `eval.created` stands for the start, `startedAt` is the last of `imported.asserted`. The
   [ENC-13](../spec/02-encoding.md#24-identifiers-and-names) encoding of a ref's name is the inverse of the export's
-  decoding (R7I-8).
-- **Scores** (IN-7, R7I-13). A list value is kept as `ext."inspect_ai".value`, beside `answer` and `metadata`;
+  decoding.
+- **Scores** (IN-7). A list value is kept as `ext."inspect_ai".value`, beside `answer` and `metadata`;
   `Score.metadata` is kept with `contentCapture: off` too. A NaN member of a map gets no score.
-- **Samples** (IN-8, R7I-10, R7I-11, R7I-12, R7I-17). `durationMs` is `total_time` × 1000, one binary64
+- **Samples** (IN-8). `durationMs` is `total_time` × 1000, one binary64
   multiplication, not rounded. A sample stopped by a limit has the reason `<type> limit <limit>` (`token limit 1000`),
   and a limit that is not `{type, limit}` is refused. An error message, like an explanation (OT-10), is cut to its
   first 4096 characters, with no mark. An empty `input`, `target` or explanation gives no blob. Two roles that land
   on one AEF role and model are added together.
-- **A limit's number, and an error without a message** (IN-8, settled 10-10, R8-4). `<limit>` is written from the
-  number's binary64 value alone: the shortest decimal that reads back as the same value, the form
-  [ENC-4](../spec/02-encoding.md#21-json-documents) recommends, spelled as ECMAScript's `Number::toString` spells it.
-  An integral value has no fraction (`1000` for both `1000` and `1000.0`), up to 21 digits in plain digits (`1e16`
-  is `10000000000000000`), then in exponent form (`1e21` is `1e+21`; `1e-7` is `1e-7`, `1e-6` is `0.000001`). So a
-  JSON parser that does not keep `1000.0` apart from `1000` writes the same reason, as "values, not bytes" requires.
-  A limit whose `type` is empty, or whose `limit` is not a finite number (Inspect's `NaN`), is refused; an infinity
-  never reaches it, since `Infinity`, or a number that overflows binary64, is refused as the log is read (IN-6,
-  R9-2). A sample `error` with an empty or absent message gives the reason "Inspect recorded an error without a
-  message".
+- **A limit's number, and an error without a message** (IN-8, settled 10-10). `<limit>` is written from the number's
+  binary64 value alone: the shortest decimal that reads back as the same value, the form
+  [ENC-4](../spec/02-encoding.md#21-json-documents) recommends, spelled as ECMAScript's `Number::toString` spells it. An
+  integral value has no fraction (`1000` for both `1000` and `1000.0`), up to 21 digits in plain digits (`1e16` is
+  `10000000000000000`), then in exponent form (`1e21` is `1e+21`; `1e-7` is `1e-7`, `1e-6` is `0.000001`). So a JSON
+  parser that does not keep `1000.0` apart from `1000` writes the same reason, as "values, not bytes" requires. A limit
+  whose `type` is empty, or whose `limit` is not a finite number (Inspect's `NaN`), is refused; an infinity never
+  reaches it, since `Infinity`, or a number that overflows binary64, is refused as the log is read (IN-6). A sample
+  `error` with an empty or absent message gives the reason "Inspect recorded an error without a message".
 - **Content that is not text** (IN-8, settled 10-10). A list of messages, a `ModelOutput` or a list of targets
   becomes a blob holding its JSON serialized by the JSON Canonicalization Scheme
   ([RFC 8785](https://www.rfc-editor.org/rfc/rfc8785), JCS): no whitespace; numbers as ECMAScript's `Number::toString`
@@ -286,8 +285,8 @@ The reference converter, `tools/aef_interop.py from-inspect`, follows the table 
   ([SEAL-2](../spec/04-integrity.md#41-sealing-a-run)), and nothing is read back through a canonical form. JCS has
   no NaN, infinity or unpaired surrogate, so content that holds a NaN is refused: writing it another way would give
   two converters two names again (an infinity and an unpaired surrogate never reach it: the log is refused as it is
-  read, R9-2).
-- **Reading the log** (IN-6, settled 10-10, R9-2). The log is read as I-JSON
+  read).
+- **Reading the log** (IN-6, settled 10-10). The log is read as I-JSON
   ([RFC 7493](https://www.rfc-editor.org/rfc/rfc7493)), as AEF reads its own files
   ([ENC-1 to ENC-3](../spec/02-encoding.md#21-json-documents)), within the nesting depth of 64 that
   [ENC-17](../spec/02-encoding.md#26-limits) sets, with the one exception Inspect needs: its bare `NaN`, where an
@@ -299,17 +298,21 @@ The reference converter, `tools/aef_interop.py from-inspect`, follows the table 
   [ENC-3](../spec/02-encoding.md#21-json-documents)); a `NaN` anywhere else; nesting deeper than 64. Every number is
   read as its binary64 value ([ENC-4](../spec/02-encoding.md#21-json-documents)), so the rules below depend on the
   value alone.
-- **A numeric `id` or `task_version`** (IN-6, IN-8, settled 10-10, R9-2). A sample's `id` (and a reduction's
-  `sample_id`) or `eval.task_version` that is a number gives `caseId` or `suite.version` only when it is an integer of
-  at most 2^53 − 1 in magnitude ([ENC-4](../spec/02-encoding.md#21-json-documents): `1`, `1.0` and `1e0` alike),
-  written in decimal digits (`1000` for `1e3`). Any other number (`1.5`, `9007199254740993`) is refused: an `id` by
-  IN-8, a `task_version` by IN-6.
-- **A sample's `error` and `limit`** (IN-8, settled 10-10, R9-2). An `error` that is present and not null is an
-  object, as Inspect writes it. One with no `message`, or a null or empty one (`{}` included), gives the reason
-  "Inspect recorded an error without a message". A `message` that is not text, or an `error` that is not an object (a
-  string, a number), is refused. A `limit` that is present and not null is `{type, limit}`, as R8-4 says, on a scored
-  sample too: `{}` is refused.
-- **The summary** (IN-9, R7I-10, R7I-15). The run's usage is one entry per `stats.model_usage` model (its role from
+- **Integers** (IN-6, IN-8, IN-9, settled 10-10). Every field the converter reads as an integer is read by its
+  binary64 value alone ([ENC-4](../spec/02-encoding.md#21-json-documents)): a sample's `id`, a reduction's
+  `sample_id` and `eval.task_version` when they are numbers, `eval.config.epochs`, a sample's `epoch`, every token
+  count of a `ModelUsage` (a sample's and the run's), and a metric's `params.k`. An integer value is accepted however
+  it is written (`1`, `1.0` and `1e0` alike); a value that is not an integer, or is beyond 2^53 − 1 in magnitude, or
+  is outside the field's range (`epochs` 1 to 1000, an `epoch` 1 to `epochs`, a token count at least 0, `k` at least
+  1), is refused, naming the field's rule: IN-6 for `task_version` and `epochs`, IN-8 for an `id`, an `epoch` and a
+  sample's tokens, IN-9 for the run's tokens and `k`. An `id` or a `task_version` is written in decimal digits
+  (`1000` for `1e3`), so `1.5` and `9007199254740993` are refused.
+- **A sample's `error` and `limit`** (IN-8, settled 10-10). An `error` that is present and not null is an object, as
+  Inspect writes it. One with no `message`, or a null or empty one (`{}` included), gives the reason "Inspect recorded
+  an error without a message". A `message` that is not text, or an `error` that is not an object (a string, a number),
+  is refused. A `limit` that is present and not null is `{type, limit}`, as the rule on a limit's number says, on a
+  scored sample too: `{}` is refused.
+- **The summary** (IN-9). The run's usage is one entry per `stats.model_usage` model (its role from
   `eval.model_roles` as IN-8 maps it, `agent` for `eval.model`, `other` otherwise), in the log's order; only without
   `model_usage`, one entry per `stats.role_usage` role, without a model. An entry with no metric (or `stderr` alone)
   is a plain mean entry, with nothing of Inspect's to compare. A mean, median, minimum or maximum is compared within
@@ -324,21 +327,23 @@ The reference converter, `tools/aef_interop.py from-inspect`, follows the table 
 - an `eval_id` that is not an AEF id; a time without an offset; a closed log without `stats.completed_at`, or one
   that ends before it starts; an `error` log without a message; a log that is not I-JSON (a member named twice, an
   unpaired surrogate, `Infinity`, a number that overflows binary64), that holds a `NaN` where no unscored value can
-  be, or that nests deeper than 64; a `task_version` that is a number but no integer of at most 2^53 − 1 (R9-2)
-  (IN-6);
+  be, or that nests deeper than 64; a `task_version` or an `eval.config.epochs` that is not an integer by value, or
+  is out of its range (IN-6);
 - a value that is a boolean, or a string other than `C`, `I`, `P` and `N` (IN-7);
-- a sample `id`, or a reduction's `sample_id`, that is a number but no integer of at most 2^53 − 1; an `error`
-  that is not an object, or whose `message` is not text (R9-2) (IN-8);
+- a sample `id`, a reduction's `sample_id`, a sample's `epoch` or one of its token counts that is a number but not
+  an integer by value, or is out of its range; an `error` that is not an object, or whose `message` is not text
+  (IN-8);
 - more than one epochs reducer; an epoch beyond `eval.config.epochs`; a sample without scores (or, for one that stopped,
   in a log that names no scorer); two scores of one case, path and epoch; a limit that is not `{type, limit}` (`{}`
-  included, on a scored sample too, R9-2), whose `type` is empty or whose `limit` is not a finite number (R8-4); content
+  included, on a scored sample too), whose `type` is empty or whose `limit` is not a finite number; content
   that is not text holding NaN, which JCS cannot write, when the run keeps content (`contentCapture: on`; with `off` the
   content is not written, so it is not refused; settled 10-10); with more than one epoch, a reduction whose reducer has
   no AEF value; a reduction with no epoch lines, and, in a closed log, a case's path with epoch lines and no reduction
   ([RES-8](../spec/03-run.md#344-repeated-trials)) (IN-8);
 - a `results.scores` entry with both `accuracy` and `mean`, or with no mean and more than one other metric, or whose
-  metric cannot be an `aggregate` method; and a mean, median, minimum or maximum Inspect gives that the lines do
-  not (IN-9);
+  metric cannot be an `aggregate` method, or whose `params.k` is not an integer of at least 1 by value; a token
+  count of the run's usage that is not an integer of at least 0 by value; and a mean, median, minimum or maximum
+  Inspect gives that the lines do not (IN-9);
 - `Score.history` edits, `samples[].invalidation` and `log_updates`: the table makes them overlay events, and the
   reference converter writes no overlays (IN-10).
 
@@ -379,7 +384,7 @@ checks, field by field, that what the trip loses is what the first list says.
 
 - List-valued scores, kept in `ext` (IN-7).
 - Reducers without an AEF value (`at_least` for a k other than 1 or all, `pass_k`, `collect`): kept in `ext` with one
-  epoch, refused with more (IN-8, R7I-14).
+  epoch, refused with more (IN-8).
 - `working_time`.
 - Inspect's event transcript as structured events.
 - Groups of runs (`eval_set_id`, kept in `ext`: AEF has no field for a group of sibling runs,

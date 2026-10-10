@@ -241,8 +241,10 @@ evaluation (§5.3) reads it, so it is defined exactly.
 - **[SUM-5]** Then: `N` is the number of lines not left out; `n` the measured ones; `notMeasured` = `N` − `n`; `sum`
   is the sum of the measured values computed exactly and rounded once to binary64 (summing in order can lose a value
   to cancellation: `1e20 + 1 − 1e20`); `sumSq` is the sum of their squares in binary64 (its terms are never negative,
-  so summing in order stays within §3.6), and a producer omits it when it is not finite; `value` is `sum` for a metric of kind `count`, and `sum` / `n` otherwise,
-  or `null` when `n` is 0. A verifier compares each within §3.6. `stderr` and `ci` are the producer's, over the same
+  so summing in order stays within §3.6), and a producer omits it when it is not finite; `value` is `sum` for a
+  metric of kind `count`, and otherwise that binary64 `sum` divided by `n`, in one binary64 division (`2.1 / 5` gives
+  `0.42000000000000004`, not the exact mean `0.42`), so that two producers write the same bytes; or `null` when `n`
+  is 0. A verifier compares each within §3.6. `stderr` and `ci` are the producer's, over the same
   values. `sum` and `sumSq` are optional in the schema; a producer **SHOULD** write `sum`, so a reader can check the
   mean without the results.
 - **[SUM-8] Aggregates.** An entry with `aggregate` carries a `value` computed by its `method` instead of the mean:

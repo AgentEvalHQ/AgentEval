@@ -272,7 +272,9 @@ def _entry(want, lane, lane_names, kinds, lines):
     if n == 0:
         value = None  # SUM-5, SUM-8: null when nothing was measured
     elif aggregate is None:
-        value = exact_sum if kind == "count" else exact_sum / n  # SUM-5
+        # SUM-5: the sum for a count; otherwise the binary64 sum divided by n, in one binary64 division (2.1 / 5 is
+        # 0.42000000000000004, not the exact mean 0.42)
+        value = exact_sum if kind == "count" else Fraction(float(_number(exact_sum)) / n)
     elif aggregate["method"] in DEFINED_AGGREGATES:  # SUM-8, over the measured values
         ordered = sorted(Fraction(v) for v in values)
         if aggregate["method"] == "min":

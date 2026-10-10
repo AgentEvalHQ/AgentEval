@@ -485,8 +485,35 @@ public static class AefScriptedRunner
             _totals.Add(total);
         }
 
-        // A reason within the 2,048 characters the schema allows it.
-        private static string Cut(string reason) => reason.Length <= 2048 ? reason : reason[..2045] + "...";
+        private static string Cut(string reason) => CutReason(reason);
+    }
+
+    /// <summary>
+    /// A reason within the 2,048 characters the schemas allow (<c>reason</c>, <c>abortReason</c>), counted as JSON Schema
+    /// counts them, in code points: a longer one keeps its first 2,045 and ends with <c>...</c>, never splitting a
+    /// character (a surrogate pair cut in two is no Unicode text, [ENC-1]).
+    /// </summary>
+    internal static string CutReason(string reason)
+    {
+        const int max = 2048;
+        if (AefScriptedTarget.Characters(reason) <= max)
+        {
+            return reason;
+        }
+
+        var (kept, end) = (0, 0);
+        foreach (var rune in reason.EnumerateRunes())
+        {
+            if (kept == max - 3)
+            {
+                break;
+            }
+
+            kept++;
+            end += rune.Utf16SequenceLength;
+        }
+
+        return reason[..end] + "...";
     }
 
     private sealed record OpenRun(string RunId, string Directory, AefRunWriter Writer, string? Lane)

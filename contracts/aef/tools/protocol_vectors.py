@@ -13,6 +13,7 @@ Usage: python contracts/aef/tools/protocol_vectors.py   (vector formats: tools/a
 """
 import hashlib
 import json
+import math
 import shutil
 import sys
 from pathlib import Path
@@ -408,7 +409,7 @@ def make_run(runs, folder, run_id, plan, digest, *, cases=TWO_CASES, lane="quali
     run.update(over)
     run = {k: v for k, v in run.items() if v is not DROP}
     values = [score for _, _, score in cases]
-    total = sum(values)
+    total = math.fsum(values)  # SUM-5: computed exactly, rounded once; value is this sum / n, one binary64 division
     lines = [line for case in cases for line in case_lines(run_id, *case)]
     if reasoning is not None:
         blob = hashlib.sha256(reasoning).hexdigest()

@@ -17,8 +17,9 @@ writes something and the conformance runner judges the result:
 
 Every expected value is written by hand below. For a summary, the generator also derives each entry from the lines
 with its own reading of [SUM-3] and [SUM-4] and stops unless it agrees with the hand-written N and measured values;
-it then computes sum, sumSq and value exactly (fractions.Fraction over the binary64 values, rounded once) and stops
-unless they agree with the hand-written decimals. For a produce scenario, it builds the expected lines with its own
+it then computes sum and sumSq exactly (fractions.Fraction over the binary64 values, rounded once) and value as SUM-5
+says (that binary64 sum divided by n, one binary64 division), and stops unless they agree with the hand-written
+decimals. For a produce scenario, it builds the expected lines with its own
 reading of [RES-4]-[RES-8] and stops unless each line's derived fields (its parent, a rollup's n, passed and agree, a
 composite's measured, total and unmeasured) are the hand-written ones. For a seal, it stops unless the byte order of
 the paths is the hand-written order. It implements only what it writes: result ids (build_conformance.result_id),
@@ -191,7 +192,8 @@ def expected_summary(name, run_id, metrics, lines, lanes):
             if n == 0:
                 value = None
             elif method is None:
-                value = total if kinds[e["metric"]] == "count" else total / n
+                # SUM-5: the binary64 sum (exact, rounded once) divided by n, in one binary64 division
+                value = total if kinds[e["metric"]] == "count" else Fraction(float(total) / n)
             elif method == "min":
                 value = min(values)
             elif method == "max":
@@ -405,6 +407,17 @@ def summarize_vectors():
         [L("k1", "scored", {"delta": 1e20}), L("k2", "scored", {"delta": 1}), L("k3", "scored", {"delta": -1e20})],
         [("quality", [E("delta", "q", N=3, measured=[1e20, 1, -1e20], sum="1", sumSq="2e40",
                         value="0.333333333333")])])
+
+    summarize_vector(
+        "value-is-sum-divided-by-n",
+        "the value is the binary64 sum divided by n, in one binary64 division: 0.3 + 0.4 + 0.5 + 0.4 + 0.5 is 2.1, and "
+        "2.1 / 5 is 0.42000000000000004, not the exact mean 0.42. A verifier accepts either within §3.6; two producers "
+        "that follow SUM-5 write the same bytes.",
+        ["SUM-5"],
+        [metric("delta", "score", "none", "unbounded")],
+        [L(f"k{i}", "scored", {"delta": v}) for i, v in enumerate((0.3, 0.4, 0.5, 0.4, 0.5), start=1)],
+        [("quality", [E("delta", "q", N=5, measured=[0.3, 0.4, 0.5, 0.4, 0.5], sum="2.1", sumSq="0.91",
+                        value="0.42000000000000004")])])
 
     summarize_vector(
         "open-run-pending",

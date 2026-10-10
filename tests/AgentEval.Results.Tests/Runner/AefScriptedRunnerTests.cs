@@ -527,6 +527,44 @@ public sealed class AefScriptedRunnerTests : IDisposable
         Assert.Throws<FormatException>(() => AefScriptedTarget.Read(Target(1, Suite("suite:a", "1", json))));
     }
 
+    [Theory]
+    [InlineData(64, true)]   // 64 characters, 128 UTF-16 units: accepted (R10-5)
+    [InlineData(65, false)]
+    [InlineData(0, false)]
+    public void APriceTablesName_HasOneTo64Characters_CountedAsJsonSchemaCountsThem(int emoji, bool accepted)
+    {
+        // JSON Schema's maxLength counts code points, so U+1F600 is one character, though .NET holds it in two units.
+        var name = string.Concat(Enumerable.Repeat("\U0001F600", emoji));
+        var target = Target(1, Suite("suite:s/a", "1", Case("a-1")));
+        target["priceTable"] = name;
+
+        if (!accepted)
+        {
+            Assert.Throws<FormatException>(() => AefScriptedTarget.Read(target));
+            return;
+        }
+
+        var job = Run(Plan(suites: [("suite:s/a", "1")]), target);
+
+        Assert.Equal("job.sealed", job.Result.Terminal);
+        Assert.Equal(name, (string?)job.Runs[0].Run["costPolicy"]!["priceTable"]);
+        Assert.Equal(name, (string?)job.Events.Single(e => (string?)e["kind"] == "plan.estimated")["priceTable"]);
+        AssertKeepsTheStreamRules(job);
+    }
+
+    [Fact]
+    public void AReasonLongerThan2048Characters_IsCutByCharacter_NeverInsideOne()
+    {
+        var emoji = string.Concat(Enumerable.Repeat("\U0001F600", 2100));
+
+        var cut = AefScriptedRunner.CutReason(emoji);
+
+        Assert.Equal(2048, cut.EnumerateRunes().Count());
+        Assert.EndsWith("\U0001F600...", cut, StringComparison.Ordinal);
+        Assert.Equal(emoji[..10], AefScriptedRunner.CutReason(emoji[..10]));                       // short: as it is
+        Assert.Equal(new string('x', 2048), AefScriptedRunner.CutReason(new string('x', 2048)));   // exactly 2,048: as it is
+    }
+
     [Fact]
     public void ATargetsWholeSeconds_MayBeWrittenWithAFraction_OfZero()
     {

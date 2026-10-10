@@ -13,7 +13,10 @@
    a target whose cases have a severity exactly when failed or warn, and expects the first cases of a suite its
    scripted target has, and one with `refused` expects nothing of a job; and run.json, a plan and a runner manifest list the same target modes;
 9. every row of a table in the spec is indented as its table's first row (a row that is not leaves the table: in a
-   list item, CommonMark renders it as a paragraph of pipes).
+   list item, CommonMark renders it as a paragraph of pipes);
+10. no published page cites a review id (R7R-3, R9-2, W3-17, …): they resolve only in the editors' notes, which are
+   not published. A page names the rule a ruling concerns instead. Every published page is checked, the changelog
+   and the interop pages included; tool code and vectors' `why` fields may cite them.
 
 Usage: python contracts/aef/tools/check_spec.py
 """
@@ -44,6 +47,22 @@ CODES_UNTESTED = {}
 NOT_CODES = {"payload", "payloadType", "signatures", "keyid", "sig", "runs", "status", "axes", "s", "null", "aborted",
              "severity", "direction", "comparison",  # CKP-8 names the fields a lane reads
              "decided"}  # CKP-7 names the state
+
+# Published pages (every Markdown file of contracts/aef) that may still cite review ids, and why (check 10).
+REVIEW_IDS_ELSEWHERE: dict[str, str] = {}  # every published page is checked: none cites a review id
+REVIEW_ID = re.compile(r"(?<![A-Za-z0-9])(R[0-9]+[A-Z]*(?:-[0-9]+[a-z]?)?|W[0-9]+-[0-9]+)(?![A-Za-z0-9])")
+
+
+def published_pages():
+    """{path relative to contracts/aef: text} of every Markdown page check 10 covers."""
+    root = AEF.parent
+    pages = {}
+    for page in sorted(root.rglob("*.md")):
+        rel = page.relative_to(root).as_posix()
+        if not any(rel == skip or (skip.endswith("/") and rel.startswith(skip)) for skip in REVIEW_IDS_ELSEWHERE):
+            pages[rel] = page.read_text(encoding="utf-8")
+    return pages
+
 
 UNTESTED = {
     "ENC-12": "a reader must not fetch the $id names: behaviour, not a file property",
@@ -150,6 +169,12 @@ def main():
         problems.append(f"problem code '{code}' is expected by no corpus vector (add one, or list it in CODES_UNTESTED)")
     for code in sorted(set(CODES_UNTESTED) & used_codes):
         problems.append(f"CODES_UNTESTED lists '{code}', but a vector expects it: take it off the list")
+
+    # Review ids resolve only in the editors' notes: a published page names the rule instead (check 10).
+    for rel, page in published_pages().items():
+        for n, line in enumerate(page.splitlines(), start=1):
+            for found in REVIEW_ID.findall(line):
+                problems.append(f"{rel}:{n}: cites the review id {found}, which no published page defines")
 
     # Tables: a row indented otherwise than its table's first row is not part of the table (CommonMark, GFM).
     for name, t in text.items():

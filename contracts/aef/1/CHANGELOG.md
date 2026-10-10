@@ -1,5 +1,25 @@
 # AEF 1.0 changelog
 
+## Unreleased (draft): rework after critic round 10
+
+Critic round 10 scored 9.46 of 10 (from 9.43): every round-9 finding fixed in both implementations; only the patent
+commitment and a first CI run block publishing. Changes since:
+
+- **An input error is exit 2 and nothing else** ([CONF-3], §9.3): a vector that expects a refusal passes only on exit
+  2 with a message on standard error. Before, any non-zero exit passed, so a program that crashed passed every refusal
+  vector; check_runner now proves that one which crashes, exits 3 or exits 2 silently passes none.
+- **A summary's mean is one division** ([SUM-5]): `value` is the binary64 `sum` divided by `n`, so two producers
+  write the same bytes (`2.1 / 5` is `0.42000000000000004`); a verifier still compares within §3.6, so the exact mean
+  stays valid. A vector shows the difference.
+- **Inspect reads every integer by value** (inspect.md, IN-6, IN-8, IN-9): epochs, epoch, token counts and `k`, like
+  ids, count however they are spelled (`1`, `1.0`), with each field's range and rule; a NaN inside a list is refused
+  as the log is read, and a bare NaN is never a member name. Both converters agree on 107 of the critic's 109 probes;
+  the other two are this SUM-5 ruling.
+- **Lengths in characters**: the .NET scripted runner counted a name's length in UTF-16 units; it now counts as JSON
+  Schema does, and cuts a reason without splitting a character.
+- **Published pages cite rules, not review ids**: the interop pages, the rationale and this changelog no longer cite
+  the editors' review ids, which resolve only in unpublished notes; check_spec now fails on one.
+
 ## Unreleased (draft): rework after critic round 9
 
 Critic round 9 scored 9.43 of 10 (from 9.39): "technically AEF 1.0 is ready"; no divergence between the two runners
@@ -72,7 +92,7 @@ commitment and a first green CI run. Changes since:
   schemes the runner cannot resolve, a missing suite, two suites sharing case ids, and a manifest without target
   modes. `runner-examples/` became these vectors; `tools/check_runner.py` keeps the sweep of the corpus plans, the
   system clock and usage errors.
-- **A second runner, and what it found** (R7R-1 to R7R-10). AgentEval.Results' scripted runner, written from the
+- **A second runner, and what it found**. AgentEval.Results' scripted runner, written from the
   text alone, passes every `job` vector, so two implementations pass the Runner class's vectors and the class is no
   longer released *at risk* (§9.1 says what no vector reaches: live targets). Ruled from its findings:
   - the budget is checked as [STRM-3] and [STRM-4] will compute it: the job's spend and the sum of the runs' costs,
@@ -85,8 +105,8 @@ commitment and a first green CI run. Changes since:
   - the scripted target fixes each case's `severity`, the run's end before closing, `process` isolation only, and
     its own shape (an unknown member is an input error) (§9.2.1).
 - **CKP-7 says one thing** (§5.3): a list of four. Only a later minor's values are `unverifiable`; a 1.0 manifest
-  checked as decided without a decision, or without its input, is a `decision` problem. The rulings R6N-1 and R6N-2
-  are revised: their vectors now expect `decision`; added a 1.0 manifest with an unknown outcome and no decision, and
+  checked as decided without a decision, or without its input, is a `decision` problem. The round-6 rulings on a manifest
+  in an unknown state are revised: their vectors now expect `decision`; added a 1.0 manifest with an unknown outcome and no decision, and
   its 1.1 twin.
 - **Self-check**: runner mutations (cost bound, time bound, case-id prefixes, credentials, a suite twice), RUN-3's
   `overlays` boundary, and `over-cases` by id alone; each is caught.
@@ -95,7 +115,7 @@ commitment and a first green CI run. Changes since:
   IMPLEMENTATIONS.md says CI's first run is pending.
 - **Interop: both directions of both mappings have two converters.** AgentEval.Results.Adapters now converts AEF
   to and from Inspect eval logs as well as OpenTelemetry, written from the page alone, and reproduces every checked
-  example. What it found (R7I-1 to R7I-17) is ruled into inspect.md (settled 10-10): values, not bytes; a run that
+  example. What it found is ruled into inspect.md (settled 10-10): values, not bytes; a run that
   keeps no content exports no explanation (IN-13), as OT-3; a blob that is not UTF-8 refuses the export, a withheld
   one is left out (IN-12), as OT-9; only the records a sample's lines cite are read or refused; a ref's name is
   decoded on export; equal root times count as one; a reducer with no AEF value is refused only with more than one
@@ -161,7 +181,7 @@ design; the two implementations agreed on every crafted input. Changes since:
     the reader refuses is now an input error (exit 2) for `match`, `stream` and `conform`, as §9.3 now says.
 - **Interop** (informative): a second AEF ↔ OpenTelemetry converter (AgentEval.Results.Adapters, .NET, written from
   the page alone) reproduces the three OpenTelemetry examples.
-  - What it found in `opentelemetry.md` is ruled into the page as rules, settled 10-09 (R7N-3 to R7N-12):
+  - What it found in `opentelemetry.md` is ruled into the page as rules, settled 10-09:
     - the page fixes values, not bytes, and `check_interop.py` now compares JSON outputs as values;
     - a refused line refuses the whole export;
     - the sealed lines are exported, overlays not applied (OT-7);
@@ -187,7 +207,7 @@ Critic round 5 scored 8.8 of 10 (from 8.6). Changes since:
   junk files voids a signed redaction.
 - **An oversized envelope is malformed, never a problem of the run** ([SIG-1], [ENC-18], §4.5): beyond 56 MiB an
   envelope verifies for no one; an attestation then signs for no one, a batch signature authorizes nothing, an
-  orphan one changes nothing. The two implementations had split on it (W3-21).
+  orphan one changes nothing. The two implementations had split on it.
 - **Only a later minor can claim `unverifiable`** ([CKP-8], [VER-6]): a document that declares 1.0 is read as 1.0
   reads it, so a member nobody defined cannot turn a false recorded result from `lane-result` into `unverifiable`.
 - **The rollup tree follows the trial trees** ([RES-8]): a rollup's parent is the rollup at its trial lines' parents'
@@ -199,7 +219,7 @@ Critic round 5 scored 8.8 of 10 (from 8.6). Changes since:
   vector's paths are relative and stay inside (§9.2.1); OVL-5 no longer says a crash line always reads as
   `event-invalid`; the producer guide writes the summary before closing the run ([RUN-4]); the `produce` judge takes
   an absent `contentCapture` as `on` ([RUN-11]).
-- **Interop** (informative): the Inspect → AEF direction is now built and checked (R5-9).
+- **Interop** (informative): the Inspect → AEF direction is now built and checked.
   - `tools/aef_interop.py from-inspect` converts an Inspect eval log into an imported run, sealed as `ingest`, with
     what it supplies in `imported.asserted`. Writing it from `inspect.md` alone settled what the table left open, as
     rules and stated refusals of the page (IN-6 to IN-10, settled 10-09): the run header; values the table does not
@@ -212,7 +232,7 @@ Critic round 5 scored 8.8 of 10 (from 8.6). Changes since:
     the worked example shows the way back.
 - **Vectors**: at their values, a 40 MiB seal, a 4 MiB results line and a 56 MiB envelope; one byte beyond, an
   envelope, an attestation, a batch signature and an orphan one; junk files under `overlays/`, by name and by number;
-  a batch beyond what a reader reads (R4N-2); 1,000,000 lines and an unfinished one (R4N-3); a 1.0 checkpoint with a
+  a batch beyond what a reader reads; 1,000,000 lines and an unfinished one; a 1.0 checkpoint with a
   member nobody defined; independent roots in trials; a versioned and a later-versioned trust policy; a `produce`
   run without `contentCapture`, and one with times to the nanosecond.
 
@@ -228,7 +248,7 @@ addressed, and a second implementation passing every vector kind, writers includ
   (an unfinished line is no line); a longer one is `limit` once, and its verified batches still stand. More than
   19,999 files under `overlays/` is `limit` at `overlays`. Before, one blank line appended by a crashed writer voided
   an authorized redaction, and a million appended lines split two verifiers; a first fix (the verified batches
-  judged as a file) still let one crash line stop the chain for good, which implementing it found (R4N-9). A new
+  judged as a file) still let one crash line stop the chain for good, which implementing it found. A new
   adversary in §8.1: the appender.
 - **1.0 verifiers never call a 1.1 lane wrong** ([CKP-8], [VER-5]): a lane is `unverifiable` when recomputing it
   reads anything this version does not know: a rule not valid against the writer schema (any new member, kind or
@@ -238,14 +258,13 @@ addressed, and a second implementation passing every vector kind, writers includ
   cannot honour a restriction it does not know); `may` is matched exactly, and a value a verifier does not know
   grants nothing. Before, the reference granted redaction to `"may": "never-redact"`.
 - **Every ruling born of a disagreement is pinned** (§9.2): `conformance/rulings/` holds a vector for each ruling
-  made where the two implementations disagreed (W3-17 to W3-19, W4-1 to W4-3, W4-5, W4-6, W4-10, and LANE-3's
-  trial lines); undoing any of them in the reference fails its vector, and `--self-check` now proves it with a
+  made where the two implementations disagreed (LANE-3's trial lines among them); undoing any of them in the reference fails its vector, and `--self-check` now proves it with a
   mutation for each, and for each of this round's rules.
 - **Limits tested at their values** (§9.2): generated vectors (`limits/`) that the conformance runner builds from a
   recipe: a run folder of exactly 100,000 files and one of 100,001, 1,000,001 lines, a 4 MiB line, a 40 MiB seal,
   20,000 files under `overlays/`. The corpus stays small.
 - **Writers**: five more `summarize` refusals, one per input error §9.3 lists. A Producer is now tested as the writer
-  of `results.ndjson` (R4-6): the write-side kind `produce` (§9.2.1, §9.3) gives it a scenario, the facts of a closed
+  of `results.ndjson`: the write-side kind `produce` (§9.2.1, §9.3) gives it a scenario, the facts of a closed
   run (its `run.json` and `metrics.json`, each case's result tree and trial trees as facts, a summary request), and
   judges the run it writes: the lines as a set, matched by case, path and trial, with their result ids, parents,
   trial numbers, rollups (`n`, `passed`, `agree`) and aggregation counts, then the summary and the reference
@@ -290,7 +309,7 @@ addressed, and a second implementation passing every vector kind, writers includ
     complete (severity, `durationMs`, `turns`, `attack`, `lane`, `normalized`, usage, start times were missing), and
     its worked example's claim that every `usage` entry sits on a span is corrected.
 
-### Rulings from implementing the run, checkpoint and stream verifiers (W3-16 to W3-21, W4-1 to W4-14)
+### Rulings from implementing the run, checkpoint and stream verifiers
 
 Written into the text in the round-3 rework, listed here for the record:
 

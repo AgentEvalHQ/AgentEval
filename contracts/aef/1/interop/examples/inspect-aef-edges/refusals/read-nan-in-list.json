@@ -69,13 +69,16 @@
   },
   "samples": [
     {
-      "id": 9007199254740993,
+      "id": "a",
       "epoch": 1,
       "input": "",
       "target": "",
       "scores": {
         "q": {
-          "value": 0.9,
+          "value": [
+            NaN,
+            1
+          ],
           "explanation": ""
         },
         "m": {

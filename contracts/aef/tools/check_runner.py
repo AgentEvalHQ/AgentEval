@@ -15,8 +15,8 @@ What is checked here:
     set; a manifest that names no targetModes is given with scripted added. A plan the reader refuses is given as
     written. The runner takes a plan exactly when the independent tools say it can: aef_stream.py's PLAN-7 matching,
     the target mode scripted, the isolation process (a scripted target runs in the runner's process, spec 09
-    §9.2.1), and the suites the target has, once each, with the digests the plan names (PLAN-8). What an accepted job ends with is written in
-    CORPUS_STOPS (a limit) or is every case of every suite. Two corpus plans are also given asking for live (no
+    §9.2.1), and the suites the target has, once each, with the digests the plan names (PLAN-8). What an accepted
+    job ends with is written in CORPUS_STOPS (a limit) or is every case of every suite. Two corpus plans are also given asking for live (no
     targetMode) and mocked: refused. Each job runs twice with --at, and the outputs must be byte-identical (this
     runner's own property: ids are free for other runners).
   - The system clock: one job without --at, judged with every check but the clock's.
@@ -24,6 +24,10 @@ What is checked here:
     empty (the conformance runner always gives a fresh one) and a suite of the target with a member §9.2.1 does not
     name each exit 2 and write nothing; and `aef_verify.py stream` and `conform`, given a plan the reader
     refuses (plans/timeout-in-seconds), exit 2 with a message, never a traceback.
+  - The conformance runner's own judging of a refusal (CONF-3: an input error is exit 2 with a message on standard
+    error, and nothing else): driven through --command, a program that crashes (exit 1, a traceback), one that exits
+    3 and one that exits 2 with no message pass none of the corpus's vectors that expect a refusal (`refused`,
+    `policyRefused`, `expectedError`).
 
 Usage: python check_runner.py     (exits 1 on any failed check)
 """
@@ -249,13 +253,14 @@ def main():
         printed = engine.call(["job", plan, runner, _write(tmp / "inputs" / "bad-target.json", dict(
             TARGET, suites=[dict(first, lane="quality")])), out, "--at", AT])
         report("input error: a target's suite with a member §9.2.1 does not name",
-               [] if "error" in printed and not out.exists() else
+               [] if aef_conformance.input_error(printed) and not out.exists() else
                [f"{printed}, OUT {'written' if out.exists() else 'absent'}"])
         out = tmp / "not-empty"
         out.mkdir()
         (out / "keep.txt").write_bytes(b"x")
         printed = engine.call(["job", plan, runner, target, out, "--at", AT])
-        report("usage error: an OUT that is not empty", [] if "error" in printed and files_of(out) == ["keep.txt"] else
+        report("usage error: an OUT that is not empty",
+               [] if aef_conformance.input_error(printed) and files_of(out) == ["keep.txt"] else
                [f"{printed}, OUT holds {files_of(out)}"])
 
         # A plan the reader refuses is no plan to check against: an input error (exit 2), never a traceback.
@@ -267,6 +272,20 @@ def main():
             report(f"aef_verify.py {argv[0]} with a plan the reader refuses",
                    [] if done.returncode == 2 and "Traceback" not in done.stderr and done.stderr.strip() else
                    [f"exit {done.returncode}: {done.stderr.strip()[-200:]}"])
+
+        # CONF-3: only exit 2, with a message, is an input error. Programs that never run pass no refusal vector.
+        vectors, refusals = aef_conformance.from_index(aef_conformance.CORPUS, aef_conformance.CORPUS / "index.json")
+        expecting = [v for v in vectors if isinstance(v.expected, dict) and (
+            v.expected.get("refused") or v.expected.get("policyRefused") or "expectedError" in v.expected)]
+        for name, code in (("crashes (exit 1, a traceback)", "raise RuntimeError('crashed')"),
+                           ("exits 3 with a message", "import sys; sys.stderr.write('no\\n'); sys.exit(3)"),
+                           ("exits 2 with no message", "import sys; sys.exit(2)")):
+            never = aef_conformance.External.__new__(aef_conformance.External)
+            never.command, never.name = [sys.executable, "-X", "utf8", "-I", "-c", code], name
+            _, failing = aef_conformance.run_all(never, expecting, [], quiet=True, show=lambda *a: None)
+            passed = [v.id for v in expecting if v.id not in failing]
+            report(f"the conformance runner, given a program that {name}: {len(expecting)} refusal vectors",
+                   [f"{len(passed)} pass: {', '.join(passed[:5])}"] if passed or not expecting else [])
 
     print(f"{count - failed} of {count} runner checks pass")
     return 1 if failed or not count else 0

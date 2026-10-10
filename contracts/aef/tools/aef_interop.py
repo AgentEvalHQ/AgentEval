@@ -86,11 +86,12 @@ def _writer_schemas():
     return _WRITER
 
 
-def _check_schema(schema, document, where):
+def _check_schema(schema, document, where, page=None):
     """A converted run is a new run (interop/README.md): its documents are valid against the writer schemas."""
     errors = _writer_schemas().validate(schema, document)
     if errors:
-        raise InputError(f"{where} would not be valid against the writer {schema} schema: {errors[0]}")
+        named = f": refused ({page})" if page else ""
+        raise InputError(f"{where} would not be valid against the writer {schema} schema: {errors[0]}{named}")
 
 
 def _verified(run_dir, what, page):
@@ -123,16 +124,18 @@ def _nanos(timestamp, what):
     return seconds * 10 ** 9 + nanos
 
 
-def _timestamp(nanos, where):
+def _timestamp(nanos, where, page=None):
     """Nanoseconds since the Unix epoch as an RFC 3339 UTC time ([ENC-8]): the fraction with no trailing zero, and
     none when it is zero (OTLP's 1790949735000000000 is 2026-10-02T14:02:15Z)."""
     seconds, fraction = divmod(nanos, 10 ** 9)
     try:
         moment = datetime.datetime.fromtimestamp(seconds, tz=datetime.timezone.utc)
     except (OverflowError, OSError, ValueError):
-        raise InputError(f"{where}: timeUnixNano {nanos} is not a time AEF can write ([ENC-8])") from None
+        raise InputError(f"{where}: {nanos} ns is not a time AEF can write ([ENC-8])"
+                         + (f": refused ({page})" if page else "")) from None
     if not 1 <= moment.year <= 9999:
-        raise InputError(f"{where}: timeUnixNano {nanos} is outside the years 0001 to 9999 ([ENC-8])")
+        raise InputError(f"{where}: {nanos} ns is outside the years 0001 to 9999 ([ENC-8])"
+                         + (f": refused ({page})" if page else ""))
     text = moment.strftime("%Y-%m-%dT%H:%M:%S")
     if fraction:
         text += "." + f"{fraction:09d}".rstrip("0")
@@ -353,10 +356,11 @@ def _hex_id(record, key, size, where):
     return value.lower()
 
 
-def _text(value, field, maximum, where):
+def _text(value, field, maximum, where, page=None):
     """caseId, a path, an evaluator id, a metric: 1 to maximum characters, no control character ([RES-4])."""
     if not 1 <= len(value) <= maximum or re.search("[\x00-\x1f\x7f-\x9f]", value):
-        raise InputError(f"{where}: {value!r} cannot be a {field} (1 to {maximum} characters, no control character)")
+        raise InputError(f"{where}: {value!r} cannot be a {field} (1 to {maximum} characters, no control character)"
+                         + (f": refused ({page})" if page else ""))
     return value
 
 
@@ -641,7 +645,7 @@ def inspect_score(run_dir, run, line, where):
                 raise InputError(f"{where}: the metric {s.get('metric')!r} is scored twice")
             values[s.get("metric")] = s["label"] if "label" in s else s.get("value")  # a label is the value
         score["value"] = next(iter(values.values())) if len(values) == 1 else values  # two or more: a map
-    # IN-13 (R7I-3): a run that keeps no content gives no explanation, as OT-3. IN-12 (R7I-9): a reasoning blob that
+    # IN-13: a run that keeps no content gives no explanation, as OT-3. IN-12: a reasoning blob that
     # is not UTF-8 refuses the export; one an authorized redaction withholds is left out.
     explanation = None if run.get("contentCapture") == "off" else \
         _explanation(run_dir, run, line, where, rule="inspect.md, AEF -> Inspect, IN-12")
@@ -680,7 +684,7 @@ def _case_content(run_dir, lines, evidence, where):
 
 def _root_fact(roots, field, where):
     """A fact of "a case's root line" (startedAt, endedAt, durationMs): roots that carry the same value (times as
-    instants, [ENC-8]) count as one; two different values are refused (IN-5, R7I-5)."""
+    instants, [ENC-8]) count as one; two different values are refused (IN-5)."""
     carried = [root[field] for root in roots if field in root]
     same = (lambda v: _nanos(v, f"{where} {field}")) if field in ("startedAt", "endedAt") else (lambda v: v)
     if len({same(v) for v in carried}) > 1:
@@ -770,7 +774,7 @@ def to_inspect(run_dir, out, ignore_overlays=False):
         raise InputError(f"run.json: the status {run.get('status')!r} is not one AEF 1.0 defines ([RUN-5])")
     ref = subject.get("ref", "")
     kind_part, _, name_part = ref.partition(":")
-    name_part = _unref(name_part)  # R7I-8: the name decoded, so the import's ENC-13 encoding gives the ref back
+    name_part = _unref(name_part)  # the name decoded, so the import's ENC-13 encoding gives the ref back
     model = name_part if subject.get("kind") == "model" and kind_part == "model" else f"{kind_part}:{name_part}"
     case_ids = list(dict.fromkeys(line["caseId"] for line in lines))
     spec = {"eval_id": run["runId"], "run_id": run["runId"], "created": run.get("startedAt"),
@@ -825,7 +829,7 @@ def to_inspect(run_dir, out, ignore_overlays=False):
         stats["role_usage"] = role_usage
     log["stats"] = stats
     if status == "error":
-        log["error"] = {"message": run.get("abortReason", ""), "traceback": "", "traceback_ansi": ""}  # R7I-7
+        log["error"] = {"message": run.get("abortReason", ""), "traceback": "", "traceback_ansi": ""}
     log["samples"] = samples
     if rollups:
         log["reductions"] = [
@@ -846,7 +850,7 @@ INSTRUMENT_BLAMED = ("grader_failed", "scoring_failed")  # with NaN: state error
 FROM_REDUCER = {"majority": "MajorityVote", "mode": "MajorityVote", "mean": "Mean", "median": "Median", "max": "Max"}
 MEAN_METRICS = ("accuracy", "mean")  # a summary entry's mean (SUM-5)
 NO_VALUE_REASON = "Inspect recorded no value (NaN) and no reason"  # IN-7
-ERROR_REASON = "Inspect recorded an error without a message"  # IN-8, R8-4
+ERROR_REASON = "Inspect recorded an error without a message"  # IN-8
 _INSPECT_TIME = re.compile(r"([0-9]{4})-([0-9]{2})-([0-9]{2})T([0-9]{2}):([0-9]{2}):([0-9]{2})(?:\.([0-9]{1,9}))?"
                            r"(Z|[+-][0-9]{2}:[0-9]{2})")
 _AEF_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
@@ -857,13 +861,14 @@ SAFE_INTEGER = 2 ** 53 - 1  # [ENC-4]: an integral value every binary64 reader r
 
 
 def _nan_allowed(path):
-    """Where an Inspect log may hold its bare NaN token (IN-6, R9-2): a score's value or a map member of it, a reduced
+    """Where an Inspect log may hold its bare NaN token (IN-6): a score's value or a map member of it, a reduced
     score's, a metric's value, a limit's number (which IN-8 then refuses) and case content (which JCS refuses when it
     is kept). Anywhere else, a NaN refuses the log."""
     p = path
-    if len(p) in (5, 6) and p[0] == "samples" and p[2] == "scores" and p[4] == "value":
+    member = len(p) == 5 or len(p) == 6 and isinstance(p[5], str)  # the value, or a member of a map one, not a list's
+    if member and p[0] == "samples" and p[2] == "scores" and p[4] == "value":
         return True
-    if len(p) in (5, 6) and p[0] == "reductions" and p[2] == "samples" and p[4] == "value":
+    if member and p[0] == "reductions" and p[2] == "samples" and p[4] == "value":
         return True
     if len(p) == 6 and p[:2] == ("results", "scores") and p[3] == "metrics" and p[5] == "value":
         return True
@@ -875,7 +880,7 @@ def _nan_allowed(path):
 def _read_inspect_log(path):
     """An Inspect log in its .json form, read as I-JSON (RFC 7493), as AEF reads its own files ([ENC-1]-[ENC-3]),
     within [ENC-17]'s nesting depth, with one exception Inspect needs: its bare NaN token, where _nan_allowed says.
-    Everything else is refused as the log is read, wherever it is (IN-6, R9-2): a byte-order mark or bytes that are
+    Everything else is refused as the log is read, wherever it is (IN-6): a byte-order mark or bytes that are
     not UTF-8; a member named twice; a string with an unpaired surrogate; Infinity; a number that overflows binary64
     (1e400); nesting deeper than 64. Every number is read as binary64 ([ENC-4]): an integer beyond 2^53 reads as the
     binary64 value a JSON parser gives it."""
@@ -938,18 +943,26 @@ def _read_inspect_log(path):
         elif isinstance(value, list):
             stack.extend((where + (i,), item) for i, item in enumerate(value))
     if not isinstance(log, dict) or not isinstance(log.get("eval"), dict):
-        raise InputError("the Inspect log is not an EvalLog (an object with eval)")
+        raise InputError("the Inspect log is not an EvalLog (an object with eval): refused (inspect.md, Inspect -> AEF, IN-6)")
     return log
 
 
-def _integral_text(value, field, where, item):
-    """A sample's id or eval.task_version that is a number: an integer of at most 2^53 - 1 in magnitude ([ENC-4]),
-    from its value alone (1, 1.0 and 1e0 alike), written in decimal digits; any other number is refused (R9-2)."""
+def _whole(value, field, where, item, low=-SAFE_INTEGER, high=SAFE_INTEGER):
+    """An integer field of the log (an id, a version, an epoch, epochs, a token count, a metric's k), read by its
+    binary64 value alone ([ENC-4]): 1, 1.0 and 1e0 are the integer 1. A value that is no integer of at most 2^53 - 1
+    in magnitude, or outside [low, high], is refused, naming the field's rule (item)."""
     if isinstance(value, float) and value.is_integer() and abs(value) <= SAFE_INTEGER:
         value = int(value)
-    if isinstance(value, bool) or not isinstance(value, int) or abs(value) > SAFE_INTEGER:
-        _in(where, f"{field} {value!r} is a number that is not an integer of at most 2^53 - 1 in magnitude", item)
-    return str(value)
+    if isinstance(value, bool) or not isinstance(value, int) or abs(value) > SAFE_INTEGER or not low <= value <= high:
+        bounds = "of at most 2^53 - 1 in magnitude" if (low, high) == (-SAFE_INTEGER, SAFE_INTEGER) else \
+            f"from {low} to {high}" if high < SAFE_INTEGER else f"of at least {low}"
+        _in(where, f"{field} {value!r} is not an integer {bounds}", item)
+    return value
+
+
+def _integral_text(value, field, where, item):
+    """A sample's id or eval.task_version that is a number: an integer, by value (_whole), in decimal digits."""
+    return str(_whole(value, field, where, item))
 
 
 def _inspect_nanos(text, where):
@@ -960,7 +973,7 @@ def _inspect_nanos(text, where):
     try:
         moment = datetime.datetime(*(int(g) for g in m.groups()[:6]), tzinfo=datetime.timezone.utc)
     except ValueError:
-        raise InputError(f"{where}: {text!r} names a date that does not exist") from None
+        raise InputError(f"{where}: {text!r} names a date that does not exist: refused (inspect.md, Inspect -> AEF, IN-6)") from None
     offset = 0 if m.group(8) == "Z" else (int(m.group(8)[1:3]) * 60 + int(m.group(8)[4:6])) * \
         (1 if m.group(8)[0] == "+" else -1)
     seconds = int(moment.timestamp()) - offset * 60
@@ -979,7 +992,7 @@ def _ref(kind, name):
 
 def _unref(name):
     """The free text a ref's name encodes ([ENC-13]): every %XX is the byte XX, `-` is the empty name. A name that
-    does not decode to UTF-8 is kept as written (R7I-8)."""
+    does not decode to UTF-8 is kept as written."""
     if name == "-":
         return ""
     if "%" not in name:
@@ -1002,7 +1015,7 @@ def _finite(value):
 
 
 def _shortest(value):
-    """A finite number written from its binary64 value alone (R8-4): the shortest decimal that reads back as the same
+    """A finite number written from its binary64 value alone: the shortest decimal that reads back as the same
     binary64 value, the form [ENC-4] recommends, spelled as ECMAScript's Number::toString spells it. 1000 and 1000.0
     give 1000, 1e16 gives 10000000000000000, 1e21 gives 1e+21, 1e-7 gives 1e-7, 0.5 gives 0.5."""
     x = float(value)
@@ -1052,11 +1065,11 @@ def _aef_role(name, model_roles):
     return "judge" if name in model_roles else "other"
 
 
-def _usage_entry(role, model, usage, where):
-    """A usage entry from an Inspect ModelUsage: tokens under OpenTelemetry's names, total_cost as costUsd; Inspect's
-    total_tokens is left out (it is input and output)."""
+def _usage_entry(role, model, usage, where, item):
+    """A usage entry from an Inspect ModelUsage: tokens under OpenTelemetry's names, each an integer by value
+    (_whole), total_cost as costUsd; Inspect's total_tokens is left out (it is input and output)."""
     if not isinstance(usage, dict):
-        raise InputError(f"{where}: a usage is not an object")
+        _in(where, "a usage that is not an object", item)
     entry = {"role": role}
     if model is not None:
         entry["model"] = model
@@ -1064,13 +1077,11 @@ def _usage_entry(role, model, usage, where):
         value = usage.get(inspect)
         if value is None:
             continue
-        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
-            raise InputError(f"{where}: {inspect} is not a count of tokens")
-        entry[aef] = value
+        entry[aef] = _whole(value, inspect, where, item, low=0)
     cost = usage.get("total_cost")
     if cost is not None:
         if isinstance(cost, bool) or not isinstance(cost, (int, float)) or not cost >= 0:
-            raise InputError(f"{where}: total_cost is not a cost")
+            _in(where, "a total_cost that is not a cost (a finite number of at least 0)", item)
         entry["costUsd"] = cost
     return entry
 
@@ -1119,7 +1130,7 @@ def _jcs(value, where):
     if isinstance(value, dict):
         members = sorted(value.items(), key=lambda kv: kv[0].encode("utf-16-be"))
         return "{" + ",".join(_jcs(k, where) + ":" + _jcs(v, where) for k, v in members) + "}"
-    raise InputError(f"{where}: content that is not JSON")
+    _in(where, "content that is not JSON", "IN-8")
 
 
 def _text_bytes(value, where):
@@ -1153,12 +1164,12 @@ class _Blobs:
 def inspect_line(run_id, case_id, path, trial, score, evaluator_id, capture, blobs, where):
     """The result line of one Inspect Score (IN-7)."""
     if not isinstance(score, dict):
-        raise InputError(f"{where}: a score is not an object")
+        _in(where, "a score that is not an object", "IN-7")
     if score.get("history"):
         _in(where, "a score with history edits: the reference converter writes no overlays", "IN-10")
     value, reason_name, explanation = score.get("value"), score.get("reason"), score.get("explanation")
     if reason_name is not None and (not isinstance(reason_name, str) or not reason_name):
-        raise InputError(f"{where}: Score.reason is not a name")
+        _in(where, "a Score.reason that is not a name", "IN-7")
     scores, extra = [], {}
 
     def measured(member, metric):
@@ -1173,7 +1184,7 @@ def inspect_line(run_id, case_id, path, trial, score, evaluator_id, capture, blo
     if isinstance(value, float) and math.isnan(value):  # unscored
         state = "error" if reason_name in INSTRUMENT_BLAMED else "failed" if reason_name in MODEL_BLAMED \
             else "not_measured"
-    elif isinstance(value, dict):  # a map: one score per member, scored; a NaN member is unscored (R7I-13)
+    elif isinstance(value, dict):  # a map: one score per member, scored; a NaN member is unscored
         scores = [measured(v, k) for k, v in value.items() if not (isinstance(v, float) and math.isnan(v))]
         state = "scored"
     elif isinstance(value, list):  # a list: kept in ext, no score
@@ -1194,7 +1205,7 @@ def inspect_line(run_id, case_id, path, trial, score, evaluator_id, capture, blo
         line["trial"] = trial
     line["evaluator"], line["state"] = {"id": evaluator_id}, state
     if explanation is not None and not isinstance(explanation, str):
-        raise InputError(f"{where}: Score.explanation is not text")
+        _in(where, "a Score.explanation that is not text", "IN-7")
     if reason is not None:
         line["reason"] = reason
     if scores:
@@ -1247,7 +1258,7 @@ def from_inspect(log_path, out, target_mode, capture, at):
     status = {"success": "completed", "error": "aborted", "cancelled": "aborted", "started": "running"}.get(
         log.get("status"))
     if status is None:
-        raise InputError(f"status {log.get('status')!r} is not one Inspect writes")
+        _in("status", f"{log.get('status')!r}, not a status Inspect writes", "IN-6")
     closed = status != "running"
     run = {"schemaVersion": AEF_VERSION, "runId": run_id, "status": status}
     if log.get("status") == "error":
@@ -1260,19 +1271,18 @@ def from_inspect(log_path, out, target_mode, capture, at):
     run["producer"] = dict(PRODUCER)
     model, task = spec.get("model"), spec.get("task")
     if not isinstance(model, str) or not isinstance(task, str):
-        raise InputError("eval.model and eval.task are strings in an Inspect log")
+        _in("eval", "eval.model and eval.task that are not both strings", "IN-6")
     run["subject"] = {"ref": _ref("model", model), "kind": "model"}
     run["execution"] = {"targetMode": target_mode}
     version = spec.get("task_version", 0)
     if not isinstance(version, str):
-        version = _integral_text(version, "task_version", "eval.task_version", "IN-6")  # R9-2
+        version = _integral_text(version, "task_version", "eval.task_version", "IN-6")
     if not re.fullmatch("[!-~]{1,128}", version) or version.lower() == "latest":
         _in("eval.task_version", f"{version!r} is not an exact version ([ENC-10])", "IN-6")
     suite = {"ref": _ref("suite", task), "version": version}
     config = spec.get("config") or {}
-    epochs = config.get("epochs") or 1
-    if isinstance(epochs, bool) or not isinstance(epochs, int) or not 1 <= epochs <= 1000:
-        raise InputError(f"eval.config.epochs {epochs!r} is not a count of trials from 1 to 1000")
+    epochs = 1 if config.get("epochs") is None else \
+        _whole(config["epochs"], "epochs", "eval.config", "IN-6", low=1, high=1000)  # by value: 1.0 is 1
     reducers = config.get("epochs_reducer") or []
     if len(reducers) > 1:
         _in("eval.config.epochs_reducer", f"{len(reducers)} reducers: a trial aggregation is one", "IN-8")
@@ -1288,7 +1298,7 @@ def from_inspect(log_path, out, target_mode, capture, at):
     model_roles = spec.get("model_roles") or {}
     judged = [c.get("model") for r, c in model_roles.items()
               if isinstance(c, dict) and _aef_role(r, model_roles) == "judge"]
-    if judged:  # eval.model_roles -> judges: a model that grades, each once (R7I-16)
+    if judged:  # eval.model_roles -> judges: a model that grades, each once
         run["judges"] = [{"model": m} for m in dict.fromkeys(judged)]
     asserted = ["subject.ref", "subject.kind", "execution.targetMode", "contentCapture"]
     if stats.get("started_at"):
@@ -1296,7 +1306,7 @@ def from_inspect(log_path, out, target_mode, capture, at):
     else:
         started = _inspect_nanos(spec.get("created"), "eval.created")  # the creation time stands for the start
         asserted.append("startedAt")
-    run["startedAt"] = _timestamp(started, "the start")
+    run["startedAt"] = _timestamp(started, "the start", "inspect.md, Inspect -> AEF, IN-6")
     ended = None
     if closed:
         if not stats.get("completed_at"):
@@ -1304,14 +1314,14 @@ def from_inspect(log_path, out, target_mode, capture, at):
         ended = _inspect_nanos(stats["completed_at"], "stats.completed_at")
         if ended < started:
             _in("stats.completed_at", "an end before the start ([RUN-5])", "IN-6")
-        run["endedAt"] = _timestamp(ended, "the end")
+        run["endedAt"] = _timestamp(ended, "the end", "inspect.md, Inspect -> AEF, IN-6")
     run["contentCapture"] = capture
     packages = spec.get("packages") or {}
     source = f"inspect_ai {packages['inspect_ai']}" if isinstance(packages.get("inspect_ai"), str) else "inspect_ai"
     run["imported"] = {"from": source, "asserted": asserted}
     ext = {k: spec[k] for k in ("run_id", "eval_set_id", "dataset") if spec.get(k) is not None}
     if reducers and not mapped:
-        ext["epochs_reducer"] = reducers  # R7I-14: a reducer without an AEF value, kept as data
+        ext["epochs_reducer"] = reducers  # a reducer without an AEF value, kept as data
     if results.get("headline") is not None:
         ext["headline"] = results["headline"]
     if ext:
@@ -1326,21 +1336,20 @@ def from_inspect(log_path, out, target_mode, capture, at):
             _in(where, "a sample whose id is no string and no number", "IN-8")
         sample_id = sample["id"]
         case_id = _text(sample_id if isinstance(sample_id, str) else
-                        _integral_text(sample_id, "id", where, "IN-8"), "caseId", 256, where)  # R9-2
+                        _integral_text(sample_id, "id", where, "IN-8"), "caseId", 256, where, "inspect.md, Inspect -> AEF, IN-8")
         epoch = sample.get("epoch", 1)
-        if isinstance(epoch, bool) or not isinstance(epoch, int) or not 1 <= epoch <= epochs:
-            _in(where, f"epoch {epoch!r}, beyond eval.config.epochs {epochs}", "IN-8")
+        epoch = 1 if epoch is None else _whole(epoch, "epoch", where, "IN-8", low=1, high=epochs)  # by value
         trial = epoch - 1 if epochs > 1 else None  # trial = epoch - 1, when there is more than one epoch
         if sample.get("invalidation"):
             _in(where, "an invalidated sample: the reference converter writes no overlays", "IN-10")
         scores = sample.get("scores") or {}
         failure, limit = sample.get("error"), sample.get("limit")
-        if failure is not None and not isinstance(failure, dict):  # R9-2: Inspect writes an error as an object
+        if failure is not None and not isinstance(failure, dict):  # Inspect writes an error as an object
             _in(where, f"an error that is not an object ({type(failure).__name__})", "IN-8")
         if limit is not None and not (isinstance(limit, dict) and isinstance(limit.get("type"), str) and limit["type"]
                                       and _finite(limit.get("limit"))):
-            _in(where, "a limit that is not {type, limit} with a type and a finite number (R8-4)", "IN-8")
-        stopped = failure is not None or limit is not None  # an error {} is an error (R9-2)
+            _in(where, "a limit that is not {type, limit} with a type and a finite number", "IN-8")
+        stopped = failure is not None or limit is not None  # an error {} is an error
         if not scores and stopped:  # stopped before it was scored: a line per scorer the log names
             scores = {s.get("name"): {"value": math.nan} for s in spec.get("scorers") or []
                       if isinstance(s, dict) and isinstance(s.get("name"), str)}
@@ -1350,7 +1359,7 @@ def from_inspect(log_path, out, target_mode, capture, at):
         evidence = _sample_content(sample, capture, blobs, where)
         sample_lines = []
         for path, score in scores.items():
-            _text(path, "path", 1024, f"{where}.scores")
+            _text(path, "path", 1024, f"{where}.scores", "inspect.md, Inspect -> AEF, IN-8")
             evaluator = scorer_of.get(path) if isinstance(scorer_of.get(path), str) else path
             line = inspect_line(run_id, case_id, path, trial, score, evaluator, capture, blobs,
                                 f"{where}.scores[{path!r}]")
@@ -1365,23 +1374,24 @@ def from_inspect(log_path, out, target_mode, capture, at):
                 if message is not None and not isinstance(message, str):
                     _in(where, "an error whose message is not text", "IN-8")
                 if not message:
-                    message = ERROR_REASON  # R8-4, R9-2: an error without a message, {} included
+                    message = ERROR_REASON  # an error without a message, {} included
             else:
-                message = f"{limit['type']} limit {_shortest(limit['limit'])}"  # R7I-12, R8-4: "token limit 1000"
+                message = f"{limit['type']} limit {_shortest(limit['limit'])}"  # "token limit 1000"
             for line in sample_lines:
                 line["state"] = "error" if failure is not None else "not_measured"
                 line["reason"] = str(message)[:REASON_MAX] or NO_VALUE_REASON
                 line.pop("scores", None)
         for field, source_field in (("startedAt", "started_at"), ("endedAt", "completed_at")):
             if sample.get(source_field):  # on the case's lines
-                stamp = _timestamp(_inspect_nanos(sample[source_field], f"{where}.{source_field}"), where)
+                stamp = _timestamp(_inspect_nanos(sample[source_field], f"{where}.{source_field}"), where,
+                                   "inspect.md, Inspect -> AEF, IN-6")
                 for line in sample_lines:
                     line[field] = stamp
         first = sample_lines[0]
         if sample.get("total_time") is not None:  # durationMs, on the sample's first line
             seconds = sample["total_time"]
             if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) or not seconds >= 0:
-                raise InputError(f"{where}: total_time is not a duration")
+                _in(where, "a total_time that is not a duration (a finite number of at least 0)", "IN-8")
             ms = float(Fraction(seconds) * 1000)  # rounded once
             first["durationMs"] = int(ms) if ms.is_integer() else ms
         model_usage = sample.get("model_usage") or {}
@@ -1391,9 +1401,9 @@ def from_inspect(log_path, out, target_mode, capture, at):
             role_model = (model_roles.get(role) or {}).get("model") if role in model_roles else \
                 model if aef_role == "agent" else None
             entries.append(_usage_entry(aef_role, role_model if role_model in model_usage else None, usage,
-                                        f"{where}.role_usage[{role!r}]"))
+                                        f"{where}.role_usage[{role!r}]", "IN-8"))
         if model in model_usage and not any(e["role"] == "agent" for e in entries):
-            entries.append(_usage_entry("agent", model, model_usage[model], f"{where}.model_usage"))
+            entries.append(_usage_entry("agent", model, model_usage[model], f"{where}.model_usage", "IN-8"))
         if entries:
             first["usage"] = _merged(entries)
         for line in sample_lines:
@@ -1445,7 +1455,7 @@ def from_inspect(log_path, out, target_mode, capture, at):
         where = f"results.scores[{i}]"
         name, measures = es.get("name"), es.get("metrics") or {}
         if not isinstance(name, str) or not isinstance(measures, dict):
-            raise InputError(f"{where}: an EvalScore has a name and metrics")
+            _in(where, "an EvalScore without a name or metrics", "IN-9")
         means = [m for m in measures if m in MEAN_METRICS]
         others = [m for m in measures if m not in MEAN_METRICS and m != "stderr"]
         if len(means) > 1:
@@ -1461,8 +1471,8 @@ def from_inspect(log_path, out, target_mode, capture, at):
                 _in(where, f"the metric {chosen!r} cannot be an aggregate method", "IN-9")
             aggregate = {"method": chosen}
             k = ((measures[chosen] or {}).get("params") or {}).get("k")
-            if isinstance(k, int) and not isinstance(k, bool) and k >= 1:
-                aggregate["k"] = k
+            if k is not None:  # an integer by value, like every integer field
+                aggregate["k"] = _whole(k, "params.k", where, "IN-9", low=1)
             entry["aggregate"] = aggregate
             given = (measures[chosen] or {}).get("value")
             if chosen not in aef_produce.DEFINED_AGGREGATES and isinstance(given, (int, float)) and \
@@ -1471,7 +1481,7 @@ def from_inspect(log_path, out, target_mode, capture, at):
         elif others:
             _in(where, "no mean and more than one other metric", "IN-9")
         else:
-            chosen = None  # R7I-15: no metric: a plain mean entry, with nothing of Inspect's to compare
+            chosen = None  # no metric: a plain mean entry, with nothing of Inspect's to compare
         inspect_values[name] = ((measures[chosen] or {}).get("value") if chosen else None,
                                 (measures.get("stderr") or {}).get("value"), chosen is not None)
         request.append(entry)
@@ -1483,12 +1493,15 @@ def from_inspect(log_path, out, target_mode, capture, at):
                                                           "scale": "unbounded"} for m in dict.fromkeys(names)]}
     summary = None
     if closed:
-        summary = aef_produce.summary_of(run, metrics, lines, {"lanes": [{"lane": "main", "metrics": request}]})
+        try:
+            summary = aef_produce.summary_of(run, metrics, lines, {"lanes": [{"lane": "main", "metrics": request}]})
+        except InputError as error:
+            raise InputError(f"{error}: refused (inspect.md, Inspect -> AEF, IN-9)") from None
         for entry in summary["lanes"][0]["metrics"]:
             given, stderr, compared = inspect_values[entry["path"]]
             given = None if isinstance(given, float) and math.isnan(given) else given
             mine = entry["value"]
-            if compared and ((given is None) != (mine is None) or (mine is not None and (  # within §3.6 (R7I-15)
+            if compared and ((given is None) != (mine is None) or (mine is not None and (  # within §3.6
                     not isinstance(given, (int, float)) or abs(mine - given) > 1e-9 * max(1, abs(mine))))):
                 _in(f"results.scores {entry['path']!r}", f"Inspect gives {given!r}, the lines give {mine!r}: the "
                                                          "summary is recomputed from the lines ([SUM-5])", "IN-9")
@@ -1501,10 +1514,11 @@ def from_inspect(log_path, out, target_mode, capture, at):
         for used, totals in (stats.get("model_usage") or {}).items():  # one entry per role and model
             role = next((_aef_role(r, model_roles) for r, c in model_roles.items() if c.get("model") == used),
                         "agent" if used == model else "other")
-            usage.append(_usage_entry(role, used, totals, f"stats.model_usage[{used!r}]"))
-        if not stats.get("model_usage"):  # R7I-10: without model_usage, one entry per role_usage role, no model
+            usage.append(_usage_entry(role, used, totals, f"stats.model_usage[{used!r}]", "IN-9"))
+        if not stats.get("model_usage"):  # without model_usage, one entry per role_usage role, no model
             for role, totals in (stats.get("role_usage") or {}).items():
-                usage.append(_usage_entry(_aef_role(role, model_roles), None, totals, f"stats.role_usage[{role!r}]"))
+                usage.append(_usage_entry(_aef_role(role, model_roles), None, totals, f"stats.role_usage[{role!r}]",
+                                          "IN-9"))
         if usage:
             summary["usage"] = _merged(usage)
         costs = [u["costUsd"] for u in usage if "costUsd" in u]
@@ -1513,14 +1527,14 @@ def from_inspect(log_path, out, target_mode, capture, at):
         if summary_ext:
             summary["ext"] = {"inspect_ai": {"metrics": summary_ext}}
 
-    _check_schema("run", run, "run.json")
-    _check_schema("metrics", metrics, "metrics.json")
+    _check_schema("run", run, "run.json", "inspect.md, Inspect -> AEF, IN-11")
+    _check_schema("metrics", metrics, "metrics.json", "inspect.md, Inspect -> AEF, IN-11")
     if summary is not None:
-        _check_schema("summary", summary, "summary.json")
+        _check_schema("summary", summary, "summary.json", "inspect.md, Inspect -> AEF, IN-11")
     for n, line in enumerate(lines, start=1):
-        _check_schema("result", line, f"results.ndjson:{n}")
+        _check_schema("result", line, f"results.ndjson:{n}", "inspect.md, Inspect -> AEF, IN-11")
     for n, record in enumerate(blobs.records, start=1):
-        _check_schema("evidence", record, f"evidence.ndjson:{n}")
+        _check_schema("evidence", record, f"evidence.ndjson:{n}", "inspect.md, Inspect -> AEF, IN-11")
     sealed_at = _nanos(at, "--at")
     if closed and sealed_at < ended:
         raise InputError("--at is before the run's end: the run is sealed after it closes ([SEAL-1])")

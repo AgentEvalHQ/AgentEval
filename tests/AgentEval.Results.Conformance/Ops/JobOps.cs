@@ -20,7 +20,11 @@ internal static class JobOps
 {
     private const string Usage = "job PLAN RUNNER TARGET OUT --at T";
 
-    /// <summary>The operation. The credentials' variables are read from this process's environment ([PLAN-3]).</summary>
+    /// <summary>
+    /// The operation. The credentials' variables are read from this process's environment ([PLAN-3]). It exits 0 when the
+    /// job ran, whatever its end, and 2 on every input or usage error and anything else that fails ([CONF-3]); never
+    /// another code.
+    /// </summary>
     public static int Job(string[] args, TextWriter stdout)
     {
         if (args.Length != 6 || args[4] != "--at" || args[..4].Any(a => a.StartsWith("--", StringComparison.Ordinal)))
@@ -28,33 +32,8 @@ internal static class JobOps
             throw new UsageException($"usage: {Usage}");
         }
 
-        var (planPath, runnerPath, targetPath, output) = (args[0], args[1], args[2], args[3]);
-        AefTime at;
-        try
-        {
-            at = AefTime.Parse(args[5]);
-        }
-        catch (FormatException e)
-        {
-            throw new UsageException($"--at {args[5]}: {e.Message}");
-        }
-
-        if (File.Exists(output) || (Directory.Exists(output) && Directory.EnumerateFileSystemEntries(output).Any()))
-        {
-            throw new UsageException($"{output}: OUT is a folder that does not exist yet or is empty (spec 09 §9.3)");
-        }
-
-        var plan = DriverIO.Bytes(planPath);
-        var runner = DriverIO.Document(runnerPath);
-        AefScriptedTarget target;
-        try
-        {
-            target = AefScriptedTarget.Read(DriverIO.Bytes(targetPath));
-        }
-        catch (FormatException e)
-        {
-            throw new UsageException($"{targetPath}: not a scripted target (spec 09 §9.2.1): {e.Message}");
-        }
+        var output = args[3];
+        var (plan, runner, target, at) = Inputs(args);
 
         AefJobResult result;
         var existed = Directory.Exists(output);
@@ -75,6 +54,44 @@ internal static class JobOps
         }
 
         return DriverIO.Print(stdout, new JsonObject { ["events"] = result.Events });
+    }
+
+    // Every input §9.3 lists, read and checked before anything is written; whatever fails is an input error (exit 2).
+    private static (byte[] Plan, JsonObject Runner, AefScriptedTarget Target, AefTime At) Inputs(string[] args)
+    {
+        var (planPath, runnerPath, targetPath, output) = (args[0], args[1], args[2], args[3]);
+        try
+        {
+            AefTime at;
+            try
+            {
+                at = AefTime.Parse(args[5]);
+            }
+            catch (FormatException e)
+            {
+                throw new UsageException($"--at {args[5]}: {e.Message}");
+            }
+
+            if (File.Exists(output) || (Directory.Exists(output) && Directory.EnumerateFileSystemEntries(output).Any()))
+            {
+                throw new UsageException($"{output}: OUT is a folder that does not exist yet or is empty (spec 09 §9.3)");
+            }
+
+            var plan = DriverIO.Bytes(planPath);
+            var runner = DriverIO.Document(runnerPath);
+            try
+            {
+                return (plan, runner, AefScriptedTarget.Read(DriverIO.Bytes(targetPath)), at);
+            }
+            catch (FormatException e)
+            {
+                throw new UsageException($"{targetPath}: not a scripted target (spec 09 §9.2.1): {e.Message}");
+            }
+        }
+        catch (Exception e) when (e is not (UsageException or OutOfMemoryException or StackOverflowException))
+        {
+            throw new UsageException($"the job's inputs cannot be read: {e.GetType().Name}: {e.Message}");
+        }
     }
 
     private static void Clear(string output, bool existed)
