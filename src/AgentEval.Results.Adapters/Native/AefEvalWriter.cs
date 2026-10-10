@@ -137,6 +137,25 @@ public static class AefEvalWriter
         }
     }
 
+    /// <summary>
+    /// <c>subject.kind</c> for a ref: the part before its colon when it is one of <c>subject.kind</c>'s values, and
+    /// <c>other</c> otherwise, as a runner derives it ([PLAN-10]).
+    /// </summary>
+    public static AefSubjectKind KindOf(string subjectRef)
+    {
+        ArgumentNullException.ThrowIfNull(subjectRef);
+        var colon = subjectRef.IndexOf(':', StringComparison.Ordinal);
+        return (colon > 0 ? subjectRef[..colon] : "") switch
+        {
+            "agent" => AefSubjectKind.Agent,
+            "workflow" => AefSubjectKind.Workflow,
+            "model" => AefSubjectKind.Model,
+            "endpoint" => AefSubjectKind.Endpoint,
+            "mcp-server" => AefSubjectKind.McpServer,
+            _ => AefSubjectKind.Other,
+        };
+    }
+
     /// <summary>A ref (<c>kind:name</c>) with the name encoded as [ENC-13] encodes one.</summary>
     public static string Ref(string kind, string name) => AefConverter.TypedRef(kind, name);
 

@@ -128,6 +128,42 @@ public class EvalCommandTemperatureAndRunsTests
     }
 
     [Fact]
+    public async Task Eval_WithAef_AndRunsAboveOne_IsAUsageError_RatherThanWritingNothing()
+    {
+        var options = new EvalOptions { Dataset = new FileInfo("unused.yaml"), Format = "json", Runs = 5, Aef = new DirectoryInfo("aef") };
+
+        var (exit, stderr) = await CaptureStdErrAsync(() => EvalCommand.ExecuteAsync(options, default, sutOverride: BenignSut()));
+
+        Assert.Equal(ExitCodes.UsageError, exit);
+        Assert.Contains("--aef cannot be combined with --runs above 1", stderr);
+    }
+
+    [Fact]
+    public async Task Eval_WithAnExplicitAefThatCannotBeWritten_ExitsWithARuntimeError()
+    {
+        var dataset = CreateTempDataset();
+        var cfg = WriteValidCopilotStudioConfig();
+        var output = TempPath(".json");
+        var notAFolder = TempPath(".txt");
+        File.WriteAllText(notAFolder.FullName, "a file where the AEF folder should be");
+        try
+        {
+            var plain = SutOptions(dataset, cfg, output);
+            var options = new EvalOptions
+            {
+                Dataset = plain.Dataset, Sut = plain.Sut, TargetOptions = plain.TargetOptions, Format = "json", Output = output,
+                Aef = new DirectoryInfo(notAFolder.FullName),
+            };
+
+            var (exit, stderr) = await CaptureStdErrAsync(() => EvalCommand.ExecuteAsync(options, default, sutOverride: BenignSut()));
+
+            Assert.Equal(ExitCodes.RuntimeError, exit);
+            Assert.Contains("Error: the AEF run was not written", stderr);
+        }
+        finally { TryDelete(dataset); TryDelete(cfg); TryDelete(output); TryDelete(notAFolder); }
+    }
+
+    [Fact]
     public async Task Eval_WithNoAef_WritesNothing_AndSaysNothing()
     {
         var dataset = CreateTempDataset();

@@ -247,6 +247,14 @@ internal static class EvalCommand
             return ExitCodes.UsageError;
         }
 
+        // An AEF run of --runs above 1 needs trial lines and their rollup, which are not written yet: refuse an explicit
+        // --aef rather than write nothing, and say so for the workspace default.
+        if (opts.Runs > 1 && opts.Aef is not null && !opts.NoAef)
+        {
+            Console.Error.WriteLine("  Error: --aef cannot be combined with --runs above 1 yet: AEF trial runs are not written in this release.");
+            return ExitCodes.UsageError;
+        }
+
         // The golden trace is read before any agent call, so a missing or unreadable file costs nothing.
         var (golden, goldenError) = await LoadGoldenAsync(opts, ct);
         if (goldenError is not null)
@@ -303,10 +311,12 @@ internal static class EvalCommand
 
         string resolvedName;
         IEvaluableAgent agent;
+        bool standIn;   // a caller-supplied stand-in answered for the subject: the run is never written as live
         IChatClient? chatClient = null;   // hoisted: --metrics' LLM-based fallback evaluator needs this outside the else block
 
         if (sutAgent is not null)
         {
+            standIn = sutOverride is not null;
             // A built-in target (e.g. copilot-studio) constructed itself; the --endpoint/--azure/--model
             // path below is entirely skipped, matching RedTeamCommand's existing --sut branch. No raw
             // IChatClient is exposed for a --sut target, so chatClient stays null here — an LLM-based
@@ -353,6 +363,7 @@ internal static class EvalCommand
                 systemPrompt = await File.ReadAllTextAsync(opts.SystemPromptFile.FullName, ct);
 
             // 3. Create IChatClient → IStreamableAgent
+            standIn = agentClientOverride is not null;
             chatClient = CliChatClientDiagnostics.Wrap(agentClientOverride ?? (opts.Azure
                 ? EndpointFactory.CreateAzure(opts.Endpoint, opts.DeploymentName!, opts.ApiKey)
                 : EndpointFactory.CreateOpenAICompatible(opts.Endpoint!, opts.Model!, opts.ApiKey)), "agent");
@@ -416,6 +427,8 @@ internal static class EvalCommand
                     "  Warning: --metrics has no effect combined with --runs > 1 in this release " +
                     "(stochastic scoring is not wired to the named-metric pipeline yet).");
 
+            if (!opts.NoAef && !opts.Quiet && EvalAef.Root(opts) is not null)
+                Console.Error.WriteLine("  AEF: --runs above 1 is not written as AEF yet, so this evaluation wrote no AEF run.");
             return await ExecuteStochasticAsync(opts, harness, agent, testCases, evalOptions, resolvedName, ct);
         }
 
@@ -447,7 +460,7 @@ internal static class EvalCommand
         // 6e. The run as sealed AEF evidence (S1 #5a): into the workspace's .agenteval/aef, or --aef. A write failure
         // fails the command only when --aef asked for it; otherwise it is a warning and the evaluation stands.
         // A real target (--endpoint, --azure, --sut) is live; a stand-in a caller passes in is never written as live.
-        var targetMode = sutOverride is null && agentClientOverride is null ? AefTargetMode.Live : AefTargetMode.Mocked;
+        var targetMode = standIn ? AefTargetMode.Mocked : AefTargetMode.Live;
         var aefFailed = WriteAef(opts, summary, testCases, resolvedName, targetMode, startedAt, DateTimeOffset.UtcNow);
 
         // 7. Export
@@ -477,14 +490,15 @@ internal static class EvalCommand
                 Console.Error.WriteLine($"  Golden trace saved: {opts.SaveGolden.FullName}");
         }
 
-        // 10. Exit code: 0 = all passed, 1 = any failure. Against a golden trace, 1 = a regression (or a tool change
-        // with --fail-on-tool-change); a test that was already failing in the golden trace does not fail the run.
+        // 10. Exit code: 3 when an explicit --aef could not be written, whatever the results; else 0 = all passed,
+        // 1 = any failure. Against a golden trace, 1 = a regression (or a tool change with --fail-on-tool-change); a test
+        // that was already failing in the golden trace does not fail the run.
+        if (aefFailed)
+            return ExitCodes.RuntimeError;
         if (comparison is not null)
             return comparison.HasRegression || (opts.FailOnToolChange && comparison.HasToolChange)
                 ? ExitCodes.TestFailure
                 : ExitCodes.Success;
-        if (aefFailed)
-            return ExitCodes.RuntimeError;
         return summary.AllPassed ? ExitCodes.Success : ExitCodes.TestFailure;
     }
 
@@ -581,11 +595,11 @@ internal static class EvalCommand
 
         try
         {
-            var model = opts.Model ?? opts.DeploymentName ?? resolvedName;
+            var subjectRef = opts.Subject ?? AefEvalWriter.Ref("model", resolvedName);   // resolvedName answered the cases
             var (directory, runHash) = AefEvalWriter.Write(Path.Combine(root, "runs"), summary, EvalAef.CaseIds(cases, summary.Results.Select(r => r.TestName).ToList()), new AefEvalRunOptions
             {
-                SubjectRef = opts.Subject ?? AefEvalWriter.Ref("model", model),
-                SubjectKind = opts.Subject is { } s && s.StartsWith("agent:", StringComparison.Ordinal) ? AefSubjectKind.Agent : AefSubjectKind.Model,
+                SubjectRef = subjectRef,
+                SubjectKind = AefEvalWriter.KindOf(subjectRef),
                 SubjectVersion = opts.SubjectVersion,
                 Endpoint = opts.Endpoint,
                 // The judge the harness was given: only with --judge, on --judge-model or the subject's model.
@@ -600,8 +614,15 @@ internal static class EvalCommand
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
         {
-            Console.Error.WriteLine($"  {(opts.Aef is null ? "Warning" : "Error")}: the AEF run was not written: {ex.Message}");
-            return opts.Aef is not null;
+            if (opts.Aef is not null)
+            {
+                Console.Error.WriteLine($"  Error: the AEF run was not written: {ex.Message}");
+                return true;
+            }
+
+            if (!opts.Quiet)
+                Console.Error.WriteLine($"  Warning: the AEF run was not written: {ex.Message}");
+            return false;
         }
     }
 

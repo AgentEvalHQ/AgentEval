@@ -105,6 +105,17 @@ public sealed class AefEvalWriterTests : IDisposable
         Assert.Null(AefTestRuns.Document(withoutJudge, "run.json")["judges"]);
     }
 
+    [Theory]
+    [InlineData("agent:a", AefSubjectKind.Agent)]
+    [InlineData("workflow:w", AefSubjectKind.Workflow)]
+    [InlineData("model:m", AefSubjectKind.Model)]
+    [InlineData("endpoint:e", AefSubjectKind.Endpoint)]
+    [InlineData("mcp-server:s", AefSubjectKind.McpServer)]
+    [InlineData("tool:t", AefSubjectKind.Other)]
+    [InlineData("noprefix", AefSubjectKind.Other)]
+    public void KindOf_TakesTheRefsKind_OrOther(string subjectRef, AefSubjectKind kind) =>
+        Assert.Equal(kind, AefEvalWriter.KindOf(subjectRef));
+
     [Fact]
     public void DatasetDigest_DoesNotDependOnLineEndings() =>
         Assert.Equal(AefEvalWriter.DatasetDigest(Encoding.UTF8.GetBytes("x\r\ny\r\n")), AefEvalWriter.DatasetDigest(Encoding.UTF8.GetBytes("x\ny\n")));
