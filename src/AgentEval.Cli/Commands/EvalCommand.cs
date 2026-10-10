@@ -21,6 +21,8 @@ using AgentEval.Exporters;
 using AgentEval.MAF;
 using AgentEval.Models;
 using AgentEval.Output;
+using AgentEval.Results.Adapters.Native;
+using AgentEval.Results.Writing;
 using AgentEval.Snapshots;
 using Microsoft.Extensions.AI;
 
@@ -124,8 +126,19 @@ internal static class EvalCommand
         // Verbosity
         var verboseFlag = new Option<bool>("--verbose") { Description = "Show detailed progress" };
         var quietFlag = new Option<bool>("--quiet") { Description = "Suppress all output except the export" };
+        var aefOpt = new Option<DirectoryInfo?>("--aef")
+            { Description = "Write the run as sealed AEF evidence under this folder (default: .agenteval/aef in a workspace)" };
+        var noAefFlag = new Option<bool>("--no-aef") { Description = "Write no AEF run" };
+        var subjectOpt = new Option<string?>("--subject")
+            { Description = "The subject's AEF ref (kind:name, e.g. agent:support-bot; default model:<model>)" };
+        var subjectVersionOpt = new Option<string?>("--subject-version")
+            { Description = "The subject's exact version, recorded in the AEF run (a checkpoint lane needs it)" };
 
         command.Options.Add(datasetOpt);
+        command.Options.Add(aefOpt);
+        command.Options.Add(noAefFlag);
+        command.Options.Add(subjectOpt);
+        command.Options.Add(subjectVersionOpt);
         command.Options.Add(endpointOpt);
         command.Options.Add(azureFlag);
         command.Options.Add(modelOpt);
@@ -181,6 +194,10 @@ internal static class EvalCommand
                 FailOnToolChange = parseResult.GetValue(failOnToolChangeFlag),
                 Verbose = parseResult.GetValue(verboseFlag),
                 Quiet = parseResult.GetValue(quietFlag),
+                Aef = parseResult.GetValue(aefOpt),
+                NoAef = parseResult.GetValue(noAefFlag),
+                Subject = parseResult.GetValue(subjectOpt),
+                SubjectVersion = parseResult.GetValue(subjectVersionOpt),
             };
 
             // No target at all is a usage error (exit 2), as for every command that evaluates an agent: there is
@@ -227,6 +244,14 @@ internal static class EvalCommand
         if (ValidateRuns(opts) is { } runsError)
         {
             Console.Error.WriteLine($"  Error: {runsError}");
+            return ExitCodes.UsageError;
+        }
+
+        // An AEF run of --runs above 1 needs trial lines and their rollup, which are not written yet: refuse an explicit
+        // --aef rather than write nothing, and say so for the workspace default.
+        if (opts.Runs > 1 && opts.Aef is not null && !opts.NoAef)
+        {
+            Console.Error.WriteLine("  Error: --aef cannot be combined with --runs above 1 yet: AEF trial runs are not written in this release.");
             return ExitCodes.UsageError;
         }
 
@@ -286,10 +311,12 @@ internal static class EvalCommand
 
         string resolvedName;
         IEvaluableAgent agent;
+        bool standIn;   // a caller-supplied stand-in answered for the subject: the run is never written as live
         IChatClient? chatClient = null;   // hoisted: --metrics' LLM-based fallback evaluator needs this outside the else block
 
         if (sutAgent is not null)
         {
+            standIn = sutOverride is not null;
             // A built-in target (e.g. copilot-studio) constructed itself; the --endpoint/--azure/--model
             // path below is entirely skipped, matching RedTeamCommand's existing --sut branch. No raw
             // IChatClient is exposed for a --sut target, so chatClient stays null here — an LLM-based
@@ -336,6 +363,7 @@ internal static class EvalCommand
                 systemPrompt = await File.ReadAllTextAsync(opts.SystemPromptFile.FullName, ct);
 
             // 3. Create IChatClient → IStreamableAgent
+            standIn = agentClientOverride is not null;
             chatClient = CliChatClientDiagnostics.Wrap(agentClientOverride ?? (opts.Azure
                 ? EndpointFactory.CreateAzure(opts.Endpoint, opts.DeploymentName!, opts.ApiKey)
                 : EndpointFactory.CreateOpenAICompatible(opts.Endpoint!, opts.Model!, opts.ApiKey)), "agent");
@@ -399,10 +427,13 @@ internal static class EvalCommand
                     "  Warning: --metrics has no effect combined with --runs > 1 in this release " +
                     "(stochastic scoring is not wired to the named-metric pipeline yet).");
 
+            if (!opts.NoAef && !opts.Quiet && EvalAef.Root(opts) is not null)
+                Console.Error.WriteLine("  AEF: --runs above 1 is not written as AEF yet, so this evaluation wrote no AEF run.");
             return await ExecuteStochasticAsync(opts, harness, agent, testCases, evalOptions, resolvedName, ct);
         }
 
         // 6c. Standard single-run evaluation path
+        var startedAt = DateTimeOffset.UtcNow;
         var summary = await harness.RunBatchAsync(agent, testCases, evalOptions, ct);
 
         // 6d. --metrics (Item 4, D1 bridge, continued): score every selected metric against each test
@@ -425,6 +456,12 @@ internal static class EvalCommand
                 summary.Results[i].MetricResults = await metricRunner.EvaluateAsync(selectedMetrics!, metricsContext, ct);
             }
         }
+
+        // 6e. The run as sealed AEF evidence (S1 #5a): into the workspace's .agenteval/aef, or --aef. A write failure
+        // fails the command only when --aef asked for it; otherwise it is a warning and the evaluation stands.
+        // A real target (--endpoint, --azure, --sut) is live; a stand-in a caller passes in is never written as live.
+        var targetMode = standIn ? AefTargetMode.Mocked : AefTargetMode.Live;
+        var aefFailed = WriteAef(opts, summary, testCases, resolvedName, targetMode, startedAt, DateTimeOffset.UtcNow);
 
         // 7. Export
         var report = summary.ToEvaluationReport(
@@ -453,8 +490,11 @@ internal static class EvalCommand
                 Console.Error.WriteLine($"  Golden trace saved: {opts.SaveGolden.FullName}");
         }
 
-        // 10. Exit code: 0 = all passed, 1 = any failure. Against a golden trace, 1 = a regression (or a tool change
-        // with --fail-on-tool-change); a test that was already failing in the golden trace does not fail the run.
+        // 10. Exit code: 3 when an explicit --aef could not be written, whatever the results; else 0 = all passed,
+        // 1 = any failure. Against a golden trace, 1 = a regression (or a tool change with --fail-on-tool-change); a test
+        // that was already failing in the golden trace does not fail the run.
+        if (aefFailed)
+            return ExitCodes.RuntimeError;
         if (comparison is not null)
             return comparison.HasRegression || (opts.FailOnToolChange && comparison.HasToolChange)
                 ? ExitCodes.TestFailure
@@ -536,6 +576,55 @@ internal static class EvalCommand
         ToolUsage = testResult.ToolUsage,
         Performance = testResult.Performance,
     };
+
+    /// <summary>
+    /// Writes the run as sealed AEF evidence (S1 #5a); returns true only when an explicit <c>--aef</c> could not be
+    /// written. A write the user did not ask for fails with a warning: the evaluation's own result stands.
+    /// </summary>
+    private static bool WriteAef(
+        EvalOptions opts, TestSummary summary, IReadOnlyList<DatasetTestCase> cases, string resolvedName,
+        AefTargetMode targetMode, DateTimeOffset startedAt, DateTimeOffset endedAt)
+    {
+        var root = EvalAef.Root(opts);
+        if (root is null)
+        {
+            if (!opts.NoAef && !opts.Quiet)
+                Console.Error.WriteLine("  AEF: no .agenteval workspace here, so no run was written (--aef <dir> writes one anywhere).");
+            return false;
+        }
+
+        try
+        {
+            var subjectRef = opts.Subject ?? AefEvalWriter.Ref("model", resolvedName);   // resolvedName answered the cases
+            var (directory, runHash) = AefEvalWriter.Write(Path.Combine(root, "runs"), summary, EvalAef.CaseIds(cases), new AefEvalRunOptions
+            {
+                SubjectRef = subjectRef,
+                SubjectKind = AefEvalWriter.KindOf(subjectRef),
+                SubjectVersion = opts.SubjectVersion,
+                Endpoint = opts.Endpoint,
+                // The judge the harness was given: only with --judge, on --judge-model or the subject's model.
+                JudgeModel = opts.JudgeEndpoint is null ? null : opts.JudgeModel ?? resolvedName,
+                TargetMode = targetMode,
+                DatasetName = Path.GetRelativePath(Directory.GetCurrentDirectory(), opts.Dataset.FullName).Replace('\\', '/'),
+                DatasetBytes = File.ReadAllBytes(opts.Dataset.FullName),
+            }, startedAt, endedAt);
+            if (!opts.Quiet)
+                Console.Error.WriteLine($"  AEF run: {directory} (run hash {runHash[..12]}…)");
+            return false;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
+        {
+            if (opts.Aef is not null)
+            {
+                Console.Error.WriteLine($"  Error: the AEF run was not written: {ex.Message}");
+                return true;
+            }
+
+            if (!opts.Quiet)
+                Console.Error.WriteLine($"  Warning: the AEF run was not written: {ex.Message}");
+            return false;
+        }
+    }
 
     private static string EndpointLabel(EvalOptions opts) =>
         opts.Sut is not null ? $"sut:{opts.Sut}" : (opts.Endpoint ?? "azure");
@@ -707,8 +796,48 @@ internal static class EvalCommand
 }
 
 /// <summary>Parsed options for the eval command.</summary>
+internal static class EvalAef
+{
+    /// <summary>The AEF root a run goes to: <c>--aef</c>, else a workspace's <c>.agenteval/aef</c>, else none.</summary>
+    public static string? Root(EvalOptions opts)
+    {
+        if (opts.NoAef)
+            return null;
+        if (opts.Aef is not null)
+            return opts.Aef.FullName;
+        var workspace = WorkspaceRootDiscovery.Find(Directory.GetCurrentDirectory());
+        return workspace is not null && Directory.Exists(Path.Combine(workspace, ".agenteval"))
+            ? Path.Combine(workspace, ".agenteval", "aef")
+            : null;
+    }
+
+    /// <summary>
+    /// A case's id: its dataset id when every case has a distinct one, else case-n. Never the test name: a case without an
+    /// id is named after the start of its input, and content stays out of a run captured with content off ([RUN-11]).
+    /// </summary>
+    public static IReadOnlyList<string> CaseIds(IReadOnlyList<DatasetTestCase> cases)
+    {
+        var ids = cases.Select(c => c.Id).ToList();
+        return ids.All(i => !string.IsNullOrWhiteSpace(i)) && ids.Distinct(StringComparer.Ordinal).Count() == ids.Count
+            ? ids
+            : cases.Select((_, i) => $"case-{i + 1}").ToList();
+    }
+}
+
 internal sealed class EvalOptions
 {
+    /// <summary>Where to write the AEF run (<c>--aef</c>); null writes into a workspace's <c>.agenteval/aef</c> when there is one.</summary>
+    public DirectoryInfo? Aef { get; init; }
+
+    /// <summary><c>--no-aef</c>: write no AEF run.</summary>
+    public bool NoAef { get; init; }
+
+    /// <summary><c>--subject</c>: the subject's AEF ref, <c>kind:name</c>.</summary>
+    public string? Subject { get; init; }
+
+    /// <summary><c>--subject-version</c>: the subject's exact version.</summary>
+    public string? SubjectVersion { get; init; }
+
     public required FileInfo Dataset { get; init; }
     public string? Endpoint { get; init; }
     public bool Azure { get; init; }

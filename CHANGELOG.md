@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+
+- **`agenteval eval` writes each run as sealed AEF evidence** (S1 #5a): into a workspace's `.agenteval/aef`, or `--aef <dir>`;
+  `--no-aef` writes nothing; `--subject` and `--subject-version` name the subject. One result line per case, the
+  target mode the run really had (a stand-in is never `live`), the judge only when it graded, and no content.
+- **`TestResult.JudgeFailed`**: the judge produced no verdict, so `Passed = false` and `Score = 0` are placeholders, not
+  a grade. Set by the evaluation harness; AEF records such a case as `error`, never `failed`.
 - **`agenteval aef`: AEF 1.0 runs from the command line.** AEF, the AgentEval Evidence Format, is AgentEval's
   evidence format from 1.0 on ([ADR-035](docs/adr/035-aef-is-the-evidence-format.md); a release candidate until the
   `aef-1.0` tag). `aef verify` reports a run as intact, unsealed or invalid with every problem, and who signed it under

@@ -95,6 +95,129 @@ public class EvalCommandTemperatureAndRunsTests
     }
 
     [Fact]
+    public async Task Eval_WithAef_WritesASealedRun_ThatVerifiesIntact_AndCallsAStandInMocked()
+    {
+        var dataset = CreateTempDataset();
+        var cfg = WriteValidCopilotStudioConfig();
+        var output = TempPath(".json");
+        var aef = Directory.CreateTempSubdirectory("aef-eval-").FullName;
+        try
+        {
+            var plain = SutOptions(dataset, cfg, output);
+            var options = new EvalOptions
+            {
+                Dataset = plain.Dataset, Sut = plain.Sut, TargetOptions = plain.TargetOptions, Format = "json", Output = output,
+                Aef = new DirectoryInfo(aef), Subject = "agent:benign", SubjectVersion = "1.2.3",
+            };
+
+            var (exit, stderr) = await CaptureStdErrAsync(() => EvalCommand.ExecuteAsync(options, default, sutOverride: BenignSut()));
+
+            Assert.Equal(ExitCodes.Success, exit);
+            Assert.Contains("AEF run:", stderr);
+            var run = Assert.Single(Directory.GetFiles(aef, "run.json", SearchOption.AllDirectories));
+            var verification = AgentEval.Results.Integrity.AefRunVerifier.Verify(Path.GetDirectoryName(run)!);
+            Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact, verification.Outcome);
+            Assert.Empty(verification.Problems);
+            var header = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(run))!;
+            Assert.Equal("mocked", (string?)header["execution"]!["targetMode"]);   // BenignSut stands in for the subject
+            Assert.Null(header["judges"]);   // no --judge, so no judge graded anything
+            Assert.Equal("agent:benign", (string?)header["subject"]!["ref"]);
+            Assert.Equal("1.2.3", (string?)header["subject"]!["version"]);
+        }
+        finally { TryDelete(dataset); TryDelete(cfg); TryDelete(output); Directory.Delete(aef, recursive: true); }
+    }
+
+    [Fact]
+    public async Task Eval_WithAef_ACaseWithoutAnId_GetsTheLoadersId_AndItsInputIsNotWritten()
+    {
+        // Without an id a case is named after the start of its input; that name must not reach a content-off run.
+        var dataset = TempPath(".yaml");
+        File.WriteAllText(dataset.FullName, """
+            - input: "my private question about payroll"
+              expectedOutput: "Hi"
+            """);
+        var cfg = WriteValidCopilotStudioConfig();
+        var output = TempPath(".json");
+        var aef = Directory.CreateTempSubdirectory("aef-eval-").FullName;
+        try
+        {
+            var plain = SutOptions(dataset, cfg, output);
+            var options = new EvalOptions
+            {
+                Dataset = plain.Dataset, Sut = plain.Sut, TargetOptions = plain.TargetOptions, Format = "json", Output = output,
+                Aef = new DirectoryInfo(aef),
+            };
+
+            await CaptureStdErrAsync(() => EvalCommand.ExecuteAsync(options, default, sutOverride: BenignSut()));
+
+            var results = Assert.Single(Directory.GetFiles(aef, "results.ndjson", SearchOption.AllDirectories));
+            // The loader names an id-less row item_<index>, which is no content.
+            Assert.Equal("item_0", (string?)System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllLines(results).First())!["caseId"]);
+            var all = string.Concat(Directory.GetFiles(aef, "*", SearchOption.AllDirectories).Select(File.ReadAllText));
+            Assert.DoesNotContain("payroll", all, StringComparison.Ordinal);
+        }
+        finally { TryDelete(dataset); TryDelete(cfg); TryDelete(output); Directory.Delete(aef, recursive: true); }
+    }
+
+    [Fact]
+    public async Task Eval_WithAef_AndRunsAboveOne_IsAUsageError_RatherThanWritingNothing()
+    {
+        var options = new EvalOptions { Dataset = new FileInfo("unused.yaml"), Format = "json", Runs = 5, Aef = new DirectoryInfo("aef") };
+
+        var (exit, stderr) = await CaptureStdErrAsync(() => EvalCommand.ExecuteAsync(options, default, sutOverride: BenignSut()));
+
+        Assert.Equal(ExitCodes.UsageError, exit);
+        Assert.Contains("--aef cannot be combined with --runs above 1", stderr);
+    }
+
+    [Fact]
+    public async Task Eval_WithAnExplicitAefThatCannotBeWritten_ExitsWithARuntimeError()
+    {
+        var dataset = CreateTempDataset();
+        var cfg = WriteValidCopilotStudioConfig();
+        var output = TempPath(".json");
+        var notAFolder = TempPath(".txt");
+        File.WriteAllText(notAFolder.FullName, "a file where the AEF folder should be");
+        try
+        {
+            var plain = SutOptions(dataset, cfg, output);
+            var options = new EvalOptions
+            {
+                Dataset = plain.Dataset, Sut = plain.Sut, TargetOptions = plain.TargetOptions, Format = "json", Output = output,
+                Aef = new DirectoryInfo(notAFolder.FullName),
+            };
+
+            var (exit, stderr) = await CaptureStdErrAsync(() => EvalCommand.ExecuteAsync(options, default, sutOverride: BenignSut()));
+
+            Assert.Equal(ExitCodes.RuntimeError, exit);
+            Assert.Contains("Error: the AEF run was not written", stderr);
+        }
+        finally { TryDelete(dataset); TryDelete(cfg); TryDelete(output); TryDelete(notAFolder); }
+    }
+
+    [Fact]
+    public async Task Eval_WithNoAef_WritesNothing_AndSaysNothing()
+    {
+        var dataset = CreateTempDataset();
+        var cfg = WriteValidCopilotStudioConfig();
+        var output = TempPath(".json");
+        try
+        {
+            var plain = SutOptions(dataset, cfg, output);
+            var options = new EvalOptions
+            {
+                Dataset = plain.Dataset, Sut = plain.Sut, TargetOptions = plain.TargetOptions, Format = "json", Output = output, NoAef = true,
+            };
+
+            var (exit, stderr) = await CaptureStdErrAsync(() => EvalCommand.ExecuteAsync(options, default, sutOverride: BenignSut()));
+
+            Assert.Equal(ExitCodes.Success, exit);
+            Assert.DoesNotContain("AEF", stderr);
+        }
+        finally { TryDelete(dataset); TryDelete(cfg); TryDelete(output); }
+    }
+
+    [Fact]
     public async Task Eval_Sut_WithoutAgentOptions_DoesNotWarn()
     {
         var dataset = CreateTempDataset();

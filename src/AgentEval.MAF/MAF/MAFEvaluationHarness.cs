@@ -652,6 +652,7 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
     {
         if (evaluation.EvaluationFailed)
         {
+            result.JudgeFailed = true;
             result.Score = 0;
             result.Passed = false;
             result.Details = "The judge produced no verdict (evaluation failed): " +
