@@ -596,7 +596,7 @@ internal static class EvalCommand
         try
         {
             var subjectRef = opts.Subject ?? AefEvalWriter.Ref("model", resolvedName);   // resolvedName answered the cases
-            var (directory, runHash) = AefEvalWriter.Write(Path.Combine(root, "runs"), summary, EvalAef.CaseIds(cases, summary.Results.Select(r => r.TestName).ToList()), new AefEvalRunOptions
+            var (directory, runHash) = AefEvalWriter.Write(Path.Combine(root, "runs"), summary, EvalAef.CaseIds(cases), new AefEvalRunOptions
             {
                 SubjectRef = subjectRef,
                 SubjectKind = AefEvalWriter.KindOf(subjectRef),
@@ -811,14 +811,16 @@ internal static class EvalAef
             : null;
     }
 
-    /// <summary>A case's id: its dataset id when every case has a distinct one, else its name, else case-n.</summary>
-    public static IReadOnlyList<string> CaseIds(IReadOnlyList<DatasetTestCase> cases, IReadOnlyList<string> names)
+    /// <summary>
+    /// A case's id: its dataset id when every case has a distinct one, else case-n. Never the test name: a case without an
+    /// id is named after the start of its input, and content stays out of a run captured with content off ([RUN-11]).
+    /// </summary>
+    public static IReadOnlyList<string> CaseIds(IReadOnlyList<DatasetTestCase> cases)
     {
-        static IReadOnlyList<string>? Distinct(IReadOnlyList<string> ids) =>
-            ids.All(i => !string.IsNullOrWhiteSpace(i)) && ids.Distinct(StringComparer.Ordinal).Count() == ids.Count ? ids : null;
-        return Distinct(cases.Select(c => c.Id).ToList())
-            ?? Distinct(names)
-            ?? cases.Select((_, i) => $"case-{i + 1}").ToList();
+        var ids = cases.Select(c => c.Id).ToList();
+        return ids.All(i => !string.IsNullOrWhiteSpace(i)) && ids.Distinct(StringComparer.Ordinal).Count() == ids.Count
+            ? ids
+            : cases.Select((_, i) => $"case-{i + 1}").ToList();
     }
 }
 

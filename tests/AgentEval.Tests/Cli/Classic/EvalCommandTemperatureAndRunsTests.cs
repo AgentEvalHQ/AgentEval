@@ -128,6 +128,38 @@ public class EvalCommandTemperatureAndRunsTests
     }
 
     [Fact]
+    public async Task Eval_WithAef_ACaseWithoutAnId_GetsTheLoadersId_AndItsInputIsNotWritten()
+    {
+        // Without an id a case is named after the start of its input; that name must not reach a content-off run.
+        var dataset = TempPath(".yaml");
+        File.WriteAllText(dataset.FullName, """
+            - input: "my private question about payroll"
+              expectedOutput: "Hi"
+            """);
+        var cfg = WriteValidCopilotStudioConfig();
+        var output = TempPath(".json");
+        var aef = Directory.CreateTempSubdirectory("aef-eval-").FullName;
+        try
+        {
+            var plain = SutOptions(dataset, cfg, output);
+            var options = new EvalOptions
+            {
+                Dataset = plain.Dataset, Sut = plain.Sut, TargetOptions = plain.TargetOptions, Format = "json", Output = output,
+                Aef = new DirectoryInfo(aef),
+            };
+
+            await CaptureStdErrAsync(() => EvalCommand.ExecuteAsync(options, default, sutOverride: BenignSut()));
+
+            var results = Assert.Single(Directory.GetFiles(aef, "results.ndjson", SearchOption.AllDirectories));
+            // The loader names an id-less row item_<index>, which is no content.
+            Assert.Equal("item_0", (string?)System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllLines(results).First())!["caseId"]);
+            var all = string.Concat(Directory.GetFiles(aef, "*", SearchOption.AllDirectories).Select(File.ReadAllText));
+            Assert.DoesNotContain("payroll", all, StringComparison.Ordinal);
+        }
+        finally { TryDelete(dataset); TryDelete(cfg); TryDelete(output); Directory.Delete(aef, recursive: true); }
+    }
+
+    [Fact]
     public async Task Eval_WithAef_AndRunsAboveOne_IsAUsageError_RatherThanWritingNothing()
     {
         var options = new EvalOptions { Dataset = new FileInfo("unused.yaml"), Format = "json", Runs = 5, Aef = new DirectoryInfo("aef") };

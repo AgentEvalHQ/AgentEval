@@ -23,7 +23,7 @@ public sealed class AefEvalWriterTests : IDisposable
     [
         new TestResult { TestName = "greets", Passed = true, Score = 90, Performance = new() { StartTime = Start, EndTime = Start.AddSeconds(2), PromptTokens = 100, CompletionTokens = 20, EstimatedCost = 0.001m, ModelUsed = "gpt-x" } },
         new TestResult { TestName = "refunds", Passed = false, Score = 40, ActualOutput = "a reply that must not be written" },
-        new TestResult { TestName = "crashes", Passed = false, Error = new InvalidOperationException("the judge said: secret text") },
+        new TestResult { TestName = "What is my secret prompt", Passed = false, Error = new InvalidOperationException("the judge said: secret text") },
     ]);
 
     private static AefEvalRunOptions Options(AefTargetMode mode = AefTargetMode.Live) => new()
@@ -72,6 +72,7 @@ public sealed class AefEvalWriterTests : IDisposable
         Assert.DoesNotContain("api-key", all, StringComparison.Ordinal);
         Assert.DoesNotContain("must not be written", all, StringComparison.Ordinal);
         Assert.DoesNotContain("secret text", all, StringComparison.Ordinal);
+        Assert.DoesNotContain("secret prompt", all, StringComparison.Ordinal);   // a test name can be the input's start
     }
 
     [Fact]

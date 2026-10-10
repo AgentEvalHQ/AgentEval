@@ -4,7 +4,6 @@
 
 using System.Security.Cryptography;
 using System.Text;
-using System.Text.Json.Nodes;
 using AgentEval.Models;
 using AgentEval.Results.Signatures;
 using AgentEval.Results.Writing;
@@ -202,8 +201,7 @@ public static class AefEvalWriter
             Scores = state == AefState.Error ? null : [new AefScore { Metric = ScoreMetric, Value = result.Score }],
             Lane = Lane,
             DurationMs = performance is { } p && p.EndTime > p.StartTime ? (p.EndTime - p.StartTime).TotalMilliseconds : null,
-            Usage = usage,
-            Ext = new JsonObject { ["agenteval.eval"] = new JsonObject { ["testName"] = AefConverter.Text(result.TestName, 1024) } },
+            Usage = usage,   // no test name: without a dataset id it is the start of the input ([RUN-11])
         };
     }
 }
