@@ -138,6 +138,9 @@ KNOWN_MUTATIONS = {
     "overlays-boundary": "a file named overlays, and a first segment Overlays in another case, are not path problems "
                          "(RUN-3)",
     "judges-same-list": "STRM-4 asks a run for the plan's whole list of judges, not some of them (R8-2)",
+    "judges-guard": "a plan that names no judges leaves a run's judges unchecked (R9-3)",
+    "judges-provider": "STRM-4 compares judges by model and rubricDigest, not by provider (R9-4)",
+    "judges-once": "a run may name a judge once at most, even one the plan names twice (R9-4)",
 }
 _ORIGINAL_COMPILE = aef_schema.compile_pattern
 
@@ -2675,16 +2678,18 @@ def _plan_problems(doc, plan, accepted, terminal):
         codes.add("time")  # made by this job, between its acceptance and its end
 
     def judges(items):
-        return [(get(j, "model", default=_MISSING), get(j, "rubricDigest", default=_MISSING))
-                for j in items or [] if isinstance(j, dict)]
+        """A judge is the fields a plan's judge and a run's judge both define (R9-4)."""
+        fields = ("model", "rubricDigest") if "judges-provider" in MUTATIONS else ("model", "provider", "rubricDigest")
+        return [tuple(get(j, f, default=_MISSING) for f in fields) for j in items or [] if isinstance(j, dict)]
 
-    if plan.get("judges"):
-        # STRM-4: a run names the judges that graded it (RUN-9): some of the plan's, in the plan's order, none twice
-        named, planned = judges(doc.get("judges")), judges(plan["judges"])
+    if plan.get("judges") or "judges-guard" not in MUTATIONS:
+        # STRM-4: a run names the judges that graded it (RUN-9): the plan's list with some left out, in its order; a
+        # plan that names none allows none (R9-3)
+        named, planned = judges(doc.get("judges")), judges(plan.get("judges"))
         if "judges-same-list" in MUTATIONS:
             within = named == planned
         else:
-            position, within = 0, len(set(named)) == len(named)
+            position, within = 0, "judges-once" not in MUTATIONS or len(set(named)) == len(named)
             for judge in named:
                 while position < len(planned) and planned[position] != judge:
                     position += 1

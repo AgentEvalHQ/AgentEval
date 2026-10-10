@@ -112,8 +112,14 @@ def refused(rules, why, **extra):
                 why=why, **extra)
 
 
+def input_error(rules, why, **extra):
+    """An input error of spec 09 §9.3: the operation exits 2 and writes nothing (`refused: true`)."""
+    return dict(refused=True, rules=rules, why=why, **extra)
+
+
 def vectors():
-    """(name, plan, target, own runner manifest or None, expected beyond kind and inputs)."""
+    """(name, plan, target, own runner manifest or None, expected beyond kind and inputs). A plan given as bytes is
+    written as they are; an expected `at` replaces the vectors' AT."""
     judge = [{"model": "gpt-5.1", "provider": "azure.ai.openai", "rubricDigest": RUBRIC}]
     judge_key = {"name": "AZURE_OPENAI_API_KEY", "scheme": "env", "path": "AEF_TEST_JUDGE_KEY", "purpose": "judge"}
     bounded_triage = suite(TRIAGE["ref"], TRIAGE["version"],
@@ -337,6 +343,54 @@ def vectors():
          target(TRIAGE), dict(RUNNER, providers=["local", "docker"]),
          refused(["PLAN-7"], "the plan asks for a container; the runner supports the provider docker, but a scripted "
                              "target runs in the runner's process, so it gives the isolation process only")),
+        # -- input errors (spec 09 §9.3): exit 2, nothing written in OUT
+        ("input-plan-not-json",
+         b'{"schemaVersion": "1.0", "planId": "plan-job-input-plan-not-json", "subject": \n',
+         target(TRIAGE), None,
+         input_error(["ENC-1"], "the plan file is not a JSON text (it ends mid-object): no plan, so no job.refused can "
+                                "name it")),
+        ("input-plan-without-plan-id",
+         {k: v for k, v in plan("plan-job-input-plan-without-plan-id", [(TRIAGE, "quality", None)],
+                                {"maxUsd": 5.0}).items() if k != "planId"},
+         target(TRIAGE), None,
+         input_error(["PLAN-5", "PLAN-7"], "a plan with no planId: a job.refused could not name it, so it is not a "
+                                           "plan, and the operation writes no stream")),
+        ("input-runner-reader-refuses",
+         plan("plan-job-input-runner-reader-refuses", [(TRIAGE, "quality", None)], {"maxUsd": 5.0}),
+         target(TRIAGE), dict(RUNNER, providers=[]),
+         input_error(["PLAN-6", "VER-3"], "the manifest the runner acts as supports no provider: the reader schema "
+                                          "refuses it, so there is no runner to run the job as")),
+        ("input-target-unknown-member",
+         plan("plan-job-input-target-unknown-member", [(TRIAGE, "quality", None)], {"maxUsd": 5.0}),
+         dict(target(TRIAGE), schemaVersion="1.0"), None,
+         input_error([], "the target has a member spec 09 §9.2.1 does not name (schemaVersion): not of its shape")),
+        ("input-target-case-unknown-member",
+         plan("plan-job-input-target-case-unknown-member", [(TRIAGE, "quality", None)], {"maxUsd": 5.0}),
+         target(suite(TRIAGE["ref"], TRIAGE["version"], [dict(TRIAGE["cases"][0], reason="scripted")]
+                      + TRIAGE["cases"][1:])), None,
+         input_error([], "a case of the target has a member spec 09 §9.2.1 does not name (reason): not of its shape")),
+        ("input-target-severity-on-passed",
+         plan("plan-job-input-target-severity-on-passed", [(TRIAGE, "quality", None)], {"maxUsd": 5.0}),
+         target(suite(TRIAGE["ref"], TRIAGE["version"], [dict(TRIAGE["cases"][0], severity="low")]
+                      + TRIAGE["cases"][1:])), None,
+         input_error(["RES-9"], "a passed case with a severity: a case has one exactly when it is failed or warn "
+                                "(spec 09 §9.2.1)")),
+        ("input-target-bound-below-cost",
+         plan("plan-job-input-target-bound-below-cost", [(TRIAGE, "quality", None)], {"maxUsd": 5.0}),
+         target(suite(TRIAGE["ref"], TRIAGE["version"], [dict(TRIAGE["cases"][0], usdBound=0.125)]
+                      + TRIAGE["cases"][1:])), None,
+         input_error(["PLAN-9"], "a case whose cost bound ($0.125) is below its cost ($0.25): a bound is the most a "
+                                 "case can cost")),
+        ("input-at-not-a-time",
+         plan("plan-job-input-at-not-a-time", [(TRIAGE, "quality", None)], {"maxUsd": 5.0}),
+         target(TRIAGE), None,
+         input_error(["ENC-8"], "the clock's start is February 31st: not a time", at="2026-02-31T09:00:00Z")),
+        ("input-at-clock-leaves-years",
+         plan("plan-job-input-at-clock-leaves-years", [(TRIAGE, "quality", None)], {"maxUsd": 5.0}),
+         target(TRIAGE), None,
+         input_error(["ENC-8"], "the clock starts a minute before the end of 9999, and three cases of 20 seconds and "
+                                "one close of a second would take it past: an input error found before anything is "
+                                "written", at="9999-12-31T23:59:00Z")),
         ("plan-reader-refuses",
          plan("plan-job-reader-refuses", [(TRIAGE, "quality", None)], {"maxUsd": 5.0, "timeout": "PT30S"}),
          target(TRIAGE), None,
@@ -355,12 +409,16 @@ def main():
     assert len(names) == len(set(names))
     for name, the_plan, the_target, own_runner, expected in vectors():
         folder = ROOT / name
-        write_json(folder / "plan.json", the_plan)
+        if isinstance(the_plan, bytes):  # a plan file that is not JSON
+            folder.mkdir(parents=True, exist_ok=True)
+            (folder / "plan.json").write_bytes(the_plan)
+        else:
+            write_json(folder / "plan.json", the_plan)
         write_json(folder / "target.json", the_target)
         if own_runner is not None:
             write_json(folder / "runner.json", own_runner)
         doc = {"kind": "job", "plan": "plan.json", "runner": "runner.json" if own_runner else "../runner.json",
-               "target": "target.json", "at": AT}
+               "target": "target.json", "at": expected.pop("at", AT)}
         if "env" in expected:
             doc["env"] = expected.pop("env")
         rules, why = expected.pop("rules"), expected.pop("why")

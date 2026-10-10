@@ -237,10 +237,11 @@ def departures(doc, plan, accepted, terminal):
     if not any(suite.get("ref") == s["ref"] and suite.get("version") == s["version"]
                and ("digest" not in s or suite.get("digest") == s["digest"]) for s in plan["suites"]):
         found.append("suite")
-    if plan.get("judges"):  # the run's judges graded it (RUN-9): some of the plan's, in its order, none twice
-        pairs = lambda judges: [(j.get("model"), j.get("rubricDigest")) for j in judges]
-        if not sub_list(pairs(doc.get("judges") or []), pairs(plan["judges"])):
-            found.append("judges")
+    # The run's judges graded it (RUN-9): the plan's with some left out, a judge being its model, provider and
+    # rubricDigest; a plan that names none allows none.
+    fields = lambda judges: [(j.get("model"), j.get("provider"), j.get("rubricDigest")) for j in judges]
+    if not sub_list(fields(doc.get("judges") or []), fields(plan.get("judges") or [])):
+        found.append("judges")
     capture = "off" if doc.get("contentCapture") == "off" else "on"  # absent or unknown reads as on
     if capture != plan["contentCapture"]:
         found.append("content-capture")
@@ -250,9 +251,8 @@ def departures(doc, plan, accepted, terminal):
 
 
 def sub_list(items, of):
-    """STRM-4 judges: items are some of `of`, in its order, none twice (each item matched to a later entry)."""
-    if len(set(items)) != len(items):
-        return False
+    """STRM-4 judges: items are `of` with some entries left out, in its order (each item matched to a later entry, so
+    an entry `of` names twice may be matched twice, and never more)."""
     rest = iter(of)
     return all(any(item == entry for entry in rest) for item in items)
 

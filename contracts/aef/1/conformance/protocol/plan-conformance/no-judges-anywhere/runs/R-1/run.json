@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "R-1",
+  "status": "completed",
+  "producer": {
+    "name": "agenteval-cli",
+    "version": "1.0.0"
+  },
+  "subject": {
+    "ref": "agent:support/support-triage",
+    "kind": "agent",
+    "version": "git:3f2a1c"
+  },
+  "deployment": {
+    "ref": "deployment:support/support-triage@dev",
+    "endpoint": "http://localhost:5080/v1"
+  },
+  "suite": {
+    "ref": "suite:support/triage-scenarios",
+    "version": "4",
+    "digest": "sha256:4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c4c"
+  },
+  "startedAt": "2026-10-08T12:00:10Z",
+  "endedAt": "2026-10-08T12:00:50Z",
+  "contentCapture": "off",
+  "execution": {
+    "targetMode": "live",
+    "stimulus": "suite"
+  },
+  "provenance": {
+    "planId": "plan-44",
+    "planDigest": "163731b5c72e4fe7607fc3b259df09093807964c17c9129a1a254bfcfa3fd377",
+    "jobId": "job-7",
+    "runnerId": "runner-local-01"
+  }
+}

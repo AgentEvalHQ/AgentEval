@@ -357,6 +357,10 @@ OTHER_RUBRIC = "sha256:" + "b7" * 32
 # A plan that names two judges (R8-2: a run names those that graded it, some of the plan's in its order, none twice).
 SECOND_JUDGE = {"model": "llama-3.3-70b", "provider": "local", "rubricDigest": OTHER_RUBRIC}
 TWO_JUDGES = dict(CPLAN, planId="plan-50", judges=CPLAN["judges"] + [SECOND_JUDGE])
+# R9-4: a judge is its model, provider and rubricDigest. One model and rubric under two providers; one judge twice.
+OTHER_PROVIDER = dict(CPLAN["judges"][0], provider="openai")
+TWO_PROVIDERS = dict(CPLAN, planId="plan-51", judges=CPLAN["judges"] + [OTHER_PROVIDER])
+JUDGE_TWICE = dict(CPLAN, planId="plan-52", judges=CPLAN["judges"] * 2)
 SCORE = "triage-score"
 DROP = object()
 TWO_CASES = (("case-17", "composite", 0.4), ("case-18", "plain", 0.9))
@@ -560,8 +564,11 @@ def conformance():
          "the job's cost ($2.00 + $1.00) equals maxUsd, which is within it; its cases are three, though five lines have "
          "no parent (a case's two trials and their rollup) and one line is a child; R-1 starts as the job is accepted "
          "and R-2 ends as it ends, the same instants written otherwise"),
-        ("plan-names-no-judges", NO_JUDGES, one_run([]), None, ["STRM-4"],
-         "a plan without judges leaves the runner's judges unchecked"),
+        ("plan-names-no-judges", NO_JUDGES, one_run([("run:R-1", "judges")]), None, ["STRM-4", "PLAN-1"],
+         "a plan that names no judges allows none (PLAN-1: a runner cannot pick them), and the run names one (changed "
+         "in round 9: the plan's judges were left unchecked)"),
+        ("no-judges-anywhere", NO_JUDGES, one_run([], judges=DROP), None, ["STRM-4", "PLAN-1", "RUN-9"],
+         "neither the plan nor the run names a judge: within"),
         ("run-missing", CPLAN, v_run_missing, None, ["STRM-4", "RUN-1"], "R-2 was announced and sealed, but no folder holds it"),
         ("numeric-run-ids", CPLAN, v_numeric_run_ids, None, ["STRM-4", "CONF-2"],
          "runs 9 and 10 of another subject version: run:10 is reported first, by bytes, as it is not a line path"),
@@ -615,7 +622,18 @@ def conformance():
         ("judges-out-of-order", TWO_JUDGES, one_run([("run:R-1", "judges")], judges=judge(**SECOND_JUDGE) + judge()),
          None, ["STRM-4", "RUN-9"], "both of the plan's judges, the second before the first: not in the plan's order"),
         ("judges-twice", TWO_JUDGES, one_run([("run:R-1", "judges")], judges=judge() + judge()), None,
-         ["STRM-4", "RUN-9"], "the plan's first judge named twice"),
+         ["STRM-4", "RUN-9"], "the plan's first judge named twice, where the plan names it once"),
+        ("judges-other-provider", CPLAN, one_run([("run:R-1", "judges")], judges=judge(provider="openai")), None,
+         ["STRM-4", "PLAN-1"], "the plan's model and rubric, served by another provider than the plan names: a judge "
+                               "is its model, provider and rubricDigest"),
+        ("judges-two-providers", TWO_PROVIDERS, one_run([], judges=judge() + judge(provider="openai")), None,
+         ["STRM-4", "RUN-9"], "a plan that names one model and rubric under two providers, and a run graded by both: "
+                              "two judges, each the plan's, in its order"),
+        ("judges-plan-names-twice", JUDGE_TWICE, one_run([], judges=judge() + judge()), None, ["STRM-4", "RUN-9"],
+         "a plan that names one judge twice lets a run name it twice"),
+        ("judges-more-often-than-plan", JUDGE_TWICE, one_run([("run:R-1", "judges")], judges=judge() * 3), None,
+         ["STRM-4", "RUN-9"], "a plan that names one judge twice, and a run that names it three times: more often "
+                              "than the plan names it"),
         ("content-capture", CPLAN, one_run([("run:R-1", "content-capture")], contentCapture="on"), None, ["STRM-4", "RUN-11"],
          "content kept on a plan that keeps none"),
         ("content-capture-absent", CPLAN, one_run([("run:R-1", "content-capture")], contentCapture=DROP), None,

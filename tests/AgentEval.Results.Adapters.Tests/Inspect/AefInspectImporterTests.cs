@@ -407,17 +407,128 @@ public sealed class AefInspectImporterTests : IDisposable
     }
 
     [Fact]
-    public void ContentHoldingNaN_OrAnUnpairedSurrogate_IsRefused()
+    public void ContentHoldingNaN_IsRefusedByIn8_AndAnUnpairedSurrogateAsTheLogIsRead()
     {
-        // IN-8: JCS has no NaN and no unpaired surrogate (content-nan.json in the example; here, the surrogate).
-        var (input, output) = Files(log => log["samples"]![0]!["messages"] = new JsonArray(new JsonObject { ["role"] = "user", ["content"] = "LONE" }));
-        File.WriteAllText(input, File.ReadAllText(input).Replace("\"LONE\"", "\"\\ud800\"", StringComparison.Ordinal), new UTF8Encoding(false));
+        // JCS has no NaN (IN-8; content-nan.json in the example too). An unpaired surrogate never reaches it: the log is
+        // refused as it is read (IN-6, R9-2).
+        var (nan, nanOutput) = Files(log => log["samples"]![0]!["messages"] = new JsonArray(new JsonObject { ["role"] = "user", ["n"] = InspectJson.NaN() }));
+        var (lone, loneOutput) = Files(log => log["samples"]![0]!["messages"] = new JsonArray(new JsonObject { ["role"] = "user", ["content"] = "LONE" }));
+        File.WriteAllText(lone, File.ReadAllText(lone).Replace("\"LONE\"", "\"\\ud800\"", StringComparison.Ordinal), new UTF8Encoding(false));
+        var options = new AefInspectImportOptions { TargetMode = AefTargetMode.Live, TimeProvider = new Clock(At) };
+
+        Assert.Contains("(IN-8)", Assert.Throws<AefInspectImportException>(() => AefInspectImporter.Import(nan, nanOutput, options)).Message, StringComparison.Ordinal);
+        var refused = Assert.Throws<AefInspectImportException>(() => AefInspectImporter.Import(lone, loneOutput, options));
+        Assert.Contains("unpaired surrogate", refused.Message, StringComparison.Ordinal);
+        Assert.Contains("(IN-6)", refused.Message, StringComparison.Ordinal);
+        Assert.False(Directory.Exists(nanOutput));
+        Assert.False(Directory.Exists(loneOutput));
+
+        // With contentCapture off the content is not written, so its NaN is not refused.
+        var conversion = AefInspectImporter.Import(nan, nanOutput, options with { ContentCapture = AefContentCapture.Off });
+        Assert.NotEqual(AefOutcome.Invalid, conversion.Verification.Outcome);
+    }
+
+    // ------------------------------------------------------------------ R9-2: reading the log, ids, errors and limits
+
+    [Theory]
+    [InlineData("id", "1.5", "IN-8")]                                   // z17
+    [InlineData("id", "12345678901234567890", "IN-8")]                  // z19
+    [InlineData("id", "9007199254740993", "IN-8")]                      // z19c: reads as 2^53, beyond 2^53 − 1
+    [InlineData("task_version", "12345678901234567890", "IN-6")]        // z21
+    [InlineData("task_version", "2.5", "IN-6")]
+    [InlineData("error", "\"boom\"", "IN-8")]                           // z22: an error that is not an object
+    [InlineData("error", "{\"message\": 3}", "IN-8")]                   // a message that is not text
+    [InlineData("limit", "{}", "IN-8")]                                 // on a scored sample too
+    [InlineData("limit-beside-error", "{}", "IN-8")]                    // beside an error too
+    [InlineData("limit-number", "1e400", "IN-6")]                       // z1: overflows binary64, refused as read
+    [InlineData("content", "1e400", "IN-6")]                            // z10
+    [InlineData("score", "1e400", "IN-6")]                              // z15
+    [InlineData("total_time", "1e400", "IN-6")]                         // z16
+    [InlineData("content-key", "\"\\udc00\"", "IN-6")]                  // z12: an unpaired surrogate, a name
+    [InlineData("score-metadata-key", "\"\\udc00\"", "IN-6")]           // z12b
+    [InlineData("eval-metadata-key", "\"\\udc00\"", "IN-6")]            // z12c: in a part not carried
+    [InlineData("explanation", "\"a\\ud800\"", "IN-6")]                 // z12d: a value
+    [InlineData("deep", "600", "IN-6")]                                 // z14: deeper than 64
+    [InlineData("deep", "200", "IN-6")]                                 // z14b
+    [InlineData("eval-metadata", "NaN", "IN-6")]                        // NaN where no unscored value can be
+    [InlineData("score-metadata", "NaN", "IN-6")]
+    [InlineData("eval-metadata", "-Infinity", "IN-6")]
+    [InlineData("twice", "\"\\u0073\"", "IN-6")]                        // a member named twice, once escaped
+    public void AMalformedLog_IsRefused_NamingItsRule_AndNeverThrows(string where, string raw, string rule)
+    {
+        var (input, output) = Files(log =>
+        {
+            var sample = log["samples"]![0]!;
+            switch (where)
+            {
+                case "id": sample["id"] = "RAW"; break;
+                case "task_version": log["eval"]!["task_version"] = "RAW"; break;
+                case "error": sample["error"] = "RAW"; break;
+                case "limit": sample["limit"] = "RAW"; break;
+                case "limit-beside-error":
+                    sample["error"] = new JsonObject { ["message"] = "crashed" };
+                    sample["limit"] = "RAW";
+                    break;
+                case "limit-number":
+                    sample["scores"] = null;
+                    sample["limit"] = new JsonObject { ["type"] = "token", ["limit"] = "RAW" };
+                    break;
+                case "content": sample["output"] = new JsonObject { ["choices"] = new JsonArray(new JsonObject { ["n"] = "RAW" }) }; break;
+                case "score": sample["scores"]!["s"]!["value"] = "RAW"; break;
+                case "total_time": sample["total_time"] = "RAW"; break;
+                case "content-key": sample["messages"] = new JsonArray(new JsonObject { ["RAWKEY"] = 1 }); break;
+                case "score-metadata-key": sample["scores"]!["s"]!["metadata"] = new JsonObject { ["RAWKEY"] = 1 }; break;
+                case "eval-metadata-key": log["eval"]!["metadata"] = new JsonObject { ["RAWKEY"] = 1 }; break;
+                case "explanation": sample["scores"]!["s"]!["explanation"] = "RAW"; break;
+                case "deep": sample["messages"] = "RAW"; break;
+                case "eval-metadata": log["eval"]!["metadata"] = new JsonObject { ["x"] = "RAW" }; break;
+                case "score-metadata": sample["scores"]!["s"]!["metadata"] = new JsonObject { ["x"] = "RAW" }; break;
+                case "twice": sample["scores"]!["RAWKEY"] = new JsonObject { ["value"] = 1 }; break;
+            }
+        });
+        var text = where == "deep"
+            ? new string('[', int.Parse(raw, CultureInfo.InvariantCulture)) + new string(']', int.Parse(raw, CultureInfo.InvariantCulture))
+            : raw;
+        File.WriteAllText(input, File.ReadAllText(input).Replace("\"RAWKEY\"", text, StringComparison.Ordinal).Replace("\"RAW\"", text, StringComparison.Ordinal), new UTF8Encoding(false));
 
         var refused = Assert.Throws<AefInspectImportException>(() => AefInspectImporter.Import(input, output, new AefInspectImportOptions { TargetMode = AefTargetMode.Live, TimeProvider = new Clock(At) }));
 
-        Assert.Contains("unpaired surrogate", refused.Message, StringComparison.Ordinal);
-        Assert.Contains("IN-8", refused.Message, StringComparison.Ordinal);
+        Assert.Contains($"({rule})", refused.Message, StringComparison.Ordinal);
         Assert.False(Directory.Exists(output));
+    }
+
+    [Theory]
+    [InlineData("id", "1.0", "1")]                                      // z18: ids are read as binary64 values
+    [InlineData("id", "1e3", "1000")]                                   // z19b
+    [InlineData("id", "9007199254740991", "9007199254740991")]          // 2^53 − 1
+    [InlineData("task_version", "2.0", "2")]                            // z20
+    [InlineData("error", "{}", "Inspect recorded an error without a message")]   // z25b
+    [InlineData("error", "{\"message\": null}", "Inspect recorded an error without a message")]
+    public void ANumericIdOrTaskVersion_IsItsIntegerInDecimalDigits_AndAnErrorWithoutAMessageSaysSo(string where, string raw, string expected)
+    {
+        var (input, output) = Files(log =>
+        {
+            switch (where)
+            {
+                case "id": log["samples"]![0]!["id"] = "RAW"; break;
+                case "task_version": log["eval"]!["task_version"] = "RAW"; break;
+                default:
+                    log["samples"]![0]!["error"] = "RAW";
+                    log["results"]!["scores"]![0]!["metrics"] = new JsonObject();   // nothing of Inspect's to compare
+                    break;
+            }
+        });
+        File.WriteAllText(input, File.ReadAllText(input).Replace("\"RAW\"", raw, StringComparison.Ordinal), new UTF8Encoding(false));
+
+        AefInspectImporter.Import(input, output, new AefInspectImportOptions { TargetMode = AefTargetMode.Live, TimeProvider = new Clock(At) });
+
+        var line = AefTestRuns.Results(output)[0];
+        Assert.Equal(expected, where switch
+        {
+            "id" => (string)line["caseId"]!,
+            "task_version" => (string)AefTestRuns.Document(output, "run.json")["suite"]!["version"]!,
+            _ => (string)line["reason"]!,
+        });
     }
 
     // ------------------------------------------------------------------ usage

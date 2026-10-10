@@ -9,7 +9,7 @@
     "task_version": "2",
     "dataset": {
       "name": "edges",
-      "samples": 8
+      "samples": 11
     },
     "model": "acme/gpt x",
     "model_roles": {
@@ -42,7 +42,7 @@
     ]
   },
   "results": {
-    "total_samples": 8,
+    "total_samples": 11,
     "completed_samples": 1,
     "scores": [
       {
@@ -221,6 +221,35 @@
           }
         }
       }
+    },
+    {
+      "id": 9007199254740991,
+      "epoch": 1,
+      "input": "",
+      "target": "",
+      "scores": {
+        "q": {
+          "value": 0.1
+        }
+      }
+    },
+    {
+      "id": 1000.0,
+      "epoch": 1,
+      "input": "",
+      "target": "",
+      "scores": {
+        "q": {
+          "value": 0.2
+        }
+      }
+    },
+    {
+      "id": "k",
+      "epoch": 1,
+      "input": "",
+      "target": "",
+      "error": {}
     }
   ]
 }

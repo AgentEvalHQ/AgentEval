@@ -365,7 +365,18 @@ public class CorpusTheories
         {
             variables.ForEach(v => Environment.SetEnvironmentVariable(v.Name, v.Value));
             var plan = Path.Combine(folder, (string)expected["plan"]!);
-            var result = Run("job", plan, Path.Combine(folder, (string)expected["runner"]!), Path.Combine(folder, (string)expected["target"]!), output, "--at", (string)expected["at"]!);
+            string[] args = ["job", plan, Path.Combine(folder, (string)expected["runner"]!), Path.Combine(folder, (string)expected["target"]!), output, "--at", (string)expected["at"]!];
+            if (expected["refused"] is not null)
+            {
+                // An input error (§9.3): exit 2, and OUT absent or holding no file.
+                var (stdout, stderr) = (new StringWriter(), new StringWriter());
+                Assert.Equal(2, Program.Dispatch(args, stdout, stderr));
+                Assert.Equal("", stdout.ToString());
+                Assert.True(!Directory.Exists(output) || Directory.GetFiles(output, "*", SearchOption.AllDirectories).Length == 0, "OUT holds a file");
+                return;
+            }
+
+            var result = Run(args);
 
             var events = File.ReadAllLines(Path.Combine(output, "events.ndjson")).Select(l => JsonNode.Parse(l)!).ToList();
             Assert.Equal((int)result["events"]!, events.Count);

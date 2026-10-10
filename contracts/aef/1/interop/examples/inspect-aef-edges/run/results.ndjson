@@ -14,3 +14,7 @@
 {"schemaVersion":"1.0","resultId":"r_640cfcb65db43b91841f2d6e7edd8131","caseId":"g","path":"m","evaluator":{"id":"m"},"state":"error","reason":"Inspect recorded an error without a message"}
 {"schemaVersion":"1.0","resultId":"r_9ae111d765c71f62a30c26851d44dca0","caseId":"h","path":"q","evaluator":{"id":"q"},"state":"scored","scores":[{"metric":"q","value":0.5}],"evidence":["E-2","E-3","E-4"]}
 {"schemaVersion":"1.0","resultId":"r_18f565282b15b1aade1ba0a3b1afcc10","caseId":"h","path":"m","evaluator":{"id":"m"},"state":"scored","scores":[{"metric":"x","value":0.25}],"evidence":["E-2","E-3","E-4"]}
+{"schemaVersion":"1.0","resultId":"r_b1efaeaf14407de162a3f6c3460367f5","caseId":"9007199254740991","path":"q","evaluator":{"id":"q"},"state":"scored","scores":[{"metric":"q","value":0.1}]}
+{"schemaVersion":"1.0","resultId":"r_759bce17361c9e99ca5f5bb6afccc5bb","caseId":"1000","path":"q","evaluator":{"id":"q"},"state":"scored","scores":[{"metric":"q","value":0.2}]}
+{"schemaVersion":"1.0","resultId":"r_ede0f9168ec6eb94d969ce98fd5143c7","caseId":"k","path":"q","evaluator":{"id":"q"},"state":"error","reason":"Inspect recorded an error without a message"}
+{"schemaVersion":"1.0","resultId":"r_2725477e2afb95a9614a4cb036af2434","caseId":"k","path":"m","evaluator":{"id":"m"},"state":"error","reason":"Inspect recorded an error without a message"}

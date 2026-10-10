@@ -1039,9 +1039,12 @@ maps it: a line per sample and score (`trial` = `epoch` − 1 when the log has m
 reduction, the summary recomputed from the lines in one lane `main`, and the run's usage from `stats`. The subject is
 `model:<eval.model>`; the target mode is yours, and `contentCapture` is `on` unless `--content-capture off` (then no
 case content, explanation or answer is kept). A closed log is sealed as `ingest` unless `--no-seal`; a `started` log
-gives a running run, which is not sealed. A log the page refuses (a time without an offset, a boolean value or a string
-other than `C`, `I`, `P` and `N`, a reducer without an AEF value, a missing reduction, a mean the lines do not give,
-`Score.history`, an invalidation or `log_updates`, …) exits `2`, naming the rule, and nothing is written.
+gives a running run, which is not sealed. The log is read as I-JSON within a nesting depth of 64, Inspect's bare `NaN`
+allowed only where an unscored value can be. A log the page refuses (one that is not I-JSON, such as a member named
+twice, `Infinity` or a number that overflows; a time without an offset; a numeric `id` that is no integer of at most
+2^53 − 1; a boolean value or a string other than `C`, `I`, `P` and `N`; a reducer without an AEF value; a missing
+reduction; a mean the lines do not give; `Score.history`, an invalidation or `log_updates`; …) exits `2`, naming the
+rule, and nothing is written.
 
 **`export-inspect`** writes an AEF run as one Inspect `EvalLog` in `.json` form: a sample per case and trial, a score
 per result line under its path (the AEF facts Inspect has no field for under `metadata.aef`), a reduction per rollup

@@ -1,5 +1,24 @@
 # AEF 1.0 changelog
 
+## Unreleased (draft): rework after critic round 9
+
+Critic round 9 scored 9.43 of 10 (from 9.39): "technically AEF 1.0 is ready"; no divergence between the two runners
+or among the three plan-conformance verifiers. Changes since:
+
+- **A plan that names no judges allows none** ([STRM-4], [PLAN-1]): the text, the primer and the rationale already
+  said a runner cannot pick them; STRM-4 now agrees. A judge is compared by `model`, `provider` and `rubricDigest`, and
+  a run's judges are the plan's with some left out, so a plan that names one judge twice (under two providers, say)
+  lets a run name both. Five plan-conformance vectors.
+- **PLAN-9 has one rule for every case**: `cases` counts cases started; the job's spend and each run's cost include a
+  run's own costs; `usdHigh` sums every bound.
+- **`job`'s input errors have vectors** (§9.2.1, §9.3): nine vectors expect exit 2 with nothing written, the clock's
+  range among them, so a runner that crashes on bad input no longer passes the corpus.
+- **Inspect logs are read as I-JSON** (inspect.md, IN-6): a member named twice, an unpaired surrogate, an infinity or a
+  number beyond binary64, a NaN outside the places the page allows, and nesting deeper than [ENC-17]'s 64 are refused as
+  the log is read; a numeric sample id or `task_version` must be a safe integer and is written as its digits; an
+  `error` must be an object and a `limit` `{type, limit}`. Eleven refusals and three samples added to
+  `inspect-aef-edges`; the reference converter no longer stops with a traceback on any of the critic's 51 probes.
+
 ## Unreleased (draft): rework after critic round 8
 
 Critic round 8 scored 9.4 of 10 (from 9.3): "technically AEF is now at 1.0 quality: every class, the Runner

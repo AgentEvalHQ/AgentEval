@@ -853,35 +853,103 @@ _AEF_ID = re.compile(r"[A-Za-z0-9._:-]{1,128}")
 _METHOD = re.compile(r"[a-z][a-z0-9@._-]{0,63}")
 
 
+SAFE_INTEGER = 2 ** 53 - 1  # [ENC-4]: an integral value every binary64 reader reads exactly
+
+
+def _nan_allowed(path):
+    """Where an Inspect log may hold its bare NaN token (IN-6, R9-2): a score's value or a map member of it, a reduced
+    score's, a metric's value, a limit's number (which IN-8 then refuses) and case content (which JCS refuses when it
+    is kept). Anywhere else, a NaN refuses the log."""
+    p = path
+    if len(p) in (5, 6) and p[0] == "samples" and p[2] == "scores" and p[4] == "value":
+        return True
+    if len(p) in (5, 6) and p[0] == "reductions" and p[2] == "samples" and p[4] == "value":
+        return True
+    if len(p) == 6 and p[:2] == ("results", "scores") and p[3] == "metrics" and p[5] == "value":
+        return True
+    if len(p) == 4 and p[0] == "samples" and p[2:] == ("limit", "limit"):
+        return True
+    return len(p) >= 3 and p[0] == "samples" and p[2] in ("input", "target", "output", "messages")
+
+
 def _read_inspect_log(path):
-    """An Inspect log in its .json form: one JSON object, with Inspect's bare NaN token read as NaN (an unscored
-    value); Infinity, a member named twice, a byte-order mark or bytes that are not UTF-8 are refused."""
+    """An Inspect log in its .json form, read as I-JSON (RFC 7493), as AEF reads its own files ([ENC-1]-[ENC-3]),
+    within [ENC-17]'s nesting depth, with one exception Inspect needs: its bare NaN token, where _nan_allowed says.
+    Everything else is refused as the log is read, wherever it is (IN-6, R9-2): a byte-order mark or bytes that are
+    not UTF-8; a member named twice; a string with an unpaired surrogate; Infinity; a number that overflows binary64
+    (1e400); nesting deeper than 64. Every number is read as binary64 ([ENC-4]): an integer beyond 2^53 reads as the
+    binary64 value a JSON parser gives it."""
+    rule = "(inspect.md, Inspect -> AEF, IN-6)"
     try:
         data = Path(path).read_bytes()
     except OSError as error:
         raise InputError(f"{path}: {error}") from None
-    text = aef_produce._decode(data, "the Inspect log")
+    try:
+        text = aef_produce._decode(data, "the Inspect log")
+    except InputError as error:
+        raise InputError(f"{error}: refused {rule}") from None
+    if aef_verify.nesting_depth(data) > aef_verify.MAX_DEPTH:
+        raise InputError(f"the Inspect log nests deeper than {aef_verify.MAX_DEPTH} ([ENC-17]): refused {rule}")
 
     def members(pairs):
         obj = {}
         for key, value in pairs:
             if key in obj:
-                raise InputError(f"the Inspect log: the member {key!r} appears twice")
+                raise InputError(f"the Inspect log: the member {key!r} appears twice ([ENC-2]): refused {rule}")
             obj[key] = value
         return obj
 
     def constant(name):
         if name == "NaN":
             return math.nan
-        raise InputError(f"the Inspect log: {name} is no value AEF can hold ([ENC-3])")
+        raise InputError(f"the Inspect log holds {name}, which no AEF number holds ([ENC-3]): refused {rule}")
+
+    def number(literal):
+        value = float(literal)
+        if not math.isfinite(value):
+            raise InputError(f"the Inspect log holds {literal}, which overflows binary64 ([ENC-3]): refused {rule}")
+        return value
+
+    def integer(literal):
+        value = int(literal)
+        if abs(value) <= 2 ** 53:
+            return value
+        return number(literal)  # read as binary64, as every JSON parser can ([ENC-4])
 
     try:
-        log = json.loads(text, object_pairs_hook=members, parse_constant=constant)
+        log = json.loads(text, object_pairs_hook=members, parse_constant=constant, parse_float=number,
+                         parse_int=integer)
     except ValueError as error:
-        raise InputError(f"the Inspect log is not JSON: {error}") from None
+        raise InputError(f"the Inspect log is not JSON: {error}: refused {rule}") from None
+    stack = [((), log)]
+    while stack:  # unpaired surrogates and NaN, anywhere
+        where, value = stack.pop()
+        if isinstance(value, str):
+            if any("\ud800" <= c <= "\udfff" for c in value):
+                raise InputError(f"the Inspect log: a string at {where} holds an unpaired surrogate ([ENC-2]): "
+                                 f"refused {rule}")
+        elif isinstance(value, float) and math.isnan(value) and not _nan_allowed(where):
+            raise InputError(f"the Inspect log: NaN at {'/'.join(map(str, where))}, where no score, metric, limit "
+                             f"or content is: refused {rule}")
+        elif isinstance(value, dict):
+            for key, item in value.items():
+                stack.append((where + (key,), key))
+                stack.append((where + (key,), item))
+        elif isinstance(value, list):
+            stack.extend((where + (i,), item) for i, item in enumerate(value))
     if not isinstance(log, dict) or not isinstance(log.get("eval"), dict):
         raise InputError("the Inspect log is not an EvalLog (an object with eval)")
     return log
+
+
+def _integral_text(value, field, where, item):
+    """A sample's id or eval.task_version that is a number: an integer of at most 2^53 - 1 in magnitude ([ENC-4]),
+    from its value alone (1, 1.0 and 1e0 alike), written in decimal digits; any other number is refused (R9-2)."""
+    if isinstance(value, float) and value.is_integer() and abs(value) <= SAFE_INTEGER:
+        value = int(value)
+    if isinstance(value, bool) or not isinstance(value, int) or abs(value) > SAFE_INTEGER:
+        _in(where, f"{field} {value!r} is a number that is not an integer of at most 2^53 - 1 in magnitude", item)
+    return str(value)
 
 
 def _inspect_nanos(text, where):
@@ -1196,10 +1264,11 @@ def from_inspect(log_path, out, target_mode, capture, at):
     run["subject"] = {"ref": _ref("model", model), "kind": "model"}
     run["execution"] = {"targetMode": target_mode}
     version = spec.get("task_version", 0)
-    if isinstance(version, bool) or not isinstance(version, (int, str)) or \
-            not re.fullmatch("[!-~]{1,128}", str(version)) or str(version).lower() == "latest":
+    if not isinstance(version, str):
+        version = _integral_text(version, "task_version", "eval.task_version", "IN-6")  # R9-2
+    if not re.fullmatch("[!-~]{1,128}", version) or version.lower() == "latest":
         _in("eval.task_version", f"{version!r} is not an exact version ([ENC-10])", "IN-6")
-    suite = {"ref": _ref("suite", task), "version": str(version)}
+    suite = {"ref": _ref("suite", task), "version": version}
     config = spec.get("config") or {}
     epochs = config.get("epochs") or 1
     if isinstance(epochs, bool) or not isinstance(epochs, int) or not 1 <= epochs <= 1000:
@@ -1253,10 +1322,11 @@ def from_inspect(log_path, out, target_mode, capture, at):
     blobs, lines, seen, trial_lines = _Blobs(), [], set(), {}
     for n, sample in enumerate(log.get("samples") or []):
         where = f"samples[{n}]"
-        if not isinstance(sample, dict) or isinstance(sample.get("id"), bool) or \
-                not isinstance(sample.get("id"), (int, str)):
-            raise InputError(f"{where}: a sample has an id, a number or a string")
-        case_id = _text(str(sample["id"]), "caseId", 256, where)
+        if not isinstance(sample, dict) or not isinstance(sample.get("id"), (int, float, str)):
+            _in(where, "a sample whose id is no string and no number", "IN-8")
+        sample_id = sample["id"]
+        case_id = _text(sample_id if isinstance(sample_id, str) else
+                        _integral_text(sample_id, "id", where, "IN-8"), "caseId", 256, where)  # R9-2
         epoch = sample.get("epoch", 1)
         if isinstance(epoch, bool) or not isinstance(epoch, int) or not 1 <= epoch <= epochs:
             _in(where, f"epoch {epoch!r}, beyond eval.config.epochs {epochs}", "IN-8")
@@ -1265,7 +1335,13 @@ def from_inspect(log_path, out, target_mode, capture, at):
             _in(where, "an invalidated sample: the reference converter writes no overlays", "IN-10")
         scores = sample.get("scores") or {}
         failure, limit = sample.get("error"), sample.get("limit")
-        if not scores and (failure or limit):  # stopped before it was scored: a line per scorer the log names
+        if failure is not None and not isinstance(failure, dict):  # R9-2: Inspect writes an error as an object
+            _in(where, f"an error that is not an object ({type(failure).__name__})", "IN-8")
+        if limit is not None and not (isinstance(limit, dict) and isinstance(limit.get("type"), str) and limit["type"]
+                                      and _finite(limit.get("limit"))):
+            _in(where, "a limit that is not {type, limit} with a type and a finite number (R8-4)", "IN-8")
+        stopped = failure is not None or limit is not None  # an error {} is an error (R9-2)
+        if not scores and stopped:  # stopped before it was scored: a line per scorer the log names
             scores = {s.get("name"): {"value": math.nan} for s in spec.get("scorers") or []
                       if isinstance(s, dict) and isinstance(s.get("name"), str)}
         if not isinstance(scores, dict) or not scores:
@@ -1283,18 +1359,17 @@ def from_inspect(log_path, out, target_mode, capture, at):
                 _in(where, f"a second score of case {case_id!r} at {path!r}, epoch {epoch}", "IN-8")
             seen.add(key)
             sample_lines.append(line)
-        if failure or limit:  # samples[].error, limit -> error (not_measured for a limit), the message in reason
-            if failure:
-                message = failure.get("message") if isinstance(failure, dict) else failure
-                if not isinstance(message, str) or not message:
-                    message = ERROR_REASON  # R8-4: an error without a message
-            elif isinstance(limit, dict) and isinstance(limit.get("type"), str) and limit["type"] and \
-                    _finite(limit.get("limit")):
-                message = f"{limit['type']} limit {_shortest(limit['limit'])}"  # R7I-12, R8-4: "token limit 1000"
+        if stopped:  # samples[].error, limit -> error (not_measured for a limit), the message in reason
+            if failure is not None:
+                message = failure.get("message")
+                if message is not None and not isinstance(message, str):
+                    _in(where, "an error whose message is not text", "IN-8")
+                if not message:
+                    message = ERROR_REASON  # R8-4, R9-2: an error without a message, {} included
             else:
-                _in(where, "a limit that is not {type, limit} with a type and a finite number (R8-4)", "IN-8")
+                message = f"{limit['type']} limit {_shortest(limit['limit'])}"  # R7I-12, R8-4: "token limit 1000"
             for line in sample_lines:
-                line["state"] = "error" if failure else "not_measured"
+                line["state"] = "error" if failure is not None else "not_measured"
                 line["reason"] = str(message)[:REASON_MAX] or NO_VALUE_REASON
                 line.pop("scores", None)
         for field, source_field in (("startedAt", "started_at"), ("endedAt", "completed_at")):
@@ -1337,7 +1412,11 @@ def from_inspect(log_path, out, target_mode, capture, at):
                 _in(where, f"the reducer {reduction.get('reducer') if isinstance(reduction, dict) else None!r}, "
                            "which has no AEF trial aggregation", "IN-8")
             for j, reduced in enumerate(reduction.get("samples") or []):
-                case_id = str(reduced.get("sample_id"))
+                sample_id = reduced.get("sample_id") if isinstance(reduced, dict) else None
+                if not isinstance(sample_id, (int, float, str)):
+                    _in(f"{where}.samples[{j}]", "a reduction without a sample_id", "IN-8")
+                case_id = sample_id if isinstance(sample_id, str) else \
+                    _integral_text(sample_id, "sample_id", f"{where}.samples[{j}]", "IN-8")
                 trials = trial_lines.get((case_id, scorer))
                 if not trials or (case_id, scorer) in rolled:
                     _in(f"{where}.samples[{j}]", f"a reduction of case {case_id!r} at {scorer!r} with no epochs, "

@@ -6,6 +6,7 @@ using System.Globalization;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using AgentEval.Results.Json;
 
 namespace AgentEval.Results.Adapters.Inspect;
 
@@ -35,14 +36,6 @@ internal static class InspectJson
     /// <summary>Whether <paramref name="node"/> is a non-finite number (NaN or an infinity).</summary>
     public static bool IsNonFinite(JsonNode? node) => Marker(node) is not null;
 
-    /// <summary>Whether <paramref name="node"/> holds <c>Infinity</c> or <c>-Infinity</c> anywhere in it.</summary>
-    public static bool HoldsInfinity(JsonNode? node) => node switch
-    {
-        JsonObject obj => obj.Any(m => HoldsInfinity(m.Value)),
-        JsonArray array => array.Any(HoldsInfinity),
-        _ => Marker(node) is InfinityMarker or MinusInfinityMarker,
-    };
-
     /// <summary>Whether <paramref name="node"/> holds a non-finite number anywhere in it.</summary>
     public static bool HoldsNonFinite(JsonNode? node) => node switch
     {
@@ -52,17 +45,20 @@ internal static class InspectJson
     };
 
     /// <summary>
-    /// Reads an Inspect log: JSON in UTF-8 (a byte-order mark is skipped), where <c>NaN</c>, <c>Infinity</c> and
-    /// <c>-Infinity</c> may stand where a number does.
+    /// Reads an Inspect log as I-JSON (RFC 7493), as AEF reads its own files ([ENC-1] to [ENC-3]), within [ENC-17]'s
+    /// nesting depth of 64 (inspect.md, "Reading the log", R9-2), with the one exception Inspect needs: a bare
+    /// <c>NaN</c>, read as <see cref="NaNMarker"/> (where it may stand is the caller's to check). Refused: a byte-order
+    /// mark, bytes that are not UTF-8, a member named twice, an unpaired surrogate in a string or a name,
+    /// <c>Infinity</c> or <c>-Infinity</c>, a number that overflows binary64, any other syntax error, nesting deeper
+    /// than 64. There is no size limit: an Inspect log is not an AEF file.
     /// </summary>
-    /// <exception cref="InvalidDataException">Not such a text.</exception>
+    /// <exception cref="FormatException">The text is refused; the message says why.</exception>
     public static JsonNode? Parse(byte[] utf8)
     {
         ArgumentNullException.ThrowIfNull(utf8);
-        var start = utf8.Length >= 3 && utf8[0] == 0xEF && utf8[1] == 0xBB && utf8[2] == 0xBF ? 3 : 0;
         var text = new List<byte>(utf8.Length + 64);
         var inString = false;
-        for (var i = start; i < utf8.Length; i++)
+        for (var i = 0; i < utf8.Length; i++)
         {
             var b = utf8[i];
             if (inString)
@@ -88,14 +84,15 @@ internal static class InspectJson
             }
 
             // Outside a string, letters stand only in true, false, null and these tokens.
-            var (marker, length) = Token(utf8, i, "NaN"u8) ? (NaNMarker, 3)
-                : Token(utf8, i, "Infinity"u8) ? (InfinityMarker, 8)
-                : Token(utf8, i, "-Infinity"u8) ? (MinusInfinityMarker, 9)
-                : (null, 0);
-            if (marker is not null)
+            if (Token(utf8, i, "Infinity"u8) || Token(utf8, i, "-Infinity"u8))
             {
-                text.AddRange(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(marker)));
-                i += length - 1;   // the loop adds the last one
+                throw new FormatException("the log holds Infinity or -Infinity, which no AEF number holds ([ENC-3])");
+            }
+
+            if (Token(utf8, i, "NaN"u8))
+            {
+                text.AddRange(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(NaNMarker)));
+                i += 2;   // the loop steps past the last byte
                 continue;
             }
 
@@ -104,13 +101,12 @@ internal static class InspectJson
 
         try
         {
-            var node = JsonNode.Parse(text.ToArray(), nodeOptions: null, new JsonDocumentOptions { MaxDepth = 512 });
-            Touch(node);   // a member name twice is found here, not later
-            return node;
+            // AgentEval.Results' own I-JSON reader: the checks every AEF reader makes, on the bytes, before a node is built.
+            return AefJsonReader.ParseValue(text.ToArray(), int.MaxValue);
         }
-        catch (Exception e) when (e is JsonException or ArgumentException or InvalidOperationException)
+        catch (AefReadException e)
         {
-            throw new InvalidDataException($"Not an Inspect eval log in JSON form: {e.Message}", e);
+            throw new FormatException($"the log is not I-JSON within a depth of {AefLimits.MaxDepth}: {e.Message}", e);
         }
     }
 
@@ -151,7 +147,7 @@ internal static class InspectJson
                 break;
             case JsonObject obj:
                 output.Append('{');
-                var members = obj.Select(m => (Name: Checked(m.Key), m.Value)).ToList();
+                var members = obj.Select(m => (Name: m.Key == NaNMarker ? throw new FormatException("it holds NaN as a member name, which JCS cannot write") : Checked(m.Key), m.Value)).ToList();
                 members.Sort((a, b) => string.CompareOrdinal(a.Name, b.Name));   // UTF-16 code units (RFC 8785 §3.2.3)
                 for (var i = 0; i < members.Count; i++)
                 {
@@ -330,27 +326,6 @@ internal static class InspectJson
 
     private static bool Token(byte[] utf8, int at, ReadOnlySpan<byte> token) =>
         at + token.Length <= utf8.Length && utf8.AsSpan(at, token.Length).SequenceEqual(token);
-
-    private static void Touch(JsonNode? node)
-    {
-        switch (node)
-        {
-            case JsonObject obj:
-                foreach (var (_, value) in obj)
-                {
-                    Touch(value);
-                }
-
-                break;
-            case JsonArray array:
-                foreach (var item in array)
-                {
-                    Touch(item);
-                }
-
-                break;
-        }
-    }
 
     private static void Write(StringBuilder output, JsonNode? node, int indent, bool indented)
     {

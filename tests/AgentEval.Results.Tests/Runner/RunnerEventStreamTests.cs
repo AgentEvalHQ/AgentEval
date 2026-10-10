@@ -214,42 +214,51 @@ public sealed class RunnerEventStreamTests : IDisposable
     }
 
     [Theory]
-    [InlineData("[]", "")]                     // no judge: within
-    [InlineData(null, "")]                     // no judges member: within
-    [InlineData("[\"B\"]", "")]              // some of the plan's
-    [InlineData("[\"A\", \"B\"]", "")]     // all, in the plan's order
-    [InlineData("[\"B\", \"A\"]", "run:R-1 judges")]   // out of the plan's order
-    [InlineData("[\"A\", \"A\"]", "run:R-1 judges")]   // one named twice
-    [InlineData("[\"A\", \"C\"]", "run:R-1 judges")]   // one the plan does not name
-    [InlineData("[\"A-other-rubric\"]", "run:R-1 judges")] // the plan's model with another rubric digest
-    public void ARunsJudges_AreASubListOfThePlans_InItsOrder_NoneTwice(string? runJudges, string expected)
+    [InlineData("A B", "", true)]              // no judge: within
+    [InlineData("A B", null, true)]            // no judges member: within
+    [InlineData("A B", "B", true)]             // some of the plan's
+    [InlineData("A B", "A B", true)]           // all, in the plan's order
+    [InlineData("A B", "B A", false)]          // out of the plan's order
+    [InlineData("A B", "A A", false)]          // more often than the plan names it
+    [InlineData("A A B", "A A", true)]         // a judge the plan names twice may be named twice
+    [InlineData("A A B", "A A A", false)]      // never more
+    [InlineData("A B", "A C", false)]          // one the plan does not name
+    [InlineData("A B", "A-other-rubric", false)]    // the plan's model with another rubric digest
+    [InlineData("A B", "A-other-provider", false)]  // the plan's model served by another provider
+    [InlineData(null, "A", false)]             // a plan that names no judges allows none
+    [InlineData("", "A", false)]
+    [InlineData(null, null, true)]
+    [InlineData("", "", true)]
+    public void ARunsJudges_AreThePlansWithSomeLeftOut_InOrder(string? planJudges, string? runJudges, bool within)
     {
-        // [STRM-4] judges (round 8): a run names the models that graded it ([RUN-9]), so none, or some of the plan's, is
-        // within. Judges by (model, rubricDigest).
+        // [STRM-4] judges (round 9): a run names the models that graded it ([RUN-9]); a judge is its model, provider and
+        // rubric digest; the run's, in order, are the plan's with some left out (none, or all, among them).
         static JsonObject Judge(string name) => name switch
         {
-            "A" => new() { ["model"] = "gpt-5.1", ["rubricDigest"] = "sha256:" + new string('a', 64) },
-            "B" => new() { ["model"] = "llama-3.3-70b", ["rubricDigest"] = "sha256:" + new string('b', 64) },
-            "C" => new() { ["model"] = "gpt-4o-mini", ["rubricDigest"] = "sha256:" + new string('a', 64) },
-            _ => new() { ["model"] = "gpt-5.1", ["rubricDigest"] = "sha256:" + new string('c', 64) },
+            "A" => new() { ["model"] = "gpt-5.1", ["provider"] = "azure.ai.openai", ["rubricDigest"] = "sha256:" + new string('a', 64) },
+            "B" => new() { ["model"] = "llama-3.3-70b", ["provider"] = "local", ["rubricDigest"] = "sha256:" + new string('b', 64) },
+            "C" => new() { ["model"] = "gpt-4o-mini", ["provider"] = "openai", ["rubricDigest"] = "sha256:" + new string('a', 64) },
+            "A-other-provider" => new() { ["model"] = "gpt-5.1", ["provider"] = "openai", ["rubricDigest"] = "sha256:" + new string('a', 64) },
+            _ => new() { ["model"] = "gpt-5.1", ["provider"] = "azure.ai.openai", ["rubricDigest"] = "sha256:" + new string('c', 64) },
         };
+        static JsonArray Judges(string names) => new([.. names.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(n => (JsonNode?)Judge(n))]);
 
         JobRun("R-1", 0.1, b =>
         {
             if (runJudges is not null)
             {
-                b.Run["judges"] = new JsonArray([.. JsonNode.Parse(runJudges)!.AsArray().Select(j => (JsonNode?)Judge((string)j!))]);
+                b.Run["judges"] = Judges(runJudges);
             }
 
             return b.Line("c1", "p", "passed");
         });
         var plan = Plan();
-        plan["judges"] = new JsonArray(Judge("A"), Judge("B"));
+        if (planJudges is not null)
+        {
+            plan["judges"] = Judges(planJudges);
+        }
 
-        Assert.Equal(expected.Length == 0 ? Array.Empty<string>() : [expected], Conform(plan, Announce("R-1"), Sealed(3, "R-1")));
-
-        plan.Remove("judges");   // a plan that names no judges leaves them unchecked
-        Assert.Empty(Conform(plan, Announce("R-1"), Sealed(3, "R-1")));
+        Assert.Equal(within ? Array.Empty<string>() : ["run:R-1 judges"], Conform(plan, Announce("R-1"), Sealed(3, "R-1")));
     }
 
     [Fact]

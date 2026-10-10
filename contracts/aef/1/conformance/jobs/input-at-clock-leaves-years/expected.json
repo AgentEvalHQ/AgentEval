@@ -1,0 +1,12 @@
+{
+  "kind": "job",
+  "plan": "plan.json",
+  "runner": "../runner.json",
+  "target": "target.json",
+  "at": "9999-12-31T23:59:00Z",
+  "refused": true,
+  "rules": [
+    "ENC-8"
+  ],
+  "why": "the clock starts a minute before the end of 9999, and three cases of 20 seconds and one close of a second would take it past: an input error found before anything is written"
+}

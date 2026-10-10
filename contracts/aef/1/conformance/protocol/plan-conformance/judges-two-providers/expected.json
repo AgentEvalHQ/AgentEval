@@ -1,0 +1,12 @@
+{
+  "kind": "plan-conformance",
+  "events": "events.ndjson",
+  "plan": "plan.json",
+  "runs": "runs",
+  "problems": [],
+  "rules": [
+    "STRM-4",
+    "RUN-9"
+  ],
+  "why": "a plan that names one model and rubric under two providers, and a run graded by both: two judges, each the plan's, in its order"
+}

@@ -85,7 +85,8 @@ Usage:
       unpadded base64), and once per break of the reference runner aef_runner.py (a limit checked against a case's
       cost or duration instead of its bound, the budget checked exactly or by the job's spend alone, case ids
       prefixed, credentials not resolved or an empty one resolved, a suite named twice taken, a container plan taken,
-      a fixed severity, no lane on the lines, a computed suite digest, the plan's judges copied into each run). Each mutation must make some vector fail that
+      a fixed severity, no lane on the lines, a computed suite digest, the plan's judges copied into each run, the
+      clock's range left unchecked, a target's unknown member ignored). Each mutation must make some vector fail that
       passes unmutated.
 Exit status: 0 when every vector passes (and, with --self-check, every mutation is caught), else 1.
 """
@@ -909,6 +910,13 @@ def _job(engine, v, scratch, diffs):
 def _judge_job(engine, v, scratch, diffs):
     e, d = v.expected, v.path
     out_dir, out, env = _job(engine, v, scratch, diffs)
+    if e.get("refused"):  # spec 09 §9.3: an input error (exit 2), with nothing written in OUT
+        if not (isinstance(out, dict) and "error" in out):
+            diffs.append(f"ran a job it must refuse as an input error: {json.dumps(out)}")
+        written = sorted(_files(out_dir)) if out_dir.is_dir() else []
+        if written:
+            diffs.append(f"wrote files although it refused: {', '.join(written)}")
+        return
     diffs.extend(judge_job_output(out_dir, out, d / e["plan"], d / e["target"], e,
                                   [value for value in env.values() if value], at=e["at"]))
 

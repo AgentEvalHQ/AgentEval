@@ -64,6 +64,9 @@ public static partial class AefInspectImporter
     /// <summary>A line's <c>reason</c> for an unscored value (NaN) without a <c>Score.reason</c> (IN-7).</summary>
     public const string NoReason = "Inspect recorded no value (NaN) and no reason";
 
+    /// <summary>A line's <c>reason</c> for a sample whose error has no message (R8-4, R9-2).</summary>
+    public const string NoMessage = "Inspect recorded an error without a message";
+
     /// <summary>The lane of the summary (IN-9).</summary>
     public const string Lane = "main";
 
@@ -98,8 +101,10 @@ public static partial class AefInspectImporter
     /// <param name="logFile">The <c>EvalLog</c> as one JSON document (Inspect's <c>.json</c>, or <c>inspect log dump</c> of an <c>.eval</c>).</param>
     /// <param name="outputDirectory">The AEF run folder to write: it must not exist, or be empty.</param>
     /// <param name="options">What the log does not record, and how to seal.</param>
-    /// <exception cref="AefInspectImportException">The page refuses the log (the message names the rule).</exception>
-    /// <exception cref="InvalidDataException">The file is not an Inspect log, or a value cannot be written as AEF.</exception>
+    /// <exception cref="AefInspectImportException">
+    /// The page refuses the log (the message names the rule): every malformed log is refused so, as it is read (IN-6) or
+    /// where a rule refuses it.
+    /// </exception>
     /// <exception cref="ArgumentException">The output folder is not empty.</exception>
     /// <exception cref="IOException">A file cannot be read or written.</exception>
     public static AefConversion Import(string logFile, string outputDirectory, AefInspectImportOptions options)
@@ -109,14 +114,18 @@ public static partial class AefInspectImporter
         ArgumentNullException.ThrowIfNull(options);
 
         // Read everything, and refuse what the page refuses, before anything is written.
-        var log = InspectJson.Parse(File.ReadAllBytes(logFile)) as JsonObject
-                  ?? throw new InvalidDataException($"{logFile} is not an Inspect eval log: its value is not an object.");
-        if (InspectJson.HoldsInfinity(log))
+        var log = ReadLog(File.ReadAllBytes(logFile), logFile);
+        ImportPlan plan;
+        try
         {
-            // IN-6: no AEF number holds an infinity ([ENC-3]), wherever the log holds one.
-            throw new AefInspectImportException($"{logFile} holds Infinity or -Infinity, which no AEF number holds ([ENC-3]): the log is refused as it is read (IN-6).");
+            plan = Read(log, options);
         }
-        var plan = Read(log, options);
+        catch (Exception e) when (e is InvalidOperationException or ArgumentException or FormatException or InvalidCastException or OverflowException or KeyNotFoundException)
+        {
+            // A part of the log in a shape no EvalLog has (an object where a list is, a string where an object is): refused
+            // rather than thrown, so every malformed log names a rule.
+            throw new AefInspectImportException($"{logFile} is not an Inspect EvalLog as the page reads one: {e.Message} (IN-6).");
+        }
 
         var clock = options.TimeProvider ?? TimeProvider.System;
         var now = AefTime.FromDateTimeOffset(clock.GetUtcNow());
@@ -134,7 +143,8 @@ public static partial class AefInspectImporter
         }
         catch (ArgumentException e) when (e.ParamName != "directory")
         {
-            throw new InvalidDataException($"The run's header cannot be written as AEF: {e.Message}", e);
+            // IN-11: a run the writer refuses is a run that would not verify.
+            throw new AefInspectImportException($"The run's header cannot be written as AEF, so nothing is written (IN-11): {e.Message}");
         }
 
         try
@@ -185,18 +195,143 @@ public static partial class AefInspectImporter
             AefConverter.Discard(outputDirectory, existed);
             if (e is ArgumentException)
             {
-                throw new InvalidDataException($"The log cannot be written as AEF: {e.Message}", e);
+                // IN-11: a line or document the writer refuses (a caseId or path too long, a value its schema refuses)
+                // would make a run that does not verify.
+                throw new AefInspectImportException($"The log cannot be written as AEF, so nothing is written (IN-11): {e.Message}");
             }
 
-            if (e is AefWriteException)
+            if (e is InvalidOperationException)
             {
-                // IN-11: the run written from the log is verified, and refused when it does not verify.
+                // IN-11: the run written from the log is verified (AefWriteException), and refused when it does not
+                // verify or close.
                 throw new AefInspectImportException($"The run written from the log does not verify, so nothing is written (IN-11): {e.Message}");
             }
 
             throw;
         }
     }
+
+    // ------------------------------------------------------------------ reading the log (IN-6, R9-2)
+
+    // The log, read as I-JSON within a depth of 64, a bare NaN allowed only where an unscored value can be (a score's
+    // value or a member of a map one, a reduced score's value, a metric's value) and where a rule then refuses it (a
+    // limit's number and content that is not text, IN-8). Anything else is refused as the log is read (IN-6).
+    private static JsonObject ReadLog(byte[] bytes, string logFile)
+    {
+        JsonNode? node;
+        try
+        {
+            node = InspectJson.Parse(bytes);
+        }
+        catch (FormatException e)
+        {
+            throw new AefInspectImportException($"{logFile}: {e.Message}: the log is refused as it is read (IN-6).");
+        }
+
+        var log = node as JsonObject ?? throw new AefInspectImportException($"{logFile}: its value is not an object, as an EvalLog is (IN-6).");
+        var unscored = new HashSet<JsonNode>(ReferenceEqualityComparer.Instance);
+        var content = new HashSet<JsonNode>(ReferenceEqualityComparer.Instance);
+        void Score(JsonNode? score)
+        {
+            if (At(score, "value") is not { } value)
+            {
+                return;
+            }
+
+            unscored.Add(value);
+            foreach (var (_, member) in value as JsonObject ?? new JsonObject())
+            {
+                if (member is not null)
+                {
+                    unscored.Add(member);
+                }
+            }
+        }
+
+        foreach (var sample in Objects(log["samples"]))
+        {
+            foreach (var (_, score) in sample["scores"] as JsonObject ?? new JsonObject())
+            {
+                Score(score);
+            }
+
+            if (At(sample["limit"], "limit") is { } limit)
+            {
+                unscored.Add(limit);   // refused there by IN-8
+            }
+
+            foreach (var member in new[] { "input", "target", "output", "messages" })
+            {
+                if (sample[member] is { } held)
+                {
+                    content.Add(held);   // refused there by IN-8 when written
+                }
+            }
+        }
+
+        foreach (var reduction in Objects(log["reductions"]))
+        {
+            foreach (var score in Objects(reduction["samples"]))
+            {
+                Score(score);
+            }
+        }
+
+        foreach (var entry in Objects(At(log["results"], "scores")))
+        {
+            foreach (var (_, metric) in entry["metrics"] as JsonObject ?? new JsonObject())
+            {
+                if (At(metric, "value") is { } value)
+                {
+                    unscored.Add(value);
+                }
+            }
+        }
+
+        void Walk(JsonNode? at, string path)
+        {
+            switch (at)
+            {
+                case null:
+                    return;
+                case var _ when content.Contains(at):
+                    return;
+                case JsonObject obj:
+                    foreach (var (name, child) in obj)
+                    {
+                        if (name == InspectJson.NaNMarker)
+                        {
+                            throw new AefInspectImportException($"{logFile}: {path} has a member named NaN, which is no JSON (IN-6).");
+                        }
+
+                        Walk(child, $"{path}.{name}");
+                    }
+
+                    return;
+                case JsonArray array:
+                    for (var i = 0; i < array.Count; i++)
+                    {
+                        Walk(array[i], $"{path}[{i.ToString(CultureInfo.InvariantCulture)}]");
+                    }
+
+                    return;
+                default:
+                    if (InspectJson.IsNaN(at) && !unscored.Contains(at))
+                    {
+                        throw new AefInspectImportException(
+                            $"{logFile}: {path} is NaN, where no unscored value can be (a score's value, a reduced score's value, a metric's value): the log is refused as it is read (IN-6).");
+                    }
+
+                    return;
+            }
+        }
+
+        Walk(log, "$");
+        return log;
+    }
+
+    // A member of an object, or null when the node is no object.
+    private static JsonNode? At(JsonNode? node, string name) => node is JsonObject obj ? obj[name] : null;
 
     // ------------------------------------------------------------------ the plan: everything read and checked
 
@@ -220,7 +355,7 @@ public static partial class AefInspectImporter
             "Each metric is declared kind score, direction none, scale unbounded: Inspect gives no kind, direction or range (IN-9).",
             "Not carried: working_time, Inspect's events, each sample's metadata, eval.metadata, the plan and the solver.",
         };
-        var eval = log["eval"] as JsonObject ?? throw new InvalidDataException("The log has no eval object (EvalSpec).");
+        var eval = log["eval"] as JsonObject ?? throw Refuse("IN-6", "The log has no eval object (EvalSpec).");
 
         // IN-10: post-run edits; the table makes them overlay events, and the converter writes none.
         if (log["log_updates"] is JsonArray { Count: > 0 })
@@ -234,7 +369,7 @@ public static partial class AefInspectImporter
             "success" => (AefRunStatus.Completed, true),
             "error" or "cancelled" => (AefRunStatus.Aborted, true),
             "started" => (AefRunStatus.Running, false),
-            var other => throw new InvalidDataException($"The log's status '{other}' is not started, success, cancelled or error."),
+            var other => throw Refuse("IN-6", $"The log's status '{other}' is not started, success, cancelled or error."),
         };
         var evalId = Text(eval["eval_id"]);
         var runId = string.IsNullOrEmpty(evalId) ? Text(eval["run_id"]) : evalId;
@@ -252,7 +387,7 @@ public static partial class AefInspectImporter
         }
         else
         {
-            startedAt = Time(Text(eval["created"]) ?? throw new InvalidDataException("The log has neither stats.started_at nor eval.created."), "eval.created");
+            startedAt = Time(Text(eval["created"]) ?? throw Refuse("IN-6", "The log has neither stats.started_at nor eval.created."), "eval.created");
             asserted.Add("startedAt");
         }
 
@@ -270,7 +405,7 @@ public static partial class AefInspectImporter
 
             abortReason = Text(log["status"]) switch
             {
-                "error" => Text(log["error"]?["message"]) is { Length: > 0 } message
+                "error" => Text(At(log["error"], "message")) is { Length: > 0 } message
                     ? Cut(message)
                     : throw new AefInspectImportException("The log's status is error and its error has no message, and abortReason is it (IN-6)."),
                 "cancelled" => "cancelled",
@@ -278,30 +413,31 @@ public static partial class AefInspectImporter
             };
         }
 
-        var version = Text(eval["packages"]?[ExtName]);
+        var version = Text(At(eval["packages"], ExtName));
         var from = version is { Length: > 0 } ? $"{ExtName} {version}" : ExtName;
-        var task = Text(eval["task"]) is { Length: > 0 } t ? t : throw new InvalidDataException("The log's eval has no task.");
+        var task = Text(eval["task"]) is { Length: > 0 } t ? t : throw Refuse("IN-6", "The log's eval has no task.");
         var taskVersion = eval["task_version"] switch
         {
             null => "0",   // Inspect's default
-            JsonValue v when v.GetValueKind() == JsonValueKind.String => v.GetValue<string>(),
-            JsonValue v when v.GetValueKind() == JsonValueKind.Number => InspectJson.Shortest(v.GetValue<double>()),   // from its value alone (R8-4)
-            _ => throw new InvalidDataException("The log's task_version is neither a number nor a string."),
+            JsonValue v when v.GetValueKind() == JsonValueKind.String && !InspectJson.IsNonFinite(v) => v.GetValue<string>(),
+            JsonValue v when v.GetValueKind() == JsonValueKind.Number => SafeInteger(v)   // an integer of at most 2^53 − 1, in decimal digits (R9-2)
+                ?? throw Refuse("IN-6", $"The log's task_version {v.ToJsonString()} is a number that is no integer of at most 2^53 − 1 in magnitude (R9-2)"),
+            _ => throw Refuse("IN-6", "The log's task_version is neither a number nor a string"),
         };
         if (!AefConverter.IsExactVersion(taskVersion))
         {
-            throw new InvalidDataException($"The log's task_version '{taskVersion}' cannot be suite.version (printable ASCII without spaces, at most 128 characters, [ENC-10]).");
+            throw Refuse("IN-6", $"The log's task_version '{taskVersion}' cannot be suite.version (printable ASCII without spaces, at most 128 characters, [ENC-10]).");
         }
 
-        var model = Text(eval["model"]) is { Length: > 0 } m ? m : throw new InvalidDataException("The log's eval has no model.");
+        var model = Text(eval["model"]) is { Length: > 0 } m ? m : throw Refuse("IN-6", "The log's eval has no model.");
         var roles = new List<(string Role, string? Model)>();
         foreach (var (role, roleConfig) in eval["model_roles"] as JsonObject ?? new JsonObject())
         {
-            roles.Add((role, Text(roleConfig?["model"]) ?? Text(roleConfig)));
+            roles.Add((role, Text(At(roleConfig, "model")) ?? Text(roleConfig)));
         }
 
         var scorerOf = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var entry in Objects(log["results"]?["scores"]))
+        foreach (var entry in Objects(At(log["results"], "scores")))
         {
             if (Text(entry["name"]) is { } name && Text(entry["scorer"]) is { Length: > 0 } scorer)
             {
@@ -311,10 +447,10 @@ public static partial class AefInspectImporter
 
         // ---- epochs and the reducer (IN-8)
         var config = eval["config"] as JsonObject;
-        var epochsGiven = Integer(config?["epochs"], "eval.config.epochs");
+        var epochsGiven = Integer(config?["epochs"], "eval.config.epochs", "IN-8");
         if (epochsGiven is < 1)
         {
-            throw new InvalidDataException("eval.config.epochs is below 1.");
+            throw Refuse("IN-8", "eval.config.epochs is below 1.");
         }
 
         var epochs = epochsGiven ?? 1;
@@ -329,7 +465,7 @@ public static partial class AefInspectImporter
 
             if (reducers.Count == 1)
             {
-                var name = Text(reducers[0]) ?? throw new InvalidDataException("eval.config.epochs_reducer holds a value that is not a reducer's name.");
+                var name = Text(reducers[0]) ?? throw Refuse("IN-8", "eval.config.epochs_reducer holds a value that is not a reducer's name.");
                 runAggregation = Reducer(name, epochs);
                 if (runAggregation is null)
                 {
@@ -374,17 +510,17 @@ public static partial class AefInspectImporter
         for (var i = 0; i < samples.Count; i++)
         {
             var where = $"samples[{i.ToString(CultureInfo.InvariantCulture)}]";
-            var sample = samples[i] as JsonObject ?? throw new InvalidDataException($"{where} is not an object.");
+            var sample = samples[i] as JsonObject ?? throw Refuse("IN-8", $"{where} is not an object.");
             if (sample["invalidation"] is not null)
             {
                 throw new AefInspectImportException($"{where} has an invalidation: the table makes it an overlay annotate event, and the converter writes no overlays (IN-10).");
             }
 
             var caseId = CaseId(sample["id"], $"{where}.id");
-            var epoch = Integer(sample["epoch"], $"{where}.epoch") ?? 1;
+            var epoch = Integer(sample["epoch"], $"{where}.epoch", "IN-8") ?? 1;
             if (epoch < 1)
             {
-                throw new InvalidDataException($"{where}: epoch {epoch} is below 1.");
+                throw Refuse("IN-8", $"{where}: epoch {epoch} is below 1.");
             }
 
             if (epoch > epochs)
@@ -400,9 +536,32 @@ public static partial class AefInspectImporter
             // The sample's lines: a score per key; a sample that stopped, a line per key (or per scorer) in error.
             var reads = new List<(string Key, ScoreRead Read)>();
             var scores = sample["scores"] as JsonObject;
-            var error = sample["error"] as JsonObject;
-            var limit = sample["limit"] as JsonObject;
-            if (error is not null || limit is not null)
+
+            // An error that is present and not null is an object (R9-2): its message, cut to its first 4096 characters
+            // with no mark (R7I-12), or, absent, null or empty, "Inspect recorded an error without a message"; a message
+            // that is not text, or an error that is not an object, is refused (IN-8).
+            string? errorReason = null;
+            if (sample["error"] is { } error)
+            {
+                errorReason = (error as JsonObject ?? throw Refuse("IN-8", $"{where}.error is {error.ToJsonString()}, not an object as Inspect writes one (R9-2)"))["message"] switch
+                {
+                    null => NoMessage,
+                    JsonValue said when said.GetValueKind() == JsonValueKind.String && !InspectJson.IsNonFinite(said) => said.GetValue<string>() is { Length: > 0 } message ? Cut(message) : NoMessage,
+                    _ => throw Refuse("IN-8", $"{where}.error.message is not text (R9-2)"),
+                };
+            }
+
+            // A limit that is present and not null is {type, limit}, a type and a finite number, on a scored sample too
+            // (R8-4, R9-2): "<type> limit <limit>", the number written from its binary64 value alone; any other is refused (IN-8).
+            string? limitReason = null;
+            if (sample["limit"] is { } limit)
+            {
+                limitReason = limit is JsonObject l && Text(l["type"]) is { Length: > 0 } type && l["limit"] is JsonValue value && value.GetValueKind() == JsonValueKind.Number
+                    ? Cut($"{type} limit {InspectJson.Shortest(value.GetValue<double>())}")
+                    : throw Refuse("IN-8", $"{where}.limit is {InspectJson.Indented(limit).ReplaceLineEndings(" ")}: a limit is {{type, limit}} with a type and a finite number, and the line's reason is \"<type> limit <limit>\" (R8-4, R9-2)");
+            }
+
+            if ((errorReason ?? limitReason) is { } reason)
             {
                 var keys = scores is { Count: > 0 } ? scores.Select(k => k.Key).ToList() : scorers;
                 if (keys.Count == 0)
@@ -415,26 +574,8 @@ public static partial class AefInspectImporter
                     NoHistory(score as JsonObject, where);
                 }
 
-                // The message, cut to its first 4096 characters with no mark (R7I-12), or, empty or absent, "Inspect
-                // recorded an error without a message"; a limit is "<type> limit <limit>", the number written from its
-                // binary64 value alone (R8-4); a limit that is not {type, limit}, whose type is empty or whose limit is not
-                // a finite number (Inspect's NaN), is refused (IN-8).
-                string reason;
-                if (error is not null)
-                {
-                    reason = Text(error["message"]) is { Length: > 0 } message ? Cut(message) : "Inspect recorded an error without a message";
-                }
-                else if (Text(limit!["type"]) is { Length: > 0 } type && limit["limit"] is JsonValue value && value.GetValueKind() == JsonValueKind.Number)
-                {
-                    reason = Cut($"{type} limit {InspectJson.Shortest(value.GetValue<double>())}");
-                }
-                else
-                {
-                    throw new AefInspectImportException(
-                        $"{where}.limit is {InspectJson.Indented(limit).ReplaceLineEndings(" ")}: a limit is {{type, limit}} with a type and a finite number, and the line's reason is \"<type> limit <limit>\" (IN-8).");
-                }
-
-                var state = error is not null ? AefState.Error : AefState.NotMeasured;
+                // A sample with an error puts its lines in error; one stopped by a limit, in not_measured.
+                var state = errorReason is not null ? AefState.Error : AefState.NotMeasured;
                 reads.AddRange(keys.Select(k => (k, new ScoreRead(state, reason, null, null, null))));
             }
             else
@@ -525,16 +666,16 @@ public static partial class AefInspectImporter
             for (var r = 0; r < reductions.Count; r++)
             {
                 var where = $"reductions[{r.ToString(CultureInfo.InvariantCulture)}]";
-                var reduction = reductions[r] as JsonObject ?? throw new InvalidDataException($"{where} is not an object.");
-                var scorer = Text(reduction["scorer"]) is { Length: > 0 } sc ? sc : throw new InvalidDataException($"{where} has no scorer.");
-                var reducerName = Text(reduction["reducer"]) ?? throw new InvalidDataException($"{where} has no reducer.");
+                var reduction = reductions[r] as JsonObject ?? throw Refuse("IN-8", $"{where} is not an object.");
+                var scorer = Text(reduction["scorer"]) is { Length: > 0 } sc ? sc : throw Refuse("IN-8", $"{where} has no scorer.");
+                var reducerName = Text(reduction["reducer"]) ?? throw Refuse("IN-8", $"{where} has no reducer.");
                 var aggregation = Reducer(reducerName, epochs)
                                   ?? throw new AefInspectImportException($"{where}: the reducer {reducerName} has no AEF value (IN-8).");
                 var reduced = reduction["samples"] as JsonArray ?? new JsonArray();
                 for (var j = 0; j < reduced.Count; j++)
                 {
                     var at = $"{where}.samples[{j.ToString(CultureInfo.InvariantCulture)}]";
-                    var score = reduced[j] as JsonObject ?? throw new InvalidDataException($"{at} is not an object.");
+                    var score = reduced[j] as JsonObject ?? throw Refuse("IN-8", $"{at} is not an object.");
                     var caseId = CaseId(score["sample_id"], $"{at}.sample_id");
                     if (!trialStates.TryGetValue((caseId, scorer), out var states))
                     {
@@ -599,7 +740,7 @@ public static partial class AefInspectImporter
         foreach (var (name, value) in new[]
                  {
                      ("run_id", eval["run_id"]), ("eval_set_id", eval["eval_set_id"]), ("dataset", eval["dataset"]),
-                     ("headline", log["results"]?["headline"]), ("epochs_reducer", reducerWithoutValue),
+                     ("headline", At(log["results"], "headline")), ("epochs_reducer", reducerWithoutValue),
                  })
         {
             if (value is not null)
@@ -617,7 +758,7 @@ public static partial class AefInspectImporter
     {
         if (score is null)
         {
-            throw new InvalidDataException($"{where} is not a Score object.");
+            throw Refuse("IN-7", $"{where} is not a Score object.");
         }
 
         NoHistory(score, where);
@@ -634,7 +775,7 @@ public static partial class AefInspectImporter
         }
         else if (InspectJson.IsNonFinite(value))
         {
-            throw new InvalidDataException($"{where}: the value is an infinity, and AEF numbers are finite ([ENC-3]).");
+            throw Refuse("IN-7", $"{where}: the value is an infinity, and AEF numbers are finite ([ENC-3]).");
         }
         else
         {
@@ -677,7 +818,7 @@ public static partial class AefInspectImporter
                                 throw new AefInspectImportException($"{where}: the member {member} is '{s.GetValue<string>()}', a string other than C, I, P and N (IN-7)."),
                             JsonValue b when b.GetValueKind() is JsonValueKind.True or JsonValueKind.False =>
                                 throw new AefInspectImportException($"{where}: the member {member} is a boolean (IN-7)."),
-                            _ => throw new InvalidDataException($"{where}: the member {member} is not a number or a string."),
+                            _ => throw Refuse("IN-7", $"{where}: the member {member} is not a number or a string."),
                         });
                     }
 
@@ -693,7 +834,7 @@ public static partial class AefInspectImporter
                     ext["value"] = Copy(list, $"{where}.value");
                     break;
                 default:
-                    throw new InvalidDataException($"{where}: the value is not a number, a string, a map or a list.");
+                    throw Refuse("IN-7", $"{where}: the value is not a number, a string, a map or a list.");
             }
         }
 
@@ -846,18 +987,18 @@ public static partial class AefInspectImporter
     {
         if (usage is null)
         {
-            throw new InvalidDataException($"{where} is not a ModelUsage object.");
+            throw Refuse("IN-8", $"{where} is not a ModelUsage object.");
         }
 
         return new AefUsage
         {
             Role = role,
             Model = model,
-            InputTokens = Integer(usage["input_tokens"], $"{where}.input_tokens"),
-            OutputTokens = Integer(usage["output_tokens"], $"{where}.output_tokens"),
-            CacheReadInputTokens = Integer(usage["input_tokens_cache_read"], $"{where}.input_tokens_cache_read"),
-            CacheWriteInputTokens = Integer(usage["input_tokens_cache_write"], $"{where}.input_tokens_cache_write"),
-            ReasoningOutputTokens = Integer(usage["reasoning_tokens"], $"{where}.reasoning_tokens"),
+            InputTokens = Integer(usage["input_tokens"], $"{where}.input_tokens", "IN-8"),
+            OutputTokens = Integer(usage["output_tokens"], $"{where}.output_tokens", "IN-8"),
+            CacheReadInputTokens = Integer(usage["input_tokens_cache_read"], $"{where}.input_tokens_cache_read", "IN-8"),
+            CacheWriteInputTokens = Integer(usage["input_tokens_cache_write"], $"{where}.input_tokens_cache_write", "IN-8"),
+            ReasoningOutputTokens = Integer(usage["reasoning_tokens"], $"{where}.reasoning_tokens", "IN-8"),
             CostUsd = usage["total_cost"] is JsonValue cost && cost.GetValueKind() == JsonValueKind.Number ? cost.GetValue<double>() : null,
         };
     }
@@ -896,12 +1037,12 @@ public static partial class AefInspectImporter
     {
         var entries = new List<AefSummaryEntry>();
         var others = new JsonObject();
-        var scores = Objects(log["results"]?["scores"]).ToList();
+        var scores = Objects(At(log["results"], "scores")).ToList();
         for (var i = 0; i < scores.Count; i++)
         {
             var where = $"results.scores[{i.ToString(CultureInfo.InvariantCulture)}]";
             var entry = scores[i];
-            var name = Text(entry["name"]) is { Length: > 0 } n ? n : throw new InvalidDataException($"{where} has no name.");
+            var name = Text(entry["name"]) is { Length: > 0 } n ? n : throw Refuse("IN-9", $"{where} has no name.");
             var all = (entry["metrics"] as JsonObject ?? new JsonObject()).Select(m => (Name: m.Key, Metric: m.Value as JsonObject ?? new JsonObject())).ToList();
             var accuracy = all.FirstOrDefault(m => m.Name == "accuracy").Metric;
             var mean = all.FirstOrDefault(m => m.Name == "mean").Metric;
@@ -943,7 +1084,7 @@ public static partial class AefInspectImporter
                     throw new AefInspectImportException($"{where} ({name}): its metric {method} cannot be an aggregate method (a lower-case letter, then lower-case letters, digits and @ . _ -, at most 64) (IN-9).");
                 }
 
-                aggregate = new AefAggregate(method, Integer(metric["params"]?["k"], $"{where}.metrics.{method}.params.k"));
+                aggregate = new AefAggregate(method, Integer(At(metric["params"], "k"), $"{where}.metrics.{method}.params.k", "IN-9"));
                 if (method is "median" or "min" or "max")
                 {
                     Check(metric["value"], figures.Count == 0 ? null : Aggregate(method, figures), name, method, where);
@@ -952,7 +1093,7 @@ public static partial class AefInspectImporter
                 {
                     producerValue = metric["value"] is JsonValue pv && pv.GetValueKind() == JsonValueKind.Number && !InspectJson.IsNonFinite(pv)
                         ? pv.GetValue<double>()
-                        : throw new InvalidDataException($"{where} ({name}): its metric {method} has no finite value, and its lines are measured ([SUM-8]).");
+                        : throw Refuse("IN-9", $"{where} ({name}): its metric {method} has no finite value, and its lines are measured ([SUM-8]).");
                 }
             }
 
@@ -1031,7 +1172,7 @@ public static partial class AefInspectImporter
         var m = TimePattern().Match(text);
         if (!m.Success)
         {
-            throw new InvalidDataException($"{where}: '{text}' is not an ISO 8601 time.");
+            throw Refuse("IN-6", $"{where}: '{text}' is not an ISO 8601 time.");
         }
 
         if (!m.Groups[8].Success)
@@ -1047,12 +1188,25 @@ public static partial class AefInspectImporter
         {
             var whole = new DateTimeOffset(Part(1), Part(2), Part(3), Part(4), Part(5), Part(6), offset);
             var time = new AefTime(whole.ToUnixTimeSeconds(), m.Groups[7].Success ? int.Parse(m.Groups[7].Value.PadRight(9, '0'), CultureInfo.InvariantCulture) : 0);
-            return time.IsValid ? time : throw new InvalidDataException($"{where}: '{text}' is outside the years 0001 to 9999 ([ENC-8]).");
+            return time.IsValid ? time : throw Refuse("IN-6", $"{where}: '{text}' is outside the years 0001 to 9999 ([ENC-8]).");
         }
-        catch (ArgumentException e)
+        catch (ArgumentException)
         {
-            throw new InvalidDataException($"{where}: '{text}' is not a time that exists.", e);
+            throw Refuse("IN-6", $"{where}: '{text}' is not a time that exists.");
         }
+    }
+
+    // A refusal naming its rule.
+    private static AefInspectImportException Refuse(string rule, string message) => new($"{message.TrimEnd('.')} ({rule}).");
+
+    // A number of the log read as its binary64 value ([ENC-4]) that is an integer of at most 2^53 − 1 in magnitude, in
+    // decimal digits (1, 1.0 and 1e0 alike); null for any other number (R9-2).
+    private static string? SafeInteger(JsonValue number)
+    {
+        var value = number.GetValue<double>();
+        return Math.Floor(value) == value && Math.Abs(value) <= 9_007_199_254_740_991
+            ? ((long)value).ToString(CultureInfo.InvariantCulture)
+            : null;
     }
 
     // A message or reason cut to its first 4096 characters (code points, as JSON Schema counts them), with no mark (R7I-12).
@@ -1073,18 +1227,20 @@ public static partial class AefInspectImporter
         return cut.ToString();
     }
 
-    // A sample id (int or string) as a caseId: as a string.
+    // A sample id (or a reduction's sample_id) as a caseId: a string as written; a number only when it is an integer of at
+    // most 2^53 − 1 in magnitude, in decimal digits (R9-2); anything else refused (IN-8).
     private static string CaseId(JsonNode? id, string where)
     {
         var text = id switch
         {
-            JsonValue v when v.GetValueKind() == JsonValueKind.String => v.GetValue<string>(),
-            JsonValue v when v.GetValueKind() == JsonValueKind.Number => InspectJson.Shortest(v.GetValue<double>()),   // from its value alone (R8-4)
-            _ => throw new InvalidDataException($"{where} is neither an integer nor a string."),
+            JsonValue v when v.GetValueKind() == JsonValueKind.String && !InspectJson.IsNonFinite(v) => v.GetValue<string>(),
+            JsonValue v when v.GetValueKind() == JsonValueKind.Number => SafeInteger(v)
+                ?? throw Refuse("IN-8", $"{where} is {v.ToJsonString()}, a number that is no integer of at most 2^53 − 1 in magnitude, so it gives no caseId (R9-2)"),
+            _ => throw Refuse("IN-8", $"{where} is neither an integer nor a string"),
         };
-        return AefConverter.IsResultText(text, 256) && !InspectJson.IsNonFinite(id)
+        return AefConverter.IsResultText(text, 256)
             ? text
-            : throw new InvalidDataException($"{where}: '{text}' cannot be a caseId (1-256 characters, no control character, [RES-4]).");
+            : throw Refuse("IN-8", $"{where}: '{text}' cannot be a caseId (1-256 characters, no control character, [RES-4])");
     }
 
     // A sample's input, target, output (when it has choices) or messages as a blob: text as written, anything else (a list
@@ -1105,7 +1261,7 @@ public static partial class AefInspectImporter
             }
             catch (InvalidOperationException e)
             {
-                throw new InvalidDataException($"{where}.{member} is not text that UTF-8 can hold: {e.Message}", e);
+                throw Refuse("IN-8", $"{where}.{member} is not text that UTF-8 can hold: {e.Message}");
             }
         }
 
@@ -1130,16 +1286,17 @@ public static partial class AefInspectImporter
         }
     }
 
-    private static long? Integer(JsonNode? node, string where)
+    // An integer of the log, read as its binary64 value ([ENC-4]: 2 and 2.0 alike), of at most 2^53 − 1 in magnitude.
+    private static long? Integer(JsonNode? node, string where, string rule)
     {
         if (node is null)
         {
             return null;
         }
 
-        return node is JsonValue v && v.GetValueKind() == JsonValueKind.Number && v.TryGetValue<long>(out var n)
-            ? n
-            : throw new InvalidDataException($"{where} is not an integer.");
+        return node is JsonValue v && v.GetValueKind() == JsonValueKind.Number && SafeInteger(v) is { } text
+            ? long.Parse(text, CultureInfo.InvariantCulture)
+            : throw Refuse(rule, $"{where} is not an integer of at most 2^53 − 1 in magnitude");
     }
 
     // A value of the log copied into AEF: AEF numbers are finite ([ENC-3]).
@@ -1147,7 +1304,7 @@ public static partial class AefInspectImporter
     {
         if (InspectJson.HoldsNonFinite(node))
         {
-            throw new InvalidDataException($"{where} holds NaN or an infinity, and AEF numbers are finite ([ENC-3]).");
+            throw Refuse("IN-7", $"{where} holds NaN or an infinity, and AEF numbers are finite ([ENC-3]).");
         }
 
         return node is null ? null : JsonNode.Parse(node.ToJsonString());

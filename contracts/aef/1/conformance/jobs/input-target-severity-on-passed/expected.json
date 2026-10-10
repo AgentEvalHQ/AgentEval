@@ -1,0 +1,12 @@
+{
+  "kind": "job",
+  "plan": "plan.json",
+  "runner": "../runner.json",
+  "target": "target.json",
+  "at": "2026-10-09T09:00:00Z",
+  "refused": true,
+  "rules": [
+    "RES-9"
+  ],
+  "why": "a passed case with a severity: a case has one exactly when it is failed or warn (spec 09 §9.2.1)"
+}

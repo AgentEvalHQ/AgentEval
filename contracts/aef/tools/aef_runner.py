@@ -147,6 +147,8 @@ KNOWN_MUTATIONS = {
     "env-empty-set": "an env credential whose variable is empty is resolved (PLAN-3, R7R-7)",
     "isolation-any": "a plan asking for container or remote-zone isolation is taken (R7R-8)",
     "judges-copied": "each run names the plan's judges, though no model graded a scripted case (R8-2)",
+    "clock-unchecked": "the clock's range is not checked before the job: it fails mid-job with files written (R8-5)",
+    "members-ignored": "a target member spec 09 §9.2.1 does not name is ignored, not an input error (R7R-9)",
 }
 
 
@@ -279,7 +281,7 @@ def _amount(value):
 def target_problem(target):
     """Why TARGET is not a scripted target of §9.2.1's shape, or None."""
     writer = schemas("writer")
-    if set(target) - TARGET_MEMBERS:
+    if set(target) - TARGET_MEMBERS and "members-ignored" not in MUTATIONS:
         return f"a member it does not name: {sorted(set(target) - TARGET_MEMBERS)[0]}"
     suites = target.get("suites")
     if not isinstance(suites, list):
@@ -294,7 +296,7 @@ def target_problem(target):
         where = f"suites[{i}]"
         if not isinstance(suite, dict) or not all(isinstance(suite.get(k), str) for k in ("ref", "version", "content")):
             return f"{where} has no ref, version and content, each a string"
-        if set(suite) - SUITE_MEMBERS:
+        if set(suite) - SUITE_MEMBERS and "members-ignored" not in MUTATIONS:
             return f"{where} has a member a suite does not name: {sorted(set(suite) - SUITE_MEMBERS)[0]}"
         if (suite["ref"], suite["version"]) in named:
             return f"{where} has the ref and version of an earlier suite"
@@ -307,7 +309,7 @@ def target_problem(target):
             at = f"{where}.cases[{k}]"
             if not isinstance(case, dict):
                 return f"{at} is not an object"
-            if set(case) - CASE_MEMBERS:
+            if set(case) - CASE_MEMBERS and "members-ignored" not in MUTATIONS:
                 return f"{at} has a member a case does not name: {sorted(set(case) - CASE_MEMBERS)[0]}"
             case_id = case.get("caseId")
             if not (isinstance(case_id, str) and 1 <= len(case_id) <= 256
@@ -732,7 +734,7 @@ def job(plan_path, runner_path, target_path, out_dir, at=None):
     if errors:
         raise InputError(f"the runner manifest is not valid against the runner schema: {errors[0]}")
     target = read_target(target_path)
-    if clock.fixed:  # spec 09 §9.3: the clock, moved as far as the target could move it, stays within ENC-8's years
+    if clock.fixed and "clock-unchecked" not in MUTATIONS:  # spec 09 §9.3: the clock, moved as far as the target could move it, stays within ENC-8's years
         furthest = sum(_whole(c["secondsBound"]) for s in target["suites"] for c in s["cases"])
         furthest += _whole(target["closeSeconds"]) * len(target["suites"])
         try:

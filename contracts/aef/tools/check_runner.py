@@ -20,10 +20,9 @@ What is checked here:
     targetMode) and mocked: refused. Each job runs twice with --at, and the outputs must be byte-identical (this
     runner's own property: ids are free for other runners).
   - The system clock: one job without --at, judged with every check but the clock's.
-  - Usage and input errors: a manifest the reader refuses, an impossible --at, an --at from which the job's clock
-    would leave ENC-8's years (9999-12-31T23:59:00Z, with two minutes of cases), a target not of §9.2.1's shape (a cost
-    bound below a cost, a member §9.2.1 does not name in the target, a suite or a case) and a non-empty OUT each exit
-    2 and write nothing; and `aef_verify.py stream` and `conform`, given a plan the reader
+  - The input errors no job vector holds (the job vectors hold the others, as refused: true): an OUT that is not
+    empty (the conformance runner always gives a fresh one) and a suite of the target with a member §9.2.1 does not
+    name each exit 2 and write nothing; and `aef_verify.py stream` and `conform`, given a plan the reader
     refuses (plans/timeout-in-seconds), exit 2 with a message, never a traceback.
 
 Usage: python check_runner.py     (exits 1 on any failed check)
@@ -244,29 +243,14 @@ def main():
 
         # Usage and input errors: exit 2, nothing written.
         plan, runner = job["plan"], job["runner"]
+        # The job vectors hold the other input errors (refused: true); these two they do not.
         first = TARGET["suites"][0]
-        bad = {"a target whose cost bound is below a cost":
-                   dict(TARGET, suites=[dict(first, cases=[dict(first["cases"][0], usdBound=0.1)])]),
-               "a target with a member §9.2.1 does not name": dict(TARGET, schemaVersion="1.0"),
-               "a target's suite with a member §9.2.1 does not name": dict(TARGET, suites=[dict(first, lane="quality")]),
-               "a target's case with a member §9.2.1 does not name":
-                   dict(TARGET, suites=[dict(first, cases=[dict(first["cases"][0], reason="x")])])}
-        errors = [("a runner manifest the reader refuses",
-                   [plan, PROTOCOL / "runners" / "no-provider" / "document.json", target])]
-        errors += [(name, [plan, runner, _write(tmp / "inputs" / f"bad-target-{n}.json", value)])
-                   for n, (name, value) in enumerate(bad.items())]
-        for name, argv in errors:
-            out = tmp / f"error-{count}"
-            printed = engine.call(["job"] + argv + [out, "--at", AT])
-            report(f"input error: {name}", [] if "error" in printed and not out.exists() else
-                   [f"{printed}, OUT {'written' if out.exists() else 'absent'}"])
-        for name, at in (("an --at that is no time", "2026-02-31T09:00:00Z"),
-                         # spec 09 §9.3: 6 cases of 20 s and 2 closes of 1 s from 23:59 would leave the year 9999
-                         ("an --at from which the job's clock would leave ENC-8's years", "9999-12-31T23:59:00Z")):
-            out = tmp / f"error-{count}"
-            printed = engine.call(["job", plan, runner, target, out, "--at", at])
-            report(f"usage error: {name}", [] if "error" in printed and not out.exists() else
-                   [f"{printed}, OUT {'written' if out.exists() else 'absent'}"])
+        out = tmp / f"error-{count}"
+        printed = engine.call(["job", plan, runner, _write(tmp / "inputs" / "bad-target.json", dict(
+            TARGET, suites=[dict(first, lane="quality")])), out, "--at", AT])
+        report("input error: a target's suite with a member §9.2.1 does not name",
+               [] if "error" in printed and not out.exists() else
+               [f"{printed}, OUT {'written' if out.exists() else 'absent'}"])
         out = tmp / "not-empty"
         out.mkdir()
         (out / "keep.txt").write_bytes(b"x")

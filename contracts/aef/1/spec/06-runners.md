@@ -133,7 +133,7 @@ on its standard output or to a file the caller names, a remote one over its chan
   |---|---|
   | `content-capture` | `contentCapture`, read as [RUN-11] and [VER-8] read it (absent or unknown is `on`), is not the plan's |
   | `deployment` | the plan's `subject` names a `deployment` and the run's `deployment.ref` is not it, or names an `endpoint` and the run's `deployment.endpoint` is not it (an absent value is not it) |
-  | `judges` | the plan's `judges` is not empty, and the run's are not a sub-list of them: each of the run's judges is one of the plan's (the same `model` and `rubricDigest`; an absent value equals only an absent value), in the plan's order, and none is named twice. A run's judges are the models that graded it ([RUN-9]), so a run that names none, or some of the plan's, is within |
+  | `judges` | the run's `judges`, in order, are not the plan's with some left out (none, or all, among them), a judge being its `model`, `provider` and `rubricDigest` (an absent value equals only an absent value). A run's judges are the models that graded it ([RUN-9]): a run that names none is within; a plan that names none allows none ([PLAN-1]); and a plan that names one judge twice lets a run name it twice, never more |
   | `no-cost` | at `run:<runId>`: a run found whose `summary.json` has no `cost.totalUsd`; the budget cannot be checked without it, so a runner cannot stay under it by leaving cost out |
   | `over-budget` | at `job`, once: the sum of `summary.json`'s `cost.totalUsd` over the runs found, computed exactly and rounded once ([SUM-5]), is above the plan's `maxUsd` (equal is within it), whatever order the runs are named in |
   | `over-cases` | at `job`, once: the plan sets `cases`, and the runs found have more: the distinct cases of their result lines without `parentResultId`, whatever their state, counted across the whole job, a case being its run's `suite` (`ref` and `version`) with its `caseId`: one case id in two suites counts twice, and in two runs of one suite once ([PLAN-8]) |
@@ -155,8 +155,9 @@ on its standard output or to a file the caller names, a remote one over its chan
   a run without a seal, a redacted run with and without the policy that authorizes it, the job's cost and cases
   exactly at the limit, runs each within the limits whose sum is not, two suites that share case ids, a case with a
   child line or repeated trials, runs that start or end exactly at the job's edges, runs a nanosecond outside them,
-  judges (none on a plan that names some, some of the plan's, one it does not name, the plan's out of order or one
-  twice), and target modes: scripted runs on a plan that asks for `scripted`, a live run on it, a scripted run on a
+  judges (none on a plan that names some, some of the plan's, one on a plan that names none, one it does not name,
+  the plan's model and rubric under another provider, one model and rubric under two providers, the plan's out of
+  order, one judge more often than the plan names it), and target modes: scripted runs on a plan that asks for `scripted`, a live run on it, a scripted run on a
   plan that asks for `live`, and a mocked run on one that names no mode).
 - **Not in 1.0:** signed jobs a remote runner pulls from a queue (so it can check who sent a plan). A later minor adds
   them; until then a remote runner authenticates its channel by other means.
@@ -183,31 +184,31 @@ plan says nothing.
   - `maxUsd`, when the spend so far plus the case's **cost bound** is above it (equal is within it). The spend is
     computed as [STRM-3] and [STRM-4] will compute it, with the cost bound added to the case's own run, and the runner
     stops when either sum is above `maxUsd`:
-    - the job's spend: the costs of the cases run, added exactly and rounded once ([SUM-5]);
-    - the sum of the runs' costs: each run's `cost.totalUsd` (its cases' costs, added exactly and rounded once), added
-      exactly and rounded once;
-  - `cases`, when the plan's number of cases are complete;
+    - the job's spend: the costs of the cases run and of the runs' own costs, added exactly and rounded once
+      ([SUM-5]);
+    - the sum of the runs' costs: each run's `cost.totalUsd` (its cases' costs and any cost of its own, added exactly
+      and rounded once), added exactly and rounded once;
+  - `cases`, when the plan's number of cases have started;
   - `timeout`, when the time since `job.accepted`, plus the case's **time bound**, plus the time the runner keeps for
     closing and sealing the run, is above it.
 
   Cases may run concurrently, and a run may cost more than its cases. So that a runner that keeps to its bounds never
   passes a limit:
   - the spend so far includes the cost bound of every case started and not yet complete;
-  - `cases` counts the cases started, not those complete;
   - the time check holds for every case in flight: each, with closing and sealing its run, ends within the timeout;
-  - a cost of a run beyond its cases (its setup, a judge's own calls) counts in the run's cost in the runs' sum, and
-    in the job's spend: it is bounded and checked as a case's is, before it is incurred.
+  - a run's own cost (its setup, a judge's own calls) is bounded and checked as a case's is, before it is incurred.
 
   A case's bounds are the runner's own: its cost bound is the most the case can cost under the runner's price table
   and the limits it enforces on the target (a maximum of tokens or of steps, for example), and its time bound the
   deadline the runner enforces on the case. A runner that cannot bound a case's cost takes no plan, since every plan
   sets `maxUsd`; one that cannot enforce a deadline on a case does not take a plan that sets `timeout` ([PLAN-7]).
-  `plan.estimated`'s `usdHigh` is the sum of the cost bounds of the cases it counts. A runner that keeps to its bounds
-  never passes a limit; a case that cost or took more than its bound is reported as the limit it passed ([STRM-3],
-  [STRM-4]). The timeout includes closing and sealing the runs: the job's terminal event is within it ([STRM-3]
-  `over-time`). A run a limit cuts off is closed `aborted` ([RUN-5]), sealed, announced and named in `job.failed`
-  with the limit ([STRM-1]); a limit that stops the job before a suite's first case opens no run for that suite. The
-  cases not run get no result lines, not `skipped` ones: an absent case is not a typed absence of the run ([RES-1]).
+  `plan.estimated`'s `usdHigh` is the sum of the cost bounds of the cases it counts and of the runs' own costs. A
+  runner that keeps to its bounds never passes a limit; a case, or a run's own cost, that came to more than its bound,
+  or a case that took longer, is reported as the limit it passed ([STRM-3], [STRM-4]). The timeout includes closing
+  and sealing the runs: the job's terminal event is within it ([STRM-3] `over-time`). A run a limit cuts off is closed
+  `aborted` ([RUN-5]), sealed, announced and named in `job.failed` with the limit ([STRM-1]); a limit that stops the
+  job before a suite's first case opens no run for that suite. The cases not run get no result lines, not `skipped`
+  ones: an absent case is not a typed absence of the run ([RES-1]).
 - `plan.estimated`'s `cases` is the number of cases of the plan's suites, at most the plan's `cases` limit when it sets
   one.
 - A runner emits `lane.completed` only when it was given the checkpoint's rules (spec 05). A plan alone does not carry

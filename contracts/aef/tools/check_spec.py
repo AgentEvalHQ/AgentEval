@@ -9,9 +9,9 @@
    AgentEval's `runs/`, must not drop vectors from a commit);
 6. every rule is named by some corpus vector, or listed in UNTESTED with the reason no vector can test it;
 7. no schema pattern uses lookaround or a backreference ([ENC-14]);
-8. every job vector's inputs are files of the corpus, its env names set, empty or absent, its target's cases have a
-   severity exactly when failed or warn, and the cases it expects are the first cases of a suite its scripted target
-   has; and run.json, a plan and a runner manifest list the same target modes;
+8. every job vector's inputs are files of the corpus, its env names set, empty or absent; one that expects a job has
+   a target whose cases have a severity exactly when failed or warn, and expects the first cases of a suite its
+   scripted target has, and one with `refused` expects nothing of a job; and run.json, a plan and a runner manifest list the same target modes;
 9. every row of a table in the spec is indented as its table's first row (a row that is not leaves the table: in a
    list item, CommonMark renders it as a paragraph of pipes).
 
@@ -219,6 +219,10 @@ def main():
                 problems.append(f"jobs/{where}: its {name} {e[name]} is not a file")
         if set((e.get("env") or {}).values()) - {"set", "empty", "absent"}:
             problems.append(f"jobs/{where}: env gives a variable something other than set, empty or absent")
+        if e.get("refused"):  # an input error: its inputs are wrong on purpose, and it expects no job
+            if any(k in e for k in ("terminal", "limit", "runs", "spentUsd", "estimated", "endsAt")):
+                problems.append(f"jobs/{where}: a refused vector expects what a job ends with")
+            continue
         target = json.loads((exp.parent / e["target"]).read_text(encoding="utf-8"))
         for c in (c for s in target["suites"] for c in s["cases"]):
             if (c["state"] in ("failed", "warn")) != ("severity" in c):  # §9.2.1, RES-9

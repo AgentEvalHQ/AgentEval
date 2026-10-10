@@ -1,0 +1,372 @@
+{
+  "version": 2,
+  "status": "success",
+  "eval": {
+    "eval_id": "edgesLog01",
+    "run_id": "edgesRun01",
+    "created": "2026-10-08T10:00:00+00:00",
+    "task": "edges",
+    "task_version": "2",
+    "dataset": {
+      "name": "edges",
+      "samples": 11
+    },
+    "model": "acme/gpt x",
+    "model_roles": {
+      "grader": {
+        "model": "acme/judge"
+      },
+      "attacker": {
+        "model": "acme/red"
+      },
+      "grader_b": {
+        "model": "acme/judge"
+      }
+    },
+    "config": {
+      "epochs": 1,
+      "epochs_reducer": [
+        "collect"
+      ]
+    },
+    "packages": {
+      "inspect_ai": "0.3.277"
+    },
+    "scorers": [
+      {
+        "name": "q"
+      },
+      {
+        "name": "m"
+      }
+    ]
+  },
+  "results": {
+    "total_samples": 11,
+    "completed_samples": 1,
+    "scores": [
+      {
+        "name": "q",
+        "scorer": "q",
+        "metrics": {}
+      }
+    ]
+  },
+  "stats": {
+    "completed_at": "2026-10-08T10:02:00+00:00",
+    "role_usage": {
+      "grader": {
+        "input_tokens": 100,
+        "output_tokens": 20,
+        "total_tokens": 120
+      },
+      "attacker": {
+        "input_tokens": 30,
+        "output_tokens": 5,
+        "total_tokens": 35
+      }
+    }
+  },
+  "samples": [
+    {
+      "id": "a",
+      "epoch": 1,
+      "input": "",
+      "target": "",
+      "scores": {
+        "q": {
+          "value": 0.9,
+          "explanation": ""
+        },
+        "m": {
+          "value": {
+            "x": 1.0,
+            "y": NaN
+          }
+        }
+      },
+      "role_usage": {
+        "grader": {
+          "input_tokens": 50,
+          "output_tokens": 10,
+          "total_tokens": 60,
+          "total_cost": 0.001
+        },
+        "grader_b": {
+          "input_tokens": 50,
+          "output_tokens": 10,
+          "total_tokens": 60,
+          "total_cost": 0.001
+        }
+      },
+      "model_usage": {
+        "acme/judge": {
+          "input_tokens": 100,
+          "output_tokens": 20,
+          "total_tokens": 120,
+          "total_cost": 0.002
+        }
+      }
+    },
+    {
+      "id": "b",
+      "epoch": 1,
+      "input": "Count to a million.",
+      "target": "",
+      "limit": {
+        "type": "token",
+        "limit": 1000
+      }
+    },
+    {
+      "id": "c",
+      "epoch": 1,
+      "input": "",
+      "target": "",
+      "error": {
+        "message": "RuntimeError: the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; the tool kept failing; ",
+        "traceback": "",
+        "traceback_ansi": ""
+      }
+    },
+    {
+      "id": "d",
+      "epoch": 1,
+      "input": "",
+      "target": "",
+      "limit": {
+        "type": "token",
+        "limit": 1000.0
+      }
+    },
+    {
+      "id": "e",
+      "epoch": 1,
+      "input": "",
+      "target": "",
+      "limit": {
+        "type": "token",
+        "limit": 1e+16
+      }
+    },
+    {
+      "id": "f",
+      "epoch": 1,
+      "input": "",
+      "target": "",
+      "limit": {
+        "type": "message",
+        "limit": 1e+21
+      }
+    },
+    {
+      "id": "g",
+      "epoch": 1,
+      "input": "",
+      "target": "",
+      "error": {
+        "message": "",
+        "traceback": "",
+        "traceback_ansi": ""
+      }
+    },
+    {
+      "id": "h",
+      "epoch": 1,
+      "input": [
+        [
+          [
+            [
+              [
+                [
+                  [
+                    [
+                      [
+                        [
+                          [
+                            [
+                              [
+                                [
+                                  [
+                                    [
+                                      [
+                                        [
+                                          [
+                                            [
+                                              [
+                                                [
+                                                  [
+                                                    [
+                                                      [
+                                                        [
+                                                          [
+                                                            [
+                                                              [
+                                                                [
+                                                                  [
+                                                                    [
+                                                                      [
+                                                                        [
+                                                                          [
+                                                                            [
+                                                                              [
+                                                                                [
+                                                                                  [
+                                                                                    [
+                                                                                      [
+                                                                                        [
+                                                                                          [
+                                                                                            [
+                                                                                              [
+                                                                                                [
+                                                                                                  [
+                                                                                                    [
+                                                                                                      [
+                                                                                                        [
+                                                                                                          [
+                                                                                                            [
+                                                                                                              [
+                                                                                                                [
+                                                                                                                  [
+                                                                                                                    [
+                                                                                                                      [
+                                                                                                                        [
+                                                                                                                          [
+                                                                                                                            [
+                                                                                                                              [
+                                                                                                                                [
+                                                                                                                                  "x"
+                                                                                                                                ]
+                                                                                                                              ]
+                                                                                                                            ]
+                                                                                                                          ]
+                                                                                                                        ]
+                                                                                                                      ]
+                                                                                                                    ]
+                                                                                                                  ]
+                                                                                                                ]
+                                                                                                              ]
+                                                                                                            ]
+                                                                                                          ]
+                                                                                                        ]
+                                                                                                      ]
+                                                                                                    ]
+                                                                                                  ]
+                                                                                                ]
+                                                                                              ]
+                                                                                            ]
+                                                                                          ]
+                                                                                        ]
+                                                                                      ]
+                                                                                    ]
+                                                                                  ]
+                                                                                ]
+                                                                              ]
+                                                                            ]
+                                                                          ]
+                                                                        ]
+                                                                      ]
+                                                                    ]
+                                                                  ]
+                                                                ]
+                                                              ]
+                                                            ]
+                                                          ]
+                                                        ]
+                                                      ]
+                                                    ]
+                                                  ]
+                                                ]
+                                              ]
+                                            ]
+                                          ]
+                                        ]
+                                      ]
+                                    ]
+                                  ]
+                                ]
+                              ]
+                            ]
+                          ]
+                        ]
+                      ]
+                    ]
+                  ]
+                ]
+              ]
+            ]
+          ]
+        ]
+      ],
+      "target": "",
+      "output": {
+        "model": "acme/gpt x",
+        "time": 1.0,
+        "choices": [
+          {
+            "stop_reason": "stop",
+            "message": {
+              "role": "assistant",
+              "content": "Fine — done.\n"
+            }
+          }
+        ],
+        "metadata": {
+          "ｚ": 1,
+          "😀": 2.5,
+          "z": true,
+          "é": null
+        }
+      },
+      "messages": [
+        {
+          "role": "user",
+          "content": "Rate this answer."
+        },
+        {
+          "role": "assistant",
+          "content": "Fine — done.\n"
+        }
+      ],
+      "scores": {
+        "q": {
+          "value": 0.5
+        },
+        "m": {
+          "value": {
+            "x": 0.25
+          }
+        }
+      }
+    },
+    {
+      "id": 9007199254740991,
+      "epoch": 1,
+      "input": "",
+      "target": "",
+      "scores": {
+        "q": {
+          "value": 0.1
+        }
+      }
+    },
+    {
+      "id": 1000.0,
+      "epoch": 1,
+      "input": "",
+      "target": "",
+      "scores": {
+        "q": {
+          "value": 0.2
+        }
+      }
+    },
+    {
+      "id": "k",
+      "epoch": 1,
+      "input": "",
+      "target": "",
+      "error": {}
+    }
+  ]
+}

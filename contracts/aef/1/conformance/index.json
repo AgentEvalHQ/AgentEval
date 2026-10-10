@@ -13118,6 +13118,28 @@
    }
   },
   {
+   "id": "protocol/plan-conformance/judges-more-often-than-plan",
+   "kind": "plan-conformance",
+   "classes": [
+    "Stream verifier"
+   ],
+   "rules": [
+    "STRM-4",
+    "RUN-9"
+   ],
+   "path": "protocol/plan-conformance/judges-more-often-than-plan",
+   "files": {
+    "events.ndjson": "62935d7a44e5283e14557409c082b612c84a8aed22c7dfaf95cac0047a8804b1",
+    "expected.json": "6692efa77f5f5836e881cd0556f3413074e4db4abedf2e6f78701e0e5fa8aac7",
+    "plan.json": "151eda17ea6a048416696437f1500540f6fcbda2b97d26f4b1e1eaed010974a5",
+    "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
+    "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
+    "runs/R-1/run.json": "00770e1a0c772c6348f1a99ef99c92a8c1ea93c1bfdee8a9a72c2a8c515d84fc",
+    "runs/R-1/seal.json": "d2605a76b48df95ac5bfdb44bbd88307a3aee62397dcef76a8a6b8f80dd1c470",
+    "runs/R-1/summary.json": "5c419eab3b644e909a540ec222c74ce57cf06afa52f2fc278c3667e009025cb7"
+   }
+  },
+  {
    "id": "protocol/plan-conformance/judges-none",
    "kind": "plan-conformance",
    "classes": [
@@ -13162,6 +13184,28 @@
    }
   },
   {
+   "id": "protocol/plan-conformance/judges-other-provider",
+   "kind": "plan-conformance",
+   "classes": [
+    "Stream verifier"
+   ],
+   "rules": [
+    "STRM-4",
+    "PLAN-1"
+   ],
+   "path": "protocol/plan-conformance/judges-other-provider",
+   "files": {
+    "events.ndjson": "7ca7db85ede92ad1a5a5a4e1757f91aca9fde1b967504a1a053b2e027d2d3223",
+    "expected.json": "94e237d98c373946bf2156dbc46c61dbf5ca0330a0771bd6feffc284dc6bdc43",
+    "plan.json": "a3a4de0f2d285cf6b1cb374c9e9a2a1c9a4172f1acbb76d7b82affd29aac66ec",
+    "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
+    "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
+    "runs/R-1/run.json": "ddd586c640144fe569dd395bc129e6216bff9495f78885298858db5bc6492342",
+    "runs/R-1/seal.json": "642c1a2b456faa9485c61ef4b26560fc6e64525d872ec3f746a16f6daddfd54b",
+    "runs/R-1/summary.json": "5c419eab3b644e909a540ec222c74ce57cf06afa52f2fc278c3667e009025cb7"
+   }
+  },
+  {
    "id": "protocol/plan-conformance/judges-out-of-order",
    "kind": "plan-conformance",
    "classes": [
@@ -13180,6 +13224,28 @@
     "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
     "runs/R-1/run.json": "61c1cb6f265184e5f35cec20ca9bb2c3b5d28937447afa679a7ed19b3601f717",
     "runs/R-1/seal.json": "b67e6b2515e464da25f9fad97afaab774ac627dfc9c4a3d8ef54941684131a75",
+    "runs/R-1/summary.json": "5c419eab3b644e909a540ec222c74ce57cf06afa52f2fc278c3667e009025cb7"
+   }
+  },
+  {
+   "id": "protocol/plan-conformance/judges-plan-names-twice",
+   "kind": "plan-conformance",
+   "classes": [
+    "Stream verifier"
+   ],
+   "rules": [
+    "STRM-4",
+    "RUN-9"
+   ],
+   "path": "protocol/plan-conformance/judges-plan-names-twice",
+   "files": {
+    "events.ndjson": "2d5db707ac33a0af7f253bed0e4b60f3b52f2f2025dbc129c5259c5fd05b9c90",
+    "expected.json": "bd3e94e1402350141f1b47f18cd519ff5bddcfbeae23404b4894b1d889f8bda0",
+    "plan.json": "151eda17ea6a048416696437f1500540f6fcbda2b97d26f4b1e1eaed010974a5",
+    "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
+    "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
+    "runs/R-1/run.json": "583b90b33285bfaf6f75ebdf2bf94b472c311e4b88a8109d7fb6d44ee0cb1fce",
+    "runs/R-1/seal.json": "81e47f1dee1c434c5ac11bb8a1555cc8aa33b2b529ead1da7ef2dd128e6563fc",
     "runs/R-1/summary.json": "5c419eab3b644e909a540ec222c74ce57cf06afa52f2fc278c3667e009025cb7"
    }
   },
@@ -13239,12 +13305,34 @@
    "path": "protocol/plan-conformance/judges-twice",
    "files": {
     "events.ndjson": "26a7bf86aa2d16f1a75d9397c5e053e4e4d7cc0098ba0617f04148e98cf547e0",
-    "expected.json": "0bd3ee24327e4d395f239bc63528ad813024d51a62894e742c48563266eeafff",
+    "expected.json": "519c62d1793363a608cf8b59ee7bfa0433e7720bc8c40b3231e9dda14cfdd0bc",
     "plan.json": "b555cca1a54d85ffd3202bc9d3d326ee770accc03fe54a682925ac6d41e0eaed",
     "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
     "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
     "runs/R-1/run.json": "8dcc71153030441554e03c9708560f7d4d56981d7d3b5d816aae72ba6c0bbc8f",
     "runs/R-1/seal.json": "4af5c2e9b56ccfb44729378b476947b0a8bb25ff87dd7366cb0b1ccfbfb047bb",
+    "runs/R-1/summary.json": "5c419eab3b644e909a540ec222c74ce57cf06afa52f2fc278c3667e009025cb7"
+   }
+  },
+  {
+   "id": "protocol/plan-conformance/judges-two-providers",
+   "kind": "plan-conformance",
+   "classes": [
+    "Stream verifier"
+   ],
+   "rules": [
+    "STRM-4",
+    "RUN-9"
+   ],
+   "path": "protocol/plan-conformance/judges-two-providers",
+   "files": {
+    "events.ndjson": "31d292d9e2e89e579092aae47b75ddd3a9b77745fa829e47b00714c1ace9cd7b",
+    "expected.json": "a85e1a47525295e7395ac7f56d376464b8e3ec6d737e6ae0c45393bdd93456c9",
+    "plan.json": "b6ed01c08c8f81622d8e9961071480a5362fd89d0075deb5a3bea6f82271d6c6",
+    "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
+    "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
+    "runs/R-1/run.json": "b2196427f49d627b0a74330035b8eb6e6d5317951d59005e1b8c9b34f426bbca",
+    "runs/R-1/seal.json": "098bd2643e7cba72480f33ef634e4b8f7dd98dcae21069182488bae4b38e15fc",
     "runs/R-1/summary.json": "5c419eab3b644e909a540ec222c74ce57cf06afa52f2fc278c3667e009025cb7"
    }
   },
@@ -13291,6 +13379,29 @@
     "runs/R-1/run.json": "67282a92981e7e9845599d939b7beb49e472a5794c1730a408a543993e110b19",
     "runs/R-1/seal.json": "a0294cb6e25cf7016b01f75ece8aacdc93cf045044d371155d2745e292875cb3",
     "runs/R-1/summary.json": "28d3d14e3acb023b4709cc93cb6e9756df1ad3c84d078e12e9eadfbba22da765"
+   }
+  },
+  {
+   "id": "protocol/plan-conformance/no-judges-anywhere",
+   "kind": "plan-conformance",
+   "classes": [
+    "Stream verifier"
+   ],
+   "rules": [
+    "STRM-4",
+    "PLAN-1",
+    "RUN-9"
+   ],
+   "path": "protocol/plan-conformance/no-judges-anywhere",
+   "files": {
+    "events.ndjson": "91ecf9f3b227424b1c9831ed20027e89da6e362a437ee067134c3f11a41ad812",
+    "expected.json": "b604dfde5a75b5d3506f288fae802095fbffb09f2cbb7e874a29bed042399492",
+    "plan.json": "163731b5c72e4fe7607fc3b259df09093807964c17c9129a1a254bfcfa3fd377",
+    "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
+    "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
+    "runs/R-1/run.json": "7bf520c66a5e313f40a76595751de43caafa758b454af08da5bf403fbaabe963",
+    "runs/R-1/seal.json": "985da0dce75125389622c03ce786c87d0ad3873f92de9a17e26b3cab7d439526",
+    "runs/R-1/summary.json": "5c419eab3b644e909a540ec222c74ce57cf06afa52f2fc278c3667e009025cb7"
    }
   },
   {
@@ -13371,12 +13482,13 @@
     "Stream verifier"
    ],
    "rules": [
-    "STRM-4"
+    "STRM-4",
+    "PLAN-1"
    ],
    "path": "protocol/plan-conformance/plan-names-no-judges",
    "files": {
     "events.ndjson": "7ba265dc51276fbc25bcc348c47adae72f98876979c6877346e13ea8e6e96bad",
-    "expected.json": "1d9115a530ac8496df00019cf1d0524ef100c0c63826f5a5a942848b0b390203",
+    "expected.json": "e2500469ef8e4e9d5e493f58e554f92f46054942bbf5e689c5ee17b89bee1400",
     "plan.json": "163731b5c72e4fe7607fc3b259df09093807964c17c9129a1a254bfcfa3fd377",
     "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
     "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
@@ -15233,6 +15345,149 @@
     "expected.json": "60aa37ee174028ae75beb6747c3f91b3da8b158935272d5a82ab31a75552c39a",
     "plan.json": "9590ad9341c4720a09e47f5e13bcbb3dd131220bdf206cc4a3f2c6bca358040d",
     "target.json": "f3398d8e5bcabca468f42eae9e2a72c5629a0b2cf1dbe1b9506eedd966ec6910"
+   }
+  },
+  {
+   "id": "jobs/input-at-clock-leaves-years",
+   "kind": "job",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "ENC-8"
+   ],
+   "path": "jobs/input-at-clock-leaves-years",
+   "files": {
+    "expected.json": "737ef026ee5e0edc36750c58215ce6113c1fcb1d1ab71d9e6ae32a5724efa57d",
+    "plan.json": "fb48008f806388984d415f2e47dd6df502fe624562a3e1359d358afaa77b9d08",
+    "target.json": "f3398d8e5bcabca468f42eae9e2a72c5629a0b2cf1dbe1b9506eedd966ec6910"
+   }
+  },
+  {
+   "id": "jobs/input-at-not-a-time",
+   "kind": "job",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "ENC-8"
+   ],
+   "path": "jobs/input-at-not-a-time",
+   "files": {
+    "expected.json": "bd3a76dcaf8587408f4fdd46e457e764b7fe870d9739d4c8ef64992a88d4e8b8",
+    "plan.json": "4acc67f54d0860cccc10b321f4fac0a673d3e25a46c755aaea72d914680825fe",
+    "target.json": "f3398d8e5bcabca468f42eae9e2a72c5629a0b2cf1dbe1b9506eedd966ec6910"
+   }
+  },
+  {
+   "id": "jobs/input-plan-not-json",
+   "kind": "job",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "ENC-1"
+   ],
+   "path": "jobs/input-plan-not-json",
+   "files": {
+    "expected.json": "82e0d56a0546a4ead37db3644d879232c11d15ef09483e1db71a7e3108b7ca61",
+    "plan.json": "301d12c014a0945d449d79a839d70115939dc840663eee241462c53a90fb6b6e",
+    "target.json": "f3398d8e5bcabca468f42eae9e2a72c5629a0b2cf1dbe1b9506eedd966ec6910"
+   }
+  },
+  {
+   "id": "jobs/input-plan-without-plan-id",
+   "kind": "job",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-5",
+    "PLAN-7"
+   ],
+   "path": "jobs/input-plan-without-plan-id",
+   "files": {
+    "expected.json": "3301673c628acdf050b606ed9f18da85ee3a71e7207c258261de7d0707f85dac",
+    "plan.json": "b1197a32649523f487fcc9a97afc6ea8df2bc9281ea7902004ba90483c525b67",
+    "target.json": "f3398d8e5bcabca468f42eae9e2a72c5629a0b2cf1dbe1b9506eedd966ec6910"
+   }
+  },
+  {
+   "id": "jobs/input-runner-reader-refuses",
+   "kind": "job",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-6",
+    "VER-3"
+   ],
+   "path": "jobs/input-runner-reader-refuses",
+   "files": {
+    "expected.json": "fd2c02df29b2641fae1f6c03df09f4e3d05bb9b7656b4fdaede405236bb45cee",
+    "plan.json": "0eb6e020b0ec49ab5f52c1cbcf13c553a4b411e3f74d123c7241e9256a6d54bc",
+    "runner.json": "ade3b3190271733dc9e87a8b55e804f385600db32316f53928e287acdf7a4627",
+    "target.json": "f3398d8e5bcabca468f42eae9e2a72c5629a0b2cf1dbe1b9506eedd966ec6910"
+   }
+  },
+  {
+   "id": "jobs/input-target-bound-below-cost",
+   "kind": "job",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-9"
+   ],
+   "path": "jobs/input-target-bound-below-cost",
+   "files": {
+    "expected.json": "a4d287c560e0d96382759056a25fb05acdea76276b04be6978538d3aee8afc1b",
+    "plan.json": "491f233d050443b932fb7e7da7edca0c5481c653682e3df2f1189593f54f5eae",
+    "target.json": "68c34f7859bf5c8c873e6902d1542efdb5a62a538dd83a2683fbcbc5e885442b"
+   }
+  },
+  {
+   "id": "jobs/input-target-case-unknown-member",
+   "kind": "job",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [],
+   "path": "jobs/input-target-case-unknown-member",
+   "files": {
+    "expected.json": "71300e7d0cd07bf7261610b1b948f80fb668b4c4a3dc840e3a8f52063bad2eb9",
+    "plan.json": "a657a1f03ee06cd72abc41cc8778779ae1984998b4d8997289649a0abb469ef7",
+    "target.json": "148233c0ee0ec073e60b1f4b8292bb324560925a776fe9f7915ba6b811b91026"
+   }
+  },
+  {
+   "id": "jobs/input-target-severity-on-passed",
+   "kind": "job",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "RES-9"
+   ],
+   "path": "jobs/input-target-severity-on-passed",
+   "files": {
+    "expected.json": "dd28e7ba593478aef4973f32cf5aae365f7ccf8ff09c3d5d3ffb7091df53dde4",
+    "plan.json": "fdef48b2fc30dda08bd71b81a2be8f6ab442ba24de874a93e522a2ed9f1cdf38",
+    "target.json": "6a7ee85ae8efdf16fa933d5cd425b5f3bb4e7e1044565cc7d9cbec95e57451b6"
+   }
+  },
+  {
+   "id": "jobs/input-target-unknown-member",
+   "kind": "job",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [],
+   "path": "jobs/input-target-unknown-member",
+   "files": {
+    "expected.json": "2b9ea81b2549a27335c34b3d1031f04566348e81ac3976787c8b5952e73a1e48",
+    "plan.json": "29b5beac135e65b6412ef8fdee409380c3352ed8c81c2d9ebb2192afea7cf1fc",
+    "target.json": "ad7d223773a212a4af37b8ad65b136d41d657bcce5730f24eeb690f9efc24faf"
    }
   },
   {

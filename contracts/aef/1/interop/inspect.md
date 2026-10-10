@@ -214,11 +214,12 @@ The reference converter, `tools/aef_interop.py from-inspect`, follows the table 
   `abortReason` is `error.message`. `imported.from` is `inspect_ai` and the version `eval.packages` gives, or
   `inspect_ai` alone. The names of `suite.ref` and `subject.ref` are encoded as
   [ENC-13](../spec/02-encoding.md#24-identifiers-and-names) says, and `suite.version` is `eval.task_version` as text
-  (Inspect's default is 0). `execution.targetMode` and `contentCapture` come from the person converting (`on` unless
-  asked otherwise); both are listed in `imported.asserted`, with `subject.ref` and `subject.kind`. `eval.run_id`,
-  `eval.eval_set_id`, `eval.dataset` and `results.headline` go to `run.json`'s `ext."inspect_ai"`. A `started` log
-  gives a running run, which is not sealed: only a closed run is ([SEAL-1](../spec/04-integrity.md#41-sealing-a-run)).
-  The run it writes is verified, and refused (nothing written) when it does not verify (IN-11).
+  (Inspect's default is 0; a number as R9-2 says, below). `execution.targetMode` and `contentCapture` come from the
+  person converting (`on` unless asked otherwise); both are listed in `imported.asserted`, with `subject.ref` and
+  `subject.kind`. `eval.run_id`, `eval.eval_set_id`, `eval.dataset` and `results.headline` go to `run.json`'s
+  `ext."inspect_ai"`. A `started` log gives a running run, which is not sealed: only a closed run is
+  ([SEAL-1](../spec/04-integrity.md#41-sealing-a-run)). The run it writes is verified, and refused (nothing written)
+  when it does not verify (IN-11).
 - **Scores** (IN-7). A score's metric is its key; a map member's metric is the member's key, a letter `C`, `I`, `P`
   or `N` in a map is the value its row gives with the letter as label, and a map's line is `scored`. NaN with
   `grader_failed` or `scoring_failed` is `error`; NaN with any other reason, or none, is `not_measured`; the three
@@ -271,8 +272,9 @@ The reference converter, `tools/aef_interop.py from-inspect`, follows the table 
   is `10000000000000000`), then in exponent form (`1e21` is `1e+21`; `1e-7` is `1e-7`, `1e-6` is `0.000001`). So a
   JSON parser that does not keep `1000.0` apart from `1000` writes the same reason, as "values, not bytes" requires.
   A limit whose `type` is empty, or whose `limit` is not a finite number (Inspect's `NaN`), is refused; an infinity
-  never reaches it, since a log holding `Infinity` is refused as it is read (IN-6). A sample `error` with an empty or
-  absent message gives the reason "Inspect recorded an error without a message".
+  never reaches it, since `Infinity`, or a number that overflows binary64, is refused as the log is read (IN-6,
+  R9-2). A sample `error` with an empty or absent message gives the reason "Inspect recorded an error without a
+  message".
 - **Content that is not text** (IN-8, settled 10-10). A list of messages, a `ModelOutput` or a list of targets
   becomes a blob holding its JSON serialized by the JSON Canonicalization Scheme
   ([RFC 8785](https://www.rfc-editor.org/rfc/rfc8785), JCS): no whitespace; numbers as ECMAScript's `Number::toString`
@@ -282,8 +284,31 @@ The reference converter, `tools/aef_interop.py from-inspect`, follows the table 
   does not contradict [Seal the bytes, not a canonical form](../rationale.md#seal-the-bytes-not-a-canonical-form): JCS
   only chooses the bytes a converter writes into a new blob, the run is then sealed over those bytes
   ([SEAL-2](../spec/04-integrity.md#41-sealing-a-run)), and nothing is read back through a canonical form. JCS has
-  no NaN, infinity or unpaired surrogate, so content that holds one is refused: writing it another way would give two
-  converters two names again.
+  no NaN, infinity or unpaired surrogate, so content that holds a NaN is refused: writing it another way would give
+  two converters two names again (an infinity and an unpaired surrogate never reach it: the log is refused as it is
+  read, R9-2).
+- **Reading the log** (IN-6, settled 10-10, R9-2). The log is read as I-JSON
+  ([RFC 7493](https://www.rfc-editor.org/rfc/rfc7493)), as AEF reads its own files
+  ([ENC-1 to ENC-3](../spec/02-encoding.md#21-json-documents)), within the nesting depth of 64 that
+  [ENC-17](../spec/02-encoding.md#26-limits) sets, with the one exception Inspect needs: its bare `NaN`, where an
+  unscored value can be (a score's value or a member of a map one, a reduced score's value, a metric's value) and
+  where a rule then refuses it (a limit's number, and content that is not text, IN-8). Anything else is refused as the
+  log is read, wherever it is, a part the converter does not carry included: a byte-order mark or bytes that are not
+  UTF-8; a member named twice (as in AEF's own files, [ENC-2](../spec/02-encoding.md#21-json-documents)); a string or
+  a member name with an unpaired surrogate; `Infinity` or `-Infinity`; a number that overflows binary64 (`1e400`,
+  [ENC-3](../spec/02-encoding.md#21-json-documents)); a `NaN` anywhere else; nesting deeper than 64. Every number is
+  read as its binary64 value ([ENC-4](../spec/02-encoding.md#21-json-documents)), so the rules below depend on the
+  value alone.
+- **A numeric `id` or `task_version`** (IN-6, IN-8, settled 10-10, R9-2). A sample's `id` (and a reduction's
+  `sample_id`) or `eval.task_version` that is a number gives `caseId` or `suite.version` only when it is an integer of
+  at most 2^53 − 1 in magnitude ([ENC-4](../spec/02-encoding.md#21-json-documents): `1`, `1.0` and `1e0` alike),
+  written in decimal digits (`1000` for `1e3`). Any other number (`1.5`, `9007199254740993`) is refused: an `id` by
+  IN-8, a `task_version` by IN-6.
+- **A sample's `error` and `limit`** (IN-8, settled 10-10, R9-2). An `error` that is present and not null is an
+  object, as Inspect writes it. One with no `message`, or a null or empty one (`{}` included), gives the reason
+  "Inspect recorded an error without a message". A `message` that is not text, or an `error` that is not an object (a
+  string, a number), is refused. A `limit` that is present and not null is `{type, limit}`, as R8-4 says, on a scored
+  sample too: `{}` is refused.
 - **The summary** (IN-9, R7I-10, R7I-15). The run's usage is one entry per `stats.model_usage` model (its role from
   `eval.model_roles` as IN-8 maps it, `agent` for `eval.model`, `other` otherwise), in the log's order; only without
   `model_usage`, one entry per `stats.role_usage` role, without a model. An entry with no metric (or `stderr` alone)
@@ -297,16 +322,20 @@ The reference converter, `tools/aef_interop.py from-inspect`, follows the table 
 **Refused** (IN-6 to IN-10; settled 10-09 and 10-10). The converter refuses these, naming the rule, and writes nothing:
 
 - an `eval_id` that is not an AEF id; a time without an offset; a closed log without `stats.completed_at`, or one
-  that ends before it starts; an `error` log without a message; a log holding `Infinity` or `-Infinity`, which no AEF
-  number holds ([ENC-3](../spec/02-encoding.md#21-json-documents)) (IN-6);
+  that ends before it starts; an `error` log without a message; a log that is not I-JSON (a member named twice, an
+  unpaired surrogate, `Infinity`, a number that overflows binary64), that holds a `NaN` where no unscored value can
+  be, or that nests deeper than 64; a `task_version` that is a number but no integer of at most 2^53 − 1 (R9-2)
+  (IN-6);
 - a value that is a boolean, or a string other than `C`, `I`, `P` and `N` (IN-7);
-- more than one epochs reducer; an epoch beyond `eval.config.epochs`; a sample without scores (or, for one that
-  stopped, in a log that names no scorer); two scores of one case, path and epoch; a limit that is not
-  `{type, limit}`, whose `type` is empty or whose `limit` is not a finite number (R8-4); content that is not text
-  holding NaN or an unpaired surrogate, which JCS cannot write, when the run keeps content (`contentCapture: on`;
-  with `off` the content is not written, so it is not refused; settled 10-10); with more than one epoch, a
-  reduction whose reducer has no AEF value; a reduction with no epoch lines, and, in a closed log, a case's path with
-  epoch lines and no reduction ([RES-8](../spec/03-run.md#344-repeated-trials)) (IN-8);
+- a sample `id`, or a reduction's `sample_id`, that is a number but no integer of at most 2^53 − 1; an `error`
+  that is not an object, or whose `message` is not text (R9-2) (IN-8);
+- more than one epochs reducer; an epoch beyond `eval.config.epochs`; a sample without scores (or, for one that stopped,
+  in a log that names no scorer); two scores of one case, path and epoch; a limit that is not `{type, limit}` (`{}`
+  included, on a scored sample too, R9-2), whose `type` is empty or whose `limit` is not a finite number (R8-4); content
+  that is not text holding NaN, which JCS cannot write, when the run keeps content (`contentCapture: on`; with `off` the
+  content is not written, so it is not refused; settled 10-10); with more than one epoch, a reduction whose reducer has
+  no AEF value; a reduction with no epoch lines, and, in a closed log, a case's path with epoch lines and no reduction
+  ([RES-8](../spec/03-run.md#344-repeated-trials)) (IN-8);
 - a `results.scores` entry with both `accuracy` and `mean`, or with no mean and more than one other metric, or whose
   metric cannot be an `aggregate` method; and a mean, median, minimum or maximum Inspect gives that the lines do
   not (IN-9);

@@ -438,13 +438,13 @@ public static class RunnerEventStream
                 && (AefNode.String(s["digest"]) is not { } digest || digest == AefNode.String(AefNode.Get(suite, "digest")))))
             found.Add("suite");
 
-        // The run's judges are the models that graded it ([RUN-9]): a sub-list of the plan's (round 8), each one of the
-        // plan's by model and rubric digest (an absent value equals only an absent one), in the plan's order, none named
-        // twice. None, or some of the plan's, is within. Checked only when the plan names judges.
-        static List<(string?, string?)> Judges(JsonNode? list) =>
-            [.. AefNode.Objects(list).Select(j => (AefNode.String(j["model"]), AefNode.String(j["rubricDigest"])))];
-        var planned = Judges(plan["judges"]);
-        if (planned.Count > 0 && !IsSubList(Judges(run["judges"]), planned))
+        // The run's judges are the models that graded it ([RUN-9]): the plan's with some left out (none, or all, among them),
+        // in order (round 9). A judge is its model, provider and rubric digest (an absent value equals only an absent
+        // one). A run that names none is within; a plan that names none allows none; a judge the plan names twice may be
+        // named twice, never more.
+        static List<(string?, string?, string?)> Judges(JsonNode? list) =>
+            [.. AefNode.Objects(list).Select(j => (AefNode.String(j["model"]), AefNode.String(j["provider"]), AefNode.String(j["rubricDigest"])))];
+        if (!IsSubsequence(Judges(run["judges"]), Judges(plan["judges"])))
             found.Add("judges");
 
         // [RUN-11], [VER-8]: an absent or unknown contentCapture reads as on.
@@ -458,15 +458,9 @@ public static class RunnerEventStream
         return found;
     }
 
-    // Whether every item of run is one of planned, in planned's order, none twice: each matched at a later place of planned
-    // than the item before it.
-    private static bool IsSubList(List<(string?, string?)> run, List<(string?, string?)> planned)
+    // Whether run is planned with some items left out: each item matched at a later place of planned than the one before.
+    private static bool IsSubsequence(List<(string?, string?, string?)> run, List<(string?, string?, string?)> planned)
     {
-        if (run.Distinct().Count() != run.Count)
-        {
-            return false;
-        }
-
         var at = 0;
         foreach (var judge in run)
         {
