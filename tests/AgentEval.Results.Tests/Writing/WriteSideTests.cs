@@ -64,10 +64,13 @@ public class WriteSideTests
                         $"{field}: {have[field]?.ToJsonString()} for {x[field]?.ToJsonString()}");
                 }
 
+                // §9.3 (pre-release): sum and value the expected binary64 values exactly ([SUM-5], [SUM-8]); sumSq within §3.6.
                 foreach (var field in new[] { "sum", "sumSq", "value" })
                 {
                     var (g, w) = (have![field], x![field]);
-                    Assert.True(w is null ? g is null : g is not null && AefSummaryCalculator.Matches(g.GetValue<double>(), w.GetValue<double>()),
+                    Assert.True(w is null ? g is null : g is not null && (field == "sumSq"
+                            ? AefSummaryCalculator.Matches(g.GetValue<double>(), w.GetValue<double>())
+                            : g.GetValue<double>() == w.GetValue<double>()),
                         $"{field}: {g?.ToJsonString()} for {w?.ToJsonString()}");
                 }
             }
@@ -203,6 +206,16 @@ public class WriteSideTests
         var summary = output.Json("summary.json");
         Assert.True(AefSchemas.Writer.IsValid("summary", summary));
         Assert.True(Same(summary, expected["summary"]), $"expected {expected["summary"]!.ToJsonString()}, got {summary.ToJsonString()}");
+        foreach (var (gotEntry, wantEntry) in summary["lanes"]!.AsArray().SelectMany(l => l!["metrics"]!.AsArray())
+                     .Zip(expected["summary"]!["lanes"]!.AsArray().SelectMany(l => l!["metrics"]!.AsArray())))
+        {
+            foreach (var field in new[] { "sum", "value" })   // exactly, as summarize's output is judged ([SUM-5], [SUM-8])
+            {
+                Assert.True(wantEntry![field] is null ? gotEntry![field] is null : (double?)gotEntry![field] == (double)wantEntry[field]!,
+                    $"{field}: {gotEntry![field]?.ToJsonString()} for {wantEntry[field]?.ToJsonString()}");
+            }
+        }
+
         var verification = AefRunVerifier.Verify(output.Dir);
         Assert.Equal(AefOutcome.Unsealed, verification.Outcome);
         Assert.Empty(verification.Problems);
@@ -215,6 +228,8 @@ public class WriteSideTests
     public void Produce_KeepsEveryMemberOfRunJsonAndMetricsJson_AsGiven()
     {
         // The writer's header holds every member of the writer run schema; a scenario's run.json goes through it whole.
+        // planDigest is all zeros: DevSkim (DS173237) reads any other bare 64-hex literal as a token, and a raw string
+        // cannot carry its ignore comment.
         var scenario = Scenario();
         scenario["run"] = JsonNode.Parse("""
             {"schemaVersion":"1.0","runId":"produce-everything","status":"completed",
@@ -229,7 +244,7 @@ public class WriteSideTests
              "startedAt":"2026-10-01T00:00:00Z","endedAt":"2026-10-01T00:01:00.25Z",
              "otel":{"semconvVersion":"1.37","dialects":["gen_ai"],"schemaUrls":["https://opentelemetry.io/schemas/1.37.0"]},
              "contentCapture":"off","costPolicy":{"maxUsd":12.5,"priceTable":"list-2026"},"ext":{"vendor.x":{"a":[1,2]}},
-             "provenance":{"planId":"plan-1","planDigest":"2222222222222222222222222222222222222222222222222222222222222222","jobId":"job-1","runnerId":"runner-1"},
+             "provenance":{"planId":"plan-1","planDigest":"0000000000000000000000000000000000000000000000000000000000000000","jobId":"job-1","runnerId":"runner-1"},
              "execution":{"targetMode":"replayed","stimulus":"suite"},
              "imported":{"from":"tool 1.0","asserted":["subject.version"]}}
             """);
@@ -457,7 +472,7 @@ public class WriteSideTests
         var file = Path.Combine(run.Root, "file.json");
         File.WriteAllText(file, "{}\n");
         var key = Path.Combine(run.Root, "key.pem");
-        using (var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256))
+        using (var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256)) // DevSkim: ignore DS440100 — the curve AEF signs with
         {
             File.WriteAllText(key, ecdsa.ExportPkcs8PrivateKeyPem());
         }
@@ -516,7 +531,7 @@ public class WriteSideTests
     [Fact]
     public void AP256Key_InPkcs8_SignsUnderItsKeyId()
     {
-        using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256);
+        using var ecdsa = ECDsa.Create(ECCurve.NamedCurves.nistP256); // DevSkim: ignore DS440100 — the curve AEF signs with
         using var signer = AefSigningKey.FromPkcs8Pem(ecdsa.ExportPkcs8PrivateKeyPem());
 
         Assert.Equal(PublicKeyInfo.FromDer(ecdsa.ExportSubjectPublicKeyInfo()).KeyId, signer.KeyId);
@@ -528,10 +543,10 @@ public class WriteSideTests
     public void AnEd25519Key_IsNotSupportedForSigning_AndOtherKeysAreRefused()
     {
         // PKCS#8 for Ed25519 (RFC 8410): version 0, id-Ed25519, and the 32-byte seed in an OCTET STRING.
-        var ed25519 = Convert.FromHexString("302e020100300506032b657004220420" + new string('1', 64));
+        var ed25519 = Convert.FromHexString("302e020100300506032b657004220420" + new string('1', 64)); // DevSkim: ignore DS173237 — a DER header, then a seed of 0x11 bytes
         Assert.Throws<NotSupportedException>(() => AefSigningKey.FromPkcs8Pem(PemEncoding.WriteString("PRIVATE KEY", ed25519)));
 
-        using var p384 = ECDsa.Create(ECCurve.NamedCurves.nistP384);
+        using var p384 = ECDsa.Create(ECCurve.NamedCurves.nistP384); // DevSkim: ignore DS440100 — a wrong curve, asserted refused
         Assert.Throws<ArgumentException>(() => AefSigningKey.FromPkcs8Pem(p384.ExportPkcs8PrivateKeyPem()));
         using var rsa = RSA.Create(2048);
         Assert.Throws<NotSupportedException>(() => AefSigningKey.FromPkcs8Pem(rsa.ExportPkcs8PrivateKeyPem()));

@@ -204,13 +204,14 @@
             "maxLength": 256
           },
           "provider": {
-            "description": "Who serves the judge model.",
+            "description": "Who must serve the judge model. Never empty; a judge without one leaves the provider to the runner, and a run names the one that served (STRM-4).",
             "type": "string",
+            "minLength": 1,
             "maxLength": 128
           },
           "rubricDigest": {
             "$ref": "common.schema.json#/$defs/sha256Uri",
-            "description": "The SHA-256 of the rubric the judge must grade with."
+            "description": "The SHA-256 of the rubric the judge must grade with. A judge without one leaves the rubric to the runner, and a run names the one that graded (STRM-4)."
           }
         }
       }

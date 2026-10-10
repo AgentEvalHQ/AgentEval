@@ -81,6 +81,8 @@ KNOWN_MUTATIONS = {
     "summary-binary64": "sum and sumSq are added up in binary64 in file order, not exactly",
     "summary-trials": "trial lines are counted in the summary beside their rollup",
     "summary-value-ignored": "a value the request gives for median, min or max is ignored instead of refused",
+    "summary-exact-mean": "the value is the exact mean rounded once, not the binary64 sum divided by n (SUM-5, R11-2)",
+    "summary-overflow-mean": "a sum beyond binary64 gives the exact mean as the value, not null (SUM-5, R10-3)",
     "produce-ids": "result ids are hashed without the trial, so a trial's lines take its rollup's ids",
     "produce-parent": "a parent is looked up by case and parent path, finding the first line written there (in a case "
                       "run in trials, trial 0's), not the line of the node's own tree",
@@ -231,6 +233,15 @@ def _number(exact):
     return float(exact)
 
 
+def _finite(exact):
+    """SUM-5: an exact value rounded once to binary64, or None when it rounds beyond binary64's finite values."""
+    try:
+        rounded = _number(exact)
+    except OverflowError:  # float(Fraction) beyond the largest finite binary64
+        return None
+    return rounded if math.isfinite(rounded) else None
+
+
 def _entry(want, lane, lane_names, kinds, lines):
     for field in ("metric", "path"):
         if not isinstance(want.get(field), str):
@@ -269,12 +280,20 @@ def _entry(want, lane, lane_names, kinds, lines):
     if defined and "value" in want and "summary-value-ignored" not in MUTATIONS:
         # SUM-5, SUM-8: AEF computes the mean, median, min and max; a given value would contradict what is computed
         raise InputError(f"{lane}/{metric}/{path}: a value is given only for an aggregate method AEF does not define")
+    rounded_sum, rounded_sq = _finite(exact_sum), _finite(exact_sq)  # None beyond binary64: omitted (SUM-5)
+    beyond = n > 0 and rounded_sum is None  # SUM-5: the mean is no binary64 value
     if n == 0:
         value = None  # SUM-5, SUM-8: null when nothing was measured
+    elif aggregate is None and beyond:
+        value = None  # SUM-5: as when n is 0; a lane reads it as not measured
+        if "summary-overflow-mean" in MUTATIONS:
+            value = exact_sum / n
     elif aggregate is None:
         # SUM-5: the sum for a count; otherwise the binary64 sum divided by n, in one binary64 division (2.1 / 5 is
         # 0.42000000000000004, not the exact mean 0.42)
-        value = exact_sum if kind == "count" else Fraction(float(_number(exact_sum)) / n)
+        value = exact_sum if kind == "count" else Fraction(float(rounded_sum) / n)
+        if "summary-exact-mean" in MUTATIONS and kind != "count":
+            value = exact_sum / n
     elif aggregate["method"] in DEFINED_AGGREGATES:  # SUM-8, over the measured values
         ordered = sorted(Fraction(v) for v in values)
         if aggregate["method"] == "min":
@@ -295,10 +314,16 @@ def _entry(want, lane, lane_names, kinds, lines):
     verdict = want.get("verdict")
     if verdict is not None and verdict not in VERDICTS:
         raise InputError(f"{lane}/{metric}/{path}: {verdict!r} is not a summary verdict ([SUM-6])")
-    entry = {"metric": metric, "path": path, "N": N, "n": n, "notMeasured": N - n,
-             "sum": _number(exact_sum), "sumSq": _number(exact_sq), "value": None if value is None else _number(value),
-             # SUM-6: not_measured when n is 0; the producer's verdict under its rule; scored when it applied none
-             "verdict": "not_measured" if n == 0 else verdict if verdict is not None else "scored"}
+    entry = {"metric": metric, "path": path, "N": N, "n": n, "notMeasured": N - n}
+    if rounded_sum is not None:
+        entry["sum"] = rounded_sum
+    if rounded_sq is not None:
+        entry["sumSq"] = rounded_sq  # SUM-5: omitted when it is not finite
+    # SUM-6: not_measured when n is 0, or when a mean's sum is beyond binary64; the producer's verdict under its rule;
+    # scored when it applied none
+    unmeasured = n == 0 or (aggregate is None and beyond and value is None)
+    entry.update(value=None if value is None else _number(value),
+                 verdict="not_measured" if unmeasured else verdict if verdict is not None else "scored")
     if "rule" in want:
         entry["rule"] = want["rule"]
     if aggregate is not None:
@@ -593,6 +618,8 @@ def run_files(run_dir):
         for name in names:
             entry = Path(root) / name
             rel = entry.relative_to(run_dir).as_posix()
+            if any("\ud800" <= c <= "\udfff" for c in rel):  # §3.9: bytes that are not UTF-8, or an unpaired surrogate
+                raise InputError(f"a file name that is not a Unicode string ([RUN-3]): the run cannot be sealed by name")
             if entry.is_symlink() or not entry.is_file():
                 raise InputError(f"{rel} is not a regular file ([RUN-3]): the run cannot be sealed")
             files.append(rel)
@@ -793,7 +820,7 @@ def load_private_key(pem: bytes):
         raise InputError("the private key is not a PEM file (ASCII)") from None
     lines = [line.rstrip("\r") for line in text.split("\n")]
     try:
-        begin = lines.index("-----BEGIN PRIVATE KEY-----")
+        begin = lines.index("-----BEGIN PRIVATE KEY-----")  # DevSkim: ignore DS173238 - the PEM label it looks for, no key
         end = lines.index("-----END PRIVATE KEY-----", begin)
     except ValueError:
         raise InputError("the private key is not a PKCS#8 PEM block (-----BEGIN PRIVATE KEY-----)") from None

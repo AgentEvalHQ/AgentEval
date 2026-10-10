@@ -224,7 +224,7 @@
               "maximum": 1000
             },
             "aggregation": {
-              "description": "How a case's trials are combined (RES-8): the same vocabulary as a rollup line's trials.aggregation.",
+              "description": "How a case's trials are combined (RES-8): the same vocabulary as a rollup line's trials.aggregation. AtLeast: the case passes when at least requirePasses of its trials pass, which it then requires.",
               "enum": [
                 "MajorityVote",
                 "AllPass",
@@ -232,7 +232,8 @@
                 "Mean",
                 "Median",
                 "Max",
-                "PassAtK"
+                "PassAtK",
+                "AtLeast"
               ]
             },
             "k": {
@@ -241,6 +242,23 @@
               "minimum": 1,
               "maximum": 9007199254740991
             }
+          },
+          "if": {
+            "description": "Applies to the AtLeast aggregation (RUN-8, RES-8).",
+            "properties": {
+              "aggregation": {
+                "const": "AtLeast"
+              }
+            },
+            "required": [
+              "aggregation"
+            ]
+          },
+          "then": {
+            "description": "AtLeast is decided by requirePasses: the least number of passing trials (RUN-8).",
+            "required": [
+              "requirePasses"
+            ]
           }
         }
       }
@@ -263,8 +281,9 @@
             "maxLength": 256
           },
           "provider": {
-            "description": "Who serves the judge model (RUN-9).",
+            "description": "Who served the judge model (RUN-9); absent when the producer does not know. Never empty.",
             "type": "string",
+            "minLength": 1,
             "maxLength": 128
           },
           "mode": {

@@ -1,0 +1,11 @@
+{
+  "kind": "run",
+  "run": "run",
+  "outcome": "intact",
+  "problems": [],
+  "rules": [
+    "SUM-5",
+    "SUM-6"
+  ],
+  "why": "two scores of 1.5e308: their exact sum, 3e308, is beyond binary64, so the mean is no binary64 value. The summary omits sum and sumSq, and its value is null and its verdict not_measured, as when nothing was measured: the run is intact, and a verifier recomputing it does not fail on the overflow."
+}

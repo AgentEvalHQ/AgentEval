@@ -16,7 +16,7 @@
     {
       "name": "run.json",
       "digest": {
-        "sha256": "583b90b33285bfaf6f75ebdf2bf94b472c311e4b88a8109d7fb6d44ee0cb1fce"
+        "sha256": "1cf056cd82c5e4e5216d2a6a3c7660a4611c9fff1152ee18a8fad90469405f89"
       }
     },
     {
@@ -30,7 +30,7 @@
   "predicate": {
     "schemaVersion": "1.0",
     "runId": "R-1",
-    "runHash": "66da7572ef987c407cb27709308807d3cf495ec32b4aaeeb7b1b50793a97ddfe",
+    "runHash": "559c13f17551a17616a78d0fed38a82d56fe4cc83743d20b030cc09a3580d3c5",
     "producer": {
       "name": "agenteval-cli",
       "version": "1.0.0"

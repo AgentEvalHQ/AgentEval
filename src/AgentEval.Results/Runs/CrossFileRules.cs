@@ -727,8 +727,10 @@ public static class CrossFileRules
         private static bool Inverted(JsonNode? interval) =>
             AefNode.Number(AefNode.Get(interval, "low")) is { } low && AefNode.Number(AefNode.Get(interval, "high")) is { } high && low > high;
 
-        // §3.6: N, n and notMeasured equal; sum and sumSq (when written) and value within 1e-9 × max(1, |recomputed|); value
-        // compared only where AEF defines it ([SUM-8]), and always null when n is 0.
+        // §3.6: N, n and notMeasured equal; sum (when written) and value the recomputed binary64 values exactly ([SUM-5],
+        // [SUM-8]: each is defined to one value, so a lane decides on what every producer writes alike); sumSq (when
+        // written) within 1e-9 × max(1, |recomputed|); value compared only where AEF defines it ([SUM-8]), and always
+        // null when n is 0.
         private static bool EntryMatches(JsonObject entry, AefSummaryFigures figures)
         {
             if (AefNode.Number(entry["N"]) != figures.N || AefNode.Number(entry["n"]) != figures.Measured
@@ -737,13 +739,20 @@ public static class CrossFileRules
                 return false;
             }
 
-            if (entry.ContainsKey("sum") && !(AefNode.Number(entry["sum"]) is { } sum && AefSummaryCalculator.Matches(sum, figures.Sum)))
+            if (entry.ContainsKey("sum") && !(AefNode.Number(entry["sum"]) is { } sum && AefSummaryCalculator.Same(sum, figures.Sum)))
+            {
+                return false;   // a sum beyond binary64 matches none: the entry omits it ([SUM-5])
+            }
+
+            // [SUM-5], [SUM-6]: a sum beyond binary64 has no mean, so an entry without aggregate reads as not measured: its
+            // value is null (below) and its verdict not_measured.
+            if (!double.IsFinite(figures.Sum) && !entry.ContainsKey("aggregate") && AefNode.String(entry["verdict"]) != "not_measured")
             {
                 return false;
             }
 
-            // [SUM-5]: sumSq, when written, is the sum of the squares in binary64 (summed in any order), compared within
-            // §3.6 like sum ("so do sumSq and its recomputed value").
+            // [SUM-5]: sumSq, when written, is the sum of the squares in binary64 (summed in any order), so it is the one
+            // figure compared within §3.6's tolerance.
             if (entry.ContainsKey("sumSq") && !(AefNode.Number(entry["sumSq"]) is { } sumSq && AefSummaryCalculator.Matches(sumSq, figures.SumOfSquares)))
             {
                 return false;
@@ -757,7 +766,7 @@ public static class CrossFileRules
 
             var written = AefNode.Number(entry["value"]);
             return figures.Value is { } value
-                ? written is { } w && AefSummaryCalculator.Matches(w, value)
+                ? written is { } w && AefSummaryCalculator.Same(w, value)
                 : written is null;
         }
     }

@@ -7,7 +7,7 @@
     "CKP-7",
     "VER-6"
   ],
-  "why": "a 1.0 manifest with an outcome nobody defined is checked as usual (R6-2): it is not the decision's outcome",
+  "why": "a 1.0 manifest with an outcome nobody defined is checked as usual: it is not the decision's outcome",
   "problems": [
     "outcome"
   ]

@@ -25,5 +25,5 @@
     "LANE-3",
     "RES-8"
   ],
-  "why": "R4-8a: LANE-3 reads trial lines in step 1 only (a failing trial fails the lane). In step 2 a case is its rollup: c1's inconclusive trial does not make the lane not_measured, since c1's rollup passed; and minimumN counts the two decided lines (c1's rollup, c2), not the passed trial: 3 is not met."
+  "why": "LANE-3 reads trial lines in step 1 only (a failing trial fails the lane). In step 2 a case is its rollup: c1's inconclusive trial does not make the lane not_measured, since c1's rollup passed; and minimumN counts the two decided lines (c1's rollup, c2), not the passed trial: 3 is not met."
 }

@@ -1,0 +1,30 @@
+{
+  "kind": "summarize",
+  "rules": [
+    "SUM-5"
+  ],
+  "run": "run",
+  "request": "request.json",
+  "summary": {
+    "schemaVersion": "1.0",
+    "runId": "summarize-sum-of-squares-beyond-binary64",
+    "lanes": [
+      {
+        "lane": "quality",
+        "metrics": [
+          {
+            "metric": "delta",
+            "path": "q",
+            "N": 1,
+            "n": 1,
+            "notMeasured": 0,
+            "sum": 1e+200,
+            "value": 1e+200,
+            "verdict": "scored"
+          }
+        ]
+      }
+    ]
+  },
+  "why": "one score of 1e200: its square, 1e400, is beyond binary64, so the summary omits sumSq (SUM-5); sum and value are 1e200 as written."
+}

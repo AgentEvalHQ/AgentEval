@@ -1,0 +1,11 @@
+{
+  "kind": "plan",
+  "schema": "run-plan",
+  "writer": "invalid",
+  "reader": "invalid",
+  "rules": [
+    "PLAN-1",
+    "RUN-9"
+  ],
+  "why": "a judge's provider names who serves it: an empty one names nobody, so a plan leaves it out instead"
+}

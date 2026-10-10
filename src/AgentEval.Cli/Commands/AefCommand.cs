@@ -619,33 +619,41 @@ internal static class AefCommand
             return ExitCodes.UsageError;
         }
 
-        EcdsaP256Signer? signer = null;
+        // [CONF-3]: exit 2 only for an input error the verb recognises; a failure it did not expect is not one, and
+        // System.CommandLine reports it with exit 1.
+        EcdsaP256Signer? signer;
         try
         {
             signer = keyPath is null ? null : AefSigningKey.Load(keyPath);
-            var conversion = AefInspectImporter.Import(logFile, outputDirectory, new AefInspectImportOptions
-            {
-                TargetMode = mode.Value,
-                ContentCapture = capture.Value,
-                Seal = !noSeal,
-                Signer = signer,
-                TimeProvider = clock,
-            });
-            return Converted(conversion, asJson, stdout);
         }
-        catch (Exception e) when (IsInputError(e) || e is AefInspectImportException or NotSupportedException)
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {
+            // The key file is missing or unreadable, or holds no key AgentEval signs with.
             stderr.WriteLine($"✖ {e.Message}");
             return ExitCodes.UsageError;
         }
-        catch (InvalidOperationException e)
+
+        using (signer)
         {
-            stderr.WriteLine($"✖ The imported run does not close or verify: {e.Message}");
-            return ExitCodes.TestFailure;
-        }
-        finally
-        {
-            signer?.Dispose();
+            try
+            {
+                var conversion = AefInspectImporter.Import(logFile, outputDirectory, new AefInspectImportOptions
+                {
+                    TargetMode = mode.Value,
+                    ContentCapture = capture.Value,
+                    Seal = !noSeal,
+                    Signer = signer,
+                    TimeProvider = clock,
+                });
+                return Converted(conversion, asJson, stdout);
+            }
+            catch (Exception e) when (e is AefInspectImportException or IOException or UnauthorizedAccessException || e is ArgumentException { ParamName: "directory" })
+            {
+                // A refusal of the page's rules (naming the rule), a log that cannot be read, or an output folder in use:
+                // nothing is written.
+                stderr.WriteLine($"✖ {e.Message}");
+                return ExitCodes.UsageError;
+            }
         }
     }
 
@@ -782,16 +790,19 @@ internal static class AefCommand
 
     internal static int RunExportInspect(string runDirectory, string outputFile, bool ignoreOverlays, string? policyPath, bool asJson, TextWriter stdout, TextWriter stderr)
     {
+        // [CONF-3]: exit 2 only for an input error the verb recognises; a failure it did not expect is not one, and
+        // System.CommandLine reports it with exit 1.
         AefInspectExport export;
         try
         {
             RequireFolder(runDirectory);
-            export = AefInspectExporter.ExportToFile(runDirectory, outputFile, new AefInspectExportOptions { Policy = LoadPolicy(policyPath), IgnoreOverlays = ignoreOverlays });
+            var policy = LoadPolicy(policyPath);
+            export = AefInspectExporter.ExportToFile(runDirectory, outputFile, new AefInspectExportOptions { Policy = policy, IgnoreOverlays = ignoreOverlays });
         }
-        catch (Exception e) when (IsInputError(e) || e is AefInspectExportException)
+        catch (Exception e) when (e is AefInspectExportException or IOException or UnauthorizedAccessException or TrustPolicyException)
         {
-            // A missing or unreadable run, an output file that exists, an invalid run, or a refusal of the page's rules
-            // (AefInspectExportException names the rule): nothing is written.
+            // A missing or unreadable run, an output file that exists, a trust policy SIG-3 refuses, an invalid run, or a
+            // refusal of the page's rules (AefInspectExportException names the rule): nothing is written.
             stderr.WriteLine($"✖ {e.Message}");
             return ExitCodes.UsageError;
         }

@@ -154,6 +154,13 @@ public enum AefTrialAggregation
 
     /// <summary><c>PassAtK</c> (with <c>k</c>).</summary>
     [AefName("PassAtK")] PassAtK,
+
+    /// <summary>
+    /// <c>AtLeast</c>: the case passes when at least the run's <c>suite.executionPolicy.requirePasses</c> of its trials
+    /// pass, which an <c>AtLeast</c> policy requires; a share threshold is written as the least count that meets it
+    /// ([RES-8], [RUN-8]).
+    /// </summary>
+    [AefName("AtLeast")] AtLeast,
 }
 
 /// <summary>A result line's state ([RES-1]); closed for major 1 ([VER-9]).</summary>
@@ -248,6 +255,12 @@ public enum AefRulePath
 
     /// <summary><c>under-covered</c>.</summary>
     [AefName("under-covered")] UnderCovered,
+
+    /// <summary><c>required-not-measured</c>: a required child did not run, so the composite's pass is withheld.</summary>
+    [AefName("required-not-measured")] RequiredNotMeasured,
+
+    /// <summary><c>failure-effect</c>: a child's measured failure decided the state, by the effect its component declares.</summary>
+    [AefName("failure-effect")] FailureEffect,
 }
 
 /// <summary>Who graded a node ([RES-10]).</summary>

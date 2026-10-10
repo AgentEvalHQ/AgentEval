@@ -11,5 +11,5 @@
     "STRM-3",
     "ENC-17"
   ],
-  "why": "W4-1: the stream complete-sealed with line 2 inserted: event 2 again (seq 2), with an ext nested 65 levels deep. A line beyond ENC-17's depth is event-invalid, and the line after it is not checked for seq. Read as an event, it would make line 3's seq 2 a seq problem."
+  "why": "the stream complete-sealed with line 2 inserted: event 2 again (seq 2), with an ext nested 65 levels deep. A line beyond ENC-17's depth is event-invalid, and the line after it is not checked for seq. Read as an event, it would make line 3's seq 2 a seq problem."
 }

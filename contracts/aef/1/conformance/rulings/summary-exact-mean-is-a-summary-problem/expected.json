@@ -1,0 +1,15 @@
+{
+  "kind": "run",
+  "run": "run",
+  "outcome": "invalid",
+  "problems": [
+    [
+      "summary.json",
+      "summary"
+    ]
+  ],
+  "rules": [
+    "SUM-5"
+  ],
+  "why": "the lines score 0.3, 0.4, 0.5, 0.4 and 0.5. SUM-5's value is their binary64 sum, 2.1, divided by 5: 0.42000000000000004. This summary writes the exact mean, 0.42, another binary64 value: SUM-5 defines value to one binary64 value, so it is compared exactly, and this is a summary problem, though it lies within 1e-9 of the right one."
+}

@@ -37,7 +37,7 @@ internal static class WriteSideOps
         {
             return DriverIO.Print(stdout, AefSummaryWriter.Build(runId, results, metrics, summary));
         }
-        catch (Exception e) when (e is ArgumentException or InvalidOperationException)
+        catch (Exception e) when (DriverIO.IsInputError(e))
         {
             throw new UsageException(e.Message);
         }
@@ -63,12 +63,17 @@ internal static class WriteSideOps
             throw new UsageException($"--sealed-by is producer or ingest, not '{by}' ([SEAL-5]); {usage}");
         }
 
+        if (!Directory.Exists(paths[0]))
+        {
+            throw new UsageException($"{paths[0]}: not a folder");
+        }
+
         try
         {
             var sealedRun = AefSealer.Seal(paths[0], new AefSealOptions { SealedBy = sealedBy.Value, SealedAt = at });
             return DriverIO.Print(stdout, new JsonObject { ["runHash"] = sealedRun.RunHash });
         }
-        catch (Exception e) when (e is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException)
+        catch (Exception e) when (DriverIO.IsInputError(e))
         {
             throw new UsageException(e.Message);
         }

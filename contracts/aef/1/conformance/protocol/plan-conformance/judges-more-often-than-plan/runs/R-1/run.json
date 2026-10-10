@@ -24,20 +24,23 @@
     {
       "model": "gpt-5.1",
       "provider": "azure.ai.openai",
-      "mode": "single",
-      "rubricDigest": "sha256:a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9"
+      "mode": "panel",
+      "rubricDigest": "sha256:a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9",
+      "panelSize": 3
     },
     {
       "model": "gpt-5.1",
       "provider": "azure.ai.openai",
-      "mode": "single",
-      "rubricDigest": "sha256:a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9"
+      "mode": "panel",
+      "rubricDigest": "sha256:a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9",
+      "panelSize": 3
     },
     {
       "model": "gpt-5.1",
       "provider": "azure.ai.openai",
-      "mode": "single",
-      "rubricDigest": "sha256:a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9"
+      "mode": "panel",
+      "rubricDigest": "sha256:a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9",
+      "panelSize": 3
     }
   ],
   "startedAt": "2026-10-08T12:00:10Z",

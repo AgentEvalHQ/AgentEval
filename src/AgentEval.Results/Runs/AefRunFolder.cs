@@ -36,6 +36,7 @@ public sealed partial class AefRunFolder
         OverFileLimit = listing.Problems.Any(p => p is { Path: ".", Code: "limit" });
         OverlaysOverLimit = listing.OverlaysOverLimit;
         OverlayIrregular = listing.OverlayIrregular ?? [];
+        IllFormed = listing.IllFormed ?? [];
         _present = new HashSet<string>(Files, StringComparer.Ordinal);
         SealedFiles = [.. Files.Where(IsSealed)];
     }
@@ -59,6 +60,13 @@ public sealed partial class AefRunFolder
     /// <c>unexpected-file</c>, whatever its name ([OVL-5]).
     /// </summary>
     public IReadOnlyList<string> OverlayIrregular { get; }
+
+    /// <summary>
+    /// The entries outside <c>overlays/</c> whose name is not a Unicode string (§3.9), under their spelling with U+FFFD,
+    /// once per entry: never read, and never in <see cref="Files"/>. Each is a <c>path</c> problem, and, in a sealed run,
+    /// <c>not-sealed</c> (no seal can name it).
+    /// </summary>
+    public IReadOnlyList<string> IllFormed { get; }
 
     /// <summary>
     /// The folder holds more than 100,000 files ([ENC-17]): <see cref="Files"/> is only part of it, and nothing more is

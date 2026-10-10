@@ -1,0 +1,21 @@
+{
+  "kind": "lane",
+  "checkpoint": "checkpoint.json",
+  "runs": "runs",
+  "lanes": [
+    {
+      "lane": "above-0.42",
+      "result": {
+        "status": "passed",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-01T12:00:00Z"
+      }
+    }
+  ],
+  "problems": [],
+  "rules": [
+    "SUM-5",
+    "LANE-2"
+  ],
+  "why": "the run's lines score 0.3, 0.4, 0.5, 0.4 and 0.5, and its summary's value is SUM-5's: their binary64 sum, 2.1, divided by 5, 0.42000000000000004. That is above the rule's 0.42, so the lane passes. The exact mean, 0.42, is not above it, and a summary that writes it is a summary problem (summary-exact-mean-is-a-summary-problem): every conforming producer's run decides this lane alike."
+}

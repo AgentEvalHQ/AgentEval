@@ -154,7 +154,8 @@ public static class AefRunVerifier
             anchored = anchors.Contains(runHash.Value, StringComparer.Ordinal);
         }
 
-        return new AefRunVerification(outcome, AefProblemOrder.Sort(problems), signedBy, anchored, seal.Withheld, documents.RunId, runHash);
+        // §3.9: two entries whose names are not Unicode strings and share a spelling are each reported.
+        return new AefRunVerification(outcome, AefFolder.PerEntry(AefProblemOrder.Sort(problems), folder.IllFormed), signedBy, anchored, seal.Withheld, documents.RunId, runHash);
     }
 
     /// <summary>

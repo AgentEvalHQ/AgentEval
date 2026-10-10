@@ -53,10 +53,10 @@ compares it depends on the version the checkpoint declares.
 `{kind: "threshold", lane, metric, path, op, value, suite?, minimumN?}`: a summary entry against a value.
 
 - **[LANE-2]** For each run, take the `summary.json` entry with this `lane`, `metric` and `path`. The run's status is
-  `not_measured` when there is no such entry, its `n` is 0, its `n` is below the rule's `minimumN` (counted in that
-  run's entry), or it has an `aggregate` whose `method` [SUM-8] does not define (its value is the producer's,
-  unchecked); otherwise `passed` when the entry's `value`, compared
-  with the rule's `value` by the rule's `op` (`>=`, `>`, `<=` or `<`, as binary64), holds, else `failed`.
+  `not_measured` when there is no such entry, its `n` is 0, its `value` is `null` (a sum beyond binary64, [SUM-5]),
+  its `n` is below the rule's `minimumN` (counted in that run's entry), or it has an `aggregate` whose `method`
+  [SUM-8] does not define (its value is the producer's, unchecked); otherwise `passed` when the entry's `value`,
+  compared with the rule's `value` by the rule's `op` (`>=`, `>`, `<=` or `<`, as binary64), holds, else `failed`.
 - The lane's status: `failed` if any run failed; otherwise `not_measured` if any run was not measured; otherwise
   `passed`.
 - A family that publishes no pass threshold takes `comparison` or `evidence-present`, never `threshold`.
@@ -253,7 +253,8 @@ policy. It reports problems as a path and a code, ordered by path and code.
   ([VER-6]) can make a lane `unverifiable`; one that declares this version, or an earlier one, and holds such a value
   is read as §7.3 says and compared as usual, so a 1.0 checkpoint cannot escape `lane-result` with a member nobody
   defined. Exactly these make a lane `unverifiable`, each in a document that declares a later minor (the checkpoint
-  for its rule; the `run.json`, result line or `metrics.json` that holds a run-side value): its rule is not valid
+  for its rule; for a value a run holds, the run's `run.json`, whatever the result line or `metrics.json` holding it
+  declares: a writer writes one minor throughout a run, [VER-6]): its rule is not valid
   against this version's writer schema (a
   kind, a member or a value a later minor added, such as a severity maximum, a threshold operator or a comparison
   axis), or when a run it reads (a found run of the lane or its baseline) holds an unknown `execution.targetMode`,

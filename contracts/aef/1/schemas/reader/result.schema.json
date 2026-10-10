@@ -81,7 +81,7 @@
           "maximum": 1000
         },
         "aggregation": {
-          "description": "How the trials were combined into the case's state: MajorityVote, AllPass, AnyPass, Mean, Median, Max or PassAtK (with k). Descriptive: a reader shows it, never recomputes it (RES-8).",
+          "description": "How the trials were combined into the case's state: MajorityVote, AllPass, AnyPass, Mean, Median, Max, PassAtK (with k) or AtLeast (at least the run's executionPolicy.requirePasses of them passed). Descriptive: a reader shows it, never recomputes it (RES-8).",
           "type": "string"
         },
         "agree": {

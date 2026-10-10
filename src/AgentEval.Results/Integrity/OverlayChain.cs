@@ -220,7 +220,7 @@ public sealed partial class OverlayChain
         // [OVL-5]: the events file is judged line by line, inside the batches and after them: a blank line, a CR or a
         // leading byte-order mark is a problem of its line alone, and never changes which batches verify (R4N-9).
         var lines = CheckEvents(events, verifiedEnd, runId, runHash, resultIds, batches, problems);
-        return new OverlayChain(AefProblemOrder.Sort(problems), batches, verifiedEnd, lines);
+        return new OverlayChain(AefFolder.PerEntry(AefProblemOrder.Sort(problems), folder.OverlayIrregular), batches, verifiedEnd, lines);
     }
 
     /// <summary>The path of the overlays folder, where too many files under it are reported, once ([ENC-18], [OVL-5]).</summary>

@@ -5,6 +5,7 @@
 using System.Text;
 using System.Text.Json.Nodes;
 using AgentEval.Results.Json;
+using AgentEval.Results.Writing;
 
 namespace AgentEval.Results.Conformance.Ops;
 
@@ -15,6 +16,17 @@ namespace AgentEval.Results.Conformance.Ops;
 /// </summary>
 internal static class DriverIO
 {
+    /// <summary>
+    /// Whether an exception AgentEval.Results threw is its refusal of the input ([CONF-3]: exit 2), as its public
+    /// contract documents refusals: an <see cref="ArgumentException"/> (an argument it refuses: a line, a header, a
+    /// request, a time) or an <see cref="InvalidOperationException"/> (a state it refuses: an open run, a run already
+    /// sealed, a rule the whole run breaks). Not an <see cref="ArgumentNullException"/> (a call the driver got wrong),
+    /// and not an <see cref="AefWriteException"/>, which reports that the writer's own verifier found what it wrote wrong:
+    /// those, and every other exception, are failures nobody expected, and the driver exits 1 (<see cref="Program.Main"/>).
+    /// </summary>
+    public static bool IsInputError(Exception e) =>
+        e is (ArgumentException and not ArgumentNullException) or (InvalidOperationException and not AefWriteException and not ObjectDisposedException);
+
     /// <summary>Exactly <paramref name="min"/> to <paramref name="max"/> arguments, else the usage.</summary>
     public static void Arguments(string[] args, int min, int max, string usage)
     {

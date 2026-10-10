@@ -1078,6 +1078,8 @@ def _usage_entry(role, model, usage, where, item):
         if value is None:
             continue
         entry[aef] = _whole(value, inspect, where, item, low=0)
+    if usage.get("total_tokens") is not None:  # read and checked like every token count; AEF has no total to write
+        _whole(usage["total_tokens"], "total_tokens", where, item, low=0)
     cost = usage.get("total_cost")
     if cost is not None:
         if isinstance(cost, bool) or not isinstance(cost, (int, float)) or not cost >= 0:
@@ -1239,6 +1241,79 @@ def _sample_content(sample, capture, blobs, where):
     return list(dict.fromkeys(ids))
 
 
+def _json_type(value):
+    return "null" if value is None else "a boolean" if isinstance(value, bool) else \
+        "a number" if isinstance(value, (int, float)) else "a string" if isinstance(value, str) else \
+        "a list" if isinstance(value, list) else "an object"
+
+
+def _need(value, kind, where, item):
+    """IN-6 to IN-10, settled 10-10: a member the converter reads has the JSON type Inspect writes for it (kind:
+    object, list or string); null counts as absent; any other type refuses the log, naming the member's rule."""
+    if value is None:
+        return
+    if not {"object": isinstance(value, dict), "list": isinstance(value, list), "string": isinstance(value, str)}[kind]:
+        article = "an" if kind == "object" else "a"
+        _in(where, f"{_json_type(value)} where Inspect writes {article} {kind}", item)
+
+
+def _check_types(log):
+    """The types of every member the import reads (the table under "Member types" in inspect.md). Members kept as
+    data (eval.run_id, eval.eval_set_id, eval.dataset, results.headline, Score.answer, Score.metadata) may hold any
+    JSON value; members the converter does not read are not checked. Values (integers, times, costs) are checked
+    where they are read."""
+    _need(log.get("status"), "string", "status", "IN-6")
+    spec = log["eval"]
+    for key in ("eval_id", "run_id", "created", "task", "model"):
+        if key != "run_id":
+            _need(spec.get(key), "string", f"eval.{key}", "IN-6")
+    for key in ("config", "packages", "model_roles"):
+        _need(spec.get(key), "object", f"eval.{key}", "IN-6")
+    for role, config in (spec.get("model_roles") or {}).items():
+        _need(config, "object", f"eval.model_roles[{role!r}]", "IN-6")
+        _need((config or {}).get("model"), "string", f"eval.model_roles[{role!r}].model", "IN-6")
+    _need((spec.get("packages") or {}).get("inspect_ai"), "string", "eval.packages.inspect_ai", "IN-6")
+    reducers = (spec.get("config") or {}).get("epochs_reducer")
+    _need(reducers, "list", "eval.config.epochs_reducer", "IN-6")
+    for i, reducer in enumerate(reducers or []):
+        _need(reducer, "string", f"eval.config.epochs_reducer[{i}]", "IN-6")
+    _need(spec.get("scorers"), "list", "eval.scorers", "IN-8")
+    for i, scorer in enumerate(spec.get("scorers") or []):
+        _need(scorer, "object", f"eval.scorers[{i}]", "IN-8")
+        _need((scorer or {}).get("name"), "string", f"eval.scorers[{i}].name", "IN-8")
+    _need(log.get("error"), "object", "error", "IN-6")
+    stats = log.get("stats")
+    _need(stats, "object", "stats", "IN-6")
+    for key in ("model_usage", "role_usage"):
+        _need((stats or {}).get(key), "object", f"stats.{key}", "IN-9")
+    results = log.get("results")
+    _need(results, "object", "results", "IN-9")
+    _need((results or {}).get("scores"), "list", "results.scores", "IN-9")
+    for i, entry in enumerate((results or {}).get("scores") or []):
+        where = f"results.scores[{i}]"
+        _need(entry, "object", where, "IN-9")
+        _need(entry.get("name"), "string", f"{where}.name", "IN-9")
+        _need(entry.get("scorer"), "string", f"{where}.scorer", "IN-9")
+        _need(entry.get("metrics"), "object", f"{where}.metrics", "IN-9")
+        for name, metric in (entry.get("metrics") or {}).items():
+            _need(metric, "object", f"{where}.metrics[{name!r}]", "IN-9")  # the value and params: where read
+    _need(log.get("samples"), "list", "samples", "IN-8")
+    for n, sample in enumerate(log.get("samples") or []):
+        where = f"samples[{n}]"
+        _need(sample, "object", where, "IN-8")
+        for key in ("scores", "role_usage", "model_usage"):
+            _need(sample.get(key), "object", f"{where}.{key}", "IN-8")
+    _need(log.get("reductions"), "list", "reductions", "IN-8")
+    for i, reduction in enumerate(log.get("reductions") or []):
+        where = f"reductions[{i}]"
+        _need(reduction, "object", where, "IN-8")
+        for key in ("scorer", "reducer"):
+            _need(reduction.get(key), "string", f"{where}.{key}", "IN-8")
+        _need(reduction.get("samples"), "list", f"{where}.samples", "IN-8")
+        for j, reduced in enumerate(reduction.get("samples") or []):
+            _need(reduced, "object", f"{where}.samples[{j}]", "IN-8")
+
+
 def from_inspect(log_path, out, target_mode, capture, at):
     """Writes the run folder OUT from an Inspect eval log (inspect.md, Inspect -> AEF, and IN-6 to IN-10)."""
     out = Path(out)
@@ -1247,6 +1322,7 @@ def from_inspect(log_path, out, target_mode, capture, at):
     if capture not in ("on", "off"):
         raise InputError("--content-capture is on or off ([RUN-11])")
     log = _read_inspect_log(log_path)
+    _check_types(log)  # IN-6 to IN-10, settled 10-10: every member read has Inspect's type
     spec, stats, results = log["eval"], log.get("stats") or {}, log.get("results") or {}
     if log.get("log_updates"):
         _in("log_updates", "post-run edits: the reference converter writes no overlays", "IN-10")
@@ -1287,7 +1363,7 @@ def from_inspect(log_path, out, target_mode, capture, at):
     if len(reducers) > 1:
         _in("eval.config.epochs_reducer", f"{len(reducers)} reducers: a trial aggregation is one", "IN-8")
     mapped = _from_reducer(reducers[0], epochs, "eval.config.epochs_reducer") if reducers else None
-    if "epochs" in config:
+    if config.get("epochs") is not None:  # null counts as absent
         policy = {"trialsPerCase": epochs}
         if mapped:
             policy["aggregation"] = mapped[0]
@@ -1470,6 +1546,7 @@ def from_inspect(log_path, out, target_mode, capture, at):
             if not _METHOD.fullmatch(chosen):
                 _in(where, f"the metric {chosen!r} cannot be an aggregate method", "IN-9")
             aggregate = {"method": chosen}
+            _need((measures[chosen] or {}).get("params"), "object", f"{where}.metrics[{chosen!r}].params", "IN-9")
             k = ((measures[chosen] or {}).get("params") or {}).get("k")
             if k is not None:  # an integer by value, like every integer field
                 aggregate["k"] = _whole(k, "params.k", where, "IN-9", low=1)
@@ -1482,6 +1559,10 @@ def from_inspect(log_path, out, target_mode, capture, at):
             _in(where, "no mean and more than one other metric", "IN-9")
         else:
             chosen = None  # no metric: a plain mean entry, with nothing of Inspect's to compare
+        for read in ([chosen] if chosen else []) + (["stderr"] if "stderr" in measures else []):
+            value = (measures[read] or {}).get("value")  # read: compared with the lines, or written as stderr
+            if value is not None and (isinstance(value, bool) or not isinstance(value, (int, float))):
+                _in(f"{where}.metrics[{read!r}].value", f"{_json_type(value)} where Inspect writes a number", "IN-9")
         inspect_values[name] = ((measures[chosen] or {}).get("value") if chosen else None,
                                 (measures.get("stderr") or {}).get("value"), chosen is not None)
         request.append(entry)

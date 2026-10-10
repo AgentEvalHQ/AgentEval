@@ -9,7 +9,7 @@ code is written to be read and checked, not to be fast.
 
 It follows:
 - DSSE v1 (github.com/secure-systems-lab/dsse, protocol.md and envelope.md): PAE and the JSON envelope;
-- ECDSA (FIPS 186-4, SEC 1) over NIST P-256 (secp256r1) with SHA-256, curve parameters from RFC 5903 section 3.1;
+- ECDSA (FIPS 186-4, SEC 1) over NIST P-256 with SHA-256, curve parameters from RFC 5903 section 3.1;
 - RFC 6979 section 3.2 for the nonce (HMAC-SHA256). A signature keeps the s the nonce gives, above n/2 about half
   the time: ECDSA accepts both s and n - s, and so does verification here (see ecdsa_verify_digest);
 - X.690 DER for the ECDSA signature, SEQUENCE { INTEGER r, INTEGER s }, as DSSE, in-toto and Sigstore use it,
@@ -767,7 +767,7 @@ def self_test():
                                                               "uncompressed"),
         "a compressed point": (spki(ID_EC_PUBLIC_KEY + PRIME256V1, bytes([2 + rfc6979.public_key.y % 2]) + x_bytes),
                                "uncompressed"),
-        "another curve (secp384r1)": (spki(ID_EC_PUBLIC_KEY + _oid("1.3.132.0.34"), p256_der[-65:]),
+        "another curve (secp384r1)": (spki(ID_EC_PUBLIC_KEY + _oid("1.3.132.0.34"), p256_der[-65:]),  # DevSkim: ignore DS440100 - a wrong curve the verifier must refuse
                                       "other than P-256"),
         "a trailing byte": (p256_der + b"\x00", "one DER SEQUENCE"),
         "Ed25519 with NULL parameters": (spki(ID_ED25519 + b"\x05\x00", ed.public_key.key), "nor an Ed25519 key"),

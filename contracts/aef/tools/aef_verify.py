@@ -141,6 +141,14 @@ KNOWN_MUTATIONS = {
     "judges-guard": "a plan that names no judges leaves a run's judges unchecked (R9-3)",
     "judges-provider": "STRM-4 compares judges by model and rubricDigest, not by provider (R9-4)",
     "judges-once": "a run may name a judge once at most, even one the plan names twice (R9-4)",
+    "summary-tolerance": "a summary's sum and value are compared within 1e-9, not exactly, so an exact mean passes "
+                         "for SUM-5's division (R11-2)",
+    "summary-overflow-mean": "a sum beyond binary64 is read as giving the exact mean as the value, not null (R10-3)",
+    "judges-provider-strict": "a plan judge without a provider matches only a run judge without one (R10-6)",
+    "judges-rubric-strict": "a plan judge without a rubricDigest matches only a run judge without one (R10-6)",
+    "names-raw": "a file name that is not a Unicode string is reported as read, not with U+FFFD (F1)",
+    "minor-per-document": "a value a lane reads counts as a later minor's by its own line or file, not its run's "
+                          "run.json (CKP-8, VER-6, F4)",
 }
 _ORIGINAL_COMPILE = aef_schema.compile_pattern
 
@@ -417,6 +425,17 @@ def utf8_key(text: str) -> bytes:
     return text.encode("utf-8", "surrogatepass")
 
 
+def reported(name: str) -> str:
+    """§3.9: a file's name as a report and a manifest give it. A name that is not a Unicode string, which Python reads
+    with surrogates (bytes that are not UTF-8 as surrogate escapes; an unpaired surrogate where names are UTF-16), has
+    each ill-formed part replaced by U+FFFD, as a decoder replaces it."""
+    if "names-raw" in MUTATIONS or not any("\ud800" <= c <= "\udfff" for c in name):
+        return name
+    if os.name == "nt":
+        return name.encode("utf-16-le", "surrogatepass").decode("utf-16-le", "replace")
+    return os.fsencode(name).decode("utf-8", "replace")
+
+
 _LINE_PATH = re.compile(r"(results\.ndjson|evidence\.ndjson|gates\.ndjson|traces\.otlp\.jsonl|logs\.otlp\.jsonl"
                         r"|overlays/events\.ndjson):([0-9]+)")  # §3.9: the run's own NDJSON files, nothing else
 
@@ -435,8 +454,10 @@ def path_key(path: str):
 
 
 def sort_problems(problems):
-    """[path, code] pairs, ordered by path (path_key) and then by code; each pair once."""
-    return [list(p) for p in sorted(set(problems), key=lambda p: (path_key(p[0]), utf8_key(p[1])))]
+    """[path, code] pairs, ordered by path (path_key) and then by code; each pair once. A path is reported as §3.9
+    says, and ordered so."""
+    problems = {(reported(path), code) for path, code in problems}
+    return [list(p) for p in sorted(problems, key=lambda p: (path_key(p[0]), utf8_key(p[1])))]
 
 
 def result_id(run_id: str, case_id: str, path: str, trial) -> str:
@@ -468,6 +489,15 @@ def close_enough(written, recomputed) -> bool:
     """§3.6: equal when they differ by at most 1e-9 x max(1, |recomputed|)."""
     w = as_number(written)
     return w is not None and abs(w - recomputed) <= 1e-9 * max(1.0, abs(recomputed))
+
+
+def defined_equal(written, recomputed) -> bool:
+    """§3.6: a summary number SUM-5 or SUM-8 defines to one binary64 value (sum, value, a median, min or max) equals
+    the recomputed one exactly, both read as binary64 (CONF-2)."""
+    if "summary-tolerance" in MUTATIONS:
+        return close_enough(written, recomputed)
+    w = as_number(written)
+    return w is not None and float(w) == float(recomputed)
 
 
 # ---------------------------------------------------------------------------- §7.3: reading unknown values
@@ -781,7 +811,7 @@ class Folder:
         files = self.sealed_files()
         if "manifest-order" in MUTATIONS:
             files = sorted(files, key=lambda p: [utf8_key(s) for s in p.split("/")])
-        return "".join(f"{self.digest(p)}  {self.size(p)}  {p}\n" for p in files)
+        return "".join(f"{self.digest(p)}  {self.size(p)}  {reported(p)}\n" for p in files)  # §3.9: a name as reported
 
     def run_hash(self):
         """SEAL-4: the SHA-256 of the manifest's bytes."""
@@ -1603,10 +1633,28 @@ def _line_value(line, metric_id, kind):
     return values[0] if values else None
 
 
+def rounded_sum(values):
+    """SUM-5: the exact sum of binary64 values, rounded once; None when it is beyond binary64 (never an exception:
+    math.fsum raises on an intermediate overflow even when the exact sum is finite, so the exact sum decides then)."""
+    try:
+        total = math.fsum(values)
+    except OverflowError:
+        total = None
+    if total is None or not math.isfinite(total):
+        try:
+            total = float(sum((Fraction(v) for v in values), Fraction(0)))
+        except OverflowError:
+            return None
+    return total if math.isfinite(total) else None
+
+
 def _median(values):
+    """SUM-8: the middle value; of an even count, the mean of the two middle values computed exactly and rounded once."""
     ordered = sorted(values)
     middle = len(ordered) // 2
-    return ordered[middle] if len(ordered) % 2 else (ordered[middle - 1] + ordered[middle]) / 2
+    if len(ordered) % 2:
+        return ordered[middle]
+    return float((Fraction(ordered[middle - 1]) + Fraction(ordered[middle])) / 2)
 
 
 AGGREGATES = {"median": _median, "min": min, "max": max}  # SUM-8: the methods AEF defines
@@ -1644,12 +1692,20 @@ def _summary_wrong(summary, results, metric):
                 if v is not None:
                     values.append(v)
             n = len(values)
-            total = math.fsum(values)
-            value = None if n == 0 else (total if kind == "count" else total / n)
+            total = rounded_sum(values)  # None beyond binary64
+            beyond = n > 0 and total is None
+            if n == 0 or beyond:
+                value = None  # SUM-5: a mean whose sum is beyond binary64 is no binary64 value, as when n is 0
+                if beyond and "summary-overflow-mean" in MUTATIONS:
+                    value = float(sum((Fraction(v) for v in values), Fraction(0)) / n)
+            else:
+                value = total if kind == "count" else total / n
             if e.get("N") != N or e.get("n") != n or e.get("notMeasured") != N - n:
                 return True
-            if "sum" in e and not close_enough(e["sum"], total):
+            if "sum" in e and (total is None or not defined_equal(e["sum"], total)):  # SUM-5: exact, or omitted
                 return True
+            if beyond and "aggregate" not in e and e.get("verdict") != "not_measured" and value is None:
+                return True  # SUM-6: as when n is 0
             if "sumSq" in e:  # §3.6: binary64, compared within 1e-9; a sum of squares that overflows matches nothing
                 squares = 0.0
                 for x in values:
@@ -1662,9 +1718,9 @@ def _summary_wrong(summary, results, metric):
                     return True
                 if n == 0:
                     pass
-                elif method in AGGREGATES and not close_enough(e.get("value"), AGGREGATES[method](values)):
+                elif method in AGGREGATES and not defined_equal(e.get("value"), AGGREGATES[method](values)):
                     return True  # median, min and max are recomputed; any other method is the producer's
-            elif (e.get("value") is None) != (value is None) or (value is not None and not close_enough(e["value"], value)):
+            elif (e.get("value") is None) != (value is None) or (value is not None and not defined_equal(e["value"], value)):
                 return True
     return False
 
@@ -1989,13 +2045,16 @@ def _reads_unknown(rule, runs):
                     continue
                 if path is not None and not (o.get("path") == path or str(o.get("path", "")).startswith(path + "/")):
                     continue
-                if "severity" in o and o["severity"] not in SEVERITY_ORDER and _later_minor(o):
+                # CKP-8, VER-6: a run's minor is its run.json's, whatever the line declares
+                if "severity" in o and o["severity"] not in SEVERITY_ORDER and _later_minor(
+                        o if "minor-per-document" in MUTATIONS else run.run_doc):
                     return True
         if kind == "comparison" and run is not runs[-1]:  # the candidates', never the baseline's (LANE-7)
             metrics = run.read()[0].get("metrics.json") or {}
             for m in metrics.get("metrics", []):
                 if (isinstance(m, dict) and m.get("id") == rule.get("metric") and "direction" in m
-                        and m["direction"] not in DIRECTIONS and _later_minor(metrics)):
+                        and m["direction"] not in DIRECTIONS
+                        and _later_minor(metrics if "minor-per-document" in MUTATIONS else run.run_doc)):
                     return True
     return False
 
@@ -2678,20 +2737,33 @@ def _plan_problems(doc, plan, accepted, terminal):
         codes.add("time")  # made by this job, between its acceptance and its end
 
     def judges(items):
-        """A judge is the fields a plan's judge and a run's judge both define (R9-4)."""
-        fields = ("model", "rubricDigest") if "judges-provider" in MUTATIONS else ("model", "provider", "rubricDigest")
-        return [tuple(get(j, f, default=_MISSING) for f in fields) for j in items or [] if isinstance(j, dict)]
+        """A judge is the fields a plan's judge and a run's judge both define (R9-4): model, provider, rubricDigest."""
+        return [tuple(get(j, f, default=_MISSING) for f in ("model", "provider", "rubricDigest"))
+                for j in items or [] if isinstance(j, dict)]
 
     if plan.get("judges") or "judges-guard" not in MUTATIONS:
         # STRM-4: a run names the judges that graded it (RUN-9): the plan's list with some left out, in its order; a
-        # plan that names none allows none (R9-3)
+        # plan that names none allows none (R9-3). A plan judge without a provider leaves it to the runner (R10-6).
         named, planned = judges(doc.get("judges")), judges(plan.get("judges"))
+        def is_the_plans(run_judge, plan_judge):
+            """Its model always; its provider (1) and rubricDigest (2) wherever the plan judge names them (R10-6)."""
+            for k, (named_value, planned_value) in enumerate(zip(run_judge, plan_judge)):
+                if k == 1 and "judges-provider" in MUTATIONS:
+                    continue  # the mutation: provider never compared
+                strict = (k == 1 and "judges-provider-strict" in MUTATIONS) or (
+                    k == 2 and "judges-rubric-strict" in MUTATIONS)
+                if k > 0 and planned_value is _MISSING and not strict:
+                    continue  # left to the runner: the run names the one that served or graded
+                if named_value != planned_value:
+                    return False
+            return True
+
         if "judges-same-list" in MUTATIONS:
             within = named == planned
         else:
             position, within = 0, "judges-once" not in MUTATIONS or len(set(named)) == len(named)
             for judge in named:
-                while position < len(planned) and planned[position] != judge:
+                while position < len(planned) and not is_the_plans(judge, planned[position]):
                     position += 1
                 within = within and position < len(planned)
                 position += 1

@@ -11,6 +11,7 @@ Usage: python contracts/aef/tools/lane_vectors.py   (after build_conformance.py)
 import hashlib
 import json
 import math
+from fractions import Fraction
 import shutil
 import sys
 from pathlib import Path
@@ -48,13 +49,23 @@ def summarize(lines, lane, entries, kinds):
                 if v is not None:
                     values.append(v)
         n = len(values)
-        # SUM-5: the sum computed exactly and rounded once (fsum; integers stay integers), and the value that binary64
-        # sum divided by n, in one binary64 division
-        s = sum(values) if all(isinstance(v, int) for v in values) else math.fsum(values)
-        value = None if n == 0 else s if kinds[metric] == "count" else s / n
-        metrics.append({"metric": metric, "path": path, "n": n, "N": total, "notMeasured": total - n, "value": value,
-                        "verdict": "not_measured" if n == 0 else "passed", "rule": "recorded by the producer",
-                        "sum": s, "sumSq": sum(v * v for v in values)})
+        # SUM-5: the sum computed exactly and rounded once (integers stay integers), and the value that binary64 sum
+        # divided by n, in one binary64 division. Beyond binary64, the sum (and sumSq) is omitted and the mean is null
+        # and not measured.
+        exact = sum((Fraction(v) for v in values), Fraction(0))
+        try:
+            s = sum(values) if all(isinstance(v, int) for v in values) else float(exact)
+        except OverflowError:
+            s = None
+        squares = sum(v * v for v in values)
+        value = None if n == 0 or s is None else s if kinds[metric] == "count" else s / n
+        entry = {"metric": metric, "path": path, "n": n, "N": total, "notMeasured": total - n, "value": value,
+                 "verdict": "not_measured" if n == 0 or s is None else "passed", "rule": "recorded by the producer"}
+        if s is not None:
+            entry["sum"] = s
+        if math.isfinite(squares):
+            entry["sumSq"] = squares
+        metrics.append(entry)
     return {"lanes": [{"lane": lane, "metrics": metrics}]}
 
 

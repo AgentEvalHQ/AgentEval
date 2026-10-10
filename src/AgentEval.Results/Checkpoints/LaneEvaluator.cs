@@ -163,14 +163,14 @@ public static class LaneEvaluator
     /// <summary>
     /// [CKP-8], [VER-8]: whether recomputing a lane reads, in <paramref name="run"/> (a found run of the lane, or its
     /// comparison's baseline, intact or not), a value this version does not know (one its writer schema does not accept
-    /// at that field) in a document that declares a later minor than this version ([VER-6]): an
-    /// <c>execution.targetMode</c> in a run.json that does; for a <c>severity</c> rule, a <c>severity</c> on one of the
-    /// rule's lines (its summary lane and path, trial lines included, whatever their state) that does; for a
-    /// <c>comparison</c> rule, the <c>direction</c> of the compared metric in the candidate's metrics.json when it does
-    /// ([LANE-7] reads the candidate's alone, so a baseline's direction is never read: round 6). A value in a document
-    /// that declares this version is read as §7.3 says, and makes nothing unverifiable (round 5). A rule not valid
-    /// against the writer schema, in a checkpoint that declares a later minor, is the other case ([CKP-8]);
-    /// <see cref="Evaluate"/> checks both.
+    /// at that field) in a run that declares a later minor than this version ([VER-6]): its <c>execution.targetMode</c>;
+    /// for a <c>severity</c> rule, a <c>severity</c> on one of the rule's lines (its summary lane and path, trial lines
+    /// included, whatever their state); for a <c>comparison</c> rule, the <c>direction</c> of the compared metric in the
+    /// candidate's metrics.json ([LANE-7] reads the candidate's alone, so a baseline's direction is never read: round 6).
+    /// A run-side value's minor is its run's run.json's, whatever the result line or metrics.json holding it declares (a
+    /// writer writes one minor throughout a run; pre-release, [CKP-8]): in a run that declares this version such a value
+    /// is read as §7.3 says, and makes nothing unverifiable. A rule not valid against the writer schema, in a checkpoint
+    /// that declares a later minor, is the other case ([CKP-8]); <see cref="Evaluate"/> checks both.
     /// </summary>
     /// <param name="rule">The lane's rule.</param>
     /// <param name="run">A found run of the lane, or its comparison's baseline.</param>
@@ -180,8 +180,12 @@ public static class LaneEvaluator
     {
         ArgumentNullException.ThrowIfNull(rule);
         ArgumentNullException.ThrowIfNull(run);
-        if (AefVersion.DeclaresLaterMinor(run.Run["schemaVersion"])
-            && AefNode.At(run.Run, "execution", "targetMode") is { } mode && !AefSchemas.Writer.IsValid(TargetModeSchema, mode))
+        if (!AefVersion.DeclaresLaterMinor(run.Run["schemaVersion"]))
+        {
+            return false;   // the run's minor is its run.json's: a value this version does not know is read as §7.3 says
+        }
+
+        if (AefNode.At(run.Run, "execution", "targetMode") is { } mode && !AefSchemas.Writer.IsValid(TargetModeSchema, mode))
         {
             return true;
         }
@@ -191,13 +195,11 @@ public static class LaneEvaluator
             case SeverityRule severity:
                 var lanes = SummaryLanes(run.Documents.Summary);
                 return run.Documents.Results.Objects.Any(l =>
-                    AefVersion.DeclaresLaterMinor(l.Value["schemaVersion"])
-                    && (severity.Lane is not { } lane || AefSummaryCalculator.Belongs(l.Value, lane, lanes))
+                    (severity.Lane is not { } lane || AefSummaryCalculator.Belongs(l.Value, lane, lanes))
                     && severity.InScope(AefNode.String(l.Value["path"]))
                     && l.Value["severity"] is { } value && !AefSchemas.Writer.IsValid(SeveritySchema, value));
             case ComparisonRule comparison:
                 return !isBaseline
-                       && AefVersion.DeclaresLaterMinor(run.Documents.Metrics?["schemaVersion"])
                        && Metric(run.Documents.Metrics, comparison.Metric)?["direction"] is { } direction
                        && !AefSchemas.Writer.IsValid(DirectionSchema, direction);
             default:

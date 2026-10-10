@@ -1,0 +1,172 @@
+{
+  "run": {
+    "schemaVersion": "1.0",
+    "runId": "produce-case-in-trials-at-least",
+    "status": "completed",
+    "producer": {
+      "name": "p",
+      "version": "1"
+    },
+    "subject": {
+      "ref": "agent:a/b",
+      "kind": "agent",
+      "version": "v1"
+    },
+    "execution": {
+      "targetMode": "live"
+    },
+    "startedAt": "2026-10-01T00:00:00Z",
+    "contentCapture": "on",
+    "endedAt": "2026-10-01T00:01:00Z",
+    "suite": {
+      "ref": "suite:a/b",
+      "version": "1",
+      "executionPolicy": {
+        "trialsPerCase": 5,
+        "requirePasses": 4,
+        "aggregation": "AtLeast"
+      }
+    }
+  },
+  "metrics": {
+    "schemaVersion": "1.0",
+    "metrics": [
+      {
+        "id": "quality",
+        "kind": "score",
+        "direction": "higher_better",
+        "scale": {
+          "min": 0,
+          "max": 1
+        }
+      },
+      {
+        "id": "pass_rate",
+        "kind": "rate",
+        "direction": "higher_better",
+        "scale": {
+          "min": 0,
+          "max": 1
+        }
+      }
+    ]
+  },
+  "cases": [
+    {
+      "caseId": "k1",
+      "path": "q",
+      "evaluator": {
+        "id": "code:q"
+      },
+      "state": "passed",
+      "scores": [
+        {
+          "metric": "quality",
+          "value": 0.8
+        }
+      ],
+      "trials": {
+        "aggregation": "AtLeast",
+        "trees": [
+          {
+            "path": "q",
+            "evaluator": {
+              "id": "code:q"
+            },
+            "state": "passed",
+            "scores": [
+              {
+                "metric": "quality",
+                "value": 0.9
+              }
+            ]
+          },
+          {
+            "path": "q",
+            "evaluator": {
+              "id": "code:q"
+            },
+            "state": "passed",
+            "scores": [
+              {
+                "metric": "quality",
+                "value": 0.8
+              }
+            ]
+          },
+          {
+            "path": "q",
+            "evaluator": {
+              "id": "code:q"
+            },
+            "state": "failed",
+            "scores": [
+              {
+                "metric": "quality",
+                "value": 0.3
+              }
+            ],
+            "severity": "medium"
+          },
+          {
+            "path": "q",
+            "evaluator": {
+              "id": "code:q"
+            },
+            "state": "passed",
+            "scores": [
+              {
+                "metric": "quality",
+                "value": 0.9
+              }
+            ]
+          },
+          {
+            "path": "q",
+            "evaluator": {
+              "id": "code:q"
+            },
+            "state": "passed",
+            "scores": [
+              {
+                "metric": "quality",
+                "value": 0.7
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "caseId": "k2",
+      "path": "q",
+      "evaluator": {
+        "id": "code:q"
+      },
+      "state": "passed",
+      "scores": [
+        {
+          "metric": "quality",
+          "value": 0.6
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "lanes": [
+      {
+        "lane": "quality",
+        "metrics": [
+          {
+            "metric": "quality",
+            "path": "q"
+          },
+          {
+            "metric": "pass_rate",
+            "path": "q"
+          }
+        ]
+      }
+    ]
+  }
+}

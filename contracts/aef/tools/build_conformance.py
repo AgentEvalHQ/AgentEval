@@ -139,7 +139,7 @@ def by(identity="oidc:https://login.example.com/u-7f3a"):
 # ---------------------------------------------------------------------------- valid runs
 
 COMPLETED_ID = "01928f3e-7c1a-7b2e-9a51-3f2c0d4e8a10"
-TRACE, SPAN = "4bf92f3577b34da6a3ce929d0e0e4736", "00f067aa0ba902b7"
+TRACE, SPAN = "4bf92f3577b34da6a3ce929d0e0e4736", "00f067aa0ba902b7"  # DevSkim: ignore DS173237 - W3C Trace Context example ids
 JUDGE_SPAN = "b7ad6b7169203331"  # the judge's own call: evidence, not the evaluated operation
 
 
@@ -424,6 +424,12 @@ def invalid_cases():
          ["ENC-15", "ENC-10"], "a version pattern's $ is the end of the input: only that refuses this value"),
         ("result-absence-without-reason", "result", dict(BASE_RESULT, state="not_measured"), "invalid", ["RES-2"],
          "a typed absence says why"),
+        ("run-judge-provider-empty", "run", base_run(judges=[{"model": "gpt-5.1", "provider": ""}]), "invalid",
+         ["RUN-9"], "a judge's provider names who served it: an empty one names nobody, so a run leaves it out"),
+        ("run-at-least-without-require-passes", "run",
+         base_run(suite={"ref": "suite:a/b", "version": "1", "executionPolicy": {"trialsPerCase": 5, "aggregation": "AtLeast"}}),
+         "invalid", ["RUN-8", "RES-8"], "AtLeast is decided by requirePasses, the least number of passing trials, "
+                                        "which it requires"),
         ("result-pending-without-reason", "result", dict(BASE_RESULT, state="pending"), "invalid", ["RES-2"],
          "pending is a typed absence too"),
         ("result-absence-with-scores", "result", dict(BASE_RESULT, state="skipped", reason="x", scores=[{"metric": "m", "value": 0}]),
@@ -538,6 +544,25 @@ def known_value_cases():
         ("result-usage-role-attacker-is-known", "result",
          dict(BASE_RESULT, usage=[{"role": "attacker", "gen_ai.usage.input_tokens": 5}]), {"usage[0].role": "attacker"},
          ["VER-8", "RES-10"]),
+        # Pre-release: a composite's pass withheld for a required child that did not run, and a component's failure
+        # effect (RES-6); a share-threshold trial aggregation (RES-8, RUN-8).
+        ("result-rule-path-required-not-measured-is-known", "result",
+         dict(BASE_RESULT, state="not_measured", reason="A required check did not run.",
+              aggregation={"strategy": "WeightedSum", "threshold": 0.7, "rulePath": "required-not-measured", "measured": 1,
+                           "total": 2, "unmeasured": {"skipped": 1}, "decisive": []}),
+         {"aggregation.rulePath": "required-not-measured"}, ["VER-8", "RES-6"]),
+        ("result-rule-path-failure-effect-is-known", "result",
+         dict(BASE_RESULT, state="failed", severity="high",
+              aggregation={"strategy": "WeightedSum", "threshold": 0.7, "score": 0.86, "rulePath": "failure-effect",
+                           "measured": 2, "total": 2, "decisive": []}),
+         {"aggregation.rulePath": "failure-effect"}, ["VER-8", "RES-6"]),
+        ("result-trials-at-least-is-known", "result",
+         dict(BASE_RESULT, trials={"n": 5, "passed": 4, "aggregation": "AtLeast", "agree": False}),
+         {"trials.aggregation": "AtLeast"}, ["VER-8", "RES-8"]),
+        ("run-execution-policy-at-least-is-known", "run",
+         base_run(suite={"ref": "suite:a/b", "version": "1",
+                         "executionPolicy": {"trialsPerCase": 5, "requirePasses": 4, "aggregation": "AtLeast"}}),
+         {"suite.executionPolicy.aggregation": "AtLeast"}, ["VER-8", "RUN-8", "RES-8"]),
     ]
 
 
@@ -1008,7 +1033,7 @@ def run_vectors():
         run={"imported": {"from": "inspect_ai 0.3.277", "asserted": ["subject.version", "execution.targetMode"]}})
     # verdictRule.expr is text for people: nonsense in it changes nothing (RES-7).
     vec("verdict-rule-not-evaluated", [], ["RES-7"], outcome="intact",
-        lines=set_line(0, verdictRule={"expr": "if (x) { return eval(y) }", "threshold": 0.5, "source": "suite"}))
+        lines=set_line(0, verdictRule={"expr": "if (x) { return eval(y) }", "threshold": 0.5, "source": "suite"}))  # DevSkim: ignore DS189424 - text a reader must not evaluate (RES-7)
     # Files written at different minors: each is read at its own version (VER-6); a reader accepts the run.
     vec("mixed-minors", [], ["VER-6", "VER-3"], outcome="intact",
         lines=lambda ls: ls[:3] + [dict(ls[3], schemaVersion="1.4", newerField={"note": "a field 1.4 added"})])
@@ -1719,18 +1744,18 @@ def checkpoints():
         ("state-unknown-without-decision-in-1-0",
          {k: v for k, v in dict(decided, state="sealed", outcome="approved").items() if k not in ("decision", "decisionInput")},
          "invalid", "valid", ["decision"], ["CKP-7", "VER-6"],
-         "a 1.0 manifest in a state nobody defined that records an outcome is checked as decided (R6N-2): with no "
-         "decision, the input cannot be decided (R7-4: only a later minor's is unverifiable)"),
+         "a 1.0 manifest in a state nobody defined that records an outcome is checked as decided: with no "
+         "decision, the input cannot be decided (only a later minor's is unverifiable)"),
         ("state-unknown-decision-without-input-in-1-0",
          {k: v for k, v in dict(decided, state="sealed").items() if k != "decisionInput"},
          "invalid", "valid", ["decision"], ["CKP-7", "VER-6"],
-         "a 1.0 manifest in a state nobody defined that records a decision without its input (R6N-1): the input cannot "
-         "be decided (R7-4)"),
+         "a 1.0 manifest in a state nobody defined that records a decision without its input: the input cannot "
+         "be decided"),
         ("outcome-unknown-without-decision-in-1-0",
          {k: v for k, v in dict(decided, outcome="ratified").items() if k not in ("decision", "decisionInput")},
          "invalid", "valid", ["decision"], ["CKP-7", "VER-6"],
          "a 1.0 manifest decided with an outcome nobody defined and no decision: not unverifiable, which only a later "
-         "minor's values are, but a decision that cannot be recomputed (R7-4)"),
+         "minor's values are, but a decision that cannot be recomputed"),
         ("state-unknown-without-decision", dict({k: v for k, v in dict(decided, state="sealed", outcome="approved").items()
                                                   if k not in ("decision", "decisionInput")}, schemaVersion="1.1"),
          "invalid", "valid", ["unverifiable"], ["CKP-7", "VER-6"],
@@ -1738,7 +1763,7 @@ def checkpoints():
          "holds can be recomputed"),
         ("state-unknown-in-1-0", dict(decided, state="sealed", outcome="approved"), "invalid", "valid", ["outcome"],
          ["CKP-7", "VER-6"],
-         "a 1.0 manifest with a state nobody defined is checked as usual (R6-2): its recorded outcome is not the "
+         "a 1.0 manifest with a state nobody defined is checked as usual: its recorded outcome is not the "
          "decision's"),
         ("latest-is-not-a-version", dict(planned, subject=dict(planned["subject"], version="Latest")), "invalid", "invalid", None, ["CKP-1"],
          "'latest' (any case) is resolved to an exact version before anything runs"),
@@ -1787,7 +1812,7 @@ def checkpoints():
          "invalid", "valid", ["unverifiable"], C7,
          "an outcome a later minor (1.1) adds: a reader cannot recompute it, and says so rather than call it tampering"),
         ("outcome-unknown-in-1-0", dict(decided, outcome="ratified"), "invalid", "valid", ["outcome"], C7 + ["VER-6"],
-         "a 1.0 manifest with an outcome nobody defined is checked as usual (R6-2): it is not the decision's outcome"),
+         "a 1.0 manifest with an outcome nobody defined is checked as usual: it is not the decision's outcome"),
         ("input-status-unknown", dict(decided, schemaVersion="1.1", decisionInput=dict(decision_input, lanes=[dict(
             decision_input["lanes"][0], result=dict(decision_input["lanes"][0]["result"], status="flaky"))]
             + decision_input["lanes"][1:])), "invalid", "valid", ["unverifiable"], C7,
@@ -1796,11 +1821,11 @@ def checkpoints():
             decision_input["lanes"][0], result=dict(decision_input["lanes"][0]["result"], status="flaky"))]
             + decision_input["lanes"][1:])), "invalid", "valid", ["decision"], C7 + ["DEC-2", "VER-6"],
          "a 1.0 input lane status nobody defined reads as not_measured (DEC-2); the recorded decision is then not the "
-         "one recomputed (R6-2)"),
+         "one recomputed"),
         ("decision-status-unknown-in-1-0", dict(decided, decision=dict(decided["decision"], lanes=[
             dict(decided["decision"]["lanes"][0], status="cleared")] + decided["decision"]["lanes"][1:])),
          "invalid", "valid", ["decision"], C7 + ["VER-6"],
-         "a 1.0 decision with a lane status nobody defined is compared as usual (R6-2): it is not the decision "
+         "a 1.0 decision with a lane status nobody defined is compared as usual: it is not the decision "
          "recomputed"),
         ("valid-decided-with-exceptions", excepted, "valid", "valid", [], ["CKP-4", "CKP-7", "DEC-1", "DEC-2", "DEC-3"],
          "a failed blocking lane waived by an exception for its exact runs, in force, recorded in the decision input: "

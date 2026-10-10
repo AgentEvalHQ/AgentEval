@@ -1,0 +1,71 @@
+{
+  "version": 2,
+  "status": "success",
+  "eval": {
+    "eval_id": "edgesLog01",
+    "run_id": "edgesRun01",
+    "created": "2026-10-08T10:00:00+00:00",
+    "task": "edges",
+    "task_version": "2",
+    "dataset": {
+      "name": "edges",
+      "samples": 12
+    },
+    "model": "acme/gpt x",
+    "model_roles": {
+      "grader": {
+        "model": "acme/judge"
+      },
+      "attacker": {
+        "model": "acme/red"
+      },
+      "grader_b": {
+        "model": "acme/judge"
+      }
+    },
+    "config": {
+      "epochs": 1,
+      "epochs_reducer": [
+        "collect"
+      ]
+    },
+    "packages": {
+      "inspect_ai": "0.3.277"
+    },
+    "scorers": [
+      {
+        "name": "q"
+      },
+      {
+        "name": "m"
+      }
+    ]
+  },
+  "results": {
+    "total_samples": 12,
+    "completed_samples": 1,
+    "scores": [
+      {
+        "name": "q",
+        "scorer": "q",
+        "metrics": {}
+      }
+    ]
+  },
+  "stats": {
+    "completed_at": "2026-10-08T10:02:00+00:00",
+    "role_usage": {
+      "grader": {
+        "input_tokens": 100,
+        "output_tokens": 20,
+        "total_tokens": 120
+      },
+      "attacker": {
+        "input_tokens": 30,
+        "output_tokens": 5,
+        "total_tokens": 35
+      }
+    }
+  },
+  "samples": "x"
+}

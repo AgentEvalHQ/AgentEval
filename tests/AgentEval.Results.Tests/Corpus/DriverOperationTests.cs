@@ -44,6 +44,50 @@ public class DriverOperationTests
         Assert.NotEqual("", stderr);
     }
 
+    public static TheoryData<string> UnexpectedFailures => new() { "InvalidOperationException", "AefWriteException", "IOException", "NullReferenceException", "ArgumentNullException" };
+
+    [Theory]
+    [MemberData(nameof(UnexpectedFailures))]
+    public void AFailureNobodyExpected_ExitsWith1_NeverWith2(string failure)
+    {
+        // [CONF-3] (pre-release, R11-3): exit 2 is a recognised input error only; an operation that fails in a way it did
+        // not recognise exits 1. Injected here: an operation that throws, outside any refusal of its input.
+        Exception thrown = failure switch
+        {
+            "InvalidOperationException" => new InvalidOperationException("injected"),
+            "AefWriteException" => new AgentEval.Results.Writing.AefWriteException("injected", []),
+            "IOException" => new IOException("injected"),
+            "NullReferenceException" => new NullReferenceException("injected"),
+            _ => new ArgumentNullException("injected"),
+        };
+        var operations = new Dictionary<string, Program.Operation>(StringComparer.Ordinal)
+        {
+            ["fail"] = (_, _) => throw thrown,
+            ["refuse"] = (_, _) => throw new UsageException("a recognised input error"),
+        };
+        var (stdout, stderr) = (new StringWriter(), new StringWriter());
+
+        Assert.Equal(1, Program.Dispatch(["fail"], stdout, stderr, operations));
+        Assert.Contains("injected", stderr.ToString(), StringComparison.Ordinal);
+        Assert.Equal(2, Program.Dispatch(["refuse"], stdout, stderr, operations));
+        Assert.Equal("", stdout.ToString());
+    }
+
+    [Theory]
+    [InlineData(typeof(ArgumentException), true)]
+    [InlineData(typeof(InvalidOperationException), true)]
+    [InlineData(typeof(ArgumentNullException), false)]
+    [InlineData(typeof(ObjectDisposedException), false)]
+    [InlineData(typeof(IOException), false)]
+    [InlineData(typeof(NullReferenceException), false)]
+    public void TheLibrarysRefusals_AreInputErrors_AndNothingElse(Type type, bool inputError)
+    {
+        var e = type == typeof(ObjectDisposedException) ? new ObjectDisposedException("x") : (Exception)Activator.CreateInstance(type, "x")!;
+
+        Assert.Equal(inputError, AgentEval.Results.Conformance.Ops.DriverIO.IsInputError(e));
+        Assert.False(AgentEval.Results.Conformance.Ops.DriverIO.IsInputError(new AgentEval.Results.Writing.AefWriteException("x", [])));
+    }
+
     [Fact]
     public void Document_BytesThatAreNotIJson_AreInvalidOnBothSides()
     {

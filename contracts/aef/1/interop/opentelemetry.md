@@ -84,7 +84,7 @@ line without scores. The events go to an OTLP logs endpoint, or into the run's o
 writes them before the run closes. The rules below the table cover what the table does not; the reference converter,
 `tools/aef_interop.py to-otel`, follows both.
 
-**Values, not bytes** (settled 10-09). This page, in both directions, fixes values, not bytes: the order of
+**Values, not bytes** (settled 2026-10-09). This page, in both directions, fixes values, not bytes: the order of
 members and of attributes, and the spelling of numbers, are free ([ENC-2](../spec/02-encoding.md#21-json-documents),
 [ENC-4](../spec/02-encoding.md#21-json-documents)). A checker compares JSON values, as `tools/check_interop.py` does.
 The worked example writes the attributes in the table's order.
@@ -118,7 +118,7 @@ The worked example writes the attributes in the table's order.
 | `run.json` `subject.telemetry.serviceName` | resource attribute `service.name` | exact |
 | `traces.otlp.jsonl`, `logs.otlp.jsonl` | OTLP traces and logs, sent as they are | exact |
 
-**Beyond the table** (settled 10-09; the ids are those of the former "Still open" items):
+**Beyond the table** (settled 2026-10-09; the ids are those of the former "Still open" items):
 
 - **The event of a line without scores** (OT-1). `gen_ai.evaluation.name` is Required, and no field of a line without
   scores names a metric (a typed absence carries no scores, [RES-2](../spec/03-run.md#341-states)). The converter
@@ -169,7 +169,7 @@ The worked example writes the attributes in the table's order.
 A run built from events alone is an imported run: its `run.json` names the source in `imported` and lists what the
 converter supplied, such as `subject.ref` and `execution.targetMode` ([RUN-15](../spec/03-run.md#32-runjson)). Like
 every conversion, it is sealed with `sealedBy: ingest` ([README](README.md#what-maps-means)). The reference
-converter, `tools/aef_interop.py from-otel`, follows the table and these rules (settled 10-09):
+converter, `tools/aef_interop.py from-otel`, follows the table and these rules (settled 2026-10-09):
 
 - **The run header** (OT-4). The converter takes the run id, `imported.from`, the subject's `ref` and `kind` and the
   target mode from the person converting; writes `status: completed`; takes `startedAt` and `endedAt` from the
@@ -186,7 +186,7 @@ converter, `tools/aef_interop.py from-otel`, follows the table and these rules (
 - **Each line** (OT-10). `evaluator.id` is the event's name. An explanation longer than 4096 characters is
   cut to its first 4096.
 
-**Refused** (OT-4, OT-6, OT-8; settled 10-09). The converter refuses these, naming the rule, and writes nothing:
+**Refused** (OT-4, OT-6, OT-8; settled 2026-10-09). The converter refuses these, naming the rule, and writes nothing:
 
 - events whose resources name more than one `service.name`: a run has one subject (OT-4);
 - logs whose records carry content ([SEC-6](../spec/08-security.md#84-privacy)) when asked for `contentCapture: off`:

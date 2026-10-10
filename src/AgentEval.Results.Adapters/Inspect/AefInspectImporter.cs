@@ -115,17 +115,12 @@ public static partial class AefInspectImporter
 
         // Read everything, and refuse what the page refuses, before anything is written.
         var log = ReadLog(File.ReadAllBytes(logFile), logFile);
-        ImportPlan plan;
-        try
-        {
-            plan = Read(log, options);
-        }
-        catch (Exception e) when (e is InvalidOperationException or ArgumentException or FormatException or InvalidCastException or OverflowException or KeyNotFoundException)
-        {
-            // A part of the log in a shape no EvalLog has (an object where a list is, a string where an object is): refused
-            // rather than thrown, so every malformed log names a rule.
-            throw new AefInspectImportException($"{logFile} is not an Inspect EvalLog as the page reads one: {e.Message} (IN-6).");
-        }
+
+        // "Member types" (IN-6 to IN-10): every member the converter reads has the type Inspect writes for it, so what
+        // follows reads a log of the right shape. A failure it did not expect is not an input error ([CONF-3]): it is
+        // not turned into a refusal.
+        CheckTypes(log);
+        var plan = Read(log, options);
 
         var clock = options.TimeProvider ?? TimeProvider.System;
         var now = AefTime.FromDateTimeOffset(clock.GetUtcNow());
@@ -330,6 +325,193 @@ public static partial class AefInspectImporter
 
     // A member of an object, or null when the node is no object.
     private static JsonNode? At(JsonNode? node, string name) => node is JsonObject obj ? obj[name] : null;
+
+    // ------------------------------------------------------------------ member types (IN-6 to IN-10, settled 10-10)
+
+    // Every member the converter reads has the JSON type Inspect writes for it; a member of another type refuses the log,
+    // naming the rule of its row. null counts as absent. Members kept as data unread (eval.run_id, eval.eval_set_id,
+    // eval.dataset, results.headline, Score.answer, Score.metadata, a metric beside the mean) may hold any JSON value, and
+    // members never read are not checked. Integers, times, costs and durations are checked as values too.
+    private static void CheckTypes(JsonObject log)
+    {
+        static bool Str(JsonNode n) => n is JsonValue v && !InspectJson.IsNaN(v) && v.GetValueKind() == JsonValueKind.String;
+        static bool Num(JsonNode n) => n is JsonValue v && !InspectJson.IsNaN(v) && v.GetValueKind() == JsonValueKind.Number;
+        static bool Obj(JsonNode n) => n is JsonObject;
+        static bool List(JsonNode n) => n is JsonArray;
+        static bool Amount(JsonNode n) => Num(n) && n.GetValue<double>() >= 0;   // finite: the log was read as I-JSON
+
+        static void Need(JsonNode? node, string where, string rule, string type, Func<JsonNode, bool> ok)
+        {
+            if (node is not null && !ok(node))
+            {
+                throw Refuse(rule, $"{where} is {Describe(node)}, where Inspect writes {type} (\"Member types\")");
+            }
+        }
+
+        // A role_usage or model_usage map is an object. Each ModelUsage in it is checked where it is read (UsageOf): a
+        // ModelUsage the converter does not read (a sample's model_usage entry for a judge's model, which only says the
+        // model was used) is not checked.
+        static void Usages(JsonNode? usages, string where, string rule) => Need(usages, where, rule, "an object", Obj);
+
+        static void Score(JsonNode? score, string where, string rule)
+        {
+            Need(score, where, rule, "a Score object", Obj);
+            if (score is JsonObject s)
+            {
+                Need(s["value"], $"{where}.value", "IN-7", "a number, NaN, a string, an object or a list", n => InspectJson.IsNaN(n) || Num(n) || Str(n) || n is JsonObject or JsonArray);
+                Need(s["explanation"], $"{where}.explanation", "IN-7", "a string", Str);
+                Need(s["reason"], $"{where}.reason", "IN-7", "a string", Str);
+            }
+        }
+
+        // IN-6: the header.
+        Need(log["status"], "status", "IN-6", "a string", Str);
+        if (log["eval"] is JsonObject eval)
+        {
+            foreach (var name in new[] { "eval_id", "created", "task", "model" })
+            {
+                Need(eval[name], $"eval.{name}", "IN-6", "a string", Str);
+            }
+
+            Need(eval["task_version"], "eval.task_version", "IN-6", "a string or an integer", n => Str(n) || Num(n));
+            Need(eval["config"], "eval.config", "IN-6", "an object", Obj);
+            if (eval["config"] is JsonObject config)
+            {
+                Need(config["epochs"], "eval.config.epochs", "IN-6", "an integer", Num);
+                Need(config["epochs_reducer"], "eval.config.epochs_reducer", "IN-6", "a list of strings", n => n is JsonArray list && list.All(r => r is not null && Str(r)));
+            }
+
+            Need(eval["packages"], "eval.packages", "IN-6", "an object", Obj);
+            Need(At(eval["packages"], ExtName), $"eval.packages.{ExtName}", "IN-6", "a string", Str);
+            Need(eval["model_roles"], "eval.model_roles", "IN-6", "an object", Obj);
+            foreach (var (role, roleConfig) in eval["model_roles"] as JsonObject ?? new JsonObject())
+            {
+                Need(roleConfig, $"eval.model_roles.{role}", "IN-6", "an object", Obj);
+                Need(At(roleConfig, "model"), $"eval.model_roles.{role}.model", "IN-6", "a string", Str);
+            }
+
+            // IN-8: the scorers.
+            Need(eval["scorers"], "eval.scorers", "IN-8", "a list", List);
+            var scorers = eval["scorers"] as JsonArray ?? new JsonArray();
+            for (var i = 0; i < scorers.Count; i++)
+            {
+                Need(scorers[i], $"eval.scorers[{i}]", "IN-8", "an object", Obj);
+                Need(At(scorers[i], "name"), $"eval.scorers[{i}].name", "IN-8", "a string", Str);
+            }
+        }
+
+        Need(log["stats"], "stats", "IN-6", "an object", Obj);
+        if (log["stats"] is JsonObject stats)
+        {
+            Need(stats["started_at"], "stats.started_at", "IN-6", "a string", Str);
+            Need(stats["completed_at"], "stats.completed_at", "IN-6", "a string", Str);
+            Usages(stats["model_usage"], "stats.model_usage", "IN-9");   // the run's usage: IN-9
+            Usages(stats["role_usage"], "stats.role_usage", "IN-9");
+        }
+
+        Need(log["error"], "error", "IN-6", "an object", Obj);
+        Need(At(log["error"], "message"), "error.message", "IN-6", "a string", Str);
+
+        // IN-8: the samples.
+        Need(log["samples"], "samples", "IN-8", "a list", List);
+        var samples = log["samples"] as JsonArray ?? new JsonArray();
+        for (var i = 0; i < samples.Count; i++)
+        {
+            var where = $"samples[{i}]";
+            Need(samples[i], where, "IN-8", "an object", Obj);
+            if (samples[i] is not JsonObject sample)
+            {
+                continue;
+            }
+
+            Need(sample["id"], $"{where}.id", "IN-8", "a string or an integer", n => Str(n) || Num(n));
+            Need(sample["epoch"], $"{where}.epoch", "IN-8", "an integer", Num);
+            Need(sample["started_at"], $"{where}.started_at", "IN-6", "a string", Str);
+            Need(sample["completed_at"], $"{where}.completed_at", "IN-6", "a string", Str);
+            Need(sample["total_time"], $"{where}.total_time", "IN-8", "a number, finite and at least 0", Amount);
+            Need(sample["scores"], $"{where}.scores", "IN-8", "an object", Obj);
+            foreach (var (key, score) in sample["scores"] as JsonObject ?? new JsonObject())
+            {
+                Score(score, $"{where}.scores.{key}", "IN-7");
+            }
+
+            Usages(sample["role_usage"], $"{where}.role_usage", "IN-8");   // a sample's usage: IN-8
+            Usages(sample["model_usage"], $"{where}.model_usage", "IN-8");
+            Need(sample["error"], $"{where}.error", "IN-8", "an object", Obj);
+            Need(At(sample["error"], "message"), $"{where}.error.message", "IN-8", "a string", Str);
+            Need(sample["limit"], $"{where}.limit", "IN-8", "an object", Obj);
+        }
+
+        // IN-8: the reductions.
+        Need(log["reductions"], "reductions", "IN-8", "a list", List);
+        var reductions = log["reductions"] as JsonArray ?? new JsonArray();
+        for (var r = 0; r < reductions.Count; r++)
+        {
+            var where = $"reductions[{r}]";
+            Need(reductions[r], where, "IN-8", "an object", Obj);
+            Need(At(reductions[r], "scorer"), $"{where}.scorer", "IN-8", "a string", Str);
+            Need(At(reductions[r], "reducer"), $"{where}.reducer", "IN-8", "a string", Str);
+            Need(At(reductions[r], "samples"), $"{where}.samples", "IN-8", "a list", List);
+            var reduced = At(reductions[r], "samples") as JsonArray ?? new JsonArray();
+            for (var j = 0; j < reduced.Count; j++)
+            {
+                Score(reduced[j], $"{where}.samples[{j}]", "IN-8");   // a reduced score: an object (IN-8), a Score's members (IN-7)
+            }
+        }
+
+        // IN-9: the results.
+        Need(log["results"], "results", "IN-9", "an object", Obj);
+        Need(At(log["results"], "scores"), "results.scores", "IN-9", "a list", List);
+        var entries = At(log["results"], "scores") as JsonArray ?? new JsonArray();
+        for (var e = 0; e < entries.Count; e++)
+        {
+            var where = $"results.scores[{e}]";
+            Need(entries[e], where, "IN-9", "an object", Obj);
+            Need(At(entries[e], "name"), $"{where}.name", "IN-9", "a string", Str);
+            Need(At(entries[e], "scorer"), $"{where}.scorer", "IN-9", "a string", Str);
+            Need(At(entries[e], "metrics"), $"{where}.metrics", "IN-9", "an object", Obj);
+            var metrics = At(entries[e], "metrics") as JsonObject ?? new JsonObject();
+            foreach (var (name, metric) in metrics)
+            {
+                Need(metric, $"{where}.metrics.{name}", "IN-9", "an object", Obj);
+            }
+
+            // The metric read (accuracy or mean, else the one other) and stderr: a number or NaN; the metric read's params,
+            // an object. A metric beside the mean is kept as data.
+            var read = metrics.Where(m => m.Key is "accuracy" or "mean").Select(m => m.Key).ToList();
+            var others = metrics.Where(m => m.Key is not ("accuracy" or "mean" or "stderr")).Select(m => m.Key).ToList();
+            if (read.Count == 0 && others.Count == 1)
+            {
+                read = others;
+            }
+
+            foreach (var name in read.Append("stderr"))
+            {
+                Need(At(metrics[name], "value"), $"{where}.metrics.{name}.value", "IN-9", "a number or NaN", n => InspectJson.IsNaN(n) || Num(n));
+            }
+
+            foreach (var name in read)
+            {
+                Need(At(metrics[name], "params"), $"{where}.metrics.{name}.params", "IN-9", "an object", Obj);
+            }
+        }
+    }
+
+    // A value's JSON type, in words.
+    private static string Describe(JsonNode node) => node switch
+    {
+        JsonObject => "an object",
+        JsonArray => "a list",
+        _ when InspectJson.IsNaN(node) => "NaN",
+        JsonValue v => v.GetValueKind() switch
+        {
+            JsonValueKind.String => "a string",
+            JsonValueKind.Number => $"the number {v.ToJsonString()}",
+            JsonValueKind.True or JsonValueKind.False => "a boolean",
+            _ => "null",
+        },
+        _ => "a value",
+    };
 
     // ------------------------------------------------------------------ the plan: everything read and checked
 
@@ -978,6 +1160,11 @@ public static partial class AefInspectImporter
 
         long? Tokens(string name) => Integer(usage[name], $"{where}.{name}", rule, min: 0);
         Tokens("total_tokens");
+        if (usage["total_cost"] is { } total && !(total is JsonValue c && !InspectJson.IsNaN(c) && c.GetValueKind() == JsonValueKind.Number && c.GetValue<double>() >= 0))
+        {
+            throw Refuse(rule, $"{where}.total_cost is {Describe(total)}, where Inspect writes a number, finite and at least 0 (\"Member types\")");
+        }
+
         return new AefUsage
         {
             Role = role,
@@ -1054,7 +1241,7 @@ public static partial class AefInspectImporter
                     var kept = new JsonObject();
                     foreach (var (metric, value) in rest)
                     {
-                        kept[metric] = Copy(value["value"], $"{where}.metrics.{metric}");
+                        kept[metric] = Copy(value["value"], $"{where}.metrics.{metric}", "IN-9");
                     }
 
                     others[name] = kept;
@@ -1295,11 +1482,11 @@ public static partial class AefInspectImporter
     }
 
     // A value of the log copied into AEF: AEF numbers are finite ([ENC-3]).
-    private static JsonNode? Copy(JsonNode? node, string where)
+    private static JsonNode? Copy(JsonNode? node, string where, string rule = "IN-7")
     {
         if (InspectJson.HoldsNaN(node))
         {
-            throw Refuse("IN-7", $"{where} holds NaN or an infinity, and AEF numbers are finite ([ENC-3]).");
+            throw Refuse(rule, $"{where} holds NaN, which no AEF number is ([ENC-3]).");
         }
 
         return node is null ? null : JsonNode.Parse(node.ToJsonString());

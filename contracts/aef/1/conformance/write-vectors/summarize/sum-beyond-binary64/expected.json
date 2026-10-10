@@ -1,0 +1,30 @@
+{
+  "kind": "summarize",
+  "rules": [
+    "SUM-5",
+    "SUM-6"
+  ],
+  "run": "run",
+  "request": "request.json",
+  "summary": {
+    "schemaVersion": "1.0",
+    "runId": "summarize-sum-beyond-binary64",
+    "lanes": [
+      {
+        "lane": "quality",
+        "metrics": [
+          {
+            "metric": "delta",
+            "path": "q",
+            "N": 2,
+            "n": 2,
+            "notMeasured": 0,
+            "value": null,
+            "verdict": "not_measured"
+          }
+        ]
+      }
+    ]
+  },
+  "why": "two scores of 1.5e308: their exact sum, 3e308, is beyond binary64, so the mean is no binary64 value. The entry omits sum and sumSq, its value is null and its verdict not_measured, as when nothing was measured, and a lane reads it as not measured (SUM-5, SUM-6, LANE-2)."
+}

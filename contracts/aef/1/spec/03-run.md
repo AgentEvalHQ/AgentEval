@@ -76,8 +76,12 @@ was kept.
   time, for example by an attacker model), `external` (another tool's cases), or `other`. (A run converted from another
   tool's output is marked by `imported`, [RUN-15].)
 - **[RUN-8] The suite.** `suite` names the cases that ran: `ref`, exact `version`, and, when the content is frozen,
-  its `digest`. `executionPolicy` says how many trials each case had.
+  its `digest`. `executionPolicy` says how many trials each case had (`trialsPerCase`), how they were combined
+  (`aggregation`, as a rollup's [RES-8]) and how many of them must pass for the case to pass (`requirePasses`, which
+  an `aggregation` of `AtLeast` requires).
 - **[RUN-9] Judges.** `judges` lists the models that graded results (`model`, `provider`, `mode`, `rubricDigest`).
+  A judge's `mode` says how it graded: `single` when it graded results alone, `panel` when it was one of a panel that
+  graded each result together (`panelSize` judges), `primary` or `shadow` beside another judge.
   A judge **MAY** carry `calibration`: how far it agreed with labelled cases before this run (`labelSet`, `n`,
   `accuracy`, `kappa`, `dangerousErrors`, `measuredAt`). It is the producer's claim about the judge, sealed with the
   run; a reader shows it as such.
@@ -89,8 +93,13 @@ was kept.
   - `off`: they are not kept, **and neither is any digest of them**: a SHA-256 of a short prompt is reversed by trying
     candidates. In a run with `off`, no result carries `reasoning` or an `annotator.promptHash`, and no evidence
     record of a content kind (`judge_reasoning`, `tool_call`, `document`, `input`, `expected`, `output`,
-    `transcript`) is written. Reported as `content-capture` (§3.9). `reason` and `ext` **SHOULD** hold no prompt,
-    response or judge reasoning either, and no digest of one: they are free text, so no check can tell.
+    `transcript`) is written. Reported as `content-capture` (§3.9). Evidence of any other kind whose bytes hold
+    prompts, responses, tool arguments or judge reasoning (a `compliance_artifact` that embeds responses) is content
+    too, and is not written under `off` either; a verifier cannot see what a blob's bytes mean, so it reports the
+    content kinds only. `reason` and `ext` **SHOULD** hold no prompt, response or judge reasoning either, and no
+    digest of one: they are free text, so no check can tell.
+  - A digest of a whole suite's content (`suite.digest`, [PLAN-8]) or of a rubric (`rubricDigest`) is not content: it
+    names a fixed artifact the run used, not one of its prompts or answers, and it is allowed under `off`.
   A producer **SHOULD** write `contentCapture`; a reader treats a run without it as `on` (content may be present).
 - **[RUN-15] Imported runs.** A run converted from another tool's output carries `imported`: the tool (`from`) and
   every `run.json` field the converter supplied because the original did not record it (`asserted`, dotted paths). A
@@ -169,6 +178,8 @@ One line per node of the run's result tree.
   | `threshold` | the score against the threshold |
   | `severity` | the worst severity among the required children |
   | `under-covered` | too few children measured (fewer than `minimumMeasuredShare` of `total`) |
+  | `required-not-measured` | a required child that was not measured (it did not run): the composite's pass is withheld |
+  | `failure-effect` | a child's own measured failure, by the effect its component declares: it fails or warns the composite whatever the score |
 
   | `strategy` | The producer combined the children by (informative) |
   |---|---|
@@ -197,6 +208,9 @@ One line per node of the run's result tree.
   its trial lines do (the rollup at a path has, as parent, the rollup at the path of its trial lines' parents when
   the case has one there, and is a root when they are roots; a rollup whose trial lines' parents are not all at one
   path, or not all roots, is `trials`), and that tree is what [SUM-3] counts. A path's spelling decides nothing: `q/x` may be a root.
+  A rollup's `aggregation` is descriptive, as a composite's is ([RES-6]). `AtLeast` says the case passes when at least
+  `requirePasses` of its trials pass (the run's `suite.executionPolicy`, [RUN-8]): a share threshold, such as "at least
+  80% of the trials pass", is written as `AtLeast` with the least count that meets it.
 
 ### 3.4.5 Facts about a result
 
@@ -243,13 +257,17 @@ evaluation (§5.3) reads it, so it is defined exactly.
   to cancellation: `1e20 + 1 − 1e20`); `sumSq` is the sum of their squares in binary64 (its terms are never negative,
   so summing in order stays within §3.6), and a producer omits it when it is not finite; `value` is `sum` for a
   metric of kind `count`, and otherwise that binary64 `sum` divided by `n`, in one binary64 division (`2.1 / 5` gives
-  `0.42000000000000004`, not the exact mean `0.42`), so that two producers write the same bytes; or `null` when `n`
-  is 0. A verifier compares each within §3.6. `stderr` and `ci` are the producer's, over the same
-  values. `sum` and `sumSq` are optional in the schema; a producer **SHOULD** write `sum`, so a reader can check the
+  `0.42000000000000004`, not the exact mean `0.42`), so that every producer writes the same value ([ENC-4] leaves its
+  spelling free); or `null` when `n` is 0. When the exact sum, rounded once, is beyond binary64 (two scores of
+  `1.5e308`), the mean is no binary64 value: the entry omits `sum` (and `sumSq`), and, without `aggregate`, its
+  `value` is `null` and its `verdict` `not_measured`, as when `n` is 0, so a lane reads it as not measured
+  ([LANE-2]). A verifier compares `sum` and `value` exactly, and `sumSq` within §3.6.
+  `stderr` and `ci` are the producer's, over the same values. `sum` and `sumSq` are optional in the schema; a producer **SHOULD** write `sum`, so a reader can check the
   mean without the results.
 - **[SUM-8] Aggregates.** An entry with `aggregate` carries a `value` computed by its `method` instead of the mean:
   - `median`, `min` and `max` are defined here, over the measured values of [SUM-4] (the median of an even count is
-    the mean of the two middle values). A verifier recomputes their `value` like any other. This set is fixed for
+    the mean of the two middle values, computed exactly and rounded once). A verifier recomputes their `value` like
+    any other, and compares it exactly. This set is fixed for
     major 1 ([VER-9]): a later minor adds no method a verifier recomputes, so verifiers of every 1.x minor agree on
     which summary values a lane may read.
   - Any other `method` (pass@k, F1, a bootstrap figure) is the producer's, shown as written. A verifier recomputes the
@@ -260,12 +278,18 @@ evaluation (§5.3) reads it, so it is defined exactly.
   reads one; no lane name appears twice in `lanes`; and no two `usage` entries have the same `role` and `model` (an
   absent `model` is a value of its own; roles compare as written). Reported as `summary-duplicate`.
 - **[SUM-6]** `verdict` is the producer's verdict on the entry under its `rule`; `scored` when the producer applied
-  no rule to it (a measurement only); and when `n` is 0, `not_measured` in every case, with or without a rule.
+  no rule to it (a measurement only); and when `n` is 0, or when an entry without `aggregate` has a sum beyond
+  binary64 ([SUM-5]), `not_measured` in every case, with or without a rule.
 - **[SUM-7]** `cost`, when present, is the run's total cost in US dollars and where the figure came from. `usage`, when
   present, is the run's total usage, one entry per party (`role`) and `model`.
-- A verifier recomputes `N`, `n`, `notMeasured`, `sum` and `value` from `results.ndjson` (§3.9); `value` and `sum`
-  match when they differ by at most 1e-9 × max(1, |recomputed|); so do `sumSq`, when present, and its recomputed
-  value (a `sumSq` whose recomputed value is not finite matches nothing).
+- A verifier recomputes `N`, `n`, `notMeasured`, `sum` and `value` from `results.ndjson` (§3.9). `sum` and `value`
+  are defined to one binary64 value each, so a lane decides on a value every conforming producer writes alike: each
+  must be the one recomputed, compared as binary64 (`0.42` where [SUM-5] gives `0.42000000000000004` is a `summary`
+  problem). Only what is not defined exactly is compared within a tolerance: `sumSq`, when present, matches its
+  recomputed value when they differ by at most 1e-9 × max(1, |recomputed|) (a `sumSq` whose recomputed value is not
+  finite matches nothing); a producer's own aggregate ([SUM-8]) is not recomputed at all. When the sum is beyond
+  binary64, an entry that writes a `sum` is a `summary` problem, and so is one without `aggregate` whose `value` is
+  not `null` or whose `verdict` is not `not_measured`.
 
 ## 3.7 `evidence.ndjson` and blobs
 
@@ -294,6 +318,11 @@ code, ordered by path and then by code (its bytes). Paths are ordered by their U
 NDJSON or JSONL file (`results.ndjson`, `evidence.ndjson`, `gates.ndjson`, `traces.otlp.jsonl`, `logs.otlp.jsonl`,
 `overlays/events.ndjson`), are ordered by line number as a number (`results.ndjson:9` before `results.ndjson:10`).
 Any other path with a colon (`run:<runId>`, [STRM-4]) is ordered by its bytes like every other path. A run with any of these problems is invalid.
+A file's name that is not a Unicode string (bytes that are not valid UTF-8, or, on a file system that names files in
+UTF-16, an unpaired surrogate) breaks [RUN-3]. A report, and a manifest ([SEAL-3]), give it with each ill-formed part
+replaced by U+FFFD (one per maximal ill-formed subsequence of bytes, one per unpaired surrogate, as a decoder replaces
+them), and order it by the UTF-8 bytes of that spelling: a verifier never stops on one. Under `overlays/` such a file
+is the chain's `unexpected-file` ([OVL-5]), never a problem of the run (§4.5).
 
 A verifier reads each JSON file whole and each NDJSON file line by line (§2.2). An NDJSON file whose framing breaks
 [ENC-5] or [ENC-7] (a CR, a blank line, a missing final LF, a byte-order mark) is reported once, as `encoding` at the

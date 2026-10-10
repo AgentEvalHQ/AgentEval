@@ -240,14 +240,18 @@ public class CrossFileRulesTests
         Assert.Equal(["summary.json summary"], Problems(run));
     }
 
-    [Fact]
-    public void Summary_WithinTheTolerance_Matches()
+    [Theory]
+    [InlineData("value", 0.65 + 5e-10)]
+    [InlineData("sum", 1.3 - 5e-10)]
+    [InlineData("value", 0.6500000000000001)]   // the next binary64 value: not the one SUM-5 defines
+    public void Summary_SumAndValue_AreComparedExactly_NotWithinTheTolerance(string figure, double written)
     {
+        // §3.6, [SUM-5] (pre-release): sum and value are defined to one binary64 value each, so a lane decides on a value
+        // every producer writes alike; within 1e-9 is no longer the same.
         using var run = new TestRun();
-        run.Summary!["lanes"]![0]!["metrics"]![0]!["value"] = 0.65 + 5e-10;
-        run.Summary!["lanes"]![0]!["metrics"]![0]!["sum"] = 1.3 - 5e-10;
+        run.Summary!["lanes"]![0]!["metrics"]![0]![figure] = written;
 
-        Assert.Empty(Problems(run));
+        Assert.Equal(["summary.json summary"], Problems(run));
     }
 
     [Theory]
@@ -317,7 +321,7 @@ public class CrossFileRulesTests
     public void TraceLink_ASpanOrATraceTheTracesFileDoesNotHave_IdsCompareWithoutCase()
     {
         using var run = new TestRun();
-        const string trace = "4bf92f3577b34da6a3ce929d0e0e4736";
+        const string trace = "4bf92f3577b34da6a3ce929d0e0e4736"; // DevSkim: ignore DS173237 — W3C Trace Context example id
         run.Files["traces.otlp.jsonl"] = Encoding.UTF8.GetBytes(
             $$"""{"resourceSpans":[{"scopeSpans":[{"spans":[{"traceId":"{{trace.ToUpperInvariant()}}","spanId":"00F067AA0BA902B7","name":"s"}]}]}]}""" + "\n");
         run.Results[0]["traceLink"] = new JsonObject { ["traceId"] = trace, ["spanId"] = "00f067aa0ba902b7" };   // resolves
@@ -376,9 +380,9 @@ public class CrossFileRulesTests
         run.Results[0].Remove("evidence");
         run.Files.Clear();
         run.Files["traces.otlp.jsonl"] = Encoding.UTF8.GetBytes(string.Concat(
-            Spans("""{"traceId":"4bf92f3577b34da6a3ce929d0e0e4736","spanId":"00f067aa0ba902b7","attributes":[{"key":"gen_ai.request.model","value":{"stringValue":"m"}}]}"""),
-            Spans("""{"traceId":"4bf92f3577b34da6a3ce929d0e0e4736","spanId":"00f067aa0ba902b8","events":[{"name":"e","attributes":[{"key":"gen_ai.tool.call.arguments","value":{"stringValue":"{}"}}]}]}"""),
-            Spans("""{"traceId":"4bf92f3577b34da6a3ce929d0e0e4736","spanId":"00f067aa0ba902b9","attributes":[{"key":"gen_ai.prompt","value":{"stringValue":"hi"}}]}""")));
+            Spans("""{"traceId":"4bf92f3577b34da6a3ce929d0e0e4736","spanId":"00f067aa0ba902b7","attributes":[{"key":"gen_ai.request.model","value":{"stringValue":"m"}}]}"""), // DevSkim: ignore DS173237 — W3C Trace Context example id
+            Spans("""{"traceId":"4bf92f3577b34da6a3ce929d0e0e4736","spanId":"00f067aa0ba902b8","events":[{"name":"e","attributes":[{"key":"gen_ai.tool.call.arguments","value":{"stringValue":"{}"}}]}]}"""), // DevSkim: ignore DS173237 — W3C Trace Context example id
+            Spans("""{"traceId":"4bf92f3577b34da6a3ce929d0e0e4736","spanId":"00f067aa0ba902b9","attributes":[{"key":"gen_ai.prompt","value":{"stringValue":"hi"}}]}"""))); // DevSkim: ignore DS173237 — W3C Trace Context example id
         run.Files["logs.otlp.jsonl"] = Encoding.UTF8.GetBytes(string.Concat(
             Logs("""{"eventName":"gen_ai.evaluation.result","attributes":[{"key":"gen_ai.evaluation.score.label","value":{"stringValue":"passed"}}]}"""),
             Logs("""{"eventName":"gen_ai.evaluation.result","attributes":[{"key":"gen_ai.evaluation.explanation","value":{"stringValue":"why"}}]}"""),

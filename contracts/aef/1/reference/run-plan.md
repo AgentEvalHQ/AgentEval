@@ -39,8 +39,8 @@ What a runner is asked to evaluate: the exact subject version, the suites and la
 | `zone` | string |  | pattern `^[a-z0-9][a-z0-9._:-]{0,63}$` | The network zone a remote-zone run must execute in. |
 | `judges` | array of object |  | ≤ 16 items | The judge models and rubrics the evaluators may use, fixed by the plan: a run names those that graded it, some of these in this order (STRM-4). |
 | `judges[].model` | string | yes | ≥ 1 chars; ≤ 256 chars | A judge model the evaluators may use. |
-| `judges[].provider` | string |  | ≤ 128 chars | Who serves the judge model. |
-| `judges[].rubricDigest` | [sha256Uri](common.md#sha256uri) |  |  | The SHA-256 of the rubric the judge must grade with. |
+| `judges[].provider` | string |  | ≥ 1 chars; ≤ 128 chars | Who must serve the judge model. Never empty; a judge without one leaves the provider to the runner, and a run names the one that served (STRM-4). |
+| `judges[].rubricDigest` | [sha256Uri](common.md#sha256uri) |  |  | The SHA-256 of the rubric the judge must grade with. A judge without one leaves the rubric to the runner, and a run names the one that graded (STRM-4). |
 | `baseline` | object or object |  |  | What a comparison lane compares against: a policy, or one sealed run. |
 | `comparability` | object |  |  | The comparability axes a comparison lane uses, fixed by the plan so the runner cannot pick them. |
 | `comparability.required` | array of [axis](common.md#axis) | yes | ≤ 16 items; unique | The axes on which a comparison lane's runs must match their baseline (spec 05, LANE-6). |

@@ -37,6 +37,7 @@ public class JsonSchemaNetComparisonTests
     {
         var differences = new List<string>();
         var unexpected = new List<string>();
+        var beyondDecimal = 0;
         foreach (var (id, schema, document) in CorpusDocuments.All)
         {
             foreach (var (side, ours, theirs) in new[]
@@ -46,7 +47,20 @@ public class JsonSchemaNetComparisonTests
                      })
             {
                 var mine = ours.IsValid(schema, document);
-                if (mine != theirs.IsValid(schema, document))
+                bool other;
+                try
+                {
+                    other = theirs.IsValid(schema, document);
+                }
+                catch (FormatException)
+                {
+                    // JsonSchema.Net reads a number as a decimal, and cannot read one beyond its range (a score of 1.5e308,
+                    // a sum of 1e200, [SUM-5]): such a document is not compared (Divergence_ANumberBeyondDecimal below).
+                    beyondDecimal++;
+                    continue;
+                }
+
+                if (mine != other)
                 {
                     var key = $"{id} {schema} {side}";
                     differences.Add(key);
@@ -59,6 +73,7 @@ public class JsonSchemaNetComparisonTests
         }
 
         Assert.True(CorpusDocuments.All.Count > 500, $"only {CorpusDocuments.All.Count} corpus documents found");
+        Assert.True(beyondDecimal < 20, $"{beyondDecimal} documents JsonSchema.Net cannot read: more than the few that hold numbers beyond a decimal");
         Assert.True(unexpected.Count == 0, string.Join("\n", unexpected));
 
         // A known divergence whose document is in the corpus still shows (the list documents the corpus, not hopes).
@@ -110,6 +125,17 @@ public class JsonSchemaNetComparisonTests
         Assert.False(JsonSchemaNetSet.IsValidAgainst(Maximum, value));
         Assert.True(Ours(Maximum, value));
         Assert.False(JsonSchemaNetSet.IsValidAgainst(Integer, value));
+        Assert.True(Ours(Integer, value));
+    }
+
+    [Fact]
+    public void Divergence_ANumberBeyondDecimal_IsOneJsonSchemaNetCannotRead_ENC4()
+    {
+        // Whether a number is an integer JsonSchema.Net asks of a decimal, which 1e200, a binary64 value, is beyond.
+        const string Integer = """{"$schema": "https://json-schema.org/draft/2020-12/schema", "type": "integer"}""";
+        var value = AefJsonReader.ParseValue("1e200"u8);
+
+        Assert.Throws<FormatException>(() => JsonSchemaNetSet.IsValidAgainst(Integer, value));
         Assert.True(Ours(Integer, value));
     }
 

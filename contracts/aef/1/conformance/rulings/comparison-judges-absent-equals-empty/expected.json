@@ -17,5 +17,5 @@
     "LANE-6",
     "LANE-8"
   ],
-  "why": "W4-6: the candidate's run.json has no judges and the baseline's has judges: []. A run without judges has the empty list (LANE-6), so the judges and rubrics axes agree, the comparison is made, and the 15 regressions against 5 improvements fail it (p = 0.0207 <= 0.05), not incomparable."
+  "why": "the candidate's run.json has no judges and the baseline's has judges: []. A run without judges has the empty list (LANE-6), so the judges and rubrics axes agree, the comparison is made, and the 15 regressions against 5 improvements fail it (p = 0.0207 <= 0.05), not incomparable."
 }

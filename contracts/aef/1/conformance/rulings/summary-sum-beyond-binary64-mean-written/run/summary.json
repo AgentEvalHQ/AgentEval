@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "1.0",
+  "runId": "R-summary-sum-beyond-binary64-mean-written",
+  "lanes": [
+    {
+      "lane": "quality",
+      "metrics": [
+        {
+          "metric": "m",
+          "path": "p",
+          "n": 2,
+          "N": 2,
+          "notMeasured": 0,
+          "value": 1.5e+308,
+          "verdict": "passed",
+          "rule": "recorded by the producer"
+        }
+      ]
+    }
+  ]
+}

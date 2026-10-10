@@ -29,5 +29,5 @@
     "ENC-17",
     "ENC-18"
   ],
-  "why": "W3-19: a valid seal.json padded with spaces to 4 MiB + 1 byte. A seal's limit is 40 MiB (ENC-17), so the document operation accepts it: the limit is the schema's file's, not one size for every document (its twin document-run-over-4-mib is refused at the same size)."
+  "why": "a valid seal.json padded with spaces to 4 MiB + 1 byte. A seal's limit is 40 MiB (ENC-17), so the document operation accepts it: the limit is the schema's file's, not one size for every document (its twin document-run-over-4-mib is refused at the same size)."
 }

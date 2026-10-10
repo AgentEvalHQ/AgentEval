@@ -97,7 +97,7 @@ public static class AefSummaryWriter
             }
 
             var figures = AefSummaryCalculator.Compute(results, lanes, lane, entry.Metric, AefWire.Name(kind), entry.Path, entry.Aggregate?.Method);
-            var decision = figures.Measured == 0 ? null : entry.Decide?.Invoke(figures);
+            var decision = figures.ReadsNotMeasured ? null : entry.Decide?.Invoke(figures);
             if (figures.ValueDefined ? decision?.Value is not null : decision?.Value is null)
             {
                 throw new InvalidOperationException(figures.ValueDefined
@@ -115,11 +115,12 @@ public static class AefSummaryWriter
         return json;
     }
 
-    // One entry in the schema's member order: the figures, the producer's verdict (not_measured when n is 0, scored
-    // when it applied no rule, [SUM-6]), its stderr and ci, and sum and sumSq.
+    // One entry in the schema's member order: the figures, the producer's verdict (not_measured when n is 0, or when,
+    // without an aggregate, the sum is beyond binary64; scored when it applied no rule, [SUM-5], [SUM-6]), its stderr
+    // and ci, and sum and sumSq, each only when it is a binary64 value (a sum beyond binary64 omits both).
     private static JsonObject EntryJson(AefSummaryEntry entry, AefSummaryFigures figures, AefSummaryDecision? decision)
     {
-        var verdict = figures.Measured == 0 ? AefSummaryVerdict.NotMeasured : decision?.Verdict ?? AefSummaryVerdict.Scored;
+        var verdict = figures.ReadsNotMeasured ? AefSummaryVerdict.NotMeasured : decision?.Verdict ?? AefSummaryVerdict.Scored;
         var value = figures.ValueDefined ? figures.Value : decision?.Value;
         var json = new JsonObject
         {
@@ -133,11 +134,15 @@ public static class AefSummaryWriter
         json.Put("ci", decision?.Ci?.ToJson());
         json["verdict"] = AefWire.Node(verdict);
         json.Put("rule", entry.Rule);
-        json["sum"] = AefWire.Number(figures.Sum, "sum");
-        if (double.IsFinite(figures.SumOfSquares))
+        if (double.IsFinite(figures.Sum))
         {
-            // [SUM-5]: optional; the squares of values beyond about 1.34e154 overflow binary64, and JSON has no infinity.
-            json["sumSq"] = AefWire.Number(figures.SumOfSquares, "sumSq");
+            // [SUM-5]: a sum beyond binary64 is omitted, and sumSq with it.
+            json["sum"] = AefWire.Number(figures.Sum, "sum");
+            if (double.IsFinite(figures.SumOfSquares))
+            {
+                // [SUM-5]: optional; the squares of values beyond about 1.34e154 overflow binary64, and JSON has no infinity.
+                json["sumSq"] = AefWire.Number(figures.SumOfSquares, "sumSq");
+            }
         }
         json["path"] = entry.Path;
         if (entry.Aggregate is { } aggregate)

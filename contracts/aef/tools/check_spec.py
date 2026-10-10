@@ -16,7 +16,9 @@
    list item, CommonMark renders it as a paragraph of pipes);
 10. no published page cites a review id (R7R-3, R9-2, W3-17, …): they resolve only in the editors' notes, which are
    not published. A page names the rule a ruling concerns instead. Every published page is checked, the changelog
-   and the interop pages included; tool code and vectors' `why` fields may cite them.
+   and the interop pages included; so is every vector's `why` and `description`, public text too, where a critic's
+   round ("changed in round 9") counts as one as well. Tool code may cite them. A date a page gives a ruling has
+   its year ("settled 2026-10-09", never "settled 10-09"): without it, it means nothing after the release.
 
 Usage: python contracts/aef/tools/check_spec.py
 """
@@ -51,6 +53,35 @@ NOT_CODES = {"payload", "payloadType", "signatures", "keyid", "sig", "runs", "st
 # Published pages (every Markdown file of contracts/aef) that may still cite review ids, and why (check 10).
 REVIEW_IDS_ELSEWHERE: dict[str, str] = {}  # every published page is checked: none cites a review id
 REVIEW_ID = re.compile(r"(?<![A-Za-z0-9])(R[0-9]+[A-Z]*(?:-[0-9]+[a-z]?)?|W[0-9]+-[0-9]+)(?![A-Za-z0-9])")
+YEARLESS_DATE = re.compile(r"settled (?:on )?(?![0-9]{4}-)[0-9]{1,2}-[0-9]{1,2}(?![0-9])")
+# In a vector's text, a critic's round is a review reference too (the changelog's headings name rounds, by design).
+VECTOR_REVIEW = re.compile(r"(?<![A-Za-z0-9])(R[0-9]+[A-Z]*(?:-[0-9]+[a-z]?)?|W[0-9]+-[0-9]+|[Rr]ound [0-9]+)"
+                           r"(?![A-Za-z0-9])")
+
+
+def vector_texts(conf):
+    """(where, text) for every `why` and `description` string in the corpus's JSON files: public text too."""
+    found = []
+
+    def walk(value, where):
+        if isinstance(value, dict):
+            for key, item in value.items():
+                if key in ("why", "description") and isinstance(item, str):
+                    found.append((where, item))
+                else:
+                    walk(item, where)
+        elif isinstance(value, list):
+            for item in value:
+                walk(item, where)
+
+    for path in sorted(conf.rglob("*.json")):
+        if path.name == "index.json":
+            continue
+        try:
+            walk(json.loads(path.read_text(encoding="utf-8")), path.relative_to(conf).as_posix())
+        except (ValueError, UnicodeDecodeError):
+            continue  # a vector's input that is not JSON on purpose
+    return found
 
 
 def published_pages():
@@ -175,6 +206,11 @@ def main():
         for n, line in enumerate(page.splitlines(), start=1):
             for found in REVIEW_ID.findall(line):
                 problems.append(f"{rel}:{n}: cites the review id {found}, which no published page defines")
+            for found in YEARLESS_DATE.findall(line):
+                problems.append(f"{rel}:{n}: '{found}' gives a date without its year")
+    for where, said in vector_texts(conf):
+        for found in VECTOR_REVIEW.findall(said):
+            problems.append(f"conformance/{where}: its why or description cites the review id {found}")
 
     # Tables: a row indented otherwise than its table's first row is not part of the table (CommonMark, GFM).
     for name, t in text.items():

@@ -7,7 +7,7 @@
     "CKP-7",
     "VER-6"
   ],
-  "why": "a 1.0 decision with a lane status nobody defined is compared as usual (R6-2): it is not the decision recomputed",
+  "why": "a 1.0 decision with a lane status nobody defined is compared as usual: it is not the decision recomputed",
   "problems": [
     "decision"
   ]

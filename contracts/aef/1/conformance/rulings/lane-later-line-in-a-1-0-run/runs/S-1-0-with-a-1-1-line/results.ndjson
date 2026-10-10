@@ -1,0 +1,4 @@
+{"schemaVersion":"1.0","resultId":"r_e40c4edcc723b828f9fd2c4ea1ea414f","caseId":"c1","path":"a","evaluator":{"id":"code:check"},"state":"passed"}
+{"schemaVersion":"1.1","resultId":"r_ea8e6fe8478d2af864b69661702dc8e9","caseId":"c2","path":"a","evaluator":{"id":"code:check"},"state":"failed","severity":"catastrophic"}
+{"schemaVersion":"1.0","resultId":"r_de8f8a916f275e77eda8917c809ba0fd","caseId":"c3","path":"a","evaluator":{"id":"code:check"},"state":"passed"}
+{"schemaVersion":"1.0","resultId":"r_94042bf4dd8140ee9c3d2ce8ad836941","caseId":"c4","path":"a","evaluator":{"id":"code:check"},"state":"failed","severity":"low"}

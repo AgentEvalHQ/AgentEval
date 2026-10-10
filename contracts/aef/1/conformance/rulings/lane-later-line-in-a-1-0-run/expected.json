@@ -1,0 +1,27 @@
+{
+  "kind": "lane",
+  "checkpoint": "checkpoint.json",
+  "runs": "runs",
+  "lanes": [
+    {
+      "lane": "severity-1-0-run",
+      "result": {
+        "status": "failed",
+        "subjectVersion": "v7",
+        "oldestClosedAt": "2026-10-03T00:00:00Z"
+      }
+    }
+  ],
+  "problems": [
+    [
+      "lanes/severity-1-0-run",
+      "lane-result"
+    ]
+  ],
+  "rules": [
+    "CKP-8",
+    "VER-6",
+    "LANE-3"
+  ],
+  "why": "the run's run.json declares 1.0, and one result line declares 1.1 with a severity 1.0 does not know (catastrophic). A run's minor is its run.json's (a writer writes one minor throughout a run), so the lane is read at 1.0, the unknown severity as critical (§7.3), and compared: c4's known low failure already fails max none, and the manifest's recorded passed is a lane-result problem, not unverifiable."
+}

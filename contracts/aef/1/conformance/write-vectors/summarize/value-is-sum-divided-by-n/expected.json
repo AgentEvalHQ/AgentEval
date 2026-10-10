@@ -27,5 +27,5 @@
       }
     ]
   },
-  "why": "the value is the binary64 sum divided by n, in one binary64 division: 0.3 + 0.4 + 0.5 + 0.4 + 0.5 is 2.1, and 2.1 / 5 is 0.42000000000000004, not the exact mean 0.42. A verifier accepts either within §3.6; two producers that follow SUM-5 write the same bytes."
+  "why": "the value is the binary64 sum divided by n, in one binary64 division: 0.3 + 0.4 + 0.5 + 0.4 + 0.5 is 2.1, and 2.1 / 5 is 0.42000000000000004, not the exact mean 0.42. SUM-5 defines it to one binary64 value, so it is compared exactly: a Producer that writes the exact mean 0.42 fails this vector."
 }

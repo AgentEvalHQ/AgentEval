@@ -186,13 +186,18 @@ public sealed class CheckpointVerifierTests : IDisposable
     [InlineData("direction", "1.0", "lane-result")]              // none: not measured
     [InlineData("baseline-direction", "1.0", null)]              // the baseline's direction is not read: passed, as recorded
     [InlineData("baseline-target-mode", "1.0", "lane-result")]   // a baseline that is not live: not measured
-    public void ALaneThatReadsAValueThisVersionDoesNotKnowInARun_IsUnverifiable_OnlyWhenTheDocumentHoldingItDeclaresALaterMinor(
+    [InlineData("severity-line-only", "1.1", "lane-result")]     // pre-release: a 1.1 line in a 1.0 run is read at 1.0 (critical)
+    [InlineData("direction-metrics-only", "1.1", "lane-result")] // and a 1.1 metrics.json in a 1.0 run
+    public void ALaneThatReadsAValueThisVersionDoesNotKnowInARun_IsUnverifiable_OnlyWhenTheRunDeclaresALaterMinor(
         string what, string declared, string? expected)
     {
         // [CKP-8] (round 4): recomputing the lane reads something this version does not know; whatever was recorded,
-        // the lane is unverifiable, never lane-result. (Round 5) only when the document holding the value (run.json, the
-        // result line, metrics.json) declares a later minor; one that declares 1.0 is read as §7.3 says and compared as
-        // usual, so a lie gives lane-result. The checkpoint itself declares 1.0 here.
+        // the lane is unverifiable, never lane-result. (Round 5) only in a run that declares a later minor; (pre-release)
+        // a run-side value's minor is its run's run.json's, whatever the line or metrics.json holding it declares, so a
+        // value in a 1.0 run is read as §7.3 says and compared as usual, and a lie gives lane-result. The checkpoint
+        // itself declares 1.0 here.
+        var declaredByTheRun = !what.EndsWith("-only", StringComparison.Ordinal);
+        what = what.Replace("-line-only", "", StringComparison.Ordinal).Replace("-metrics-only", "", StringComparison.Ordinal);
         var run = new LaneRunBuilder("R");
         JsonObject rule = Threshold();
         var lane = (Runs: new List<string> { "R" }, Baseline: (LaneRunBuilder?)null);
@@ -215,6 +220,11 @@ public sealed class CheckpointVerifierTests : IDisposable
                 }
 
                 run.Results.First(l => (string?)l["severity"] == "info")["schemaVersion"] = declared;
+                if (declaredByTheRun)
+                {
+                    run.Run["schemaVersion"] = declared;
+                }
+
                 break;
             default:
                 var baseline = new LaneRunBuilder("B", "v6");
@@ -229,6 +239,10 @@ public sealed class CheckpointVerifierTests : IDisposable
                 {
                     unknown.Metrics["metrics"]![0]!["direction"] = "target_band";
                     unknown.Metrics["schemaVersion"] = declared;
+                    if (declaredByTheRun)
+                    {
+                        unknown.Run["schemaVersion"] = declared;
+                    }
                 }
                 else
                 {

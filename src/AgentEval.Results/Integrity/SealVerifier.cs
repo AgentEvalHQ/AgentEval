@@ -197,6 +197,13 @@ public static class SealVerifier
             }
         }
 
+        // §3.9: an entry whose name is not a Unicode string is named by no seal (a subject's name is a string); it is never
+        // read, so never hashed.
+        foreach (var path in folder.IllFormed)
+        {
+            problems.Add(new AefProblem(path, "not-sealed"));
+        }
+
         // Every sealed file listed is present, or is a blob an authorized redaction withholds.
         foreach (var name in times.Keys.Where(n => AefRunFolder.IsSealed(n) && !folder.Has(n)))
         {
@@ -229,7 +236,7 @@ public static class SealVerifier
             }
         }
 
-        return new SealVerification(seal, AefProblemOrder.Sort(problems));
+        return new SealVerification(seal, AefFolder.PerEntry(AefProblemOrder.Sort(problems), folder.IllFormed));
     }
 
     /// <summary>

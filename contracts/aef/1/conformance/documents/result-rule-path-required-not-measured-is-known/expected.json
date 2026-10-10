@@ -1,0 +1,13 @@
+{
+  "kind": "document",
+  "schema": "result",
+  "writer": "valid",
+  "reader": "valid",
+  "reads": {
+    "aggregation.rulePath": "required-not-measured"
+  },
+  "rules": [
+    "VER-8",
+    "RES-6"
+  ]
+}

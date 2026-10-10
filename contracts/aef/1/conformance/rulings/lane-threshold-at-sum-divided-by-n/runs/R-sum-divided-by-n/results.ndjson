@@ -1,0 +1,5 @@
+{"schemaVersion":"1.0","resultId":"r_498bad2aaf7031fdeb7150b28d1da39a","caseId":"c1","path":"p","evaluator":{"id":"code:check"},"state":"passed","scores":[{"metric":"m","value":0.3}]}
+{"schemaVersion":"1.0","resultId":"r_3d72104282533cb4e8b1c302d6619fb9","caseId":"c2","path":"p","evaluator":{"id":"code:check"},"state":"passed","scores":[{"metric":"m","value":0.4}]}
+{"schemaVersion":"1.0","resultId":"r_fe6cf24f5d28cc4330e061655b41bd1b","caseId":"c3","path":"p","evaluator":{"id":"code:check"},"state":"passed","scores":[{"metric":"m","value":0.5}]}
+{"schemaVersion":"1.0","resultId":"r_382ef8982f7829898c5c95b2b6a233f1","caseId":"c4","path":"p","evaluator":{"id":"code:check"},"state":"passed","scores":[{"metric":"m","value":0.4}]}
+{"schemaVersion":"1.0","resultId":"r_797951d846bf79ce9ca0887182c71948","caseId":"c5","path":"p","evaluator":{"id":"code:check"},"state":"passed","scores":[{"metric":"m","value":0.5}]}

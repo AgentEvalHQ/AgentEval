@@ -66,7 +66,7 @@ internal static class ProduceOps
             writer.Close(scenario.Status, scenario.EndedAt, scenario.AbortReason);
             return DriverIO.Print(stdout, new JsonObject { ["results"] = scenario.Lines.Count });
         }
-        catch (Exception e) when (e is ArgumentException or InvalidOperationException or IOException or UnauthorizedAccessException)
+        catch (Exception e) when (DriverIO.IsInputError(e))
         {
             Clear(output, existed);
             throw new UsageException($"{args[0]}: the writer refuses the run: {e.Message}");

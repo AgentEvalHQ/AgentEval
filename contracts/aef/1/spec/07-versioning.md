@@ -29,7 +29,8 @@
   policy is closed for readers as a whole ([SIG-4]): it is an input, and a verifier cannot honour a restriction it
   does not know.
 - **[VER-6]** A run may mix minors only as their files were written: a reader reads each document at its own
-  `schemaVersion`. A writer writes one minor throughout a run.
+  `schemaVersion`. A writer writes one minor throughout a run, so where a run's minor decides something (whether a
+  value a lane reads comes from a later minor, [CKP-8]), it is its `run.json`'s.
 - `tools/schema_diff.py` compares two versions of the writer schemas and fails on any change [VER-5] does not allow
   (§9.5).
 

@@ -15,7 +15,7 @@ One node of a run's result tree. A composite node carries aggregation; its child
 | `trials` | object |  |  | The rollup line of a case that ran several times. The case's result is this line, never one trial; agree false marks it flaky. |
 | `trials.n` | integer | yes | ≥ 1; ≤ 1000 | How many trials the case had, from 1 to 1000 (RES-8). |
 | `trials.passed` | integer | yes | ≥ 0; ≤ 1000 | How many of the n trials passed; never more than n (RES-8). |
-| `trials.aggregation` | one of `"MajorityVote"`, `"AllPass"`, `"AnyPass"`, `"Mean"`, `"Median"`, `"Max"`, `"PassAtK"` | yes |  | How the trials were combined into the case's state: MajorityVote, AllPass, AnyPass, Mean, Median, Max or PassAtK (with k). Descriptive: a reader shows it, never recomputes it (RES-8). |
+| `trials.aggregation` | one of `"MajorityVote"`, `"AllPass"`, `"AnyPass"`, `"Mean"`, `"Median"`, `"Max"`, `"PassAtK"`, `"AtLeast"` | yes |  | How the trials were combined into the case's state: MajorityVote, AllPass, AnyPass, Mean, Median, Max, PassAtK (with k) or AtLeast (at least the run's executionPolicy.requirePasses of them passed). Descriptive: a reader shows it, never recomputes it (RES-8). |
 | `trials.agree` | boolean | yes |  | Whether the trials agreed. false marks the case as flaky (RES-8). |
 | `trials.k` | integer |  | ≥ 1; ≤ 9007199254740991 | k, for PassAtK: the case passes when at least one of k trials passes. |
 | `evaluator` | object | yes |  | The evaluator that produced this line. |
@@ -61,7 +61,7 @@ One node of a run's result tree. A composite node carries aggregation; its child
 | `aggregation.strategy` | one of `"WeightedSum"`, `"Min"`, `"WeightedMedian"`, `"CapByWorst"`, `"MajorityVote"`, `"Own"` | yes |  | The strategy the producer used, for display: aggregation is descriptive (spec 03, RES-6). |
 | `aggregation.threshold` | number or null |  |  | The threshold the composite score was compared with, or null (RES-5). |
 | `aggregation.score` | number or null |  |  | The composite score the strategy gave, or null when it gave none (RES-5). |
-| `aggregation.rulePath` | one of `"required-error"`, `"nothing-measured"`, `"threshold"`, `"severity"`, `"under-covered"` | yes |  | Which branch of the producer's verdict rules decided the state, for display (spec 03, RES-6). |
+| `aggregation.rulePath` | one of `"required-error"`, `"nothing-measured"`, `"threshold"`, `"severity"`, `"under-covered"`, `"required-not-measured"`, `"failure-effect"` | yes |  | Which branch of the producer's verdict rules decided the state, for display (spec 03, RES-6). |
 | `aggregation.measured` | integer | yes | ≥ 0; ≤ 9007199254740991 | How many children were measured; at most total (RES-6). |
 | `aggregation.total` | integer | yes | ≥ 0; ≤ 9007199254740991 | How many children the node has (RES-5). |
 | `aggregation.minimumMeasuredShare` | number |  | ≥ 0; ≤ 1 | The share of children, from 0 to 1, the producer's rules require to be measured. Fewer gives the rule path under-covered. |

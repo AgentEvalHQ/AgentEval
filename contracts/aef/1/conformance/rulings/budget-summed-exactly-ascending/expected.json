@@ -9,5 +9,5 @@
     "PLAN-2",
     "SUM-5"
   ],
-  "why": "W4-2: three runs cost $0.10, $0.20 and $0.30, named in that order, under maxUsd 0.6. Summed exactly (0.6000000000000000055...) and rounded once, the cost is the binary64 0.6, which equals maxUsd: within it. Added in binary64 in this order it is 0.6000000000000001, over it; compared exactly without rounding, it is over too."
+  "why": "three runs cost $0.10, $0.20 and $0.30, named in that order, under maxUsd 0.6. Summed exactly (0.6000000000000000055...) and rounded once, the cost is the binary64 0.6, which equals maxUsd: within it. Added in binary64 in this order it is 0.6000000000000001, over it; compared exactly without rounding, it is over too."
 }

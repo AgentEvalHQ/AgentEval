@@ -1,6 +1,8 @@
 using System.Collections.Concurrent;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json.Nodes;
+using Microsoft.Win32.SafeHandles;
 
 namespace AgentEval.Results.Tests.Corpus;
 
@@ -10,17 +12,25 @@ namespace AgentEval.Results.Tests.Corpus;
 /// the conformance runner, generating is the runner's job: the driver is given the generated folder as it would be given
 /// a stored one. Each vector is generated once per test run, under the temporary folder, and removed at exit. A
 /// <c>link</c> step (round 7) makes a symbolic link; where this process cannot make one (Windows without the privilege),
-/// the vector is skipped: its theory returns without judging it, as the runner reports it skipped.
+/// the vector is skipped: its theory returns without judging it, as the runner reports it skipped. An
+/// <c>ill-formed-name</c> step (pre-release) makes a file whose name is not a Unicode string: the byte 0xFF on Linux,
+/// the unpaired surrogate U+DCFF on Windows; elsewhere the vector is skipped.
 /// </summary>
 internal static class GeneratedVectors
 {
     private static readonly string Root = Path.Combine(Path.GetTempPath(), $"aef-generated-{Guid.NewGuid():N}");
     private static readonly ConcurrentDictionary<string, Lazy<string?>> Folders = new(StringComparer.Ordinal);
+    private static readonly ConcurrentBag<byte[]> IllFormedFiles = [];
 
     static GeneratedVectors()
     {
         AppDomain.CurrentDomain.ProcessExit += (_, _) =>
         {
+            foreach (var raw in IllFormedFiles)
+            {
+                Unlink(raw);   // the base library cannot remove a file it cannot name
+            }
+
             try
             {
                 Directory.Delete(Root, recursive: true);
@@ -118,6 +128,16 @@ internal static class GeneratedVectors
                     }
 
                     break;
+                case "ill-formed-name":
+                    // An empty file in FOLDER named BEFORE, one ill-formed unit, then AFTER (spec 09 §9.2.1, pre-release).
+                    var into = At(arg![0]);
+                    Directory.CreateDirectory(into);
+                    if (!TryIllFormedName(into, (string)arg[1]!, (string)arg[2]!))
+                    {
+                        return null;
+                    }
+
+                    break;
                 default:
                     throw new InvalidOperationException($"{vector}: a generate step this runner does not know: {op}");
             }
@@ -148,6 +168,40 @@ internal static class GeneratedVectors
             return false;
         }
     }
+
+    // A file whose name is not a Unicode string: on Linux the byte 0xFF (made by its raw name, which the base library
+    // cannot write), on Windows the unpaired surrogate U+DCFF; false elsewhere (macOS refuses such names).
+    private static bool TryIllFormedName(string folder, string before, string after)
+    {
+        if (OperatingSystem.IsWindows())
+        {
+            File.WriteAllBytes(Path.Combine(folder, before + "\uDCFF" + after), []);
+            return true;
+        }
+
+        if (!OperatingSystem.IsLinux())
+        {
+            return false;
+        }
+
+        byte[] path = [.. Encoding.UTF8.GetBytes(Path.Combine(folder, before)), 0xFF, .. Encoding.UTF8.GetBytes(after), 0];
+        const int writeOnly = 0x0001, create = 0x0020, closeOnExec = 0x0010;   // System.Native's flags
+        var fd = Open(path, writeOnly | create | closeOnExec, Convert.ToInt32("644", 8));
+        if (fd == -1)
+        {
+            return false;
+        }
+
+        new SafeFileHandle(fd, ownsHandle: true).Dispose();
+        IllFormedFiles.Add(path);
+        return true;
+    }
+
+    [DllImport("libSystem.Native", EntryPoint = "SystemNative_Open", SetLastError = true)]
+    private static extern IntPtr Open(byte[] path, int flags, int mode);
+
+    [DllImport("libSystem.Native", EntryPoint = "SystemNative_Unlink", SetLastError = true)]
+    private static extern int Unlink(byte[] path);
 
     // A file, or a folder with everything under it.
     private static void Copy(string source, string target)

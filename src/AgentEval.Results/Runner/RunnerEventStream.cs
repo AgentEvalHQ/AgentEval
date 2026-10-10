@@ -439,9 +439,10 @@ public static class RunnerEventStream
             found.Add("suite");
 
         // The run's judges are the models that graded it ([RUN-9]): the plan's with some left out (none, or all, among them),
-        // in order (round 9). A judge is its model, provider and rubric digest (an absent value equals only an absent
-        // one). A run that names none is within; a plan that names none allows none; a judge the plan names twice may be
-        // named twice, never more.
+        // in order. A run's judge is a plan's when it has the plan judge's model (an absent value equals only an absent
+        // one), and its provider and rubric digest wherever the plan judge names them: one that leaves either out leaves
+        // it to the runner. A run that names none is within; a plan that names none allows none; a judge the plan names
+        // twice may be named twice, never more.
         static List<(string?, string?, string?)> Judges(JsonNode? list) =>
             [.. AefNode.Objects(list).Select(j => (AefNode.String(j["model"]), AefNode.String(j["provider"]), AefNode.String(j["rubricDigest"])))];
         if (!IsSubsequence(Judges(run["judges"]), Judges(plan["judges"])))
@@ -458,13 +459,17 @@ public static class RunnerEventStream
         return found;
     }
 
-    // Whether run is planned with some items left out: each item matched at a later place of planned than the one before.
-    private static bool IsSubsequence(List<(string?, string?, string?)> run, List<(string?, string?, string?)> planned)
+    // Whether the run's judges are the plan's with some left out: each matched at a later place of the plan's than the one
+    // before (the earliest place that matches, which never leaves a later judge unmatched that another choice would match).
+    private static bool IsSubsequence(List<(string? Model, string? Provider, string? Rubric)> run, List<(string? Model, string? Provider, string? Rubric)> planned)
     {
+        static bool IsPlans((string? Model, string? Provider, string? Rubric) judge, (string? Model, string? Provider, string? Rubric) plan) =>
+            judge.Model == plan.Model && (plan.Provider is null || judge.Provider == plan.Provider) && (plan.Rubric is null || judge.Rubric == plan.Rubric);
+
         var at = 0;
         foreach (var judge in run)
         {
-            while (at < planned.Count && planned[at] != judge)
+            while (at < planned.Count && !IsPlans(judge, planned[at]))
             {
                 at++;
             }

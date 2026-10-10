@@ -39,7 +39,7 @@ None of these is required. Each lets a reader check more without trusting you.
 
 | Write | Because |
 |---|---|
-| `sum` (and `sumSq`) on every summary entry | a reader checks the mean without the results ([SUM-5]); `sum` must be exact |
+| `sum` (and `sumSq`) on every summary entry | a reader checks the mean without the results ([SUM-5]); `sum` and `value` are each one binary64 value, compared exactly: `value` is that `sum` divided by `n`, not the exact mean |
 | `target.runHash` on every overlay event | the event cannot be replayed onto another run with the same `runId` ([OVL-2]) |
 | `judges[]` with `rubricDigest`, and `calibration` when it was measured before the run | a reader knows which rubric graded, and how far the judge was right on labelled cases ([RUN-9]) |
 | `suite.digest` | the cases themselves, not only their name and version ([RUN-8]) |
@@ -55,13 +55,21 @@ None of these is required. Each lets a reader check more without trusting you.
   say so: `strategy: Own`, each child with weight 0.
 - A case run several times has one line per trial, each tree carrying its `trial`, and one rollup per path with
   `trials` (`n`, `passed`, `agree`) ([RES-8]). A composite case in trials has a rollup at every path its trials have,
-  and those rollups form its tree.
+  and those rollups form its tree. A share rule ("at least 80% of the trials pass") is the aggregation `AtLeast`, with
+  `suite.executionPolicy.requirePasses` the least count that meets it (4 of 5).
 - `tools/aef_conformance.py --kind produce` checks that a writer derives all of this right.
 
 ## Privacy and secrets
 
 - **Choose `contentCapture` on purpose** ([RUN-11]). With `off`, no prompt, response, transcript or judge reasoning is
   kept, no digest of one either, and `reason` and `ext` hold none of it ([SEC-3]).
+- **Evidence that embeds content is content.** Under `off`, write no evidence whose bytes hold prompts or responses,
+  whatever its kind: a `compliance_artifact` that quotes the subject's answers included. No verifier can see what a
+  blob's bytes mean, so only you can keep this rule.
+- **A suite's digest is not content** ([RUN-11]): `suite.digest` and a judge's `rubricDigest` are allowed under `off`.
+  Digest a text file over a stated normalisation, and state it with the suite: its UTF-8 bytes with every line ending
+  made LF, for example (AgentEval's choice). A checkout's line endings (Git's `core.autocrlf` on Windows) then do not
+  change the digest, and two machines name one suite alike.
 - **Never seal a secret** ([SEC-1], [SEC-2]): no key, token or password in any file, `ext` included. A sealed run
   cannot be edited; it can only be withdrawn and produced again.
 - Identities in overlays should be stable opaque ids, not e-mail addresses: an overlay cannot be erased ([SEC-4]).

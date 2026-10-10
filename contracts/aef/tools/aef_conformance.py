@@ -420,6 +420,21 @@ def _generated(v):
             with open(folder / arg[0], "wb" if op == "write" else "ab") as out:
                 for text, repeat in arg[1]:
                     out.write(text.encode("utf-8") * repeat)
+        elif op == "ill-formed-name":  # a file named arg[1], one ill-formed unit, arg[2] (spec 09 §9.2.1)
+            if any(not isinstance(part, str) or "/" in part or "\\" in part for part in arg[1:]):
+                raise ValueError(f"{v.id}: an ill-formed-name step names a file, not a path")
+            target = folder / arg[0]
+            target.mkdir(parents=True, exist_ok=True)
+            try:
+                if os.name == "nt":  # names are UTF-16: an unpaired surrogate
+                    with open(os.path.join(str(target), arg[1] + "\udcff" + arg[2]), "wb"):
+                        pass
+                else:  # names are bytes: 0xFF, never valid UTF-8
+                    with open(os.path.join(os.fsencode(str(target)), arg[1].encode("utf-8") + b"\xff"
+                                           + arg[2].encode("utf-8")), "wb"):
+                        pass
+            except (OSError, UnicodeError) as error:
+                raise GenerateSkipped(f"this platform cannot create a name that is not a Unicode string ({error})") from None
         elif op == "link":  # a symbolic link at arg[0] to arg[1], both relative to the vector's folder
             link, target = folder / arg[0], folder / arg[1]
             link.parent.mkdir(parents=True, exist_ok=True)
@@ -591,6 +606,15 @@ def _policy(expected, folder):
 _STANDARD_BASE64 = re.compile(r"(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?")
 
 
+def _binary64_equal(actual, expected):
+    """CONF-2: two numbers are one binary64 value; null matches only null."""
+    if actual is None or expected is None:
+        return actual is None and expected is None
+    if isinstance(actual, bool) or not isinstance(actual, (int, float)):
+        return False
+    return float(actual) == float(expected)
+
+
 def _close(actual, expected):
     """§3.6: numbers match when they differ by at most 1e-9 x max(1, |expected|); null matches only null."""
     if actual is None or expected is None:
@@ -640,8 +664,8 @@ def judge_write(engine, v, scratch, diffs):
 
 
 def _judge_summary(diffs, out, want):
-    """[SUM-2]-[SUM-9]: runId, lanes and entries in request order; counts, verdict, rule and aggregate exactly; sum,
-    sumSq and value under §3.6's tolerance."""
+    """[SUM-2]-[SUM-9]: runId, lanes and entries in request order; counts, verdict, rule and aggregate exactly; sum and
+    value exactly too, as binary64 (SUM-5 and SUM-8 define each to one value); sumSq under §3.6's tolerance."""
     compare(diffs, "runId", out.get("runId"), want["runId"])
     lanes = [l for l in out.get("lanes")] if isinstance(out.get("lanes"), list) else []
     compare(diffs, "lanes", [l.get("lane") if isinstance(l, dict) else l for l in lanes], [l["lane"] for l in want["lanes"]])
@@ -654,10 +678,13 @@ def _judge_summary(diffs, out, want):
             label = f"{lane['lane']}/{x['metric']}@{x['path']}"
             for field in ("N", "n", "notMeasured", "verdict", "rule", "aggregate"):
                 compare(diffs, f"{label} {field}", got.get(field, "<absent>"), x.get(field, "<absent>"))
-            for field in ("sum", "sumSq", "value"):
-                if not _close(got.get(field, "<absent>"), x[field]):
-                    diffs.append(f"{label} {field}: expected {json.dumps(x[field])} (within 1e-9 x max(1, |x|)), "
-                                 f"got {json.dumps(got.get(field, '<absent>'))}")
+            # SUM-5: sum and sumSq are omitted when they are beyond binary64; absent must then be absent
+            for field, same, how in (("sum", _binary64_equal, "as binary64, exactly"),
+                                     ("value", _binary64_equal, "as binary64, exactly"),
+                                     ("sumSq", _close, "within 1e-9 x max(1, |x|)")):
+                have, want = got.get(field, "<absent>"), x.get(field, "<absent>")
+                if not ((have == "<absent>" and want == "<absent>") or (want != "<absent>" and same(have, want))):
+                    diffs.append(f"{label} {field}: expected {json.dumps(want)} ({how}), got {json.dumps(have)}")
 
 
 PRODUCED = ("metrics.json", "results.ndjson", "run.json", "summary.json")  # spec 09 §9.3: produce writes these

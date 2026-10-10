@@ -30,5 +30,5 @@
     "CKP-8",
     "CONF-2"
   ],
-  "why": "W4-10: missing runs x.ndjson:9 and x.ndjson:10. Only the line paths of a run's own NDJSON and JSONL files order by line number (§3.9); lanes/missing-runs/runs/x.ndjson:10 is not one, so it orders by its bytes, before :9."
+  "why": "missing runs x.ndjson:9 and x.ndjson:10. Only the line paths of a run's own NDJSON and JSONL files order by line number (§3.9); lanes/missing-runs/runs/x.ndjson:10 is not one, so it orders by its bytes, before :9."
 }

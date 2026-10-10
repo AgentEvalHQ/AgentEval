@@ -24,14 +24,16 @@
     {
       "model": "gpt-5.1",
       "provider": "azure.ai.openai",
-      "mode": "single",
-      "rubricDigest": "sha256:a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9"
+      "mode": "panel",
+      "rubricDigest": "sha256:a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9",
+      "panelSize": 2
     },
     {
       "model": "gpt-5.1",
       "provider": "azure.ai.openai",
-      "mode": "single",
-      "rubricDigest": "sha256:a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9"
+      "mode": "panel",
+      "rubricDigest": "sha256:a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9",
+      "panelSize": 2
     }
   ],
   "startedAt": "2026-10-08T12:00:10Z",

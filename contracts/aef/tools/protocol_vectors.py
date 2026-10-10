@@ -115,6 +115,9 @@ def documents():
          "a ci:<name> provider is known: the writer schema accepts it through its pattern, so a reader keeps it"),
         ("plans", "unknown-content-capture", "run-plan", dict(PLAN, contentCapture="partial"), "invalid", "valid",
          ["PLAN-7", "VER-8"], "a content capture this version does not know: a reader takes the plan, and a runner refuses it"),
+        ("plans", "judge-provider-empty", "run-plan",
+         dict(PLAN, judges=[dict(PLAN["judges"][0], provider="")]), "invalid", "invalid", ["PLAN-1", "RUN-9"],
+         "a judge's provider names who serves it: an empty one names nobody, so a plan leaves it out instead"),
         ("plans", "valid-target-mode-scripted", "run-plan", dict(PLAN, targetMode="scripted"), "valid", "valid",
          ["PLAN-7", "RUN-7"],
          "a plan that asks for a scripted stand-in: a runner that cannot drive one refuses it, and its runs are checked "
@@ -205,8 +208,8 @@ def ev(seq, kind, at, **fields):
 
 
 T = "2026-10-08T12:00:{:02d}Z"
-RUN_HASH = "5ad6d0d7e4dbb218bd5503ec4448bd88c8542f18740e0074c4abed6156484985"
-OTHER_HASH = "1406e38d556046d439c0218e150c737fe737a650f9dfd5f988a0c55d24f8bff4"
+RUN_HASH = "5ad6d0d7e4dbb218bd5503ec4448bd88c8542f18740e0074c4abed6156484985"  # DevSkim: ignore DS173237 - a run hash in a stream vector
+OTHER_HASH = "1406e38d556046d439c0218e150c737fe737a650f9dfd5f988a0c55d24f8bff4"  # DevSkim: ignore DS173237 - a run hash in a stream vector
 
 # The rules each stream vector concerns.
 STREAM_RULES = {
@@ -347,6 +350,10 @@ CPLAN = dict(PLAN, planId="plan-43", subject=dict(PLAN["subject"], deployment=DE
              suites=[dict(PLAN["suites"][0], digest=TRIAGE["digest"]), PLAN["suites"][1]],
              limits={"maxUsd": 3.0, "cases": 3, "timeout": "PT2H"})
 NO_JUDGES = {k: v for k, v in dict(CPLAN, planId="plan-44").items() if k != "judges"}
+# R10-6: a plan judge that names no provider leaves it to the runner.
+NO_PROVIDER = dict(CPLAN, planId="plan-53", judges=[{k: v for k, v in CPLAN["judges"][0].items() if k != "provider"}])
+# A plan judge that names no rubric leaves it to the runner too.
+NO_RUBRIC = dict(CPLAN, planId="plan-54", judges=[{k: v for k, v in CPLAN["judges"][0].items() if k != "rubricDigest"}])
 FOUR_CASES = dict(CPLAN, planId="plan-49", limits={"maxUsd": 3.0, "cases": 4, "timeout": "PT2H"})
 CAPTURED = dict(CPLAN, planId="plan-45", contentCapture="on")
 # Plans that name their target mode (a plan without one, as CPLAN, asks for live).
@@ -555,6 +562,8 @@ def conformance():
     (CPLAN): maxUsd 3.0, cases 3. Problems are written in the order of STRM-4: by path (UTF-8 bytes: job first), then by
     code."""
     judge = lambda **j: [dict({"model": "gpt-5.1", "provider": "azure.ai.openai", "mode": "single", "rubricDigest": RUBRIC}, **j)]
+    # RUN-9: judges that graded each result together are a panel, each with mode panel and the panel's size
+    panel = lambda judges: [dict(j, mode="panel", panelSize=len(judges)) for j in judges]
     return [
         ("valid", CPLAN, two_runs([], dict(cases=ONE_CASE, cost=1.5), {}), None, ["STRM-4", "RUN-12"],
          "two runs, one per suite (the frozen one with the plan's digest), each the plan's subject, judges and capture, "
@@ -566,8 +575,7 @@ def conformance():
          "no parent (a case's two trials and their rollup) and one line is a child; R-1 starts as the job is accepted "
          "and R-2 ends as it ends, the same instants written otherwise"),
         ("plan-names-no-judges", NO_JUDGES, one_run([("run:R-1", "judges")]), None, ["STRM-4", "PLAN-1"],
-         "a plan that names no judges allows none (PLAN-1: a runner cannot pick them), and the run names one (changed "
-         "in round 9: the plan's judges were left unchecked)"),
+         "a plan that names no judges allows none (PLAN-1: a runner cannot pick them), and the run names one"),
         ("no-judges-anywhere", NO_JUDGES, one_run([], judges=DROP), None, ["STRM-4", "PLAN-1", "RUN-9"],
          "neither the plan nor the run names a judge: within"),
         ("run-missing", CPLAN, v_run_missing, None, ["STRM-4", "RUN-1"], "R-2 was announced and sealed, but no folder holds it"),
@@ -608,31 +616,37 @@ def conformance():
         ("ended-after-terminal", CPLAN, one_run([("run:R-1", "time")], endedAt="2026-10-08T12:02:00.000000001Z"), None,
          ["STRM-4", "ENC-8"], "the run ended a nanosecond after the job's terminal event"),
         ("judges", CPLAN, one_run([("run:R-1", "judges")], judges=judge(model="gpt-4o-mini")), None, ["STRM-4"],
-         "a judge the plan does not name: another model, with the plan's rubric (changed in round 8: a run's judges "
-         "are some of the plan's, not its whole list)"),
+         "a judge the plan does not name: another model, with the plan's rubric (a run's judges are some "
+         "of the plan's, never one it does not name)"),
         ("judges-rubric", CPLAN, one_run([("run:R-1", "judges")], judges=judge(rubricDigest=OTHER_RUBRIC)), None, ["STRM-4"],
-         "a judge the plan does not name: the plan's model, with another rubric (changed in round 8: a run's judges are "
-         "some of the plan's, not its whole list)"),
+         "a judge the plan does not name: the plan's model, with another rubric (a run's judges are some of "
+         "the plan's, never one it does not name)"),
         ("judges-none", CPLAN, one_run([], judges=DROP), None, ["STRM-4", "RUN-9"],
          "a run that names no judge, on a plan that names one: no model graded it, which is within the plan"),
         ("judges-some", TWO_JUDGES, one_run([], judges=judge(**SECOND_JUDGE)), None, ["STRM-4", "RUN-9"],
          "a run graded by the plan's second judge only: some of the plan's judges, which is within"),
         ("judges-not-named", TWO_JUDGES,
-         one_run([("run:R-1", "judges")], judges=judge() + judge(model="gpt-4o-mini", provider="openai")), None,
+         one_run([("run:R-1", "judges")], judges=panel(judge() + judge(model="gpt-4o-mini", provider="openai"))), None,
          ["STRM-4", "RUN-9"], "the plan's first judge, then one the plan does not name"),
-        ("judges-out-of-order", TWO_JUDGES, one_run([("run:R-1", "judges")], judges=judge(**SECOND_JUDGE) + judge()),
+        ("judges-out-of-order", TWO_JUDGES, one_run([("run:R-1", "judges")], judges=panel(judge(**SECOND_JUDGE) + judge())),
          None, ["STRM-4", "RUN-9"], "both of the plan's judges, the second before the first: not in the plan's order"),
-        ("judges-twice", TWO_JUDGES, one_run([("run:R-1", "judges")], judges=judge() + judge()), None,
+        ("judges-twice", TWO_JUDGES, one_run([("run:R-1", "judges")], judges=panel(judge() + judge())), None,
          ["STRM-4", "RUN-9"], "the plan's first judge named twice, where the plan names it once"),
+        ("judges-plan-names-no-provider", NO_PROVIDER, one_run([]), None, ["STRM-4", "RUN-9"],
+         "the plan's judge names its model and rubric and no provider, which it leaves to the runner; the run names "
+         "the provider that served it: the plan's judge, within"),
+        ("judges-plan-names-no-rubric", NO_RUBRIC, one_run([]), None, ["STRM-4", "RUN-9"],
+         "the plan's judge names its model and provider and no rubric, which it leaves to the runner; the run names "
+         "the rubric that graded: the plan's judge, within"),
         ("judges-other-provider", CPLAN, one_run([("run:R-1", "judges")], judges=judge(provider="openai")), None,
          ["STRM-4", "PLAN-1"], "the plan's model and rubric, served by another provider than the plan names: a judge "
                                "is its model, provider and rubricDigest"),
-        ("judges-two-providers", TWO_PROVIDERS, one_run([], judges=judge() + judge(provider="openai")), None,
-         ["STRM-4", "RUN-9"], "a plan that names one model and rubric under two providers, and a run graded by both: "
-                              "two judges, each the plan's, in its order"),
-        ("judges-plan-names-twice", JUDGE_TWICE, one_run([], judges=judge() + judge()), None, ["STRM-4", "RUN-9"],
+        ("judges-two-providers", TWO_PROVIDERS, one_run([], judges=panel(judge() + judge(provider="openai"))), None,
+         ["STRM-4", "RUN-9"], "a plan that names one model and rubric under two providers, and a run graded by both as a "
+                              "panel: two judges, each the plan's, in its order"),
+        ("judges-plan-names-twice", JUDGE_TWICE, one_run([], judges=panel(judge() + judge())), None, ["STRM-4", "RUN-9"],
          "a plan that names one judge twice lets a run name it twice"),
-        ("judges-more-often-than-plan", JUDGE_TWICE, one_run([("run:R-1", "judges")], judges=judge() * 3), None,
+        ("judges-more-often-than-plan", JUDGE_TWICE, one_run([("run:R-1", "judges")], judges=panel(judge() * 3)), None,
          ["STRM-4", "RUN-9"], "a plan that names one judge twice, and a run that names it three times: more often "
                               "than the plan names it"),
         ("content-capture", CPLAN, one_run([("run:R-1", "content-capture")], contentCapture="on"), None, ["STRM-4", "RUN-11"],

@@ -1,5 +1,54 @@
 # AEF 1.0 changelog
 
+## Unreleased (draft): pre-release fixes before the 1.0 tag
+
+AEF 1.0 is settled but not yet tagged. These are changes to 1.0 itself, made before the `aef-1.0` tag: what critic
+round 11 found, and what AgentEval needs to write AEF natively. None is an erratum.
+
+- **A summary's `sum` and `value` are compared exactly** ([SUM-5], [SUM-8], §3.6): each is defined to one binary64
+  value (`value` is the rounded `sum` divided by `n`; an even count's median is the exact mean of the two middle values,
+  rounded once), so a Run verifier compares them exactly, and an exact mean where SUM-5 gives the division (`0.42` for
+  `0.42000000000000004`) is a `summary` problem. A lane therefore decides on a value every conforming producer writes
+  alike. Only `sumSq` keeps §3.6's tolerance; a producer's own aggregate is not recomputed. The `summarize` judge is
+  exact too ("the same value", not "the same bytes": [ENC-4] leaves the spelling free). Two ruling vectors: a run whose
+  summary writes `0.42` (`summary`), and a `> 0.42` lane that passes on SUM-5's value.
+- **Exit 2 means a recognised input error** ([CONF-3]): an implementation **MUST NOT** report a failure it did not
+  expect as exit 2; it exits 1.
+- **Two `rulePath` values** ([RES-6]): `required-not-measured` (a required child did not run, so the composite's pass
+  is withheld) and `failure-effect` (a child's measured failure decided the state, by the effect its component
+  declares). Known to every 1.0 reader and writer.
+- **A share-threshold trial rule** ([RES-8], [RUN-8]): the aggregation `AtLeast` says a case passes when at least
+  `suite.executionPolicy.requirePasses` of its trials pass, which an `AtLeast` policy requires; "at least 80% of 5
+  trials" is `AtLeast` with `requirePasses` 4. Document vectors and a `produce` vector.
+- **Content capture** ([RUN-11]): a digest of a whole suite's content or of a rubric is not content and is allowed
+  under `off`; evidence of any kind whose bytes hold prompts or responses is content, whatever its kind (no verifier can
+  see a blob's meaning, so only the content kinds are reported). producers.md: digest a suite's text files over a
+  stated normalisation (LF line endings), so a checkout's line endings do not change the digest.
+- **Judges** ([RUN-9]): a judge's `mode` is explained; the plan-conformance runs whose judges graded each result
+  together name them as a panel (`mode: panel`, `panelSize`).
+- **Vectors' public text cites rules**: no vector's `why` or `description` cites a review id or a critic's round any
+  more, and check_spec's check 10 covers them.
+- **A sum beyond binary64** ([SUM-5], [SUM-6], [LANE-2]): when the measured values' exact sum, rounded once, is beyond
+  binary64 (two scores of `1.5e308`), the mean is no binary64 value: the entry omits `sum` and `sumSq`, and, without
+  `aggregate`, its `value` is `null` and its `verdict` `not_measured`, as when `n` is 0; a lane reads it as not
+  measured. A `sumSq` beyond binary64 alone (one score of `1e200`) is omitted, as SUM-5 already said. The reference
+  Producer and Run verifier no longer fail at binary64's edge. Two `summarize` vectors and three ruling vectors (the
+  run as written, the run with the exact mean written, and a lane on it).
+- **A judge's `provider` and `rubricDigest`** ([STRM-4], [RUN-9]): a `provider` is never empty (both schemas refuse
+  `""`). A run's judge is a plan's when it has the plan judge's `model`, and its `provider` and `rubricDigest` wherever
+  the plan judge names them: one the plan leaves out is the runner's, and the run names the provider that served and
+  the rubric that graded. A plan and a run.json document vector, and two plan-conformance vectors.
+- **Dates with their year**: the interop pages and this changelog write "settled 2026-10-09", never a month and day
+  alone; check_spec refuses a date without its year in a published page.
+- **A file name that is not a Unicode string** (§3.9, [RUN-3], [OVL-5]): bytes that are not valid UTF-8, or an
+  unpaired surrogate where names are UTF-16, break RUN-3; a report and a manifest give such a name with U+FFFD in
+  place of each ill-formed part, and a verifier never stops on one. At the run's root it is a `path` problem; under
+  `overlays/` it is the chain's `unexpected-file`, never a problem of the run. A new `generate` step,
+  `ill-formed-name`, makes such a file where the platform can (skipped where it cannot); three vectors.
+- **A run's minor is its `run.json`'s** ([VER-6], [CKP-8]): whether a value a lane reads comes from a later minor is
+  decided by the run's `run.json`, not by the result line or `metrics.json` holding it, so one line declaring 1.1 in a
+  1.0 run no longer makes a lane `unverifiable`: the lane is compared, and a wrong recorded result is `lane-result`.
+
 ## Unreleased (draft): rework after critic round 10
 
 Critic round 10 scored 9.46 of 10 (from 9.43): every round-9 finding fixed in both implementations; only the patent
@@ -115,7 +164,7 @@ commitment and a first green CI run. Changes since:
   IMPLEMENTATIONS.md says CI's first run is pending.
 - **Interop: both directions of both mappings have two converters.** AgentEval.Results.Adapters now converts AEF
   to and from Inspect eval logs as well as OpenTelemetry, written from the page alone, and reproduces every checked
-  example. What it found is ruled into inspect.md (settled 10-10): values, not bytes; a run that
+  example. What it found is ruled into inspect.md (settled 2026-10-10): values, not bytes; a run that
   keeps no content exports no explanation (IN-13), as OT-3; a blob that is not UTF-8 refuses the export, a withheld
   one is left out (IN-12), as OT-9; only the records a sample's lines cite are read or refused; a ref's name is
   decoded on export; equal root times count as one; a reducer with no AEF value is refused only with more than one
@@ -181,7 +230,7 @@ design; the two implementations agreed on every crafted input. Changes since:
     the reader refuses is now an input error (exit 2) for `match`, `stream` and `conform`, as §9.3 now says.
 - **Interop** (informative): a second AEF ↔ OpenTelemetry converter (AgentEval.Results.Adapters, .NET, written from
   the page alone) reproduces the three OpenTelemetry examples.
-  - What it found in `opentelemetry.md` is ruled into the page as rules, settled 10-09:
+  - What it found in `opentelemetry.md` is ruled into the page as rules, settled 2026-10-09:
     - the page fixes values, not bytes, and `check_interop.py` now compares JSON outputs as values;
     - a refused line refuses the whole export;
     - the sealed lines are exported, overlays not applied (OT-7);
@@ -222,7 +271,7 @@ Critic round 5 scored 8.8 of 10 (from 8.6). Changes since:
 - **Interop** (informative): the Inspect → AEF direction is now built and checked.
   - `tools/aef_interop.py from-inspect` converts an Inspect eval log into an imported run, sealed as `ingest`, with
     what it supplies in `imported.asserted`. Writing it from `inspect.md` alone settled what the table left open, as
-    rules and stated refusals of the page (IN-6 to IN-10, settled 10-09): the run header; values the table does not
+    rules and stated refusals of the page (IN-6 to IN-10, settled 2026-10-09): the run header; values the table does not
     place (a map, NaN without a reason, a list); samples (epochs as trials, reductions as rollups, a sample that
     failed before it was scored, usage and case content); the summary, recomputed from the lines and compared with
     Inspect's; and overlays, which the converter does not write.
@@ -303,7 +352,7 @@ addressed, and a second implementation passing every vector kind, writers includ
     every example, verifies every run, checks field by field that a round trip loses exactly the page's "What does not
     carry over" list, and fails when a page's worked example differs from an example's data. Writing it found what
     the two pages left undecided (OT-1 to OT-6, IN-1 to IN-5): the name of an event for a line without scores, the
-    header of an imported run, the shape of Inspect's `results`, overlays, among others. Each was settled on 10-09
+    header of an imported run, the shape of Inspect's `results`, overlays, among others. Each was settled on 2026-10-09
     and written into the page's mapping as a rule or a stated refusal; the converter follows them, and names the rule
     when it refuses. The OpenTelemetry page's loss list is now
     complete (severity, `durationMs`, `turns`, `attack`, `lane`, `normalized`, usage, start times were missing), and

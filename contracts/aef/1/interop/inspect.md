@@ -47,7 +47,7 @@ document. Inspect's documentation tells other languages to get JSON with `inspec
 One AEF run gives one `EvalLog` in `.json` form. Writing `.eval` also needs zstd. The rules and refusals below the
 table cover what the table does not; the reference converter, `tools/aef_interop.py to-inspect`, follows both.
 
-**Values, not bytes** (settled 10-10). As for OpenTelemetry ([opentelemetry.md](opentelemetry.md)), this page fixes
+**Values, not bytes** (settled 2026-10-10). As for OpenTelemetry ([opentelemetry.md](opentelemetry.md)), this page fixes
 values, not bytes, in both directions: the order of members and the spelling of numbers are free
 ([ENC-2](../spec/02-encoding.md#21-json-documents), [ENC-4](../spec/02-encoding.md#21-json-documents)), and a checker
 compares JSON values, as `tools/check_interop.py` does. An unscored value is the bare token `NaN` wherever Inspect
@@ -91,7 +91,7 @@ writes one: a score's value, and a metric's value over no samples (IN-3).
 | overlays `approve`, `reject`, `waive`, `annotate` | `log_updates` | lossy |
 | `seal.json`, signatures, the overlay chain | none: an Inspect log is edited in place | none |
 
-**Beyond the table** (settled 10-09; the ids are those of the former "Still open" items):
+**Beyond the table** (settled 2026-10-09; the ids are those of the former "Still open" items):
 
 - **The eval header Inspect requires** (IN-1). `eval.task` is the suite's ref without `suite:`. `eval.model` is a model
   subject's ref without `model:`, and for any other subject (an agent, a workflow) the subject's `ref` as written, its
@@ -138,8 +138,8 @@ writes one: a score's value, and a metric's value over no samples (IN-3).
   place.
 - **Duration**. `total_time` is `durationMs` / 1000, one binary64 division, not rounded.
 
-**Refused** (IN-1, IN-3 to IN-5, IN-11, IN-12; settled 10-09 and 10-10). The converter refuses these, naming the rule,
-and writes nothing:
+**Refused** (IN-1, IN-3 to IN-5, IN-11, IN-12; settled 2026-10-09 and 2026-10-10). The converter refuses these,
+naming the rule, and writes nothing:
 
 - a run that does not verify (IN-11);
 - a run without a `suite`, or whose suite ref is not `suite:<task>`: `eval.task` is required (IN-1);
@@ -207,7 +207,7 @@ The converted run names the converter in `producer` and the source in `imported`
 | `results.headline` | `ext` | none |
 | `stats.model_usage`, `role_usage` (run totals) | `summary.json` `usage`: one entry per role and model, tokens named as on the result lines and `total_cost` as `costUsd` ([SUM-7](../spec/03-run.md#36-summaryjson)); the role from `eval.model_roles`, `agent` for `eval.model`; `cost.totalUsd`, the sum of `total_cost` | lossy: Inspect's role names become `agent`, `judge`, `attacker` or `other`; two roles that become one AEF role with the same model are added together ([SUM-9](../spec/03-run.md#36-summaryjson)) |
 
-The reference converter, `tools/aef_interop.py from-inspect`, follows the table and these rules (settled 10-09):
+The reference converter, `tools/aef_interop.py from-inspect`, follows the table and these rules (settled 2026-10-09):
 
 - **The run header** (IN-6). `runId` is `eval.eval_id` (or `eval.run_id`). `startedAt` is `stats.started_at`, or
   `eval.created` when the log has none (then listed in `imported.asserted`); `endedAt` is `stats.completed_at`.
@@ -238,7 +238,7 @@ The reference converter, `tools/aef_interop.py from-inspect`, follows the table 
   `eval.model` when no role is the agent. A sample with `error` or `limit` puts each of its lines in `error`
   (`not_measured` for a limit), without scores, with the message in `reason`; one that stopped before it was scored gets
   a line per scorer of `eval.scorers`. With `contentCapture: on`, `input`, `target`, `output` (when it has choices) and
-  `messages` are blobs, as written when they are text and otherwise serialized by JCS (settled 10-10, below), cited by
+  `messages` are blobs, as written when they are text and otherwise serialized by JCS (settled 2026-10-10, below), cited by
   every line of the sample, one evidence record per kind and content. With more than one epoch, each reduction gives the
   case's rollup at its scorer: the reduced score read as a sample's is, `trials.aggregation` and `k` from its reducer.
 - **The summary** (IN-9). One lane, `main`. Each `results.scores` entry gives one summary entry at its name for the
@@ -265,7 +265,7 @@ The reference converter, `tools/aef_interop.py from-inspect`, follows the table 
   and a limit that is not `{type, limit}` is refused. An error message, like an explanation (OT-10), is cut to its
   first 4096 characters, with no mark. An empty `input`, `target` or explanation gives no blob. Two roles that land
   on one AEF role and model are added together.
-- **A limit's number, and an error without a message** (IN-8, settled 10-10). `<limit>` is written from the number's
+- **A limit's number, and an error without a message** (IN-8, settled 2026-10-10). `<limit>` is written from the number's
   binary64 value alone: the shortest decimal that reads back as the same value, the form
   [ENC-4](../spec/02-encoding.md#21-json-documents) recommends, spelled as ECMAScript's `Number::toString` spells it. An
   integral value has no fraction (`1000` for both `1000` and `1000.0`), up to 21 digits in plain digits (`1e16` is
@@ -274,7 +274,7 @@ The reference converter, `tools/aef_interop.py from-inspect`, follows the table 
   whose `type` is empty, or whose `limit` is not a finite number (Inspect's `NaN`), is refused; an infinity never
   reaches it, since `Infinity`, or a number that overflows binary64, is refused as the log is read (IN-6). A sample
   `error` with an empty or absent message gives the reason "Inspect recorded an error without a message".
-- **Content that is not text** (IN-8, settled 10-10). A list of messages, a `ModelOutput` or a list of targets
+- **Content that is not text** (IN-8, settled 2026-10-10). A list of messages, a `ModelOutput` or a list of targets
   becomes a blob holding its JSON serialized by the JSON Canonicalization Scheme
   ([RFC 8785](https://www.rfc-editor.org/rfc/rfc8785), JCS): no whitespace; numbers as ECMAScript's `Number::toString`
   writes them, as for a limit; strings with only `"`, `\` and the control characters escaped; object members sorted
@@ -286,7 +286,7 @@ The reference converter, `tools/aef_interop.py from-inspect`, follows the table 
   no NaN, infinity or unpaired surrogate, so content that holds a NaN is refused: writing it another way would give
   two converters two names again (an infinity and an unpaired surrogate never reach it: the log is refused as it is
   read).
-- **Reading the log** (IN-6, settled 10-10). The log is read as I-JSON
+- **Reading the log** (IN-6, settled 2026-10-10). The log is read as I-JSON
   ([RFC 7493](https://www.rfc-editor.org/rfc/rfc7493)), as AEF reads its own files
   ([ENC-1 to ENC-3](../spec/02-encoding.md#21-json-documents)), within the nesting depth of 64 that
   [ENC-17](../spec/02-encoding.md#26-limits) sets, with the one exception Inspect needs: its bare `NaN`, where an
@@ -298,16 +298,17 @@ The reference converter, `tools/aef_interop.py from-inspect`, follows the table 
   [ENC-3](../spec/02-encoding.md#21-json-documents)); a `NaN` anywhere else; nesting deeper than 64. Every number is
   read as its binary64 value ([ENC-4](../spec/02-encoding.md#21-json-documents)), so the rules below depend on the
   value alone.
-- **Integers** (IN-6, IN-8, IN-9, settled 10-10). Every field the converter reads as an integer is read by its
+- **Integers** (IN-6, IN-8, IN-9, settled 2026-10-10). Every field the converter reads as an integer is read by its
   binary64 value alone ([ENC-4](../spec/02-encoding.md#21-json-documents)): a sample's `id`, a reduction's
   `sample_id` and `eval.task_version` when they are numbers, `eval.config.epochs`, a sample's `epoch`, every token
-  count of a `ModelUsage` (a sample's and the run's), and a metric's `params.k`. An integer value is accepted however
+  count of a `ModelUsage` (a sample's and the run's; `total_tokens` included, which is checked and not written: AEF
+  has no total), and a metric's `params.k`. An integer value is accepted however
   it is written (`1`, `1.0` and `1e0` alike); a value that is not an integer, or is beyond 2^53 − 1 in magnitude, or
   is outside the field's range (`epochs` 1 to 1000, an `epoch` 1 to `epochs`, a token count at least 0, `k` at least
   1), is refused, naming the field's rule: IN-6 for `task_version` and `epochs`, IN-8 for an `id`, an `epoch` and a
   sample's tokens, IN-9 for the run's tokens and `k`. An `id` or a `task_version` is written in decimal digits
   (`1000` for `1e3`), so `1.5` and `9007199254740993` are refused.
-- **A sample's `error` and `limit`** (IN-8, settled 10-10). An `error` that is present and not null is an object, as
+- **A sample's `error` and `limit`** (IN-8, settled 2026-10-10). An `error` that is present and not null is an object, as
   Inspect writes it. One with no `message`, or a null or empty one (`{}` included), gives the reason "Inspect recorded
   an error without a message". A `message` that is not text, or an `error` that is not an object (a string, a number),
   is refused. A `limit` that is present and not null is `{type, limit}`, as the rule on a limit's number says, on a
@@ -319,11 +320,46 @@ The reference converter, `tools/aef_interop.py from-inspect`, follows the table 
   [§3.6](../spec/03-run.md#36-summaryjson)'s tolerance, 1e-9 × max(1, |recomputed|): Inspect's 0.85 and the lines'
   0.8500000000000001 agree. `scored_samples` and `unscored_samples` are not checked.
 
+**Member types** (IN-6 to IN-10, settled 2026-10-10). Every member the converter reads has the JSON type Inspect writes
+for it; a member of another type refuses the log, naming the rule of its row. `null` counts as absent, wherever it is.
+Members the converter keeps as data, unread (`eval.run_id`, `eval.eval_set_id`, `eval.dataset`, `results.headline`,
+`Score.answer`, `Score.metadata`, and a metric beside the mean, under `summary.json`'s `ext`), may hold any JSON value,
+and members it does not read (`version`, `plan`, `eval.metadata`, a sample's `metadata` and `working_time`, an
+error's `traceback`) are not checked. The values are checked where the rules above read them: integers, times, costs
+and durations.
+
+| Member | Type | Rule |
+|---|---|---|
+| `status`, `eval.eval_id`, `eval.created`, `eval.task`, `eval.model`, `eval.packages.inspect_ai`, a role's `model`, `stats.started_at`, `stats.completed_at`, a sample's `started_at` and `completed_at`, the log's `error.message` | string | IN-6 |
+| `eval.task_version` | string, or a number that is an integer | IN-6 |
+| `eval.config`, `eval.packages`, `eval.model_roles` and each role in it, `stats`, the log's `error` | object | IN-6 |
+| `eval.config.epochs_reducer` | list of strings | IN-6 |
+| `eval.config.epochs` | number that is an integer | IN-6 |
+| `samples`, `reductions`, `eval.scorers`, a reduction's `samples` | list | IN-8 |
+| a sample, a scorer, a reduction, a reduced score; a sample's `scores`, `role_usage`, `model_usage`, `error` and `limit` | object | IN-8 |
+| a scorer's `name`, a reduction's `scorer` and `reducer` | string | IN-8 |
+| a sample's `id` | string, or a number that is an integer | IN-8 |
+| a sample's `epoch` | number that is an integer | IN-8 |
+| a sample's `total_time` | number, finite and at least 0 | IN-8 |
+| a `Score` | object | IN-7 |
+| `Score.value` | number, `NaN`, string (a letter), object or list | IN-7 |
+| `Score.explanation`, `Score.reason` | string | IN-7 |
+| `results`, each entry of `results.scores`, an entry's `metrics` and each metric in it, the `params` of the metric read, `stats.model_usage`, `stats.role_usage` | object | IN-9 |
+| `results.scores` | list | IN-9 |
+| an entry's `name` and `scorer` | string | IN-9 |
+| the value of the metric read, and of `stderr` | number or `NaN` | IN-9 |
+| a `ModelUsage` (a sample's: IN-8; the run's: IN-9) | object | IN-8, IN-9 |
+| its token counts and `total_tokens` | number that is an integer, at least 0 | IN-8, IN-9 |
+| its `total_cost` | number, finite and at least 0 | IN-8, IN-9 |
+| `Score.history`, a sample's `invalidation`, `log_updates` | refused when present and not empty | IN-10 |
+
 [`examples/aef-inspect-edges/`](examples/aef-inspect-edges/) and
 [`examples/inspect-aef-edges/`](examples/inspect-aef-edges/) pin these rulings.
 
-**Refused** (IN-6 to IN-10; settled 10-09 and 10-10). The converter refuses these, naming the rule, and writes nothing:
+**Refused** (IN-6 to IN-10; settled 2026-10-09 and 2026-10-10). The converter refuses these, naming the rule, and
+writes nothing:
 
+- a member of a type the table above does not give it (the rule of its row);
 - an `eval_id` that is not an AEF id; a time without an offset; a closed log without `stats.completed_at`, or one
   that ends before it starts; an `error` log without a message; a log that is not I-JSON (a member named twice, an
   unpaired surrogate, `Infinity`, a number that overflows binary64), that holds a `NaN` where no unscored value can
@@ -337,7 +373,7 @@ The reference converter, `tools/aef_interop.py from-inspect`, follows the table 
   in a log that names no scorer); two scores of one case, path and epoch; a limit that is not `{type, limit}` (`{}`
   included, on a scored sample too), whose `type` is empty or whose `limit` is not a finite number; content
   that is not text holding NaN, which JCS cannot write, when the run keeps content (`contentCapture: on`; with `off` the
-  content is not written, so it is not refused; settled 10-10); with more than one epoch, a reduction whose reducer has
+  content is not written, so it is not refused; settled 2026-10-10); with more than one epoch, a reduction whose reducer has
   no AEF value; a reduction with no epoch lines, and, in a closed log, a case's path with epoch lines and no reduction
   ([RES-8](../spec/03-run.md#344-repeated-trials)) (IN-8);
 - a `results.scores` entry with both `accuracy` and `mean`, or with no mean and more than one other metric, or whose

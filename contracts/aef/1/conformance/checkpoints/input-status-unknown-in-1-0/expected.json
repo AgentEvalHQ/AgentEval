@@ -8,7 +8,7 @@
     "DEC-2",
     "VER-6"
   ],
-  "why": "a 1.0 input lane status nobody defined reads as not_measured (DEC-2); the recorded decision is then not the one recomputed (R6-2)",
+  "why": "a 1.0 input lane status nobody defined reads as not_measured (DEC-2); the recorded decision is then not the one recomputed",
   "problems": [
     "decision"
   ]

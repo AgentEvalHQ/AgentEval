@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Builds conformance/rulings/: one vector per ruling made where two implementations read the specification apart
 (the reference tools/aef_verify.py and AgentEval's .NET implementation: findings W3-17 to W3-19 and W4-1 to W4-10 of
-Q4-39, and the critic's R4-8a). With a ruling undone in a copy of a verifier, its vector here fails: each vector pins
-the reading the specification chose against the one it did not.
+Q4-39, and the critic's R4-8a), and the pre-release ruling that SUM-5's sum and value are compared exactly (R11-2).
+With a ruling undone in a copy of a verifier, its vector here fails: each vector pins the reading the specification
+chose against the one it did not.
 
 Each vector is a folder rulings/<name>/ whose expected.json uses an existing kind and that kind's format (run, chain,
 document, stream, plan-conformance, checkpoint, lane: spec 09 §9.2.1), names its rules, and gives the finding it pins
@@ -50,7 +51,7 @@ def w3_17_second_rollup():
     expect(folder, {"kind": "run", "run": "run", "outcome": "invalid",
                     "problems": [["results.ndjson:8", "result-id"], ["results.ndjson:8", "trials"]],
                     "rules": ["RES-8", "RES-4"],
-                    "why": "W3-17: line 8 repeats line 7, the rollup of case k3 at path t (and so its result id). The "
+                    "why": "line 8 repeats line 7, the rollup of case k3 at path t (and so its result id). The "
                            "second rollup for one case and path is reported at the later one (line 8), never at the "
                            "first, which matches its two trial lines."})
 
@@ -76,7 +77,7 @@ def w3_18_target_despite_schema_problem():
     overlay_batches(run_dir, COMPLETED_ID, [events[:1], events[1:] + [stray]], the_hash)
     expect(folder, {"kind": "chain", "run": "run", "problems": [["overlays/events.ndjson:3", "target"]],
                     "rules": ["OVL-2", "OVL-5"],
-                    "why": "W3-18: results.ndjson line 2 has a state 1.0 does not define, a schema problem; the file "
+                    "why": "results.ndjson line 2 has a state 1.0 does not define, a schema problem; the file "
                            "still reads (no encoding or limit problem), so OVL-2's target check is made, and the third "
                            "event, which names a result the run does not have, is target."})
 
@@ -98,11 +99,11 @@ def w3_19_document_limit_of_its_role():
     assert json.loads(seal_bytes)["predicate"]["runHash"] == the_hash
     for name, schema, data, verdict, why in (
             ("document-run-over-4-mib", "run", run_bytes, "invalid",
-             "W3-19: a valid run.json padded with spaces to 4 MiB + 1 byte. The document operation applies the limit of "
+             "a valid run.json padded with spaces to 4 MiB + 1 byte. The document operation applies the limit of "
              "the file its schema names (ENC-17): a run.json is a JSON file of at most 4 MiB, so both schemas refuse "
              "it, however valid its content. Its twin, document-seal-over-4-mib-valid, is the same size and valid."),
             ("document-seal-over-4-mib-valid", "seal", seal_bytes, "valid",
-             "W3-19: a valid seal.json padded with spaces to 4 MiB + 1 byte. A seal's limit is 40 MiB (ENC-17), so "
+             "a valid seal.json padded with spaces to 4 MiB + 1 byte. A seal's limit is 40 MiB (ENC-17), so "
              "the document operation accepts it: the limit is the schema's file's, not one size for every "
              "document (its twin document-run-over-4-mib is refused at the same size).")):
         padded = data[:-1] + b" " * (size - len(data)) + b"\n"
@@ -130,7 +131,7 @@ def w4_1_stream_line_depth_65():
     write_bytes(folder / "events.ndjson", ndjson_bytes(sealed[:1]) + line + ndjson_bytes(sealed[1:]))
     expect(folder, {"kind": "stream", "plan": "plan.json", "problems": [["event:2", "event-invalid"]],
                     "rules": ["STRM-3", "ENC-17"],
-                    "why": "W4-1: the stream complete-sealed with line 2 inserted: event 2 again (seq 2), with an ext "
+                    "why": "the stream complete-sealed with line 2 inserted: event 2 again (seq 2), with an ext "
                            "nested 65 levels deep. A line beyond ENC-17's depth is event-invalid, and the line after it "
                            "is not checked for seq. Read as an event, it would make line 3's seq 2 a seq problem."})
 
@@ -141,12 +142,12 @@ def w4_2_budget_summed_exactly():
     digest = hashlib.sha256(PV.dumps(plan)).hexdigest()
     for name, order, why in (
             ("budget-summed-exactly-ascending", ["R-1", "R-2", "R-3"],
-             "W4-2: three runs cost $0.10, $0.20 and $0.30, named in that order, under maxUsd 0.6. Summed exactly "
+             "three runs cost $0.10, $0.20 and $0.30, named in that order, under maxUsd 0.6. Summed exactly "
              "(0.6000000000000000055...) and rounded once, the cost is the binary64 0.6, which equals maxUsd: within it. "
              "Added in binary64 in this order it is 0.6000000000000001, over it; compared exactly without rounding, it "
              "is over too."),
             ("budget-summed-exactly-descending", ["R-3", "R-2", "R-1"],
-             "W4-2: the same three runs named in the other order: within the budget all the same (in binary64, in "
+             "the same three runs named in the other order: within the budget all the same (in binary64, in "
              "this order, 0.3 + 0.2 + 0.1 is 0.6).")):
         folder = OUT / name
         runs = folder / "runs"
@@ -173,7 +174,7 @@ def w4_3_input_only_lane():
     write_json(folder / "document.json", doc)
     expect(folder, {"kind": "checkpoint", "schema": "checkpoint", "writer": "valid", "reader": "valid",
                     "problems": ["evidence", "lanes"], "rules": ["CKP-7"],
-                    "why": "W4-3: valid-decided, its input given a lane phantom (a copy of the quality lane, with its "
+                    "why": "valid-decided, its input given a lane phantom (a copy of the quality lane, with its "
                            "result) that the manifest does not have, and the decision recomputed from that input. "
                            "phantom has a result but no runs: evidence, as for a lane on both sides; and lanes."})
 
@@ -263,6 +264,138 @@ def r4_8a_undecided_trial(runs):
     return lanes, results, [], ["LANE-3", "RES-8"]
 
 
+# ---------------------------------------------------------------------------- SUM-5 defined exactly (R11-2)
+
+# Scores whose binary64 sum is 2.1: SUM-5's value is 2.1 / 5 = 0.42000000000000004, the exact mean 0.42.
+SUM5_LINES = [dict(case=f"c{i}", path="p", state="passed", scores=LV.scores(m=v))
+              for i, v in enumerate((0.3, 0.4, 0.5, 0.4, 0.5), start=1)]
+
+
+def r11_2_exact_mean():
+    """A sealed run whose summary writes the exact mean, 0.42, where SUM-5 gives 0.42000000000000004."""
+    folder = OUT / "summary-exact-mean-is-a-summary-problem"
+    run_id = "R-exact-mean"
+    LV.make_run(folder, run_id, SUM5_LINES, sealed=False)
+    run_dir = folder / run_id
+    summary = read_json(run_dir / "summary.json")
+    entry = summary["lanes"][0]["metrics"][0]
+    assert (entry["sum"], entry["value"]) == (2.1, 0.42000000000000004), entry
+    entry["value"] = 0.42
+    write_json(run_dir / "summary.json", summary)
+    seal(run_dir, read_json(run_dir / "run.json"), "producer", sealed_at="2026-10-07T00:00:00Z")
+    run_dir.rename(folder / "run")
+    expect(folder, {"kind": "run", "run": "run", "outcome": "invalid", "problems": [["summary.json", "summary"]],
+                    "rules": ["SUM-5"],
+                    "why": "the lines score 0.3, 0.4, 0.5, 0.4 and 0.5. SUM-5's value is their binary64 sum, 2.1, "
+                           "divided by 5: 0.42000000000000004. This summary writes the exact mean, 0.42, another "
+                           "binary64 value: SUM-5 defines value to one binary64 value, so it is compared exactly, and "
+                           "this is a summary problem, though it lies within 1e-9 of the right one."})
+
+
+def r11_2_threshold(runs):
+    run = LV.make_run(runs, "R-sum-divided-by-n", SUM5_LINES)
+    lanes = [("above-0.42", LV.threshold("quality", ">", 0.42), [run], True)]
+    return lanes, {"above-0.42": LV.res("passed", "2026-10-01T12:00:00Z")}, [], ["SUM-5", "LANE-2"]
+
+
+# ---------------------------------------------------------------------------- a sum beyond binary64 (R10-3)
+
+# Two scores of 1.5e308: their exact sum, 3e308, is beyond binary64.
+BEYOND_LINES = [dict(case=f"c{i}", path="p", state="passed", scores=LV.scores(m=1.5e308)) for i in (1, 2)]
+
+
+def r10_3_sum_beyond_binary64():
+    """As a producer writes it (no sum or sumSq, value null, not_measured), and with the exact mean written instead."""
+    for name, mean, outcome, problems, why in (
+            ("summary-sum-beyond-binary64", None, "intact", [],
+             "two scores of 1.5e308: their exact sum, 3e308, is beyond binary64, so the mean is no binary64 value. The "
+             "summary omits sum and sumSq, and its value is null and its verdict not_measured, as when nothing was "
+             "measured: the run is intact, and a verifier recomputing it does not fail on the overflow."),
+            ("summary-sum-beyond-binary64-mean-written", 1.5e308, "invalid", [["summary.json", "summary"]],
+             "the same lines, and a summary that writes the exact mean, 1.5e308, a finite number: SUM-5 gives no "
+             "binary64 value for a mean whose sum is beyond binary64, so its value is null, and this is a summary "
+             "problem.")):
+        folder = OUT / name
+        run_id = "R-" + name
+        LV.make_run(folder, run_id, BEYOND_LINES, sealed=False)
+        run_dir = folder / run_id
+        summary = read_json(run_dir / "summary.json")
+        entry = summary["lanes"][0]["metrics"][0]
+        assert "sum" not in entry and "sumSq" not in entry and entry["value"] is None, entry
+        assert entry["verdict"] == "not_measured", entry
+        if mean is not None:
+            entry.update(value=mean, verdict="passed")
+            write_json(run_dir / "summary.json", summary)
+        seal(run_dir, read_json(run_dir / "run.json"), "producer", sealed_at="2026-10-07T00:00:00Z")
+        run_dir.rename(folder / "run")
+        expect(folder, {"kind": "run", "run": "run", "outcome": outcome, "problems": problems,
+                        "rules": ["SUM-5", "SUM-6"], "why": why})
+
+
+def r10_3_lane(runs):
+    run = LV.make_run(runs, "R-sum-beyond-binary64", BEYOND_LINES)
+    lanes = [("at-least-zero", LV.threshold("quality", ">=", 0), [run], True)]
+    return lanes, {"at-least-zero": LV.res("not_measured", "2026-10-01T12:00:00Z")}, [], ["SUM-5", "LANE-2"]
+
+
+# ---------------------------------------------------------------------------- names that are not Unicode strings (F1)
+
+REPORTED = "n\ufffdo.txt"  # the name n, one ill-formed unit, o.txt, as a report gives it (§3.9)
+
+
+def f1_ill_formed_names():
+    """Generated (spec 09 §9.2.1): a file name that is not a Unicode string, at the run's root and under overlays/."""
+    copy = {"copy": ["valid/completed-eval/run", "run"]}
+    for name, kind, where, outcome, problems, rules, why in (
+            ("name-not-unicode-at-the-root", "run", "run", "invalid",
+             [[REPORTED, "not-sealed"], [REPORTED, "path"]], ["RUN-3", "SEAL-3"],
+             "a sealed run with a file added at its root whose name is n, one ill-formed unit (the byte 0xFF, or an "
+             "unpaired surrogate where names are UTF-16), then o.txt: not a Unicode string, so a path problem, and a "
+             "file the seal does not list. The report names it with U+FFFD in place of the ill-formed unit, and the "
+             "verifier does not stop on it."),
+            ("name-not-unicode-under-overlays", "run", "run/overlays", "intact", [], ["RUN-3", "OVL-5"],
+             "the same name under overlays/: nothing under overlays/ is a problem of the run (§4.5), so the run is "
+             "intact."),
+            ("name-not-unicode-under-overlays-chain", "chain", "run/overlays", None,
+             [["overlays/" + REPORTED, "unexpected-file"]], ["OVL-5", "RUN-3"],
+             "the same name under overlays/, as the chain reports it: an unexpected file, named with U+FFFD in place "
+             "of the ill-formed unit.")):
+        expected = {"kind": kind, "run": "run", "generate": [copy, {"ill-formed-name": [where, "n", "o.txt"]}]}
+        if outcome is not None:
+            expected["outcome"] = outcome
+        expected.update(problems=problems, rules=rules, why=why)
+        expect(OUT / name, expected)
+
+
+# ---------------------------------------------------------------------------- a run's minor is its run.json's (F4)
+
+def f4_later_line_in_a_1_0_run():
+    """A 1.0 run with one result line that declares 1.1 and holds a severity 1.0 does not know: the lane is read at
+    the run's minor, 1.0, so it is compared (lane-result), not unverifiable."""
+    folder = OUT / "lane-later-line-in-a-1-0-run"
+    runs = folder / "runs"
+    run_id = "S-1-0-with-a-1-1-line"
+    LV.make_run(runs, run_id, [dict(case="c1", path="a", state="passed"),
+                               dict(case="c2", path="a", state="failed", severity="catastrophic"),
+                               dict(case="c3", path="a", state="passed"),
+                               dict(case="c4", path="a", state="failed", severity="low")], sealed=False, **OK_RATE)
+    run_dir = runs / run_id
+    lines = [json.loads(line) for line in (run_dir / "results.ndjson").read_text(encoding="utf-8").splitlines()]
+    lines[1]["schemaVersion"] = "1.1"  # one line declares a later minor; run.json declares 1.0
+    write_ndjson(run_dir / "results.ndjson", lines)
+    the_hash = seal(run_dir, read_json(run_dir / "run.json"), "producer", sealed_at="2026-10-07T00:00:00Z")
+    lanes = [("severity-1-0-run", {"kind": "severity", "max": "none"}, [(run_id, the_hash)], True)]
+    LV.checkpoint(folder, lanes, {"severity-1-0-run": LV.res("passed", SEVERITY_ENDED)})
+    expect(folder, {"kind": "lane", "checkpoint": "checkpoint.json", "runs": "runs",
+                    "lanes": [{"lane": "severity-1-0-run", "result": LV.res("failed", SEVERITY_ENDED)}],
+                    "problems": [["lanes/severity-1-0-run", "lane-result"]], "rules": ["CKP-8", "VER-6", "LANE-3"],
+                    "why": "the run's run.json declares 1.0, and one result line declares 1.1 with a severity 1.0 does "
+                           "not know (catastrophic). A run's minor is its run.json's (a writer writes one minor "
+                           "throughout a run), so the lane is read at 1.0, the unknown severity as critical (§7.3), "
+                           "and compared: c4's known low failure already fails max none, and the manifest's recorded "
+                           "passed is a lane-result problem, not unverifiable."})
+
+
 # ---------------------------------------------------------------------------- main
 
 def main():
@@ -275,23 +408,35 @@ def main():
     w4_2_budget_summed_exactly()
     w4_3_input_only_lane()
     lane_vector("lane-run-named-twice-evidence-present", w4_5_evidence_present,
-                "W4-5: a lane's runs are its distinct pairs of runId and runHash (LANE-4): E1 named twice is one run, "
+                "a lane's runs are its distinct pairs of runId and runHash (LANE-4): E1 named twice is one run, "
                 "so evidence-present with runs 2 is not_measured (and with runs 1 passed: once, not never).")
     lane_vector("lane-run-named-twice-severity", w4_5_severity,
-                "W4-5: S-two-passed (two passed lines) named twice is one run: two decided lines, so minimumN 4 is "
+                "S-two-passed (two passed lines) named twice is one run: two decided lines, so minimumN 4 is "
                 "not_measured, and minimumN 2 passed (its lines count once, not never).")
     lane_vector("comparison-judges-absent-equals-empty", w4_6_judges_absent,
-                "W4-6: the candidate's run.json has no judges and the baseline's has judges: []. A run without judges "
+                "the candidate's run.json has no judges and the baseline's has judges: []. A run without judges "
                 "has the empty list (LANE-6), so the judges and rubrics axes agree, the comparison is made, and the 15 "
                 "regressions against 5 improvements fail it (p = 0.0207 <= 0.05), not incomparable.")
     lane_vector("lane-missing-runs-ordered-by-bytes", w4_10_missing_runs_order,
-                "W4-10: missing runs x.ndjson:9 and x.ndjson:10. Only the line paths of a run's own NDJSON and JSONL "
+                "missing runs x.ndjson:9 and x.ndjson:10. Only the line paths of a run's own NDJSON and JSONL "
                 "files order by line number (§3.9); lanes/missing-runs/runs/x.ndjson:10 is not one, so it orders by "
                 "its bytes, before :9.")
     lane_vector("severity-undecided-trial-under-decided-rollup", r4_8a_undecided_trial,
-                "R4-8a: LANE-3 reads trial lines in step 1 only (a failing trial fails the lane). In step 2 a case is "
+                "LANE-3 reads trial lines in step 1 only (a failing trial fails the lane). In step 2 a case is "
                 "its rollup: c1's inconclusive trial does not make the lane not_measured, since c1's rollup passed; "
                 "and minimumN counts the two decided lines (c1's rollup, c2), not the passed trial: 3 is not met.")
+    r11_2_exact_mean()
+    r10_3_sum_beyond_binary64()
+    f1_ill_formed_names()
+    f4_later_line_in_a_1_0_run()
+    lane_vector("lane-sum-beyond-binary64-not-measured", r10_3_lane,
+                "the run's two scores of 1.5e308 have a sum beyond binary64, so its summary's value is null: the lane "
+                "reads the run as not measured, not as passed, however low its threshold.")
+    lane_vector("lane-threshold-at-sum-divided-by-n", r11_2_threshold,
+                "the run's lines score 0.3, 0.4, 0.5, 0.4 and 0.5, and its summary's value is SUM-5's: their binary64 "
+                "sum, 2.1, divided by 5, 0.42000000000000004. That is above the rule's 0.42, so the lane passes. The "
+                "exact mean, 0.42, is not above it, and a summary that writes it is a summary problem "
+                "(summary-exact-mean-is-a-summary-problem): every conforming producer's run decides this lane alike.")
     print("ruling vectors written:", ", ".join(sorted(p.name for p in OUT.iterdir())))
 
 

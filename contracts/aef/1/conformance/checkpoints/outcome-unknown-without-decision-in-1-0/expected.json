@@ -7,7 +7,7 @@
     "CKP-7",
     "VER-6"
   ],
-  "why": "a 1.0 manifest decided with an outcome nobody defined and no decision: not unverifiable, which only a later minor's values are, but a decision that cannot be recomputed (R7-4)",
+  "why": "a 1.0 manifest decided with an outcome nobody defined and no decision: not unverifiable, which only a later minor's values are, but a decision that cannot be recomputed",
   "problems": [
     "decision"
   ]

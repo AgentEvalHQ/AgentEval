@@ -29,5 +29,5 @@
     "ENC-17",
     "ENC-18"
   ],
-  "why": "W3-19: a valid run.json padded with spaces to 4 MiB + 1 byte. The document operation applies the limit of the file its schema names (ENC-17): a run.json is a JSON file of at most 4 MiB, so both schemas refuse it, however valid its content. Its twin, document-seal-over-4-mib-valid, is the same size and valid."
+  "why": "a valid run.json padded with spaces to 4 MiB + 1 byte. The document operation applies the limit of the file its schema names (ENC-17): a run.json is a JSON file of at most 4 MiB, so both schemas refuse it, however valid its content. Its twin, document-seal-over-4-mib-valid, is the same size and valid."
 }

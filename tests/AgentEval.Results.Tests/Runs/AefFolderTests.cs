@@ -1,6 +1,9 @@
 using System.Diagnostics;
 using System.Net.Sockets;
+using System.Runtime.InteropServices;
+using System.Text;
 using AgentEval.Results.Runs;
+using Microsoft.Win32.SafeHandles;
 
 namespace AgentEval.Results.Tests.Runs;
 
@@ -24,8 +27,15 @@ public sealed class AefFolderTests : IDisposable
         File.WriteAllText(Path.Combine(_outside, "secret.txt"), "not part of the run");
     }
 
+    private readonly List<byte[]> _rawFiles = [];
+
     public void Dispose()
     {
+        foreach (var raw in _rawFiles)
+        {
+            Unlink(raw);   // the base library cannot remove a file it cannot name
+        }
+
         Directory.Delete(_run, recursive: true);
         Directory.Delete(_outside, recursive: true);
     }
@@ -337,6 +347,140 @@ public sealed class AefFolderTests : IDisposable
             Assert.ThrowsAny<IOException>(() => AefFolder.KindOf(Path.Combine(_run, "no-such-entry")));
         }
     }
+
+    // ------------------------------------------------------------------ names that are not Unicode strings (§3.9)
+
+    [Theory]
+    [InlineData(new byte[] { 0xFF }, "\uFFFD")]                       // one byte that is never UTF-8
+    [InlineData(new byte[] { 0xFF, 0xFE }, "\uFFFD\uFFFD")]           // two maximal ill-formed subsequences
+    [InlineData(new byte[] { 0xF0, 0x9F, 0x98 }, "\uFFFD")]            // a four-byte sequence cut short: one
+    [InlineData(new byte[] { 0xC3, 0x28 }, "\uFFFD(")]                 // a lead byte without its continuation
+    public void OnLinux_ANameThatIsNotUtf8_IsListedUnderItsSpellingWithUFFFD_AsAPathProblem_AndNeverRead(byte[] illFormed, string spelled)
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            return;
+        }
+
+        var name = $"n{spelled}o.txt";
+        RawFile(_run, illFormed, "x"u8.ToArray());
+
+        var listing = AefFolder.List(_run);
+
+        Assert.DoesNotContain(name, listing.Files);   // no reader opens it
+        Assert.Equal([name], listing.IllFormed!);
+        Assert.Equal([new AefProblem(name, "path")], listing.Problems);
+    }
+
+    [Fact]
+    public void OnLinux_UnderOverlays_SuchANameIsNoProblemOfTheRun_ButTheChainsUnexpectedFile()
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            return;
+        }
+
+        Directory.CreateDirectory(Path.Combine(_run, "overlays"));
+        RawFile(Path.Combine(_run, "overlays"), [0xFF], []);
+
+        var listing = AefFolder.List(_run);
+
+        Assert.Empty(listing.Problems);
+        Assert.Equal(["overlays/n\uFFFDo.txt"], listing.OverlayIrregular!);
+        Assert.Equal([new AefProblem("overlays/n\uFFFDo.txt", "unexpected-file")],
+            AgentEval.Results.Integrity.OverlayChain.Verify(AefRunFolder.Open(_run), null, "", null).Problems);
+    }
+
+    [Fact]
+    public void OnLinux_TwoNamesWithOneSpelling_AreEachListed_AndEachReported()
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            return;
+        }
+
+        RawFile(_run, [0xFF], []);
+        RawFile(_run, [0xFE], []);   // n\xFEo.txt and n\xFFo.txt are both n\uFFFDo.txt
+
+        var listing = AefFolder.List(_run);
+
+        Assert.Equal(["n\uFFFDo.txt", "n\uFFFDo.txt"], listing.IllFormed!);
+        Assert.Equal([new AefProblem("n\uFFFDo.txt", "path"), new AefProblem("n\uFFFDo.txt", "path")], listing.Problems);
+    }
+
+    [Fact]
+    public void OnLinux_ASealedRunWithSuchAName_IsInvalid_NotSealedAndAPathProblem_OncePerEntry()
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            return;
+        }
+
+        // A sealed run of the corpus, copied, with two such files at its root.
+        var source = Path.Combine(Corpus.AefCorpus.Conformance, "valid", "completed-eval", "run");
+        foreach (var file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
+        {
+            var to = Path.Combine(_run, "sealed", Path.GetRelativePath(source, file));
+            Directory.CreateDirectory(Path.GetDirectoryName(to)!);
+            File.Copy(file, to);
+        }
+
+        var run = Path.Combine(_run, "sealed");
+        RawFile(run, [0xFF], "x"u8.ToArray());
+        RawFile(run, [0xFE], "y"u8.ToArray());
+
+        var verification = AgentEval.Results.Integrity.AefRunVerifier.Verify(run);
+
+        Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Invalid, verification.Outcome);
+        Assert.Equal(
+            [new AefProblem("n\uFFFDo.txt", "not-sealed"), new AefProblem("n\uFFFDo.txt", "not-sealed"),
+             new AefProblem("n\uFFFDo.txt", "path"), new AefProblem("n\uFFFDo.txt", "path")],
+            verification.Problems);
+        // A sealer refuses such a run: its paths are not ones a seal can name ([SEAL-1], [RUN-3]).
+        File.Delete(Path.Combine(run, "seal.json"));
+        File.Delete(Path.Combine(run, "attestation.dsse.json"));
+        var refused = Assert.Throws<InvalidOperationException>(() => AgentEval.Results.Writing.AefSealer.Seal(
+            run, new AgentEval.Results.Writing.AefSealOptions { SealedBy = AgentEval.Results.Writing.AefSealedBy.Ingest }));
+        Assert.Contains("n\uFFFDo.txt path", refused.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void OnWindows_ANameWithAnUnpairedSurrogate_IsListedUnderItsSpellingWithUFFFD_AsAPathProblem_AndNeverRead()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        File.WriteAllBytes(Path.Combine(_run, "n\uDCFFo.txt"), "x"u8.ToArray());
+
+        var listing = AefFolder.List(_run);
+
+        Assert.DoesNotContain("n\uFFFDo.txt", listing.Files);
+        Assert.Equal(["n\uFFFDo.txt"], listing.IllFormed!);
+        Assert.Equal([new AefProblem("n\uFFFDo.txt", "path")], listing.Problems);
+    }
+
+    // A file in folder named n, the ill-formed bytes, then o.txt, made by its raw name (the base library cannot).
+    private void RawFile(string folder, byte[] illFormed, byte[] content)
+    {
+        byte[] path = [.. Encoding.UTF8.GetBytes(Path.Combine(folder, "n")), .. illFormed, .. "o.txt"u8, 0];
+        const int writeOnly = 0x0001, create = 0x0020, closeOnExec = 0x0010;   // System.Native's flags
+        var fd = Open(path, writeOnly | create | closeOnExec, Convert.ToInt32("644", 8));
+        Assert.NotEqual(-1, fd);
+        using (var stream = new FileStream(new SafeFileHandle(fd, ownsHandle: true), FileAccess.Write, 1))
+        {
+            stream.Write(content);
+        }
+
+        _rawFiles.Add(path);
+    }
+
+    [DllImport("libSystem.Native", EntryPoint = "SystemNative_Open", SetLastError = true)]
+    private static extern IntPtr Open(byte[] path, int flags, int mode);
+
+    [DllImport("libSystem.Native", EntryPoint = "SystemNative_Unlink", SetLastError = true)]
+    private static extern int Unlink(byte[] path);
 
     private static bool TryLink(string link, string target, bool folder)
     {

@@ -81,8 +81,9 @@ def L(case, state, scores=None, path="q", **extra):
 
 def E(metric_id, path, *, N, measured, sum, sumSq, value, rule=None, verdict=None, aggregate=None, given=None):
     """A hand-written entry: N and the measured values in file order (the hand reading of SUM-3 and SUM-4), and
-    sum, sumSq and value as decimals worked out by hand (value None when nothing was measured). rule and verdict are
-    the producer's; given is the producer's value for an aggregate method AEF does not define."""
+    sum, sumSq and value as decimals worked out by hand (value None when nothing was measured; sum or sumSq None when
+    it is beyond binary64, so omitted). rule and verdict are the producer's; given is the producer's value for an
+    aggregate method AEF does not define."""
     return {"metric": metric_id, "path": path, "N": N, "measured": measured, "sum": sum, "sumSq": sumSq,
             "value": value, "rule": rule, "verdict": verdict, "aggregate": aggregate, "given": given}
 
@@ -128,6 +129,14 @@ def derive(lines, lane, lane_names, metric_id, kind, path):
 def num(exact):
     """An exact value rounded once to binary64; an integer in plain digits."""
     return exact.numerator if exact.denominator == 1 and abs(exact.numerator) <= 2 ** 53 else float(exact)
+
+
+def finite(exact):
+    """SUM-5: an exact value rounded once to binary64, or None beyond binary64 (then omitted)."""
+    try:
+        return num(exact)
+    except OverflowError:
+        return None
 
 
 def agrees(exact, hand, where):
@@ -186,10 +195,14 @@ def expected_summary(name, run_id, metrics, lines, lanes):
             assert (N, measured) == (e["N"], e["measured"]), f"{where}: derived N={N}, measured={measured}"
             values = [Fraction(v) for v in measured]  # the exact binary64 values the lines hold
             n, total, squares = len(values), sum(values, Fraction(0)), sum((v * v for v in values), Fraction(0))
-            agrees(total, e["sum"], where + " sum")
-            agrees(squares, e["sumSq"], where + " sumSq")
+            rounded_sum, rounded_sq = finite(total), finite(squares)
+            for exact, rounded, hand, what in ((total, rounded_sum, e["sum"], "sum"), (squares, rounded_sq, e["sumSq"], "sumSq")):
+                assert (rounded is None) == (hand is None), f"{where}: {what} {rounded} against {hand}"
+                if hand is not None:
+                    agrees(exact, hand, f"{where} {what}")
             method = (e["aggregate"] or {}).get("method")
-            if n == 0:
+            beyond = n > 0 and rounded_sum is None  # SUM-5: the mean is no binary64 value
+            if n == 0 or (beyond and method is None):
                 value = None
             elif method is None:
                 # SUM-5: the binary64 sum (exact, rounded once) divided by n, in one binary64 division
@@ -207,9 +220,13 @@ def expected_summary(name, run_id, metrics, lines, lanes):
             if value is not None:
                 agrees(value, e["value"], where + " value")
             ask = {"metric": e["metric"], "path": e["path"]}
-            entry = {"metric": e["metric"], "path": e["path"], "N": N, "n": n, "notMeasured": N - n, "sum": num(total),
-                     "sumSq": num(squares), "value": None if value is None else num(value),
-                     "verdict": "not_measured" if n == 0 else e["verdict"] or "scored"}
+            entry = {"metric": e["metric"], "path": e["path"], "N": N, "n": n, "notMeasured": N - n}
+            if rounded_sum is not None:
+                entry["sum"] = rounded_sum
+            if rounded_sq is not None:
+                entry["sumSq"] = rounded_sq
+            entry.update(value=None if value is None else num(value),
+                         verdict="not_measured" if n == 0 or (beyond and method is None) else e["verdict"] or "scored")
             for field in ("rule", "verdict", "aggregate"):
                 if e[field] is not None:
                     ask[field] = e[field]
@@ -409,10 +426,29 @@ def summarize_vectors():
                         value="0.333333333333")])])
 
     summarize_vector(
+        "sum-of-squares-beyond-binary64",
+        "one score of 1e200: its square, 1e400, is beyond binary64, so the summary omits sumSq (SUM-5); sum and value "
+        "are 1e200 as written.",
+        ["SUM-5"],
+        [metric("delta", "score", "none", "unbounded")],
+        [L("k1", "scored", {"delta": 1e200})],
+        [("quality", [E("delta", "q", N=1, measured=[1e200], sum="1e200", sumSq=None, value="1e200")])])
+
+    summarize_vector(
+        "sum-beyond-binary64",
+        "two scores of 1.5e308: their exact sum, 3e308, is beyond binary64, so the mean is no binary64 value. The entry "
+        "omits sum and sumSq, its value is null and its verdict not_measured, as when nothing was measured, and a lane "
+        "reads it as not measured (SUM-5, SUM-6, LANE-2).",
+        ["SUM-5", "SUM-6"],
+        [metric("delta", "score", "none", "unbounded")],
+        [L("k1", "scored", {"delta": 1.5e308}), L("k2", "scored", {"delta": 1.5e308})],
+        [("quality", [E("delta", "q", N=2, measured=[1.5e308, 1.5e308], sum=None, sumSq=None, value=None)])])
+
+    summarize_vector(
         "value-is-sum-divided-by-n",
         "the value is the binary64 sum divided by n, in one binary64 division: 0.3 + 0.4 + 0.5 + 0.4 + 0.5 is 2.1, and "
-        "2.1 / 5 is 0.42000000000000004, not the exact mean 0.42. A verifier accepts either within §3.6; two producers "
-        "that follow SUM-5 write the same bytes.",
+        "2.1 / 5 is 0.42000000000000004, not the exact mean 0.42. SUM-5 defines it to one binary64 value, so it is "
+        "compared exactly: a Producer that writes the exact mean 0.42 fails this vector.",
         ["SUM-5"],
         [metric("delta", "score", "none", "unbounded")],
         [L(f"k{i}", "scored", {"delta": v}) for i, v in enumerate((0.3, 0.4, 0.5, 0.4, 0.5), start=1)],
@@ -667,8 +703,27 @@ def produce_vectors():
                       E("pass_rate", "q", N=2, measured=[1, 1], sum="2", sumSq="2", value="1")])])
 
     produce_vector(
+        "case-in-trials-at-least",
+        "A case run five times under AtLeast with requirePasses 4 (a share threshold of 80%): four trials pass, so the "
+        "rollup the producer gives passes; it carries n 5, passed 4, agree false and the aggregation AtLeast. The "
+        "summary counts the rollup, never a trial, whatever the aggregation.",
+        ["RES-8", "RUN-8", "SUM-3"],
+        [case("k1", node("q", "passed", quality=0.8), aggregation="AtLeast",
+              trees=[node("q", "passed", quality=0.9), node("q", "passed", quality=0.8),
+                     node("q", "failed", quality=0.3, severity="medium"), node("q", "passed", quality=0.9),
+                     node("q", "passed", quality=0.7)]),
+         case("k2", node("q", "passed", quality=0.6))],
+        [H("k1", "q", t) for t in range(5)] + [H("k1", "q", trials=(5, 4, False)), H("k2", "q")],
+        # the rollup's 0.8 and k2's 0.6: 1.4; squares 0.64 + 0.36 = 1; 0.7.
+        [("quality", [E("quality", "q", N=2, measured=[0.8, 0.6], sum="1.4", sumSq="1", value="0.7"),
+                      E("pass_rate", "q", N=2, measured=[1, 1], sum="2", sumSq="2", value="1")])],
+        run=scenario_run("produce-case-in-trials-at-least",
+                         suite={"ref": "suite:a/b", "version": "1",
+                                "executionPolicy": {"trialsPerCase": 5, "requirePasses": 4, "aggregation": "AtLeast"}}))
+
+    produce_vector(
         "independent-roots-in-trials",
-        "One case with two independent root trees, at q and at q/x, each run in two trials (R5-5, R6-5): each has its "
+        "One case with two independent root trees, at q and at q/x, each run in two trials: each has its "
         "own rollup, and the rollup at q/x is a root, as its trial lines are: a path's spelling makes no parent.",
         ["RES-8", "RES-4"],
         [case("k1", node("q", "passed", quality=0.8), aggregation="AllPass",
@@ -835,7 +890,7 @@ def produce_vectors():
 
 # ---------------------------------------------------------------------------- seal-write
 
-TRACE, SPAN ="4bf92f3577b34da6a3ce929d0e0e4736", "00f067aa0ba902b7"
+TRACE, SPAN ="4bf92f3577b34da6a3ce929d0e0e4736", "00f067aa0ba902b7"  # DevSkim: ignore DS173237 - W3C Trace Context example ids
 
 
 def seal_write_vector(name, why, rules, build, order, sealed_by, sealed_at, predicate):

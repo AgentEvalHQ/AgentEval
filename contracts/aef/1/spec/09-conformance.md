@@ -220,6 +220,7 @@ vector's folder before it runs the vector. Each step is an object with one membe
 | `{"remove": PATH}` | removes a file or a folder |
 | `{"files": [FOLDER, N]}` | creates `N` empty files in `FOLDER`, named `0` to `N`−1 |
 | `{"write": [PATH, PARTS]}`, `{"append": [PATH, PARTS]}` | writes or appends a file of `PARTS`: `[text, count]` pairs, each text in UTF-8 repeated `count` times |
+| `{"ill-formed-name": [FOLDER, BEFORE, AFTER]}` | creates in `FOLDER` an empty file whose name is `BEFORE`, one ill-formed unit, then `AFTER`: the byte 0xFF where a file system names files in bytes, the unpaired surrogate U+DCFF where it names them in UTF-16. Either is reported as `BEFORE`, U+FFFD, `AFTER` (§3.9). A runner on a platform that can create neither skips the vector and reports it as skipped |
 | `{"link": [PATH, TARGET]}` | makes `PATH` a symbolic link to `TARGET` (both relative to the vector's folder; the link itself holds the relative path between them). A runner on a platform that cannot create one skips the vector and reports it as skipped |
 
 Paths are relative to the vector's folder, `/`-separated, with no `..` segment, no drive and no leading `/`: a
@@ -238,6 +239,8 @@ each limit of [ENC-17] at its value or one beyond.
   operation, input paths as arguments, one JSON value (UTF-8, no BOM) on standard output, exit status 0 when the
   operation ran and 2 with a message on standard error for a usage or input error. An input error is exit 2 and
   nothing else: any other exit status (1, a crash, a signal) is neither, and fails the vector, whatever it expects.
+  An implementation exits 2 only for a usage or input error it recognises: a failure it did not expect is not one,
+  and it **MUST NOT** report it as exit 2, but exits 1.
   Problems are `[path, code]` pairs in the order of §3.9, except a checkpoint's [CKP-7] codes, which are codes alone
   in code order. Times are RFC 3339 UTC strings ([ENC-8]).
 
@@ -272,9 +275,9 @@ each limit of [ENC-17] at its value or one beyond.
   signature need not be deterministic. The runner judges what was written with the reference verifier, whichever
   implementation is under test:
   - `summarize`: the output is valid against the writer `summary` schema; `runId`, the lanes and entries in request
-    order, `N`, `n`, `notMeasured`, `verdict`, `rule` and `aggregate` are as expected; `sum`, `sumSq` and `value` match
-    the expected values ([SUM-5]: `sum` and `sumSq` computed exactly and rounded once, `value` that `sum` divided by
-    `n`) under §3.6's rule, within 1e-9 × max(1, |expected|);
+    order, `N`, `n`, `notMeasured`, `verdict`, `rule` and `aggregate` are as expected; `sum` and `value` are the
+    expected ones, compared as binary64 ([SUM-5] and [SUM-8] define each exactly); `sumSq` matches the expected one
+    under §3.6's rule, within 1e-9 × max(1, |expected|);
     and the run, with the output added as its `summary.json`, verifies `unsealed` with no problems.
   - `produce`: the runner gives a fresh `OUT`. It then holds the four files and no other; `run.json` and
     `metrics.json` are the scenario's `run` and `metrics`; every line of `results.ndjson` is valid against the writer

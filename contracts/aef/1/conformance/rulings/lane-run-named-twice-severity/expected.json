@@ -25,5 +25,5 @@
     "LANE-3",
     "LANE-4"
   ],
-  "why": "W4-5: S-two-passed (two passed lines) named twice is one run: two decided lines, so minimumN 4 is not_measured, and minimumN 2 passed (its lines count once, not never)."
+  "why": "S-two-passed (two passed lines) named twice is one run: two decided lines, so minimumN 4 is not_measured, and minimumN 2 passed (its lines count once, not never)."
 }

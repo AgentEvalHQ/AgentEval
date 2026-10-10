@@ -1,0 +1,44 @@
+{
+  "kind": "produce",
+  "rules": [
+    "RES-8",
+    "RUN-8",
+    "SUM-3"
+  ],
+  "scenario": "scenario.json",
+  "results": "expected-results.ndjson",
+  "summary": {
+    "schemaVersion": "1.0",
+    "runId": "produce-case-in-trials-at-least",
+    "lanes": [
+      {
+        "lane": "quality",
+        "metrics": [
+          {
+            "metric": "quality",
+            "path": "q",
+            "N": 2,
+            "n": 2,
+            "notMeasured": 0,
+            "sum": 1.4,
+            "sumSq": 1.0,
+            "value": 0.7,
+            "verdict": "scored"
+          },
+          {
+            "metric": "pass_rate",
+            "path": "q",
+            "N": 2,
+            "n": 2,
+            "notMeasured": 0,
+            "sum": 2,
+            "sumSq": 2,
+            "value": 1,
+            "verdict": "scored"
+          }
+        ]
+      }
+    ]
+  },
+  "why": "A case run five times under AtLeast with requirePasses 4 (a share threshold of 80%): four trials pass, so the rollup the producer gives passes; it carries n 5, passed 4, agree false and the aggregation AtLeast. The summary counts the rollup, never a trial, whatever the aggregation."
+}

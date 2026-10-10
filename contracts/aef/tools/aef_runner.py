@@ -749,7 +749,7 @@ def job(plan_path, runner_path, target_path, out_dir, at=None):
         raise InputError(f"{out_dir}: OUT is a folder that does not exist yet, or an empty one")
 
     started = clock.now()
-    job_id = "job-" + hashlib.sha256(f"{plan_digest}\x1f{runner['runnerId']}\x1f{format_time(started)}"
+    job_id = "job-" + hashlib.sha256(f"{plan_digest}\x1f{runner['runnerId']}\x1f{format_time(started)}"  # DevSkim: ignore DS197836 - a job id, not a secret
                                      .encode("utf-8")).hexdigest()[:16]
     out.mkdir(parents=True, exist_ok=True)
     work = Job(out, plan, plan_digest, runner, target, clock, job_id)

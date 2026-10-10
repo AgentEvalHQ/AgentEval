@@ -16,5 +16,5 @@
     "RES-8",
     "RES-4"
   ],
-  "why": "W3-17: line 8 repeats line 7, the rollup of case k3 at path t (and so its result id). The second rollup for one case and path is reported at the later one (line 8), never at the first, which matches its two trial lines."
+  "why": "line 8 repeats line 7, the rollup of case k3 at path t (and so its result id). The second rollup for one case and path is reported at the later one (line 8), never at the first, which matches its two trial lines."
 }

@@ -13,7 +13,7 @@ namespace AgentEval.Results.Tests.Runner;
 /// </summary>
 public sealed class RunnerEventStreamTests : IDisposable
 {
-    private const string Accepted = """{"schemaVersion":"1.0","seq":1,"kind":"job.accepted","jobId":"job-7","at":"2026-10-08T12:00:00Z","planId":"plan-1","planDigest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","runnerId":"runner-1"}""";
+    private const string Accepted = """{"schemaVersion":"1.0","seq":1,"kind":"job.accepted","jobId":"job-7","at":"2026-10-08T12:00:00Z","planId":"plan-1","planDigest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","runnerId":"runner-1"}"""; // DevSkim: ignore DS173237 — a placeholder digest
 
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"aef-stream-{Guid.NewGuid():N}");
 
@@ -225,20 +225,29 @@ public sealed class RunnerEventStreamTests : IDisposable
     [InlineData("A B", "A C", false)]          // one the plan does not name
     [InlineData("A B", "A-other-rubric", false)]    // the plan's model with another rubric digest
     [InlineData("A B", "A-other-provider", false)]  // the plan's model served by another provider
+    [InlineData("P", "A", true)]               // a plan judge that names no provider leaves it to the runner
+    [InlineData("P", "A-other-provider", true)]
+    [InlineData("A", "P", false)]              // a plan judge that names one: the run's names it too
+    [InlineData("M", "A", true)]               // a plan judge that names only its model leaves provider and rubric to the runner
+    [InlineData("M", "A-other-rubric", true)]
+    [InlineData("M", "C", false)]              // but not the model
     [InlineData(null, "A", false)]             // a plan that names no judges allows none
     [InlineData("", "A", false)]
     [InlineData(null, null, true)]
     [InlineData("", "", true)]
     public void ARunsJudges_AreThePlansWithSomeLeftOut_InOrder(string? planJudges, string? runJudges, bool within)
     {
-        // [STRM-4] judges (round 9): a run names the models that graded it ([RUN-9]); a judge is its model, provider and
-        // rubric digest; the run's, in order, are the plan's with some left out (none, or all, among them).
+        // [STRM-4] judges: a run names the models that graded it ([RUN-9]); the run's, in order, are the plan's with some
+        // left out (none, or all, among them); a run's judge is a plan's with its model and rubric digest and, when the
+        // plan judge names a provider, that provider.
         static JsonObject Judge(string name) => name switch
         {
             "A" => new() { ["model"] = "gpt-5.1", ["provider"] = "azure.ai.openai", ["rubricDigest"] = "sha256:" + new string('a', 64) },
             "B" => new() { ["model"] = "llama-3.3-70b", ["provider"] = "local", ["rubricDigest"] = "sha256:" + new string('b', 64) },
             "C" => new() { ["model"] = "gpt-4o-mini", ["provider"] = "openai", ["rubricDigest"] = "sha256:" + new string('a', 64) },
             "A-other-provider" => new() { ["model"] = "gpt-5.1", ["provider"] = "openai", ["rubricDigest"] = "sha256:" + new string('a', 64) },
+            "P" => new() { ["model"] = "gpt-5.1", ["rubricDigest"] = "sha256:" + new string('a', 64) },
+            "M" => new() { ["model"] = "gpt-5.1" },
             _ => new() { ["model"] = "gpt-5.1", ["provider"] = "azure.ai.openai", ["rubricDigest"] = "sha256:" + new string('c', 64) },
         };
         static JsonArray Judges(string names) => new([.. names.Split(' ', StringSplitOptions.RemoveEmptyEntries).Select(n => (JsonNode?)Judge(n))]);
@@ -262,16 +271,19 @@ public sealed class RunnerEventStreamTests : IDisposable
     }
 
     [Fact]
-    public void AJudgesAbsentRubricDigest_EqualsOnlyAnAbsentOne()
+    public void APlanJudgeThatNamesOnlyItsModel_LeavesProviderAndRubricToTheRunner_ButNotTheModel()
     {
         JobRun("R-1", 0.1, b =>
         {
-            b.Run["judges"] = new JsonArray(new JsonObject { ["model"] = "gpt-5.1", ["rubricDigest"] = "sha256:" + new string('a', 64) });
+            b.Run["judges"] = new JsonArray(new JsonObject { ["model"] = "gpt-5.1", ["provider"] = "openai", ["rubricDigest"] = "sha256:" + new string('a', 64) });
             return b.Line("c1", "p", "passed");
         });
         var plan = Plan();
         plan["judges"] = new JsonArray(new JsonObject { ["model"] = "gpt-5.1" });
 
+        Assert.Empty(Conform(plan, Announce("R-1"), Sealed(3, "R-1")));
+
+        plan["judges"] = new JsonArray(new JsonObject { ["model"] = "gpt-5" });   // only the model is always compared
         Assert.Equal(["run:R-1 judges"], Conform(plan, Announce("R-1"), Sealed(3, "R-1")));
     }
 

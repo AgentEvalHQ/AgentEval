@@ -3,6 +3,7 @@
 // Licensed under the MIT License.
 
 using System.Runtime.InteropServices;
+using System.Text;
 
 namespace AgentEval.Results.Runs;
 
@@ -45,8 +46,14 @@ public enum AefEntryKind
 /// <param name="Problems">The <c>path</c> problems of [RUN-3] outside <c>overlays/</c>, or the one <c>limit</c> at <c>.</c>.</param>
 /// <param name="OverlaysOverLimit">More than 19,999 files under <c>overlays/</c>.</param>
 /// <param name="OverlayIrregular">The entries under <c>overlays/</c> that are not regular files nor folders, in byte order.</param>
+/// <param name="IllFormed">
+/// The entries outside <c>overlays/</c> whose name is not a Unicode string (§3.9), each under its spelling with U+FFFD for
+/// each ill-formed part, once per entry, in byte order: <c>path</c> problems, never read. (Under <c>overlays/</c> they
+/// are in <paramref name="OverlayIrregular"/>.)
+/// </param>
 public sealed record AefFolderListing(
-    IReadOnlyList<string> Files, IReadOnlyList<AefProblem> Problems, bool OverlaysOverLimit = false, IReadOnlyList<string>? OverlayIrregular = null);
+    IReadOnlyList<string> Files, IReadOnlyList<AefProblem> Problems, bool OverlaysOverLimit = false, IReadOnlyList<string>? OverlayIrregular = null,
+    IReadOnlyList<string>? IllFormed = null);
 
 /// <summary>
 /// Lists a run folder as [RUN-3] (contracts/aef/1/spec/03-run.md) allows it: every entry is a regular file or a
@@ -100,6 +107,16 @@ public static class AefFolder
     private static readonly AsyncLocal<bool> s_fallbackForTesting = new();
 
     /// <summary>Lists the folder (see <see cref="AefFolderListing"/>).</summary>
+    /// <remarks>
+    /// A name that is not a Unicode string (§3.9) is listed, never refused and never read: the base library gives it as
+    /// its spelling with U+FFFD for each ill-formed part (on Linux, as its decoder replaces each maximal ill-formed
+    /// subsequence of bytes; on Windows this walk replaces each unpaired surrogate), and the spec needs nothing from such
+    /// an entry but its name. Outside <c>overlays/</c> it is a <c>path</c> problem (and, in a sealed run, the seal names it
+    /// nowhere: <c>not-sealed</c>); under <c>overlays/</c> it is the chain's <c>unexpected-file</c>. It is in
+    /// <see cref="AefFolderListing.IllFormed"/> or <see cref="AefFolderListing.OverlayIrregular"/>, never in
+    /// <see cref="AefFolderListing.Files"/>, so no reader opens it; a folder so named is one such entry, not walked. Two such
+    /// entries with one spelling are each listed, and each reported.
+    /// </remarks>
     /// <exception cref="IOException">The folder or an entry cannot be read.</exception>
     public static AefFolderListing List(string folder)
     {
@@ -114,6 +131,7 @@ public static class AefFolder
 
         var files = new List<string>();
         var irregular = new List<string>();
+        var illFormed = new List<string>();   // outside overlays/, once per entry
         var counted = 0;          // [ENC-17]: the files that count toward the limit
         var overlayEntries = 0;   // [ENC-17]: the files under overlays/, one events file and two per batch at most
         var pending = new Stack<(string Full, string Relative)>();
@@ -123,15 +141,24 @@ public static class AefFolder
             foreach (var full in Directory.EnumerateFileSystemEntries(current.Full, "*", options))
             {
                 var name = Path.GetFileName(full);
-                var relative = current.Relative.Length == 0 ? name : $"{current.Relative}/{name}";
-                var kind = KindOf(full);
-                if (kind == AefEntryKind.Folder)
+                var spelling = WithoutUnpairedSurrogates(name);
+                var relative = current.Relative.Length == 0 ? spelling : $"{current.Relative}/{spelling}";
+                var kind = ReferenceEquals(spelling, name) ? KindOrIllFormed(full, name) : null;
+                if (kind is null)
+                {
+                    // §3.9: a name that is not a Unicode string, reported under its spelling and never read.
+                    (IsUnderOverlays(relative) ? irregular : illFormed).Add(relative);
+                }
+                else if (kind == AefEntryKind.Folder)
                 {
                     pending.Push((full, relative));
                     continue;
                 }
+                else
+                {
+                    (kind == AefEntryKind.File ? files : irregular).Add(relative);
+                }
 
-                (kind == AefEntryKind.File ? files : irregular).Add(relative);
                 overlayEntries += IsUnderOverlays(relative) ? 1 : 0;
                 counted += CountsTowardTheLimit(relative) ? 1 : 0;
                 if (counted > AefLimits.MaxFiles)
@@ -141,20 +168,71 @@ public static class AefFolder
             }
         }
 
-        // [RUN-3]'s rules are on the paths of files; a link, pipe, socket or device is a path problem whatever its name.
-        // overlays/ is not checked by them (round 5): whatever it holds is the overlay chain's to report ([OVL-5]). Its
-        // files are still listed whatever their number (R4N-8), for the chain to read.
+        // [RUN-3]'s rules are on the paths of files; a link, pipe, socket or device is a path problem whatever its name,
+        // and so is a name that is not a Unicode string (§3.9), once per such entry. overlays/ is not checked by them (round
+        // 5): whatever it holds is the overlay chain's to report ([OVL-5]). Its files are still listed whatever their
+        // number (R4N-8).
         var runFiles = files.Concat(irregular).Where(p => !IsUnderOverlays(p)).ToList();
         var runIrregular = irregular.Where(p => !IsUnderOverlays(p));
         var problems = AefPaths.Check(runFiles)
             .Concat(runIrregular.Select(p => new AefProblem(p, "path")))
             .Concat(runFiles.Where(BreaksTheOverlaysBoundary).Select(p => new AefProblem(p, "path")))
+            .Concat(illFormed.Select(p => new AefProblem(p, "path")))
             .Distinct();
+        var sortedIllFormed = illFormed.Order(AefProblemOrder.Utf8).ToList();
         return new AefFolderListing(
             [.. files.Order(AefProblemOrder.Utf8)],
-            AefProblemOrder.Sort(problems),
+            PerEntry(AefProblemOrder.Sort(problems), sortedIllFormed),
             overlayEntries > AefLimits.MaxOverlayFiles,
-            [.. irregular.Where(IsUnderOverlays).Order(AefProblemOrder.Utf8)]);
+            [.. irregular.Where(IsUnderOverlays).Order(AefProblemOrder.Utf8)],
+            sortedIllFormed);
+    }
+
+    /// <summary>
+    /// §3.9: problems already ordered, with each problem at a path two or more entries share (names that are not Unicode
+    /// strings with one spelling, <paramref name="entries"/> listing each once per entry) repeated once per entry, so each
+    /// entry is reported.
+    /// </summary>
+    internal static IReadOnlyList<AefProblem> PerEntry(IReadOnlyList<AefProblem> problems, IEnumerable<string> entries)
+    {
+        var shared = entries.GroupBy(p => p, StringComparer.Ordinal).Where(g => g.Count() > 1).ToDictionary(g => g.Key, g => g.Count(), StringComparer.Ordinal);
+        return shared.Count == 0
+            ? problems
+            : [.. problems.SelectMany(p => Enumerable.Repeat(p, shared.TryGetValue(p.Path, out var times) ? times : 1))];
+    }
+
+    // An entry's kind, or null for a name the base library decoded with U+FFFD and then cannot find by that spelling: a
+    // name that is not a Unicode string (§3.9), whose bytes the base library does not give.
+    private static AefEntryKind? KindOrIllFormed(string full, string name)
+    {
+        try
+        {
+            return KindOf(full);
+        }
+        catch (IOException) when (name.Contains('�', StringComparison.Ordinal))
+        {
+            return null;
+        }
+    }
+
+    // A name with each unpaired surrogate replaced by U+FFFD, or the same string when it has none.
+    private static string WithoutUnpairedSurrogates(string name)
+    {
+        StringBuilder? spelled = null;
+        for (var i = 0; i < name.Length; i++)
+        {
+            var c = name[i];
+            var paired = char.IsHighSurrogate(c) ? i + 1 < name.Length && char.IsLowSurrogate(name[i + 1])
+                : !char.IsLowSurrogate(c) || (i > 0 && char.IsHighSurrogate(name[i - 1]));
+            if (!paired && spelled is null)
+            {
+                spelled = new StringBuilder(name, 0, i, name.Length);
+            }
+
+            spelled?.Append(paired ? c : '�');
+        }
+
+        return spelled?.ToString() ?? name;
     }
 
     /// <summary>Whether <paramref name="path"/> is under <c>overlays/</c>, which [RUN-3] does not check ([OVL-5] does).</summary>

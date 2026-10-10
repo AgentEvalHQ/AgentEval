@@ -154,13 +154,63 @@ public class AefSummaryCalculatorTests
     }
 
     [Theory]
+    [InlineData(0.42000000000000004, 0.42000000000000004, true)]
+    [InlineData(0.42, 0.42000000000000004, false)]   // the exact mean where SUM-5 gives the division
+    [InlineData(1.0, 1.0 + 1e-10, false)]
+    [InlineData(1.7e308, double.PositiveInfinity, false)]
+    public void SumAndValue_AreTheRecomputedBinary64ValuesExactly(double written, double recomputed, bool same) =>
+        Assert.Equal(same, AefSummaryCalculator.Same(written, recomputed));
+
+    [Theory]
+    [InlineData(new[] { 1.5e308, 1.5e308 }, double.PositiveInfinity)]                       // beyond binary64
+    [InlineData(new[] { -1.5e308, -1.5e308 }, double.NegativeInfinity)]
+    [InlineData(new[] { 1e308, 1e308, -1e308 }, 1e308)]                                      // a partial sum leaves binary64, the sum does not
+    [InlineData(new[] { 1e308, 1e308, -1e308, -1e308, 5e-324 }, 5e-324)]                    // exactly, to the least subnormal
+    [InlineData(new[] { 1.7976931348623157e308, 9.9792015476736e291 }, double.PositiveInfinity)]   // max + half its unit: the tie goes to even, beyond
+    [InlineData(new[] { 1.7976931348623157e308, 4.9896007738368e291 }, 1.7976931348623157e308)]    // max + a quarter: max
+    public void AnExactSum_BeyondBinary64_IsAnInfinity_AndOneWithinIt_IsFoundThoughAPartialSumLeavesIt(double[] values, double sum) =>
+        Assert.Equal(sum, AefSummaryCalculator.ExactSum(values));
+
+    [Fact]
+    public void AnEntryWhoseSumIsBeyondBinary64_HasNoMean_AndReadsAsNotMeasured_ButAnAggregateKeepsItsValue()
+    {
+        // [SUM-5], [SUM-6], [SUM-8]: two scores of 1.5e308.
+        var lines = new[] { 1.5e308, 1.5e308 }.Select(v => Line("scored", v)).ToList();
+
+        var mean = AefSummaryCalculator.Compute(lines, ["a"], "a", "m", "score", "q");
+        Assert.Equal((double.PositiveInfinity, (double?)null, true), (mean.Sum, mean.Value, mean.ReadsNotMeasured));
+
+        var median = AefSummaryCalculator.Compute(lines, ["a"], "a", "m", "score", "q", "median");
+        Assert.Equal((1.5e308, false), (median.Value, median.ReadsNotMeasured));
+    }
+
+    [Fact]
+    public void TheMean_IsTheRoundedSumDividedByN_InOneDivision()
+    {
+        // [SUM-5]: 0.4 + 0.5 + 0.6 + 0.3 + 0.3 is 2.1 rounded once; 2.1 / 5 is 0.42000000000000004, not 0.42.
+        var lines = new[] { 0.4, 0.5, 0.6, 0.3, 0.3 }.Select(v => Line("passed", v)).ToList();
+        var figures = AefSummaryCalculator.Compute(lines, ["a"], "a", "m", "score", "q");
+
+        Assert.Equal(2.1, figures.Sum);
+        Assert.Equal(0.42000000000000004, figures.Value);
+    }
+
+    [Theory]
+    [InlineData(new[] { 0.1, 0.2 }, 0.15000000000000002)]                    // (0.1 + 0.2) rounded once, halved
+    [InlineData(new[] { 1.7976931348623157e308, 1.7976931348623157e308 }, 1.7976931348623157e308)]   // the sum overflows; the mean does not
+    [InlineData(new[] { 5e-324, 1e-323 }, 1e-323)]                           // 1.5 × the least subnormal: the tie goes to even
+    [InlineData(new[] { 3.0, 1.0, 2.0 }, 2.0)]
+    public void AnEvenCountsMedian_IsTheExactMeanOfTheTwoMiddleValues_RoundedOnce(double[] values, double median) =>
+        Assert.Equal(median, AefSummaryCalculator.Median(values));
+
+    [Theory]
     [InlineData(1.0, 1.0 + 1e-10, true)]
     [InlineData(1.0, 1.0 + 2e-9, false)]
     [InlineData(1e12, 1e12 + 900, true)]   // relative to |recomputed| beyond 1
     [InlineData(1e12, 1e12 + 1100, false)]
     [InlineData(0.0, 9e-10, true)]          // absolute below 1
     [InlineData(1.7e308, double.PositiveInfinity, false)]   // a sum that overflows: no written number is it
-    public void WrittenAndRecomputed_MatchWithin1e9TimesMaxOf1AndTheRecomputed(double written, double recomputed, bool matches) =>
+    public void ASumOfSquares_MatchesWithin1e9TimesMaxOf1AndTheRecomputed(double written, double recomputed, bool matches) =>
         Assert.Equal(matches, AefSummaryCalculator.Matches(written, recomputed));
 
     private static JsonObject Line(string state, double? score = null)

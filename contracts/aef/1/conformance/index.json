@@ -5561,6 +5561,27 @@
    }
   },
   {
+   "id": "invalid/run-at-least-without-require-passes",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
+   ],
+   "rules": [
+    "RUN-8",
+    "RES-8"
+   ],
+   "path": "invalid/run-at-least-without-require-passes",
+   "files": {
+    "document.json": "f3aa4cb485821216db897443e3f81daed7a3c342fe4ae85e1653b0dc40c73fa3",
+    "expected.json": "03cc053540afd906cc48199a6443e9753d32fef2433885348da2a346aa916c88"
+   }
+  },
+  {
    "id": "invalid/run-bad-timestamp",
    "kind": "document",
    "classes": [
@@ -5680,6 +5701,26 @@
    "files": {
     "document.json": "76a497e8ade006bdd643474129b362abebb86a0beb6155489d16fcec70931b53",
     "expected.json": "aae65072b413d2cdc182a563b644ad831b3134cc106df90b51e9dc5dcab3271b"
+   }
+  },
+  {
+   "id": "invalid/run-judge-provider-empty",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
+   ],
+   "rules": [
+    "RUN-9"
+   ],
+   "path": "invalid/run-judge-provider-empty",
+   "files": {
+    "document.json": "90f82cc8980a035008c3d6f1dcf41ee3eb2410c1155797a63dc97035fe4880ab",
+    "expected.json": "4e096f86028017ae6e08f655ebd321ddad6be6ea8f1d51dcb553ce7c3dcc740c"
    }
   },
   {
@@ -7096,6 +7137,69 @@
    }
   },
   {
+   "id": "documents/result-rule-path-failure-effect-is-known",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
+   ],
+   "rules": [
+    "VER-8",
+    "RES-6"
+   ],
+   "path": "documents/result-rule-path-failure-effect-is-known",
+   "files": {
+    "document.json": "5a40224594e919a5b37b6072ef9e1145cf0c58c83f48be74c5c313e3ef0d56f8",
+    "expected.json": "1afcd7e6d6d96884125bf17dc4a8995509cc790ab39ad53006b7feb1aab7f4d4"
+   }
+  },
+  {
+   "id": "documents/result-rule-path-required-not-measured-is-known",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
+   ],
+   "rules": [
+    "VER-8",
+    "RES-6"
+   ],
+   "path": "documents/result-rule-path-required-not-measured-is-known",
+   "files": {
+    "document.json": "51330b3568892305d78541019053a381998f63909667b0fad416f4adc1117edd",
+    "expected.json": "641cb00695a786edbddcb236a2a56c6dc1636fe60cf2b08d480333e159c94d59"
+   }
+  },
+  {
+   "id": "documents/result-trials-at-least-is-known",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
+   ],
+   "rules": [
+    "VER-8",
+    "RES-8"
+   ],
+   "path": "documents/result-trials-at-least-is-known",
+   "files": {
+    "document.json": "00303c249430ee55912c9b6b8818a3fa5e19bd19565d25e46375bc6342c69f08",
+    "expected.json": "84f9d5a11aec024edcf4709f0f99a0f9a0bf61b50c98d51dcab5767d093df27d"
+   }
+  },
+  {
    "id": "documents/result-usage-role-attacker-is-known",
    "kind": "document",
    "classes": [
@@ -7114,6 +7218,28 @@
    "files": {
     "document.json": "a53eaabbdb7fe302449014b642cfe10353239a69950eabe39292bc8c3b74bbb6",
     "expected.json": "7e98f7cd6dacc66964e62342c7ea1dcdafff82b27b39dc2b03fdbd54b6022c3e"
+   }
+  },
+  {
+   "id": "documents/run-execution-policy-at-least-is-known",
+   "kind": "document",
+   "classes": [
+    "Producer",
+    "Reader",
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier",
+    "Runner"
+   ],
+   "rules": [
+    "VER-8",
+    "RUN-8",
+    "RES-8"
+   ],
+   "path": "documents/run-execution-policy-at-least-is-known",
+   "files": {
+    "document.json": "f06570617d0ea5c9d3625ef76d7849dedbd7bd1f2417c0c222758d989c798ae4",
+    "expected.json": "4c4e0e8f3e7f993c04deaedcdc2b279bcebfe06a8b7d6cbaea1c23ba6dacb2b8"
    }
   },
   {
@@ -7321,7 +7447,7 @@
    "path": "checkpoints/decision-status-unknown-in-1-0",
    "files": {
     "document.json": "ce2701f51ee9b7dcd63c41f425e8c677f864ea2034fe77aa4053db984cc6435c",
-    "expected.json": "1e0a9c7689a2fde6ba828ffe90486cd94d31bfb161a1867a54ad6b3373e1ad68"
+    "expected.json": "6b3ac1a65e3e820e2e50477d8f65f0cd2a39dbf6b5c914b761f64b8106c6e422"
    }
   },
   {
@@ -7599,7 +7725,7 @@
    "path": "checkpoints/input-status-unknown-in-1-0",
    "files": {
     "document.json": "0e5d864cc7b42fd2b112372d4901cb57d5a27c5a40f909a5d51be4df2bdab51f",
-    "expected.json": "1daef07aaaafa60c94808994e2bc69fae1b5194885647d93dca642c8731bcad9"
+    "expected.json": "5d211b04b3c91b9ec14bc15115290cb6d97519a7439617fdd34cfd21b59be97a"
    }
   },
   {
@@ -7721,7 +7847,7 @@
    "path": "checkpoints/outcome-unknown-in-1-0",
    "files": {
     "document.json": "f8eb8c21463ef98812427944e85dde550e37c31b826e65acd385a8f65ec5c3de",
-    "expected.json": "cc1f8039023e910e6596130310469bb25baa312d72986bd9ef901410e09fad27"
+    "expected.json": "aec3c2bd229fbc1adc3ebabb0ace0bc6b5ca1b654d04888a69a05eb5da5e8ef3"
    }
   },
   {
@@ -7737,7 +7863,7 @@
    "path": "checkpoints/outcome-unknown-without-decision-in-1-0",
    "files": {
     "document.json": "f74e02c831100eef7ef69c8178848db1391a738c3aa34f53e80f60c022aebabd",
-    "expected.json": "6269ea98c76f8b17a8b0feb559eb379222e37a35911f89e9b2e6e7efd28049a2"
+    "expected.json": "370eff5b74a259a0d654f07f0733414d902cfbecf9b6f9e9eb27411e52e7dc90"
    }
   },
   {
@@ -7815,7 +7941,7 @@
    "path": "checkpoints/state-unknown-decision-without-input-in-1-0",
    "files": {
     "document.json": "3cf68c8a69e84b56002f12d0ed0c27305e8e4130a55d874761641c1abb75be84",
-    "expected.json": "1e38e45d6b1b24c5797751a88d1a59ee4a327239d3e8d9d4c5e9d1607b910566"
+    "expected.json": "38766115715135a6797580969b94cc46275ec57ec5adb1e341ccc9f7c59859f6"
    }
   },
   {
@@ -7831,7 +7957,7 @@
    "path": "checkpoints/state-unknown-in-1-0",
    "files": {
     "document.json": "e90d8ae9c0f1ba1899db6dde5f6bd5b86a28ee390cce5e96f218aa825448fc30",
-    "expected.json": "198b11acc28e1616459d0757919964b09308903f9b321b79078e3423f43a5ac5"
+    "expected.json": "286c049216f2ad85cc6fcdd7a0de3dc40c616c1bc703a590c37511d75101b12a"
    }
   },
   {
@@ -7863,7 +7989,7 @@
    "path": "checkpoints/state-unknown-without-decision-in-1-0",
    "files": {
     "document.json": "ff3da6ad74d78b1ad7f09a6e9192fd93444ec6d7ebde1e32e9b3f47d513bbdc3",
-    "expected.json": "bf110972f3fbb32f80d341b83e5ec8ebc3a4aaa8e57061c968b303f6e3c1be56"
+    "expected.json": "68b43563f68c53187415be3b7d6e7cd177f469b5f360c0214ae13922f8268942"
    }
   },
   {
@@ -10053,7 +10179,7 @@
    "path": "rulings/budget-summed-exactly-ascending",
    "files": {
     "events.ndjson": "04e3b88efb38590b44a7570d077e6ba08887f6a51621ac3776831b0a331056be",
-    "expected.json": "3a6b3afe36a930bdef43c52bb86fd1b9049699cbf87adb973b1d4359e9902e8a",
+    "expected.json": "11ae3a0748d881358c94d8164a4c4d58a6e7cc35a454e7be0c03c7db3f8c5f34",
     "plan.json": "d19ba07448f8c00c2d450e63186418edd2e1adc938f84894db4a019cde6add32",
     "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
     "runs/R-1/results.ndjson": "2572cc41c5abbc0a2d1df009a2979e298727f2f3f8ffff2fba42b591fa7ba1c4",
@@ -10086,7 +10212,7 @@
    "path": "rulings/budget-summed-exactly-descending",
    "files": {
     "events.ndjson": "ffa12862ea242e8c51d9efdae203089f1cf319e0340cf1d4ac4479ded0acf2ad",
-    "expected.json": "689d0a5dbcaf38c5952a5c9a50085d8c3aba19cf8ded08df9a62685db0e7489b",
+    "expected.json": "101422040845b77c6f068f3b68d4baab518bdbb80dd40f213a68d4997ab1802f",
     "plan.json": "d19ba07448f8c00c2d450e63186418edd2e1adc938f84894db4a019cde6add32",
     "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
     "runs/R-1/results.ndjson": "2572cc41c5abbc0a2d1df009a2979e298727f2f3f8ffff2fba42b591fa7ba1c4",
@@ -10117,7 +10243,7 @@
    "path": "rulings/checkpoint-input-only-lane",
    "files": {
     "document.json": "7e20678598865c1b698bfe40fd205d808a3ae51dd028796d60ab6dc857daa303",
-    "expected.json": "3a131ccbe976a6c03e0795cd9ed99453a3362ecf1ee8fc2c8bbfdff7178cc89d"
+    "expected.json": "2a387f865146b61b90b31f73774e1261789de3f66ba69f8eb5256f328fd35c6f"
    }
   },
   {
@@ -10133,7 +10259,7 @@
    "path": "rulings/comparison-judges-absent-equals-empty",
    "files": {
     "checkpoint.json": "6da88291519f9cb099be490b6c069e5dacf3470912edaa837448a2cd787bf52e",
-    "expected.json": "b1d26a4b0c29b2523eb216e9c552f7ce379ce9754c2d9d6448ff9a74b9dc020e",
+    "expected.json": "3bf5c214efe12c5a463c21290e04f895254ea0871cf59aea79d06a5e406a2168",
     "runs/B-judges-empty/metrics.json": "f82b2f218a638efa196d95b6cbd9589a3c0f127ab840033d2faa4e2dd47e17b9",
     "runs/B-judges-empty/results.ndjson": "3e997c2e3e5fc46f86b7eb5729b01f24ca21322edcca1abda312e36c4570d6ca",
     "runs/B-judges-empty/run.json": "abbeda59ab430427ad3758ea0ab0535463db7097dec79f5748b4803c13bc11dd",
@@ -10163,7 +10289,7 @@
    ],
    "path": "rulings/document-run-over-4-mib",
    "files": {
-    "expected.json": "e6b4f35098e49aba750e644bb6a719361f82185675bec94d18735c097cfd8410"
+    "expected.json": "3d663adb814db1aa46c46c06ed1b3c3c10a6a0a5ad37bcd9c2c4d1d1879246cc"
    }
   },
   {
@@ -10183,7 +10309,29 @@
    ],
    "path": "rulings/document-seal-over-4-mib-valid",
    "files": {
-    "expected.json": "384c189a8a79ac71bc7d21294c4c5884ddb4228416b507dea18c6b7721e70c73"
+    "expected.json": "bfa1b3e479352ee0d31567da42acecc8dbf517776878cea3e8a0f98c3f604b80"
+   }
+  },
+  {
+   "id": "rulings/lane-later-line-in-a-1-0-run",
+   "kind": "lane",
+   "classes": [
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "CKP-8",
+    "VER-6",
+    "LANE-3"
+   ],
+   "path": "rulings/lane-later-line-in-a-1-0-run",
+   "files": {
+    "checkpoint.json": "c28b77dd213de272b27bb8bc4216edba47916ab9e1ba9916cc4cb8533b8c4c46",
+    "expected.json": "35cf6a5e478c46a40399b45f55391308ba551edda695a020c33c4caccfe70996",
+    "runs/S-1-0-with-a-1-1-line/metrics.json": "7be4c9b8d0eeb24dbfe42bf235bf78e7c16f8e634bc029873d7ab272de7b4bd7",
+    "runs/S-1-0-with-a-1-1-line/results.ndjson": "2d706b144c04453fda5e310b54db06a99a5d49d57806190aff8610365fcb3416",
+    "runs/S-1-0-with-a-1-1-line/run.json": "1537ac4113eb33501c295cd81e042beb71e3286ffc8486d06807d5173bccbb5a",
+    "runs/S-1-0-with-a-1-1-line/seal.json": "379c04747c48bfa4efb85c08a33066046ab3075271678a636ffc3aa042e89e5a",
+    "runs/S-1-0-with-a-1-1-line/summary.json": "4dd3344afa449e2f608b5d03747aabf6afaf8df98ffbe376d2b19d3c993a506e"
    }
   },
   {
@@ -10199,7 +10347,7 @@
    "path": "rulings/lane-missing-runs-ordered-by-bytes",
    "files": {
     "checkpoint.json": "f9091e8b463e9413953b58e7faeb84becf1a24732c10fd165937137223554c8e",
-    "expected.json": "81e53192d18b92ccacb9a1b43513b9295e6a8b11d4ec841efaceec0ed485714a",
+    "expected.json": "32ffc40b41e443f76a5daaade733ce52a366c949757d2dab865aa2d38be30208",
     "runs/Q1/metrics.json": "81ac87c69d20ca49d69e0a5541b062fe1f8fcc4529117c6d6f29eac1403b3d6c",
     "runs/Q1/results.ndjson": "79cd14e559b4736cd09272cc797423ad31b14c033c85c15493497de28ce2695d",
     "runs/Q1/run.json": "81fdba3f34f44206f0f6cb394ff46ca203905cb4f6c2ec06773382de2514b6dd",
@@ -10219,7 +10367,7 @@
    "path": "rulings/lane-run-named-twice-evidence-present",
    "files": {
     "checkpoint.json": "089a4ae751b3e4481d43a51eee99689495214f05809866d32fc47ded990646d8",
-    "expected.json": "4dbaf8743e679fa2db4b2e480e6ce231425ceec6366e7f5be21f12a60dbc935a",
+    "expected.json": "651000dcd09746df4521a33002a3a5c249fda38c00492d7fb4a770d675f3d9b6",
     "runs/E1/metrics.json": "81ac87c69d20ca49d69e0a5541b062fe1f8fcc4529117c6d6f29eac1403b3d6c",
     "runs/E1/results.ndjson": "9f5a56810ab45c6fba768095d8469d372edbe4ef189f6e6a06771b20ca27fd15",
     "runs/E1/run.json": "fe8d04e126730c9ae9c8142be7a39fd4e37bb2f62af55f1fde2f67bc653e1ce6",
@@ -10240,12 +10388,103 @@
    "path": "rulings/lane-run-named-twice-severity",
    "files": {
     "checkpoint.json": "f59128f726d9892b80368b4da306f726f57ffdd9859f17a16305d6582a0df2c8",
-    "expected.json": "068f8565045027c1fc4c395febf308dcf066b759d0725a1a28c04685d84c6236",
+    "expected.json": "4e18260107b4cbd91aa1fff935e7e365ae19e4287fc4916fc0265872d5ffe62b",
     "runs/S-two-passed/metrics.json": "7be4c9b8d0eeb24dbfe42bf235bf78e7c16f8e634bc029873d7ab272de7b4bd7",
     "runs/S-two-passed/results.ndjson": "fd59b58e936591b0b68b22a242b9620e5967e1ff95f4edc12455f56af1af2c9c",
     "runs/S-two-passed/run.json": "c593f6bf3ee49efdb0eebd30a524e03850ad06607421cdea884d6abf9f5a4704",
     "runs/S-two-passed/seal.json": "c68217e25500f7950ffbf81dae780a8cd0bb2a29e36f8a3bfe3e98c56c3454cc",
     "runs/S-two-passed/summary.json": "692f917b6d19b017d282567b0269fb7945ed4a46288aa18ea8bc0f0c612b6bae"
+   }
+  },
+  {
+   "id": "rulings/lane-sum-beyond-binary64-not-measured",
+   "kind": "lane",
+   "classes": [
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "SUM-5",
+    "LANE-2"
+   ],
+   "path": "rulings/lane-sum-beyond-binary64-not-measured",
+   "files": {
+    "checkpoint.json": "fabfbd9df6921f3c09a41b6302fc40def7c2d51a55423477315ffccbc88b1812",
+    "expected.json": "4ddbd45c550ef27fb8f5bb4e1449cdb8f70d510cb6c0dc5ccc2ec47cd762de93",
+    "runs/R-sum-beyond-binary64/metrics.json": "81ac87c69d20ca49d69e0a5541b062fe1f8fcc4529117c6d6f29eac1403b3d6c",
+    "runs/R-sum-beyond-binary64/results.ndjson": "7a4ff80b9d3d55638572d60738c1bd9147852df0e42027771fb1d54539e54cb1",
+    "runs/R-sum-beyond-binary64/run.json": "1be0fb79f866f0d09cb87a6fde53be20bb663e66fafa12f561c2d9f7c813a5f9",
+    "runs/R-sum-beyond-binary64/seal.json": "92d59618d428144a2cc2b6ccce11b66834fcb655859b795805a12b2534c7c14a",
+    "runs/R-sum-beyond-binary64/summary.json": "1b7ba12a85de72b2258458b4242042d75edadbd54b98a707d9e90e4f488b2f0f"
+   }
+  },
+  {
+   "id": "rulings/lane-threshold-at-sum-divided-by-n",
+   "kind": "lane",
+   "classes": [
+    "Checkpoint verifier"
+   ],
+   "rules": [
+    "SUM-5",
+    "LANE-2"
+   ],
+   "path": "rulings/lane-threshold-at-sum-divided-by-n",
+   "files": {
+    "checkpoint.json": "7c22d6273ef0b7be7b516a0a2ed6848ae1e187be38253a6597a048f00978d784",
+    "expected.json": "b8b71986432d8aa12727a643e3cf6b3c330393d428ff398862ce89593cc5004b",
+    "runs/R-sum-divided-by-n/metrics.json": "81ac87c69d20ca49d69e0a5541b062fe1f8fcc4529117c6d6f29eac1403b3d6c",
+    "runs/R-sum-divided-by-n/results.ndjson": "a4fd7f6739ddb2ffb6f685f772c7d8e64aba5ce485e6db9ad784a55f4f4bd33c",
+    "runs/R-sum-divided-by-n/run.json": "3aca444db780eea526fd478db41e59e16ebd243318b4c8109c4b7299f493fdcc",
+    "runs/R-sum-divided-by-n/seal.json": "dcca40e0934a8a6243832fdc4289c2c281051bd57b5bb1f62293dbaa8f309bf7",
+    "runs/R-sum-divided-by-n/summary.json": "943b8f34bc20b246adb9619fa2dbc2296ec5a9ca8338b26dea4b2d9923dea27b"
+   }
+  },
+  {
+   "id": "rulings/name-not-unicode-at-the-root",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "RUN-3",
+    "SEAL-3"
+   ],
+   "path": "rulings/name-not-unicode-at-the-root",
+   "files": {
+    "expected.json": "e9437198e3c2d842c580bed6c119dc8a9d690f7742314d42854c0db874a90d5a"
+   }
+  },
+  {
+   "id": "rulings/name-not-unicode-under-overlays",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "RUN-3",
+    "OVL-5"
+   ],
+   "path": "rulings/name-not-unicode-under-overlays",
+   "files": {
+    "expected.json": "51c5545968c70c9b5ee26d779afb0a93a4b09acd88dae3f53e6c8835dc0aef96"
+   }
+  },
+  {
+   "id": "rulings/name-not-unicode-under-overlays-chain",
+   "kind": "chain",
+   "classes": [
+    "Overlay verifier"
+   ],
+   "rules": [
+    "OVL-5",
+    "RUN-3"
+   ],
+   "path": "rulings/name-not-unicode-under-overlays-chain",
+   "files": {
+    "expected.json": "028868f46ae16c0386589dca4cdaf9f228e0a19a163256fbf80a7804f163d02c"
    }
   },
   {
@@ -10260,7 +10499,7 @@
    ],
    "path": "rulings/overlay-target-checked-despite-a-results-schema-problem",
    "files": {
-    "expected.json": "f1b577fee19b0a8c428cdd2002a52a4d590eb8ff919d4f370416113db6ccad23",
+    "expected.json": "fa729ab3f639647acf29eabbc282e99b80c24beaf873a53b7b741e2f9f53cd8d",
     "run/blobs/sha256/63/635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5": "635221c9c64f48e2843e4186b0a1b66f07a1492c14dcb866bb83dba6a5e5fef5",
     "run/evidence.ndjson": "f76af41ebe790477719e419c60ab430ef5cc98263b8fd8dd5bb52988a03108b1",
     "run/gates.ndjson": "6db8527cfa0e3d60c242253e40f123eb56b4105f2b14a622af21370fd10b9c63",
@@ -10288,7 +10527,7 @@
    "path": "rulings/severity-undecided-trial-under-decided-rollup",
    "files": {
     "checkpoint.json": "e98dc7f643e4a7ad074ab8c37a04c5251d5f7882e268746c6b225c5f10ce5311",
-    "expected.json": "ed8b28a3d92b9edcea2daca8b19e18e1e712bd36e2a2d5a3d673ddd3e01ff183",
+    "expected.json": "48140994b3607d675018450857839a81e864d4ca57ce093e7cfe9a96b67df2ef",
     "runs/S-inconclusive-trial/metrics.json": "7be4c9b8d0eeb24dbfe42bf235bf78e7c16f8e634bc029873d7ab272de7b4bd7",
     "runs/S-inconclusive-trial/results.ndjson": "d9b0bce92078cf45922dd5970ae87c89dd5bf84042d1beca09a1015174c8c467",
     "runs/S-inconclusive-trial/run.json": "5bd8e048bb5a9ccbc81551eb744a83cfae4a6c562770e747440f121b4f4cc9b7",
@@ -10309,8 +10548,73 @@
    "path": "rulings/stream-line-depth-65",
    "files": {
     "events.ndjson": "8c42b7ef0d37140dafd49a325e833ea59181f38ec8a853de49d20ca2aa119ae8",
-    "expected.json": "7ad4be418d9756e382982e493d431fd3c4e06c41c3c98b29f5bc7bf805d72458",
+    "expected.json": "6fb6e3fac7492a20d61573416918fe64dad2c21092cdc9e8d4e87bc0c7a3e20c",
     "plan.json": "187f26d366ef3d7c58464707660c0e05be722ffce3406cbe4f0eae9250e22ad9"
+   }
+  },
+  {
+   "id": "rulings/summary-exact-mean-is-a-summary-problem",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "SUM-5"
+   ],
+   "path": "rulings/summary-exact-mean-is-a-summary-problem",
+   "files": {
+    "expected.json": "ddf92c4cbb5970c9ed1fcf7fb90faa2d173f542d1f044fd4f9c8ff8ddeda57e0",
+    "run/metrics.json": "81ac87c69d20ca49d69e0a5541b062fe1f8fcc4529117c6d6f29eac1403b3d6c",
+    "run/results.ndjson": "5a05b049796097c9e3842239f763df6d9ea95e427e5a6115f74e541099d9e55d",
+    "run/run.json": "9790ee13167354d1b1a1a72a4cef0ad120b9c7ed8f8864e366c005b09f871161",
+    "run/seal.json": "d6800d00650d11f18c442ace5fcd3460ca5bd09b149e81ad87970d7469417c4f",
+    "run/summary.json": "97b3662d212589ec8058c0b508e96ac68d1828923b5d68bb72439cf362eaca62"
+   }
+  },
+  {
+   "id": "rulings/summary-sum-beyond-binary64",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "SUM-5",
+    "SUM-6"
+   ],
+   "path": "rulings/summary-sum-beyond-binary64",
+   "files": {
+    "expected.json": "c76a0ff09fa20f590713e1074f9bd42292740b353c3faa340afd1b6c46168ae2",
+    "run/metrics.json": "81ac87c69d20ca49d69e0a5541b062fe1f8fcc4529117c6d6f29eac1403b3d6c",
+    "run/results.ndjson": "30ce099d7875692332bebc1d50a407075435a35ba1fb207258f2c1c99b25f726",
+    "run/run.json": "2982e70462dbb4d2cbfe3fe2a87ec442da7c15feab1b80598797f12bf3005288",
+    "run/seal.json": "c556b7b3d0aa65e73360d09e251bf213ed7adb10f66175c6b820540d80461790",
+    "run/summary.json": "93860b469bce35bc8ba640e14529a389e2b540ca954ec4cde54bc3bf3641502c"
+   }
+  },
+  {
+   "id": "rulings/summary-sum-beyond-binary64-mean-written",
+   "kind": "run",
+   "classes": [
+    "Run verifier",
+    "Checkpoint verifier",
+    "Stream verifier"
+   ],
+   "rules": [
+    "SUM-5",
+    "SUM-6"
+   ],
+   "path": "rulings/summary-sum-beyond-binary64-mean-written",
+   "files": {
+    "expected.json": "7c4835a3320c3acfdcbf6d234b18b5b5025f503669028fd37f17bca53c360459",
+    "run/metrics.json": "81ac87c69d20ca49d69e0a5541b062fe1f8fcc4529117c6d6f29eac1403b3d6c",
+    "run/results.ndjson": "887e12971ae8bddb012ba5725a2a9d85d04a503ac60fd053bd94993292f1bffb",
+    "run/run.json": "6155d50d07e2f1590990a3db396072b937aea6b70b00f72e118e2d4d76bb4ba1",
+    "run/seal.json": "ea2b4f5cbc877707138d585352098b2094e36330177631f692cba7b0c483927c",
+    "run/summary.json": "6d8ca8b331b3703277d461530137d78f700d2aa36c3018b78c858bd118895fd3"
    }
   },
   {
@@ -10327,7 +10631,7 @@
    ],
    "path": "rulings/trials-second-rollup-at-the-later-one",
    "files": {
-    "expected.json": "909ea34dbc396fc59729d643d5772577b8005f13d5baf5eca8a2fc7a8903a091",
+    "expected.json": "f415b4424c0b6294d353a8277f6018d05fa06c374e0fef5511c8a3be7b005ff9",
     "run/blobs/sha256/47/474400071c193b3faf9f2c7f82e28fea484a7b59a07fc0a247282870d6441e99": "474400071c193b3faf9f2c7f82e28fea484a7b59a07fc0a247282870d6441e99",
     "run/evidence.ndjson": "0cb5efa41e591fed8fc988a7e2063ba7285b4faebe8ddbac0d7782643ceb8642",
     "run/gates.ndjson": "a7015f35139336ec94132638061773933c7e118c718e81dea171768d1377b26e",
@@ -11776,6 +12080,22 @@
    }
   },
   {
+   "id": "protocol/plans/judge-provider-empty",
+   "kind": "plan",
+   "classes": [
+    "Runner"
+   ],
+   "rules": [
+    "PLAN-1",
+    "RUN-9"
+   ],
+   "path": "protocol/plans/judge-provider-empty",
+   "files": {
+    "document.json": "0609af832a88d1dc695828b29a1747853a7056776dc041f18964b2b4d70f9659",
+    "expected.json": "784ba250b0184ff425cd3bd05f77565c9e2efea1e6fc755cfc50acc84ead5ef2"
+   }
+  },
+  {
    "id": "protocol/plans/latest-is-not-a-version",
    "kind": "plan",
    "classes": [
@@ -13108,7 +13428,7 @@
    "path": "protocol/plan-conformance/judges",
    "files": {
     "events.ndjson": "46c61ce87aa6787f09010a9505ccf823dcd8470949307a56aa88aba914d4cc71",
-    "expected.json": "d0975f726fbd058ca679e25260f1403f0e08e565b02d0d1e0b69195798fc178c",
+    "expected.json": "098d871fee4751fb22ba36a399e21f42f639fd717a4580acef570fdf97968fd0",
     "plan.json": "a3a4de0f2d285cf6b1cb374c9e9a2a1c9a4172f1acbb76d7b82affd29aac66ec",
     "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
     "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
@@ -13129,13 +13449,13 @@
    ],
    "path": "protocol/plan-conformance/judges-more-often-than-plan",
    "files": {
-    "events.ndjson": "62935d7a44e5283e14557409c082b612c84a8aed22c7dfaf95cac0047a8804b1",
+    "events.ndjson": "a0e975f8c7b1bff7d67407bbd347732132c08973882c4bad66f84f6637f90f2e",
     "expected.json": "6692efa77f5f5836e881cd0556f3413074e4db4abedf2e6f78701e0e5fa8aac7",
     "plan.json": "151eda17ea6a048416696437f1500540f6fcbda2b97d26f4b1e1eaed010974a5",
     "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
     "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
-    "runs/R-1/run.json": "00770e1a0c772c6348f1a99ef99c92a8c1ea93c1bfdee8a9a72c2a8c515d84fc",
-    "runs/R-1/seal.json": "d2605a76b48df95ac5bfdb44bbd88307a3aee62397dcef76a8a6b8f80dd1c470",
+    "runs/R-1/run.json": "1461bf9052b5081a61ffad28d8506c8ea3d28ada68ddc0a4b33270623925a967",
+    "runs/R-1/seal.json": "d423a493eb94ed19f204ba34238fae10465a971208d624965c8674912e0c437b",
     "runs/R-1/summary.json": "5c419eab3b644e909a540ec222c74ce57cf06afa52f2fc278c3667e009025cb7"
    }
   },
@@ -13173,13 +13493,13 @@
    ],
    "path": "protocol/plan-conformance/judges-not-named",
    "files": {
-    "events.ndjson": "d27bfb6e2b225a17c2853618cfd484bfef27de2e8252365ac2dc71f3c1ae58ef",
+    "events.ndjson": "44a8d587594202f690c5d5ff557d42550b9847cb31071a156cbc0dacca1c81b6",
     "expected.json": "03131863bfd0563b921257c11e2b781c6529ba3d98568581b2fd321edf977094",
     "plan.json": "b555cca1a54d85ffd3202bc9d3d326ee770accc03fe54a682925ac6d41e0eaed",
     "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
     "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
-    "runs/R-1/run.json": "6c659ea9e245b43779a36fa2b301b4d2763a922002d28ce3e58cad987d6404c1",
-    "runs/R-1/seal.json": "72dd80a007c95dfafada78461525f93477654a25081991daf6c994da930d9ccd",
+    "runs/R-1/run.json": "95d0b3cc6320d08246a40675f375ce86595f0df8460c648ef2965c0048dba9a1",
+    "runs/R-1/seal.json": "692c0fe02c9533e76a00a75e7c366108085f6f558a11edce93dd9404fe5164b9",
     "runs/R-1/summary.json": "5c419eab3b644e909a540ec222c74ce57cf06afa52f2fc278c3667e009025cb7"
    }
   },
@@ -13217,13 +13537,57 @@
    ],
    "path": "protocol/plan-conformance/judges-out-of-order",
    "files": {
-    "events.ndjson": "c7924bca62d1e84c5660c744cc79de22f44603d976375f8235c8338be7e7bc86",
+    "events.ndjson": "51ffd4927f1f9cd24b20ad15ee731e219a328b9dc2b1a597d27a14209c1b5a84",
     "expected.json": "7cf45b967f3943a73cd2ceb4d6e6016aa504480a90489d1f9f55bdbe1f06a8d0",
     "plan.json": "b555cca1a54d85ffd3202bc9d3d326ee770accc03fe54a682925ac6d41e0eaed",
     "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
     "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
-    "runs/R-1/run.json": "61c1cb6f265184e5f35cec20ca9bb2c3b5d28937447afa679a7ed19b3601f717",
-    "runs/R-1/seal.json": "b67e6b2515e464da25f9fad97afaab774ac627dfc9c4a3d8ef54941684131a75",
+    "runs/R-1/run.json": "ba2cf655858685bda65e261023ad3e2b403de84f1056a0b3f6f4a81d8ad4a05c",
+    "runs/R-1/seal.json": "bea4d1892bbe2b4972cc72225a9d318dada4f1a6d077ea9b9188d7b5e6f49131",
+    "runs/R-1/summary.json": "5c419eab3b644e909a540ec222c74ce57cf06afa52f2fc278c3667e009025cb7"
+   }
+  },
+  {
+   "id": "protocol/plan-conformance/judges-plan-names-no-provider",
+   "kind": "plan-conformance",
+   "classes": [
+    "Stream verifier"
+   ],
+   "rules": [
+    "STRM-4",
+    "RUN-9"
+   ],
+   "path": "protocol/plan-conformance/judges-plan-names-no-provider",
+   "files": {
+    "events.ndjson": "0e605df6f9158b8a55e1c3d513f577323391d1d986ff6dbd8415ca9f39cc746f",
+    "expected.json": "7796e7fac2a3ea36a58f103580dbc2009bb379b5665cba4c68eedab79d8ed66f",
+    "plan.json": "84bb369837a34cf5748243ce46255cfaed01df7f2e100292756fae8e618714a3",
+    "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
+    "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
+    "runs/R-1/run.json": "df390c6d0f9ef8455ce4c1e4da547be187a2dc048577917bc6715a3c624620bd",
+    "runs/R-1/seal.json": "139e7bb64e15e3c014ef3b85bfb0dcd920cbd0d2242996cfa8d78a64ccf81914",
+    "runs/R-1/summary.json": "5c419eab3b644e909a540ec222c74ce57cf06afa52f2fc278c3667e009025cb7"
+   }
+  },
+  {
+   "id": "protocol/plan-conformance/judges-plan-names-no-rubric",
+   "kind": "plan-conformance",
+   "classes": [
+    "Stream verifier"
+   ],
+   "rules": [
+    "STRM-4",
+    "RUN-9"
+   ],
+   "path": "protocol/plan-conformance/judges-plan-names-no-rubric",
+   "files": {
+    "events.ndjson": "7d09b97fc8701755bd7068f00dc4521f3a3a3dd49e5282b9f4db85814719173f",
+    "expected.json": "538d3017ae29a21d26f9635f014e186734981338d1c8ed7d5e4c91f98acd894a",
+    "plan.json": "3b71d42850eeca43bdbcff0b93e037cda48563d7852e2a807cbacfb93e2f3db4",
+    "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
+    "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
+    "runs/R-1/run.json": "7e0b120fd16947f403acda29c7e5431af987fcf8b71e149268aa06d5788fb812",
+    "runs/R-1/seal.json": "18bd790395a868b243133fc76661d44d32dc227c08dab39b38e09873eea857ac",
     "runs/R-1/summary.json": "5c419eab3b644e909a540ec222c74ce57cf06afa52f2fc278c3667e009025cb7"
    }
   },
@@ -13239,13 +13603,13 @@
    ],
    "path": "protocol/plan-conformance/judges-plan-names-twice",
    "files": {
-    "events.ndjson": "2d5db707ac33a0af7f253bed0e4b60f3b52f2f2025dbc129c5259c5fd05b9c90",
+    "events.ndjson": "de1839fbba7ca5c2304a37ea5522906647f4390a71ed26211d11cc78d17ec5ab",
     "expected.json": "bd3e94e1402350141f1b47f18cd519ff5bddcfbeae23404b4894b1d889f8bda0",
     "plan.json": "151eda17ea6a048416696437f1500540f6fcbda2b97d26f4b1e1eaed010974a5",
     "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
     "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
-    "runs/R-1/run.json": "583b90b33285bfaf6f75ebdf2bf94b472c311e4b88a8109d7fb6d44ee0cb1fce",
-    "runs/R-1/seal.json": "81e47f1dee1c434c5ac11bb8a1555cc8aa33b2b529ead1da7ef2dd128e6563fc",
+    "runs/R-1/run.json": "1cf056cd82c5e4e5216d2a6a3c7660a4611c9fff1152ee18a8fad90469405f89",
+    "runs/R-1/seal.json": "416a0fd5c820fdf883fcc8dbee44d10de722f387b920eb5caa02120ead7f4ee5",
     "runs/R-1/summary.json": "5c419eab3b644e909a540ec222c74ce57cf06afa52f2fc278c3667e009025cb7"
    }
   },
@@ -13261,7 +13625,7 @@
    "path": "protocol/plan-conformance/judges-rubric",
    "files": {
     "events.ndjson": "fb39e85e4c5db34eb8931fe93713fe4c2a4b1d37c78fab1a8ce7824e8c9f922e",
-    "expected.json": "4f4fd0ed7d50c7981f95d6a0bdbee99d6b4611a75b644edd1611d13f8a7e1d70",
+    "expected.json": "0ef9c67870d2bfa2bd61e20c2eb7964ceb727d4001a2ce55cfa6bd5958055481",
     "plan.json": "a3a4de0f2d285cf6b1cb374c9e9a2a1c9a4172f1acbb76d7b82affd29aac66ec",
     "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
     "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
@@ -13304,13 +13668,13 @@
    ],
    "path": "protocol/plan-conformance/judges-twice",
    "files": {
-    "events.ndjson": "26a7bf86aa2d16f1a75d9397c5e053e4e4d7cc0098ba0617f04148e98cf547e0",
+    "events.ndjson": "d961531dca3a14a98b9b4b5bb6565b6a0e03f41f9cf3e75afdcb0547efe053b3",
     "expected.json": "519c62d1793363a608cf8b59ee7bfa0433e7720bc8c40b3231e9dda14cfdd0bc",
     "plan.json": "b555cca1a54d85ffd3202bc9d3d326ee770accc03fe54a682925ac6d41e0eaed",
     "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
     "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
-    "runs/R-1/run.json": "8dcc71153030441554e03c9708560f7d4d56981d7d3b5d816aae72ba6c0bbc8f",
-    "runs/R-1/seal.json": "4af5c2e9b56ccfb44729378b476947b0a8bb25ff87dd7366cb0b1ccfbfb047bb",
+    "runs/R-1/run.json": "7017cc9d9b8a9207e311dcd0c5b041af495e1f560724676833cdda57616f7bc7",
+    "runs/R-1/seal.json": "aebc4e4f9c2710ad37c240b77a3eb55350251e87000bc7ee8ff2e45c1c77cd7f",
     "runs/R-1/summary.json": "5c419eab3b644e909a540ec222c74ce57cf06afa52f2fc278c3667e009025cb7"
    }
   },
@@ -13326,13 +13690,13 @@
    ],
    "path": "protocol/plan-conformance/judges-two-providers",
    "files": {
-    "events.ndjson": "31d292d9e2e89e579092aae47b75ddd3a9b77745fa829e47b00714c1ace9cd7b",
-    "expected.json": "a85e1a47525295e7395ac7f56d376464b8e3ec6d737e6ae0c45393bdd93456c9",
+    "events.ndjson": "882e722f886b2fec4d4631b5193f57d361c389c3b6b249b3dcdf2b701f539e9e",
+    "expected.json": "5f7f96d96121256ccf987f70f38235d17782147214866c0bcff40c1cfa5906c0",
     "plan.json": "b6ed01c08c8f81622d8e9961071480a5362fd89d0075deb5a3bea6f82271d6c6",
     "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
     "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
-    "runs/R-1/run.json": "b2196427f49d627b0a74330035b8eb6e6d5317951d59005e1b8c9b34f426bbca",
-    "runs/R-1/seal.json": "098bd2643e7cba72480f33ef634e4b8f7dd98dcae21069182488bae4b38e15fc",
+    "runs/R-1/run.json": "e60e6c90662654738c833023557770438906fb0c3ec59552946f1b8149ddc590",
+    "runs/R-1/seal.json": "4f36af326f8a459ef2e49bf8ee8854c6290d20979ccf4c6d493126c04df86edc",
     "runs/R-1/summary.json": "5c419eab3b644e909a540ec222c74ce57cf06afa52f2fc278c3667e009025cb7"
    }
   },
@@ -13488,7 +13852,7 @@
    "path": "protocol/plan-conformance/plan-names-no-judges",
    "files": {
     "events.ndjson": "7ba265dc51276fbc25bcc348c47adae72f98876979c6877346e13ea8e6e96bad",
-    "expected.json": "e2500469ef8e4e9d5e493f58e554f92f46054942bbf5e689c5ee17b89bee1400",
+    "expected.json": "930f6ab662cc3fd577f9bb3ec2123ca04ca6639b1ace2cabd97b7e17853018f8",
     "plan.json": "163731b5c72e4fe7607fc3b259df09093807964c17c9129a1a254bfcfa3fd377",
     "runs/R-1/metrics.json": "f59381a8d404b585db9857e19a7bd6d3d07f05f3ce14f75e811f23ae54fbcca8",
     "runs/R-1/results.ndjson": "f647a55ad5f2b8dada18b300a082bf7707aeb282f17ce640d9a1dcc8168b71cb",
@@ -14360,6 +14724,45 @@
    }
   },
   {
+   "id": "write-vectors/summarize/sum-beyond-binary64",
+   "kind": "summarize",
+   "classes": [
+    "Producer",
+    "Runner"
+   ],
+   "rules": [
+    "SUM-5",
+    "SUM-6"
+   ],
+   "path": "write-vectors/summarize/sum-beyond-binary64",
+   "files": {
+    "expected.json": "495fb56eee28cd6e73e8827e8903f76f3b3739276a2c39b1c5aab025ad54276f",
+    "request.json": "bedb30c4c93639aee567d27186f0e94867ddf0c00019c5145a43963a749532b4",
+    "run/metrics.json": "3c0d08411b2259c712ac474ca2e3fe07bed55f10285ff3c4027130390a402813",
+    "run/results.ndjson": "19fa1beeb4dd92eaf4fd8767d0609bc7cdd1a328bf9810081256a1b791d2ddd2",
+    "run/run.json": "f1e5ffd9483e18a8a73cfad055260196248bb605e5e909a9499817e5fa257623"
+   }
+  },
+  {
+   "id": "write-vectors/summarize/sum-of-squares-beyond-binary64",
+   "kind": "summarize",
+   "classes": [
+    "Producer",
+    "Runner"
+   ],
+   "rules": [
+    "SUM-5"
+   ],
+   "path": "write-vectors/summarize/sum-of-squares-beyond-binary64",
+   "files": {
+    "expected.json": "6b45f6f8eeeee3066a189480444d4da5ec8b7aa77df86319a3e4cff45f115e2c",
+    "request.json": "bedb30c4c93639aee567d27186f0e94867ddf0c00019c5145a43963a749532b4",
+    "run/metrics.json": "3c0d08411b2259c712ac474ca2e3fe07bed55f10285ff3c4027130390a402813",
+    "run/results.ndjson": "615c008d6e2fe445ef7792ea0f1ba9984da91d94ece81289cdb2b0c9b890dc4c",
+    "run/run.json": "9b40df277613a2da9289f402137cacdd69daef594b59d35474c9ecd2aeaddc76"
+   }
+  },
+  {
    "id": "write-vectors/summarize/trial-lines",
    "kind": "summarize",
    "classes": [
@@ -14471,7 +14874,7 @@
    ],
    "path": "write-vectors/summarize/value-is-sum-divided-by-n",
    "files": {
-    "expected.json": "b6833cc7e1b7874503bd017b4caa4cbee2269ab3c89a5df304354f83965a2d4c",
+    "expected.json": "f4300dcd68b55e11e509c17c135f82240f518efb4ea8733a778fb3c0f77f4c2b",
     "request.json": "bedb30c4c93639aee567d27186f0e94867ddf0c00019c5145a43963a749532b4",
     "run/metrics.json": "3c0d08411b2259c712ac474ca2e3fe07bed55f10285ff3c4027130390a402813",
     "run/results.ndjson": "a884f00545f6f922662c7bf6157ded6ebdf062b202db781c53b2c92de76cabbf",
@@ -14551,6 +14954,25 @@
     "expected-results.ndjson": "c8cf5f1a96bd24aa261ac527b73240eab52557a6e765d9faa913f17580234e1a",
     "expected.json": "bb916d7847b2a8e0532b6821a431a58865c3b562df07406cf667c83a0c0a50a1",
     "scenario.json": "44d20612ad6a92aea8f32cf3137e42b5c2379af82b2555d0766a5d4de374f8d4"
+   }
+  },
+  {
+   "id": "write-vectors/produce/case-in-trials-at-least",
+   "kind": "produce",
+   "classes": [
+    "Producer",
+    "Runner"
+   ],
+   "rules": [
+    "RES-8",
+    "RUN-8",
+    "SUM-3"
+   ],
+   "path": "write-vectors/produce/case-in-trials-at-least",
+   "files": {
+    "expected-results.ndjson": "1a8334143145323af3a2ea5fcd8b22171d269e8f7dd461814e4897414fe1136a",
+    "expected.json": "898ad2abecef1b142bd4fbe39e89bc0d122e2985943f0084b120d038a0c51e77",
+    "scenario.json": "6f56fb4bbfb879eb9c4c45b29f0850d3590770bc2236ee1bde82c94e27708dba"
    }
   },
   {
@@ -14713,7 +15135,7 @@
    "path": "write-vectors/produce/independent-roots-in-trials",
    "files": {
     "expected-results.ndjson": "474235a238d801fc44dae86a18d8d192828fb39df44c748070e516b85fecc612",
-    "expected.json": "7504d43929d496ef79fceda20d1a5544430abea982e27f0ce86bf90848940e2d",
+    "expected.json": "dc19ef113035472698ca53c2bc37621aebbfd9edac3d0b476960cf7db5d6908b",
     "scenario.json": "653a526c720e876802bf088c588b61e69efa9e8884e67c5cce032420c7e750ac"
    }
   },

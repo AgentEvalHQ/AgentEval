@@ -7,7 +7,7 @@
     "CKP-7",
     "VER-6"
   ],
-  "why": "a 1.0 manifest in a state nobody defined that records a decision without its input (R6N-1): the input cannot be decided (R7-4)",
+  "why": "a 1.0 manifest in a state nobody defined that records a decision without its input: the input cannot be decided",
   "problems": [
     "decision"
   ]

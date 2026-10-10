@@ -1,0 +1,35 @@
+{
+  "kind": "run",
+  "run": "run",
+  "generate": [
+    {
+      "copy": [
+        "valid/completed-eval/run",
+        "run"
+      ]
+    },
+    {
+      "ill-formed-name": [
+        "run",
+        "n",
+        "o.txt"
+      ]
+    }
+  ],
+  "outcome": "invalid",
+  "problems": [
+    [
+      "n�o.txt",
+      "not-sealed"
+    ],
+    [
+      "n�o.txt",
+      "path"
+    ]
+  ],
+  "rules": [
+    "RUN-3",
+    "SEAL-3"
+  ],
+  "why": "a sealed run with a file added at its root whose name is n, one ill-formed unit (the byte 0xFF, or an unpaired surrogate where names are UTF-16), then o.txt: not a Unicode string, so a path problem, and a file the seal does not list. The report names it with U+FFFD in place of the ill-formed unit, and the verifier does not stop on it."
+}

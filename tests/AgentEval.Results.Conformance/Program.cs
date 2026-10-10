@@ -48,16 +48,24 @@ public static class Program
         }
     }
 
-    /// <summary>Runs one operation; the in-process entry point the tests use.</summary>
-    public static int Dispatch(string[] args, TextWriter stdout, TextWriter stderr)
+    /// <summary>
+    /// Runs one operation; the in-process entry point the tests use. Exit codes ([CONF-3]): 0 when the operation ran; 2 for
+    /// a usage or input error the operation recognised (a <see cref="UsageException"/>); 1 for any other failure, which
+    /// nobody expected and is never reported as an input error. The message goes to standard error.
+    /// </summary>
+    public static int Dispatch(string[] args, TextWriter stdout, TextWriter stderr) => Dispatch(args, stdout, stderr, Operations);
+
+    /// <summary><see cref="Dispatch(string[], TextWriter, TextWriter)"/> over the given operations (a test injects a failing one).</summary>
+    internal static int Dispatch(string[] args, TextWriter stdout, TextWriter stderr, IReadOnlyDictionary<string, Operation> operations)
     {
-        if (args.Length == 0 || !Operations.TryGetValue(args[0], out var operation))
+        if (args.Length == 0 || !operations.TryGetValue(args[0], out var operation))
         {
             stderr.WriteLine(args.Length == 0
                 ? "usage: aef-dotnet <operation> <arguments>"
-                : $"unknown operation '{args[0]}' (known: {string.Join(", ", Operations.Keys.Order(StringComparer.Ordinal))})");
+                : $"unknown operation '{args[0]}' (known: {string.Join(", ", operations.Keys.Order(StringComparer.Ordinal))})");
             return 2;
         }
+
         try
         {
             return operation(args[1..], stdout);
@@ -67,8 +75,16 @@ public static class Program
             stderr.WriteLine(e.Message);
             return 2;
         }
+        catch (Exception e) when (e is not OutOfMemoryException)
+        {
+            stderr.WriteLine($"aef-dotnet {args[0]}: an unexpected failure, not an input error: {e}");
+            return 1;
+        }
     }
 }
 
-/// <summary>Wrong arguments or unreadable input for an operation: reported on standard error, exit code 2.</summary>
+/// <summary>
+/// Wrong arguments or unreadable input for an operation, recognised as such: reported on standard error, exit code 2
+/// ([CONF-3]). Never thrown for a failure nobody expected.
+/// </summary>
 public sealed class UsageException(string message) : Exception(message);

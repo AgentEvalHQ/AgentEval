@@ -465,6 +465,32 @@ public sealed class AefInspectImporterTests : IDisposable
     [InlineData("run-tokens", "1e16", "IN-9")]                          // beyond 2^53 − 1
     [InlineData("k", "1.5", "IN-9")]                                    // k, at least 1
     [InlineData("k", "0", "IN-9")]
+    [InlineData("sample-cost", "\"0.1\"", "IN-8")]                      // "Member types": c01
+    [InlineData("sample-cost", "true", "IN-8")]                         // c03
+    [InlineData("sample-cost", "-0.5", "IN-8")]                         // c02: a cost is at least 0
+    [InlineData("run-cost", "\"1\"", "IN-9")]                           // c04
+    [InlineData("total_time", "\"4\"", "IN-8")]                         // c07
+    [InlineData("total_time", "true", "IN-8")]                          // c09
+    [InlineData("total_time", "-1", "IN-8")]
+    [InlineData("explanation", "3", "IN-7")]                            // s37
+    [InlineData("samples", "{}", "IN-8")]                               // s12
+    [InlineData("samples", "\"x\"", "IN-8")]                            // s27
+    [InlineData("model_usage", "[]", "IN-8")]                           // s19
+    [InlineData("role_usage", "[]", "IN-8")]                            // s18
+    [InlineData("total_tokens", "1.5", "IN-8")]                         // i23
+    [InlineData("total_tokens", "\"x\"", "IN-8")]                       // i24
+    [InlineData("results.scores", "[\"x\"]", "IN-9")]                   // s01
+    [InlineData("results.scores", "{}", "IN-9")]                        // s02, s29
+    [InlineData("metrics", "{\"accuracy\": 0.5}", "IN-9")]              // s03: a metric that is a number
+    [InlineData("metrics", "{\"accuracy\": {\"name\": \"accuracy\", \"value\": 1.0}, \"stderr\": 0.1}", "IN-9")]   // s05
+    [InlineData("results", "[]", "IN-9")]                               // s06
+    [InlineData("stats", "[]", "IN-6")]                                 // s07
+    [InlineData("config", "[]", "IN-6")]                                // s08
+    [InlineData("packages", "[]", "IN-6")]                              // s09
+    [InlineData("model_roles", "{\"grader\": \"openai/g\"}", "IN-6")]   // s10
+    [InlineData("model_roles", "[]", "IN-6")]                           // s11
+    [InlineData("epochs_reducer", "[1]", "IN-6")]
+    [InlineData("scorers", "{}", "IN-8")]
     [InlineData("twice", "\"\\u0073\"", "IN-6")]                        // a member named twice, once escaped
     public void AMalformedLog_IsRefused_NamingItsRule_AndNeverThrows(string where, string raw, string rule)
     {
@@ -491,6 +517,21 @@ public sealed class AefInspectImporterTests : IDisposable
                 case "content-key" or "content-key-off": sample["output"] = new JsonObject { ["choices"] = new JsonArray(), ["metadata"] = new JsonObject { ["RAWKEY"] = 1 } }; break;
                 case "score-marker-string": sample["scores"]!["s"]!["value"] = "RAW"; break;
                 case "list-score": sample["scores"]!["s"]!["value"] = "RAW"; break;
+                case "sample-cost": sample["role_usage"] = new JsonObject { ["agent"] = new JsonObject { ["input_tokens"] = 1, ["total_cost"] = "RAW" } }; break;
+                case "run-cost": log["stats"]!["model_usage"] = new JsonObject { ["openai/m"] = new JsonObject { ["input_tokens"] = 1, ["total_cost"] = "RAW" } }; break;
+                case "samples": log["samples"] = "RAW"; break;
+                case "model_usage": sample["model_usage"] = "RAW"; break;
+                case "role_usage": sample["role_usage"] = "RAW"; break;
+                case "total_tokens": sample["model_usage"] = new JsonObject { ["openai/m"] = new JsonObject { ["total_tokens"] = "RAW" } }; break;
+                case "results.scores": log["results"]!["scores"] = "RAW"; break;
+                case "metrics": log["results"]!["scores"]![0]!["metrics"] = "RAW"; break;
+                case "results": log["results"] = "RAW"; break;
+                case "stats": log["stats"] = "RAW"; break;
+                case "config": log["eval"]!["config"] = "RAW"; break;
+                case "packages": log["eval"]!["packages"] = "RAW"; break;
+                case "model_roles": log["eval"]!["model_roles"] = "RAW"; break;
+                case "epochs_reducer": log["eval"]!["config"]!["epochs_reducer"] = "RAW"; break;
+                case "scorers": log["eval"]!["scorers"] = "RAW"; break;
                 case "epochs": log["eval"]!["config"]!["epochs"] = "RAW"; break;
                 case "epoch": sample["epoch"] = "RAW"; break;
                 case "sample-tokens": sample["role_usage"] = new JsonObject { ["agent"] = new JsonObject { ["input_tokens"] = "RAW" } }; break;
@@ -570,6 +611,21 @@ public sealed class AefInspectImporterTests : IDisposable
             "run-tokens" => summary["usage"]![0]!["gen_ai.usage.input_tokens"]!.ToJsonString(),
             _ => summary["lanes"]![0]!["metrics"]![0]!["aggregate"]!["k"]!.ToJsonString(),
         });
+    }
+
+    [Fact]
+    public void NullCountsAsAbsent_SoEpochsNullWritesNoExecutionPolicy()
+    {
+        // "Member types" (i11): null is absent, wherever it is.
+        var (output, _) = Import(log =>
+        {
+            log["eval"]!["config"]!["epochs"] = null;
+            log["samples"]![0]!["total_time"] = null;
+            log["samples"]![0]!["scores"]!["s"]!["explanation"] = null;
+        });
+
+        Assert.Null(AefTestRuns.Document(output, "run.json")["suite"]!["executionPolicy"]);
+        Assert.False(AefTestRuns.Results(output)[0].ContainsKey("durationMs"));
     }
 
     [Theory]

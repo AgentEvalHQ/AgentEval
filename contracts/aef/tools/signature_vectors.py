@@ -718,7 +718,7 @@ def write_private_keys():
     trust them."""
     def pem(der):
         b64 = base64.b64encode(der).decode()
-        return ("-----BEGIN PRIVATE KEY-----\n" + "\n".join(b64[i:i + 64] for i in range(0, len(b64), 64))
+        return ("-----BEGIN PRIVATE KEY-----\n" + "\n".join(b64[i:i + 64] for i in range(0, len(b64), 64))  # DevSkim: ignore DS173238 - writes the published test keys
                 + "\n-----END PRIVATE KEY-----\n")
 
     p256 = C._der(0x30, C.ID_EC_PUBLIC_KEY + C.PRIME256V1)

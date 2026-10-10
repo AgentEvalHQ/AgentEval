@@ -1,0 +1,2 @@
+{"schemaVersion":"1.0","resultId":"r_f90d122a27c956fea456414984d430e0","caseId":"k1","path":"q","evaluator":{"id":"e:q"},"state":"scored","scores":[{"metric":"delta","value":1.5e+308}]}
+{"schemaVersion":"1.0","resultId":"r_699064dfaa0e90770c986a2e46d5edf5","caseId":"k2","path":"q","evaluator":{"id":"e:q"},"state":"scored","scores":[{"metric":"delta","value":1.5e+308}]}
