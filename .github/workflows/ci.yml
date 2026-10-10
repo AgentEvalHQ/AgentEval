@@ -172,7 +172,7 @@ jobs:
 
     - name: Upload test results (Linux)
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: test-results-linux
         path: coverage/**/*.trx
@@ -190,7 +190,7 @@ jobs:
     - name: Upload coverage reports
       # SHA-pinned (SEC-04): third-party action runs in CI with the workflow token. Dependabot
       # (github-actions ecosystem) keeps this current. Resolved from the v5 moving tag.
-      uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v5
+      uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v5
       with:
         # Find all coverage files in the coverage directory
         files: ./coverage/**/coverage.cobertura.xml
@@ -245,7 +245,7 @@ jobs:
 
     - name: Upload test results (Windows)
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: test-results-windows
         path: TestResults/**/*.trx

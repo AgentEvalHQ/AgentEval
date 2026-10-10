@@ -190,7 +190,7 @@ jobs:
 
     - name: Publish Test Summary
       # SHA-pinned (SEC-04): third-party action; resolved from the v1 moving tag, kept current by Dependabot.
-      uses: dorny/test-reporter@a53e41438c2381e621dc719a47a57180e30c7075 # v1
+      uses: dorny/test-reporter@3d49bf4e0715e7fe48375099bd6b1058d42e673c # v1
       if: always() && steps.provider.outputs.provider == 'azure'
       with:
         name: LLM Integration Test Results
