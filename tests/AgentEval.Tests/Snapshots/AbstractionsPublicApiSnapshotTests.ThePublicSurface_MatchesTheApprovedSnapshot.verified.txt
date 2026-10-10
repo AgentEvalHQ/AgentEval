@@ -11,7 +11,7 @@
     Void Validate()
     ctor()
     static AgentEval.Calibration.CalibratedJudgeOptions Default { get; }
-class AgentEval.Calibration.CalibratedResult
+class AgentEval.Calibration.CalibratedResult : IEquatable<AgentEval.Calibration.CalibratedResult>
     AgentEval.Calibration.CalibratedResult <Clone>$()
     AgentEval.Calibration.VotingStrategy Strategy { get; init; }
     Boolean Equals(AgentEval.Calibration.CalibratedResult other)
@@ -42,7 +42,7 @@ enum AgentEval.Calibration.VotingStrategy
     Mean
     Unanimous
     Weighted
-class AgentEval.Comparison.ConfidenceInterval
+class AgentEval.Comparison.ConfidenceInterval : IEquatable<AgentEval.Comparison.ConfidenceInterval>
     AgentEval.Comparison.ConfidenceInterval <Clone>$()
     Boolean Equals(AgentEval.Comparison.ConfidenceInterval other)
     Boolean Equals(Object obj)
@@ -54,7 +54,7 @@ class AgentEval.Comparison.ConfidenceInterval
     String ToString()
     Void Deconstruct(out Double Lower, out Double Upper, out Double Level)
     ctor(Double Lower, Double Upper, Double Level)
-class AgentEval.Comparison.DistributionStatistics
+class AgentEval.Comparison.DistributionStatistics : IEquatable<AgentEval.Comparison.DistributionStatistics>
     AgentEval.Comparison.DistributionStatistics <Clone>$()
     Boolean Equals(AgentEval.Comparison.DistributionStatistics other)
     Boolean Equals(Object obj)
@@ -102,7 +102,7 @@ interface AgentEval.Comparison.IStatisticsCalculator
 interface AgentEval.Comparison.IStochasticRunner
     Task<AgentEval.Comparison.StochasticResult> RunStochasticTestAsync(AgentEval.Comparison.IAgentFactory factory, AgentEval.Models.TestCase testCase, AgentEval.Comparison.StochasticOptions options = null, CancellationToken cancellationToken = default)
     Task<AgentEval.Comparison.StochasticResult> RunStochasticTestAsync(AgentEval.Core.IEvaluableAgent agent, AgentEval.Models.TestCase testCase, AgentEval.Comparison.StochasticOptions options = null, CancellationToken cancellationToken = default)
-class AgentEval.Comparison.ModelComparisonOptions
+class AgentEval.Comparison.ModelComparisonOptions : IEquatable<AgentEval.Comparison.ModelComparisonOptions>
     AgentEval.Comparison.ModelComparisonOptions <Clone>$()
     AgentEval.Comparison.ScoringWeights EffectiveScoringWeights { get; }
     AgentEval.Comparison.ScoringWeights ScoringWeights { get; init; }
@@ -122,7 +122,7 @@ class AgentEval.Comparison.ModelComparisonOptions
     static AgentEval.Comparison.ModelComparisonOptions Default { get; }
     static AgentEval.Comparison.ModelComparisonOptions Quick { get; }
     static AgentEval.Comparison.ModelComparisonOptions Thorough { get; }
-class AgentEval.Comparison.ModelComparisonResult
+class AgentEval.Comparison.ModelComparisonResult : IEquatable<AgentEval.Comparison.ModelComparisonResult>
     AgentEval.Comparison.ModelComparisonOptions Options { get; init; }
     AgentEval.Comparison.ModelComparisonResult <Clone>$()
     AgentEval.Comparison.ModelRanking Winner { get; init; }
@@ -136,7 +136,7 @@ class AgentEval.Comparison.ModelComparisonResult
     String ToString()
     Void Deconstruct(out AgentEval.Models.TestCase TestCase, out IReadOnlyList<AgentEval.Comparison.ModelResult> ModelResults, out IReadOnlyList<AgentEval.Comparison.ModelRanking> Ranking, out AgentEval.Comparison.ModelRanking Winner, out AgentEval.Comparison.ModelComparisonOptions Options)
     ctor(AgentEval.Models.TestCase TestCase, IReadOnlyList<AgentEval.Comparison.ModelResult> ModelResults, IReadOnlyList<AgentEval.Comparison.ModelRanking> Ranking, AgentEval.Comparison.ModelRanking Winner, AgentEval.Comparison.ModelComparisonOptions Options)
-class AgentEval.Comparison.ModelConfiguration
+class AgentEval.Comparison.ModelConfiguration : IEquatable<AgentEval.Comparison.ModelConfiguration>
     AgentEval.Comparison.ModelConfiguration <Clone>$()
     Boolean Equals(AgentEval.Comparison.ModelConfiguration other)
     Boolean Equals(Object obj)
@@ -148,7 +148,7 @@ class AgentEval.Comparison.ModelConfiguration
     String DeploymentName { get; init; }
     String ToString()
     ctor()
-class AgentEval.Comparison.ModelRanking
+class AgentEval.Comparison.ModelRanking : IEquatable<AgentEval.Comparison.ModelRanking>
     AgentEval.Comparison.ModelRanking <Clone>$()
     Boolean Equals(AgentEval.Comparison.ModelRanking other)
     Boolean Equals(Object obj)
@@ -164,7 +164,7 @@ class AgentEval.Comparison.ModelRanking
     String ToString()
     Void Deconstruct(out String ModelId, out String ModelName, out Double CompositeScore, out Double QualityScore, out Double SpeedScore, out Double CostScore, out Double ReliabilityScore, out Int32 Rank)
     ctor(String ModelId, String ModelName, Double CompositeScore, Double QualityScore, Double SpeedScore, Double CostScore, Double ReliabilityScore, Int32 Rank)
-class AgentEval.Comparison.ModelResult
+class AgentEval.Comparison.ModelResult : IEquatable<AgentEval.Comparison.ModelResult>
     AgentEval.Comparison.ModelResult <Clone>$()
     AgentEval.Comparison.StochasticResult StochasticResult { get; init; }
     Boolean Equals(AgentEval.Comparison.ModelResult other)
@@ -181,7 +181,7 @@ class AgentEval.Comparison.ModelResult
     TimeSpan AverageLatency { get; init; }
     Void Deconstruct(out String ModelId, out String ModelName, out AgentEval.Comparison.StochasticResult StochasticResult, out TimeSpan AverageLatency, out Decimal? AverageCost, out Decimal? TotalCost)
     ctor(String ModelId, String ModelName, AgentEval.Comparison.StochasticResult StochasticResult, TimeSpan AverageLatency, Decimal? AverageCost, Decimal? TotalCost)
-class AgentEval.Comparison.ScoringWeights
+class AgentEval.Comparison.ScoringWeights : IEquatable<AgentEval.Comparison.ScoringWeights>
     AgentEval.Comparison.ScoringWeights <Clone>$()
     Boolean Equals(AgentEval.Comparison.ScoringWeights other)
     Boolean Equals(Object obj)
@@ -200,7 +200,7 @@ class AgentEval.Comparison.ScoringWeights
     static AgentEval.Comparison.ScoringWeights QualityFocused { get; }
     static AgentEval.Comparison.ScoringWeights ReliabilityFocused { get; }
     static AgentEval.Comparison.ScoringWeights SpeedFocused { get; }
-class AgentEval.Comparison.StochasticOptions
+class AgentEval.Comparison.StochasticOptions : IEquatable<AgentEval.Comparison.StochasticOptions>
     Action<AgentEval.Comparison.StochasticProgress> OnProgress { get; init; }
     AgentEval.Comparison.StochasticOptions <Clone>$()
     Boolean EnableStatisticalAnalysis { get; init; }
@@ -221,7 +221,7 @@ class AgentEval.Comparison.StochasticOptions
     static AgentEval.Comparison.StochasticOptions Default { get; }
     static AgentEval.Comparison.StochasticOptions Quick { get; }
     static AgentEval.Comparison.StochasticOptions Thorough { get; }
-class AgentEval.Comparison.StochasticProgress
+class AgentEval.Comparison.StochasticProgress : IEquatable<AgentEval.Comparison.StochasticProgress>
     AgentEval.Comparison.StochasticProgress <Clone>$()
     AgentEval.Models.TestResult LastResult { get; init; }
     Boolean Equals(AgentEval.Comparison.StochasticProgress other)
@@ -234,7 +234,7 @@ class AgentEval.Comparison.StochasticProgress
     TimeSpan? EstimatedRemaining { get; init; }
     Void Deconstruct(out Int32 CurrentRun, out Int32 TotalRuns, out AgentEval.Models.TestResult LastResult, out TimeSpan Elapsed, out TimeSpan? EstimatedRemaining)
     ctor(Int32 CurrentRun, Int32 TotalRuns, AgentEval.Models.TestResult LastResult, TimeSpan Elapsed, TimeSpan? EstimatedRemaining)
-class AgentEval.Comparison.StochasticResult
+class AgentEval.Comparison.StochasticResult : IEquatable<AgentEval.Comparison.StochasticResult>
     AgentEval.Comparison.DistributionStatistics CompletionTokenStats { get; }
     AgentEval.Comparison.DistributionStatistics CostStats { get; }
     AgentEval.Comparison.DistributionStatistics DurationStats { get; }
@@ -262,7 +262,7 @@ class AgentEval.Comparison.StochasticResult
     ValueTuple<AgentEval.Models.TestResult, TimeSpan>? SlowestRun { get; }
     Void Deconstruct(out AgentEval.Models.TestCase TestCase, out IReadOnlyList<AgentEval.Models.TestResult> IndividualResults, out AgentEval.Comparison.StochasticStatistics Statistics, out AgentEval.Comparison.StochasticOptions Options, out Boolean Passed)
     ctor(AgentEval.Models.TestCase TestCase, IReadOnlyList<AgentEval.Models.TestResult> IndividualResults, AgentEval.Comparison.StochasticStatistics Statistics, AgentEval.Comparison.StochasticOptions Options, Boolean Passed)
-class AgentEval.Comparison.StochasticStatistics
+class AgentEval.Comparison.StochasticStatistics : IEquatable<AgentEval.Comparison.StochasticStatistics>
     AgentEval.Comparison.ConfidenceInterval ConfidenceInterval { get; init; }
     AgentEval.Comparison.StochasticStatistics <Clone>$()
     Boolean Equals(AgentEval.Comparison.StochasticStatistics other)
@@ -281,7 +281,7 @@ class AgentEval.Comparison.StochasticStatistics
     String ToString()
     Void Deconstruct(out Double PassRate, out Double MeanScore, out Double MedianScore, out Double StandardDeviation, out Int32 MinScore, out Int32 MaxScore, out Double Percentile25, out Double Percentile75, out Double Percentile95, out AgentEval.Comparison.ConfidenceInterval ConfidenceInterval, out Int32 SampleSize)
     ctor(Double PassRate, Double MeanScore, Double MedianScore, Double StandardDeviation, Int32 MinScore, Int32 MaxScore, Double Percentile25, Double Percentile75, Double Percentile95, AgentEval.Comparison.ConfidenceInterval ConfidenceInterval, Int32 SampleSize)
-class AgentEval.Comparison.ToolUsageSummary
+class AgentEval.Comparison.ToolUsageSummary : IEquatable<AgentEval.Comparison.ToolUsageSummary>
     AgentEval.Comparison.DistributionStatistics CallCountStats { get; init; }
     AgentEval.Comparison.ToolUsageSummary <Clone>$()
     Boolean AllCallsSucceeded { get; }
@@ -326,7 +326,7 @@ class AgentEval.Core.AgentResponseChunk
     String ModelId { get; init; }
     String Text { get; init; }
     ctor()
-class AgentEval.Core.AnswerSamplingAcknowledgement
+sealed class AgentEval.Core.AnswerSamplingAcknowledgement : IEquatable<AgentEval.Core.AnswerSamplingAcknowledgement>
     AgentEval.Core.AnswerSamplingAcknowledgement <Clone>$()
     Boolean Equals(AgentEval.Core.AnswerSamplingAcknowledgement other)
     Boolean Equals(Object obj)
@@ -337,7 +337,7 @@ class AgentEval.Core.AnswerSamplingAcknowledgement
     ctor()
     static AgentEval.Core.AnswerSamplingAcknowledgement AppliedFrom(AgentEval.Core.AnswerSamplingRequest request)
     static AgentEval.Core.AnswerSamplingAcknowledgement None { get; }
-class AgentEval.Core.AnswerSamplingRequest
+sealed class AgentEval.Core.AnswerSamplingRequest : IEquatable<AgentEval.Core.AnswerSamplingRequest>
     AgentEval.Core.AnswerSamplingRequest <Clone>$()
     Boolean Equals(AgentEval.Core.AnswerSamplingRequest other)
     Boolean Equals(Object obj)
@@ -352,7 +352,7 @@ class AgentEval.Core.CriterionResult
     String Criterion { get; init; }
     String Explanation { get; init; }
     ctor()
-class AgentEval.Core.EvalRubric
+sealed class AgentEval.Core.EvalRubric : IEquatable<AgentEval.Core.EvalRubric>
     AgentEval.Core.EvalRubric <Clone>$()
     AgentEval.Core.RubricScoreScale Scale { get; init; }
     Boolean Dimensional { get; init; }
@@ -431,7 +431,7 @@ interface AgentEval.Core.IAgentEvalLogger
     Void LogFailure(AgentEval.Models.FailureReport report)
     Void LogMetricResult(AgentEval.Core.MetricResult result)
     Void LogTimeline(AgentEval.Models.ToolCallTimeline timeline)
-interface AgentEval.Core.IAgentEvalPlugin
+interface AgentEval.Core.IAgentEvalPlugin : IDisposable
     AgentEval.Core.PluginLifecycleStage Stage { get; }
     IReadOnlyList<String> Dependencies { get; }
     String Description { get; }
@@ -442,11 +442,11 @@ interface AgentEval.Core.IAgentEvalPlugin
     Task OnBeforeEvaluationAsync(AgentEval.Core.EvaluationContext context, CancellationToken cancellationToken = default)
     Task ShutdownAsync(CancellationToken cancellationToken = default)
     Version Version { get; }
-interface AgentEval.Core.IAgenticMetric
+interface AgentEval.Core.IAgenticMetric : AgentEval.Core.IMetric
     Boolean RequiresToolUsage { get; }
 interface AgentEval.Core.IAnswerSamplingConfigurableAgent
     AgentEval.Core.AnswerSamplingAcknowledgement ConfigureAnswerSampling(AgentEval.Core.AnswerSamplingRequest request)
-interface AgentEval.Core.IBatchEvaluationHarness
+interface AgentEval.Core.IBatchEvaluationHarness : AgentEval.Core.IEvaluationHarness
     Task<AgentEval.Models.TestSummary> RunBatchAsync(AgentEval.Core.IEvaluableAgent agent, IEnumerable<AgentEval.Models.DatasetTestCase> testCases, AgentEval.Core.EvaluationOptions options = null, CancellationToken cancellationToken = default)
 interface AgentEval.Core.IEvaluableAgent
     String Name { get; }
@@ -470,7 +470,7 @@ interface AgentEval.Core.IHistoryInjectableAgent
 interface AgentEval.Core.IJudgePromptSource
     String PromptMaterial { get; }
     String SystemPromptId { get; }
-interface AgentEval.Core.IMemoryMetric
+interface AgentEval.Core.IMemoryMetric : AgentEval.Core.IMetric
 interface AgentEval.Core.IMetric
     AgentEval.Core.MetricCategory Categories { get; }
     Decimal? EstimatedCostPerEvaluation { get; }
@@ -487,15 +487,15 @@ interface AgentEval.Core.IMetricRegistry
     Void Clear()
     Void Register(AgentEval.Core.IMetric metric)
     Void Register(String name, AgentEval.Core.IMetric metric)
-interface AgentEval.Core.IPerformanceMetric
+interface AgentEval.Core.IPerformanceMetric : AgentEval.Core.IMetric
 interface AgentEval.Core.IPluginContext
     AgentEval.Core.IAgentEvalLogger Logger { get; }
     AgentEval.Core.IMetricRegistry Metrics { get; }
     IReadOnlyDictionary<String, Object> Configuration { get; }
     T GetConfig<T>(String key)
     T GetRequiredConfig<T>(String key)
-interface AgentEval.Core.IQualityMetric
-interface AgentEval.Core.IRAGMetric
+interface AgentEval.Core.IQualityMetric : AgentEval.Core.IMetric
+interface AgentEval.Core.IRAGMetric : AgentEval.Core.IMetric
     Boolean RequiresContext { get; }
     Boolean RequiresGroundTruth { get; }
 interface AgentEval.Core.IResultExporter
@@ -509,23 +509,23 @@ interface AgentEval.Core.IResultTransformer
     Int32 Priority { get; }
 interface AgentEval.Core.IRubricBindable
     AgentEval.Core.IEvaluator WithRubric(AgentEval.Core.EvalRubric rubric, String dimension)
-interface AgentEval.Core.ISafetyMetric
+interface AgentEval.Core.ISafetyMetric : AgentEval.Core.IMetric
 interface AgentEval.Core.ISessionResettableAgent
     Task ResetSessionAsync(CancellationToken cancellationToken = default)
-interface AgentEval.Core.IStreamableAgent
+interface AgentEval.Core.IStreamableAgent : AgentEval.Core.IEvaluableAgent
     IAsyncEnumerable<AgentEval.Core.AgentResponseChunk> InvokeStreamingAsync(String prompt, CancellationToken cancellationToken = default)
-interface AgentEval.Core.IStreamingEvaluationHarness
+interface AgentEval.Core.IStreamingEvaluationHarness : AgentEval.Core.IEvaluationHarness
     Task<AgentEval.Models.TestResult> RunEvaluationStreamingAsync(AgentEval.Core.IStreamableAgent agent, AgentEval.Models.TestCase testCase, AgentEval.Core.StreamingOptions streamingOptions = null, AgentEval.Core.EvaluationOptions options = null, CancellationToken cancellationToken = default)
 interface AgentEval.Core.ITimestampedHistoryInjectableAgent
     Void InjectTimestampedConversationHistory(AgentEval.Core.TimestampedConversationHistory history)
 interface AgentEval.Core.IToolUsageExtractor
     AgentEval.Models.ToolUsageReport Extract(AgentEval.Core.AgentResponse response)
     AgentEval.Models.ToolUsageReport Extract(IReadOnlyList<Object> rawMessages)
-interface AgentEval.Core.IWorkflowEvaluableAgent
+interface AgentEval.Core.IWorkflowEvaluableAgent : AgentEval.Core.IEvaluableAgent
     IReadOnlyList<String> ExecutorIds { get; }
     String WorkflowType { get; }
     Task<AgentEval.Models.WorkflowExecutionResult> ExecuteWorkflowAsync(String prompt, CancellationToken cancellationToken = default)
-class AgentEval.Core.JudgeEvidence
+sealed class AgentEval.Core.JudgeEvidence
     String Message { get; init; }
     String Reference { get; init; }
     String Source { get; init; }
@@ -576,7 +576,7 @@ enum AgentEval.Core.PluginLifecycleStage
 enum AgentEval.Core.RubricScoreScale
     Unit
     Percent
-class AgentEval.Core.RubricSeverityBand
+sealed class AgentEval.Core.RubricSeverityBand : IEquatable<AgentEval.Core.RubricSeverityBand>
     AgentEval.Core.RubricSeverityBand <Clone>$()
     Boolean Equals(AgentEval.Core.RubricSeverityBand other)
     Boolean Equals(Object obj)
@@ -593,11 +593,11 @@ class AgentEval.Core.StreamingOptions
     Action<String> OnTextChunk { get; init; }
     Action<TimeSpan> OnFirstToken { get; init; }
     ctor()
-class AgentEval.Core.TimestampedConversationHistory
+sealed class AgentEval.Core.TimestampedConversationHistory
     DateTimeOffset QueryTime { get; init; }
     IReadOnlyList<AgentEval.Core.TimestampedConversationTurn> Turns { get; init; }
     ctor()
-struct AgentEval.Core.TimestampedConversationTurn
+struct AgentEval.Core.TimestampedConversationTurn : IEquatable<AgentEval.Core.TimestampedConversationTurn>
     Boolean Equals(AgentEval.Core.TimestampedConversationTurn other)
     Boolean Equals(Object obj)
     DateTimeOffset Timestamp { get; init; }
@@ -635,7 +635,7 @@ interface AgentEval.DataLoaders.IDatasetLoaderFactory
     AgentEval.DataLoaders.IDatasetLoader Create(String format)
     AgentEval.DataLoaders.IDatasetLoader CreateFromExtension(String extension)
     Void Register(String extension, Func<AgentEval.DataLoaders.IDatasetLoader> factory)
-class AgentEval.Decisions.BinaryAnswer [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
+sealed class AgentEval.Decisions.BinaryAnswer : AgentEval.Decisions.DecisionAnswer, IEquatable<AgentEval.Decisions.BinaryAnswer>, IEquatable<AgentEval.Decisions.DecisionAnswer> [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
     AgentEval.Decisions.BinaryAnswer <Clone>$()
     Boolean Equals(AgentEval.Decisions.BinaryAnswer other)
     Boolean Equals(AgentEval.Decisions.DecisionAnswer other)
@@ -645,7 +645,7 @@ class AgentEval.Decisions.BinaryAnswer [Experimental(AGENTEVAL_DECISIONS_PREVIEW
     String ToString()
     Void Deconstruct(out Double TrueProbability)
     ctor(Double TrueProbability)
-class AgentEval.Decisions.BinaryQuestion [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
+sealed class AgentEval.Decisions.BinaryQuestion : AgentEval.Decisions.DecisionQuestion, IEquatable<AgentEval.Decisions.BinaryQuestion>, IEquatable<AgentEval.Decisions.DecisionQuestion> [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
     AgentEval.Decisions.BinaryQuestion <Clone>$()
     Boolean Equals(AgentEval.Decisions.BinaryQuestion other)
     Boolean Equals(AgentEval.Decisions.DecisionQuestion other)
@@ -656,7 +656,7 @@ class AgentEval.Decisions.BinaryQuestion [Experimental(AGENTEVAL_DECISIONS_PREVI
     String TrueCriteria { get; init; }
     Void Deconstruct(out String Instructions, out String TrueCriteria, out String FalseCriteria)
     ctor(String Instructions, String TrueCriteria = null, String FalseCriteria = null)
-class AgentEval.Decisions.ChoiceAnswer [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
+sealed class AgentEval.Decisions.ChoiceAnswer : AgentEval.Decisions.DecisionAnswer, IEquatable<AgentEval.Decisions.ChoiceAnswer>, IEquatable<AgentEval.Decisions.DecisionAnswer> [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
     AgentEval.Decisions.ChoiceAnswer <Clone>$()
     Boolean Equals(AgentEval.Decisions.ChoiceAnswer other)
     Boolean Equals(AgentEval.Decisions.DecisionAnswer other)
@@ -668,7 +668,7 @@ class AgentEval.Decisions.ChoiceAnswer [Experimental(AGENTEVAL_DECISIONS_PREVIEW
     String ToString()
     Void Deconstruct(out String Choice, out IReadOnlyDictionary<String, Double> Probabilities, out Double Confidence)
     ctor(String Choice, IReadOnlyDictionary<String, Double> Probabilities, Double Confidence)
-class AgentEval.Decisions.ChoiceQuestion [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
+sealed class AgentEval.Decisions.ChoiceQuestion : AgentEval.Decisions.DecisionQuestion, IEquatable<AgentEval.Decisions.ChoiceQuestion>, IEquatable<AgentEval.Decisions.DecisionQuestion> [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
     AgentEval.Decisions.ChoiceQuestion <Clone>$()
     Boolean Equals(AgentEval.Decisions.ChoiceQuestion other)
     Boolean Equals(AgentEval.Decisions.DecisionQuestion other)
@@ -679,13 +679,13 @@ class AgentEval.Decisions.ChoiceQuestion [Experimental(AGENTEVAL_DECISIONS_PREVI
     Void Deconstruct(out String Instructions, out IReadOnlyDictionary<String, String> Criteria)
     const Int32 MinOptions
     ctor(String Instructions, IReadOnlyDictionary<String, String> Criteria)
-class AgentEval.Decisions.DecisionAnswer [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
+abstract class AgentEval.Decisions.DecisionAnswer : IEquatable<AgentEval.Decisions.DecisionAnswer> [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
     AgentEval.Decisions.DecisionAnswer <Clone>$()
     Boolean Equals(AgentEval.Decisions.DecisionAnswer other)
     Boolean Equals(Object obj)
     Int32 GetHashCode()
     String ToString()
-class AgentEval.Decisions.DecisionClientException [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
+sealed class AgentEval.Decisions.DecisionClientException : Exception, ISerializable [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
     AgentEval.Decisions.DecisionFailureKind Kind { get; }
     Boolean IsTransient { get; }
     Int32? StatusCode { get; }
@@ -698,7 +698,7 @@ enum AgentEval.Decisions.DecisionFailureKind [Experimental(AGENTEVAL_DECISIONS_P
     Overloaded
     ProviderUnavailable
     InvalidResponse
-class AgentEval.Decisions.DecisionQuestion [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
+abstract class AgentEval.Decisions.DecisionQuestion : IEquatable<AgentEval.Decisions.DecisionQuestion> [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
     AgentEval.Decisions.DecisionQuestion <Clone>$()
     Boolean Equals(AgentEval.Decisions.DecisionQuestion other)
     Boolean Equals(Object obj)
@@ -706,7 +706,8 @@ class AgentEval.Decisions.DecisionQuestion [Experimental(AGENTEVAL_DECISIONS_PRE
     String Instructions { get; }
     String ToString()
     Void Deconstruct(out String Instructions)
-class AgentEval.Decisions.DecisionRequest [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
+    protected ctor(String Instructions)
+sealed class AgentEval.Decisions.DecisionRequest : IEquatable<AgentEval.Decisions.DecisionRequest> [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
     AgentEval.Decisions.DecisionRequest <Clone>$()
     Boolean Equals(AgentEval.Decisions.DecisionRequest other)
     Boolean Equals(Object obj)
@@ -717,7 +718,7 @@ class AgentEval.Decisions.DecisionRequest [Experimental(AGENTEVAL_DECISIONS_PREV
     String ToString()
     Void Deconstruct(out Object State, out IReadOnlyDictionary<String, AgentEval.Decisions.DecisionQuestion> Questions, out String Model)
     ctor(Object State, IReadOnlyDictionary<String, AgentEval.Decisions.DecisionQuestion> Questions, String Model = null)
-class AgentEval.Decisions.DecisionResponse [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
+sealed class AgentEval.Decisions.DecisionResponse : IEquatable<AgentEval.Decisions.DecisionResponse> [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
     AgentEval.Decisions.DecisionResponse <Clone>$()
     AgentEval.Decisions.DecisionUsage Usage { get; init; }
     Boolean Equals(AgentEval.Decisions.DecisionResponse other)
@@ -729,7 +730,7 @@ class AgentEval.Decisions.DecisionResponse [Experimental(AGENTEVAL_DECISIONS_PRE
     String ToString()
     Void Deconstruct(out String Model, out IReadOnlyDictionary<String, AgentEval.Decisions.DecisionAnswer> Answers, out AgentEval.Decisions.DecisionUsage Usage, out String ResponseId)
     ctor(String Model, IReadOnlyDictionary<String, AgentEval.Decisions.DecisionAnswer> Answers, AgentEval.Decisions.DecisionUsage Usage, String ResponseId = null)
-class AgentEval.Decisions.DecisionUsage [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
+sealed class AgentEval.Decisions.DecisionUsage : IEquatable<AgentEval.Decisions.DecisionUsage> [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
     AgentEval.Decisions.DecisionUsage <Clone>$()
     Boolean Equals(AgentEval.Decisions.DecisionUsage other)
     Boolean Equals(Object obj)
@@ -744,7 +745,7 @@ static class AgentEval.Decisions.DecisionsPreview
     const String DiagnosticId
 interface AgentEval.Decisions.IDecisionClient [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
     Task<AgentEval.Decisions.DecisionResponse> DecideAsync(AgentEval.Decisions.DecisionRequest request, CancellationToken cancellationToken = default)
-class AgentEval.Decisions.ScoreAnswer [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
+sealed class AgentEval.Decisions.ScoreAnswer : AgentEval.Decisions.DecisionAnswer, IEquatable<AgentEval.Decisions.DecisionAnswer>, IEquatable<AgentEval.Decisions.ScoreAnswer> [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
     AgentEval.Decisions.ScoreAnswer <Clone>$()
     Boolean Equals(AgentEval.Decisions.DecisionAnswer other)
     Boolean Equals(AgentEval.Decisions.ScoreAnswer other)
@@ -757,7 +758,7 @@ class AgentEval.Decisions.ScoreAnswer [Experimental(AGENTEVAL_DECISIONS_PREVIEW0
     String ToString()
     Void Deconstruct(out Double Score, out IReadOnlyDictionary<String, Double> Probabilities, out IReadOnlyDictionary<String, String> Legend, out Double Confidence)
     ctor(Double Score, IReadOnlyDictionary<String, Double> Probabilities, IReadOnlyDictionary<String, String> Legend, Double Confidence)
-class AgentEval.Decisions.ScoreQuestion [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
+sealed class AgentEval.Decisions.ScoreQuestion : AgentEval.Decisions.DecisionQuestion, IEquatable<AgentEval.Decisions.DecisionQuestion>, IEquatable<AgentEval.Decisions.ScoreQuestion> [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
     AgentEval.Decisions.ScoreQuestion <Clone>$()
     Boolean Equals(AgentEval.Decisions.DecisionQuestion other)
     Boolean Equals(AgentEval.Decisions.ScoreQuestion other)
@@ -776,7 +777,7 @@ enum AgentEval.Evals.ComponentFailureEffect
     Warn
     Fail
     FailUnlessPass
-class AgentEval.Evals.EvalComponent
+sealed class AgentEval.Evals.EvalComponent : IEquatable<AgentEval.Evals.EvalComponent>
     AgentEval.Evals.ComponentFailureEffect OnFailure { get; init; }
     AgentEval.Evals.EvalComponent <Clone>$()
     AgentEval.Evals.IEval Eval { get; init; }
@@ -788,7 +789,7 @@ class AgentEval.Evals.EvalComponent
     String ToString()
     Void Deconstruct(out AgentEval.Evals.IEval Eval, out Double Weight, out Boolean Required)
     ctor(AgentEval.Evals.IEval Eval, Double Weight = 1, Boolean Required = true)
-class AgentEval.Evals.EvalDetails
+sealed class AgentEval.Evals.EvalDetails : IEquatable<AgentEval.Evals.EvalDetails>
     AgentEval.Evals.EvalDetails <Clone>$()
     Boolean Equals(AgentEval.Evals.EvalDetails other)
     Boolean Equals(Object obj)
@@ -802,7 +803,7 @@ class AgentEval.Evals.EvalDetails
     String ToString()
     Void Deconstruct(out IReadOnlyDictionary<String, Double> Dimensions, out IReadOnlyList<AgentEval.Evals.EvalEvidence> Evidence, out IReadOnlyList<String> Recommendations, out IReadOnlyList<AgentEval.Evals.EvalResult> SubResults, out String AggregationStrategy)
     ctor(IReadOnlyDictionary<String, Double> Dimensions, IReadOnlyList<AgentEval.Evals.EvalEvidence> Evidence, IReadOnlyList<String> Recommendations, IReadOnlyList<AgentEval.Evals.EvalResult> SubResults, String AggregationStrategy)
-class AgentEval.Evals.EvalEvidence
+sealed class AgentEval.Evals.EvalEvidence : IEquatable<AgentEval.Evals.EvalEvidence>
     AgentEval.Evals.EvalEvidence <Clone>$()
     Boolean Equals(AgentEval.Evals.EvalEvidence other)
     Boolean Equals(Object obj)
@@ -813,7 +814,7 @@ class AgentEval.Evals.EvalEvidence
     String ToString()
     Void Deconstruct(out String Source, out String Reference, out String Message)
     ctor(String Source, String Reference, String Message)
-class AgentEval.Evals.EvalInput
+sealed class AgentEval.Evals.EvalInput : IEquatable<AgentEval.Evals.EvalInput>
     AgentEval.Evals.EvalInput <Clone>$()
     AgentEval.Models.PerformanceMetrics Performance { get; init; }
     Boolean Equals(AgentEval.Evals.EvalInput other)
@@ -838,7 +839,7 @@ static class AgentEval.Evals.EvalInputAgentBinding
     const String AgentMetadataKey
     static Boolean TryReadAgent(AgentEval.Evals.EvalInput input, out AgentEval.Core.IEvaluableAgent agent)
     static String AbsentAgentReason(String family, String typedEntryPoint)
-class AgentEval.Evals.EvalMetadata
+sealed class AgentEval.Evals.EvalMetadata : IEquatable<AgentEval.Evals.EvalMetadata>
     AgentEval.Evals.EvalMetadata <Clone>$()
     Boolean Equals(AgentEval.Evals.EvalMetadata other)
     Boolean Equals(Object obj)
@@ -850,7 +851,7 @@ class AgentEval.Evals.EvalMetadata
     String Version { get; init; }
     Void Deconstruct(out String Key, out String Name, out String Category, out String Version)
     ctor(String Key, String Name, String Category, String Version)
-class AgentEval.Evals.EvalProvenance
+sealed class AgentEval.Evals.EvalProvenance : IEquatable<AgentEval.Evals.EvalProvenance>
     AgentEval.Evals.EvalProvenance <Clone>$()
     Boolean CacheHit { get; init; }
     Boolean Equals(AgentEval.Evals.EvalProvenance other)
@@ -869,7 +870,7 @@ static class AgentEval.Evals.EvalReportHelpers
     static AgentEval.Evals.EvalResult FindByKey(AgentEval.Evals.EvalResult root, String key, Int32 depth = 0)
     static String Capitalize(String s)
     static String TruncateForPreview(String text, Int32 maxLen = 80)
-class AgentEval.Evals.EvalResult
+sealed class AgentEval.Evals.EvalResult : IEquatable<AgentEval.Evals.EvalResult>
     AgentEval.Evals.EvalDetails Details { get; init; }
     AgentEval.Evals.EvalMetadata Metric { get; init; }
     AgentEval.Evals.EvalProvenance Provenance { get; init; }
@@ -883,7 +884,7 @@ class AgentEval.Evals.EvalResult
     Void Deconstruct(out AgentEval.Evals.EvalMetadata Metric, out AgentEval.Evals.EvalScore Score, out AgentEval.Evals.EvalDetails Details, out AgentEval.Evals.EvalProvenance Provenance, out DateTimeOffset EvaluatedAt)
     ctor(AgentEval.Evals.EvalMetadata Metric, AgentEval.Evals.EvalScore Score, AgentEval.Evals.EvalDetails Details, AgentEval.Evals.EvalProvenance Provenance, DateTimeOffset EvaluatedAt)
     static AgentEval.Evals.EvalResult Skipped(AgentEval.Evals.IEval eval, String reason)
-class AgentEval.Evals.EvalResultRenderOptions
+sealed class AgentEval.Evals.EvalResultRenderOptions : IEquatable<AgentEval.Evals.EvalResultRenderOptions>
     AgentEval.Evals.EvalResultRenderOptions <Clone>$()
     AgentEval.Output.SubjectIdentity Subject { get; init; }
     Boolean Equals(AgentEval.Evals.EvalResultRenderOptions other)
@@ -900,7 +901,7 @@ class AgentEval.Evals.EvalResultRenderOptions
     String ToString()
     Void Deconstruct(out AgentEval.Output.SubjectIdentity Subject, out String Title, out String RegulationOrBenchmark, out String RunId, out DateTimeOffset? GeneratedAt, out Boolean IncludeProvenance, out String AuditHash, out String AgentEvalVersion, out Int32 EvidenceTruncationLength)
     ctor(AgentEval.Output.SubjectIdentity Subject, String Title = null, String RegulationOrBenchmark = null, String RunId = null, DateTimeOffset? GeneratedAt = null, Boolean IncludeProvenance = true, String AuditHash = null, String AgentEvalVersion = null, Int32 EvidenceTruncationLength = 800)
-class AgentEval.Evals.EvalScore
+sealed class AgentEval.Evals.EvalScore : IEquatable<AgentEval.Evals.EvalScore>
     AgentEval.Evals.EvalScore <Clone>$()
     AgentEval.Evals.Meta.MeasurementState Measurement { get; init; }
     Boolean Equals(AgentEval.Evals.EvalScore other)
@@ -928,7 +929,7 @@ static class AgentEval.Evals.EvalScoreExtensions
     static String RunVerdict(AgentEval.Evals.EvalScore root, AgentEval.Output.RunStats stats)
 static class AgentEval.Evals.EvalTreeLimits
     const Int32 MaxTreeWalkDepth
-class AgentEval.Evals.EvaluatorCard
+sealed class AgentEval.Evals.EvaluatorCard : IEquatable<AgentEval.Evals.EvaluatorCard>
     AgentEval.Evals.EvaluatorCard <Clone>$()
     AgentEval.Evals.EvaluatorCardLinks Links { get; init; }
     AgentEval.Evals.EvaluatorCostTier CostTier { get; init; }
@@ -948,7 +949,7 @@ class AgentEval.Evals.EvaluatorCard
     String Version { get; init; }
     Void Deconstruct(out String Key, out String Name, out String Category, out String Version, out String Description, out AgentEval.Evals.EvaluatorCostTier CostTier, out Boolean HigherIsBetter, out Double? DefaultThreshold, out IReadOnlyList<AgentEval.Evals.EvaluatorExpectedInput> ExpectedInputs, out String RecommendedVisualization, out IReadOnlyList<AgentEval.Evals.EvaluatorExternalCompat> CompatibleWith, out AgentEval.Evals.EvaluatorCardLinks Links)
     ctor(String Key, String Name, String Category, String Version, String Description, AgentEval.Evals.EvaluatorCostTier CostTier, Boolean HigherIsBetter, Double? DefaultThreshold, IReadOnlyList<AgentEval.Evals.EvaluatorExpectedInput> ExpectedInputs, String RecommendedVisualization, IReadOnlyList<AgentEval.Evals.EvaluatorExternalCompat> CompatibleWith, AgentEval.Evals.EvaluatorCardLinks Links)
-class AgentEval.Evals.EvaluatorCardLinks
+sealed class AgentEval.Evals.EvaluatorCardLinks : IEquatable<AgentEval.Evals.EvaluatorCardLinks>
     AgentEval.Evals.EvaluatorCardLinks <Clone>$()
     Boolean Equals(AgentEval.Evals.EvaluatorCardLinks other)
     Boolean Equals(Object obj)
@@ -963,7 +964,7 @@ enum AgentEval.Evals.EvaluatorCostTier
     Low
     Medium
     High
-class AgentEval.Evals.EvaluatorExpectedInput
+sealed class AgentEval.Evals.EvaluatorExpectedInput : IEquatable<AgentEval.Evals.EvaluatorExpectedInput>
     AgentEval.Evals.EvaluatorExpectedInput <Clone>$()
     Boolean Equals(AgentEval.Evals.EvaluatorExpectedInput other)
     Boolean Equals(Object obj)
@@ -975,7 +976,7 @@ class AgentEval.Evals.EvaluatorExpectedInput
     String ToString()
     Void Deconstruct(out String Kind, out String Key, out Boolean Required, out String Description)
     ctor(String Kind, String Key, Boolean Required, String Description)
-class AgentEval.Evals.EvaluatorExternalCompat
+sealed class AgentEval.Evals.EvaluatorExternalCompat : IEquatable<AgentEval.Evals.EvaluatorExternalCompat>
     AgentEval.Evals.EvaluatorExternalCompat <Clone>$()
     Boolean Equals(AgentEval.Evals.EvaluatorExternalCompat other)
     Boolean Equals(Object obj)
@@ -985,7 +986,7 @@ class AgentEval.Evals.EvaluatorExternalCompat
     String Uri { get; init; }
     Void Deconstruct(out String System, out String Uri)
     ctor(String System, String Uri)
-class AgentEval.Evals.ExpectedAction
+sealed class AgentEval.Evals.ExpectedAction : IEquatable<AgentEval.Evals.ExpectedAction>
     AgentEval.Evals.ExpectedAction <Clone>$()
     Boolean Equals(AgentEval.Evals.ExpectedAction other)
     Boolean Equals(Object obj)
@@ -995,7 +996,7 @@ class AgentEval.Evals.ExpectedAction
     String ToString()
     Void Deconstruct(out String Description, out IReadOnlyList<String> RequiredTools)
     ctor(String Description, IReadOnlyList<String> RequiredTools)
-class AgentEval.Evals.FloorAdmittedEval
+sealed class AgentEval.Evals.FloorAdmittedEval : AgentEval.Evals.IEval
     AgentEval.Evals.IEval Inner { get; }
     AgentEval.Evals.Meta.ChanceFloor Floor { get; }
     String Category { get; }
@@ -1025,7 +1026,7 @@ static class AgentEval.Evals.JudgeCostMap
     static Boolean IsRegistered(String judgeModel)
     static Double EstimateCost(String judgeModel, Int64 inputTokens, Int64 outputTokens)
     static Void Register(String judgeModel, Double inputRatePer1K, Double outputRatePer1K)
-struct AgentEval.Evals.JudgeCostMap.ModelRate
+struct AgentEval.Evals.JudgeCostMap.ModelRate : IEquatable<AgentEval.Evals.JudgeCostMap.ModelRate>
     Boolean Equals(AgentEval.Evals.JudgeCostMap.ModelRate other)
     Boolean Equals(Object obj)
     Double InputRatePer1K { get; init; }
@@ -1034,7 +1035,7 @@ struct AgentEval.Evals.JudgeCostMap.ModelRate
     String ToString()
     Void Deconstruct(out Double InputRatePer1K, out Double OutputRatePer1K)
     ctor(Double InputRatePer1K, Double OutputRatePer1K)
-class AgentEval.Evals.Meta.ArmProfile
+sealed class AgentEval.Evals.Meta.ArmProfile : IEquatable<AgentEval.Evals.Meta.ArmProfile>
     AgentEval.Evals.Meta.ArmProfile <Clone>$()
     Boolean Equals(AgentEval.Evals.Meta.ArmProfile other)
     Boolean Equals(Object obj)
@@ -1045,7 +1046,7 @@ class AgentEval.Evals.Meta.ArmProfile
     String ToString()
     Void Deconstruct(out String ArmId, out Int32 DeclaredDrawBudget, out String BudgetSource)
     ctor(String ArmId, Int32 DeclaredDrawBudget, String BudgetSource)
-class AgentEval.Evals.Meta.ChanceFloor
+sealed class AgentEval.Evals.Meta.ChanceFloor : IEquatable<AgentEval.Evals.Meta.ChanceFloor>
     AgentEval.Evals.Meta.ChanceFloor <Clone>$()
     AgentEval.Evals.Meta.FloorState State { get; init; }
     Boolean Equals(AgentEval.Evals.Meta.ChanceFloor other)
@@ -1082,7 +1083,7 @@ static class AgentEval.Evals.Meta.ExactTests
     static Double MinimumAttainableP(Int32 nonTied)
     static Double TwoSidedSignP(Int32 wins, Int32 nonTied)
     static ValueTuple<Double, Double> ClopperPearson(Int32 successes, Int32 trials, Double alpha = 0.05)
-class AgentEval.Evals.Meta.FloorComparison
+sealed class AgentEval.Evals.Meta.FloorComparison : IEquatable<AgentEval.Evals.Meta.FloorComparison>
     AgentEval.Evals.Meta.FloorComparison <Clone>$()
     AgentEval.Evals.Meta.ObservationCensus Census { get; init; }
     Boolean AboveFloor { get; }
@@ -1109,7 +1110,7 @@ enum AgentEval.Evals.Meta.MeasurementState
     Measured
     NotApplicable
     NotMeasured
-struct AgentEval.Evals.Meta.Observation
+struct AgentEval.Evals.Meta.Observation : IEquatable<AgentEval.Evals.Meta.Observation>
     AgentEval.Evals.Meta.MeasurementState State { get; init; }
     Boolean CountsTowardAggregate { get; }
     Boolean Equals(AgentEval.Evals.Meta.Observation other)
@@ -1124,7 +1125,7 @@ struct AgentEval.Evals.Meta.Observation
     static AgentEval.Evals.Meta.Observation Measured(String caseId, String armId, Double value)
     static AgentEval.Evals.Meta.Observation NotApplicable(String caseId, String armId)
     static AgentEval.Evals.Meta.Observation NotMeasured(String caseId, String armId)
-class AgentEval.Evals.Meta.ObservationCensus
+sealed class AgentEval.Evals.Meta.ObservationCensus : IEquatable<AgentEval.Evals.Meta.ObservationCensus>
     AgentEval.Evals.Meta.ObservationCensus <Clone>$()
     Boolean Equals(AgentEval.Evals.Meta.ObservationCensus other)
     Boolean Equals(Object obj)
@@ -1143,7 +1144,7 @@ class AgentEval.Evals.Meta.ObservationCensus
     String ToString()
     Void Deconstruct(out Int32 Measured, out Int32 NotApplicable, out Int32 NotMeasured)
     ctor(Int32 Measured, Int32 NotApplicable, Int32 NotMeasured)
-class AgentEval.Evals.Meta.ObservationUnit
+sealed class AgentEval.Evals.Meta.ObservationUnit : IEquatable<AgentEval.Evals.Meta.ObservationUnit>
     AgentEval.Evals.Meta.ObservationUnit <Clone>$()
     AgentEval.Evals.Meta.RepCollapse Strategy { get; init; }
     Boolean Equals(AgentEval.Evals.Meta.ObservationUnit other)
@@ -1158,7 +1159,7 @@ class AgentEval.Evals.Meta.ObservationUnit
     Void Deconstruct(out Int32 Cases, out Int32 TotalReps, out Double MeanRepsPerCase, out AgentEval.Evals.Meta.RepCollapse Strategy)
     ctor(Int32 Cases, Int32 TotalReps, Double MeanRepsPerCase, AgentEval.Evals.Meta.RepCollapse Strategy)
     static Double Collapse(IReadOnlyList<Double> repValues, AgentEval.Evals.Meta.RepCollapse strategy, Double passAt = 1)
-class AgentEval.Evals.Meta.PairedComparison
+sealed class AgentEval.Evals.Meta.PairedComparison : IEquatable<AgentEval.Evals.Meta.PairedComparison>
     AgentEval.Evals.Meta.ObservationCensus Census { get; init; }
     AgentEval.Evals.Meta.ObservationUnit Unit { get; init; }
     AgentEval.Evals.Meta.PairedComparison <Clone>$()
@@ -1183,7 +1184,7 @@ class AgentEval.Evals.Meta.PairedComparison
     String ToString()
     Void Deconstruct(out String Reference, out String Challenger, out Int32 Wins, out Int32 Losses, out Int32 Ties, out Double PValue, out Double MinimumAttainableP, out Double MeanDelta, out AgentEval.Evals.Meta.ObservationCensus Census, out AgentEval.Evals.Meta.ObservationUnit Unit, out String RuleHash, out IReadOnlyDictionary<String, String> Absent)
     ctor(String Reference, String Challenger, Int32 Wins, Int32 Losses, Int32 Ties, Double PValue, Double MinimumAttainableP, Double MeanDelta, AgentEval.Evals.Meta.ObservationCensus Census, AgentEval.Evals.Meta.ObservationUnit Unit, String RuleHash, IReadOnlyDictionary<String, String> Absent)
-class AgentEval.Evals.Meta.PairedEvalComparer
+sealed class AgentEval.Evals.Meta.PairedEvalComparer
     AgentEval.Evals.Meta.Observation? CollapseCell(String caseId, String armId)
     AgentEval.Evals.Meta.PairedComparison Compare(String reference, String challenger, String ruleHash = null)
     AgentEval.Evals.Meta.RepCollapse Collapse { get; }
@@ -1198,7 +1199,7 @@ enum AgentEval.Evals.Meta.RepCollapse
     All
     Majority
     Any
-class AgentEval.Evals.Meta.ZeroEventBound
+sealed class AgentEval.Evals.Meta.ZeroEventBound : IEquatable<AgentEval.Evals.Meta.ZeroEventBound>
     AgentEval.Evals.Meta.ZeroEventBound <Clone>$()
     Boolean Equals(AgentEval.Evals.Meta.ZeroEventBound other)
     Boolean Equals(Object obj)
@@ -1224,7 +1225,7 @@ static class AgentEval.Evals.TestRunEvalProjection
     const String UnconvertibleResultPrefix
     static AgentEval.Evals.EvalInput ToEvalInput(AgentEval.Models.TestCase testCase, AgentEval.Models.TestResult result)
     static AgentEval.Evals.ToolCall ToToolCall(AgentEval.Models.ToolCallRecord record)
-class AgentEval.Evals.ToolCall
+sealed class AgentEval.Evals.ToolCall : IEquatable<AgentEval.Evals.ToolCall>
     AgentEval.Evals.ToolCall <Clone>$()
     Boolean Equals(AgentEval.Evals.ToolCall other)
     Boolean Equals(Object obj)
@@ -1237,7 +1238,7 @@ class AgentEval.Evals.ToolCall
     String ToString()
     Void Deconstruct(out String Name, out IReadOnlyDictionary<String, Object> Arguments, out String Result)
     ctor(String Name, IReadOnlyDictionary<String, Object> Arguments, String Result)
-class AgentEval.Evals.ToolDefinition
+sealed class AgentEval.Evals.ToolDefinition : IEquatable<AgentEval.Evals.ToolDefinition>
     AgentEval.Evals.ToolDefinition <Clone>$()
     Boolean Equals(AgentEval.Evals.ToolDefinition other)
     Boolean Equals(Object obj)
@@ -1271,7 +1272,7 @@ static class AgentEval.Models.DatasetTestCaseExtensions
     static AgentEval.Core.EvaluationContext ToEvaluationContext(AgentEval.Models.DatasetTestCase d, String actualOutput, String contextSeparator = "
 ")
     static AgentEval.Models.TestCase ToTestCase(AgentEval.Models.DatasetTestCase d, Func<AgentEval.Models.GroundTruthToolCall, String> groundTruthProjection = null)
-class AgentEval.Models.EdgeExecution
+class AgentEval.Models.EdgeExecution : IEquatable<AgentEval.Models.EdgeExecution>
     AgentEval.Models.EdgeExecution <Clone>$()
     AgentEval.Models.EdgeType EdgeType { get; init; }
     Boolean Equals(AgentEval.Models.EdgeExecution other)
@@ -1314,7 +1315,7 @@ class AgentEval.Models.EvaluationReport
     String RunId { get; set; }
     TimeSpan Duration { get; }
     ctor()
-class AgentEval.Models.ExecutorStep
+class AgentEval.Models.ExecutorStep : IEquatable<AgentEval.Models.ExecutorStep>
     AgentEval.Core.TokenUsage TokenUsage { get; init; }
     AgentEval.Models.EdgeExecution IncomingEdge { get; init; }
     AgentEval.Models.ExecutorStep <Clone>$()
@@ -1338,7 +1339,7 @@ class AgentEval.Models.ExecutorStep
     TimeSpan Duration { get; init; }
     TimeSpan StartOffset { get; init; }
     ctor()
-class AgentEval.Models.FailureReason
+sealed class AgentEval.Models.FailureReason : IEquatable<AgentEval.Models.FailureReason>
     AgentEval.Models.FailureReason <Clone>$()
     AgentEval.Models.FailureSeverity Severity { get; init; }
     AgentEval.Models.ToolInvocation RelatedToolCall { get; init; }
@@ -1351,7 +1352,7 @@ class AgentEval.Models.FailureReason
     String TechnicalDetails { get; init; }
     String ToString()
     ctor()
-class AgentEval.Models.FailureReport
+sealed class AgentEval.Models.FailureReport
     AgentEval.Models.FailureReason PrimaryReason { get; }
     AgentEval.Models.FailureReport AddReason(AgentEval.Models.FailureReason reason)
     AgentEval.Models.FailureReport AddReason(String category, String description, AgentEval.Models.FailureSeverity severity = FailureSeverity.Error)
@@ -1377,7 +1378,7 @@ enum AgentEval.Models.FailureSeverity
     Warning
     Error
     Critical
-class AgentEval.Models.FixSuggestion
+sealed class AgentEval.Models.FixSuggestion : IEquatable<AgentEval.Models.FixSuggestion>
     AgentEval.Models.FixSuggestion <Clone>$()
     Boolean Equals(AgentEval.Models.FixSuggestion other)
     Boolean Equals(Object obj)
@@ -1406,7 +1407,7 @@ static class AgentEval.Models.ModelPricing
     static Int32 EstimateTokensFromText(String text)
     static ValueTuple<Decimal, Decimal, Decimal, Decimal>? GetPricing(String modelName)
     static Void SetPricing(String modelName, Decimal inputPer1K, Decimal outputPer1K)
-class AgentEval.Models.ParallelBranch
+class AgentEval.Models.ParallelBranch : IEquatable<AgentEval.Models.ParallelBranch>
     AgentEval.Models.ParallelBranch <Clone>$()
     Boolean Equals(AgentEval.Models.ParallelBranch other)
     Boolean Equals(Object obj)
@@ -1439,7 +1440,7 @@ class AgentEval.Models.PerformanceMetrics
 enum AgentEval.Models.RequestPermissibility
     NotPermissible
     Permissible
-class AgentEval.Models.RoutingDecision
+class AgentEval.Models.RoutingDecision : IEquatable<AgentEval.Models.RoutingDecision>
     AgentEval.Models.RoutingDecision <Clone>$()
     Boolean Equals(AgentEval.Models.RoutingDecision other)
     Boolean Equals(Object obj)
@@ -1533,7 +1534,7 @@ class AgentEval.Models.ToolCallRecord
     const String ApprovalRejected
     const String ApprovalRequested
     ctor()
-class AgentEval.Models.ToolCallTimeline
+sealed class AgentEval.Models.ToolCallTimeline
     AgentEval.Models.ToolInvocation SlowestTool { get; }
     DateTimeOffset StartedAt { get; set; }
     Double ToolTimePercentage { get; }
@@ -1552,7 +1553,7 @@ class AgentEval.Models.ToolCallTimeline
     Void AddInvocation(AgentEval.Models.ToolInvocation invocation)
     ctor()
     static AgentEval.Models.ToolCallTimeline Create(String conversationId = null)
-class AgentEval.Models.ToolInvocation
+sealed class AgentEval.Models.ToolInvocation : IEquatable<AgentEval.Models.ToolInvocation>
     AgentEval.Models.ToolInvocation <Clone>$()
     Boolean Equals(AgentEval.Models.ToolInvocation other)
     Boolean Equals(Object obj)
@@ -1568,7 +1569,7 @@ class AgentEval.Models.ToolInvocation
     TimeSpan EndTime { get; }
     TimeSpan StartTime { get; init; }
     ctor()
-class AgentEval.Models.ToolStatistics
+sealed class AgentEval.Models.ToolStatistics : IEquatable<AgentEval.Models.ToolStatistics>
     AgentEval.Models.ToolStatistics <Clone>$()
     Boolean Equals(AgentEval.Models.ToolStatistics other)
     Boolean Equals(Object obj)
@@ -1601,7 +1602,7 @@ class AgentEval.Models.ToolUsageReport
     Void AddCall(AgentEval.Models.ToolCallRecord call)
     Void DeclareAvailableTools(IEnumerable<String> toolNames)
     ctor()
-class AgentEval.Models.WorkflowAssertionResult
+class AgentEval.Models.WorkflowAssertionResult : IEquatable<AgentEval.Models.WorkflowAssertionResult>
     AgentEval.Models.WorkflowAssertionResult <Clone>$()
     Boolean Equals(AgentEval.Models.WorkflowAssertionResult other)
     Boolean Equals(Object obj)
@@ -1611,7 +1612,7 @@ class AgentEval.Models.WorkflowAssertionResult
     String FailureMessage { get; init; }
     String ToString()
     ctor()
-class AgentEval.Models.WorkflowEdge
+class AgentEval.Models.WorkflowEdge : IEquatable<AgentEval.Models.WorkflowEdge>
     AgentEval.Models.EdgeType EdgeType { get; init; }
     AgentEval.Models.WorkflowEdge <Clone>$()
     Boolean Equals(AgentEval.Models.WorkflowEdge other)
@@ -1626,7 +1627,7 @@ class AgentEval.Models.WorkflowEdge
     String TargetExecutorId { get; init; }
     String ToString()
     ctor()
-class AgentEval.Models.WorkflowError
+class AgentEval.Models.WorkflowError : IEquatable<AgentEval.Models.WorkflowError>
     AgentEval.Models.WorkflowError <Clone>$()
     Boolean Equals(AgentEval.Models.WorkflowError other)
     Boolean Equals(Object obj)
@@ -1638,7 +1639,7 @@ class AgentEval.Models.WorkflowError
     String ToString()
     TimeSpan OccurredAt { get; init; }
     ctor()
-class AgentEval.Models.WorkflowExecutionResult
+class AgentEval.Models.WorkflowExecutionResult : IEquatable<AgentEval.Models.WorkflowExecutionResult>
     AgentEval.Models.ExecutorStep GetStep(String executorId)
     AgentEval.Models.ToolCallTimeline Timeline { get; }
     AgentEval.Models.ToolUsageReport ToolUsage { get; }
@@ -1660,7 +1661,7 @@ class AgentEval.Models.WorkflowExecutionResult
     String ToString()
     TimeSpan TotalDuration { get; init; }
     ctor()
-class AgentEval.Models.WorkflowGraphSnapshot
+class AgentEval.Models.WorkflowGraphSnapshot : IEquatable<AgentEval.Models.WorkflowGraphSnapshot>
     AgentEval.Models.WorkflowGraphSnapshot <Clone>$()
     Boolean Equals(AgentEval.Models.WorkflowGraphSnapshot other)
     Boolean Equals(Object obj)
@@ -1679,7 +1680,7 @@ class AgentEval.Models.WorkflowGraphSnapshot
     String EntryNodeId { get; init; }
     String ToString()
     ctor()
-class AgentEval.Models.WorkflowNode
+class AgentEval.Models.WorkflowNode : IEquatable<AgentEval.Models.WorkflowNode>
     AgentEval.Models.WorkflowNode <Clone>$()
     Boolean Equals(AgentEval.Models.WorkflowNode other)
     Boolean Equals(Object obj)
@@ -1693,7 +1694,7 @@ class AgentEval.Models.WorkflowNode
     String NodeId { get; init; }
     String ToString()
     ctor()
-class AgentEval.Models.WorkflowTestCase
+class AgentEval.Models.WorkflowTestCase : IEquatable<AgentEval.Models.WorkflowTestCase>
     AgentEval.Models.WorkflowTestCase <Clone>$()
     Boolean Equals(AgentEval.Models.WorkflowTestCase other)
     Boolean Equals(Object obj)
@@ -1710,7 +1711,7 @@ class AgentEval.Models.WorkflowTestCase
     String ToString()
     TimeSpan? MaxDuration { get; init; }
     ctor()
-class AgentEval.Models.WorkflowTestOptions
+class AgentEval.Models.WorkflowTestOptions : IEquatable<AgentEval.Models.WorkflowTestOptions>
     AgentEval.Models.WorkflowTestOptions <Clone>$()
     Boolean CaptureTelemetry { get; init; }
     Boolean ContinueOnFailure { get; init; }
@@ -1721,7 +1722,7 @@ class AgentEval.Models.WorkflowTestOptions
     String ToString()
     TimeSpan Timeout { get; init; }
     ctor()
-class AgentEval.Models.WorkflowTestResult
+class AgentEval.Models.WorkflowTestResult : IEquatable<AgentEval.Models.WorkflowTestResult>
     AgentEval.Models.WorkflowExecutionResult ExecutionResult { get; init; }
     AgentEval.Models.WorkflowTestResult <Clone>$()
     Boolean Equals(AgentEval.Models.WorkflowTestResult other)
@@ -1737,7 +1738,7 @@ class AgentEval.Models.WorkflowTestResult
     String WorkflowName { get; init; }
     TimeSpan TotalDuration { get; init; }
     ctor()
-class AgentEval.Models.WorkflowTestSummary
+class AgentEval.Models.WorkflowTestSummary : IEquatable<AgentEval.Models.WorkflowTestSummary>
     AgentEval.Models.WorkflowTestSummary <Clone>$()
     Boolean AllPassed { get; }
     Boolean Equals(AgentEval.Models.WorkflowTestSummary other)
@@ -1753,7 +1754,7 @@ class AgentEval.Models.WorkflowTestSummary
     String WorkflowName { get; init; }
     TimeSpan TotalDuration { get; init; }
     ctor()
-class AgentEval.Output.AgentEvalRef
+sealed class AgentEval.Output.AgentEvalRef : IEquatable<AgentEval.Output.AgentEvalRef>
     AgentEval.Output.AgentEvalRef <Clone>$()
     Boolean Equals(AgentEval.Output.AgentEvalRef other)
     Boolean Equals(Object obj)
@@ -1763,7 +1764,7 @@ class AgentEval.Output.AgentEvalRef
     String Version { get; init; }
     Void Deconstruct(out String Version, out String ConfigurationId)
     ctor(String Version, String ConfigurationId)
-class AgentEval.Output.AgentTrace
+sealed class AgentEval.Output.AgentTrace : IEquatable<AgentEval.Output.AgentTrace>
     AgentEval.Output.AgentTrace <Clone>$()
     Boolean Equals(AgentEval.Output.AgentTrace other)
     Boolean Equals(Object obj)
@@ -1778,7 +1779,7 @@ enum AgentEval.Output.AssertionOutcome
     Inconclusive
     Passed
     Failed
-class AgentEval.Output.AssertionResult
+sealed class AgentEval.Output.AssertionResult : IEquatable<AgentEval.Output.AssertionResult>
     AgentEval.Output.AssertionOutcome Outcome { get; init; }
     AgentEval.Output.AssertionResult <Clone>$()
     Boolean Equals(AgentEval.Output.AssertionResult other)
@@ -1795,7 +1796,7 @@ class AgentEval.Output.AssertionResult
     static AgentEval.Output.AssertionResult Fail(String assertion, String message = null)
     static AgentEval.Output.AssertionResult Pass(String assertion, String message = null)
     static AgentEval.Output.AssertionResult Undecidable(String assertion, String reason)
-class AgentEval.Output.Attestation
+sealed class AgentEval.Output.Attestation : IEquatable<AgentEval.Output.Attestation>
     AgentEval.Output.Attestation <Clone>$()
     Boolean Equals(AgentEval.Output.Attestation other)
     Boolean Equals(Object obj)
@@ -1807,7 +1808,7 @@ class AgentEval.Output.Attestation
     String ToString()
     Void Deconstruct(out String AgentEvalVersion, out String ConfigurationId, out String Evaluator, out String EvaluatorModel)
     ctor(String AgentEvalVersion, String ConfigurationId, String Evaluator, String EvaluatorModel)
-class AgentEval.Output.BaselineComparison
+sealed class AgentEval.Output.BaselineComparison : IEquatable<AgentEval.Output.BaselineComparison>
     AgentEval.Output.BaselineComparison <Clone>$()
     AgentEval.Output.RunSummary Baseline { get; init; }
     AgentEval.Output.RunSummary Current { get; init; }
@@ -1825,7 +1826,7 @@ static class AgentEval.Output.BaselinePromotion
     static Boolean IsPromotable(AgentEval.Output.RunSummary summary)
     static String RefusalFor(AgentEval.Output.RunSummary summary)
     static Void EnsurePromotable(AgentEval.Output.RunSummary summary)
-class AgentEval.Output.ComparabilityFacts
+sealed class AgentEval.Output.ComparabilityFacts : IEquatable<AgentEval.Output.ComparabilityFacts>
     AgentEval.Output.ComparabilityFacts <Clone>$()
     AgentEval.Output.JudgeFingerprint Judge { get; init; }
     AgentEval.Output.RecordedChanceFloor ChanceFloor { get; init; }
@@ -1840,7 +1841,7 @@ class AgentEval.Output.ComparabilityFacts
     const String ChanceFloorDimension
     const String ChanceFloorEvidenceSource
     ctor(String EvalKey, String EvalVersion)
-class AgentEval.Output.ComplianceEvidence
+sealed class AgentEval.Output.ComplianceEvidence : IEquatable<AgentEval.Output.ComplianceEvidence>
     AgentEval.Output.Attestation Attestation { get; init; }
     AgentEval.Output.ComplianceEvidence <Clone>$()
     AgentEval.Output.EvidenceSummary Summary { get; init; }
@@ -1856,7 +1857,7 @@ class AgentEval.Output.ComplianceEvidence
     String ToString()
     Void Deconstruct(out String SchemaVersion, out String Regulation, out AgentEval.Output.SubjectIdentity Subject, out DateTimeOffset GeneratedAt, out AgentEval.Output.SourceRunRef SourceRun, out IReadOnlyList<AgentEval.Output.EvidenceControl> Controls, out AgentEval.Output.EvidenceSummary Summary, out AgentEval.Output.Attestation Attestation)
     ctor(String SchemaVersion, String Regulation, AgentEval.Output.SubjectIdentity Subject, DateTimeOffset GeneratedAt, AgentEval.Output.SourceRunRef SourceRun, IReadOnlyList<AgentEval.Output.EvidenceControl> Controls, AgentEval.Output.EvidenceSummary Summary, AgentEval.Output.Attestation Attestation)
-class AgentEval.Output.ComplianceEvidencePointer
+sealed class AgentEval.Output.ComplianceEvidencePointer : IEquatable<AgentEval.Output.ComplianceEvidencePointer>
     AgentEval.Output.ComplianceEvidencePointer <Clone>$()
     Boolean Equals(AgentEval.Output.ComplianceEvidencePointer other)
     Boolean Equals(Object obj)
@@ -1868,7 +1869,7 @@ class AgentEval.Output.ComplianceEvidencePointer
     String ToString()
     Void Deconstruct(out String Regulation, out String SubjectName, out String Timestamp, out String OverallStatus)
     ctor(String Regulation, String SubjectName, String Timestamp, String OverallStatus)
-class AgentEval.Output.DateRange
+sealed class AgentEval.Output.DateRange : IEquatable<AgentEval.Output.DateRange>
     AgentEval.Output.DateRange <Clone>$()
     Boolean Equals(AgentEval.Output.DateRange other)
     Boolean Equals(Object obj)
@@ -1878,7 +1879,7 @@ class AgentEval.Output.DateRange
     String ToString()
     Void Deconstruct(out DateTimeOffset From, out DateTimeOffset To)
     ctor(DateTimeOffset From, DateTimeOffset To)
-class AgentEval.Output.EnvRef
+sealed class AgentEval.Output.EnvRef : IEquatable<AgentEval.Output.EnvRef>
     AgentEval.Output.EnvRef <Clone>$()
     Boolean Ci { get; init; }
     Boolean Equals(AgentEval.Output.EnvRef other)
@@ -1892,7 +1893,7 @@ class AgentEval.Output.EnvRef
     String ToString()
     Void Deconstruct(out String Machine, out String Os, out String DotnetVersion, out Boolean Ci, out String CiSystem, out String Runner)
     ctor(String Machine, String Os, String DotnetVersion, Boolean Ci, String CiSystem, String Runner)
-class AgentEval.Output.EvidenceControl
+sealed class AgentEval.Output.EvidenceControl : IEquatable<AgentEval.Output.EvidenceControl>
     AgentEval.Output.EvidenceControl <Clone>$()
     Boolean Equals(AgentEval.Output.EvidenceControl other)
     Boolean Equals(Object obj)
@@ -1907,7 +1908,7 @@ class AgentEval.Output.EvidenceControl
     String ToString()
     Void Deconstruct(out String Id, out String Title, out String Status, out Double PassRate, out IReadOnlyList<String> ScenarioRefs, out String Notes, out Boolean? RegressedFromBaseline)
     ctor(String Id, String Title, String Status, Double PassRate, IReadOnlyList<String> ScenarioRefs, String Notes, Boolean? RegressedFromBaseline = null)
-class AgentEval.Output.EvidenceSummary
+sealed class AgentEval.Output.EvidenceSummary : IEquatable<AgentEval.Output.EvidenceSummary>
     AgentEval.Output.EvidenceSummary <Clone>$()
     Boolean Equals(AgentEval.Output.EvidenceSummary other)
     Boolean Equals(Object obj)
@@ -1920,7 +1921,7 @@ class AgentEval.Output.EvidenceSummary
     String ToString()
     Void Deconstruct(out Int32 ControlsTotal, out Int32 Passed, out Int32 Warnings, out Int32 Failed, out String OverallStatus)
     ctor(Int32 ControlsTotal, Int32 Passed, Int32 Warnings, Int32 Failed, String OverallStatus)
-class AgentEval.Output.GitRef
+sealed class AgentEval.Output.GitRef : IEquatable<AgentEval.Output.GitRef>
     AgentEval.Output.GitRef <Clone>$()
     Boolean Dirty { get; init; }
     Boolean Equals(AgentEval.Output.GitRef other)
@@ -1932,7 +1933,7 @@ class AgentEval.Output.GitRef
     String ToString()
     Void Deconstruct(out String Commit, out String Branch, out Boolean Dirty, out String Tag)
     ctor(String Commit, String Branch, Boolean Dirty, String Tag)
-class AgentEval.Output.HistoryEntry
+sealed class AgentEval.Output.HistoryEntry : IEquatable<AgentEval.Output.HistoryEntry>
     AgentEval.Output.HistoryEntry <Clone>$()
     Boolean Equals(AgentEval.Output.HistoryEntry other)
     Boolean Equals(Object obj)
@@ -1946,7 +1947,7 @@ class AgentEval.Output.HistoryEntry
     Void Deconstruct(out String RunId, out DateTimeOffset Timestamp, out String Verdict, out Double Score, out String Notes)
     ctor(String RunId, DateTimeOffset Timestamp, String Verdict, Double Score, String Notes)
     static AgentEval.Output.HistoryEntry From(AgentEval.Output.RunManifest manifest, AgentEval.Output.RunSummary summary)
-interface AgentEval.Output.IOutputStore
+interface AgentEval.Output.IOutputStore : AgentEval.Output.IOutputStoreReader
     Task AppendHistoryEntryAsync(AgentEval.Output.SubjectIdentity subject, AgentEval.Output.HistoryEntry entry, CancellationToken ct = default)
     Task AppendTraceAsync(String runId, AgentEval.Output.AgentTrace trace, CancellationToken ct = default)
     Task CompleteRedTeamCampaignAsync(String campaignId, AgentEval.Output.RedTeamFindings findings, CancellationToken ct = default)
@@ -1976,7 +1977,7 @@ interface AgentEval.Output.IOutputStoreReader
     Task<AgentEval.Output.RunSummary> GetRunSummaryAsync(String runId, CancellationToken ct = default)
     Task<AgentEval.Output.RunSummary> LoadBaselineAsync(AgentEval.Output.SubjectIdentity subject, CancellationToken ct = default)
     Task<AgentEval.Output.SolutionInfo> EnsureSolutionAsync(CancellationToken ct = default)
-class AgentEval.Output.JudgeFingerprint
+sealed class AgentEval.Output.JudgeFingerprint : IEquatable<AgentEval.Output.JudgeFingerprint>
     AgentEval.Output.JudgeFingerprint <Clone>$()
     AgentEval.Output.JudgeSubjectRelation SubjectRelation { get; init; }
     Boolean Equals(AgentEval.Output.JudgeFingerprint other)
@@ -2019,7 +2020,7 @@ enum AgentEval.Output.OutputStoreMode
     Auto
     FileSystem
     Null
-class AgentEval.Output.RecordedChanceFloor
+sealed class AgentEval.Output.RecordedChanceFloor : IEquatable<AgentEval.Output.RecordedChanceFloor>
     AgentEval.Evals.Meta.FloorState State { get; init; }
     AgentEval.Output.RecordedChanceFloor <Clone>$()
     Boolean Equals(AgentEval.Output.RecordedChanceFloor other)
@@ -2033,7 +2034,7 @@ class AgentEval.Output.RecordedChanceFloor
     Void Deconstruct(out String Kind, out AgentEval.Evals.Meta.FloorState State, out Double? Bar, out String Derivation)
     ctor(String Kind, AgentEval.Evals.Meta.FloorState State, Double? Bar, String Derivation)
     static AgentEval.Output.RecordedChanceFloor From(AgentEval.Evals.Meta.ChanceFloor floor)
-class AgentEval.Output.RedTeamCampaignContext
+sealed class AgentEval.Output.RedTeamCampaignContext : IEquatable<AgentEval.Output.RedTeamCampaignContext>
     AgentEval.Output.RedTeamCampaignContext <Clone>$()
     Boolean Equals(AgentEval.Output.RedTeamCampaignContext other)
     Boolean Equals(Object obj)
@@ -2044,7 +2045,7 @@ class AgentEval.Output.RedTeamCampaignContext
     String ToString()
     Void Deconstruct(out String Name, out IReadOnlyList<AgentEval.Output.SubjectIdentity> Targets, out String Mode)
     ctor(String Name, IReadOnlyList<AgentEval.Output.SubjectIdentity> Targets, String Mode)
-class AgentEval.Output.RedTeamCampaignManifest
+sealed class AgentEval.Output.RedTeamCampaignManifest : IEquatable<AgentEval.Output.RedTeamCampaignManifest>
     AgentEval.Output.RedTeamCampaignManifest <Clone>$()
     Boolean Equals(AgentEval.Output.RedTeamCampaignManifest other)
     Boolean Equals(Object obj)
@@ -2059,7 +2060,7 @@ class AgentEval.Output.RedTeamCampaignManifest
     String ToString()
     Void Deconstruct(out String SchemaVersion, out String CampaignId, out String Name, out DateTimeOffset StartedAt, out IReadOnlyList<AgentEval.Output.SubjectIdentity> Targets, out String Mode, out String CompletedAt)
     ctor(String SchemaVersion, String CampaignId, String Name, DateTimeOffset StartedAt, IReadOnlyList<AgentEval.Output.SubjectIdentity> Targets, String Mode, String CompletedAt = null)
-class AgentEval.Output.RedTeamFindings
+sealed class AgentEval.Output.RedTeamFindings : IEquatable<AgentEval.Output.RedTeamFindings>
     AgentEval.Output.RedTeamFindings <Clone>$()
     Boolean Equals(AgentEval.Output.RedTeamFindings other)
     Boolean Equals(Object obj)
@@ -2068,7 +2069,7 @@ class AgentEval.Output.RedTeamFindings
     String ToString()
     Void Deconstruct(out IReadOnlyList<Object> Items)
     ctor(IReadOnlyList<Object> Items)
-class AgentEval.Output.RunContext
+sealed class AgentEval.Output.RunContext : IEquatable<AgentEval.Output.RunContext>
     AgentEval.Output.RunContext <Clone>$()
     Boolean Equals(AgentEval.Output.RunContext other)
     Boolean Equals(Object obj)
@@ -2082,7 +2083,7 @@ class AgentEval.Output.RunContext
     String ToString()
     Void Deconstruct(out String EvalProject, out String EvalProjectPath, out String Harness, out Int32? Seed, out String ParentInvocationId, out String Kind)
     ctor(String EvalProject, String EvalProjectPath, String Harness, Int32? Seed, String ParentInvocationId, String Kind)
-class AgentEval.Output.RunCostInfo
+sealed class AgentEval.Output.RunCostInfo : IEquatable<AgentEval.Output.RunCostInfo>
     AgentEval.Output.RunCostInfo <Clone>$()
     Boolean Equals(AgentEval.Output.RunCostInfo other)
     Boolean Equals(Object obj)
@@ -2093,7 +2094,7 @@ class AgentEval.Output.RunCostInfo
     String ToString()
     Void Deconstruct(out Double EstimatedCost, out Int64 PromptTokens, out Int64 CompletionTokens)
     ctor(Double EstimatedCost, Int64 PromptTokens, Int64 CompletionTokens)
-class AgentEval.Output.RunManifest
+sealed class AgentEval.Output.RunManifest : IEquatable<AgentEval.Output.RunManifest>
     AgentEval.Output.AgentEvalRef AgentEval { get; init; }
     AgentEval.Output.EnvRef Environment { get; init; }
     AgentEval.Output.GitRef Git { get; init; }
@@ -2109,7 +2110,7 @@ class AgentEval.Output.RunManifest
     String ToString()
     Void Deconstruct(out String SchemaVersion, out AgentEval.Output.SolutionRef Solution, out AgentEval.Output.SubjectRef Subject, out AgentEval.Output.RunRef Run, out AgentEval.Output.GitRef Git, out AgentEval.Output.AgentEvalRef AgentEval, out AgentEval.Output.EnvRef Environment, out String ContentHash)
     ctor(String SchemaVersion, AgentEval.Output.SolutionRef Solution, AgentEval.Output.SubjectRef Subject, AgentEval.Output.RunRef Run, AgentEval.Output.GitRef Git, AgentEval.Output.AgentEvalRef AgentEval, AgentEval.Output.EnvRef Environment, String ContentHash)
-class AgentEval.Output.RunPointer
+sealed class AgentEval.Output.RunPointer : IEquatable<AgentEval.Output.RunPointer>
     AgentEval.Output.RunPointer <Clone>$()
     AgentEval.Output.SubjectKind? Kind { get; init; }
     Boolean Equals(AgentEval.Output.RunPointer other)
@@ -2125,7 +2126,7 @@ class AgentEval.Output.RunPointer
     String Verdict { get; init; }
     Void Deconstruct(out String RunId, out String SubjectName, out String Verdict, out DateTimeOffset Timestamp, out AgentEval.Output.SubjectKind? Kind, out Double? Score, out Int64? DurationMs, out Double? EstimatedCost)
     ctor(String RunId, String SubjectName, String Verdict, DateTimeOffset Timestamp, AgentEval.Output.SubjectKind? Kind = null, Double? Score = null, Int64? DurationMs = null, Double? EstimatedCost = null)
-class AgentEval.Output.RunRef
+sealed class AgentEval.Output.RunRef : IEquatable<AgentEval.Output.RunRef>
     AgentEval.Output.RunRef <Clone>$()
     Boolean Equals(AgentEval.Output.RunRef other)
     Boolean Equals(Object obj)
@@ -2144,7 +2145,7 @@ class AgentEval.Output.RunRef
     TimeSpan Duration { get; init; }
     Void Deconstruct(out String RunId, out DateTimeOffset Timestamp, out TimeSpan Duration, out Int32 ScenarioCount, out String Verdict, out String Kind, out String EvalProject, out String EvalProjectPath, out String Harness, out Int32? Seed, out String ParentInvocationId)
     ctor(String RunId, DateTimeOffset Timestamp, TimeSpan Duration, Int32 ScenarioCount, String Verdict, String Kind, String EvalProject, String EvalProjectPath, String Harness, Int32? Seed, String ParentInvocationId)
-class AgentEval.Output.RunStats
+sealed class AgentEval.Output.RunStats : IEquatable<AgentEval.Output.RunStats>
     AgentEval.Output.RunStats <Clone>$()
     Boolean Equals(AgentEval.Output.RunStats other)
     Boolean Equals(Object obj)
@@ -2157,7 +2158,7 @@ class AgentEval.Output.RunStats
     String ToString()
     Void Deconstruct(out Int32 Total, out Int32 Passed, out Int32 Failed, out Int32 Warnings, out Int32 Skipped)
     ctor(Int32 Total, Int32 Passed, Int32 Failed, Int32 Warnings, Int32 Skipped = 0)
-class AgentEval.Output.RunSummary
+sealed class AgentEval.Output.RunSummary : IEquatable<AgentEval.Output.RunSummary>
     AgentEval.Output.RunCostInfo Cost { get; init; }
     AgentEval.Output.RunStats Stats { get; init; }
     AgentEval.Output.RunSummary <Clone>$()
@@ -2171,7 +2172,7 @@ class AgentEval.Output.RunSummary
     String Verdict { get; init; }
     Void Deconstruct(out String SchemaVersion, out String RunId, out String Verdict, out AgentEval.Output.RunStats Stats, out IReadOnlyDictionary<String, Double> Metrics, out AgentEval.Output.RunCostInfo Cost)
     ctor(String SchemaVersion, String RunId, String Verdict, AgentEval.Output.RunStats Stats, IReadOnlyDictionary<String, Double> Metrics, AgentEval.Output.RunCostInfo Cost = null)
-class AgentEval.Output.ScenarioResult
+sealed class AgentEval.Output.ScenarioResult : IEquatable<AgentEval.Output.ScenarioResult>
     AgentEval.Output.ComparabilityFacts Comparability { get; init; }
     AgentEval.Output.ScenarioResult <Clone>$()
     Boolean Equals(AgentEval.Output.ScenarioResult other)
@@ -2191,7 +2192,7 @@ class AgentEval.Output.ScenarioResult
     TimeSpan Duration { get; init; }
     Void Deconstruct(out String Id, out String Name, out String Input, out String Output, out Boolean Passed, out Double Score, out IReadOnlyDictionary<String, Double> Metrics, out IReadOnlyList<AgentEval.Output.AssertionResult> Assertions, out TimeSpan Duration, out Double EstimatedCost)
     ctor(String Id, String Name, String Input, String Output, Boolean Passed, Double Score, IReadOnlyDictionary<String, Double> Metrics, IReadOnlyList<AgentEval.Output.AssertionResult> Assertions, TimeSpan Duration, Double EstimatedCost)
-class AgentEval.Output.SolutionInfo
+sealed class AgentEval.Output.SolutionInfo : IEquatable<AgentEval.Output.SolutionInfo>
     AgentEval.Output.SolutionInfo <Clone>$()
     Boolean Equals(AgentEval.Output.SolutionInfo other)
     Boolean Equals(Object obj)
@@ -2202,7 +2203,7 @@ class AgentEval.Output.SolutionInfo
     String ToString()
     Void Deconstruct(out Guid Id, out String Name, out String Path)
     ctor(Guid Id, String Name, String Path)
-class AgentEval.Output.SolutionRef
+sealed class AgentEval.Output.SolutionRef : IEquatable<AgentEval.Output.SolutionRef>
     AgentEval.Output.SolutionRef <Clone>$()
     Boolean Equals(AgentEval.Output.SolutionRef other)
     Boolean Equals(Object obj)
@@ -2213,7 +2214,7 @@ class AgentEval.Output.SolutionRef
     String WorkspaceTag { get; init; }
     Void Deconstruct(out Guid Id, out String Name, out String WorkspaceTag)
     ctor(Guid Id, String Name, String WorkspaceTag)
-class AgentEval.Output.SourceRunRef
+sealed class AgentEval.Output.SourceRunRef : IEquatable<AgentEval.Output.SourceRunRef>
     AgentEval.Output.SourceRunRef <Clone>$()
     Boolean Equals(AgentEval.Output.SourceRunRef other)
     Boolean Equals(Object obj)
@@ -2227,7 +2228,7 @@ static class AgentEval.Output.StimulusHash
     const String Prefix
     static Boolean SameStimulus(String left, String right)
     static String Of(String stimulus)
-class AgentEval.Output.SubjectIdentity
+sealed class AgentEval.Output.SubjectIdentity : IEquatable<AgentEval.Output.SubjectIdentity>
     AgentEval.Output.SubjectIdentity <Clone>$()
     AgentEval.Output.SubjectKind Kind { get; init; }
     Boolean Equals(AgentEval.Output.SubjectIdentity other)
@@ -2243,7 +2244,7 @@ class AgentEval.Output.SubjectIdentity
     String Version { get; init; }
     Void Deconstruct(out AgentEval.Output.SubjectKind Kind, out String Name, out String SourceProject, out String SourcePath, out String Version, out String ModelId, out String Framework, out IReadOnlyList<String> Tags)
     ctor(AgentEval.Output.SubjectKind Kind, String Name, String SourceProject = null, String SourcePath = null, String Version = null, String ModelId = null, String Framework = null, IReadOnlyList<String> Tags = null)
-class AgentEval.Output.SubjectInfo
+sealed class AgentEval.Output.SubjectInfo : IEquatable<AgentEval.Output.SubjectInfo>
     AgentEval.Output.RunSummary LastRun { get; init; }
     AgentEval.Output.SubjectIdentity Identity { get; init; }
     AgentEval.Output.SubjectInfo <Clone>$()
@@ -2258,7 +2259,7 @@ enum AgentEval.Output.SubjectKind
     Workflow
 static class AgentEval.Output.SubjectKindExtensions
     static String Folder(AgentEval.Output.SubjectKind k)
-class AgentEval.Output.SubjectRef
+sealed class AgentEval.Output.SubjectRef : IEquatable<AgentEval.Output.SubjectRef>
     AgentEval.Output.SubjectIdentity ToIdentity()
     AgentEval.Output.SubjectKind Kind { get; init; }
     AgentEval.Output.SubjectRef <Clone>$()
@@ -2274,7 +2275,7 @@ class AgentEval.Output.SubjectRef
     String Version { get; init; }
     Void Deconstruct(out AgentEval.Output.SubjectKind Kind, out String Name, out String Version, out String Framework, out String ModelId, out String SourceProject, out String SourcePath)
     ctor(AgentEval.Output.SubjectKind Kind, String Name, String Version, String Framework, String ModelId, String SourceProject, String SourcePath)
-class AgentEval.Output.TraceEvent
+sealed class AgentEval.Output.TraceEvent : IEquatable<AgentEval.Output.TraceEvent>
     AgentEval.Output.TraceEvent <Clone>$()
     Boolean Equals(AgentEval.Output.TraceEvent other)
     Boolean Equals(Object obj)
@@ -2317,7 +2318,7 @@ interface AgentEval.Snapshots.ISnapshotStore
     String GetSnapshotPath(String testName, String suffix = "")
     Task SaveAsync<T>(String testName, T value, String suffix = "", CancellationToken cancellationToken = default)
     Task<T> LoadAsync<T>(String testName, String suffix = "", CancellationToken cancellationToken = default)
-class AgentEval.Snapshots.SemanticComparisonResult
+class AgentEval.Snapshots.SemanticComparisonResult : IEquatable<AgentEval.Snapshots.SemanticComparisonResult>
     AgentEval.Snapshots.SemanticComparisonResult <Clone>$()
     Boolean Equals(AgentEval.Snapshots.SemanticComparisonResult other)
     Boolean Equals(Object obj)
@@ -2336,7 +2337,7 @@ class AgentEval.Snapshots.SnapshotComparisonResult
     List<AgentEval.Snapshots.SnapshotDifference> Differences { get; init; }
     List<String> IgnoredFields { get; init; }
     ctor()
-class AgentEval.Snapshots.SnapshotDifference
+class AgentEval.Snapshots.SnapshotDifference : IEquatable<AgentEval.Snapshots.SnapshotDifference>
     AgentEval.Snapshots.SnapshotDifference <Clone>$()
     Boolean Equals(AgentEval.Snapshots.SnapshotDifference other)
     Boolean Equals(Object obj)

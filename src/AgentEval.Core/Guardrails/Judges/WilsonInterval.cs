@@ -27,7 +27,7 @@ public readonly record struct WilsonInterval(int Successes, int Total, double Es
     /// </remarks>
     /// <param name="successes">Number of successes. Must be ≥ 0 and ≤ <paramref name="total"/>.</param>
     /// <param name="total">Number of trials. Must be ≥ 0.</param>
-    /// <param name="z">Standard-normal critical value. Default 1.959963984540054 (95 %).</param>
+    /// <param name="z">Standard-normal critical value. Must be finite and positive. Default 1.959963984540054 (95 %).</param>
     public static WilsonInterval Compute(int successes, int total, double z = 1.959963984540054)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(successes);
@@ -36,6 +36,12 @@ public readonly record struct WilsonInterval(int Successes, int Total, double Es
         {
             throw new ArgumentOutOfRangeException(
                 nameof(successes), successes, $"successes ({successes}) cannot exceed total ({total}).");
+        }
+
+        // A negative z swaps the bounds; NaN or an infinity makes them NaN.
+        if (!double.IsFinite(z) || z <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(z), z, "z must be finite and positive.");
         }
 
         if (total == 0)

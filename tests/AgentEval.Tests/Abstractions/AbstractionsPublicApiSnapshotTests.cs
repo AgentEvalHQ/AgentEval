@@ -5,6 +5,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Reflection;
+using System.Runtime.CompilerServices;
 using System.Text;
 using Xunit;
 
@@ -13,7 +14,8 @@ namespace AgentEval.Tests.Abstractions;
 /// <summary>
 /// Abstractions assembly v1 API freeze: the complete public surface of <c>AgentEval.Abstractions</c>
 /// is snapshotted. Any change to a public type or member fails this test until the new snapshot is
-/// reviewed and accepted, so the surface cannot move silently.
+/// reviewed and accepted, so the surface cannot move silently. Each type is listed with abstract/sealed, its base
+/// class and its public interfaces, inherited ones included; members include the protected ones a subclass can reach.
 /// Types marked <c>[Experimental]</c> are listed with that marker and are preview, outside the v1 promise.
 /// </summary>
 public class AbstractionsPublicApiSnapshotTests
@@ -35,38 +37,65 @@ public class AbstractionsPublicApiSnapshotTests
             var experimental = (t.GetCustomAttribute<ExperimentalAttribute>() ?? t.Assembly.GetCustomAttribute<ExperimentalAttribute>()) is { } x
                 ? $" [Experimental({x.DiagnosticId})]"
                 : "";
-            sb.Append(Kind(t)).Append(' ').Append(Name(t)).AppendLine(experimental);
+            sb.Append(Kind(t)).Append(' ').Append(Name(t)).Append(Bases(t)).AppendLine(experimental);
             foreach (var m in Members(t))
                 sb.Append("    ").AppendLine(m);
         }
         return Verify(sb.ToString());
     }
 
+    // abstract and sealed are part of the contract: sealing a class breaks subclasses, making one abstract breaks `new`.
     private static string Kind(Type t) =>
         t.IsInterface ? "interface" : t.IsEnum ? "enum" : t.IsValueType ? "struct"
-        : typeof(Delegate).IsAssignableFrom(t) ? "delegate" : t.IsAbstract && t.IsSealed ? "static class" : "class";
+        : typeof(Delegate).IsAssignableFrom(t) ? "delegate" : t.IsAbstract && t.IsSealed ? "static class"
+        : t.IsAbstract ? "abstract class" : t.IsSealed ? "sealed class" : "class";
+
+    // The base class and every public interface, inherited ones included: dropping either breaks callers that convert.
+    private static string Bases(Type t)
+    {
+        if (t.IsEnum || typeof(Delegate).IsAssignableFrom(t))
+            return "";
+        var bases = new List<string>();
+        if (t.BaseType is { } b && b != typeof(object) && b != typeof(ValueType))
+            bases.Add(Name(b));
+        bases.AddRange(t.GetInterfaces().Where(i => i.IsVisible).Select(Name).OrderBy(n => n, StringComparer.Ordinal));
+        return bases.Count == 0 ? "" : " : " + string.Join(", ", bases);
+    }
+
+    // Public members, and protected ones where a subclass can reach them (the type is not sealed). A record's
+    // compiler-generated protected members (EqualityContract, PrintMembers, the copy constructor) are left out:
+    // they follow from its being a record, which the IEquatable<T> in its header already shows.
+    private static bool Visible(MethodBase? m, Type t) =>
+        m is not null && (m.IsPublic || (!t.IsSealed && (m.IsFamily || m.IsFamilyOrAssembly)
+            && !m.IsDefined(typeof(CompilerGeneratedAttribute), false)
+            && !(m.IsSpecialName && m.Name == "get_EqualityContract")));
+
+    private static bool Visible(FieldInfo f, Type t) =>
+        f.IsPublic || (!t.IsSealed && (f.IsFamily || f.IsFamilyOrAssembly));
+
+    private static string Protected(MethodBase m) => m.IsPublic ? "" : "protected ";
 
     private static IEnumerable<string> Members(Type t)
     {
-        const BindingFlags flags = BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
+        const BindingFlags flags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly;
         if (t.IsEnum)
             return Enum.GetNames(t).Select(n => $"{n}");
 
         var list = new List<string>();
-        foreach (var c in t.GetConstructors(flags))
-            list.Add($"ctor({Params(c.GetParameters())})");
-        foreach (var p in t.GetProperties(flags))
+        foreach (var c in t.GetConstructors(flags).Where(c => Visible(c, t)))
+            list.Add($"{Protected(c)}ctor({Params(c.GetParameters())})");
+        foreach (var p in t.GetProperties(flags).Where(p => Visible(p.GetMethod, t) || Visible(p.SetMethod, t)))
         {
-            var acc = string.Join(" ", new[] { p.GetMethod is { IsPublic: true } ? "get;" : null, p.SetMethod is { IsPublic: true } ? (p.SetMethod.ReturnParameter.GetRequiredCustomModifiers().Any(m => m.Name == "IsExternalInit") ? "init;" : "set;") : null }.Where(s => s is not null));
+            var acc = string.Join(" ", new[] { Visible(p.GetMethod, t) ? Protected(p.GetMethod!) + "get;" : null, Visible(p.SetMethod, t) ? Protected(p.SetMethod!) + (p.SetMethod!.ReturnParameter.GetRequiredCustomModifiers().Any(m => m.Name == "IsExternalInit") ? "init;" : "set;") : null }.Where(s => s is not null));
             var isStatic = (p.GetMethod ?? p.SetMethod)?.IsStatic == true ? "static " : "";
             list.Add($"{isStatic}{Name(p.PropertyType)} {p.Name} {{ {acc} }}");
         }
-        foreach (var f in t.GetFields(flags))
-            list.Add($"{(f.IsLiteral ? "const " : f.IsStatic ? "static " : "")}{Name(f.FieldType)} {f.Name}");
-        foreach (var e in t.GetEvents(flags))
-            list.Add($"event {Name(e.EventHandlerType!)} {e.Name}");
-        foreach (var m in t.GetMethods(flags).Where(m => !m.IsSpecialName))
-            list.Add($"{(m.IsStatic ? "static " : "")}{Name(m.ReturnType)} {m.Name}{GenericArgs(m)}({Params(m.GetParameters())})");
+        foreach (var f in t.GetFields(flags).Where(f => Visible(f, t)))
+            list.Add($"{(f.IsPublic ? "" : "protected ")}{(f.IsLiteral ? "const " : f.IsStatic ? "static " : "")}{Name(f.FieldType)} {f.Name}");
+        foreach (var e in t.GetEvents(flags).Where(e => Visible(e.AddMethod, t)))
+            list.Add($"{Protected(e.AddMethod!)}event {Name(e.EventHandlerType!)} {e.Name}");
+        foreach (var m in t.GetMethods(flags).Where(m => !m.IsSpecialName && Visible(m, t)))
+            list.Add($"{Protected(m)}{(m.IsStatic ? "static " : "")}{Name(m.ReturnType)} {m.Name}{GenericArgs(m)}({Params(m.GetParameters())})");
         return list.OrderBy(s => s, StringComparer.Ordinal);
     }
 

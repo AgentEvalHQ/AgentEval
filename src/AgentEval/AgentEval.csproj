@@ -22,6 +22,11 @@
     
     <!-- Include sub-project DLLs in the NuGet package (they're internal, not separate packages) -->
     <TargetsForTfmSpecificBuildOutput>$(TargetsForTfmSpecificBuildOutput);IncludeSubProjectDlls</TargetsForTfmSpecificBuildOutput>
+
+    <!-- Package validation runs on pack, so it belongs on the one project that packs: Core and Abstractions are
+         IsPackable=false and ship inside this package. It checks the package's per-framework assemblies against
+         each other on every pack. The public surface itself is frozen by the API snapshot tests. -->
+    <EnablePackageValidation>true</EnablePackageValidation>
   </PropertyGroup>
 
   <!-- MSBuild target: embed all ProjectReference DLLs into the NuGet lib/ folder -->

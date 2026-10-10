@@ -201,7 +201,8 @@ public class CalibratedJudge : ICalibratedJudge
         }
 
         // Too few measured because the input lacked something: not measured, not a judge failure.
-        if (judgeScores.Count < _options.MinimumJudgesRequired && notMeasured.Count > 0)
+        // Only when no judge failed: a failed or timed-out judge in the shortfall is an outage, and an outage throws below.
+        if (judgeScores.Count < _options.MinimumJudgesRequired && notMeasured.Count > 0 && errors.Count == 0)
         {
             return new CalibratedResult
             {

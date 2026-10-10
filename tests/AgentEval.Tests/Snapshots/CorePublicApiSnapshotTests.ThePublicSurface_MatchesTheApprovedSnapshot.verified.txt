@@ -1,4 +1,4 @@
-﻿class AgentEval.Adapters.MicrosoftEvaluatorAdapter
+﻿class AgentEval.Adapters.MicrosoftEvaluatorAdapter : AgentEval.Core.IMetric, AgentEval.Evals.IEval
     System.String Category { get; }
     System.String Description { get; }
     System.String JudgeModel { get; init; }
@@ -19,7 +19,7 @@
 static class AgentEval.Adapters.MicrosoftEvaluatorExtensions
     static System.Collections.Generic.IEnumerable<AgentEval.Core.IMetric> CreateAllQualityEvaluators(Microsoft.Extensions.AI.IChatClient chatClient)
     static System.Collections.Generic.IEnumerable<AgentEval.Evals.IEval> CreateAllQualityEvals(Microsoft.Extensions.AI.IChatClient chatClient)
-class AgentEval.Assertions.AgentEvalAssertionException
+class AgentEval.Assertions.AgentEvalAssertionException : System.Exception, System.Runtime.Serialization.ISerializable
     System.Collections.Generic.IReadOnlyList<System.String> Suggestions { get; init; }
     System.String Actual { get; init; }
     System.String Because { get; init; }
@@ -29,7 +29,7 @@ class AgentEval.Assertions.AgentEvalAssertionException
     ctor(System.String message)
     ctor(System.String message, System.Exception inner)
     static AgentEval.Assertions.AgentEvalAssertionException Create(System.String message, System.String expected = null, System.String actual = null, System.String context = null, System.Collections.Generic.IReadOnlyList<System.String> suggestions = null, System.String subjectName = null, System.String because = null)
-class AgentEval.Assertions.AgentEvalScope
+sealed class AgentEval.Assertions.AgentEvalScope : System.IDisposable
     AgentEval.Assertions.AgentEvalScope WithContext(System.String context)
     AgentEval.Assertions.AgentEvalScopeMode Mode { get; }
     System.Boolean HasFailures { get; }
@@ -52,7 +52,7 @@ class AgentEval.Assertions.AgentEvalScope
     static System.Void Record(AgentEval.Output.AssertionResult result)
     static System.Void RecordInconclusive(System.String assertion, System.String reason)
     static System.Void RecordPass(System.String assertion, System.String message = null)
-class AgentEval.Assertions.AgentEvalScopeException
+class AgentEval.Assertions.AgentEvalScopeException : AgentEval.Assertions.AgentEvalAssertionException, System.Runtime.Serialization.ISerializable
     System.Collections.Generic.IReadOnlyList<AgentEval.Assertions.AgentEvalAssertionException> Failures { get; }
     ctor(System.Collections.Generic.IReadOnlyList<AgentEval.Assertions.AgentEvalAssertionException> failures)
 static class AgentEval.Assertions.AgentEvalScopeExtensions
@@ -61,14 +61,14 @@ static class AgentEval.Assertions.AgentEvalScopeExtensions
 enum AgentEval.Assertions.AgentEvalScopeMode
     Throw
     Collect
-class AgentEval.Assertions.AssertionProbe
+sealed class AgentEval.Assertions.AssertionProbe : System.IDisposable
     System.Boolean IsActive { get; }
     System.String Name { get; }
     System.Void Complete()
     System.Void Dispose()
     System.Void MarkInconclusive(System.String reason)
     T Complete<T>(T value)
-class AgentEval.Assertions.BehavioralPolicyViolationException
+class AgentEval.Assertions.BehavioralPolicyViolationException : AgentEval.Assertions.AgentEvalAssertionException, System.Runtime.Serialization.ISerializable
     System.Collections.Generic.IReadOnlyList<System.String> Suggestions { get; init; }
     System.String ArgumentName { get; init; }
     System.String Because { get; init; }
@@ -83,7 +83,7 @@ class AgentEval.Assertions.BehavioralPolicyViolationException
     ctor(System.String message, System.Exception innerException)
     static AgentEval.Assertions.BehavioralPolicyViolationException Create(System.String message, System.String policyName, System.String violationType, System.String violatingAction, System.String forbiddenToolName = null, System.String matchedPattern = null, System.String redactedValue = null, System.String argumentName = null, System.String toolName = null, System.String because = null, System.Collections.Generic.IReadOnlyList<System.String> suggestions = null)
     static System.String RedactSensitiveData(System.String value, System.Int32 matchStart, System.Int32 matchLength)
-class AgentEval.Assertions.ChatResponseAssertions
+sealed class AgentEval.Assertions.ChatResponseAssertions
     Microsoft.Extensions.AI.ChatResponse Response { get; }
 static class AgentEval.Assertions.ChatResponseAssertionsExtensions
     static AgentEval.Assertions.ChatResponseAssertions Should(Microsoft.Extensions.AI.ChatResponse response)
@@ -132,7 +132,7 @@ static class AgentEval.Assertions.ForbiddenPatternScanner
 static class AgentEval.Assertions.ModelAssertionExtensions
     static AgentEval.Assertions.PerformanceAssertions Should(AgentEval.Models.PerformanceMetrics metrics)
     static AgentEval.Assertions.ToolUsageAssertions Should(AgentEval.Models.ToolUsageReport report)
-class AgentEval.Assertions.PerformanceAssertionException
+class AgentEval.Assertions.PerformanceAssertionException : AgentEval.Assertions.AgentEvalAssertionException, System.Runtime.Serialization.ISerializable
     System.String MeasuredValue { get; init; }
     System.String MetricName { get; init; }
     System.String Threshold { get; init; }
@@ -151,7 +151,7 @@ class AgentEval.Assertions.PerformanceAssertions
     AgentEval.Assertions.PerformanceAssertions HaveTotalToolTimeUnder(System.TimeSpan max, System.String because = null)
     AgentEval.Models.PerformanceMetrics Metrics { get; }
     ctor(AgentEval.Models.PerformanceMetrics metrics, System.String subjectName = null)
-class AgentEval.Assertions.ResponseAssertionException
+class AgentEval.Assertions.ResponseAssertionException : AgentEval.Assertions.AgentEvalAssertionException, System.Runtime.Serialization.ISerializable
     System.String ResponsePreview { get; init; }
     ctor(System.String message)
     static AgentEval.Assertions.ResponseAssertionException Create(System.String message, System.String responsePreview = null, System.String expected = null, System.String actual = null, System.String context = null, System.Collections.Generic.IReadOnlyList<System.String> suggestions = null, System.String because = null)
@@ -185,7 +185,7 @@ static class AgentEval.Assertions.SkillUsageAssertions
     static AgentEval.Assertions.ToolUsageAssertions HaveDisclosedProgressively(AgentEval.Assertions.ToolUsageAssertions a, System.String because = null)
     static AgentEval.Assertions.ToolUsageAssertions NotHaveRunSkillScript(AgentEval.Assertions.ToolUsageAssertions a, System.String because)
     static AgentEval.Models.ToolUsageReport ForSkill(AgentEval.Models.ToolUsageReport report, System.String skillName)
-class AgentEval.Assertions.StochasticAssertionException
+class AgentEval.Assertions.StochasticAssertionException : AgentEval.Assertions.AgentEvalAssertionException, System.Runtime.Serialization.ISerializable
     ctor(System.String message)
     ctor(System.String message, System.Exception innerException)
 class AgentEval.Assertions.StochasticAssertions
@@ -201,7 +201,7 @@ class AgentEval.Assertions.StochasticAssertions
     ctor(AgentEval.Comparison.StochasticResult result)
 static class AgentEval.Assertions.StochasticExtensions
     static AgentEval.Assertions.StochasticAssertions Should(AgentEval.Comparison.StochasticResult result)
-class AgentEval.Assertions.ToolAssertionException
+class AgentEval.Assertions.ToolAssertionException : AgentEval.Assertions.AgentEvalAssertionException, System.Runtime.Serialization.ISerializable
     System.Collections.Generic.IReadOnlyList<System.String> CalledTools { get; init; }
     System.String ToolName { get; init; }
     ctor(System.String message)
@@ -267,7 +267,7 @@ class AgentEval.Assertions.WorkflowAssertionBuilder
     System.Collections.Generic.IReadOnlyList<System.String> Failures { get; }
     System.Collections.Generic.IReadOnlyList<System.ValueTuple<System.String, System.String>> FailureDetails { get; }
     System.Void Validate()
-class AgentEval.Assertions.WorkflowAssertionException
+class AgentEval.Assertions.WorkflowAssertionException : AgentEval.Assertions.AgentEvalAssertionException, System.Runtime.Serialization.ISerializable
     System.Collections.Generic.IReadOnlyList<System.String> Failures { get; init; }
     ctor(System.String message)
     ctor(System.String message, System.Exception inner)
@@ -288,7 +288,7 @@ class AgentEval.Assertions.WorkflowToolCallAssertionBuilder
     AgentEval.Assertions.WorkflowToolCallAssertionBuilder WithDurationUnder(System.TimeSpan max, System.String because = null)
     AgentEval.Assertions.WorkflowToolCallAssertionBuilder WithResultContaining(System.String substring, System.String because = null)
     AgentEval.Assertions.WorkflowToolCallAssertionBuilder WithoutError(System.String because = null)
-class AgentEval.Benchmarks.AdmittedCheck
+sealed class AgentEval.Benchmarks.AdmittedCheck : System.IEquatable<AgentEval.Benchmarks.AdmittedCheck>
     AgentEval.Benchmarks.AdmittedCheck <Clone>$()
     AgentEval.Evals.FloorAdmittedEval Admit()
     AgentEval.Evals.IEval Eval { get; init; }
@@ -304,7 +304,7 @@ static class AgentEval.Benchmarks.AutoAuditDemo
     const System.String LeakEndpoint
     const System.String RetryEndpoint
     static System.Threading.Tasks.Task<AgentEval.Benchmarks.AutoAuditReport> BuildOfflineReportAsync(System.Threading.CancellationToken cancellationToken = default)
-class AgentEval.Benchmarks.AutoAuditEndpointResult
+sealed class AgentEval.Benchmarks.AutoAuditEndpointResult : System.IEquatable<AgentEval.Benchmarks.AutoAuditEndpointResult>
     AgentEval.Benchmarks.AutoAuditEndpointResult <Clone>$()
     System.Boolean Completed { get; init; }
     System.Boolean Equals(AgentEval.Benchmarks.AutoAuditEndpointResult other)
@@ -328,7 +328,7 @@ static class AgentEval.Benchmarks.AutoAuditLive
     const System.String Request
     const System.String TestSsn
     static System.Threading.Tasks.Task<System.ValueTuple<AgentEval.Benchmarks.AutoAuditEndpointResult, System.Exception>> EvaluateAsync(System.String endpoint, Microsoft.Extensions.AI.IChatClient model, System.Threading.CancellationToken cancellationToken = default)
-class AgentEval.Benchmarks.AutoAuditReport
+sealed class AgentEval.Benchmarks.AutoAuditReport : System.IEquatable<AgentEval.Benchmarks.AutoAuditReport>
     AgentEval.Benchmarks.AutoAuditEndpointResult Winner { get; }
     AgentEval.Benchmarks.AutoAuditReport <Clone>$()
     System.Boolean Equals(AgentEval.Benchmarks.AutoAuditReport other)
@@ -343,7 +343,7 @@ class AgentEval.Benchmarks.AutoAuditReport
 static class AgentEval.Benchmarks.AutoAuditRunner
     static AgentEval.Benchmarks.AutoAuditEndpointResult Evaluate(System.String endpoint, AgentEval.Tracing.AgentTrace agentBoundary, AgentEval.Tracing.AgentTrace chatBoundary, System.Boolean completed = true, System.Boolean leakedPastGate = false)
     static AgentEval.Benchmarks.AutoAuditReport Compare(System.Collections.Generic.IEnumerable<AgentEval.Benchmarks.AutoAuditEndpointResult> results)
-class AgentEval.Benchmarks.BenchmarkArm
+sealed class AgentEval.Benchmarks.BenchmarkArm : System.IEquatable<AgentEval.Benchmarks.BenchmarkArm>
     AgentEval.Benchmarks.BenchmarkArm <Clone>$()
     System.Boolean Equals(AgentEval.Benchmarks.BenchmarkArm other)
     System.Boolean Equals(System.Object obj)
@@ -355,7 +355,7 @@ class AgentEval.Benchmarks.BenchmarkArm
     ctor(System.String ArmId, System.Func<AgentEval.Models.TestCase, System.Threading.CancellationToken, System.Threading.Tasks.Task<AgentEval.Evals.EvalInput>> Observe)
     static AgentEval.Benchmarks.BenchmarkArm From(System.String armId, System.Func<AgentEval.Models.TestCase, System.Threading.CancellationToken, System.Threading.Tasks.Task<AgentEval.Evals.EvalInput>> observe)
     static AgentEval.Benchmarks.BenchmarkArm FromHarness(System.String armId, AgentEval.Core.IEvaluationHarness harness, AgentEval.Core.IEvaluableAgent agent, AgentEval.Core.EvaluationOptions options = null)
-class AgentEval.Benchmarks.BenchmarkDefinition
+sealed class AgentEval.Benchmarks.BenchmarkDefinition : System.IEquatable<AgentEval.Benchmarks.BenchmarkDefinition>
     AgentEval.Benchmarks.BenchmarkDefinition <Clone>$()
     System.Boolean Equals(AgentEval.Benchmarks.BenchmarkDefinition other)
     System.Boolean Equals(System.Object obj)
@@ -367,7 +367,7 @@ class AgentEval.Benchmarks.BenchmarkDefinition
     System.String Version { get; init; }
     System.Void Deconstruct(out System.String Key, out System.String Version, out System.Collections.Generic.IReadOnlyList<AgentEval.Models.TestCase> Cases, out System.Collections.Generic.IReadOnlyList<AgentEval.Benchmarks.AdmittedCheck> Checks)
     ctor(System.String Key, System.String Version, System.Collections.Generic.IReadOnlyList<AgentEval.Models.TestCase> Cases, System.Collections.Generic.IReadOnlyList<AgentEval.Benchmarks.AdmittedCheck> Checks)
-class AgentEval.Benchmarks.BenchmarkRun
+sealed class AgentEval.Benchmarks.BenchmarkRun : System.IEquatable<AgentEval.Benchmarks.BenchmarkRun>
     AgentEval.Benchmarks.BenchmarkDefinition Definition { get; init; }
     AgentEval.Benchmarks.BenchmarkRun <Clone>$()
     System.Boolean Equals(AgentEval.Benchmarks.BenchmarkRun other)
@@ -379,7 +379,7 @@ class AgentEval.Benchmarks.BenchmarkRun
     System.String ToString()
     System.Void Deconstruct(out System.String RunId, out System.String ArmId, out AgentEval.Benchmarks.BenchmarkDefinition Definition, out System.Collections.Generic.IReadOnlyList<AgentEval.Benchmarks.CheckObservation> Observations)
     ctor(System.String RunId, System.String ArmId, AgentEval.Benchmarks.BenchmarkDefinition Definition, System.Collections.Generic.IReadOnlyList<AgentEval.Benchmarks.CheckObservation> Observations)
-class AgentEval.Benchmarks.BenchmarkRunner
+sealed class AgentEval.Benchmarks.BenchmarkRunner
     System.Threading.Tasks.Task<AgentEval.Benchmarks.BenchmarkRun> RunAsync(AgentEval.Benchmarks.BenchmarkDefinition definition, AgentEval.Benchmarks.BenchmarkArm arm, System.String parentInvocationId = null, System.Threading.CancellationToken ct = default)
     const System.String RunKind
     const System.String ScenarioIdSeparator
@@ -389,7 +389,7 @@ static class AgentEval.Benchmarks.BenchmarkScore
     static System.Collections.Generic.IReadOnlyList<System.ValueTuple<System.String, AgentEval.Evals.Meta.FloorComparison>> AgainstFloor(System.Collections.Generic.IReadOnlyList<AgentEval.Benchmarks.BenchmarkRun> runsOfOneArm, AgentEval.Evals.Meta.RepCollapse collapse = RepCollapse.All, System.Double passAt = 1)
     static System.Collections.Generic.IReadOnlyList<System.ValueTuple<System.String, AgentEval.Evals.Meta.ObservationCensus>> Census(System.Collections.Generic.IReadOnlyList<AgentEval.Benchmarks.BenchmarkRun> runsOfOneArm)
     static System.Collections.Generic.IReadOnlyList<System.ValueTuple<System.String, AgentEval.Evals.Meta.PairedComparison>> AgainstReference(System.Collections.Generic.IReadOnlyList<AgentEval.Benchmarks.BenchmarkRun> reference, System.Collections.Generic.IReadOnlyList<AgentEval.Benchmarks.BenchmarkRun> challenger, AgentEval.Evals.Meta.RepCollapse collapse = RepCollapse.All, System.Double passAt = 1)
-class AgentEval.Benchmarks.CheckObservation
+sealed class AgentEval.Benchmarks.CheckObservation : System.IEquatable<AgentEval.Benchmarks.CheckObservation>
     AgentEval.Benchmarks.CheckObservation <Clone>$()
     AgentEval.Evals.EvalResult Result { get; init; }
     AgentEval.Evals.Meta.Observation Observation { get; init; }
@@ -404,7 +404,7 @@ static class AgentEval.Benchmarks.TraceFidelityBenchmark
     static AgentEval.Benchmarks.TraceFidelityRunner AuditGrade()
     static AgentEval.Benchmarks.TraceFidelityRunner Smoke()
     static AgentEval.Benchmarks.TraceFidelityRunner Standard()
-class AgentEval.Benchmarks.TraceFidelityDiscrepancy
+sealed class AgentEval.Benchmarks.TraceFidelityDiscrepancy : System.IEquatable<AgentEval.Benchmarks.TraceFidelityDiscrepancy>
     AgentEval.Benchmarks.TraceFidelityDiscrepancy <Clone>$()
     System.Boolean Equals(AgentEval.Benchmarks.TraceFidelityDiscrepancy other)
     System.Boolean Equals(System.Object obj)
@@ -417,7 +417,7 @@ class AgentEval.Benchmarks.TraceFidelityDiscrepancy
     System.String ToString()
     System.Void Deconstruct(out System.String ClassKey, out System.String Severity, out System.Int32 Count, out System.Double Score, out System.Collections.Generic.IReadOnlyList<System.String> Examples)
     ctor(System.String ClassKey, System.String Severity, System.Int32 Count, System.Double Score, System.Collections.Generic.IReadOnlyList<System.String> Examples)
-class AgentEval.Benchmarks.TraceFidelityReport
+sealed class AgentEval.Benchmarks.TraceFidelityReport : System.IEquatable<AgentEval.Benchmarks.TraceFidelityReport>
     AgentEval.Benchmarks.TraceFidelityReport <Clone>$()
     System.Boolean Equals(AgentEval.Benchmarks.TraceFidelityReport other)
     System.Boolean Equals(System.Object obj)
@@ -440,18 +440,18 @@ static class AgentEval.Benchmarks.TraceFidelityRubric
     static System.Double SeverityPenalty(System.String severity)
     static System.Double Weight(System.String classKey)
     static System.String Severity(System.String classKey)
-class AgentEval.Benchmarks.TraceFidelityRunner
+sealed class AgentEval.Benchmarks.TraceFidelityRunner
     AgentEval.Benchmarks.TraceFidelityReport Reconcile(AgentEval.Tracing.AgentTrace agentTrace, AgentEval.Tracing.AgentTrace chatTrace)
     AgentEval.Evals.EvalResult ReconcileToEvalResult(AgentEval.Tracing.AgentTrace agentTrace, AgentEval.Tracing.AgentTrace chatTrace)
     AgentEval.Tracing.SamplePreset Preset { get; }
     ctor(AgentEval.Tracing.SamplePreset preset = SamplePreset.Standard)
-class AgentEval.Benchmarks.TraceFidelityRunnerHostingContext
+sealed class AgentEval.Benchmarks.TraceFidelityRunnerHostingContext : System.IDisposable
     AgentEval.Tracing.AgentTrace AgentBoundaryTrace { get; }
     AgentEval.Tracing.AgentTrace ChatBoundaryTrace { get; }
     System.Void Dispose()
     ctor(AgentEval.Tracing.AgentTrace agentBoundaryTrace, AgentEval.Tracing.AgentTrace chatBoundaryTrace)
     static AgentEval.Benchmarks.TraceFidelityRunnerHostingContext Current { get; }
-class AgentEval.Benchmarks.WorkflowExecutorFidelity
+sealed class AgentEval.Benchmarks.WorkflowExecutorFidelity : System.IEquatable<AgentEval.Benchmarks.WorkflowExecutorFidelity>
     AgentEval.Benchmarks.WorkflowExecutorFidelity <Clone>$()
     AgentEval.Benchmarks.WorkflowFidelityDiff DiffKind { get; init; }
     System.Boolean Equals(AgentEval.Benchmarks.WorkflowExecutorFidelity other)
@@ -476,12 +476,12 @@ static class AgentEval.Benchmarks.WorkflowTraceFidelityBenchmark
     static AgentEval.Benchmarks.WorkflowTraceFidelityReconciler AuditGrade()
     static AgentEval.Benchmarks.WorkflowTraceFidelityReconciler Smoke()
     static AgentEval.Benchmarks.WorkflowTraceFidelityReconciler Standard()
-class AgentEval.Benchmarks.WorkflowTraceFidelityReconciler
+sealed class AgentEval.Benchmarks.WorkflowTraceFidelityReconciler
     AgentEval.Benchmarks.WorkflowTraceFidelityReport Reconcile(AgentEval.Models.WorkflowExecutionResult result, System.Collections.Generic.IReadOnlyDictionary<System.String, AgentEval.Tracing.AgentTrace> chatTraces = null)
     AgentEval.Evals.EvalResult ReconcileToEvalResult(AgentEval.Models.WorkflowExecutionResult result, System.Collections.Generic.IReadOnlyDictionary<System.String, AgentEval.Tracing.AgentTrace> chatTraces = null)
     AgentEval.Tracing.SamplePreset Preset { get; }
     ctor(AgentEval.Tracing.SamplePreset preset = SamplePreset.Standard)
-class AgentEval.Benchmarks.WorkflowTraceFidelityReport
+sealed class AgentEval.Benchmarks.WorkflowTraceFidelityReport : System.IEquatable<AgentEval.Benchmarks.WorkflowTraceFidelityReport>
     AgentEval.Benchmarks.WorkflowTraceFidelityReport <Clone>$()
     System.Boolean Equals(AgentEval.Benchmarks.WorkflowTraceFidelityReport other)
     System.Boolean Equals(System.Object obj)
@@ -497,12 +497,12 @@ static class AgentEval.Calibration.AgreementMetrics
     static System.Double Accuracy(System.Collections.Generic.IReadOnlyList<System.ValueTuple<System.String, System.String>> pairs)
     static System.Double CohensKappa(System.Collections.Generic.IReadOnlyList<System.ValueTuple<System.String, System.String>> pairs)
     static System.Double MacroF1(System.Collections.Generic.IReadOnlyList<System.ValueTuple<System.String, System.String>> pairs)
-class AgentEval.Calibration.CalibratedEvaluator
+class AgentEval.Calibration.CalibratedEvaluator : AgentEval.Core.IEvaluator
     AgentEval.Calibration.CalibratedJudgeOptions Options { get; }
     System.Collections.Generic.IReadOnlyList<System.String> JudgeNames { get; }
     System.Threading.Tasks.Task<AgentEval.Core.EvaluationResult> EvaluateAsync(System.String input, System.String output, System.Collections.Generic.IEnumerable<System.String> criteria, System.Threading.CancellationToken cancellationToken = default)
     ctor(System.Collections.Generic.IEnumerable<System.ValueTuple<System.String, Microsoft.Extensions.AI.IChatClient>> judges, AgentEval.Calibration.CalibratedJudgeOptions options = null)
-class AgentEval.Calibration.CalibratedJudge
+class AgentEval.Calibration.CalibratedJudge : AgentEval.Calibration.ICalibratedJudge
     AgentEval.Calibration.CalibratedJudgeOptions Options { get; }
     System.Collections.Generic.IReadOnlyList<System.String> JudgeNames { get; }
     System.Collections.Generic.IReadOnlyList<System.ValueTuple<System.String, Microsoft.Extensions.AI.IChatClient>> Judges { get; }
@@ -515,7 +515,7 @@ class AgentEval.Calibration.CalibratedJudge
 enum AgentEval.Calibration.CutObjective
     Accuracy
     BalancedAccuracy
-class AgentEval.Calibration.HeldOutEvaluation
+sealed class AgentEval.Calibration.HeldOutEvaluation : System.IEquatable<AgentEval.Calibration.HeldOutEvaluation>
     AgentEval.Calibration.CutObjective Objective { get; init; }
     AgentEval.Calibration.HeldOutEvaluation <Clone>$()
     System.Boolean Equals(AgentEval.Calibration.HeldOutEvaluation other)
@@ -530,7 +530,7 @@ class AgentEval.Calibration.HeldOutEvaluation
     System.Void Deconstruct(out System.Double Cut, out AgentEval.Calibration.CutObjective Objective, out System.Int32 TrainingCount, out System.Double TrainingAccuracy, out System.Double TrainingAuroc, out WilsonInterval HeldOutAccuracy, out System.Double HeldOutAuroc)
     WilsonInterval HeldOutAccuracy { get; init; }
     ctor(System.Double Cut, AgentEval.Calibration.CutObjective Objective, System.Int32 TrainingCount, System.Double TrainingAccuracy, System.Double TrainingAuroc, WilsonInterval HeldOutAccuracy, System.Double HeldOutAuroc)
-struct AgentEval.Calibration.ScoredCase
+struct AgentEval.Calibration.ScoredCase : System.IEquatable<AgentEval.Calibration.ScoredCase>
     System.Boolean Equals(AgentEval.Calibration.ScoredCase other)
     System.Boolean Equals(System.Object obj)
     System.Boolean Positive { get; init; }
@@ -544,7 +544,7 @@ static class AgentEval.Calibration.ThresholdCalibration
     static System.Double Auroc(System.Collections.Generic.IReadOnlyList<AgentEval.Calibration.ScoredCase> cases)
     static System.Double ChooseCut(System.Collections.Generic.IReadOnlyList<AgentEval.Calibration.ScoredCase> cases, AgentEval.Calibration.CutObjective objective = CutObjective.Accuracy)
     static System.ValueTuple<System.Collections.Generic.IReadOnlyList<AgentEval.Calibration.ScoredCase>, System.Collections.Generic.IReadOnlyList<AgentEval.Calibration.ScoredCase>> Split(System.Collections.Generic.IReadOnlyList<AgentEval.Calibration.ScoredCase> cases, System.Double heldOutFraction, System.Int32 seed)
-class AgentEval.Comparison.DefaultStatisticsCalculator
+sealed class AgentEval.Comparison.DefaultStatisticsCalculator : AgentEval.Comparison.IStatisticsCalculator
     AgentEval.Comparison.ConfidenceInterval CalculateConfidenceInterval(System.Collections.Generic.IReadOnlyList<System.Double> values, System.Double confidenceLevel = 0.95)
     AgentEval.Comparison.DistributionStatistics CreateDistribution(System.Collections.Generic.IReadOnlyList<System.Decimal> values)
     AgentEval.Comparison.DistributionStatistics CreateDistribution(System.Collections.Generic.IReadOnlyList<System.Double> values)
@@ -558,7 +558,7 @@ class AgentEval.Comparison.DefaultStatisticsCalculator
     System.Double StandardDeviation(System.Collections.Generic.IReadOnlyList<System.Double> values)
     ctor()
     static AgentEval.Comparison.IStatisticsCalculator Instance { get; }
-class AgentEval.Comparison.DelegateAgentFactory
+class AgentEval.Comparison.DelegateAgentFactory : AgentEval.Comparison.IAgentFactory
     AgentEval.Comparison.ModelConfiguration Configuration { get; }
     AgentEval.Core.IEvaluableAgent CreateAgent()
     System.String ModelId { get; }
@@ -577,7 +577,7 @@ class AgentEval.Comparison.MarkdownExportOptions
     ctor()
     static AgentEval.Comparison.MarkdownExportOptions Default { get; }
     static AgentEval.Comparison.MarkdownExportOptions Minimal { get; }
-class AgentEval.Comparison.ModelComparer
+class AgentEval.Comparison.ModelComparer : AgentEval.Comparison.IModelComparer
     System.Threading.Tasks.Task<AgentEval.Comparison.ModelComparisonResult> CompareModelsAsync(System.Collections.Generic.IReadOnlyList<AgentEval.Comparison.IAgentFactory> factories, AgentEval.Models.TestCase testCase, AgentEval.Comparison.ModelComparisonOptions options = null, System.Threading.CancellationToken cancellationToken = default)
     System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<AgentEval.Comparison.ModelComparisonResult>> CompareModelsAsync(System.Collections.Generic.IReadOnlyList<AgentEval.Comparison.IAgentFactory> factories, System.Collections.Generic.IReadOnlyList<AgentEval.Models.TestCase> testCases, AgentEval.Comparison.ModelComparisonOptions options = null, System.Threading.CancellationToken cancellationToken = default)
     ctor(AgentEval.Comparison.IStochasticRunner stochasticRunner)
@@ -603,11 +603,11 @@ static class AgentEval.Comparison.StatisticsCalculator
     static System.Double Median(System.Collections.Generic.IReadOnlyList<System.Double> values)
     static System.Double Percentile(System.Collections.Generic.IReadOnlyList<System.Double> values, System.Double percentile)
     static System.Double StandardDeviation(System.Collections.Generic.IReadOnlyList<System.Double> values)
-class AgentEval.Comparison.StochasticRunner
+class AgentEval.Comparison.StochasticRunner : AgentEval.Comparison.IStochasticRunner
     System.Threading.Tasks.Task<AgentEval.Comparison.StochasticResult> RunStochasticTestAsync(AgentEval.Comparison.IAgentFactory factory, AgentEval.Models.TestCase testCase, AgentEval.Comparison.StochasticOptions options = null, System.Threading.CancellationToken cancellationToken = default)
     System.Threading.Tasks.Task<AgentEval.Comparison.StochasticResult> RunStochasticTestAsync(AgentEval.Core.IEvaluableAgent agent, AgentEval.Models.TestCase testCase, AgentEval.Comparison.StochasticOptions options = null, System.Threading.CancellationToken cancellationToken = default)
     ctor(AgentEval.Core.IEvaluationHarness harness, AgentEval.Comparison.IStatisticsCalculator statisticsCalculator = null, AgentEval.Core.EvaluationOptions evaluationOptions = null)
-class AgentEval.Core.AgentEvalBuilder
+sealed class AgentEval.Core.AgentEvalBuilder
     AgentEval.Core.AgentEvalBuilder AddEval(AgentEval.Evals.IEval eval, AgentEval.Evals.Meta.ChanceFloor floor)
     AgentEval.Core.AgentEvalBuilder AddMetric(AgentEval.Core.IMetric metric)
     AgentEval.Core.AgentEvalBuilder AddMetric<TMetric>()
@@ -626,7 +626,8 @@ class AgentEval.Core.AgentEvalBuilder
     System.Threading.Tasks.Task<AgentEval.Core.AgentEvalRunner> BuildAsync(System.Threading.CancellationToken cancellationToken = default)
     ctor()
     static AgentEval.Core.AgentEvalBuilder Create()
-class AgentEval.Core.AgentEvalPluginBase
+abstract class AgentEval.Core.AgentEvalPluginBase : AgentEval.Core.IAgentEvalPlugin, System.IAsyncDisposable, System.IDisposable
+    AgentEval.Core.IAgentEvalLogger Logger { protected get; }
     AgentEval.Core.PluginLifecycleStage Stage { get; }
     System.Collections.Generic.IReadOnlyList<System.String> Dependencies { get; }
     System.String Description { get; }
@@ -639,7 +640,10 @@ class AgentEval.Core.AgentEvalPluginBase
     System.Threading.Tasks.ValueTask DisposeAsync()
     System.Version Version { get; }
     System.Void Dispose()
-class AgentEval.Core.AgentEvalRunner
+    protected System.Threading.Tasks.Task OnInitializeAsync(System.Threading.CancellationToken cancellationToken)
+    protected System.Threading.Tasks.Task OnShutdownAsync(System.Threading.CancellationToken cancellationToken)
+    protected ctor()
+sealed class AgentEval.Core.AgentEvalRunner : System.IAsyncDisposable
     AgentEval.Core.IAgentEvalLogger Logger { get; }
     AgentEval.Core.IMetricRegistry Metrics { get; }
     Microsoft.Extensions.AI.IChatClient EvaluatorClient { get; }
@@ -652,7 +656,7 @@ class AgentEval.Core.AgentEvalRunner
     System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<AgentEval.Core.MetricResult>> EvaluateAsync(System.Collections.Generic.IEnumerable<System.String> metricNames, System.String input, System.String output, System.Threading.CancellationToken cancellationToken = default)
     System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<AgentEval.Evals.EvalResult>> EvaluateEvalsAsync(AgentEval.Evals.EvalInput input, System.Threading.CancellationToken cancellationToken = default)
     System.Threading.Tasks.ValueTask DisposeAsync()
-class AgentEval.Core.Benchmarks.BenchmarkFamily
+sealed class AgentEval.Core.Benchmarks.BenchmarkFamily
     AgentEval.Core.Benchmarks.CostTier DefaultCostTier { get; }
     System.Collections.Generic.IReadOnlyList<AgentEval.Core.Benchmarks.BenchmarkPreset> Presets { get; }
     System.Func<AgentEval.Evals.EvalInput, AgentEval.Core.IEvaluator, System.Threading.CancellationToken, System.Threading.Tasks.Task<AgentEval.Evals.EvalResult>> EvaluateAsync { get; }
@@ -668,7 +672,7 @@ static class AgentEval.Core.Benchmarks.BenchmarkFamilyRegistry
     static AgentEval.Core.Benchmarks.BenchmarkFamily TryGet(System.String name)
     static System.Collections.Generic.IReadOnlyList<AgentEval.Core.Benchmarks.BenchmarkFamily> All { get; }
     static System.Void Register(AgentEval.Core.Benchmarks.BenchmarkFamily family)
-class AgentEval.Core.Benchmarks.BenchmarkPreset
+sealed class AgentEval.Core.Benchmarks.BenchmarkPreset : System.IEquatable<AgentEval.Core.Benchmarks.BenchmarkPreset>
     AgentEval.Core.Benchmarks.BenchmarkPreset <Clone>$()
     AgentEval.Core.Benchmarks.CostTier? CostTier { get; init; }
     System.Boolean Equals(AgentEval.Core.Benchmarks.BenchmarkPreset other)
@@ -684,7 +688,7 @@ enum AgentEval.Core.Benchmarks.CostTier
     Low
     Medium
     High
-class AgentEval.Core.ChatClientAgentAdapter
+class AgentEval.Core.ChatClientAgentAdapter : AgentEval.Core.IAnswerSamplingConfigurableAgent, AgentEval.Core.IEvaluableAgent, AgentEval.Core.IHistoryInjectableAgent, AgentEval.Core.ISessionResettableAgent, AgentEval.Core.IStreamableAgent, AgentEval.Core.ITimestampedHistoryInjectableAgent
     AgentEval.Core.AnswerSamplingAcknowledgement ConfigureAnswerSampling(AgentEval.Core.AnswerSamplingRequest request)
     System.Collections.Generic.IAsyncEnumerable<AgentEval.Core.AgentResponseChunk> InvokeStreamingAsync(System.String prompt, System.Threading.CancellationToken cancellationToken = default)
     System.Collections.Generic.IReadOnlyList<Microsoft.Extensions.AI.ChatMessage> History { get; }
@@ -699,7 +703,7 @@ class AgentEval.Core.ChatClientAgentAdapter
     static AgentEval.Core.ChatClientAgentAdapter Create(Microsoft.Extensions.AI.IChatClient chatClient, System.String name = null, System.String systemPrompt = null, System.Single? temperature = null, System.Int32? maxTokens = null)
     static System.String QueryTimeSystemMessage(System.DateTimeOffset queryTime)
     static System.String Stamp(System.DateTimeOffset timestamp, System.String text)
-class AgentEval.Core.ChatClientEvaluator
+class AgentEval.Core.ChatClientEvaluator : AgentEval.Core.IEvaluator, AgentEval.Core.IJudgePromptSource, AgentEval.Core.IRubricBindable
     AgentEval.Core.IEvaluator WithRubric(AgentEval.Core.EvalRubric rubric, System.String dimension)
     System.String PromptMaterial { get; }
     System.String SystemPromptId { get; }
@@ -711,7 +715,7 @@ class AgentEval.Core.ChatClientEvaluator
     ctor(Microsoft.Extensions.AI.IChatClient chatClient, System.String systemPrompt, System.String systemPromptId)
 static class AgentEval.Core.ChatClientExtensions
     static AgentEval.Core.IStreamableAgent AsEvaluableAgent(Microsoft.Extensions.AI.IChatClient chatClient, System.String name = "Agent", System.String systemPrompt = null, Microsoft.Extensions.AI.ChatOptions chatOptions = null, System.Boolean includeHistory = false)
-class AgentEval.Core.ConsoleAgentEvalLogger
+sealed class AgentEval.Core.ConsoleAgentEvalLogger : AgentEval.Core.IAgentEvalLogger
     System.Boolean IsEnabled(AgentEval.Core.LogLevel level)
     System.IDisposable BeginScope(System.String scopeName, System.ValueTuple<System.String, System.Object>[] properties)
     System.Void Log(AgentEval.Core.LogLevel level, System.Exception exception, System.String message)
@@ -727,7 +731,7 @@ static class AgentEval.Core.CriterionText
     static System.String MatchDeclared(System.String echoed, System.Collections.Generic.IEnumerable<System.String> declared)
     static System.String Normalize(System.String text)
     static System.String StripLeadingEnumerator(System.String text)
-class AgentEval.Core.DefaultToolUsageExtractor
+sealed class AgentEval.Core.DefaultToolUsageExtractor : AgentEval.Core.IToolUsageExtractor
     AgentEval.Models.ToolUsageReport Extract(AgentEval.Core.AgentResponse response)
     AgentEval.Models.ToolUsageReport Extract(System.Collections.Generic.IReadOnlyList<System.Object> rawMessages)
     System.Boolean IncludeApprovalGatedCalls { get; }
@@ -740,13 +744,15 @@ static class AgentEval.Core.EvalRubrics
     static System.Boolean TryGet(System.String id, out AgentEval.Core.EvalRubric rubric)
     static System.Collections.Generic.IReadOnlyCollection<AgentEval.Core.EvalRubric> All { get; }
     static System.Void Register(AgentEval.Core.EvalRubric rubric)
-class AgentEval.Core.Evals.Rendering.HtmlEvalResultRenderer
+sealed class AgentEval.Core.Evals.Rendering.HtmlEvalResultRenderer : AgentEval.Evals.IEvalResultRenderer
     System.String FileExtension { get; }
     System.String FormatId { get; }
     System.Threading.Tasks.Task<System.Byte[]> RenderAsync(AgentEval.Evals.EvalResult result, AgentEval.Evals.EvalResultRenderOptions options, System.Threading.CancellationToken ct = default)
     ctor()
-class AgentEval.Core.FatalEvaluationException
-class AgentEval.Core.MetricRegistry
+abstract class AgentEval.Core.FatalEvaluationException : System.Exception, System.Runtime.Serialization.ISerializable
+    protected ctor(System.String message)
+    protected ctor(System.String message, System.Exception innerException)
+sealed class AgentEval.Core.MetricRegistry : AgentEval.Core.IMetricRegistry
     AgentEval.Core.IMetric Get(System.String name)
     AgentEval.Core.IMetric GetRequired(System.String name)
     System.Boolean Contains(System.String name)
@@ -759,7 +765,7 @@ class AgentEval.Core.MetricRegistry
     System.Void Register(System.String name, AgentEval.Core.IMetric metric)
     ctor()
     ctor(System.Collections.Generic.IEnumerable<AgentEval.Core.IMetric> metrics)
-class AgentEval.Core.MicrosoftLoggingAdapter
+sealed class AgentEval.Core.MicrosoftLoggingAdapter : AgentEval.Core.IAgentEvalLogger
     System.Boolean IsEnabled(AgentEval.Core.LogLevel level)
     System.IDisposable BeginScope(System.String scopeName, System.ValueTuple<System.String, System.Object>[] properties)
     System.Void Log(AgentEval.Core.LogLevel level, System.Exception exception, System.String message)
@@ -771,7 +777,7 @@ class AgentEval.Core.MicrosoftLoggingAdapter
     ctor(Microsoft.Extensions.Logging.ILogger logger)
     static AgentEval.Core.MicrosoftLoggingAdapter Create(Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, System.String categoryName = "AgentEval")
     static AgentEval.Core.MicrosoftLoggingAdapter Create<T>(Microsoft.Extensions.Logging.ILogger<T> logger)
-class AgentEval.Core.NullAgentEvalLogger
+sealed class AgentEval.Core.NullAgentEvalLogger : AgentEval.Core.IAgentEvalLogger
     System.Boolean IsEnabled(AgentEval.Core.LogLevel level)
     System.IDisposable BeginScope(System.String scopeName, System.ValueTuple<System.String, System.Object>[] properties)
     System.Void Log(AgentEval.Core.LogLevel level, System.Exception exception, System.String message)
@@ -792,10 +798,10 @@ static class AgentEval.Core.Reporting.MarkdownText
     static System.String Escape(System.String text)
     static System.String EscapeInline(System.String text, System.Int32 maxLength = 200)
     static System.String Truncate(System.String text, System.Int32 maxLength = 200)
-class AgentEval.Core.RetryExhaustedException
+class AgentEval.Core.RetryExhaustedException : System.Exception, System.Runtime.Serialization.ISerializable
     System.Collections.Generic.IReadOnlyList<System.Exception> Attempts { get; }
     ctor(System.String message, System.Collections.Generic.IEnumerable<System.Exception> attempts)
-class AgentEval.Core.RetryPolicy
+sealed class AgentEval.Core.RetryPolicy
     System.Double BackoffMultiplier { get; init; }
     System.Func<System.Exception, System.Boolean> ShouldRetry { get; init; }
     System.Int32 InitialDelayMs { get; init; }
@@ -823,7 +829,7 @@ static class AgentEval.Core.ToolUsageExtractor
     static AgentEval.Models.ToolUsageReport Extract(System.Collections.Generic.IReadOnlyList<System.Object> rawMessages, System.Boolean includeApprovalGatedCalls)
     static System.Collections.Generic.IReadOnlyList<System.String> ApprovalGatedToolNames(System.Collections.Generic.IReadOnlyList<System.Object> rawMessages)
     static System.Void EnrichFromTrace(AgentEval.Models.ToolUsageReport report, AgentEval.Tracing.AgentTrace trace)
-class AgentEval.Decisions.DecisionJudge [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
+sealed class AgentEval.Decisions.DecisionJudge : AgentEval.Core.IEvaluator, AgentEval.Core.IJudgePromptSource [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
     AgentEval.Decisions.DecisionRequest BuildRequest(System.String input, System.String output, System.Collections.Generic.IReadOnlyList<System.String> criteria)
     System.String PromptMaterial { get; }
     System.String SystemPromptId { get; }
@@ -833,7 +839,7 @@ class AgentEval.Decisions.DecisionJudge [Experimental(AGENTEVAL_DECISIONS_PREVIE
     static System.Collections.Generic.IReadOnlyDictionary<System.String, AgentEval.Decisions.DecisionQuestion> BuildQuestions(System.Collections.Generic.IReadOnlyList<System.String> criteria)
     static System.String BuildState(System.String input, System.String output)
     static System.String BuildState(System.String input, System.String output, System.String reference)
-class AgentEval.Decisions.DecisionJudge.Trace
+sealed class AgentEval.Decisions.DecisionJudge.Trace : System.IEquatable<AgentEval.Decisions.DecisionJudge.Trace>
     AgentEval.Decisions.DecisionJudge.Trace <Clone>$()
     System.Boolean Equals(AgentEval.Decisions.DecisionJudge.Trace other)
     System.Boolean Equals(System.Object obj)
@@ -858,7 +864,7 @@ static class AgentEval.Decisions.DecisionReferences
     const System.String Reasoning
     const System.String SelfHarm
     const System.String Violence
-class AgentEval.Decisions.SystemOneClientOptions [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
+sealed class AgentEval.Decisions.SystemOneClientOptions [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
     System.String ApiKey { get; init; }
     System.String Model { get; init; }
     System.String ProviderName { get; init; }
@@ -870,7 +876,7 @@ class AgentEval.Decisions.SystemOneClientOptions [Experimental(AGENTEVAL_DECISIO
     ctor()
     static AgentEval.Decisions.SystemOneClientOptions ForOpenRouter(System.String apiKey, System.String model = "typesafe/jev-1.13")
     static AgentEval.Decisions.SystemOneClientOptions ForTypeSafe(System.String apiKey, System.String model = "jev-1.13.0")
-class AgentEval.Decisions.SystemOneDecisionClient [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
+sealed class AgentEval.Decisions.SystemOneDecisionClient : AgentEval.Decisions.IDecisionClient, System.IDisposable [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
     System.String Model { get; }
     System.String ProviderName { get; }
     System.Threading.Tasks.Task<AgentEval.Decisions.DecisionResponse> DecideAsync(AgentEval.Decisions.DecisionRequest request, System.Threading.CancellationToken cancellationToken = default)
@@ -891,7 +897,7 @@ class AgentEval.DependencyInjection.AgentEvalServiceOptions
     System.Func<System.IServiceProvider, AgentEval.Core.IEvaluationHarness> EvaluationHarnessFactory { get; set; }
     System.Int32 EmbeddingCacheMaxSize { get; set; }
     ctor()
-class AgentEval.Embeddings.CachingEmbeddingsDecorator
+class AgentEval.Embeddings.CachingEmbeddingsDecorator : AgentEval.Embeddings.IAgentEvalEmbeddings
     System.Int32 CacheCount { get; }
     System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<System.ReadOnlyMemory<System.Single>>> GetEmbeddingsAsync(System.Collections.Generic.IEnumerable<System.String> texts, System.Threading.CancellationToken cancellationToken = default)
     System.Threading.Tasks.Task<System.ReadOnlyMemory<System.Single>> GetEmbeddingAsync(System.String text, System.Threading.CancellationToken cancellationToken = default)
@@ -904,7 +910,7 @@ static class AgentEval.Embeddings.EmbeddingSimilarity
     static System.Single DotProduct(System.ReadOnlySpan<System.Single> a, System.ReadOnlySpan<System.Single> b)
     static System.Single EuclideanDistance(System.ReadOnlySpan<System.Single> a, System.ReadOnlySpan<System.Single> b)
     static System.Single[] ComputeSimilarities(System.ReadOnlyMemory<System.Single> query, System.Collections.Generic.IReadOnlyList<System.ReadOnlyMemory<System.Single>> candidates)
-class AgentEval.Embeddings.MEAIEmbeddingAdapter
+class AgentEval.Embeddings.MEAIEmbeddingAdapter : AgentEval.Embeddings.IAgentEvalEmbeddings
     System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<System.ReadOnlyMemory<System.Single>>> GetEmbeddingsAsync(System.Collections.Generic.IEnumerable<System.String> texts, System.Threading.CancellationToken cancellationToken = default)
     System.Threading.Tasks.Task<System.ReadOnlyMemory<System.Single>> GetEmbeddingAsync(System.String text, System.Threading.CancellationToken cancellationToken = default)
     ctor(Microsoft.Extensions.AI.IEmbeddingGenerator<System.String, Microsoft.Extensions.AI.Embedding<System.Single>> generator)
@@ -917,7 +923,7 @@ class AgentEval.Embeddings.MemoryVectorStore
     System.Void AddRange(System.Collections.Generic.IEnumerable<System.ValueTuple<System.String, System.String, System.ReadOnlyMemory<System.Single>>> documents)
     System.Void Clear()
     ctor()
-class AgentEval.Embeddings.MemoryVectorStore.SearchResult
+sealed class AgentEval.Embeddings.MemoryVectorStore.SearchResult : System.IEquatable<AgentEval.Embeddings.MemoryVectorStore.SearchResult>
     AgentEval.Embeddings.MemoryVectorStore.SearchResult <Clone>$()
     System.Boolean Equals(AgentEval.Embeddings.MemoryVectorStore.SearchResult other)
     System.Boolean Equals(System.Object obj)
@@ -929,22 +935,27 @@ class AgentEval.Embeddings.MemoryVectorStore.SearchResult
     System.String ToString()
     System.Void Deconstruct(out System.String Id, out System.String Text, out System.Single Score, out System.Collections.Generic.Dictionary<System.String, System.Object> Metadata)
     ctor(System.String Id, System.String Text, System.Single Score, System.Collections.Generic.Dictionary<System.String, System.Object> Metadata)
-class AgentEval.Evals.AgentScenarioEval
+sealed class AgentEval.Evals.AgentScenarioEval : AgentEval.Evals.IEval
     System.String Category { get; }
     System.String Key { get; }
     System.String Name { get; }
     System.String Version { get; }
     System.Threading.Tasks.Task<AgentEval.Evals.EvalResult> EvaluateAsync(AgentEval.Evals.EvalInput input, System.Threading.CancellationToken ct = default)
     ctor(AgentEval.Core.IEvaluableAgent agent, System.String scenarioInput, AgentEval.Evals.IEval inner)
-class AgentEval.Evals.AtomicCodeEval
+abstract class AgentEval.Evals.AtomicCodeEval : AgentEval.Evals.AtomicEval, AgentEval.Evals.IEval
     System.Threading.Tasks.Task<AgentEval.Evals.EvalResult> EvaluateAsync(AgentEval.Evals.EvalInput input, System.Threading.CancellationToken ct = default)
-class AgentEval.Evals.AtomicEval
+    protected AgentEval.Evals.EvalResult Build(System.Double value, System.Boolean passed, System.String severity, System.Collections.Generic.IReadOnlyDictionary<System.String, System.Double> dimensions = null, System.Collections.Generic.IReadOnlyList<AgentEval.Evals.EvalEvidence> evidence = null)
+    protected AgentEval.Evals.EvalResult Evaluate(AgentEval.Evals.EvalInput input)
+    protected AgentEval.Evals.EvalResult NotApplicable(System.String reason, AgentEval.Evals.EvalEvidence evidence = null)
+    protected ctor(System.String key, System.String name, System.String category, System.String version)
+abstract class AgentEval.Evals.AtomicEval : AgentEval.Evals.IEval
     System.String Category { get; }
     System.String Key { get; }
     System.String Name { get; }
     System.String Version { get; }
     System.Threading.Tasks.Task<AgentEval.Evals.EvalResult> EvaluateAsync(AgentEval.Evals.EvalInput input, System.Threading.CancellationToken ct = default)
-class AgentEval.Evals.AtomicLlmEval
+    protected ctor(System.String key, System.String name, System.String category, System.String version)
+sealed class AgentEval.Evals.AtomicLlmEval : AgentEval.Evals.AtomicEval, AgentEval.Evals.IEval
     AgentEval.Evals.JudgeToolData JudgeSeesToolData { get; init; }
     System.Threading.Tasks.Task<AgentEval.Evals.EvalResult> EvaluateAsync(AgentEval.Evals.EvalInput input, System.Threading.CancellationToken ct = default)
     const System.Int32 ToolSectionCharacterLimit
@@ -952,13 +963,13 @@ class AgentEval.Evals.AtomicLlmEval
     const System.String JudgeInputFramingVersion
     const System.String JudgeNotesMetadataKey
     ctor(AgentEval.Core.IEvaluator evaluator, System.String key, System.String name, System.String category, System.String version, System.Collections.Generic.IReadOnlyList<System.String> criteria, System.Double passThreshold = 0.7, System.String judgeModel = null, System.String promptId = null, System.String failureSeverity = null, System.Func<System.String, AgentEval.Evals.JudgeCostMap.ModelRate> rateResolver = null)
-class AgentEval.Evals.CapByWorstAggregation
+sealed class AgentEval.Evals.CapByWorstAggregation : AgentEval.Evals.IAggregationStrategy
     System.String Name { get; }
     System.ValueTuple<System.Double, System.String> Aggregate(System.Collections.Generic.IReadOnlyList<AgentEval.Evals.EvalResult> results, System.Collections.Generic.IReadOnlyList<AgentEval.Evals.EvalComponent> components)
     ctor()
     static AgentEval.Evals.IAggregationStrategy Instance { get; }
     static System.ValueTuple<System.Double, System.String> AggregateWeights(System.Collections.Generic.IReadOnlyList<AgentEval.Evals.EvalResult> results, System.Collections.Generic.IReadOnlyList<System.Double> weights)
-class AgentEval.Evals.CompositeEval
+sealed class AgentEval.Evals.CompositeEval : AgentEval.Evals.IEval
     AgentEval.Evals.CompositeEval WithComponents(System.Collections.Generic.IReadOnlyList<AgentEval.Evals.EvalComponent> components)
     AgentEval.Evals.IAggregationStrategy Aggregation { get; }
     System.Boolean SeverityCapsThreshold { get; init; }
@@ -975,7 +986,7 @@ static class AgentEval.Evals.CompositeEvalsServiceExtensions
     static Microsoft.Extensions.DependencyInjection.IServiceCollection AddCompositeEvals(Microsoft.Extensions.DependencyInjection.IServiceCollection services)
 static class AgentEval.Evals.CostRollup
     static System.ValueTuple<System.Double, System.Boolean> Aggregate(System.Collections.Generic.IEnumerable<AgentEval.Evals.EvalResult> results)
-class AgentEval.Evals.DecisionEval [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
+sealed class AgentEval.Evals.DecisionEval : AgentEval.Evals.AtomicEval, AgentEval.Evals.IEval [Experimental(AGENTEVAL_DECISIONS_PREVIEW001)]
     System.Double PassThreshold { get; }
     System.String Instructions { get; }
     System.String Reference { get; }
@@ -988,13 +999,13 @@ static class AgentEval.Evals.EvalInputTraceAccessor
     static AgentEval.Tracing.AgentTrace GetTrace(AgentEval.Evals.EvalInput input)
     static System.Collections.Generic.IReadOnlyList<AgentEval.Evals.ToolCall> ToolCallsFrom(AgentEval.Tracing.AgentTrace trace)
     static System.Collections.Generic.IReadOnlyList<AgentEval.Evals.ToolDefinition> ToolDefinitionsFrom(AgentEval.Tracing.AgentTrace trace)
-class AgentEval.Evals.EvalRegistration
+sealed class AgentEval.Evals.EvalRegistration
     System.Func<AgentEval.Core.IEvaluator, System.String, AgentEval.Evals.IEval> Factory { get; }
     System.String Key { get; }
     System.String OwningAssemblyName { get; }
     System.Type EvalType { get; }
     ctor(System.String key, System.Type evalType, System.Func<AgentEval.Core.IEvaluator, System.String, AgentEval.Evals.IEval> factory, System.String owningAssemblyName = null)
-class AgentEval.Evals.EvalRegistry
+sealed class AgentEval.Evals.EvalRegistry : AgentEval.Evals.IEvalRegistry
     AgentEval.Evals.EvalRegistration TryGet(System.String key)
     AgentEval.Evals.IEval Resolve(System.String key, AgentEval.Core.IEvaluator judge, System.String judgeModel)
     System.Collections.Generic.IReadOnlyList<AgentEval.Evals.EvalRegistration> All { get; }
@@ -1004,7 +1015,7 @@ class AgentEval.Evals.EvalRegistry
 static class AgentEval.Evals.EvalResultPersistence
     static AgentEval.Evals.EvalResult FromScenarioResult(AgentEval.Output.ScenarioResult sr)
     static AgentEval.Output.ScenarioResult ToScenarioResult(AgentEval.Evals.EvalResult result, System.String scenarioId, System.String scenarioName, System.Collections.Generic.IReadOnlyList<AgentEval.Output.AssertionResult> assertions = null, System.String input = null, System.String subjectModel = null)
-class AgentEval.Evals.EvaluatorCardRegistry
+sealed class AgentEval.Evals.EvaluatorCardRegistry
     AgentEval.Evals.EvaluatorCard Get(System.String key)
     System.Collections.Generic.IEnumerable<AgentEval.Evals.EvaluatorCard> List(System.String category = null, AgentEval.Evals.EvaluatorCostTier? costTier = null)
     System.Collections.Generic.IReadOnlyList<System.String> ScannedAssemblies { get; }
@@ -1012,7 +1023,7 @@ class AgentEval.Evals.EvaluatorCardRegistry
     const System.String ResourceInfix
     ctor(System.Collections.Generic.IEnumerable<System.Reflection.Assembly> sources)
     ctor(System.Reflection.Assembly[] sources)
-class AgentEval.Evals.F1ScoreEval
+sealed class AgentEval.Evals.F1ScoreEval : AgentEval.Evals.AtomicCodeEval, AgentEval.Evals.IEval
     ctor(System.Double passThreshold = 0.5, System.String groundTruth = null)
 interface AgentEval.Evals.IEvalRegistry
     AgentEval.Evals.EvalRegistration TryGet(System.String key)
@@ -1023,20 +1034,20 @@ enum AgentEval.Evals.JudgeToolData
     None
     ToolCalls
     ToolDefinitions
-class AgentEval.Evals.MajorityVoteAggregation
+sealed class AgentEval.Evals.MajorityVoteAggregation : AgentEval.Evals.IAggregationStrategy
     System.String Name { get; }
     System.ValueTuple<System.Double, System.String> Aggregate(System.Collections.Generic.IReadOnlyList<AgentEval.Evals.EvalResult> results, System.Collections.Generic.IReadOnlyList<AgentEval.Evals.EvalComponent> components)
     ctor()
     static AgentEval.Evals.IAggregationStrategy Instance { get; }
     static System.String WinningLabel(System.Collections.Generic.IReadOnlyList<AgentEval.Evals.EvalResult> voting)
     static System.ValueTuple<System.Double, System.String> AggregateWeights(System.Collections.Generic.IReadOnlyList<AgentEval.Evals.EvalResult> results, System.Collections.Generic.IReadOnlyList<System.Double> weights)
-class AgentEval.Evals.MinAggregation
+sealed class AgentEval.Evals.MinAggregation : AgentEval.Evals.IAggregationStrategy
     System.String Name { get; }
     System.ValueTuple<System.Double, System.String> Aggregate(System.Collections.Generic.IReadOnlyList<AgentEval.Evals.EvalResult> results, System.Collections.Generic.IReadOnlyList<AgentEval.Evals.EvalComponent> components)
     ctor()
     static AgentEval.Evals.IAggregationStrategy Instance { get; }
     static System.ValueTuple<System.Double, System.String> AggregateWeights(System.Collections.Generic.IReadOnlyList<AgentEval.Evals.EvalResult> results, System.Collections.Generic.IReadOnlyList<System.Double> weights)
-class AgentEval.Evals.MultiJudgeWrapper
+sealed class AgentEval.Evals.MultiJudgeWrapper : AgentEval.Evals.IEval
     AgentEval.Evals.IAggregationStrategy Aggregation { get; }
     System.Collections.Generic.IReadOnlyList<AgentEval.Evals.EvalComponent> Judges { get; }
     System.Double? Threshold { get; }
@@ -1052,60 +1063,60 @@ static class AgentEval.Evals.ObservationAdapters
     static AgentEval.Evals.Meta.Observation ToObservation(Microsoft.Extensions.AI.Evaluation.EvaluationResult result, System.String caseId, System.String armId, System.String metricName = null)
 static class AgentEval.Evals.SeverityRollup
     static System.String Max(System.Collections.Generic.IEnumerable<System.String> severities)
-class AgentEval.Evals.WeightedMedianAggregation
+sealed class AgentEval.Evals.WeightedMedianAggregation : AgentEval.Evals.IAggregationStrategy
     System.String Name { get; }
     System.ValueTuple<System.Double, System.String> Aggregate(System.Collections.Generic.IReadOnlyList<AgentEval.Evals.EvalResult> results, System.Collections.Generic.IReadOnlyList<AgentEval.Evals.EvalComponent> components)
     ctor()
     static AgentEval.Evals.IAggregationStrategy Instance { get; }
     static System.ValueTuple<System.Double, System.String> AggregateWeights(System.Collections.Generic.IReadOnlyList<AgentEval.Evals.EvalResult> results, System.Collections.Generic.IReadOnlyList<System.Double> weights)
-class AgentEval.Evals.WeightedSumAggregation
+sealed class AgentEval.Evals.WeightedSumAggregation : AgentEval.Evals.IAggregationStrategy
     System.String Name { get; }
     System.ValueTuple<System.Double, System.String> Aggregate(System.Collections.Generic.IReadOnlyList<AgentEval.Evals.EvalResult> results, System.Collections.Generic.IReadOnlyList<AgentEval.Evals.EvalComponent> components)
     ctor()
     static AgentEval.Evals.IAggregationStrategy Instance { get; }
     static System.ValueTuple<System.Double, System.String> AggregateWeights(System.Collections.Generic.IReadOnlyList<AgentEval.Evals.EvalResult> results, System.Collections.Generic.IReadOnlyList<System.Double> weights)
-class AgentEval.Metrics.Agentic.SkillDisclosureEfficiencyMetric
+sealed class AgentEval.Metrics.Agentic.SkillDisclosureEfficiencyMetric : AgentEval.Core.IAgenticMetric, AgentEval.Core.IMetric
     AgentEval.Core.MetricCategory Categories { get; }
     System.Boolean RequiresToolUsage { get; }
     System.String Description { get; }
     System.String Name { get; }
     System.Threading.Tasks.Task<AgentEval.Core.MetricResult> EvaluateAsync(AgentEval.Core.EvaluationContext context, System.Threading.CancellationToken cancellationToken = default)
     ctor(AgentEval.Metrics.Agentic.SkillDisclosureEfficiencyOptions options = null)
-class AgentEval.Metrics.Agentic.SkillDisclosureEfficiencyOptions
+sealed class AgentEval.Metrics.Agentic.SkillDisclosureEfficiencyOptions
     System.Double LoadStormPenaltyFactor { get; init; }
     System.Int32 LoadStormThreshold { get; init; }
     ctor()
-class AgentEval.Metrics.Agentic.TaskCompletionMetric
+class AgentEval.Metrics.Agentic.TaskCompletionMetric : AgentEval.Core.IAgenticMetric, AgentEval.Core.IMetric
     System.Boolean RequiresToolUsage { get; }
     System.String Description { get; }
     System.String Name { get; }
     System.Threading.Tasks.Task<AgentEval.Core.MetricResult> EvaluateAsync(AgentEval.Core.EvaluationContext context, System.Threading.CancellationToken cancellationToken = default)
     ctor(Microsoft.Extensions.AI.IChatClient chatClient, System.Collections.Generic.IEnumerable<System.String> completionCriteria = null)
-class AgentEval.Metrics.Agentic.ToolArgumentsMetric
+class AgentEval.Metrics.Agentic.ToolArgumentsMetric : AgentEval.Core.IAgenticMetric, AgentEval.Core.IMetric
     System.Boolean RequiresToolUsage { get; }
     System.String Description { get; }
     System.String Name { get; }
     System.Threading.Tasks.Task<AgentEval.Core.MetricResult> EvaluateAsync(AgentEval.Core.EvaluationContext context, System.Threading.CancellationToken cancellationToken = default)
     ctor(System.Collections.Generic.Dictionary<System.String, System.Collections.Generic.IEnumerable<System.String>> requiredArgumentsByTool)
-class AgentEval.Metrics.Agentic.ToolEfficiencyMetric
+class AgentEval.Metrics.Agentic.ToolEfficiencyMetric : AgentEval.Core.IAgenticMetric, AgentEval.Core.IMetric
     System.Boolean RequiresToolUsage { get; }
     System.String Description { get; }
     System.String Name { get; }
     System.Threading.Tasks.Task<AgentEval.Core.MetricResult> EvaluateAsync(AgentEval.Core.EvaluationContext context, System.Threading.CancellationToken cancellationToken = default)
     ctor(System.Int32? maxExpectedCalls = null, System.TimeSpan? maxExpectedDuration = null)
-class AgentEval.Metrics.Agentic.ToolSelectionMetric
+class AgentEval.Metrics.Agentic.ToolSelectionMetric : AgentEval.Core.IAgenticMetric, AgentEval.Core.IMetric
     System.Boolean RequiresToolUsage { get; }
     System.String Description { get; }
     System.String Name { get; }
     System.Threading.Tasks.Task<AgentEval.Core.MetricResult> EvaluateAsync(AgentEval.Core.EvaluationContext context, System.Threading.CancellationToken cancellationToken = default)
     ctor(System.Collections.Generic.IEnumerable<System.String> expectedTools, System.Boolean strictOrder = false)
-class AgentEval.Metrics.Agentic.ToolSuccessMetric
+class AgentEval.Metrics.Agentic.ToolSuccessMetric : AgentEval.Core.IAgenticMetric, AgentEval.Core.IMetric
     System.Boolean RequiresToolUsage { get; }
     System.String Description { get; }
     System.String Name { get; }
     System.Threading.Tasks.Task<AgentEval.Core.MetricResult> EvaluateAsync(AgentEval.Core.EvaluationContext context, System.Threading.CancellationToken cancellationToken = default)
     ctor()
-class AgentEval.Metrics.RAG.AnswerCorrectnessMetric
+class AgentEval.Metrics.RAG.AnswerCorrectnessMetric : AgentEval.Core.IMetric, AgentEval.Core.IRAGMetric
     AgentEval.Core.MetricCategory Categories { get; }
     System.Boolean RequiresContext { get; }
     System.Boolean RequiresGroundTruth { get; }
@@ -1113,13 +1124,17 @@ class AgentEval.Metrics.RAG.AnswerCorrectnessMetric
     System.String Name { get; }
     System.Threading.Tasks.Task<AgentEval.Core.MetricResult> EvaluateAsync(AgentEval.Core.EvaluationContext context, System.Threading.CancellationToken cancellationToken = default)
     ctor(Microsoft.Extensions.AI.IChatClient chatClient)
-class AgentEval.Metrics.RAG.AnswerSimilarityMetric
+class AgentEval.Metrics.RAG.AnswerSimilarityMetric : AgentEval.Metrics.RAG.EmbeddingBasedMetric, AgentEval.Core.IMetric, AgentEval.Core.IRAGMetric
     System.Boolean RequiresContext { get; }
     System.Boolean RequiresGroundTruth { get; }
     System.String Description { get; }
     System.String Name { get; }
     ctor(AgentEval.Embeddings.IAgentEvalEmbeddings embeddings, System.Double passingThreshold = 70)
-class AgentEval.Metrics.RAG.ContextPrecisionMetric
+    protected System.Collections.Generic.Dictionary<System.String, System.Object> GetAdditionalMetadata(AgentEval.Core.EvaluationContext context, System.Double similarity, System.Double score)
+    protected System.String GetFailMessage(System.Double similarity)
+    protected System.String GetPassMessage(System.Double similarity)
+    protected System.ValueTuple<System.String, System.String, System.String> GetTextsToCompare(AgentEval.Core.EvaluationContext context)
+class AgentEval.Metrics.RAG.ContextPrecisionMetric : AgentEval.Core.IMetric, AgentEval.Core.IRAGMetric
     AgentEval.Core.MetricCategory Categories { get; }
     System.Boolean RequiresContext { get; }
     System.Boolean RequiresGroundTruth { get; }
@@ -1127,7 +1142,7 @@ class AgentEval.Metrics.RAG.ContextPrecisionMetric
     System.String Name { get; }
     System.Threading.Tasks.Task<AgentEval.Core.MetricResult> EvaluateAsync(AgentEval.Core.EvaluationContext context, System.Threading.CancellationToken cancellationToken = default)
     ctor(Microsoft.Extensions.AI.IChatClient chatClient)
-class AgentEval.Metrics.RAG.ContextRecallMetric
+class AgentEval.Metrics.RAG.ContextRecallMetric : AgentEval.Core.IMetric, AgentEval.Core.IRAGMetric
     AgentEval.Core.MetricCategory Categories { get; }
     System.Boolean RequiresContext { get; }
     System.Boolean RequiresGroundTruth { get; }
@@ -1135,13 +1150,21 @@ class AgentEval.Metrics.RAG.ContextRecallMetric
     System.String Name { get; }
     System.Threading.Tasks.Task<AgentEval.Core.MetricResult> EvaluateAsync(AgentEval.Core.EvaluationContext context, System.Threading.CancellationToken cancellationToken = default)
     ctor(Microsoft.Extensions.AI.IChatClient chatClient)
-class AgentEval.Metrics.RAG.EmbeddingBasedMetric
+abstract class AgentEval.Metrics.RAG.EmbeddingBasedMetric : AgentEval.Core.IMetric, AgentEval.Core.IRAGMetric
     System.Boolean RequiresContext { get; }
     System.Boolean RequiresGroundTruth { get; }
     System.String Description { get; }
     System.String Name { get; }
     System.Threading.Tasks.Task<AgentEval.Core.MetricResult> EvaluateAsync(AgentEval.Core.EvaluationContext context, System.Threading.CancellationToken cancellationToken = default)
-class AgentEval.Metrics.RAG.FaithfulnessMetric
+    protected AgentEval.Embeddings.IAgentEvalEmbeddings Embeddings
+    protected System.Collections.Generic.Dictionary<System.String, System.Object> GetAdditionalMetadata(AgentEval.Core.EvaluationContext context, System.Double similarity, System.Double score)
+    protected System.Double PassingThreshold
+    protected System.String GetFailMessage(System.Double similarity)
+    protected System.String GetPassMessage(System.Double similarity)
+    protected System.ValueTuple<System.String, System.String, System.String> GetTextsToCompare(AgentEval.Core.EvaluationContext context)
+    protected const System.String NotSuppliedSuffix
+    protected ctor(AgentEval.Embeddings.IAgentEvalEmbeddings embeddings, System.Double passingThreshold)
+class AgentEval.Metrics.RAG.FaithfulnessMetric : AgentEval.Core.IMetric, AgentEval.Core.IQualityMetric, AgentEval.Core.IRAGMetric
     AgentEval.Core.MetricCategory Categories { get; }
     System.Boolean RequiresContext { get; }
     System.Boolean RequiresGroundTruth { get; }
@@ -1149,13 +1172,16 @@ class AgentEval.Metrics.RAG.FaithfulnessMetric
     System.String Name { get; }
     System.Threading.Tasks.Task<AgentEval.Core.MetricResult> EvaluateAsync(AgentEval.Core.EvaluationContext context, System.Threading.CancellationToken cancellationToken = default)
     ctor(Microsoft.Extensions.AI.IChatClient chatClient)
-class AgentEval.Metrics.RAG.QueryContextSimilarityMetric
+class AgentEval.Metrics.RAG.QueryContextSimilarityMetric : AgentEval.Metrics.RAG.EmbeddingBasedMetric, AgentEval.Core.IMetric, AgentEval.Core.IRAGMetric
     System.Boolean RequiresContext { get; }
     System.Boolean RequiresGroundTruth { get; }
     System.String Description { get; }
     System.String Name { get; }
     ctor(AgentEval.Embeddings.IAgentEvalEmbeddings embeddings, System.Double passingThreshold = 50)
-class AgentEval.Metrics.RAG.RelevanceMetric
+    protected System.String GetFailMessage(System.Double similarity)
+    protected System.String GetPassMessage(System.Double similarity)
+    protected System.ValueTuple<System.String, System.String, System.String> GetTextsToCompare(AgentEval.Core.EvaluationContext context)
+class AgentEval.Metrics.RAG.RelevanceMetric : AgentEval.Core.IMetric, AgentEval.Core.IQualityMetric, AgentEval.Core.IRAGMetric
     AgentEval.Core.MetricCategory Categories { get; }
     System.Boolean RequiresContext { get; }
     System.Boolean RequiresGroundTruth { get; }
@@ -1163,13 +1189,16 @@ class AgentEval.Metrics.RAG.RelevanceMetric
     System.String Name { get; }
     System.Threading.Tasks.Task<AgentEval.Core.MetricResult> EvaluateAsync(AgentEval.Core.EvaluationContext context, System.Threading.CancellationToken cancellationToken = default)
     ctor(Microsoft.Extensions.AI.IChatClient chatClient)
-class AgentEval.Metrics.RAG.ResponseContextSimilarityMetric
+class AgentEval.Metrics.RAG.ResponseContextSimilarityMetric : AgentEval.Metrics.RAG.EmbeddingBasedMetric, AgentEval.Core.IMetric, AgentEval.Core.IRAGMetric
     System.Boolean RequiresContext { get; }
     System.Boolean RequiresGroundTruth { get; }
     System.String Description { get; }
     System.String Name { get; }
     ctor(AgentEval.Embeddings.IAgentEvalEmbeddings embeddings, System.Double passingThreshold = 50)
-class AgentEval.Metrics.ResponsibleAI.BiasMetric
+    protected System.String GetFailMessage(System.Double similarity)
+    protected System.String GetPassMessage(System.Double similarity)
+    protected System.ValueTuple<System.String, System.String, System.String> GetTextsToCompare(AgentEval.Core.EvaluationContext context)
+class AgentEval.Metrics.ResponsibleAI.BiasMetric : AgentEval.Core.IMetric, AgentEval.Core.ISafetyMetric
     AgentEval.Core.MetricCategory Categories { get; }
     System.Decimal? EstimatedCostPerEvaluation { get; }
     System.String Description { get; }
@@ -1177,7 +1206,7 @@ class AgentEval.Metrics.ResponsibleAI.BiasMetric
     System.Threading.Tasks.Task<AgentEval.Core.MetricResult> EvaluateAsync(AgentEval.Core.EvaluationContext context, System.Threading.CancellationToken cancellationToken = default)
     System.Threading.Tasks.Task<AgentEval.Core.MetricResult> EvaluateCounterfactualAsync(AgentEval.Core.EvaluationContext originalContext, AgentEval.Core.EvaluationContext counterfactualContext, System.String demographicDimension, System.Threading.CancellationToken cancellationToken = default)
     ctor(Microsoft.Extensions.AI.IChatClient chatClient)
-class AgentEval.Metrics.ResponsibleAI.MisinformationMetric
+class AgentEval.Metrics.ResponsibleAI.MisinformationMetric : AgentEval.Core.IMetric, AgentEval.Core.ISafetyMetric
     AgentEval.Core.MetricCategory Categories { get; }
     System.Decimal? EstimatedCostPerEvaluation { get; }
     System.String Description { get; }
@@ -1194,7 +1223,7 @@ enum AgentEval.Metrics.ResponsibleAI.ToxicityCategory
     SelfHarm
     IllegalActivity
     Discrimination
-class AgentEval.Metrics.ResponsibleAI.ToxicityMetric
+class AgentEval.Metrics.ResponsibleAI.ToxicityMetric : AgentEval.Core.IMetric, AgentEval.Core.ISafetyMetric
     AgentEval.Core.MetricCategory Categories { get; }
     System.Decimal? EstimatedCostPerEvaluation { get; }
     System.String Description { get; }
@@ -1202,7 +1231,7 @@ class AgentEval.Metrics.ResponsibleAI.ToxicityMetric
     System.Threading.Tasks.Task<AgentEval.Core.MetricResult> EvaluateAsync(AgentEval.Core.EvaluationContext context, System.Threading.CancellationToken cancellationToken = default)
     ctor()
     ctor(Microsoft.Extensions.AI.IChatClient chatClient, System.Boolean useLlmFallback = true)
-class AgentEval.Metrics.Retrieval.MRRMetric
+class AgentEval.Metrics.Retrieval.MRRMetric : AgentEval.Core.IMetric, AgentEval.Core.IRAGMetric
     AgentEval.Core.MetricCategory Categories { get; }
     System.Boolean RequiresContext { get; }
     System.Boolean RequiresGroundTruth { get; }
@@ -1214,7 +1243,7 @@ class AgentEval.Metrics.Retrieval.MRRMetric
     const System.String RelevantDocumentIdsKey
     const System.String RetrievedDocumentIdsKey
     ctor(System.Int32? maxRank = null, System.Int32 maxPassRank = 3)
-class AgentEval.Metrics.Retrieval.RecallAtKMetric
+class AgentEval.Metrics.Retrieval.RecallAtKMetric : AgentEval.Core.IMetric, AgentEval.Core.IRAGMetric
     AgentEval.Core.MetricCategory Categories { get; }
     System.Boolean RequiresContext { get; }
     System.Boolean RequiresGroundTruth { get; }
@@ -1226,7 +1255,7 @@ class AgentEval.Metrics.Retrieval.RecallAtKMetric
     const System.String RelevantDocumentIdsKey
     const System.String RetrievedDocumentIdsKey
     ctor(System.Int32 k = 10, System.Double passThreshold = 0.7)
-class AgentEval.Metrics.Safety.CoherenceMetric
+class AgentEval.Metrics.Safety.CoherenceMetric : AgentEval.Core.IMetric, AgentEval.Core.IQualityMetric, AgentEval.Core.IRAGMetric
     AgentEval.Core.MetricCategory Categories { get; }
     System.Boolean RequiresContext { get; }
     System.Boolean RequiresGroundTruth { get; }
@@ -1234,7 +1263,7 @@ class AgentEval.Metrics.Safety.CoherenceMetric
     System.String Name { get; }
     System.Threading.Tasks.Task<AgentEval.Core.MetricResult> EvaluateAsync(AgentEval.Core.EvaluationContext context, System.Threading.CancellationToken cancellationToken = default)
     ctor(Microsoft.Extensions.AI.IChatClient chatClient)
-class AgentEval.Metrics.Safety.FluencyMetric
+class AgentEval.Metrics.Safety.FluencyMetric : AgentEval.Core.IMetric, AgentEval.Core.IQualityMetric, AgentEval.Core.IRAGMetric
     AgentEval.Core.MetricCategory Categories { get; }
     System.Boolean RequiresContext { get; }
     System.Boolean RequiresGroundTruth { get; }
@@ -1242,7 +1271,7 @@ class AgentEval.Metrics.Safety.FluencyMetric
     System.String Name { get; }
     System.Threading.Tasks.Task<AgentEval.Core.MetricResult> EvaluateAsync(AgentEval.Core.EvaluationContext context, System.Threading.CancellationToken cancellationToken = default)
     ctor(Microsoft.Extensions.AI.IChatClient chatClient)
-class AgentEval.Metrics.Safety.GroundednessMetric
+class AgentEval.Metrics.Safety.GroundednessMetric : AgentEval.Core.IMetric, AgentEval.Core.IRAGMetric, AgentEval.Core.ISafetyMetric
     AgentEval.Core.MetricCategory Categories { get; }
     System.Boolean RequiresContext { get; }
     System.Boolean RequiresGroundTruth { get; }
@@ -1250,7 +1279,7 @@ class AgentEval.Metrics.Safety.GroundednessMetric
     System.String Name { get; }
     System.Threading.Tasks.Task<AgentEval.Core.MetricResult> EvaluateAsync(AgentEval.Core.EvaluationContext context, System.Threading.CancellationToken cancellationToken = default)
     ctor(Microsoft.Extensions.AI.IChatClient chatClient)
-class AgentEval.Output.ComparabilityAxis
+sealed class AgentEval.Output.ComparabilityAxis : System.IEquatable<AgentEval.Output.ComparabilityAxis>
     AgentEval.Output.ComparabilityAxis <Clone>$()
     AgentEval.Output.ComparabilityAxisState State { get; init; }
     System.Boolean Equals(AgentEval.Output.ComparabilityAxis other)
@@ -1271,7 +1300,7 @@ enum AgentEval.Output.ComparabilityAxisState
 enum AgentEval.Output.ComparisonVerdict
     Comparable
     Incomparable
-class AgentEval.Output.RunComparison
+sealed class AgentEval.Output.RunComparison : System.IEquatable<AgentEval.Output.RunComparison>
     AgentEval.Output.ComparisonVerdict Verdict { get; }
     AgentEval.Output.RunComparison <Clone>$()
     System.Boolean Equals(AgentEval.Output.RunComparison other)
@@ -1294,7 +1323,7 @@ class AgentEval.Output.RunComparison
     ctor(System.Collections.Generic.IReadOnlyList<AgentEval.Output.ScenarioComparison> Scenarios, System.Collections.Generic.IReadOnlyList<System.String> BaselineOnly, System.Collections.Generic.IReadOnlyList<System.String> CandidateOnly, System.Boolean Strict)
     static AgentEval.Output.RunComparison Of(System.Collections.Generic.IReadOnlyList<AgentEval.Output.ScenarioResult> baseline, System.Collections.Generic.IReadOnlyList<AgentEval.Output.ScenarioResult> candidate, System.Boolean strict = false)
     static System.Collections.Generic.IReadOnlyList<System.String> GatingAxes { get; }
-class AgentEval.Output.ScenarioComparison
+sealed class AgentEval.Output.ScenarioComparison : System.IEquatable<AgentEval.Output.ScenarioComparison>
     AgentEval.Output.ScenarioComparison <Clone>$()
     System.Boolean BaselineHasUsableFloor { get; init; }
     System.Boolean BaselinePassed { get; init; }
@@ -1349,7 +1378,7 @@ enum AgentEval.Providers.InferenceProviderSelection
     None
     Explicit
     AutoDetected
-class AgentEval.Providers.InferenceProviderSettings
+sealed class AgentEval.Providers.InferenceProviderSettings : System.IEquatable<AgentEval.Providers.InferenceProviderSettings>
     AgentEval.Providers.InferenceProvider Provider { get; init; }
     AgentEval.Providers.InferenceProviderSelection Selection { get; init; }
     AgentEval.Providers.InferenceProviderSettings <Clone>$()
@@ -1377,7 +1406,7 @@ interface AgentEval.Skills.ISkillBaselineStore
     System.Threading.Tasks.Task<AgentEval.Skills.SkillBaselineSnapshot> LoadAsync(System.String id, System.Threading.CancellationToken ct = default)
     System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<AgentEval.Skills.SkillBaselineSnapshot>> ListAsync(System.Threading.CancellationToken ct = default)
     System.Threading.Tasks.Task<System.String> SaveAsync(AgentEval.Skills.SkillBaselineSnapshot snapshot, System.Threading.CancellationToken ct = default)
-class AgentEval.Skills.JsonFileSkillBaselineStore
+sealed class AgentEval.Skills.JsonFileSkillBaselineStore : AgentEval.Skills.ISkillBaselineStore
     System.Threading.Tasks.Task<AgentEval.Skills.SkillBaselineSnapshot> LoadAsync(System.String id, System.Threading.CancellationToken ct = default)
     System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<AgentEval.Skills.SkillBaselineSnapshot>> ListAsync(System.Threading.CancellationToken ct = default)
     System.Threading.Tasks.Task<System.String> SaveAsync(AgentEval.Skills.SkillBaselineSnapshot snapshot, System.Threading.CancellationToken ct = default)
@@ -1385,7 +1414,7 @@ class AgentEval.Skills.JsonFileSkillBaselineStore
 static class AgentEval.Skills.RawSkillDirectoryScanner
     static System.Boolean TryFindSkillMdFile(System.String directory, out System.String skillMdPath)
     static System.Collections.Generic.IReadOnlyList<System.String> FindCandidateSkillDirectories(System.String rootPath)
-class AgentEval.Skills.RawSkillFrontmatter
+sealed class AgentEval.Skills.RawSkillFrontmatter : System.IEquatable<AgentEval.Skills.RawSkillFrontmatter>
     AgentEval.Skills.RawSkillFrontmatter <Clone>$()
     System.Boolean Equals(AgentEval.Skills.RawSkillFrontmatter other)
     System.Boolean Equals(System.Object obj)
@@ -1403,7 +1432,7 @@ enum AgentEval.Skills.Severity
     Low
     Medium
     High
-class AgentEval.Skills.SkillBaselineEntry
+sealed class AgentEval.Skills.SkillBaselineEntry : System.IEquatable<AgentEval.Skills.SkillBaselineEntry>
     AgentEval.Skills.SkillBaselineEntry <Clone>$()
     AgentEval.Skills.SkillSourceKind SourceKind { get; init; }
     System.Boolean Equals(AgentEval.Skills.SkillBaselineEntry other)
@@ -1420,7 +1449,7 @@ class AgentEval.Skills.SkillBaselineEntry
     System.String ToString()
     System.Void Deconstruct(out System.String Name, out AgentEval.Skills.SkillSourceKind SourceKind, out System.String RelativePath, out System.String StructuralFingerprint, out System.String ContentHash, out System.String Source, out System.String SourceUrl, out System.String Ref, out System.Collections.Generic.IReadOnlyList<AgentEval.Skills.SkillComplianceFinding> ComplianceFindings)
     ctor(System.String Name, AgentEval.Skills.SkillSourceKind SourceKind, System.String RelativePath, System.String StructuralFingerprint, System.String ContentHash, System.String Source, System.String SourceUrl, System.String Ref, System.Collections.Generic.IReadOnlyList<AgentEval.Skills.SkillComplianceFinding> ComplianceFindings)
-class AgentEval.Skills.SkillBaselineSnapshot
+sealed class AgentEval.Skills.SkillBaselineSnapshot : System.IEquatable<AgentEval.Skills.SkillBaselineSnapshot>
     AgentEval.Skills.SkillBaselineSnapshot <Clone>$()
     System.Boolean Equals(AgentEval.Skills.SkillBaselineSnapshot other)
     System.Boolean Equals(System.Object obj)
@@ -1432,7 +1461,7 @@ class AgentEval.Skills.SkillBaselineSnapshot
     System.String ToString()
     System.Void Deconstruct(out System.String Id, out System.DateTimeOffset CapturedAt, out System.String ScannedRoot, out System.Collections.Generic.IReadOnlyList<AgentEval.Skills.SkillBaselineEntry> Skills)
     ctor(System.String Id, System.DateTimeOffset CapturedAt, System.String ScannedRoot, System.Collections.Generic.IReadOnlyList<AgentEval.Skills.SkillBaselineEntry> Skills)
-class AgentEval.Skills.SkillComplianceFinding
+sealed class AgentEval.Skills.SkillComplianceFinding : System.IEquatable<AgentEval.Skills.SkillComplianceFinding>
     AgentEval.Skills.Severity Severity { get; init; }
     AgentEval.Skills.SkillComplianceFinding <Clone>$()
     AgentEval.Skills.SkillComplianceRule Rule { get; init; }
@@ -1445,7 +1474,7 @@ class AgentEval.Skills.SkillComplianceFinding
     System.String ToString()
     System.Void Deconstruct(out System.String SkillName, out AgentEval.Skills.SkillComplianceRule Rule, out AgentEval.Skills.Severity Severity, out System.String Message, out System.String Field)
     ctor(System.String SkillName, AgentEval.Skills.SkillComplianceRule Rule, AgentEval.Skills.Severity Severity, System.String Message, System.String Field)
-class AgentEval.Skills.SkillComplianceReport
+sealed class AgentEval.Skills.SkillComplianceReport : System.IEquatable<AgentEval.Skills.SkillComplianceReport>
     AgentEval.Skills.SkillComplianceReport <Clone>$()
     AgentEval.Skills.SkillCoverageSummary Coverage { get; init; }
     System.Boolean Equals(AgentEval.Skills.SkillComplianceReport other)
@@ -1481,7 +1510,7 @@ static class AgentEval.Skills.SkillComplianceValidator
     static System.Collections.Generic.IReadOnlyList<AgentEval.Skills.SkillComplianceFinding> ValidateSingle(AgentEval.Skills.SkillManifest skill, AgentEval.Skills.SkillScanOptions options = null)
 static class AgentEval.Skills.SkillContentHasher
     static System.String HashSkillFolder(System.String skillFolderAbsolutePath)
-class AgentEval.Skills.SkillCoverageSummary
+sealed class AgentEval.Skills.SkillCoverageSummary : System.IEquatable<AgentEval.Skills.SkillCoverageSummary>
     AgentEval.Skills.SkillCoverageSummary <Clone>$()
     System.Boolean Equals(AgentEval.Skills.SkillCoverageSummary other)
     System.Boolean Equals(System.Object obj)
@@ -1494,7 +1523,7 @@ class AgentEval.Skills.SkillCoverageSummary
     System.String ToString()
     System.Void Deconstruct(out System.Int32 SkillCount, out System.Int32 WithResources, out System.Int32 WithScripts, out System.Collections.Generic.IReadOnlyDictionary<System.String, System.Int32> StageHistogram, out System.Int32 SilentlyExcludedCount)
     ctor(System.Int32 SkillCount, System.Int32 WithResources, System.Int32 WithScripts, System.Collections.Generic.IReadOnlyDictionary<System.String, System.Int32> StageHistogram, System.Int32 SilentlyExcludedCount = 0)
-class AgentEval.Skills.SkillManifest
+sealed class AgentEval.Skills.SkillManifest : System.IEquatable<AgentEval.Skills.SkillManifest>
     AgentEval.Skills.SkillManifest <Clone>$()
     AgentEval.Skills.SkillSourceKind SourceKind { get; init; }
     System.Boolean Equals(AgentEval.Skills.SkillManifest other)
@@ -1512,7 +1541,7 @@ class AgentEval.Skills.SkillManifest
     System.String ToString()
     System.Void Deconstruct(out System.String Name, out System.String Description, out System.Collections.Generic.IReadOnlyList<System.String> ResourceNames, out System.Collections.Generic.IReadOnlyList<System.String> ScriptNames, out System.Int32? CompatibilityLength, out System.Collections.Generic.IReadOnlyList<System.String> AllowedTools, out AgentEval.Skills.SkillSourceKind SourceKind, out System.String ParentDirectoryName)
     ctor(System.String Name, System.String Description, System.Collections.Generic.IReadOnlyList<System.String> ResourceNames, System.Collections.Generic.IReadOnlyList<System.String> ScriptNames, System.Int32? CompatibilityLength, System.Collections.Generic.IReadOnlyList<System.String> AllowedTools, AgentEval.Skills.SkillSourceKind SourceKind, System.String ParentDirectoryName)
-class AgentEval.Skills.SkillManifestBaseline
+sealed class AgentEval.Skills.SkillManifestBaseline : System.IEquatable<AgentEval.Skills.SkillManifestBaseline>
     AgentEval.Skills.SkillManifestBaseline <Clone>$()
     System.Boolean Equals(AgentEval.Skills.SkillManifestBaseline other)
     System.Boolean Equals(System.Object obj)
@@ -1533,14 +1562,14 @@ static class AgentEval.Skills.SkillManifestPoisoningGate
     static System.Collections.Generic.IReadOnlyList<ManifestDriftFinding> CheckDrift(System.Collections.Generic.IReadOnlyList<AgentEval.Skills.SkillManifest> currentSkills, AgentEval.Skills.SkillManifestBaseline baseline)
     static System.String CanonicalContent(AgentEval.Skills.SkillManifest manifest)
     static System.String Fingerprint(AgentEval.Skills.SkillManifest manifest)
-class AgentEval.Skills.SkillScanOptions
+sealed class AgentEval.Skills.SkillScanOptions
     System.Boolean EnforceNameMatchesDirectory { get; init; }
     System.Boolean FlagScriptsForGovernance { get; init; }
     System.Boolean FlagUntrustedResourceSources { get; init; }
     ctor()
 static class AgentEval.Skills.SkillSecurityIndex
     static AgentEval.Skills.SkillSecurityIndexResult Compute(AgentEval.Skills.SkillSecurityIndexInputs inputs)
-class AgentEval.Skills.SkillSecurityIndexInputs
+sealed class AgentEval.Skills.SkillSecurityIndexInputs : System.IEquatable<AgentEval.Skills.SkillSecurityIndexInputs>
     AgentEval.Core.MetricResult Efficiency { get; init; }
     AgentEval.Skills.SkillComplianceReport Compliance { get; init; }
     AgentEval.Skills.SkillSecurityIndexInputs <Clone>$()
@@ -1551,7 +1580,7 @@ class AgentEval.Skills.SkillSecurityIndexInputs
     System.String ToString()
     System.Void Deconstruct(out AgentEval.Skills.SkillComplianceReport Compliance, out AgentEval.Core.MetricResult Efficiency, out AgentEval.Skills.SkillSecurityOutcome Security)
     ctor(AgentEval.Skills.SkillComplianceReport Compliance, AgentEval.Core.MetricResult Efficiency, AgentEval.Skills.SkillSecurityOutcome Security)
-class AgentEval.Skills.SkillSecurityIndexResult
+sealed class AgentEval.Skills.SkillSecurityIndexResult : System.IEquatable<AgentEval.Skills.SkillSecurityIndexResult>
     AgentEval.Skills.SkillSecurityIndexResult <Clone>$()
     System.Boolean Equals(AgentEval.Skills.SkillSecurityIndexResult other)
     System.Boolean Equals(System.Object obj)
@@ -1565,7 +1594,7 @@ class AgentEval.Skills.SkillSecurityIndexResult
     System.String ToString()
     System.Void Deconstruct(out System.Double? Score, out System.Int32 AxesMeasured, out System.Double? ComplianceComponent, out System.Double? EfficiencyComponent, out System.Double? SecurityComponent, out System.String Explanation)
     ctor(System.Double? Score, System.Int32 AxesMeasured, System.Double? ComplianceComponent, System.Double? EfficiencyComponent, System.Double? SecurityComponent, System.String Explanation)
-class AgentEval.Skills.SkillSecurityOutcome
+sealed class AgentEval.Skills.SkillSecurityOutcome : System.IEquatable<AgentEval.Skills.SkillSecurityOutcome>
     AgentEval.Skills.SkillSecurityOutcome <Clone>$()
     System.Boolean Equals(AgentEval.Skills.SkillSecurityOutcome other)
     System.Boolean Equals(System.Object obj)
@@ -1592,7 +1621,7 @@ static class AgentEval.Skills.SkillToolNames
     const System.String ScriptNameArg
     const System.String SkillNameArg
     static System.Collections.Generic.IReadOnlyList<System.String> All
-class AgentEval.Snapshots.GoldenToolCall
+sealed class AgentEval.Snapshots.GoldenToolCall : System.IEquatable<AgentEval.Snapshots.GoldenToolCall>
     AgentEval.Snapshots.GoldenToolCall <Clone>$()
     System.Boolean Equals(AgentEval.Snapshots.GoldenToolCall other)
     System.Boolean Equals(System.Object obj)
@@ -1602,7 +1631,7 @@ class AgentEval.Snapshots.GoldenToolCall
     System.String ToString()
     System.Void Deconstruct(out System.String Name, out System.String Arguments)
     ctor(System.String Name, System.String Arguments)
-class AgentEval.Snapshots.GoldenTrace
+sealed class AgentEval.Snapshots.GoldenTrace : System.IEquatable<AgentEval.Snapshots.GoldenTrace>
     AgentEval.Snapshots.GoldenTrace <Clone>$()
     System.Boolean Equals(AgentEval.Snapshots.GoldenTrace other)
     System.Boolean Equals(System.Object obj)
@@ -1618,7 +1647,7 @@ class AgentEval.Snapshots.GoldenTrace
     ctor(System.Int32 SchemaVersion, System.DateTimeOffset CreatedAt, System.String Model, System.Collections.Generic.IReadOnlyList<AgentEval.Snapshots.GoldenTraceCase> Cases)
     static AgentEval.Snapshots.GoldenTrace FromResults(System.Collections.Generic.IEnumerable<AgentEval.Models.TestResult> results, System.String model = null, System.DateTimeOffset? createdAt = null)
     static System.Threading.Tasks.Task<AgentEval.Snapshots.GoldenTrace> LoadAsync(System.String path, System.Threading.CancellationToken ct = default)
-class AgentEval.Snapshots.GoldenTraceCase
+sealed class AgentEval.Snapshots.GoldenTraceCase : System.IEquatable<AgentEval.Snapshots.GoldenTraceCase>
     AgentEval.Snapshots.GoldenTraceCase <Clone>$()
     System.Boolean Equals(AgentEval.Snapshots.GoldenTraceCase other)
     System.Boolean Equals(System.Object obj)
@@ -1633,7 +1662,7 @@ class AgentEval.Snapshots.GoldenTraceCase
     ctor(System.String Name, System.Boolean Passed, System.Int32 Score, System.String Output, System.Collections.Generic.IReadOnlyList<AgentEval.Snapshots.GoldenToolCall> ToolCalls)
 static class AgentEval.Snapshots.GoldenTraceComparer
     static AgentEval.Snapshots.GoldenTraceComparison Compare(AgentEval.Snapshots.GoldenTrace golden, AgentEval.Snapshots.GoldenTrace current)
-class AgentEval.Snapshots.GoldenTraceComparison
+sealed class AgentEval.Snapshots.GoldenTraceComparison : System.IEquatable<AgentEval.Snapshots.GoldenTraceComparison>
     AgentEval.Snapshots.GoldenTraceComparison <Clone>$()
     System.Boolean Equals(AgentEval.Snapshots.GoldenTraceComparison other)
     System.Boolean Equals(System.Object obj)
@@ -1645,11 +1674,11 @@ class AgentEval.Snapshots.GoldenTraceComparison
     System.String ToString()
     System.Void Deconstruct(out System.Collections.Generic.IReadOnlyList<AgentEval.Snapshots.TraceCaseComparison> Cases)
     ctor(System.Collections.Generic.IReadOnlyList<AgentEval.Snapshots.TraceCaseComparison> Cases)
-class AgentEval.Snapshots.SnapshotComparer
+class AgentEval.Snapshots.SnapshotComparer : AgentEval.Snapshots.ISnapshotComparer
     AgentEval.Snapshots.SnapshotComparisonResult Compare(System.String expected, System.String actual)
     System.String ApplyScrubbing(System.String value)
     ctor(AgentEval.Snapshots.SnapshotOptions options = null)
-class AgentEval.Snapshots.SnapshotStore
+class AgentEval.Snapshots.SnapshotStore : AgentEval.Snapshots.ISnapshotStore
     System.Boolean Delete(System.String testName, System.String suffix = "")
     System.Boolean Exists(System.String testName, System.String suffix = "")
     System.Collections.Generic.IReadOnlyList<System.String> ListSnapshots()
@@ -1658,7 +1687,7 @@ class AgentEval.Snapshots.SnapshotStore
     System.Threading.Tasks.Task SaveAsync<T>(System.String testName, T value, System.String suffix = "", System.Threading.CancellationToken cancellationToken = default)
     System.Threading.Tasks.Task<T> LoadAsync<T>(System.String testName, System.String suffix = "", System.Threading.CancellationToken cancellationToken = default)
     ctor(System.String basePath)
-class AgentEval.Snapshots.TraceCaseComparison
+sealed class AgentEval.Snapshots.TraceCaseComparison : System.IEquatable<AgentEval.Snapshots.TraceCaseComparison>
     AgentEval.Snapshots.TraceCaseComparison <Clone>$()
     AgentEval.Snapshots.TraceChange Change { get; init; }
     System.Boolean Equals(AgentEval.Snapshots.TraceCaseComparison other)
@@ -1679,7 +1708,7 @@ enum AgentEval.Snapshots.TraceChange
     Unchanged
     Added
     Removed
-class AgentEval.Testing.AssertionResult
+class AgentEval.Testing.AssertionResult : System.IEquatable<AgentEval.Testing.AssertionResult>
     AgentEval.Output.AssertionResult ToAssertionResult()
     AgentEval.Testing.AssertionResult <Clone>$()
     System.Boolean Equals(AgentEval.Testing.AssertionResult other)
@@ -1691,7 +1720,7 @@ class AgentEval.Testing.AssertionResult
     System.String ToString()
     System.Void Deconstruct(out System.String Name, out System.Boolean Passed, out System.String Message)
     ctor(System.String Name, System.Boolean Passed, System.String Message = null)
-class AgentEval.Testing.ConversationAggregateStats
+class AgentEval.Testing.ConversationAggregateStats : System.IEquatable<AgentEval.Testing.ConversationAggregateStats>
     AgentEval.Testing.ConversationAggregateStats <Clone>$()
     System.Boolean Equals(AgentEval.Testing.ConversationAggregateStats other)
     System.Boolean Equals(System.Object obj)
@@ -1764,7 +1793,7 @@ class AgentEval.Testing.ConversationalTestCaseBuilder
     AgentEval.Testing.ConversationalTestCaseBuilder WithMaxDuration(System.TimeSpan duration)
     AgentEval.Testing.ConversationalTestCaseBuilder WithMetadata(System.String key, System.Object value)
     AgentEval.Testing.ConversationalTestCaseBuilder WithSystemPrompt(System.String prompt)
-class AgentEval.Testing.FakeChatClient
+class AgentEval.Testing.FakeChatClient : Microsoft.Extensions.AI.IChatClient, System.IDisposable
     AgentEval.Testing.FakeChatClient WithResponse(System.String response)
     System.Boolean ThrowOnNextCall { get; set; }
     System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.AI.ChatResponseUpdate> GetStreamingResponseAsync(System.Collections.Generic.IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages, Microsoft.Extensions.AI.ChatOptions options = null, System.Threading.CancellationToken cancellationToken = default)
@@ -1776,11 +1805,11 @@ class AgentEval.Testing.FakeChatClient
     System.Threading.Tasks.Task<Microsoft.Extensions.AI.ChatResponse> GetResponseAsync(System.Collections.Generic.IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages, Microsoft.Extensions.AI.ChatOptions options = null, System.Threading.CancellationToken cancellationToken = default)
     System.Void Dispose()
     ctor(System.String[] responses)
-class AgentEval.Testing.FakeEmbeddings
+sealed class AgentEval.Testing.FakeEmbeddings : AgentEval.Embeddings.IAgentEvalEmbeddings
     System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<System.ReadOnlyMemory<System.Single>>> GetEmbeddingsAsync(System.Collections.Generic.IEnumerable<System.String> texts, System.Threading.CancellationToken cancellationToken = default)
     System.Threading.Tasks.Task<System.ReadOnlyMemory<System.Single>> GetEmbeddingAsync(System.String text, System.Threading.CancellationToken cancellationToken = default)
     ctor(System.Int32 dimensions = 1536)
-class AgentEval.Testing.ScriptedChatClient
+sealed class AgentEval.Testing.ScriptedChatClient : Microsoft.Extensions.AI.IChatClient, System.IDisposable
     AgentEval.Testing.ScriptedChatClient Add(AgentEval.Testing.ScriptedTurn turn)
     AgentEval.Testing.ScriptedChatClient AddParallelToolCalls(System.ValueTuple<System.String, System.String, System.Collections.Generic.IDictionary<System.String, System.Object>>[] calls)
     AgentEval.Testing.ScriptedChatClient AddText(System.String text, System.Int64? inTok = null, System.Int64? outTok = null)
@@ -1795,12 +1824,12 @@ class AgentEval.Testing.ScriptedChatClient
     System.Void Dispose()
     ctor()
     static AgentEval.Testing.ScriptedChatClient FromFixture(System.Collections.Generic.IEnumerable<AgentEval.Testing.ScriptedFixtureTurn> turns)
-class AgentEval.Testing.ScriptedFixtureToolCall
+sealed class AgentEval.Testing.ScriptedFixtureToolCall
     System.Collections.Generic.IDictionary<System.String, System.Object> ToolArgs { get; init; }
     System.String ToolCallId { get; init; }
     System.String ToolName { get; init; }
     ctor()
-class AgentEval.Testing.ScriptedFixtureTurn
+sealed class AgentEval.Testing.ScriptedFixtureTurn
     AgentEval.Testing.ScriptedTurn ToScriptedTurn()
     System.Collections.Generic.IDictionary<System.String, System.Object> ToolArgs { get; init; }
     System.Collections.Generic.IReadOnlyList<AgentEval.Testing.ScriptedFixtureToolCall> ToolCalls { get; init; }
@@ -1812,12 +1841,12 @@ class AgentEval.Testing.ScriptedFixtureTurn
     System.String ToolCallId { get; init; }
     System.String ToolName { get; init; }
     ctor()
-class AgentEval.Testing.ScriptedToolCall
+sealed class AgentEval.Testing.ScriptedToolCall
     System.Collections.Generic.IDictionary<System.String, System.Object> ToolArgs { get; init; }
     System.String ToolCallId { get; init; }
     System.String ToolName { get; init; }
     ctor()
-class AgentEval.Testing.ScriptedTurn
+sealed class AgentEval.Testing.ScriptedTurn
     Microsoft.Extensions.AI.ChatFinishReason? FinishReason { get; init; }
     System.Collections.Generic.IDictionary<System.String, System.Object> ToolArgs { get; init; }
     System.Collections.Generic.IReadOnlyList<AgentEval.Testing.ScriptedToolCall> ToolCalls { get; init; }
@@ -1828,7 +1857,7 @@ class AgentEval.Testing.ScriptedTurn
     System.String ToolCallId { get; init; }
     System.String ToolName { get; init; }
     ctor()
-class AgentEval.Testing.ToolCallInfo
+class AgentEval.Testing.ToolCallInfo : System.IEquatable<AgentEval.Testing.ToolCallInfo>
     AgentEval.Testing.ToolCallInfo <Clone>$()
     System.Boolean Equals(AgentEval.Testing.ToolCallInfo other)
     System.Boolean Equals(System.Object obj)
@@ -1839,7 +1868,7 @@ class AgentEval.Testing.ToolCallInfo
     System.String ToString()
     System.Void Deconstruct(out System.String Name, out System.Collections.Generic.IReadOnlyDictionary<System.String, System.Object> Arguments, out System.String Id)
     ctor(System.String Name, System.Collections.Generic.IReadOnlyDictionary<System.String, System.Object> Arguments = null, System.String Id = null)
-class AgentEval.Testing.Turn
+class AgentEval.Testing.Turn : System.IEquatable<AgentEval.Testing.Turn>
     AgentEval.Testing.Turn <Clone>$()
     System.Boolean Equals(AgentEval.Testing.Turn other)
     System.Boolean Equals(System.Object obj)
@@ -1857,7 +1886,7 @@ class AgentEval.Testing.Turn
     static AgentEval.Testing.Turn User(System.String content)
 static class AgentEval.Tracing.AgentBoundaryTraceBuilder
     static AgentEval.Tracing.AgentTrace FromAgentResponse(System.Collections.Generic.IEnumerable<Microsoft.Extensions.AI.ChatMessage> finalMessages, Microsoft.Extensions.AI.UsageDetails usage = null, System.String finishReason = null, System.String agentName = null, System.Int64? durationMs = null)
-class AgentEval.Tracing.AgentTrace
+sealed class AgentEval.Tracing.AgentTrace
     AgentEval.Tracing.TracePerformance Performance { get; set; }
     System.Collections.Generic.Dictionary<System.String, System.Object> Metadata { get; set; }
     System.Collections.Generic.List<AgentEval.Tracing.TraceEntry> Entries { get; set; }
@@ -1870,7 +1899,7 @@ class AgentEval.Tracing.AgentTrace
     System.Void AddEntry(AgentEval.Tracing.TraceEntry entry)
     System.Void SetMetadata(System.String key, System.Object value)
     ctor()
-class AgentEval.Tracing.ChatExecutionResult
+sealed class AgentEval.Tracing.ChatExecutionResult
     AgentEval.Models.PerformanceMetrics AggregatePerformance { get; init; }
     AgentEval.Models.ToolUsageReport CombinedToolUsage { get; init; }
     System.Boolean AllTurnsSucceeded { get; }
@@ -1889,7 +1918,7 @@ enum AgentEval.Tracing.ChatRole
     User
     Assistant
     System
-class AgentEval.Tracing.ChatTraceRecorder
+sealed class AgentEval.Tracing.ChatTraceRecorder : System.IAsyncDisposable
     AgentEval.Tracing.AgentTrace ToAgentTrace()
     AgentEval.Tracing.ChatExecutionResult GetResult()
     System.Int32 TurnCount { get; }
@@ -1904,7 +1933,7 @@ class AgentEval.Tracing.ChatTraceRecorderOptions
     System.Boolean TrackToolCalls { get; set; }
     System.Int32 MaxTurns { get; set; }
     ctor()
-class AgentEval.Tracing.ChatTurn
+sealed class AgentEval.Tracing.ChatTurn
     AgentEval.Tracing.ChatRole Role { get; init; }
     AgentEval.Tracing.TraceError Error { get; init; }
     AgentEval.Tracing.TraceTokenUsage TokenUsage { get; init; }
@@ -1922,7 +1951,7 @@ static class AgentEval.Tracing.GateMetadataReader
     static System.String PolicyFromKey(System.String key)
     static System.String ReadField(System.Object value, System.String field)
     static System.String StageFromKey(System.String key)
-class AgentEval.Tracing.GlassBoxEvidence
+sealed class AgentEval.Tracing.GlassBoxEvidence : System.IEquatable<AgentEval.Tracing.GlassBoxEvidence>
     AgentEval.Tracing.GlassBoxEvidence <Clone>$()
     System.Boolean Equals(AgentEval.Tracing.GlassBoxEvidence other)
     System.Boolean Equals(System.Object obj)
@@ -1956,11 +1985,11 @@ enum AgentEval.Tracing.SamplePreset
     Smoke
     Standard
     AuditGrade
-class AgentEval.Tracing.ToolCorrelationScope
+sealed class AgentEval.Tracing.ToolCorrelationScope : System.IDisposable
     System.Void Dispose()
     ctor(System.String correlationId)
     static System.String Current { get; }
-class AgentEval.Tracing.ToolDefinitionDeduplicator
+sealed class AgentEval.Tracing.ToolDefinitionDeduplicator
     System.Collections.Generic.List<AgentEval.Tracing.TraceToolDefinition> Process(System.Collections.Generic.List<AgentEval.Tracing.TraceToolDefinition> defs)
     ctor(System.Boolean enabled)
 class AgentEval.Tracing.TraceEntry
@@ -2011,7 +2040,7 @@ class AgentEval.Tracing.TracePerformance
     System.Int64 TotalDurationMs { get; set; }
     System.Int64? TimeToFirstTokenMs { get; set; }
     ctor()
-class AgentEval.Tracing.TraceRecordingAgent
+sealed class AgentEval.Tracing.TraceRecordingAgent : AgentEval.Core.IEvaluableAgent, AgentEval.Core.IStreamableAgent, System.IAsyncDisposable
     AgentEval.Tracing.AgentTrace Trace { get; }
     System.Collections.Generic.IAsyncEnumerable<AgentEval.Core.AgentResponseChunk> InvokeStreamingAsync(System.String prompt, System.Threading.CancellationToken cancellationToken = default)
     System.String Name { get; }
@@ -2020,7 +2049,7 @@ class AgentEval.Tracing.TraceRecordingAgent
     System.Threading.Tasks.Task<System.String> ToJsonAsync(System.Threading.CancellationToken cancellationToken = default)
     System.Threading.Tasks.ValueTask DisposeAsync()
     ctor(AgentEval.Core.IEvaluableAgent inner, System.String traceName, AgentEval.Tracing.TraceRecordingOptions options = null)
-class AgentEval.Tracing.TraceRecordingChatClient
+sealed class AgentEval.Tracing.TraceRecordingChatClient : Microsoft.Extensions.AI.DelegatingChatClient, Microsoft.Extensions.AI.IChatClient, System.IDisposable
     AgentEval.Tracing.AgentTrace Trace { get; }
     System.Collections.Generic.IAsyncEnumerable<Microsoft.Extensions.AI.ChatResponseUpdate> GetStreamingResponseAsync(System.Collections.Generic.IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages, Microsoft.Extensions.AI.ChatOptions options = null, System.Threading.CancellationToken cancellationToken = default)
     System.Threading.Tasks.Task<Microsoft.Extensions.AI.ChatResponse> GetResponseAsync(System.Collections.Generic.IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages, Microsoft.Extensions.AI.ChatOptions options = null, System.Threading.CancellationToken cancellationToken = default)
@@ -2036,10 +2065,10 @@ class AgentEval.Tracing.TraceRecordingOptions
     System.String AgentName { get; set; }
     System.String ModelId { get; set; }
     ctor()
-class AgentEval.Tracing.TraceReplayException
+class AgentEval.Tracing.TraceReplayException : System.Exception, System.Runtime.Serialization.ISerializable
     ctor(System.String message)
     ctor(System.String message, System.Exception innerException)
-class AgentEval.Tracing.TraceReplayMismatchException
+class AgentEval.Tracing.TraceReplayMismatchException : AgentEval.Tracing.TraceReplayException, System.Runtime.Serialization.ISerializable
     System.Int32 Index { get; }
     System.String ActualPrompt { get; }
     System.String RecordedPrompt { get; }
@@ -2053,7 +2082,7 @@ class AgentEval.Tracing.TraceReplayOptions
     System.Int32 DefaultChunkDelayMs { get; set; }
     System.Int32 DefaultChunkSize { get; set; }
     ctor()
-class AgentEval.Tracing.TraceReplayingAgent
+sealed class AgentEval.Tracing.TraceReplayingAgent : AgentEval.Core.IEvaluableAgent, AgentEval.Core.IStreamableAgent
     AgentEval.Tracing.AgentTrace Trace { get; }
     System.Boolean IsComplete { get; }
     System.Collections.Generic.IAsyncEnumerable<AgentEval.Core.AgentResponseChunk> InvokeStreamingAsync(System.String prompt, System.Threading.CancellationToken cancellationToken = default)
@@ -2098,7 +2127,7 @@ class AgentEval.Tracing.TraceToolDefinition
     System.String Name { get; set; }
     System.String ParametersSchema { get; set; }
     ctor()
-class AgentEval.Tracing.WorkflowTrace
+sealed class AgentEval.Tracing.WorkflowTrace
     AgentEval.Tracing.WorkflowTraceGraph Graph { get; set; }
     AgentEval.Tracing.WorkflowTracePerformance Performance { get; set; }
     System.Collections.Generic.Dictionary<System.String, AgentEval.Tracing.AgentTrace> ExecutorTraces { get; set; }
@@ -2144,7 +2173,7 @@ class AgentEval.Tracing.WorkflowTracePerformance
     System.Int32 TotalToolCalls { get; set; }
     System.Int64 TotalDurationMs { get; set; }
     ctor()
-class AgentEval.Tracing.WorkflowTraceRecorder
+sealed class AgentEval.Tracing.WorkflowTraceRecorder : AgentEval.Core.IEvaluableAgent, AgentEval.Core.IWorkflowEvaluableAgent, System.IAsyncDisposable
     AgentEval.Tracing.AgentTrace ToAgentTrace()
     AgentEval.Tracing.WorkflowTrace Trace { get; }
     System.Collections.Generic.IReadOnlyList<System.String> ExecutorIds { get; }
@@ -2162,7 +2191,7 @@ class AgentEval.Tracing.WorkflowTraceRecorderOptions
     System.Collections.Generic.Dictionary<System.String, System.Object> Metadata { get; set; }
     System.Collections.Generic.List<System.Func<System.String, System.String>> Sanitizers { get; set; }
     ctor()
-class AgentEval.Tracing.WorkflowTraceReplayMismatchException
+class AgentEval.Tracing.WorkflowTraceReplayMismatchException : System.Exception, System.Runtime.Serialization.ISerializable
     System.String ActualPrompt { get; }
     System.String RecordedPrompt { get; }
     ctor(System.String message, System.String actualPrompt, System.String recordedPrompt)
@@ -2174,7 +2203,7 @@ class AgentEval.Tracing.WorkflowTraceReplayOptions
     System.Boolean ValidatePrompt { get; set; }
     System.Double DelayMultiplier { get; set; }
     ctor()
-class AgentEval.Tracing.WorkflowTraceReplayingAgent
+sealed class AgentEval.Tracing.WorkflowTraceReplayingAgent : AgentEval.Core.IEvaluableAgent, AgentEval.Core.IWorkflowEvaluableAgent
     AgentEval.Tracing.WorkflowTrace Trace { get; }
     System.Collections.Generic.IReadOnlyList<System.String> ExecutorIds { get; }
     System.Int32 ExecutionCount { get; }
@@ -2220,7 +2249,7 @@ enum AgentEval.Trust.TrustBand
     Low
     Moderate
     High
-class AgentEval.Trust.TrustScoreBreakdown
+sealed class AgentEval.Trust.TrustScoreBreakdown : System.IEquatable<AgentEval.Trust.TrustScoreBreakdown>
     AgentEval.Trust.TrustBand Band { get; init; }
     AgentEval.Trust.TrustScoreBreakdown <Clone>$()
     AgentEval.Trust.TrustScoreResult Result { get; init; }
@@ -2238,7 +2267,7 @@ static class AgentEval.Trust.TrustScoreCalculator
     static AgentEval.Trust.TrustScoreResult Compute(System.Collections.Generic.IReadOnlyList<AgentEval.Trust.TrustSignal> signals)
 static class AgentEval.Trust.TrustScoreRenderer
     static System.String Render(AgentEval.Trust.TrustScoreBreakdown breakdown)
-class AgentEval.Trust.TrustScoreResult
+sealed class AgentEval.Trust.TrustScoreResult : System.IEquatable<AgentEval.Trust.TrustScoreResult>
     AgentEval.Trust.TrustScoreResult <Clone>$()
     System.Boolean Equals(AgentEval.Trust.TrustScoreResult other)
     System.Boolean Equals(System.Object obj)
@@ -2250,7 +2279,7 @@ class AgentEval.Trust.TrustScoreResult
     System.String ToString()
     System.Void Deconstruct(out System.Double? Score, out System.Int32 SignalsMeasured, out System.Int32 SignalsTotal, out System.String Explanation)
     ctor(System.Double? Score, System.Int32 SignalsMeasured, System.Int32 SignalsTotal, System.String Explanation)
-class AgentEval.Trust.TrustSignal
+sealed class AgentEval.Trust.TrustSignal : System.IEquatable<AgentEval.Trust.TrustSignal>
     AgentEval.Trust.TrustSignal <Clone>$()
     System.Boolean Equals(AgentEval.Trust.TrustSignal other)
     System.Boolean Equals(System.Object obj)
@@ -2262,7 +2291,7 @@ class AgentEval.Trust.TrustSignal
     System.String ToString()
     System.Void Deconstruct(out System.String Name, out System.Double Score, out System.Double Weight, out System.String Label)
     ctor(System.String Name, System.Double Score, System.Double Weight, System.String Label = "measured")
-class AgentEval.Trust.TrustSignalContribution
+sealed class AgentEval.Trust.TrustSignalContribution : System.IEquatable<AgentEval.Trust.TrustSignalContribution>
     AgentEval.Trust.TrustSignalContribution <Clone>$()
     System.Boolean Equals(AgentEval.Trust.TrustSignalContribution other)
     System.Boolean Equals(System.Object obj)

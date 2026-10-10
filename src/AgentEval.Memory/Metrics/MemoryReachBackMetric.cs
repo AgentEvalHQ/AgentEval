@@ -78,17 +78,20 @@ public class MemoryReachBackMetric : IMemoryMetric
         }
         var successfulReachBack = measured.Count(r => r.Passed);
         var reachBackScore = (double)successfulReachBack / measured.Length * 100;
+        var notMeasured = queryResults.Length - measured.Length;
 
         var details = new Dictionary<string, object>
         {
-            ["queries_analyzed"] = queryResults.Length,
+            ["queries_analyzed"] = measured.Length,
+            ["queries_not_measured"] = notMeasured,
             ["successful_reachback"] = successfulReachBack,
             ["reachback_score"] = reachBackScore,
             ["analysis_type"] = "general"
         };
 
-        var explanation = $"General reach-back analysis: {successfulReachBack}/{queryResults.Length} " +
-                         $"queries successfully retrieved information from memory ({reachBackScore:F1}%)";
+        var explanation = $"General reach-back analysis: {successfulReachBack}/{measured.Length} " +
+                         $"measured queries successfully retrieved information from memory ({reachBackScore:F1}%)" +
+                         (notMeasured > 0 ? $"; {notMeasured} not measured (the judge produced no score)" : "");
 
         return Task.FromResult(reachBackScore >= 70
             ? MetricResult.Pass(Name, reachBackScore, explanation, details)

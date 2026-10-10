@@ -17,7 +17,7 @@ namespace AgentEval.Benchmarks;
 /// <remarks>
 /// <para>
 /// <see cref="MitreBenchmark"/> is a thin façade over <see cref="AttackPipeline"/>
-/// in <c>AgentEval.RedTeam</c>. Each preset wires a curated subset of the 13 built-in
+/// in <c>AgentEval.RedTeam</c>. Each preset wires a curated subset of the 14 built-in
 /// attack types and returns a <see cref="MitreBenchmarkRun"/>
 /// that exposes:
 /// </para>

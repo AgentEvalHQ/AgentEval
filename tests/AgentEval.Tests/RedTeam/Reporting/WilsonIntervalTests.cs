@@ -77,4 +77,16 @@ public sealed class WilsonIntervalTests
         // Fail closed on impossible input rather than emitting a nonsense interval.
         Assert.Throws<ArgumentOutOfRangeException>(() => WilsonInterval.Compute(5, 3));
     }
+
+    [Theory]
+    [InlineData(-1.96)]   // would swap the bounds
+    [InlineData(0d)]
+    [InlineData(double.NaN)]
+    [InlineData(double.PositiveInfinity)]
+    [InlineData(double.NegativeInfinity)]
+    public void ACriticalValueThatIsNotFiniteAndPositive_IsRejected(double z)
+    {
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(() => WilsonInterval.Compute(3, 10, z));
+        Assert.Equal("z", ex.ParamName);
+    }
 }

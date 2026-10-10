@@ -89,8 +89,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Core and Abstractions API snapshots** — `CorePublicApiSnapshotTests` and
   `AbstractionsPublicApiSnapshotTests` freeze the public surface of `AgentEval.Core` and
   `AgentEval.Abstractions` using the same Verify-based pattern as the existing Gatekeeper snapshot.
-  Any silent API change now fails CI. `EnablePackageValidation` added to both project files for
-  additional binary-compat detection.
+  Any silent API change now fails CI. `EnablePackageValidation` is on the umbrella `AgentEval` package, the one
+  project that packs (Core and Abstractions ship inside it), so every pack checks its per-framework assemblies
+  against each other.
 - **`agenteval compare --fail-on-regression`.** A comparable result exited 0 whatever it showed, so a CI step running
   `compare` never failed on a regression. With the flag it exits 1 when a scenario the baseline passed fails in the
   candidate, and names those scenarios; incomparable runs still exit 13. The default exit codes are unchanged. `--json`

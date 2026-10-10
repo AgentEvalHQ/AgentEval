@@ -88,6 +88,22 @@ public sealed class MemoryMetricsNotMeasuredTests
         Assert.True(result.Measured);
     }
 
+    [Fact]
+    public async Task ReachBack_ReportsTheMeasuredDenominator_AndTheUnmeasuredApart()
+    {
+        // One measured pass, two unmeasured: 1/1 at 100 %, never "1/3 (100%)".
+        var memory = Result([Query(measured: true), Query(measured: false), Query(measured: false)]);
+
+        var result = await Create("reach_back").EvaluateAsync(memory.ToEvaluationContext());
+
+        Assert.True(memory.QueryResults.First().Passed);
+        Assert.Equal(100, result.Score);
+        Assert.Contains("1/1 measured queries", result.Explanation);
+        Assert.Contains("2 not measured", result.Explanation);
+        Assert.Equal(1, result.Details!["queries_analyzed"]);
+        Assert.Equal(2, result.Details["queries_not_measured"]);
+    }
+
     private static MemoryQueryResult Query(bool measured) => new()
     {
         Query = MemoryQuery.Create("q?", MemoryFact.Create("fact")),

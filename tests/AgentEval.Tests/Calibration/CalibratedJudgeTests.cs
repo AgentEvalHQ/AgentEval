@@ -705,6 +705,26 @@ public class CalibratedJudgeTests
         Assert.Equal(["J1"], result.JudgeScores.Keys);
     }
 
+    [Fact]
+    public async Task EvaluateAsync_NotEnoughMeasured_WithAFailedJudgeToo_ThrowsRatherThanNotMeasured()
+    {
+        // J3's failure is part of the shortfall: reading the result as "not measured" would hide the outage.
+        var metrics = new Dictionary<string, IMetric>
+        {
+            ["J1"] = new FixedResultMetric(MetricResult.Pass("m", 80)),
+            ["J2"] = new FixedResultMetric(MetricResult.NotMeasured("m", "m: no context: not measured.")),
+            ["J3"] = new ThrowingMetric("Model overloaded"),
+        };
+        var judge = new CalibratedJudge(
+            metrics.Keys.Select(k => (k, (IChatClient)new FakeChatClient())).ToArray(),
+            new CalibratedJudgeOptions { MinimumJudgesRequired = 2 });
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            judge.EvaluateAsync(CreateSampleContext(), jn => metrics[jn]));
+
+        Assert.Contains("J3: Model overloaded", ex.Message);
+    }
+
     #endregion
     
     #region Helper Methods
@@ -726,6 +746,14 @@ public class CalibratedJudgeTests
         public string Description => "Returns a fixed result.";
         public Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken cancellationToken = default)
             => Task.FromResult(result);
+    }
+
+    private sealed class ThrowingMetric(string message) : IMetric
+    {
+        public string Name => "m";
+        public string Description => "Always throws, as a failed judge call does.";
+        public Task<MetricResult> EvaluateAsync(EvaluationContext context, CancellationToken cancellationToken = default)
+            => throw new HttpRequestException(message);
     }
 
     #endregion
