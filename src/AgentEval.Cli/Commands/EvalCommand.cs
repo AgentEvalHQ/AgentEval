@@ -454,7 +454,8 @@ internal static class EvalCommand
         // A real target (--endpoint, --azure, --sut) is live; a stand-in a caller passes in is never written as live.
         var targetMode = standIn ? AefTargetMode.Mocked : AefTargetMode.Live;
         var aefFailed = WriteAef(opts, resolvedName, targetMode,
-            (runs, aefOptions) => AefEvalWriter.Write(runs, summary, EvalAef.CaseIds(testCases), aefOptions, startedAt, DateTimeOffset.UtcNow));
+            (runs, aefOptions) => AefEvalWriter.Write(runs, summary, EvalAef.CaseIds(testCases), aefOptions, startedAt, DateTimeOffset.UtcNow,
+                testCases.Select(c => c.ToTestCase().PassingScore).ToList()));
 
         // 7. Export
         var report = summary.ToEvaluationReport(
@@ -801,12 +802,13 @@ internal static class EvalCommand
 internal static class EvalAef
 {
     /// <summary>The AEF root a run goes to: <c>--aef</c>, else a workspace's <c>.agenteval/aef</c>, else none.</summary>
-    public static string? Root(EvalOptions opts)
+    public static string? Root(EvalOptions opts) => opts.NoAef ? null : Root(opts.Aef);
+
+    /// <summary>Where a command writes AEF runs: <paramref name="aef"/>, else a workspace's <c>.agenteval/aef</c>, else null.</summary>
+    public static string? Root(DirectoryInfo? aef)
     {
-        if (opts.NoAef)
-            return null;
-        if (opts.Aef is not null)
-            return opts.Aef.FullName;
+        if (aef is not null)
+            return aef.FullName;
         var workspace = WorkspaceRootDiscovery.Find(Directory.GetCurrentDirectory());
         return workspace is not null && Directory.Exists(Path.Combine(workspace, ".agenteval"))
             ? Path.Combine(workspace, ".agenteval", "aef")

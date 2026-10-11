@@ -14,6 +14,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   target mode the run really had (a stand-in is never `live`), the judge only when it graded, and no content.
   With `--runs N`, each case gets a line per trial and a rollup under `AtLeast`, with the least pass count that meets
   `--success-threshold`; a rollup whose unmeasured trials leave it undecided is `error`, not `failed`.
+  A case's judge criteria and assertions are its child lines (`case/criteria/<n>`, `case/assertions/<n>`), beside
+  its own verdict; their texts, the judge's explanations and assertion messages are not written.
 - **`TestResult.JudgeFailed`**: the judge produced no verdict, so `Passed = false` and `Score = 0` are placeholders, not
   a grade. Set by the evaluation harness; AEF records such a case as `error`, never `failed`.
 - **`agenteval aef`: AEF 1.0 runs from the command line.** AEF, the AgentEval Evidence Format, is AgentEval's

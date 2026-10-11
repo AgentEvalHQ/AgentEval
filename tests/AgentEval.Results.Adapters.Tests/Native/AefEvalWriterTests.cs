@@ -106,6 +106,54 @@ public sealed class AefEvalWriterTests : IDisposable
         Assert.Null(AefTestRuns.Document(withoutJudge, "run.json")["judges"]);
     }
 
+    [Fact]
+    public void Write_RecordsCriteriaAndAssertionsAsChildren_BesideTheCasesOwnVerdict()
+    {
+        var summary = new TestSummary("demo",
+        [
+            new TestResult
+            {
+                TestName = "judged", Passed = true, Score = 85,
+                CriteriaResults =
+                [
+                    new AgentEval.Core.CriterionResult { Criterion = "mentions the refund policy", Met = true, Explanation = "the reply quotes it" },
+                    new AgentEval.Core.CriterionResult { Criterion = "is polite", Met = false },
+                ],
+                AssertionResults =
+                [
+                    AgentEval.Output.AssertionResult.Pass("HaveCalledTool(Search)"),
+                    AgentEval.Output.AssertionResult.Fail("HaveCallCount", "Expected 2 tool call(s), but 3 were made."),
+                    AgentEval.Output.AssertionResult.Undecidable("NeverCallTool(PlaceOrder)", "not a declared tool"),
+                ],
+            },
+        ]);
+
+        var (dir, _) = AefEvalWriter.Write(_out, summary, ["c1"], Options(), Start, Start.AddSeconds(1), passingScores: [70]);
+
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+        {
+            Assert.Equal("intact", (string?)reference["outcome"]);
+        }
+
+        var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!.AsObject()).ToList();
+        var root = lines.Single(l => (string?)l["path"] == "case");
+        Assert.Equal("Own", (string?)root["aggregation"]!["strategy"]);
+        Assert.Equal("threshold", (string?)root["aggregation"]!["rulePath"]);
+        Assert.Equal(70.0, (double)root["aggregation"]!["threshold"]!);
+        Assert.Equal(5, (int)root["aggregation"]!["total"]!);
+        var children = lines.Where(l => l["parentResultId"] is not null).ToDictionary(l => (string)l["path"]!, l => (string?)l["state"]);
+        Assert.Equal("passed", children["case/criteria/1"]);
+        Assert.Equal("failed", children["case/criteria/2"]);
+        Assert.Equal("passed", children["case/assertions/1"]);
+        Assert.Equal("failed", children["case/assertions/2"]);
+        Assert.Equal("inconclusive", children["case/assertions/3"]);
+        var all = string.Concat(Directory.GetFiles(dir, "*", SearchOption.AllDirectories).Select(File.ReadAllText));
+        Assert.DoesNotContain("refund policy", all, StringComparison.Ordinal);   // criterion text is the suite's, not written
+        Assert.DoesNotContain("quotes it", all, StringComparison.Ordinal);       // the judge's explanation is content
+        Assert.DoesNotContain("were made", all, StringComparison.Ordinal);       // an assertion's message may quote the response
+    }
+
     private static TestResult Pass(int score = 90) => new() { TestName = "t", Passed = true, Score = score };
     private static TestResult Fail(int score = 20) => new() { TestName = "t", Passed = false, Score = score };
     private static TestResult Broken() => new() { TestName = "t", Passed = false, Error = new TimeoutException() };
