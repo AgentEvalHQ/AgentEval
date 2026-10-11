@@ -98,6 +98,9 @@ var benchResponseOpt = new Option<string?>("--response") { Description = "The ag
 var benchResponseFileOpt = new Option<string?>("--response-file") { Description = "Path to a file containing the agent's actual response to grade (alternative to --response, for multi-line output)." };
 var benchRunsOpt = new Option<int?>("--runs") { Description = "Number of stochastic runs (default: 1). When > 1, runs the benchmark N times and aggregates via MajorityVote." };
 var benchGdprAzureFromEnvOpt = FromEnvOption.Create("Drive a live agent from the environment (the provider AI_INFERENCE_PROVIDER selects) per scenario: each scenario's own prompt is sent to the agent and its real answer is graded, instead of grading a single --response. The judge resolves AZURE_OPENAI_JUDGE_* first, then the selected provider, so agent and judge can target different endpoints.");
+var benchAefOpt = new Option<DirectoryInfo?>("--aef") { Description = "Write the run as sealed AEF evidence under this folder (default: the workspace's .agenteval/aef)" };
+var benchNoAefOpt = new Option<bool>("--no-aef") { Description = "Write no AEF run" };
+var benchSubjectVersionOpt = new Option<string?>("--subject-version") { Description = "The subject's exact version, recorded in the AEF run (a checkpoint lane needs it)" };
 var benchGdprCmd = new Command("gdpr", "Run the GDPR compliance benchmark. Needs a target: --sut or --from-env drives a live agent per scenario, or --response/--response-file grades an answer the agent gave (with its --input). Without one it refuses; --sut mock grades a canned answer that measures nothing and is not stored.");
 benchGdprCmd.Add(benchPresetOpt);
 benchGdprCmd.Add(benchSubjectOpt);
@@ -107,6 +110,9 @@ benchGdprCmd.Add(benchResponseOpt);
 benchGdprCmd.Add(benchResponseFileOpt);
 benchGdprCmd.Add(benchRunsOpt);
 benchGdprCmd.Add(benchGdprAzureFromEnvOpt);
+benchGdprCmd.Add(benchAefOpt);
+benchGdprCmd.Add(benchNoAefOpt);
+benchGdprCmd.Add(benchSubjectVersionOpt);
 var (benchGdprSutOpt, benchGdprSutTargets) = SutTargetResolver.AddOptionsTo(benchGdprCmd, "bench");
 benchGdprCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
@@ -150,7 +156,9 @@ benchGdprCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 
     var response = await ResolveBenchResponseAsync(parseResult.GetValue(benchResponseOpt), parseResult.GetValue(benchResponseFileOpt), ct);
     if (response.Error) return AgentEval.Cli.ExitCodes.UsageError;
-    return await BenchCommand.RunGdprAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride: agentOverride, runs: runs, responseText: response.Text, azureFromEnv: azureFromEnv, mock: mock, ct: ct);
+    return await BenchCommand.RunGdprAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride: agentOverride, runs: runs, responseText: response.Text, azureFromEnv: azureFromEnv, mock: mock, ct: ct,
+        aef: parseResult.GetValue(benchAefOpt), noAef: parseResult.GetValue(benchNoAefOpt), subjectVersion: parseResult.GetValue(benchSubjectVersionOpt),
+        agentIsLive: agentOverride is not null);
 });
 
 // bench gdpr calibrate

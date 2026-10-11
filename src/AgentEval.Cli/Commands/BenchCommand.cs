@@ -49,8 +49,14 @@ public static class BenchCommand
         string? responseText = null,
         bool azureFromEnv = false,
         bool mock = false,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        DirectoryInfo? aef = null,
+        bool noAef = false,
+        string? subjectVersion = null,
+        bool agentIsLive = false)
     {
+        // agentIsLive: the caller resolved agentOverride from --sut, a real target. Any other agentOverride is a stand-in,
+        // which the AEF run records as mocked, never live (RUN-7).
         var gradesSuppliedResponse = !string.IsNullOrWhiteSpace(responseText);
         if (mock && (agentOverride is not null || azureFromEnv || gradesSuppliedResponse))
         {
@@ -209,6 +215,7 @@ public static class BenchCommand
 
         string runId;
         EvalResult compositeResult;
+        var startedAt = DateTimeOffset.UtcNow;
         try
         {
             if (runs > 1)
@@ -296,7 +303,27 @@ public static class BenchCommand
             Console.Error.WriteLine($"Warning: failed to write PDF report: {ex.Message}");
         }
 
+        // ── AEF ───────────────────────────────────────────────────────────────
+        // One run of the preset as sealed evidence. A live agent (--from-env, or --sut) is live; a stand-in is mocked; a
+        // supplied --response is replayed: the subject was not driven, its recorded answer was graded. --runs above 1 is
+        // not written yet (its MajorityVote root is AgentEval's, not one run of the preset).
+        var aefFailed = false;
+        if (!noAef && runs > 1)
+        {
+            Console.Error.WriteLine("AEF: --runs above 1 is not written as AEF yet, so this benchmark wrote no AEF run.");
+        }
+        else if (!noAef)
+        {
+            var targetMode = agent is null ? AgentEval.Results.Writing.AefTargetMode.Replayed
+                : agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live
+                : AgentEval.Results.Writing.AefTargetMode.Mocked;
+            aefFailed = BenchAef.Write(aef, agentEvalDir, "gdpr", preset, subject, subjectVersion, targetMode, benchmark,
+                compositeResult, startedAt, DateTimeOffset.UtcNow);
+        }
+
         // ── Exit code ─────────────────────────────────────────────────────────
+        if (aefFailed)
+            return ExitCodes.RuntimeError;   // an explicit --aef could not be written
         var overall = evidence.Summary.OverallStatus;
         Console.WriteLine($"Overall result: {overall} (score {evidence.Summary.OverallScore:P0})");
 

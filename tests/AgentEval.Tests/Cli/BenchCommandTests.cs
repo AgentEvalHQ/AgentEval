@@ -123,6 +123,52 @@ public class BenchCommandTests : IDisposable
 
     // ── Tests ─────────────────────────────────────────────────────────────
 
+    private static System.Text.Json.Nodes.JsonNode AefRun(string aefRoot, out string dir)
+    {
+        var run = Assert.Single(Directory.GetFiles(aefRoot, "run.json", SearchOption.AllDirectories));
+        dir = Path.GetDirectoryName(run)!;
+        var verification = AgentEval.Results.Integrity.AefRunVerifier.Verify(dir);
+        Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact, verification.Outcome);
+        Assert.Empty(verification.Problems);
+        return System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(run))!;
+    }
+
+    [Fact]
+    public async Task BenchGdpr_GradingASuppliedResponse_WritesASealedReplayedRun_IntoTheWorkspace()
+    {
+        InitWorkspace();
+
+        await BenchCommand.RunGdprAsync(preset: "smoke", subject: "ResponseAgent", rootOverride: _root, inputText: SuppliedQuestion,
+            evaluatorOverride: new CapturingStubEvaluator(), responseText: SuppliedAnswer, subjectVersion: "2.1.0");
+
+        var header = AefRun(Path.Combine(_root, ".agenteval", "aef"), out var dir);
+        Assert.Equal("replayed", (string?)header["execution"]!["targetMode"]);   // the subject was not driven
+        Assert.Equal("agent:ResponseAgent", (string?)header["subject"]!["ref"]);
+        Assert.Equal("2.1.0", (string?)header["subject"]!["version"]);
+        Assert.StartsWith("bench:gdpr", (string?)header["suite"]!["ref"]);
+        Assert.NotEmpty(File.ReadAllLines(Path.Combine(dir, "results.ndjson")));
+        var all = string.Concat(Directory.GetFiles(dir, "*", SearchOption.AllDirectories).Select(File.ReadAllText));
+        Assert.DoesNotContain("delete them", all, StringComparison.Ordinal);   // the graded answer is content
+    }
+
+    [Fact]
+    public async Task BenchGdpr_WithAStandInAgent_IsMocked_AndNoAefWritesNothing()
+    {
+        InitWorkspace();
+        var aef = Path.Combine(_root, "aef-out");
+
+        await BenchCommand.RunGdprAsync(preset: "smoke", subject: "SutAgent", rootOverride: _root, inputText: null,
+            evaluatorOverride: new CapturingStubEvaluator(), agentOverride: new FixedAnswerAgent("SutAgent", "an answer"),
+            aef: new DirectoryInfo(aef));
+        Assert.Equal("mocked", (string?)AefRun(aef, out _)["execution"]!["targetMode"]);   // not resolved from --sut
+
+        var none = Path.Combine(_root, "aef-none");
+        await BenchCommand.RunGdprAsync(preset: "smoke", subject: "SutAgent", rootOverride: _root, inputText: null,
+            evaluatorOverride: new CapturingStubEvaluator(), agentOverride: new FixedAnswerAgent("SutAgent", "an answer"),
+            aef: new DirectoryInfo(none), noAef: true);
+        Assert.False(Directory.Exists(none));
+    }
+
     [Fact]
     public async Task BenchGdpr_WithResponseText_GradesSuppliedResponse_NotFixture()
     {
