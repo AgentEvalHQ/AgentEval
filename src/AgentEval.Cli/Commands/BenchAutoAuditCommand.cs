@@ -85,9 +85,10 @@ public static class BenchAutoAuditCommand
         Console.WriteLine();
 
         var results = new List<AutoAuditEndpointResult>();
-        var startedAt = DateTimeOffset.UtcNow;
+        var times = new List<(DateTimeOffset Start, DateTimeOffset End)>();   // each model's own audit, for its AEF run
         foreach (var model in targets)
         {
+            var modelStart = DateTimeOffset.UtcNow;
             var endpoint = $"{model} ({provider})";
             IChatClient? owned = null;
             IChatClient client;
@@ -104,6 +105,7 @@ public static class BenchAutoAuditCommand
                     // rows already paid for.
                     Console.Error.WriteLine($"  {endpoint} did not complete: no client: {diagnostic}");
                     results.Add(new AutoAuditEndpointResult(endpoint, 0, 0, 0, 0, 0, Completed: false, TopDiscrepancies: []));
+                    times.Add((modelStart, DateTimeOffset.UtcNow));
                     continue;
                 }
                 client = owned = built;
@@ -117,6 +119,7 @@ public static class BenchAutoAuditCommand
                 if (failure is not null)
                     Console.Error.WriteLine($"  {endpoint} did not complete: {failure.GetType().Name}: {failure.Message}");
                 results.Add(result);
+                times.Add((modelStart, DateTimeOffset.UtcNow));
             }
             finally
             {
@@ -146,7 +149,7 @@ public static class BenchAutoAuditCommand
                 var (tree, caseExt) = BenchAef.AutoAuditTree(results[i]);
                 if (BenchAef.WriteResult(aef, Path.GetDirectoryName(aefRoot)!, "autoaudit", "support-task", targets[i], null,
                         clientOverride is null ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                        tree, startedAt, DateTimeOffset.UtcNow, subjectKind: "model", caseExt: caseExt))
+                        tree, times[i].Start, times[i].End, subjectKind: "model", caseExt: caseExt))
                     return ExitCodes.RuntimeError;   // an explicit --aef could not be written
             }
         }

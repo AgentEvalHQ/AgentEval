@@ -113,7 +113,7 @@ public sealed class BenchMemoryCompareTests : IDisposable
     }
 
     [Fact]
-    public async Task AMemoryRun_WritesASealedAefRun_ACasePerCategory_AStandInMocked()
+    public async Task RunAsync_WithAefAndAStandInClient_WritesAMockedRunWithWeightedCategories()
     {
         var aef = Path.Combine(_root, "aef-out");
 
@@ -130,6 +130,9 @@ public sealed class BenchMemoryCompareTests : IDisposable
         var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => System.Text.Json.Nodes.JsonNode.Parse(l)!).ToList();
         Assert.NotEmpty(lines);
         Assert.All(lines, l => Assert.StartsWith("memory.", (string?)l["caseId"]));
+        var root = Assert.Single(lines, l => l["parentResultId"] is null);   // one case: the benchmark
+        Assert.Equal("WeightedSum", (string?)root["aggregation"]!["strategy"]);
+        Assert.All(lines.Where(l => l["parentResultId"] is not null), l => Assert.NotNull(l["component"]!["weight"]));   // each category weighted
     }
 
     [Fact]

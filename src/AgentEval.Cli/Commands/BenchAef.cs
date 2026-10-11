@@ -101,14 +101,24 @@ internal static class BenchAef
                 new EvalProvenance(judgeModel is null ? "atomic-code" : "atomic-llm", judgeModel, null, null, null, 0, false),
                 DateTimeOffset.UtcNow);
         }).ToList();
-        var root = new EvalResult(
+        // One case, the benchmark, with its categories as weighted parts below it: the weights reach the run as each
+        // part's component weight and the case's aggregation is WeightedSum, as the overall score is computed. An
+        // incomplete run withholds its verdict: a warn, not measured, as the store records it.
+        var incomplete = verdict == "INCOMPLETE";
+        var benchmark = new EvalResult(
             new EvalMetadata("memory." + preset.ToLowerInvariant(), "Memory " + preset, "memory", "1.0.0"),
-            new EvalScore(Math.Clamp(result.OverallScore / 100.0, 0.0, 1.0), null, verdict.ToLowerInvariant(), verdict == "PASS", 0.7, "none", null),
+            new EvalScore(Math.Clamp(result.OverallScore / 100.0, 0.0, 1.0), null, incomplete ? "warn" : verdict.ToLowerInvariant(), verdict == "PASS", 0.7, "none", null)
+            {
+                Measurement = incomplete ? AgentEval.Evals.Meta.MeasurementState.NotMeasured : AgentEval.Evals.Meta.MeasurementState.Measured,
+            },
             new EvalDetails(null, null, null, categories, "WeightedSum"),
             new EvalProvenance("composite", null, null, null, null, 0, false),
             DateTimeOffset.UtcNow);
+        var root = new EvalResult(benchmark.Metric, benchmark.Score, new EvalDetails(null, null, null, [benchmark], null), benchmark.Provenance, DateTimeOffset.UtcNow);
         return (root, new AefComponentShape(1, true, "Averaged",
-            result.CategoryResults.Select(c => new AefComponentShape(c.Weight, true, "Averaged", [])).ToList()));
+        [
+            new AefComponentShape(1, true, "Averaged", result.CategoryResults.Select(c => new AefComponentShape(c.Weight, true, "Averaged", [])).ToList()),
+        ]));
     }
 
     /// <summary>
@@ -137,7 +147,7 @@ internal static class BenchAef
         }).ToList();
         return new EvalResult(
             new EvalMetadata($"{family}.{preset.ToLowerInvariant()}", $"{family} {preset}", family, "1.0.0"),
-            new EvalScore(result.OverallAccuracy ?? 0, null, verdict.ToLowerInvariant(), verdict == "PASS", null, "none", null),
+            new EvalScore((result.OverallAccuracy ?? 0) / 100.0, null, verdict.ToLowerInvariant(), verdict == "PASS", null, "none", null),   // a percentage
             new EvalDetails(null, null, null, questions, null),
             new EvalProvenance("composite", null, null, null, null, 0, false),
             DateTimeOffset.UtcNow);
@@ -226,9 +236,10 @@ internal static class BenchAef
         var questions = result.QuestionResults.Select(q =>
         {
             var outcome = q.TypedOutcome?.Outcome;
-            var label = q.ExecutionStatus != AgentEval.Memory.External.Models.QuestionExecutionStatus.Completed ? "error"
+            // Unrun first: the runner marks a question it did not run as Unrun with an AgentError status.
+            var label = outcome == AgentEval.Memory.External.Models.TypedMemEvalOutcome.Unrun ? "skipped"
+                : q.ExecutionStatus != AgentEval.Memory.External.Models.QuestionExecutionStatus.Completed ? "error"
                 : outcome is null or AgentEval.Memory.External.Models.TypedMemEvalOutcome.Inconclusive ? "inconclusive"
-                : outcome == AgentEval.Memory.External.Models.TypedMemEvalOutcome.Unrun ? "skipped"
                 : "scored";
             if (label == "scored")
             {
@@ -251,7 +262,7 @@ internal static class BenchAef
         }).ToList();
         var root = new EvalResult(
             new EvalMetadata($"typedmemeval.{vertical}", $"TypedMemEval {vertical}", "typedmemeval", "1.0.0"),
-            new EvalScore(result.OverallAccuracy ?? 0, null, "scored", false, null, "none", null),
+            new EvalScore((result.OverallAccuracy ?? 0) / 100.0, null, "scored", false, null, "none", null),   // a percentage
             new EvalDetails(null, null, null, questions, null),
             new EvalProvenance("composite", null, null, null, null, 0, false),
             DateTimeOffset.UtcNow);

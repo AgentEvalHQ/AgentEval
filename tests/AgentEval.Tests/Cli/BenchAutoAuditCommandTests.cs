@@ -79,7 +79,7 @@ public sealed class BenchAutoAuditCommandTests
     }
 
     [Fact]
-    public async Task ARealRun_WritesOneSealedAefRunPerModel_ScoredWithNoVerdict()
+    public async Task RunAsync_WithAefAndTwoModels_WritesOneScoredRunPerModel()
     {
         var clients = new Dictionary<string, IChatClient>
         {

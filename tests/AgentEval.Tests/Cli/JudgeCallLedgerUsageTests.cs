@@ -36,7 +36,7 @@ public class JudgeCallLedgerUsageTests
     }
 
     [Fact]
-    public async Task ItSumsTheReportedTokens_OfPlainAndStreamingCalls()
+    public async Task GetResponseAsync_WithReportedUsage_SumsPlainAndStreamingTokens()
     {
         var ledger = new JudgeCallLedger(new ReportingJudge(new UsageDetails { InputTokenCount = 100, OutputTokenCount = 7 }));
 
@@ -52,12 +52,24 @@ public class JudgeCallLedgerUsageTests
     }
 
     [Fact]
-    public async Task AJudgeThatReportsNoUsage_LeavesNoTotals()
+    public async Task GetResponseAsync_WithOnlyInputReported_LeavesTheOutputTotalNull()
+    {
+        var ledger = new JudgeCallLedger(new ReportingJudge(new UsageDetails { InputTokenCount = 50 }));
+
+        await ledger.GetResponseAsync([new ChatMessage(ChatRole.User, "grade")]);
+
+        Assert.Equal(50, ledger.InputTokens);
+        Assert.Null(ledger.OutputTokens);   // unreported, not a false zero
+    }
+
+    [Fact]
+    public async Task GetResponseAsync_WithoutReportedUsage_LeavesTotalsNull()
     {
         var ledger = new JudgeCallLedger(new ReportingJudge(null));
 
         await ledger.GetResponseAsync([new ChatMessage(ChatRole.User, "grade")]);
 
         Assert.False(ledger.ReportedUsage);   // the run then names no judge usage rather than a false zero
+        Assert.Null(ledger.InputTokens);
     }
 }

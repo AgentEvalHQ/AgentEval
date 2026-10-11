@@ -44,7 +44,7 @@ public sealed class BenchTypedMemEvalAefTests : IDisposable
     {
         BenchmarkId = "typedmemeval",
         BenchmarkName = "TypedMemEval",
-        OverallAccuracy = 0.25,
+        OverallAccuracy = 25,   // a percentage, as the runner reports it
         TaskAveragedAccuracy = null,
         PerTypeResults = [],
         Duration = TimeSpan.FromSeconds(3),
@@ -56,13 +56,13 @@ public sealed class BenchTypedMemEvalAefTests : IDisposable
             Question("q3", TypedMemEvalOutcome.Abstained),
             Question("q4", TypedMemEvalOutcome.Premature),
             Question("q5", TypedMemEvalOutcome.Inconclusive),
-            Question("q6", TypedMemEvalOutcome.Unrun),
+            Question("q6", TypedMemEvalOutcome.Unrun, QuestionExecutionStatus.AgentError),   // as the runner marks a skip
             Question("q7", null, QuestionExecutionStatus.AgentError),
         ],
     };
 
     [Fact]
-    public void EachQuestionIsScored_WithNoVerdict_AndItsTypedOutcome_AndNoText()
+    public void TypedTree_WithEveryOutcome_WritesScoredLinesWithoutVerdictOrText()
     {
         var (tree, caseExt) = BenchAef.TypedTree(Result(), "episodic", "judge-x");
         var start = new DateTimeOffset(2026, 10, 1, 9, 0, 0, TimeSpan.Zero);
@@ -88,6 +88,7 @@ public sealed class BenchTypedMemEvalAefTests : IDisposable
 
         var score = AefTestRunsSummary(dir, "score");
         Assert.Equal(0.25, (double)score["value"]!);   // q1 of q1-q4: the accuracy over the measured questions
+        Assert.Equal(0.25, (double)JsonNode.Parse(File.ReadAllText(Path.Combine(dir, "summary.json")))!["ext"]!["agenteval.bench"]!["score"]!);   // 0..1, not 25
         var all = string.Concat(Directory.GetFiles(dir, "*", SearchOption.AllDirectories).Select(File.ReadAllText));
         Assert.DoesNotContain("secret", all, StringComparison.Ordinal);
     }

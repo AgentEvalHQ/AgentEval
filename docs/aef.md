@@ -151,12 +151,11 @@ specification says how to claim conformance.
 - **Nothing makes a result true.** AEF makes results attributable and tamper-evident, nothing more.
 - **Overlays never change the sealed run.** An override is shown beside the sealed result, never instead of it.
 
-## Today and next
+## What AgentEval does with AEF today
 
-- **Today:** `eval`, `redteam` and most `bench` families write AEF runs directly (above); the `agenteval aef` command
-  checks, seals and views them, checks checkpoints, and converts store v1 and ASSERT runs.
-- **Next:** the memory benchmark families, `bench --runs`, and a local runner that executes a run plan
-  (`agenteval run --plan`); `AgentEval.Results` will be published as a package.
+- `eval`, `redteam` and the `bench` families write AEF runs directly (above).
+- The `agenteval aef` command checks, seals and views runs, checks checkpoints, and converts store v1, ASSERT,
+  OpenTelemetry and Inspect runs.
 
 ## Read more
 

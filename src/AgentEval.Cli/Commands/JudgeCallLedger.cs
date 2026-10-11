@@ -27,18 +27,19 @@ internal sealed class JudgeCallLedger(IChatClient inner) : DelegatingChatClient(
     /// <summary>Judge calls that threw, including timeouts: each one is a verdict the judge did not give.</summary>
     public int Failures => Volatile.Read(ref _failures);
 
-    private int _reported;
+    private int _inputReported;
+    private int _outputReported;
     private long _inputTokens;
     private long _outputTokens;
 
-    /// <summary>Whether any judge response reported its token usage; without it the totals below say nothing.</summary>
-    public bool ReportedUsage => Volatile.Read(ref _reported) > 0;
+    /// <summary>Whether any judge response reported a token count; without one the totals below are null.</summary>
+    public bool ReportedUsage => InputTokens is not null || OutputTokens is not null;
 
-    /// <summary>The input tokens the judge's responses reported, summed.</summary>
-    public long InputTokens => Interlocked.Read(ref _inputTokens);
+    /// <summary>The input tokens the judge's responses reported, summed; null when none reported an input count.</summary>
+    public long? InputTokens => Volatile.Read(ref _inputReported) > 0 ? Interlocked.Read(ref _inputTokens) : null;
 
-    /// <summary>The output tokens the judge's responses reported, summed.</summary>
-    public long OutputTokens => Interlocked.Read(ref _outputTokens);
+    /// <summary>The output tokens the judge's responses reported, summed; null when none reported an output count.</summary>
+    public long? OutputTokens => Volatile.Read(ref _outputReported) > 0 ? Interlocked.Read(ref _outputTokens) : null;
 
     private void Count(UsageDetails? usage)
     {
@@ -47,14 +48,15 @@ internal sealed class JudgeCallLedger(IChatClient inner) : DelegatingChatClient(
             return;
         }
 
-        Interlocked.Increment(ref _reported);
         if (usage.InputTokenCount is { } input)
         {
+            Interlocked.Increment(ref _inputReported);
             Interlocked.Add(ref _inputTokens, input);
         }
 
         if (usage.OutputTokenCount is { } output)
         {
+            Interlocked.Increment(ref _outputReported);
             Interlocked.Add(ref _outputTokens, output);
         }
     }

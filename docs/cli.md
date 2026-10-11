@@ -503,7 +503,8 @@ agenteval bench agentic calibrate [--root <path>] [--out <path>] [--records <pat
 - `agenteval bench --list` prints the registry-backed family catalog.
 - **AEF runs:** `gdpr`, `eu-ai-act`, `agentic`, `owasp`, `mitre`, `nist`, `perf`, `memory`, `longmemeval`,
   `typedmemeval`, `autoaudit`, `trace-fidelity` and `workflow-trace-fidelity` write each run as a sealed AEF run into the workspace's `.agenteval/aef` (or `--aef <dir>`;
-  `--no-aef` writes none; `--subject-version` records the subject's version). A real target is recorded as `live`, a
+  `--no-aef` writes none; `--subject-version` records the subject's version, except on `autoaudit`, which audits
+  several models at once and records each as `model:<name>` with no version). A real target is recorded as `live`, a
   graded `--response` or trace as `replayed`. See [Runs from eval, redteam and bench](aef.md#runs-from-eval-redteam-and-bench).
 - **Exit codes:** `bench <family>` and `bench <regulation> calibrate` return **9** (FAIL), **10** (WARN — `bench <family>` only), or **11** (indeterminate) for a benchmark gate outcome, and **3** if the judge fails to configure — see [Exit codes](#exit-codes). A missing required option (`--subject`, and for some families `--input`, `--vertical`, `--agent-trace`/`--chat-trace` or `--workflow-trace`), an `--evidence-detail` value other than `references` or `content`, and `agenteval bench` with no family and no `--list` return **2**.
 - Compliance and agentic families support calibration helpers where available. Each calibration report names the judge's provider and model in its header.
