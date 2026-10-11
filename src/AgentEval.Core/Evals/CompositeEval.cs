@@ -363,6 +363,7 @@ public sealed class CompositeEval : IEval
             .Where(p => !FailsIt(p.Component, p.Sub))
             .Select(p => p.Sub.Metric.Key)
             .ToArray();
+        var labelBeforeEffects = label;
         // A required part that errored does not change it either (B6c-10): more measurement cannot turn a measured
         // accuracy failure into a pass, so the label is the fail, not "error".
         if (failingAccuracy.Length > 0 && label is "pass" or "warn" or "error")
@@ -547,6 +548,23 @@ public sealed class CompositeEval : IEval
         var coverageNote = string.Join(" ", new[] { decidedNote, effectNote, severityNote, nothingMeasuredNote ?? partialCoverageNote, absorbedNote }.Where(n => n is not null))
                            is { Length: > 0 } joined ? joined : null;
 
+        // Which rule decided the label, in the order the rules above apply (the last to change the label wins). It
+        // describes the verdict and changes nothing (AEF's aggregation.rulePath and decisive).
+        var requiredErrored = Components.Zip(subs, (c, s) => (Component: c, Sub: s))
+            .Where(p => p.Component.Required && p.Sub.Score.Label == "error")
+            .Select(p => p.Sub.Metric.Key)
+            .ToArray();
+        var lineage =
+            failingAccuracy.Length > 0 && labelBeforeEffects is "pass" or "warn" or "error" ? new EvalLineage("failure-effect", failingAccuracy)
+            : notOptimal.Length > 0 && labelBeforeEffects == "pass" ? new EvalLineage("failure-effect", notOptimal)
+            : passUnattested ? new EvalLineage("required-not-measured", requiredUnattested)
+            : underCovered ? new EvalLineage("under-covered", [])
+            : decidedDespiteError ? new EvalLineage(decidedBySeverity ? "severity" : "threshold", [])
+            : hasRequiredError ? new EvalLineage("required-error", requiredErrored)
+            : nothingMeasured ? (withheldOnly ? new EvalLineage("required-not-measured", withheld) : new EvalLineage("nothing-measured", []))
+            : Threshold is { } usedBar && (score < usedBar || !SeverityCapsThreshold) ? new EvalLineage("threshold", [])
+            : new EvalLineage("severity", []);
+
         return new EvalResult(
             Metric: new(Key, Name, Category, Version),
             Score: new(score, null, label, passed, Threshold, ReportedSeverity(label, severity), null) { Measurement = measurement },
@@ -558,6 +576,7 @@ public sealed class CompositeEval : IEval
                 AggregationStrategy: Aggregation.Name)
             {
                 Summary = coverageNote,
+                Lineage = lineage,
             },
             Provenance: new(
                 Type: "composite",

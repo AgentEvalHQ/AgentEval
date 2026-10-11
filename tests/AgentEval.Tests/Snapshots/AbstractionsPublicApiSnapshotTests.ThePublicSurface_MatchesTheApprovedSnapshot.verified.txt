@@ -791,6 +791,7 @@ sealed class AgentEval.Evals.EvalComponent : IEquatable<AgentEval.Evals.EvalComp
     ctor(AgentEval.Evals.IEval Eval, Double Weight = 1, Boolean Required = true)
 sealed class AgentEval.Evals.EvalDetails : IEquatable<AgentEval.Evals.EvalDetails>
     AgentEval.Evals.EvalDetails <Clone>$()
+    AgentEval.Evals.EvalLineage Lineage { get; init; }
     Boolean Equals(AgentEval.Evals.EvalDetails other)
     Boolean Equals(Object obj)
     IReadOnlyDictionary<String, Double> Dimensions { get; init; }
@@ -839,6 +840,16 @@ static class AgentEval.Evals.EvalInputAgentBinding
     const String AgentMetadataKey
     static Boolean TryReadAgent(AgentEval.Evals.EvalInput input, out AgentEval.Core.IEvaluableAgent agent)
     static String AbsentAgentReason(String family, String typedEntryPoint)
+sealed class AgentEval.Evals.EvalLineage : IEquatable<AgentEval.Evals.EvalLineage>
+    AgentEval.Evals.EvalLineage <Clone>$()
+    Boolean Equals(AgentEval.Evals.EvalLineage other)
+    Boolean Equals(Object obj)
+    IReadOnlyList<String> Decisive { get; init; }
+    Int32 GetHashCode()
+    String RulePath { get; init; }
+    String ToString()
+    Void Deconstruct(out String RulePath, out IReadOnlyList<String> Decisive)
+    ctor(String RulePath, IReadOnlyList<String> Decisive)
 sealed class AgentEval.Evals.EvalMetadata : IEquatable<AgentEval.Evals.EvalMetadata>
     AgentEval.Evals.EvalMetadata <Clone>$()
     Boolean Equals(AgentEval.Evals.EvalMetadata other)
