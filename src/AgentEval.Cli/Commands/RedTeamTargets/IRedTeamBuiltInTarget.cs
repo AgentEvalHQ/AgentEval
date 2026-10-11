@@ -56,6 +56,13 @@ internal interface IRedTeamBuiltInTarget
     string ResolvedName(RedTeamOptions opts);
 
     /// <summary>
+    /// How the target drives its model, for the AEF run's <c>execution.targetMode</c> ([RUN-7]): <c>live</c> for a real
+    /// model, <c>scripted</c> for a scripted one. A stand-in passed in place of the target is <c>mocked</c>, decided by
+    /// the caller.
+    /// </summary>
+    AgentEval.Results.Writing.AefTargetMode TargetMode(RedTeamOptions opts);
+
+    /// <summary>
     /// Build the system-under-test. <paramref name="sutOverride"/>, if non-null, is returned as-is (the test seam — a
     /// pre-built agent drives the whole scan credential-free). <paramref name="trace"/> lets a gated target record
     /// <c>gate.*</c> evidence.

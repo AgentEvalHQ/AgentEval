@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--success-threshold`; a rollup whose unmeasured trials leave it undecided is `error`, not `failed`.
   A case's judge criteria and assertions are its child lines (`case/criteria/<n>`, `case/assertions/<n>`), beside
   its own verdict; their texts, the judge's explanations and assertion messages are not written.
+- **`agenteval redteam` writes each scan as sealed AEF evidence** too (same `--aef`, `--no-aef`, `--subject`,
+  `--subject-version`): a line per probe (`<attack>/<probe>`: resisted `passed`, succeeded `failed` with
+  `attack.success`, `inconclusive`, `error`, or `not_applicable` for an attack that cannot be measured in the setup),
+  with OWASP LLM and MITRE ATLAS ids, severity and turns; benign controls in lane `over-refusal`. The metrics
+  `resisted` and `resisted-conclusive` give the scan's rate and its conclusive score. The gatekeeper demo's scripted
+  model is recorded as `scripted`, not `live`. No prompt, response or grader reasoning is written.
 - **`TestResult.JudgeFailed`**: the judge produced no verdict, so `Passed = false` and `Score = 0` are placeholders, not
   a grade. Set by the evaluation harness; AEF records such a case as `error`, never `failed`.
 - **`agenteval aef`: AEF 1.0 runs from the command line.** AEF, the AgentEval Evidence Format, is AgentEval's
