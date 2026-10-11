@@ -2,7 +2,6 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using System.Security.Cryptography;
 using System.Text;
 using AgentEval.Results.Signatures;
 using AgentEval.Results.Writing;
@@ -109,8 +108,10 @@ public static class AefProbeRunWriter
             throw new ArgumentException("a scan with no probe lines has nothing to record", nameof(lines));
         }
 
-        var runId = $"{startedAt.UtcDateTime:yyyyMMddTHHmmssZ}-redteam-{Convert.ToHexString(RandomNumberGenerator.GetBytes(4)).ToLowerInvariant()}";
-        var directory = Path.Combine(runsRoot, $"{startedAt.UtcDateTime:yyyy}", $"{startedAt.UtcDateTime:MM}", runId);
+        // A folder this writer owns (AefRunFolder), so a failure below discards only its own run.
+        using var folder = AefRunFolder.Reserve(runsRoot, startedAt, "redteam");
+        var runId = folder.RunId;
+        var directory = folder.Directory;
         var endpoint = options.Endpoint is null ? null : AefConverter.Endpoint(AefConverter.WithoutCredentials(options.Endpoint));
         var controls = lines.Any(l => l.Control);
         var header = new AefRunHeader

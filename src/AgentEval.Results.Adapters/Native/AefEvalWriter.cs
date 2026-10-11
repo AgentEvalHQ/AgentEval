@@ -2,7 +2,6 @@
 // Copyright (c) 2026 AgentEval Contributors
 // Licensed under the MIT License.
 
-using System.Security.Cryptography;
 using System.Text;
 using AgentEval.Models;
 using AgentEval.Output;
@@ -133,8 +132,10 @@ public static class AefEvalWriter
 
         var all = cases.SelectMany(c => c).ToList();
 
-        var runId = $"{startedAt.UtcDateTime:yyyyMMddTHHmmssZ}-eval-{Convert.ToHexString(RandomNumberGenerator.GetBytes(4)).ToLowerInvariant()}";
-        var directory = Path.Combine(runsRoot, $"{startedAt.UtcDateTime:yyyy}", $"{startedAt.UtcDateTime:MM}", runId);
+        // A folder this writer owns (AefRunFolder), so a failure below discards only its own run.
+        using var folder = AefRunFolder.Reserve(runsRoot, startedAt, "eval");
+        var runId = folder.RunId;
+        var directory = folder.Directory;
         var digest = DatasetDigest(options.DatasetBytes);
         var endpoint = options.Endpoint is null ? null : AefConverter.Endpoint(AefConverter.WithoutCredentials(options.Endpoint));
         var header = new AefRunHeader
