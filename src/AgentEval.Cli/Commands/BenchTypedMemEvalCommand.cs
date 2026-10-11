@@ -58,8 +58,8 @@ public static class BenchTypedMemEvalCommand
     /// </param>
     public static Task<int> RunAsync(
         string vertical, string? subject, string? root, bool captureEvidenceContent,
-        CancellationToken ct = default)
-        => RunAsync(vertical, subject, root, captureEvidenceContent, chatClientOverride: null, ct);
+        CancellationToken ct = default, DirectoryInfo? aef = null, bool noAef = false, string? subjectVersion = null)
+        => RunAsync(vertical, subject, root, captureEvidenceContent, chatClientOverride: null, ct, aef, noAef, subjectVersion);
 
     /// <summary>
     /// Turns the caller's evidence-detail choice into runner options, or null to take the runner's
@@ -85,7 +85,10 @@ public static class BenchTypedMemEvalCommand
         string? root,
         bool captureEvidenceContent,
         Microsoft.Extensions.AI.IChatClient? chatClientOverride,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        DirectoryInfo? aef = null,
+        bool noAef = false,
+        string? subjectVersion = null)
     {
         if (string.IsNullOrWhiteSpace(subject))
         {
@@ -184,6 +187,7 @@ public static class BenchTypedMemEvalCommand
 
         // ── Run ──────────────────────────────────────────────────────────────
         ExternalBenchmarkResult result;
+        var startedAt = DateTimeOffset.UtcNow;
         try
         {
             result = await new TypedMemEvalRunner(chatClient)
@@ -316,6 +320,17 @@ public static class BenchTypedMemEvalCommand
         }
 
         PrintTypedReport(descriptor, result, typed, runId, runDir);
+
+        // AEF: a case per question, scored with no verdict (the vertical publishes no pass mark). The environment's
+        // provider is live; a client passed in (tests) is a stand-in.
+        if (!noAef)
+        {
+            var (tree, caseExt) = BenchAef.TypedTree(result, descriptor.Vertical.ToString().ToLowerInvariant(), chatClientOverride is null ? deployment : null);
+            if (BenchAef.WriteResult(aef, agentEvalDir, "typedmemeval", descriptor.Vertical.ToString().ToLowerInvariant(), subject!, subjectVersion,
+                    chatClientOverride is null ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
+                    tree, startedAt, DateTimeOffset.UtcNow, caseExt: caseExt))
+                return ExitCodes.RuntimeError;   // an explicit --aef could not be written
+        }
 
         // GateIndeterminate (11) is the documented bench code for "no verdict"; 6 belongs to
         // `gatekeeper inspect`, and reusing it would make a script keyed on exit codes read a

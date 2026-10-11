@@ -76,6 +76,55 @@ public sealed class AefEvalWriterTests : IDisposable
     }
 
     [Fact]
+    public void Write_TotalsTheRunsUsage_PerRoleAndModel_WithTheJudgesAsReported()
+    {
+        var options = Options() with { JudgeUsage = new AefUsage { Role = AefUsageRole.Judge, Model = "judge-x", InputTokens = 500, OutputTokens = 40 } };
+
+        PerformanceMetrics Perf(int input) => new() { StartTime = Start, EndTime = Start.AddSeconds(1), PromptTokens = input, CompletionTokens = 5, ModelUsed = "gpt-x" };
+        var complete = new TestSummary("demo",
+        [
+            new TestResult { TestName = "a", Passed = true, Score = 90, Performance = Perf(100) },
+            new TestResult { TestName = "b", Passed = true, Score = 90, Performance = Perf(30) },
+        ]);
+
+        var (dir, _) = AefEvalWriter.Write(_out, complete, ["c1", "c2"], options, Start, Start.AddSeconds(5));
+        var (partialDir, _) = AefEvalWriter.Write(Path.Combine(_out, "partial"), Summary(), ["c1", "c2", "c3"], options, Start, Start.AddSeconds(5));
+
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        var usage = AefTestRuns.Document(dir, "summary.json")["usage"]!.AsArray();
+        var agent = usage.Single(u => (string?)u!["role"] == "agent")!;
+        Assert.Equal("gpt-x", (string?)agent["model"]);
+        Assert.Equal(130, (long)agent["gen_ai.usage.input_tokens"]!);
+        // Two of the three cases reported no performance: the agent's total is unknown, not the one case's figure.
+        Assert.DoesNotContain(AefTestRuns.Document(partialDir, "summary.json")["usage"]!.AsArray(), u => (string?)u!["role"] == "agent");
+        var judge = usage.Single(u => (string?)u!["role"] == "judge")!;
+        Assert.Equal(500, (long)judge["gen_ai.usage.input_tokens"]!);
+        Assert.Equal(40, (long)judge["gen_ai.usage.output_tokens"]!);
+    }
+
+    [Fact]
+    public void Write_RecordsTheGate_NoShip_NamingTheCasesThatDidNotPass()
+    {
+        var (dir, _) = AefEvalWriter.Write(_out, Summary(), ["c1", "c2", "c3"], Options() with { GateRule = "all-cases-pass" }, Start, Start.AddSeconds(5));
+
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+        {
+            Assert.Equal("intact", (string?)reference["outcome"]);
+        }
+
+        var gate = JsonNode.Parse(File.ReadAllLines(Path.Combine(dir, "gates.ndjson")).Single())!;
+        Assert.Equal("no_ship", (string?)gate["outcome"]);
+        Assert.Equal(1, (int)gate["exitCode"]!);
+        Assert.Equal(2, gate["decisive"]!.AsArray().Count);   // c2 failed, c3 errored
+        Assert.Equal(3, gate["inputs"]!["results"]!.AsArray().Count);
+    }
+
+    [Fact]
+    public void Write_RecordsNoGate_WhenTheCommandHasNone() =>
+        Assert.False(File.Exists(Path.Combine(AefEvalWriter.Write(_out, Summary(), ["c1", "c2", "c3"], Options(), Start, Start.AddSeconds(5)).Directory, "gates.ndjson")));
+
+    [Fact]
     public void Write_RecordsAJudgeThatProducedNoVerdict_AsAnError_NeverAsAFailure()
     {
         var summary = new TestSummary("demo",

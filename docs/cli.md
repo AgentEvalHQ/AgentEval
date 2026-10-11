@@ -248,6 +248,8 @@ LLM-as-judge, named metrics (`--metrics`), and the `--output-dir` ADR-002 direct
 | `--golden <path>` | Compare this run with a golden trace and exit on regressions only (below). |
 | `--fail-on-tool-change` | With `--golden`, also exit `1` when a test case's tool calls changed. |
 | `--quiet` | Suppress the header, progress, summary, and the `--metrics` and `--sut` warnings. Errors are still printed. |
+| `--aef <dir>` / `--no-aef` | Where the sealed AEF run goes: by default a workspace's `.agenteval/aef`; `--aef` writes it anywhere and fails the command (exit 3) if it cannot; `--no-aef` writes none. See [Runs from eval, redteam and bench](aef.md#runs-from-eval-redteam-and-bench). |
+| `--subject <kind:name>` / `--subject-version <v>` | The subject the AEF run names, such as `agent:support-bot` (default `model:<model>`), and its exact version. |
 
 **Stochastic mode (`--runs` greater than 1)**
 
@@ -499,6 +501,11 @@ agenteval bench agentic calibrate [--root <path>] [--out <path>] [--records <pat
 **Notes**
 
 - `agenteval bench --list` prints the registry-backed family catalog.
+- **AEF runs:** `gdpr`, `eu-ai-act`, `agentic`, `owasp`, `mitre`, `nist`, `perf`, `memory`, `longmemeval`,
+  `typedmemeval`, `autoaudit`, `trace-fidelity` and `workflow-trace-fidelity` write each run as a sealed AEF run into the workspace's `.agenteval/aef` (or `--aef <dir>`;
+  `--no-aef` writes none; `--subject-version` records the subject's version, except on `autoaudit`, which audits
+  several models at once and records each as `model:<name>` with no version). A real target is recorded as `live`, a
+  graded `--response` or trace as `replayed`. See [Runs from eval, redteam and bench](aef.md#runs-from-eval-redteam-and-bench).
 - **Exit codes:** `bench <family>` and `bench <regulation> calibrate` return **9** (FAIL), **10** (WARN — `bench <family>` only), or **11** (indeterminate) for a benchmark gate outcome, and **3** if the judge fails to configure — see [Exit codes](#exit-codes). A missing required option (`--subject`, and for some families `--input`, `--vertical`, `--agent-trace`/`--chat-trace` or `--workflow-trace`), an `--evidence-detail` value other than `references` or `content`, and `agenteval bench` with no family and no `--list` return **2**.
 - Compliance and agentic families support calibration helpers where available. Each calibration report names the judge's provider and model in its header.
 - **`bench gdpr calibrate --decisions` and `bench eu-ai-act calibrate --decisions`** grade the golden datasets with the decision model (TypeSafe Jev) instead of the generative judge. The transport is read from `TYPESAFE_API_KEY` or `OPENROUTER_API_KEY` (`JEV_TRANSPORT` forces one, `JEV_MODEL` pins a build); with neither configured the command exits **3**. The report header names the provider (TypeSafe or OpenRouter) and the model that was requested, marked as requested, because the provider may serve a different build under that name. It never contains the key or the endpoint.
@@ -568,6 +575,8 @@ agenteval redteam [--azure] [--endpoint <url>] [--model <name>] [--deployment-na
 | `--calibration` | Relative scoring against a reference cohort. |
 | `--explain` | Attach an LLM rationale to each finding (requires `--judge`). |
 | `--benign-controls` | Also run benign look-alike requests and report over-refusal beside the attack success rate, graded by the over-refusal judge (needs `--judge`; does not change the verdict). |
+| `--aef <dir>` / `--no-aef` | Where the sealed AEF run goes: by default a workspace's `.agenteval/aef`; `--aef` writes it anywhere and fails the command (exit 3) if it cannot; `--no-aef` writes none. See [Runs from eval, redteam and bench](aef.md#runs-from-eval-redteam-and-bench). |
+| `--subject <kind:name>` / `--subject-version <v>` | The subject the AEF run names, such as `agent:support-bot` (default `model:<model>`), and its exact version. |
 
 For the full flag matrix and examples, see [Red Team Security](redteam.md). Exit codes: see [Exit codes](#exit-codes).
 

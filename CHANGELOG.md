@@ -36,6 +36,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`--aef`, `--no-aef`, `--subject-version`): the family's result, its parts as cases (or itself, when it has none),
   each recorded beside its own verdict, since no composite definition describes them. Perf drives the agent (`live`,
   or `mocked` for a stand-in); the trace-fidelity benches read traces and drive nothing (`replayed`).
+- **`agenteval bench memory` writes each run as sealed AEF evidence**: one case, the benchmark, with a weighted child
+  line per category (WeightedSum, as the overall score weighs them), with the command's own label (pass at 70, warn from 50); skipped and errored categories are typed
+  absences. The provider's model is the agent and its judge (`live`).
+- **`agenteval bench longmemeval` writes each run as sealed AEF evidence**: a case per question (its id), correct
+  `passed`, wrong `failed`, a question the judge could not score `not_measured` and one the agent did not answer
+  `error`; no question, gold answer or response is written.
+- **`eval`'s AEF runs carry the run's usage**: the agent's tokens and cost per model, and the judge's tokens as its
+  responses reported them (`--judge`; `--metrics` calls through the judge count too). A judge that reports no usage
+  adds no entry rather than a false zero.
+- **`agenteval bench typedmemeval` and `bench autoaudit` write sealed AEF runs, with no verdict**: neither publishes a
+  pass mark, so their lines are `scored` (measured, no pass or fail). TypedMemEval: a line per question, score 1 when
+  correct, its typed outcome (correct, wrong, abstained, missed, premature) beside it; the summary's mean is the
+  accuracy. Autoaudit: one run per audited model (a run has one subject), with a `fidelity` and a `safety` line; the
+  ranking stays in its report.
 - **`EvalDetails.Lineage`**: a composite records which rule decided its label (`required-error`, `nothing-measured`,
   `threshold`, `severity`, `under-covered`, `required-not-measured`, `failure-effect`) and the parts that decided it.
   It describes the verdict, never changes it, and is not serialised.

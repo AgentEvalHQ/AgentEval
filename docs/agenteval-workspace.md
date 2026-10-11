@@ -89,6 +89,10 @@ without overwriting anything.
 │   ├── findings.json
 │   └── reports/
 │
+├── aef/runs/<yyyy>/<MM>/<runId>/   # sealed AEF runs from eval, redteam and bench (see AEF Evidence Format)
+│   ├── run.json / results.ndjson / metrics.json / summary.json
+│   └── seal.json
+│
 ├── runs-index/                   # cross-cutting indices
 │   ├── recent.jsonl              # most recent N runs
 │   └── runs.index.jsonl          # master index

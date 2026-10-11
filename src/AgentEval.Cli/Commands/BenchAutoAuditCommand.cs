@@ -43,7 +43,9 @@ public static class BenchAutoAuditCommand
         IReadOnlyList<string>? models = null,
         bool mock = false,
         CancellationToken ct = default,
-        Func<string, IChatClient>? clientOverride = null)
+        Func<string, IChatClient>? clientOverride = null,
+        DirectoryInfo? aef = null,
+        bool noAef = false)
     {
         if (mock)
         {
@@ -83,8 +85,10 @@ public static class BenchAutoAuditCommand
         Console.WriteLine();
 
         var results = new List<AutoAuditEndpointResult>();
+        var times = new List<(DateTimeOffset Start, DateTimeOffset End)>();   // each model's own audit, for its AEF run
         foreach (var model in targets)
         {
+            var modelStart = DateTimeOffset.UtcNow;
             var endpoint = $"{model} ({provider})";
             IChatClient? owned = null;
             IChatClient client;
@@ -101,6 +105,7 @@ public static class BenchAutoAuditCommand
                     // rows already paid for.
                     Console.Error.WriteLine($"  {endpoint} did not complete: no client: {diagnostic}");
                     results.Add(new AutoAuditEndpointResult(endpoint, 0, 0, 0, 0, 0, Completed: false, TopDiscrepancies: []));
+                    times.Add((modelStart, DateTimeOffset.UtcNow));
                     continue;
                 }
                 client = owned = built;
@@ -114,6 +119,7 @@ public static class BenchAutoAuditCommand
                 if (failure is not null)
                     Console.Error.WriteLine($"  {endpoint} did not complete: {failure.GetType().Name}: {failure.Message}");
                 results.Add(result);
+                times.Add((modelStart, DateTimeOffset.UtcNow));
             }
             finally
             {
@@ -128,6 +134,25 @@ public static class BenchAutoAuditCommand
             "the SSN that reached the caller in a form the gate missed. Fidelity reconciles the tool loop's own account " +
             "with the chat boundary; a standard loop agrees with it, so it is 100% unless a turn ended on a content " +
             "filter or a length limit.", report, outPath, ct);
+
+        // AEF: one run per model (a run has one subject; the ranking compares the runs). The configured provider's
+        // models are live; clients passed in (tests) are stand-ins. Into --aef, else a workspace's .agenteval/aef.
+        var aefRoot = noAef ? null : EvalAef.Root(aef);
+        if (!noAef && aefRoot is null)
+        {
+            Console.Error.WriteLine("AEF: no .agenteval workspace here, so no run was written (--aef <dir> writes one anywhere).");
+        }
+        else if (aefRoot is not null)
+        {
+            for (var i = 0; i < results.Count; i++)
+            {
+                var (tree, caseExt) = BenchAef.AutoAuditTree(results[i]);
+                if (BenchAef.WriteResult(aef, Path.GetDirectoryName(aefRoot)!, "autoaudit", "support-task", targets[i], null,
+                        clientOverride is null ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
+                        tree, times[i].Start, times[i].End, subjectKind: "model", caseExt: caseExt))
+                    return ExitCodes.RuntimeError;   // an explicit --aef could not be written
+            }
+        }
 
         if (!results.Any(r => r.Completed))
         {

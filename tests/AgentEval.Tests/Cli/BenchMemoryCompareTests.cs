@@ -107,8 +107,32 @@ public sealed class BenchMemoryCompareTests : IDisposable
         Assert.Equal(ExitCodes.GateIndeterminate, exit);
         Assert.Contains("INCOMPLETE", stdout.ToString(), StringComparison.Ordinal);
         Assert.DoesNotContain("Grade:", stdout.ToString(), StringComparison.Ordinal);
-        var summary = Directory.GetFiles(_root, "summary.json", SearchOption.AllDirectories).Single();
+        var aef = Path.Combine(_root, ".agenteval", "aef") + Path.DirectorySeparatorChar;   // the AEF run has its own summary.json
+        var summary = Directory.GetFiles(_root, "summary.json", SearchOption.AllDirectories).Single(f => !f.StartsWith(aef, StringComparison.Ordinal));
         Assert.Contains("\"WARN\"", File.ReadAllText(summary));
+    }
+
+    [Fact]
+    public async Task RunAsync_WithAefAndAStandInClient_WritesAMockedRunWithWeightedCategories()
+    {
+        var aef = Path.Combine(_root, "aef-out");
+
+        await BenchMemoryCommand.RunAsync("quick", "mem-aef", _root, new FixedReplyChatClient(), aef: new DirectoryInfo(aef), subjectVersion: "1.0.0");
+
+        var run = Assert.Single(Directory.GetFiles(aef, "run.json", SearchOption.AllDirectories));
+        var dir = Path.GetDirectoryName(run)!;
+        var verification = AgentEval.Results.Integrity.AefRunVerifier.Verify(dir);
+        Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact, verification.Outcome);
+        Assert.Empty(verification.Problems);
+        var header = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(run))!;
+        Assert.Equal("mocked", (string?)header["execution"]!["targetMode"]);   // a client passed in, not the provider
+        Assert.Equal("bench:memory/quick", (string?)header["suite"]!["ref"]);
+        var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => System.Text.Json.Nodes.JsonNode.Parse(l)!).ToList();
+        Assert.NotEmpty(lines);
+        Assert.All(lines, l => Assert.StartsWith("memory.", (string?)l["caseId"]));
+        var root = Assert.Single(lines, l => l["parentResultId"] is null);   // one case: the benchmark
+        Assert.Equal("WeightedSum", (string?)root["aggregation"]!["strategy"]);
+        Assert.All(lines.Where(l => l["parentResultId"] is not null), l => Assert.NotNull(l["component"]!["weight"]));   // each category weighted
     }
 
     [Fact]

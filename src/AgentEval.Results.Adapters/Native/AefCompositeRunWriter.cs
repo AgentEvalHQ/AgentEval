@@ -41,6 +41,12 @@ public sealed record AefCompositeRunOptions
 
     /// <summary>A signer for the seal, if any.</summary>
     public IAefSigner? Signer { get; init; }
+
+    /// <summary>
+    /// Facts a case's root line carries in <c>ext</c>, by case id: what the producer measured that AEF has no field for
+    /// (TypedMemEval's typed outcome, say). Never content.
+    /// </summary>
+    public IReadOnlyDictionary<string, JsonObject>? CaseExt { get; init; }
 }
 
 /// <summary>
@@ -121,7 +127,8 @@ public static class AefCompositeRunWriter
 
             for (var i = 0; i < cases.Count; i++)
             {
-                Add(writer, cases[i], caseShapes[i], cases[i].Metric.Key, CasePath, parent: null, component: null);
+                Add(writer, cases[i], caseShapes[i], cases[i].Metric.Key, CasePath, parent: null, component: null,
+                    options.CaseExt is { } caseExt && caseExt.TryGetValue(cases[i].Metric.Key, out var ext) ? ext : null);
             }
 
             writer.SetSummary(new AefSummary
@@ -170,13 +177,14 @@ public static class AefCompositeRunWriter
                 "error" => AefState.Error,
                 "skipped" => AefState.Skipped,
                 "inapplicable" => AefState.NotApplicable,
+                "scored" => AefState.Scored,   // measured, with no verdict: a benchmark that publishes no pass mark
                 _ => score.Passed ? AefState.Passed : AefState.Failed,
             },
         };
     }
 
     private static void Add(AefRunWriter writer, EvalResult node, AefComponentShape shape, string caseId, string path,
-        AefResultHandle? parent, AefComponent? component)
+        AefResultHandle? parent, AefComponent? component, JsonObject? caseExt = null)
     {
         var subs = node.Details.SubResults ?? [];
         var state = StateOf(node.Score);
@@ -233,7 +241,7 @@ public static class AefCompositeRunWriter
             Component = component,
             Ext = component is not null && shape.OnFailure != "Averaged"
                 ? new JsonObject { ["agenteval.component"] = new JsonObject { ["onFailure"] = shape.OnFailure } }
-                : null,
+                : caseExt?.DeepClone().AsObject(),
         }, parent);
 
         for (var i = 0; i < subs.Count; i++)

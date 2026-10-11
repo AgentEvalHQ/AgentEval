@@ -44,8 +44,9 @@ namespace AgentEval.Cli.Commands;
 public static class BenchLongMemEvalCommand
 {
     /// <summary>Runs the bench longmemeval command using auto-discovered workspace root.</summary>
-    public static Task<int> RunAsync(string preset, string subject, string? rootOverride, CancellationToken ct = default)
-        => RunAsync(preset, subject, rootOverride, chatClientOverride: null, ct);
+    public static Task<int> RunAsync(string preset, string subject, string? rootOverride, CancellationToken ct = default,
+        DirectoryInfo? aef = null, bool noAef = false, string? subjectVersion = null)
+        => RunAsync(preset, subject, rootOverride, chatClientOverride: null, ct, aef, noAef, subjectVersion);
 
     /// <summary>Internal overload exposed for tests; allows chat-client injection.</summary>
     internal static async Task<int> RunAsync(
@@ -53,7 +54,10 @@ public static class BenchLongMemEvalCommand
         string subject,
         string? rootOverride,
         Microsoft.Extensions.AI.IChatClient? chatClientOverride,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        DirectoryInfo? aef = null,
+        bool noAef = false,
+        string? subjectVersion = null)
     {
         // ── Workspace setup ──────────────────────────────────────────────────
         if (rootOverride is not null)
@@ -163,6 +167,7 @@ public static class BenchLongMemEvalCommand
 
         // ── Run ──────────────────────────────────────────────────────────────
         ExternalBenchmarkResult result;
+        var startedAt = DateTimeOffset.UtcNow;
         try
         {
             result = await runner.RunAsync(agent, benchmarkConfig, options, ct);
@@ -256,6 +261,14 @@ public static class BenchLongMemEvalCommand
             Console.Error.WriteLine($"Failed to persist LongMemEval run: {ex.Message}");
             return 1;
         }
+
+        // AEF: a case per question. The environment's provider is live; a client passed in (tests) is a stand-in.
+        if (!noAef && BenchAef.WriteResult(aef, agentEvalDir, "longmemeval", preset, subject, subjectVersion,
+                chatClientOverride is null ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
+                BenchAef.QuestionTree(result, "longmemeval", preset, LongMemEvalVerdict(result.OverallAccuracy, result.QuestionResults.Count - result.ScoredQuestions),
+                    chatClientOverride is null ? deployment : null),
+                startedAt, DateTimeOffset.UtcNow))
+            return ExitCodes.RuntimeError;   // an explicit --aef could not be written
 
         return LongMemEvalVerdict(result.OverallAccuracy, result.QuestionResults.Count - result.ScoredQuestions) switch
         {

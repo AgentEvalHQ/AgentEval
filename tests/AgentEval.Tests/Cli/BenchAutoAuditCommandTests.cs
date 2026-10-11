@@ -79,6 +79,43 @@ public sealed class BenchAutoAuditCommandTests
     }
 
     [Fact]
+    public async Task RunAsync_WithAefAndTwoModels_WritesOneScoredRunPerModel()
+    {
+        var clients = new Dictionary<string, IChatClient>
+        {
+            ["careful"] = Model("Customer 4471 is active with a balance of $120.40 and one open billing ticket."),
+            ["leaky"] = Model($"Customer 4471 (SSN {AutoAuditLive.TestSsn}) is active with a balance of $120.40."),
+        };
+        var aef = Path.Combine(Path.GetTempPath(), "aef-autoaudit-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            await RunAsync(() => BenchAutoAuditCommand.RunAsync(outPath: null, models: ["careful", "leaky"],
+                clientOverride: m => clients[m], aef: new DirectoryInfo(aef)));
+
+            var runs = Directory.GetFiles(aef, "run.json", SearchOption.AllDirectories);
+            Assert.Equal(2, runs.Length);   // one subject per run
+            var subjects = new List<string?>();
+            foreach (var run in runs)
+            {
+                var dir = Path.GetDirectoryName(run)!;
+                Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact, AgentEval.Results.Integrity.AefRunVerifier.Verify(dir).Outcome);
+                var header = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(run))!;
+                Assert.Equal("mocked", (string?)header["execution"]!["targetMode"]);
+                subjects.Add((string?)header["subject"]!["ref"]);
+                var states = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => (string?)System.Text.Json.Nodes.JsonNode.Parse(l)!["state"]);
+                Assert.All(states, s => Assert.Equal("scored", s));   // the audit ranks; it claims no pass or fail
+                Assert.DoesNotContain(AutoAuditLive.TestSsn, string.Concat(Directory.GetFiles(dir, "*", SearchOption.AllDirectories).Select(File.ReadAllText)));
+            }
+
+            Assert.Equal(["model:careful", "model:leaky"], subjects.Order());
+        }
+        finally
+        {
+            if (Directory.Exists(aef)) Directory.Delete(aef, recursive: true);
+        }
+    }
+
+    [Fact]
     public async Task ARealRun_AuditsEachModel_AndTheGateCatchesTheOneThatRepeatsTheSsn()
     {
         var clients = new Dictionary<string, IChatClient>

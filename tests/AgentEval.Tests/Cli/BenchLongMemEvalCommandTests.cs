@@ -58,6 +58,17 @@ public sealed class BenchLongMemEvalCommandTests
         var summary = JsonDocument.Parse(
             await File.ReadAllTextAsync(Path.Combine(runDirectory, "summary.json")));
         Assert.Equal("WARN", summary.RootElement.GetProperty("verdict").GetString());
+
+        // The AEF run: a case per question; the unscored one is not measured, never failed; no answer is written.
+        var aefRun = Assert.Single(Directory.GetFiles(Path.Combine(fixture.Root, ".agenteval", "aef"), "run.json", SearchOption.AllDirectories));
+        var aefDir = Path.GetDirectoryName(aefRun)!;
+        Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact, AgentEval.Results.Integrity.AefRunVerifier.Verify(aefDir).Outcome);
+        Assert.Contains("\"mocked\"", File.ReadAllText(aefRun));
+        var states = File.ReadAllLines(Path.Combine(aefDir, "results.ndjson"))
+            .Select(l => (string?)System.Text.Json.Nodes.JsonNode.Parse(l)!["state"]).Order().ToList();
+        Assert.Equal(["failed", "not_measured", "passed"], states);
+        var aefText = string.Concat(Directory.GetFiles(aefDir, "*", SearchOption.AllDirectories).Select(File.ReadAllText));
+        Assert.DoesNotContain("agent answer", aefText, StringComparison.Ordinal);
         var stats = summary.RootElement.GetProperty("stats");
         Assert.Equal(3, stats.GetProperty("total").GetInt32());
         Assert.Equal(1, stats.GetProperty("passed").GetInt32());

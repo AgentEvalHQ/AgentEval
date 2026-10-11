@@ -373,10 +373,12 @@ internal static class EvalCommand
             throw new InvalidOperationException($"Dataset is empty: {opts.Dataset.FullName}");
 
         // 5. Create harness (optionally with LLM judge)
-        IChatClient? judgeClient = opts.JudgeEndpoint is not null
-            ? CliChatClientDiagnostics.Wrap(EndpointFactory.CreateOpenAICompatible(
-                opts.JudgeEndpoint, opts.JudgeModel ?? resolvedName, opts.ApiKey), "judge")
+        // The ledger counts the judge's calls and the tokens they report, for the AEF run's usage.
+        var judgeLedger = opts.JudgeEndpoint is not null
+            ? new JudgeCallLedger(CliChatClientDiagnostics.Wrap(EndpointFactory.CreateOpenAICompatible(
+                opts.JudgeEndpoint, opts.JudgeModel ?? resolvedName, opts.ApiKey), "judge"))
             : null;
+        IChatClient? judgeClient = judgeLedger;
         var harness = judgeClient is not null
             ? new MAFEvaluationHarness(judgeClient, verbose: opts.Verbose && !opts.Quiet)
             : new MAFEvaluationHarness(verbose: opts.Verbose && !opts.Quiet);
@@ -421,7 +423,7 @@ internal static class EvalCommand
                     "(stochastic scoring is not wired to the named-metric pipeline yet).");
 
             return await ExecuteStochasticAsync(opts, harness, agent, testCases, evalOptions, resolvedName,
-                standIn ? AefTargetMode.Mocked : AefTargetMode.Live, ct);
+                standIn ? AefTargetMode.Mocked : AefTargetMode.Live, judgeLedger, ct);
         }
 
         // 6c. Standard single-run evaluation path
@@ -453,7 +455,7 @@ internal static class EvalCommand
         // fails the command only when --aef asked for it; otherwise it is a warning and the evaluation stands.
         // A real target (--endpoint, --azure, --sut) is live; a stand-in a caller passes in is never written as live.
         var targetMode = standIn ? AefTargetMode.Mocked : AefTargetMode.Live;
-        var aefFailed = WriteAef(opts, resolvedName, targetMode,
+        var aefFailed = WriteAef(opts, resolvedName, targetMode, judgeLedger,
             (runs, aefOptions) => AefEvalWriter.Write(runs, summary, EvalAef.CaseIds(testCases), aefOptions, startedAt, DateTimeOffset.UtcNow,
                 testCases.Select(c => c.ToTestCase().PassingScore).ToList()));
 
@@ -576,7 +578,7 @@ internal static class EvalCommand
     /// written. A write the user did not ask for fails with a warning: the evaluation's own result stands.
     /// </summary>
     private static bool WriteAef(
-        EvalOptions opts, string resolvedName, AefTargetMode targetMode,
+        EvalOptions opts, string resolvedName, AefTargetMode targetMode, JudgeCallLedger? judge,
         Func<string, AefEvalRunOptions, (string Directory, string RunHash)> write)
     {
         var root = EvalAef.Root(opts);
@@ -599,6 +601,11 @@ internal static class EvalCommand
                 // The judge the harness was given: only with --judge, on --judge-model or the subject's model.
                 JudgeModel = opts.JudgeEndpoint is null ? null : opts.JudgeModel ?? resolvedName,
                 TargetMode = targetMode,
+                // The gate the exit code applies; against a golden trace it is the regression check, not recorded yet.
+                GateRule = opts.Golden is not null ? null : opts.Runs > 1 ? "all-cases-pass-at-least" : "all-cases-pass",
+                JudgeUsage = judge is { ReportedUsage: true }
+                    ? new AefUsage { Role = AefUsageRole.Judge, Model = opts.JudgeModel ?? resolvedName, InputTokens = judge.InputTokens, OutputTokens = judge.OutputTokens }
+                    : null,
                 DatasetName = Path.GetRelativePath(Directory.GetCurrentDirectory(), opts.Dataset.FullName).Replace('\\', '/'),
                 DatasetBytes = File.ReadAllBytes(opts.Dataset.FullName),
             });
@@ -736,6 +743,7 @@ internal static class EvalCommand
         EvaluationOptions evalOptions,
         string resolvedName,
         AefTargetMode targetMode,
+        JudgeCallLedger? judgeLedger,
         CancellationToken ct)
     {
         var runner = new StochasticRunner(harness, statisticsCalculator: null, evalOptions);
@@ -777,7 +785,7 @@ internal static class EvalCommand
         await ExportReportAsync(opts, report, ct);
 
         // AEF: a line per trial and a rollup per case, under AtLeast with the least pass count that meets the threshold.
-        var aefFailed = WriteAef(opts, resolvedName, targetMode,
+        var aefFailed = WriteAef(opts, resolvedName, targetMode, judgeLedger,
             (runs, aefOptions) => AefEvalWriter.WriteTrials(
                 runs, results.Select(r => r.IndividualResults).ToList(), EvalAef.CaseIds(datasetTestCases),
                 AefEvalWriter.RequirePasses(opts.SuccessThreshold, opts.Runs), aefOptions, startTime, DateTimeOffset.UtcNow));

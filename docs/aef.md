@@ -85,6 +85,51 @@ An exported store run is marked as imported, and lists what the exporter *suppli
 exported run is never passed off as live evidence unless you say it was. The full mapping is in the specification,
 §7.5.
 
+## Runs from eval, redteam and bench
+
+`agenteval eval`, `agenteval redteam` and the `agenteval bench` families write each run they make as a sealed AEF
+run. Nothing to switch on: in a workspace (a folder with `.agenteval/`, see `agenteval init-workspace`) every run lands
+in `.agenteval/aef/runs/<yyyy>/<MM>/<runId>/`, and the command prints its folder and run hash.
+
+| Option | What it does |
+|---|---|
+| `--aef <dir>` | Write the run under `<dir>/runs/` instead, anywhere. If it cannot be written, the command fails (exit 3). |
+| `--no-aef` | Write no AEF run. |
+| `--subject <kind:name>` | `eval` and `redteam`: the subject's ref, such as `agent:support-bot` (default `model:<model>`; a built-in redteam target is `agent:<target>`). Bench families use `--subject` as the agent's name. |
+| `--subject-version <v>` | The subject's exact version. A checkpoint lane only counts runs that name one. |
+
+Without a workspace and without `--aef`, the command says so and writes no run. Without `--aef`, a run that cannot be
+written is a warning, never a failure.
+
+**What each command records**
+
+| Command | Lane | One line per | Notes |
+|---|---|---|---|
+| `eval` | `eval` | test case (`case`) | Judge criteria at `case/criteria/<n>` and assertions at `case/assertions/<n>`, beside the case's own verdict. With `--runs N`, one line per run and a rollup per case: it passes when at least the number of runs that meets `--success-threshold` passed, fails when it could not have, and is `error` when runs that errored leave it undecided. |
+| `redteam` | `redteam` | probe (`probe`, case `<attack>/<probe>`) | Resisted is `passed`; a successful attack is `failed` with `attack.success`, its severity and OWASP LLM / MITRE ATLAS ids; an attack that cannot be measured in the setup is `not_applicable`. Benign controls are lane `over-refusal`, path `control`. |
+| `bench gdpr`, `eu-ai-act`, `agentic` | the family | top-level part of the preset (`case`) | The preset's tree below each case: every part's weight, whether it is required and its failure effect, and for every composite the rule that decided it (threshold, severity, a required part that errored, …) and the parts that did. |
+| `bench owasp`, `mitre`, `nist` | the family | probe | The scan's probes, as `redteam` writes them; the benchmark's own verdict is in the summary. |
+| `bench perf`, `trace-fidelity`, `workflow-trace-fidelity` | the family | part of the result (`case`) | Each part beside its own verdict. |
+| `bench longmemeval` | `longmemeval` | question (`case`, its id) | Correct `passed`, wrong `failed`, unscored `not_measured`, unanswered `error`; no question or answer text. |
+| `bench typedmemeval` | `typedmemeval` | question (`case`, its id) | `scored`: measured, no pass or fail (the benchmark publishes no pass mark); score 1 when correct; the typed outcome (`abstained`, `missed`, …) in `ext`. |
+| `bench autoaudit` | `autoaudit` | one run per model, lines `fidelity` and `safety` | `scored`; the ranking compares the runs and stays in the report. |
+| `bench memory` | `memory` | the benchmark (`case`), with one weighted child line per category | `WeightedSum`, as the overall score weighs the categories; each category with the command's label (pass at 70, warn from 50). |
+
+Not yet: `bench --runs` above 1 (the command says so).
+
+**How the run says what was tested.** `execution.targetMode` is never assumed:
+
+- `live` only for a target the command itself resolved: `--endpoint`/`--azure`, `--sut <target>` or `--from-env`;
+- `replayed` when the command graded an answer or trace the agent already gave (`--response`, `bench agentic`, the
+  trace-fidelity families);
+- `scripted` for a scripted model (`redteam --sut gatekeeper-demo --scripted`);
+- `mocked` for a stand-in. A `--sut mock` run is not stored and writes no AEF run.
+
+**No content.** These runs are written with `contentCapture: off`: no prompt, response, judge reasoning, criterion
+text, assertion name or message, or error message. A typed absence says only its kind ("the probe timed out", "the
+judge produced no verdict"). A dataset row without an `id` is written under the loader's id (`item_0`), never its text.
+The dataset itself is identified by its digest.
+
 ## Checking AEF without AgentEval
 
 AEF does not depend on AgentEval. The specification ships a conformance corpus (over 600 vectors, each expected result
@@ -106,12 +151,11 @@ specification says how to claim conformance.
 - **Nothing makes a result true.** AEF makes results attributable and tamper-evident, nothing more.
 - **Overlays never change the sealed run.** An override is shown beside the sealed result, never instead of it.
 
-## Today and next
+## What AgentEval does with AEF today
 
-- **Today:** the `agenteval aef` command checks, seals and views AEF runs, checks checkpoints, and converts store v1
-  and ASSERT runs.
-- **Next:** AgentEval's evaluation pipelines will write AEF directly (ADR-035), and `AgentEval.Results` will be
-  published as a package.
+- `eval`, `redteam` and the `bench` families write AEF runs directly (above).
+- The `agenteval aef` command checks, seals and views runs, checks checkpoints, and converts store v1, ASSERT,
+  OpenTelemetry and Inspect runs.
 
 ## Read more
 
