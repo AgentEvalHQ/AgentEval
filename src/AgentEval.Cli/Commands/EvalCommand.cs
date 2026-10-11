@@ -601,6 +601,8 @@ internal static class EvalCommand
                 // The judge the harness was given: only with --judge, on --judge-model or the subject's model.
                 JudgeModel = opts.JudgeEndpoint is null ? null : opts.JudgeModel ?? resolvedName,
                 TargetMode = targetMode,
+                // The gate the exit code applies; against a golden trace it is the regression check, not recorded yet.
+                GateRule = opts.Golden is not null ? null : opts.Runs > 1 ? "all-cases-pass-at-least" : "all-cases-pass",
                 JudgeUsage = judge is { ReportedUsage: true }
                     ? new AefUsage { Role = AefUsageRole.Judge, Model = opts.JudgeModel ?? resolvedName, InputTokens = judge.InputTokens, OutputTokens = judge.OutputTokens }
                     : null,

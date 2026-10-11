@@ -93,6 +93,28 @@ public sealed class AefEvalWriterTests : IDisposable
     }
 
     [Fact]
+    public void Write_RecordsTheGate_NoShip_NamingTheCasesThatDidNotPass()
+    {
+        var (dir, _) = AefEvalWriter.Write(_out, Summary(), ["c1", "c2", "c3"], Options() with { GateRule = "all-cases-pass" }, Start, Start.AddSeconds(5));
+
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+        {
+            Assert.Equal("intact", (string?)reference["outcome"]);
+        }
+
+        var gate = JsonNode.Parse(File.ReadAllLines(Path.Combine(dir, "gates.ndjson")).Single())!;
+        Assert.Equal("no_ship", (string?)gate["outcome"]);
+        Assert.Equal(1, (int)gate["exitCode"]!);
+        Assert.Equal(2, gate["decisive"]!.AsArray().Count);   // c2 failed, c3 errored
+        Assert.Equal(3, gate["inputs"]!["results"]!.AsArray().Count);
+    }
+
+    [Fact]
+    public void Write_RecordsNoGate_WhenTheCommandHasNone() =>
+        Assert.False(File.Exists(Path.Combine(AefEvalWriter.Write(_out, Summary(), ["c1", "c2", "c3"], Options(), Start, Start.AddSeconds(5)).Directory, "gates.ndjson")));
+
+    [Fact]
     public void Write_RecordsAJudgeThatProducedNoVerdict_AsAnError_NeverAsAFailure()
     {
         var summary = new TestSummary("demo",

@@ -37,6 +37,13 @@ public sealed record AefEvalRunOptions
     /// </summary>
     public AefUsage? JudgeUsage { get; init; }
 
+    /// <summary>
+    /// The gate the command decided on when it closed, if its decision rests on the cases alone: its rule name, such
+    /// as <c>all-cases-pass</c>. The run then records it ([GATE-1]): <c>ship</c> (exit 0) when every case passed,
+    /// <c>no_ship</c> (exit 1) otherwise, naming the cases that did not pass. Null records none.
+    /// </summary>
+    public string? GateRule { get; init; }
+
     /// <summary>How the run drove its target ([RUN-7]); a stand-in target is never <c>live</c>.</summary>
     public required AefTargetMode TargetMode { get; init; }
 
@@ -185,11 +192,12 @@ public static class AefEvalWriter
                 },
             ]);
 
+            var roots = new List<(string ResultId, AefState State)>();
             for (var i = 0; i < cases.Count; i++)
             {
                 if (requirePasses is not { } required)
                 {
-                    AddCase(writer, cases[i][0], caseIds[i], passingScores?[i]);
+                    roots.Add(AddCase(writer, cases[i][0], caseIds[i], passingScores?[i]));
                     continue;
                 }
 
@@ -198,7 +206,26 @@ public static class AefEvalWriter
                     writer.AddResult(Line(cases[i][t], caseIds[i], t));
                 }
 
-                writer.AddResult(Rollup(cases[i], caseIds[i], required));
+                var rollup = Rollup(cases[i], caseIds[i], required);
+                roots.Add((writer.AddResult(rollup).ResultId, rollup.State));
+            }
+
+            if (options.GateRule is { } rule)
+            {
+                // The command's own gate: every case passed, or it does not ship (exit 1, as the command exits).
+                var notPassed = roots.Where(r => r.State != AefState.Passed).Select(r => r.ResultId).ToList();
+                writer.AddGate(new AefGateDecision
+                {
+                    GateId = "gate:eval",
+                    DecisionId = runId + "-gate",
+                    Rule = new AefGateRule(rule),
+                    Inputs = new AefGateInputs { Results = roots.Select(r => r.ResultId).ToList() },
+                    Comparability = AefComparability.NotApplicable,
+                    Outcome = notPassed.Count == 0 ? AefGateOutcome.Ship : AefGateOutcome.NoShip,
+                    ExitCode = notPassed.Count == 0 ? 0 : 1,
+                    Decisive = notPassed.Count > 0 ? notPassed : null,
+                    DecidedAt = AefTime.FromDateTimeOffset(endedAt),
+                });
             }
 
             var cost = all.Select(r => r.Performance?.EstimatedCost).Where(c => c is not null).Sum(c => (double)c!.Value);
@@ -312,7 +339,7 @@ public static class AefEvalWriter
     // A case and its children: the judge's criteria (graded by the judge, so no text of them is written) and the
     // assertions (no name or message: either may quote the expected text or the response). The
     // case's verdict is its own, recorded beside them: Own, with each child weight 0 and not required (§7.5).
-    private static void AddCase(AefRunWriter writer, TestResult result, string caseId, int? passingScore)
+    private static (string ResultId, AefState State) AddCase(AefRunWriter writer, TestResult result, string caseId, int? passingScore)
     {
         var children = new List<AefResult>();
         var criteria = result.JudgeFailed ? [] : result.CriteriaResults ?? [];
@@ -359,6 +386,8 @@ public static class AefEvalWriter
         {
             writer.AddResult(child, handle);
         }
+
+        return (handle.ResultId, root.State);
     }
 
     private static AefResult Child(string caseId, string path, string evaluator, AefState state) => new()
