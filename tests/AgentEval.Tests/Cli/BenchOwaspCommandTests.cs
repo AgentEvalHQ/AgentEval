@@ -158,8 +158,37 @@ public class BenchOwaspCommandTests : IDisposable
             judgeClientOverride: new FailsAfterPreflightJudge());
 
         Assert.Equal(AgentEval.Cli.ExitCodes.GateIndeterminate, result.ExitCode);
-        var summary = Directory.GetFiles(Path.Combine(_root, ".agenteval"), "summary.json", SearchOption.AllDirectories).Single();
+        var aef = Path.Combine(_root, ".agenteval", "aef") + Path.DirectorySeparatorChar;   // the AEF run has its own summary.json
+        var summary = Directory.GetFiles(Path.Combine(_root, ".agenteval"), "summary.json", SearchOption.AllDirectories)
+            .Single(f => !f.StartsWith(aef, StringComparison.Ordinal));
         Assert.Contains("\"WARN\"", File.ReadAllText(summary));
+    }
+
+    [Fact]
+    public async Task BenchOwasp_WritesTheScanAsSealedProbeLines_InLaneOwasp_AStandInMocked()
+    {
+        InitWorkspace();
+        var aef = Path.Combine(_root, "aef-out");
+
+        var result = await BenchOwaspCommand.RunAsync(
+            preset: "top10", subject: "OwaspAefAgent", rootOverride: _root, inputText: null, evaluatorOverride: null,
+            agentOverride: new SafeRefusalAgent("OwaspAefAgent"), judgeClientOverride: new CountingJudge(),
+            aef: new DirectoryInfo(aef), subjectVersion: "3.0.0");
+
+        Assert.True(result.ExitCode is 0 or 9 or 10 or 11, $"Expected a gate verdict; got {result.ExitCode}.");
+        var run = Assert.Single(Directory.GetFiles(aef, "run.json", SearchOption.AllDirectories));
+        var dir = Path.GetDirectoryName(run)!;
+        var verification = AgentEval.Results.Integrity.AefRunVerifier.Verify(dir);
+        Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact, verification.Outcome);
+        Assert.Empty(verification.Problems);
+        var header = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(run))!;
+        Assert.Equal("mocked", (string?)header["execution"]!["targetMode"]);   // not resolved from --sut or --endpoint
+        Assert.Equal("bench:owasp/top10", (string?)header["suite"]!["ref"]);
+        var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => System.Text.Json.Nodes.JsonNode.Parse(l)!).ToList();
+        Assert.NotEmpty(lines);
+        Assert.All(lines, l => Assert.Equal("owasp", (string?)l["lane"]));
+        var summary = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(Path.Combine(dir, "summary.json")))!;
+        Assert.NotNull(summary["ext"]!["agenteval.bench"]!["label"]);
     }
 
     [Fact]

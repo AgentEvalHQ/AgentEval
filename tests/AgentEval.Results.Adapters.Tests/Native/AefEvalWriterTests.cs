@@ -106,6 +106,110 @@ public sealed class AefEvalWriterTests : IDisposable
         Assert.Null(AefTestRuns.Document(withoutJudge, "run.json")["judges"]);
     }
 
+    [Fact]
+    public void Write_RecordsCriteriaAndAssertionsAsChildren_BesideTheCasesOwnVerdict()
+    {
+        var summary = new TestSummary("demo",
+        [
+            new TestResult
+            {
+                TestName = "judged", Passed = true, Score = 85,
+                CriteriaResults =
+                [
+                    new AgentEval.Core.CriterionResult { Criterion = "mentions the refund policy", Met = true, Explanation = "the reply quotes it" },
+                    new AgentEval.Core.CriterionResult { Criterion = "is polite", Met = false },
+                ],
+                AssertionResults =
+                [
+                    AgentEval.Output.AssertionResult.Pass("Contain(\"the refund window is 30 days\")"),
+                    AgentEval.Output.AssertionResult.Fail("HaveCallCount", "Expected 2 tool call(s), but 3 were made."),
+                    AgentEval.Output.AssertionResult.Undecidable("NeverCallTool(PlaceOrder)", "not a declared tool"),
+                ],
+            },
+        ]);
+
+        var (dir, _) = AefEvalWriter.Write(_out, summary, ["c1"], Options(), Start, Start.AddSeconds(1), passingScores: [70]);
+
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+        {
+            Assert.Equal("intact", (string?)reference["outcome"]);
+        }
+
+        var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!.AsObject()).ToList();
+        var root = lines.Single(l => (string?)l["path"] == "case");
+        Assert.Equal("Own", (string?)root["aggregation"]!["strategy"]);
+        Assert.Equal("threshold", (string?)root["aggregation"]!["rulePath"]);
+        Assert.Equal(70.0, (double)root["aggregation"]!["threshold"]!);
+        Assert.Equal(5, (int)root["aggregation"]!["total"]!);
+        var children = lines.Where(l => l["parentResultId"] is not null).ToDictionary(l => (string)l["path"]!, l => (string?)l["state"]);
+        Assert.Equal("passed", children["case/criteria/1"]);
+        Assert.Equal("failed", children["case/criteria/2"]);
+        Assert.Equal("passed", children["case/assertions/1"]);
+        Assert.Equal("failed", children["case/assertions/2"]);
+        Assert.Equal("inconclusive", children["case/assertions/3"]);
+        var all = string.Concat(Directory.GetFiles(dir, "*", SearchOption.AllDirectories).Select(File.ReadAllText));
+        Assert.DoesNotContain("refund policy", all, StringComparison.Ordinal);   // criterion text is the suite's, not written
+        Assert.DoesNotContain("quotes it", all, StringComparison.Ordinal);       // the judge's explanation is content
+        Assert.DoesNotContain("were made", all, StringComparison.Ordinal);       // an assertion's message may quote the response
+        Assert.DoesNotContain("refund window", all, StringComparison.Ordinal);   // nor its name the expected text
+    }
+
+    private static TestResult Pass(int score = 90) => new() { TestName = "t", Passed = true, Score = score };
+    private static TestResult Fail(int score = 20) => new() { TestName = "t", Passed = false, Score = score };
+    private static TestResult Broken() => new() { TestName = "t", Passed = false, Error = new TimeoutException() };
+
+    [Fact]
+    public void WriteTrials_WritesALinePerTrial_AndARollupPerCase_IntactUnderBothVerifiers()
+    {
+        // requirePasses 2 of 3: c1 passes 3/3; c2 passes 1/3 with no unmeasured trial, so it fails and is flaky;
+        // c3 passes 1/3 with one error, which could have been the second pass, so it is undecided: an error.
+        IReadOnlyList<IReadOnlyList<TestResult>> trials =
+        [
+            [Pass(), Pass(80), Pass(70)],
+            [Pass(), Fail(), Fail()],
+            [Pass(), Fail(), Broken()],
+        ];
+
+        var (dir, _) = AefEvalWriter.WriteTrials(_out, trials, ["c1", "c2", "c3"], 2, Options(), Start, Start.AddSeconds(9));
+
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+        {
+            Assert.Equal("intact", (string?)reference["outcome"]);
+        }
+
+        var policy = AefTestRuns.Document(dir, "run.json")["suite"]!["executionPolicy"]!;
+        Assert.Equal(3, (int)policy["trialsPerCase"]!);
+        Assert.Equal(2, (int)policy["requirePasses"]!);
+        Assert.Equal("AtLeast", (string?)policy["aggregation"]);
+
+        var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!.AsObject()).ToList();
+        Assert.Equal(9, lines.Count(l => l["trial"] is not null));
+        var rollups = lines.Where(l => l["trials"] is not null).ToDictionary(l => (string)l["caseId"]!);
+        Assert.Equal(["passed", "failed", "error"], new[] { "c1", "c2", "c3" }.Select(c => (string?)rollups[c]["state"]));
+        Assert.Equal(80.0, (double)rollups["c1"]["scores"]![0]!["value"]!);   // the mean of 90, 80, 70
+        Assert.False((bool)rollups["c2"]["trials"]!["agree"]!);
+        Assert.Equal(1, (int)rollups["c3"]["trials"]!["passed"]!);
+        Assert.StartsWith("1 of 3 trials were not measured", (string?)rollups["c3"]["reason"]);
+        var pass = AefTestRuns.Document(dir, "summary.json")["lanes"]![0]!["metrics"]![0]!;   // rollups only (SUM-3)
+        Assert.Equal(0.5, (double)pass["value"]!);   // c1 passed, c2 failed
+        Assert.Equal(1, (int)pass["notMeasured"]!);   // c3 is undecided
+    }
+
+    [Theory]
+    [InlineData(0.8, 5, 4)]
+    [InlineData(0.8, 3, 3)]
+    [InlineData(0.5, 4, 2)]
+    [InlineData(1.0, 10, 10)]
+    [InlineData(0.01, 3, 1)]
+    public void RequirePasses_IsTheLeastPassCountThatMeetsTheThreshold(double threshold, int trials, int expected) =>
+        Assert.Equal(expected, AefEvalWriter.RequirePasses(threshold, trials));
+
+    [Fact]
+    public void RequirePasses_RefusesAThresholdThatZeroPassesMeet() =>
+        Assert.Throws<ArgumentOutOfRangeException>(() => AefEvalWriter.RequirePasses(0, 5));
+
     [Theory]
     [InlineData("agent:a", AefSubjectKind.Agent)]
     [InlineData("workflow:w", AefSubjectKind.Workflow)]

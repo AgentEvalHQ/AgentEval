@@ -47,7 +47,10 @@ public static class BenchAgenticCommand
         bool mock = false,
         string? reference = null,
         string? context = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        DirectoryInfo? aef = null,
+        bool noAef = false,
+        string? subjectVersion = null)
     {
         // A blank reference or context is none: the checks that need one then report not measured, as without the flag.
         reference = string.IsNullOrWhiteSpace(reference) ? null : reference;
@@ -245,6 +248,7 @@ public static class BenchAgenticCommand
 
         string runId;
         EvalResult compositeResult;
+        var startedAt = DateTimeOffset.UtcNow;
         try
         {
             var runner = new AgenticBenchmarkRunner();
@@ -322,6 +326,13 @@ public static class BenchAgenticCommand
                         ? "This preset grades against a reference answer and a retrieved context; pass --reference/--reference-file and --context/--context-file."
                         : "This preset reads inputs from EvalInput.Metadata (e.g. \"agentic_telemetry\" / \"run_results\"), which this CLI path does not populate."));
         }
+
+        // ── AEF ───────────────────────────────────────────────────────────────
+        // bench agentic grades a response (and trace) the agent already produced: it drives no agent, so the run is
+        // replayed.
+        if (!noAef && BenchAef.Write(aef, agentEvalDir, "agentic", preset, subject, subjectVersion,
+                AgentEval.Results.Writing.AefTargetMode.Replayed, benchmark, compositeResult, startedAt, DateTimeOffset.UtcNow))
+            return ExitCodes.RuntimeError;   // an explicit --aef could not be written
 
         // ── Exit code ─────────────────────────────────────────────────────────
         var overall = result.Summary.OverallStatus;

@@ -24,6 +24,8 @@ using AgentEval.RedTeam.Importers;
 using AgentEval.RedTeam.Reporting;
 using AgentEval.RedTeam.Reporting.Compliance;
 using AgentEval.RedTeam.Transforms;
+using AgentEval.Results.Adapters.Native;
+using AgentEval.Results.Writing;
 using Microsoft.Extensions.AI;
 
 namespace AgentEval.Cli.Commands;
@@ -192,6 +194,18 @@ internal static class RedTeamCommand
         command.Options.Add(intensityOpt);
         command.Options.Add(failFastFlag);
         command.Options.Add(benignControlsFlag);
+
+        var aefOpt = new Option<DirectoryInfo?>("--aef")
+            { Description = "Write the scan as sealed AEF evidence under this folder (default: .agenteval/aef in a workspace)" };
+        var noAefFlag = new Option<bool>("--no-aef") { Description = "Write no AEF run" };
+        var subjectOpt = new Option<string?>("--subject")
+            { Description = "The subject's AEF ref (kind:name, e.g. agent:support-bot; default model:<model>, or agent:<target>)" };
+        var subjectVersionOpt = new Option<string?>("--subject-version")
+            { Description = "The subject's exact version, recorded in the AEF run (a checkpoint lane needs it)" };
+        command.Options.Add(aefOpt);
+        command.Options.Add(noAefFlag);
+        command.Options.Add(subjectOpt);
+        command.Options.Add(subjectVersionOpt);
         command.Options.Add(maxProbesOpt);
         command.Options.Add(delayOpt);
         command.Options.Add(parallelismOpt);
@@ -250,6 +264,10 @@ internal static class RedTeamCommand
                 Intensity = parseResult.GetValue(intensityOpt)!,
                 FailFast = parseResult.GetValue(failFastFlag),
                 BenignControls = parseResult.GetValue(benignControlsFlag),
+                Aef = parseResult.GetValue(aefOpt),
+                NoAef = parseResult.GetValue(noAefFlag),
+                Subject = parseResult.GetValue(subjectOpt),
+                SubjectVersion = parseResult.GetValue(subjectVersionOpt),
                 MaxProbes = parseResult.GetValue(maxProbesOpt),
                 DelaySeconds = parseResult.GetValue(delayOpt),
                 Parallelism = parseResult.GetValue(parallelismOpt),
@@ -712,6 +730,11 @@ internal static class RedTeamCommand
             }
         }
 
+        // 8a. AEF: the scan as sealed evidence. A stand-in is mocked; a built-in target says how it ran (the demo's
+        // scripted model is scripted); a real endpoint is live.
+        var aefFailed = !opts.NoAef && WriteAef(opts, result, resolvedName, selectedTarget is not null,
+            sutOverride is not null ? AefTargetMode.Mocked : selectedTarget?.TargetMode(opts) ?? AefTargetMode.Live);
+
         // 8b. Calibration (garak-inspired relative scoring): standardize per-attack scores against a user-supplied
         // cohort and report a z-score. Informational only — it never changes the verdict or exit code (a model can be
         // "unusually vulnerable" relative to peers yet still pass absolutely, and vice-versa).
@@ -769,7 +792,54 @@ internal static class RedTeamCommand
         }
 
         // 11. Honest exit-code gate (W-E3).
+        if (aefFailed)
+            return ExitCodes.RuntimeError;   // an explicit --aef could not be written
         return ComputeExitCode(failOn, regression, result.Passed);
+    }
+
+    /// <summary>
+    /// Writes the scan as a sealed AEF run, as eval does: into <c>--aef</c>, else a workspace's <c>.agenteval/aef</c>,
+    /// else nothing with a hint. Returns true only when an explicit <c>--aef</c> could not be written (exit 3).
+    /// </summary>
+    private static bool WriteAef(RedTeamOptions opts, RedTeamResult result, string resolvedName, bool builtInTarget, AefTargetMode targetMode)
+    {
+        var root = EvalAef.Root(opts.Aef);
+        if (root is null)
+        {
+            if (!opts.Quiet)
+                Console.Error.WriteLine("  AEF: no .agenteval workspace here, so no run was written (--aef <dir> writes one anywhere).");
+            return false;
+        }
+
+        try
+        {
+            var lines = RedTeamAef.Lines(result);
+            var (directory, runHash) = AefProbeRunWriter.Write(Path.Combine(root, "runs"), lines, new AefProbeRunOptions
+            {
+                SubjectRef = opts.Subject ?? AefEvalWriter.Ref(builtInTarget ? "agent" : "model", resolvedName),
+                SubjectVersion = opts.SubjectVersion,
+                Endpoint = builtInTarget ? null : opts.Endpoint,
+                JudgeModel = string.IsNullOrWhiteSpace(opts.JudgeEndpoint) ? null : opts.JudgeModel ?? resolvedName,
+                TargetMode = targetMode,
+                SuiteRef = AefEvalWriter.Ref("redteam", $"{opts.Attacks ?? "default"}/{opts.Intensity}"),
+                ProbesNotRun = result.SkippedProbes,
+            }, result.StartedAt, result.CompletedAt);
+            if (!opts.Quiet)
+                Console.Error.WriteLine($"  AEF run: {directory} (run hash {runHash[..12]}...)");
+            return false;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
+        {
+            if (opts.Aef is not null)
+            {
+                Console.Error.WriteLine($"  Error: the AEF run was not written: {ex.Message}");
+                return true;
+            }
+
+            if (!opts.Quiet)
+                Console.Error.WriteLine($"  Warning: the AEF run was not written: {ex.Message}");
+            return false;
+        }
     }
 
     /// <summary>
@@ -1069,6 +1139,19 @@ internal sealed class RedTeamOptions
     public required string Intensity { get; init; }
     public bool FailFast { get; init; }
     public bool BenignControls { get; init; }
+
+    /// <summary>Where to write the AEF run (<c>--aef</c>); null writes into a workspace's <c>.agenteval/aef</c> when there is one.</summary>
+    public DirectoryInfo? Aef { get; init; }
+
+    /// <summary><c>--no-aef</c>: write no AEF run.</summary>
+    public bool NoAef { get; init; }
+
+    /// <summary><c>--subject</c>: the subject's AEF ref.</summary>
+    public string? Subject { get; init; }
+
+    /// <summary><c>--subject-version</c>: the subject's exact version.</summary>
+    public string? SubjectVersion { get; init; }
+
     public int MaxProbes { get; init; }
     public string? JudgeEndpoint { get; init; }
     public string? JudgeModel { get; init; }

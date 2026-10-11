@@ -72,6 +72,11 @@ internal sealed class GatekeeperDemoRedTeamTarget : IRedTeamBuiltInTarget
         ? $"gatekeeper-demo (real model {model}@{ProviderChatClientFactory.Settings.ProviderTag})"
         : "gatekeeper-demo (scripted)";
 
+    /// <summary>The scripted model is scripted; a real provider's model is live.</summary>
+    public AgentEval.Results.Writing.AefTargetMode TargetMode(RedTeamOptions opts) => Model(opts).Client is null
+        ? AgentEval.Results.Writing.AefTargetMode.Scripted
+        : AgentEval.Results.Writing.AefTargetMode.Live;
+
     public void Validate(RedTeamOptions opts)
     {
         // The built-in demo shares one gate trace across probes — concurrent probes would race it, so reject

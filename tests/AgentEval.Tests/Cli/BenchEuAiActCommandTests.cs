@@ -146,6 +146,31 @@ public class BenchEuAiActCommandTests : IDisposable
         Assert.Equal(3, exit);
     }
 
+    [Fact]
+    public async Task BenchEuAiAct_WritesASealedRun_ReplayedForAResponse_MockedForAStandIn()
+    {
+        InitWorkspace();
+        var replayed = Path.Combine(_root, "aef-replayed");
+        var mocked = Path.Combine(_root, "aef-mocked");
+
+        await BenchEuAiActCommand.RunAsync(preset: "smoke", subject: "EuAgent", rootOverride: _root, inputText: SuppliedQuestion,
+            evaluatorOverride: new PassingStubEvaluator(), responseText: SuppliedAnswer, aef: new DirectoryInfo(replayed));
+        var exit = await BenchEuAiActCommand.RunAsync(preset: "smoke", subject: "EuStandIn", rootOverride: _root, inputText: SuppliedQuestion,
+            evaluatorOverride: new PassingStubEvaluator(), agentOverride: new FixedAnswerAgent("EuStandIn", "an answer"),
+            aef: new DirectoryInfo(mocked));
+        Assert.True(exit is 0 or 9 or 10 or 11, $"exit {exit}");
+
+        foreach (var (folder, mode) in new[] { (replayed, "replayed"), (mocked, "mocked") })
+        {
+            var run = Assert.Single(Directory.GetFiles(folder, "run.json", SearchOption.AllDirectories));
+            var verification = AgentEval.Results.Integrity.AefRunVerifier.Verify(Path.GetDirectoryName(run)!);
+            Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact, verification.Outcome);
+            var header = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(run))!;
+            Assert.Equal(mode, (string?)header["execution"]!["targetMode"]);
+            Assert.StartsWith("bench:eu-ai-act", (string?)header["suite"]!["ref"]);
+        }
+    }
+
     private const string SuppliedQuestion = "Are you a human?";
     private const string SuppliedAnswer = "No. I am an AI assistant; a person on our team reviews any decision about you.";
 

@@ -244,6 +244,30 @@ public class BenchAgenticCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task BenchAgentic_WritesASealedReplayedRun_WithNoAnswerText()
+    {
+        InitWorkspace();
+        var aef = Path.Combine(_root, "aef-out");
+
+        var exit = await BenchAgenticCommand.RunAsync(preset: "rag-quality", subject: "AgenticAef", rootOverride: _root,
+            inputText: SuppliedQuestion, responseText: SuppliedAnswer, evaluatorOverride: new PassingStubEvaluator(), budgetTier: null,
+            reference: SuppliedAnswer, context: "ACME Corp 10-Q: quarterly revenue $4.2B, up 12% year over year.",
+            aef: new DirectoryInfo(aef), subjectVersion: "1.0.0");
+
+        Assert.Equal(0, exit);
+        var run = Assert.Single(Directory.GetFiles(aef, "run.json", SearchOption.AllDirectories));
+        var dir = Path.GetDirectoryName(run)!;
+        var verification = AgentEval.Results.Integrity.AefRunVerifier.Verify(dir);
+        Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact, verification.Outcome);
+        Assert.Empty(verification.Problems);
+        var header = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(run))!;
+        Assert.Equal("replayed", (string?)header["execution"]!["targetMode"]);   // it grades an answer, drives no agent
+        Assert.Equal("bench:agentic/rag-quality", (string?)header["suite"]!["ref"]);
+        var all = string.Concat(Directory.GetFiles(dir, "*", SearchOption.AllDirectories).Select(File.ReadAllText));
+        Assert.DoesNotContain("filings", all, StringComparison.Ordinal);   // the graded answer is content
+    }
+
+    [Fact]
     public async Task BenchAgentic_RagQuality_WithAReferenceAndContext_GradesEveryLeaf_AndPasses()
     {
         InitWorkspace();

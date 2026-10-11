@@ -12,6 +12,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`agenteval eval` writes each run as sealed AEF evidence** (S1 #5a): into a workspace's `.agenteval/aef`, or `--aef <dir>`;
   `--no-aef` writes nothing; `--subject` and `--subject-version` name the subject. One result line per case, the
   target mode the run really had (a stand-in is never `live`), the judge only when it graded, and no content.
+  With `--runs N`, each case gets a line per trial and a rollup under `AtLeast`, with the least pass count that meets
+  `--success-threshold`; a rollup whose unmeasured trials leave it undecided is `error`, not `failed`.
+  A case's judge criteria and assertions are its child lines (`case/criteria/<n>`, `case/assertions/<n>`), beside
+  its own verdict; their texts, the judge's explanations and assertion messages are not written.
+- **`agenteval redteam` writes each scan as sealed AEF evidence** too (same `--aef`, `--no-aef`, `--subject`,
+  `--subject-version`): a line per probe (`<attack>/<probe>`: resisted `passed`, succeeded `failed` with
+  `attack.success`, `inconclusive`, `error`, or `not_applicable` for an attack that cannot be measured in the setup),
+  with OWASP LLM and MITRE ATLAS ids, severity and turns; benign controls in lane `over-refusal`. The metrics
+  `resisted` and `resisted-conclusive` give the scan's rate and its conclusive score. The gatekeeper demo's scripted
+  model is recorded as `scripted`, not `live`. No prompt, response or grader reasoning is written.
+- **`agenteval bench gdpr`, `bench eu-ai-act` and `bench agentic` write each run as sealed AEF evidence** (`--aef`, `--no-aef`, `--subject-version`; default
+  the workspace's `.agenteval/aef`): each of the preset's top-level parts is a case, its subtree below it, with each
+  composite's strategy, threshold, measured parts and the rule that decided it, and each part's weight, whether it is
+  required and its failure effect; a leaf's own breakdown (groundedness's claims) beside its verdict. A live agent
+  is `live`, a stand-in `mocked`, a graded `--response` `replayed` (bench agentic always grades one).
+  `--runs` above 1 is not written yet.
+- **`bench owasp`, `bench mitre` and `bench nist` write each scan as sealed AEF evidence** (`--aef`, `--no-aef`,
+  `--subject-version`): the scan's probes, as `redteam` writes them, in a lane named after the family, with the
+  benchmark's own composite verdict in the summary. A real target (`--sut`, `--endpoint`, `--from-env`) is `live`, a
+  stand-in `mocked`; a mock run is not stored and writes none.
+- **`bench perf`, `bench trace-fidelity` and `bench workflow-trace-fidelity` write each run as sealed AEF evidence**
+  (`--aef`, `--no-aef`, `--subject-version`): the family's result, its parts as cases (or itself, when it has none),
+  each recorded beside its own verdict, since no composite definition describes them. Perf drives the agent (`live`,
+  or `mocked` for a stand-in); the trace-fidelity benches read traces and drive nothing (`replayed`).
+- **`EvalDetails.Lineage`**: a composite records which rule decided its label (`required-error`, `nothing-measured`,
+  `threshold`, `severity`, `under-covered`, `required-not-measured`, `failure-effect`) and the parts that decided it.
+  It describes the verdict, never changes it, and is not serialised.
 - **`TestResult.JudgeFailed`**: the judge produced no verdict, so `Passed = false` and `Score = 0` are placeholders, not
   a grade. Set by the evaluation harness; AEF records such a case as `error`, never `failed`.
 - **`agenteval aef`: AEF 1.0 runs from the command line.** AEF, the AgentEval Evidence Format, is AgentEval's

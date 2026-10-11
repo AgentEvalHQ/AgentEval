@@ -244,6 +244,9 @@ internal sealed class CopilotStudioRedTeamTarget : IRedTeamBuiltInTarget, ISutTa
 
     public string ResolvedName(RedTeamOptions opts) => EnsureConfig(opts).DisplayName;
 
+    /// <summary>A Copilot Studio agent is a real, published agent: live.</summary>
+    public AgentEval.Results.Writing.AefTargetMode TargetMode(RedTeamOptions opts) => AgentEval.Results.Writing.AefTargetMode.Live;
+
     public IEvaluableAgent Build(RedTeamOptions opts, IEvaluableAgent? sutOverride, AgentTrace trace)
     {
         if (sutOverride is not null)

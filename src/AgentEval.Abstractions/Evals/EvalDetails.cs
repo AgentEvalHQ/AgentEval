@@ -24,4 +24,11 @@ public sealed record EvalDetails(
     /// </para>
     /// </summary>
     public string? Summary { get; init; }
+
+    /// <summary>
+    /// How a composite reached its label (<see cref="EvalLineage"/>); null on a leaf. Not serialised: store v1's
+    /// eval-result schema admits no other property, and the label it explains is already there.
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public EvalLineage? Lineage { get; init; }
 }

@@ -108,11 +108,55 @@ public class CopilotStudioRedTeamTargetTests
         finally { TryDelete(cfg); TryDelete(outFile); }
     }
 
+    [Fact]
+    public async Task Redteam_WithAef_WritesASealedScan_AStandInIsMocked_AndNoPromptOrResponseIsWritten()
+    {
+        var cfg = WriteValidConfig();
+        var outFile = new FileInfo(Path.Combine(Path.GetTempPath(), "agenteval-cs-report-" + Guid.NewGuid().ToString("N") + ".json"));
+        var aef = Directory.CreateTempSubdirectory("aef-redteam-");
+        try
+        {
+            AIAgent inner = new ChatClientAgent(new AlwaysBenignChatClient(), new ChatClientAgentOptions { Name = "cs-fake" });
+            IEvaluableAgent sut = CopilotStudioAgentFactory.FromAgent(inner);
+            var opts = BaseOptions(ackConsent: true, config: cfg, attacks: "PromptInjection", maxProbes: 2,
+                intensity: "quick", output: outFile, aef: aef);
+
+            var exit = await RedTeamCommand.ExecuteAsync(opts, default, sutOverride: sut);
+
+            Assert.Equal(ExitCodes.Success, exit);
+            var run = Assert.Single(Directory.GetFiles(aef.FullName, "run.json", SearchOption.AllDirectories));
+            var dir = Path.GetDirectoryName(run)!;
+            var verification = AgentEval.Results.Integrity.AefRunVerifier.Verify(dir);
+            Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact, verification.Outcome);
+            Assert.Empty(verification.Problems);
+
+            var header = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(run))!;
+            Assert.Equal("mocked", (string?)header["execution"]!["targetMode"]);   // the benign fake stands in
+            Assert.Equal("off", (string?)header["contentCapture"]);
+            Assert.StartsWith("redteam:", (string?)header["suite"]!["ref"]);
+
+            var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => System.Text.Json.Nodes.JsonNode.Parse(l)!).ToList();
+            Assert.NotEmpty(lines);
+            Assert.All(lines, l =>
+            {
+                Assert.Equal("probe", (string?)l["path"]);
+                Assert.StartsWith("PromptInjection/", (string?)l["caseId"]);
+                Assert.Equal("owasp-llm", (string?)l["attack"]!["taxonomy"]![0]!["scheme"]);
+            });
+
+            // The agent's replies are content: the run never holds them.
+            var all = string.Concat(Directory.GetFiles(dir, "*", SearchOption.AllDirectories).Select(File.ReadAllText));
+            Assert.DoesNotContain("help with that request", all, StringComparison.Ordinal);
+        }
+        finally { TryDelete(cfg); TryDelete(outFile); aef.Delete(recursive: true); }
+    }
+
     // ── helpers ──
 
     private static RedTeamOptions BaseOptions(
         bool ackConsent, FileInfo? config, string? sut = "copilot-studio", int parallelism = 1,
-        string? attacks = null, int maxProbes = 0, string intensity = "moderate", FileInfo? output = null) => new()
+        string? attacks = null, int maxProbes = 0, string intensity = "moderate", FileInfo? output = null,
+        DirectoryInfo? aef = null) => new()
     {
         Sut = sut,
         TargetOptions = new Dictionary<string, IRedTeamTargetOptions?>
@@ -127,6 +171,7 @@ public class CopilotStudioRedTeamTargetTests
         FailOn = "vuln",
         Quiet = true,
         Output = output,
+        Aef = aef,
     };
 
     private static FileInfo WriteValidConfig()

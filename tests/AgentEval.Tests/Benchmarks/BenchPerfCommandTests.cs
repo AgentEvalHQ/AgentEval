@@ -49,6 +49,30 @@ public class BenchPerfCommandTests
     }
 
     [Fact]
+    public async Task RunAsync_WritesASealedAefRun_AStandInMocked()
+    {
+        var workspace = CreateTempWorkspace();
+        try
+        {
+            var exitCode = await BenchPerfCommand.RunAsync(preset: "latency", subject: "perf-aef", prompt: "hello",
+                rootOverride: workspace, agentOverride: new StubAgent("perf-aef"), subjectVersion: "0.9.0");
+
+            Assert.True(exitCode is 0 or 9 or 10 or 11, $"got {exitCode}");
+            var run = Assert.Single(Directory.GetFiles(Path.Combine(workspace, ".agenteval", "aef"), "run.json", SearchOption.AllDirectories));
+            var verification = AgentEval.Results.Integrity.AefRunVerifier.Verify(Path.GetDirectoryName(run)!);
+            Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact, verification.Outcome);
+            Assert.Empty(verification.Problems);
+            var header = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(run))!;
+            Assert.Equal("mocked", (string?)header["execution"]!["targetMode"]);
+            Assert.Equal("bench:perf/latency", (string?)header["suite"]!["ref"]);
+        }
+        finally
+        {
+            Cleanup(workspace);
+        }
+    }
+
+    [Fact]
     public async Task RunAsync_SubjectRequiringSanitization_ReportCoLocatesWithManifest()
     {
         // BUG-17: the store writes the manifest/summary under the SANITIZED subject dir,

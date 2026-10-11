@@ -98,6 +98,9 @@ var benchResponseOpt = new Option<string?>("--response") { Description = "The ag
 var benchResponseFileOpt = new Option<string?>("--response-file") { Description = "Path to a file containing the agent's actual response to grade (alternative to --response, for multi-line output)." };
 var benchRunsOpt = new Option<int?>("--runs") { Description = "Number of stochastic runs (default: 1). When > 1, runs the benchmark N times and aggregates via MajorityVote." };
 var benchGdprAzureFromEnvOpt = FromEnvOption.Create("Drive a live agent from the environment (the provider AI_INFERENCE_PROVIDER selects) per scenario: each scenario's own prompt is sent to the agent and its real answer is graded, instead of grading a single --response. The judge resolves AZURE_OPENAI_JUDGE_* first, then the selected provider, so agent and judge can target different endpoints.");
+var benchAefOpt = new Option<DirectoryInfo?>("--aef") { Description = "Write the run as sealed AEF evidence under this folder (default: the workspace's .agenteval/aef)" };
+var benchNoAefOpt = new Option<bool>("--no-aef") { Description = "Write no AEF run" };
+var benchSubjectVersionOpt = new Option<string?>("--subject-version") { Description = "The subject's exact version, recorded in the AEF run (a checkpoint lane needs it)" };
 var benchGdprCmd = new Command("gdpr", "Run the GDPR compliance benchmark. Needs a target: --sut or --from-env drives a live agent per scenario, or --response/--response-file grades an answer the agent gave (with its --input). Without one it refuses; --sut mock grades a canned answer that measures nothing and is not stored.");
 benchGdprCmd.Add(benchPresetOpt);
 benchGdprCmd.Add(benchSubjectOpt);
@@ -107,6 +110,9 @@ benchGdprCmd.Add(benchResponseOpt);
 benchGdprCmd.Add(benchResponseFileOpt);
 benchGdprCmd.Add(benchRunsOpt);
 benchGdprCmd.Add(benchGdprAzureFromEnvOpt);
+benchGdprCmd.Add(benchAefOpt);
+benchGdprCmd.Add(benchNoAefOpt);
+benchGdprCmd.Add(benchSubjectVersionOpt);
 var (benchGdprSutOpt, benchGdprSutTargets) = SutTargetResolver.AddOptionsTo(benchGdprCmd, "bench");
 benchGdprCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
@@ -150,7 +156,9 @@ benchGdprCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 
     var response = await ResolveBenchResponseAsync(parseResult.GetValue(benchResponseOpt), parseResult.GetValue(benchResponseFileOpt), ct);
     if (response.Error) return AgentEval.Cli.ExitCodes.UsageError;
-    return await BenchCommand.RunGdprAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride: agentOverride, runs: runs, responseText: response.Text, azureFromEnv: azureFromEnv, mock: mock, ct: ct);
+    return await BenchCommand.RunGdprAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride: agentOverride, runs: runs, responseText: response.Text, azureFromEnv: azureFromEnv, mock: mock, ct: ct,
+        aef: parseResult.GetValue(benchAefOpt), noAef: parseResult.GetValue(benchNoAefOpt), subjectVersion: parseResult.GetValue(benchSubjectVersionOpt),
+        agentIsLive: agentOverride is not null);
 });
 
 // bench gdpr calibrate
@@ -196,6 +204,12 @@ benchEuAiActCmd.Add(benchEuAiActInputOpt);
 benchEuAiActCmd.Add(benchEuAiActResponseOpt);
 benchEuAiActCmd.Add(benchEuAiActResponseFileOpt);
 benchEuAiActCmd.Add(benchEuAiActAzureFromEnvOpt);
+var benchEuAiActAefOpt = new Option<DirectoryInfo?>("--aef") { Description = "Write the run as sealed AEF evidence under this folder (default: the workspace's .agenteval/aef)" };
+var benchEuAiActNoAefOpt = new Option<bool>("--no-aef") { Description = "Write no AEF run" };
+var benchEuAiActSubjectVersionOpt = new Option<string?>("--subject-version") { Description = "The subject's exact version, recorded in the AEF run (a checkpoint lane needs it)" };
+benchEuAiActCmd.Add(benchEuAiActAefOpt);
+benchEuAiActCmd.Add(benchEuAiActNoAefOpt);
+benchEuAiActCmd.Add(benchEuAiActSubjectVersionOpt);
 var (benchEuAiActSutOpt, benchEuAiActSutTargets) = SutTargetResolver.AddOptionsTo(benchEuAiActCmd, "bench");
 benchEuAiActCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
@@ -241,7 +255,9 @@ benchEuAiActCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) 
 
     var response = await ResolveBenchResponseAsync(parseResult.GetValue(benchEuAiActResponseOpt), parseResult.GetValue(benchEuAiActResponseFileOpt), ct);
     if (response.Error) return AgentEval.Cli.ExitCodes.UsageError;
-    return await BenchEuAiActCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride: agentOverride, responseText: response.Text, azureFromEnv: azureFromEnv, mock: mock, ct: ct);
+    return await BenchEuAiActCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride: agentOverride, responseText: response.Text, azureFromEnv: azureFromEnv, mock: mock, ct: ct,
+        aef: parseResult.GetValue(benchEuAiActAefOpt), noAef: parseResult.GetValue(benchEuAiActNoAefOpt),
+        subjectVersion: parseResult.GetValue(benchEuAiActSubjectVersionOpt), agentIsLive: agentOverride is not null);
 });
 // bench eu-ai-act calibrate
 var euCalibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };
@@ -296,6 +312,12 @@ benchAgenticCmd.Add(benchAgenticReferenceFileOpt);
 benchAgenticCmd.Add(benchAgenticContextOpt);
 benchAgenticCmd.Add(benchAgenticContextFileOpt);
 benchAgenticCmd.Add(benchAgenticSutOpt);
+var benchAgenticAefOpt = new Option<DirectoryInfo?>("--aef") { Description = "Write the run as sealed AEF evidence under this folder (default: the workspace's .agenteval/aef)" };
+var benchAgenticNoAefOpt = new Option<bool>("--no-aef") { Description = "Write no AEF run" };
+var benchAgenticSubjectVersionOpt = new Option<string?>("--subject-version") { Description = "The subject's exact version, recorded in the AEF run (a checkpoint lane needs it)" };
+benchAgenticCmd.Add(benchAgenticAefOpt);
+benchAgenticCmd.Add(benchAgenticNoAefOpt);
+benchAgenticCmd.Add(benchAgenticSubjectVersionOpt);
 benchAgenticCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
     var preset = parseResult.GetValue(benchAgenticPresetOpt) ?? "agentic-execution";
@@ -326,7 +348,9 @@ benchAgenticCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) 
         return AgentEval.Cli.ExitCodes.UsageError;
     }
     return await BenchAgenticCommand.RunAsync(preset, subject, root, input, response.Text, evaluatorOverride: null, budgetTier, traceFile, mock,
-        reference: reference.Text, context: context.Text, ct: ct);
+        reference: reference.Text, context: context.Text, ct: ct,
+        aef: parseResult.GetValue(benchAgenticAefOpt), noAef: parseResult.GetValue(benchAgenticNoAefOpt),
+        subjectVersion: parseResult.GetValue(benchAgenticSubjectVersionOpt));
 });
 // bench agentic calibrate
 var agenticCalibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };
@@ -362,6 +386,12 @@ var benchOwaspModelOpt = new Option<string?>("--model") { Description = "Model n
 var benchOwaspApiKeyOpt = new Option<string?>("--api-key") { Description = "API key for --endpoint (or set OPENAI_API_KEY env var)." };
 var benchOwaspCmd = new Command("owasp", "Run the OWASP LLM Top 10 red-team benchmark. Needs a target: --sut, --endpoint/--model, or --from-env (the provider AI_INFERENCE_PROVIDER selects); without one it refuses. --sut mock runs a stand-in that measures nothing and is not stored. Attacks are graded judge first by the judge the environment configures (AZURE_OPENAI_JUDGE_*, else AI_INFERENCE_PROVIDER), as `agenteval redteam --judge` grades them; use `agenteval redteam` for a fully-parameterised scan.");
 benchOwaspCmd.Add(benchOwaspPresetOpt);
+var benchOwaspAefOpt = new Option<DirectoryInfo?>("--aef") { Description = "Write the scan as sealed AEF evidence under this folder (default: the workspace's .agenteval/aef)" };
+var benchOwaspNoAefOpt = new Option<bool>("--no-aef") { Description = "Write no AEF run" };
+var benchOwaspSubjectVersionOpt = new Option<string?>("--subject-version") { Description = "The subject's exact version, recorded in the AEF run (a checkpoint lane needs it)" };
+benchOwaspCmd.Add(benchOwaspAefOpt);
+benchOwaspCmd.Add(benchOwaspNoAefOpt);
+benchOwaspCmd.Add(benchOwaspSubjectVersionOpt);
 benchOwaspCmd.Add(benchOwaspSubjectOpt);
 benchOwaspCmd.Add(benchOwaspRootOpt);
 benchOwaspCmd.Add(benchOwaspInputOpt);
@@ -406,7 +436,9 @@ benchOwaspCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     }
 
     var (exitCode, _) = await BenchOwaspCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride, azureFromEnv, mock,
-        agentModel: agentOverride is not null && sut is null ? parseResult.GetValue(benchOwaspModelOpt) : null, ct: ct);
+        agentModel: agentOverride is not null && sut is null ? parseResult.GetValue(benchOwaspModelOpt) : null, ct: ct,
+        aef: parseResult.GetValue(benchOwaspAefOpt), noAef: parseResult.GetValue(benchOwaspNoAefOpt),
+        subjectVersion: parseResult.GetValue(benchOwaspSubjectVersionOpt), agentIsLive: agentOverride is not null);
     return exitCode;
 });
 benchCmd.Add(benchOwaspCmd);
@@ -423,6 +455,12 @@ var benchMitreModelOpt = new Option<string?>("--model") { Description = "Model n
 var benchMitreApiKeyOpt = new Option<string?>("--api-key") { Description = "API key for --endpoint (or set OPENAI_API_KEY env var)." };
 var benchMitreCmd = new Command("mitre", "Run the MITRE ATLAS red-team benchmark. Needs a target: --sut, --endpoint/--model, or --from-env (the provider AI_INFERENCE_PROVIDER selects); without one it refuses. --sut mock runs a stand-in that measures nothing and is not stored. Attacks are graded judge first by the judge the environment configures (AZURE_OPENAI_JUDGE_*, else AI_INFERENCE_PROVIDER), as `agenteval redteam --judge` grades them; use `agenteval redteam` for a fully-parameterised scan.");
 benchMitreCmd.Add(benchMitrePresetOpt);
+var benchMitreAefOpt = new Option<DirectoryInfo?>("--aef") { Description = "Write the scan as sealed AEF evidence under this folder (default: the workspace's .agenteval/aef)" };
+var benchMitreNoAefOpt = new Option<bool>("--no-aef") { Description = "Write no AEF run" };
+var benchMitreSubjectVersionOpt = new Option<string?>("--subject-version") { Description = "The subject's exact version, recorded in the AEF run (a checkpoint lane needs it)" };
+benchMitreCmd.Add(benchMitreAefOpt);
+benchMitreCmd.Add(benchMitreNoAefOpt);
+benchMitreCmd.Add(benchMitreSubjectVersionOpt);
 benchMitreCmd.Add(benchMitreSubjectOpt);
 benchMitreCmd.Add(benchMitreRootOpt);
 benchMitreCmd.Add(benchMitreInputOpt);
@@ -467,7 +505,9 @@ benchMitreCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     }
 
     var (exitCode, _) = await BenchMitreCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride, azureFromEnv, mock,
-        agentModel: agentOverride is not null && sut is null ? parseResult.GetValue(benchMitreModelOpt) : null, ct: ct);
+        agentModel: agentOverride is not null && sut is null ? parseResult.GetValue(benchMitreModelOpt) : null, ct: ct,
+        aef: parseResult.GetValue(benchMitreAefOpt), noAef: parseResult.GetValue(benchMitreNoAefOpt),
+        subjectVersion: parseResult.GetValue(benchMitreSubjectVersionOpt), agentIsLive: agentOverride is not null);
     return exitCode;
 });
 benchCmd.Add(benchMitreCmd);
@@ -483,6 +523,12 @@ var benchNistModelOpt = new Option<string?>("--model") { Description = "Model na
 var benchNistApiKeyOpt = new Option<string?>("--api-key") { Description = "API key for --endpoint (or set OPENAI_API_KEY env var)." };
 var benchNistCmd = new Command("nist", "Run the NIST AI RMF (AI 100-1) red-team benchmark. Needs a target: --sut, --endpoint/--model, or --from-env (the provider AI_INFERENCE_PROVIDER selects); without one it refuses. --sut mock runs a stand-in that measures nothing and is not stored. Attacks are graded judge first by the judge the environment configures (AZURE_OPENAI_JUDGE_*, else AI_INFERENCE_PROVIDER), as `agenteval redteam --judge` grades them; use `agenteval redteam` for a fully-parameterised scan.");
 benchNistCmd.Add(benchNistPresetOpt);
+var benchNistAefOpt = new Option<DirectoryInfo?>("--aef") { Description = "Write the scan as sealed AEF evidence under this folder (default: the workspace's .agenteval/aef)" };
+var benchNistNoAefOpt = new Option<bool>("--no-aef") { Description = "Write no AEF run" };
+var benchNistSubjectVersionOpt = new Option<string?>("--subject-version") { Description = "The subject's exact version, recorded in the AEF run (a checkpoint lane needs it)" };
+benchNistCmd.Add(benchNistAefOpt);
+benchNistCmd.Add(benchNistNoAefOpt);
+benchNistCmd.Add(benchNistSubjectVersionOpt);
 benchNistCmd.Add(benchNistSubjectOpt);
 benchNistCmd.Add(benchNistRootOpt);
 benchNistCmd.Add(benchNistInputOpt);
@@ -527,7 +573,9 @@ benchNistCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     }
 
     var (exitCode, _) = await BenchNistCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride, azureFromEnv, mock,
-        agentModel: agentOverride is not null && sut is null ? parseResult.GetValue(benchNistModelOpt) : null, ct: ct);
+        agentModel: agentOverride is not null && sut is null ? parseResult.GetValue(benchNistModelOpt) : null, ct: ct,
+        aef: parseResult.GetValue(benchNistAefOpt), noAef: parseResult.GetValue(benchNistNoAefOpt),
+        subjectVersion: parseResult.GetValue(benchNistSubjectVersionOpt), agentIsLive: agentOverride is not null);
     return exitCode;
 });
 benchCmd.Add(benchNistCmd);
@@ -537,6 +585,9 @@ benchCmd.Add(benchNistCmd);
 // Convention-2 EvaluateAsync adapter.
 {
     var benchPerfSubjectOpt = new Option<string?>("--subject") { Description = "Subject name (agent or workflow under evaluation). REQUIRED." };
+    var benchPerfAefOpt = new Option<DirectoryInfo?>("--aef") { Description = "Write the run as sealed AEF evidence under this folder (default: the workspace's .agenteval/aef)" };
+    var benchPerfNoAefOpt = new Option<bool>("--no-aef") { Description = "Write no AEF run" };
+    var benchPerfSubjectVersionOpt = new Option<string?>("--subject-version") { Description = "The subject's exact version, recorded in the AEF run (a checkpoint lane needs it)" };
     var benchPerfPromptOpt = new Option<string?>("--prompt") { Description = "Prompt to measure against (default: 'Hello!')." };
     var benchPerfRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: auto-detected)" };
     var benchPerfAzureFromEnvOpt = FromEnvOption.Create("Measure a chat agent built from the environment (the provider AI_INFERENCE_PROVIDER selects). Requires a configured provider; run with none set to see what is missing.");
@@ -653,6 +704,12 @@ benchCmd.Add(benchNistCmd);
         benchTraceFidelityCmd.Add(tfPresetOpt);
         benchTraceFidelityCmd.Add(tfSubjectOpt);
         benchTraceFidelityCmd.Add(tfRootOpt);
+        var tfAefOpt = new Option<DirectoryInfo?>("--aef") { Description = "Write the run as sealed AEF evidence under this folder (default: the workspace's .agenteval/aef)" };
+        var tfNoAefOpt = new Option<bool>("--no-aef") { Description = "Write no AEF run" };
+        var tfSubjectVersionOpt = new Option<string?>("--subject-version") { Description = "The subject's exact version, recorded in the AEF run (a checkpoint lane needs it)" };
+        benchTraceFidelityCmd.Add(tfAefOpt);
+        benchTraceFidelityCmd.Add(tfNoAefOpt);
+        benchTraceFidelityCmd.Add(tfSubjectVersionOpt);
         benchTraceFidelityCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
         {
             var agentTrace = parseResult.GetValue(tfAgentOpt);
@@ -672,7 +729,8 @@ benchCmd.Add(benchNistCmd);
 
             var preset = parseResult.GetValue(tfPresetOpt) ?? "standard";
             var root = parseResult.GetValue(tfRootOpt);
-            return await BenchTraceFidelityCommand.RunAsync(agentTrace, chatTrace, preset, subject, root, ct);
+            return await BenchTraceFidelityCommand.RunAsync(agentTrace, chatTrace, preset, subject, root, ct,
+                parseResult.GetValue(tfAefOpt), parseResult.GetValue(tfNoAefOpt), parseResult.GetValue(tfSubjectVersionOpt));
         });
         benchCmd.Add(benchTraceFidelityCmd);
     }
@@ -689,6 +747,12 @@ benchCmd.Add(benchNistCmd);
         benchWorkflowTraceFidelityCmd.Add(wtfPresetOpt);
         benchWorkflowTraceFidelityCmd.Add(wtfSubjectOpt);
         benchWorkflowTraceFidelityCmd.Add(wtfRootOpt);
+        var wtfAefOpt = new Option<DirectoryInfo?>("--aef") { Description = "Write the run as sealed AEF evidence under this folder (default: the workspace's .agenteval/aef)" };
+        var wtfNoAefOpt = new Option<bool>("--no-aef") { Description = "Write no AEF run" };
+        var wtfSubjectVersionOpt = new Option<string?>("--subject-version") { Description = "The subject's exact version, recorded in the AEF run (a checkpoint lane needs it)" };
+        benchWorkflowTraceFidelityCmd.Add(wtfAefOpt);
+        benchWorkflowTraceFidelityCmd.Add(wtfNoAefOpt);
+        benchWorkflowTraceFidelityCmd.Add(wtfSubjectVersionOpt);
         benchWorkflowTraceFidelityCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
         {
             var workflowTrace = parseResult.GetValue(wtfTraceOpt);
@@ -707,7 +771,8 @@ benchCmd.Add(benchNistCmd);
 
             var preset = parseResult.GetValue(wtfPresetOpt) ?? "standard";
             var root = parseResult.GetValue(wtfRootOpt);
-            return await BenchWorkflowTraceFidelityCommand.RunAsync(workflowTrace, preset, subject, root, ct);
+            return await BenchWorkflowTraceFidelityCommand.RunAsync(workflowTrace, preset, subject, root, ct,
+                parseResult.GetValue(wtfAefOpt), parseResult.GetValue(wtfNoAefOpt), parseResult.GetValue(wtfSubjectVersionOpt));
         });
         benchCmd.Add(benchWorkflowTraceFidelityCmd);
     }
@@ -748,6 +813,9 @@ benchCmd.Add(benchNistCmd);
         presetCmd.Add(benchPerfEndpointOpt);
         presetCmd.Add(benchPerfModelOpt);
         presetCmd.Add(benchPerfApiKeyOpt);
+        presetCmd.Add(benchPerfAefOpt);
+        presetCmd.Add(benchPerfNoAefOpt);
+        presetCmd.Add(benchPerfSubjectVersionOpt);
         var (presetSutOpt, presetSutTargets) = SutTargetResolver.AddOptionsTo(presetCmd, "bench");
         var capturedPreset = presetName;
         presetCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
@@ -786,7 +854,9 @@ benchCmd.Add(benchNistCmd);
 
             // The --endpoint target's model prices the run; a --sut target names no model.
             var agentModel = agentOverride is not null && sut is null ? parseResult.GetValue(benchPerfModelOpt) : null;
-            return await BenchPerfCommand.RunAsync(capturedPreset, subject, prompt, root, agentOverride, azureFromEnv, mock, agentModel, ct);
+            return await BenchPerfCommand.RunAsync(capturedPreset, subject, prompt, root, agentOverride, azureFromEnv, mock, agentModel, ct,
+                aef: parseResult.GetValue(benchPerfAefOpt), noAef: parseResult.GetValue(benchPerfNoAefOpt),
+                subjectVersion: parseResult.GetValue(benchPerfSubjectVersionOpt), agentIsLive: agentOverride is not null);
         });
         benchPerfCmd.Add(presetCmd);
     }
