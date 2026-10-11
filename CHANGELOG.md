@@ -22,7 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with OWASP LLM and MITRE ATLAS ids, severity and turns; benign controls in lane `over-refusal`. The metrics
   `resisted` and `resisted-conclusive` give the scan's rate and its conclusive score. The gatekeeper demo's scripted
   model is recorded as `scripted`, not `live`. No prompt, response or grader reasoning is written.
-- **`agenteval bench gdpr` writes each run as sealed AEF evidence** (`--aef`, `--no-aef`, `--subject-version`; default
+- **`agenteval bench gdpr` and `bench eu-ai-act` write each run as sealed AEF evidence** (`--aef`, `--no-aef`, `--subject-version`; default
   the workspace's `.agenteval/aef`): each of the preset's top-level parts is a case, its subtree below it, with each
   composite's strategy, threshold, measured parts and the rule that decided it, and each part's weight, whether it is
   required and its failure effect. A live agent is `live`, a stand-in `mocked`, a graded `--response` `replayed`.

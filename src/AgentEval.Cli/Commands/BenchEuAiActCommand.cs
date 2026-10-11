@@ -47,8 +47,14 @@ public static class BenchEuAiActCommand
         string? responseText = null,
         bool azureFromEnv = false,
         bool mock = false,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        DirectoryInfo? aef = null,
+        bool noAef = false,
+        string? subjectVersion = null,
+        bool agentIsLive = false)
     {
+        // agentIsLive: the caller resolved agentOverride from --sut, a real target. Any other agentOverride is a stand-in,
+        // which the AEF run records as mocked, never live (RUN-7).
         var gradesSuppliedResponse = !string.IsNullOrWhiteSpace(responseText);
         if (mock && (agentOverride is not null || azureFromEnv || gradesSuppliedResponse))
         {
@@ -205,6 +211,7 @@ public static class BenchEuAiActCommand
 
         string runId;
         EvalResult compositeResult;
+        var startedAt = DateTimeOffset.UtcNow;
         try
         {
             var runner = new EuAiActBenchmarkRunner();
@@ -274,7 +281,17 @@ public static class BenchEuAiActCommand
             Console.Error.WriteLine($"Warning: failed to write PDF report: {ex.Message}");
         }
 
+        // ── AEF ───────────────────────────────────────────────────────────────
+        // As bench gdpr: a live agent is live, a stand-in mocked, a graded --response replayed.
+        var aefFailed = !noAef && BenchAef.Write(aef, agentEvalDir, "eu-ai-act", preset, subject, subjectVersion,
+            agent is null ? AgentEval.Results.Writing.AefTargetMode.Replayed
+                : agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live
+                : AgentEval.Results.Writing.AefTargetMode.Mocked,
+            benchmark, compositeResult, startedAt, DateTimeOffset.UtcNow);
+
         // ── Exit code ─────────────────────────────────────────────────────────
+        if (aefFailed)
+            return ExitCodes.RuntimeError;   // an explicit --aef could not be written
         var overall = evidence.Summary.OverallStatus;
         Console.WriteLine($"Overall result: {overall} (score {evidence.Summary.OverallScore:P0})");
 

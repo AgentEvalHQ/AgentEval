@@ -204,6 +204,12 @@ benchEuAiActCmd.Add(benchEuAiActInputOpt);
 benchEuAiActCmd.Add(benchEuAiActResponseOpt);
 benchEuAiActCmd.Add(benchEuAiActResponseFileOpt);
 benchEuAiActCmd.Add(benchEuAiActAzureFromEnvOpt);
+var benchEuAiActAefOpt = new Option<DirectoryInfo?>("--aef") { Description = "Write the run as sealed AEF evidence under this folder (default: the workspace's .agenteval/aef)" };
+var benchEuAiActNoAefOpt = new Option<bool>("--no-aef") { Description = "Write no AEF run" };
+var benchEuAiActSubjectVersionOpt = new Option<string?>("--subject-version") { Description = "The subject's exact version, recorded in the AEF run (a checkpoint lane needs it)" };
+benchEuAiActCmd.Add(benchEuAiActAefOpt);
+benchEuAiActCmd.Add(benchEuAiActNoAefOpt);
+benchEuAiActCmd.Add(benchEuAiActSubjectVersionOpt);
 var (benchEuAiActSutOpt, benchEuAiActSutTargets) = SutTargetResolver.AddOptionsTo(benchEuAiActCmd, "bench");
 benchEuAiActCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
@@ -249,7 +255,9 @@ benchEuAiActCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) 
 
     var response = await ResolveBenchResponseAsync(parseResult.GetValue(benchEuAiActResponseOpt), parseResult.GetValue(benchEuAiActResponseFileOpt), ct);
     if (response.Error) return AgentEval.Cli.ExitCodes.UsageError;
-    return await BenchEuAiActCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride: agentOverride, responseText: response.Text, azureFromEnv: azureFromEnv, mock: mock, ct: ct);
+    return await BenchEuAiActCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride: agentOverride, responseText: response.Text, azureFromEnv: azureFromEnv, mock: mock, ct: ct,
+        aef: parseResult.GetValue(benchEuAiActAefOpt), noAef: parseResult.GetValue(benchEuAiActNoAefOpt),
+        subjectVersion: parseResult.GetValue(benchEuAiActSubjectVersionOpt), agentIsLive: agentOverride is not null);
 });
 // bench eu-ai-act calibrate
 var euCalibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };
