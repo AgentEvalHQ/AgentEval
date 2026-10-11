@@ -121,7 +121,7 @@ public sealed class AefEvalWriterTests : IDisposable
                 ],
                 AssertionResults =
                 [
-                    AgentEval.Output.AssertionResult.Pass("HaveCalledTool(Search)"),
+                    AgentEval.Output.AssertionResult.Pass("Contain(\"the refund window is 30 days\")"),
                     AgentEval.Output.AssertionResult.Fail("HaveCallCount", "Expected 2 tool call(s), but 3 were made."),
                     AgentEval.Output.AssertionResult.Undecidable("NeverCallTool(PlaceOrder)", "not a declared tool"),
                 ],
@@ -152,6 +152,7 @@ public sealed class AefEvalWriterTests : IDisposable
         Assert.DoesNotContain("refund policy", all, StringComparison.Ordinal);   // criterion text is the suite's, not written
         Assert.DoesNotContain("quotes it", all, StringComparison.Ordinal);       // the judge's explanation is content
         Assert.DoesNotContain("were made", all, StringComparison.Ordinal);       // an assertion's message may quote the response
+        Assert.DoesNotContain("refund window", all, StringComparison.Ordinal);   // nor its name the expected text
     }
 
     private static TestResult Pass(int score = 90) => new() { TestName = "t", Passed = true, Score = score };

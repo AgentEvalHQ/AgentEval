@@ -146,7 +146,7 @@ public static class BenchWorkflowTraceFidelityCommand
             Console.WriteLine($"   Canonical: {runDir}");
             // AEF: the result as sealed evidence. It grades traces the agent already produced and drives no agent: replayed.
             if (!noAef && BenchAef.WriteResult(aef, agentEvalDir, "workflow-trace-fidelity", preset, subject, subjectVersion,
-                    AgentEval.Results.Writing.AefTargetMode.Replayed, result, startedAt, DateTimeOffset.UtcNow))
+                    AgentEval.Results.Writing.AefTargetMode.Replayed, result, startedAt, DateTimeOffset.UtcNow, subjectKind: "workflow"))
                 return ExitCodes.RuntimeError;   // an explicit --aef could not be written
 
             return BenchExitCodes.FromLabel(result.Score.Label);

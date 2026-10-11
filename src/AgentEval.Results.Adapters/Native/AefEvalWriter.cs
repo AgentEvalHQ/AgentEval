@@ -276,7 +276,7 @@ public static class AefEvalWriter
     }
 
     // A case and its children: the judge's criteria (graded by the judge, so no text of them is written) and the
-    // assertions (named as AgentEval names them; their messages may quote the response, so they are not written). The
+    // assertions (no name or message: either may quote the expected text or the response). The
     // case's verdict is its own, recorded beside them: Own, with each child weight 0 and not required (§7.5).
     private static void AddCase(AefRunWriter writer, TestResult result, string caseId, int? passingScore)
     {
@@ -297,7 +297,8 @@ public static class AefEvalWriter
                 AssertionOutcome.Failed => AefState.Failed,
                 _ => AefState.Inconclusive,
             };
-            children.Add(Child(caseId, $"{CasePath}/assertions/{n + 1}", AefConverter.Text(assertion.Assertion, 256) ?? "agenteval.assertion", state));
+            // Not the assertion's name: it can quote the expected text (Contain("…"), a regex), which is content ([RUN-11]).
+            children.Add(Child(caseId, $"{CasePath}/assertions/{n + 1}", "agenteval.assertion", state));
         }
 
         var root = Line(result, caseId, trial: null);

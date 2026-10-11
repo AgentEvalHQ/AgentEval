@@ -42,7 +42,7 @@ public sealed class AefCompositeRunWriterTests : IDisposable
             Leaf("art5.judge", "fail", 0.2, "atomic-llm", "judge-x", "high"),
             Leaf("art5.check", "pass", 0.9));
         var art6 = Composite("art6", "error", 0, 0.7, new EvalLineage("required-error", ["art6.trace"]),
-            Leaf("art6.trace", "error", 0),
+            Leaf("art6.trace", "error", 0, "atomic-llm", "judge-y"),
             Leaf("art6.check", "skipped", 0));
         var preset = Composite("gdpr.standard", "fail", 0.4, null, new EvalLineage("severity", []), art5, art6);
         var shape = new AefComponentShape(1, true, "Averaged",
@@ -65,6 +65,7 @@ public sealed class AefCompositeRunWriterTests : IDisposable
         }
 
         Assert.Equal("judge-x", (string?)AefTestRuns.Document(dir, "run.json")["judges"]![0]!["model"]);
+        Assert.Single(AefTestRuns.Document(dir, "run.json")["judges"]!.AsArray());   // judge-y's leaf errored: it graded nothing
         var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!.AsObject())
             .ToDictionary(l => $"{l["caseId"]}@{l["path"]}");
 
@@ -84,6 +85,8 @@ public sealed class AefCompositeRunWriterTests : IDisposable
         Assert.Equal(0, (int)art6Root["aggregation"]!["measured"]!);
         Assert.Equal(1, (int)art6Root["aggregation"]!["unmeasured"]!["error"]!);
         Assert.Equal(1, (int)art6Root["aggregation"]!["unmeasured"]!["skipped"]!);
+        Assert.Null(lines["art6@case/art6.trace"]["annotator"]);   // an errored judge leaf names no grader
+        Assert.Contains("measurement state NotMeasured", (string?)lines["art6@case/art6.check"]["reason"]);   // skipped: not "Measured"
 
         var summary = AefTestRuns.Document(dir, "summary.json");
         Assert.Equal("fail", (string?)summary["ext"]!["agenteval.bench"]!["label"]);

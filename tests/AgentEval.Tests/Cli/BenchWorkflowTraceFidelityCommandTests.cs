@@ -106,6 +106,8 @@ public class BenchWorkflowTraceFidelityCommandTests : IDisposable
         var header = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(run))!;
         Assert.Equal("replayed", (string?)header["execution"]!["targetMode"]);   // it reads a trace, drives nothing
         Assert.Equal("bench:workflow-trace-fidelity/standard", (string?)header["suite"]!["ref"]);
+        Assert.Equal("workflow", (string?)header["subject"]!["kind"]);   // it evaluates a workflow, not an agent
+        Assert.Equal("workflow:wf", (string?)header["subject"]!["ref"]);
     }
 
     [Fact]

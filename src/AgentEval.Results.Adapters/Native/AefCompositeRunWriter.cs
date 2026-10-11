@@ -80,7 +80,8 @@ public static class AefCompositeRunWriter
 
         var runId = $"{startedAt.UtcDateTime:yyyyMMddTHHmmssZ}-bench-{Convert.ToHexString(RandomNumberGenerator.GetBytes(4)).ToLowerInvariant()}";
         var directory = Path.Combine(runsRoot, $"{startedAt.UtcDateTime:yyyy}", $"{startedAt.UtcDateTime:MM}", runId);
-        var judges = Leaves(preset).Select(l => l.Provenance.JudgeModel).Where(m => !string.IsNullOrWhiteSpace(m))
+        // The models that graded a leaf: a leaf whose judge gave no verdict (error, skipped) was not graded ([RUN-9]).
+        var judges = Leaves(preset).Where(l => IsMeasured(StateOf(l.Score))).Select(l => l.Provenance.JudgeModel).Where(m => !string.IsNullOrWhiteSpace(m))
             .Distinct(StringComparer.Ordinal).Select(m => new AefJudge { Model = m!, Mode = AefJudgeMode.Single }).ToList();
         var header = new AefRunHeader
         {
@@ -223,10 +224,10 @@ public static class AefCompositeRunWriter
             Evaluator = new AefEvaluator(AefConverter.Text(node.Metric.Key, 256) ?? "agenteval.eval", AefConverter.Text(node.Metric.Version, 64)),
             State = state,
             // A typed absence says only where its state came from: the eval's own words may quote content ([RUN-11]).
-            Reason = measured ? null : $"AgentEval: the eval's label is '{AefConverter.Text(node.Score.Label, 64)}' and its measurement state {node.Score.Measurement}",
+            Reason = measured ? null : $"AgentEval: the eval's label is '{AefConverter.Text(node.Score.Label, 64)}' and its measurement state {node.Score.CensusBucket()}",
             Severity = severity,
             Scores = measured && double.IsFinite(node.Score.Value) ? [new AefScore { Metric = ScoreMetric, Value = node.Score.Value }] : null,
-            Annotator = subs.Count > 0 ? null : new AefAnnotator { Kind = llm ? AefAnnotatorKind.Llm : AefAnnotatorKind.Code, Model = llm ? node.Provenance.JudgeModel : null },
+            Annotator = subs.Count > 0 || !measured ? null : new AefAnnotator { Kind = llm ? AefAnnotatorKind.Llm : AefAnnotatorKind.Code, Model = llm ? node.Provenance.JudgeModel : null },
             Aggregation = aggregation,
             Component = component,
             Ext = component is not null && shape.OnFailure != "Averaged"
