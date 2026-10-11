@@ -63,6 +63,36 @@ public class JudgeCallLedgerUsageTests
     }
 
     [Fact]
+    public async Task GetResponseAsync_WhenOneCallReportsNoUsage_LeavesTheTotalUnknown()
+    {
+        var reporting = new ReportingJudge(new UsageDetails { InputTokenCount = 100, OutputTokenCount = 7 });
+        var silent = new ReportingJudge(null);
+        var calls = 0;
+        var ledger = new JudgeCallLedger(new DelegatingChatClientSwitch(() => calls++ == 0 ? reporting : silent));
+
+        await ledger.GetResponseAsync([new ChatMessage(ChatRole.User, "grade")]);
+        await ledger.GetResponseAsync([new ChatMessage(ChatRole.User, "grade")]);
+
+        Assert.Null(ledger.InputTokens);   // 100 is not the total of two calls
+        Assert.False(ledger.ReportedUsage);
+    }
+
+    private sealed class DelegatingChatClientSwitch(Func<IChatClient> next) : IChatClient
+    {
+        public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) =>
+            next().GetResponseAsync(messages, options, cancellationToken);
+
+        public IAsyncEnumerable<ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default) =>
+            next().GetStreamingResponseAsync(messages, options, cancellationToken);
+
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+
+        public void Dispose()
+        {
+        }
+    }
+
+    [Fact]
     public async Task GetResponseAsync_WithoutReportedUsage_LeavesTotalsNull()
     {
         var ledger = new JudgeCallLedger(new ReportingJudge(null));

@@ -32,32 +32,52 @@ internal sealed class JudgeCallLedger(IChatClient inner) : DelegatingChatClient(
     private long _inputTokens;
     private long _outputTokens;
 
-    /// <summary>Whether any judge response reported a token count; without one the totals below are null.</summary>
+    /// <summary>Whether a run total is known for either count (see <see cref="InputTokens"/>).</summary>
     public bool ReportedUsage => InputTokens is not null || OutputTokens is not null;
 
-    /// <summary>The input tokens the judge's responses reported, summed; null when none reported an input count.</summary>
-    public long? InputTokens => Volatile.Read(ref _inputReported) > 0 ? Interlocked.Read(ref _inputTokens) : null;
+    /// <summary>
+    /// The judge's input tokens over every call, or null unless every call reported its input count: a call that threw
+    /// or reported none leaves the total unknown, never a partial sum taken for the whole ([SUM-7]).
+    /// </summary>
+    public long? InputTokens => Complete(ref _inputReported) ? Interlocked.Read(ref _inputTokens) : null;
 
-    /// <summary>The output tokens the judge's responses reported, summed; null when none reported an output count.</summary>
-    public long? OutputTokens => Volatile.Read(ref _outputReported) > 0 ? Interlocked.Read(ref _outputTokens) : null;
+    /// <summary>The judge's output tokens over every call, or null unless every call reported its output count.</summary>
+    public long? OutputTokens => Complete(ref _outputReported) ? Interlocked.Read(ref _outputTokens) : null;
 
-    private void Count(UsageDetails? usage)
+    private bool Complete(ref int reported) => Calls > 0 && Volatile.Read(ref reported) == Calls;
+
+    // Adds one usage report to the sums, and says which counts it held.
+    private (bool Input, bool Output) Count(UsageDetails? usage)
     {
         if (usage is null)
         {
-            return;
+            return (false, false);
         }
 
         if (usage.InputTokenCount is { } input)
         {
-            Interlocked.Increment(ref _inputReported);
             Interlocked.Add(ref _inputTokens, input);
         }
 
         if (usage.OutputTokenCount is { } output)
         {
-            Interlocked.Increment(ref _outputReported);
             Interlocked.Add(ref _outputTokens, output);
+        }
+
+        return (usage.InputTokenCount is not null, usage.OutputTokenCount is not null);
+    }
+
+    // A completed call that reported a count, once per call.
+    private void Reported((bool Input, bool Output) seen)
+    {
+        if (seen.Input)
+        {
+            Interlocked.Increment(ref _inputReported);
+        }
+
+        if (seen.Output)
+        {
+            Interlocked.Increment(ref _outputReported);
         }
     }
 
@@ -68,7 +88,7 @@ internal sealed class JudgeCallLedger(IChatClient inner) : DelegatingChatClient(
         try
         {
             var response = await base.GetResponseAsync(messages, options, cancellationToken).ConfigureAwait(false);
-            Count(response.Usage);
+            Reported(Count(response.Usage));
             return response;
         }
         catch
@@ -84,6 +104,7 @@ internal sealed class JudgeCallLedger(IChatClient inner) : DelegatingChatClient(
     {
         Interlocked.Increment(ref _calls);
         var stream = base.GetStreamingResponseAsync(messages, options, cancellationToken).GetAsyncEnumerator(cancellationToken);
+        (bool Input, bool Output) seen = (false, false);
         try
         {
             while (true)
@@ -91,11 +112,17 @@ internal sealed class JudgeCallLedger(IChatClient inner) : DelegatingChatClient(
                 ChatResponseUpdate update;
                 try
                 {
-                    if (!await stream.MoveNextAsync().ConfigureAwait(false)) yield break;
+                    if (!await stream.MoveNextAsync().ConfigureAwait(false))
+                    {
+                        Reported(seen);   // the call completed: it counts once, as reported or not
+                        yield break;
+                    }
+
                     update = stream.Current;
                     foreach (var usage in update.Contents.OfType<UsageContent>())
                     {
-                        Count(usage.Details);
+                        var counted = Count(usage.Details);
+                        seen = (seen.Input || counted.Input, seen.Output || counted.Output);
                     }
                 }
                 catch

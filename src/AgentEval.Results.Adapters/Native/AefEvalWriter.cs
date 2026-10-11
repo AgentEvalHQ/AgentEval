@@ -279,22 +279,23 @@ public static class AefEvalWriter
     private static bool Graded(TestResult result) => result.CriteriaResults is not null && !result.JudgeFailed;
 
     // The run's total usage, one entry per role and model ([SUM-7]): the agent's, summed over the cases by the model that
-    // answered, and the judge's, as its responses reported it. Null when nothing reported any.
+    // answered, and the judge's, as its responses reported it. A total is complete or absent: the agent's figures are
+    // written only when every case reported its performance, and each field only when every case of that model has it.
     private static List<AefUsage>? Totals(IReadOnlyList<TestResult> results, AefUsage? judge)
     {
-        var totals = results
-            .Select(r => r.Performance)
-            .Where(p => p is not null && (p.PromptTokens is not null || p.CompletionTokens is not null || p.EstimatedCost is not null))
-            .GroupBy(p => AefConverter.Text(p!.ModelUsed, 256), StringComparer.Ordinal)
+        var totals = results.Any(r => r.Performance is null) ? new List<AefUsage>() : results
+            .Select(r => r.Performance!)
+            .GroupBy(p => AefConverter.Text(p.ModelUsed, 256), StringComparer.Ordinal)
             .Select(g => new AefUsage
             {
                 Role = AefUsageRole.Agent,
                 Model = g.Key,
-                InputTokens = g.Any(p => p!.PromptTokens is not null) ? g.Sum(p => (long)(p!.PromptTokens ?? 0)) : null,
-                OutputTokens = g.Any(p => p!.CompletionTokens is not null) ? g.Sum(p => (long)(p!.CompletionTokens ?? 0)) : null,
-                CostUsd = g.Any(p => p!.EstimatedCost is not null) ? g.Sum(p => (double)(p!.EstimatedCost ?? 0)) : null,
-                CostSource = g.Any(p => p!.EstimatedCost is not null) ? "AgentEval's estimate from the reported token usage" : null,
+                InputTokens = g.All(p => p.PromptTokens is not null) ? g.Sum(p => (long)p.PromptTokens!.Value) : null,
+                OutputTokens = g.All(p => p.CompletionTokens is not null) ? g.Sum(p => (long)p.CompletionTokens!.Value) : null,
+                CostUsd = g.All(p => p.EstimatedCost is not null) ? g.Sum(p => (double)p.EstimatedCost!.Value) : null,
+                CostSource = g.All(p => p.EstimatedCost is not null) ? "AgentEval's estimate from the reported token usage" : null,
             })
+            .Where(u => u.InputTokens is not null || u.OutputTokens is not null || u.CostUsd is not null)
             .ToList();
         if (judge is not null)
         {
