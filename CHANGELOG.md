@@ -45,6 +45,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`eval`'s AEF runs carry the run's usage**: the agent's tokens and cost per model, and the judge's tokens as its
   responses reported them (`--judge`; `--metrics` calls through the judge count too). A judge that reports no usage
   adds no entry rather than a false zero.
+- **`agenteval bench typedmemeval` and `bench autoaudit` write sealed AEF runs, with no verdict**: neither publishes a
+  pass mark, so their lines are `scored` (measured, no pass or fail). TypedMemEval: a line per question, score 1 when
+  correct, its typed outcome (correct, wrong, abstained, missed, premature) beside it; the summary's mean is the
+  accuracy. Autoaudit: one run per audited model (a run has one subject), with a `fidelity` and a `safety` line; the
+  ranking stays in its report.
 - **`EvalDetails.Lineage`**: a composite records which rule decided its label (`required-error`, `nothing-measured`,
   `threshold`, `severity`, `under-covered`, `required-not-measured`, `failure-effect`) and the parts that decided it.
   It describes the verdict, never changes it, and is not serialised.

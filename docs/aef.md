@@ -111,9 +111,11 @@ written is a warning, never a failure.
 | `bench owasp`, `mitre`, `nist` | the family | probe | The scan's probes, as `redteam` writes them; the benchmark's own verdict is in the summary. |
 | `bench perf`, `trace-fidelity`, `workflow-trace-fidelity` | the family | part of the result (`case`) | Each part beside its own verdict. |
 | `bench longmemeval` | `longmemeval` | question (`case`, its id) | Correct `passed`, wrong `failed`, unscored `not_measured`, unanswered `error`; no question or answer text. |
+| `bench typedmemeval` | `typedmemeval` | question (`case`, its id) | `scored`: measured, no pass or fail (the benchmark publishes no pass mark); score 1 when correct; the typed outcome (`abstained`, `missed`, …) in `ext`. |
+| `bench autoaudit` | `autoaudit` | one run per model, lines `fidelity` and `safety` | `scored`; the ranking compares the runs and stays in the report. |
 | `bench memory` | `memory` | category (`case`) | Weighted as the overall score weighs them, each with the command's label (pass at 70, warn from 50). |
 
-Not yet: `bench --runs` above 1 (the command says so), and `typedmemeval` and `autoaudit`.
+Not yet: `bench --runs` above 1 (the command says so).
 
 **How the run says what was tested.** `execution.targetMode` is never assumed:
 

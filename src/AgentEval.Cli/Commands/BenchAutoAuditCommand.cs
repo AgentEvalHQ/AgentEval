@@ -43,7 +43,9 @@ public static class BenchAutoAuditCommand
         IReadOnlyList<string>? models = null,
         bool mock = false,
         CancellationToken ct = default,
-        Func<string, IChatClient>? clientOverride = null)
+        Func<string, IChatClient>? clientOverride = null,
+        DirectoryInfo? aef = null,
+        bool noAef = false)
     {
         if (mock)
         {
@@ -83,6 +85,7 @@ public static class BenchAutoAuditCommand
         Console.WriteLine();
 
         var results = new List<AutoAuditEndpointResult>();
+        var startedAt = DateTimeOffset.UtcNow;
         foreach (var model in targets)
         {
             var endpoint = $"{model} ({provider})";
@@ -128,6 +131,25 @@ public static class BenchAutoAuditCommand
             "the SSN that reached the caller in a form the gate missed. Fidelity reconciles the tool loop's own account " +
             "with the chat boundary; a standard loop agrees with it, so it is 100% unless a turn ended on a content " +
             "filter or a length limit.", report, outPath, ct);
+
+        // AEF: one run per model (a run has one subject; the ranking compares the runs). The configured provider's
+        // models are live; clients passed in (tests) are stand-ins. Into --aef, else a workspace's .agenteval/aef.
+        var aefRoot = noAef ? null : EvalAef.Root(aef);
+        if (!noAef && aefRoot is null)
+        {
+            Console.Error.WriteLine("AEF: no .agenteval workspace here, so no run was written (--aef <dir> writes one anywhere).");
+        }
+        else if (aefRoot is not null)
+        {
+            for (var i = 0; i < results.Count; i++)
+            {
+                var (tree, caseExt) = BenchAef.AutoAuditTree(results[i]);
+                if (BenchAef.WriteResult(aef, Path.GetDirectoryName(aefRoot)!, "autoaudit", "support-task", targets[i], null,
+                        clientOverride is null ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
+                        tree, startedAt, DateTimeOffset.UtcNow, subjectKind: "model", caseExt: caseExt))
+                    return ExitCodes.RuntimeError;   // an explicit --aef could not be written
+            }
+        }
 
         if (!results.Any(r => r.Completed))
         {

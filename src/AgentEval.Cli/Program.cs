@@ -639,6 +639,12 @@ benchCmd.Add(benchNistCmd);
         benchTmeCmd.Add(benchTmeSubjectOpt);
         benchTmeCmd.Add(benchTmeRootOpt);
         benchTmeCmd.Add(benchTmeEvidenceOpt);
+        var benchTmeAefOpt = new Option<DirectoryInfo?>("--aef") { Description = "Write the run as sealed AEF evidence under this folder (default: the workspace's .agenteval/aef)" };
+        var benchTmeNoAefOpt = new Option<bool>("--no-aef") { Description = "Write no AEF run" };
+        var benchTmeSubjectVersionOpt = new Option<string?>("--subject-version") { Description = "The subject's exact version, recorded in the AEF run (a checkpoint lane needs it)" };
+        benchTmeCmd.Add(benchTmeAefOpt);
+        benchTmeCmd.Add(benchTmeNoAefOpt);
+        benchTmeCmd.Add(benchTmeSubjectVersionOpt);
         benchTmeCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
         {
             var vertical = parseResult.GetValue(benchTmeVerticalOpt);
@@ -667,7 +673,8 @@ benchCmd.Add(benchNistCmd);
             }
 
             return await BenchTypedMemEvalCommand.RunAsync(
-                vertical, subject, root, captureEvidenceContent: evidenceDetail == "content", ct);
+                vertical, subject, root, captureEvidenceContent: evidenceDetail == "content", ct,
+                parseResult.GetValue(benchTmeAefOpt), parseResult.GetValue(benchTmeNoAefOpt), parseResult.GetValue(benchTmeSubjectVersionOpt));
         });
         benchCmd.Add(benchTmeCmd);
     }
@@ -800,6 +807,10 @@ benchCmd.Add(benchNistCmd);
         benchAutoAuditCmd.Add(aaOutOpt);
         benchAutoAuditCmd.Add(aaModelsOpt);
         benchAutoAuditCmd.Add(aaSutOpt);
+        var aaAefOpt = new Option<DirectoryInfo?>("--aef") { Description = "Write one sealed AEF run per audited model under this folder (default: a workspace's .agenteval/aef)" };
+        var aaNoAefOpt = new Option<bool>("--no-aef") { Description = "Write no AEF run" };
+        benchAutoAuditCmd.Add(aaAefOpt);
+        benchAutoAuditCmd.Add(aaNoAefOpt);
         benchAutoAuditCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
         {
             var sut = parseResult.GetValue(aaSutOpt);
@@ -810,7 +821,8 @@ benchCmd.Add(benchNistCmd);
             }
             var models = parseResult.GetValue(aaModelsOpt)?
                 .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            return await BenchAutoAuditCommand.RunAsync(parseResult.GetValue(aaOutOpt), models, mock: sut is not null, ct);
+            return await BenchAutoAuditCommand.RunAsync(parseResult.GetValue(aaOutOpt), models, mock: sut is not null, ct,
+                aef: parseResult.GetValue(aaAefOpt), noAef: parseResult.GetValue(aaNoAefOpt));
         });
         benchCmd.Add(benchAutoAuditCmd);
     }
