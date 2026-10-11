@@ -48,6 +48,15 @@ internal static class BenchAef
         }
     }
 
+    /// <summary>
+    /// Writes a family's result that no <see cref="CompositeEval"/> definition describes (bench perf, trace-fidelity):
+    /// its parts are the cases, or the result itself when it has none, each recorded beside its own verdict.
+    /// </summary>
+    public static bool WriteResult(
+        DirectoryInfo? aef, string agentEvalDir, string family, string preset, string subject, string? subjectVersion,
+        AefTargetMode targetMode, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt) =>
+        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, AefCompositeRunWriter.Undescribed, result, startedAt, endedAt);
+
     /// <summary>The definition of <paramref name="eval"/> as AEF needs it beside its result.</summary>
     public static AefComponentShape Shape(IEval eval, double weight = 1, bool required = true, ComponentFailureEffect onFailure = ComponentFailureEffect.Averaged) =>
         new(weight, required, onFailure.ToString(), eval is CompositeEval composite
@@ -60,12 +69,17 @@ internal static class BenchAef
     /// </summary>
     public static bool Write(
         DirectoryInfo? aef, string agentEvalDir, string family, string preset, string subject, string? subjectVersion,
-        AefTargetMode targetMode, CompositeEval benchmark, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt)
+        AefTargetMode targetMode, CompositeEval benchmark, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt) =>
+        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, Shape(benchmark), result, startedAt, endedAt);
+
+    private static bool Write(
+        DirectoryInfo? aef, string agentEvalDir, string family, string preset, string subject, string? subjectVersion,
+        AefTargetMode targetMode, AefComponentShape shape, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt)
     {
         var root = aef?.FullName ?? Path.Combine(agentEvalDir, "aef");
         try
         {
-            var (directory, runHash) = AefCompositeRunWriter.Write(Path.Combine(root, "runs"), result, Shape(benchmark), new AefCompositeRunOptions
+            var (directory, runHash) = AefCompositeRunWriter.Write(Path.Combine(root, "runs"), result, shape, new AefCompositeRunOptions
             {
                 SubjectRef = AefEvalWriter.Ref("agent", subject),
                 SubjectVersion = subjectVersion,

@@ -86,6 +86,29 @@ public class BenchWorkflowTraceFidelityCommandTests : IDisposable
     }
 
     [Fact]
+    public async Task ItWritesASealedReplayedAefRun()
+    {
+        var trace = new WorkflowTrace
+        {
+            TraceName = "wtf", OriginalPrompt = "go", FinalOutput = "done",
+            Steps = { Step("a", 10, 5, "stop") },
+            ExecutorTraces = new Dictionary<string, AgentTrace> { ["a"] = ChatTrace(15, "stop") },
+        };
+        var path = await WriteTraceAsync(trace);
+        var aef = Path.Combine(_root, "aef-out");
+
+        await BenchWorkflowTraceFidelityCommand.RunAsync(path, "standard", "wf", _root, aef: new DirectoryInfo(aef));
+
+        var run = Assert.Single(Directory.GetFiles(aef, "run.json", SearchOption.AllDirectories));
+        var verification = AgentEval.Results.Integrity.AefRunVerifier.Verify(Path.GetDirectoryName(run)!);
+        Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact, verification.Outcome);
+        Assert.Empty(verification.Problems);
+        var header = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(run))!;
+        Assert.Equal("replayed", (string?)header["execution"]!["targetMode"]);   // it reads a trace, drives nothing
+        Assert.Equal("bench:workflow-trace-fidelity/standard", (string?)header["suite"]!["ref"]);
+    }
+
+    [Fact]
     public async Task APassOnPartOfTheExecutors_IsWithheld_ExitsTen()
     {
         var trace = new WorkflowTrace

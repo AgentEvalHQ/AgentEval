@@ -24,8 +24,10 @@ public static class BenchTraceFidelityCommand
     /// <summary>Runs the reconciliation. Returns 0 (clean, PASS), 10 (minor discrepancies, WARN), 9 (discrepancies, FAIL),
     /// 11 (nothing to reconcile: no verdict, stored PENDING) or 1 (setup/IO error).</summary>
     public static async Task<int> RunAsync(
-        string agentTraceFile, string chatTraceFile, string preset, string subject, string? rootOverride, CancellationToken ct = default)
+        string agentTraceFile, string chatTraceFile, string preset, string subject, string? rootOverride, CancellationToken ct = default,
+        DirectoryInfo? aef = null, bool noAef = false, string? subjectVersion = null)
     {
+        var startedAt = DateTimeOffset.UtcNow;
         // ── Workspace setup (mirrors BenchMemoryCommand) ──
         if (rootOverride is not null)
         {
@@ -130,6 +132,11 @@ public static class BenchTraceFidelityCommand
             Console.WriteLine();
             Console.WriteLine($"   Run ID: {runId}");
             Console.WriteLine($"   Canonical: {runDir}");
+            // AEF: the result as sealed evidence. It grades traces the agent already produced and drives no agent: replayed.
+            if (!noAef && BenchAef.WriteResult(aef, agentEvalDir, "trace-fidelity", preset, subject, subjectVersion,
+                    AgentEval.Results.Writing.AefTargetMode.Replayed, result, startedAt, DateTimeOffset.UtcNow))
+                return ExitCodes.RuntimeError;   // an explicit --aef could not be written
+
             return BenchExitCodes.FromLabel(result.Score.Label);
         }
         catch (Exception ex)

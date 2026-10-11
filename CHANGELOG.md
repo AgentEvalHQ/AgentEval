@@ -32,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--subject-version`): the scan's probes, as `redteam` writes them, in a lane named after the family, with the
   benchmark's own composite verdict in the summary. A real target (`--sut`, `--endpoint`, `--from-env`) is `live`, a
   stand-in `mocked`; a mock run is not stored and writes none.
+- **`bench perf`, `bench trace-fidelity` and `bench workflow-trace-fidelity` write each run as sealed AEF evidence**
+  (`--aef`, `--no-aef`, `--subject-version`): the family's result, its parts as cases (or itself, when it has none),
+  each recorded beside its own verdict, since no composite definition describes them. Perf drives the agent (`live`,
+  or `mocked` for a stand-in); the trace-fidelity benches read traces and drive nothing (`replayed`).
 - **`EvalDetails.Lineage`**: a composite records which rule decided its label (`required-error`, `nothing-measured`,
   `threshold`, `severity`, `under-covered`, `required-not-measured`, `failure-effect`) and the parts that decided it.
   It describes the verdict, never changes it, and is not serialised.

@@ -66,8 +66,14 @@ public static class AefCompositeRunWriter
         ArgumentNullException.ThrowIfNull(preset);
         ArgumentNullException.ThrowIfNull(shape);
         ArgumentNullException.ThrowIfNull(options);
-        var cases = preset.Details.SubResults ?? [];
-        if (cases.Count == 0 || cases.Count != shape.Children.Count)
+        // The preset's parts are the cases. A result without parts is one case, itself. Without a definition (a family
+        // that builds its result itself, such as bench perf) each case's parts are recorded beside its verdict (Own).
+        var single = (preset.Details.SubResults ?? []).Count == 0;
+        IReadOnlyList<EvalResult> cases = single ? [preset] : preset.Details.SubResults!;
+        IReadOnlyList<AefComponentShape> caseShapes = single ? [shape]
+            : shape.Children.Count == 0 ? cases.Select(_ => Undescribed).ToList()
+            : shape.Children;
+        if (cases.Count != caseShapes.Count)
         {
             throw new ArgumentException("the preset's components and its result's parts must match, one case each", nameof(shape));
         }
@@ -113,7 +119,7 @@ public static class AefCompositeRunWriter
 
             for (var i = 0; i < cases.Count; i++)
             {
-                Add(writer, cases[i], shape.Children[i], cases[i].Metric.Key, CasePath, parent: null, component: null);
+                Add(writer, cases[i], caseShapes[i], cases[i].Metric.Key, CasePath, parent: null, component: null);
             }
 
             writer.SetSummary(new AefSummary
@@ -142,6 +148,9 @@ public static class AefCompositeRunWriter
             throw;
         }
     }
+
+    /// <summary>A part whose definition is not known: weight 0, not required, recorded beside its parent's verdict.</summary>
+    public static AefComponentShape Undescribed { get; } = new(0, false, "Averaged", []);
 
     /// <summary>A score's AEF state: its measurement first, then its label (§7.5); an unknown label by its pass flag.</summary>
     public static AefState StateOf(EvalScore score)
@@ -227,7 +236,7 @@ public static class AefCompositeRunWriter
 
         for (var i = 0; i < subs.Count; i++)
         {
-            var child = described ? shape.Children[i] : new AefComponentShape(0, false, "Averaged", []);
+            var child = described ? shape.Children[i] : Undescribed;
             Add(writer, subs[i], child, caseId, childPaths[i], handle, new AefComponent(child.Weight, child.Required));
         }
     }

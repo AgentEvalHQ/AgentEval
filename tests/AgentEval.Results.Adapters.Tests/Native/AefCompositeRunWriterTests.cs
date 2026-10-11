@@ -117,7 +117,7 @@ public sealed class AefCompositeRunWriterTests : IDisposable
     {
         var preset = Composite("p", "pass", 1, 0.5, new EvalLineage("threshold", []), Leaf("a", "pass", 1));
 
-        Assert.Throws<ArgumentException>(() => AefCompositeRunWriter.Write(_out, preset, new AefComponentShape(1, true, "Averaged", []),
+        Assert.Throws<ArgumentException>(() => AefCompositeRunWriter.Write(_out, preset, new AefComponentShape(1, true, "Averaged", [Leaf(), Leaf()]),
             new AefCompositeRunOptions { SubjectRef = "agent:x", TargetMode = AefTargetMode.Mocked, Lane = "gdpr", SuiteRef = "bench:gdpr/x" },
             Start, Start.AddMinutes(1)));
     }

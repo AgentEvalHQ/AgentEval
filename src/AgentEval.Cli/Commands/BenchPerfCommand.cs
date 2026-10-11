@@ -44,8 +44,14 @@ public static class BenchPerfCommand
         bool azureFromEnv = false,
         bool mock = false,
         string? agentModel = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        DirectoryInfo? aef = null,
+        bool noAef = false,
+        string? subjectVersion = null,
+        bool agentIsLive = false)
     {
+        // agentIsLive: the caller resolved agentOverride from --sut or --endpoint, a real target. Any other agentOverride
+        // is a stand-in, which the AEF run records as mocked, never live (RUN-7).
         if (mock && (agentOverride is not null || azureFromEnv))
         {
             return MockTarget.RefuseMockWithRealTarget();
@@ -163,6 +169,7 @@ public static class BenchPerfCommand
         Console.WriteLine($"Running perf benchmark ({preset}) for subject '{subject}'...");
 
         EvalResult result;
+        var startedAt = DateTimeOffset.UtcNow;
         try
         {
             result = await family.EvaluateAsync!(input, null, ct);
@@ -241,6 +248,12 @@ public static class BenchPerfCommand
 
         Console.WriteLine($"Overall result: composite verdict {result.Score.Label.ToUpperInvariant()} " +
             $"(score {result.Score.Value:F3})");
+
+        // AEF: the perf result as sealed evidence (the mock run returned above, unstored).
+        if (!noAef && BenchAef.WriteResult(aef, agentEvalDir, "perf", preset, subject, subjectVersion,
+                agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
+                result, startedAt, DateTimeOffset.UtcNow))
+            return ExitCodes.RuntimeError;   // an explicit --aef could not be written
 
         // Reuse fix (BUG-22 follow-up): was an inlined duplicate of BenchExitCodes.FromLabel
         // (identical pass=>0/fail=>2/_=>2 mapping, now split 9/10/11 — see that class's own remarks).
