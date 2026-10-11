@@ -171,19 +171,27 @@ public static class AefCompositeRunWriter
         var state = StateOf(node.Score);
         var measured = IsMeasured(state);
         AefAggregation? aggregation = null;
-        var childPaths = subs.Select(s => $"{path}/{s.Metric.Key}").ToList();
+
+        // A composite's parts are its definition's components, in order. A leaf eval that keeps its own breakdown as
+        // sub-results (groundedness's claims, say) has none: its parts are recorded beside its own verdict, Own, each
+        // with weight 0 and not required (section 7.5).
+        var described = shape.Children.Count > 0;
+        if (described && subs.Count != shape.Children.Count)
+        {
+            throw new ArgumentException($"'{node.Metric.Key}': its parts must match its definition's components", nameof(shape));
+        }
+
+        var distinctKeys = subs.Select(s => s.Metric.Key).Distinct(StringComparer.Ordinal).Count() == subs.Count;
+        var childPaths = subs.Select((s, i) => distinctKeys ? $"{path}/{s.Metric.Key}" : $"{path}/{i + 1}").ToList();
         if (subs.Count > 0)
         {
-            if (subs.Count != shape.Children.Count || childPaths.Distinct(StringComparer.Ordinal).Count() != subs.Count)
-            {
-                throw new ArgumentException($"'{node.Metric.Key}': its parts must match its definition, with distinct keys", nameof(shape));
-            }
-
             var childStates = subs.Select(s => StateOf(s.Score)).ToList();
-            var keyToPath = subs.Zip(childPaths).ToDictionary(p => p.First.Metric.Key, p => p.Second, StringComparer.Ordinal);
+            var keyToPath = distinctKeys
+                ? subs.Zip(childPaths).ToDictionary(p => p.First.Metric.Key, p => p.Second, StringComparer.Ordinal)
+                : [];
             aggregation = new AefAggregation
             {
-                Strategy = AefNames.TryParse<AefAggregationStrategy>(node.Details.AggregationStrategy ?? "", out var strategy) ? strategy.Value : AefAggregationStrategy.Own,
+                Strategy = described && AefNames.TryParse<AefAggregationStrategy>(node.Details.AggregationStrategy ?? "", out var strategy) ? strategy.Value : AefAggregationStrategy.Own,
                 RulePath = AefNames.TryParse<AefRulePath>(node.Details.Lineage?.RulePath ?? "", out var rule) ? rule.Value
                     : measured ? AefRulePath.Threshold : AefRulePath.NothingMeasured,
                 Threshold = node.Score.Threshold,
@@ -219,7 +227,7 @@ public static class AefCompositeRunWriter
 
         for (var i = 0; i < subs.Count; i++)
         {
-            var child = shape.Children[i];
+            var child = described ? shape.Children[i] : new AefComponentShape(0, false, "Averaged", []);
             Add(writer, subs[i], child, caseId, childPaths[i], handle, new AefComponent(child.Weight, child.Required));
         }
     }

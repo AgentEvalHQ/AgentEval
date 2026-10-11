@@ -312,6 +312,12 @@ benchAgenticCmd.Add(benchAgenticReferenceFileOpt);
 benchAgenticCmd.Add(benchAgenticContextOpt);
 benchAgenticCmd.Add(benchAgenticContextFileOpt);
 benchAgenticCmd.Add(benchAgenticSutOpt);
+var benchAgenticAefOpt = new Option<DirectoryInfo?>("--aef") { Description = "Write the run as sealed AEF evidence under this folder (default: the workspace's .agenteval/aef)" };
+var benchAgenticNoAefOpt = new Option<bool>("--no-aef") { Description = "Write no AEF run" };
+var benchAgenticSubjectVersionOpt = new Option<string?>("--subject-version") { Description = "The subject's exact version, recorded in the AEF run (a checkpoint lane needs it)" };
+benchAgenticCmd.Add(benchAgenticAefOpt);
+benchAgenticCmd.Add(benchAgenticNoAefOpt);
+benchAgenticCmd.Add(benchAgenticSubjectVersionOpt);
 benchAgenticCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
 {
     var preset = parseResult.GetValue(benchAgenticPresetOpt) ?? "agentic-execution";
@@ -342,7 +348,9 @@ benchAgenticCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) 
         return AgentEval.Cli.ExitCodes.UsageError;
     }
     return await BenchAgenticCommand.RunAsync(preset, subject, root, input, response.Text, evaluatorOverride: null, budgetTier, traceFile, mock,
-        reference: reference.Text, context: context.Text, ct: ct);
+        reference: reference.Text, context: context.Text, ct: ct,
+        aef: parseResult.GetValue(benchAgenticAefOpt), noAef: parseResult.GetValue(benchAgenticNoAefOpt),
+        subjectVersion: parseResult.GetValue(benchAgenticSubjectVersionOpt));
 });
 // bench agentic calibrate
 var agenticCalibrateRootOpt = new Option<string?>("--root") { Description = "Workspace root path (default: current directory)" };

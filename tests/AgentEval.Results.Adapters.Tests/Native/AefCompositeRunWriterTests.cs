@@ -92,6 +92,27 @@ public sealed class AefCompositeRunWriterTests : IDisposable
     }
 
     [Fact]
+    public void Write_RecordsALeafsOwnBreakdown_BesideItsVerdict_AsOwn()
+    {
+        // A leaf eval (no components) that keeps sub-results, two of them with the same key: Own, weight 0, index paths.
+        var leaf = new EvalResult(new("groundedness", "g", "test", "1.0.0"),
+            new EvalScore(0.5, null, "warn", false, 0.7, "medium", null),
+            new(null, null, null, [Leaf("claim", "pass", 1), Leaf("claim", "fail", 0)], null),
+            new("atomic-code", null, null, null, null, 0, false), Start);
+        var preset = Composite("p", "warn", 0.5, 0.7, new EvalLineage("threshold", []), leaf);
+
+        var (dir, _) = AefCompositeRunWriter.Write(_out, preset, new AefComponentShape(1, true, "Averaged", [Leaf()]),
+            new AefCompositeRunOptions { SubjectRef = "agent:x", TargetMode = AefTargetMode.Replayed, Lane = "agentic", SuiteRef = "bench:agentic/x" },
+            Start, Start.AddMinutes(1));
+
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!.AsObject()).ToDictionary(l => (string)l["path"]!);
+        Assert.Equal("Own", (string?)lines["case"]["aggregation"]!["strategy"]);
+        Assert.Equal(0.0, (double)lines["case/2"]["component"]!["weight"]!);
+        Assert.Equal("failed", (string?)lines["case/2"]["state"]);
+    }
+
+    [Fact]
     public void Write_RefusesAShapeThatDoesNotMatchTheResult()
     {
         var preset = Composite("p", "pass", 1, 0.5, new EvalLineage("threshold", []), Leaf("a", "pass", 1));
