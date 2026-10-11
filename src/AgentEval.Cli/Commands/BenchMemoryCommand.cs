@@ -29,8 +29,9 @@ namespace AgentEval.Cli.Commands;
 /// </remarks>
 public static class BenchMemoryCommand
 {
-    public static Task<int> RunAsync(string preset, string subject, string? rootOverride, CancellationToken ct = default)
-        => RunAsync(preset, subject, rootOverride, chatClientOverride: null, ct);
+    public static Task<int> RunAsync(string preset, string subject, string? rootOverride, CancellationToken ct = default,
+        DirectoryInfo? aef = null, bool noAef = false, string? subjectVersion = null)
+        => RunAsync(preset, subject, rootOverride, chatClientOverride: null, ct, aef, noAef, subjectVersion);
 
     /// <summary>Internal overload exposed for tests; allows chat-client injection.</summary>
     internal static async Task<int> RunAsync(
@@ -38,7 +39,10 @@ public static class BenchMemoryCommand
         string subject,
         string? rootOverride,
         Microsoft.Extensions.AI.IChatClient? chatClientOverride,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        DirectoryInfo? aef = null,
+        bool noAef = false,
+        string? subjectVersion = null)
     {
         // ── Workspace setup ──────────────────────────────────────────────────
         if (rootOverride is not null)
@@ -88,15 +92,17 @@ public static class BenchMemoryCommand
 
         // ── Resolve chat client ──────────────────────────────────────────────
         Microsoft.Extensions.AI.IChatClient chatClient;
+        string? model = null;   // the provider's model: the agent and its judge
         if (chatClientOverride is not null)
         {
             chatClient = chatClientOverride;
         }
         else
         {
-            var (resolved, _, exitCode) = AzureChatAgentFactory.TryBuildChatClientFromEnv();
+            var (resolved, deployment, exitCode) = AzureChatAgentFactory.TryBuildChatClientFromEnv();
             if (resolved is null) return exitCode;
             chatClient = resolved;
+            model = deployment;
         }
 
         // ── Build the agent-under-test ───────────────────────────────────────
@@ -117,6 +123,7 @@ public static class BenchMemoryCommand
         // ── Run ──────────────────────────────────────────────────────────────
         var runner = MemoryBenchmarkRunner.Create(chatClient);
         MemoryBenchmarkResult result;
+        var startedAt = DateTimeOffset.UtcNow;
         try
         {
             result = await runner.RunBenchmarkAsync(agent, benchmark, ct);
@@ -242,6 +249,16 @@ public static class BenchMemoryCommand
             // WARN=>GateWarning (10), FAIL=>GateFailed (9). Previously WARN returned 0, so a memory
             // run in the 50–69 band silently passed CI while the identical band failed CI for every
             // other benchmark family (BUG-23). An INCOMPLETE run exits GateIndeterminate (11).
+            // AEF: a case per category. The environment's provider is live; a client passed in (tests) is a stand-in.
+            if (!noAef)
+            {
+                var (tree, shape) = BenchAef.MemoryTree(result, preset, verdict, model);
+                if (BenchAef.WriteTree(aef, agentEvalDir, "memory", preset, subject, subjectVersion,
+                        chatClientOverride is null ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
+                        shape, tree, startedAt, DateTimeOffset.UtcNow))
+                    return ExitCodes.RuntimeError;   // an explicit --aef could not be written
+            }
+
             return verdict == "INCOMPLETE" ? ExitCodes.GateIndeterminate : BenchExitCodes.FromLabel(verdict);
         }
         catch (Exception ex)

@@ -72,6 +72,44 @@ internal static class BenchAef
         AefTargetMode targetMode, CompositeEval benchmark, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt) =>
         Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, Shape(benchmark), result, startedAt, endedAt, "agent");
 
+    /// <summary>
+    /// Writes a family's result as a tree whose shape the caller gives (bench memory builds both from its categories).
+    /// Returns true only when an explicit <paramref name="aef"/> could not be written.
+    /// </summary>
+    public static bool WriteTree(
+        DirectoryInfo? aef, string agentEvalDir, string family, string preset, string subject, string? subjectVersion,
+        AefTargetMode targetMode, AefComponentShape shape, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt) =>
+        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, shape, result, startedAt, endedAt, "agent");
+
+    /// <summary>
+    /// bench memory's result as a tree: a case per category, weighted as the overall score weighs them (WeightedSum),
+    /// each with the command's own label (pass at 70 and above, warn from 50, fail below), a skipped category skipped and
+    /// an errored one error. The one model is the agent and its judge.
+    /// </summary>
+    public static (EvalResult Result, AefComponentShape Shape) MemoryTree(
+        AgentEval.Memory.Models.MemoryBenchmarkResult result, string preset, string verdict, string? judgeModel)
+    {
+        var categories = result.CategoryResults.Select(c =>
+        {
+            var label = c.Errored ? "error" : c.Skipped ? "skipped" : c.Score >= 70 ? "pass" : c.Score >= 50 ? "warn" : "fail";
+            return new EvalResult(
+                new EvalMetadata("memory." + c.CategoryName.ToLowerInvariant().Replace(' ', '-'), c.CategoryName, "memory", "1.0.0"),
+                // No severity: the benchmark grades a score, it does not say how bad a low one is.
+                new EvalScore(Math.Clamp(c.Score / 100.0, 0.0, 1.0), null, label, label == "pass", 0.7, label == "pass" ? "none" : "", null),
+                new EvalDetails(null, null, null, null, null),
+                new EvalProvenance(judgeModel is null ? "atomic-code" : "atomic-llm", judgeModel, null, null, null, 0, false),
+                DateTimeOffset.UtcNow);
+        }).ToList();
+        var root = new EvalResult(
+            new EvalMetadata("memory." + preset.ToLowerInvariant(), "Memory " + preset, "memory", "1.0.0"),
+            new EvalScore(Math.Clamp(result.OverallScore / 100.0, 0.0, 1.0), null, verdict.ToLowerInvariant(), verdict == "PASS", 0.7, "none", null),
+            new EvalDetails(null, null, null, categories, "WeightedSum"),
+            new EvalProvenance("composite", null, null, null, null, 0, false),
+            DateTimeOffset.UtcNow);
+        return (root, new AefComponentShape(1, true, "Averaged",
+            result.CategoryResults.Select(c => new AefComponentShape(c.Weight, true, "Averaged", [])).ToList()));
+    }
+
     private static bool Write(
         DirectoryInfo? aef, string agentEvalDir, string family, string preset, string subject, string? subjectVersion,
         AefTargetMode targetMode, AefComponentShape shape, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt,

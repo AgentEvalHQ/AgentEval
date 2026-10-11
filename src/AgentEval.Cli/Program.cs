@@ -675,6 +675,12 @@ benchCmd.Add(benchNistCmd);
         benchMemCmd.Add(benchMemPresetOpt);
         benchMemCmd.Add(benchMemSubjectOpt);
         benchMemCmd.Add(benchMemRootOpt);
+        var benchMemAefOpt = new Option<DirectoryInfo?>("--aef") { Description = "Write the run as sealed AEF evidence under this folder (default: the workspace's .agenteval/aef)" };
+        var benchMemNoAefOpt = new Option<bool>("--no-aef") { Description = "Write no AEF run" };
+        var benchMemSubjectVersionOpt = new Option<string?>("--subject-version") { Description = "The subject's exact version, recorded in the AEF run (a checkpoint lane needs it)" };
+        benchMemCmd.Add(benchMemAefOpt);
+        benchMemCmd.Add(benchMemNoAefOpt);
+        benchMemCmd.Add(benchMemSubjectVersionOpt);
         benchMemCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
         {
             var preset = parseResult.GetValue(benchMemPresetOpt) ?? "quick";
@@ -685,7 +691,8 @@ benchCmd.Add(benchNistCmd);
                 return AgentEval.Cli.ExitCodes.UsageError;
             }
             var root = parseResult.GetValue(benchMemRootOpt);
-            return await BenchMemoryCommand.RunAsync(preset, subject, root, ct);
+            return await BenchMemoryCommand.RunAsync(preset, subject, root, ct,
+                parseResult.GetValue(benchMemAefOpt), parseResult.GetValue(benchMemNoAefOpt), parseResult.GetValue(benchMemSubjectVersionOpt));
         });
         benchCmd.Add(benchMemCmd);
     }

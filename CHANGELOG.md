@@ -36,6 +36,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`--aef`, `--no-aef`, `--subject-version`): the family's result, its parts as cases (or itself, when it has none),
   each recorded beside its own verdict, since no composite definition describes them. Perf drives the agent (`live`,
   or `mocked` for a stand-in); the trace-fidelity benches read traces and drive nothing (`replayed`).
+- **`agenteval bench memory` writes each run as sealed AEF evidence**: a case per category, weighted as the overall
+  score weighs them, with the command's own label (pass at 70, warn from 50); skipped and errored categories are typed
+  absences. The provider's model is the agent and its judge (`live`).
 - **`EvalDetails.Lineage`**: a composite records which rule decided its label (`required-error`, `nothing-measured`,
   `threshold`, `severity`, `under-covered`, `required-not-measured`, `failure-effect`) and the parts that decided it.
   It describes the verdict, never changes it, and is not serialised.

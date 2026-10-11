@@ -110,9 +110,9 @@ written is a warning, never a failure.
 | `bench gdpr`, `eu-ai-act`, `agentic` | the family | top-level part of the preset (`case`) | The preset's tree below each case: every part's weight, whether it is required and its failure effect, and for every composite the rule that decided it (threshold, severity, a required part that errored, …) and the parts that did. |
 | `bench owasp`, `mitre`, `nist` | the family | probe | The scan's probes, as `redteam` writes them; the benchmark's own verdict is in the summary. |
 | `bench perf`, `trace-fidelity`, `workflow-trace-fidelity` | the family | part of the result (`case`) | Each part beside its own verdict. |
+| `bench memory` | `memory` | category (`case`) | Weighted as the overall score weighs them, each with the command's label (pass at 70, warn from 50). |
 
-Not yet: `bench --runs` above 1 (the command says so), and the memory families (`memory`, `typedmemeval`,
-`longmemeval`, `autoaudit`).
+Not yet: `bench --runs` above 1 (the command says so), and `typedmemeval`, `longmemeval` and `autoaudit`.
 
 **How the run says what was tested.** `execution.targetMode` is never assumed:
 
