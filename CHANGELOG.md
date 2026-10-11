@@ -39,6 +39,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`agenteval bench memory` writes each run as sealed AEF evidence**: a case per category, weighted as the overall
   score weighs them, with the command's own label (pass at 70, warn from 50); skipped and errored categories are typed
   absences. The provider's model is the agent and its judge (`live`).
+- **`agenteval bench longmemeval` writes each run as sealed AEF evidence**: a case per question (its id), correct
+  `passed`, wrong `failed`, a question the judge could not score `not_measured` and one the agent did not answer
+  `error`; no question, gold answer or response is written.
 - **`EvalDetails.Lineage`**: a composite records which rule decided its label (`required-error`, `nothing-measured`,
   `threshold`, `severity`, `under-covered`, `required-not-measured`, `failure-effect`) and the parts that decided it.
   It describes the verdict, never changes it, and is not serialised.

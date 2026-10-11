@@ -110,6 +110,38 @@ internal static class BenchAef
             result.CategoryResults.Select(c => new AefComponentShape(c.Weight, true, "Averaged", [])).ToList()));
     }
 
+    /// <summary>
+    /// An external memory benchmark's result (bench longmemeval) as a tree: a case per question, case id the question's
+    /// id, recorded beside the benchmark's verdict. Correct is passed and wrong failed; a question the judge could not
+    /// score is not measured and one the agent did not answer an error: typed absences, never failures. No question,
+    /// answer or response is written. The one model is the agent and its judge.
+    /// </summary>
+    public static EvalResult QuestionTree(
+        AgentEval.Memory.External.Models.ExternalBenchmarkResult result, string family, string preset, string verdict, string? judgeModel)
+    {
+        var questions = result.QuestionResults.Select(q =>
+        {
+            var agentFailed = q.ExecutionStatus != AgentEval.Memory.External.Models.QuestionExecutionStatus.Completed;
+            var label = agentFailed ? "error" : q.Correct is true ? "pass" : q.Correct is false ? "fail" : "inconclusive";
+            return new EvalResult(
+                new EvalMetadata(q.QuestionId, q.QuestionId, q.QuestionType, "1.0.0"),
+                new EvalScore(q.Correct is true ? 1 : 0, null, label, q.Correct is true, null, label == "pass" ? "none" : "", null)
+                {
+                    // An unscored judgment is a typed absence: not measured, never a failure.
+                    Measurement = label == "inconclusive" ? AgentEval.Evals.Meta.MeasurementState.NotMeasured : AgentEval.Evals.Meta.MeasurementState.Measured,
+                },
+                new EvalDetails(null, null, null, null, null),
+                new EvalProvenance(judgeModel is null ? "atomic-code" : "atomic-llm", judgeModel, null, null, null, 0, false),
+                DateTimeOffset.UtcNow);
+        }).ToList();
+        return new EvalResult(
+            new EvalMetadata($"{family}.{preset.ToLowerInvariant()}", $"{family} {preset}", family, "1.0.0"),
+            new EvalScore(result.OverallAccuracy ?? 0, null, verdict.ToLowerInvariant(), verdict == "PASS", null, "none", null),
+            new EvalDetails(null, null, null, questions, null),
+            new EvalProvenance("composite", null, null, null, null, 0, false),
+            DateTimeOffset.UtcNow);
+    }
+
     private static bool Write(
         DirectoryInfo? aef, string agentEvalDir, string family, string preset, string subject, string? subjectVersion,
         AefTargetMode targetMode, AefComponentShape shape, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt,
