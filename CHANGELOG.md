@@ -42,6 +42,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`agenteval bench longmemeval` writes each run as sealed AEF evidence**: a case per question (its id), correct
   `passed`, wrong `failed`, a question the judge could not score `not_measured` and one the agent did not answer
   `error`; no question, gold answer or response is written.
+- **`eval`'s AEF runs carry the run's usage**: the agent's tokens and cost per model, and the judge's tokens as its
+  responses reported them (`--judge`; `--metrics` calls through the judge count too). A judge that reports no usage
+  adds no entry rather than a false zero.
 - **`EvalDetails.Lineage`**: a composite records which rule decided its label (`required-error`, `nothing-measured`,
   `threshold`, `severity`, `under-covered`, `required-not-measured`, `failure-effect`) and the parts that decided it.
   It describes the verdict, never changes it, and is not serialised.

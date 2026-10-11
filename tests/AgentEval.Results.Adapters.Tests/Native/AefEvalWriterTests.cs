@@ -76,6 +76,23 @@ public sealed class AefEvalWriterTests : IDisposable
     }
 
     [Fact]
+    public void Write_TotalsTheRunsUsage_PerRoleAndModel_WithTheJudgesAsReported()
+    {
+        var options = Options() with { JudgeUsage = new AefUsage { Role = AefUsageRole.Judge, Model = "judge-x", InputTokens = 500, OutputTokens = 40 } };
+
+        var (dir, _) = AefEvalWriter.Write(_out, Summary(), ["c1", "c2", "c3"], options, Start, Start.AddSeconds(5));
+
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        var usage = AefTestRuns.Document(dir, "summary.json")["usage"]!.AsArray();
+        var agent = usage.Single(u => (string?)u!["role"] == "agent")!;
+        Assert.Equal("gpt-x", (string?)agent["model"]);
+        Assert.Equal(100, (long)agent["gen_ai.usage.input_tokens"]!);
+        var judge = usage.Single(u => (string?)u!["role"] == "judge")!;
+        Assert.Equal(500, (long)judge["gen_ai.usage.input_tokens"]!);
+        Assert.Equal(40, (long)judge["gen_ai.usage.output_tokens"]!);
+    }
+
+    [Fact]
     public void Write_RecordsAJudgeThatProducedNoVerdict_AsAnError_NeverAsAFailure()
     {
         var summary = new TestSummary("demo",

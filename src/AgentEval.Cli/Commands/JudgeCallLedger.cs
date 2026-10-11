@@ -27,13 +27,47 @@ internal sealed class JudgeCallLedger(IChatClient inner) : DelegatingChatClient(
     /// <summary>Judge calls that threw, including timeouts: each one is a verdict the judge did not give.</summary>
     public int Failures => Volatile.Read(ref _failures);
 
+    private int _reported;
+    private long _inputTokens;
+    private long _outputTokens;
+
+    /// <summary>Whether any judge response reported its token usage; without it the totals below say nothing.</summary>
+    public bool ReportedUsage => Volatile.Read(ref _reported) > 0;
+
+    /// <summary>The input tokens the judge's responses reported, summed.</summary>
+    public long InputTokens => Interlocked.Read(ref _inputTokens);
+
+    /// <summary>The output tokens the judge's responses reported, summed.</summary>
+    public long OutputTokens => Interlocked.Read(ref _outputTokens);
+
+    private void Count(UsageDetails? usage)
+    {
+        if (usage is null)
+        {
+            return;
+        }
+
+        Interlocked.Increment(ref _reported);
+        if (usage.InputTokenCount is { } input)
+        {
+            Interlocked.Add(ref _inputTokens, input);
+        }
+
+        if (usage.OutputTokenCount is { } output)
+        {
+            Interlocked.Add(ref _outputTokens, output);
+        }
+    }
+
     public override async Task<ChatResponse> GetResponseAsync(
         IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
     {
         Interlocked.Increment(ref _calls);
         try
         {
-            return await base.GetResponseAsync(messages, options, cancellationToken).ConfigureAwait(false);
+            var response = await base.GetResponseAsync(messages, options, cancellationToken).ConfigureAwait(false);
+            Count(response.Usage);
+            return response;
         }
         catch
         {
@@ -57,6 +91,10 @@ internal sealed class JudgeCallLedger(IChatClient inner) : DelegatingChatClient(
                 {
                     if (!await stream.MoveNextAsync().ConfigureAwait(false)) yield break;
                     update = stream.Current;
+                    foreach (var usage in update.Contents.OfType<UsageContent>())
+                    {
+                        Count(usage.Details);
+                    }
                 }
                 catch
                 {

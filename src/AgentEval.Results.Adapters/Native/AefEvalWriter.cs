@@ -31,6 +31,12 @@ public sealed record AefEvalRunOptions
     /// </summary>
     public string? JudgeModel { get; init; }
 
+    /// <summary>
+    /// What the judge consumed over the run, when its responses reported it: the run summary's judge usage entry
+    /// ([SUM-7]). It counts every judge call, a call that produced no verdict included.
+    /// </summary>
+    public AefUsage? JudgeUsage { get; init; }
+
     /// <summary>How the run drove its target ([RUN-7]); a stand-in target is never <c>live</c>.</summary>
     public required AefTargetMode TargetMode { get; init; }
 
@@ -200,6 +206,7 @@ public static class AefEvalWriter
             {
                 Lanes = [new AefSummaryLane(Lane, [new AefSummaryEntry { Metric = PassMetric, Path = CasePath }, new AefSummaryEntry { Metric = ScoreMetric, Path = CasePath }])],
                 Cost = cost > 0 ? new AefCost(cost, "AgentEval's estimate from the agent's reported token usage; judge calls are not included") : null,
+                Usage = Totals(all, options.JudgeUsage),
             });
             writer.Close(AefRunStatus.Completed, AefTime.FromDateTimeOffset(endedAt));
             var seal = AefSealer.Seal(directory, new AefSealOptions { SealedBy = AefSealedBy.Producer, Signer = options.Signer });
@@ -243,6 +250,32 @@ public static class AefEvalWriter
 
     // The judge graded a case when it returned criteria results and a verdict ([RUN-9]).
     private static bool Graded(TestResult result) => result.CriteriaResults is not null && !result.JudgeFailed;
+
+    // The run's total usage, one entry per role and model ([SUM-7]): the agent's, summed over the cases by the model that
+    // answered, and the judge's, as its responses reported it. Null when nothing reported any.
+    private static List<AefUsage>? Totals(IReadOnlyList<TestResult> results, AefUsage? judge)
+    {
+        var totals = results
+            .Select(r => r.Performance)
+            .Where(p => p is not null && (p.PromptTokens is not null || p.CompletionTokens is not null || p.EstimatedCost is not null))
+            .GroupBy(p => AefConverter.Text(p!.ModelUsed, 256), StringComparer.Ordinal)
+            .Select(g => new AefUsage
+            {
+                Role = AefUsageRole.Agent,
+                Model = g.Key,
+                InputTokens = g.Any(p => p!.PromptTokens is not null) ? g.Sum(p => (long)(p!.PromptTokens ?? 0)) : null,
+                OutputTokens = g.Any(p => p!.CompletionTokens is not null) ? g.Sum(p => (long)(p!.CompletionTokens ?? 0)) : null,
+                CostUsd = g.Any(p => p!.EstimatedCost is not null) ? g.Sum(p => (double)(p!.EstimatedCost ?? 0)) : null,
+                CostSource = g.Any(p => p!.EstimatedCost is not null) ? "AgentEval's estimate from the reported token usage" : null,
+            })
+            .ToList();
+        if (judge is not null)
+        {
+            totals.Add(judge with { Role = AefUsageRole.Judge });
+        }
+
+        return totals.Count > 0 ? totals : null;
+    }
 
     // A judge that produced no verdict measured nothing: its Passed and Score are placeholders, so the case is an error
     // (a typed absence, [RES-1]), never a failure.
