@@ -15,6 +15,39 @@ namespace AgentEval.Cli.Commands;
 /// </summary>
 internal static class BenchAef
 {
+    /// <summary>
+    /// Writes a red-team benchmark (bench owasp, mitre, nist) as its probes: the scan is the evidence, lane the family;
+    /// the benchmark's own composite verdict goes in the summary. Returns true only when an explicit
+    /// <paramref name="aef"/> could not be written.
+    /// </summary>
+    public static bool WriteScan(
+        DirectoryInfo? aef, string agentEvalDir, string family, string preset, string subject, string? subjectVersion,
+        AefTargetMode targetMode, string? judgeModel, AgentEval.RedTeam.RedTeamResult scan, EvalResult verdict)
+    {
+        var root = aef?.FullName ?? Path.Combine(agentEvalDir, "aef");
+        try
+        {
+            var (directory, runHash) = AefProbeRunWriter.Write(Path.Combine(root, "runs"), RedTeamAef.Lines(scan), new AefProbeRunOptions
+            {
+                SubjectRef = AefEvalWriter.Ref("agent", subject),
+                SubjectVersion = subjectVersion,
+                JudgeModel = judgeModel,
+                TargetMode = targetMode,
+                SuiteRef = AefEvalWriter.Ref("bench", $"{family}/{preset}"),
+                ProbesNotRun = scan.SkippedProbes,
+                Lane = family,
+                BenchVerdict = (verdict.Score.Label, verdict.Score.Value),
+            }, scan.StartedAt, scan.CompletedAt);
+            Console.Error.WriteLine($"AEF run: {directory} (run hash {runHash[..12]}...)");
+            return false;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
+        {
+            Console.Error.WriteLine($"{(aef is null ? "Warning" : "Error")}: the AEF run was not written: {ex.Message}");
+            return aef is not null;
+        }
+    }
+
     /// <summary>The definition of <paramref name="eval"/> as AEF needs it beside its result.</summary>
     public static AefComponentShape Shape(IEval eval, double weight = 1, bool required = true, ComponentFailureEffect onFailure = ComponentFailureEffect.Averaged) =>
         new(weight, required, onFailure.ToString(), eval is CompositeEval composite

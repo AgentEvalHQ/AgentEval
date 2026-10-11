@@ -28,6 +28,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   required and its failure effect; a leaf's own breakdown (groundedness's claims) beside its verdict. A live agent
   is `live`, a stand-in `mocked`, a graded `--response` `replayed` (bench agentic always grades one).
   `--runs` above 1 is not written yet.
+- **`bench owasp`, `bench mitre` and `bench nist` write each scan as sealed AEF evidence** (`--aef`, `--no-aef`,
+  `--subject-version`): the scan's probes, as `redteam` writes them, in a lane named after the family, with the
+  benchmark's own composite verdict in the summary. A real target (`--sut`, `--endpoint`, `--from-env`) is `live`, a
+  stand-in `mocked`; a mock run is not stored and writes none.
 - **`EvalDetails.Lineage`**: a composite records which rule decided its label (`required-error`, `nothing-measured`,
   `threshold`, `severity`, `under-covered`, `required-not-measured`, `failure-effect`) and the parts that decided it.
   It describes the verdict, never changes it, and is not serialised.

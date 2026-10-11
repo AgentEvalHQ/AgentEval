@@ -68,6 +68,15 @@ public sealed record AefProbeRunOptions
     /// <summary>Probes planned but not run (FailFast, truncation): they have no lines, and the summary says how many.</summary>
     public int ProbesNotRun { get; init; }
 
+    /// <summary>The probes' lane: <c>redteam</c>, or a benchmark family (<c>owasp</c>, <c>mitre</c>, <c>nist</c>).</summary>
+    public string Lane { get; init; } = AefProbeRunWriter.Lane;
+
+    /// <summary>
+    /// A benchmark's own verdict over the scan (its label and score), which no lane recomputes ([RES-6]): written to the
+    /// summary's <c>ext</c>.
+    /// </summary>
+    public (string Label, double Score)? BenchVerdict { get; init; }
+
     /// <summary>A signer for the seal, if any.</summary>
     public IAefSigner? Signer { get; init; }
 }
@@ -154,25 +163,34 @@ public static class AefProbeRunWriter
             writer.SetMetrics(metrics);
             foreach (var line in lines)
             {
-                writer.AddResult(Line(line, options.JudgeModel));
+                writer.AddResult(Line(line, options.JudgeModel, options.Lane));
             }
 
             var lanes = new List<AefSummaryLane>
             {
-                new(Lane, [new AefSummaryEntry { Metric = ResistedMetric, Path = ProbePath }, new AefSummaryEntry { Metric = ResistedConclusiveMetric, Path = ProbePath }]),
+                new(options.Lane, [new AefSummaryEntry { Metric = ResistedMetric, Path = ProbePath }, new AefSummaryEntry { Metric = ResistedConclusiveMetric, Path = ProbePath }]),
             };
             if (controls)
             {
                 lanes.Add(new AefSummaryLane(ControlLane, [new AefSummaryEntry { Metric = AnsweredMetric, Path = ControlPath }]));
             }
 
-            writer.SetSummary(new AefSummary
+            var ext = new System.Text.Json.Nodes.JsonObject();
+            if (options.ProbesNotRun > 0)
             {
-                Lanes = lanes,
-                Ext = options.ProbesNotRun > 0
-                    ? new System.Text.Json.Nodes.JsonObject { ["agenteval.redteam"] = new System.Text.Json.Nodes.JsonObject { ["probesNotRun"] = options.ProbesNotRun } }
-                    : null,
-            });
+                ext["agenteval.redteam"] = new System.Text.Json.Nodes.JsonObject { ["probesNotRun"] = options.ProbesNotRun };
+            }
+
+            if (options.BenchVerdict is { } verdict)
+            {
+                ext["agenteval.bench"] = new System.Text.Json.Nodes.JsonObject
+                {
+                    ["label"] = verdict.Label,
+                    ["score"] = double.IsFinite(verdict.Score) ? verdict.Score : null,
+                };
+            }
+
+            writer.SetSummary(new AefSummary { Lanes = lanes, Ext = ext.Count > 0 ? ext : null });
             writer.Close(AefRunStatus.Completed, AefTime.FromDateTimeOffset(endedAt));
             var seal = AefSealer.Seal(directory, new AefSealOptions { SealedBy = AefSealedBy.Producer, Signer = options.Signer });
             return (directory, seal.RunHash);
@@ -191,14 +209,14 @@ public static class AefProbeRunWriter
         return AefConverter.Sha256Of(Encoding.UTF8.GetBytes(string.Concat(ids.Select(id => id + "\n"))));
     }
 
-    private static AefResult Line(AefProbeLine line, string? judgeModel)
+    private static AefResult Line(AefProbeLine line, string? judgeModel, string lane)
     {
         var conclusive = !line.Control && line.State is AefState.Passed or AefState.Failed;
         return new AefResult
         {
             CaseId = line.CaseId,
             Path = line.Control ? ControlPath : ProbePath,
-            Lane = line.Control ? ControlLane : Lane,
+            Lane = line.Control ? ControlLane : lane,
             Evaluator = new AefEvaluator(line.Control ? "agenteval.redteam.over-refusal" : "agenteval.redteam", AefConverter.Version),
             State = line.State,
             Reason = line.Reason,

@@ -67,8 +67,14 @@ public static class BenchMitreCommand
         bool mock = false,
         IChatClient? judgeClientOverride = null,
         string? agentModel = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        DirectoryInfo? aef = null,
+        bool noAef = false,
+        string? subjectVersion = null,
+        bool agentIsLive = false)
     {
+        // agentIsLive: the caller resolved agentOverride from --sut or --endpoint, a real target. Any other agentOverride
+        // is a stand-in, which the AEF run records as mocked, never live (RUN-7).
         if (mock && (agentOverride is not null || azureFromEnv))
         {
             return (MockTarget.RefuseMockWithRealTarget(), null);
@@ -321,6 +327,13 @@ public static class BenchMitreCommand
             runId: runId);
         if (htmlPath is not null) Console.WriteLine($"HTML report:     {htmlPath}");
         if (pdfPath is not null)  Console.WriteLine($"PDF report:      {pdfPath}");
+
+        // ── AEF ───────────────────────────────────────────────────────────────
+        // The scan's probes as sealed evidence, lane mitre; a mock run is not stored, so it writes none.
+        if (!isMock && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "mitre", preset, subject, subjectVersion,
+                agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
+                judgeModelName, redTeamResult, compositeEval))
+            return (ExitCodes.RuntimeError, null);   // an explicit --aef could not be written
 
         // ── Exit code ─────────────────────────────────────────────────────────
         Console.WriteLine($"Overall result: pass rate {report.Summary.OverallPassRate:F1}% " +
