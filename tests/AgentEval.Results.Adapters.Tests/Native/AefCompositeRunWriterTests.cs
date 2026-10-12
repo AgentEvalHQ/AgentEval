@@ -18,6 +18,37 @@ public sealed class AefCompositeRunWriterTests : IDisposable
 
     private static readonly DateTimeOffset Start = new(2026, 10, 1, 9, 0, 0, TimeSpan.Zero);
 
+    [Theory]
+    [InlineData("https://user:private@example.test/v1?api-key=secret#token", "https://example.test/v1", false)]
+    [InlineData("https://user:private@example.test/v1?api-key=secret#token", "https://example.test/v1", true)]
+    [InlineData("https://example.test/a%20b", "https://example.test/a%20b", false)]
+    [InlineData("not-an-endpoint?secret", null, false)]
+    [InlineData(null, null, false)]
+    public void Write_Endpoint_UsesSanitizedRunnerIdentity(string? endpoint, string? expected, bool aborted)
+    {
+        var options = new AefCompositeRunOptions
+        {
+            SubjectRef = "agent:test", TargetMode = AefTargetMode.Live, Lane = "test", SuiteRef = "bench:test",
+            Endpoint = endpoint, AbortReason = aborted ? "cancelled" : null,
+        };
+        var (dir, _) = aborted
+            ? AefCompositeRunWriter.WriteAbortedEmpty(_out, Leaf("case", "pass", 1), options, Start, Start.AddSeconds(1))
+            : AefCompositeRunWriter.Write(_out, Leaf("case", "pass", 1), AefCompositeRunWriter.Undescribed, options, Start, Start.AddSeconds(1));
+        var text = File.ReadAllText(Path.Combine(dir, "run.json"));
+        var deployment = JsonNode.Parse(text)!["deployment"];
+        if (expected is null) Assert.Null(deployment);
+        else
+        {
+            Assert.Equal(expected, (string?)deployment!["endpoint"]);
+            var plan = new JsonObject { ["subject"] = new JsonObject { ["endpoint"] = expected } };
+            Assert.Equal(AgentEval.Results.Runner.AefPlanDefaults.DeploymentRef(plan), (string?)deployment["ref"]);
+        }
+        Assert.DoesNotContain("private", text);
+        Assert.DoesNotContain("secret", text);
+        Assert.DoesNotContain("token", text);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+    }
+
     [Fact]
     public void Write_StoreV1Links_PreservesAggregateAndOrderedTrialIds()
     {

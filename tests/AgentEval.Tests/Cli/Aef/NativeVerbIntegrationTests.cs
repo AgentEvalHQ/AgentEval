@@ -84,6 +84,35 @@ public sealed class NativeVerbIntegrationTests : IDisposable
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task BenchEvidence_Endpoint_RemovesSecretsAndMatchesRunner(bool scan)
+    {
+        const string endpoint = "https://user:private@example.test/a%20b?api-key=secret#token";
+        const string sanitized = "https://example.test/a%20b";
+        var aef = new DirectoryInfo(Path.Combine(_root, "aef"));
+        var started = DateTimeOffset.UtcNow;
+        var result = await new MockProgressEval("case").EvaluateAsync(new EvalInput("q", "r"));
+        var failed = scan
+            ? BenchAef.WriteScan(aef, _root, "test", "test", "subject", null,
+                AgentEval.Results.Writing.AefTargetMode.Live, null, new RedTeamAef.PartialScan("subject").Snapshot(),
+                null, 1, null, abortReason: "cancelled", endpoint: endpoint)
+            : BenchAef.WriteResult(aef, _root, "test", "test", "subject", null,
+                AgentEval.Results.Writing.AefTargetMode.Live, result, started, DateTimeOffset.UtcNow, endpoint: endpoint);
+        Assert.False(failed);
+        var dir = RunDirectory(aef.FullName);
+        AssertIntact(dir);
+        var deployment = Document(dir, "run.json")["deployment"]!;
+        Assert.Equal(sanitized, (string?)deployment["endpoint"]);
+        var plan = new JsonObject { ["subject"] = new JsonObject { ["endpoint"] = sanitized } };
+        Assert.Equal(AgentEval.Results.Runner.AefPlanDefaults.DeploymentRef(plan), (string?)deployment["ref"]);
+        var persisted = string.Concat(Directory.GetFiles(dir).Select(File.ReadAllText));
+        Assert.DoesNotContain("private", persisted);
+        Assert.DoesNotContain("secret", persisted);
+        Assert.DoesNotContain("api-key", persisted);
+    }
+
+    [Theory]
     [InlineData("owasp")]
     [InlineData("mitre")]
     [InlineData("nist")]

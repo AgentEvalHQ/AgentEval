@@ -309,6 +309,9 @@ Agentic benchmarks also link their created store manifests, including interrupte
 GDPR and EU AI Act also record single-run identities, or ordered `trialRunIds` plus the aggregate `runId` for
 repeated runs. IDs are captured immediately after manifest creation, including an interrupted trial or aggregate
 persistence; an aggregate that was never created has no `runId`. Native adapter options expose the same links.
+`AefCompositeRunOptions.Endpoint` accepts the actual target endpoint when known, as the eval and probe options do.
+Writers remove user information, query and fragment before creating a deployment header, and omit invalid or
+unknown endpoints. The sanitized endpoint determines the deployment reference using Runner-compatible encoding.
 Fatal evaluation or report errors retain the observed GDPR/EU AI Act/agentic composite evidence as aborted, without a command gate;
 `--no-aef` still opts out and an explicit AEF write failure retains the runtime-error exit.
 OWASP/MITRE/NIST likewise retain measured probes on scan or persistence errors, with no aborted-run gate.

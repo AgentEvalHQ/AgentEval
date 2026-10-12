@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Native composite deployment metadata:** composite writer options accept a known target endpoint, sanitize
+  user information/query/fragment, and use the same deployment reference encoding as Runner. Unknown or invalid
+  endpoints are omitted. Benchmark AEF helpers can forward the endpoint to composite and probe writers.
+
 - **Agentic and scan failure evidence:** agentic benchmarks link created store manifests and retain observed
   results after fatal evaluation/report failures. OWASP, MITRE and NIST scans also retain measured probes after
   scan or persistence errors, without a command gate. Opt-out and explicit-output error behavior is preserved.

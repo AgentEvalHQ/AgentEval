@@ -33,6 +33,9 @@ public sealed record AefCompositeRunOptions
     /// <summary>The subject's ref (<c>kind:name</c>, [ENC-13]).</summary>
     public required string SubjectRef { get; init; }
 
+    /// <summary>The actual target endpoint, when known; user information, query and fragment are removed.</summary>
+    public string? Endpoint { get; init; }
+
     /// <summary>The subject's version, if exact ([ENC-10]).</summary>
     public string? SubjectVersion { get; init; }
 
@@ -154,6 +157,7 @@ public static class AefCompositeRunWriter
 
         // A folder this writer owns (AefRunFolder), so a failure below discards only its own run.
         var storeExtension = options.StoreV1?.ToExtension();
+        var endpoint = options.Endpoint is null ? null : AefConverter.Endpoint(AefConverter.WithoutCredentials(options.Endpoint));
         using var folder = AefRunFolder.Reserve(runsRoot, startedAt, "bench");
         var runId = folder.RunId;
         var directory = folder.Directory;
@@ -165,6 +169,7 @@ public static class AefCompositeRunWriter
             RunId = runId,
             Producer = AefConverter.DefaultProducer,
             Subject = new AefSubject { Ref = options.SubjectRef, Kind = AefEvalWriter.KindOf(options.SubjectRef), Version = options.SubjectVersion },
+            Deployment = endpoint is null ? null : new AefDeployment { Ref = AefConverter.TypedRef("endpoint", endpoint), Endpoint = endpoint },
             Suite = new AefSuite
             {
                 Ref = options.SuiteRef,
