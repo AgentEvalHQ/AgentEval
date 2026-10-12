@@ -25,6 +25,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Runner client foundations now include purpose-scoped endpoint creation without ambient key fallback or SDK
   retries, plus per-role call, text-input and output-token caps. Missing usage and interrupted calls retain their
   reserved cost; reported token overruns stop further calls. Live dataset and CLI wiring remain in progress.
+  Dataset snapshots can now be parsed from the exact supplied UTF-8 bytes with explicit, unique IDs, without
+  reopening a file or generating replacement IDs. The native eval mapper is reusable without writing a run,
+  preserving criteria, assertions, named metrics, typed absences and content privacy.
 - **`agenteval eval` writes each run as sealed AEF evidence** (S1 #5a): into a workspace's `.agenteval/aef`, or `--aef <dir>`;
   `--no-aef` writes nothing; `--subject` and `--subject-version` name the subject. One result line per case, the
   target mode the run really had (a stand-in is never `live`), the judge only when it graded, and no content.

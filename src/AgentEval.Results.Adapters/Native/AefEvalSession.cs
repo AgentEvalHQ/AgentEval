@@ -143,39 +143,14 @@ public static partial class AefEvalWriter
                 if (_caseMetrics.Contains((caseId, metric.MetricName)))
                     throw new ArgumentException("A named metric can be recorded only once per case.", nameof(metrics));
                 var metricId = metric.MetricName;
-                if (metricId is PassMetric or ScoreMetric)
-                    throw new ArgumentException("Named metrics cannot use the reserved harness metric names pass or score.", nameof(metrics));
+                ValidateMetricName(metricId, nameof(metrics));
                 if (!_metrics.Any(m => m.Id == metricId))
                 {
-                    _metrics.Add(new AefMetric
-                    {
-                        Id = metricId, Kind = AefMetricKind.Score, Direction = AefMetricDirection.None,
-                        Scale = AefScale.Between(0, 100),
-                    });
+                    _metrics.Add(NamedMetric(metricId));
                     _writer.SetMetrics(_metrics);
                 }
-                var child = Child(caseId, $"{CasePath}/metrics/{Uri.EscapeDataString(metricId)}", "agenteval.metric",
-                    metric.Measured ? metric.Passed ? AefState.Passed : AefState.Failed : AefState.NotMeasured) with
-                {
-                    Scores = metric.Measured ? [new AefScore { Metric = metricId, Value = metric.Score }] : null,
-                    Reason = metric.Measured ? null : "The metric could not be measured",
-                };
-                _writer.AddResult(child, entry.Handle);
-                var previous = entry.Root.Aggregation;
-                var absent = (previous?.Unmeasured?.NotMeasured ?? 0) + (metric.Measured ? 0 : 1);
-                var root = entry.Root with
-                {
-                    Aggregation = new AefAggregation
-                    {
-                        Strategy = AefAggregationStrategy.Own,
-                        RulePath = entry.Root.State == AefState.Error ? AefRulePath.NothingMeasured : AefRulePath.Threshold,
-                        Score = entry.Root.State == AefState.Error ? null : entry.Root.Scores![0].Value,
-                        Threshold = entry.Root.State == AefState.Error ? null : entry.PassingScore,
-                        Measured = (previous?.Measured ?? 0) + (metric.Measured ? 1 : 0),
-                        Total = (previous?.Total ?? 0) + 1,
-                        Unmeasured = absent == 0 ? null : new AefUnmeasured { NotMeasured = absent },
-                    },
-                };
+                _writer.AddResult(MetricChild(caseId, metric), entry.Handle);
+                var root = IncludeMetric(entry.Root, metric, entry.PassingScore);
                 _writer.UpdateResult(entry.Handle, root);
                 entry = (entry.Handle, root, entry.PassingScore);
                 _cases[caseId] = entry;

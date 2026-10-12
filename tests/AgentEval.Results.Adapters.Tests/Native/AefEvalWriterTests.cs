@@ -19,6 +19,61 @@ public sealed class AefEvalWriterTests : IDisposable
 
     private static readonly DateTimeOffset Start = new(2026, 10, 10, 12, 0, 0, TimeSpan.Zero);
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void MapCase_CompleteEvidence_MatchesIncrementalWriterWithoutContent(bool judgeFailed)
+    {
+        var result = new TestResult
+        {
+            TestName = "secret prompt", ActualOutput = "secret response", Passed = !judgeFailed, Score = 85,
+            JudgeFailed = judgeFailed,
+            CriteriaResults = [new AgentEval.Core.CriterionResult { Criterion = "secret criterion", Met = false }],
+            AssertionResults = [AgentEval.Output.AssertionResult.Undecidable("secret assertion", "secret explanation")],
+            MetricResults =
+            [
+                AgentEval.Core.MetricResult.Fail("code_quality", "secret reason", 25),
+                AgentEval.Core.MetricResult.NotMeasured("llm_context", "secret context"),
+            ],
+        };
+        using var session = AefEvalWriter.Start(_out, Options(), Start);
+        session.Add(result, "unchanged-id", 70);
+        var (original, _) = session.Complete(Start.AddSeconds(1));
+        var mapped = AefEvalWriter.MapCase(result, "unchanged-id", 70);
+        var directory = Path.Combine(_out, "mapped");
+        var writer = AefRunWriter.Create(directory, new AefRunHeader
+        {
+            RunId = "mapped-case", Producer = new() { Name = "test", Version = "1.0.0" },
+            Subject = new() { Ref = "model:test", Kind = AefSubjectKind.Model },
+            StartedAt = AefTime.FromDateTimeOffset(Start), ContentCapture = AefContentCapture.Off,
+            Execution = new() { TargetMode = AefTargetMode.Live, Stimulus = AefStimulus.Suite },
+        });
+        writer.SetMetrics([
+            new() { Id = "score", Kind = AefMetricKind.Score, Direction = AefMetricDirection.HigherBetter, Scale = AefScale.Between(0, 100) },
+            .. mapped.Metrics,
+        ]);
+        var parent = writer.AddResult(mapped.Root);
+        foreach (var child in mapped.Children) writer.AddResult(child, parent);
+        writer.Close(AefRunStatus.Completed, AefTime.FromDateTimeOffset(Start.AddSeconds(1)));
+        AefSealer.Seal(directory, new AefSealOptions { SealedBy = AefSealedBy.Producer });
+
+        var expected = AefTestRuns.Results(original);
+        var actual = AefTestRuns.Results(directory);
+        Assert.Equal(expected.Count, actual.Count);
+        for (var i = 0; i < expected.Count; i++)
+        {
+            foreach (var key in new[] { "resultId", "parentResultId" })
+            {
+                expected[i].Remove(key);
+                actual[i].Remove(key);
+            }
+            Assert.True(JsonNode.DeepEquals(expected[i], actual[i]));
+        }
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(directory).Outcome);
+        if (AefTestRuns.ReferenceVerify(directory) is { } reference) Assert.Equal("intact", (string?)reference["outcome"]);
+        Assert.DoesNotContain("secret", string.Concat(Directory.GetFiles(directory).Select(File.ReadAllText)));
+    }
+
     private static TestSummary Summary() => new("demo",
     [
         new TestResult { TestName = "greets", Passed = true, Score = 90, Performance = new() { StartTime = Start, EndTime = Start.AddSeconds(2), PromptTokens = 100, CompletionTokens = 20, EstimatedCost = 0.001m, ModelUsed = "gpt-x" } },

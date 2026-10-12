@@ -84,6 +84,30 @@ public static partial class AefEvalWriter
     public const string PassMetric = "pass";
     public const string ScoreMetric = "score";
 
+    /// <summary>
+    /// Maps one harness result to its native root and children, without writing a run. The runner supplies the
+    /// lane, timestamps and usage accounting. Criteria, assertions and named metrics preserve the same Own
+    /// aggregation as the incremental eval writer; no prompt, response or judge explanation is included.
+    /// </summary>
+    public static AefEvalCase MapCase(TestResult result, string caseId, int? passingScore = null)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+        ArgumentNullException.ThrowIfNull(caseId);
+        var (root, children) = MapBaseCase(result, caseId, passingScore);
+        var metrics = new List<AefMetric>();
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var metric in result.MetricResults ?? [])
+        {
+            if (!names.Add(metric.MetricName))
+                throw new ArgumentException("A named metric can be recorded only once per case.", nameof(result));
+            ValidateMetricName(metric.MetricName, nameof(result));
+            metrics.Add(NamedMetric(metric.MetricName));
+            children.Add(MetricChild(caseId, metric));
+            root = IncludeMetric(root, metric, passingScore);
+        }
+        return new AefEvalCase(root, children, metrics);
+    }
+
     /// <summary>Writes the run under <paramref name="runsRoot"/>/<c>yyyy/MM/runId</c> and seals it; returns its folder and run hash.</summary>
     /// <param name="passingScores">Each case's passing score, the threshold of its own verdict; null records none.</param>
     /// <param name="runsRoot">The root folder for runs.</param>
@@ -286,6 +310,14 @@ public static partial class AefEvalWriter
     // case's verdict is its own, recorded beside them: Own, with each child weight 0 and not required (§7.5).
     private static (AefResultHandle Handle, AefResult Root) AddCase(AefRunWriter writer, TestResult result, string caseId, int? passingScore)
     {
+        var (root, children) = MapBaseCase(result, caseId, passingScore);
+        var handle = writer.AddResult(root);
+        foreach (var child in children) writer.AddResult(child, handle);
+        return (handle, root);
+    }
+
+    private static (AefResult Root, List<AefResult> Children) MapBaseCase(TestResult result, string caseId, int? passingScore)
+    {
         var children = new List<AefResult>();
         var criteria = result.JudgeFailed ? [] : result.CriteriaResults ?? [];
         for (var n = 0; n < criteria.Count; n++)
@@ -326,13 +358,45 @@ public static partial class AefEvalWriter
             };
         }
 
-        var handle = writer.AddResult(root);
-        foreach (var child in children)
-        {
-            writer.AddResult(child, handle);
-        }
+        return (root, children);
+    }
 
-        return (handle, root);
+    private static void ValidateMetricName(string name, string parameterName)
+    {
+        if (name is PassMetric or ScoreMetric)
+            throw new ArgumentException("Named metrics cannot use the reserved harness metric names pass or score.", parameterName);
+    }
+
+    private static AefMetric NamedMetric(string name) => new()
+    {
+        Id = name, Kind = AefMetricKind.Score, Direction = AefMetricDirection.None, Scale = AefScale.Between(0, 100),
+    };
+
+    private static AefResult MetricChild(string caseId, AgentEval.Core.MetricResult metric) =>
+        Child(caseId, $"{CasePath}/metrics/{Uri.EscapeDataString(metric.MetricName)}", "agenteval.metric",
+            metric.Measured ? metric.Passed ? AefState.Passed : AefState.Failed : AefState.NotMeasured) with
+        {
+            Scores = metric.Measured ? [new AefScore { Metric = metric.MetricName, Value = metric.Score }] : null,
+            Reason = metric.Measured ? null : "The metric could not be measured",
+        };
+
+    private static AefResult IncludeMetric(AefResult root, AgentEval.Core.MetricResult metric, int? passingScore)
+    {
+        var previous = root.Aggregation;
+        var absent = (previous?.Unmeasured?.NotMeasured ?? 0) + (metric.Measured ? 0 : 1);
+        return root with
+        {
+            Aggregation = new AefAggregation
+            {
+                Strategy = AefAggregationStrategy.Own,
+                RulePath = root.State == AefState.Error ? AefRulePath.NothingMeasured : AefRulePath.Threshold,
+                Score = root.State == AefState.Error ? null : root.Scores![0].Value,
+                Threshold = root.State == AefState.Error ? null : passingScore,
+                Measured = (previous?.Measured ?? 0) + (metric.Measured ? 1 : 0),
+                Total = (previous?.Total ?? 0) + 1,
+                Unmeasured = absent == 0 ? null : new AefUnmeasured { NotMeasured = absent },
+            },
+        };
     }
 
     private static AefResult Child(string caseId, string path, string evaluator, AefState state) => new()
@@ -381,3 +445,9 @@ public static partial class AefEvalWriter
         };
     }
 }
+
+/// <summary>A native harness case, its immediate child evidence and any named metric declarations.</summary>
+/// <param name="Root">The harness's own decision.</param>
+/// <param name="Children">Criteria, assertions and named metrics in their recording order.</param>
+/// <param name="Metrics">Named metrics used by the children, excluding the standard pass and score declarations.</param>
+public sealed record AefEvalCase(AefResult Root, IReadOnlyList<AefResult> Children, IReadOnlyList<AefMetric> Metrics);

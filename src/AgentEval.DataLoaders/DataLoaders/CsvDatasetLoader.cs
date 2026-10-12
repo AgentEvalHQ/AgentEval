@@ -73,6 +73,14 @@ public class CsvDatasetLoader : IDatasetLoader
             bufferSize: 4096, useAsync: true);
         using var reader = new StreamReader(stream, Encoding.UTF8);
 
+        await foreach (var testCase in ParseReaderAsync(reader, separator, path, false, ct))
+            yield return testCase;
+    }
+
+    internal static async IAsyncEnumerable<DatasetTestCase> ParseReaderAsync(TextReader reader, char separator,
+        string path, bool requireExplicitIds, [EnumeratorCancellation] CancellationToken ct)
+    {
+
         // Read header line
         var headerLine = await reader.ReadLineAsync(ct);
         if (string.IsNullOrWhiteSpace(headerLine))
@@ -80,8 +88,8 @@ public class CsvDatasetLoader : IDatasetLoader
             throw new InvalidDataException($"CSV file is empty or missing header: {path}");
         }
 
-        var headers = ParseCsvLine(headerLine, separator);
-        var columnMap = BuildColumnMap(headers);
+        var headers = ParseCsvLine(headerLine, separator, requireExplicitIds);
+        var columnMap = BuildColumnMap(headers, requireExplicitIds);
 
         if (!columnMap.ContainsKey("input"))
         {
@@ -104,7 +112,7 @@ public class CsvDatasetLoader : IDatasetLoader
             DatasetTestCase? testCase;
             try
             {
-                testCase = ParseRow(line, separator, columnMap, rowNumber);
+                testCase = ParseRow(line, separator, columnMap, rowNumber, requireExplicitIds);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -119,7 +127,7 @@ public class CsvDatasetLoader : IDatasetLoader
         }
     }
 
-    private static Dictionary<string, int> BuildColumnMap(IReadOnlyList<string> headers)
+    private static Dictionary<string, int> BuildColumnMap(IReadOnlyList<string> headers, bool requireExplicitIds = false)
     {
         var map = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         
@@ -146,6 +154,10 @@ public class CsvDatasetLoader : IDatasetLoader
             {
                 map[standardName] = i;
             }
+            else if (requireExplicitIds)
+            {
+                throw new InvalidDataException("A snapshot with explicit IDs cannot have ambiguous duplicate CSV columns.");
+            }
         }
         
         return map;
@@ -155,9 +167,9 @@ public class CsvDatasetLoader : IDatasetLoader
         string line, 
         char separator, 
         Dictionary<string, int> columnMap, 
-        int rowNumber)
+        int rowNumber, bool requireExplicitIds)
     {
-        var values = ParseCsvLine(line, separator);
+        var values = ParseCsvLine(line, separator, requireExplicitIds);
         
         string GetValue(string columnName, string defaultValue = "")
         {
@@ -172,12 +184,16 @@ public class CsvDatasetLoader : IDatasetLoader
         var input = GetValue("input");
         if (string.IsNullOrWhiteSpace(input))
         {
+            if (requireExplicitIds) throw new InvalidDataException("A snapshot case cannot have an empty input.");
             return null; // Skip rows without input
         }
 
         var testCase = new DatasetTestCase
         {
-            Id = GetValue("id", $"row_{rowNumber}"),
+            // Preserve the CSV cell exactly in strict snapshot mode; do not trim a caller's identity.
+            Id = requireExplicitIds
+                ? columnMap.TryGetValue("id", out var idColumn) && idColumn < values.Count ? values[idColumn] : ""
+                : GetValue("id", $"row_{rowNumber}"),
             Category = GetValue("category"),
             Input = input,
             ExpectedOutput = GetValue("expected"),
@@ -310,11 +326,12 @@ public class CsvDatasetLoader : IDatasetLoader
     /// <summary>
     /// Parses a CSV line handling quoted fields.
     /// </summary>
-    private static IReadOnlyList<string> ParseCsvLine(string line, char separator)
+    private static IReadOnlyList<string> ParseCsvLine(string line, char separator, bool strict = false)
     {
         var result = new List<string>();
         var field = new StringBuilder();
         bool inQuotes = false;
+        bool closedQuote = false;
         
         for (int i = 0; i < line.Length; i++)
         {
@@ -333,6 +350,7 @@ public class CsvDatasetLoader : IDatasetLoader
                     else
                     {
                         inQuotes = false;
+                        closedQuote = true;
                     }
                 }
                 else
@@ -342,14 +360,19 @@ public class CsvDatasetLoader : IDatasetLoader
             }
             else
             {
+                if (strict && closedQuote && c != separator)
+                    throw new InvalidDataException("Snapshot CSV does not allow text after a closing quote.");
                 if (c == '"')
                 {
+                    if (strict && field.Length > 0)
+                        throw new InvalidDataException("Snapshot CSV quoted fields must start with a quote.");
                     inQuotes = true;
                 }
                 else if (c == separator)
                 {
                     result.Add(field.ToString());
                     field.Clear();
+                    closedQuote = false;
                 }
                 else
                 {
@@ -358,6 +381,9 @@ public class CsvDatasetLoader : IDatasetLoader
             }
         }
         
+        if (strict && inQuotes)
+            throw new InvalidDataException("Snapshot CSV requires closed quoted fields on each line.");
+
         // Add last field
         result.Add(field.ToString());
         

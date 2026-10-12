@@ -105,6 +105,12 @@ PerformanceBenchmark is a pure-code measurement layer — no LLM judge involved.
 
 Both the agentic suite and PerformanceBenchmark accept prompts loaded from JSONL files via `DatasetLoaderFactory`. JSONL is the industry-standard format for AI benchmark datasets (used by BFCL, GAIA, MMLU, GSM8K, ToolBench, etc.).
 
+For reproducible runs, `DatasetLoaderFactory.LoadSnapshotAsync(bytes, extension, requireExplicitIds: true)`
+parses the same UTF-8 bytes you retain or hash, without reopening a file. It supports the built-in JSON, JSONL,
+YAML, CSV and TSV formats. Explicit-ID mode refuses missing or duplicate IDs and preserves CSV IDs without
+trimming; CSV rows with empty inputs or ambiguous columns/quoting are refused. CSV snapshots use one physical
+line per record. Existing file-loading methods keep their current behavior and generated-ID defaults.
+
 ```csharp
 using AgentEval.DataLoaders;
 

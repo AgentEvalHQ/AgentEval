@@ -50,7 +50,7 @@ public class JsonDatasetLoader : IDatasetLoader
         await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read,
             bufferSize: 4096, useAsync: true);
         
-        var doc = await JsonDocument.ParseAsync(stream, new JsonDocumentOptions
+        using var doc = await JsonDocument.ParseAsync(stream, new JsonDocumentOptions
         {
             CommentHandling = JsonCommentHandling.Skip,
             AllowTrailingCommas = true
@@ -74,7 +74,7 @@ public class JsonDatasetLoader : IDatasetLoader
         }
     }
 
-    private static IReadOnlyList<DatasetTestCase> ParseDocument(JsonDocument doc, string path)
+    internal static IReadOnlyList<DatasetTestCase> ParseDocument(JsonDocument doc, string path, bool requireExplicitIds = false)
     {
         var root = doc.RootElement;
         JsonElement arrayElement;
@@ -112,14 +112,14 @@ public class JsonDatasetLoader : IDatasetLoader
         int index = 0;
         foreach (var item in arrayElement.EnumerateArray())
         {
-            results.Add(ParseTestCase(item, index, path));
+            results.Add(ParseTestCase(item, index, path, requireExplicitIds));
             index++;
         }
 
         return results;
     }
 
-    private static DatasetTestCase ParseTestCase(JsonElement element, int index, string path)
+    private static DatasetTestCase ParseTestCase(JsonElement element, int index, string path, bool requireExplicitIds)
     {
         // An item that is not an object used to be skipped without a word, so a dataset could run fewer cases than
         // it holds.
@@ -130,7 +130,7 @@ public class JsonDatasetLoader : IDatasetLoader
 
         try
         {
-            return JsonParsingHelper.ParseTestCase(element, $"item_{index}");
+            return JsonParsingHelper.ParseTestCase(element, requireExplicitIds ? "" : $"item_{index}");
         }
         catch (InvalidDataException ex)
         {

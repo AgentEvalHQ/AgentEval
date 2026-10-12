@@ -81,7 +81,7 @@ public class YamlDatasetLoader : IDatasetLoader
         }
     }
 
-    private static IReadOnlyList<DatasetTestCase> ParseYaml(string content, string path)
+    internal static IReadOnlyList<DatasetTestCase> ParseYaml(string content, string path, bool requireExplicitIds = false)
     {
         object? root;
         try
@@ -117,7 +117,7 @@ public class YamlDatasetLoader : IDatasetLoader
                 throw new InvalidDataException($"Test case {i} in {path} is not a mapping of fields.");
             }
 
-            results.Add(ConvertToDatasetTestCase(fields, i, path));
+            results.Add(ConvertToDatasetTestCase(fields, i, path, requireExplicitIds));
         }
 
         return results;
@@ -143,7 +143,7 @@ public class YamlDatasetLoader : IDatasetLoader
         return null;
     }
 
-    private static DatasetTestCase ConvertToDatasetTestCase(Dictionary<object, object?> map, int index, string path)
+    private static DatasetTestCase ConvertToDatasetTestCase(Dictionary<object, object?> map, int index, string path, bool requireExplicitIds)
     {
         var testCase = new DatasetTestCase();
 
@@ -210,7 +210,7 @@ public class YamlDatasetLoader : IDatasetLoader
             }
             : null;
 
-        testCase.Id = Scalar("id") ?? $"item_{index}";
+        testCase.Id = Scalar("id") ?? (requireExplicitIds ? "" : $"item_{index}");
         testCase.Category = Scalar("category");
         testCase.Input = Scalar("input", "question", "prompt", "query") ?? "";
         testCase.ExpectedOutput = Scalar("expected", "expected_output", "answer", "response");
