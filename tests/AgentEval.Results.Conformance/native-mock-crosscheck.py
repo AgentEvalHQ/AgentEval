@@ -20,12 +20,13 @@ def invoke(args, expected):
 
 
 with tempfile.TemporaryDirectory(prefix="aef-mock-") as temporary:
-    for family in ("owasp", "mitre", "nist"):
+    for family in ("owasp", "mitre", "nist", "gdpr", "eu-ai-act", "agentic"):
         workspace = Path(temporary) / family
         store = workspace / ".agenteval"
         store.mkdir(parents=True)
+        preset = "standard" if family in ("gdpr", "eu-ai-act") else "agentic-execution" if family == "agentic" else "smoke"
         args = ["bench", family, "--root", str(workspace), "--subject", "mock-subject",
-                "--preset", "smoke", "--sut", "mock"]
+                "--preset", preset, "--sut", "mock", "--input", "test input"]
         invoke(args, 11)
         assert not list(store.iterdir()), "Default mock wrote legacy data or AEF"
         destination = workspace / "evidence"
@@ -51,4 +52,4 @@ with tempfile.TemporaryDirectory(prefix="aef-mock-") as temporary:
         blocked.write_text("not a directory")
         invoke(args + ["--aef", str(blocked)], 3)
         assert not list(store.iterdir())
-print(f"{tfm}: 12 actual CLI mock scenarios passed; 3 mocked runs accepted by CLI and Python")
+print(f"{tfm}: 24 actual CLI mock scenarios passed; 6 mocked runs accepted by CLI and Python")

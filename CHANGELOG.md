@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Explicit composite mock evidence:** GDPR, EU AI Act and agentic benchmarks now honor explicit `--aef` for
+  mock runs, preserving exit 11 and completed children after interruption. Built-in placeholder judgments use
+  CODE provenance; supplied evaluators keep their own provenance. Default mock runs still write nothing.
+
 - **Explicit mock scan evidence:** OWASP, MITRE and NIST benchmarks honor `--sut mock --aef <dir>` with
   mocked AEF provenance, exit 11 and an inconclusive gate. Default mock runs still store nothing; cancellation
   preserves explicitly requested aborted evidence, and explicit write failures return exit 3.

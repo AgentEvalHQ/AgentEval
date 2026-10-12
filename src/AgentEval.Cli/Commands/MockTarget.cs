@@ -4,6 +4,9 @@
 
 using System.CommandLine;
 using AgentEval.Core;
+using AgentEval.Evals;
+using AgentEval.Evals.Meta;
+using AgentEval.Results.Writing;
 
 namespace AgentEval.Cli.Commands;
 
@@ -108,6 +111,51 @@ internal static class MockTarget
         Console.WriteLine($"MOCK RESULT ({command}, stand-in, {(aefWritten ? "explicit mocked AEF only" : "not stored")}): {result}");
         return ExitCodes.GateIndeterminate;
     }
+
+    /// <summary>Runs a mock composite without legacy storage, retaining explicitly requested AEF on interruption.</summary>
+    internal static async Task<int> RunCompositeAsync(string family, string preset, string subject, string? subjectVersion,
+        string agentEvalDir, CompositeEval benchmark, EvalInput input, bool placeholderJudge,
+        DirectoryInfo? aef, bool noAef, CancellationToken ct, int runs = 1)
+    {
+        var started = DateTimeOffset.UtcNow;
+        var progress = new CompositeProgress(benchmark);
+        bool Write(EvalResult result, string? abortReason = null) => aef is not null && !noAef &&
+            BenchAef.Write(aef, agentEvalDir, family, preset, subject, subjectVersion, AefTargetMode.Mocked,
+                benchmark, placeholderJudge ? CodeJudged(result) : result, started, DateTimeOffset.UtcNow,
+                exitCode: abortReason is null ? ExitCodes.GateIndeterminate : 1, abortReason: abortReason,
+                emptyResults: abortReason is not null && !progress.HasCompletedResults);
+        EvalResult result;
+        try
+        {
+            result = await benchmark.EvaluateWithProgressAsync(input, progress.Completed, ct, progress.Started);
+            ct.ThrowIfCancellationRequested();
+        }
+        catch (OperationCanceledException ex) when (ct.IsCancellationRequested)
+        {
+            Console.Error.WriteLine($"Benchmark run failed: {ex.Message}");
+            return Write(progress.Snapshot(), "cancelled") ? ExitCodes.RuntimeError : 1;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Benchmark run failed: {ex.Message}");
+            return Write(progress.Snapshot(), "execution-error") ? ExitCodes.RuntimeError : 1;
+        }
+        if (Write(result)) return ExitCodes.RuntimeError;
+        return Finish($"bench {family}",
+            $"{result.Score.Label.ToUpperInvariant()} (score {result.Score.Value:F3}) for a canned answer" +
+            (runs > 1 ? " (--runs is ignored for a mock run)" : ""), aefWritten: aef is not null && !noAef);
+    }
+
+    // Only the built-in Judge is normalized. A supplied evaluator retains its own provenance.
+    private static EvalResult CodeJudged(EvalResult result) => result with
+    {
+        Provenance = result.Provenance with
+        {
+            Type = result.Provenance.Type == "atomic-llm" ? "atomic-code" : result.Provenance.Type,
+            JudgeModel = null, PromptId = null, PromptHash = null, TokensUsed = null, EstimatedCost = 0,
+        },
+        Details = result.Details with { SubResults = result.Details.SubResults?.Select(CodeJudged).ToArray() },
+    };
 
     /// <summary>The mock run's judge: a fixed placeholder verdict, labelled as such in every criterion.</summary>
     internal sealed class Judge : IEvaluator

@@ -6,6 +6,8 @@ using System.Text.Json.Nodes;
 using System.CommandLine;
 using System.Security.Cryptography;
 using AgentEval.Cli.Commands;
+using AgentEval.Evals;
+using AgentEval.Evals.Meta;
 using AgentEval.Results.Integrity;
 using AgentEval.Tests.TestHelpers;
 using Xunit;
@@ -85,7 +87,10 @@ public sealed class NativeVerbIntegrationTests : IDisposable
     [InlineData("owasp")]
     [InlineData("mitre")]
     [InlineData("nist")]
-    public async Task BenchScan_Mock_ExplicitEvidenceIsMockedAndDefaultStoresNothing(string family)
+    [InlineData("gdpr")]
+    [InlineData("eu-ai-act")]
+    [InlineData("agentic")]
+    public async Task BenchMock_ExplicitEvidenceIsMockedAndDefaultStoresNothing(string family)
     {
         var workspace = Path.Combine(_root, ".agenteval");
         Directory.CreateDirectory(workspace);
@@ -95,8 +100,14 @@ public sealed class NativeVerbIntegrationTests : IDisposable
                 mock: true, aef: aef, noAef: noAef, ct: ct),
             "mitre" => await BenchMitreCommand.RunAsync("smoke", "mock-subject", _root, null, null, null,
                 mock: true, aef: aef, noAef: noAef, ct: ct),
-            _ => await BenchNistCommand.RunAsync("smoke", "mock-subject", _root, null, null, null,
+            "nist" => await BenchNistCommand.RunAsync("smoke", "mock-subject", _root, null, null, null,
                 mock: true, aef: aef, noAef: noAef, ct: ct),
+            "gdpr" => (await BenchCommand.RunGdprAsync("standard", "mock-subject", _root, "test input", null,
+                mock: true, aef: aef, noAef: noAef, ct: ct), null),
+            "eu-ai-act" => (await BenchEuAiActCommand.RunAsync("standard", "mock-subject", _root, "test input", null,
+                mock: true, aef: aef, noAef: noAef, ct: ct), null),
+            _ => (await BenchAgenticCommand.RunAsync("agentic-execution", "mock-subject", _root, "test input", null, null,
+                mock: true, aef: aef, noAef: noAef, ct: ct), null),
         };
         Assert.Equal(11, (await Run(null)).ExitCode);
         Assert.Empty(Directory.GetFileSystemEntries(workspace));
@@ -132,6 +143,52 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         var blocked = Path.Combine(_root, "blocked");
         File.WriteAllText(blocked, "not a directory");
         Assert.Equal(3, (await Run(new DirectoryInfo(blocked))).ExitCode);
+    }
+
+    [Theory]
+    [InlineData(true, true)]
+    [InlineData(true, false)]
+    [InlineData(false, true)]
+    [InlineData(false, false)]
+    public async Task MockComposite_Interrupted_PreservesCompletedJudgments(bool cancel, bool placeholder)
+    {
+        using var cancellation = new CancellationTokenSource();
+        var benchmark = new CompositeEval("test", "Test", "test", "1",
+            [new(new MockProgressEval("completed"), 1),
+             new(new MockProgressEval("interrupted", () =>
+             {
+                 if (cancel) { cancellation.Cancel(); cancellation.Token.ThrowIfCancellationRequested(); }
+                 throw new InvalidOperationException("fixture failure");
+             }), 1)], WeightedSumAggregation.Instance);
+        var destination = new DirectoryInfo(Path.Combine(_root, "partial"));
+        var exit = await MockTarget.RunCompositeAsync("agentic", "test", "mock-subject", null, _root,
+            benchmark, new EvalInput("q", "r"), placeholder, destination, false, cancellation.Token);
+        Assert.Equal(1, exit);
+        var run = RunDirectory(destination.FullName);
+        AssertIntact(run);
+        Assert.Equal("aborted", (string?)Document(run, "run.json")["status"]);
+        var lines = File.ReadAllLines(Path.Combine(run, "results.ndjson")).Select(l => JsonNode.Parse(l)!).ToList();
+        var completed = Assert.Single(lines, l => (string?)l["caseId"] == "completed");
+        Assert.Equal("passed", (string?)completed["state"]);
+        Assert.Equal(placeholder ? "CODE" : "LLM", (string?)completed["annotator"]!["kind"]);
+        Assert.Equal(placeholder ? null : "fixture-judge", (string?)completed["annotator"]?["model"]);
+        Assert.DoesNotContain(lines, l => (string?)l["caseId"] == "interrupted" && (string?)l["state"] == "passed");
+        Assert.False(File.Exists(Path.Combine(run, "gates.ndjson")));
+    }
+
+    private sealed class MockProgressEval(string key, Action? interrupt = null) : IEval
+    {
+        public string Key => key;
+        public string Name => key;
+        public string Category => "test";
+        public string Version => "1";
+        public Task<EvalResult> EvaluateAsync(EvalInput input, CancellationToken ct = default)
+        {
+            interrupt?.Invoke();
+            return Task.FromResult(new EvalResult(new(Key, Name, Category, Version),
+                new(1, null, "pass", true, null, "none", null), new(null, null, null, null, null),
+                new("atomic-llm", "fixture-judge", null, null, null, 0, false), DateTimeOffset.UtcNow));
+        }
     }
 
     [Fact]

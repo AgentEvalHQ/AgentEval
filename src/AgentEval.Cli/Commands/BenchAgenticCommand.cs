@@ -186,7 +186,7 @@ public static class BenchAgenticCommand
         if (mock)
         {
             // --sut mock, asked for by name: a canned exchange, labelled and not stored.
-            MockTarget.PrintBanner("bench agentic", "a canned answer");
+            MockTarget.PrintBanner("bench agentic", "a canned answer", aefRequested: aef is not null && !noAef);
             query = inputText ??
                 "Search for the latest quarterly earnings report for ACME Corp and summarize the key financial metrics.";
             agentResponse =
@@ -223,19 +223,8 @@ public static class BenchAgenticCommand
         // ── Run benchmark ────────────────────────────────────────────────────
         if (mock)
         {
-            EvalResult mockResult;
-            try
-            {
-                mockResult = await benchmark.EvaluateAsync(evalInput, ct);
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"Benchmark run failed: {ex.Message}");
-                return 1;
-            }
-
-            return MockTarget.Finish("bench agentic",
-                $"{mockResult.Score.Label.ToUpperInvariant()} (score {mockResult.Score.Value:F3}) for a canned answer");
+            return await MockTarget.RunCompositeAsync("agentic", preset, subject, subjectVersion, agentEvalDir,
+                benchmark, evalInput, judge is MockTarget.Judge, aef, noAef, ct, 1);
         }
 
         var store = new FileSystemOutputStore(agentEvalDir);

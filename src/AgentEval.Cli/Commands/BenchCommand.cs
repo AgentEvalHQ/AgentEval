@@ -183,7 +183,7 @@ public static class BenchCommand
         else
         {
             // --sut mock, asked for by name: a canned answer, graded, labelled and not stored.
-            MockTarget.PrintBanner("bench gdpr", "a canned answer");
+            MockTarget.PrintBanner("bench gdpr", "a canned answer", aefRequested: aef is not null && !noAef);
             agentResponse =
                 "I can help with that. We store your name and email. " +
                 "You can request deletion by contacting privacy@example.com.";
@@ -192,20 +192,8 @@ public static class BenchCommand
 
         if (isMock)
         {
-            EvalResult mockResult;
-            try
-            {
-                mockResult = await benchmark.EvaluateAsync(evalInput, ct);
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"Benchmark run failed: {ex.Message}");
-                return 1;
-            }
-
-            return MockTarget.Finish("bench gdpr",
-                $"{mockResult.Score.Label.ToUpperInvariant()} (score {mockResult.Score.Value:F3}) for a canned answer" +
-                (runs > 1 ? " (--runs is ignored for a mock run)" : ""));
+            return await MockTarget.RunCompositeAsync("gdpr", preset, subject, subjectVersion, agentEvalDir,
+                benchmark, evalInput, judge is MockTarget.Judge, aef, noAef, ct, runs);
         }
 
         // ── Run benchmark ────────────────────────────────────────────────────

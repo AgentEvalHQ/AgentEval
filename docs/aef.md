@@ -278,13 +278,15 @@ An interrupted stochastic case keeps its completed trials and an incomplete roll
 - `replayed` when the command graded an answer or trace the agent already gave (`--response`, `bench agentic`, the
   trace-fidelity families);
 - `scripted` for a scripted model (`redteam --sut gatekeeper-demo --scripted`);
-- `mocked` for a stand-in. OWASP, MITRE and NIST `--sut mock` scans write AEF only when `--aef` is explicit;
+- `mocked` for a stand-in. OWASP, MITRE, NIST, GDPR, EU AI Act and agentic `--sut mock` benchmarks write AEF only when `--aef` is explicit;
   they retain exit 11 and an inconclusive command gate. Defaults write nothing, and legacy storage remains off.
-  Cancellation preserves an explicitly requested aborted mock run without a gate. Other mock benchmark families
+  Cancellation preserves an explicitly requested aborted mock run without a gate. Composite mocks retain
+  completed children after cancellation or an exception. Their built-in placeholder judge is recorded as code,
+  with no LLM model or token usage; supplied evaluators retain their provenance. Perf and autoaudit mock paths
   are still being audited for this opt-in behavior.
 
 After building the CLI, `python tests/AgentEval.Results.Conformance/native-mock-crosscheck.py net10.0`
-(also `net8.0`) checks these three scan families through the executable, including defaults, opt-out and write
+(also `net8.0`) checks these six families through the executable, including defaults, opt-out and write
 failures, and verifies the explicit mocked runs with both .NET and Python.
 
 **No content by default.** With the default `contentCapture: off`, runs contain no prompt, response, judge reasoning, criterion

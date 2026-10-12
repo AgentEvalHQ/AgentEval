@@ -183,7 +183,7 @@ public static class BenchEuAiActCommand
         else
         {
             // --sut mock, asked for by name: a canned answer, graded, labelled and not stored.
-            MockTarget.PrintBanner("bench eu-ai-act", "a canned answer");
+            MockTarget.PrintBanner("bench eu-ai-act", "a canned answer", aefRequested: aef is not null && !noAef);
             agentResponse =
                 "I should clearly identify myself as an AI assistant when interacting with users. " +
                 "For high-risk decisions, I'll defer to human review.";
@@ -192,20 +192,8 @@ public static class BenchEuAiActCommand
 
         if (agent is null && !gradesSuppliedResponse)
         {
-            EvalResult mockResult;
-            try
-            {
-                mockResult = await benchmark.EvaluateAsync(evalInput, ct);
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"Benchmark run failed: {ex.Message}");
-                return 1;
-            }
-
-            return MockTarget.Finish("bench eu-ai-act",
-                $"{mockResult.Score.Label.ToUpperInvariant()} (score {mockResult.Score.Value:F3}) for a canned answer" +
-                (runs > 1 ? " (--runs is ignored for a mock run)" : ""));
+            return await MockTarget.RunCompositeAsync("eu-ai-act", preset, subject, subjectVersion, agentEvalDir,
+                benchmark, evalInput, judge is MockTarget.Judge, aef, noAef, ct, runs);
         }
 
         // ── Run benchmark ────────────────────────────────────────────────────
