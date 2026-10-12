@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Agentic and scan failure evidence:** agentic benchmarks link created store manifests and retain observed
+  results after fatal evaluation/report failures. OWASP, MITRE and NIST scans also retain measured probes after
+  scan or persistence errors, without a command gate. Opt-out and explicit-output error behavior is preserved.
+
 - **Composite store links and failure evidence:** GDPR and EU AI Act native evidence retains persisted trial
   identities in execution order and the aggregate manifest identity when created. Fatal evaluation/report errors
   now retain observed evidence in an aborted run without a command gate; explicit output failures still return

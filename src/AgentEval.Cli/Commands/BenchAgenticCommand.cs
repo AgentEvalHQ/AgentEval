@@ -237,6 +237,9 @@ public static class BenchAgenticCommand
 
         var startedAt = DateTimeOffset.UtcNow;
         var progress = new CompositeProgress(benchmark);
+        string? storeRunId = null;
+        AgentEval.Results.Adapters.Native.AefStoreV1Link? StoreLink() =>
+            storeRunId is null ? null : new() { RunId = storeRunId };
         try
         {
             string runId;
@@ -245,12 +248,12 @@ public static class BenchAgenticCommand
             try
             {
                 var runner = new AgenticBenchmarkRunner();
-                (runId, compositeResult) = await runner.RunWithProgressAsync(store, subjectIdentity, benchmark, evalInput, progress.Completed, progress.Started, ct: ct);
+                (runId, compositeResult) = await runner.RunWithProgressAsync(store, subjectIdentity, benchmark, evalInput, id => storeRunId = id, progress.Completed, progress.Started, ct: ct);
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
                 Console.Error.WriteLine($"Benchmark run failed: {ex.Message}");
-                return 1;
+                throw;
             }
 
             // ── Generate reports ─────────────────────────────────────────────────
@@ -265,7 +268,7 @@ public static class BenchAgenticCommand
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
                 Console.Error.WriteLine($"Failed to generate agentic benchmark report: {ex.Message}");
-                return 1;
+                throw;
             }
 
             // Derive output directory (mirrors AgenticBenchmarkReporter path convention)
@@ -327,7 +330,7 @@ public static class BenchAgenticCommand
             // bench agentic grades a response (and trace) the agent already produced: it drives no agent, so the run is
             // replayed.
             if (!noAef && BenchAef.Write(aef, agentEvalDir, "agentic", preset, subject, subjectVersion,
-                    AgentEval.Results.Writing.AefTargetMode.Replayed, benchmark, compositeResult, startedAt, DateTimeOffset.UtcNow, exitCode: finalExit))
+                    AgentEval.Results.Writing.AefTargetMode.Replayed, benchmark, compositeResult, startedAt, DateTimeOffset.UtcNow, exitCode: finalExit, storeV1: StoreLink()))
                 return ExitCodes.RuntimeError;   // an explicit --aef could not be written
 
             // ── Exit code ─────────────────────────────────────────────────────────
@@ -346,11 +349,12 @@ public static class BenchAgenticCommand
             // the shared helper exists specifically so a future policy change lands in one place.
             return finalExit;
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        catch (Exception ex)
         {
+            var abortReason = ex is OperationCanceledException && ct.IsCancellationRequested ? "cancelled" : "execution-error";
             if (!noAef && BenchAef.Write(aef, agentEvalDir, "agentic", preset, subject, subjectVersion,
                 AgentEval.Results.Writing.AefTargetMode.Replayed, benchmark, progress.Snapshot(),
-                startedAt, DateTimeOffset.UtcNow, abortReason: "cancelled", emptyResults: !progress.HasCompletedResults))
+                startedAt, DateTimeOffset.UtcNow, abortReason: abortReason, emptyResults: !progress.HasCompletedResults, storeV1: StoreLink()))
                 return ExitCodes.RuntimeError;
             return 1;
         }

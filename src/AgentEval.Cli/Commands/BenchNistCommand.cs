@@ -181,17 +181,14 @@ public static class BenchNistCommand
             ct.ThrowIfCancellationRequested();
             compositeEval = benchmark.BuildEvalResult(redTeamResult);
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "nist", preset, subject, subjectVersion,
-                !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                judgeModelName, partialScan.Snapshot(), null, 1, judgeLedger, storeV1: StoreLink(), abortReason: "cancelled"))
-                return (ExitCodes.RuntimeError, null);
-            return (1, null);
-        }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"NIST AI RMF scan failed: {ex.Message}");
+            var abortReason = ex is OperationCanceledException && ct.IsCancellationRequested ? "cancelled" : "execution-error";
+            if (abortReason != "cancelled") Console.Error.WriteLine($"NIST AI RMF scan failed: {ex.Message}");
+            if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "nist", preset, subject, subjectVersion,
+                !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
+                judgeModelName, partialScan.Snapshot(), null, 1, judgeLedger, storeV1: StoreLink(), abortReason: abortReason))
+                return (ExitCodes.RuntimeError, null);
             return (1, null);
         }
 
@@ -266,7 +263,7 @@ public static class BenchNistCommand
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
                 Console.Error.WriteLine($"Failed to persist NIST AI RMF run to output store: {ex.Message}");
-                return (1, null);
+                throw;
             }
 
             // ── Persist the rich NIST compliance evidence ────────────────────────
@@ -342,12 +339,13 @@ public static class BenchNistCommand
 
             return (finalExit, outputDir);
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        catch (Exception ex)
         {
+            var abortReason = ex is OperationCanceledException && ct.IsCancellationRequested ? "cancelled" : "execution-error";
             // The scan may finish before persistence or report generation is cancelled.
             if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "nist", preset, subject, subjectVersion,
                 !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                judgeModelName, redTeamResult, null, 1, judgeLedger, storeV1: StoreLink(), abortReason: "cancelled"))
+                judgeModelName, redTeamResult, null, 1, judgeLedger, storeV1: StoreLink(), abortReason: abortReason))
                 return (ExitCodes.RuntimeError, null);
             return (1, null);
         }

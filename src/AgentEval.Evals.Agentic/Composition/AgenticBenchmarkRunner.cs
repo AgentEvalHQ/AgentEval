@@ -52,10 +52,24 @@ public sealed class AgenticBenchmarkRunner
         return RunCoreAsync(store, subject, benchmark, input, context, ct, onCompleted, onStarted);
     }
 
+    /// <summary>
+    /// Reports the persisted manifest identity before evaluation, then streams node progress.
+    /// The run-created callback is synchronous and also identifies runs interrupted before completion.
+    /// </summary>
+    public Task<(string RunId, EvalResult Result)> RunWithProgressAsync(
+        IOutputStore store, SubjectIdentity subject, CompositeEval benchmark, EvalInput input,
+        Action<string> onRunCreated, Action<IReadOnlyList<int>, EvalResult> onCompleted,
+        Action<IReadOnlyList<int>>? onStarted = null, RunContext? context = null, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(onRunCreated);
+        ArgumentNullException.ThrowIfNull(onCompleted);
+        return RunCoreAsync(store, subject, benchmark, input, context, ct, onCompleted, onStarted, onRunCreated);
+    }
+
     private async Task<(string RunId, EvalResult Result)> RunCoreAsync(
         IOutputStore store, SubjectIdentity subject, CompositeEval benchmark, EvalInput input,
         RunContext? context, CancellationToken ct, Action<IReadOnlyList<int>, EvalResult>? onCompleted,
-        Action<IReadOnlyList<int>>? onStarted)
+        Action<IReadOnlyList<int>>? onStarted, Action<string>? onRunCreated = null)
     {
         ArgumentNullException.ThrowIfNull(store);
         ArgumentNullException.ThrowIfNull(subject);
@@ -71,6 +85,7 @@ public sealed class AgenticBenchmarkRunner
             Kind: "benchmark");
 
         var manifest = await store.StartRunAsync(subject, context, ct);
+        onRunCreated?.Invoke(manifest.Run.RunId);
 
         // Run the composite — sub-evals fire in parallel via Task.WhenAll inside CompositeEval.
         var result = onCompleted is null

@@ -305,11 +305,13 @@ full results remain available after persistence or report failure.
 Perf, memory, LongMemEval, TypedMemEval, OWASP/MITRE/NIST and both trace-fidelity commands record an existing store manifest's ID
 in `run.json` under `ext.agenteval.store-v1.runId`. The AEF run keeps its own identity. No directory path is stored;
 an interrupted run may link an incomplete manifest, while a run stopped before manifest creation has no link.
+Agentic benchmarks also link their created store manifests, including interrupted runs.
 GDPR and EU AI Act also record single-run identities, or ordered `trialRunIds` plus the aggregate `runId` for
 repeated runs. IDs are captured immediately after manifest creation, including an interrupted trial or aggregate
 persistence; an aggregate that was never created has no `runId`. Native adapter options expose the same links.
-Fatal evaluation or report errors retain the observed composite evidence as aborted, without a command gate;
+Fatal evaluation or report errors retain the observed GDPR/EU AI Act/agentic composite evidence as aborted, without a command gate;
 `--no-aef` still opts out and an explicit AEF write failure retains the runtime-error exit.
+OWASP/MITRE/NIST likewise retain measured probes on scan or persistence errors, with no aborted-run gate.
 GDPR, EU AI Act, and agentic benchmarks preserve completed nested evaluations on cancellation too. Unfinished
 nodes carry typed absences, and the aborted run has no command gate. Repeated GDPR/EU AI Act runs retain their
 started trial trees and original requested trial count. If trial aggregation was interrupted, every observed path

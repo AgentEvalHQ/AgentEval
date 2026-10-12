@@ -207,17 +207,14 @@ public static class BenchOwaspCommand
             ct.ThrowIfCancellationRequested();
             compositeEval = benchmark.BuildEvalResult(redTeamResult);
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
-        {
-            if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "owasp", preset, subject, subjectVersion,
-                !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                judgeModelName, partialScan.Snapshot(), null, 1, judgeLedger, storeV1: StoreLink(), abortReason: "cancelled"))
-                return (ExitCodes.RuntimeError, null);
-            return (1, null);
-        }
         catch (Exception ex)
         {
-            Console.Error.WriteLine($"OWASP scan failed: {ex.Message}");
+            var abortReason = ex is OperationCanceledException && ct.IsCancellationRequested ? "cancelled" : "execution-error";
+            if (abortReason != "cancelled") Console.Error.WriteLine($"OWASP scan failed: {ex.Message}");
+            if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "owasp", preset, subject, subjectVersion,
+                !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
+                judgeModelName, partialScan.Snapshot(), null, 1, judgeLedger, storeV1: StoreLink(), abortReason: abortReason))
+                return (ExitCodes.RuntimeError, null);
             return (1, null);
         }
 
@@ -296,7 +293,7 @@ public static class BenchOwaspCommand
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
                 Console.Error.WriteLine($"Failed to persist OWASP run to output store: {ex.Message}");
-                return (1, null);
+                throw;
             }
 
             // ── Persist the rich OWASP compliance evidence (sibling to GDPR/EU AI Act) ─
@@ -379,12 +376,13 @@ public static class BenchOwaspCommand
 
             return (finalExit, outputDir);
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        catch (Exception ex)
         {
+            var abortReason = ex is OperationCanceledException && ct.IsCancellationRequested ? "cancelled" : "execution-error";
             // The scan may finish before persistence or report generation is cancelled.
             if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "owasp", preset, subject, subjectVersion,
                 !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                judgeModelName, redTeamResult, null, 1, judgeLedger, storeV1: StoreLink(), abortReason: "cancelled", complianceArtifacts: complianceArtifacts))
+                judgeModelName, redTeamResult, null, 1, judgeLedger, storeV1: StoreLink(), abortReason: abortReason, complianceArtifacts: complianceArtifacts))
                 return (ExitCodes.RuntimeError, null);
             return (1, null);
         }

@@ -770,7 +770,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         var outputRoot = Path.Combine(_root, "perf-aef");
         if (invalidOutput) File.WriteAllText(outputRoot, "not a directory");
         var original = Console.Out;
-        using StringWriter output = failPersistence ? new FailOnPerfPersistenceWriter()
+        using StringWriter output = failPersistence ? new FailOnPersistenceWriter()
             : new CancelOnPersistenceWriter(cancel, beforeEvaluation ? "Running perf benchmark" : "Persisted run ");
         try
         {
@@ -1100,6 +1100,93 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         }
     }
 
+    [Theory]
+    [InlineData("success", false, false)]
+    [InlineData("report-error", false, false)]
+    [InlineData("report-error", true, false)]
+    [InlineData("report-error", false, true)]
+    [InlineData("cancel", false, false)]
+    public async Task Agentic_StoreAndInterruption_RetainsObservedEvidence(string failure, bool noAef, bool invalidDestination)
+    {
+        var workspace = Path.Combine(_root, ".agenteval");
+        Directory.CreateDirectory(workspace);
+        File.WriteAllText(Path.Combine(workspace, "solution.json"),
+            new JsonObject { ["schemaVersion"] = "1.0", ["id"] = Guid.NewGuid().ToString(), ["name"] = "agentic-recovery" }.ToJsonString());
+        if (failure == "report-error") File.WriteAllText(Path.Combine(workspace, "benchmarks"), "occupied");
+        using var cancellation = new CancellationTokenSource();
+        AgentEval.Core.IEvaluator judge = failure == "cancel" ? new CancellingEvaluator(cancellation) : new PassingEvaluator();
+        var aef = new DirectoryInfo(Path.Combine(_root, "aef"));
+        if (invalidDestination) File.WriteAllText(aef.FullName, "occupied");
+        var exit = await BenchAgenticCommand.RunAsync("agentic-execution", "subject", _root, "question", "answer", judge,
+            aef: aef, noAef: noAef, ct: cancellation.Token);
+        Assert.Equal(invalidDestination ? 3 : failure == "success" ? 10 : 1, exit);
+        if (noAef || invalidDestination)
+        {
+            Assert.False(Directory.Exists(aef.FullName));
+            return;
+        }
+        var dir = RunDirectory(aef.FullName);
+        AssertIntact(dir);
+        AssertStoreLink(dir);
+        Assert.Equal("replayed", (string?)Document(dir, "run.json")["execution"]!["targetMode"]);
+        Assert.Equal(failure == "success" ? "completed" : "aborted", (string?)Document(dir, "run.json")["status"]);
+        Assert.Equal(failure == "success", File.Exists(Path.Combine(dir, "gates.ndjson")));
+        if (failure == "success")
+            Assert.Equal(exit, (int)JsonNode.Parse(File.ReadAllLines(Path.Combine(dir, "gates.ndjson")).Single())!["exitCode"]!);
+        if (failure != "cancel") Assert.NotEmpty(File.ReadAllLines(Path.Combine(dir, "results.ndjson")));
+    }
+
+    [Theory]
+    [InlineData("owasp", false, false)]
+    [InlineData("mitre", false, false)]
+    [InlineData("nist", false, false)]
+    [InlineData("owasp", true, false)]
+    [InlineData("mitre", true, false)]
+    [InlineData("nist", true, false)]
+    [InlineData("owasp", false, true)]
+    [InlineData("mitre", false, true)]
+    [InlineData("nist", false, true)]
+    public async Task BenchScan_PersistenceError_RetainsMeasuredScan(string family, bool noAef, bool invalidDestination)
+    {
+        await using var endpoint = await LocalChatEndpoint.StartAsync("I cannot assist with that request.");
+        await using var judgeEndpoint = await LocalChatEndpoint.StartAsync("VERDICT: INCONCLUSIVE\nCONFIDENCE: 0.5\nREASON: test");
+        var agent = BenchTier1SutResolver.BuildFromOpenAiEndpoint(endpoint.Endpoint, "local-model", "local-test", "http-subject");
+        using var judge = AgentEval.Cli.Infrastructure.EndpointFactory.CreateOpenAICompatible(judgeEndpoint.Endpoint, "local-judge", "local-test");
+        Directory.CreateDirectory(Path.Combine(_root, ".agenteval"));
+        File.WriteAllText(Path.Combine(_root, ".agenteval", "solution.json"),
+            new JsonObject { ["schemaVersion"] = "1.0", ["id"] = Guid.NewGuid().ToString(), ["name"] = "scan-error" }.ToJsonString());
+        var aef = new DirectoryInfo(Path.Combine(_root, "aef"));
+        if (invalidDestination) File.WriteAllText(aef.FullName, "occupied");
+        var original = Console.Out;
+        using var output = new FailOnPersistenceWriter();
+        try
+        {
+            Console.SetOut(output);
+            var result = family switch
+            {
+                "owasp" => await BenchOwaspCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
+                    judgeClientOverride: judge, aef: aef, noAef: noAef, agentIsLive: true),
+                "mitre" => await BenchMitreCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
+                    judgeClientOverride: judge, aef: aef, noAef: noAef, agentIsLive: true),
+                _ => await BenchNistCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
+                    judgeClientOverride: judge, aef: aef, noAef: noAef, agentIsLive: true),
+            };
+            Assert.Equal(invalidDestination ? 3 : 1, result.ExitCode);
+        }
+        finally { Console.SetOut(original); (agent as IDisposable)?.Dispose(); }
+        if (noAef || invalidDestination)
+        {
+            Assert.False(Directory.Exists(aef.FullName));
+            return;
+        }
+        var dir = RunDirectory(aef.FullName);
+        AssertIntact(dir);
+        AssertStoreLink(dir);
+        Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
+        Assert.NotEmpty(File.ReadAllLines(Path.Combine(dir, "results.ndjson")));
+        Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
+    }
+
     private void AssertCompositeStoreLinks(string directory, int trials)
     {
         var manifests = Directory.GetFiles(Path.Combine(_root, ".agenteval"), "manifest.json", SearchOption.AllDirectories)
@@ -1127,7 +1214,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         }
     }
 
-    private sealed class FailOnPerfPersistenceWriter : StringWriter
+    private sealed class FailOnPersistenceWriter : StringWriter
     {
         public override void WriteLine(string? value)
         {
