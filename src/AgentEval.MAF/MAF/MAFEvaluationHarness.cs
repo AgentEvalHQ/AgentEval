@@ -684,6 +684,7 @@ public class MAFEvaluationHarness : IStreamingEvaluationHarness, IBatchEvaluatio
             return;
         }
 
+        result.JudgeRubricDigest = evaluation.RubricDigest;
         result.Score = evaluation.OverallScore;
         result.Passed = evaluation.OverallScore >= testCase.PassingScore;
         result.Details = evaluation.Summary;

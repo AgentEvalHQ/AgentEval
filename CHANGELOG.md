@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Harness rubric identity:** successful normal and streaming evaluations retain a full instrument digest
+  through to native AEF judge headers. Distinct criteria remain distinct for the same judge model; case input,
+  output and rationale are excluded, and unknown or failed grading does not invent an observed rubric.
+
 - **Direct CLI judge providers:** eval and redteam record the configured OpenAI-compatible judge provider.
   Named eval metrics retain Azure/OpenAI-compatible subject-client identity when reused for grading; custom
   client overrides remain unknown. Single-run and stochastic harness evidence share the same provider facts.

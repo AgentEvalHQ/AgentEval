@@ -19,6 +19,22 @@ namespace AgentEval.Tests.MAF;
 /// </summary>
 public class MAFEvaluationHarnessJudgeFailureTests
 {
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Harness_ObservedRubric_RetainsIdentityAcrossNormalAndStreaming(bool streaming)
+    {
+        var evaluator = new ChatClientEvaluator(new AgentEval.Testing.FakeChatClient(
+            """{"overallScore":90,"criteriaResults":[],"summary":"ok"}"""));
+        var expected = await evaluator.EvaluateAsync("different input", "different output", Case(70).EvaluationCriteria!);
+        var harness = new MAFEvaluationHarness(evaluator, NullAgentEvalLogger.Instance);
+        var result = streaming
+            ? await harness.RunEvaluationStreamingAsync(new TextAgent("Four."), Case(70))
+            : await harness.RunEvaluationAsync(new TextAgent("Four."), Case(70));
+        Assert.Matches("^sha256:[0-9a-f]{64}$", result.JudgeRubricDigest!);
+        Assert.Equal(expected.RubricDigest, result.JudgeRubricDigest);
+    }
+
     /// <summary>The exact shape <c>ChatClientEvaluator</c> returns when the judge does not speak.</summary>
     private sealed class ParseFailingJudge : IEvaluator
     {

@@ -56,6 +56,22 @@ public class CriterionTextTests
         => Assert.Equal(input, CriterionText.StripLeadingEnumerator(input));
 
     [Fact]
+    public async Task ChatClientEvaluator_RubricIdentity_TracksInstrumentAndCriteriaWithoutCaseContent()
+    {
+        static ChatClientEvaluator Judge(string? system = null) => new(new FakeChatClient(
+            """{"overallScore":90,"criteriaResults":[],"summary":"ok"}"""), system);
+        async Task<string?> Digest(string[] criteria, string? system = null, string input = "private") =>
+            (await Judge(system).EvaluateAsync(input, "private output", criteria)).RubricDigest;
+        var baseline = await Digest(["accurate", "concise"]);
+        Assert.Matches("^sha256:[0-9a-f]{64}$", baseline!);
+        Assert.Equal(baseline, await Digest(["accurate", "concise"], input: "other case"));
+        Assert.NotEqual(baseline, await Digest(["concise", "accurate"]));
+        Assert.NotEqual(baseline, await Digest(["accurate", "concise"], "custom instructions"));
+        Assert.NotEqual(await Digest(["a\u001eb", "c"]), await Digest(["a", "b\u001ec"]));
+        Assert.Equal(await Digest(["a\r\nb"]), await Digest(["a\nb"]));
+    }
+
+    [Fact]
     public void StripLeadingEnumerator_RemovesExactlyOneMarker()
         => Assert.Equal("2. the second one", CriterionText.StripLeadingEnumerator("1. 2. the second one"));
 

@@ -123,6 +123,10 @@ public class TestResult
     /// consumer that records outcomes must read this first and report the case as not measured, never as failed.
     /// </summary>
     public bool JudgeFailed { get; set; }
+
+    /// <summary>Full SHA-256 identity of the grading instrument and declared criteria, excluding case input/output; null when unknown.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? JudgeRubricDigest { get; set; }
     
     /// <summary>Tool usage information from the agent run.</summary>
     public ToolUsageReport? ToolUsage { get; set; }

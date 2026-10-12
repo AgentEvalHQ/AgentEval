@@ -19,6 +19,29 @@ public sealed class AefEvalWriterTests : IDisposable
 
     private static readonly DateTimeOffset Start = new(2026, 10, 10, 12, 0, 0, TimeSpan.Zero);
 
+    [Fact]
+    public void Session_DistinctObservedRubrics_RetainsEachWithoutFailedJudge()
+    {
+        using var session = AefEvalWriter.Start(_out, Options(), Start);
+        var digests = new[] { "sha256:" + new string('a', 64), "sha256:" + new string('b', 64) };
+        for (var i = 0; i < 4; i++)
+            session.Add(new TestResult
+            {
+                TestName = "case", Passed = i < 3, Score = 90, CriteriaResults = [],
+                JudgeRubricDigest = i == 3 ? "sha256:" + new string('c', 64) : digests[i % 2],
+                JudgeFailed = i == 3,
+            }, "case-" + i);
+        var (dir, _) = session.Complete(Start.AddSeconds(1));
+        var judges = AefTestRuns.Document(dir, "run.json")["judges"]!.AsArray();
+        Assert.Equal(digests, judges.Select(j => (string?)j!["rubricDigest"]));
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+        {
+            Assert.Equal("intact", (string?)reference["outcome"]);
+            Assert.Empty(reference["problems"]!.AsArray());
+        }
+    }
+
     [Theory]
     [InlineData(null, null, 1)]
     [InlineData("judge-x", null, 2)]

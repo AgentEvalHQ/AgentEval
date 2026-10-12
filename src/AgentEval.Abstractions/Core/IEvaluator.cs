@@ -76,6 +76,10 @@ public class EvaluationResult
     /// </summary>
     public bool EvaluationFailed { get; init; }
 
+    /// <summary>Full SHA-256 identity of the grading instrument and declared criteria, excluding case input/output; null when unknown.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? RubricDigest { get; init; }
+
     /// <summary>
     /// Optional input (prompt) token count reported by the underlying chat model.
     /// <c>null</c> when the evaluator did not invoke a chat model or the model did not report usage.

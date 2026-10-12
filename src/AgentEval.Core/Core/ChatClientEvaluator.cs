@@ -203,6 +203,14 @@ public class ChatClientEvaluator : IEvaluator, IJudgePromptSource, IRubricBindab
 
         return new EvaluationResult
         {
+            // Structured encoding preserves criterion boundaries, even when criteria contain delimiters.
+            // No case input, output, or returned rationale participates in this instrument identity.
+            RubricDigest = "sha256:" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                System.Text.Encoding.UTF8.GetBytes(System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    Instrument = PromptMaterial.Replace("\r\n", "\n", StringComparison.Ordinal),
+                    Criteria = declaredCriteria.Select(c => c.Replace("\r\n", "\n", StringComparison.Ordinal)).ToArray(),
+                })))).ToLowerInvariant(),
             OverallScore = parsed.OverallScore,
             Summary = parsed.Summary,
             Improvements = parsed.Improvements,

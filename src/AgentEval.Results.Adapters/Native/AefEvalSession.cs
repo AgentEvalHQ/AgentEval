@@ -137,12 +137,12 @@ public static partial class AefEvalWriter
                 if (trials.Count == _plannedTrials) AddRollup(caseId, trials);
             }
             _all.Add(result);
-            if (_options.JudgeModel is { } judge && Graded(result)) RecordJudge(judge, _options.JudgeProvider);
+            if (_options.JudgeModel is { } judge && Graded(result)) RecordJudge(judge, _options.JudgeProvider, result.JudgeRubricDigest);
         }
 
-        private void RecordJudge(string model, string? provider)
+        private void RecordJudge(string model, string? provider, string? rubricDigest = null)
         {
-            var judge = new AefJudge { Model = model, Provider = provider, Mode = AefJudgeMode.Single };
+            var judge = new AefJudge { Model = model, Provider = provider, RubricDigest = rubricDigest, Mode = AefJudgeMode.Single };
             if (_judges.Contains(judge)) return;
             _judges.Add(judge);
             _writer.SetJudges(_judges.ToArray());

@@ -229,6 +229,11 @@ Signing and unsealed controls cannot be combined with `--no-aef`. Use `--aef <di
 at a chosen destination. `run --plan` supports signing and explicit placement too, but requires sealed evidence
 and checks identity/content flags against the saved plan as described above.
 
+Native harness judge headers also retain the full instrument digest reported by `ChatClientEvaluator`.
+It covers the system/template/rubric-reading instructions and ordered declared criteria, with CRLF normalized
+to LF, excluding case input, output and returned rationale. Normal and streaming harness paths preserve it;
+unknown evaluators leave it absent. Failed grading does not register an observed rubric.
+
 Native composite judge headers include a full rubric digest when the evaluation records one. Atomic LLM and
 decision evaluations compute it from their existing instrument material, preserving the legacy 16-character
 `PromptHash`. Distinct rubrics for the same model remain separate header entries. Legacy short fingerprints
