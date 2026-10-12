@@ -441,7 +441,8 @@ benchOwaspCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     var (exitCode, _) = await BenchOwaspCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride, azureFromEnv, mock,
         agentModel: agentOverride is not null && sut is null ? parseResult.GetValue(benchOwaspModelOpt) : null, ct: ct,
         aef: parseResult.GetValue(benchOwaspAefOpt), noAef: parseResult.GetValue(benchOwaspNoAefOpt),
-        subjectVersion: parseResult.GetValue(benchOwaspSubjectVersionOpt), agentIsLive: agentOverride is not null);
+        subjectVersion: parseResult.GetValue(benchOwaspSubjectVersionOpt), agentIsLive: agentOverride is not null,
+        agentEndpoint: agentOverride is not null && sut is null ? parseResult.GetValue(benchOwaspEndpointOpt) : null);
     return exitCode;
 });
 benchCmd.Add(benchOwaspCmd);
@@ -510,7 +511,8 @@ benchMitreCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     var (exitCode, _) = await BenchMitreCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride, azureFromEnv, mock,
         agentModel: agentOverride is not null && sut is null ? parseResult.GetValue(benchMitreModelOpt) : null, ct: ct,
         aef: parseResult.GetValue(benchMitreAefOpt), noAef: parseResult.GetValue(benchMitreNoAefOpt),
-        subjectVersion: parseResult.GetValue(benchMitreSubjectVersionOpt), agentIsLive: agentOverride is not null);
+        subjectVersion: parseResult.GetValue(benchMitreSubjectVersionOpt), agentIsLive: agentOverride is not null,
+        agentEndpoint: agentOverride is not null && sut is null ? parseResult.GetValue(benchMitreEndpointOpt) : null);
     return exitCode;
 });
 benchCmd.Add(benchMitreCmd);
@@ -578,7 +580,8 @@ benchNistCmd.SetAction(async (ParseResult parseResult, CancellationToken ct) =>
     var (exitCode, _) = await BenchNistCommand.RunAsync(preset, subject, root, input, evaluatorOverride: null, agentOverride, azureFromEnv, mock,
         agentModel: agentOverride is not null && sut is null ? parseResult.GetValue(benchNistModelOpt) : null, ct: ct,
         aef: parseResult.GetValue(benchNistAefOpt), noAef: parseResult.GetValue(benchNistNoAefOpt),
-        subjectVersion: parseResult.GetValue(benchNistSubjectVersionOpt), agentIsLive: agentOverride is not null);
+        subjectVersion: parseResult.GetValue(benchNistSubjectVersionOpt), agentIsLive: agentOverride is not null,
+        agentEndpoint: agentOverride is not null && sut is null ? parseResult.GetValue(benchNistEndpointOpt) : null);
     return exitCode;
 });
 benchCmd.Add(benchNistCmd);
@@ -885,7 +888,8 @@ benchCmd.Add(benchNistCmd);
             var agentModel = agentOverride is not null && sut is null ? parseResult.GetValue(benchPerfModelOpt) : null;
             return await BenchPerfCommand.RunAsync(capturedPreset, subject, prompt, root, agentOverride, azureFromEnv, mock, agentModel, ct,
                 aef: parseResult.GetValue(benchPerfAefOpt), noAef: parseResult.GetValue(benchPerfNoAefOpt),
-                subjectVersion: parseResult.GetValue(benchPerfSubjectVersionOpt), agentIsLive: agentOverride is not null);
+                subjectVersion: parseResult.GetValue(benchPerfSubjectVersionOpt), agentIsLive: agentOverride is not null,
+                agentEndpoint: agentOverride is not null && sut is null ? parseResult.GetValue(benchPerfEndpointOpt) : null);
         });
         benchPerfCmd.Add(presetCmd);
     }

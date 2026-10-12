@@ -53,7 +53,7 @@ public static class BenchEuAiActCommand
         bool noAef = false,
         string? subjectVersion = null,
         bool agentIsLive = false,
-        int runs = 1)
+        int runs = 1, string? agentEndpoint = null)
     {
         if (runs < 1)
         {
@@ -111,9 +111,10 @@ public static class BenchEuAiActCommand
         AgentEval.Core.IEvaluableAgent? agent = agentOverride;
         if (agent is null && azureFromEnv)
         {
-            var (builtAgent, agentExit) = AzureChatAgentFactory.TryBuildFromEnv(subject);
+            var (builtAgent, _, agentExit, envEndpoint) = AzureChatAgentFactory.TryBuildFromEnvWithEndpoint(subject);
             if (builtAgent is null) return agentExit;
             agent = builtAgent;
+            agentEndpoint = envEndpoint;
         }
 
         // ── Build registry ───────────────────────────────────────────────────
@@ -325,7 +326,7 @@ public static class BenchEuAiActCommand
                     : agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live
                     : AgentEval.Results.Writing.AefTargetMode.Mocked,
                 benchmark, compositeResult, startedAt, DateTimeOffset.UtcNow, exitCode: finalExit,
-                trials: trialResults, complianceArtifacts: complianceArtifacts, storeV1: StoreLink());
+                trials: trialResults, complianceArtifacts: complianceArtifacts, storeV1: StoreLink(), endpoint: agent is not null && (agentOverride is null || agentIsLive) ? agentEndpoint : null);
 
             // ── Exit code ─────────────────────────────────────────────────────────
             if (aefFailed)
@@ -347,7 +348,7 @@ public static class BenchEuAiActCommand
                     : AgentEval.Results.Writing.AefTargetMode.Mocked,
                 benchmark, completedRollup ?? snapshots.FirstOrDefault() ?? new CompositeProgress(benchmark).Snapshot(), startedAt, DateTimeOffset.UtcNow,
                 trials: runs > 1 && snapshots.Count > 0 ? snapshots : null, abortReason: abortReason, requestedTrials: runs > 1 ? runs : null, trialAggregationCompleted: completedRollup is not null,
-                emptyResults: !partialTrials.Any(p => p.HasCompletedResults), complianceArtifacts: complianceArtifacts, storeV1: StoreLink()))
+                emptyResults: !partialTrials.Any(p => p.HasCompletedResults), complianceArtifacts: complianceArtifacts, storeV1: StoreLink(), endpoint: agent is not null && (agentOverride is null || agentIsLive) ? agentEndpoint : null))
                 return ExitCodes.RuntimeError;
             return 1;
         }

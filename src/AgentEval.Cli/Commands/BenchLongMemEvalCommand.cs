@@ -100,6 +100,7 @@ public static class BenchLongMemEvalCommand
         }
 
         // ── Resolve chat client ──────────────────────────────────────────────
+        string? agentEndpoint = null;
         Microsoft.Extensions.AI.IChatClient chatClient;
         string deployment;
         if (chatClientOverride is not null)
@@ -109,9 +110,10 @@ public static class BenchLongMemEvalCommand
         }
         else
         {
-            var (resolved, resolvedDeployment, exitCode) = AzureChatAgentFactory.TryBuildChatClientFromEnv();
+            var (resolved, resolvedDeployment, exitCode, envEndpoint) = AzureChatAgentFactory.TryBuildChatClientFromEnvWithEndpoint();
             if (resolved is null) return exitCode;
             chatClient = resolved;
+            agentEndpoint = envEndpoint;
             deployment = resolvedDeployment!;
         }
 
@@ -186,7 +188,7 @@ public static class BenchLongMemEvalCommand
                 BenchAef.QuestionTree(observed, "longmemeval", preset,
                     result is null ? "INCONCLUSIVE" : LongMemEvalVerdict(result.OverallAccuracy, result.QuestionResults.Count - result.ScoredQuestions),
                     chatClientOverride is null ? deployment : null), startedAt, DateTimeOffset.UtcNow,
-                exitCode: exitCode, abortReason: reason, emptyResults: result is null && completed.Count == 0, storeV1: StoreLink());
+                exitCode: exitCode, abortReason: reason, emptyResults: result is null && completed.Count == 0, storeV1: StoreLink(), endpoint: agentEndpoint);
         }
         try
         {

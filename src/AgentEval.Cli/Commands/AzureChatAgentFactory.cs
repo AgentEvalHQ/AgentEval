@@ -73,14 +73,22 @@ internal static class AzureChatAgentFactory
         string subject,
         string? systemPrompt = null)
     {
-        var (chatClient, model, diagnostic) = ProviderChatClientFactory.TryCreate("agent", generousTimeout: true);
+        var (agent, model, exitCode, _) = TryBuildFromEnvWithEndpoint(subject, systemPrompt);
+        return (agent, model, exitCode);
+    }
+
+    /// <summary>Builds the target and retains the endpoint used by that construction.</summary>
+    internal static (IEvaluableAgent? Agent, string? Model, int ExitCode, string? Endpoint) TryBuildFromEnvWithEndpoint(
+        string subject, string? systemPrompt = null)
+    {
+        var (chatClient, model, diagnostic, endpoint) = ProviderChatClientFactory.TryCreateWithEndpoint("agent", generousTimeout: true);
         if (chatClient is null)
         {
             Console.Error.WriteLine(
                 "✖ --from-env was passed but no inference provider is configured.\n" +
                 $"  {diagnostic}\n" +
                 "  Configure one and retry, or name another target (--sut, --endpoint/--model).");
-            return (null, null, ExitCodes.RuntimeError);
+            return (null, null, ExitCodes.RuntimeError, null);
         }
 
         IEvaluableAgent agent = new ChatClientAgentAdapter(
@@ -88,7 +96,7 @@ internal static class AzureChatAgentFactory
             name: subject,
             systemPrompt: systemPrompt);
         Console.Error.WriteLine($"{ProviderChatClientFactory.Describe("agent", model!)} subject={subject}");
-        return (agent, model, 0);
+        return (agent, model, 0, endpoint);
     }
 
     /// <summary>
@@ -103,15 +111,22 @@ internal static class AzureChatAgentFactory
     /// </summary>
     public static (IChatClient? ChatClient, string? Deployment, int ExitCode) TryBuildChatClientFromEnv()
     {
-        var (chatClient, model, diagnostic) = ProviderChatClientFactory.TryCreate("agent", generousTimeout: true);
+        var (client, model, exitCode, _) = TryBuildChatClientFromEnvWithEndpoint();
+        return (client, model, exitCode);
+    }
+
+    /// <summary>Builds a client with the endpoint captured at provider resolution.</summary>
+    internal static (IChatClient? ChatClient, string? Deployment, int ExitCode, string? Endpoint) TryBuildChatClientFromEnvWithEndpoint()
+    {
+        var (chatClient, model, diagnostic, endpoint) = ProviderChatClientFactory.TryCreateWithEndpoint("agent", generousTimeout: true);
         if (chatClient is null)
         {
             Console.Error.WriteLine(
                 $"✖ No inference provider is configured. {diagnostic}\n" +
                 "  This benchmark requires a real LLM and cannot fall back to a stub.");
-            return (null, null, ExitCodes.RuntimeError);
+            return (null, null, ExitCodes.RuntimeError, null);
         }
 
-        return (chatClient, model, 0);
+        return (chatClient, model, 0, endpoint);
     }
 }

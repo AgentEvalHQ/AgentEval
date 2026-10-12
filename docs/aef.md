@@ -310,6 +310,9 @@ GDPR and EU AI Act also record single-run identities, or ordered `trialRunIds` p
 repeated runs. IDs are captured immediately after manifest creation, including an interrupted trial or aggregate
 persistence; an aggregate that was never created has no `runId`. Native adapter options expose the same links.
 `AefCompositeRunOptions.Endpoint` accepts the actual target endpoint when known, as the eval and probe options do.
+Environment-backed perf, scan, GDPR/EU AI Act, memory and autoaudit commands capture the endpoint at client
+construction; explicit scan/perf endpoint targets also forward it, including for interrupted runs. Supplied
+responses, mocks and custom targets whose endpoint is unknown do not invent a deployment.
 Writers remove user information, query and fragment before creating a deployment header, and omit invalid or
 unknown endpoints. The sanitized endpoint determines the deployment reference using Runner-compatible encoding.
 Fatal evaluation or report errors retain the observed GDPR/EU AI Act/agentic composite evidence as aborted, without a command gate;

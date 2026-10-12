@@ -143,6 +143,7 @@ public static class BenchTypedMemEvalCommand
         }
 
         // ── Resolve chat client ──────────────────────────────────────────────
+        string? agentEndpoint = null;
         Microsoft.Extensions.AI.IChatClient chatClient;
         string deployment;
         if (chatClientOverride is not null)
@@ -152,9 +153,10 @@ public static class BenchTypedMemEvalCommand
         }
         else
         {
-            var (resolved, resolvedDeployment, exitCode) = AzureChatAgentFactory.TryBuildChatClientFromEnv();
+            var (resolved, resolvedDeployment, exitCode, envEndpoint) = AzureChatAgentFactory.TryBuildChatClientFromEnvWithEndpoint();
             if (resolved is null) return exitCode;
             chatClient = resolved;
+            agentEndpoint = envEndpoint;
             deployment = resolvedDeployment!;
         }
 
@@ -203,7 +205,7 @@ public static class BenchTypedMemEvalCommand
             return BenchAef.WriteResult(aef, agentEvalDir, "typedmemeval", verticalName, subject!, subjectVersion,
                 chatClientOverride is null ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
                 tree, startedAt, DateTimeOffset.UtcNow, caseExt: caseExt, abortReason: reason,
-                emptyResults: result is null && completed.Count == 0, storeV1: StoreLink());
+                emptyResults: result is null && completed.Count == 0, storeV1: StoreLink(), endpoint: agentEndpoint);
         }
         try
         {

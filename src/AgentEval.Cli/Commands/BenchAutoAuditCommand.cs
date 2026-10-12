@@ -81,6 +81,8 @@ public static class BenchAutoAuditCommand
         Console.WriteLine();
 
         var results = new List<AutoAuditEndpointResult>();
+        var deploymentEndpoints = new List<string?>();
+        string? activeEndpoint = null;
         var times = new List<(DateTimeOffset Start, DateTimeOffset End)>();   // each model's own audit, for its AEF run
         string? active = null;
         var modelStart = DateTimeOffset.UtcNow;
@@ -99,12 +101,12 @@ public static class BenchAutoAuditCommand
             {
                 var (tree, caseExt) = BenchAef.AutoAuditTree(results[i]);
                 failed |= BenchAef.WriteResult(aef, Path.GetDirectoryName(aefRoot)!, "autoaudit", "support-task", targets[i], null,
-                    mode, tree, times[i].Start, times[i].End, subjectKind: "model", caseExt: caseExt, abortReason: reason);
+                    mode, tree, times[i].Start, times[i].End, subjectKind: "model", caseExt: caseExt, abortReason: reason, endpoint: deploymentEndpoints[i]);
             }
             if (active is not null)
                 failed |= BenchAef.WriteResult(aef, Path.GetDirectoryName(aefRoot)!, "autoaudit", "support-task", active, null,
                     mode, MockTarget.UnmeasuredResult("autoaudit"), modelStart, DateTimeOffset.UtcNow,
-                    subjectKind: "model", abortReason: reason, emptyResults: true);
+                    subjectKind: "model", abortReason: reason, emptyResults: true, endpoint: activeEndpoint);
             return failed;
         }
         try
@@ -112,6 +114,7 @@ public static class BenchAutoAuditCommand
             foreach (var model in targets)
             {
                 active = model;
+                activeEndpoint = null;
                 modelStart = DateTimeOffset.UtcNow;
                 ct.ThrowIfCancellationRequested();
                 var endpoint = $"{model} ({provider})";
@@ -123,7 +126,7 @@ public static class BenchAutoAuditCommand
                 }
                 else
                 {
-                    var (built, _, diagnostic) = ProviderChatClientFactory.TryCreate("auto-audit", model, generousTimeout: true);
+                    var (built, _, diagnostic, resolvedEndpoint) = ProviderChatClientFactory.TryCreateWithEndpoint("auto-audit", model, generousTimeout: true);
                     if (built is null)
                     {
                         // A model that cannot be reached is a row that did not complete, not a reason to throw away the
@@ -131,10 +134,12 @@ public static class BenchAutoAuditCommand
                         Console.Error.WriteLine($"  {endpoint} did not complete: no client: {diagnostic}");
                         results.Add(new AutoAuditEndpointResult(endpoint, 0, 0, 0, 0, 0, Completed: false, TopDiscrepancies: []));
                         times.Add((modelStart, DateTimeOffset.UtcNow));
+                        deploymentEndpoints.Add(activeEndpoint);
                         active = null;
                         continue;
                     }
                     client = owned = built;
+                    activeEndpoint = resolvedEndpoint;
                     Console.Error.WriteLine($"  {ProviderChatClientFactory.Describe("auto-audit", model)}");
                 }
 
@@ -144,6 +149,7 @@ public static class BenchAutoAuditCommand
                     var (result, failure) = await AutoAuditLive.EvaluateAsync(endpoint, client, ct);
                     results.Add(result);
                     times.Add((modelStart, DateTimeOffset.UtcNow));
+                    deploymentEndpoints.Add(activeEndpoint);
                     active = null;
                     if (failure is not null)
                         Console.Error.WriteLine($"  {endpoint} did not complete: {failure.GetType().Name}: {failure.Message}");

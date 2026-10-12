@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Benchmark target endpoint wiring:** environment-backed benchmark commands retain the endpoint captured
+  when their client was constructed; explicit scan/perf endpoints also reach AEF deployment headers. Interrupted
+  runs keep the same endpoint. Replayed responses, mocks and unknown custom-target endpoints remain absent.
+
 - **Native composite deployment metadata:** composite writer options accept a known target endpoint, sanitize
   user information/query/fragment, and use the same deployment reference encoding as Runner. Unknown or invalid
   endpoints are omitted. Benchmark AEF helpers can forward the endpoint to composite and probe writers.

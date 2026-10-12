@@ -48,7 +48,7 @@ public static class BenchPerfCommand
         DirectoryInfo? aef = null,
         bool noAef = false,
         string? subjectVersion = null,
-        bool agentIsLive = false)
+        bool agentIsLive = false, string? agentEndpoint = null)
     {
         // agentIsLive: the caller resolved agentOverride from --sut or --endpoint, a real target. Any other agentOverride
         // is a stand-in, which the AEF run records as mocked, never live (RUN-7).
@@ -111,10 +111,11 @@ public static class BenchPerfCommand
         }
         else if (azureFromEnv)
         {
-            var (azureAgent, envModel, azureExitCode) = AzureChatAgentFactory.TryBuildFromEnvWithModel(subject);
+            var (azureAgent, envModel, azureExitCode, envEndpoint) = AzureChatAgentFactory.TryBuildFromEnvWithEndpoint(subject);
             if (azureAgent is null) return azureExitCode;
             agent = azureAgent;
             agentModel = envModel;
+            agentEndpoint = envEndpoint;
         }
         else
         {
@@ -184,7 +185,7 @@ public static class BenchPerfCommand
             agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
             result ?? MockTarget.UnmeasuredResult($"perf.{preset}"), startedAt, DateTimeOffset.UtcNow,
             exitCode: reason is null && result is not null ? BenchExitCodes.FromLabel(result.Score.Label) : null,
-            abortReason: reason, emptyResults: result is null, storeV1: StoreLink());
+            abortReason: reason, emptyResults: result is null, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null);
         try
         {
             result = await family.EvaluateAsync!(input, null, ct);

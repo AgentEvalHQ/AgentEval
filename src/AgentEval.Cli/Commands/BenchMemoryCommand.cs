@@ -92,6 +92,7 @@ public static class BenchMemoryCommand
         }
 
         // ── Resolve chat client ──────────────────────────────────────────────
+        string? agentEndpoint = null;
         Microsoft.Extensions.AI.IChatClient chatClient;
         string? model = null;   // the provider's model: the agent and its judge
         if (chatClientOverride is not null)
@@ -100,9 +101,10 @@ public static class BenchMemoryCommand
         }
         else
         {
-            var (resolved, deployment, exitCode) = AzureChatAgentFactory.TryBuildChatClientFromEnv();
+            var (resolved, deployment, exitCode, envEndpoint) = AzureChatAgentFactory.TryBuildChatClientFromEnvWithEndpoint();
             if (resolved is null) return exitCode;
             chatClient = resolved;
+            agentEndpoint = envEndpoint;
             model = deployment;
         }
 
@@ -140,13 +142,13 @@ public static class BenchMemoryCommand
             });
             if (observed is null)
                 return BenchAef.WriteResult(aef, agentEvalDir, "memory", preset, subject, subjectVersion, mode,
-                    MockTarget.UnmeasuredResult("memory"), startedAt, DateTimeOffset.UtcNow, abortReason: reason, emptyResults: true, storeV1: StoreLink());
+                    MockTarget.UnmeasuredResult("memory"), startedAt, DateTimeOffset.UtcNow, abortReason: reason, emptyResults: true, storeV1: StoreLink(), endpoint: agentEndpoint);
             var verdict = result is null ? "INCOMPLETE" : Verdict(observed);
             var (tree, shape) = BenchAef.MemoryTree(observed, preset, verdict, model);
             return BenchAef.WriteTree(aef, agentEvalDir, "memory", preset, subject, subjectVersion, mode, shape, tree,
                 startedAt, DateTimeOffset.UtcNow,
                 exitCode: reason is null ? (verdict == "INCOMPLETE" ? ExitCodes.GateIndeterminate : BenchExitCodes.FromLabel(verdict)) : null,
-                abortReason: reason, storeV1: StoreLink());
+                abortReason: reason, storeV1: StoreLink(), endpoint: agentEndpoint);
         }
         try
         {

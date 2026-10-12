@@ -537,6 +537,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.NotEmpty(endpoint.Requests);
         var dir = RunDirectory(aef.FullName);
         AssertIntact(dir);
+        Assert.Equal(endpoint.Endpoint.TrimEnd('/'), ((string)Document(dir, "run.json")["deployment"]!["endpoint"]!).TrimEnd('/'));
         AssertCompositeStoreLinks(dir, 2);
         var header = Document(dir, "run.json");
         Assert.Equal("live", (string?)header["execution"]!["targetMode"]);
@@ -570,11 +571,11 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         async Task<int> Run(DirectoryInfo destination, bool noAef) => (family switch
         {
             "mitre" => await BenchMitreCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
-                judgeClientOverride: judge, aef: destination, noAef: noAef, agentIsLive: true),
+                judgeClientOverride: judge, aef: destination, noAef: noAef, agentIsLive: true, agentEndpoint: endpoint.Endpoint),
             "nist" => await BenchNistCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
-                judgeClientOverride: judge, aef: destination, noAef: noAef, agentIsLive: true),
+                judgeClientOverride: judge, aef: destination, noAef: noAef, agentIsLive: true, agentEndpoint: endpoint.Endpoint),
             _ => await BenchOwaspCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
-                judgeClientOverride: judge, aef: destination, noAef: noAef, agentIsLive: true),
+                judgeClientOverride: judge, aef: destination, noAef: noAef, agentIsLive: true, agentEndpoint: endpoint.Endpoint),
         }).ExitCode;
         var written = await Run(aef, false);
         AssertStoreLink(RunDirectory(aef.FullName));
@@ -589,6 +590,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.NotEmpty(judgeEndpoint.Requests);
         var dir = RunDirectory(aef.FullName);
         AssertIntact(dir);
+        Assert.Equal(endpoint.Endpoint.TrimEnd('/'), ((string)Document(dir, "run.json")["deployment"]!["endpoint"]!).TrimEnd('/'));
         Assert.Equal("live", (string?)Document(dir, "run.json")["execution"]!["targetMode"]);
         var gate = JsonNode.Parse(File.ReadAllLines(Path.Combine(dir, "gates.ndjson")).Single())!;
         Assert.Equal(written, (int)gate["exitCode"]!);
@@ -721,11 +723,11 @@ public sealed class NativeVerbIntegrationTests : IDisposable
             var result = family switch
             {
                 "owasp" => await BenchOwaspCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
-                    judgeClientOverride: judge, aef: aef, agentIsLive: true, ct: cancel.Token),
+                    judgeClientOverride: judge, aef: aef, agentIsLive: true, agentEndpoint: endpoint.Endpoint, ct: cancel.Token),
                 "mitre" => await BenchMitreCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
-                    judgeClientOverride: judge, aef: aef, agentIsLive: true, ct: cancel.Token),
+                    judgeClientOverride: judge, aef: aef, agentIsLive: true, agentEndpoint: endpoint.Endpoint, ct: cancel.Token),
                 _ => await BenchNistCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
-                    judgeClientOverride: judge, aef: aef, agentIsLive: true, ct: cancel.Token),
+                    judgeClientOverride: judge, aef: aef, agentIsLive: true, agentEndpoint: endpoint.Endpoint, ct: cancel.Token),
             };
             Assert.Equal(1, result.ExitCode);
         }
@@ -738,6 +740,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.True(cancel.IsCancellationRequested);
         var dir = RunDirectory(aef.FullName);
         AssertIntact(dir);
+        Assert.Equal(endpoint.Endpoint.TrimEnd('/'), ((string)Document(dir, "run.json")["deployment"]!["endpoint"]!).TrimEnd('/'));
         AssertStoreLink(dir);
         Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
         Assert.NotEmpty(File.ReadAllLines(Path.Combine(dir, "results.ndjson")));
@@ -805,7 +808,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         {
             Console.SetOut(output);
             var exit = await BenchPerfCommand.RunAsync("latency", agent.Name, "hello", _root, agent,
-                ct: cancel.Token, aef: defaultOutput ? null : new DirectoryInfo(outputRoot), noAef: noAef, agentIsLive: true);
+                ct: cancel.Token, aef: defaultOutput ? null : new DirectoryInfo(outputRoot), noAef: noAef, agentIsLive: true, agentEndpoint: endpoint.Endpoint);
             Assert.Equal(invalidOutput ? 3 : 1, exit);
         }
         finally
@@ -821,6 +824,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         }
         var dir = RunDirectory(defaultOutput ? Path.Combine(_root, ".agenteval", "aef") : outputRoot);
         AssertIntact(dir);
+        Assert.Equal(endpoint.Endpoint.TrimEnd('/'), ((string)Document(dir, "run.json")["deployment"]!["endpoint"]!).TrimEnd('/'));
         AssertStoreLink(dir);
         Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
         Assert.Equal("live", (string?)Document(dir, "run.json")["execution"]!["targetMode"]);
@@ -1194,11 +1198,11 @@ public sealed class NativeVerbIntegrationTests : IDisposable
             var result = family switch
             {
                 "owasp" => await BenchOwaspCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
-                    judgeClientOverride: judge, aef: aef, noAef: noAef, agentIsLive: true),
+                    judgeClientOverride: judge, aef: aef, noAef: noAef, agentIsLive: true, agentEndpoint: endpoint.Endpoint),
                 "mitre" => await BenchMitreCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
-                    judgeClientOverride: judge, aef: aef, noAef: noAef, agentIsLive: true),
+                    judgeClientOverride: judge, aef: aef, noAef: noAef, agentIsLive: true, agentEndpoint: endpoint.Endpoint),
                 _ => await BenchNistCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
-                    judgeClientOverride: judge, aef: aef, noAef: noAef, agentIsLive: true),
+                    judgeClientOverride: judge, aef: aef, noAef: noAef, agentIsLive: true, agentEndpoint: endpoint.Endpoint),
             };
             Assert.Equal(invalidDestination ? 3 : 1, result.ExitCode);
         }
@@ -1210,6 +1214,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         }
         var dir = RunDirectory(aef.FullName);
         AssertIntact(dir);
+        Assert.Equal(endpoint.Endpoint.TrimEnd('/'), ((string)Document(dir, "run.json")["deployment"]!["endpoint"]!).TrimEnd('/'));
         AssertStoreLink(dir);
         Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
         Assert.NotEmpty(File.ReadAllLines(Path.Combine(dir, "results.ndjson")));

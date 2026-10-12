@@ -50,7 +50,7 @@ public static class BenchNistCommand
         DirectoryInfo? aef = null,
         bool noAef = false,
         string? subjectVersion = null,
-        bool agentIsLive = false)
+        bool agentIsLive = false, string? agentEndpoint = null)
     {
         // agentIsLive: the caller resolved agentOverride from --sut or --endpoint, a real target. Any other agentOverride
         // is a stand-in, which the AEF run records as mocked, never live (RUN-7).
@@ -134,10 +134,11 @@ public static class BenchNistCommand
         }
         else if (azureFromEnv)
         {
-            var (azureAgent, envModel, azureExitCode) = AzureChatAgentFactory.TryBuildFromEnvWithModel(subject);
+            var (azureAgent, envModel, azureExitCode, envEndpoint) = AzureChatAgentFactory.TryBuildFromEnvWithEndpoint(subject);
             if (azureAgent is null) return (azureExitCode, null);
             agent = azureAgent;
             agentModel = envModel;
+            agentEndpoint = envEndpoint;
         }
         else
         {
@@ -187,7 +188,7 @@ public static class BenchNistCommand
             if (abortReason != "cancelled") Console.Error.WriteLine($"NIST AI RMF scan failed: {ex.Message}");
             if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "nist", preset, subject, subjectVersion,
                 !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                judgeModelName, partialScan.Snapshot(), null, 1, judgeLedger, storeV1: StoreLink(), abortReason: abortReason))
+                judgeModelName, partialScan.Snapshot(), null, 1, judgeLedger, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null, abortReason: abortReason))
                 return (ExitCodes.RuntimeError, null);
             return (1, null);
         }
@@ -319,7 +320,7 @@ public static class BenchNistCommand
             // The scan's probes as sealed evidence, lane nist; a mock run is not stored, so it writes none.
             if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "nist", preset, subject, subjectVersion,
                     !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                    judgeModelName, redTeamResult, compositeEval, finalExit, judgeLedger, storeV1: StoreLink()))
+                    judgeModelName, redTeamResult, compositeEval, finalExit, judgeLedger, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null))
                 return (ExitCodes.RuntimeError, null);   // an explicit --aef could not be written
 
             // ── Exit code ─────────────────────────────────────────────────────────
@@ -345,7 +346,7 @@ public static class BenchNistCommand
             // The scan may finish before persistence or report generation is cancelled.
             if ((!isMock || aef is not null) && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "nist", preset, subject, subjectVersion,
                 !isMock && (agentOverride is null || agentIsLive) ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                judgeModelName, redTeamResult, null, 1, judgeLedger, storeV1: StoreLink(), abortReason: abortReason))
+                judgeModelName, redTeamResult, null, 1, judgeLedger, storeV1: StoreLink(), endpoint: agentOverride is null || agentIsLive ? agentEndpoint : null, abortReason: abortReason))
                 return (ExitCodes.RuntimeError, null);
             return (1, null);
         }
