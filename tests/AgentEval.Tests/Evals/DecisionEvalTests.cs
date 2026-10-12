@@ -18,8 +18,9 @@ public class DecisionEvalTests
 {
     // ── Fake transport ───────────────────────────────────────────────────────
 
-    private sealed class FakeDecisionClient : IDecisionClient
+    private sealed class FakeDecisionClient : IDecisionClient, AgentEval.Core.IJudgeProviderSource
     {
+        public string? ProviderName { get; init; }
         public double TrueProbability { get; set; } = 0.5;
         public string Model { get; set; } = "typesafe/jev-1.13-20260917";
         public DecisionUsage? Usage { get; set; } = new(200, 10, Cost: null);
@@ -39,6 +40,15 @@ public class DecisionEvalTests
                 StringComparer.Ordinal);
             return Task.FromResult(new DecisionResponse(Model, answers, Usage));
         }
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("typesafe")]
+    public async Task EvaluateAsync_ProviderMetadata_PreservesKnownOrUnknown(string? provider)
+    {
+        var result = await MakeSut(new FakeDecisionClient { ProviderName = provider }).EvaluateAsync(MakeInput());
+        Assert.Equal(provider, result.Provenance.JudgeProvider);
     }
 
     private static DecisionEval MakeSut(

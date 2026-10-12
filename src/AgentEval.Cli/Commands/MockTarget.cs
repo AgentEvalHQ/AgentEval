@@ -152,7 +152,7 @@ internal static class MockTarget
         Provenance = result.Provenance with
         {
             Type = result.Provenance.Type == "atomic-llm" ? "atomic-code" : result.Provenance.Type,
-            JudgeModel = null, PromptId = null, PromptHash = null, RubricDigest = null, TokensUsed = null, EstimatedCost = 0,
+            JudgeModel = null, JudgeProvider = null, PromptId = null, PromptHash = null, RubricDigest = null, TokensUsed = null, EstimatedCost = 0,
         },
         Details = result.Details with { SubResults = result.Details.SubResults?.Select(CodeJudged).ToArray() },
     };

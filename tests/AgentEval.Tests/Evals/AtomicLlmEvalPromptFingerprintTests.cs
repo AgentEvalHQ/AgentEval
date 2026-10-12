@@ -30,8 +30,9 @@ public class AtomicLlmEvalPromptFingerprintTests
     }
 
     /// <summary>An evaluator that names its prompt, as ChatClientEvaluator does.</summary>
-    private sealed class NamedPromptEvaluator(string id, string material) : IEvaluator, IJudgePromptSource
+    private sealed class NamedPromptEvaluator(string id, string material) : IEvaluator, IJudgePromptSource, IJudgeProviderSource
     {
+        public string? ProviderName { get; init; }
         public string? SystemPromptId => id;
         public string PromptMaterial => material;
 
@@ -44,6 +45,15 @@ public class AtomicLlmEvalPromptFingerprintTests
 
     private static async Task<EvalProvenance> ProvenanceOf(AtomicLlmEval eval) =>
         (await eval.EvaluateAsync(new EvalInput(Query: "q", Response: "r"))).Provenance;
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("private-provider")]
+    public async Task EvaluateAsync_ProviderMetadata_PreservesKnownOrUnknown(string? provider)
+    {
+        var provenance = await ProvenanceOf(Leaf(new NamedPromptEvaluator("p", "m") { ProviderName = provider }, ["Is safe."]));
+        Assert.Equal(provider, provenance.JudgeProvider);
+    }
 
     [Fact]
     public async Task ThePromptHash_IsAlwaysRecorded()

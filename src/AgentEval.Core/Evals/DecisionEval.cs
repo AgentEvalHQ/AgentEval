@@ -226,7 +226,7 @@ public sealed class DecisionEval : AtomicEval
                 PromptHash: _promptHash,
                 TokensUsed: tokensUsed,
                 EstimatedCost: estimatedCost,
-                CacheHit: false) { RubricDigest = _rubricDigest },
+                CacheHit: false) { RubricDigest = _rubricDigest, JudgeProvider = (_client as AgentEval.Core.IJudgeProviderSource)?.ProviderName },
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 

@@ -19,6 +19,10 @@ public sealed record EvalProvenance(
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public string? RubricDigest { get; init; }
 
+    /// <summary>The configured judge provider, when known; never inferred from a model name.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? JudgeProvider { get; init; }
+
     /// <summary>Number of configured panel members, when this result represents a judge panel.</summary>
     /// <remarks>The first N sub-results are panel members in definition order. Any subsequent sub-results
     /// are separately invoked adjudicators, not additional panel votes. Absent for ordinary composites.</remarks>

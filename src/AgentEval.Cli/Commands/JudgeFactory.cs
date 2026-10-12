@@ -104,10 +104,10 @@ internal static class JudgeFactory
         if (evaluatorOverride is not null)
             return (evaluatorOverride, "override", 0);
 
-        var (client, model, exitCode) = ResolveChatClient(judgeKind, systemPrompt?.Length);
+        var (client, model, exitCode, provider) = ResolveChatClientWithProvider(judgeKind, systemPrompt?.Length);
         return client is null
             ? (null, "", exitCode)
-            : (new ChatClientEvaluator(client, systemPrompt, systemPromptId), model, 0);
+            : (new ChatClientEvaluator(client, systemPrompt, systemPromptId) { ProviderName = provider }, model, 0);
     }
 
     /// <summary>
@@ -119,6 +119,14 @@ internal static class JudgeFactory
     internal static (IChatClient? Client, string JudgeModel, int ExitCode) ResolveChatClient(
         string judgeKind = "benchmark",
         int? systemPromptLength = null)
+    {
+        var (client, model, exitCode, _) = ResolveChatClientWithProvider(judgeKind, systemPromptLength);
+        return (client, model, exitCode);
+    }
+
+    /// <summary>Resolves the client and its provider in one operation.</summary>
+    internal static (IChatClient? Client, string JudgeModel, int ExitCode, string? Provider) ResolveChatClientWithProvider(
+        string judgeKind = "benchmark", int? systemPromptLength = null)
     {
         // AZURE_OPENAI_JUDGE_* still wins outright, so the judge and the agent-under-test can point at
         // DIFFERENT endpoints in the same run — a capable grader against a cheap subject. It is the only
@@ -142,7 +150,7 @@ internal static class JudgeFactory
             {
                 Console.Error.WriteLine(
                     $"✖ AZURE_OPENAI_JUDGE_ENDPOINT {endpointWhy}");
-                return (null, "", ExitCodes.RuntimeError);
+                return (null, "", ExitCodes.RuntimeError, null);
             }
 
             try
@@ -152,7 +160,7 @@ internal static class JudgeFactory
                 Console.Error.WriteLine(
                     $"✔ Azure OpenAI judge configured — endpoint={ProviderChatClientFactory.SafeEndpoint(new Uri(endpoint!))}, deployment={deployment} ({judgeKind})" +
                     (systemPromptLength is null ? "." : $" [system prompt: {systemPromptLength} chars]."));
-                return (chatClient, deployment!, 0);
+                return (chatClient, deployment!, 0, "azure");
             }
             catch (Exception ex)
             {
@@ -160,7 +168,7 @@ internal static class JudgeFactory
                     $"✖ Failed to construct the Azure OpenAI judge ({ex.GetType().Name}) for " +
                     $"endpoint={ProviderChatClientFactory.SafeEndpoint(new Uri(endpoint!))}.\n" +
                     "  Check AZURE_OPENAI_JUDGE_ENDPOINT / AZURE_OPENAI_JUDGE_API_KEY / AZURE_OPENAI_JUDGE_DEPLOYMENT values.");
-                return (null, "", ExitCodes.RuntimeError);
+                return (null, "", ExitCodes.RuntimeError, null);
             }
         }
 
@@ -181,17 +189,17 @@ internal static class JudgeFactory
                 $"✖ Judge-specific Azure OpenAI endpoint partially configured — missing: {string.Join(", ", missing)}.\n" +
                 "  Set all three AZURE_OPENAI_JUDGE_* variables to point the judge at its own endpoint,\n" +
                 $"  or unset all three to judge with the provider {InferenceProviderEnvironment.SelectorVariable} selects.");
-            return (null, "", ExitCodes.RuntimeError);
+            return (null, "", ExitCodes.RuntimeError, null);
         }
 
         // The general path: whichever provider AI_INFERENCE_PROVIDER selects (Azure included).
-        var (providerClient, providerModel, diagnostic) = ProviderChatClientFactory.TryCreate("judge");
+        var (providerClient, providerModel, diagnostic, _, provider) = ProviderChatClientFactory.TryCreateWithMetadata("judge");
         if (providerClient is not null)
         {
             Console.Error.WriteLine(
                 $"{ProviderChatClientFactory.Describe($"{judgeKind} judge", providerModel!)}" +
                 (systemPromptLength is null ? "" : $" [system prompt: {systemPromptLength} chars]"));
-            return (providerClient, providerModel!, 0);
+            return (providerClient, providerModel!, 0, provider);
         }
 
         // A provider WAS named or half-configured and could not be built: that is a typo, not an
@@ -201,14 +209,14 @@ internal static class JudgeFactory
             Console.Error.WriteLine(
                 $"✖ A provider is selected or partially configured but could not be used. {diagnostic}\n" +
                 "  Fix its variables and retry.");
-            return (null, "", ExitCodes.RuntimeError);
+            return (null, "", ExitCodes.RuntimeError, null);
         }
 
         // No provider at all. There is no stand-in judge: a verdict no judge gave measures nothing.
         Console.Error.WriteLine(
             $"✖ No LLM judge configured for {judgeKind}. {diagnostic}\n" +
             $"  Configure a provider ({InferenceProviderEnvironment.SelectorVariable}; see docs/cli.md) and retry.");
-        return (null, "", ExitCodes.RuntimeError);
+        return (null, "", ExitCodes.RuntimeError, null);
     }
 
     /// <summary>Returns the value of the first environment variable in <paramref name="names"/>

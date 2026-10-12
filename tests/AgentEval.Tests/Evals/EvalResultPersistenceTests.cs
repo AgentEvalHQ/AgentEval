@@ -98,7 +98,7 @@ public class EvalResultPersistenceTests
     public void ToScenarioResult_ThenFromScenarioResult_RoundTripPreservesStructure()
     {
         var original = MakeAtomicResult();
-        original = original with { Provenance = original.Provenance with { RubricDigest = "sha256:" + new string('a', 64) } };
+        original = original with { Provenance = original.Provenance with { RubricDigest = "sha256:" + new string('a', 64), JudgeProvider = "test-provider" } };
         var sr = EvalResultPersistence.ToScenarioResult(original, "scen-001", "Acknowledgment Scenario");
         var restored = EvalResultPersistence.FromScenarioResult(sr);
 

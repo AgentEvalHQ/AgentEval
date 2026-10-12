@@ -98,6 +98,30 @@ public sealed class AefCompositeRunWriterTests : IDisposable
 
     private static AefComponentShape Leaf(double weight = 1, bool required = true, string onFailure = "Averaged") => new(weight, required, onFailure, []);
 
+    [Fact]
+    public void Write_SameModelDifferentProviders_PreservesDistinctJudgesAndUnknown()
+    {
+        var leaves = new[] { "provider-a", "provider-b", null }.Select((provider, i) =>
+        {
+            var leaf = Leaf("case" + i, "pass", 1, "atomic-llm", "same-model");
+            return leaf with { Provenance = leaf.Provenance with { JudgeProvider = provider } };
+        }).ToArray();
+        var preset = Composite("preset", "pass", 1, null, new EvalLineage("threshold", []), leaves);
+        var (dir, _) = AefCompositeRunWriter.Write(_out, preset, AefCompositeRunWriter.Undescribed,
+            new AefCompositeRunOptions
+            {
+                SubjectRef = "agent:test", TargetMode = AefTargetMode.Live, Lane = "test", SuiteRef = "bench:test",
+            }, Start, Start.AddSeconds(1));
+        var judges = JsonNode.Parse(File.ReadAllText(Path.Combine(dir, "run.json")))!["judges"]!.AsArray();
+        Assert.Equal(new[] { "provider-a", "provider-b", null }, judges.Select(j => (string?)j!["provider"]));
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+        {
+            Assert.Equal("intact", (string?)reference["outcome"]);
+            Assert.Empty(reference["problems"]!.AsArray());
+        }
+    }
+
     [Theory]
     [InlineData(false, false)]
     [InlineData(true, false)]

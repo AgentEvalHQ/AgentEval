@@ -502,7 +502,7 @@ public static class AefCompositeRunWriter
         {
             yield return new AefJudge
             {
-                Model = node.Provenance.JudgeModel!, RubricDigest = node.Provenance.RubricDigest,
+                Model = node.Provenance.JudgeModel!, Provider = node.Provenance.JudgeProvider, RubricDigest = node.Provenance.RubricDigest,
                 Mode = panelSize is null ? AefJudgeMode.Single : AefJudgeMode.Panel, PanelSize = panelSize,
             };
         }

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Benchmark judge providers:** judge construction captures the configured provider from the same settings
+  snapshot as the client. Atomic/decision provenance and composite AEF headers retain known providers; rubric
+  binding preserves them, unknown providers remain absent, and placeholder mock evidence clears them.
+
 - **Judge panel provenance:** panel wrappers persist their configured member count on success and no-verdict
   results. Native composite headers distinguish measured panel members from ordinary single judges and a
   separately invoked adjudicator, without deriving panel size from criteria or successful model counts.

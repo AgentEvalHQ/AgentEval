@@ -63,6 +63,7 @@
       "properties": {
         "type":          { "enum": ["atomic-llm", "atomic-code", "atomic-decision", "composite", "skipped", "multi-judge-adjudicated"] },
         "judgeModel":    { "type": ["string", "null"] },
+        "judgeProvider": { "type": ["string", "null"] },
         "promptId":      { "type": ["string", "null"] },
         "promptHash":    { "type": ["string", "null"] },
         "judgePanelSize": { "type": ["integer", "null"], "minimum": 1 },

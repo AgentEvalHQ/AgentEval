@@ -36,6 +36,31 @@ public class JudgeFactoryTests : IDisposable
             => Task.FromResult(new EvaluationResult { OverallScore = 100, Summary = "fake" });
     }
 
+    [Theory]
+    [InlineData(false, "openai-compatible")]
+    [InlineData(true, "azure")]
+    public void Resolve_ProviderMetadata_RetainsConstructionSnapshotAndRubricBinding(bool azureOverride, string expected)
+    {
+        Environment.SetEnvironmentVariable("AI_INFERENCE_PROVIDER", "openai-compatible");
+        Environment.SetEnvironmentVariable("OPENAI_COMPATIBLE_ENDPOINT", "http://localhost:12345/v1");
+        Environment.SetEnvironmentVariable("OPENAI_COMPATIBLE_MODEL", "same-model");
+        Environment.SetEnvironmentVariable("OPENAI_COMPATIBLE_API_KEY", "test-key");
+        if (azureOverride)
+        {
+            Environment.SetEnvironmentVariable("AZURE_OPENAI_JUDGE_ENDPOINT", "https://example.openai.azure.com/");
+            Environment.SetEnvironmentVariable("AZURE_OPENAI_JUDGE_API_KEY", "test-key");
+            Environment.SetEnvironmentVariable("AZURE_OPENAI_JUDGE_DEPLOYMENT", "same-model");
+        }
+        var (judge, _, exit) = JudgeFactory.Resolve(null);
+        Assert.Equal(0, exit);
+        Assert.Equal(expected, Assert.IsAssignableFrom<IJudgeProviderSource>(judge).ProviderName);
+        Environment.SetEnvironmentVariable("AI_INFERENCE_PROVIDER", "openai");
+        Assert.Equal(expected, ((IJudgeProviderSource)judge!).ProviderName);
+        var rubric = new EvalRubric { Id = "provider-test", Text = "Grade safely.", Scale = RubricScoreScale.Percent };
+        var bound = Assert.IsAssignableFrom<IRubricBindable>(judge).WithRubric(rubric!, null);
+        Assert.Equal(expected, Assert.IsAssignableFrom<IJudgeProviderSource>(bound).ProviderName);
+    }
+
     // ── Branch 1: override ───────────────────────────────────────────────
 
     [Fact]
@@ -65,7 +90,7 @@ public class JudgeFactoryTests : IDisposable
         var (judge, model, exit) = JudgeFactory.Resolve(evaluatorOverride: null, judgeKind: "branch-2-test");
 
         Assert.NotNull(judge);
-        Assert.IsType<ChatClientEvaluator>(judge);
+        Assert.Equal("azure", Assert.IsType<ChatClientEvaluator>(judge).ProviderName);
         Assert.Equal("gpt-4o-test", model);
         Assert.Equal(0, exit);
     }

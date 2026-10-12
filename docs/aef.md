@@ -237,6 +237,12 @@ and decision-model leaves also carry the model and rubric digest in their annota
 use the `LLM` annotator kind; code checks remain `CODE`. Rubric identity is available with content capture off;
 judge reasoning is attached only with capture on.
 
+Composite judge headers retain `JudgeProvider` when the evaluator or decision transport implements
+`IJudgeProviderSource`. The CLI benchmark judge factory captures the configured provider alongside its client;
+`ChatClientEvaluator.ProviderName` can also be supplied by hosts and survives rubric binding. System One
+transports expose their configured provider. Unknown providers stay absent: an OpenAI-compatible SDK or a
+model name alone does not identify the service that graded the result.
+
 Panel wrappers persist `JudgePanelSize`: their first N sub-results are panel members in definition order;
 any following adjudicator is a separate invocation. Composite AEF headers use these explicit facts to record
 `mode: panel` and the configured size for measured member judges, including members that grade several criteria.

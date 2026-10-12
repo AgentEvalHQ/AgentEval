@@ -335,7 +335,7 @@ public sealed class AtomicLlmEval : AtomicEval
                 PromptHash: PromptHash,
                 TokensUsed: tokensUsed,
                 EstimatedCost: estimatedCost,
-                CacheHit: false) { RubricDigest = "sha256:" + InstrumentHash },
+                CacheHit: false) { RubricDigest = "sha256:" + InstrumentHash, JudgeProvider = (_evaluator as AgentEval.Core.IJudgeProviderSource)?.ProviderName },
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 

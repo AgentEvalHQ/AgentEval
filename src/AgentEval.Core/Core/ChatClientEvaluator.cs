@@ -17,7 +17,7 @@ namespace AgentEval.Core;
 /// <see cref="IRubricBindable.WithRubric"/> (#203 review, B9): the judge then sends the rubric as its system prompt and
 /// reads the reply on the rubric's own scale.
 /// </remarks>
-public class ChatClientEvaluator : IEvaluator, IJudgePromptSource, IRubricBindable
+public class ChatClientEvaluator : IEvaluator, IJudgePromptSource, IRubricBindable, IJudgeProviderSource
 {
     /// <summary>The <see cref="IJudgePromptSource.SystemPromptId"/> reported when no system prompt was supplied.</summary>
     public const string DefaultSystemPromptId = "agenteval.judge.default-system.v1";
@@ -32,6 +32,9 @@ public class ChatClientEvaluator : IEvaluator, IJudgePromptSource, IRubricBindab
 
     /// <summary>Used as the id when a caller supplies a system prompt without naming it.</summary>
     public const string UnnamedCustomSystemPromptId = "custom-system-prompt";
+
+    /// <summary>The provider captured by the caller when constructing the client, or null when unknown.</summary>
+    public string? ProviderName { get; init; }
 
     private readonly IChatClient _chatClient;
     private readonly string _systemPrompt;
@@ -84,7 +87,7 @@ public class ChatClientEvaluator : IEvaluator, IJudgePromptSource, IRubricBindab
     {
         ArgumentNullException.ThrowIfNull(rubric);
         rubric.Validate();
-        return new ChatClientEvaluator(_chatClient, rubric, dimension);
+        return new ChatClientEvaluator(_chatClient, rubric, dimension) { ProviderName = ProviderName };
     }
 
     /// <inheritdoc/>
