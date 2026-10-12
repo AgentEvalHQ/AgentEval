@@ -63,10 +63,31 @@ and `AefWriteException` failures after writing remain errors; do not classify ar
 or `InvalidOperationException` instances as input refusals. The conformance driver maps recognized input
 refusals to exit 2 and unexpected failures to exit 1. The CLI's `aef seal` retains exit 1 for an unsealable run.
 
-### Local dataset runner configuration (implementation preview)
+### Local dataset runner
 
-The internal live dataset adapter is implemented; the `run --plan` command and runner manifest CLI are still
-being connected. Its plan extension is `ext."agenteval.run"`. The subject endpoint comes from `subject.endpoint`;
+`agenteval runner manifest --runner-id local-eval --json` prints the local runner's capabilities.
+The ID comes from `--runner-id`, then `AGENTEVAL_RUNNER_ID`, then `runnerId` in `~/.agenteval/runner.json`.
+There is no hostname fallback. That optional configuration file supports `runnerId` and a `tags` array only;
+the manifest derives platform/runtime/software versions and advertises provider `local` and target mode `live`.
+This runner uses process isolation and an endpoint that is already running. Signing identity is omitted until
+runner signing is configured and implemented.
+
+Run a plan with `agenteval run --plan ./plans/eval.json --runner-id local-eval --root . --json`.
+The root must exist; when omitted it is discovered from the current directory, falling back to that directory.
+The job writes `.agenteval/aef/jobs/<jobId>/` with exact `plan.json` bytes, `runner.json`, `events.ndjson`, and
+`runs/<runId>/`. Existing job directories are refused. `--json` prints a terminal report containing the job ID,
+terminal event, sealed run IDs and any failure reason/limit. Dry-run, progress and budget-override CLI options
+are still being connected.
+
+| Outcome | Exit code |
+|---|---|
+| Job sealed | 0 |
+| Unreadable plan or invalid CLI input/configuration | 2 |
+| Job refused, cancelled or otherwise failed | 3 |
+| Job failed at `maxUsd` | 8 |
+| Job stopped at `cases` or `timeout` | 11 |
+
+The plan extension is `ext."agenteval.run"`. The subject endpoint comes from `subject.endpoint`;
 `model` names an exact entry in AgentEval's model price table, defaulting to the decoded `model:` subject name.
 Unknown model aliases are refused rather than matched to a similar model's price.
 

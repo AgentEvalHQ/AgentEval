@@ -27,7 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   reserved cost; reported token overruns stop further calls. The live dataset target resolves relative snapshots,
   binds exact known prices, budgets readiness separately, and records subject/judge usage including interrupted
   calls. Unresolvable targets are refused before acceptance. Provider failures retain actual spend and identify
-  a crossed cost limit. CLI manifest and run-command wiring remain in progress.
+  a crossed cost limit. `runner manifest` exposes schema-checked local capabilities with an explicit runner ID;
+  `run --plan` saves exact plan bytes and the manifest beside job events and runs in the workspace, with
+  documented terminal exit codes. Dry-run, progress and budget-override CLI options remain in progress.
   Dataset snapshots can now be parsed from the exact supplied UTF-8 bytes with explicit, unique IDs, without
   reopening a file or generating replacement IDs. The native eval mapper is reusable without writing a run,
   preserving criteria, assertions, named metrics, typed absences and content privacy.

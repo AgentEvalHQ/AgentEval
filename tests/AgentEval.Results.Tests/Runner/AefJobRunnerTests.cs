@@ -30,6 +30,24 @@ public sealed class AefJobRunnerTests : IDisposable
     }
 
     [Fact]
+    public async Task RunWorkspaceAsync_ExistingJob_RefusesWithoutChangingEvidence()
+    {
+        var plan = Plan();
+        var manifest = Manifest();
+        var target = new Target(new Case(_ => ValueTask.FromResult(Passed())));
+        var options = new AefJobOptions { At = Start, Clock = new AefSimulatedJobClock(Start) };
+        var result = await AefJobRunner.RunWorkspaceAsync(plan, manifest, target, _output, options);
+        var folder = Path.Combine(_output, result.JobId);
+        Assert.Equal(plan, File.ReadAllBytes(Path.Combine(folder, "plan.json")));
+        var before = Directory.GetFiles(folder, "*", SearchOption.AllDirectories).ToDictionary(p => p, File.ReadAllBytes);
+        await Assert.ThrowsAsync<AefInputException>(() => AefJobRunner.RunWorkspaceAsync(plan, manifest,
+            new Target(new Case(_ => ValueTask.FromResult(Passed()))), _output,
+            new AefJobOptions { At = Start, Clock = new AefSimulatedJobClock(Start) }));
+        foreach (var (path, bytes) in before) Assert.Equal(bytes, File.ReadAllBytes(path));
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(Path.Combine(folder, "runs", Assert.Single(result.Runs))).Outcome);
+    }
+
+    [Fact]
     public async Task RunAsync_ProgressFailsAfterSealing_StillAnnouncesSealedRunAndCleansUp()
     {
         using var progress = new FailOnEvidenceProgress();

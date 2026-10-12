@@ -38,6 +38,28 @@ public static class AefJobRunner
     public static AefJobAnalysis Analyze(byte[] plan, JsonObject runner, IAefJobTarget target, AefJobOptions options) =>
         CreateJob(plan, runner, target, options).Analyze();
 
+    /// <summary>
+    /// Executes a job in a new child of <paramref name="jobsDirectory"/> named by the engine's job ID.
+    /// Saves the exact plan bytes and the runner manifest beside its events and runs. Existing job directories
+    /// are refused, including empty ones, so prior evidence is never overwritten.
+    /// </summary>
+    public static async Task<AefJobResult> RunWorkspaceAsync(byte[] plan, JsonObject runner, IAefJobTarget target,
+        string jobsDirectory, AefJobOptions options, CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(jobsDirectory);
+        var job = CreateJob(plan, runner, target, options);
+        var output = Path.Combine(jobsDirectory, job.JobId);
+        if (Directory.Exists(output) || File.Exists(output))
+            throw new AefInputException("The job directory already exists; previous evidence cannot be overwritten.");
+        Directory.CreateDirectory(output);
+        // CreateNew also guards against concurrent writers racing the existence check.
+        using (var file = new FileStream(Path.Combine(output, "plan.json"), FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            file.Write(plan);
+        using (var file = new FileStream(Path.Combine(output, "runner.json"), FileMode.CreateNew, FileAccess.Write, FileShare.None))
+            file.Write(AefJsonWriter.Compact(runner));
+        return await job.RunAsync(output, cancellationToken).ConfigureAwait(false);
+    }
+
     private static Job CreateJob(byte[] plan, JsonObject runner, IAefJobTarget target, AefJobOptions options)
     {
         ArgumentNullException.ThrowIfNull(plan);
@@ -130,6 +152,8 @@ public static class AefJobRunner
         private long _done;
         private EventWriter? _events;
         private AefJobCredentials? _credentials;
+
+        public string JobId => _jobId;
 
         public Job(JsonObject plan, byte[] bytes, JsonObject runner, IAefJobTarget target, AefJobOptions options)
         {

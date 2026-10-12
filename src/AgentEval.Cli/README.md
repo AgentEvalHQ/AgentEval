@@ -51,6 +51,19 @@ agenteval eval --endpoint https://api.openai.com/v1 --model gpt-4o --dataset age
 agenteval eval --endpoint http://localhost:11434/v1 --model llama3 --dataset agenteval.yaml
 ```
 
+### Run a bounded AEF plan
+
+```bash
+agenteval runner manifest --runner-id local-eval --json
+agenteval run --plan ./plans/eval.json --runner-id local-eval --root . --json
+```
+
+The local runner supports text-only dataset plans against existing OpenAI-compatible or Azure endpoints.
+It requires exact known model prices, explicit dataset case IDs and purpose-scoped credential references.
+Jobs save their plan, manifest, events and sealed runs under `.agenteval/aef/jobs/<jobId>/`.
+See [AEF runner configuration](https://github.com/AgentEvalHQ/AgentEval/blob/main/docs/aef.md#local-dataset-runner)
+for plan settings and exit codes.
+
 ### Stochastic evaluation (multi-run)
 
 ```bash

@@ -1041,6 +1041,8 @@ rootCmd.Add(SkillsScanCommand.Create());
 rootCmd.Add(LogFileCommand.Create());
 rootCmd.Add(AssertAiCommand.Create());             // assert-ai — serve/import/export/calibrate with Microsoft's ASSERT (assert-ai 0.3)
 rootCmd.Add(AefCommand.Create());                  // aef — verify/seal/view/checkpoint AEF 1.0 runs; export store v1, import ASSERT
+rootCmd.Add(AgentEval.Cli.Runner.RunnerManifest.Create());
+rootCmd.Add(AgentEval.Cli.Runner.RunCommand.Create());
 
 var parseResult = rootCmd.Parse(args);
 
