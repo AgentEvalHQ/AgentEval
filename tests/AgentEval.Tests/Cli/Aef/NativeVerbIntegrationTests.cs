@@ -90,6 +90,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
     [InlineData("gdpr")]
     [InlineData("eu-ai-act")]
     [InlineData("agentic")]
+    [InlineData("perf")]
     public async Task BenchMock_ExplicitEvidenceIsMockedAndDefaultStoresNothing(string family)
     {
         var workspace = Path.Combine(_root, ".agenteval");
@@ -105,6 +106,8 @@ public sealed class NativeVerbIntegrationTests : IDisposable
             "gdpr" => (await BenchCommand.RunGdprAsync("standard", "mock-subject", _root, "test input", null,
                 mock: true, aef: aef, noAef: noAef, ct: ct), null),
             "eu-ai-act" => (await BenchEuAiActCommand.RunAsync("standard", "mock-subject", _root, "test input", null,
+                mock: true, aef: aef, noAef: noAef, ct: ct), null),
+            "perf" => (await BenchPerfCommand.RunAsync("latency", "mock-subject", "test input", _root, null,
                 mock: true, aef: aef, noAef: noAef, ct: ct), null),
             _ => (await BenchAgenticCommand.RunAsync("agentic-execution", "mock-subject", _root, "test input", null, null,
                 mock: true, aef: aef, noAef: noAef, ct: ct), null),
@@ -143,6 +146,100 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         var blocked = Path.Combine(_root, "blocked");
         File.WriteAllText(blocked, "not a directory");
         Assert.Equal(3, (await Run(new DirectoryInfo(blocked))).ExitCode);
+    }
+
+    [Fact]
+    public async Task AutoauditMock_ExplicitEvidence_RecordsEachScriptedSubjectWithoutLegacyStorage()
+    {
+        Assert.Equal(11, await BenchAutoAuditCommand.RunAsync(null, mock: true));
+        Assert.Empty(Directory.GetFileSystemEntries(_root));
+        var disabled = new DirectoryInfo(Path.Combine(_root, "disabled"));
+        Assert.Equal(11, await BenchAutoAuditCommand.RunAsync(null, mock: true, aef: disabled, noAef: true));
+        Assert.False(disabled.Exists);
+        var destination = new DirectoryInfo(Path.Combine(_root, "aef"));
+        Assert.Equal(11, await BenchAutoAuditCommand.RunAsync(null, mock: true, aef: destination));
+        var headers = Directory.GetFiles(destination.FullName, "run.json", SearchOption.AllDirectories);
+        Assert.Equal(3, headers.Length);
+        foreach (var file in headers)
+        {
+            var run = Path.GetDirectoryName(file)!;
+            AssertIntact(run);
+            Assert.Equal("mocked", (string?)Document(run, "run.json")["execution"]!["targetMode"]);
+            var gate = JsonNode.Parse(Assert.Single(File.ReadAllLines(Path.Combine(run, "gates.ndjson"))))!;
+            Assert.Equal("inconclusive", (string?)gate["outcome"]);
+            Assert.Equal(11, (int)gate["exitCode"]!);
+        }
+        var blocked = Path.Combine(_root, "blocked");
+        File.WriteAllText(blocked, "file");
+        Assert.Equal(3, await BenchAutoAuditCommand.RunAsync(null, mock: true, aef: new DirectoryInfo(blocked)));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task AutoauditMock_CancelBeforeExecutionOrAfterReport_RetainsOnlyObservedResults(bool afterReport)
+    {
+        using var cancel = new CancellationTokenSource();
+        if (!afterReport) cancel.Cancel();
+        var original = Console.Out;
+        using var output = new CancelOnPersistenceWriter(cancel, "> **MOCK:");
+        Console.SetOut(output);
+        var destination = new DirectoryInfo(Path.Combine(_root, "cancelled"));
+        try
+        {
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+                BenchAutoAuditCommand.RunAsync(null, mock: true, ct: cancel.Token, aef: destination));
+        }
+        finally { Console.SetOut(original); }
+        var headers = Directory.GetFiles(destination.FullName, "run.json", SearchOption.AllDirectories);
+        Assert.Equal(afterReport ? 3 : 1, headers.Length);
+        foreach (var file in headers)
+        {
+            var run = Path.GetDirectoryName(file)!;
+            AssertIntact(run);
+            Assert.Equal("aborted", (string?)Document(run, "run.json")["status"]);
+            Assert.False(File.Exists(Path.Combine(run, "gates.ndjson")));
+            var lines = File.Exists(Path.Combine(run, "results.ndjson")) ? File.ReadAllLines(Path.Combine(run, "results.ndjson")) : [];
+            Assert.Equal(afterReport, lines.Length > 0);
+        }
+    }
+
+    [Fact]
+    public async Task AutoauditProgress_CancelAfterFirstEndpoint_RetainsCompletedEndpoint()
+    {
+        using var cancel = new CancellationTokenSource();
+        var completed = new List<AgentEval.Benchmarks.AutoAuditEndpointResult>();
+        var started = new List<string>();
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            AgentEval.Benchmarks.AutoAuditDemo.BuildOfflineReportWithProgressAsync(started.Add,
+                result => { completed.Add(result); cancel.Cancel(); }, cancel.Token));
+        Assert.Equal(AgentEval.Benchmarks.AutoAuditDemo.CleanEndpoint, Assert.Single(completed).Endpoint);
+        Assert.Equal(2, started.Count);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task AutoauditMock_CancelBetweenEndpoints_PreservesCompletedSubjectsAndEmptyInterruptedRun(int completedCount)
+    {
+        using var cancel = new CancellationTokenSource();
+        var destination = new DirectoryInfo(Path.Combine(_root, "partial-autoaudit"));
+        var observed = 0;
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => BenchAutoAuditCommand.RunMockAsync(
+            null, destination, false, cancel.Token, _ => { if (++observed == completedCount) cancel.Cancel(); }));
+        var headers = Directory.GetFiles(destination.FullName, "run.json", SearchOption.AllDirectories);
+        Assert.Equal(completedCount + 1, headers.Length);
+        var measured = 0;
+        foreach (var file in headers)
+        {
+            var run = Path.GetDirectoryName(file)!;
+            AssertIntact(run);
+            Assert.Equal("aborted", (string?)Document(run, "run.json")["status"]);
+            Assert.False(File.Exists(Path.Combine(run, "gates.ndjson")));
+            if (File.Exists(Path.Combine(run, "results.ndjson")) && File.ReadAllLines(Path.Combine(run, "results.ndjson")).Length > 0)
+                measured++;
+        }
+        Assert.Equal(completedCount, measured);
     }
 
     [Theory]

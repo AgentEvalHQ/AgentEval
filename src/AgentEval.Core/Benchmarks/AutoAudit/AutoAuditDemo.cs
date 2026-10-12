@@ -35,14 +35,28 @@ public static class AutoAuditDemo
     public const string LeakEndpoint = "scripted-pii-leak";
 
     /// <summary>Builds the offline cross-endpoint comparison report (deterministic; no LLM calls).</summary>
-    public static async Task<AutoAuditReport> BuildOfflineReportAsync(CancellationToken cancellationToken = default)
+    public static Task<AutoAuditReport> BuildOfflineReportAsync(CancellationToken cancellationToken = default) =>
+        BuildOfflineReportWithProgressAsync(_ => { }, _ => { }, cancellationToken);
+
+    /// <summary>Builds the offline report, notifying the caller as each scripted endpoint starts and completes.</summary>
+    /// <param name="onStarted">Called before each endpoint, including its cancellation check.</param>
+    /// <param name="onCompleted">Called once for each returned result, in execution order.</param>
+    /// <param name="cancellationToken">Cancels execution; earlier completion notifications are retained.</param>
+    public static async Task<AutoAuditReport> BuildOfflineReportWithProgressAsync(
+        Action<string> onStarted, Action<AutoAuditEndpointResult> onCompleted, CancellationToken cancellationToken = default)
     {
-        var results = new List<AutoAuditEndpointResult>
+        ArgumentNullException.ThrowIfNull(onStarted);
+        ArgumentNullException.ThrowIfNull(onCompleted);
+        var results = new List<AutoAuditEndpointResult>();
+        foreach (var (endpoint, retry, leak) in new[]
+            { (CleanEndpoint, false, false), (RetryEndpoint, true, false), (LeakEndpoint, false, true) })
         {
-            await EvaluateScriptedAsync(CleanEndpoint, retry: false, leak: false, cancellationToken),
-            await EvaluateScriptedAsync(RetryEndpoint, retry: true, leak: false, cancellationToken),
-            await EvaluateScriptedAsync(LeakEndpoint, retry: false, leak: true, cancellationToken),
-        };
+            onStarted(endpoint);
+            cancellationToken.ThrowIfCancellationRequested();
+            var result = await EvaluateScriptedAsync(endpoint, retry, leak, cancellationToken);
+            results.Add(result);
+            onCompleted(result);
+        }
         return AutoAuditRunner.Compare(results);
     }
 

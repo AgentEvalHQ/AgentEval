@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Perf and autoaudit mock AEF:** explicit output retains perf results and one autoaudit run per scripted
+  subject, with exit 11/inconclusive gates. Autoaudit progress callbacks preserve completed endpoint results
+  on interruption; an interrupted endpoint with no returned result has empty aborted evidence. Defaults
+  and `--no-aef` continue to write no AEF.
+
 - **Explicit composite mock evidence:** GDPR, EU AI Act and agentic benchmarks now honor explicit `--aef` for
   mock runs, preserving exit 11 and completed children after interruption. Built-in placeholder judgments use
   CODE provenance; supplied evaluators keep their own provenance. Default mock runs still write nothing.

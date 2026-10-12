@@ -118,7 +118,7 @@ public static class BenchPerfCommand
         }
         else
         {
-            MockTarget.PrintBanner($"bench perf {preset}", "a stand-in that echoes the prompt after 50 ms");
+            MockTarget.PrintBanner($"bench perf {preset}", "a stand-in that echoes the prompt after 50 ms", aefRequested: aef is not null && !noAef);
             agent = new MockTarget.EchoingAgent(subject);
         }
 
@@ -145,19 +145,26 @@ public static class BenchPerfCommand
         // ── Run via the registry's EvaluateAsync adapter ─────────────────────
         if (agent is MockTarget.EchoingAgent)
         {
-            EvalResult mockResult;
+            var mockStarted = DateTimeOffset.UtcNow;
+            EvalResult? mockResult = null;
+            bool WriteMock(string? reason = null) => aef is not null && !noAef && BenchAef.WriteResult(
+                aef, agentEvalDir, "perf", preset, subject, subjectVersion, AgentEval.Results.Writing.AefTargetMode.Mocked,
+                mockResult ?? MockTarget.UnmeasuredResult($"perf.{preset}"), mockStarted, DateTimeOffset.UtcNow,
+                exitCode: reason is null ? ExitCodes.GateIndeterminate : null, abortReason: reason, emptyResults: mockResult is null);
             try
             {
                 mockResult = await family.EvaluateAsync!(input, null, ct);
+                ct.ThrowIfCancellationRequested();
             }
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Performance benchmark failed: {ex.Message}");
-                return 1;
+                return WriteMock(ct.IsCancellationRequested ? "cancelled" : "execution-error") ? ExitCodes.RuntimeError : 1;
             }
 
+            if (WriteMock()) return ExitCodes.RuntimeError;
             return MockTarget.Finish($"bench perf {preset}",
-                $"{mockResult.Score.Label.ToUpperInvariant()} (score {mockResult.Score.Value:F3}) for the echo stand-in");
+                $"{mockResult.Score.Label.ToUpperInvariant()} (score {mockResult.Score.Value:F3}) for the echo stand-in", aefWritten: aef is not null && !noAef);
         }
 
         var store = new FileSystemOutputStore(agentEvalDir);

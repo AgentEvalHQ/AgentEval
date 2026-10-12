@@ -157,6 +157,11 @@ internal static class MockTarget
         Details = result.Details with { SubResults = result.Details.SubResults?.Select(CodeJudged).ToArray() },
     };
 
+    /// <summary>Describes an interrupted invocation with no returned result; never treated as a measurement.</summary>
+    internal static EvalResult UnmeasuredResult(string key) => new(new(key, key, "mock", "1"),
+        new EvalScore(0, null, "error", false, null, "none", null) { Measurement = MeasurementState.NotMeasured },
+        new(null, null, null, null, null), new("atomic-code", null, null, null, null, 0, false), DateTimeOffset.UtcNow);
+
     /// <summary>The mock run's judge: a fixed placeholder verdict, labelled as such in every criterion.</summary>
     internal sealed class Judge : IEvaluator
     {

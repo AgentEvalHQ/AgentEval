@@ -52,11 +52,7 @@ public static class BenchAutoAuditCommand
             if (models is { Count: > 0 })
                 return MockTarget.RefuseMockWithRealTarget();
 
-            MockTarget.PrintBanner(Command, "three scripted endpoints (clean, silent retry, PII leak)");
-            var demo = await AutoAuditDemo.BuildOfflineReportAsync(ct);
-            await PrintAndWriteAsync(
-                "> **MOCK:** three scripted endpoints, not models. Nothing here measures a model.", demo, outPath, ct);
-            return MockTarget.Finish(Command, $"the scripted showcase ranked {demo.Winner?.Endpoint ?? "nothing"} first");
+            return await RunMockAsync(outPath, aef, noAef, ct);
         }
 
         if (models is { Count: 0 })
@@ -160,6 +156,54 @@ public static class BenchAutoAuditCommand
             return ExitCodes.RuntimeError;
         }
         return ExitCodes.Success;
+    }
+
+    internal static async Task<int> RunMockAsync(string? outPath, DirectoryInfo? aef, bool noAef, CancellationToken ct,
+        Action<AutoAuditEndpointResult>? onCompleted = null)
+    {
+        MockTarget.PrintBanner(Command, "three scripted endpoints (clean, silent retry, PII leak)",
+            aefRequested: aef is not null && !noAef);
+        var completed = new List<(AutoAuditEndpointResult Result, DateTimeOffset Start, DateTimeOffset End)>();
+        string? active = null;
+        var started = DateTimeOffset.UtcNow;
+        bool Write(string? reason = null)
+        {
+            if (aef is null || noAef) return false;
+            foreach (var entry in completed)
+            {
+                var (tree, ext) = BenchAef.AutoAuditTree(entry.Result);
+                if (BenchAef.WriteResult(aef, aef.FullName, "autoaudit", "support-task", entry.Result.Endpoint, null,
+                    AgentEval.Results.Writing.AefTargetMode.Mocked, tree, entry.Start, entry.End, subjectKind: "model",
+                    caseExt: ext, exitCode: reason is null ? ExitCodes.GateIndeterminate : null, abortReason: reason))
+                    return true;
+            }
+            return active is not null && BenchAef.WriteResult(aef, aef.FullName, "autoaudit", "support-task", active, null,
+                AgentEval.Results.Writing.AefTargetMode.Mocked, MockTarget.UnmeasuredResult("autoaudit"), started,
+                DateTimeOffset.UtcNow, subjectKind: "model", abortReason: reason, emptyResults: true);
+        }
+        AutoAuditReport demo;
+        try
+        {
+            demo = await AutoAuditDemo.BuildOfflineReportWithProgressAsync(
+                endpoint => { active = endpoint; started = DateTimeOffset.UtcNow; },
+                result => { completed.Add((result, started, DateTimeOffset.UtcNow)); active = null; onCompleted?.Invoke(result); }, ct);
+            await PrintAndWriteAsync(
+                "> **MOCK:** three scripted endpoints, not models. Nothing here measures a model.", demo, outPath, ct);
+            ct.ThrowIfCancellationRequested();
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            if (Write("cancelled")) return ExitCodes.RuntimeError;
+            throw;
+        }
+        catch
+        {
+            if (Write("execution-error")) return ExitCodes.RuntimeError;
+            throw;
+        }
+        if (Write()) return ExitCodes.RuntimeError;
+        return MockTarget.Finish(Command, $"the scripted showcase ranked {demo.Winner?.Endpoint ?? "nothing"} first",
+            aefWritten: aef is not null && !noAef);
     }
 
     private static async Task PrintAndWriteAsync(string header, AutoAuditReport report, string? outPath, CancellationToken ct)
