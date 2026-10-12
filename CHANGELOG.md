@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Memory benchmark interruption evidence:** completed categories now travel with progress updates, allowing
+  the CLI to retain them in an aborted AEF run on cancellation. Completed results also survive persistence
+  interruption; absent results are not fabricated and aborted runs have no gate.
+
 - **Trace-fidelity interruption evidence:** both trace and workflow reconciliation retain their observed result
   as aborted, replayed AEF evidence when persistence or reporting is interrupted; aborted invocations omit gates.
 

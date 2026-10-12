@@ -42,7 +42,8 @@ public static class BenchMemoryCommand
         CancellationToken ct = default,
         DirectoryInfo? aef = null,
         bool noAef = false,
-        string? subjectVersion = null)
+        string? subjectVersion = null,
+        Action<BenchmarkCategoryResult>? onCategoryCompleted = null)
     {
         // ── Workspace setup ──────────────────────────────────────────────────
         if (rootOverride is not null)
@@ -122,16 +123,42 @@ public static class BenchMemoryCommand
 
         // ── Run ──────────────────────────────────────────────────────────────
         var runner = MemoryBenchmarkRunner.Create(chatClient);
-        MemoryBenchmarkResult result;
+        MemoryBenchmarkResult? result = null;
+        var completed = new List<BenchmarkCategoryResult>();
         var startedAt = DateTimeOffset.UtcNow;
+        string Verdict(MemoryBenchmarkResult value) => !value.IsComplete ? "INCOMPLETE"
+            : value.OverallScore >= 70 ? "PASS" : value.OverallScore >= 50 ? "WARN" : "FAIL";
+        bool WriteEvidence(string? reason = null)
+        {
+            if (noAef) return false;
+            var mode = chatClientOverride is null ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked;
+            var observed = result ?? (completed.Count == 0 ? null : new MemoryBenchmarkResult
+            {
+                BenchmarkName = benchmark.Name, CategoryResults = completed.ToArray(), Duration = DateTimeOffset.UtcNow - startedAt,
+            });
+            if (observed is null)
+                return BenchAef.WriteResult(aef, agentEvalDir, "memory", preset, subject, subjectVersion, mode,
+                    MockTarget.UnmeasuredResult("memory"), startedAt, DateTimeOffset.UtcNow, abortReason: reason, emptyResults: true);
+            var verdict = result is null ? "INCOMPLETE" : Verdict(observed);
+            var (tree, shape) = BenchAef.MemoryTree(observed, preset, verdict, model);
+            return BenchAef.WriteTree(aef, agentEvalDir, "memory", preset, subject, subjectVersion, mode, shape, tree,
+                startedAt, DateTimeOffset.UtcNow,
+                exitCode: reason is null ? (verdict == "INCOMPLETE" ? ExitCodes.GateIndeterminate : BenchExitCodes.FromLabel(verdict)) : null,
+                abortReason: reason);
+        }
         try
         {
-            result = await runner.RunBenchmarkAsync(agent, benchmark, ct);
+            result = await runner.RunBenchmarkAsync(agent, benchmark, new CategoryProgress(category =>
+            {
+                completed.Add(category);
+                onCategoryCompleted?.Invoke(category);
+            }), ct);
+            ct.ThrowIfCancellationRequested();
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Memory benchmark failed: {ex.GetType().Name}: {ex.Message}");
-            return 1;
+            return WriteEvidence(ct.IsCancellationRequested ? "cancelled" : "execution-error") ? ExitCodes.RuntimeError : 1;
         }
 
         // ── Persist via output store ─────────────────────────────────────────
@@ -156,8 +183,7 @@ public static class BenchMemoryCommand
             // An incomplete run (a category that crashed or measured nothing, or questions the judge produced no score
             // for) is neither a pass nor a fail. The stored verdict is WARN, the schema's indeterminate value (as for
             // bench typedmemeval); the console says INCOMPLETE and the exit code is GateIndeterminate (11).
-            var verdict = !result.IsComplete ? "INCOMPLETE"
-                : result.OverallScore >= 70 ? "PASS" : result.OverallScore >= 50 ? "WARN" : "FAIL";
+            var verdict = Verdict(result);
             var summary = new RunSummary(
                 SchemaVersion: "1.0",
                 RunId: runId,
@@ -250,22 +276,24 @@ public static class BenchMemoryCommand
             // run in the 50–69 band silently passed CI while the identical band failed CI for every
             // other benchmark family (BUG-23). An INCOMPLETE run exits GateIndeterminate (11).
             // AEF: a case per category. The environment's provider is live; a client passed in (tests) is a stand-in.
-            if (!noAef)
-            {
-                var (tree, shape) = BenchAef.MemoryTree(result, preset, verdict, model);
-                if (BenchAef.WriteTree(aef, agentEvalDir, "memory", preset, subject, subjectVersion,
-                        chatClientOverride is null ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                        shape, tree, startedAt, DateTimeOffset.UtcNow,
-                        exitCode: verdict == "INCOMPLETE" ? ExitCodes.GateIndeterminate : BenchExitCodes.FromLabel(verdict)))
-                    return ExitCodes.RuntimeError;   // an explicit --aef could not be written
-            }
+            ct.ThrowIfCancellationRequested();
+            if (WriteEvidence()) return ExitCodes.RuntimeError;
 
             return verdict == "INCOMPLETE" ? ExitCodes.GateIndeterminate : BenchExitCodes.FromLabel(verdict);
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Failed to persist memory benchmark run: {ex.Message}");
-            return 1;
+            return WriteEvidence(ct.IsCancellationRequested ? "cancelled" : "execution-error") ? ExitCodes.RuntimeError : 1;
         }
     }
+    // IProgress must run inline: Progress<T> may post callbacks after cancellation has unwound the runner.
+    private sealed class CategoryProgress(Action<BenchmarkCategoryResult> onCompleted) : IProgress<BenchmarkProgress>
+    {
+        public void Report(BenchmarkProgress value)
+        {
+            if (value.Result is { } category) onCompleted(category);
+        }
+    }
+
 }

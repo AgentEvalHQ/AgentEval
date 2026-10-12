@@ -903,6 +903,64 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
     }
 
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(false, false, true)]
+    public async Task Memory_CancelAfterCategory_RetainsObservedCategory(bool afterReport, bool noAef, bool invalidOutput)
+    {
+        Directory.CreateDirectory(Path.Combine(_root, ".agenteval"));
+        File.WriteAllText(Path.Combine(_root, ".agenteval", "solution.json"),
+            new JsonObject { ["schemaVersion"] = "1.0", ["id"] = Guid.NewGuid().ToString(), ["name"] = "memory-cancel" }.ToJsonString());
+        using var cancel = new CancellationTokenSource();
+        using var client = new MemoryReplyClient();
+        var aef = new DirectoryInfo(Path.Combine(_root, "memory-aef"));
+        if (invalidOutput) File.WriteAllText(aef.FullName, "not a directory");
+        var completed = 0;
+        var original = Console.Out;
+        using var output = new CancelOnPersistenceWriter(cancel, "   Native:");
+        try
+        {
+            if (afterReport) Console.SetOut(output);
+            var exit = await BenchMemoryCommand.RunAsync("quick", "memory-subject", _root, client, cancel.Token,
+                aef, noAef, onCategoryCompleted: category =>
+                {
+                    completed++;
+                    if (!afterReport) cancel.Cancel();
+                });
+            Assert.Equal(invalidOutput ? 3 : 1, exit);
+        }
+        finally { Console.SetOut(original); }
+        Assert.True(cancel.IsCancellationRequested);
+        Assert.True(completed > 0);
+        if (!afterReport) Assert.Equal(1, completed);
+        if (noAef || invalidOutput)
+        {
+            Assert.Empty(Directory.GetFiles(_root, "seal.json", SearchOption.AllDirectories));
+            return;
+        }
+        var dir = RunDirectory(aef.FullName);
+        AssertIntact(dir);
+        Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
+        Assert.Equal("mocked", (string?)Document(dir, "run.json")["execution"]!["targetMode"]);
+        Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
+        var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!).ToList();
+        Assert.Equal(completed, lines.Count(l => ((string?)l["path"])?.StartsWith("case/", StringComparison.Ordinal) == true));
+    }
+
+    private sealed class MemoryReplyClient : Microsoft.Extensions.AI.IChatClient
+    {
+        public Task<Microsoft.Extensions.AI.ChatResponse> GetResponseAsync(IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages,
+            Microsoft.Extensions.AI.ChatOptions? options = null, CancellationToken cancellationToken = default) =>
+            Task.FromResult(new Microsoft.Extensions.AI.ChatResponse(new Microsoft.Extensions.AI.ChatMessage(
+                Microsoft.Extensions.AI.ChatRole.Assistant, "{\"found_facts\":[],\"missing_facts\":[],\"forbidden_found\":[],\"score\":80,\"explanation\":\"I remember that.\"}")));
+        public IAsyncEnumerable<Microsoft.Extensions.AI.ChatResponseUpdate> GetStreamingResponseAsync(IEnumerable<Microsoft.Extensions.AI.ChatMessage> messages,
+            Microsoft.Extensions.AI.ChatOptions? options = null, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+        public object? GetService(Type serviceType, object? serviceKey = null) => null;
+        public void Dispose() { }
+    }
+
     private sealed class FailOnPerfPersistenceWriter : StringWriter
     {
         public override void WriteLine(string? value)

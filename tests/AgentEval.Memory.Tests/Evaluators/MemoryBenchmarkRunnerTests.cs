@@ -46,6 +46,27 @@ public class MemoryBenchmarkRunnerTests
     }
 
     [Fact]
+    public async Task RunBenchmarkAsync_CancelAfterCategory_ReportsCompletedResultBeforeThrowing()
+    {
+        using var cancellation = new CancellationTokenSource();
+        BenchmarkProgress? observed = null;
+        var progress = new InlineProgress(value => { observed = value; cancellation.Cancel(); });
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            _runner.RunBenchmarkAsync(_agent, MemoryBenchmark.Quick, progress, cancellation.Token));
+        Assert.NotNull(observed);
+        Assert.Equal(1, observed.CompletedCategories);
+        Assert.Equal(3, observed.TotalCategories);
+        Assert.NotNull(observed.Result);
+        Assert.Equal(observed.CategoryName, observed.Result.CategoryName);
+        Assert.Equal(observed.Score, observed.Result.Score);
+    }
+
+    private sealed class InlineProgress(Action<BenchmarkProgress> report) : IProgress<BenchmarkProgress>
+    {
+        public void Report(BenchmarkProgress value) => report(value);
+    }
+
+    [Fact]
     public async Task RunBenchmarkAsync_StandardPreset_Returns8Categories()
     {
         var result = await _runner.RunBenchmarkAsync(_agent, MemoryBenchmark.Standard);
