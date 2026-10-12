@@ -795,6 +795,65 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
     }
 
+    [Theory]
+    [InlineData("factory", false, false)]
+    [InlineData("cancel", false, false)]
+    [InlineData("report", false, false)]
+    [InlineData("cancel", true, false)]
+    [InlineData("cancel", false, true)]
+    public async Task AutoAudit_Interrupted_RetainsCompletedModels(string interruption, bool noAef, bool invalidOutput)
+    {
+        Directory.CreateDirectory(_root);
+        using var cancel = new CancellationTokenSource();
+        var aef = new DirectoryInfo(Path.Combine(_root, "audit-aef"));
+        if (invalidOutput) File.WriteAllText(aef.FullName, "not a directory");
+        using var first = new AgentEval.Testing.ScriptedChatClient()
+            .AddToolCall("c1", "Lookup", new Dictionary<string, object?> { ["customerId"] = "4471" })
+            .AddText("Customer 4471 is active with a balance of $120.40 and one open billing ticket.", inTok: 120, outTok: 30);
+        var reportPath = Path.Combine(_root, "report-directory");
+        Directory.CreateDirectory(reportPath);
+        Task<int> Invoke() => BenchAutoAuditCommand.RunAsync(
+            outPath: interruption == "report" ? reportPath : null,
+            models: interruption == "report" ? ["first"] : ["first", "second", "unstarted"],
+            clientOverride: model =>
+            {
+                if (model == "first") return first;
+                if (interruption == "cancel")
+                {
+                    cancel.Cancel();
+                    throw new OperationCanceledException(cancel.Token);
+                }
+                throw new InvalidOperationException("test factory failure");
+            }, aef: aef, noAef: noAef, ct: cancel.Token);
+        if (invalidOutput) Assert.Equal(3, await Invoke());
+        else if (interruption == "cancel") await Assert.ThrowsAnyAsync<OperationCanceledException>(Invoke);
+        else if (interruption == "factory") await Assert.ThrowsAsync<InvalidOperationException>(Invoke);
+        else
+        {
+            var error = await Assert.ThrowsAnyAsync<Exception>(Invoke);
+            Assert.True(error is IOException or UnauthorizedAccessException, error.ToString());
+        }
+
+        if (noAef || invalidOutput)
+        {
+            Assert.Empty(Directory.GetFiles(_root, "seal.json", SearchOption.AllDirectories));
+            return;
+        }
+        var runs = Directory.GetFiles(aef.FullName, "run.json", SearchOption.AllDirectories);
+        Assert.Equal(interruption == "report" ? 1 : 2, runs.Length);
+        var populated = 0;
+        foreach (var header in runs)
+        {
+            var dir = Path.GetDirectoryName(header)!;
+            AssertIntact(dir);
+            Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
+            Assert.Equal("mocked", (string?)Document(dir, "run.json")["execution"]!["targetMode"]);
+            Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
+            if (File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Length > 0) populated++;
+        }
+        Assert.Equal(1, populated);
+    }
+
     private sealed class FailOnPerfPersistenceWriter : StringWriter
     {
         public override void WriteLine(string? value)

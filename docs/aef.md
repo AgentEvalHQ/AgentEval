@@ -287,6 +287,9 @@ during subsequent persistence or report generation. `--no-aef` still suppresses 
 Live perf benchmarks retain a returned result when persistence fails or reporting is cancelled. Evaluation failures
 before a result is returned produce an empty aborted run. Neither path adds a gate; an explicit AEF write failure
 returns exit 3, while a default-output failure remains a warning alongside the original failure exit.
+Live autoaudit retains each returned model result if a later model or report is interrupted. An active model
+without a returned result gets an empty aborted run; later unstarted models get no run. These aborted runs have
+no gate. The command rethrows the original cancellation or exception unless explicit evidence output fails (exit 3).
 GDPR, EU AI Act, and agentic benchmarks preserve completed nested evaluations on cancellation too. Unfinished
 nodes carry typed absences, and the aborted run has no command gate. Repeated GDPR/EU AI Act runs retain their
 started trial trees and original requested trial count. If trial aggregation was interrupted, every observed path

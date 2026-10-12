@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Live autoaudit interruption evidence:** completed models remain available as aborted AEF runs when a later
+  model or report fails. An interrupted model without a returned result has empty evidence; unstarted models
+  are omitted. Cancellation and exception propagation are preserved unless explicit evidence output fails.
+
 - **Live perf interruption evidence:** evaluation and persistence failures now retain an aborted AEF run,
   including any returned benchmark result. Cancellation after persistence/reporting omits the gate;
   `--no-aef` and explicit-output failure exit behavior remain respected.
