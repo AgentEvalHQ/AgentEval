@@ -25,6 +25,43 @@ public class CliUsageMeterTests
         public void Dispose() { }
     }
 
+    private sealed class Harness(IChatClient client) : AgentEval.Core.IEvaluationHarness
+    {
+        public async Task<AgentEval.Models.TestResult> RunEvaluationAsync(AgentEval.Core.IEvaluableAgent agent,
+            AgentEval.Models.TestCase testCase, AgentEval.Core.EvaluationOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            await Task.Yield();
+            await client.GetResponseAsync("subject", cancellationToken: cancellationToken);
+            using (CliUsageMeter.Attribute(AefUsageRole.Judge))
+                await client.GetResponseAsync("judge", cancellationToken: cancellationToken);
+            return new() { TestName = testCase.Name!, Passed = true, Score = 100 };
+        }
+    }
+
+    [Fact]
+    public async Task UsageHarness_ConcurrentTrials_AssociatesOnlyOwnCallsAndRestoresParent()
+    {
+        using var meter = CliUsageMeter.Begin();
+        using var client = CliUsageMeter.Wrap(new Client(), "agent", "model");
+        using var parent = CliUsageMeter.Attribute(caseId: "parent");
+        var harness = new CliUsageEvaluationHarness(new Harness(client));
+        var results = await Task.WhenAll(Enumerable.Range(0, 5).Select(i => harness.RunEvaluationAsync(
+            null!, new AgentEval.Models.TestCase { Name = "same", Input = "same" })));
+        foreach (var result in results)
+        {
+            var usage = harness.TakeUsage(result)!;
+            Assert.Equal(2, usage.Count);
+            Assert.All(usage, u => Assert.Equal(10, u.InputTokens));
+            Assert.Single(usage, u => u.Role == AefUsageRole.Agent);
+            Assert.Single(usage, u => u.Role == AefUsageRole.Judge);
+            Assert.Null(harness.TakeUsage(result));
+        }
+        Assert.Null(meter.Snapshot("parent"));
+        await client.GetResponseAsync("after");
+        Assert.Equal(10, Assert.Single(meter.Snapshot("parent")!).InputTokens);
+    }
+
     [Fact]
     public async Task Attribute_ConcurrentReusedClient_IsolatesRolesAndCasesAndRestoresParent()
     {

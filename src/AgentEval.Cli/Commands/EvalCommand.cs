@@ -790,7 +790,8 @@ internal static class EvalCommand
         JudgeCallLedger? judgeLedger,
         CancellationToken ct)
     {
-        var runner = new StochasticRunner(harness, statisticsCalculator: null, evalOptions);
+        var usageHarness = new CliUsageEvaluationHarness(harness);
+        var runner = new StochasticRunner(usageHarness, statisticsCalculator: null, evalOptions);
         var stochasticOptions = ToStochasticOptions(opts);
 
         if (!opts.Quiet)
@@ -823,7 +824,8 @@ internal static class EvalCommand
                         if (trial.Error is OperationCanceledException && ct.IsCancellationRequested)
                             ct.ThrowIfCancellationRequested();
                         evidence.Add(trial, caseId, content: AefCliOptions.ContentCapture == AefContentCapture.On
-                            ? new AefNativeContent { Input = datasetTestCase.Input, Expected = datasetTestCase.ExpectedOutput } : null);
+                            ? new AefNativeContent { Input = datasetTestCase.Input, Expected = datasetTestCase.ExpectedOutput } : null,
+                            trialUsage: usageHarness.TakeUsage(trial));
                         stochasticOptions.OnProgress?.Invoke(progress);
                     },
                 }, ct);

@@ -429,6 +429,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
     [InlineData(3)]
     public async Task Eval_ExplicitJudge_RecordsProviderForSingleAndRepeatedRuns(int runs)
     {
+        using var meter = AgentEval.Cli.Infrastructure.CliUsageMeter.Begin();
         await using var agent = await LocalChatEndpoint.StartAsync("Hi");
         await using var judge = await LocalChatEndpoint.StartAsync("""{"overallScore":95,"criteriaResults":[{"criterion":"Greets","met":true}]}""");
         var options = Options(agent.Endpoint, runs: runs, judgeEndpoint: judge.Endpoint);
@@ -452,6 +453,19 @@ public sealed class NativeVerbIntegrationTests : IDisposable
             Assert.Null(l["annotator"]!["promptHash"]);
         });
         Assert.Equal(runs, judge.Requests.Count);
+        var usageLines = lines.Where(l => l["usage"] is not null).ToArray();
+        Assert.Equal(runs, usageLines.Length);
+        Assert.All(usageLines, line =>
+        {
+            if (runs > 1) Assert.NotNull(line["trial"]);
+            var usage = line["usage"]!.AsArray();
+            Assert.Equal(2, usage.Count);
+            Assert.All(usage, u => Assert.Equal(10, (long)u!["gen_ai.usage.input_tokens"]!));
+            Assert.Single(usage, u => (string?)u!["role"] == "agent");
+            Assert.Single(usage, u => (string?)u!["role"] == "judge");
+        });
+        Assert.All(Document(dir, "summary.json")["usage"]!.AsArray(),
+            u => Assert.Equal(runs * 10, (long)u!["gen_ai.usage.input_tokens"]!));
     }
 
     [Theory]
@@ -628,6 +642,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
     [InlineData(4)]
     public async Task Eval_CancelDuringStochasticTrial_PreservesCompletedTrialsAndOriginalPolicy(int completedTrials)
     {
+        using var meter = AgentEval.Cli.Infrastructure.CliUsageMeter.Begin();
         using var cancel = new CancellationTokenSource();
         var count = 0;
         await using var endpoint = await LocalChatEndpoint.StartAsync(async (_, requestCancelled) =>
@@ -650,6 +665,10 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.Equal(3, (int)header["suite"]!["executionPolicy"]!["trialsPerCase"]!);
         var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!).ToList();
         Assert.Equal(completedTrials, lines.Count(l => l["trial"] is not null));
+        Assert.All(lines.Where(l => l["trial"] is not null), line =>
+            Assert.Equal(10, (long)Assert.Single(line["usage"]!.AsArray())!["gen_ai.usage.input_tokens"]!));
+        Assert.All(lines.Where(l => l["trials"] is not null), line => Assert.Null(line["usage"]));
+        Assert.Null(Document(dir, "summary.json")["usage"]![0]!["gen_ai.usage.input_tokens"]);
         if (completedTrials % 3 != 0)
         {
             var partial = Assert.Single(lines, l => l["trials"] is { } t && (int)t["n"]! == completedTrials % 3);

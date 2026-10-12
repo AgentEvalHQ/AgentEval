@@ -32,10 +32,11 @@ internal sealed class EvalEvidence : IDisposable
         catch (Exception ex) when (IsWriteFailure(ex)) { Failed(ex); }
     }
 
-    public void Add(TestResult result, string caseId, int? passingScore = null, AefNativeContent? content = null, bool caseUsage = false)
+    public void Add(TestResult result, string caseId, int? passingScore = null, AefNativeContent? content = null,
+        bool caseUsage = false, IReadOnlyList<AefUsage>? trialUsage = null)
     {
         try { _session?.Add(result, caseId, passingScore, content,
-            caseUsage ? AgentEval.Cli.Infrastructure.CliUsageMeter.ForCase(caseId) : null); }
+            caseUsage ? AgentEval.Cli.Infrastructure.CliUsageMeter.ForCase(caseId) : trialUsage); }
         catch (Exception ex) when (IsWriteFailure(ex)) { Failed(ex); }
     }
 

@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Stochastic eval usage:** each completed trial records its own agent and judge usage; rollups do not
+  repeat these totals. Cancelled runs preserve completed trial counts and leave incomplete run usage unknown.
+
 - **Interrupted metric usage:** eval refreshes case usage even when a named metric throws or is cancelled.
   Completed agent counts remain visible; an interrupted judge call stays unknown without a fabricated verdict.
 
