@@ -19,6 +19,35 @@ public sealed class AefCompositeRunWriterTests : IDisposable
     private static readonly DateTimeOffset Start = new(2026, 10, 1, 9, 0, 0, TimeSpan.Zero);
 
     [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void Write_Usage_KeepsUnknownRolesAndOnlyTotalsCompleteCost(bool aborted, bool unknown)
+    {
+        var options = new AefCompositeRunOptions
+        {
+            SubjectRef = "agent:test", TargetMode = AefTargetMode.Live, Lane = "test", SuiteRef = "bench:test",
+            AbortReason = aborted ? "cancelled" : null,
+            Usage = [new() { Role = AefUsageRole.Agent, Model = "subject", InputTokens = 10, CostUsd = 0.1, CostSource = "fixture" },
+                new() { Role = AefUsageRole.Judge, Model = "judge", CostUsd = unknown ? null : 0.2, CostSource = unknown ? null : "fixture" }],
+        };
+        var (dir, _) = aborted
+            ? AefCompositeRunWriter.WriteAbortedEmpty(_out, Leaf("case", "pass", 1), options, Start, Start.AddSeconds(1))
+            : AefCompositeRunWriter.Write(_out, Leaf("case", "pass", 1), AefCompositeRunWriter.Undescribed, options, Start, Start.AddSeconds(1));
+        var summary = AefTestRuns.Document(dir, "summary.json");
+        Assert.Equal(2, summary["usage"]!.AsArray().Count);
+        if (unknown) Assert.Null(summary["cost"]);
+        else Assert.Equal(0.3, (double)summary["cost"]!["totalUsd"]!, 8);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+        {
+            Assert.Equal("intact", (string?)reference["outcome"]);
+            Assert.Empty(reference["problems"]!.AsArray());
+        }
+    }
+
+    [Theory]
     [InlineData("https://user:private@example.test/v1?api-key=secret#token", "https://example.test/v1", false)]
     [InlineData("https://user:private@example.test/v1?api-key=secret#token", "https://example.test/v1", true)]
     [InlineData("https://example.test/a%20b", "https://example.test/a%20b", false)]

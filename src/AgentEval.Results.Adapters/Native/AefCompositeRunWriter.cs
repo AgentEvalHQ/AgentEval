@@ -24,6 +24,9 @@ public sealed record AefComponentShape(double Weight, bool Required, string OnFa
 /// <summary>What a composite benchmark run knows about itself that its result does not hold.</summary>
 public sealed record AefCompositeRunOptions
 {
+    /// <summary>Observed invocation totals, already grouped by role and model; null when unknown.</summary>
+    public IReadOnlyList<AefUsage>? Usage { get; init; }
+
     /// <summary>Content-free configuration actually applied by the producer.</summary>
     public AefRunConfig? Config { get; init; }
 
@@ -250,6 +253,9 @@ public static class AefCompositeRunWriter
 
             writer.SetSummary(new AefSummary
             {
+                Usage = options.Usage,
+                Cost = options.Usage is { Count: > 0 } usage && usage.All(u => u.CostUsd is not null)
+                    ? new AefCost(usage.Sum(u => u.CostUsd!.Value), "sum of recorded usage costs") : null,
                 Lanes = [new AefSummaryLane(options.Lane,
                 [
                     new AefSummaryEntry { Metric = PassMetric, Path = CasePath },

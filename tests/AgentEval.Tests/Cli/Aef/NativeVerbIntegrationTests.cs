@@ -621,6 +621,11 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.Equal(2, (int)Document(dir, "run.json")["config"]!["runs"]!);
         Assert.Equal(endpoint.Endpoint.TrimEnd('/'), ((string)Document(dir, "run.json")["deployment"]!["endpoint"]!).TrimEnd('/'));
         AssertCompositeStoreLinks(dir, 2);
+        var usage = Assert.Single(Document(dir, "summary.json")["usage"]!.AsArray())!;
+        Assert.Equal("agent", (string?)usage["role"]);
+        Assert.Equal(endpoint.Requests.Count * 10L, (long)usage["gen_ai.usage.input_tokens"]!);
+        Assert.Null(usage["costUsd"]); // This local model has no configured price.
+
         var header = Document(dir, "run.json");
         Assert.Equal("live", (string?)header["execution"]!["targetMode"]);
         Assert.Equal("1", (string?)header["subject"]!["version"]);

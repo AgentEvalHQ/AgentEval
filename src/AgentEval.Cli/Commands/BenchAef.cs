@@ -203,6 +203,7 @@ internal static class BenchAef
             if (budgetTier is not null) settings["budgetTier"] = budgetTier;
             var options = new AefCompositeRunOptions
             {
+                Usage = AgentEval.Cli.Infrastructure.CliUsageMeter.CurrentUsage,
                 Config = new AefRunConfig { Settings = settings },
                 StoreV1 = storeV1,
                 Endpoint = endpoint,

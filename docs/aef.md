@@ -250,6 +250,15 @@ Benign controls record CODE when the refusal prefilter answers without a model c
 judge verdicts record LLM and the digest of that rubric's template with its response slot empty. Undecided
 control grading does not claim a grader or rubric; its actual model usage remains separately accounted for.
 
+Native CLI composite summaries accept invocation usage collected by the shared client wrapper, grouped by
+role and reported/configured model. A missing report, interrupted stream or partially consumed stream leaves
+that call's totals unknown. Unknown role/model entries remain present without invented zero counts. Complete
+counts for priced models receive an estimate from configured `ModelPricing` rates; the source names the
+bundled baseline without claiming that overrides are part of it. Run cost is emitted only when all recorded
+entries have known cost. Native clients without declared bounds do not invent a charge for missing usage.
+This composite path is separate from existing eval/probe ledgers; per-case attribution and remaining native
+client/role coverage are still being completed.
+
 Native composite judge headers include a full rubric digest when the evaluation records one. Atomic LLM and
 decision evaluations compute it from their existing instrument material, preserving the legacy 16-character
 `PromptHash`. Distinct rubrics for the same model remain separate header entries. Legacy short fingerprints

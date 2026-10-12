@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Composite usage accounting:** native CLI invocations can collect observed client usage by role/model
+  and retain it in composite AEF summaries, including aborted runs. Missing or interrupted reports remain
+  unknown; complete known-model usage receives a ModelPricing estimate, with a total only when every role
+  has known cost. Existing eval/probe ledgers remain separate while coverage is completed.
+
 - **Named metric instruments:** CLI-selectable model metrics retain their own content-free template digests
   in native judge headers and result annotations. Bias/misinformation empty-output shortcuts explicitly record
   code grading, without a model judge or judge rationale. Existing prompts, scores and thresholds are unchanged.

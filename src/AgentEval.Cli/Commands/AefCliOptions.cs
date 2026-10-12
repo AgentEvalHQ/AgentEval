@@ -80,6 +80,7 @@ internal sealed class AefCliOptions
             Console.Error.WriteLine("Error: --aef-key must name a readable, unencrypted PKCS#8 ECDSA P-256 private key.");
             return ExitCodes.UsageError;
         }
+        using var usage = AgentEval.Cli.Infrastructure.CliUsageMeter.Begin();
         var previous = Active.Value;
         try
         {

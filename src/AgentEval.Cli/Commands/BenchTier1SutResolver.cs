@@ -95,5 +95,5 @@ internal static class BenchTier1SutResolver
     /// abstraction (Part C of the design doc).
     /// </summary>
     internal static IEvaluableAgent BuildFromOpenAiEndpoint(string endpoint, string model, string? apiKey, string subject)
-        => CliChatClientDiagnostics.Wrap(EndpointFactory.CreateOpenAICompatible(endpoint, model, apiKey), "sut").AsEvaluableAgent(name: subject);
+        => CliChatClientDiagnostics.Wrap(EndpointFactory.CreateOpenAICompatible(endpoint, model, apiKey), "sut", model).AsEvaluableAgent(name: subject);
 }

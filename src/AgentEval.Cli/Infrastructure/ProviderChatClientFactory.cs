@@ -96,7 +96,7 @@ internal static class ProviderChatClientFactory
                     .GetChatClient(resolved).AsIChatClient();
             }
 
-            return (CliChatClientDiagnostics.Wrap(client, purpose), resolved, null, settings.Endpoint?.AbsoluteUri, settings.ProviderTag);
+            return (CliChatClientDiagnostics.Wrap(client, purpose, resolved), resolved, null, settings.Endpoint?.AbsoluteUri, settings.ProviderTag);
         }
         catch (Exception ex)
         {
