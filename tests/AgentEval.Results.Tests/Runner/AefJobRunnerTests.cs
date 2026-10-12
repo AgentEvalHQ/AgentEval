@@ -12,6 +12,18 @@ public sealed class AefJobRunnerTests : IDisposable
     private readonly string _output = Path.Combine(Path.GetTempPath(), "aef-async-job-" + Guid.NewGuid().ToString("N"));
     private static readonly AefTime Start = AefTime.Parse("2026-10-09T09:00:00Z");
 
+    [Fact]
+    public async Task RunAsync_IoFailureWithIncurredOverrun_ReportsTheCostLimit()
+    {
+        var testCase = new Case(_ => throw new IOException("private provider error"), incurredUsd: 3);
+        var result = await AefJobRunner.RunAsync(Plan(), Manifest(), new Target(testCase), _output, new AefJobOptions { At = Start });
+        Assert.Equal("job.failed", result.Terminal);
+        Assert.Equal("maxUsd", result.Limit);
+        Assert.DoesNotContain("private", result.Reason);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(RunDirectory()).Outcome);
+        Assert.Equal(3, (double)Json(RunDirectory(), "summary.json")["cost"]!["totalUsd"]!);
+    }
+
     public void Dispose()
     {
         if (Directory.Exists(_output)) Directory.Delete(_output, recursive: true);

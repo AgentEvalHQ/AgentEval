@@ -63,6 +63,45 @@ and `AefWriteException` failures after writing remain errors; do not classify ar
 or `InvalidOperationException` instances as input refusals. The conformance driver maps recognized input
 refusals to exit 2 and unexpected failures to exit 1. The CLI's `aef seal` retains exit 1 for an unsealable run.
 
+### Local dataset runner configuration (implementation preview)
+
+The internal live dataset adapter is implemented; the `run --plan` command and runner manifest CLI are still
+being connected. Its plan extension is `ext."agenteval.run"`. The subject endpoint comes from `subject.endpoint`;
+`model` names an exact entry in AgentEval's model price table, defaulting to the decoded `model:` subject name.
+Unknown model aliases are refused rather than matched to a similar model's price.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `model` | `model:` subject name | Priced subject model |
+| `azure`, `deployment` | `false`, model name | Azure adapter and deployment; deployment is Azure-only |
+| `inputCap` | 32768 | Maximum UTF-8 request bytes including all roles, instructions, schema and framing allowance |
+| `outputCap` | 1024 | Maximum requested output tokens |
+| `maxCalls` | 1 for subject; 2 for judge | Calls per role per case, including judge correction/fallback calls |
+| `caseSeconds` | 60 | Deadline for one case |
+| `preparationSeconds` | 30 | Deadline for readiness probes |
+| `closeSeconds` | 5 | Reserved time for closing the run |
+| `judge` | absent | Endpoint/budget settings for `judges[0]`; supports `endpoint`, `azure`, `deployment`, `inputCap`, `outputCap`, `maxCalls` |
+
+Suites use `dataset:<relative-path>` with forward slashes, resolved from the plan's directory. JSON, JSONL,
+YAML, CSV and TSV snapshots require explicit unique case IDs; IDs are never trimmed or replaced. The digest
+uses the same LF-normalised bytes as native eval. A supplied plan digest must match; an omitted digest remains
+omitted in the run. Case fields use the ordinary harness's input, expected substring and evaluation criteria.
+Tool expectations are refused because this adapter cannot enforce them. Criteria require a plan judge.
+The first judge uses the existing default harness prompt; custom rubric digests are refused. A requested judge
+provider must match `openai-compatible` or `azure`, according to its adapter.
+
+Each role (`subject` or `judge`) accepts at most one `credentialRefs` entry. Its resolved value is passed directly
+as that role's API key, without ambient environment fallback or environment mutation. Use distinct reference
+names for different keys; the shared runner refuses one name assigned conflicting values across purposes.
+Azure requires a reference. An OpenAI-compatible local endpoint may be keyless. Secrets belong only in the
+referenced environment variables, never the plan extension.
+
+Readiness makes one bounded request per configured role before the first case of each suite. Estimates and
+admission include that cost and its time bound. Cases run sequentially with fresh role budgets and no shared
+conversation history. Missing usage, failed requests and interrupted calls retain their reserved cost and leave
+token totals unknown. Reported overruns stop the job; evidence retains actual spend, even when it exceeds the
+declared budget. Such a provider violation is not reported as a compliant budget run.
+
 ### Export a run, check it, sign it
 
 ```bash

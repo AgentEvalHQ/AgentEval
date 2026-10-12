@@ -23,6 +23,8 @@ public interface IAefJobTarget
     IReadOnlyList<IAefJobSuite> Suites { get; }
     /// <summary>The purposes to which this target can deliver credentials, such as subject or judge.</summary>
     IReadOnlyCollection<string> CredentialPurposes { get; }
+    /// <summary>A content-free reason resolution failed; checked before acceptance or credential delivery.</summary>
+    string? RefusalReason => null;
     /// <summary>Installs purpose-scoped credentials without network calls or process environment changes.</summary>
     void SetCredentials(AefJobCredentials credentials);
 }
@@ -44,6 +46,8 @@ public interface IAefJobSuite
     IReadOnlyList<AefMetric> Metrics { get; }
     /// <summary>The entries summarized in the lane assigned by the plan.</summary>
     IReadOnlyList<AefSummaryEntry> SummaryEntries { get; }
+    /// <summary>Complete per-role run usage, including preparation and interrupted calls; null when unavailable.</summary>
+    IReadOnlyList<AefUsage>? SummaryUsage => null;
     /// <summary>Known lower cost estimate for preparing this run.</summary>
     double PreparationUsdLow => 0;
     /// <summary>Upper cost bound for preparing this run, charged separately from cases.</summary>

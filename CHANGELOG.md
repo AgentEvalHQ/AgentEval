@@ -24,7 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   deadline. Closing-time overruns and cleanup errors are reported while retaining any sealed evidence.
   Runner client foundations now include purpose-scoped endpoint creation without ambient key fallback or SDK
   retries, plus per-role call, text-input and output-token caps. Missing usage and interrupted calls retain their
-  reserved cost; reported token overruns stop further calls. Live dataset and CLI wiring remain in progress.
+  reserved cost; reported token overruns stop further calls. The live dataset target resolves relative snapshots,
+  binds exact known prices, budgets readiness separately, and records subject/judge usage including interrupted
+  calls. Unresolvable targets are refused before acceptance. Provider failures retain actual spend and identify
+  a crossed cost limit. CLI manifest and run-command wiring remain in progress.
   Dataset snapshots can now be parsed from the exact supplied UTF-8 bytes with explicit, unique IDs, without
   reopening a file or generating replacement IDs. The native eval mapper is reusable without writing a run,
   preserving criteria, assertions, named metrics, typed absences and content privacy.

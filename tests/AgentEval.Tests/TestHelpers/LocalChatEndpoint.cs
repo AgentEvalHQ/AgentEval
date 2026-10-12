@@ -34,7 +34,7 @@ internal sealed class LocalChatEndpoint : IAsyncDisposable
     public IReadOnlyList<string> ApiKeyHeaders => _apiKeyHeaders.ToArray();
 
     public static async Task<LocalChatEndpoint> StartAsync(Func<JsonObject, CancellationToken, Task<string>> reply,
-        int statusCode = StatusCodes.Status200OK)
+        int statusCode = StatusCodes.Status200OK, Func<JsonObject, (long? Input, long? Output)?>? usage = null)
     {
         var builder = WebApplication.CreateSlimBuilder(new WebApplicationOptions { Args = [] });
         builder.Logging.ClearProviders();
@@ -56,6 +56,7 @@ internal sealed class LocalChatEndpoint : IAsyncDisposable
                 return;
             }
             var text = await reply(request, context.RequestAborted);
+            (long? Input, long? Output)? report = usage is null ? (10L, 5L) : usage(request);
             await context.Response.WriteAsJsonAsync(new
             {
                 id = "chatcmpl-local",
@@ -63,7 +64,8 @@ internal sealed class LocalChatEndpoint : IAsyncDisposable
                 created = 1,
                 model = (string?)request["model"] ?? "local-model",
                 choices = new[] { new { index = 0, message = new { role = "assistant", content = text }, finish_reason = "stop" } },
-                usage = new { prompt_tokens = 10, completion_tokens = 5, total_tokens = 15 },
+                usage = report is { } counts ? new
+                { prompt_tokens = counts.Input, completion_tokens = counts.Output, total_tokens = counts.Input + counts.Output } : null,
             }, context.RequestAborted);
         }
         app.MapPost("/v1/chat/completions", HandleChat);

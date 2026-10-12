@@ -259,12 +259,14 @@ public static class AefJobRunner
 
         private async Task<AefJobResult> FailIoAsync(OpenRun? run)
         {
+            var (limit, reason) = run is null ? (null, null) : CheckActual(run);
+            reason ??= "The job encountered an I/O failure";
             // A permanently unwritable event file still propagates its I/O error; a successful terminal event is never claimed.
             if (run?.Writer.Status == AefRunStatus.Running)
-                try { Seal(run, null, "The job encountered an I/O failure"); }
+                try { Seal(run, limit, reason); }
                 catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
             if (run is not null) await CloseResourcesAsync(run).ConfigureAwait(false);
-            return Fail("The job encountered an I/O failure");
+            return Fail(reason, limit);
         }
 
         private AefJobResult Fail(string reason, string? limit = null)
@@ -319,6 +321,7 @@ public static class AefJobRunner
             {
                 return (notTaken, resolved);
             }
+            if (_target.RefusalReason is { } refusal) return (refusal, resolved);
 
             var mode = RunnerEventStream.TargetModeOf(_plan);
             if (mode != AefNames.Of(_target.TargetMode))
@@ -447,7 +450,7 @@ public static class AefJobRunner
         {
             var maxUsd = AefNode.Number(AefNode.At(_plan, "limits", "maxUsd")) ?? 0;
             if (AefSummaryCalculator.ExactSum(_spent) > maxUsd
-                || AefSummaryCalculator.ExactSum(_totals.Append(AefSummaryCalculator.ExactSum(run.Usd))) > maxUsd)
+                || AefSummaryCalculator.ExactSum(_sealed.Contains(run.RunId) ? _totals : _totals.Append(AefSummaryCalculator.ExactSum(run.Usd))) > maxUsd)
                 return ("maxUsd", "The case exceeded the job's cost limit");
             if (TimeoutSeconds is { } timeout && _clock.CompareTo(_start.AddSeconds(timeout)) > 0)
                 return ("timeout", "The case exceeded the job's time limit");
@@ -632,6 +635,7 @@ public static class AefJobRunner
             {
                 Lanes = run.Lane is { } lane ? [new AefSummaryLane(lane, run.Suite.SummaryEntries)] : [],
                 Cost = new AefCost(total, $"price table {_target.PriceTable}"),
+                Usage = run.Suite.SummaryUsage,
             });
             run.Writer.Close(why is null ? AefRunStatus.Completed : AefRunStatus.Aborted, _clock, why is null ? null : Cut(why));
             _jobClock.Advance(_target.CloseSeconds);
