@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Usage attribution:** asynchronous role/case scopes separate subject calls from metric judging when one
+  client serves both purposes. Known direct eval/redteam and Azure judge models are captured at construction;
+  auto-audit, replay and demo subject clients are classified as agent usage.
+
 - **Composite usage accounting:** native CLI invocations can collect observed client usage by role/model
   and retain it in composite AEF summaries, including aborted runs. Missing or interrupted reports remain
   unknown; complete known-model usage receives a ModelPricing estimate, with a total only when every role

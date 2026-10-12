@@ -26,6 +26,29 @@ public class CliUsageMeterTests
     }
 
     [Fact]
+    public async Task Attribute_ConcurrentReusedClient_IsolatesRolesAndCasesAndRestoresParent()
+    {
+        using var meter = CliUsageMeter.Begin();
+        using var client = CliUsageMeter.Wrap(new Client(), "agent", "same-model");
+        await Task.WhenAll(Enumerable.Range(0, 5).Select(async i =>
+        {
+            using var caseScope = CliUsageMeter.Attribute(caseId: "case-" + i);
+            await client.GetResponseAsync("subject");
+            using (CliUsageMeter.Attribute(AefUsageRole.Judge))
+                await client.GetResponseAsync("judge");
+            await client.GetResponseAsync("subject again");
+        }));
+        for (var i = 0; i < 5; i++)
+        {
+            var usage = meter.Snapshot("case-" + i)!;
+            Assert.Equal(20, Assert.Single(usage, u => u.Role == AefUsageRole.Agent).InputTokens);
+            Assert.Equal(10, Assert.Single(usage, u => u.Role == AefUsageRole.Judge).InputTokens);
+        }
+        Assert.Equal(100, Assert.Single(meter.Snapshot()!, u => u.Role == AefUsageRole.Agent).InputTokens);
+        Assert.Equal(50, Assert.Single(meter.Snapshot()!, u => u.Role == AefUsageRole.Judge).InputTokens);
+    }
+
+    [Fact]
     public async Task Snapshot_ConcurrentRolesAndModels_SeparatesTotalsAndPricesKnownModel()
     {
         using var meter = CliUsageMeter.Begin();

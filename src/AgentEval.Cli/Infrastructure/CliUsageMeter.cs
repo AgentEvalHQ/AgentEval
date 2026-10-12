@@ -12,6 +12,7 @@ namespace AgentEval.Cli.Infrastructure;
 internal sealed class CliUsageMeter : IDisposable
 {
     private static readonly AsyncLocal<CliUsageMeter?> Active = new();
+    private static readonly AsyncLocal<Attribution?> AttributionContext = new();
     private readonly CliUsageMeter? _previous;
     private readonly object _sync = new();
     private readonly List<Call> _calls = [];
@@ -23,17 +24,38 @@ internal sealed class CliUsageMeter : IDisposable
     internal static IChatClient Wrap(IChatClient client, string? role, string? model = null) =>
         Active.Value is { } meter ? new MeteredClient(client, meter, role switch
         {
-            "agent" or "sut" or "subject" => AefUsageRole.Agent,
+            "agent" or "sut" or "subject" or "auto-audit" or "replay-target" or "gatekeeper demo agent" => AefUsageRole.Agent,
             "judge" => AefUsageRole.Judge,
             "attacker" => AefUsageRole.Attacker,
             _ => AefUsageRole.Other,
         }, model) : client;
 
-    internal IReadOnlyList<AefUsage>? Snapshot()
+    /// <summary>Attributes calls in this asynchronous flow; nested scopes restore their parent.</summary>
+    internal static IDisposable Attribute(AefUsageRole? role = null, string? caseId = null)
+    {
+        var previous = AttributionContext.Value;
+        var parent = previous?.Meter == Active.Value ? previous : null;
+        AttributionContext.Value = new(Active.Value, role ?? parent?.Role, caseId ?? parent?.CaseId);
+        return new RestoreAttribution(previous);
+    }
+
+    private sealed record Attribution(CliUsageMeter? Meter, AefUsageRole? Role, string? CaseId);
+    private sealed class RestoreAttribution(Attribution? previous) : IDisposable
+    {
+        private bool _disposed;
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+            AttributionContext.Value = previous;
+        }
+    }
+
+    internal IReadOnlyList<AefUsage>? Snapshot(string? caseId = null)
     {
         lock (_sync)
         {
-            var totals = _calls.GroupBy(c => (c.Role, c.Model)).Select(g => new AefUsage
+            var totals = _calls.Where(c => caseId is null || c.CaseId == caseId).GroupBy(c => (c.Role, c.Model)).Select(g => new AefUsage
             {
                 Role = g.Key.Role, Model = g.Key.Model,
                 InputTokens = Sum(g.Select(c => c.Input)), OutputTokens = Sum(g.Select(c => c.Output)),
@@ -57,7 +79,9 @@ internal sealed class CliUsageMeter : IDisposable
 
     private Call Start(AefUsageRole role, string? model)
     {
-        var call = new Call { Role = role, Model = model };
+        var attribution = AttributionContext.Value;
+        if (attribution?.Meter != this) attribution = null;
+        var call = new Call { Role = attribution?.Role ?? role, Model = model, CaseId = attribution?.CaseId };
         lock (_sync) _calls.Add(call);
         return call;
     }
@@ -89,6 +113,7 @@ internal sealed class CliUsageMeter : IDisposable
     {
         internal AefUsageRole Role;
         internal string? Model;
+        internal string? CaseId;
         internal long? Input, Output;
         internal decimal? Cost;
     }

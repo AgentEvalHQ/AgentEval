@@ -461,6 +461,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
     [InlineData(true, true)]
     public async Task Eval_LlmMetricUsingSubjectClient_RecordsJudgeAndSeparateUsage(bool azure, bool clientOverride)
     {
+        using var usageMeter = AgentEval.Cli.Infrastructure.CliUsageMeter.Begin();
         var calls = 0;
         await using var endpoint = await LocalChatEndpoint.StartAsync((_, _) => Task.FromResult(
             Interlocked.Increment(ref calls) == 1 ? "Hi" : """{"score":95,"addressesQuestion":true,"reasoning":"secret explanation"}"""));
@@ -469,6 +470,9 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.Equal(0, await EvalCommand.ExecuteAsync(options, CancellationToken.None,
             agentClientOverride: clientOverride ? customClient : null));
         Assert.Equal(2, endpoint.Requests.Count);
+        var metered = usageMeter.Snapshot()!;
+        Assert.Equal(10, Assert.Single(metered, u => u.Role == AgentEval.Results.Writing.AefUsageRole.Agent).InputTokens);
+        Assert.Equal(10, Assert.Single(metered, u => u.Role == AgentEval.Results.Writing.AefUsageRole.Judge).InputTokens);
         var dir = RunDirectory(options.Aef!.FullName);
         AssertIntact(dir);
         var judge = Assert.Single(Document(dir, "run.json")["judges"]!.AsArray())!;

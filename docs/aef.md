@@ -256,8 +256,10 @@ that call's totals unknown. Unknown role/model entries remain present without in
 counts for priced models receive an estimate from configured `ModelPricing` rates; the source names the
 bundled baseline without claiming that overrides are part of it. Run cost is emitted only when all recorded
 entries have known cost. Native clients without declared bounds do not invent a charge for missing usage.
-This composite path is separate from existing eval/probe ledgers; per-case attribution and remaining native
-client/role coverage are still being completed.
+The meter supports asynchronous role/case scopes: named eval metric calls are attributed to the judge and
+stable dataset case even when they reuse the subject client. Concurrent cases and nested scopes stay isolated.
+This composite path is separate from existing eval/probe ledgers; exporting per-case totals and the remaining
+native client/role coverage are still being completed.
 
 Native composite judge headers include a full rubric digest when the evaluation records one. Atomic LLM and
 decision evaluations compute it from their existing instrument material, preserving the legacy 16-character

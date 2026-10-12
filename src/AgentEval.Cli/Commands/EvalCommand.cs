@@ -359,7 +359,7 @@ internal static class EvalCommand
             standIn = agentClientOverride is not null;
             chatClient = CliChatClientDiagnostics.Wrap(agentClientOverride ?? (opts.Azure
                 ? EndpointFactory.CreateAzure(opts.Endpoint, opts.DeploymentName!, opts.ApiKey)
-                : EndpointFactory.CreateOpenAICompatible(opts.Endpoint!, opts.Model!, opts.ApiKey)), "agent");
+                : EndpointFactory.CreateOpenAICompatible(opts.Endpoint!, opts.Model!, opts.ApiKey)), "agent", agentClientOverride is null ? (opts.Azure ? opts.DeploymentName : opts.Model) : null);
 
             agent = chatClient.AsEvaluableAgent(
                 name: resolvedName,
@@ -376,7 +376,7 @@ internal static class EvalCommand
         // The ledger counts the judge's calls and the tokens they report, for the AEF run's usage.
         var judgeLedger = opts.JudgeEndpoint is not null
             ? new JudgeCallLedger(CliChatClientDiagnostics.Wrap(EndpointFactory.CreateOpenAICompatible(
-                opts.JudgeEndpoint, opts.JudgeModel ?? resolvedName, opts.ApiKey), "judge"))
+                opts.JudgeEndpoint, opts.JudgeModel ?? resolvedName, opts.ApiKey), "judge", opts.JudgeModel ?? resolvedName))
             : null;
         IChatClient? judgeClient = judgeLedger;
         var harness = judgeClient is not null
@@ -466,6 +466,7 @@ internal static class EvalCommand
                 await using var metricRunner = await metricsBuilder.BuildAsync(ct);
                 for (var i = 0; i < testCases.Count && i < summary.Results.Count; i++)
                 {
+                    using var usageAttribution = CliUsageMeter.Attribute(AefUsageRole.Judge, caseIds[i]);
                     var metricsContext = ToMetricsContext(testCases[i], summary.Results[i]);
                     summary.Results[i].MetricResults = await metricRunner.EvaluateAsync(selectedMetrics!, metricsContext, ct);
                     evidence.AddMetrics(caseIds[i], summary.Results[i].MetricResults!);
