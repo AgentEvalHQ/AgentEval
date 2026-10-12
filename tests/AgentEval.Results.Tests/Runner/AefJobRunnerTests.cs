@@ -2,6 +2,7 @@ using System.Text;
 using System.Text.Json.Nodes;
 using AgentEval.Results.Integrity;
 using AgentEval.Results.Runner;
+using AgentEval.Results.Signatures;
 using AgentEval.Results.Tests.Corpus;
 using AgentEval.Results.Writing;
 
@@ -11,6 +12,34 @@ public sealed class AefJobRunnerTests : IDisposable
 {
     private readonly string _output = Path.Combine(Path.GetTempPath(), "aef-async-job-" + Guid.NewGuid().ToString("N"));
     private static readonly AefTime Start = AefTime.Parse("2026-10-09T09:00:00Z");
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RunWorkspaceAsync_Signer_SignsCompletedAndCancelledEvidence(bool cancel)
+    {
+        using var signer = EcdsaP256Signer.Generate();
+        using var cancellation = new CancellationTokenSource();
+        var target = new Target(new Case(token =>
+        {
+            if (cancel) { cancellation.Cancel(); token.ThrowIfCancellationRequested(); }
+            return ValueTask.FromResult(Passed());
+        }));
+        var bytes = Plan();
+        var result = await AefJobRunner.RunWorkspaceAsync(bytes, Manifest(), target, _output,
+            new AefJobOptions { At = Start, Signer = signer }, cancellation.Token);
+        Assert.Equal(cancel ? "job.cancelled" : "job.sealed", result.Terminal);
+        var job = Path.Combine(_output, result.JobId);
+        Assert.Equal(bytes, File.ReadAllBytes(Path.Combine(job, "plan.json")));
+        Assert.Equal(signer.KeyId, (string?)Json(job, "runner-options.json")["signingKeyId"]);
+        var verified = AefRunVerifier.Verify(RunDirectory(), new AefVerifyOptions
+            { Policy = new TrustPolicy([new TrustedKey("test:runner", signer.PublicKey)]) });
+        Assert.Equal(AefOutcome.Intact, verified.Outcome);
+        Assert.Empty(verified.Problems);
+        Assert.Equal("test:runner", Assert.Single(verified.SignedBy!));
+        Assert.Equal(cancel ? "aborted" : "completed", (string?)Json(RunDirectory(), "run.json")["status"]);
+        Assert.NotEmpty(signer.Sign([1, 2, 3])); // The engine never disposes its caller-owned signer.
+    }
 
     [Fact]
     public async Task RunAsync_IoFailureWithIncurredOverrun_ReportsTheCostLimit()

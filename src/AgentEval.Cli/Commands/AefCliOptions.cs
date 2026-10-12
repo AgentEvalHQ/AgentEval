@@ -16,6 +16,7 @@ internal sealed class AefCliOptions
     internal static bool Seal => Active.Value?.Seal ?? true;
     internal static IAefSigner? Signer => Active.Value?.Signer;
     internal static AefContentCapture ContentCapture => Active.Value?.ContentCapture ?? AefContentCapture.Off;
+    internal static AefContentCapture? RequestedContentCapture => Active.Value?.RequestedContentCapture;
 
     internal AefCliOptions(Command root) => Register(root);
 
@@ -47,6 +48,11 @@ internal sealed class AefCliOptions
             return ExitCodes.UsageError;
         }
         var noAef = parsed.CommandResult.Command.Options.OfType<Option<bool>>().FirstOrDefault(o => o.Name == "--no-aef");
+        if (parsed.CommandResult.Command.Name == "run" && (unsealed || (noAef is not null && parsed.GetValue(noAef))))
+        {
+            Console.Error.WriteLine("Error: runner jobs require sealed AEF evidence; --no-aef and --aef-unsealed are not supported.");
+            return ExitCodes.UsageError;
+        }
         if ((keyPath is not null || unsealed || content == "on") && noAef is not null && parsed.GetValue(noAef))
         {
             Console.Error.WriteLine("Error: --no-aef cannot be combined with --aef-key, --aef-unsealed or --aef-content on.");
@@ -72,7 +78,8 @@ internal sealed class AefCliOptions
         var previous = Active.Value;
         try
         {
-            Active.Value = new(!unsealed, signer, content == "on" ? AefContentCapture.On : AefContentCapture.Off);
+            Active.Value = new(!unsealed, signer, content == "on" ? AefContentCapture.On : AefContentCapture.Off,
+                content is null ? null : content == "on" ? AefContentCapture.On : AefContentCapture.Off);
             return await invoke();
         }
         finally
@@ -83,5 +90,5 @@ internal sealed class AefCliOptions
     }
 
     private sealed record Binding(Option<string?> Key, Option<bool> Unsealed, Option<string?> Content);
-    private sealed record Settings(bool Seal, IAefSigner? Signer, AefContentCapture ContentCapture);
+    private sealed record Settings(bool Seal, IAefSigner? Signer, AefContentCapture ContentCapture, AefContentCapture? RequestedContentCapture);
 }

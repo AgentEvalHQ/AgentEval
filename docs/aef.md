@@ -78,6 +78,22 @@ The job writes `.agenteval/aef/jobs/<jobId>/` with exact `plan.json` bytes, `run
 `runs/<runId>/`. Existing job directories are refused. `--json` prints a terminal report containing the job ID,
 terminal event, sealed run IDs and any failure reason/limit.
 
+`--aef <dir>` places jobs under `<dir>/jobs/<jobId>/` instead of the workspace's evidence directory.
+`--aef-key <pkcs8.pem>` signs every produced run seal, including aborted runs, with an ECDSA P-256 key.
+The public `signingKeyId` is recorded in runner options/events and contributes to the job ID; private key material
+is never recorded. The library's optional `AefJobOptions.Signer` remains caller-owned.
+
+Runner identity and capture policy belong to the saved plan. `--subject` asserts its exact typed subject reference,
+`--subject-version` asserts its version, and `--aef-content on|off` asserts its capture setting. A mismatch is an
+input error; these flags do not rewrite the plan. Unlike native standalone commands, runner jobs reject
+`--no-aef` and `--aef-unsealed`: the protocol requires sealed evidence. Dry-run validates these controls and
+the signing key without requests or file writes. The dataset runner currently emits metrics and usage;
+plan-permitted content attachments remain separate implementation work.
+
+After building the CLI, `python tests/AgentEval.Results.Conformance/runner-controls-crosscheck.py net10.0`
+(also `net8.0`) checks actual signed identity, explicit output placement, unchanged plan bytes, preflight/dry-run
+side effects and agreement between the .NET and Python run/stream/conformance verifiers.
+
 Use `--dry-run --json` to resolve the same plan and credentials and return an acceptance/estimate report without
 requests, events or file writes (including diagnostic files). Accepted reports contain `cases`, `calls.target`,
 `calls.judge`, `models`, `costRange` (low/high/currency/priceTable), `durationRange` (low/high/unit), `warnings`
@@ -207,8 +223,8 @@ Without a workspace and without `--aef`, the command says so and writes no run. 
 written is a warning, never a failure.
 
 Signing and unsealed controls cannot be combined with `--no-aef`. Use `--aef <dir>` to explicitly require evidence
-at a chosen destination. These controls apply to the native evaluation commands; `run --plan` continues to use
-the runner protocol's mandatory sealed evidence. Runner signing and plan-governed content controls are separate.
+at a chosen destination. `run --plan` supports signing and explicit placement too, but requires sealed evidence
+and checks identity/content flags against the saved plan as described above.
 
 With content capture on, eval records dataset inputs, expected answers, actual responses and observed tool calls;
 redteam and scan benchmarks record available probe/control prompts, responses, folded transcripts and grading

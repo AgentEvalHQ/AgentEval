@@ -164,10 +164,11 @@ public static class AefJobRunner
         {
             get
             {
-                if (_options.MaxUsd is null && !_options.RefuseOverBudget) return null;
+                if (_options.MaxUsd is null && !_options.RefuseOverBudget && _options.Signer is null) return null;
                 var policy = new JsonObject();
                 if (_options.MaxUsd is { } cap) policy["maxUsd"] = cap;
                 if (_options.RefuseOverBudget) policy["refuseOverBudget"] = true;
+                if (_options.Signer is { } signer) policy["signingKeyId"] = signer.KeyId;
                 return policy;
             }
         }
@@ -692,7 +693,7 @@ public static class AefJobRunner
             });
             run.Writer.Close(why is null ? AefRunStatus.Completed : AefRunStatus.Aborted, _clock, why is null ? null : Cut(why));
             _jobClock.Advance(_target.CloseSeconds);
-            var seal = AefSealer.Seal(run.Directory, new AefSealOptions { SealedAt = _clock.ToString() });
+            var seal = AefSealer.Seal(run.Directory, new AefSealOptions { SealedAt = _clock.ToString(), Signer = _options.Signer });
             _sealed.Add(run.RunId);
             _totals.Add(total);
             _events!.Emit("evidence.produced", _clock, new JsonObject { ["runId"] = run.RunId, ["runHash"] = seal.RunHash });

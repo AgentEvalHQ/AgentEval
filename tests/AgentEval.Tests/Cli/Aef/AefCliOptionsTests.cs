@@ -12,6 +12,18 @@ namespace AgentEval.Tests.Cli.Aef;
 [Collection("ConsoleTests")]
 public sealed class AefCliOptionsTests
 {
+    [Theory]
+    [InlineData("--no-aef")]
+    [InlineData("--aef-unsealed")]
+    public async Task Runner_UnsupportedEvidenceMode_RefusesBeforeExecution(string option)
+    {
+        var command = AgentEval.Cli.Runner.RunCommand.Create();
+        var controls = new AefCliOptions(command);
+        var invoked = false;
+        Assert.Equal(2, await controls.InvokeAsync(command.Parse("--plan missing.json " + option),
+            () => { invoked = true; return Task.FromResult(0); }));
+        Assert.False(invoked);
+    }
     private static (Command Command, AefCliOptions Controls) Create()
     {
         var command = new Command("native");

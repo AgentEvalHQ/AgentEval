@@ -17,6 +17,9 @@ namespace AgentEval.Results.Runner;
 /// <summary>Execution and analysis settings shared by <see cref="AefJobRunner"/> and its scripted adapter.</summary>
 public sealed class AefJobOptions
 {
+    /// <summary>Optional caller-owned signer for every completed or aborted run seal. Defaults to unsigned seals.</summary>
+    public AgentEval.Results.Signatures.IAefSigner? Signer { get; init; }
+
     /// <summary>
     /// The job clock's starting instant. Scripted jobs advance simulated time by preparation, case and closing
     /// durations (spec 09 §9.2.1); live jobs measure monotonic elapsed time from this instant.

@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Runner signing and evidence controls:** `run --aef-key` signs completed and aborted seals; `--aef` selects
+  the job evidence base. Subject/version/content flags assert saved-plan values without rewriting its bytes.
+  Jobs reject no-evidence/unsealed modes, and dry-run validates controls without requests or writes. Public
+  signing key IDs are recorded in runner policy; caller-owned library signers remain caller-owned.
+
 - **Perf and autoaudit mock AEF:** explicit output retains perf results and one autoaudit run per scripted
   subject, with exit 11/inconclusive gates. Autoaudit progress callbacks preserve completed endpoint results
   on interruption; an interrupted endpoint with no returned result has empty aborted evidence. Defaults

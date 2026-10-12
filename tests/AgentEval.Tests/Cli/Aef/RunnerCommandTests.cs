@@ -15,6 +15,22 @@ namespace AgentEval.Tests.Cli.Aef;
 
 public sealed class RunnerCommandTests : IDisposable
 {
+    [Theory]
+    [InlineData("other:subject", "1", 2)]
+    [InlineData("model:gpt-4o-mini", "different", 2)]
+    [InlineData("model:gpt-4o-mini", "1", 0)]
+    public async Task Run_IdentityAssertions_PreservePlanAndRejectMismatchBeforeRequests(string subject, string version, int expected)
+    {
+        await using var endpoint = await LocalChatEndpoint.StartAsync("Hi");
+        var path = Path.Combine(_root, "plan.json");
+        var bytes = Encoding.UTF8.GetBytes(CreatePlan(endpoint.Endpoint).ToJsonString());
+        File.WriteAllBytes(path, bytes);
+        using var output = new StringWriter(); using var error = new StringWriter();
+        Assert.Equal(expected, await RunCommand.ExecuteAsync(path, _root, "test", true, output, error,
+            environment: _ => null, dryRun: true, subject: subject, subjectVersion: version));
+        Assert.Equal(bytes, File.ReadAllBytes(path));
+        Assert.False(Directory.Exists(Path.Combine(_root, ".agenteval")));
+    }
     private readonly string _root = Path.Combine(Path.GetTempPath(), "runner-command-" + Guid.NewGuid().ToString("N"));
     public RunnerCommandTests() => Directory.CreateDirectory(_root);
     public void Dispose()

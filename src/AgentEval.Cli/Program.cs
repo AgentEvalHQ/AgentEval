@@ -1066,7 +1066,7 @@ if (parseResult.Action is System.CommandLine.Help.HelpAction)
     return await parseResult.InvokeAsync();
 
 if (parseResult.CommandResult.Command == aefRunCommand && AgentEval.Cli.Runner.RunCommand.IsDryRun(parseResult))
-    return await parseResult.InvokeAsync();
+    return await nativeAefOptions.InvokeAsync(parseResult, () => parseResult.InvokeAsync());
 
 return await nativeAefOptions.InvokeAsync(parseResult, async () =>
 {
