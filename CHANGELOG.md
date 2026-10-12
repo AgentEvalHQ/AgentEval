@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **TypedMemEval interruption evidence:** completed typed question outcomes survive cancellation or later failure.
+  Partial evidence withholds the benchmark aggregate and command gate; missing typed vectors never fall back to
+  compatibility accuracy. The existing runner API remains available beside a synchronous progress method.
+
 - **LongMemEval interruption evidence:** completed question results survive cancellation or later failure through
   a synchronous progress API. Partial runs omit benchmark-wide accuracy and command gates; returned full results
   remain available when persistence is interrupted.

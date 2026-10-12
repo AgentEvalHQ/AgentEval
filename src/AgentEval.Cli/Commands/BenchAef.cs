@@ -281,10 +281,15 @@ internal static class BenchAef
     /// answer or evidence text is written.
     /// </summary>
     public static (EvalResult Result, IReadOnlyDictionary<string, System.Text.Json.Nodes.JsonObject> CaseExt) TypedTree(
-        AgentEval.Memory.External.Models.ExternalBenchmarkResult result, string vertical, string? judgeModel)
+        AgentEval.Memory.External.Models.ExternalBenchmarkResult result, string vertical, string? judgeModel) =>
+        TypedTree(result.QuestionResults, (result.OverallAccuracy ?? 0) / 100.0, vertical, judgeModel);
+
+    /// <summary>Maps observed questions; a null overall score withholds a partial benchmark's aggregate.</summary>
+    public static (EvalResult Result, IReadOnlyDictionary<string, System.Text.Json.Nodes.JsonObject> CaseExt) TypedTree(
+        IReadOnlyList<AgentEval.Memory.External.Models.QuestionResult> observed, double? overallScore, string vertical, string? judgeModel)
     {
         var ext = new Dictionary<string, System.Text.Json.Nodes.JsonObject>(StringComparer.Ordinal);
-        var questions = result.QuestionResults.Select(q =>
+        var questions = observed.Select(q =>
         {
             var outcome = q.TypedOutcome?.Outcome;
             // Unrun first: the runner marks a question it did not run as Unrun with an AgentError status.
@@ -313,7 +318,10 @@ internal static class BenchAef
         }).ToList();
         var root = new EvalResult(
             new EvalMetadata($"typedmemeval.{vertical}", $"TypedMemEval {vertical}", "typedmemeval", "1.0.0"),
-            new EvalScore((result.OverallAccuracy ?? 0) / 100.0, null, "scored", false, null, "none", null),   // a percentage
+            new EvalScore(overallScore ?? 0, null, "scored", false, null, "none", null)
+            {
+                Measurement = overallScore is null ? AgentEval.Evals.Meta.MeasurementState.NotMeasured : AgentEval.Evals.Meta.MeasurementState.Measured,
+            },
             new EvalDetails(null, null, null, questions, null),
             new EvalProvenance("composite", null, null, null, null, 0, false),
             DateTimeOffset.UtcNow);

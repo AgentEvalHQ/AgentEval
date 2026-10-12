@@ -88,7 +88,8 @@ public static class BenchTypedMemEvalCommand
         CancellationToken ct = default,
         DirectoryInfo? aef = null,
         bool noAef = false,
-        string? subjectVersion = null)
+        string? subjectVersion = null,
+        Action<QuestionResult>? onQuestionCompleted = null)
     {
         if (string.IsNullOrWhiteSpace(subject))
         {
@@ -186,12 +187,31 @@ public static class BenchTypedMemEvalCommand
         Console.WriteLine();
 
         // ── Run ──────────────────────────────────────────────────────────────
-        ExternalBenchmarkResult result;
+        ExternalBenchmarkResult? result = null;
+        var completed = new List<QuestionResult>();
         var startedAt = DateTimeOffset.UtcNow;
+        bool WriteEvidence(string? reason = null)
+        {
+            if (noAef) return false;
+            var verticalName = descriptor.Vertical.ToString().ToLowerInvariant();
+            var judgeModel = chatClientOverride is null ? deployment : null;
+            var (tree, caseExt) = result?.TypedOutcomes is null
+                ? BenchAef.TypedTree(result?.QuestionResults ?? completed, null, verticalName, judgeModel)
+                : BenchAef.TypedTree(result, verticalName, judgeModel);
+            return BenchAef.WriteResult(aef, agentEvalDir, "typedmemeval", verticalName, subject!, subjectVersion,
+                chatClientOverride is null ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
+                tree, startedAt, DateTimeOffset.UtcNow, caseExt: caseExt, abortReason: reason,
+                emptyResults: result is null && completed.Count == 0);
+        }
         try
         {
             result = await new TypedMemEvalRunner(chatClient)
-                .RunAsync(agent, descriptor.Vertical, BuildRunOptions(captureEvidenceContent), ct);
+                .RunWithProgressAsync(agent, descriptor.Vertical, BuildRunOptions(captureEvidenceContent), question =>
+                {
+                    completed.Add(question);
+                    onQuestionCompleted?.Invoke(question);
+                }, ct);
+            ct.ThrowIfCancellationRequested();
         }
         catch (ArgumentException ex) when (ex.ParamName == "agent")
         {
@@ -209,7 +229,7 @@ public static class BenchTypedMemEvalCommand
         catch (Exception ex)
         {
             Console.Error.WriteLine($"TypedMemEval run failed: {ex.GetType().Name}: {ex.Message}");
-            return 1;
+            return WriteEvidence(ct.IsCancellationRequested ? "cancelled" : "execution-error") ? ExitCodes.RuntimeError : 1;
         }
 
         var typed = result.TypedOutcomes;
@@ -218,6 +238,7 @@ public static class BenchTypedMemEvalCommand
             Console.Error.WriteLine(
                 "TypedMemEval run produced no typed outcome vector. Refusing to report the compatibility " +
                 "accuracy field in its place — it is not a TypedMemEval score.");
+            WriteEvidence("missing-typed-outcomes");
             return ExitCodes.RuntimeError;
         }
 
@@ -312,25 +333,16 @@ public static class BenchTypedMemEvalCommand
             await File.WriteAllTextAsync(
                 Path.Combine(runDir, "report-native.json"),
                 JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }));
+            PrintTypedReport(descriptor, result, typed, runId, runDir);
+            ct.ThrowIfCancellationRequested();
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Failed to persist TypedMemEval run: {ex.Message}");
-            return 1;
+            return WriteEvidence(ct.IsCancellationRequested ? "cancelled" : "execution-error") ? ExitCodes.RuntimeError : 1;
         }
 
-        PrintTypedReport(descriptor, result, typed, runId, runDir);
-
-        // AEF: a case per question, scored with no verdict (the vertical publishes no pass mark). The environment's
-        // provider is live; a client passed in (tests) is a stand-in.
-        if (!noAef)
-        {
-            var (tree, caseExt) = BenchAef.TypedTree(result, descriptor.Vertical.ToString().ToLowerInvariant(), chatClientOverride is null ? deployment : null);
-            if (BenchAef.WriteResult(aef, agentEvalDir, "typedmemeval", descriptor.Vertical.ToString().ToLowerInvariant(), subject!, subjectVersion,
-                    chatClientOverride is null ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                    tree, startedAt, DateTimeOffset.UtcNow, caseExt: caseExt))
-                return ExitCodes.RuntimeError;   // an explicit --aef could not be written
-        }
+        if (WriteEvidence()) return ExitCodes.RuntimeError;
 
         // GateIndeterminate (11) is the documented bench code for "no verdict"; 6 belongs to
         // `gatekeeper inspect`, and reusing it would make a script keyed on exit codes read a

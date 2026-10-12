@@ -298,6 +298,9 @@ interruption. If no category returned, aborted evidence contains no result rows.
 LongMemEval likewise retains completed question results through synchronous progress. Partial runs do not infer
 benchmark-wide accuracy, and aborted invocations have no command gate. Existing `RunAsync` callers retain their API;
 hosts needing completed-question observations can use `RunWithProgressAsync`.
+TypedMemEval exposes the same progress method and retains typed outcomes on interruption. Partial runs withhold
+the aggregate score and gate; a missing typed vector never substitutes the compatibility accuracy field. Returned
+full results remain available after persistence or report failure.
 GDPR, EU AI Act, and agentic benchmarks preserve completed nested evaluations on cancellation too. Unfinished
 nodes carry typed absences, and the aborted run has no command gate. Repeated GDPR/EU AI Act runs retain their
 started trial trees and original requested trial count. If trial aggregation was interrupted, every observed path

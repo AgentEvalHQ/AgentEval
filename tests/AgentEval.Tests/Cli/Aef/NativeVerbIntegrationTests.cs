@@ -961,6 +961,48 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         public void Dispose() { }
     }
 
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(false, false, true)]
+    public async Task TypedMemory_InterruptedAfterQuestion_PreservesTypedOutcome(bool fail, bool noAef, bool invalidOutput)
+    {
+        Directory.CreateDirectory(Path.Combine(_root, ".agenteval"));
+        File.WriteAllText(Path.Combine(_root, ".agenteval", "solution.json"),
+            new JsonObject { ["schemaVersion"] = "1.0", ["id"] = Guid.NewGuid().ToString(), ["name"] = "typed-cancel" }.ToJsonString());
+        using var cancel = new CancellationTokenSource();
+        using var client = new AgentEval.Testing.ScriptedChatClient()
+            .AddText("test answer").AddText("{\"outcome\":\"correct\",\"reasoning\":\"test judge\"}");
+        var aef = new DirectoryInfo(Path.Combine(_root, "typed-aef"));
+        if (invalidOutput) File.WriteAllText(aef.FullName, "not a directory");
+        string? observed = null;
+        var exit = await BenchTypedMemEvalCommand.RunAsync("episodic", "subject", _root, false, client, cancel.Token,
+            aef, noAef, onQuestionCompleted: question =>
+            {
+                observed = question.QuestionId;
+                if (fail) throw new InvalidOperationException("test failure after typed question");
+                cancel.Cancel();
+            });
+        Assert.Equal(invalidOutput ? 3 : 1, exit);
+        Assert.NotNull(observed);
+        if (noAef || invalidOutput)
+        {
+            Assert.Empty(Directory.GetFiles(_root, "seal.json", SearchOption.AllDirectories));
+            return;
+        }
+        var dir = RunDirectory(aef.FullName);
+        AssertIntact(dir);
+        Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
+        Assert.Equal("mocked", (string?)Document(dir, "run.json")["execution"]!["targetMode"]);
+        Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
+        var line = JsonNode.Parse(Assert.Single(File.ReadAllLines(Path.Combine(dir, "results.ndjson"))))!;
+        Assert.Equal(observed, (string?)line["caseId"]);
+        Assert.Equal("scored", (string?)line["state"]);
+        Assert.Equal("correct", (string?)line["ext"]!["agenteval.typedmemeval"]!["outcome"]);
+        Assert.Null(Document(dir, "summary.json")["ext"]!["agenteval.bench"]!["score"]);
+    }
+
     private sealed class FailOnPerfPersistenceWriter : StringWriter
     {
         public override void WriteLine(string? value)
