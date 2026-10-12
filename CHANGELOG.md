@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Asynchronous AEF job engine:** `AefJobRunner.RunAsync` accepts target, suite, case and clock contracts,
+  preserving scripted job bytes while adding awaited cases, cancellation, error evidence, partial costs and
+  case deadlines. A monotonic elapsed clock supports real execution; scripted execution retains its simulated clock.
 - **`agenteval eval` writes each run as sealed AEF evidence** (S1 #5a): into a workspace's `.agenteval/aef`, or `--aef <dir>`;
   `--no-aef` writes nothing; `--subject` and `--subject-version` name the subject. One result line per case, the
   target mode the run really had (a stand-in is never `live`), the judge only when it graded, and no content.

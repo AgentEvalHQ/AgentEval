@@ -13,18 +13,15 @@ using AgentEval.Results.Writing;
 
 namespace AgentEval.Results.Runner;
 
-// The job engine is extracted before introducing asynchronous target/suite/case adapters. The scripted public
-// entry point remains stable; the pre-refactor conformance snapshots pin every byte written by this engine.
-internal static class AefJobRunner
+/// <summary>Executes bounded AEF jobs against asynchronous targets while preserving scripted conformance.</summary>
+public static class AefJobRunner
 {
     private const string EventsFile = "events.ndjson";
     private const string RunsFolder = "runs";
-    private const string CasePath = AefScriptedRunner.CasePath;
-    private const string EvaluatorId = AefScriptedRunner.EvaluatorId;
-    private static AefMetric PassRate => AefScriptedRunner.PassRate;
     private static AefProducer DefaultProducer => AefScriptedRunner.DefaultProducer;
 
-    internal static AefJobResult Run(byte[] plan, JsonObject runner, AefScriptedTarget target, string output, AefJobOptions options)
+    /// <summary>Accepts or refuses a plan, then executes its suites sequentially and writes sealed evidence and events.</summary>
+    public static async Task<AefJobResult> RunAsync(byte[] plan, JsonObject runner, IAefJobTarget target, string output, AefJobOptions options, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(plan);
         ArgumentNullException.ThrowIfNull(runner);
@@ -42,10 +39,14 @@ internal static class AefJobRunner
         }
 
         var document = ReadPlan(plan);
+        if (target.CloseSeconds < 0 || target.Suites.SelectMany(s => s.Cases).Any(c =>
+            !double.IsFinite(c.UsdLow) || !double.IsFinite(c.UsdBound) || c.UsdLow < 0 || c.UsdBound < c.UsdLow
+            || c.SecondsBound < 0 || (target.TargetMode != AefTargetMode.Scripted && c.SecondsBound > 4_294_967)))
+            throw new ArgumentException("Target cost bounds must be finite and nonnegative; live time bounds must fit a cancellation timer.", nameof(target));
         CheckClock(target, options.At);
         var job = new Job(document, plan, runner, target, options);
         Directory.CreateDirectory(output);
-        return job.Run(output);
+        return await job.RunAsync(output, cancellationToken).ConfigureAwait(false);
     }
 
     // A plan that reads ([ENC-1]–[ENC-7], within [ENC-17]) and names a planId a job.refused can carry (PLAN-7); its other
@@ -73,7 +74,7 @@ internal static class AefJobRunner
     // §9.3: the job's clock, moved by every case's secondsBound and closeSeconds once per suite of the target, stays in
     // [ENC-8]'s years; a start from which it would not is an input error, found before anything is written. The clock of
     // any job against the target moves no further (a case takes no more than its bound, and a suite is one run).
-    private static void CheckClock(AefScriptedTarget target, AefTime at)
+    private static void CheckClock(IAefJobTarget target, AefTime at)
     {
         const long beyond = 400_000_000_000;   // more seconds than 0001 to 9999 hold: the sum stops there, and cannot overflow
         var seconds = 0L;
@@ -99,7 +100,7 @@ internal static class AefJobRunner
     {
         private readonly JsonObject _plan;
         private readonly JsonObject _runner;
-        private readonly AefScriptedTarget _target;
+        private readonly IAefJobTarget _target;
         private readonly AefJobOptions _options;
         private readonly string _planDigest;
         private readonly string _runnerId;
@@ -108,11 +109,12 @@ internal static class AefJobRunner
         private readonly List<double> _spent = [];
         private readonly List<double> _totals = [];
         private readonly List<string> _sealed = [];
-        private AefTime _clock;
+        private readonly IAefJobClock _jobClock;
+        private AefTime _clock => _jobClock.Now;
         private long _done;
         private EventWriter? _events;
 
-        public Job(JsonObject plan, byte[] bytes, JsonObject runner, AefScriptedTarget target, AefJobOptions options)
+        public Job(JsonObject plan, byte[] bytes, JsonObject runner, IAefJobTarget target, AefJobOptions options)
         {
             _plan = plan;
             _runner = runner;
@@ -120,7 +122,9 @@ internal static class AefJobRunner
             _options = options;
             _planDigest = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
             _runnerId = AefNode.String(runner["runnerId"])!;
-            _start = _clock = options.At;
+            _jobClock = options.Clock ?? (target.TargetMode == AefTargetMode.Scripted
+                ? new AefSimulatedJobClock(options.At) : new AefElapsedJobClock(options.At));
+            _start = _clock;
 
             // The job's id, from everything that decides what it writes: one job run twice writes the same bytes, and two
             // jobs that would write different runs never share a run id ([RUN-13]).
@@ -128,7 +132,7 @@ internal static class AefJobRunner
             _jobId = "job-" + Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(seed)), 0, 12).ToLowerInvariant();
         }
 
-        public AefJobResult Run(string output)
+        public async Task<AefJobResult> RunAsync(string output, CancellationToken cancellationToken)
         {
             _events = new EventWriter(Path.Combine(output, EventsFile), _jobId);
             var (refusal, suites) = Decide();
@@ -145,44 +149,74 @@ internal static class AefJobRunner
             Estimate(suites);
 
             string? limit = null, why = null;
-            for (var k = 0; k < suites.Count && limit is null; k++)
+            OpenRun? activeRun = null;
+            try
             {
-                var (planSuite, suite) = suites[k];
-                OpenRun? run = null;
-                foreach (var scripted in suite.Cases)
+                cancellationToken.ThrowIfCancellationRequested();
+                for (var k = 0; k < suites.Count && why is null; k++)
                 {
-                    (limit, why) = Check(scripted, suite, run);
-                    if (limit is not null)
+                    var (planSuite, suite) = suites[k];
+                    foreach (var next in suite.Cases)
                     {
-                        break;
+                        cancellationToken.ThrowIfCancellationRequested();
+                        (limit, why) = Check(next, suite, activeRun);
+                        if (limit is not null) break;
+                        activeRun ??= Open(k, planSuite, suite, output);
+                        var violation = await RunCaseAsync(activeRun, next, suite, planSuite, cancellationToken).ConfigureAwait(false);
+                        (limit, why) = CheckActual(activeRun);
+                        why ??= violation;
+                        if (why is not null) break;
                     }
-
-                    run ??= Open(k, planSuite, suite, output);
-                    RunCase(run, scripted, planSuite);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (activeRun is not null) Seal(activeRun, limit, why);
+                    activeRun = null;
                 }
-
-                if (run is not null)
-                {
-                    Seal(run, limit, why);
-                }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                try { if (activeRun is not null) Seal(activeRun, null, "The job was cancelled"); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return FailIo(activeRun); }
+                _events.Emit("job.cancelled", _clock, new JsonObject { ["reason"] = "The job was cancelled" });
+                return new AefJobResult(_jobId, _events.Count, "job.cancelled", null, "The job was cancelled", [.. _sealed], _clock);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return FailIo(activeRun);
             }
 
             var runs = new JsonArray([.. _sealed.Select(r => (JsonNode?)JsonValue.Create(r))]);
-            if (limit is null)
+            if (why is null)
             {
                 _events.Emit("job.sealed", _clock, new JsonObject { ["runs"] = runs });
                 return new AefJobResult(_jobId, _events.Count, "job.sealed", null, null, [.. _sealed], _clock);
             }
 
-            _events.Emit("job.failed", _clock, new JsonObject { ["reason"] = Cut(why!), ["limit"] = limit, ["runs"] = runs });
+            var failure = new JsonObject { ["reason"] = Cut(why) };
+            if (limit is not null) failure["limit"] = limit;
+            failure["runs"] = runs;
+            _events.Emit("job.failed", _clock, failure);
             return new AefJobResult(_jobId, _events.Count, "job.failed", limit, why, [.. _sealed], _clock);
+        }
+
+        private AefJobResult FailIo(OpenRun? run)
+        {
+            // A permanently unwritable event file still propagates its I/O error; a successful terminal event is never claimed.
+            if (run?.Writer.Status == AefRunStatus.Running)
+                try { Seal(run, null, "The job encountered an I/O failure"); }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            _events!.Emit("job.failed", _clock, new JsonObject
+            {
+                ["reason"] = "The job encountered an I/O failure",
+                ["runs"] = new JsonArray([.. _sealed.Select(r => (JsonNode?)JsonValue.Create(r))]),
+            });
+            return new AefJobResult(_jobId, _events.Count, "job.failed", null, "The job encountered an I/O failure", [.. _sealed], _clock);
         }
 
         // [PLAN-7], [PLAN-8], [PLAN-3]: whether this runner takes the plan, and, when it does, the plan's suites resolved
         // in the target, in the plan's order. The refusal names no credential's path or value.
-        private (string? Refusal, List<(JsonObject Plan, AefScriptedSuite Target)> Suites) Decide()
+        private (string? Refusal, List<(JsonObject Plan, IAefJobSuite Target)> Suites) Decide()
         {
-            List<(JsonObject, AefScriptedSuite)> resolved = [];
+            List<(JsonObject, IAefJobSuite)> resolved = [];
             if (AefSchemas.Reader.Validate("run-plan", _plan) is not null)
             {
                 return ("the plan is not valid against the reader run-plan schema ([PLAN-7], [VER-3])", resolved);
@@ -194,14 +228,18 @@ internal static class AefJobRunner
             }
 
             var mode = RunnerEventStream.TargetModeOf(_plan);
-            if (mode != "scripted")
+            if (mode != AefNames.Of(_target.TargetMode))
             {
-                return ($"this runner drives a scripted target only: it cannot give the target mode {mode} ([PLAN-7], [RUN-7])", resolved);
+                return (_target.TargetMode == AefTargetMode.Scripted
+                    ? $"this runner drives a scripted target only: it cannot give the target mode {mode} ([PLAN-7], [RUN-7])"
+                    : $"this target cannot give the target mode {mode} ([PLAN-7], [RUN-7])", resolved);
             }
 
-            if (AefNode.String(_plan["isolation"]) is { } isolation && isolation != "process")
+            if (AefNode.String(_plan["isolation"]) is { } isolation && isolation != _target.Isolation)
             {
-                return ($"a scripted target runs in the runner's own process, so this runner gives the isolation process only, not {isolation} ([PLAN-7], §9.2.1)", resolved);
+                return (_target.TargetMode == AefTargetMode.Scripted
+                    ? $"a scripted target runs in the runner's own process, so this runner gives the isolation process only, not {isolation} ([PLAN-7], §9.2.1)"
+                    : $"this target cannot provide isolation {isolation} ([PLAN-7])", resolved);
             }
 
             foreach (var planSuite in AefNode.Objects(_plan["suites"]))
@@ -212,7 +250,7 @@ internal static class AefJobRunner
                     return ($"the plan names the suite {suiteRef} version {version} twice: a job runs a suite's cases once ([PLAN-8])", []);
                 }
 
-                if (_target.Find(suiteRef, version) is not { } suite)
+                if (_target.Suites.FirstOrDefault(s => s.Ref == suiteRef && s.Version == version) is not { } suite)
                 {
                     return ($"the suite {suiteRef} version {version} cannot be resolved ([PLAN-8])", []);
                 }
@@ -247,14 +285,14 @@ internal static class AefJobRunner
 
         // plan.estimated: the cases of the plan's suites, at most its cases limit, and the sums of the usd and usdBound of
         // the cases it counts (the first ones, in run order), each computed exactly and rounded once (§9.2.1, [SUM-5]).
-        private void Estimate(List<(JsonObject Plan, AefScriptedSuite Target)> suites)
+        private void Estimate(List<(JsonObject Plan, IAefJobSuite Target)> suites)
         {
             var planned = suites.SelectMany(s => s.Target.Cases).ToList();
             var counted = CasesLimit is { } limit && limit < planned.Count ? planned.Take((int)limit).ToList() : planned;
             _events!.Emit("plan.estimated", _clock, new JsonObject
             {
                 ["cases"] = (long)counted.Count,
-                ["usdLow"] = AefSummaryCalculator.ExactSum(counted.Select(c => c.Usd)),
+                ["usdLow"] = AefSummaryCalculator.ExactSum(counted.Select(c => c.UsdLow)),
                 ["usdHigh"] = AefSummaryCalculator.ExactSum(counted.Select(c => c.UsdBound)),
                 ["priceTable"] = _target.PriceTable,
             });
@@ -262,7 +300,7 @@ internal static class AefJobRunner
 
         // [PLAN-9]: the first limit, in [PLAN-2]'s order, the case could pass, and why; or none. open is the run the case
         // would be a case of, when it is open already.
-        private (string? Limit, string? Why) Check(AefScriptedCase next, AefScriptedSuite suite, OpenRun? open)
+        private (string? Limit, string? Why) Check(IAefJobCase next, IAefJobSuite suite, OpenRun? open)
         {
             var where = $"before case {next.CaseId} of suite {suite.Ref} version {suite.Version}";
             var maxUsd = AefNode.Number(AefNode.At(_plan, "limits", "maxUsd")) ?? 0;
@@ -284,11 +322,22 @@ internal static class AefJobRunner
                 return ("cases", $"stopped {where}: the plan's {cases} cases are complete ([PLAN-9])");
             }
 
-            if (TimeoutSeconds is { } timeout && (_clock.Seconds - _start.Seconds) + next.SecondsBound + _target.CloseSeconds > timeout)
+            if (TimeoutSeconds is { } timeout && _clock.CompareTo(_start.AddSeconds(timeout - next.SecondsBound - _target.CloseSeconds)) > 0)
             {
                 return ("timeout", $"stopped {where}: the time since job.accepted, plus its time bound, plus the time kept for closing and sealing the run, would be above the timeout ([PLAN-9])");
             }
 
+            return (null, null);
+        }
+
+        private (string? Limit, string? Why) CheckActual(OpenRun run)
+        {
+            var maxUsd = AefNode.Number(AefNode.At(_plan, "limits", "maxUsd")) ?? 0;
+            if (AefSummaryCalculator.ExactSum(_spent) > maxUsd
+                || AefSummaryCalculator.ExactSum(_totals.Append(AefSummaryCalculator.ExactSum(run.Usd))) > maxUsd)
+                return ("maxUsd", "The case exceeded the job's cost limit");
+            if (TimeoutSeconds is { } timeout && _clock.CompareTo(_start.AddSeconds(timeout)) > 0)
+                return ("timeout", "The case exceeded the job's time limit");
             return (null, null);
         }
 
@@ -298,7 +347,7 @@ internal static class AefJobRunner
 
         // A run for the k-th suite of the plan, started now: what the plan gives ([STRM-4]), what [PLAN-10] derives, and
         // the job's provenance ([RUN-12]).
-        private OpenRun Open(int k, JsonObject planSuite, AefScriptedSuite suite, string output)
+        private OpenRun Open(int k, JsonObject planSuite, IAefJobSuite suite, string output)
         {
             var runId = $"{_jobId}-{(k + 1).ToString(CultureInfo.InvariantCulture)}";
             var subject = _plan["subject"]!;
@@ -322,39 +371,92 @@ internal static class AefJobRunner
                 ContentCapture = AefNode.String(_plan["contentCapture"]) == "on" ? AefContentCapture.On : AefContentCapture.Off,
                 CostPolicy = new AefCostPolicy { MaxUsd = AefNode.Number(AefNode.At(_plan, "limits", "maxUsd")), PriceTable = _target.PriceTable },
                 Provenance = new AefProvenance { PlanId = AefNode.String(_plan["planId"])!, PlanDigest = _planDigest, JobId = _jobId, RunnerId = _runnerId },
-                Execution = new AefExecution { TargetMode = AefTargetMode.Scripted, Stimulus = AefStimulus.Suite },
+                Execution = new AefExecution { TargetMode = _target.TargetMode, Stimulus = AefStimulus.Suite },
             };
             var directory = Path.Combine(output, RunsFolder, runId);
             var writer = AefRunWriter.Create(directory, header);
-            writer.SetMetrics([PassRate]);
-            return new OpenRun(runId, directory, writer, AefNode.String(planSuite["lane"]));
+            writer.SetMetrics(suite.Metrics);
+            return new OpenRun(runId, directory, writer, AefNode.String(planSuite["lane"]), suite);
         }
 
         // A case: its line (the case's root at path check, its caseId unrewritten, its state; a severity on a failed or
         // warn line, a reason on a typed absence), the clock moved by its seconds, its usd added to the spend.
-        private void RunCase(OpenRun run, AefScriptedCase scripted, JsonObject planSuite)
+        private async Task<string?> RunCaseAsync(OpenRun run, IAefJobCase next, IAefJobSuite suite, JsonObject planSuite, CancellationToken cancellationToken)
         {
             var started = _clock;
-            _clock = _clock.AddSeconds(scripted.Seconds);
-            run.Writer.AddResult(new AefResult
+            AefJobCaseResult result;
+            using var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            if (_target.TargetMode != AefTargetMode.Scripted)
+                deadline.CancelAfter(TimeSpan.FromSeconds(next.SecondsBound));
+            var timedOut = false;
+            try
             {
-                CaseId = scripted.CaseId,
-                Path = CasePath,
-                Evaluator = new AefEvaluator(EvaluatorId),
-                State = scripted.State,
-                Reason = scripted.State is AefState.NotMeasured or AefState.NotApplicable or AefState.Skipped or AefState.Error
-                    ? $"the scripted target answers this case {AefNames.Of(scripted.State)}"
-                    : null,
-                Severity = scripted.Severity,
+                result = await next.RunAsync(deadline.Token).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                AddSpend(run, next.IncurredUsd);
+                if (next.IncurredUsd > 0)
+                    _events!.Emit("spend.updated", _clock, new JsonObject { ["spentUsd"] = AefSummaryCalculator.ExactSum(_spent) });
+                throw;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                AddSpend(run, next.IncurredUsd);
+                if (next.IncurredUsd > 0)
+                    _events!.Emit("spend.updated", _clock, new JsonObject { ["spentUsd"] = AefSummaryCalculator.ExactSum(_spent) });
+                throw;
+            }
+            catch (Exception ex) when (ex is not IOException and not UnauthorizedAccessException)
+            {
+                timedOut = deadline.IsCancellationRequested;
+                result = new AefJobCaseResult(new AefResult
+                {
+                    CaseId = next.CaseId, Path = suite.CasePath, Evaluator = new AefEvaluator("agenteval.runner"),
+                    State = AefState.Error, Reason = timedOut ? "The case exceeded its time bound" : $"The case threw {ex.GetType().Name}",
+                }, next.IncurredUsd, 0);
+            }
+            if (result.Root.CaseId != next.CaseId || result.Root.Path != suite.CasePath || result.Seconds < 0)
+                throw new InvalidOperationException("A case result must retain its declared id, root path and nonnegative duration.");
+            _jobClock.Advance(result.Seconds);
+            var root = result.Root with
+            {
                 Lane = AefNode.String(planSuite["lane"]),
                 StartedAt = started,
                 EndedAt = _clock,
-            });
-            run.Usd.Add(scripted.Usd);
-            _spent.Add(scripted.Usd);
+            };
+            var handle = run.Writer.AddResult(root);
+            WriteChildren(run.Writer, handle, result.Children, root.Lane);
+            if (result.Judges is { Count: > 0 })
+            {
+                foreach (var judge in result.Judges) run.Judges[judge.Model] = judge;
+                run.Writer.SetJudges(run.Judges.Values.ToArray());
+            }
+            AddSpend(run, result.Usd);
             _done++;
-            _events!.Emit("case.completed", _clock, new JsonObject { ["caseId"] = scripted.CaseId, ["state"] = AefNames.Of(scripted.State), ["runId"] = run.RunId });
+            _events!.Emit("case.completed", _clock, new JsonObject { ["caseId"] = next.CaseId, ["state"] = AefNames.Of(root.State), ["runId"] = run.RunId });
             _events.Emit("spend.updated", _clock, new JsonObject { ["spentUsd"] = AefSummaryCalculator.ExactSum(_spent) });
+            if (result.Usd > next.UsdBound) return "The case exceeded its declared cost bound";
+            if (timedOut || _clock.CompareTo(started.AddSeconds(next.SecondsBound)) > 0)
+                return "The case exceeded its declared time bound";
+            return null;
+        }
+
+        private static void WriteChildren(AefRunWriter writer, AefResultHandle parent, IReadOnlyList<AefJobCaseNode>? children, string? lane)
+        {
+            if (children is null) return;
+            foreach (var child in children)
+            {
+                var handle = writer.AddResult(child.Result with { Lane = lane }, parent);
+                WriteChildren(writer, handle, child.Children, lane);
+            }
+        }
+
+        private void AddSpend(OpenRun run, double usd)
+        {
+            if (!double.IsFinite(usd) || usd < 0) throw new InvalidOperationException("A case cost must be finite and nonnegative.");
+            run.Usd.Add(usd);
+            _spent.Add(usd);
         }
 
         // Closes the run (completed, or aborted when a limit cut it off, [RUN-5]) when its last case has run, seals it once
@@ -365,11 +467,11 @@ internal static class AefJobRunner
             var total = AefSummaryCalculator.ExactSum(run.Usd);
             run.Writer.SetSummary(new AefSummary
             {
-                Lanes = run.Lane is { } lane ? [new AefSummaryLane(lane, [new AefSummaryEntry { Metric = PassRate.Id, Path = CasePath }])] : [],
+                Lanes = run.Lane is { } lane ? [new AefSummaryLane(lane, run.Suite.SummaryEntries)] : [],
                 Cost = new AefCost(total, $"price table {_target.PriceTable}"),
             });
-            run.Writer.Close(limit is null ? AefRunStatus.Completed : AefRunStatus.Aborted, _clock, limit is null ? null : Cut(why!));
-            _clock = _clock.AddSeconds(_target.CloseSeconds);
+            run.Writer.Close(why is null ? AefRunStatus.Completed : AefRunStatus.Aborted, _clock, why is null ? null : Cut(why));
+            _jobClock.Advance(_target.CloseSeconds);
             var seal = AefSealer.Seal(run.Directory, new AefSealOptions { SealedAt = _clock.ToString() });
             _events!.Emit("evidence.produced", _clock, new JsonObject { ["runId"] = run.RunId, ["runHash"] = seal.RunHash });
             _sealed.Add(run.RunId);
@@ -407,9 +509,10 @@ internal static class AefJobRunner
         return reason[..end] + "...";
     }
 
-    private sealed record OpenRun(string RunId, string Directory, AefRunWriter Writer, string? Lane)
+    private sealed record OpenRun(string RunId, string Directory, AefRunWriter Writer, string? Lane, IAefJobSuite Suite)
     {
         public List<double> Usd { get; } = [];
+        public Dictionary<string, AefJudge> Judges { get; } = new(StringComparer.Ordinal);
     }
 
     /// <summary>

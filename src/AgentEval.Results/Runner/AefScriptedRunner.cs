@@ -32,12 +32,15 @@ public sealed class AefJobOptions
 
     /// <summary>The producer each run's run.json names; <see cref="AefScriptedRunner.DefaultProducer"/> when not given.</summary>
     public AefProducer? Producer { get; init; }
+
+    /// <summary>The execution clock; defaults to simulated time for scripted targets and monotonic elapsed time otherwise.</summary>
+    public IAefJobClock? Clock { get; init; }
 }
 
 /// <summary>What a job wrote (<see cref="AefScriptedRunner.Run"/>).</summary>
 /// <param name="JobId">The job's id, on every event.</param>
 /// <param name="Events">The number of events in <c>events.ndjson</c>.</param>
-/// <param name="Terminal">The terminal event's kind: <c>job.refused</c>, <c>job.sealed</c> or <c>job.failed</c>.</param>
+/// <param name="Terminal">The terminal event's kind: <c>job.refused</c>, <c>job.sealed</c>, <c>job.cancelled</c> or <c>job.failed</c>.</param>
 /// <param name="Limit">The plan limit the job stopped at (<c>maxUsd</c>, <c>cases</c>, <c>timeout</c>), or null.</param>
 /// <param name="Reason">Why the plan was refused or the job stopped, or null for a sealed job.</param>
 /// <param name="Runs">The runs it sealed, in the order announced.</param>
@@ -117,7 +120,8 @@ public static class AefScriptedRunner
     /// <exception cref="ArgumentException"><paramref name="output"/> is a file, or a folder that is not empty.</exception>
     /// <exception cref="IOException">The output cannot be written.</exception>
     public static AefJobResult Run(byte[] plan, JsonObject runner, AefScriptedTarget target, string output, AefJobOptions options) =>
-        AefJobRunner.Run(plan, runner, target, output, options);
+        AefJobRunner.RunAsync(plan, runner, new AefScriptedJobTarget(target ?? throw new ArgumentNullException(nameof(target))), output, options)
+            .GetAwaiter().GetResult();
 
     private static string ReadVersion()
     {
