@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Trace-fidelity interruption evidence:** both trace and workflow reconciliation retain their observed result
+  as aborted, replayed AEF evidence when persistence or reporting is interrupted; aborted invocations omit gates.
+
 - **Live autoaudit interruption evidence:** completed models remain available as aborted AEF runs when a later
   model or report fails. An interrupted model without a returned result has empty evidence; unstarted models
   are omitted. Cancellation and exception propagation are preserved unless explicit evidence output fails.

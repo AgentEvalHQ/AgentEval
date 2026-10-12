@@ -83,15 +83,21 @@ public static class BenchTraceFidelityCommand
         var result = new TraceFidelityRunner(ParsePreset(preset)).ReconcileToEvalResult(agentTrace, chatTrace);
 
         // ── Persist via the canonical output store (manifest + native report) ──
-        var store = new FileSystemOutputStore(agentEvalDir);
-        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
-        var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
-        await store.EnsureSolutionAsync();
-        await store.EnsureSubjectAsync(subjectIdentity);
-
-        Console.WriteLine($"Running trace-fidelity ({preset}) for subject '{subject}'...");
+        bool WriteEvidence(string? reason = null) => !noAef && BenchAef.WriteResult(
+            aef, agentEvalDir, "trace-fidelity", preset, subject, subjectVersion,
+            AgentEval.Results.Writing.AefTargetMode.Replayed, result, startedAt, DateTimeOffset.UtcNow,
+            subjectKind: "agent", exitCode: reason is null ? BenchExitCodes.FromLabel(result.Score.Label) : null,
+            abortReason: reason);
         try
         {
+            var store = new FileSystemOutputStore(agentEvalDir);
+            await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
+            var subjectIdentity = new SubjectIdentity(SubjectKind.Agent, subject);
+            await store.EnsureSolutionAsync();
+            await store.EnsureSubjectAsync(subjectIdentity);
+
+            Console.WriteLine($"Running trace-fidelity ({preset}) for subject '{subject}'...");
+            ct.ThrowIfCancellationRequested();
             var manifest = await store.StartRunAsync(
                 subjectIdentity,
                 new RunContext(
@@ -133,8 +139,8 @@ public static class BenchTraceFidelityCommand
             Console.WriteLine($"   Run ID: {runId}");
             Console.WriteLine($"   Canonical: {runDir}");
             // AEF: the result as sealed evidence. It grades traces the agent already produced and drives no agent: replayed.
-            if (!noAef && BenchAef.WriteResult(aef, agentEvalDir, "trace-fidelity", preset, subject, subjectVersion,
-                AgentEval.Results.Writing.AefTargetMode.Replayed, result, startedAt, DateTimeOffset.UtcNow, exitCode: BenchExitCodes.FromLabel(result.Score.Label)))
+            ct.ThrowIfCancellationRequested();
+            if (WriteEvidence())
                 return ExitCodes.RuntimeError;   // an explicit --aef could not be written
 
             return BenchExitCodes.FromLabel(result.Score.Label);
@@ -142,7 +148,7 @@ public static class BenchTraceFidelityCommand
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Failed to persist trace-fidelity run: {ex.Message}");
-            return 1;
+            return WriteEvidence(ct.IsCancellationRequested ? "cancelled" : "execution-error") ? ExitCodes.RuntimeError : 1;
         }
     }
 

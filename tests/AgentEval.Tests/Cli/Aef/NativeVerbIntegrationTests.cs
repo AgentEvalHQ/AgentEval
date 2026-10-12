@@ -854,6 +854,55 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.Equal(1, populated);
     }
 
+    [Theory]
+    [InlineData(false, false, false)]
+    [InlineData(true, false, false)]
+    [InlineData(false, true, false)]
+    [InlineData(true, true, false)]
+    [InlineData(false, false, true)]
+    [InlineData(true, false, true)]
+    public async Task TraceFidelity_CancelAfterReconciliation_RetainsReplayedEvidence(bool workflow, bool noAef, bool invalidOutput)
+    {
+        Directory.CreateDirectory(Path.Combine(_root, ".agenteval"));
+        File.WriteAllText(Path.Combine(_root, ".agenteval", "solution.json"),
+            new JsonObject { ["schemaVersion"] = "1.0", ["id"] = Guid.NewGuid().ToString(), ["name"] = "trace-cancel" }.ToJsonString());
+        var tracePath = Path.Combine(_root, "trace.json");
+        if (workflow)
+            await AgentEval.Tracing.WorkflowTraceSerializer.SaveToFileAsync(new AgentEval.Tracing.WorkflowTrace
+            {
+                TraceName = "workflow", OriginalPrompt = "go", FinalOutput = "done",
+                Steps = { new AgentEval.Tracing.WorkflowTraceStep { ExecutorId = "a", Output = "done", StepIndex = 0 } },
+            }, tracePath);
+        else
+            await AgentEval.Tracing.TraceSerializer.SaveToFileAsync(new AgentEval.Tracing.AgentTrace(), tracePath);
+        var aef = new DirectoryInfo(Path.Combine(_root, "trace-aef"));
+        if (invalidOutput) File.WriteAllText(aef.FullName, "not a directory");
+        using var cancel = new CancellationTokenSource();
+        var original = Console.Out;
+        using var output = new CancelOnPersistenceWriter(cancel, "Running ");
+        try
+        {
+            Console.SetOut(output);
+            var exit = workflow
+                ? await BenchWorkflowTraceFidelityCommand.RunAsync(tracePath, "standard", "subject", _root, cancel.Token, aef, noAef)
+                : await BenchTraceFidelityCommand.RunAsync(tracePath, tracePath, "standard", "subject", _root, cancel.Token, aef, noAef);
+            Assert.Equal(invalidOutput ? 3 : 1, exit);
+        }
+        finally { Console.SetOut(original); }
+        Assert.True(cancel.IsCancellationRequested);
+        if (noAef || invalidOutput)
+        {
+            Assert.Empty(Directory.GetFiles(_root, "seal.json", SearchOption.AllDirectories));
+            return;
+        }
+        var dir = RunDirectory(aef.FullName);
+        AssertIntact(dir);
+        Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
+        Assert.Equal("replayed", (string?)Document(dir, "run.json")["execution"]!["targetMode"]);
+        Assert.NotEmpty(File.ReadAllLines(Path.Combine(dir, "results.ndjson")));
+        Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
+    }
+
     private sealed class FailOnPerfPersistenceWriter : StringWriter
     {
         public override void WriteLine(string? value)

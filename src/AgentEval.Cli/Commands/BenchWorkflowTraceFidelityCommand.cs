@@ -89,15 +89,21 @@ public static class BenchWorkflowTraceFidelityCommand
         var result = new WorkflowTraceFidelityReconciler(ParsePreset(preset)).ReconcileToEvalResult(wfResult, chatTraces);
 
         // ── Persist via the canonical output store (manifest + native report) ──
-        var store = new FileSystemOutputStore(agentEvalDir);
-        await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
-        var subjectIdentity = new SubjectIdentity(SubjectKind.Workflow, subject);
-        await store.EnsureSolutionAsync();
-        await store.EnsureSubjectAsync(subjectIdentity);
-
-        Console.WriteLine($"Running workflow-trace-fidelity ({preset}) for subject '{subject}'...");
+        bool WriteEvidence(string? reason = null) => !noAef && BenchAef.WriteResult(
+            aef, agentEvalDir, "workflow-trace-fidelity", preset, subject, subjectVersion,
+            AgentEval.Results.Writing.AefTargetMode.Replayed, result, startedAt, DateTimeOffset.UtcNow,
+            subjectKind: "workflow", exitCode: reason is null ? BenchExitCodes.FromLabel(result.Score.Label) : null,
+            abortReason: reason);
         try
         {
+            var store = new FileSystemOutputStore(agentEvalDir);
+            await store.SweepStaleSentinelsAsync(TimeSpan.FromHours(24), ct);
+            var subjectIdentity = new SubjectIdentity(SubjectKind.Workflow, subject);
+            await store.EnsureSolutionAsync();
+            await store.EnsureSubjectAsync(subjectIdentity);
+
+            Console.WriteLine($"Running workflow-trace-fidelity ({preset}) for subject '{subject}'...");
+            ct.ThrowIfCancellationRequested();
             var manifest = await store.StartRunAsync(
                 subjectIdentity,
                 new RunContext(
@@ -145,8 +151,8 @@ public static class BenchWorkflowTraceFidelityCommand
             Console.WriteLine($"   Run ID: {runId}");
             Console.WriteLine($"   Canonical: {runDir}");
             // AEF: the result as sealed evidence. It grades traces the agent already produced and drives no agent: replayed.
-            if (!noAef && BenchAef.WriteResult(aef, agentEvalDir, "workflow-trace-fidelity", preset, subject, subjectVersion,
-                AgentEval.Results.Writing.AefTargetMode.Replayed, result, startedAt, DateTimeOffset.UtcNow, subjectKind: "workflow", exitCode: BenchExitCodes.FromLabel(result.Score.Label)))
+            ct.ThrowIfCancellationRequested();
+            if (WriteEvidence())
                 return ExitCodes.RuntimeError;   // an explicit --aef could not be written
 
             return BenchExitCodes.FromLabel(result.Score.Label);
@@ -154,7 +160,7 @@ public static class BenchWorkflowTraceFidelityCommand
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Failed to persist workflow-trace-fidelity run: {ex.Message}");
-            return 1;
+            return WriteEvidence(ct.IsCancellationRequested ? "cancelled" : "execution-error") ? ExitCodes.RuntimeError : 1;
         }
     }
 
