@@ -880,6 +880,7 @@ internal static class RedTeamCommand
                 SubjectVersion = opts.SubjectVersion,
                 Endpoint = builtInTarget ? null : opts.Endpoint,
                 JudgeModel = string.IsNullOrWhiteSpace(opts.JudgeEndpoint) ? null : opts.JudgeModel ?? resolvedName,
+                JudgeProvider = judge is null ? null : "openai-compatible",
                 JudgeUsage = judge is { ReportedUsage: true }
                     ? new AefUsage { Role = AefUsageRole.Judge, Model = opts.JudgeModel ?? resolvedName, InputTokens = judge.InputTokens, OutputTokens = judge.OutputTokens }
                     : null,

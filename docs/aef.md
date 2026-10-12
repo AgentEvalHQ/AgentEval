@@ -251,6 +251,11 @@ custom client overrides leave it absent. A configured provider is listed only wh
 An adopted fallback-judge success carries judge provenance; a judge refusal that the oracle cannot support
 still leaves the original verdict unchanged and does not claim that the judge supplied the result.
 
+Direct `eval --judge` and `redteam --judge` construct OpenAI-compatible judge clients and record that provider
+when their verdicts are used. Named eval metrics that reuse a CLI-created subject client record `azure` for
+`--azure`, otherwise `openai-compatible`. A custom subject-client override does not inherit either label from
+CLI flags. Explicit judge clients retain their own provider independently of the subject.
+
 Panel wrappers persist `JudgePanelSize`: their first N sub-results are panel members in definition order;
 any following adjudicator is a separate invocation. Composite AEF headers use these explicit facts to record
 `mode: panel` and the configured size for measured member judges, including members that grade several criteria.

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Direct CLI judge providers:** eval and redteam record the configured OpenAI-compatible judge provider.
+  Named eval metrics retain Azure/OpenAI-compatible subject-client identity when reused for grading; custom
+  client overrides remain unknown. Single-run and stochastic harness evidence share the same provider facts.
+
 - **Eval/probe judge providers:** native writer options accept known provider identities. Eval sessions keep
   separate model/provider pairs and do not copy the harness provider onto an explicitly separate metric judge.
   OWASP, MITRE and NIST pass captured judge-provider identity through normal and interrupted scan evidence.

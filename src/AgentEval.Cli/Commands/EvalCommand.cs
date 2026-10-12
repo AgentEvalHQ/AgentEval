@@ -435,7 +435,8 @@ internal static class EvalCommand
         var completed = new List<TestResult>();
         var caseIds = EvalAef.CaseIds(testCases);
         var targetMode = standIn ? AefTargetMode.Mocked : AefTargetMode.Live;
-        using var evidence = new EvalEvidence(opts, () => AefOptions(opts, resolvedName, targetMode, judgeLedger, testCases),
+        using var evidence = new EvalEvidence(opts, () => AefOptions(opts, resolvedName, targetMode, judgeLedger, testCases,
+                opts.Sut is null && agentClientOverride is null ? (opts.Azure ? "azure" : "openai-compatible") : null),
             () => AefJudgeUsage(opts, resolvedName, judgeLedger), startedAt);
         try
         {
@@ -605,7 +606,7 @@ internal static class EvalCommand
         Performance = testResult.Performance,
     };
 
-    private static AefEvalRunOptions AefOptions(EvalOptions opts, string resolvedName, AefTargetMode targetMode, JudgeCallLedger? judge, IReadOnlyList<DatasetTestCase> cases)
+    private static AefEvalRunOptions AefOptions(EvalOptions opts, string resolvedName, AefTargetMode targetMode, JudgeCallLedger? judge, IReadOnlyList<DatasetTestCase> cases, string? subjectProvider = null)
     {
         var subjectRef = opts.Subject ?? AefEvalWriter.Ref("model", resolvedName);
         var settings = new System.Text.Json.Nodes.JsonObject { ["runs"] = opts.Runs };
@@ -643,7 +644,9 @@ internal static class EvalCommand
             Endpoint = opts.Endpoint,
             // The judge the harness was given: only with --judge, on --judge-model or the subject's model.
             JudgeModel = opts.JudgeEndpoint is null ? null : opts.JudgeModel ?? resolvedName,
+            JudgeProvider = opts.JudgeEndpoint is null ? null : "openai-compatible",
             MetricJudgeModel = opts.JudgeEndpoint is null ? resolvedName : opts.JudgeModel ?? resolvedName,
+            MetricJudgeProvider = opts.JudgeEndpoint is null ? subjectProvider : "openai-compatible",
             TargetMode = targetMode,
             // Golden-trace callers supply their comparison decision after it has been computed.
             GateRule = opts.Golden is not null ? null : opts.Runs > 1 ? "all-cases-pass-at-least" : "all-cases-pass",

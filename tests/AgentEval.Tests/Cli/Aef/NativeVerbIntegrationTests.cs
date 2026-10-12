@@ -69,16 +69,17 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Directory.Delete(_root, recursive: true);
     }
 
-    private EvalOptions Options(string endpoint, int count = 1, int runs = 1, string? metrics = null, float? temperature = null, int? maxTokens = null)
+    private EvalOptions Options(string endpoint, int count = 1, int runs = 1, string? metrics = null, float? temperature = null, int? maxTokens = null, bool azure = false, string? judgeEndpoint = null)
     {
         var dataset = Path.Combine(_root, "dataset.yaml");
         File.WriteAllText(dataset, string.Concat(Enumerable.Range(0, count).Select(i => $"- id: c{i}\n  input: secret-prompt-{i}\n  expected: Hi\n")));
         return new EvalOptions
         {
-            Dataset = new FileInfo(dataset), Endpoint = endpoint, Model = "local-model", ApiKey = "local-test",
+            Dataset = new FileInfo(dataset), Endpoint = azure ? new Uri(endpoint).GetLeftPart(UriPartial.Authority) : endpoint,
+            Azure = azure, DeploymentName = azure ? "local-model" : null, Model = "local-model", ApiKey = "local-test",
             Format = "json", Output = new FileInfo(Path.Combine(_root, "report.json")), Quiet = true,
             Aef = new DirectoryInfo(Path.Combine(_root, "aef")), SubjectVersion = "1",
-            Runs = runs,
+            Runs = runs, JudgeEndpoint = judgeEndpoint, JudgeModel = judgeEndpoint is null ? null : "local-judge",
             Metrics = metrics, Temperature = temperature, MaxTokens = maxTokens,
         };
     }
@@ -423,19 +424,44 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         AssertIntact(RunDirectory(options.Aef!.FullName));
     }
 
-    [Fact]
-    public async Task Eval_LlmMetricUsingSubjectClient_RecordsJudgeAndSeparateUsage()
+    [Theory]
+    [InlineData(1)]
+    [InlineData(3)]
+    public async Task Eval_ExplicitJudge_RecordsProviderForSingleAndRepeatedRuns(int runs)
+    {
+        await using var agent = await LocalChatEndpoint.StartAsync("Hi");
+        await using var judge = await LocalChatEndpoint.StartAsync("""{"overallScore":95,"criteriaResults":[{"criterion":"Greets","met":true}]}""");
+        var options = Options(agent.Endpoint, runs: runs, judgeEndpoint: judge.Endpoint);
+        File.WriteAllText(options.Dataset.FullName, "- id: c0\n  input: Greet\n  expected: Hi\n  evaluation_criteria: [Greets]\n");
+        Assert.Equal(0, await EvalCommand.ExecuteAsync(options, CancellationToken.None));
+        var dir = RunDirectory(options.Aef!.FullName);
+        AssertIntact(dir);
+        var grader = Assert.Single(Document(dir, "run.json")["judges"]!.AsArray())!;
+        Assert.Equal("local-judge", (string?)grader["model"]);
+        Assert.Equal("openai-compatible", (string?)grader["provider"]);
+        Assert.Equal(runs, judge.Requests.Count);
+    }
+
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task Eval_LlmMetricUsingSubjectClient_RecordsJudgeAndSeparateUsage(bool azure, bool clientOverride)
     {
         var calls = 0;
         await using var endpoint = await LocalChatEndpoint.StartAsync((_, _) => Task.FromResult(
             Interlocked.Increment(ref calls) == 1 ? "Hi" : """{"score":95,"addressesQuestion":true,"reasoning":"secret explanation"}"""));
-        var options = Options(endpoint.Endpoint, metrics: "llm_relevance");
-        Assert.Equal(0, await EvalCommand.ExecuteAsync(options, CancellationToken.None));
+        var options = Options(endpoint.Endpoint, metrics: "llm_relevance", azure: azure);
+        using var customClient = AgentEval.Cli.Infrastructure.EndpointFactory.CreateOpenAICompatible(endpoint.Endpoint, "local-model", "local-test");
+        Assert.Equal(0, await EvalCommand.ExecuteAsync(options, CancellationToken.None,
+            agentClientOverride: clientOverride ? customClient : null));
         Assert.Equal(2, endpoint.Requests.Count);
         var dir = RunDirectory(options.Aef!.FullName);
         AssertIntact(dir);
         var judge = Assert.Single(Document(dir, "run.json")["judges"]!.AsArray())!;
         Assert.Equal("local-model", (string?)judge["model"]);
+        Assert.Equal(clientOverride ? null : azure ? "azure" : "openai-compatible", (string?)judge["provider"]);
         var usage = Document(dir, "summary.json")["usage"]!.AsArray();
         Assert.Equal(2, usage.Count);
         Assert.All(usage, u => Assert.Equal(10, (long)u!["gen_ai.usage.input_tokens"]!));
@@ -647,6 +673,28 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.Equal(written, (int)gate["exitCode"]!);
         if (family != "nist") AssertArtifactBytes(dir, reportBytes);
         (agent as IDisposable)?.Dispose();
+    }
+
+    [Fact]
+    public async Task Redteam_AdoptedJudge_RecordsConfiguredProvider()
+    {
+        await using var agent = await LocalChatEndpoint.StartAsync("Call 202-555-0123.");
+        await using var judge = await LocalChatEndpoint.StartAsync("VERDICT: SUCCEEDED\nCONFIDENCE: 0.95\nREASON: fixture");
+        var options = new RedTeamOptions
+        {
+            Endpoint = agent.Endpoint, Model = "local-model", ApiKey = "local-test", Intensity = "quick",
+            Attacks = "PIILeakage", MaxProbes = 1,
+            JudgeEndpoint = judge.Endpoint, JudgeModel = "local-judge", JudgeApiKey = "local-test",
+            Format = "json", Output = new FileInfo(Path.Combine(_root, "redteam.json")), Quiet = true,
+            Aef = new DirectoryInfo(Path.Combine(_root, "redteam-aef")), FailOn = "never",
+        };
+        Assert.Equal(0, await RedTeamCommand.ExecuteAsync(options, CancellationToken.None));
+        var dir = RunDirectory(options.Aef!.FullName);
+        AssertIntact(dir);
+        var grader = Assert.Single(Document(dir, "run.json")["judges"]!.AsArray())!;
+        Assert.Equal("local-judge", (string?)grader["model"]);
+        Assert.Equal("openai-compatible", (string?)grader["provider"]);
+        Assert.NotEmpty(judge.Requests);
     }
 
     [Fact]
