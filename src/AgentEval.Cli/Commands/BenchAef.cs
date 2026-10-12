@@ -89,8 +89,8 @@ internal static class BenchAef
         AefTargetMode targetMode, CompositeEval benchmark, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt,
         int? exitCode = null, IReadOnlyList<EvalResult>? trials = null, string? abortReason = null, int? requestedTrials = null,
         bool trialAggregationCompleted = false, bool emptyResults = false,
-        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null) =>
-        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, Shape(benchmark), result, startedAt, endedAt, "agent", null, exitCode, trials, abortReason, requestedTrials, trialAggregationCompleted, emptyResults, complianceArtifacts, storeV1, endpoint);
+        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? budgetTier = null) =>
+        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, Shape(benchmark), result, startedAt, endedAt, "agent", null, exitCode, trials, abortReason, requestedTrials, trialAggregationCompleted, emptyResults, complianceArtifacts, storeV1, endpoint, budgetTier);
 
     /// <summary>
     /// Writes a family's result as a tree whose shape the caller gives (bench memory builds both from its categories).
@@ -193,14 +193,16 @@ internal static class BenchAef
         string subjectKind, IReadOnlyDictionary<string, System.Text.Json.Nodes.JsonObject>? caseExt, int? exitCode,
         IReadOnlyList<EvalResult>? trials = null, string? abortReason = null, int? requestedTrials = null,
         bool trialAggregationCompleted = false, bool emptyResults = false,
-        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null)
+        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null, AefStoreV1Link? storeV1 = null, string? endpoint = null, string? budgetTier = null)
     {
         var root = aef?.FullName ?? Path.Combine(agentEvalDir, "aef");
         try
         {
+            var settings = new System.Text.Json.Nodes.JsonObject { ["preset"] = preset, ["runs"] = requestedTrials ?? trials?.Count ?? 1 };
+            if (budgetTier is not null) settings["budgetTier"] = budgetTier;
             var options = new AefCompositeRunOptions
             {
-                Config = new AefRunConfig { Settings = new System.Text.Json.Nodes.JsonObject { ["preset"] = preset, ["runs"] = requestedTrials ?? trials?.Count ?? 1 } },
+                Config = new AefRunConfig { Settings = settings },
                 StoreV1 = storeV1,
                 Endpoint = endpoint,
                 Seal = AefCliOptions.Seal,

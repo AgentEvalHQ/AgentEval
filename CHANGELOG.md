@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Agentic budget metadata:** AEF configuration records the applied, normalized budget tier (`all` when no
+  filter applies), including explicit mock evidence and interrupted runs. Other benchmark families omit it.
+
 - **Native threshold and suite facts:** eval headers record a shared case threshold only when all dataset cases
   agree; mixed policies are keyed by evidence case ID. Stochastic headers no longer claim ignored named metrics.
   Composite suite versions now retain the evaluation definition's exact version instead of the package version.

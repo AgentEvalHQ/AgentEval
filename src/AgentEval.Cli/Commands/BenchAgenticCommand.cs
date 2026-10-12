@@ -136,6 +136,7 @@ public static class BenchAgenticCommand
             return 1;
         }
 
+        var appliedBudgetTier = "all";
         // ── Apply budget-tier filter (optional) ──────────────────────────────
         if (!string.IsNullOrWhiteSpace(budgetTier) && !string.Equals(budgetTier, "all", StringComparison.OrdinalIgnoreCase))
         {
@@ -148,6 +149,7 @@ public static class BenchAgenticCommand
             {
                 var beforeCount = benchmark.Components.Count;
                 benchmark = CostFilteredCompositeBuilder.FilterByBudget(benchmark, tier);
+                appliedBudgetTier = tier.ToString().ToLowerInvariant();
                 var afterCount = benchmark.Components.Count;
                 if (afterCount < beforeCount)
                 {
@@ -224,7 +226,7 @@ public static class BenchAgenticCommand
         if (mock)
         {
             return await MockTarget.RunCompositeAsync("agentic", preset, subject, subjectVersion, agentEvalDir,
-                benchmark, evalInput, judge is MockTarget.Judge, aef, noAef, ct, 1);
+                benchmark, evalInput, judge is MockTarget.Judge, aef, noAef, ct, 1, budgetTier: appliedBudgetTier);
         }
 
         var store = new FileSystemOutputStore(agentEvalDir);
@@ -330,7 +332,7 @@ public static class BenchAgenticCommand
             // bench agentic grades a response (and trace) the agent already produced: it drives no agent, so the run is
             // replayed.
             if (!noAef && BenchAef.Write(aef, agentEvalDir, "agentic", preset, subject, subjectVersion,
-                    AgentEval.Results.Writing.AefTargetMode.Replayed, benchmark, compositeResult, startedAt, DateTimeOffset.UtcNow, exitCode: finalExit, storeV1: StoreLink()))
+                    AgentEval.Results.Writing.AefTargetMode.Replayed, benchmark, compositeResult, startedAt, DateTimeOffset.UtcNow, exitCode: finalExit, storeV1: StoreLink(), budgetTier: appliedBudgetTier))
                 return ExitCodes.RuntimeError;   // an explicit --aef could not be written
 
             // ── Exit code ─────────────────────────────────────────────────────────
@@ -354,7 +356,7 @@ public static class BenchAgenticCommand
             var abortReason = ex is OperationCanceledException && ct.IsCancellationRequested ? "cancelled" : "execution-error";
             if (!noAef && BenchAef.Write(aef, agentEvalDir, "agentic", preset, subject, subjectVersion,
                 AgentEval.Results.Writing.AefTargetMode.Replayed, benchmark, progress.Snapshot(),
-                startedAt, DateTimeOffset.UtcNow, abortReason: abortReason, emptyResults: !progress.HasCompletedResults, storeV1: StoreLink()))
+                startedAt, DateTimeOffset.UtcNow, abortReason: abortReason, emptyResults: !progress.HasCompletedResults, storeV1: StoreLink(), budgetTier: appliedBudgetTier))
                 return ExitCodes.RuntimeError;
             return 1;
         }

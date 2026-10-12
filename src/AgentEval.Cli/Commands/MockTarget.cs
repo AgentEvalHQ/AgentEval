@@ -115,7 +115,7 @@ internal static class MockTarget
     /// <summary>Runs a mock composite without legacy storage, retaining explicitly requested AEF on interruption.</summary>
     internal static async Task<int> RunCompositeAsync(string family, string preset, string subject, string? subjectVersion,
         string agentEvalDir, CompositeEval benchmark, EvalInput input, bool placeholderJudge,
-        DirectoryInfo? aef, bool noAef, CancellationToken ct, int runs = 1)
+        DirectoryInfo? aef, bool noAef, CancellationToken ct, int runs = 1, string? budgetTier = null)
     {
         var started = DateTimeOffset.UtcNow;
         var progress = new CompositeProgress(benchmark);
@@ -123,7 +123,7 @@ internal static class MockTarget
             BenchAef.Write(aef, agentEvalDir, family, preset, subject, subjectVersion, AefTargetMode.Mocked,
                 benchmark, placeholderJudge ? CodeJudged(result) : result, started, DateTimeOffset.UtcNow,
                 exitCode: abortReason is null ? ExitCodes.GateIndeterminate : 1, abortReason: abortReason,
-                emptyResults: abortReason is not null && !progress.HasCompletedResults);
+                emptyResults: abortReason is not null && !progress.HasCompletedResults, budgetTier: budgetTier);
         EvalResult result;
         try
         {

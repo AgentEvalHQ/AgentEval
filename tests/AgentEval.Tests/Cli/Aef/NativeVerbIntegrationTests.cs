@@ -1178,6 +1178,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
 
     [Theory]
     [InlineData("success", false, false)]
+    [InlineData("mock", false, false)]
     [InlineData("report-error", false, false)]
     [InlineData("report-error", true, false)]
     [InlineData("report-error", false, true)]
@@ -1193,9 +1194,10 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         AgentEval.Core.IEvaluator judge = failure == "cancel" ? new CancellingEvaluator(cancellation) : new PassingEvaluator();
         var aef = new DirectoryInfo(Path.Combine(_root, "aef"));
         if (invalidDestination) File.WriteAllText(aef.FullName, "occupied");
-        var exit = await BenchAgenticCommand.RunAsync("agentic-execution", "subject", _root, "question", "answer", judge,
+        var exit = await BenchAgenticCommand.RunAsync("agentic-execution", "subject", _root, "question", failure == "mock" ? null : "answer", judge,
+            mock: failure == "mock", budgetTier: "HIGH",
             aef: aef, noAef: noAef, ct: cancellation.Token);
-        Assert.Equal(invalidDestination ? 3 : failure == "success" ? 10 : 1, exit);
+        Assert.Equal(invalidDestination ? 3 : failure == "success" ? 10 : failure == "mock" ? 11 : 1, exit);
         if (noAef || invalidDestination)
         {
             Assert.False(Directory.Exists(aef.FullName));
@@ -1203,11 +1205,13 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         }
         var dir = RunDirectory(aef.FullName);
         AssertIntact(dir);
-        AssertStoreLink(dir);
-        Assert.Equal("replayed", (string?)Document(dir, "run.json")["execution"]!["targetMode"]);
-        Assert.Equal(failure == "success" ? "completed" : "aborted", (string?)Document(dir, "run.json")["status"]);
-        Assert.Equal(failure == "success", File.Exists(Path.Combine(dir, "gates.ndjson")));
-        if (failure == "success")
+        if (failure != "mock") AssertStoreLink(dir);
+        else Assert.Null(Document(dir, "run.json")["ext"]?["agenteval.store-v1"]);
+        Assert.Equal("high", (string?)Document(dir, "run.json")["config"]!["budgetTier"]);
+        Assert.Equal(failure == "mock" ? "mocked" : "replayed", (string?)Document(dir, "run.json")["execution"]!["targetMode"]);
+        Assert.Equal(failure is "success" or "mock" ? "completed" : "aborted", (string?)Document(dir, "run.json")["status"]);
+        Assert.Equal(failure is "success" or "mock", File.Exists(Path.Combine(dir, "gates.ndjson")));
+        if (failure is "success" or "mock")
             Assert.Equal(exit, (int)JsonNode.Parse(File.ReadAllLines(Path.Combine(dir, "gates.ndjson")).Single())!["exitCode"]!);
         if (failure != "cancel") Assert.NotEmpty(File.ReadAllLines(Path.Combine(dir, "results.ndjson")));
     }

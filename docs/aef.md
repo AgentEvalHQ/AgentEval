@@ -316,6 +316,8 @@ Eval uses `config.thresholds.case` when every dataset case has the same passing 
 `config.caseThresholds` maps evidence case IDs to `{op, value}` and no misleading global threshold is emitted.
 Named metrics ignored by stochastic evaluation are omitted from applied configuration. Composite suite versions
 come from the evaluation definition, so they remain distinct from the producer package version.
+Agentic runs also record the applied `config.budgetTier`, normalized from the validated filter (`all` for no
+filter), including mocks and aborted evidence. Other benchmark families do not invent a budget tier.
 The default `costPolicy.priceTable` names `ModelPricing.TableName`, the bundled pricing baseline, with no spending
 limit implied. Hosts that override rates can supply their own policy identity (or omit it); this name is not a
 fingerprint of runtime pricing overrides. Configuration does not copy command-line arguments, prompts, keys or paths.
