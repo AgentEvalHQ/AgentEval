@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Explicit AEF input errors:** `AefInputException` identifies recognized writer, sealer, summary and job
+  input refusals. The conformance driver's write boundary no longer treats arbitrary argument or operation
+  exceptions as invalid input; callback bugs and post-write verification failures remain unexpected failures.
 - **Asynchronous AEF job engine:** `AefJobRunner.RunAsync` accepts target, suite, case and clock contracts,
   preserving scripted job bytes while adding awaited cases, cancellation, error evidence, partial costs and
   case deadlines. A monotonic elapsed clock supports real execution; scripted execution retains its simulated clock.

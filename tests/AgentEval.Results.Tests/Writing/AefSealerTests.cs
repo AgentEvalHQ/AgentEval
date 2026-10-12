@@ -140,7 +140,7 @@ public class AefSealerTests
         using var run = new WriterRun();
         run.Create().AddResult(WriterRun.Leaf("k1"));
 
-        Assert.Throws<InvalidOperationException>(() => AefSealer.Seal(run.Dir, WriterRun.Options()));
+        Assert.Throws<AefInputException>(() => AefSealer.Seal(run.Dir, WriterRun.Options()));
         Assert.False(File.Exists(run.Full("seal.json")));
     }
 
@@ -152,7 +152,7 @@ public class AefSealerTests
         AefSealer.Seal(run.Dir, WriterRun.Options());
         var seal = run.Read("seal.json");
 
-        Assert.Throws<InvalidOperationException>(() => AefSealer.Seal(run.Dir, WriterRun.Options(at: WriterRun.Start.AddDays(1))));
+        Assert.Throws<AefInputException>(() => AefSealer.Seal(run.Dir, WriterRun.Options(at: WriterRun.Start.AddDays(1))));
         Assert.Equal(seal, run.Read("seal.json"));
     }
 
@@ -162,7 +162,7 @@ public class AefSealerTests
         using var run = new WriterRun();
         run.WriteSmall();
 
-        Assert.Throws<InvalidOperationException>(() => AefSealer.Seal(run.Dir, WriterRun.Options(at: WriterRun.Start.AddMinutes(4))));
+        Assert.Throws<AefInputException>(() => AefSealer.Seal(run.Dir, WriterRun.Options(at: WriterRun.Start.AddMinutes(4))));
         Assert.False(File.Exists(run.Full("seal.json")));
     }
 
@@ -174,9 +174,9 @@ public class AefSealerTests
         var summary = Encoding.UTF8.GetString(run.Read("summary.json")).Replace("\"N\": 2", "\"N\": 3", StringComparison.Ordinal);
         File.WriteAllText(run.Full("summary.json"), summary);
 
-        var refused = Assert.Throws<AefWriteException>(() => AefSealer.Seal(run.Dir, WriterRun.Options()));
+        var refused = Assert.Throws<AefInputException>(() => AefSealer.Seal(run.Dir, WriterRun.Options()));
 
-        Assert.Contains(refused.Problems, p => p is { Path: "summary.json", Code: "summary" });
+        Assert.Contains("summary.json summary", refused.Message, StringComparison.Ordinal);
         Assert.False(File.Exists(run.Full("seal.json")));
     }
 
@@ -201,7 +201,7 @@ public class AefSealerTests
         run.WriteSmall();
         File.WriteAllText(run.Full("results.ndjson"), "{\"schemaVersion\": \"1.0\"}\n");
 
-        var refused = Assert.Throws<InvalidOperationException>(() => AefSealer.Seal(run.Dir, WriterRun.Options(by: AefSealedBy.Ingest)));
+        var refused = Assert.Throws<AefInputException>(() => AefSealer.Seal(run.Dir, WriterRun.Options(by: AefSealedBy.Ingest)));
 
         Assert.Contains("results.ndjson:1 schema", refused.Message, StringComparison.Ordinal);
         Assert.False(File.Exists(run.Full("seal.json")));
@@ -217,7 +217,7 @@ public class AefSealerTests
         Directory.CreateDirectory(run.Full("ext"));
         File.WriteAllText(run.Full("ext/.DS_Store"), "x");
 
-        Assert.Throws<InvalidOperationException>(() => AefSealer.Seal(run.Dir, WriterRun.Options(by: by)));
+        Assert.Throws<AefInputException>(() => AefSealer.Seal(run.Dir, WriterRun.Options(by: by)));
         Assert.False(File.Exists(run.Full("seal.json")));
     }
 

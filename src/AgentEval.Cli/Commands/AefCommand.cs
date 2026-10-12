@@ -149,9 +149,9 @@ internal static class AefCommand
             {
                 sealedRun = AefSealer.Seal(runDirectory, new AefSealOptions { SealedBy = by.Value, Signer = signer, TimeProvider = clock });
             }
-            catch (InvalidOperationException e)
+            catch (Exception e) when (e is AefInputException or AefWriteException)
             {
-                // Open, already sealed, not a run, or with problems (AefWriteException names them).
+                // Preserve this CLI's exit 1 for an unsealable run; the conformance driver's contract uses exit 2.
                 stderr.WriteLine($"✖ Not sealed: {e.Message}");
                 return ExitCodes.TestFailure;
             }

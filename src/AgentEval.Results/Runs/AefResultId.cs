@@ -23,7 +23,7 @@ public static class AefResultId
     /// <param name="caseId">The line's caseId.</param>
     /// <param name="path">The line's path.</param>
     /// <param name="trial">The line's trial (0-based), or null on a line without one.</param>
-    /// <exception cref="ArgumentException">
+    /// <exception cref="AefInputException">
     /// A control character (C0, DEL or C1: U+001F among them, which would make the join ambiguous) or an unpaired
     /// surrogate in one of the strings, or a negative trial.
     /// </exception>
@@ -34,7 +34,7 @@ public static class AefResultId
         Check(path, nameof(path));
         if (trial < 0)
         {
-            throw new ArgumentOutOfRangeException(nameof(trial), trial, "A trial number is 0-based ([RES-8]).");
+            throw new AefInputException("A trial number is 0-based ([RES-8]).", nameof(trial));
         }
 
         byte[] joined;
@@ -44,7 +44,7 @@ public static class AefResultId
         }
         catch (EncoderFallbackException e)
         {
-            throw new ArgumentException("A string holds an unpaired surrogate: it has no UTF-8 form ([ENC-2]).", e);
+            throw new AefInputException("A string holds an unpaired surrogate: it has no UTF-8 form ([ENC-2]).", e);
         }
 
         return "r_" + Convert.ToHexString(SHA256.HashData(joined), 0, 16).ToLowerInvariant();
@@ -55,7 +55,7 @@ public static class AefResultId
         ArgumentNullException.ThrowIfNull(text, name);
         if (text.Any(char.IsControl))
         {
-            throw new ArgumentException($"{name} holds a control character: a result id joins its parts with U+001F ([RES-4]).", name);
+            throw new AefInputException($"{name} holds a control character: a result id joins its parts with U+001F ([RES-4]).", name);
         }
     }
 }

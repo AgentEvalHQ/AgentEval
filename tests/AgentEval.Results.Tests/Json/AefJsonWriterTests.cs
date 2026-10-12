@@ -71,7 +71,7 @@ public class AefJsonWriterTests
     [InlineData(double.NegativeInfinity)]
     public void NaNAndInfinity_AreRefused(double value)
     {
-        Assert.Throws<ArgumentException>(() => AefJsonWriter.FormatNumber(value));
+        Assert.Throws<AefInputException>(() => AefJsonWriter.FormatNumber(value));
     }
 
     // Built at run time: xunit carries a lone surrogate in InlineData as U+FFFD.
@@ -83,8 +83,8 @@ public class AefJsonWriterTests
     {
         var text = new string(units.Select(u => (char)u).ToArray());
 
-        Assert.Throws<ArgumentException>(() => AefJsonWriter.Line(new JsonObject { ["s"] = text }));
-        Assert.Throws<ArgumentException>(() => AefJsonWriter.Line(new JsonObject { [text] = 1 }));
+        Assert.Throws<AefInputException>(() => AefJsonWriter.Line(new JsonObject { ["s"] = text }));
+        Assert.Throws<AefInputException>(() => AefJsonWriter.Line(new JsonObject { [text] = 1 }));
     }
 
     [Fact]
@@ -125,8 +125,8 @@ public class AefJsonWriterTests
         }
 
         _ = AefJsonReader.ParseDocument(AefJsonWriter.Line(Nested(64)));
-        Assert.Throws<ArgumentException>(() => AefJsonWriter.Line(Nested(65)));
-        Assert.Throws<ArgumentException>(() => AefJsonWriter.Document(Nested(65)));
+        Assert.Throws<AefInputException>(() => AefJsonWriter.Line(Nested(65)));
+        Assert.Throws<AefInputException>(() => AefJsonWriter.Document(Nested(65)));
     }
 
     [Fact]
@@ -134,8 +134,8 @@ public class AefJsonWriterTests
     {
         var big = new JsonObject { ["s"] = new string('a', AefLimits.MaxJsonBytes) };
 
-        Assert.Throws<ArgumentException>(() => AefJsonWriter.Line(big));
-        Assert.Throws<ArgumentException>(() => AefJsonWriter.Document(big));
+        Assert.Throws<AefInputException>(() => AefJsonWriter.Line(big));
+        Assert.Throws<AefInputException>(() => AefJsonWriter.Document(big));
         Assert.NotEmpty(AefJsonWriter.Document(big, AefLimits.MaxSealBytes));   // a seal: 40 MiB (an envelope: 56 MiB)
         Assert.NotEmpty(AefJsonWriter.Compact(big));   // a tool's output has no such limit
     }

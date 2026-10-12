@@ -23,7 +23,7 @@ public static class AefSummaryWriter
     /// metric and path, no two usage entries with one role and model ([SUM-9]), and every value valid against the writer
     /// summary schema.
     /// </summary>
-    /// <exception cref="ArgumentException">One of these is broken.</exception>
+    /// <exception cref="AefInputException">One of these is broken.</exception>
     public static void Check(AefSummary summary)
     {
         ArgumentNullException.ThrowIfNull(summary);
@@ -33,7 +33,7 @@ public static class AefSummaryWriter
             // SUM-9 (ruled under W3-2): a summary names each lane once.
             if (!lanes.Add(lane.Lane))
             {
-                throw new ArgumentException($"The lane {lane.Lane} is listed twice: a summary names each lane once ([SUM-9]).", nameof(summary));
+                throw new AefInputException($"The lane {lane.Lane} is listed twice: a summary names each lane once ([SUM-9]).", nameof(summary));
             }
 
             var keys = new HashSet<(string, string)>();
@@ -41,7 +41,7 @@ public static class AefSummaryWriter
             {
                 if (!keys.Add((entry.Metric, entry.Path)))
                 {
-                    throw new ArgumentException(
+                    throw new AefInputException(
                         $"Lane {lane.Lane} has two entries for metric {entry.Metric} at path {entry.Path}: no two entries have one lane, metric and path ([SUM-9]).",
                         nameof(summary));
                 }
@@ -53,7 +53,7 @@ public static class AefSummaryWriter
         {
             if (!usage.Add((entry.Role, entry.Model)))
             {
-                throw new ArgumentException($"Two usage entries have role {AefWire.Name(entry.Role)} and model {entry.Model ?? "(none)"} ([SUM-9]).", nameof(summary));
+                throw new AefInputException($"Two usage entries have role {AefWire.Name(entry.Role)} and model {entry.Model ?? "(none)"} ([SUM-9]).", nameof(summary));
             }
         }
 
@@ -61,7 +61,7 @@ public static class AefSummaryWriter
         var shape = Json("run", summary, (_, entry) => EntryJson(entry, new AefSummaryFigures(0, 0, 0, 0, null, true, []), null));
         if (AefSchemas.Writer.Validate("summary", shape) is { } failure)
         {
-            throw new ArgumentException($"summary.json would not be valid against the writer summary schema ([VER-2]): {failure}.", nameof(summary));
+            throw new AefInputException($"summary.json would not be valid against the writer summary schema ([VER-2]): {failure}.", nameof(summary));
         }
     }
 
@@ -74,11 +74,11 @@ public static class AefSummaryWriter
     /// <param name="results">The run's result lines, in results.ndjson order (each valid against the result schema).</param>
     /// <param name="metrics">metrics.json's metrics: each id declared once, with its kind.</param>
     /// <param name="summary">What the summary reports.</param>
-    /// <exception cref="ArgumentException">
+    /// <exception cref="AefInputException">
     /// <see cref="Check"/> refuses <paramref name="summary"/>; an entry names a metric <paramref name="metrics"/> does
     /// not declare ([SUM-1]); or a number the producer gives is not finite ([ENC-3]).
     /// </exception>
-    /// <exception cref="InvalidOperationException">
+    /// <exception cref="AefInputException">
     /// An entry whose aggregate method is the producer's has measured lines and no value from the producer, or one whose
     /// value AEF defines has one ([SUM-8]).
     /// </exception>
@@ -93,14 +93,14 @@ public static class AefSummaryWriter
         {
             if (!metrics.TryGetValue(entry.Metric, out var kind))
             {
-                throw new ArgumentException($"Summary lane {lane}: the metric {entry.Metric} is not declared in metrics.json ([SUM-1]).", nameof(summary));
+                throw new AefInputException($"Summary lane {lane}: the metric {entry.Metric} is not declared in metrics.json ([SUM-1]).", nameof(summary));
             }
 
             var figures = AefSummaryCalculator.Compute(results, lanes, lane, entry.Metric, AefWire.Name(kind), entry.Path, entry.Aggregate?.Method);
             var decision = figures.ReadsNotMeasured ? null : entry.Decide?.Invoke(figures);
             if (figures.ValueDefined ? decision?.Value is not null : decision?.Value is null)
             {
-                throw new InvalidOperationException(figures.ValueDefined
+                throw new AefInputException(figures.ValueDefined
                     ? $"Summary {lane}/{entry.Metric}/{entry.Path}: the value of this entry is computed ([SUM-5], [SUM-8]); the producer gives none."
                     : $"Summary {lane}/{entry.Metric}/{entry.Path}: the aggregate method {entry.Aggregate!.Method} is the producer's, which gives its value ([SUM-8]).");
             }
@@ -109,7 +109,7 @@ public static class AefSummaryWriter
         });
         if (AefSchemas.Writer.Validate("summary", json) is { } failure)
         {
-            throw new ArgumentException($"summary.json is not valid against the writer summary schema ([VER-2]): {failure}.", nameof(summary));
+            throw new AefInputException($"summary.json is not valid against the writer summary schema ([VER-2]): {failure}.", nameof(summary));
         }
 
         return json;

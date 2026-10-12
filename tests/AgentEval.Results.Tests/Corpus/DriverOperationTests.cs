@@ -74,8 +74,9 @@ public class DriverOperationTests
     }
 
     [Theory]
-    [InlineData(typeof(ArgumentException), true)]
-    [InlineData(typeof(InvalidOperationException), true)]
+    [InlineData(typeof(AefInputException), true)]
+    [InlineData(typeof(ArgumentException), false)]
+    [InlineData(typeof(InvalidOperationException), false)]
     [InlineData(typeof(ArgumentNullException), false)]
     [InlineData(typeof(ObjectDisposedException), false)]
     [InlineData(typeof(IOException), false)]

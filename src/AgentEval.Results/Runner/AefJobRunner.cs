@@ -26,7 +26,7 @@ public static class AefJobRunner
         ArgumentNullException.ThrowIfNull(output);
         if (File.Exists(output) || (Directory.Exists(output) && Directory.EnumerateFileSystemEntries(output).Any()))
         {
-            throw new ArgumentException($"{output} is a file or a folder that is not empty: a job writes into a new or empty folder.", nameof(output));
+            throw new AefInputException($"{output} is a file or a folder that is not empty: a job writes into a new or empty folder.", nameof(output));
         }
 
         var job = CreateJob(plan, runner, target, options);
@@ -47,19 +47,19 @@ public static class AefJobRunner
 
         if (AefSchemas.Reader.Validate("runner", runner) is { } manifestProblem)
         {
-            throw new FormatException($"The runner manifest is not valid against the reader runner schema: {manifestProblem}");
+            throw new AefInputException($"The runner manifest is not valid against the reader runner schema: {manifestProblem}");
         }
 
         var document = ReadPlan(plan);
         if (target.Suites.Any(s => !double.IsFinite(s.PreparationUsdLow) || !double.IsFinite(s.PreparationUsdBound)
             || s.PreparationUsdLow < 0 || s.PreparationUsdBound < s.PreparationUsdLow
             || s.PreparationSecondsBound is < 0 or > 4_294_967))
-            throw new ArgumentException("Preparation requires finite nonnegative cost bounds and a time bound within the cancellation timer range.", nameof(target));
+            throw new AefInputException("Preparation requires finite nonnegative cost bounds and a time bound within the cancellation timer range.", nameof(target));
         if (target.CloseSeconds < 0 || (target.TargetMode != AefTargetMode.Scripted && target.CloseSeconds > 4_294_967)
             || target.Suites.SelectMany(s => s.Cases).Any(c =>
             !double.IsFinite(c.UsdLow) || !double.IsFinite(c.UsdBound) || c.UsdLow < 0 || c.UsdBound < c.UsdLow
             || c.SecondsBound < 0 || (target.TargetMode != AefTargetMode.Scripted && c.SecondsBound > 4_294_967)))
-            throw new ArgumentException("Target cost bounds must be finite and nonnegative; live time bounds must fit a cancellation timer.", nameof(target));
+            throw new AefInputException("Target cost bounds must be finite and nonnegative; live time bounds must fit a cancellation timer.", nameof(target));
         CheckClock(target, options.At);
         return new Job(document, plan, runner, target, options);
     }
@@ -75,12 +75,12 @@ public static class AefJobRunner
         }
         catch (AefReadException e)
         {
-            throw new FormatException($"The plan does not read as an I-JSON document: {e.Message}", e);
+            throw new AefInputException($"The plan does not read as an I-JSON document: {e.Message}", e);
         }
 
         if (!AefSchemas.Reader.IsValid("run-plan#/properties/planId", document["planId"]) || AefNode.String(document["planId"]) is null)
         {
-            throw new FormatException("The plan names no planId a job.refused can carry (an id: 1 to 128 letters, digits and . _ : -), [PLAN-7].");
+            throw new AefInputException("The plan names no planId a job.refused can carry (an id: 1 to 128 letters, digits and . _ : -), [PLAN-7].");
         }
 
         return document;
@@ -106,7 +106,7 @@ public static class AefJobRunner
 
         if (!at.AddSeconds(seconds).IsValid)
         {
-            throw new FormatException(
+            throw new AefInputException(
                 $"--at {at}: the job's clock, moved by the target's time bounds and closeSeconds ({seconds} s), would pass the end of the year 9999 ([ENC-8], spec 09 §9.3).");
         }
     }

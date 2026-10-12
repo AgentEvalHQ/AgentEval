@@ -73,11 +73,11 @@ public static class AefSealer
     /// seal problem, and, for a producer's seal, says <c>intact</c>; with a signer, the signature verifies for the
     /// signer's key.
     /// </summary>
-    /// <exception cref="InvalidOperationException">
+    /// <exception cref="AefInputException">
     /// The run is running, or already has a <c>seal.json</c> or an <c>attestation.dsse.json</c>; or it is not a run the
     /// sealer seals (the message names the problems); or <c>sealedAt</c> would be earlier than the run's end.
     /// </exception>
-    /// <exception cref="ArgumentException"><see cref="AefSealOptions.SealedAt"/> is not an RFC 3339 UTC time.</exception>
+    /// <exception cref="AefInputException"><see cref="AefSealOptions.SealedAt"/> is not an RFC 3339 UTC time.</exception>
     /// <exception cref="AefWriteException">The seal written does not verify; it is removed again.</exception>
     /// <exception cref="IOException">The folder cannot be read or written.</exception>
     public static AefSealResult Seal(string directory, AefSealOptions? options = null)
@@ -92,38 +92,38 @@ public static class AefSealer
             }
             catch (FormatException e)
             {
-                throw new ArgumentException($"sealedAt '{given}' is not an RFC 3339 UTC time ([ENC-8]).", nameof(options), e);
+                throw new AefInputException($"sealedAt '{given}' is not an RFC 3339 UTC time ([ENC-8]).", nameof(options), e);
             }
         }
 
         var folder = AefRunFolder.Open(directory);
         if (folder.Has(SealVerifier.SealPath) || folder.Has(SealVerifier.AttestationPath))
         {
-            throw new InvalidOperationException($"{directory} is already sealed: a sealed run never changes ([RUN-4]).");
+            throw new AefInputException($"{directory} is already sealed: a sealed run never changes ([RUN-4]).");
         }
 
         if (folder.OverFileLimit || folder.PathProblems.Count > 0)
         {
-            throw new InvalidOperationException(
+            throw new AefInputException(
                 $"{directory} has paths a seal cannot name ([RUN-3]): " + string.Join(", ", folder.PathProblems.Select(p => $"{p.Path} {p.Code}")));
         }
 
         var documents = AefRunDocuments.Read(folder);
         if (documents.Run is not { } run || documents.RunId is null)
         {
-            throw new InvalidOperationException($"{directory} has no run.json that reads: it is not a run ([RUN-1]).");
+            throw new AefInputException($"{directory} has no run.json that reads: it is not a run ([RUN-1]).");
         }
 
         if (!documents.IsClosed)
         {
-            throw new InvalidOperationException($"{directory} is {documents.Status ?? "not closed"}: only a closed run is sealed ([SEAL-1]).");
+            throw new AefInputException($"{directory} is {documents.Status ?? "not closed"}: only a closed run is sealed ([SEAL-1]).");
         }
 
         if (options.SealedBy == AefSealedBy.Ingest)
         {
             if (documents.Problems.Count > 0)
             {
-                throw new InvalidOperationException(
+                throw new AefInputException(
                     $"{directory}: a host seals only a run whose files are valid against the reader schemas ([SEAL-1]): "
                     + string.Join(", ", documents.Problems.Select(p => $"{p.Path} {p.Code}")));
             }
@@ -133,7 +133,8 @@ public static class AefSealer
             var before = AefRunVerifier.Verify(folder);
             if (before.Problems.Count > 0)
             {
-                throw new AefWriteException($"{directory}: a producer seals only a run without problems", before.Problems);
+                throw new AefInputException($"{directory}: a producer seals only a run without problems: "
+                    + string.Join(", ", before.Problems.Select(p => $"{p.Path} {p.Code}")));
             }
         }
 
@@ -142,13 +143,13 @@ public static class AefSealer
         var closedAt = AefNode.String(run["endedAt"])!;   // as run.json writes it, every fraction digit kept
         if (AefTime.Parse(sealedAt) < AefTime.Parse(closedAt))
         {
-            throw new InvalidOperationException($"sealedAt {sealedAt} would be earlier than the run's end {closedAt}: a run is sealed after it closed ([SEAL-1]).");
+            throw new AefInputException($"sealedAt {sealedAt} would be earlier than the run's end {closedAt}: a run is sealed after it closed ([SEAL-1]).");
         }
 
         var seal = Statement(manifest, run, closedAt, sealedAt, options.SealedBy);
         if (AefSchemas.Writer.Validate("seal", seal) is { } failure)
         {
-            throw new InvalidOperationException($"seal.json would not be valid against the writer seal schema ([VER-2]): {failure}.");
+            throw new AefInputException($"seal.json would not be valid against the writer seal schema ([VER-2]): {failure}.");
         }
 
         var sealBytes = AefJsonWriter.Document(seal, AefLimits.MaxSealBytes);

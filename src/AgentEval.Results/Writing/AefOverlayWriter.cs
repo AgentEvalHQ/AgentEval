@@ -216,7 +216,7 @@ public sealed class AefOverlayWriter
     /// one that crashed) is ended with an LF by the first <see cref="Append"/>, so it reads as one invalid event of the
     /// next batch rather than joining the next event ([OVL-5]: a crash costs one line, never the chain).
     /// </summary>
-    /// <exception cref="InvalidOperationException">
+    /// <exception cref="AefInputException">
     /// The folder has no run.json that reads, the run is running (overlays are what is added after close, §4.2), or its
     /// chain has a problem about a batch or the events file.
     /// </exception>
@@ -228,12 +228,12 @@ public sealed class AefOverlayWriter
         var documents = AefRunDocuments.Read(folder);
         if (documents.RunId is not { } runId)
         {
-            throw new InvalidOperationException($"{directory} has no run.json that reads: it is not a run ([RUN-1]).");
+            throw new AefInputException($"{directory} has no run.json that reads: it is not a run ([RUN-1]).");
         }
 
         if (!documents.IsClosed)
         {
-            throw new InvalidOperationException($"{directory} is {documents.Status ?? "not closed"}: overlays are what is added to a run after it closed (§4.2, [RUN-4]).");
+            throw new AefInputException($"{directory} is {documents.Status ?? "not closed"}: overlays are what is added to a run after it closed (§4.2, [RUN-4]).");
         }
 
         // [RUN-3] (round 7): overlays is a folder of the run. An entry of that name that is a file or a link (an event
@@ -267,35 +267,35 @@ public sealed class AefOverlayWriter
     /// first ([OVL-5]): it then reads as an invalid event, which the next batch seals with this one.
     /// </summary>
     /// <returns>The event's id.</returns>
-    /// <exception cref="ArgumentException">
+    /// <exception cref="AefInputException">
     /// The event is not valid against the writer overlay-event schema (a kind's required members and targets among
     /// it); its id is taken; it targets a result that is no line of the run, or a blob that is not the run's ([OVL-2],
     /// [OVL-5] <c>target</c>).
     /// </exception>
-    /// <exception cref="InvalidOperationException">The events file holds as many lines as [ENC-17] allows.</exception>
+    /// <exception cref="AefInputException">The events file holds as many lines as [ENC-17] allows.</exception>
     public string Append(AefOverlayEvent overlayEvent)
     {
         ArgumentNullException.ThrowIfNull(overlayEvent);
         var eventId = overlayEvent.EventId ?? "ov_" + Convert.ToHexString(RandomNumberGenerator.GetBytes(16)).ToLowerInvariant();
         if (_eventIds.Contains(eventId))
         {
-            throw new ArgumentException($"The event id {eventId} is taken: an event's id is unique ([OVL-1], [OVL-5] event-id).", nameof(overlayEvent));
+            throw new AefInputException($"The event id {eventId} is taken: an event's id is unique ([OVL-1], [OVL-5] event-id).", nameof(overlayEvent));
         }
 
         if (overlayEvent.Target.Result is { } result && (_resultIds is null || !_resultIds.Contains(result)))
         {
-            throw new ArgumentException($"{result} is no result of the run {RunId}: an overlay targets only its own run ([OVL-2]).", nameof(overlayEvent));
+            throw new AefInputException($"{result} is no result of the run {RunId}: an overlay targets only its own run ([OVL-2]).", nameof(overlayEvent));
         }
 
         if (overlayEvent.Target.Blob is { } blob && !_blobs.Contains(blob))
         {
-            throw new ArgumentException($"{blob} is no blob of the run {RunId} ([OVL-1], [OVL-2]).", nameof(overlayEvent));
+            throw new AefInputException($"{blob} is no blob of the run {RunId} ([OVL-1], [OVL-2]).", nameof(overlayEvent));
         }
 
         var json = overlayEvent.ToJson(eventId, RunId, RunHash);
         if (AefSchemas.Writer.Validate("overlay-event", json) is { } failure)
         {
-            throw new ArgumentException($"The event {eventId} is not valid against the writer overlay-event schema ([VER-2]): {failure}.", nameof(overlayEvent));
+            throw new AefInputException($"The event {eventId} is not valid against the writer overlay-event schema ([VER-2]): {failure}.", nameof(overlayEvent));
         }
 
         // [OVL-5]: an unfinished last line (a writer still writing it, or one that crashed) is ended with an LF first, so it
@@ -309,12 +309,12 @@ public sealed class AefOverlayWriter
 
         if (_lines + (unfinished ? 2 : 1) > AefLimits.MaxLines)
         {
-            throw new InvalidOperationException($"{OverlayChain.EventsPath} holds {AefLimits.MaxLines} lines, the most [ENC-17] allows.");
+            throw new AefInputException($"{OverlayChain.EventsPath} holds {AefLimits.MaxLines} lines, the most [ENC-17] allows.");
         }
 
         if (_sealedEnd + _tail.Length + line.Length > AefLimits.MaxNdjsonBytes)
         {
-            throw new InvalidOperationException($"{OverlayChain.EventsPath} would exceed the {AefLimits.MaxNdjsonBytes} bytes [ENC-17] allows an NDJSON file.");
+            throw new AefInputException($"{OverlayChain.EventsPath} would exceed the {AefLimits.MaxNdjsonBytes} bytes [ENC-17] allows an NDJSON file.");
         }
 
         var path = Full(OverlayChain.EventsPath);
@@ -336,28 +336,27 @@ public sealed class AefOverlayWriter
     /// batch, the run, its run hash, the range and the previous seal; signed by <paramref name="signer"/> when one is
     /// given. Afterwards the chain must verify up to this batch, and the signature for the signer's key.
     /// </summary>
-    /// <exception cref="InvalidOperationException">
-    /// Nothing to seal; batch <see cref="MaxBatches"/> already sealed; or the events file changed since this writer
-    /// read it.
+    /// <exception cref="AefInputException">
+    /// Nothing to seal, or batch <see cref="MaxBatches"/> already sealed.
     /// </exception>
-    /// <exception cref="AefWriteException">The batch written does not verify; its files are removed again.</exception>
+    /// <exception cref="AefWriteException">The events file changed behind the writer's back, or the batch written does not verify; its new files are removed again.</exception>
     public AefSealedBatch SealBatch(IAefSigner? signer = null)
     {
         if (_tail.Length == 0)
         {
-            throw new InvalidOperationException("No event was appended since the last batch: a batch holds at least one ([OVL-4]).");
+            throw new AefInputException("No event was appended since the last batch: a batch holds at least one ([OVL-4]).");
         }
 
         if (Batches >= MaxBatches)
         {
-            throw new InvalidOperationException($"Batch {MaxBatches} is sealed: a batch seal's name has four digits ([OVL-4]).");
+            throw new AefInputException($"Batch {MaxBatches} is sealed: a batch seal's name has four digits ([OVL-4]).");
         }
 
         var events = File.ReadAllBytes(Full(OverlayChain.EventsPath));
         var batch = _tail.ToArray();
         if (events.Length != _sealedEnd + batch.Length || !events.AsSpan((int)_sealedEnd).SequenceEqual(batch))
         {
-            throw new InvalidOperationException($"{OverlayChain.EventsPath} changed since this writer read it: it would seal events it did not see.");
+            throw new AefWriteException($"{OverlayChain.EventsPath} changed since this writer read it: it would seal events it did not see.", []);
         }
 
         var number = Batches + 1;
@@ -390,7 +389,7 @@ public sealed class AefOverlayWriter
         };
         if (AefSchemas.Writer.Validate("overlay-seal", seal) is { } failure)
         {
-            throw new InvalidOperationException($"The batch seal would not be valid against the writer overlay-seal schema ([VER-2]): {failure}.");
+            throw new AefInputException($"The batch seal would not be valid against the writer overlay-seal schema ([VER-2]): {failure}.");
         }
 
         var sealPath = OverlayChain.SealPath(number);
@@ -434,7 +433,7 @@ public sealed class AefOverlayWriter
     /// <param name="directory">The run folder.</param>
     /// <param name="sha256">The blob's SHA-256, 64 lower-case hex characters.</param>
     /// <param name="policy">The trust policy that decides which redactions are authorized ([SIG-4]).</param>
-    /// <exception cref="InvalidOperationException">
+    /// <exception cref="AefInputException">
     /// The run has no valid seal listing the blob (only a sealed blob is withheld, [OVL-10]), the blob is not there, or
     /// no authorized redaction names it.
     /// </exception>
@@ -448,18 +447,18 @@ public sealed class AefOverlayWriter
         var path = AefRunFolder.BlobPath(sha256);
         if (!AefSealDocument.Read(folder).SubjectNames.Contains(path, StringComparer.Ordinal))
         {
-            throw new InvalidOperationException($"{path} is not a blob the run's seal lists: only a sealed blob is withheld ([OVL-10]).");
+            throw new AefInputException($"{path} is not a blob the run's seal lists: only a sealed blob is withheld ([OVL-10]).");
         }
 
         if (!folder.Has(path))
         {
-            throw new InvalidOperationException($"{path} is not in the run.");
+            throw new AefInputException($"{path} is not in the run.");
         }
 
         var chain = OverlayChain.Verify(folder, AefRunDocuments.Read(folder));
         if (!EffectiveView.AuthorizedRedactions(folder, chain, policy).Contains(sha256, StringComparer.Ordinal))
         {
-            throw new InvalidOperationException($"No authorized redaction names {sha256}: a blob is withheld only by a signed redaction whose identity the policy lets redact ([OVL-10]).");
+            throw new AefInputException($"No authorized redaction names {sha256}: a blob is withheld only by a signed redaction whose identity the policy lets redact ([OVL-10]).");
         }
 
         var options = new AefVerifyOptions { Policy = policy };

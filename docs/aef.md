@@ -57,6 +57,12 @@ differently.
 Every command takes `--json` and then prints one JSON value instead of a report. Exit code 2 is a usage or input
 error (a missing folder, a trust policy that cannot be read).
 
+For .NET integrations, `AgentEval.Results.AefInputException` identifies an explicit refusal of supplied AEF
+data or run state by the writers or job runner. Catch it when reporting invalid input. Producer callback bugs
+and `AefWriteException` failures after writing remain errors; do not classify arbitrary `ArgumentException`
+or `InvalidOperationException` instances as input refusals. The conformance driver maps recognized input
+refusals to exit 2 and unexpected failures to exit 1. The CLI's `aef seal` retains exit 1 for an unsealable run.
+
 ### Export a run, check it, sign it
 
 ```bash

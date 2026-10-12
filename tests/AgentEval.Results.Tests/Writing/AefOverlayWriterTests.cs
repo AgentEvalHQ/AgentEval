@@ -127,12 +127,12 @@ public class AefOverlayWriterTests
         overlay.Append(Event(AefOverlayKind.Redact, new AefOverlayTarget { Blob = blob }, by: WriterRun.Bob, reason: "personal data"));
         overlay.SealBatch();   // unsigned: whoever can append an unsigned event cannot suppress evidence
 
-        Assert.Throws<InvalidOperationException>(() => AefOverlayWriter.DeleteRedactedBlob(run.Dir, blob, WriterRun.Policy(bob, WriterRun.Bob, redact: true)));
+        Assert.Throws<AefInputException>(() => AefOverlayWriter.DeleteRedactedBlob(run.Dir, blob, WriterRun.Policy(bob, WriterRun.Bob, redact: true)));
 
         var signed = AefOverlayWriter.Open(run.Dir);
         signed.Append(Event(AefOverlayKind.Redact, new AefOverlayTarget { Blob = blob }, by: WriterRun.Bob, reason: "again, signed"));
         signed.SealBatch(bob);
-        Assert.Throws<InvalidOperationException>(() => AefOverlayWriter.DeleteRedactedBlob(run.Dir, blob, WriterRun.Policy(bob, WriterRun.Bob, redact: false)));
+        Assert.Throws<AefInputException>(() => AefOverlayWriter.DeleteRedactedBlob(run.Dir, blob, WriterRun.Policy(bob, WriterRun.Bob, redact: false)));
         Assert.True(File.Exists(run.Full(AefRunFolder.BlobPath(blob))));
     }
 
@@ -149,7 +149,7 @@ public class AefOverlayWriterTests
         overlay.Append(Event(AefOverlayKind.Redact, new AefOverlayTarget { Blob = blob.Sha256 }, by: WriterRun.Bob, reason: "personal data"));
         overlay.SealBatch(bob);
 
-        Assert.Throws<InvalidOperationException>(() => AefOverlayWriter.DeleteRedactedBlob(run.Dir, blob.Sha256, WriterRun.Policy(bob, WriterRun.Bob, redact: true)));
+        Assert.Throws<AefInputException>(() => AefOverlayWriter.DeleteRedactedBlob(run.Dir, blob.Sha256, WriterRun.Policy(bob, WriterRun.Bob, redact: true)));
     }
 
     [Fact]
@@ -158,7 +158,7 @@ public class AefOverlayWriterTests
         using var run = new WriterRun();
         run.Create();
 
-        Assert.Throws<InvalidOperationException>(() => AefOverlayWriter.Open(run.Dir));
+        Assert.Throws<AefInputException>(() => AefOverlayWriter.Open(run.Dir));
     }
 
     [Fact]
@@ -266,12 +266,12 @@ public class AefOverlayWriterTests
     {
         using var run = SealedRun(out var k1, out _);
         var overlay = AefOverlayWriter.Open(run.Dir);
-        Assert.Throws<InvalidOperationException>(() => overlay.SealBatch());
+        Assert.Throws<AefInputException>(() => overlay.SealBatch());
 
         overlay.Append(Event(AefOverlayKind.Override, new AefOverlayTarget { Result = k1 }, state: AefState.Passed, reason: "r"));
         AefOverlayWriter.Open(run.Dir).Append(Event(AefOverlayKind.Annotate, new AefOverlayTarget { Result = k1 }, reason: "someone else's"));
 
-        Assert.Throws<InvalidOperationException>(() => overlay.SealBatch());
+        Assert.Throws<AefWriteException>(() => overlay.SealBatch());
         Assert.False(File.Exists(run.Full("overlays/seal-0001.json")));
     }
 
@@ -282,14 +282,14 @@ public class AefOverlayWriterTests
         var overlay = AefOverlayWriter.Open(run.Dir);
         overlay.Append(Event(AefOverlayKind.Annotate, new AefOverlayTarget { Result = k1 }, reason: "first", id: "ov_1"));
 
-        Assert.Throws<ArgumentException>(() => overlay.Append(Event(AefOverlayKind.Annotate, new AefOverlayTarget { Result = k1 }, reason: "again", id: "ov_1")));      // event-id
-        Assert.Throws<ArgumentException>(() => overlay.Append(Event(AefOverlayKind.Override, new AefOverlayTarget { Result = k1 }, reason: "no state")));               // schema
-        Assert.Throws<ArgumentException>(() => overlay.Append(Event(AefOverlayKind.Override, new AefOverlayTarget { Result = k1 }, state: AefState.Pending, reason: "r")));
-        Assert.Throws<ArgumentException>(() => overlay.Append(Event(AefOverlayKind.Waive, new AefOverlayTarget { Result = k1 }, reason: "no expiry")));
-        Assert.Throws<ArgumentException>(() => overlay.Append(Event(AefOverlayKind.Approve, new AefOverlayTarget { Requirement = "REQ-1" })));
-        Assert.Throws<ArgumentException>(() => overlay.Append(Event(AefOverlayKind.Annotate, new AefOverlayTarget { Result = "r_" + new string('0', 32) }, reason: "x")));   // no result of the run
-        Assert.Throws<ArgumentException>(() => overlay.Append(Event(AefOverlayKind.Redact, new AefOverlayTarget { Blob = new string('0', 64) }, reason: "x")));               // no blob of the run
-        Assert.Throws<ArgumentException>(() => overlay.Append(Event(AefOverlayKind.Annotate, AefOverlayTarget.TheRun, reason: "x", id: "not-ov")));
+        Assert.Throws<AefInputException>(() => overlay.Append(Event(AefOverlayKind.Annotate, new AefOverlayTarget { Result = k1 }, reason: "again", id: "ov_1")));      // event-id
+        Assert.Throws<AefInputException>(() => overlay.Append(Event(AefOverlayKind.Override, new AefOverlayTarget { Result = k1 }, reason: "no state")));               // schema
+        Assert.Throws<AefInputException>(() => overlay.Append(Event(AefOverlayKind.Override, new AefOverlayTarget { Result = k1 }, state: AefState.Pending, reason: "r")));
+        Assert.Throws<AefInputException>(() => overlay.Append(Event(AefOverlayKind.Waive, new AefOverlayTarget { Result = k1 }, reason: "no expiry")));
+        Assert.Throws<AefInputException>(() => overlay.Append(Event(AefOverlayKind.Approve, new AefOverlayTarget { Requirement = "REQ-1" })));
+        Assert.Throws<AefInputException>(() => overlay.Append(Event(AefOverlayKind.Annotate, new AefOverlayTarget { Result = "r_" + new string('0', 32) }, reason: "x")));   // no result of the run
+        Assert.Throws<AefInputException>(() => overlay.Append(Event(AefOverlayKind.Redact, new AefOverlayTarget { Blob = new string('0', 64) }, reason: "x")));               // no blob of the run
+        Assert.Throws<AefInputException>(() => overlay.Append(Event(AefOverlayKind.Annotate, AefOverlayTarget.TheRun, reason: "x", id: "not-ov")));
         Assert.Single(File.ReadAllLines(run.Full("overlays/events.ndjson")));
     }
 

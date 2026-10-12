@@ -27,13 +27,13 @@ internal static class AefWire
     private static readonly ConcurrentDictionary<Enum, string> Names = new();
 
     /// <summary>The writer schema's name for an enum member.</summary>
-    /// <exception cref="ArgumentException">A value that is not a named member (a cast integer).</exception>
+    /// <exception cref="AefInputException">A value that is not a named member (a cast integer).</exception>
     public static string Name<T>(T value)
         where T : struct, Enum => Names.GetOrAdd(value, static v =>
         {
             var field = v.GetType().GetField(v.ToString(), BindingFlags.Public | BindingFlags.Static);
             return field?.GetCustomAttribute<AefNameAttribute>()?.Name
-                   ?? throw new ArgumentException($"{v.GetType().Name} has no member {v}: a writer writes only known values ([VER-2]).");
+                   ?? throw new AefInputException($"{v.GetType().Name} has no member {v}: a writer writes only known values ([VER-2]).");
         });
 
     /// <summary>A string value of the enum's name.</summary>
@@ -44,31 +44,31 @@ internal static class AefWire
     /// A time as AEF writes it ([ENC-8]): UTC, <c>yyyy-MM-ddTHH:mm:ss</c>, the fraction of the second only when it is not
     /// zero and without trailing zeros (up to nine digits, at the full precision given: n2-d), then <c>Z</c>.
     /// </summary>
-    /// <exception cref="ArgumentException">Not an [ENC-8] time: nanoseconds beyond 0 to 999,999,999, or a year beyond 0001 to 9999.</exception>
+    /// <exception cref="AefInputException">Not an [ENC-8] time: nanoseconds beyond 0 to 999,999,999, or a year beyond 0001 to 9999.</exception>
     public static string Time(AefTime time) => time.IsValid
         ? time.ToString()
-        : throw new ArgumentException($"{time} is not an AEF time: nanoseconds 0 to 999,999,999, in the years 0001 to 9999 ([ENC-8]).", nameof(time));
+        : throw new AefInputException($"{time} is not an AEF time: nanoseconds 0 to 999,999,999, in the years 0001 to 9999 ([ENC-8]).", nameof(time));
 
     /// <summary>A number as AEF writes it: finite ([ENC-3]).</summary>
-    /// <exception cref="ArgumentException">NaN or an infinity.</exception>
+    /// <exception cref="AefInputException">NaN or an infinity.</exception>
     public static JsonNode Number(double value, string field)
     {
         if (!double.IsFinite(value))
         {
-            throw new ArgumentException($"{field} is {value.ToString(CultureInfo.InvariantCulture)}: JSON has no NaN or infinity ([ENC-3]).", field);
+            throw new AefInputException($"{field} is {value.ToString(CultureInfo.InvariantCulture)}: JSON has no NaN or infinity ([ENC-3]).", field);
         }
 
         return JsonValue.Create(value);
     }
 
     /// <summary>An integer as AEF writes it: plain digits ([ENC-4]), within ±(2^53 − 1).</summary>
-    /// <exception cref="ArgumentException">Beyond ±(2^53 − 1), which a binary64 reader would not read exactly.</exception>
+    /// <exception cref="AefInputException">Beyond ±(2^53 − 1), which a binary64 reader would not read exactly.</exception>
     public static JsonNode Integer(long value, string field)
     {
         const long max = 9_007_199_254_740_991;
         if (value is > max or < -max)
         {
-            throw new ArgumentException($"{field} is {value}: an integer is at most 2^53 − 1 in magnitude ([ENC-4]).", field);
+            throw new AefInputException($"{field} is {value}: an integer is at most 2^53 − 1 in magnitude ([ENC-4]).", field);
         }
 
         return JsonValue.Create(value);

@@ -110,7 +110,7 @@ public sealed class AefRunWriter
     /// files, [RUN-2]): writes run.json (<c>status: running</c>), an empty metrics.json and an empty results.ndjson, so
     /// the folder is a valid open run from the start.
     /// </summary>
-    /// <exception cref="ArgumentException">
+    /// <exception cref="AefInputException">
     /// The folder is not empty; or the header is not valid against the writer run schema ([VER-2]), or breaks a rule of
     /// §3.9 about run.json (<c>calibration</c>, <c>execution-policy</c>).
     /// </exception>
@@ -121,7 +121,7 @@ public sealed class AefRunWriter
         ArgumentNullException.ThrowIfNull(header);
         if (System.IO.Directory.Exists(directory) && System.IO.Directory.EnumerateFileSystemEntries(directory).Any())
         {
-            throw new ArgumentException($"{directory} is not empty: a run folder holds only the run's files ([RUN-2]).", nameof(directory));
+            throw new AefInputException($"{directory} is not empty: a run folder holds only the run's files ([RUN-2]).", nameof(directory));
         }
 
         var run = header.ToJson(AefRunStatus.Running, null, null);
@@ -155,7 +155,7 @@ public sealed class AefRunWriter
     /// The <c>resultId</c> a line of this run with <paramref name="caseId"/>, <paramref name="path"/> and
     /// <paramref name="trial"/> has ([RES-4]): for a parent's <c>aggregation.decisive</c> before its children are added.
     /// </summary>
-    /// <exception cref="ArgumentException">A control character in the case or the path.</exception>
+    /// <exception cref="AefInputException">A control character in the case or the path.</exception>
     public string ResultIdOf(string caseId, string path, int? trial = null) => AefResultId.Compute(RunId, caseId, path, trial);
 
     /// <summary>
@@ -163,7 +163,7 @@ public sealed class AefRunWriter
     /// <c>resultId</c> is computed ([RES-4]) and is unique: no two lines with one case, path and trial.
     /// </summary>
     /// <returns>A handle to the line, for its children.</returns>
-    /// <exception cref="ArgumentException">
+    /// <exception cref="AefInputException">
     /// The line is not valid against the writer result schema; it breaks a rule of §3.9 about one line
     /// (<c>aggregation</c> counts, <c>annotator</c>, <c>trials</c>, <c>attack</c>, <c>result-times</c>,
     /// <c>interval</c>, a metric scored twice); it has the id of a line already added; <paramref name="parent"/> is no
@@ -172,30 +172,30 @@ public sealed class AefRunWriter
     /// that carries none ([RES-8]: a trial is a whole tree of its case); its reasoning is no blob of this run; or the run
     /// keeps no content and the line has reasoning or a prompt hash ([RUN-11]).
     /// </exception>
-    /// <exception cref="InvalidOperationException">The run is closed ([RUN-4]).</exception>
+    /// <exception cref="AefInputException">The run is closed ([RUN-4]).</exception>
     public AefResultHandle AddResult(AefResult result, AefResultHandle? parent = null)
     {
         ArgumentNullException.ThrowIfNull(result);
         EnsureRunning();
         if (parent is not null && (!ReferenceEquals(parent.Writer, this) || !_resultIndex.ContainsKey(parent.ResultId)))
         {
-            throw new ArgumentException($"The parent {parent.ResultId} is no line of this run: a parentResultId names a line of the run (§3.9 parent).", nameof(parent));
+            throw new AefInputException($"The parent {parent.ResultId} is no line of this run: a parentResultId names a line of the run (§3.9 parent).", nameof(parent));
         }
 
         if (parent is not null && !string.Equals(parent.CaseId, result.CaseId, StringComparison.Ordinal))
         {
-            throw new ArgumentException(
+            throw new AefInputException(
                 $"A child of case '{parent.CaseId}' is of that case, not '{result.CaseId}': a tree belongs to one case ([RES-5], §3.9 parent).", nameof(result));
         }
 
         if (parent?.Trial is { } trial && result.Trial != trial)
         {
-            throw new ArgumentException($"A line under trial {trial} carries that trial: a trial's tree is the trial's ([RES-8], §3.9 trials).", nameof(result));
+            throw new AefInputException($"A line under trial {trial} carries that trial: a trial's tree is the trial's ([RES-8], §3.9 trials).", nameof(result));
         }
 
         if (parent is not null && parent.Trial is null && result.Trial is { } own)
         {
-            throw new ArgumentException(
+            throw new AefInputException(
                 $"Trial {own} of case '{result.CaseId}' at '{result.Path}' is under a line that carries no trial: a trial line's parent carries a trial too, as a trial is a whole tree of its case ([RES-8], §3.9 trials).",
                 nameof(result));
         }
@@ -203,7 +203,7 @@ public sealed class AefRunWriter
         var resultId = ResultIdOf(result.CaseId, result.Path, result.Trial);
         if (_resultIndex.ContainsKey(resultId))
         {
-            throw new ArgumentException(
+            throw new AefInputException(
                 $"A line with case '{result.CaseId}', path '{result.Path}' and trial {result.Trial?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? "(none)"} was already added: its resultId {resultId} is taken ([RES-4], §3.9 result-id).",
                 nameof(result));
         }
@@ -234,11 +234,11 @@ public sealed class AefRunWriter
     /// <c>pending</c> line given its final state, a composite given its aggregation once its children are known. The
     /// line keeps its case, path, trial and parent, so its id; results.ndjson is rewritten.
     /// </summary>
-    /// <exception cref="ArgumentException">
+    /// <exception cref="AefInputException">
     /// <paramref name="handle"/> is no line of this run; the case, path or trial differ from the line's; or the line
     /// breaks what <see cref="AddResult"/> refuses.
     /// </exception>
-    /// <exception cref="InvalidOperationException">The run is closed ([RUN-4]).</exception>
+    /// <exception cref="AefInputException">The run is closed ([RUN-4]).</exception>
     public void UpdateResult(AefResultHandle handle, AefResult result)
     {
         ArgumentNullException.ThrowIfNull(handle);
@@ -246,12 +246,12 @@ public sealed class AefRunWriter
         EnsureRunning();
         if (!ReferenceEquals(handle.Writer, this) || !_resultIndex.TryGetValue(handle.ResultId, out var index))
         {
-            throw new ArgumentException($"{handle.ResultId} is no line of this run.", nameof(handle));
+            throw new AefInputException($"{handle.ResultId} is no line of this run.", nameof(handle));
         }
 
         if (result.CaseId != handle.CaseId || result.Path != handle.Path || result.Trial != handle.Trial)
         {
-            throw new ArgumentException("An updated line keeps its case, path and trial: they make its resultId ([RES-4]).", nameof(result));
+            throw new AefInputException("An updated line keeps its case, path and trial: they make its resultId ([RES-4]).", nameof(result));
         }
 
         var (json, _) = ResultLine(result, handle.ResultId, handle.ParentResultId);
@@ -259,7 +259,7 @@ public sealed class AefRunWriter
         var size = lines.Sum(l => (long)l.Length);
         if (size > MaxNdjsonBytes)
         {
-            throw new InvalidOperationException($"{ResultsPath} would hold {size} bytes, above the {MaxNdjsonBytes} [ENC-17] allows an NDJSON file.");
+            throw new AefInputException($"{ResultsPath} would hold {size} bytes, above the {MaxNdjsonBytes} [ENC-17] allows an NDJSON file.");
         }
 
         _results[index] = json;
@@ -271,14 +271,14 @@ public sealed class AefRunWriter
     /// Stores a blob ([EVD-3]): the bytes at <c>blobs/sha256/&lt;ab&gt;/&lt;hex&gt;</c>, named by their SHA-256. The same
     /// bytes put twice are one blob.
     /// </summary>
-    /// <exception cref="ArgumentException">More than 1 GiB ([ENC-17]).</exception>
-    /// <exception cref="InvalidOperationException">The run is closed, or holds as many files as [ENC-17] allows.</exception>
+    /// <exception cref="AefInputException">More than 1 GiB ([ENC-17]).</exception>
+    /// <exception cref="AefInputException">The run is closed, or holds as many files as [ENC-17] allows.</exception>
     public AefBlob PutBlob(ReadOnlySpan<byte> bytes)
     {
         EnsureRunning();
         if (bytes.Length > AefLimits.MaxBlobBytes)
         {
-            throw new ArgumentException($"A blob is at most {AefLimits.MaxBlobBytes} bytes ([ENC-17]).", nameof(bytes));
+            throw new AefInputException($"A blob is at most {AefLimits.MaxBlobBytes} bytes ([ENC-17]).", nameof(bytes));
         }
 
         var blob = new AefBlob(AefWire.Sha256(bytes), bytes.Length);
@@ -293,8 +293,8 @@ public sealed class AefRunWriter
     }
 
     /// <summary>Stores a blob read from <paramref name="content"/> to its end (<see cref="PutBlob(ReadOnlySpan{byte})"/>), hashed as it is copied.</summary>
-    /// <exception cref="ArgumentException">More than 1 GiB ([ENC-17]).</exception>
-    /// <exception cref="InvalidOperationException">The run is closed, or holds as many files as [ENC-17] allows.</exception>
+    /// <exception cref="AefInputException">More than 1 GiB ([ENC-17]).</exception>
+    /// <exception cref="AefInputException">The run is closed, or holds as many files as [ENC-17] allows.</exception>
     /// <exception cref="IOException">The stream or the folder cannot be read or written.</exception>
     public AefBlob PutBlob(Stream content)
     {
@@ -314,7 +314,7 @@ public sealed class AefRunWriter
                     size += read;
                     if (size > AefLimits.MaxBlobBytes)
                     {
-                        throw new ArgumentException($"A blob is at most {AefLimits.MaxBlobBytes} bytes ([ENC-17]).", nameof(content));
+                        throw new AefInputException($"A blob is at most {AefLimits.MaxBlobBytes} bytes ([ENC-17]).", nameof(content));
                     }
 
                     hash.AppendData(buffer, 0, read);
@@ -341,24 +341,24 @@ public sealed class AefRunWriter
     }
 
     /// <summary>Adds an evidence record (evidence.ndjson, [EVD-1], [EVD-2]).</summary>
-    /// <exception cref="ArgumentException">
+    /// <exception cref="AefInputException">
     /// Not valid against the writer evidence schema; an <c>evidenceId</c> already added (§3.9 <c>evidence-id</c>); a
     /// blob link to a blob not in this run; or a content kind in a run that keeps no content ([RUN-11]).
     /// </exception>
-    /// <exception cref="InvalidOperationException">The run is closed ([RUN-4]).</exception>
+    /// <exception cref="AefInputException">The run is closed ([RUN-4]).</exception>
     public void AddEvidence(AefEvidence evidence)
     {
         ArgumentNullException.ThrowIfNull(evidence);
         EnsureRunning();
         if (_evidence.ContainsKey(evidence.EvidenceId))
         {
-            throw new ArgumentException($"The evidence id {evidence.EvidenceId} was already added: an evidence id is unique in the run ([EVD-1], §3.9 evidence-id).", nameof(evidence));
+            throw new AefInputException($"The evidence id {evidence.EvidenceId} was already added: an evidence id is unique in the run ([EVD-1], §3.9 evidence-id).", nameof(evidence));
         }
 
         var kind = AefWire.Name(evidence.Kind);
         if (_contentOff && CrossFileRules.ContentEvidenceKinds.Contains(kind))
         {
-            throw new ArgumentException($"Evidence of kind {kind} holds content: a run with contentCapture off writes none ([RUN-11]).", nameof(evidence));
+            throw new AefInputException($"Evidence of kind {kind} holds content: a run with contentCapture off writes none ([RUN-11]).", nameof(evidence));
         }
 
         if (evidence.Link.Blob is { } blob)
@@ -375,8 +375,8 @@ public sealed class AefRunWriter
     }
 
     /// <summary>Adds a gate decision (gates.ndjson, [GATE-1], [GATE-2]). The results it names are checked by <see cref="Close"/>.</summary>
-    /// <exception cref="ArgumentException">Not valid against the writer gate-decision schema (<c>ship</c> on an incomparable comparison among them).</exception>
-    /// <exception cref="InvalidOperationException">The run is closed ([RUN-4]).</exception>
+    /// <exception cref="AefInputException">Not valid against the writer gate-decision schema (<c>ship</c> on an incomparable comparison among them).</exception>
+    /// <exception cref="AefInputException">The run is closed ([RUN-4]).</exception>
     public void AddGate(AefGateDecision gate)
     {
         ArgumentNullException.ThrowIfNull(gate);
@@ -390,8 +390,8 @@ public sealed class AefRunWriter
     }
 
     /// <summary>Writes metrics.json ([SUM-1]), replacing the metrics set before (the run is still running, [RUN-4]).</summary>
-    /// <exception cref="ArgumentException">Not valid against the writer metrics schema, a metric declared twice, or a scale whose min exceeds its max (§3.9 <c>metric</c>).</exception>
-    /// <exception cref="InvalidOperationException">The run is closed ([RUN-4]).</exception>
+    /// <exception cref="AefInputException">Not valid against the writer metrics schema, a metric declared twice, or a scale whose min exceeds its max (§3.9 <c>metric</c>).</exception>
+    /// <exception cref="AefInputException">The run is closed ([RUN-4]).</exception>
     public void SetMetrics(IEnumerable<AefMetric> metrics, JsonObject? ext = null)
     {
         ArgumentNullException.ThrowIfNull(metrics);
@@ -402,12 +402,12 @@ public sealed class AefRunWriter
         {
             if (!kinds.TryAdd(metric.Id, metric.Kind))
             {
-                throw new ArgumentException($"The metric {metric.Id} is declared twice: a metric's id is unique ([SUM-1], §3.9 metric).", nameof(metrics));
+                throw new AefInputException($"The metric {metric.Id} is declared twice: a metric's id is unique ([SUM-1], §3.9 metric).", nameof(metrics));
             }
 
             if (metric.Scale.Min > metric.Scale.Max)
             {
-                throw new ArgumentException($"The metric {metric.Id} has a scale whose min exceeds its max ([SUM-1], §3.9 metric).", nameof(metrics));
+                throw new AefInputException($"The metric {metric.Id} has a scale whose min exceeds its max ([SUM-1], §3.9 metric).", nameof(metrics));
             }
         }
 
@@ -421,11 +421,11 @@ public sealed class AefRunWriter
     /// Says what summary.json summarises: its lanes, the entries of each, the run's cost and usage. It is written by
     /// <see cref="Close"/>, which computes each entry's figures. Without it, summary.json has no lane.
     /// </summary>
-    /// <exception cref="ArgumentException">
+    /// <exception cref="AefInputException">
     /// A lane named twice; two entries with one lane, metric and path, or two usage entries with one role and model
     /// ([SUM-9], §3.9 <c>summary-duplicate</c>); or a value the writer summary schema refuses.
     /// </exception>
-    /// <exception cref="InvalidOperationException">The run is closed ([RUN-4]).</exception>
+    /// <exception cref="AefInputException">The run is closed ([RUN-4]).</exception>
     public void SetSummary(AefSummary summary)
     {
         ArgumentNullException.ThrowIfNull(summary);
@@ -438,24 +438,24 @@ public sealed class AefRunWriter
     /// Adds an OpenTelemetry <c>TracesData</c> object as a line of traces.otlp.jsonl ([RUN-14]): OTLP/JSON 1.x
     /// (<c>resourceSpans[].scopeSpans[].spans[]</c>), lower-case hex ids.
     /// </summary>
-    /// <exception cref="ArgumentException">
+    /// <exception cref="AefInputException">
     /// Spans under the pre-1.0 <c>instrumentationLibrarySpans</c>, which readers of OTLP/JSON 1.x do not see; a span
     /// id or trace id that is not lower-case hex of its length ([RUN-14]); or, in a run that keeps no content, a span,
     /// span event, resource or scope carrying an attribute [SEC-6] names.
     /// </exception>
-    /// <exception cref="InvalidOperationException">The run is closed ([RUN-4]).</exception>
+    /// <exception cref="AefInputException">The run is closed ([RUN-4]).</exception>
     public void AddTraces(JsonObject tracesData)
     {
         ArgumentNullException.ThrowIfNull(tracesData);
         EnsureRunning();
         if (AefNode.Objects(tracesData["resourceSpans"]).Any(r => r.ContainsKey("instrumentationLibrarySpans")))
         {
-            throw new ArgumentException("Spans under instrumentationLibrarySpans (OTLP before 1.0): a reader sees only scopeSpans ([RUN-14]).", nameof(tracesData));
+            throw new AefInputException("Spans under instrumentationLibrarySpans (OTLP before 1.0): a reader sees only scopeSpans ([RUN-14]).", nameof(tracesData));
         }
 
         if (_contentOff && CrossFileRules.Otlp.ResourcesAndScopes(tracesData, "resourceSpans", "scopeSpans").Any(CrossFileRules.Otlp.CarriesContent))
         {
-            throw new ArgumentException("A resource or scope carries content: a run with contentCapture off writes none of the attributes [SEC-6] names.", nameof(tracesData));
+            throw new AefInputException("A resource or scope carries content: a run with contentCapture off writes none of the attributes [SEC-6] names.", nameof(tracesData));
         }
 
         var spans = CrossFileRules.Otlp.Spans(tracesData).ToList();
@@ -465,12 +465,12 @@ public sealed class AefRunWriter
             var (traceId, spanId) = (AefNode.String(span["traceId"]), AefNode.String(span["spanId"]));
             if (!IsLowerHex(traceId, 32) || !IsLowerHex(spanId, 16))
             {
-                throw new ArgumentException("A span's traceId is 32 and its spanId 16 lower-case hex characters (a writer writes lower case, [RUN-14]).", nameof(tracesData));
+                throw new AefInputException("A span's traceId is 32 and its spanId 16 lower-case hex characters (a writer writes lower case, [RUN-14]).", nameof(tracesData));
             }
 
             if (_contentOff && (CrossFileRules.Otlp.CarriesContent(span) || AefNode.Objects(span["events"]).Any(CrossFileRules.Otlp.CarriesContent)))
             {
-                throw new ArgumentException("A span carries content: a run with contentCapture off writes none of the attributes [SEC-6] names.", nameof(tracesData));
+                throw new AefInputException("A span carries content: a run with contentCapture off writes none of the attributes [SEC-6] names.", nameof(tracesData));
             }
 
             ids.Add((traceId!, spanId!));
@@ -490,24 +490,24 @@ public sealed class AefRunWriter
     /// Adds an OpenTelemetry <c>LogsData</c> object as a line of logs.otlp.jsonl ([RUN-14]): OTLP/JSON 1.x
     /// (<c>resourceLogs[].scopeLogs[].logRecords[]</c>), such as <c>gen_ai.evaluation.result</c> events.
     /// </summary>
-    /// <exception cref="ArgumentException">
+    /// <exception cref="AefInputException">
     /// Records under the pre-1.0 <c>instrumentationLibraryLogs</c>; or, in a run that keeps no content, a log record
     /// with a <c>body</c>, or a log record, resource or scope with an attribute [SEC-6] names.
     /// </exception>
-    /// <exception cref="InvalidOperationException">The run is closed ([RUN-4]).</exception>
+    /// <exception cref="AefInputException">The run is closed ([RUN-4]).</exception>
     public void AddLogs(JsonObject logsData)
     {
         ArgumentNullException.ThrowIfNull(logsData);
         EnsureRunning();
         if (AefNode.Objects(logsData["resourceLogs"]).Any(r => r.ContainsKey("instrumentationLibraryLogs")))
         {
-            throw new ArgumentException("Log records under instrumentationLibraryLogs (OTLP before 1.0): a reader sees only scopeLogs ([RUN-14]).", nameof(logsData));
+            throw new AefInputException("Log records under instrumentationLibraryLogs (OTLP before 1.0): a reader sees only scopeLogs ([RUN-14]).", nameof(logsData));
         }
 
         if (_contentOff && (CrossFileRules.Otlp.LogRecords(logsData).Any(r => r.ContainsKey("body") || CrossFileRules.Otlp.CarriesContent(r))
                             || CrossFileRules.Otlp.ResourcesAndScopes(logsData, "resourceLogs", "scopeLogs").Any(CrossFileRules.Otlp.CarriesContent)))
         {
-            throw new ArgumentException("A log record carries content: a run with contentCapture off writes no body and none of the attributes [SEC-6] names (on records, resources or scopes).", nameof(logsData));
+            throw new AefInputException("A log record carries content: a run with contentCapture off writes no body and none of the attributes [SEC-6] names (on records, resources or scopes).", nameof(logsData));
         }
 
         var line = AefJsonWriter.Line(logsData);
@@ -521,12 +521,12 @@ public sealed class AefRunWriter
     /// </summary>
     /// <param name="path">The path under <c>ext/</c>, <c>/</c> between segments.</param>
     /// <param name="bytes">The file's bytes.</param>
-    /// <exception cref="ArgumentException">
+    /// <exception cref="AefInputException">
     /// <c>ext/</c> and the path break [RUN-3]: a segment that is empty, holds a character other than ASCII letters,
     /// digits, <c>.</c>, <c>_</c> and <c>-</c>, starts or ends with <c>.</c>, or is a name Windows reserves; more than
     /// 255 bytes; or a path or folder that differs from another of the run only in letter case.
     /// </exception>
-    /// <exception cref="InvalidOperationException">The run is closed, or holds as many files as [ENC-17] allows.</exception>
+    /// <exception cref="AefInputException">The run is closed, or holds as many files as [ENC-17] allows.</exception>
     public void PutExtFile(string path, ReadOnlySpan<byte> bytes)
     {
         ArgumentNullException.ThrowIfNull(path);
@@ -536,7 +536,7 @@ public sealed class AefRunWriter
         {
             if (!AefPaths.IsValid(full) || AefPaths.Check([.. _paths, full]).Count > 0)
             {
-                throw new ArgumentException($"{full} is not a path a run folder may hold ([RUN-3]).", nameof(path));
+                throw new AefInputException($"{full} is not a path a run folder may hold ([RUN-3]).", nameof(path));
             }
 
             ReserveFile(full);
@@ -557,11 +557,11 @@ public sealed class AefRunWriter
     /// </param>
     /// <param name="abortReason">Why it was aborted: required for an aborted run, and only for one.</param>
     /// <returns>The run verifier's report: <c>unsealed</c>, no problem.</returns>
-    /// <exception cref="ArgumentException">
+    /// <exception cref="AefInputException">
     /// A status that is not a closed one, an end before the start, an abort reason missing or out of place ([RUN-5]), or
     /// an end that is not an AEF time ([ENC-8]).
     /// </exception>
-    /// <exception cref="InvalidOperationException">
+    /// <exception cref="AefInputException">
     /// The run is already closed, or a rule that needs the whole run is broken: a <c>pending</c> line ([RES-3]: the
     /// producer updates it to <c>skipped</c> or <c>error</c>); a node with children and no aggregation ([RES-5]); a
     /// <c>total</c> that is not the number of children, or a <c>decisive</c> id that is not a child ([RES-6]); a case
@@ -580,17 +580,17 @@ public sealed class AefRunWriter
         EnsureRunning();
         if (status is not (AefRunStatus.Completed or AefRunStatus.Aborted))
         {
-            throw new ArgumentException("A run closes as completed or aborted ([RUN-5]).", nameof(status));
+            throw new AefInputException("A run closes as completed or aborted ([RUN-5]).", nameof(status));
         }
 
         if ((status == AefRunStatus.Aborted) != (abortReason is not null))
         {
-            throw new ArgumentException("An aborted run has an abortReason, and only an aborted run has one ([RUN-5]).", nameof(abortReason));
+            throw new AefInputException("An aborted run has an abortReason, and only an aborted run has one ([RUN-5]).", nameof(abortReason));
         }
 
         if (endedAt < _header.StartedAt)
         {
-            throw new ArgumentException("endedAt is not earlier than startedAt ([RUN-5]).", nameof(endedAt));
+            throw new AefInputException("endedAt is not earlier than startedAt ([RUN-5]).", nameof(endedAt));
         }
 
         CheckHeader(_header);   // again: the header's lists and objects are the caller's, and may have changed since Create
@@ -626,7 +626,7 @@ public sealed class AefRunWriter
             if (judge.Calibration is { } calibration
                 && (calibration.DangerousErrors > calibration.N || calibration.MeasuredAt > header.StartedAt))
             {
-                throw new ArgumentException(
+                throw new AefInputException(
                     $"Judge {judge.Model}: a calibration has no more dangerous errors than cases, and was measured before the run started ([RUN-9], §3.9 calibration).",
                     nameof(header));
             }
@@ -634,7 +634,7 @@ public sealed class AefRunWriter
 
         if (header.Suite?.ExecutionPolicy is { } policy && policy.RequirePasses > policy.TrialsPerCase)
         {
-            throw new ArgumentException("requirePasses is not above trialsPerCase (§3.9 execution-policy).", nameof(header));
+            throw new AefInputException("requirePasses is not above trialsPerCase (§3.9 execution-policy).", nameof(header));
         }
     }
 
@@ -645,14 +645,14 @@ public sealed class AefRunWriter
         var where = $"result {result.CaseId}/{result.Path}";
         if (parentResultId is not null && result.Component is null)
         {
-            throw new ArgumentException($"{where}: a child of a composite has a component ([RES-5]).", nameof(result));
+            throw new AefInputException($"{where}: a child of a composite has a component ([RES-5]).", nameof(result));
         }
 
         if (result.Reasoning is { } reasoning)
         {
             if (_contentOff)
             {
-                throw new ArgumentException($"{where}: a run with contentCapture off keeps no reasoning ([RUN-11]).", nameof(result));
+                throw new AefInputException($"{where}: a run with contentCapture off keeps no reasoning ([RUN-11]).", nameof(result));
             }
 
             RequireBlob(reasoning, $"{where}: the reasoning");
@@ -660,49 +660,49 @@ public sealed class AefRunWriter
 
         if (_contentOff && result.Annotator?.PromptHash is not null)
         {
-            throw new ArgumentException($"{where}: a run with contentCapture off keeps no digest of a prompt ([RUN-11]).", nameof(result));
+            throw new AefInputException($"{where}: a run with contentCapture off keeps no digest of a prompt ([RUN-11]).", nameof(result));
         }
 
         if (result.Aggregation is { } aggregation
             && (aggregation.Measured > aggregation.Total || (aggregation.Unmeasured?.Total ?? 0) != aggregation.Total - aggregation.Measured))
         {
-            throw new ArgumentException(
+            throw new AefInputException(
                 $"{where}: measured is at most total, and the unmeasured counts add up to total − measured ([RES-6], §3.9 aggregation).", nameof(result));
         }
 
         if (result.Annotator?.Panel is { } panel && panel.Agree > panel.Of)
         {
-            throw new ArgumentException($"{where}: a panel's agree does not exceed its of ([RES-10], §3.9 annotator).", nameof(result));
+            throw new AefInputException($"{where}: a panel's agree does not exceed its of ([RES-10], §3.9 annotator).", nameof(result));
         }
 
         if (result.Trials is { } trials && trials.Passed > trials.N)
         {
-            throw new ArgumentException($"{where}: a rollup's passed does not exceed its n ([RES-8], §3.9 trials).", nameof(result));
+            throw new AefInputException($"{where}: a rollup's passed does not exceed its n ([RES-8], §3.9 trials).", nameof(result));
         }
 
         if (result.Attack?.Success == true && result.State == AefState.Passed)
         {
-            throw new ArgumentException($"{where}: an attack that succeeded is not a pass (§3.9 attack).", nameof(result));
+            throw new AefInputException($"{where}: an attack that succeeded is not a pass (§3.9 attack).", nameof(result));
         }
 
         if (result.EndedAt < result.StartedAt)
         {
-            throw new ArgumentException($"{where}: endedAt is not before startedAt ([RES-10], §3.9 result-times).", nameof(result));
+            throw new AefInputException($"{where}: endedAt is not before startedAt ([RES-10], §3.9 result-times).", nameof(result));
         }
 
         if (result.Usage is { } usage && usage.Select(u => (u.Role, u.Model)).Distinct().Count() != usage.Count)
         {
-            throw new ArgumentException($"{where}: usage names each role and model once ([RES-10], §3.9 result-times).", nameof(result));
+            throw new AefInputException($"{where}: usage names each role and model once ([RES-10], §3.9 result-times).", nameof(result));
         }
 
         if (result.Uncertainty?.Ci is { } ci && ci.Low > ci.High)
         {
-            throw new ArgumentException($"{where}: an interval's low does not exceed its high (§3.9 interval).", nameof(result));
+            throw new AefInputException($"{where}: an interval's low does not exceed its high (§3.9 interval).", nameof(result));
         }
 
         if (result.Scores is { } scores && scores.Select(s => s.Metric).Distinct(StringComparer.Ordinal).Count() != scores.Count)
         {
-            throw new ArgumentException($"{where}: a line scores each metric once (§3.9 metric).", nameof(result));
+            throw new AefInputException($"{where}: a line scores each metric once (§3.9 metric).", nameof(result));
         }
 
         var json = result.ToJson(resultId, parentResultId);
@@ -862,7 +862,7 @@ public sealed class AefRunWriter
 
         if (problems.Count > 0)
         {
-            throw new InvalidOperationException("The run cannot close: " + string.Join("; ", problems) + ".");
+            throw new AefInputException("The run cannot close: " + string.Join("; ", problems) + ".");
         }
     }
 
@@ -882,7 +882,7 @@ public sealed class AefRunWriter
     {
         if (!_blobs.TryGetValue(blob.Sha256, out var size) || size != blob.Size)
         {
-            throw new ArgumentException($"{what} names blob {blob.Sha256} ({blob.Size} bytes), which is not a blob of this run ([EVD-3], §3.9 blob).");
+            throw new AefInputException($"{what} names blob {blob.Sha256} ({blob.Size} bytes), which is not a blob of this run ([EVD-3], §3.9 blob).");
         }
     }
 
@@ -890,7 +890,7 @@ public sealed class AefRunWriter
     {
         if (AefSchemas.Writer.Validate(schema, json) is { } failure)
         {
-            throw new ArgumentException($"{what} is not valid against the writer schema '{schema}' ([VER-2]): {failure}.");
+            throw new AefInputException($"{what} is not valid against the writer schema '{schema}' ([VER-2]): {failure}.");
         }
     }
 
@@ -901,7 +901,7 @@ public sealed class AefRunWriter
     {
         if (Status != AefRunStatus.Running)
         {
-            throw new InvalidOperationException($"The run {RunId} is closed: a closed run never changes ([RUN-4]); what comes later is an overlay (§4.2).");
+            throw new AefInputException($"The run {RunId} is closed: a closed run never changes ([RUN-4]); what comes later is an overlay (§4.2).");
         }
     }
 
@@ -913,13 +913,13 @@ public sealed class AefRunWriter
         var lines = _lines.GetValueOrDefault(path);
         if (lines >= AefLimits.MaxLines)
         {
-            throw new InvalidOperationException($"{path} holds {AefLimits.MaxLines} lines, the most [ENC-17] allows.");
+            throw new AefInputException($"{path} holds {AefLimits.MaxLines} lines, the most [ENC-17] allows.");
         }
 
         var size = _sizes.GetValueOrDefault(path) + line.Length;
         if (size > MaxNdjsonBytes)
         {
-            throw new InvalidOperationException($"{path} would hold {size} bytes, above the {MaxNdjsonBytes} [ENC-17] allows an NDJSON file.");
+            throw new AefInputException($"{path} would hold {size} bytes, above the {MaxNdjsonBytes} [ENC-17] allows an NDJSON file.");
         }
 
         if (lines == 0 && path != ResultsPath && !_paths.Contains(path))
@@ -936,7 +936,7 @@ public sealed class AefRunWriter
     {
         if (_paths.Count + 1 > AefLimits.MaxFiles - ReservedFiles)
         {
-            throw new InvalidOperationException($"The run holds {_paths.Count} files: with summary.json it would exceed the {AefLimits.MaxFiles} [ENC-17] allows.");
+            throw new AefInputException($"The run holds {_paths.Count} files: with summary.json it would exceed the {AefLimits.MaxFiles} [ENC-17] allows.");
         }
     }
 

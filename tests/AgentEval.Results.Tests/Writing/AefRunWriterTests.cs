@@ -234,7 +234,7 @@ public class AefRunWriterTests
         writer.AddResult(WriterRun.Leaf("k1", m: 0.2));
         writer.SetSummary(new AefSummary { Lanes = [new AefSummaryLane("a", [new AefSummaryEntry { Metric = "m", Path = "q", Aggregate = new AefAggregate("f1") }])] });
 
-        Assert.Throws<InvalidOperationException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1)));
+        Assert.Throws<AefInputException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1)));
         Assert.Equal(AefRunStatus.Running, writer.Status);
         Assert.Equal("running", run.Json("run.json")["status"]!.GetValue<string>());
         Assert.False(File.Exists(run.Full("summary.json")));
@@ -257,7 +257,7 @@ public class AefRunWriterTests
             Lanes = [new AefSummaryLane("a", [new AefSummaryEntry { Metric = "m", Path = "q", Decide = _ => new AefSummaryDecision(AefSummaryVerdict.Passed, Value: 1) }])],
         });
 
-        Assert.Throws<InvalidOperationException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1)));
+        Assert.Throws<AefInputException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1)));
     }
 
     [Fact]
@@ -268,7 +268,7 @@ public class AefRunWriterTests
         var line = writer.AddResult(WriterRun.Leaf("k1", m: null, state: AefState.Pending));
         Assert.Empty(run.Problems());   // pending is fine in an open run
 
-        var refused = Assert.Throws<InvalidOperationException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1)));
+        var refused = Assert.Throws<AefInputException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1)));
         Assert.Contains("[RES-3]", refused.Message, StringComparison.Ordinal);
 
         writer.UpdateResult(line, WriterRun.Leaf("k1", m: 0.5, state: AefState.Failed));
@@ -285,8 +285,8 @@ public class AefRunWriterTests
         var line = writer.AddResult(WriterRun.Leaf("k1"));
         writer.AddResult(WriterRun.Leaf("k2"));
 
-        Assert.Throws<ArgumentException>(() => writer.UpdateResult(line, WriterRun.Leaf("k3")));
-        Assert.Throws<ArgumentException>(() => writer.UpdateResult(line, WriterRun.Leaf("k1", trial: 0)));
+        Assert.Throws<AefInputException>(() => writer.UpdateResult(line, WriterRun.Leaf("k3")));
+        Assert.Throws<AefInputException>(() => writer.UpdateResult(line, WriterRun.Leaf("k1", trial: 0)));
         writer.UpdateResult(line, WriterRun.Leaf("k1", m: 0.1, state: AefState.Failed));
 
         var lines = run.Lines("results.ndjson");
@@ -322,14 +322,14 @@ public class AefRunWriterTests
         writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1));
         var before = run.Snapshot();
 
-        Assert.Throws<InvalidOperationException>(() => writer.AddResult(WriterRun.Leaf("k2")));
-        Assert.Throws<InvalidOperationException>(() => writer.UpdateResult(line, WriterRun.Leaf("k1", m: 0.1)));
-        Assert.Throws<InvalidOperationException>(() => writer.PutBlob("x"u8));
-        Assert.Throws<InvalidOperationException>(() => writer.SetMetrics([WriterRun.Metric()]));
-        Assert.Throws<InvalidOperationException>(() => writer.SetJudges([new AefJudge { Model = "judge", Mode = AefJudgeMode.Single }]));
-        Assert.Throws<InvalidOperationException>(() => writer.SetSummary(new AefSummary { Lanes = [] }));
-        Assert.Throws<InvalidOperationException>(() => writer.PutExtFile("a", "x"u8));
-        Assert.Throws<InvalidOperationException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(2)));
+        Assert.Throws<AefInputException>(() => writer.AddResult(WriterRun.Leaf("k2")));
+        Assert.Throws<AefInputException>(() => writer.UpdateResult(line, WriterRun.Leaf("k1", m: 0.1)));
+        Assert.Throws<AefInputException>(() => writer.PutBlob("x"u8));
+        Assert.Throws<AefInputException>(() => writer.SetMetrics([WriterRun.Metric()]));
+        Assert.Throws<AefInputException>(() => writer.SetJudges([new AefJudge { Model = "judge", Mode = AefJudgeMode.Single }]));
+        Assert.Throws<AefInputException>(() => writer.SetSummary(new AefSummary { Lanes = [] }));
+        Assert.Throws<AefInputException>(() => writer.PutExtFile("a", "x"u8));
+        Assert.Throws<AefInputException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(2)));
 
         var after = run.Snapshot();
         Assert.Equal(before.Keys, after.Keys);
@@ -384,7 +384,7 @@ public class AefRunWriterTests
         Directory.CreateDirectory(run.Dir);
         File.WriteAllText(Path.Combine(run.Dir, "notes.txt"), "x");
 
-        Assert.Throws<ArgumentException>(() => AefRunWriter.Create(run.Dir, WriterRun.Header()));
+        Assert.Throws<AefInputException>(() => AefRunWriter.Create(run.Dir, WriterRun.Header()));
     }
 
     [Theory]
@@ -394,7 +394,7 @@ public class AefRunWriterTests
     {
         using var run = new WriterRun();
 
-        Assert.Throws<ArgumentException>(() => AefRunWriter.Create(run.Dir, WriterRun.Header(runId: runId)));
+        Assert.Throws<AefInputException>(() => AefRunWriter.Create(run.Dir, WriterRun.Header(runId: runId)));
         Assert.False(Directory.Exists(run.Dir));
     }
 
@@ -404,8 +404,8 @@ public class AefRunWriterTests
         using var run = new WriterRun();
         var header = WriterRun.Header() with { Deployment = new AefDeployment { Ref = "deployment:d", Endpoint = "https://example.com/x?api-key=secret" } };
 
-        Assert.Throws<ArgumentException>(() => AefRunWriter.Create(run.Dir, header));
-        Assert.Throws<ArgumentException>(() => AefRunWriter.Create(run.Dir, header with { Deployment = new AefDeployment { Ref = "deployment:d", Endpoint = "https://user:pw@example.com/x" } }));
+        Assert.Throws<AefInputException>(() => AefRunWriter.Create(run.Dir, header));
+        Assert.Throws<AefInputException>(() => AefRunWriter.Create(run.Dir, header with { Deployment = new AefDeployment { Ref = "deployment:d", Endpoint = "https://user:pw@example.com/x" } }));
     }
 
     [Theory]
@@ -416,7 +416,7 @@ public class AefRunWriterTests
         using var run = new WriterRun();
         var header = WithJudge(new AefCalibration { LabelSet = "labels:x", N = n, DangerousErrors = dangerous, MeasuredAt = WriterRun.Start.AddHours(hoursAfterStart) });
 
-        Assert.Throws<ArgumentException>(() => AefRunWriter.Create(run.Dir, header));
+        Assert.Throws<AefInputException>(() => AefRunWriter.Create(run.Dir, header));
     }
 
     [Fact]
@@ -428,7 +428,7 @@ public class AefRunWriterTests
             Suite = new AefSuite { Ref = "suite:s", Version = "1", ExecutionPolicy = new AefExecutionPolicy { TrialsPerCase = 2, RequirePasses = 3 } },
         };
 
-        Assert.Throws<ArgumentException>(() => AefRunWriter.Create(run.Dir, header));
+        Assert.Throws<AefInputException>(() => AefRunWriter.Create(run.Dir, header));
     }
 
     [Fact]
@@ -437,10 +437,10 @@ public class AefRunWriterTests
         using var run = new WriterRun();
         var writer = run.Create();
 
-        Assert.Throws<ArgumentException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddSeconds(-1)));
-        Assert.Throws<ArgumentException>(() => writer.Close(AefRunStatus.Aborted, WriterRun.Start.AddMinutes(1)));
-        Assert.Throws<ArgumentException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1), "why"));
-        Assert.Throws<ArgumentException>(() => writer.Close(AefRunStatus.Running, WriterRun.Start.AddMinutes(1)));
+        Assert.Throws<AefInputException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddSeconds(-1)));
+        Assert.Throws<AefInputException>(() => writer.Close(AefRunStatus.Aborted, WriterRun.Start.AddMinutes(1)));
+        Assert.Throws<AefInputException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1), "why"));
+        Assert.Throws<AefInputException>(() => writer.Close(AefRunStatus.Running, WriterRun.Start.AddMinutes(1)));
         Assert.Equal(AefRunStatus.Running, writer.Status);
     }
 
@@ -453,7 +453,7 @@ public class AefRunWriterTests
         var writer = run.Create(AefContentCapture.Off);
         var blob = writer.PutBlob("a compliance artifact, not content"u8);
 
-        var refused = Assert.Throws<ArgumentException>(() => writer.AddResult(WriterRun.Leaf("k1") with { Reasoning = blob }));
+        var refused = Assert.Throws<AefInputException>(() => writer.AddResult(WriterRun.Leaf("k1") with { Reasoning = blob }));
         Assert.Contains("[RUN-11]", refused.Message, StringComparison.Ordinal);
     }
 
@@ -463,7 +463,7 @@ public class AefRunWriterTests
         using var run = new WriterRun();
         var writer = run.Create(AefContentCapture.Off);
 
-        Assert.Throws<ArgumentException>(() => writer.AddResult(WriterRun.Leaf("k1") with
+        Assert.Throws<AefInputException>(() => writer.AddResult(WriterRun.Leaf("k1") with
         {
             Annotator = new AefAnnotator { Kind = AefAnnotatorKind.Llm, PromptHash = "sha256:" + new string('a', 64) },
         }));
@@ -483,7 +483,7 @@ public class AefRunWriterTests
         using var run = new WriterRun();
         var writer = run.Create(AefContentCapture.Off);
 
-        Assert.Throws<ArgumentException>(() => writer.AddEvidence(new AefEvidence { EvidenceId = "E-1", Kind = kind, Link = AefEvidenceLink.ToUri("https://example.com/x") }));
+        Assert.Throws<AefInputException>(() => writer.AddEvidence(new AefEvidence { EvidenceId = "E-1", Kind = kind, Link = AefEvidenceLink.ToUri("https://example.com/x") }));
     }
 
     [Theory]
@@ -521,7 +521,7 @@ public class AefRunWriterTests
             span["events"] = new JsonArray(holder);
         }
 
-        Assert.Throws<ArgumentException>(() => writer.AddTraces(traces));
+        Assert.Throws<AefInputException>(() => writer.AddTraces(traces));
         Assert.False(File.Exists(run.Full("traces.otlp.jsonl")));
     }
 
@@ -531,11 +531,11 @@ public class AefRunWriterTests
         using var run = new WriterRun();
         var writer = run.Create(AefContentCapture.Off);
 
-        Assert.Throws<ArgumentException>(() => writer.AddLogs(Logs(body: true)));
+        Assert.Throws<AefInputException>(() => writer.AddLogs(Logs(body: true)));
         var attribute = Logs(body: false);
         attribute["resourceLogs"]![0]!["scopeLogs"]![0]!["logRecords"]![0]!["attributes"] =
             new JsonArray(new JsonObject { ["key"] = "gen_ai.evaluation.explanation", ["value"] = new JsonObject { ["stringValue"] = "x" } });
-        Assert.Throws<ArgumentException>(() => writer.AddLogs(attribute));
+        Assert.Throws<AefInputException>(() => writer.AddLogs(attribute));
         writer.AddLogs(Logs(body: false));
     }
 
@@ -562,9 +562,9 @@ public class AefRunWriterTests
         var writer = run.Create();
         var old = new JsonObject { ["resourceSpans"] = new JsonArray(new JsonObject { ["instrumentationLibrarySpans"] = new JsonArray() }) };
 
-        Assert.Throws<ArgumentException>(() => writer.AddTraces(old));
-        Assert.Throws<ArgumentException>(() => writer.AddTraces(Traces(("4BF92F3577B34DA6A3CE929D0E0E4736", "00f067aa0ba902b7"))));
-        Assert.Throws<ArgumentException>(() => writer.AddLogs(new JsonObject { ["resourceLogs"] = new JsonArray(new JsonObject { ["instrumentationLibraryLogs"] = new JsonArray() }) }));
+        Assert.Throws<AefInputException>(() => writer.AddTraces(old));
+        Assert.Throws<AefInputException>(() => writer.AddTraces(Traces(("4BF92F3577B34DA6A3CE929D0E0E4736", "00f067aa0ba902b7"))));
+        Assert.Throws<AefInputException>(() => writer.AddLogs(new JsonObject { ["resourceLogs"] = new JsonArray(new JsonObject { ["instrumentationLibraryLogs"] = new JsonArray() }) }));
     }
 
     // ------------------------------------------------------------------ refusals: paths
@@ -587,7 +587,7 @@ public class AefRunWriterTests
         using var run = new WriterRun();
         var writer = run.Create();
 
-        Assert.Throws<ArgumentException>(() => writer.PutExtFile(path, "x"u8));
+        Assert.Throws<AefInputException>(() => writer.PutExtFile(path, "x"u8));
         Assert.False(Directory.Exists(run.Full("ext")) && Directory.EnumerateFiles(run.Full("ext"), "*", SearchOption.AllDirectories).Any());
     }
 
@@ -598,7 +598,7 @@ public class AefRunWriterTests
         var writer = run.Create();
 
         writer.PutExtFile(new string('a', 251), "x"u8);   // ext/ + 251 = 255 bytes
-        Assert.Throws<ArgumentException>(() => writer.PutExtFile(new string('b', 252), "x"u8));
+        Assert.Throws<AefInputException>(() => writer.PutExtFile(new string('b', 252), "x"u8));
     }
 
     [Theory]
@@ -610,7 +610,7 @@ public class AefRunWriterTests
         var writer = run.Create();
         writer.PutExtFile(first, "x"u8);
 
-        Assert.Throws<ArgumentException>(() => writer.PutExtFile(second, "y"u8));
+        Assert.Throws<AefInputException>(() => writer.PutExtFile(second, "y"u8));
         writer.PutExtFile(first, "rewritten while running"u8);
         writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1));
         Assert.Empty(run.Problems());
@@ -624,14 +624,14 @@ public class AefRunWriterTests
         using var run = new WriterRun();
         var writer = run.Create();
 
-        Assert.Throws<ArgumentException>(() => writer.AddResult(WriterRun.Leaf("k1", m: double.NaN)));
-        Assert.Throws<ArgumentException>(() => writer.AddResult(WriterRun.Leaf("k1") with { DurationMs = double.PositiveInfinity }));
-        Assert.Throws<ArgumentException>(() => writer.SetMetrics([new AefMetric { Id = "m", Kind = AefMetricKind.Score, Direction = AefMetricDirection.None, Scale = AefScale.Between(0, double.NaN) }]));
+        Assert.Throws<AefInputException>(() => writer.AddResult(WriterRun.Leaf("k1", m: double.NaN)));
+        Assert.Throws<AefInputException>(() => writer.AddResult(WriterRun.Leaf("k1") with { DurationMs = double.PositiveInfinity }));
+        Assert.Throws<AefInputException>(() => writer.SetMetrics([new AefMetric { Id = "m", Kind = AefMetricKind.Score, Direction = AefMetricDirection.None, Scale = AefScale.Between(0, double.NaN) }]));
         Assert.Empty(run.Read("results.ndjson"));
 
         writer.AddResult(WriterRun.Leaf("k1"));
         writer.SetSummary(new AefSummary { Lanes = [new AefSummaryLane("a", [new AefSummaryEntry { Metric = "m", Path = "q", Decide = _ => new AefSummaryDecision(AefSummaryVerdict.Passed, Stderr: double.NaN) }])] });
-        Assert.Throws<ArgumentException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1)));
+        Assert.Throws<AefInputException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1)));
         Assert.Equal(AefRunStatus.Running, writer.Status);
     }
 
@@ -649,8 +649,8 @@ public class AefRunWriterTests
             inner = next;
         }
 
-        Assert.Throws<ArgumentException>(() => writer.AddResult(WriterRun.Leaf("k1") with { Ext = new JsonObject { ["x"] = new string('a', AefLimits.MaxJsonBytes) } }));
-        Assert.Throws<ArgumentException>(() => writer.AddResult(WriterRun.Leaf("k1") with { Ext = deep }));
+        Assert.Throws<AefInputException>(() => writer.AddResult(WriterRun.Leaf("k1") with { Ext = new JsonObject { ["x"] = new string('a', AefLimits.MaxJsonBytes) } }));
+        Assert.Throws<AefInputException>(() => writer.AddResult(WriterRun.Leaf("k1") with { Ext = deep }));
         Assert.Empty(run.Read("results.ndjson"));
     }
 
@@ -663,8 +663,8 @@ public class AefRunWriterTests
         writer.AddResult(WriterRun.Leaf("k1", trial: 0));
         writer.AddResult(WriterRun.Leaf("k1", "q/a"));
 
-        Assert.Throws<ArgumentException>(() => writer.AddResult(WriterRun.Leaf("k1", m: 0.1)));
-        Assert.Throws<ArgumentException>(() => writer.AddResult(WriterRun.Leaf("k1", trial: 0)));
+        Assert.Throws<AefInputException>(() => writer.AddResult(WriterRun.Leaf("k1", m: 0.1)));
+        Assert.Throws<AefInputException>(() => writer.AddResult(WriterRun.Leaf("k1", trial: 0)));
         Assert.Equal(3, run.Lines("results.ndjson").Count);
     }
 
@@ -674,8 +674,8 @@ public class AefRunWriterTests
         using var run = new WriterRun();
         var writer = run.Create();
 
-        Assert.Throws<ArgumentException>(() => writer.AddResult(WriterRun.Leaf("k\u001f1")));
-        Assert.Throws<ArgumentException>(() => writer.AddResult(WriterRun.Leaf("k1", "q\n")));
+        Assert.Throws<AefInputException>(() => writer.AddResult(WriterRun.Leaf("k\u001f1")));
+        Assert.Throws<AefInputException>(() => writer.AddResult(WriterRun.Leaf("k1", "q\n")));
     }
 
     [Fact]
@@ -686,8 +686,8 @@ public class AefRunWriterTests
         var writer = run.Create();
         var foreign = other.Create().AddResult(WriterRun.Leaf("k1"));
 
-        Assert.Throws<ArgumentException>(() => writer.AddResult(WriterRun.Leaf("k1", "q/a") with { Component = new AefComponent(1, true) }, foreign));
-        Assert.Throws<ArgumentException>(() => writer.UpdateResult(foreign, WriterRun.Leaf("k1")));
+        Assert.Throws<AefInputException>(() => writer.AddResult(WriterRun.Leaf("k1", "q/a") with { Component = new AefComponent(1, true) }, foreign));
+        Assert.Throws<AefInputException>(() => writer.UpdateResult(foreign, WriterRun.Leaf("k1")));
     }
 
     [Fact]
@@ -697,7 +697,7 @@ public class AefRunWriterTests
         var writer = run.Create();
         var parent = writer.AddResult(WriterRun.Leaf("k1"));
 
-        Assert.Throws<ArgumentException>(() => parent.AddChild(WriterRun.Leaf("k1", "q/a")));
+        Assert.Throws<AefInputException>(() => parent.AddChild(WriterRun.Leaf("k1", "q/a")));
     }
 
     [Theory]
@@ -709,7 +709,7 @@ public class AefRunWriterTests
         using var run = new WriterRun();
         var writer = run.Create();
 
-        Assert.Throws<ArgumentException>(() => writer.AddResult(WriterRun.Leaf("k1") with
+        Assert.Throws<AefInputException>(() => writer.AddResult(WriterRun.Leaf("k1") with
         {
             Aggregation = new AefAggregation
             {
@@ -725,15 +725,15 @@ public class AefRunWriterTests
         using var run = new WriterRun();
         var writer = run.Create();
 
-        Assert.Throws<ArgumentException>(() => writer.AddResult(WriterRun.Leaf("k1") with { Annotator = new AefAnnotator { Kind = AefAnnotatorKind.Hybrid, Panel = new AefPanel(4, 3) } }));
-        Assert.Throws<ArgumentException>(() => writer.AddResult(WriterRun.Leaf("k1") with { Trials = new AefTrials(2, 3, AefTrialAggregation.MajorityVote, true) }));
-        Assert.Throws<ArgumentException>(() => writer.AddResult(WriterRun.Leaf("k1") with { Attack = new AefAttack { Technique = "x", Success = true } }));
-        Assert.Throws<ArgumentException>(() => writer.AddResult(WriterRun.Leaf("k1") with { StartedAt = WriterRun.Start.AddSeconds(2), EndedAt = WriterRun.Start.AddSeconds(1) }));
-        Assert.Throws<ArgumentException>(() => writer.AddResult(WriterRun.Leaf("k1") with { Usage = [new AefUsage { Role = AefUsageRole.Agent }, new AefUsage { Role = AefUsageRole.Agent }] }));
-        Assert.Throws<ArgumentException>(() => writer.AddResult(WriterRun.Leaf("k1") with { Uncertainty = new AefUncertainty(Ci: new AefInterval(0.6, 0.4, 0.95)) }));
-        Assert.Throws<ArgumentException>(() => writer.AddResult(WriterRun.Leaf("k1") with { Scores = [new AefScore { Metric = "m", Value = 1 }, new AefScore { Metric = "m", Value = 0 }] }));
-        Assert.Throws<ArgumentException>(() => writer.AddResult(WriterRun.Leaf("k1", m: 0.5, state: AefState.Skipped)));   // a typed absence carries no scores ([RES-2])
-        Assert.Throws<ArgumentException>(() => writer.AddResult(WriterRun.Leaf("k1") with { Trial = 0, Trials = new AefTrials(1, 1, AefTrialAggregation.AllPass, true) }));
+        Assert.Throws<AefInputException>(() => writer.AddResult(WriterRun.Leaf("k1") with { Annotator = new AefAnnotator { Kind = AefAnnotatorKind.Hybrid, Panel = new AefPanel(4, 3) } }));
+        Assert.Throws<AefInputException>(() => writer.AddResult(WriterRun.Leaf("k1") with { Trials = new AefTrials(2, 3, AefTrialAggregation.MajorityVote, true) }));
+        Assert.Throws<AefInputException>(() => writer.AddResult(WriterRun.Leaf("k1") with { Attack = new AefAttack { Technique = "x", Success = true } }));
+        Assert.Throws<AefInputException>(() => writer.AddResult(WriterRun.Leaf("k1") with { StartedAt = WriterRun.Start.AddSeconds(2), EndedAt = WriterRun.Start.AddSeconds(1) }));
+        Assert.Throws<AefInputException>(() => writer.AddResult(WriterRun.Leaf("k1") with { Usage = [new AefUsage { Role = AefUsageRole.Agent }, new AefUsage { Role = AefUsageRole.Agent }] }));
+        Assert.Throws<AefInputException>(() => writer.AddResult(WriterRun.Leaf("k1") with { Uncertainty = new AefUncertainty(Ci: new AefInterval(0.6, 0.4, 0.95)) }));
+        Assert.Throws<AefInputException>(() => writer.AddResult(WriterRun.Leaf("k1") with { Scores = [new AefScore { Metric = "m", Value = 1 }, new AefScore { Metric = "m", Value = 0 }] }));
+        Assert.Throws<AefInputException>(() => writer.AddResult(WriterRun.Leaf("k1", m: 0.5, state: AefState.Skipped)));   // a typed absence carries no scores ([RES-2])
+        Assert.Throws<AefInputException>(() => writer.AddResult(WriterRun.Leaf("k1") with { Trial = 0, Trials = new AefTrials(1, 1, AefTrialAggregation.AllPass, true) }));
         Assert.Empty(run.Read("results.ndjson"));
     }
 
@@ -744,7 +744,7 @@ public class AefRunWriterTests
         var writer = run.Create();
 
         // [RES-10] after R3-9: no role and model twice (an absent model a value of its own).
-        Assert.Throws<ArgumentException>(() => writer.AddResult(WriterRun.Leaf("k1") with { Usage = [new AefUsage { Role = AefUsageRole.Judge, Model = "a" }, new AefUsage { Role = AefUsageRole.Judge, Model = "a" }] }));
+        Assert.Throws<AefInputException>(() => writer.AddResult(WriterRun.Leaf("k1") with { Usage = [new AefUsage { Role = AefUsageRole.Judge, Model = "a" }, new AefUsage { Role = AefUsageRole.Judge, Model = "a" }] }));
         _ = writer.AddResult(WriterRun.Leaf("k1") with { Usage = [new AefUsage { Role = AefUsageRole.Judge, Model = "a" }, new AefUsage { Role = AefUsageRole.Judge, Model = "b" }, new AefUsage { Role = AefUsageRole.Judge }] });
 
         var written = System.Text.Encoding.UTF8.GetString(run.Read("results.ndjson"));
@@ -759,10 +759,10 @@ public class AefRunWriterTests
         var writer = run.Create();
         var foreign = new AefBlob(new string('a', 64), 3);
 
-        Assert.Throws<ArgumentException>(() => writer.AddResult(WriterRun.Leaf("k1") with { Reasoning = foreign }));
-        Assert.Throws<ArgumentException>(() => writer.AddEvidence(new AefEvidence { EvidenceId = "E-1", Kind = AefEvidenceKind.Other, Link = AefEvidenceLink.ToBlob(foreign) }));
+        Assert.Throws<AefInputException>(() => writer.AddResult(WriterRun.Leaf("k1") with { Reasoning = foreign }));
+        Assert.Throws<AefInputException>(() => writer.AddEvidence(new AefEvidence { EvidenceId = "E-1", Kind = AefEvidenceKind.Other, Link = AefEvidenceLink.ToBlob(foreign) }));
         var blob = writer.PutBlob("abc"u8);
-        Assert.Throws<ArgumentException>(() => writer.AddResult(WriterRun.Leaf("k1") with { Reasoning = blob with { Size = 4 } }));
+        Assert.Throws<AefInputException>(() => writer.AddResult(WriterRun.Leaf("k1") with { Reasoning = blob with { Size = 4 } }));
     }
 
     [Fact]
@@ -772,8 +772,8 @@ public class AefRunWriterTests
         var writer = run.Create();
         writer.AddEvidence(new AefEvidence { EvidenceId = "E-1", Kind = AefEvidenceKind.Other, Link = AefEvidenceLink.ToUri("https://example.com/a") });
 
-        Assert.Throws<ArgumentException>(() => writer.AddEvidence(new AefEvidence { EvidenceId = "E-1", Kind = AefEvidenceKind.Other, Link = AefEvidenceLink.ToUri("https://example.com/b") }));
-        Assert.Throws<ArgumentException>(() => writer.AddEvidence(new AefEvidence { EvidenceId = "not-E", Kind = AefEvidenceKind.Other, Link = AefEvidenceLink.ToUri("https://example.com/b") }));
+        Assert.Throws<AefInputException>(() => writer.AddEvidence(new AefEvidence { EvidenceId = "E-1", Kind = AefEvidenceKind.Other, Link = AefEvidenceLink.ToUri("https://example.com/b") }));
+        Assert.Throws<AefInputException>(() => writer.AddEvidence(new AefEvidence { EvidenceId = "not-E", Kind = AefEvidenceKind.Other, Link = AefEvidenceLink.ToUri("https://example.com/b") }));
     }
 
     [Fact]
@@ -782,7 +782,7 @@ public class AefRunWriterTests
         using var run = new WriterRun();
         var writer = run.Create();
 
-        Assert.Throws<ArgumentException>(() => writer.AddGate(new AefGateDecision
+        Assert.Throws<AefInputException>(() => writer.AddGate(new AefGateDecision
         {
             GateId = "gate:ci", DecisionId = "d-1", Rule = new AefGateRule("baseline"), Inputs = new AefGateInputs(),
             Comparability = AefComparability.Incomparable, Outcome = AefGateOutcome.Ship, DecidedAt = WriterRun.Start,
@@ -795,8 +795,8 @@ public class AefRunWriterTests
         using var run = new WriterRun();
         var writer = run.Create();
 
-        Assert.Throws<ArgumentException>(() => writer.SetMetrics([WriterRun.Metric(), WriterRun.Metric()]));
-        Assert.Throws<ArgumentException>(() => writer.SetMetrics([new AefMetric { Id = "m", Kind = AefMetricKind.Score, Direction = AefMetricDirection.None, Scale = AefScale.Between(1, 0) }]));
+        Assert.Throws<AefInputException>(() => writer.SetMetrics([WriterRun.Metric(), WriterRun.Metric()]));
+        Assert.Throws<AefInputException>(() => writer.SetMetrics([new AefMetric { Id = "m", Kind = AefMetricKind.Score, Direction = AefMetricDirection.None, Scale = AefScale.Between(1, 0) }]));
     }
 
     [Fact]
@@ -806,15 +806,15 @@ public class AefRunWriterTests
         var writer = run.Create();
         var entry = new AefSummaryEntry { Metric = "m", Path = "q" };
 
-        Assert.Throws<ArgumentException>(() => writer.SetSummary(new AefSummary { Lanes = [new AefSummaryLane("a", [entry, new AefSummaryEntry { Metric = "m", Path = "q", Aggregate = new AefAggregate("median") }])] }));
-        Assert.Throws<ArgumentException>(() => writer.SetSummary(new AefSummary { Lanes = [new AefSummaryLane("a", [entry]), new AefSummaryLane("a", [])] }));
-        Assert.Throws<ArgumentException>(() => writer.SetSummary(new AefSummary
+        Assert.Throws<AefInputException>(() => writer.SetSummary(new AefSummary { Lanes = [new AefSummaryLane("a", [entry, new AefSummaryEntry { Metric = "m", Path = "q", Aggregate = new AefAggregate("median") }])] }));
+        Assert.Throws<AefInputException>(() => writer.SetSummary(new AefSummary { Lanes = [new AefSummaryLane("a", [entry]), new AefSummaryLane("a", [])] }));
+        Assert.Throws<AefInputException>(() => writer.SetSummary(new AefSummary
         {
             Lanes = [],
             Usage = [new AefUsage { Role = AefUsageRole.Judge, Model = "j" }, new AefUsage { Role = AefUsageRole.Judge, Model = "j" }],
         }));
-        Assert.Throws<ArgumentException>(() => writer.SetSummary(new AefSummary { Lanes = [new AefSummaryLane("lane with spaces", [])] }));
-        Assert.Throws<ArgumentException>(() => writer.SetSummary(new AefSummary { Lanes = [new AefSummaryLane("a", [new AefSummaryEntry { Metric = "m", Path = "q", Aggregate = new AefAggregate("Not A Method") }])] }));
+        Assert.Throws<AefInputException>(() => writer.SetSummary(new AefSummary { Lanes = [new AefSummaryLane("lane with spaces", [])] }));
+        Assert.Throws<AefInputException>(() => writer.SetSummary(new AefSummary { Lanes = [new AefSummaryLane("a", [new AefSummaryEntry { Metric = "m", Path = "q", Aggregate = new AefAggregate("Not A Method") }])] }));
 
         // Two entries for one metric and path in different lanes, and two usage entries of one role with and without a model, are fine.
         writer.SetSummary(new AefSummary
@@ -850,7 +850,7 @@ public class AefRunWriterTests
         writer.SetSummary(new AefSummary { Lanes = [new AefSummaryLane("a", [new AefSummaryEntry { Metric = "undeclared-too", Path = "q" }])] });
         var before = run.Snapshot();
 
-        var refused = Assert.Throws<InvalidOperationException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1)));
+        var refused = Assert.Throws<AefInputException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1)));
 
         foreach (var rule in new[] { "[RES-5]", "[RES-6]", "[RES-8]", "§3.9 evidence", "undeclared,", "§3.9 gate", "§3.9 trace-link", "undeclared-too" })
         {
@@ -874,7 +874,7 @@ public class AefRunWriterTests
         });
         parent.AddChild(WriterRun.Leaf("k1", "q/a") with { Component = new AefComponent(1, true) });
 
-        var refused = Assert.Throws<InvalidOperationException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1)));
+        var refused = Assert.Throws<AefInputException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1)));
         Assert.Contains("total is 2, and it has 1 children", refused.Message, StringComparison.Ordinal);
 
         parent.AddChild(WriterRun.Leaf("k1", "q/b") with { Component = new AefComponent(1, true) });
@@ -891,7 +891,7 @@ public class AefRunWriterTests
         writer.AddResult(WriterRun.Leaf("k1", m: 0.1, state: AefState.Failed, trial: 1));
         var rollup = writer.AddResult(WriterRun.Leaf("k1") with { Trials = new AefTrials(2, 2, AefTrialAggregation.AllPass, true) });
 
-        var refused = Assert.Throws<InvalidOperationException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1)));
+        var refused = Assert.Throws<AefInputException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1)));
         Assert.Contains("[RES-8]", refused.Message, StringComparison.Ordinal);
 
         writer.UpdateResult(rollup, WriterRun.Leaf("k1", m: 0.5, state: AefState.Failed) with { Trials = new AefTrials(2, 1, AefTrialAggregation.AllPass, false) });
@@ -909,8 +909,8 @@ public class AefRunWriterTests
             Aggregation = new AefAggregation { Strategy = AefAggregationStrategy.Min, RulePath = AefRulePath.Threshold, Measured = 1, Total = 1 },
         });
 
-        Assert.Throws<ArgumentException>(() => trial.AddChild(WriterRun.Leaf("k1", "q/a") with { Component = new AefComponent(1, true) }));
-        Assert.Throws<ArgumentException>(() => trial.AddChild(WriterRun.Leaf("k1", "q/a", trial: 1) with { Component = new AefComponent(1, true) }));
+        Assert.Throws<AefInputException>(() => trial.AddChild(WriterRun.Leaf("k1", "q/a") with { Component = new AefComponent(1, true) }));
+        Assert.Throws<AefInputException>(() => trial.AddChild(WriterRun.Leaf("k1", "q/a", trial: 1) with { Component = new AefComponent(1, true) }));
         trial.AddChild(WriterRun.Leaf("k1", "q/a", trial: 0) with { Component = new AefComponent(1, true) });
         var rollup = writer.AddResult(WriterRun.Leaf("k1") with
         {
@@ -920,7 +920,7 @@ public class AefRunWriterTests
 
         // The child is a trial line at q/a: its case and path have a rollup too (both verifiers read RES-8 so; W5a-23),
         // and that rollup is a child of the case's rollup at q: the rollups form the case's own tree (round 4).
-        var refused = Assert.Throws<InvalidOperationException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1)));
+        var refused = Assert.Throws<AefInputException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1)));
         Assert.Contains("at q/a and has no rollup line", refused.Message, StringComparison.Ordinal);
         rollup.AddChild(WriterRun.Leaf("k1", "q/a") with { Trials = new AefTrials(1, 1, AefTrialAggregation.AllPass, true), Component = new AefComponent(1, true) });
         writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1));
@@ -940,9 +940,9 @@ public class AefRunWriterTests
         var rollup = writer.AddResult(WriterRun.Leaf("k2") with { Trials = new AefTrials(1, 1, AefTrialAggregation.AllPass, true), Aggregation = aggregation });
         var before = run.Lines("results.ndjson").Count;
 
-        var underPlain = Assert.Throws<ArgumentException>(() => plain.AddChild(WriterRun.Leaf("k1", "q/a", trial: 0) with { Component = new AefComponent(1, true) }));
+        var underPlain = Assert.Throws<AefInputException>(() => plain.AddChild(WriterRun.Leaf("k1", "q/a", trial: 0) with { Component = new AefComponent(1, true) }));
         Assert.Contains("a trial line's parent carries a trial too", underPlain.Message, StringComparison.Ordinal);
-        Assert.Throws<ArgumentException>(() => rollup.AddChild(WriterRun.Leaf("k2", "q/a", trial: 0) with { Component = new AefComponent(1, true) }));
+        Assert.Throws<AefInputException>(() => rollup.AddChild(WriterRun.Leaf("k2", "q/a", trial: 0) with { Component = new AefComponent(1, true) }));
         Assert.Equal(before, run.Lines("results.ndjson").Count);
     }
 
@@ -957,7 +957,7 @@ public class AefRunWriterTests
             Aggregation = new AefAggregation { Strategy = AefAggregationStrategy.Min, RulePath = AefRulePath.Threshold, Measured = 1, Total = 1 },
         });
 
-        var refused = Assert.Throws<ArgumentException>(() => parent.AddChild(WriterRun.Leaf("k2", "q/a") with { Component = new AefComponent(1, true) }));
+        var refused = Assert.Throws<AefInputException>(() => parent.AddChild(WriterRun.Leaf("k2", "q/a") with { Component = new AefComponent(1, true) }));
         Assert.Contains("a tree belongs to one case", refused.Message, StringComparison.Ordinal);
         Assert.Single(run.Lines("results.ndjson"));
 
@@ -976,7 +976,7 @@ public class AefRunWriterTests
         var rollup = writer.AddResult(WriterRun.Leaf("k1", m: 0.5, state: AefState.Failed) with { Trials = new AefTrials(2, 1, AefTrialAggregation.AllPass, true) });
 
         // Two states: the trials disagreed (round 4).
-        var refused = Assert.Throws<InvalidOperationException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1)));
+        var refused = Assert.Throws<AefInputException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1)));
         Assert.Contains("agree is true exactly when they are all in one", refused.Message, StringComparison.Ordinal);
 
         writer.UpdateResult(rollup, WriterRun.Leaf("k1", m: 0.5, state: AefState.Failed) with { Trials = new AefTrials(2, 1, AefTrialAggregation.AllPass, false) });
@@ -998,7 +998,7 @@ public class AefRunWriterTests
         writer.AddResult(WriterRun.Leaf("k1", "q/a") with { Trials = new AefTrials(1, 1, AefTrialAggregation.AllPass, true) });   // a root
 
         // §3.9 trials (round 4, W5a-23; round 5: q/a's trial lines have their parents at q): refused before anything is written.
-        var refused = Assert.Throws<InvalidOperationException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1)));
+        var refused = Assert.Throws<AefInputException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1)));
         Assert.Contains("its rollup at q/a is not a child of its rollup at q", refused.Message, StringComparison.Ordinal);
     }
 
@@ -1036,7 +1036,7 @@ public class AefRunWriterTests
         });
         rollup.AddChild(WriterRun.Leaf("k1", "q/x") with { Trials = new AefTrials(1, 1, AefTrialAggregation.AllPass, true), Component = new AefComponent(1, true) });
 
-        var refused = Assert.Throws<InvalidOperationException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1)));
+        var refused = Assert.Throws<AefInputException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1)));
         Assert.Contains("its trial lines at q/x are roots, and its rollup there is not", refused.Message, StringComparison.Ordinal);
         Assert.Equal(AefRunStatus.Running, writer.Status);
     }
@@ -1056,7 +1056,7 @@ public class AefRunWriterTests
         writer.AddResult(WriterRun.Leaf("k1") with { Trials = new AefTrials(1, 1, AefTrialAggregation.AllPass, true) });
         writer.AddResult(WriterRun.Leaf("k1", "q/x") with { Trials = new AefTrials(2, 2, AefTrialAggregation.AllPass, true) });
 
-        var refused = Assert.Throws<InvalidOperationException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1)));
+        var refused = Assert.Throws<AefInputException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start.AddMinutes(1)));
         Assert.Contains("its trial lines at q/x have parents at several paths, or some are roots and some not", refused.Message, StringComparison.Ordinal);
     }
 
@@ -1095,8 +1095,8 @@ public class AefRunWriterTests
         var writer = AefRunWriter.Create(run.Dir, WriterRun.Header() with { StartedAt = AefTime.Parse("2026-10-01T10:00:00.000000002Z") });
         writer.SetMetrics([WriterRun.Metric()]);
 
-        Assert.Throws<ArgumentException>(() => writer.Close(AefRunStatus.Completed, AefTime.Parse("2026-10-01T10:00:00.000000001Z")));
-        Assert.Throws<ArgumentException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start));   // 10:00:00Z, a DateTimeOffset
+        Assert.Throws<AefInputException>(() => writer.Close(AefRunStatus.Completed, AefTime.Parse("2026-10-01T10:00:00.000000001Z")));
+        Assert.Throws<AefInputException>(() => writer.Close(AefRunStatus.Completed, WriterRun.Start));   // 10:00:00Z, a DateTimeOffset
         writer.Close(AefRunStatus.Completed, WriterRun.Start.AddTicks(1));                               // 10:00:00.0000001Z
 
         Assert.Equal("2026-10-01T10:00:00.0000001Z", (string)run.Json("run.json")["endedAt"]!);
@@ -1106,8 +1106,8 @@ public class AefRunWriterTests
     public void ATimeThatIsNotAnAefTime_IsRefused_N2d()
     {
         using var run = new WriterRun();
-        Assert.Throws<ArgumentException>(() => AefRunWriter.Create(run.Dir, WriterRun.Header() with { StartedAt = new AefTime(0, 1_000_000_000) }));
-        Assert.Throws<ArgumentException>(() => AefRunWriter.Create(run.Dir, WriterRun.Header() with { StartedAt = new AefTime(-62_135_596_801, 0) }));   // the year 0000
+        Assert.Throws<AefInputException>(() => AefRunWriter.Create(run.Dir, WriterRun.Header() with { StartedAt = new AefTime(0, 1_000_000_000) }));
+        Assert.Throws<AefInputException>(() => AefRunWriter.Create(run.Dir, WriterRun.Header() with { StartedAt = new AefTime(-62_135_596_801, 0) }));   // the year 0000
         Assert.False(Directory.Exists(run.Dir));
     }
 
@@ -1132,8 +1132,8 @@ public class AefRunWriterTests
             logs["resourceLogs"]![0]!["scopeLogs"]![0]!["scope"] = new JsonObject { ["attributes"] = attribute.DeepClone() };
         }
 
-        Assert.Throws<ArgumentException>(() => writer.AddTraces(traces));
-        Assert.Throws<ArgumentException>(() => writer.AddLogs(logs));
+        Assert.Throws<AefInputException>(() => writer.AddTraces(traces));
+        Assert.Throws<AefInputException>(() => writer.AddLogs(logs));
     }
 
     [Fact]

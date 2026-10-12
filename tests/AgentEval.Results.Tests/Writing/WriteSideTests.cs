@@ -465,6 +465,22 @@ public class WriteSideTests
     }
 
     [Fact]
+    public void SealWrite_InvalidProducerInput_Exits2WithoutWritingSeal()
+    {
+        using var run = new WriterRun();
+        run.WriteSmall();
+        var summary = Encoding.UTF8.GetString(run.Read("summary.json")).Replace("\"N\": 2", "\"N\": 3", StringComparison.Ordinal);
+        File.WriteAllText(run.Full("summary.json"), summary);
+
+        var (code, output, error) = Dispatch("seal-write", run.Dir, "--sealed-by", "producer", "--sealed-at", "2026-10-02T00:00:00Z");
+
+        Assert.Equal(2, code);
+        Assert.Equal("", output);
+        Assert.Contains("summary.json summary", error, StringComparison.Ordinal);
+        Assert.False(File.Exists(run.Full("seal.json")));
+    }
+
+    [Fact]
     public void Sign_NeedsAPayloadType_AndAPkcs8Key()
     {
         using var run = new WriterRun();
@@ -519,11 +535,43 @@ public class WriteSideTests
 
         Assert.Null(summary["lanes"]![0]!["metrics"]![0]!["value"]);
         Assert.Equal("not_measured", summary["lanes"]![0]!["metrics"]![0]!["verdict"]!.GetValue<string>());
-        Assert.Throws<InvalidOperationException>(() => AefSummaryWriter.Build("r", [Line("k1", 0.5)], Kinds(), Request(new AefSummaryEntry
+        Assert.Throws<AefInputException>(() => AefSummaryWriter.Build("r", [Line("k1", 0.5)], Kinds(), Request(new AefSummaryEntry
         {
             Metric = "m", Path = "q", Aggregate = new AefAggregate("median"), Decide = _ => new AefSummaryDecision(AefSummaryVerdict.Passed, Value: 1),
         })));
-        Assert.Throws<ArgumentException>(() => AefSummaryWriter.Build("r", [], Kinds(), Request(new AefSummaryEntry { Metric = "nope", Path = "q" })));
+        Assert.Throws<AefInputException>(() => AefSummaryWriter.Build("r", [], Kinds(), Request(new AefSummaryEntry { Metric = "nope", Path = "q" })));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Build_ProducerCallbackThrows_ReportsUnexpectedFailure(bool argumentFailure)
+    {
+        Exception failure = argumentFailure ? new ArgumentException("callback bug") : new InvalidOperationException("callback bug");
+        var operations = new Dictionary<string, Driver.Operation>
+        {
+            ["summarize"] = (_, _) =>
+            {
+                try
+                {
+                    AefSummaryWriter.Build("r", [Line("k1", 0.5)], Kinds(), Request(new AefSummaryEntry
+                    {
+                        Metric = "m", Path = "q", Decide = _ => throw failure,
+                    }));
+                    return 0;
+                }
+                catch (Exception e) when (AgentEval.Results.Conformance.Ops.DriverIO.IsInputError(e))
+                {
+                    throw new AgentEval.Results.Conformance.UsageException(e.Message);
+                }
+            },
+        };
+        var stdout = new StringWriter();
+        var stderr = new StringWriter();
+
+        Assert.Equal(1, Driver.Dispatch(["summarize"], stdout, stderr, operations));
+        Assert.Equal("", stdout.ToString());
+        Assert.Contains("callback bug", stderr.ToString(), StringComparison.Ordinal);
     }
 
     // ------------------------------------------------------------------ AefSigningKey

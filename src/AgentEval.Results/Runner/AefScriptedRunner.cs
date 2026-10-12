@@ -114,13 +114,13 @@ public static class AefScriptedRunner
     /// stream <c>events.ndjson</c> and <c>runs/&lt;runId&gt;/</c> for each run it seals, and nothing else.
     /// </summary>
     /// <returns>What the job wrote: refused, sealed or failed, all of them a job that ran.</returns>
-    /// <exception cref="FormatException">
+    /// <exception cref="AefInputException">
     /// An input error, with nothing written: a plan that does not read as an I-JSON document or names no <c>planId</c> a
     /// <c>job.refused</c> can carry (a valid id), a manifest the reader <c>runner</c> schema refuses, or a start from
     /// which the job's clock, moved by every case's time bound and <c>closeSeconds</c> once per suite of the target,
     /// would leave the years 0001 to 9999 ([ENC-8]).
     /// </exception>
-    /// <exception cref="ArgumentException"><paramref name="output"/> is a file, or a folder that is not empty.</exception>
+    /// <exception cref="AefInputException"><paramref name="output"/> is a file, or a folder that is not empty.</exception>
     /// <exception cref="IOException">The output cannot be written.</exception>
     public static AefJobResult Run(byte[] plan, JsonObject runner, AefScriptedTarget target, string output, AefJobOptions options) =>
         AefJobRunner.RunAsync(plan, runner, new AefScriptedJobTarget(target ?? throw new ArgumentNullException(nameof(target))), output, options)
