@@ -246,111 +246,125 @@ public static class BenchAgenticCommand
 
         Console.WriteLine($"Running agentic benchmark ({preset}) for subject '{subject}'...");
 
-        string runId;
-        EvalResult compositeResult;
         var startedAt = DateTimeOffset.UtcNow;
+        var progress = new CompositeProgress(benchmark);
         try
         {
-            var runner = new AgenticBenchmarkRunner();
-            (runId, compositeResult) = await runner.RunAsync(store, subjectIdentity, benchmark, evalInput, ct: ct);
+            string runId;
+            EvalResult compositeResult;
+
+            try
+            {
+                var runner = new AgenticBenchmarkRunner();
+                (runId, compositeResult) = await runner.RunWithProgressAsync(store, subjectIdentity, benchmark, evalInput, progress.Completed, progress.Started, ct: ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+            {
+                Console.Error.WriteLine($"Benchmark run failed: {ex.Message}");
+                return 1;
+            }
+
+            // ── Generate reports ─────────────────────────────────────────────────
+            var reporter = new AgenticBenchmarkReporter();
+            // A pure-code preset calls no judge, and its report must not say one graded it.
+            var options = new AgenticReportOptions(Preset: preset, JudgeMode: PresetNeedsNoJudge(preset) ? "none" : "single");
+            AgenticBenchmarkResult result;
+            try
+            {
+                result = await reporter.SaveReportAsync(store, subjectIdentity, runId, compositeResult, options);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+            {
+                Console.Error.WriteLine($"Failed to generate agentic benchmark report: {ex.Message}");
+                return 1;
+            }
+
+            // Derive output directory (mirrors AgenticBenchmarkReporter path convention)
+            var sanitizedSubject = FileSystemLayout.Sanitize(subject);
+            var ts = result.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss");
+            var outputDir = Path.Combine(agentEvalDir, "benchmarks", "agentic", sanitizedSubject, ts);
+            Directory.CreateDirectory(outputDir);
+
+            // Markdown report
+            try
+            {
+                var md = new AgenticMarkdownRenderer().Render(result);
+                var mdPath = Path.Combine(outputDir, "report.md");
+                await File.WriteAllTextAsync(mdPath, md);
+                Console.WriteLine($"Markdown report: {mdPath}");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+            {
+                Console.Error.WriteLine($"Warning: failed to write Markdown report: {ex.Message}");
+            }
+
+            // PDF report
+            try
+            {
+                var pdfPath = Path.Combine(outputDir, "report.pdf");
+                await new AgenticPdfRenderer().RenderAsync(result, pdfPath);
+                Console.WriteLine($"PDF report:      {pdfPath}");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+            {
+                Console.Error.WriteLine($"Warning: failed to write PDF report: {ex.Message}");
+            }
+
+            // ── All-skipped diagnostic ────────────────────────────────────────────
+            // A trace-only preset (e.g. glass-box-diagnostics) run without a trace yields an all-skipped
+            // composite. That is a "nothing ran" state, not a genuine regression: the status is SKIPPED (B9b; it
+            // used to read FAIL) and the exit is indeterminate (11) — print why.
+            var subResults = compositeResult.Details.SubResults;
+            if (subResults is { Count: > 0 } && subResults.All(s => s.Score.Label == "skipped"))
+            {
+                var isGlassBox = string.Equals(preset, "glass-box-diagnostics", StringComparison.OrdinalIgnoreCase);
+                var isRag = string.Equals(preset, "rag-quality", StringComparison.OrdinalIgnoreCase);
+                Console.Error.WriteLine(
+                    $"[bench agentic] NOTE: all {subResults.Count} evaluator(s) in preset '{preset}' were SKIPPED — "
+                    + "no score was produced (SKIPPED below means 'nothing ran', not a 0% result). "
+                    + (isGlassBox
+                        ? (traceFile is null
+                            ? "This preset reads a Glass Box trace; pass --trace <file> to activate it."
+                            : "Check that the supplied trace contains the entry scopes these evaluators read.")
+                        : isRag
+                            ? "This preset grades against a reference answer and a retrieved context; pass --reference/--reference-file and --context/--context-file."
+                            : "This preset reads inputs from EvalInput.Metadata (e.g. \"agentic_telemetry\" / \"run_results\"), which this CLI path does not populate."));
+            }
+
+            // ── AEF ───────────────────────────────────────────────────────────────
+            ct.ThrowIfCancellationRequested();
+            var overall = result.Summary.OverallStatus;
+            var finalExit = BenchExitCodes.FromLabel(overall);
+            // bench agentic grades a response (and trace) the agent already produced: it drives no agent, so the run is
+            // replayed.
+            if (!noAef && BenchAef.Write(aef, agentEvalDir, "agentic", preset, subject, subjectVersion,
+                    AgentEval.Results.Writing.AefTargetMode.Replayed, benchmark, compositeResult, startedAt, DateTimeOffset.UtcNow, exitCode: finalExit))
+                return ExitCodes.RuntimeError;   // an explicit --aef could not be written
+
+            // ── Exit code ─────────────────────────────────────────────────────────
+            // ERROR / SKIPPED are not verdicts on the agent (B9b): the score covers only what was measured, and the exit is
+            // indeterminate (11), not "gate failed" (9).
+            var errored = result.Summary.PerEvaluator.Where(kv => kv.Value.Status == "ERROR").Select(kv => kv.Key).ToList();
+            var scoreText = overall is "ERROR" or "SKIPPED"
+                ? $"score {result.Summary.OverallScore:P0} of the measured part only"
+                : $"score {result.Summary.OverallScore:P0}";
+            Console.WriteLine($"Overall result: {overall} ({scoreText})");
+            if (errored.Count > 0)
+                Console.WriteLine($"  {errored.Count} check(s) produced no verdict — the judge or its input failed, not the agent: " +
+                                  string.Join(", ", errored));
+
+            // Reuse fix: was an inlined duplicate of BenchExitCodes.FromLabel (identical PASS=>0/else=>2 mapping);
+            // the shared helper exists specifically so a future policy change lands in one place.
+            return finalExit;
         }
-        catch (Exception ex)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            Console.Error.WriteLine($"Benchmark run failed: {ex.Message}");
+            if (!noAef && BenchAef.Write(aef, agentEvalDir, "agentic", preset, subject, subjectVersion,
+                AgentEval.Results.Writing.AefTargetMode.Replayed, benchmark, progress.Snapshot(),
+                startedAt, DateTimeOffset.UtcNow, abortReason: "cancelled"))
+                return ExitCodes.RuntimeError;
             return 1;
         }
-
-        // ── Generate reports ─────────────────────────────────────────────────
-        var reporter = new AgenticBenchmarkReporter();
-        // A pure-code preset calls no judge, and its report must not say one graded it.
-        var options = new AgenticReportOptions(Preset: preset, JudgeMode: PresetNeedsNoJudge(preset) ? "none" : "single");
-        AgenticBenchmarkResult result;
-        try
-        {
-            result = await reporter.SaveReportAsync(store, subjectIdentity, runId, compositeResult, options);
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Failed to generate agentic benchmark report: {ex.Message}");
-            return 1;
-        }
-
-        // Derive output directory (mirrors AgenticBenchmarkReporter path convention)
-        var sanitizedSubject = FileSystemLayout.Sanitize(subject);
-        var ts = result.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss");
-        var outputDir = Path.Combine(agentEvalDir, "benchmarks", "agentic", sanitizedSubject, ts);
-        Directory.CreateDirectory(outputDir);
-
-        // Markdown report
-        try
-        {
-            var md = new AgenticMarkdownRenderer().Render(result);
-            var mdPath = Path.Combine(outputDir, "report.md");
-            await File.WriteAllTextAsync(mdPath, md);
-            Console.WriteLine($"Markdown report: {mdPath}");
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Warning: failed to write Markdown report: {ex.Message}");
-        }
-
-        // PDF report
-        try
-        {
-            var pdfPath = Path.Combine(outputDir, "report.pdf");
-            await new AgenticPdfRenderer().RenderAsync(result, pdfPath);
-            Console.WriteLine($"PDF report:      {pdfPath}");
-        }
-        catch (Exception ex)
-        {
-            Console.Error.WriteLine($"Warning: failed to write PDF report: {ex.Message}");
-        }
-
-        // ── All-skipped diagnostic ────────────────────────────────────────────
-        // A trace-only preset (e.g. glass-box-diagnostics) run without a trace yields an all-skipped
-        // composite. That is a "nothing ran" state, not a genuine regression: the status is SKIPPED (B9b; it
-        // used to read FAIL) and the exit is indeterminate (11) — print why.
-        var subResults = compositeResult.Details.SubResults;
-        if (subResults is { Count: > 0 } && subResults.All(s => s.Score.Label == "skipped"))
-        {
-            var isGlassBox = string.Equals(preset, "glass-box-diagnostics", StringComparison.OrdinalIgnoreCase);
-            var isRag = string.Equals(preset, "rag-quality", StringComparison.OrdinalIgnoreCase);
-            Console.Error.WriteLine(
-                $"[bench agentic] NOTE: all {subResults.Count} evaluator(s) in preset '{preset}' were SKIPPED — "
-                + "no score was produced (SKIPPED below means 'nothing ran', not a 0% result). "
-                + (isGlassBox
-                    ? (traceFile is null
-                        ? "This preset reads a Glass Box trace; pass --trace <file> to activate it."
-                        : "Check that the supplied trace contains the entry scopes these evaluators read.")
-                    : isRag
-                        ? "This preset grades against a reference answer and a retrieved context; pass --reference/--reference-file and --context/--context-file."
-                        : "This preset reads inputs from EvalInput.Metadata (e.g. \"agentic_telemetry\" / \"run_results\"), which this CLI path does not populate."));
-        }
-
-        // ── AEF ───────────────────────────────────────────────────────────────
-        var overall = result.Summary.OverallStatus;
-        var finalExit = BenchExitCodes.FromLabel(overall);
-        // bench agentic grades a response (and trace) the agent already produced: it drives no agent, so the run is
-        // replayed.
-        if (!noAef && BenchAef.Write(aef, agentEvalDir, "agentic", preset, subject, subjectVersion,
-                AgentEval.Results.Writing.AefTargetMode.Replayed, benchmark, compositeResult, startedAt, DateTimeOffset.UtcNow, exitCode: finalExit))
-            return ExitCodes.RuntimeError;   // an explicit --aef could not be written
-
-        // ── Exit code ─────────────────────────────────────────────────────────
-        // ERROR / SKIPPED are not verdicts on the agent (B9b): the score covers only what was measured, and the exit is
-        // indeterminate (11), not "gate failed" (9).
-        var errored = result.Summary.PerEvaluator.Where(kv => kv.Value.Status == "ERROR").Select(kv => kv.Key).ToList();
-        var scoreText = overall is "ERROR" or "SKIPPED"
-            ? $"score {result.Summary.OverallScore:P0} of the measured part only"
-            : $"score {result.Summary.OverallScore:P0}";
-        Console.WriteLine($"Overall result: {overall} ({scoreText})");
-        if (errored.Count > 0)
-            Console.WriteLine($"  {errored.Count} check(s) produced no verdict — the judge or its input failed, not the agent: " +
-                              string.Join(", ", errored));
-
-        // Reuse fix: was an inlined duplicate of BenchExitCodes.FromLabel (identical PASS=>0/else=>2 mapping);
-        // the shared helper exists specifically so a future policy change lands in one place.
-        return finalExit;
     }
 
     /// <summary>The presets built only from pure-code evaluators: they never call a judge.</summary>

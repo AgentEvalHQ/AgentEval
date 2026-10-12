@@ -35,6 +35,36 @@ public sealed class AefCompositeRunWriterTests : IDisposable
     private static AefComponentShape Leaf(double weight = 1, bool required = true, string onFailure = "Averaged") => new(weight, required, onFailure, []);
 
     [Fact]
+    public void WriteAbortedTrials_DifferentLeafBreakdowns_PreservesOnlyObservedPathsAndExactRollups()
+    {
+        var first = Composite("preset", "pass", 1, null, new EvalLineage("threshold", []),
+            Composite("leaf", "pass", 1, null, new EvalLineage("threshold", []), Leaf("claim", "pass", 1)));
+        var second = Composite("preset", "error", 0, null, new EvalLineage("required-error", []), Leaf("leaf", "error", 0));
+        var (dir, _) = AefCompositeRunWriter.WriteAbortedTrials(_out, [first, second],
+            new AefComponentShape(1, true, "Averaged", [Leaf()]), new AefCompositeRunOptions
+            {
+                SubjectRef = "agent:test", TargetMode = AefTargetMode.Mocked, Lane = "gdpr", SuiteRef = "bench:gdpr/test",
+                AbortReason = "cancelled",
+                ExecutionPolicy = new AefExecutionPolicy { TrialsPerCase = 3, Aggregation = AefTrialAggregation.MajorityVote },
+            }, Start, Start.AddSeconds(1));
+
+        var verified = AefRunVerifier.Verify(dir);
+        Assert.Equal(AefOutcome.Intact, verified.Outcome);
+        Assert.Empty(verified.Problems);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference) Assert.Equal("intact", (string?)reference["outcome"]);
+        var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!).ToList();
+        Assert.Equal(5, lines.Count);
+        var roots = lines.Where(l => (string?)l["path"] == "case").ToList();
+        Assert.Equal(2, (int)Assert.Single(roots, l => l["trials"] is not null)["trials"]!["n"]!);
+        var claim = Assert.Single(lines, l => (string?)l["path"] == "case/claim" && l["trials"] is not null);
+        Assert.Equal(1, (int)claim["trials"]!["n"]!);
+        Assert.Equal("error", (string?)claim["state"]);
+        Assert.DoesNotContain(lines, l => (string?)l["path"] == "case/claim" && (int?)l["trial"] == 1);
+        Assert.Equal(3, (int)AefTestRuns.Document(dir, "run.json")["suite"]!["executionPolicy"]!["trialsPerCase"]!);
+        Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
+    }
+
+    [Fact]
     public void Write_AbortedTree_RetainsMeasuredChildrenWithoutGateOrInventedParentScore()
     {
         var interrupted = Leaf("interrupted", "error", 0);

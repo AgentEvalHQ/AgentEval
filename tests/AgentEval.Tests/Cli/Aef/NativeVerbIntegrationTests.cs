@@ -311,12 +311,56 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
     }
 
-    private sealed class CancelOnPersistenceWriter(CancellationTokenSource cancel) : StringWriter
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task RepeatedComposite_CancelDuringReports_PreservesAlreadyComputedRollups(bool euAiAct)
+    {
+        Directory.CreateDirectory(Path.Combine(_root, ".agenteval"));
+        File.WriteAllText(Path.Combine(_root, ".agenteval", "solution.json"),
+            new JsonObject { ["schemaVersion"] = "1.0", ["id"] = Guid.NewGuid().ToString(), ["name"] = "report-cancel" }.ToJsonString());
+        using var cancel = new CancellationTokenSource();
+        var aef = new DirectoryInfo(Path.Combine(_root, "aef"));
+        var original = Console.Out;
+        using var output = new CancelOnPersistenceWriter(cancel, "Markdown report:");
+        try
+        {
+            Console.SetOut(output);
+            var exit = euAiAct
+                ? await BenchEuAiActCommand.RunAsync("standard", "subject", _root, "question", evaluatorOverride: new PassingEvaluator(),
+                    responseText: "answer", runs: 2, ct: cancel.Token, aef: aef)
+                : await BenchCommand.RunGdprAsync("standard", "subject", _root, "question", evaluatorOverride: new PassingEvaluator(),
+                    responseText: "answer", runs: 2, ct: cancel.Token, aef: aef);
+            Assert.Equal(1, exit);
+        }
+        finally { Console.SetOut(original); }
+
+        Assert.True(cancel.IsCancellationRequested);
+        var dir = RunDirectory(aef.FullName);
+        AssertIntact(dir);
+        Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
+        Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
+        var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!).ToList();
+        Assert.Contains(lines, l => l["trials"] is not null && (string?)l["state"] == "passed");
+        Assert.All(lines.Where(l => l["trials"] is not null), l => Assert.Equal(2, (int)l["trials"]!["n"]!));
+    }
+
+    private sealed class PassingEvaluator : AgentEval.Core.IEvaluator
+    {
+        public Task<AgentEval.Core.EvaluationResult> EvaluateAsync(string input, string output, IEnumerable<string> criteria, CancellationToken ct = default) =>
+            Task.FromResult(new AgentEval.Core.EvaluationResult
+            {
+                OverallScore = 100, Summary = "test",
+                CriteriaResults = criteria.Select(c => new AgentEval.Core.CriterionResult { Criterion = c, Met = true, Explanation = "test" }).ToList(),
+            });
+    }
+
+    private sealed class CancelOnPersistenceWriter(CancellationTokenSource cancel, string prefix = "Persisted run ") : StringWriter
     {
         public override void WriteLine(string? value)
         {
             base.WriteLine(value);
-            if (value?.StartsWith("Persisted run ", StringComparison.Ordinal) is true)
+            if (value?.StartsWith(prefix, StringComparison.Ordinal) is true)
                 cancel.Cancel();
         }
     }

@@ -130,9 +130,11 @@ Redteam and the OWASP, MITRE and NIST benchmarks also record judge token totals 
 Cancellation during eval or redteam execution seals completed results in an `aborted` run with no final gate.
 Redteam and the OWASP, MITRE, and NIST benchmarks also preserve their completed scan if cancellation occurs
 during subsequent persistence or report generation. `--no-aef` still suppresses this evidence.
-Single-run GDPR and EU AI Act benchmarks preserve completed nested evaluations on cancellation too. Unfinished
-nodes carry typed absences, and the aborted run has no command gate. Cancellation capture for repeated composite
-benchmark runs is not yet supported.
+GDPR, EU AI Act, and agentic benchmarks preserve completed nested evaluations on cancellation too. Unfinished
+nodes carry typed absences, and the aborted run has no command gate. Repeated GDPR/EU AI Act runs retain their
+started trial trees and original requested trial count. If trial aggregation was interrupted, every observed path
+gets an error rollup with exact trial counts; a breakdown absent from another trial is not fabricated. If aggregation
+finished before reporting was cancelled, its computed rollups are retained.
 An interrupted stochastic case keeps its completed trials and an incomplete rollup.
 
 **How the run says what was tested.** `execution.targetMode` is never assumed:

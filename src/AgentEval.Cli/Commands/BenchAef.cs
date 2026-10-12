@@ -77,8 +77,9 @@ internal static class BenchAef
     public static bool Write(
         DirectoryInfo? aef, string agentEvalDir, string family, string preset, string subject, string? subjectVersion,
         AefTargetMode targetMode, CompositeEval benchmark, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt,
-        int? exitCode = null, IReadOnlyList<EvalResult>? trials = null, string? abortReason = null) =>
-        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, Shape(benchmark), result, startedAt, endedAt, "agent", null, exitCode, trials, abortReason);
+        int? exitCode = null, IReadOnlyList<EvalResult>? trials = null, string? abortReason = null, int? requestedTrials = null,
+        bool trialAggregationCompleted = false) =>
+        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, Shape(benchmark), result, startedAt, endedAt, "agent", null, exitCode, trials, abortReason, requestedTrials, trialAggregationCompleted);
 
     /// <summary>
     /// Writes a family's result as a tree whose shape the caller gives (bench memory builds both from its categories).
@@ -178,7 +179,8 @@ internal static class BenchAef
         DirectoryInfo? aef, string agentEvalDir, string family, string preset, string subject, string? subjectVersion,
         AefTargetMode targetMode, AefComponentShape shape, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt,
         string subjectKind, IReadOnlyDictionary<string, System.Text.Json.Nodes.JsonObject>? caseExt, int? exitCode,
-        IReadOnlyList<EvalResult>? trials = null, string? abortReason = null)
+        IReadOnlyList<EvalResult>? trials = null, string? abortReason = null, int? requestedTrials = null,
+        bool trialAggregationCompleted = false)
     {
         var root = aef?.FullName ?? Path.Combine(agentEvalDir, "aef");
         try
@@ -193,11 +195,16 @@ internal static class BenchAef
                 CaseExt = caseExt,
                 Gate = exitCode is { } code ? Gate(result.Score.Label, code) : null,
                 AbortReason = abortReason,
+                ExecutionPolicy = requestedTrials is not null || trials is not null
+                    ? new AefExecutionPolicy { TrialsPerCase = requestedTrials ?? trials!.Count, Aggregation = AefTrialAggregation.MajorityVote }
+                    : null,
             };
             var (directory, runHash) = trials is null
                 ? AefCompositeRunWriter.Write(Path.Combine(root, "runs"), result, shape, options, startedAt, endedAt)
-                : AefCompositeRunWriter.WriteTrials(Path.Combine(root, "runs"), result, trials,
-                    shape, options, startedAt, endedAt);
+                : abortReason is not null && !trialAggregationCompleted
+                    ? AefCompositeRunWriter.WriteAbortedTrials(Path.Combine(root, "runs"), trials, shape, options, startedAt, endedAt)
+                    : AefCompositeRunWriter.WriteTrials(Path.Combine(root, "runs"), result, trials,
+                        shape, options, startedAt, endedAt);
             Console.Error.WriteLine($"AEF run: {directory} (run hash {runHash[..12]}...)");
             return false;
         }

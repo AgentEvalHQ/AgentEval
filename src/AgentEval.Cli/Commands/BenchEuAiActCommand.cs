@@ -217,7 +217,15 @@ public static class BenchEuAiActCommand
         Console.WriteLine($"Running EU AI Act benchmark ({preset}) for subject '{subject}'...");
 
         var startedAt = DateTimeOffset.UtcNow;
-        var progress = new CompositeProgress(benchmark);
+        var partialTrials = new List<CompositeProgress>();
+        EvalResult? completedRollup = null;
+        async Task<(string RunId, EvalResult Result)> RunTrial(CancellationToken token)
+        {
+            var progress = new CompositeProgress(benchmark);
+            partialTrials.Add(progress);
+            return await new EuAiActBenchmarkRunner().RunWithProgressAsync(store, subjectIdentity, benchmark, evalInput,
+                progress.Completed, progress.Started, ct: token);
+        }
         try
         {
             string runId;
@@ -226,19 +234,20 @@ public static class BenchEuAiActCommand
 
             try
             {
-                var runner = new EuAiActBenchmarkRunner();
+
                 if (runs > 1)
                 {
                     compositeResult = await StochasticBenchRunner.RunNAsync(store, subjectIdentity, benchmark, evalInput, runs, ct,
-                        async token => (await runner.RunAsync(store, subjectIdentity, benchmark, evalInput, ct: token)).Item2);
+                        async token => (await RunTrial(token)).Result);
                     trialResults = compositeResult.Details.SubResults!;
                     compositeResult = StochasticBenchRunner.RollupTree(trialResults);
+                    completedRollup = compositeResult;
                     runId = await StochasticBenchRunner.PersistRollupAsync(store, subjectIdentity, compositeResult, evalInput, ct);
                 }
                 else
-                    (runId, compositeResult) = await runner.RunWithProgressAsync(store, subjectIdentity, benchmark, evalInput, progress.Completed, progress.Started, ct: ct);
+                    (runId, compositeResult) = await RunTrial(ct);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested || runs > 1)
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
                 Console.Error.WriteLine($"Benchmark run failed: {ex.Message}");
                 return 1;
@@ -264,7 +273,7 @@ public static class BenchEuAiActCommand
             {
                 evidence = await reporter.SaveReportAsync(store, subjectIdentity, runId, compositeResult, options);
             }
-            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested || runs > 1)
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
                 Console.Error.WriteLine($"Failed to generate compliance report: {ex.Message}");
                 return 1;
@@ -284,7 +293,7 @@ public static class BenchEuAiActCommand
                 await File.WriteAllTextAsync(mdPath, md);
                 Console.WriteLine($"Markdown report: {mdPath}");
             }
-            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested || runs > 1)
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
                 Console.Error.WriteLine($"Warning: failed to write Markdown report: {ex.Message}");
             }
@@ -297,12 +306,12 @@ public static class BenchEuAiActCommand
                 await pdfRenderer.RenderAsync(evidence, pdfPath);
                 Console.WriteLine($"PDF report: {pdfPath}");
             }
-            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested || runs > 1)
+            catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
                 Console.Error.WriteLine($"Warning: failed to write PDF report: {ex.Message}");
             }
 
-            if (runs == 1) ct.ThrowIfCancellationRequested();
+            ct.ThrowIfCancellationRequested();
             var overall = evidence.Summary.OverallStatus;
             var finalExit = BenchExitCodes.FromLabel(overall);
             // ── AEF ───────────────────────────────────────────────────────────────
@@ -324,13 +333,15 @@ public static class BenchEuAiActCommand
             // unchanged); the shared helper exists specifically so a future policy change lands in one place.
             return finalExit;
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested && runs == 1)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
+            var snapshots = partialTrials.Select(p => p.Snapshot()).ToList();
             if (!noAef && BenchAef.Write(aef, agentEvalDir, "eu-ai-act", preset, subject, subjectVersion,
                 agent is null ? AgentEval.Results.Writing.AefTargetMode.Replayed
                     : agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live
                     : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                benchmark, progress.Snapshot(), startedAt, DateTimeOffset.UtcNow, abortReason: "cancelled"))
+                benchmark, completedRollup ?? snapshots.FirstOrDefault() ?? new CompositeProgress(benchmark).Snapshot(), startedAt, DateTimeOffset.UtcNow,
+                trials: runs > 1 && snapshots.Count > 0 ? snapshots : null, abortReason: "cancelled", requestedTrials: runs > 1 ? runs : null, trialAggregationCompleted: completedRollup is not null))
                 return ExitCodes.RuntimeError;
             return 1;
         }

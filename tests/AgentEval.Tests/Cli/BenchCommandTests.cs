@@ -80,6 +80,52 @@ public class BenchCommandTests : IDisposable
         }
     }
 
+    [Theory]
+    [InlineData("gdpr")]
+    [InlineData("eu-ai-act")]
+    public async Task RepeatedComposite_CancelDuringSecondTrial_RetainsBothTrialsAndRequestedPolicy(string family)
+    {
+        InitWorkspace();
+        var counter = new CountingEvaluator();
+        var aef = new DirectoryInfo(Path.Combine(_root, "repeated-cancel-aef"));
+        async Task<int> Run(IEvaluator evaluator, int runs, bool noAef, CancellationToken ct) => family == "gdpr"
+            ? await BenchCommand.RunGdprAsync("standard", "subject", _root, "question", evaluatorOverride: evaluator,
+                responseText: "answer", runs: runs, noAef: noAef, aef: aef, ct: ct)
+            : await BenchEuAiActCommand.RunAsync("standard", "subject", _root, "question", evaluatorOverride: evaluator,
+                responseText: "answer", runs: runs, noAef: noAef, aef: aef, ct: ct);
+        await Run(counter, 1, true, CancellationToken.None);
+        Assert.True(counter.Calls > 0);
+        using var cancel = new CancellationTokenSource();
+        var exit = await Run(new CancellingEvaluator(cancel, counter.Calls + 1), 3, false, cancel.Token);
+
+        Assert.Equal(1, exit);
+        var path = Assert.Single(Directory.GetFiles(aef.FullName, "run.json", SearchOption.AllDirectories));
+        var dir = Path.GetDirectoryName(path)!;
+        var verified = AgentEval.Results.Integrity.AefRunVerifier.Verify(dir);
+        Assert.Equal(AgentEval.Results.Integrity.AefOutcome.Intact, verified.Outcome);
+        Assert.Empty(verified.Problems);
+        var header = System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(path))!;
+        Assert.Equal("aborted", (string?)header["status"]);
+        Assert.Equal(3, (int)header["suite"]!["executionPolicy"]!["trialsPerCase"]!);
+        var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => System.Text.Json.Nodes.JsonNode.Parse(l)!).ToList();
+        Assert.Contains(lines, l => (int?)l["trial"] == 0 && (string?)l["state"] == "passed");
+        Assert.Contains(lines, l => (int?)l["trial"] == 1 && (string?)l["state"] == "error");
+        Assert.DoesNotContain(lines, l => (int?)l["trial"] == 2);
+        Assert.All(lines.Where(l => l["trials"] is not null), l => Assert.Equal("error", (string?)l["state"]));
+        Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
+    }
+
+    private sealed class CountingEvaluator : IEvaluator
+    {
+        private int _calls;
+        public int Calls => _calls;
+        public Task<EvaluationResult> EvaluateAsync(string input, string output, IEnumerable<string> criteria, CancellationToken ct = default)
+        {
+            Interlocked.Increment(ref _calls);
+            return new PassingStubEvaluator().EvaluateAsync(input, output, criteria, ct);
+        }
+    }
+
     [Fact]
     public async Task RepeatedRuns_WriteSealedTrialTrees()
     {

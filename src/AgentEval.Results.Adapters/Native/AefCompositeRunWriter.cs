@@ -48,6 +48,9 @@ public sealed record AefCompositeRunOptions
     /// <summary>A content-free reason when execution was interrupted; suppresses any final gate.</summary>
     public string? AbortReason { get; init; }
 
+    /// <summary>The originally requested trial policy, including when cancellation stops it early.</summary>
+    public AefExecutionPolicy? ExecutionPolicy { get; init; }
+
     /// <summary>
     /// Facts a case's root line carries in <c>ext</c>, by case id: what the producer measured that AEF has no field for
     /// (TypedMemEval's typed outcome, say). Never content.
@@ -89,9 +92,28 @@ public static class AefCompositeRunWriter
         return WriteCore(runsRoot, rollup, shape, options, startedAt, endedAt, trials);
     }
 
+    /// <summary>
+    /// Preserves interrupted trials, including differing leaf breakdowns. Every observed path receives an error
+    /// rollup with exact trial counts; an interrupted invocation makes no aggregate verdict.
+    /// </summary>
+    public static (string Directory, string RunHash) WriteAbortedTrials(
+        string runsRoot, IReadOnlyList<EvalResult> trials, AefComponentShape shape,
+        AefCompositeRunOptions options, DateTimeOffset startedAt, DateTimeOffset endedAt)
+    {
+        ArgumentNullException.ThrowIfNull(trials);
+        ArgumentNullException.ThrowIfNull(options);
+        if (trials.Count == 0) throw new ArgumentException("At least one started trial is required.", nameof(trials));
+        if (options.AbortReason is null) throw new ArgumentException("An aborted trial run requires an abort reason.", nameof(options));
+        var preset = trials[0] with
+        {
+            Score = new EvalScore(0, null, "error", false, null, "none", null) { Measurement = MeasurementState.NotMeasured },
+        };
+        return WriteCore(runsRoot, preset, shape, options, startedAt, endedAt, trials, abortedTrials: true);
+    }
+
     private static (string Directory, string RunHash) WriteCore(
         string runsRoot, EvalResult preset, AefComponentShape shape, AefCompositeRunOptions options,
-        DateTimeOffset startedAt, DateTimeOffset endedAt, IReadOnlyList<EvalResult>? trials)
+        DateTimeOffset startedAt, DateTimeOffset endedAt, IReadOnlyList<EvalResult>? trials, bool abortedTrials = false)
     {
         ArgumentNullException.ThrowIfNull(preset);
         ArgumentNullException.ThrowIfNull(shape);
@@ -126,6 +148,7 @@ public static class AefCompositeRunWriter
                 Version = AefConverter.Version,
                 Digest = AefProbeRunWriter.RosterDigest(Keys(preset)),
                 Frozen = true,
+                ExecutionPolicy = options.ExecutionPolicy,
             },
             Judges = judges.Count > 0 ? judges : null,   // the models that graded a leaf ([RUN-9])
             StartedAt = AefTime.FromDateTimeOffset(startedAt),
@@ -156,7 +179,21 @@ public static class AefCompositeRunWriter
                 },
             ]);
 
-            for (var i = 0; i < cases.Count; i++)
+            if (abortedTrials)
+            {
+                var captured = new List<(AefResult Result, string? Parent)>();
+                for (var t = 0; t < trials!.Count; t++)
+                {
+                    var trialCases = single ? new[] { trials[t] } : trials[t].Details.SubResults ?? [];
+                    if (trialCases.Count != cases.Count || trialCases.Where((c, i) => c.Metric.Key != cases[i].Metric.Key).Any())
+                        throw new ArgumentException("Repeated presets must have the same ordered case keys.", nameof(trials));
+                    for (var i = 0; i < trialCases.Count; i++)
+                        Add(writer, trialCases[i], caseShapes[i], trialCases[i].Metric.Key, CasePath, null, null, trial: t,
+                            capture: (line, parent) => captured.Add((line, parent?.Path)));
+                }
+                AddAbortedRollups(writer, captured);
+            }
+            else for (var i = 0; i < cases.Count; i++)
             {
                 var caseTrials = trials?.Select(t => single ? t : t.Details.SubResults![i]).ToList();
                 if (caseTrials is not null)
@@ -251,7 +288,8 @@ public static class AefCompositeRunWriter
 
     private static void Add(AefRunWriter writer, EvalResult node, AefComponentShape shape, string caseId, string path,
         AefResultHandle? parent, AefComponent? component, JsonObject? caseExt = null, int? trial = null,
-        IReadOnlyList<EvalResult>? trials = null, bool presetMeasured = false)
+        IReadOnlyList<EvalResult>? trials = null, bool presetMeasured = false,
+        Action<AefResult, AefResultHandle?>? capture = null)
     {
         var subs = node.Details.SubResults ?? [];
         var state = StateOf(node.Score);
@@ -293,7 +331,7 @@ public static class AefCompositeRunWriter
 
         AefSeverity? severity = state is AefState.Failed or AefState.Warn && AefNames.TryParse<AefSeverity>(node.Score.Severity, out var s) ? s : null;
         var llm = node.Provenance.Type == "atomic-llm" && !string.IsNullOrWhiteSpace(node.Provenance.JudgeModel);
-        var handle = writer.AddResult(new AefResult
+        var line = new AefResult
         {
             CaseId = caseId,
             Path = path,
@@ -317,13 +355,47 @@ public static class AefCompositeRunWriter
             Ext = component is not null && shape.OnFailure != "Averaged"
                 ? new JsonObject { ["agenteval.component"] = new JsonObject { ["onFailure"] = shape.OnFailure } }
                 : caseExt?.DeepClone().AsObject(),
-        }, parent);
+        };
+        var handle = writer.AddResult(line, parent);
+        capture?.Invoke(line, parent);
 
         for (var i = 0; i < subs.Count; i++)
         {
             var child = described ? shape.Children[i] : Undescribed;
             Add(writer, subs[i], child, caseId, childPaths[i], handle, new AefComponent(child.Weight, child.Required),
-                trial: trial, trials: trials?.Select(t => t.Details.SubResults![i]).ToList());
+                trial: trial, trials: trials?.Select(t => t.Details.SubResults![i]).ToList(), capture: capture);
+        }
+    }
+
+    private static void AddAbortedRollups(AefRunWriter writer, List<(AefResult Result, string? Parent)> captured)
+    {
+        var groups = captured.GroupBy(x => (x.Result.CaseId, x.Result.Path)).ToList();
+        var childCounts = groups.Where(g => g.First().Parent is not null)
+            .GroupBy(g => (g.Key.CaseId, Parent: g.First().Parent!)).ToDictionary(g => g.Key, g => g.Count());
+        var handles = new Dictionary<(string CaseId, string Path), AefResultHandle>();
+        // Each trial was traversed parent first; a newly encountered path's ancestors therefore precede it too.
+        foreach (var group in groups)
+        {
+            var first = group.First();
+            if (group.Any(x => x.Parent != first.Parent || x.Result.Evaluator != first.Result.Evaluator))
+                throw new ArgumentException("Trial paths must identify the same evaluator and parent in every trial.", nameof(captured));
+            var children = childCounts.GetValueOrDefault((group.Key.CaseId, group.Key.Path));
+            var rollup = first.Result with
+            {
+                Trial = null,
+                Trials = new AefTrials(group.Count(), group.Count(x => x.Result.State == AefState.Passed),
+                    AefTrialAggregation.MajorityVote, group.Select(x => x.Result.State).Distinct().Count() == 1),
+                State = AefState.Error,
+                Reason = "AgentEval: trial aggregation did not complete because execution was cancelled",
+                Scores = null, Severity = null, Annotator = null,
+                Aggregation = children == 0 ? null : new AefAggregation
+                {
+                    Strategy = AefAggregationStrategy.Own, RulePath = AefRulePath.NothingMeasured,
+                    Measured = 0, Total = children, Unmeasured = new AefUnmeasured { Error = children },
+                },
+            };
+            var parent = first.Parent is null ? null : handles[(group.Key.CaseId, first.Parent)];
+            handles.Add(group.Key, writer.AddResult(rollup, parent));
         }
     }
 
