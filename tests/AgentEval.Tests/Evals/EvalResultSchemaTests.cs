@@ -49,6 +49,19 @@ public class EvalResultSchemaTests
         Assert.Equal(valid, result.IsValid);
     }
 
+    [Theory]
+    [InlineData(null, true)]
+    [InlineData(1, true)]
+    [InlineData(3, true)]
+    [InlineData(0, false)]
+    [InlineData(-1, false)]
+    public void Provenance_PanelSize_RequiresPositiveCountWhenPresent(int? size, bool valid)
+    {
+        var node = JsonNode.Parse(PassResultJson)!;
+        node["provenance"]!["judgePanelSize"] = size;
+        Assert.Equal(valid, Evaluate(node.ToJsonString()).IsValid);
+    }
+
     private const string PassResultJson = """
         {
           "metric": {

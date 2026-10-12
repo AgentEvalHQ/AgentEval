@@ -61,6 +61,18 @@ public class MultiJudgeWrapperTests
 
     // ── Tests ─────────────────────────────────────────────────────────────────
 
+    [Theory]
+    [InlineData("pass")]
+    [InlineData("error")]
+    [InlineData("skipped")]
+    public async Task EvaluateAsync_PanelProvenance_PreservesSizeWithOrWithoutVerdict(string label)
+    {
+        var sut = MakeWrapper([JudgeComp("one", 1, label: label), JudgeComp("two", 1, label: label)]);
+        var result = await sut.EvaluateAsync(Input);
+        Assert.Equal(2, result.Provenance.JudgePanelSize);
+        Assert.Equal(new[] { "one", "two" }, result.Details.SubResults!.Select(r => r.Metric.Key));
+    }
+
     [Fact]
     public async Task EvaluateAsync_ThreeJudgesAgreePass_CompositeIsPass()
     {
@@ -75,6 +87,7 @@ public class MultiJudgeWrapperTests
 
         // Act
         var result = await sut.EvaluateAsync(Input);
+        Assert.Equal(judges.Length, result.Provenance.JudgePanelSize);
 
         // Assert
         Assert.True(result.Score.Passed);

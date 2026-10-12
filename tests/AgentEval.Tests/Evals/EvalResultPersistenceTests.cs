@@ -111,6 +111,7 @@ public class EvalResultPersistenceTests
     public void ToScenarioResult_ThenFromScenarioResult_RecursiveCompositeRoundTrip()
     {
         var deep = MakeDeepComposite();
+        deep = deep with { Provenance = deep.Provenance with { JudgePanelSize = deep.Details.SubResults!.Count } };
         var sr = EvalResultPersistence.ToScenarioResult(deep, "scen-deep", "Deep Composite");
         var restored = EvalResultPersistence.FromScenarioResult(sr);
 

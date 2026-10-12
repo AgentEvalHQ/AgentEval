@@ -99,6 +99,43 @@ public sealed class AefCompositeRunWriterTests : IDisposable
     private static AefComponentShape Leaf(double weight = 1, bool required = true, string onFailure = "Averaged") => new(weight, required, onFailure, []);
 
     [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public void Write_ExplicitPanel_PreservesConfiguredSizeAndSeparateAdjudicator(bool panel, bool adjudicated)
+    {
+        var member = Composite("member", "pass", 1, null, new EvalLineage("threshold", []),
+            Leaf("criterion1", "pass", 1, "atomic-llm", "judge-a"),
+            Leaf("criterion2", "pass", 1, "atomic-llm", "judge-a"));
+        var children = new List<EvalResult> { member, Leaf("failed-judge", "error", 0, "atomic-llm", "not-measured") };
+        if (adjudicated) children.Add(Leaf("adjudicator", "pass", 1, "atomic-decision", "judge-b"));
+        var result = Composite("panel", "pass", 1, null, new EvalLineage("threshold", []), children.ToArray());
+        result = result with { Provenance = result.Provenance with { JudgePanelSize = panel ? 2 : null } };
+        var (dir, _) = AefCompositeRunWriter.Write(_out, result, AefCompositeRunWriter.Undescribed,
+            new AefCompositeRunOptions
+            {
+                SubjectRef = "agent:test", TargetMode = AefTargetMode.Live, Lane = "test", SuiteRef = "bench:test",
+            }, Start, Start.AddSeconds(1));
+        var judges = JsonNode.Parse(File.ReadAllText(Path.Combine(dir, "run.json")))!["judges"]!.AsArray();
+        Assert.Equal(adjudicated ? 2 : 1, judges.Count);
+        Assert.Equal("judge-a", (string?)judges[0]!["model"]);
+        Assert.Equal(panel ? "panel" : "single", (string?)judges[0]!["mode"]);
+        Assert.Equal(panel ? 2 : (int?)null, (int?)judges[0]!["panelSize"]);
+        if (adjudicated)
+        {
+            Assert.Equal("judge-b", (string?)judges[1]!["model"]);
+            Assert.Equal("single", (string?)judges[1]!["mode"]);
+            Assert.Null(judges[1]!["panelSize"]);
+        }
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+        {
+            Assert.Equal("intact", (string?)reference["outcome"]);
+            Assert.Empty(reference["problems"]!.AsArray());
+        }
+    }
+
+    [Theory]
     [InlineData("atomic-llm", false)]
     [InlineData("atomic-llm", true)]
     [InlineData("atomic-decision", false)]

@@ -65,6 +65,7 @@
         "judgeModel":    { "type": ["string", "null"] },
         "promptId":      { "type": ["string", "null"] },
         "promptHash":    { "type": ["string", "null"] },
+        "judgePanelSize": { "type": ["integer", "null"], "minimum": 1 },
         "rubricDigest":  { "type": ["string", "null"], "pattern": "^sha256:[0-9a-f]{64}$" },
         "tokensUsed":    { "type": ["integer", "null"] },
         "estimatedCost": { "type": "number", "minimum": 0 },

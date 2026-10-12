@@ -168,8 +168,7 @@ public static class AefCompositeRunWriter
         var runId = folder.RunId;
         var directory = folder.Directory;
         // The models that graded a leaf: a leaf whose judge gave no verdict (error, skipped) was not graded ([RUN-9]).
-        var judges = (emptyResults ? [] : trials ?? [preset]).SelectMany(Leaves).Where(l => IsMeasured(StateOf(l.Score))).Select(l => l.Provenance).Where(p => !string.IsNullOrWhiteSpace(p.JudgeModel))
-            .Select(p => new AefJudge { Model = p.JudgeModel!, Mode = AefJudgeMode.Single, RubricDigest = p.RubricDigest })
+        var judges = (emptyResults ? [] : trials ?? [preset]).SelectMany(r => ObservedJudges(r))
             .Distinct().ToList();
         var header = new AefRunHeader
         {
@@ -485,8 +484,29 @@ public static class AefCompositeRunWriter
     private static bool IsMeasured(AefState state) =>
         state is AefState.Passed or AefState.Failed or AefState.Warn or AefState.Inconclusive or AefState.Scored;
 
-    private static IEnumerable<EvalResult> Leaves(EvalResult node) =>
-        node.Details.SubResults is { Count: > 0 } subs ? subs.SelectMany(Leaves) : [node];
+    private static IEnumerable<AefJudge> ObservedJudges(EvalResult node, int? panelSize = null)
+    {
+        if (node.Details.SubResults is { Count: > 0 } subs)
+        {
+            var ownPanel = node.Provenance.JudgePanelSize;
+            if (ownPanel is <= 0 || ownPanel > subs.Count)
+                throw new ArgumentException("Judge panel size must name the leading panel sub-results.");
+            for (var i = 0; i < subs.Count; i++)
+            {
+                // A wrapper's trailing adjudicator is a separate invocation, not another panel vote.
+                var childPanel = ownPanel is { } size ? (i < size ? size : (int?)null) : panelSize;
+                foreach (var judge in ObservedJudges(subs[i], childPanel)) yield return judge;
+            }
+        }
+        else if (IsMeasured(StateOf(node.Score)) && !string.IsNullOrWhiteSpace(node.Provenance.JudgeModel))
+        {
+            yield return new AefJudge
+            {
+                Model = node.Provenance.JudgeModel!, RubricDigest = node.Provenance.RubricDigest,
+                Mode = panelSize is null ? AefJudgeMode.Single : AefJudgeMode.Panel, PanelSize = panelSize,
+            };
+        }
+    }
 
     private static IEnumerable<string> Keys(EvalResult node) =>
         node.Details.SubResults is { Count: > 0 } subs ? subs.SelectMany(s => Keys(s).Prepend(s.Metric.Key)) : [];

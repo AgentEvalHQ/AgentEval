@@ -18,4 +18,10 @@ public sealed record EvalProvenance(
     /// <remarks>The legacy <see cref="PromptHash"/> remains a short compatibility fingerprint.</remarks>
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public string? RubricDigest { get; init; }
+
+    /// <summary>Number of configured panel members, when this result represents a judge panel.</summary>
+    /// <remarks>The first N sub-results are panel members in definition order. Any subsequent sub-results
+    /// are separately invoked adjudicators, not additional panel votes. Absent for ordinary composites.</remarks>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public int? JudgePanelSize { get; init; }
 }

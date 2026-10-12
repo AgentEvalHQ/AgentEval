@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Judge panel provenance:** panel wrappers persist their configured member count on success and no-verdict
+  results. Native composite headers distinguish measured panel members from ordinary single judges and a
+  separately invoked adjudicator, without deriving panel size from criteria or successful model counts.
+
 - **Decision-judge evidence:** native composite leaf results identify decision models as model judges rather
   than code checks, and carry known rubric digests beside the model. Judge reasoning remains capture-on only;
   code checks, aggregates and unmeasured results do not gain model annotations.

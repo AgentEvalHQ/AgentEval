@@ -67,6 +67,7 @@ public class AdjudicatedMultiJudgeWrapperTests
 
         var result = await sut.EvaluateAsync(new EvalInput("q", "r"));
 
+        Assert.Equal(3, result.Provenance.JudgePanelSize);
         Assert.Equal("error", result.Score.Label);
         Assert.False(result.Score.Passed);
         Assert.Equal(0, adjudicator.InvocationCount);
@@ -149,6 +150,7 @@ public class AdjudicatedMultiJudgeWrapperTests
         var input = new EvalInput(Query: "test", Response: "response");
         // If adjudicator is invoked it throws — test passes only if it is NOT invoked
         var result = await wrapper.EvaluateAsync(input);
+        Assert.Equal(judges.Length, result.Provenance.JudgePanelSize);
 
         Assert.NotNull(result);
         // Agreement should be high enough that we didn't adjudicate
@@ -174,6 +176,7 @@ public class AdjudicatedMultiJudgeWrapperTests
 
         var input = new EvalInput(Query: "test", Response: "mixed response");
         var result = await wrapper.EvaluateAsync(input);
+        Assert.Equal(judges.Length, result.Provenance.JudgePanelSize);
 
         Assert.NotNull(result);
         // Adjudicator must have been invoked exactly once
@@ -203,6 +206,7 @@ public class AdjudicatedMultiJudgeWrapperTests
         var wrapper = BuildWrapper(judges, new ThrowingAdjudicator());
 
         var result = await wrapper.EvaluateAsync(new EvalInput(Query: "q", Response: "r"));
+        Assert.Equal(judges.Length, result.Provenance.JudgePanelSize);
 
         Assert.Equal("error", result.Score.Label);
         Assert.False(result.Score.Passed);
@@ -222,6 +226,7 @@ public class AdjudicatedMultiJudgeWrapperTests
         var wrapper = BuildWrapper(judges, new ThrowingAdjudicator());
 
         var result = await wrapper.EvaluateAsync(new EvalInput(Query: "q", Response: "r"));
+        Assert.Equal(judges.Length, result.Provenance.JudgePanelSize);
 
         Assert.Equal("error", result.Score.Label);
         Assert.False(result.Score.Passed);
@@ -240,6 +245,7 @@ public class AdjudicatedMultiJudgeWrapperTests
         var wrapper = BuildWrapper(judges, new ThrowingAdjudicator());
 
         var result = await wrapper.EvaluateAsync(new EvalInput(Query: "q", Response: "r"));
+        Assert.Equal(judges.Length, result.Provenance.JudgePanelSize);
 
         Assert.NotEqual("error", result.Score.Label);
     }
@@ -255,6 +261,7 @@ public class AdjudicatedMultiJudgeWrapperTests
         var wrapper = BuildWrapper(judges, new ThrowingAdjudicator());
 
         var result = await wrapper.EvaluateAsync(new EvalInput(Query: "q", Response: "r"));
+        Assert.Equal(judges.Length, result.Provenance.JudgePanelSize);
 
         Assert.Equal("skipped", result.Score.Label);
         Assert.False(result.Score.Passed);

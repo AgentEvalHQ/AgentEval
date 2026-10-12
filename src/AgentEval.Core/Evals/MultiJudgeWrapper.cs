@@ -213,7 +213,7 @@ public sealed class MultiJudgeWrapper : IEval
             {
                 Summary = dissentNote,
             },
-            Provenance: new("composite", null, null, null, null, cost, allCacheHits),
+            Provenance: new("composite", null, null, null, null, cost, allCacheHits) { JudgePanelSize = Judges.Count },
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 
@@ -254,7 +254,7 @@ public sealed class MultiJudgeWrapper : IEval
             {
                 Summary = note,
             },
-            Provenance: new("composite", null, null, null, null, cost, allCacheHits),
+            Provenance: new("composite", null, null, null, null, cost, allCacheHits) { JudgePanelSize = Judges.Count },
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 }

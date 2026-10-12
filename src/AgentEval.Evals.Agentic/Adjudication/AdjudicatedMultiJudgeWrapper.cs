@@ -205,7 +205,7 @@ public sealed class AdjudicatedMultiJudgeWrapper : IEval
                 Recommendations: recommendations,
                 SubResults: allSubResults,
                 AggregationStrategy: finalAggStrategy),
-            Provenance: new("multi-judge-adjudicated", null, null, null, null, cost, false),
+            Provenance: new("multi-judge-adjudicated", null, null, null, null, cost, false) { JudgePanelSize = _judges.Count },
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 
@@ -239,7 +239,7 @@ public sealed class AdjudicatedMultiJudgeWrapper : IEval
                 Summary = note,
             },
             Provenance: new("multi-judge-adjudicated", null, null, null, null,
-                panelResults.Sum(r => r.Provenance.EstimatedCost), false),
+                panelResults.Sum(r => r.Provenance.EstimatedCost), false) { JudgePanelSize = _judges.Count },
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 
@@ -260,7 +260,7 @@ public sealed class AdjudicatedMultiJudgeWrapper : IEval
                 Summary = note,
             },
             Provenance: new("multi-judge-adjudicated", null, null, null, null,
-                panelResults.Sum(r => r.Provenance.EstimatedCost), false),
+                panelResults.Sum(r => r.Provenance.EstimatedCost), false) { JudgePanelSize = _judges.Count },
             EvaluatedAt: DateTimeOffset.UtcNow);
     }
 

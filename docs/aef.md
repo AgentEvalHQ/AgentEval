@@ -237,6 +237,12 @@ and decision-model leaves also carry the model and rubric digest in their annota
 use the `LLM` annotator kind; code checks remain `CODE`. Rubric identity is available with content capture off;
 judge reasoning is attached only with capture on.
 
+Panel wrappers persist `JudgePanelSize`: their first N sub-results are panel members in definition order;
+any following adjudicator is a separate invocation. Composite AEF headers use these explicit facts to record
+`mode: panel` and the configured size for measured member judges, including members that grade several criteria.
+An errored or skipped judge is not listed as having graded a result. The configured panel size still includes
+that member. Ordinary composites and separately invoked adjudicators retain `mode: single`.
+
 With content capture on, eval records dataset inputs, expected answers, actual responses and observed tool calls;
 redteam and scan benchmarks record available probe/control prompts, responses, folded transcripts and grading
 explanations; composite benchmarks record available summaries, supporting evidence and recommendations. Observed
