@@ -19,6 +19,31 @@ public sealed class AefEvalWriterTests : IDisposable
 
     private static readonly DateTimeOffset Start = new(2026, 10, 10, 12, 0, 0, TimeSpan.Zero);
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Write_ObservedUsage_ReplacesLegacyRoleWithoutDoubleCounting(bool unknown)
+    {
+        var legacy = new AefUsage { Role = AefUsageRole.Judge, Model = "deployment", InputTokens = 999, CostUsd = 5 };
+        AefUsage[] observed = [new() { Role = AefUsageRole.Judge, Model = "reported-model",
+            InputTokens = unknown ? null : 10, CostUsd = unknown ? null : 0.1, CostSource = unknown ? null : "fixture" }];
+        using var session = AefEvalWriter.Start(_out, Options() with { JudgeUsage = legacy }, Start);
+        session.Add(new TestResult { TestName = "case", Passed = true, Score = 100 }, "case");
+        var (dir, _) = session.Complete(Start.AddSeconds(1), null, null, null, observed);
+        var summary = AefTestRuns.Document(dir, "summary.json");
+        var usage = Assert.Single(summary["usage"]!.AsArray())!;
+        Assert.Equal("reported-model", (string?)usage["model"]);
+        Assert.Equal(unknown ? (long?)null : 10, (long?)usage["gen_ai.usage.input_tokens"]);
+        if (unknown) Assert.Null(summary["cost"]);
+        else Assert.Equal(0.1, (double)summary["cost"]!["totalUsd"]!);
+        Assert.Equal(AefOutcome.Intact, AefRunVerifier.Verify(dir).Outcome);
+        if (AefTestRuns.ReferenceVerify(dir) is { } reference)
+        {
+            Assert.Equal("intact", (string?)reference["outcome"]);
+            Assert.Empty(reference["problems"]!.AsArray());
+        }
+    }
+
     [Fact]
     public void Session_MetricInstrument_RetainsOwnRubricAndDoesNotInventModelForCodeShortcut()
     {

@@ -737,6 +737,7 @@ public sealed class NativeVerbIntegrationTests : IDisposable
     [Fact]
     public async Task Redteam_AdoptedJudge_RecordsConfiguredProvider()
     {
+        using var usageMeter = AgentEval.Cli.Infrastructure.CliUsageMeter.Begin();
         await using var agent = await LocalChatEndpoint.StartAsync("Call 202-555-0123.");
         await using var judge = await LocalChatEndpoint.StartAsync("VERDICT: SUCCEEDED\nCONFIDENCE: 0.95\nREASON: fixture");
         var options = new RedTeamOptions
@@ -760,6 +761,10 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.NotEmpty(judged);
         Assert.All(judged, l => Assert.Equal(rubric, (string?)l["annotator"]!["rubricDigest"]));
         Assert.NotEmpty(judge.Requests);
+        var usage = Document(dir, "summary.json")["usage"]!.AsArray();
+        Assert.Equal(2, usage.Count);
+        Assert.Equal(agent.Requests.Count * 10L, (long)Assert.Single(usage, u => (string?)u!["role"] == "agent")!["gen_ai.usage.input_tokens"]!);
+        Assert.Equal(judge.Requests.Count * 10L, (long)Assert.Single(usage, u => (string?)u!["role"] == "judge")!["gen_ai.usage.input_tokens"]!);
     }
 
     [Fact]

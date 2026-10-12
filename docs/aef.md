@@ -258,8 +258,11 @@ bundled baseline without claiming that overrides are part of it. Run cost is emi
 entries have known cost. Native clients without declared bounds do not invent a charge for missing usage.
 The meter supports asynchronous role/case scopes: named eval metric calls are attributed to the judge and
 stable dataset case even when they reuse the subject client. Concurrent cases and nested scopes stay isolated.
-This composite path is separate from existing eval/probe ledgers; exporting per-case totals and the remaining
-native client/role coverage are still being completed.
+Eval, redteam and scan summaries also accept invocation totals. A metered role replaces that role's legacy
+ledger/performance totals; it is never added twice, even when a returned model name differs from a configured
+deployment. Roles absent from the meter retain available legacy totals. Unknown metered counts take precedence
+over partial fallback counts. Cost is the sum of recorded usage costs only when every entry has known cost.
+Exporting per-case totals and the remaining native client/role coverage are still being completed.
 
 Native composite judge headers include a full rubric digest when the evaluation records one. Atomic LLM and
 decision evaluations compute it from their existing instrument material, preserving the legacy 16-character

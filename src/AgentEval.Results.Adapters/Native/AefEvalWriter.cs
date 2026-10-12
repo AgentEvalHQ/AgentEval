@@ -52,6 +52,9 @@ public sealed record AefEvalRunOptions
     /// </summary>
     public AefUsage? JudgeUsage { get; init; }
 
+    /// <summary>Observed totals by role/model; each present role replaces its legacy usage source.</summary>
+    public IReadOnlyList<AefUsage>? Usage { get; init; }
+
     /// <summary>
     /// The gate the command decided on when it closed, if its decision rests on the cases alone: its rule name, such
     /// as <c>all-cases-pass</c>. The run then records it ([GATE-1]): <c>ship</c> (exit 0) when every case passed,

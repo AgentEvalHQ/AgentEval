@@ -49,6 +49,7 @@ internal static class BenchAef
                 BenchVerdict = verdict is null ? null : (verdict.Score.Label, verdict.Score.Value),
                 Gate = abortReason is null && verdict is not null ? Gate(verdict.Score.Label, exitCode) : null,
                 AbortReason = abortReason,
+                Usage = AgentEval.Cli.Infrastructure.CliUsageMeter.CurrentUsage,
                 JudgeUsage = judgeLedger is { ReportedUsage: true }
                     ? new AefUsage { Role = AefUsageRole.Judge, Model = judgeModel, InputTokens = judgeLedger.InputTokens, OutputTokens = judgeLedger.OutputTokens }
                     : null,

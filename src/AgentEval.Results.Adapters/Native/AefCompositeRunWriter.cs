@@ -254,8 +254,7 @@ public static class AefCompositeRunWriter
             writer.SetSummary(new AefSummary
             {
                 Usage = options.Usage,
-                Cost = options.Usage is { Count: > 0 } usage && usage.All(u => u.CostUsd is not null)
-                    ? new AefCost(usage.Sum(u => u.CostUsd!.Value), "sum of recorded usage costs") : null,
+                Cost = AefNativeUsage.Cost(options.Usage),
                 Lanes = [new AefSummaryLane(options.Lane,
                 [
                     new AefSummaryEntry { Metric = PassMetric, Path = CasePath },

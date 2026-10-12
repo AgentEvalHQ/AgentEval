@@ -193,7 +193,12 @@ public static partial class AefEvalWriter
 
         /// <summary>Closes the run and seals it by default, with final command decision and judge usage if known. An unsealed run returns no hash.</summary>
         public (string Directory, string? RunHash) Complete(DateTimeOffset endedAt, AefCommandGate? gate = null,
-            string? abortReason = null, AefUsage? judgeUsage = null)
+            string? abortReason = null, AefUsage? judgeUsage = null) =>
+            Complete(endedAt, gate, abortReason, judgeUsage, null);
+
+        /// <summary>Closes the run with observed usage; metered roles replace legacy accounting for those roles.</summary>
+        public (string Directory, string? RunHash) Complete(DateTimeOffset endedAt, AefCommandGate? gate,
+            string? abortReason, AefUsage? judgeUsage, IReadOnlyList<AefUsage>? usage)
         {
             EnsureOpen();
             var options = _options with
@@ -201,6 +206,7 @@ public static partial class AefEvalWriter
                 Gate = gate ?? _options.Gate,
                 AbortReason = abortReason ?? _options.AbortReason,
                 JudgeUsage = judgeUsage ?? _options.JudgeUsage,
+                Usage = usage ?? _options.Usage,
             };
             if (options.AbortReason is null && _trials.Any(t => t.Value.Count != _plannedTrials))
                 throw new InvalidOperationException("An incomplete trial run must close aborted.");
@@ -232,12 +238,12 @@ public static partial class AefEvalWriter
                 });
             }
 
-            var cost = _all.Select(r => r.Performance?.EstimatedCost).Where(c => c is not null).Sum(c => (double)c!.Value);
+            var totals = AefNativeUsage.Merge(options.Usage, Totals(_all, options.JudgeUsage));
             _writer.SetSummary(new AefSummary
             {
                 Lanes = [new AefSummaryLane(Lane, [new AefSummaryEntry { Metric = PassMetric, Path = CasePath }, new AefSummaryEntry { Metric = ScoreMetric, Path = CasePath }])],
-                Cost = cost > 0 ? new AefCost(cost, "AgentEval's estimate from the agent's reported token usage; judge calls are not included") : null,
-                Usage = Totals(_all, options.JudgeUsage),
+                Cost = AefNativeUsage.Cost(totals),
+                Usage = totals,
             });
             _writer.Close(options.AbortReason is null ? AefRunStatus.Completed : AefRunStatus.Aborted,
                 AefTime.FromDateTimeOffset(endedAt), options.AbortReason);

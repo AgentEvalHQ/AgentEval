@@ -82,6 +82,9 @@ public sealed record AefProbeRunOptions
     /// <summary>Reported judge usage, including calls that did not produce a verdict ([SUM-7]).</summary>
     public AefUsage? JudgeUsage { get; init; }
 
+    /// <summary>Observed totals by role/model; each present role replaces its legacy usage source.</summary>
+    public IReadOnlyList<AefUsage>? Usage { get; init; }
+
     /// <summary>The command's final decision, recorded before sealing ([GATE-1]).</summary>
     public AefCommandGate? Gate { get; init; }
 
@@ -238,11 +241,13 @@ public static class AefProbeRunWriter
                 };
             }
 
+            var totals = AefNativeUsage.Merge(options.Usage, options.JudgeUsage is { } legacy ? [legacy] : null);
             writer.SetSummary(new AefSummary
             {
                 Lanes = lanes,
                 Ext = ext.Count > 0 ? ext : null,
-                Usage = options.JudgeUsage is { } usage ? [usage] : null,
+                Usage = totals,
+                Cost = AefNativeUsage.Cost(totals),
             });
             writer.Close(options.AbortReason is null ? AefRunStatus.Completed : AefRunStatus.Aborted,
                 AefTime.FromDateTimeOffset(endedAt), options.AbortReason);
