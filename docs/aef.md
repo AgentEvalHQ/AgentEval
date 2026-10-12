@@ -219,6 +219,13 @@ their own. Existing upstream redaction remains in effect; capture does not recon
 capture off, these fields and blobs are omitted. This flag does not enable request logging or include provider
 configuration and signing keys in evidence.
 
+GDPR and EU AI Act attach the reporter's exact rich JSON bytes as a `compliance_artifact` when content capture is
+on. OWASP and MITRE attach their content-free control `evidence.json` even with capture off. Each artifact is
+cited only by observed roots matching its controls; repeated runs cite aggregate roots, not individual trials.
+The producer checks the entire saved document against the report returned by this invocation, including its
+source run and manifest hash, before attaching it. Markdown/PDF renderings
+are excluded. Reports already produced before a later cancellation can remain attached to the aborted evidence.
+
 After building the CLI, `python tests/AgentEval.Results.Conformance/native-controls-crosscheck.py net10.0`
 (also `net8.0`) exercises these controls through the executable against a loopback HTTP server. It checks
 preflight/help side effects and verifies signed identity and unsealed evidence with both .NET and Python.

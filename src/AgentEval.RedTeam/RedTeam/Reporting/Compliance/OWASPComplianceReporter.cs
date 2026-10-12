@@ -173,7 +173,17 @@ public class OWASPComplianceReporter : IComplianceReporter<OWASPComplianceReport
     /// <param name="result">The red team scan result.</param>
     /// <param name="options">Optional report generation options.</param>
     /// <param name="ct">Cancellation token.</param>
-    public async Task SaveReportAsync(
+    public Task SaveReportAsync(
+        AgentEval.Output.IOutputStore store,
+        AgentEval.Output.SubjectIdentity subject,
+        string sourceRunId,
+        RedTeamResult result,
+        ComplianceReportOptions? options = null,
+        CancellationToken ct = default) =>
+        SaveReportWithEvidenceAsync(store, subject, sourceRunId, result, options, ct);
+
+    /// <summary>Persists the report and returns the exact evidence identity used to locate its saved bytes.</summary>
+    public async Task<AgentEval.Output.ComplianceEvidence> SaveReportWithEvidenceAsync(
         AgentEval.Output.IOutputStore store,
         AgentEval.Output.SubjectIdentity subject,
         string sourceRunId,
@@ -238,6 +248,7 @@ public class OWASPComplianceReporter : IComplianceReporter<OWASPComplianceReport
                 null, "AgentEval", "internal"));
 
         await store.SaveComplianceEvidenceAsync(Regulation, subject, evidence, ct);
+        return evidence;
     }
 
     private static List<ComplianceFinding> BuildFindings(List<AttackResult> attackResults, bool includeEvidence)

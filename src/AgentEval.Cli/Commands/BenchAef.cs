@@ -23,7 +23,8 @@ internal static class BenchAef
     public static bool WriteScan(
         DirectoryInfo? aef, string agentEvalDir, string family, string preset, string subject, string? subjectVersion,
         AefTargetMode targetMode, string? judgeModel, AgentEval.RedTeam.RedTeamResult scan, EvalResult? verdict,
-        int exitCode, JudgeCallLedger? judgeLedger, string? abortReason = null)
+        int exitCode, JudgeCallLedger? judgeLedger, string? abortReason = null,
+        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null)
     {
         var root = aef?.FullName ?? Path.Combine(agentEvalDir, "aef");
         try
@@ -33,6 +34,7 @@ internal static class BenchAef
                 Seal = AefCliOptions.Seal,
                 Signer = AefCliOptions.Signer,
                 ContentCapture = AefCliOptions.ContentCapture,
+                ComplianceArtifacts = complianceArtifacts?.Invoke(),
                 SubjectRef = AefEvalWriter.Ref("agent", subject),
                 SubjectVersion = subjectVersion,
                 JudgeModel = judgeModel,
@@ -81,8 +83,9 @@ internal static class BenchAef
         DirectoryInfo? aef, string agentEvalDir, string family, string preset, string subject, string? subjectVersion,
         AefTargetMode targetMode, CompositeEval benchmark, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt,
         int? exitCode = null, IReadOnlyList<EvalResult>? trials = null, string? abortReason = null, int? requestedTrials = null,
-        bool trialAggregationCompleted = false, bool emptyResults = false) =>
-        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, Shape(benchmark), result, startedAt, endedAt, "agent", null, exitCode, trials, abortReason, requestedTrials, trialAggregationCompleted, emptyResults);
+        bool trialAggregationCompleted = false, bool emptyResults = false,
+        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null) =>
+        Write(aef, agentEvalDir, family, preset, subject, subjectVersion, targetMode, Shape(benchmark), result, startedAt, endedAt, "agent", null, exitCode, trials, abortReason, requestedTrials, trialAggregationCompleted, emptyResults, complianceArtifacts);
 
     /// <summary>
     /// Writes a family's result as a tree whose shape the caller gives (bench memory builds both from its categories).
@@ -183,7 +186,8 @@ internal static class BenchAef
         AefTargetMode targetMode, AefComponentShape shape, EvalResult result, DateTimeOffset startedAt, DateTimeOffset endedAt,
         string subjectKind, IReadOnlyDictionary<string, System.Text.Json.Nodes.JsonObject>? caseExt, int? exitCode,
         IReadOnlyList<EvalResult>? trials = null, string? abortReason = null, int? requestedTrials = null,
-        bool trialAggregationCompleted = false, bool emptyResults = false)
+        bool trialAggregationCompleted = false, bool emptyResults = false,
+        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null)
     {
         var root = aef?.FullName ?? Path.Combine(agentEvalDir, "aef");
         try
@@ -193,6 +197,7 @@ internal static class BenchAef
                 Seal = AefCliOptions.Seal,
                 Signer = AefCliOptions.Signer,
                 ContentCapture = AefCliOptions.ContentCapture,
+                ComplianceArtifacts = complianceArtifacts?.Invoke(),
                 SubjectRef = AefEvalWriter.Ref(subjectKind, subject),   // the bench's own subject kind
                 SubjectVersion = subjectVersion,
                 TargetMode = targetMode,

@@ -6,6 +6,7 @@ using Microsoft.Extensions.AI;
 using AgentEval.Benchmarks;
 using AgentEval.Core;
 using AgentEval.Evals;
+using AgentEval.Results.Adapters.Native;
 using AgentEval.Output;
 using AgentEval.RedTeam;
 using AgentEval.RedTeam.Reporting.Compliance;
@@ -169,6 +170,7 @@ public static class BenchMitreCommand
             agent = new MockTarget.RefusingAgent(subject);
         }
         var isMock = agent is MockTarget.RefusingAgent;
+        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null;
 
         // One cheap call before the scan: a judge that cannot answer (a wrong key, deployment or quota) stops the run
         // here instead of turning every semantic probe into "inconclusive" and the composite into a pass.
@@ -295,8 +297,9 @@ public static class BenchMitreCommand
             try
             {
                 var reporter = new MITREATLASReporter();
-                await reporter.SaveReportAsync(store!, subjectIdentity, runId, redTeamResult,
+                var complianceEvidence = await reporter.SaveReportWithEvidenceAsync(store!, subjectIdentity, runId, redTeamResult,
                     new ComplianceReportOptions { IncompleteReason = incomplete ? string.Join("; ", incompleteReasons) : null });
+                complianceArtifacts = () => ComplianceAef.Scan(agentEvalDir, complianceEvidence, redTeamResult);
             }
             catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
             {
@@ -349,7 +352,7 @@ public static class BenchMitreCommand
             // The scan's probes as sealed evidence, lane mitre; a mock run is not stored, so it writes none.
             if (!isMock && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "mitre", preset, subject, subjectVersion,
                     agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                    judgeModelName, redTeamResult, compositeEval, finalExit, judgeLedger))
+                    judgeModelName, redTeamResult, compositeEval, finalExit, judgeLedger, complianceArtifacts: complianceArtifacts))
                 return (ExitCodes.RuntimeError, null);   // an explicit --aef could not be written
 
             // ── Exit code ─────────────────────────────────────────────────────────
@@ -374,7 +377,7 @@ public static class BenchMitreCommand
             // The scan may finish before persistence or report generation is cancelled.
             if (!isMock && !noAef && BenchAef.WriteScan(aef, agentEvalDir, "mitre", preset, subject, subjectVersion,
                 agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live : AgentEval.Results.Writing.AefTargetMode.Mocked,
-                judgeModelName, redTeamResult, null, 1, judgeLedger, abortReason: "cancelled"))
+                judgeModelName, redTeamResult, null, 1, judgeLedger, abortReason: "cancelled", complianceArtifacts: complianceArtifacts))
                 return (ExitCodes.RuntimeError, null);
             return (1, null);
         }

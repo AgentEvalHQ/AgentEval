@@ -5,6 +5,7 @@
 using AgentEval.Benchmarks;
 using AgentEval.Core;
 using AgentEval.Evals;
+using AgentEval.Results.Adapters.Native;
 using AgentEval.Compliance.Gdpr.Articles;
 using AgentEval.Compliance.Gdpr.Articles.Building;
 using AgentEval.Compliance.Gdpr.Articles.Loading;
@@ -220,6 +221,7 @@ public static class BenchCommand
 
         var startedAt = DateTimeOffset.UtcNow;
         var partialTrials = new List<CompositeProgress>();
+        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null;
         EvalResult? completedRollup = null;
         async Task<(string RunId, EvalResult Result)> RunTrial(CancellationToken token)
         {
@@ -296,6 +298,7 @@ public static class BenchCommand
             var ts = evidence.Base.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss");
             var outputDir = Path.Combine(agentEvalDir, "compliance", "GDPR", sanitizedSubject, ts);
             Directory.CreateDirectory(outputDir);
+            complianceArtifacts = () => ComplianceAef.Composite(Path.Combine(outputDir, "gdpr-evidence.json"), evidence.Base, compositeResult, evidence);
 
             // Markdown report
             try
@@ -339,7 +342,7 @@ public static class BenchCommand
                     : AgentEval.Results.Writing.AefTargetMode.Mocked;
                 aefFailed = BenchAef.Write(aef, agentEvalDir, "gdpr", preset, subject, subjectVersion, targetMode, benchmark,
                     compositeResult, startedAt, DateTimeOffset.UtcNow, exitCode: finalExit,
-                    trials: trialResults);
+                    trials: trialResults, complianceArtifacts: complianceArtifacts);
             }
 
             // ── Exit code ─────────────────────────────────────────────────────────
@@ -360,7 +363,7 @@ public static class BenchCommand
                     : AgentEval.Results.Writing.AefTargetMode.Mocked,
                 benchmark, completedRollup ?? snapshots.FirstOrDefault() ?? new CompositeProgress(benchmark).Snapshot(), startedAt, DateTimeOffset.UtcNow,
                 trials: runs > 1 && snapshots.Count > 0 ? snapshots : null, abortReason: "cancelled", requestedTrials: runs > 1 ? runs : null, trialAggregationCompleted: completedRollup is not null,
-                emptyResults: !partialTrials.Any(p => p.HasCompletedResults)))
+                emptyResults: !partialTrials.Any(p => p.HasCompletedResults), complianceArtifacts: complianceArtifacts))
                 return ExitCodes.RuntimeError;
             return 1;
         }

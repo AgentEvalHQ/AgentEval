@@ -17,6 +17,32 @@ public sealed class NativeVerbIntegrationTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), "aef-native-" + Guid.NewGuid().ToString("N"));
 
+    private static Task<int> WithCapture(bool enabled, Func<Task<int>> invoke)
+    {
+        var command = new Command("test");
+        command.Options.Add(new Option<DirectoryInfo?>("--aef"));
+        var controls = new AefCliOptions(command);
+        return controls.InvokeAsync(command.Parse(["--aef-content", enabled ? "on" : "off"]), invoke);
+    }
+
+    private static List<JsonNode> ArtifactLines(string directory) => File.Exists(Path.Combine(directory, "evidence.ndjson"))
+        ? File.ReadAllLines(Path.Combine(directory, "evidence.ndjson")).Select(l => JsonNode.Parse(l)!)
+            .Where(l => (string?)l["kind"] == "compliance_artifact").ToList() : [];
+
+    private static void AssertArtifactBytes(string directory, byte[] expected)
+    {
+        var artifact = Assert.Single(ArtifactLines(directory));
+        var digest = "sha256:" + Convert.ToHexString(SHA256.HashData(expected)).ToLowerInvariant();
+        Assert.Equal(digest, (string?)artifact["link"]!["blob"]);
+        Assert.Contains(Directory.GetFiles(Path.Combine(directory, "blobs"), "*", SearchOption.AllDirectories),
+            path => File.ReadAllBytes(path).SequenceEqual(expected));
+        var id = (string)artifact["evidenceId"]!;
+        var references = File.ReadAllLines(Path.Combine(directory, "results.ndjson")).Select(l => JsonNode.Parse(l)!)
+            .Where(l => l["evidence"]?.AsArray().Any(e => (string?)e == id) == true).ToList();
+        Assert.NotEmpty(references);
+        Assert.All(references, line => Assert.Null(line["trial"]));
+    }
+
     public NativeVerbIntegrationTests() => Directory.CreateDirectory(_root);
 
     public void Dispose()
@@ -30,8 +56,12 @@ public sealed class NativeVerbIntegrationTests : IDisposable
                 if (!File.Exists(Path.Combine(source, "seal.json"))) continue;
                 var target = Path.Combine(fixtures, Path.GetFileName(source));
                 Directory.CreateDirectory(target);
-                foreach (var file in Directory.GetFiles(source))
-                    File.Copy(file, Path.Combine(target, Path.GetFileName(file)));
+                foreach (var file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
+                {
+                    var copy = Path.Combine(target, Path.GetRelativePath(source, file));
+                    Directory.CreateDirectory(Path.GetDirectoryName(copy)!);
+                    File.Copy(file, copy);
+                }
             }
         }
         Directory.Delete(_root, recursive: true);
@@ -248,8 +278,10 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
     }
 
-    [Fact]
-    public async Task BenchGdpr_FromEnvironment_UsesHttpTargetAndSealsLiveTrials()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task BenchGdpr_FromEnvironment_UsesHttpTargetAndSealsLiveTrials(bool capture)
     {
         await using var endpoint = await LocalChatEndpoint.StartAsync("I respect privacy and minimize personal data.");
         using var environment = new ProviderEnvironmentScope(
@@ -262,8 +294,8 @@ public sealed class NativeVerbIntegrationTests : IDisposable
             new JsonObject { ["schemaVersion"] = "1.0", ["id"] = Guid.NewGuid().ToString(), ["name"] = "http-test" }.ToJsonString());
         var aef = new DirectoryInfo(Path.Combine(_root, "gdpr-aef"));
 
-        var exit = await BenchCommand.RunGdprAsync("smoke", "http-subject", _root, "privacy question",
-            evaluatorOverride: new PassingEvaluator(), azureFromEnv: true, runs: 2, aef: aef, subjectVersion: "1");
+        var exit = await WithCapture(capture, () => BenchCommand.RunGdprAsync("smoke", "http-subject", _root, "privacy question",
+            evaluatorOverride: new PassingEvaluator(), azureFromEnv: true, runs: 2, aef: aef, subjectVersion: "1"));
 
         Assert.Equal(0, exit);
         Assert.NotEmpty(endpoint.Requests);
@@ -277,10 +309,16 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.Contains(lines, l => l["trial"] is not null);
         Assert.Contains(lines, l => l["trials"] is not null);
         Assert.DoesNotContain("I respect privacy", string.Concat(Directory.GetFiles(dir).Select(File.ReadAllText)));
+        var artifacts = ArtifactLines(dir);
+        Assert.Equal(capture ? 1 : 0, artifacts.Count);
+        if (capture) AssertArtifactBytes(dir, File.ReadAllBytes(Assert.Single(Directory.GetFiles(
+            Path.Combine(_root, ".agenteval", "compliance"), "gdpr-evidence.json", SearchOption.AllDirectories))));
     }
 
-    [Fact]
-    public async Task BenchOwasp_HttpTarget_WritesLiveEvidenceAndPreservesTheCommandExit()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task BenchScan_HttpTarget_WritesLiveEvidenceAndPreservesTheCommandExit(bool mitre)
     {
         await using var endpoint = await LocalChatEndpoint.StartAsync("I cannot assist with that request.");
         await using var judgeEndpoint = await LocalChatEndpoint.StartAsync("VERDICT: INCONCLUSIVE\nCONFIDENCE: 0.5\nREASON: test");
@@ -291,13 +329,18 @@ public sealed class NativeVerbIntegrationTests : IDisposable
             new JsonObject { ["schemaVersion"] = "1.0", ["id"] = Guid.NewGuid().ToString(), ["name"] = "http-test" }.ToJsonString());
         var aef = new DirectoryInfo(Path.Combine(_root, "bench-aef"));
 
-        var written = await BenchOwaspCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
-            judgeClientOverride: judge, aef: aef, agentIsLive: true);
+        async Task<int> Run(DirectoryInfo destination, bool noAef) => mitre
+            ? (await BenchMitreCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
+                judgeClientOverride: judge, aef: destination, noAef: noAef, agentIsLive: true)).ExitCode
+            : (await BenchOwaspCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
+                judgeClientOverride: judge, aef: destination, noAef: noAef, agentIsLive: true)).ExitCode;
+        var written = await Run(aef, false);
+        var reportBytes = File.ReadAllBytes(Assert.Single(Directory.GetFiles(
+            Path.Combine(_root, ".agenteval", "compliance"), "evidence.json", SearchOption.AllDirectories)));
         var notWritten = new DirectoryInfo(Path.Combine(_root, "disabled-aef"));
-        var disabled = await BenchOwaspCommand.RunAsync("smoke", agent.Name, _root, null, null, agent,
-            judgeClientOverride: judge, aef: notWritten, noAef: true, agentIsLive: true);
+        var disabled = await Run(notWritten, true);
 
-        Assert.Equal(disabled.ExitCode, written.ExitCode);
+        Assert.Equal(disabled, written);
         Assert.False(notWritten.Exists);
         Assert.NotEmpty(endpoint.Requests);
         Assert.NotEmpty(judgeEndpoint.Requests);
@@ -305,7 +348,8 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         AssertIntact(dir);
         Assert.Equal("live", (string?)Document(dir, "run.json")["execution"]!["targetMode"]);
         var gate = JsonNode.Parse(File.ReadAllLines(Path.Combine(dir, "gates.ndjson")).Single())!;
-        Assert.Equal(written.ExitCode, (int)gate["exitCode"]!);
+        Assert.Equal(written, (int)gate["exitCode"]!);
+        AssertArtifactBytes(dir, reportBytes);
         (agent as IDisposable)?.Dispose();
     }
 
@@ -471,11 +515,11 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         try
         {
             Console.SetOut(output);
-            var exit = euAiAct
-                ? await BenchEuAiActCommand.RunAsync("standard", "subject", _root, "question", evaluatorOverride: new PassingEvaluator(),
+            var exit = await WithCapture(true, () => euAiAct
+                ? BenchEuAiActCommand.RunAsync("standard", "subject", _root, "question", evaluatorOverride: new PassingEvaluator(),
                     responseText: "answer", runs: 2, ct: cancel.Token, aef: aef)
-                : await BenchCommand.RunGdprAsync("standard", "subject", _root, "question", evaluatorOverride: new PassingEvaluator(),
-                    responseText: "answer", runs: 2, ct: cancel.Token, aef: aef);
+                : BenchCommand.RunGdprAsync("standard", "subject", _root, "question", evaluatorOverride: new PassingEvaluator(),
+                    responseText: "answer", runs: 2, ct: cancel.Token, aef: aef));
             Assert.Equal(1, exit);
         }
         finally { Console.SetOut(original); }
@@ -488,6 +532,8 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!).ToList();
         Assert.Contains(lines, l => l["trials"] is not null && (string?)l["state"] == "passed");
         Assert.All(lines.Where(l => l["trials"] is not null), l => Assert.Equal(2, (int)l["trials"]!["n"]!));
+        AssertArtifactBytes(dir, File.ReadAllBytes(Assert.Single(Directory.GetFiles(
+            Path.Combine(_root, ".agenteval", "compliance"), euAiAct ? "eu-ai-act-evidence.json" : "gdpr-evidence.json", SearchOption.AllDirectories))));
     }
 
     private sealed class PassingEvaluator : AgentEval.Core.IEvaluator

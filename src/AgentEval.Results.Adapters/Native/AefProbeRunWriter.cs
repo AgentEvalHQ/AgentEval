@@ -50,6 +50,8 @@ public sealed record AefProbeRunOptions
 {
     /// <summary>Whether to persist observed content as evidence blobs; off by default.</summary>
     public AefContentCapture ContentCapture { get; init; } = AefContentCapture.Off;
+    /// <summary>Exact compliance reports linked to their observed root cases.</summary>
+    public IReadOnlyList<AefComplianceArtifact>? ComplianceArtifacts { get; init; }
     /// <summary>The subject's ref (<c>kind:name</c>, [ENC-13]).</summary>
     public required string SubjectRef { get; init; }
 
@@ -179,10 +181,12 @@ public static class AefProbeRunWriter
             }
 
             writer.SetMetrics(metrics);
+            var artifactLinks = AefComplianceArtifact.Write(writer, options.ComplianceArtifacts, options.ContentCapture, lines.Select(l => l.CaseId));
             var resultIds = new List<string>();
             foreach (var line in lines)
             {
-                resultIds.Add(writer.AddResult(AefNativeContent.Attach(writer, Line(line, options.JudgeModel, options.Lane),
+                resultIds.Add(writer.AddResult(AefNativeContent.Attach(writer, Line(line, options.JudgeModel, options.Lane) with
+                    { Evidence = artifactLinks.GetValueOrDefault(line.CaseId) },
                     options.ContentCapture == AefContentCapture.On ? line.Content : null)).ResultId);
             }
 

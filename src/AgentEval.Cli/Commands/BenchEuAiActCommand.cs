@@ -5,6 +5,7 @@
 using AgentEval.Benchmarks;
 using AgentEval.Core;
 using AgentEval.Evals;
+using AgentEval.Results.Adapters.Native;
 using AgentEval.Compliance.EuAiAct.Articles;
 using AgentEval.Compliance.EuAiAct.Articles.Building;
 using AgentEval.Compliance.EuAiAct.Articles.Loading;
@@ -218,6 +219,7 @@ public static class BenchEuAiActCommand
 
         var startedAt = DateTimeOffset.UtcNow;
         var partialTrials = new List<CompositeProgress>();
+        Func<IReadOnlyList<AefComplianceArtifact>>? complianceArtifacts = null;
         EvalResult? completedRollup = null;
         async Task<(string RunId, EvalResult Result)> RunTrial(CancellationToken token)
         {
@@ -284,6 +286,7 @@ public static class BenchEuAiActCommand
             var ts = evidence.Base.GeneratedAt.ToString("yyyy-MM-dd_HH-mm-ss");
             var outputDir = Path.Combine(agentEvalDir, "compliance", "EU-AI-Act", sanitizedSubject, ts);
             Directory.CreateDirectory(outputDir);
+            complianceArtifacts = () => ComplianceAef.Composite(Path.Combine(outputDir, "eu-ai-act-evidence.json"), evidence.Base, compositeResult, evidence);
 
             // Markdown report
             try
@@ -321,7 +324,7 @@ public static class BenchEuAiActCommand
                     : agentOverride is null || agentIsLive ? AgentEval.Results.Writing.AefTargetMode.Live
                     : AgentEval.Results.Writing.AefTargetMode.Mocked,
                 benchmark, compositeResult, startedAt, DateTimeOffset.UtcNow, exitCode: finalExit,
-                trials: trialResults);
+                trials: trialResults, complianceArtifacts: complianceArtifacts);
 
             // ── Exit code ─────────────────────────────────────────────────────────
             if (aefFailed)
@@ -342,7 +345,7 @@ public static class BenchEuAiActCommand
                     : AgentEval.Results.Writing.AefTargetMode.Mocked,
                 benchmark, completedRollup ?? snapshots.FirstOrDefault() ?? new CompositeProgress(benchmark).Snapshot(), startedAt, DateTimeOffset.UtcNow,
                 trials: runs > 1 && snapshots.Count > 0 ? snapshots : null, abortReason: "cancelled", requestedTrials: runs > 1 ? runs : null, trialAggregationCompleted: completedRollup is not null,
-                emptyResults: !partialTrials.Any(p => p.HasCompletedResults)))
+                emptyResults: !partialTrials.Any(p => p.HasCompletedResults), complianceArtifacts: complianceArtifacts))
                 return ExitCodes.RuntimeError;
             return 1;
         }

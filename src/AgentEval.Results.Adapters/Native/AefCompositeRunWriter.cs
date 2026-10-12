@@ -26,6 +26,8 @@ public sealed record AefCompositeRunOptions
 {
     /// <summary>Whether to persist evaluation details as evidence blobs; off by default.</summary>
     public AefContentCapture ContentCapture { get; init; } = AefContentCapture.Off;
+    /// <summary>Exact compliance reports linked to their observed root cases.</summary>
+    public IReadOnlyList<AefComplianceArtifact>? ComplianceArtifacts { get; init; }
     /// <summary>The subject's ref (<c>kind:name</c>, [ENC-13]).</summary>
     public required string SubjectRef { get; init; }
 
@@ -197,6 +199,7 @@ public static class AefCompositeRunWriter
                 },
             ]);
 
+            var artifactLinks = AefComplianceArtifact.Write(writer, options.ComplianceArtifacts, options.ContentCapture, cases.Select(c => c.Metric.Key));
             if (abortedTrials)
             {
                 var captured = new List<(AefResult Result, string? Parent)>();
@@ -209,7 +212,7 @@ public static class AefCompositeRunWriter
                         Add(writer, trialCases[i], caseShapes[i], trialCases[i].Metric.Key, CasePath, null, null, trial: t,
                             capture: (line, parent) => captured.Add((line, parent?.Path)), contentCapture: options.ContentCapture);
                 }
-                AddAbortedRollups(writer, captured);
+                AddAbortedRollups(writer, captured, artifactLinks);
             }
             else for (var i = 0; i < cases.Count; i++)
             {
@@ -221,7 +224,8 @@ public static class AefCompositeRunWriter
                 }
                 Add(writer, cases[i], caseShapes[i], cases[i].Metric.Key, CasePath, parent: null, component: null,
                     options.CaseExt is { } caseExt && caseExt.TryGetValue(cases[i].Metric.Key, out var ext) ? ext : null,
-                    trials: caseTrials, presetMeasured: presetMeasured, contentCapture: options.ContentCapture);
+                    trials: caseTrials, presetMeasured: presetMeasured, contentCapture: options.ContentCapture,
+                    artifactEvidence: artifactLinks.GetValueOrDefault(cases[i].Metric.Key));
             }
 
             if (options.AbortReason is null)
@@ -306,7 +310,8 @@ public static class AefCompositeRunWriter
     private static void Add(AefRunWriter writer, EvalResult node, AefComponentShape shape, string caseId, string path,
         AefResultHandle? parent, AefComponent? component, JsonObject? caseExt = null, int? trial = null,
         IReadOnlyList<EvalResult>? trials = null, bool presetMeasured = false,
-        Action<AefResult, AefResultHandle?>? capture = null, AefContentCapture contentCapture = AefContentCapture.Off)
+        Action<AefResult, AefResultHandle?>? capture = null, AefContentCapture contentCapture = AefContentCapture.Off,
+        IReadOnlyList<string>? artifactEvidence = null)
     {
         var subs = node.Details.SubResults ?? [];
         var state = StateOf(node.Score);
@@ -350,6 +355,7 @@ public static class AefCompositeRunWriter
         var llm = node.Provenance.Type == "atomic-llm" && !string.IsNullOrWhiteSpace(node.Provenance.JudgeModel);
         var line = new AefResult
         {
+            Evidence = artifactEvidence,
             CaseId = caseId,
             Path = path,
             Trial = trial,
@@ -394,7 +400,8 @@ public static class AefCompositeRunWriter
         }
     }
 
-    private static void AddAbortedRollups(AefRunWriter writer, List<(AefResult Result, string? Parent)> captured)
+    private static void AddAbortedRollups(AefRunWriter writer, List<(AefResult Result, string? Parent)> captured,
+        IReadOnlyDictionary<string, IReadOnlyList<string>> artifactLinks)
     {
         var groups = captured.GroupBy(x => (x.Result.CaseId, x.Result.Path)).ToList();
         var childCounts = groups.Where(g => g.First().Parent is not null)
@@ -409,7 +416,7 @@ public static class AefCompositeRunWriter
             var children = childCounts.GetValueOrDefault((group.Key.CaseId, group.Key.Path));
             var rollup = first.Result with
             {
-                Evidence = null,
+                Evidence = first.Parent is null ? artifactLinks.GetValueOrDefault(group.Key.CaseId) : null,
                 Reasoning = null,
                 Trial = null,
                 Trials = new AefTrials(group.Count(), group.Count(x => x.Result.State == AefState.Passed),

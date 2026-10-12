@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Native compliance artifacts:** GDPR/EU AI Act rich JSON reports (with content capture on) and OWASP/MITRE
+  content-free control summaries are attached byte-for-byte to matching AEF roots. Source-run binding rejects
+  overwritten reports; completed reports can remain attached when later rendering is cancelled.
+
 - **Opt-in native AEF content capture:** `--aef-content on|off` defaults to off. Eval inputs/expected answers/outputs,
   available probe content and composite evaluation details are stored in result-linked blobs only when enabled.
   Repeated and interrupted runs preserve content on observed trials without inventing content for synthetic rollups.
