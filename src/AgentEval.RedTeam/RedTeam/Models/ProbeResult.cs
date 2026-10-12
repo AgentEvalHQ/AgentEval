@@ -10,6 +10,14 @@ namespace AgentEval.RedTeam;
 /// </summary>
 public record ProbeResult
 {
+    /// <summary>Observed source of the verdict when explicitly reported; null means unknown.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public GradingProvenanceKind? GradedBy { get; init; }
+
+    /// <summary>Observed grading instrument digest, excluding case content; null when unknown.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public string? RubricDigest { get; init; }
+
     /// <summary>The probe ID that was executed.</summary>
     public required string ProbeId { get; init; }
 

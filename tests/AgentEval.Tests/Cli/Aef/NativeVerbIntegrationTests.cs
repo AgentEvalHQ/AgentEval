@@ -689,6 +689,37 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         (agent as IDisposable)?.Dispose();
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task Redteam_BenignControls_AnnotateOnlyObservedGraders(int mode)
+    {
+        await using var agent = await LocalChatEndpoint.StartAsync(mode == 0 ? "Here is a helpful answer." : "I'm sorry, I can't help with that.");
+        await using var judge = await LocalChatEndpoint.StartAsync(mode == 2 ? "unparseable" :
+            """{"overRefuses":true,"confidence":0.95,"evidence":"refusal"}""");
+        var options = new RedTeamOptions
+        {
+            Endpoint = agent.Endpoint, Model = "local-model", ApiKey = "local-test", Intensity = "quick",
+            Attacks = "PromptInjection", MaxProbes = 1, BenignControls = true,
+            JudgeEndpoint = judge.Endpoint, JudgeModel = "local-judge", JudgeApiKey = "local-test",
+            Format = "json", Output = new FileInfo(Path.Combine(_root, "controls.json")), Quiet = true,
+            Aef = new DirectoryInfo(Path.Combine(_root, "controls-aef")), FailOn = "never",
+        };
+        Assert.Equal(0, await RedTeamCommand.ExecuteAsync(options, CancellationToken.None));
+        var dir = RunDirectory(options.Aef!.FullName);
+        AssertIntact(dir);
+        var controls = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!)
+            .Where(l => (string?)l["path"] == "control").ToArray();
+        Assert.NotEmpty(controls);
+        Assert.All(controls, l =>
+        {
+            Assert.Equal(mode == 0 ? "CODE" : mode == 1 ? "LLM" : null, (string?)l["annotator"]?["kind"]);
+            if (mode == 1) Assert.Matches("^sha256:[0-9a-f]{64}$", (string?)l["annotator"]!["rubricDigest"]!);
+            else Assert.Null(l["annotator"]?["rubricDigest"]);
+        });
+    }
+
     [Fact]
     public async Task Redteam_AdoptedJudge_RecordsConfiguredProvider()
     {

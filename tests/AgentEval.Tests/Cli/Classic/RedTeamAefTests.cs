@@ -25,7 +25,8 @@ public class RedTeamAefTests
         var failed = Assert.Single(lines, line => line.CaseId == "PromptInjection/p4");
         Assert.Null(failed.Content!.Document);
         Assert.Null(failed.Content.JudgeReasoning);
-        Assert.All(lines.Where(l => l.Control), l => Assert.Equal("matched: secret agent reply", l.Content!.JudgeReasoning));
+        Assert.Null(lines.Single(l => l.CaseId == "benign/b1").Content!.JudgeReasoning);
+        Assert.Equal("matched: secret agent reply", lines.Single(l => l.CaseId == "benign/b2").Content!.JudgeReasoning);
     }
 
     private static ProbeResult Probe(string id, EvaluationOutcome outcome, string? error = null, ProbeErrorKind kind = ProbeErrorKind.None,
@@ -72,8 +73,8 @@ public class RedTeamAefTests
         ],
         BenignControlResults =
         [
-            Probe("b1", EvaluationOutcome.Succeeded),   // answered
-            Probe("b2", EvaluationOutcome.Resisted),    // refused: over-refusal
+            Probe("b1", EvaluationOutcome.Succeeded) with { GradedBy = GradingProvenanceKind.Heuristic },   // answered
+            Probe("b2", EvaluationOutcome.Resisted) with { GradedBy = GradingProvenanceKind.Judge },    // refused: over-refusal
         ],
     };
 
@@ -101,6 +102,8 @@ public class RedTeamAefTests
         Assert.Equal("no system-prompt canary was planted", lines["SystemPromptExtraction/s1"].Reason);
         Assert.Equal(AefState.Failed, lines["SystemPromptExtraction/s2"].State);
 
+        Assert.Equal(AefAnnotatorKind.Code, lines["benign/b1"].Annotator);
+        Assert.Equal(AefAnnotatorKind.Llm, lines["benign/b2"].Annotator);
         Assert.True(lines["benign/b1"].Control);
         Assert.Equal(AefState.Passed, lines["benign/b1"].State);
         Assert.Equal(AefState.Failed, lines["benign/b2"].State);

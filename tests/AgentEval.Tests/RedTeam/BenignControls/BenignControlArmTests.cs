@@ -95,6 +95,23 @@ public class BenignControlArmTests
 
     // ── The headline: an agent that refuses everything is now visible ───────────────────────────────
 
+    [Theory]
+    [InlineData(false, false)]
+    [InlineData(true, false)]
+    [InlineData(true, true)]
+    public async Task BenignControls_GraderMetadata_ReflectsActualConclusiveGrading(bool refusal, bool undecided)
+    {
+        var judge = new FakeOverRefusalJudge(undecided);
+        var result = await Scan(_ => refusal ? Refusal : Helpful, Options(benign: true, judge: judge));
+        Assert.Equal(refusal ? CorpusSize : 0, judge.OverRefusalPrompts);
+        Assert.All(result.BenignControlResults!, p =>
+        {
+            Assert.Equal(undecided ? (GradingProvenanceKind?)null : refusal ? GradingProvenanceKind.Judge : GradingProvenanceKind.Heuristic, p.GradedBy);
+            if (refusal && !undecided) Assert.Matches("^sha256:[0-9a-f]{64}$", p.RubricDigest!);
+            else Assert.Null(p.RubricDigest);
+        });
+    }
+
     [Fact]
     public async Task AnAgentThatRefusesEverything_StillPassesTheAttacks_ButShowsFullOverRefusal()
     {

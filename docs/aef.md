@@ -242,7 +242,10 @@ Native probe judge headers and annotators retain the full digest of the actual L
 user template. Built-in template versions and custom template text are distinguished; CRLF is normalized.
 Probe prompts, responses, identifiers and returned rationale are excluded. Different attack-family rubrics
 remain separate header entries for the same model. A discarded judge verdict does not supply the keyword
-verdict's rubric; unknown instruments (including separate control graders) remain absent.
+verdict's rubric; unknown instruments remain absent.
+Benign controls record CODE when the refusal prefilter answers without a model call. Conclusive over-refusal
+judge verdicts record LLM and the digest of that rubric's template with its response slot empty. Undecided
+control grading does not claim a grader or rubric; its actual model usage remains separately accounted for.
 
 Native composite judge headers include a full rubric digest when the evaluation records one. Atomic LLM and
 decision evaluations compute it from their existing instrument material, preserving the legacy 16-character

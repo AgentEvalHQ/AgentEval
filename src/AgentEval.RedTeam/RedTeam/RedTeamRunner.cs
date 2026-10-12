@@ -584,7 +584,9 @@ public sealed class RedTeamRunner : IRedTeamRunner
                 Severity = attackSeverity,
                 Fidelity = fidelity,
                 Surface = probe.Surface,
-                Grading = grading
+                Grading = grading,
+                GradedBy = evalResult.GradedBy,
+                RubricDigest = evalResult.RubricDigest,
             };
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

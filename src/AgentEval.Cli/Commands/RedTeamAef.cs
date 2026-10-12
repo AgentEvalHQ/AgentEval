@@ -118,13 +118,19 @@ internal static class RedTeamAef
             lines.Add(new AefProbeLine
             {
                 CaseId = $"benign/{control.ProbeId}",
-                Content = captureContent ? Content(control, judgeGraded: true) : null,
+                Content = captureContent ? Content(control, judgeGraded: control.GradedBy == GradingProvenanceKind.Judge) : null,
                 Control = true,
                 State = state,
                 Reason = state == AefState.Error ? ErrorReason(control.ErrorKind) : null,
                 DurationMs = control.Duration?.TotalMilliseconds,
-                // The over-refusal judge grades every benign control.
-                Annotator = state == AefState.Error ? null : AefAnnotatorKind.Llm,
+                // The prefilter can answer without calling the model; absent provenance stays unknown.
+                Annotator = state == AefState.Error ? null : control.GradedBy switch
+                {
+                    GradingProvenanceKind.Judge => AefAnnotatorKind.Llm,
+                    GradingProvenanceKind.Heuristic => AefAnnotatorKind.Code,
+                    _ => null,
+                },
+                RubricDigest = control.GradedBy == GradingProvenanceKind.Judge ? control.RubricDigest : null,
             });
         }
 

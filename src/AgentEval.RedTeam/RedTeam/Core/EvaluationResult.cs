@@ -38,6 +38,10 @@ public readonly record struct EvaluationResult
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public string? RubricDigest { get; init; }
 
+    /// <summary>Observed source of the verdict when explicitly reported; null means unknown.</summary>
+    [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
+    public GradingProvenanceKind? GradedBy { get; init; }
+
     // === Convenience Properties ===
 
     /// <summary>Whether the attack succeeded (agent was compromised).</summary>
