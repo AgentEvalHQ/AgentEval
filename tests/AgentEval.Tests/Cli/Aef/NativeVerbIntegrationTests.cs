@@ -506,6 +506,46 @@ public sealed class NativeVerbIntegrationTests : IDisposable
         Assert.DoesNotContain("secret", string.Concat(Directory.GetFiles(dir).Select(File.ReadAllText)));
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    public async Task Eval_CancelDuringNamedMetric_RetainsCaseUsageWithoutInventingVerdict(int completedMetrics)
+    {
+        using var meter = AgentEval.Cli.Infrastructure.CliUsageMeter.Begin();
+        using var cancel = new CancellationTokenSource();
+        var calls = 0;
+        await using var endpoint = await LocalChatEndpoint.StartAsync(async (_, requestCancelled) =>
+        {
+            var call = Interlocked.Increment(ref calls);
+            if (call <= 2) return "Hi";
+            if (call <= 2 + completedMetrics) return """{"score":95,"addressesQuestion":true,"reasoning":"secret explanation"}""";
+            cancel.Cancel();
+            await Task.Delay(Timeout.InfiniteTimeSpan, requestCancelled);
+            return "unreachable";
+        });
+        var options = Options(endpoint.Endpoint, count: 2, metrics: "llm_relevance");
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => EvalCommand.ExecuteAsync(options, cancel.Token));
+        var dir = RunDirectory(options.Aef!.FullName);
+        AssertIntact(dir);
+        Assert.Equal("aborted", (string?)Document(dir, "run.json")["status"]);
+        Assert.Equal("cancelled", (string?)Document(dir, "run.json")["abortReason"]);
+        var lines = File.ReadAllLines(Path.Combine(dir, "results.ndjson")).Select(l => JsonNode.Parse(l)!).ToArray();
+        var roots = lines.Where(l => (string?)l["path"] == "case").ToArray();
+        Assert.Equal(2, roots.Length);
+        Assert.All(roots, root => Assert.Equal(10, (long)Assert.Single(root["usage"]!.AsArray(),
+            u => (string?)u!["role"] == "agent")!["gen_ai.usage.input_tokens"]!));
+        var interrupted = Assert.Single(roots, root => (string?)root["caseId"] == "c" + completedMetrics);
+        var unknown = Assert.Single(interrupted["usage"]!.AsArray(), u => (string?)u!["role"] == "judge")!;
+        Assert.Null(unknown["gen_ai.usage.input_tokens"]);
+        Assert.Null(unknown["costUsd"]);
+        Assert.Equal(completedMetrics, lines.Count(l => (string?)l["path"] == "case/metrics/llm_relevance"));
+        var summary = Document(dir, "summary.json")["usage"]!.AsArray();
+        Assert.Equal(20, (long)Assert.Single(summary, u => (string?)u!["role"] == "agent")!["gen_ai.usage.input_tokens"]!);
+        Assert.Null(Assert.Single(summary, u => (string?)u!["role"] == "judge")!["gen_ai.usage.input_tokens"]);
+        Assert.False(File.Exists(Path.Combine(dir, "gates.ndjson")));
+        Assert.DoesNotContain("secret", string.Concat(Directory.GetFiles(dir).Select(File.ReadAllText)));
+    }
+
     [Fact]
     public async Task Eval_NamedMetric_WritesChildWithoutChangingHarnessGate()
     {

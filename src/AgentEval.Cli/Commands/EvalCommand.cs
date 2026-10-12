@@ -469,8 +469,16 @@ internal static class EvalCommand
                 {
                     using var usageAttribution = CliUsageMeter.Attribute(AefUsageRole.Judge, caseIds[i]);
                     var metricsContext = ToMetricsContext(testCases[i], summary.Results[i]);
-                    summary.Results[i].MetricResults = await metricRunner.EvaluateAsync(selectedMetrics!, metricsContext, ct);
-                    evidence.AddMetrics(caseIds[i], summary.Results[i].MetricResults!);
+                    try
+                    {
+                        summary.Results[i].MetricResults = await metricRunner.EvaluateAsync(selectedMetrics!, metricsContext, ct);
+                        evidence.AddMetrics(caseIds[i], summary.Results[i].MetricResults!);
+                    }
+                    finally
+                    {
+                        // A started metric call belongs to this case even if it supplies no final usage report.
+                        evidence.UpdateCaseUsage(caseIds[i]);
+                    }
                 }
             }
 

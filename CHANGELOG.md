@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Interrupted metric usage:** eval refreshes case usage even when a named metric throws or is cancelled.
+  Completed agent counts remain visible; an interrupted judge call stays unknown without a fabricated verdict.
+
 - **Per-case eval usage:** single-run eval case roots retain scoped agent and judge usage, including
   subsequent named-metric calls, without repeating it on metric children. Completed-case counts survive
   cancellation while incomplete run totals remain unknown. Interrupted streams retain observed model identity.

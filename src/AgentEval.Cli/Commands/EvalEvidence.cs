@@ -60,8 +60,13 @@ internal sealed class EvalEvidence : IDisposable
         try
         {
             _session?.AddMetrics(caseId, metrics);
-            _session?.UpdateCaseUsage(caseId, AgentEval.Cli.Infrastructure.CliUsageMeter.ForCase(caseId));
         }
+        catch (Exception ex) when (IsWriteFailure(ex)) { Failed(ex); }
+    }
+
+    public void UpdateCaseUsage(string caseId)
+    {
+        try { _session?.UpdateCaseUsage(caseId, AgentEval.Cli.Infrastructure.CliUsageMeter.ForCase(caseId)); }
         catch (Exception ex) when (IsWriteFailure(ex)) { Failed(ex); }
     }
 
