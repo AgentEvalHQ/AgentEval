@@ -44,7 +44,7 @@ internal static class BenchAef
                     ? new AefUsage { Role = AefUsageRole.Judge, Model = judgeModel, InputTokens = judgeLedger.InputTokens, OutputTokens = judgeLedger.OutputTokens }
                     : null,
             }, scan.StartedAt, DateTimeOffset.UtcNow);
-            Console.Error.WriteLine($"AEF run: {directory} (run hash {runHash[..12]}...)");
+            Console.Error.WriteLine($"AEF run: {directory} ({(runHash is null ? "unsealed" : $"run hash {runHash[..12]}...")})");
             return false;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
@@ -207,7 +207,7 @@ internal static class BenchAef
                     ? AefCompositeRunWriter.WriteAbortedTrials(Path.Combine(root, "runs"), trials, shape, options, startedAt, endedAt)
                     : AefCompositeRunWriter.WriteTrials(Path.Combine(root, "runs"), result, trials,
                         shape, options, startedAt, endedAt);
-            Console.Error.WriteLine($"AEF run: {directory} (run hash {runHash[..12]}...)");
+            Console.Error.WriteLine($"AEF run: {directory} ({(runHash is null ? "unsealed" : $"run hash {runHash[..12]}...")})");
             return false;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)

@@ -45,7 +45,7 @@ internal sealed class EvalEvidence : IDisposable
             if (_session is not null)
             {
                 var (directory, hash) = _session.Complete(DateTimeOffset.UtcNow, gate, abortReason, _judgeUsage());
-                if (!_options.Quiet) Console.Error.WriteLine($"  AEF run: {directory} (run hash {hash[..12]}…)");
+                if (!_options.Quiet) Console.Error.WriteLine($"  AEF run: {directory} ({(hash is null ? "unsealed" : $"run hash {hash[..12]}…")})");
                 _session.Dispose();
                 _session = null;
             }

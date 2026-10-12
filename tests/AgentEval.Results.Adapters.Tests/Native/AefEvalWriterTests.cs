@@ -163,6 +163,7 @@ public sealed class AefEvalWriterTests : IDisposable
         var verification = AefRunVerifier.Verify(dir);
         Assert.Equal(AefOutcome.Intact, verification.Outcome);
         Assert.Empty(verification.Problems);
+        Assert.NotNull(runHash);
         Assert.Equal(64, runHash.Length);
         if (AefTestRuns.ReferenceVerify(dir) is { } reference)
         {

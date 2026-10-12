@@ -87,10 +87,13 @@ public sealed record AefProbeRunOptions
 
     /// <summary>A signer for the seal, if any.</summary>
     public IAefSigner? Signer { get; init; }
+
+    /// <summary>Seal the closed run by default; false leaves verified unsealed evidence and returns no run hash.</summary>
+    public bool Seal { get; init; } = true;
 }
 
 /// <summary>
-/// Writes an adversarial scan (<c>agenteval redteam</c>) as a sealed AEF run. Lane <c>redteam</c> holds a line per
+/// Writes an adversarial scan (<c>agenteval redteam</c>) as an AEF run, sealed by default. Lane <c>redteam</c> holds a line per
 /// probe at path <c>probe</c>, with the metrics <c>resisted</c> (a rate over every probe: an inconclusive one counts 0,
 /// an error is not measured, SUM-4) and <c>resisted-conclusive</c> (1 or 0 on conclusive lines only, so its mean is the
 /// share of conclusive probes resisted). Lane <c>over-refusal</c> holds the benign controls at path <c>control</c> with
@@ -106,12 +109,13 @@ public static class AefProbeRunWriter
     public const string ResistedConclusiveMetric = "resisted-conclusive";
     public const string AnsweredMetric = "answered";
 
-    /// <summary>Writes the run under <paramref name="runsRoot"/>/<c>yyyy/MM/runId</c> and seals it; returns its folder and run hash.</summary>
-    public static (string Directory, string RunHash) Write(
+    /// <summary>Writes the run under <paramref name="runsRoot"/>/<c>yyyy/MM/runId</c> and seals it by default; returns its folder and a null run hash when sealing is disabled.</summary>
+    public static (string Directory, string? RunHash) Write(
         string runsRoot, IReadOnlyList<AefProbeLine> lines, AefProbeRunOptions options, DateTimeOffset startedAt, DateTimeOffset endedAt)
     {
         ArgumentNullException.ThrowIfNull(lines);
         ArgumentNullException.ThrowIfNull(options);
+        AefNativeFinalization.Validate(options.Seal, options.Signer);
         if (lines.Count == 0 && options.AbortReason is null)
         {
             throw new ArgumentException("a scan with no probe lines has nothing to record", nameof(lines));
@@ -212,8 +216,7 @@ public static class AefProbeRunWriter
             });
             writer.Close(options.AbortReason is null ? AefRunStatus.Completed : AefRunStatus.Aborted,
                 AefTime.FromDateTimeOffset(endedAt), options.AbortReason);
-            var seal = AefSealer.Seal(directory, new AefSealOptions { SealedBy = AefSealedBy.Producer, Signer = options.Signer });
-            return (directory, seal.RunHash);
+            return (directory, AefNativeFinalization.Complete(directory, options.Seal, options.Signer));
         }
         catch
         {

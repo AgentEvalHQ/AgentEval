@@ -878,7 +878,7 @@ internal static class RedTeamCommand
                 ProbesNotRun = result.SkippedProbes,
             }, result.StartedAt, DateTimeOffset.UtcNow);
             if (!opts.Quiet)
-                Console.Error.WriteLine($"  AEF run: {directory} (run hash {runHash[..12]}...)");
+                Console.Error.WriteLine($"  AEF run: {directory} ({(runHash is null ? "unsealed" : $"run hash {runHash[..12]}...")})");
             return false;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)

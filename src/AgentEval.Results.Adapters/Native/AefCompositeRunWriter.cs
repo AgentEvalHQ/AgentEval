@@ -42,6 +42,9 @@ public sealed record AefCompositeRunOptions
     /// <summary>A signer for the seal, if any.</summary>
     public IAefSigner? Signer { get; init; }
 
+    /// <summary>Seal the closed run by default; false leaves verified unsealed evidence and returns no run hash.</summary>
+    public bool Seal { get; init; } = true;
+
     /// <summary>The command's final decision, if this benchmark applies a gate ([GATE-1]).</summary>
     public AefCommandGate? Gate { get; init; }
 
@@ -59,7 +62,7 @@ public sealed record AefCompositeRunOptions
 }
 
 /// <summary>
-/// Writes a composite benchmark (a preset's <c>EvalResult</c> tree) as a sealed AEF run (S1 #5a). Each of the preset's
+/// Writes a composite benchmark (a preset's <c>EvalResult</c> tree) as an AEF run, sealed by default (S1 #5a). Each of the preset's
 /// top-level components is a case: its root at path <c>case</c>, case id the component's key; its parts at
 /// <c>case/&lt;key&gt;/…</c>. States come from each score's measurement and label, as §7.5 reads them; a composite records
 /// its strategy, threshold, score, how many parts were measured, and the rule that decided it with the parts that did
@@ -74,23 +77,24 @@ public static class AefCompositeRunWriter
     /// <summary>Case scores supplied to the preset's own aggregation, distinct from their arithmetic mean.</summary>
     public const string PresetScoreMetric = "preset-score";
 
-    /// <summary>Writes the run under <paramref name="runsRoot"/>/<c>yyyy/MM/runId</c> and seals it; returns its folder and run hash.</summary>
-    public static (string Directory, string RunHash) Write(
+    /// <summary>Writes the run under <paramref name="runsRoot"/>/<c>yyyy/MM/runId</c> and seals it by default; returns its folder and a null run hash when sealing is disabled.</summary>
+    public static (string Directory, string? RunHash) Write(
         string runsRoot, EvalResult preset, AefComponentShape shape, AefCompositeRunOptions options,
         DateTimeOffset startedAt, DateTimeOffset endedAt) =>
         WriteCore(runsRoot, preset, shape, options, startedAt, endedAt, null);
 
     /// <summary>Writes an aborted run with no result lines when evaluation produced no completed node.</summary>
-    public static (string Directory, string RunHash) WriteAbortedEmpty(
+    public static (string Directory, string? RunHash) WriteAbortedEmpty(
         string runsRoot, EvalResult preset, AefCompositeRunOptions options, DateTimeOffset startedAt, DateTimeOffset endedAt)
     {
         ArgumentNullException.ThrowIfNull(options);
+        AefNativeFinalization.Validate(options.Seal, options.Signer);
         if (options.AbortReason is null) throw new ArgumentException("An empty aborted run requires an abort reason.", nameof(options));
         return WriteCore(runsRoot, preset, Undescribed, options, startedAt, endedAt, null, emptyResults: true);
     }
 
     /// <summary>Writes each repeated preset tree and its caller-computed majority-vote rollup, preserving trial parentage.</summary>
-    public static (string Directory, string RunHash) WriteTrials(
+    public static (string Directory, string? RunHash) WriteTrials(
         string runsRoot, EvalResult rollup, IReadOnlyList<EvalResult> trials, AefComponentShape shape,
         AefCompositeRunOptions options, DateTimeOffset startedAt, DateTimeOffset endedAt)
     {
@@ -105,12 +109,13 @@ public static class AefCompositeRunWriter
     /// Preserves interrupted trials, including differing leaf breakdowns. Every observed path receives an error
     /// rollup with exact trial counts; an interrupted invocation makes no aggregate verdict.
     /// </summary>
-    public static (string Directory, string RunHash) WriteAbortedTrials(
+    public static (string Directory, string? RunHash) WriteAbortedTrials(
         string runsRoot, IReadOnlyList<EvalResult> trials, AefComponentShape shape,
         AefCompositeRunOptions options, DateTimeOffset startedAt, DateTimeOffset endedAt)
     {
         ArgumentNullException.ThrowIfNull(trials);
         ArgumentNullException.ThrowIfNull(options);
+        AefNativeFinalization.Validate(options.Seal, options.Signer);
         if (trials.Count == 0) throw new ArgumentException("At least one started trial is required.", nameof(trials));
         if (options.AbortReason is null) throw new ArgumentException("An aborted trial run requires an abort reason.", nameof(options));
         var preset = trials[0] with
@@ -120,7 +125,7 @@ public static class AefCompositeRunWriter
         return WriteCore(runsRoot, preset, shape, options, startedAt, endedAt, trials, abortedTrials: true);
     }
 
-    private static (string Directory, string RunHash) WriteCore(
+    private static (string Directory, string? RunHash) WriteCore(
         string runsRoot, EvalResult preset, AefComponentShape shape, AefCompositeRunOptions options,
         DateTimeOffset startedAt, DateTimeOffset endedAt, IReadOnlyList<EvalResult>? trials, bool abortedTrials = false,
         bool emptyResults = false)
@@ -128,6 +133,7 @@ public static class AefCompositeRunWriter
         ArgumentNullException.ThrowIfNull(preset);
         ArgumentNullException.ThrowIfNull(shape);
         ArgumentNullException.ThrowIfNull(options);
+        AefNativeFinalization.Validate(options.Seal, options.Signer);
         // The preset's parts are the cases. A result without parts is one case, itself. Without a definition (a family
         // that builds its result itself, such as bench perf) each case's parts are recorded beside its verdict (Own).
         var single = (preset.Details.SubResults ?? []).Count == 0;
@@ -256,8 +262,7 @@ public static class AefCompositeRunWriter
             });
             writer.Close(options.AbortReason is null ? AefRunStatus.Completed : AefRunStatus.Aborted,
                 AefTime.FromDateTimeOffset(endedAt), options.AbortReason);
-            var seal = AefSealer.Seal(directory, new AefSealOptions { SealedBy = AefSealedBy.Producer, Signer = options.Signer });
-            return (directory, seal.RunHash);
+            return (directory, AefNativeFinalization.Complete(directory, options.Seal, options.Signer));
         }
         catch
         {

@@ -67,15 +67,18 @@ public sealed record AefEvalRunOptions
 
     /// <summary>A signer for the seal, if any.</summary>
     public IAefSigner? Signer { get; init; }
+
+    /// <summary>Seal the closed run by default; false leaves verified unsealed evidence and returns no run hash.</summary>
+    public bool Seal { get; init; } = true;
 }
 
 /// <summary>
-/// Writes an <c>agenteval eval</c> run as a sealed AEF run: one root line per case at path <c>case</c> in lane
+/// Writes an <c>agenteval eval</c> run as an AEF run, sealed by default: one root line per case at path <c>case</c> in lane
 /// <c>eval</c>, with the metrics <c>pass</c> and <c>score</c> and a summary over them. A case's judge criteria and
 /// assertions are its children, at <c>case/criteria/&lt;n&gt;</c> and <c>case/assertions/&lt;n&gt;</c> (1-based), recorded beside
 /// its own verdict (<c>Own</c>, §7.5). Named metrics are children at <c>case/metrics/&lt;name&gt;</c>.
 /// A case run several times (<c>--runs</c>) has one line per trial and a rollup line
-/// ([RES-8]), without children. The run is AgentEval's own (no <c>imported</c>), sealed by its producer.
+/// ([RES-8]), without children. The run is AgentEval's own (no <c>imported</c>), sealed by its producer by default.
 /// </summary>
 public static partial class AefEvalWriter
 {
@@ -108,7 +111,7 @@ public static partial class AefEvalWriter
         return new AefEvalCase(root, children, metrics);
     }
 
-    /// <summary>Writes the run under <paramref name="runsRoot"/>/<c>yyyy/MM/runId</c> and seals it; returns its folder and run hash.</summary>
+    /// <summary>Writes the run under <paramref name="runsRoot"/>/<c>yyyy/MM/runId</c> and seals it by default; returns its folder and a null run hash when sealing is disabled.</summary>
     /// <param name="passingScores">Each case's passing score, the threshold of its own verdict; null records none.</param>
     /// <param name="runsRoot">The root folder for runs.</param>
     /// <param name="summary">The completed evaluation results.</param>
@@ -116,7 +119,7 @@ public static partial class AefEvalWriter
     /// <param name="options">Run identity and recording options.</param>
     /// <param name="startedAt">When evaluation started.</param>
     /// <param name="endedAt">When evaluation and its gate decision finished.</param>
-    public static (string Directory, string RunHash) Write(
+    public static (string Directory, string? RunHash) Write(
         string runsRoot, TestSummary summary, IReadOnlyList<string> caseIds, AefEvalRunOptions options,
         DateTimeOffset startedAt, DateTimeOffset endedAt, IReadOnlyList<int>? passingScores = null)
     {
@@ -133,7 +136,7 @@ public static partial class AefEvalWriter
     /// Writes a run whose cases each ran <c>n</c> times: a line per trial (<c>trial</c> 0 to n − 1) and a rollup per case
     /// with <c>trials</c>, under <c>AtLeast</c> with <paramref name="requirePasses"/> ([RES-8], [RUN-8]).
     /// </summary>
-    public static (string Directory, string RunHash) WriteTrials(
+    public static (string Directory, string? RunHash) WriteTrials(
         string runsRoot, IReadOnlyList<IReadOnlyList<TestResult>> trials, IReadOnlyList<string> caseIds, int requirePasses,
         AefEvalRunOptions options, DateTimeOffset startedAt, DateTimeOffset endedAt)
     {
@@ -173,7 +176,7 @@ public static partial class AefEvalWriter
     }
 
     /// <summary>Seals the completed trials of an interrupted run, retaining its original execution policy.</summary>
-    public static (string Directory, string RunHash) WriteAbortedTrials(
+    public static (string Directory, string? RunHash) WriteAbortedTrials(
         string runsRoot, IReadOnlyList<IReadOnlyList<TestResult>> trials, IReadOnlyList<string> caseIds,
         int plannedTrials, int requirePasses, AefEvalRunOptions options, DateTimeOffset startedAt, DateTimeOffset endedAt)
     {
@@ -187,7 +190,7 @@ public static partial class AefEvalWriter
         return WriteRun(runsRoot, trials, caseIds, requirePasses, options, startedAt, endedAt, plannedTrials: plannedTrials);
     }
 
-    private static (string Directory, string RunHash) WriteRun(
+    private static (string Directory, string? RunHash) WriteRun(
         string runsRoot, IReadOnlyList<IReadOnlyList<TestResult>> cases, IReadOnlyList<string> caseIds, int? requirePasses,
         AefEvalRunOptions options, DateTimeOffset startedAt, DateTimeOffset endedAt, IReadOnlyList<int>? passingScores = null,
         int? plannedTrials = null)

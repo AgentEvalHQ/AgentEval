@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Native AEF adapters can leave closed evidence unsealed:** set `Seal = false` on eval, probe or composite
+  run options for a host to seal later. The writer verifies the closed evidence and returns a null run hash;
+  combining this mode with a signer is rejected before creating a run. Default sealing is unchanged.
+
 - **Explicit AEF input errors:** `AefInputException` identifies recognized writer, sealer, summary and job
   input refusals. The conformance driver's write boundary no longer treats arbitrary argument or operation
   exceptions as invalid input; callback bugs and post-write verification failures remain unexpected failures.

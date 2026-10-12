@@ -39,6 +39,7 @@ public static partial class AefEvalWriter
         internal Session(string runsRoot, AefEvalRunOptions options, DateTimeOffset startedAt, int? plannedTrials, int? requirePasses)
         {
             ArgumentNullException.ThrowIfNull(options);
+            AefNativeFinalization.Validate(options.Seal, options.Signer);
             if ((plannedTrials is null) != (requirePasses is null)
                 || plannedTrials is < 1 or > 1000 || requirePasses is < 1 || requirePasses > plannedTrials)
                 throw new ArgumentException("A trial run requires 1 to 1000 planned trials and a pass count within that range.");
@@ -98,7 +99,7 @@ public static partial class AefEvalWriter
             }
         }
 
-        /// <summary>The running or sealed run folder.</summary>
+        /// <summary>The run folder, whether running, closed or sealed.</summary>
         public string Directory => _folder.Directory;
 
         /// <summary>Appends a completed case, or the next completed trial of that case, to disk.</summary>
@@ -168,8 +169,8 @@ public static partial class AefEvalWriter
             _rolledUp.Add(caseId);
         }
 
-        /// <summary>Closes and seals the run, with final command decision and judge usage if known.</summary>
-        public (string Directory, string RunHash) Complete(DateTimeOffset endedAt, AefCommandGate? gate = null,
+        /// <summary>Closes the run and seals it by default, with final command decision and judge usage if known. An unsealed run returns no hash.</summary>
+        public (string Directory, string? RunHash) Complete(DateTimeOffset endedAt, AefCommandGate? gate = null,
             string? abortReason = null, AefUsage? judgeUsage = null)
         {
             EnsureOpen();
@@ -218,9 +219,7 @@ public static partial class AefEvalWriter
             });
             _writer.Close(options.AbortReason is null ? AefRunStatus.Completed : AefRunStatus.Aborted,
                 AefTime.FromDateTimeOffset(endedAt), options.AbortReason);
-            var seal = AefSealer.Seal(_folder.Directory, new AefSealOptions { SealedBy = AefSealedBy.Producer, Signer = options.Signer });
-
-            return (_folder.Directory, seal.RunHash);
+            return (_folder.Directory, AefNativeFinalization.Complete(_folder.Directory, options.Seal, options.Signer));
         }
 
         private void EnsureOpen()
